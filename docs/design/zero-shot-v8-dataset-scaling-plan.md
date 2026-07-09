@@ -110,10 +110,10 @@ A100 単一 GPU への移行に伴う **P0 最適化フラグ** をまとめて�
 --language-balanced-sampling                     # ja/en 話者比 >> pt 30 話者のため必須
 --num-workers 8                                  # A100 host は 32 vCPU、v7 の 2 では GPU 待ち
 --val-every-n-epochs 5                           # SCL/DINO 込み val は G+D full forward、頻度低下
---compile --compile-mode reduce-overhead         # torch.compile (Plan A で mode/dynamic を CLI 化)
---no-compile-dynamic                             # length_bucketing で shape 固定化 → CUDA Graph capture 有効化
---enable-length-bucketing                        # 話者スロット内で phoneme_length ソート、padding 削減 (Plan A 実装 3/4)
+--compile --compile-mode reduce-overhead         # torch.compile (§3.5 でリベンチ後 default 維持)
 --no-wavlm                                       # v7 継承 (VRAM 節約 & WavLM 経路 P0 未実装)
+# --enable-length-bucketing / --no-compile-dynamic は §3.5 の 300 batch A/B で
+# +34% の逆効果を実測、 v8 本走では **使わない**
 ```
 
 **削除したフラグ (v7 コマンドから)**:
@@ -265,6 +265,69 @@ Plan A 反映後の初 GPU 実行で 2 つのバグを発見し、 修正済 (�
 - memcpy 合計 10.7% は tmpfs preload / mmap で削減可能 (§3.3 未実装項目参照)
 - **nchw↔nhwc 変換 12.8% は無視できない**、 v8 完走後の Plan B で `torch.channels_last`
   移行を検討する価値あり
+
+### 3.5 300 batch A/B 再測定 + real config 実測 (2026-07-09 追試)
+
+前 §3.4 の 40 batch A/B は warmup 支配で判断保留としていたが、 **300 batch まで延長** して
+cudnn.benchmark を steady state に持ち込んだ再測定を実施。 同時に **real config
+(bf16-mixed + SCL + DINO + bucketing、 batch=64)** の 100 batch 実行で v8 学習の実効
+sec/step を確定。 全 700 batches (Test 1 + 2A + 2B) を通して **Non-finite skip 0 件** で
+§3.4 の KL fix が real config でも完全動作することを実証。
+
+**測定結果**:
+
+| Test | 設定 | wall-clock | sec/step | Non-finite |
+|---|---|---|---|---|
+| **Test 1** | bf16-mixed + SCL + DINO + bucketing、 batch=64、 `--compile` OFF、 100 batches | 1399 sec | **14.0** | 0/100 |
+| **Test 2A** | 32-true simplified (SCL/DINO off)、 bucketing OFF、 batch=32、 300 batches | 1545 sec | **5.15** | 0/300 |
+| **Test 2B** | 32-true simplified、 bucketing ON、 batch=32、 300 batches | 2069 sec | **6.90** (+34%) | 0/300 |
+
+**Test 2 A/B からの重要な発見**:
+
+- **bucketing は steady state でも 34% 遅い**。 40 batch (§3.4) では warmup 支配と判断していたが、
+  300 batch でも改善せず「実装上の real regression」と確定
+- **メカニズム (推定)**: `SpeakerBalancedBatchSampler` の length-bucket は per-speaker で
+  phoneme_length 昇順ソート → batch は epoch を通じて **shortest → longest** の順で
+  取り出される。 Test 2B batch 0 の audio_max=180k、 batch 50 の audio_max=281k、
+  batch 250+ の audio_max はさらに大。 batch ごとに **cudnn.benchmark が異なる shape の
+  kernel を再選択** し、 選択オーバーヘッドが累積
+- 加えて **長い batches (後半) の compute が集中** し、 GPU の warm state が
+  batch 単位の shape 変動で崩れる
+- **結論: `--enable-length-bucketing` は default OFF 継続、 v8 本走で使用しない**。
+  Plan A の 4 施策のうち bucketing (施策 #3) は撤回、 残り 3 施策 (D concat / static_graph /
+  compile 再チューン) は維持
+
+**v8 本走 wall-clock 見積 (Test 1 を出発点に更新)**:
+
+Test 1 の 14.0 sec/step (bf16-mixed real config、 batch=64、 `--compile` OFF、
+bucketing 有害と判明) を基準に、 各要素を分離して見積もる:
+
+| 適用要素 | sec/step 影響 | 累積 sec/step |
+|---|---|---|
+| Test 1 baseline (bucketing ON、 `--compile` OFF) | — | 14.0 |
+| bucketing OFF (Test 2B の発見) | -30-40% | 9-10 |
+| batch=64 → batch=128 (A100 SXM4 80GB) | -20-30% | 6-8 |
+| `--compile=reduce-overhead` (torch.compile) | -10-15% | 5-7 |
+| Super-MAS Triton (docker `[super-mas]`、 §3.2) | -3-10% | **5-6** |
+
+**80 epoch 見積 (v8 dataset 321,391 utts / batch 128 = 2,511 batches/epoch)**:
+
+| GPU 構成 | 1 epoch | 80 epoch | コスト ($1.73/hr storage 込) |
+|---|---|---|---|
+| A100 SXM4 × 1 (batch=128) | 5.4 hr | **18 日** | ~$747 |
+| **A100 SXM4 × 4 (DDP、 static_graph)** ⭐ | **1.6 hr** | **5.4 日** | ~$672 ($5.19/hr × 129 hr) |
+| H100 SXM 80GB × 2 (batch=128) | 1.7 hr | 5.7 日 | ~$598 |
+
+**§3.3 の "Plan A 3.3-4.0 日" は達成不可を実測で確定**:
+- 主因: bucketing が -30-40% ではなく +34% (逆効果)
+- 単一 A100 で 18 日は現実的でない → **Plan B (4x A100 DDP) を v8 本走の推奨構成に更新**
+- H100 x 2 は最安だが v7 で検証済みの 4x A100 DDP パスに比べて未検証項目 (H100 native BF16、
+  Multi-scale FiLM 数値安定) が多く、 v8 では避けて Plan C (別 PR) で検討
+
+**§3.1 学習コマンドの更新**:
+- `--enable-length-bucketing` を **削除**
+- `--no-compile-dynamic` も削除 (bucketing 前提だったため意味なし)
+- multi-GPU (`--devices 4`) で `--precision bf16-mixed` を継続
 
 | 項目 | 値 |
 |---|---|
