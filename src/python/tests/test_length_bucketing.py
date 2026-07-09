@@ -254,6 +254,50 @@ class TestLengthBucketing:
                 )
                 seen.add(idx)
 
+    def test_length_bucketing_reduces_within_batch_spread(self):
+        """Fix B: length-binned global sampling.
+
+        The whole batch is drawn from a single length bin (N_BINS=4), so the
+        within-batch max-min phoneme_length spread must shrink dramatically
+        vs. length_bucket=False. This is the property that lets
+        cudnn.benchmark cache the same conv plan across consecutive batches
+        and reduces the per-step overhead measured on A100 SXM4
+        (5.15 → target ~5.0 sec/step).
+        """
+        dataset = self._make_dataset()
+
+        sampler_off = SpeakerBalancedBatchSampler(
+            dataset,
+            batch_size=32,
+            samples_per_speaker=4,
+            length_bucket=False,
+        )
+        sampler_on = SpeakerBalancedBatchSampler(
+            dataset,
+            batch_size=32,
+            samples_per_speaker=4,
+            length_bucket=True,
+        )
+
+        spread_off = [_batch_length_spread(b, dataset) for b in sampler_off]
+        spread_on = [_batch_length_spread(b, dataset) for b in sampler_on]
+
+        assert spread_off and spread_on, "sampler produced no batches"
+
+        mean_off = mean(spread_off)
+        mean_on = mean(spread_on)
+
+        # Uniform [20, 400] distribution, 4 bins → each bin has width ~95.
+        # length_bucket=False: batches are random → within-batch spread
+        # approaches the full 380 range. length_bucket=True: within-batch
+        # spread bounded by bin width + a bit of overlap → ~100-150 typical.
+        # 60% ratio is conservative.
+        assert mean_on < mean_off * 0.6, (
+            "length_bucket=True (Fix B) did not reduce within-batch length "
+            f"spread: off={mean_off:.1f}, on={mean_on:.1f} "
+            "(expected on < off * 0.6)"
+        )
+
     def test_default_off_is_backward_compatible(self):
         """Constructing without the length_bucket kwarg must behave like False."""
         dataset = self._make_dataset()
