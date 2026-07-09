@@ -23,7 +23,13 @@ from pathlib import Path
 
 from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
 from piper_plus_g2p.multilingual import MultilingualPhonemizer
-from piper_train.norm_audio import cache_norm_audio, make_silence_detector
+from tqdm import tqdm
+
+from piper_train.norm_audio import (
+    cache_norm_audio,
+    default_num_processes,
+    make_silence_detector,
+)
 
 
 _LOGGER = logging.getLogger("prepare_bilingual")
@@ -250,7 +256,13 @@ def process_ja_dataset(
                     executor.submit(_cache_audio_batch_worker_fast, b): i
                     for i, b in enumerate(batches)
                 }
-                done = 0
+                pbar = tqdm(
+                    total=len(need_caching),
+                    desc="Cache JA",
+                    unit="file",
+                    dynamic_ncols=True,
+                    ascii=True,
+                )
                 for future in as_completed(futures):
                     try:
                         for wav_str, norm_str, spec_str in future.result():
@@ -258,32 +270,43 @@ def process_ja_dataset(
                                 _LOGGER.warning(
                                     "Audio cache failed for %s: %s", wav_str, spec_str
                                 )
+                                pbar.update(1)
                                 continue
                             audio_map[wav_str] = (norm_str, spec_str)
-                            done += 1
+                            pbar.update(1)
                     except Exception as e:
                         _LOGGER.warning("Audio cache batch failed: %s", e)
-                    if done // 1000 != (done - _CACHE_BATCH_SIZE_FAST) // 1000:
-                        _LOGGER.info("Cached audio %d/%d", done, len(need_caching))
+                pbar.close()
         elif workers > 1:
             with ProcessPoolExecutor(max_workers=workers) as executor:
                 futures = {
                     executor.submit(_cache_audio_worker, a): i
                     for i, a in enumerate(need_caching)
                 }
-                done = 0
+                pbar = tqdm(
+                    total=len(need_caching),
+                    desc="Cache JA",
+                    unit="file",
+                    dynamic_ncols=True,
+                    ascii=True,
+                )
                 for future in as_completed(futures):
                     try:
                         wav_str, norm_str, spec_str = future.result()
                         audio_map[wav_str] = (norm_str, spec_str)
                     except Exception as e:
                         _LOGGER.warning("Audio cache failed: %s", e)
-                    done += 1
-                    if done % 1000 == 0:
-                        _LOGGER.info("Cached audio %d/%d", done, len(need_caching))
+                    pbar.update(1)
+                pbar.close()
         else:
             detector = make_silence_detector()
-            for i, (wav_path_str, _, sr) in enumerate(need_caching):
+            for wav_path_str, _, sr in tqdm(
+                need_caching,
+                desc="Cache JA",
+                unit="file",
+                dynamic_ncols=True,
+                ascii=True,
+            ):
                 try:
                     norm_path, spec_path = cache_norm_audio(
                         wav_path_str, cache_dir, detector, sr
@@ -291,8 +314,6 @@ def process_ja_dataset(
                     audio_map[wav_path_str] = (str(norm_path), str(spec_path))
                 except Exception as e:
                     _LOGGER.warning("Audio cache failed for %s: %s", wav_path_str, e)
-                if (i + 1) % 1000 == 0:
-                    _LOGGER.info("Cached audio %d/%d", i + 1, len(need_caching))
 
     # ===== Phase 3: Assemble utterances =====
     utterances = []
@@ -814,8 +835,13 @@ def process_en_dataset(
                     executor.submit(_cache_audio_batch_worker_fast, a): i
                     for i, a in enumerate(batch_args)
                 }
-                done = 0
-                next_log = 1000
+                pbar = tqdm(
+                    total=len(need_caching),
+                    desc="Cache EN",
+                    unit="file",
+                    dynamic_ncols=True,
+                    ascii=True,
+                )
                 for future in as_completed(futures):
                     try:
                         batch_results = future.result()
@@ -826,20 +852,20 @@ def process_en_dataset(
                                 _LOGGER.warning(
                                     "Audio cache failed for %s: %s", wav_str, spec_str
                                 )
-                            done += 1
-                            if done >= next_log:
-                                _LOGGER.info(
-                                    "Cached audio %d/%d",
-                                    min(done, len(need_caching)),
-                                    len(need_caching),
-                                )
-                                next_log += 1000
+                            pbar.update(1)
                     except Exception as e:
                         _LOGGER.warning("Audio cache batch failed: %s", e)
-                        done += _CACHE_BATCH_SIZE
+                        pbar.update(_CACHE_BATCH_SIZE)
+                pbar.close()
         else:
             detector = make_silence_detector()
-            for i, (wav_path_str, _, sr) in enumerate(need_caching):
+            for wav_path_str, _, sr in tqdm(
+                need_caching,
+                desc="Cache EN",
+                unit="file",
+                dynamic_ncols=True,
+                ascii=True,
+            ):
                 try:
                     norm_path, spec_path = cache_norm_audio(
                         wav_path_str, cache_dir, detector, sr
@@ -847,8 +873,6 @@ def process_en_dataset(
                     audio_map[wav_path_str] = (str(norm_path), str(spec_path))
                 except Exception as e:
                     _LOGGER.warning("Audio cache failed for %s: %s", wav_path_str, e)
-                if (i + 1) % 1000 == 0:
-                    _LOGGER.info("Cached audio %d/%d", i + 1, len(need_caching))
 
     # Phase 3: Assemble utterances
     utterances = []
@@ -938,7 +962,18 @@ def main():
         action="store_true",
         help="Force single-speaker EN mode (combine all EN data into one speaker)",
     )
-    parser.add_argument("--workers", type=int, default=1)
+    parser.add_argument(
+        "--workers",
+        "--num-processes",
+        dest="workers",
+        type=int,
+        default=default_num_processes(),
+        help=(
+            "Number of parallel workers (default: min(cpu_count//2, 32); "
+            "capped to prevent A100/64-vCPU host thrashing). "
+            "--num-processes is accepted as an alias."
+        ),
+    )
     args = parser.parse_args()
 
     if not args.en_input_dir and not args.en_libritts:
