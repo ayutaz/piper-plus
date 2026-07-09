@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Prepare multilingual (8-language G2P support) dataset for Piper TTS.
 
-Merges existing JA+EN v4 dataset with new ZH (AISHELL-3), ES/FR/PT (CML-TTS)
-corpora. The bilingual phoneme IDs (0-96) are 100% compatible with the
-multilingual ID space, so JA+EN data is reused as-is.
+Merges existing JA+EN v4 dataset with new ZH (AISHELL-3), ES/FR/PT (CML-TTS),
+and KO (Zeroth-Korean / KsponSpeech / Common Voice ko) corpora. The bilingual
+phoneme IDs (0-96) are 100% compatible with the multilingual ID space, so
+JA+EN data is reused as-is.
 
 Optimizations:
 - Skip VAD for pre-cleaned corpora (AISHELL-3, CML-TTS) — ~30% faster audio
@@ -28,6 +29,7 @@ Usage:
 import argparse
 import json
 import logging
+import re as _re
 import time
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -42,11 +44,19 @@ from piper_train.norm_audio import default_num_processes
 
 _LOGGER = logging.getLogger("prepare_multilingual")
 
-# Language ID mapping (must match model config)
-LANGUAGE_ID_MAP = {"ja": 0, "en": 1, "zh": 2, "es": 3, "fr": 4, "pt": 5, "sv": 6}
+# Language ID mapping (must match model config).
+#
+# 2026-07-09: v8 で ko=7 を追加 (8-lang extended form)。 sv=6 は G2P + symbol
+# 実装済だが trained ckpt は未存在、 ko は v8 学習で ckpt に取り込まれる予定。
+# 契約は `docs/spec/language-id-map-contract.toml:extended_language_id_map` に pin。
+# Keep this on a single line — `scripts/check_language_id_map_contract.py`
+# only supports single-line dict literals when parsing this canonical.
+# fmt: off
+LANGUAGE_ID_MAP = {"ja": 0, "en": 1, "zh": 2, "es": 3, "fr": 4, "pt": 5, "sv": 6, "ko": 7}
+# fmt: on
 
-# All languages in canonical order
-ALL_LANGUAGES = ["ja", "en", "zh", "es", "fr", "pt", "sv"]
+# All languages in canonical order (sorted by language_id).
+ALL_LANGUAGES = ["ja", "en", "zh", "es", "fr", "pt", "sv", "ko"]
 
 # Batch sizes for parallel processing
 _RESAMPLE_BATCH_SIZE = 50
@@ -278,6 +288,366 @@ def parse_cml_tts(
         len(speaker_counts),
         skipped,
         ",".join(splits),
+    )
+    return entries, dict(speaker_counts)
+
+
+# ---------------------------------------------------------------------------
+# 3b. Parse Korean corpora (Zeroth-Korean / KsponSpeech / Common Voice ko)
+# ---------------------------------------------------------------------------
+
+
+# ETRI/AI-Hub KsponSpeech notation.
+#
+# Reference (KsponSpeech distribution guidelines):
+#   (A)/(B)           dual-form: A = written form (숫자/영문 표기),
+#                                B = pronunciation form (한글 표기).
+#                     TTS 学習では pronunciation form (B) を採用するのが
+#                     一般的なため、 マッチしたら 2 番目を残す。
+#   b/                background noise マーカー           → 削除
+#   l/                laughter マーカー                    → 削除
+#   o/                overlapping speech マーカー          → 削除
+#   n/                noise マーカー                      → 削除
+#   u/                unintelligible マーカー              → 削除
+#   +                 repetition (word+) or 途中発話       → 削除
+#   *                 emphasis / unclear                 → 削除
+#   /                 stray repair marker (paren 外)      → 削除
+#
+# 参考: https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=123 の
+# 「전사규격.pdf」 (韓国語 STT 分野で広く採用されている ETRI 表記)。
+# _re は module top で import 済 (`from re import re as _re` 相当)。
+_KSPON_DUAL_RE = _re.compile(r"\(([^()/]*)\)/\(([^()/]*)\)")
+_KSPON_TAG_RE = _re.compile(r"\b[blonu]/")
+_KSPON_STRAY_SLASH_RE = _re.compile(r"(?<!\()/(?!\()")
+
+
+def _clean_kspon_text(raw: str) -> str:
+    """Strip KsponSpeech ETRI annotation, keeping only pronunciation form.
+
+    See notation table above. Idempotent — calling again on the cleaned string
+    is a no-op (all markup has been removed).
+    """
+    text = _KSPON_DUAL_RE.sub(lambda m: m.group(2), raw)
+    text = _KSPON_TAG_RE.sub("", text)
+    text = text.replace("+", "").replace("*", "")
+    text = _KSPON_STRAY_SLASH_RE.sub("", text)
+    # collapse repeated whitespace introduced by tag removal
+    text = _re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def parse_zeroth_korean(
+    base_dir: Path,
+    splits: tuple[str, ...] = ("train_data_01",),
+) -> tuple[list[tuple[str, str, str]], dict[str, int]]:
+    """Parse Zeroth-Korean corpus (CC BY 4.0, LibriSpeech-style tree).
+
+    Layout:
+        base_dir/
+          train_data_01/
+            003/                        # speaker id
+              003_0033.trans.txt         # lines: "003_0033_0001 <text>"
+              003_0033_0001.flac
+              003_0033_0002.flac
+              ...
+
+    splits: sub-directories under ``base_dir`` to enumerate. Zeroth ships
+    both ``train_data_01`` and ``test_data_01`` (~51.6h total). Defaults to
+    the train shard for parity with ``parse_aishell3(splits=("train",))``.
+
+    Returns:
+        (entries, speaker_counts)
+        entries: list of (text, flac_path, speaker_id_str) tuples where
+                 speaker_id_str is prefixed with "zeroth-" for global
+                 uniqueness across ko sources.
+        speaker_counts: {speaker_id_str: utterance_count}
+    """
+    entries: list[tuple[str, str, str]] = []
+    speaker_counts: dict[str, int] = Counter()
+    skipped = 0
+
+    for split in splits:
+        split_dir = base_dir / split
+        if not split_dir.is_dir():
+            _LOGGER.error("Zeroth-Korean split not found: %s", split_dir)
+            continue
+
+        # Build transcript index: {utterance_id: text} across all *.trans.txt.
+        transcript: dict[str, str] = {}
+        for trans_path in split_dir.rglob("*.trans.txt"):
+            try:
+                content = trans_path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            for line in content.splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                # Format: "003_0033_0001 안녕하세요 ..."
+                utt_id, _, text = line.partition(" ")
+                text = text.strip()
+                if not utt_id or not text:
+                    continue
+                transcript[utt_id] = text
+
+        # Enumerate flac files and pair with transcripts.
+        for flac_path in split_dir.rglob("*.flac"):
+            utt_id = flac_path.stem
+            text = transcript.get(utt_id)
+            if not text:
+                skipped += 1
+                continue
+            # Speaker id is the first underscore-separated segment.
+            raw_speaker = utt_id.split("_", maxsplit=1)[0]
+            speaker_id_str = f"zeroth-{raw_speaker}"
+            entries.append((text, str(flac_path), speaker_id_str))
+            speaker_counts[speaker_id_str] += 1
+
+    _LOGGER.info(
+        "Parsed %d Zeroth-Korean utterances (%d speakers, %d skipped, splits=%s)",
+        len(entries),
+        len(speaker_counts),
+        skipped,
+        ",".join(splits),
+    )
+    return entries, dict(speaker_counts)
+
+
+def parse_kspon_speech(
+    base_dir: Path,
+    splits: tuple[str, ...] = ("KsponSpeech_01",),
+    audio_ext: str = ".wav",
+    min_utts_per_spk: int = 20,
+    cap_per_speaker: int | None = 60,
+) -> tuple[list[tuple[str, str, str]], dict[str, int]]:
+    """Parse KsponSpeech corpus (MIT/ETRI consent form, ~969h / ~2000 spk).
+
+    Layout after PCM→WAV conversion (see docs/handoff/zero-shot-v8-*.md):
+        base_dir/
+          KsponSpeech_01/
+            KsponSpeech_0001/               # speaker id
+              KsponSpeech_000001.wav        # or .pcm (16kHz raw)
+              KsponSpeech_000001.txt        # ETRI transcript (utf-8)
+              ...
+
+    Params:
+        audio_ext: extension to enumerate. Defaults to ``.wav`` since the raw
+                   distribution ships headerless PCM which soundfile cannot
+                   read directly; users typically convert PCM→WAV first via
+                   the shipping ETRI tool. Pass ``.pcm`` if the downstream
+                   audio loader has custom PCM support.
+        min_utts_per_spk: drop speakers with fewer surviving utterances (the
+                   `samples_per_speaker=4` sampler contract needs ≥ 4;
+                   default 20 mirrors the Common Voice ko threshold).
+        cap_per_speaker: keep at most this many utterances per speaker
+                   (chronological order, mirrors the pt CV export). ``None``
+                   disables the cap. Default 60 targets the "話者多様性へ
+                   予算を再配分" design principle (design doc §2).
+
+    Returns:
+        (entries, speaker_counts)
+        entries: list of (cleaned_text, wav_path, speaker_id_str) tuples with
+                 speaker_id_str prefixed by "kspon-" for global uniqueness.
+        speaker_counts: {speaker_id_str: utterance_count}
+    """
+    entries_by_spk: dict[str, list[tuple[str, str]]] = {}
+    skipped = 0
+
+    for split in splits:
+        split_dir = base_dir / split
+        if not split_dir.is_dir():
+            _LOGGER.error("KsponSpeech split not found: %s", split_dir)
+            continue
+
+        # Enumerate transcript files; pair with matching audio.
+        for txt_path in sorted(split_dir.rglob("*.txt")):
+            try:
+                raw_text = txt_path.read_text(encoding="utf-8").strip()
+            except (OSError, UnicodeDecodeError):
+                # Some releases ship CP949; retry once with a permissive codec.
+                try:
+                    raw_text = txt_path.read_text(encoding="cp949").strip()
+                except (OSError, UnicodeDecodeError):
+                    skipped += 1
+                    continue
+
+            cleaned = _clean_kspon_text(raw_text)
+            if not cleaned:
+                skipped += 1
+                continue
+
+            audio_path = txt_path.with_suffix(audio_ext)
+            if not audio_path.exists():
+                skipped += 1
+                continue
+
+            # Speaker id: the immediate parent directory
+            # (e.g. KsponSpeech_0001).
+            raw_speaker = txt_path.parent.name
+            speaker_id_str = f"kspon-{raw_speaker}"
+            entries_by_spk.setdefault(speaker_id_str, []).append(
+                (cleaned, str(audio_path))
+            )
+
+    # Apply per-speaker cap + minimum threshold.
+    entries: list[tuple[str, str, str]] = []
+    speaker_counts: dict[str, int] = Counter()
+    for speaker_id_str, utts in entries_by_spk.items():
+        if len(utts) < min_utts_per_spk:
+            skipped += len(utts)
+            continue
+        take = utts if cap_per_speaker is None else utts[:cap_per_speaker]
+        for text, wav_path in take:
+            entries.append((text, wav_path, speaker_id_str))
+        speaker_counts[speaker_id_str] = len(take)
+
+    _LOGGER.info(
+        "Parsed %d KsponSpeech utterances (%d speakers, %d skipped, splits=%s, "
+        "min_utts=%d, cap=%s)",
+        len(entries),
+        len(speaker_counts),
+        skipped,
+        ",".join(splits),
+        min_utts_per_spk,
+        "None" if cap_per_speaker is None else str(cap_per_speaker),
+    )
+    return entries, dict(speaker_counts)
+
+
+def parse_common_voice_ko(
+    base_dir: Path,
+    splits: tuple[str, ...] = ("cv",),
+    min_clips_per_spk: int = 20,
+    min_utmos: float = 2.5,
+) -> tuple[list[tuple[str, str, str]], dict[str, int]]:
+    """Parse Common Voice ko (CC0) after `export_common_voice_ko.py`.
+
+    Reads the CML-TTS-shaped ``{split}.csv`` written by
+    ``export_common_voice_ko.py`` — same 8-column pipe-delimited layout as
+    ``parse_cml_tts``, plus a companion ``utmos.tsv`` (``client_id\tutmos``)
+    that lets the parser gate speakers on estimated MOS. Reusing the CML-TTS
+    schema avoids inventing a second reader in the ProcessPool workers, so
+    downstream phonemization/caching for ko-CV is identical to es/fr/pt.
+
+    Layout:
+        base_dir/
+          {split}.csv           # 8 columns, first row is header (pt export
+                                # writes this; ko export mirrors it)
+          audios/
+            cv_<client_prefix>/*.wav
+          utmos.tsv             # optional; two-column tsv with header
+
+    Params:
+        splits: csv basenames to read. The pt CV export writes ``cv.csv``;
+                the ko export defaults to the same for consistency.
+        min_clips_per_spk: drop speakers with < N surviving clips. Mirrors
+                the pt CV filter and the KsponSpeech default.
+        min_utmos: UTMOS floor; speakers below this in ``utmos.tsv`` are
+                dropped. If ``utmos.tsv`` is absent, the filter is disabled
+                and every valid row passes (with a WARN log).
+
+    Returns:
+        (entries, speaker_counts)
+        entries: list of (text, wav_path, speaker_id_str) tuples with
+                 speaker_id_str prefixed by "cv-" for global uniqueness.
+        speaker_counts: {speaker_id_str: utterance_count}
+    """
+    # Load UTMOS index (optional).
+    utmos_by_spk: dict[str, float] = {}
+    utmos_path = base_dir / "utmos.tsv"
+    if utmos_path.exists():
+        try:
+            with utmos_path.open(encoding="utf-8") as f:
+                header = f.readline()  # skip header
+                if header:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        parts = line.split("\t")
+                        if len(parts) < 2:
+                            continue
+                        try:
+                            utmos_by_spk[parts[0]] = float(parts[1])
+                        except ValueError:
+                            continue
+        except OSError:
+            _LOGGER.warning("Failed to read %s; UTMOS filter disabled", utmos_path)
+    else:
+        _LOGGER.warning(
+            "No utmos.tsv found under %s — Common Voice ko UTMOS filter disabled",
+            base_dir,
+        )
+
+    entries_by_spk: dict[str, list[tuple[str, str]]] = {}
+    skipped = 0
+
+    for split in splits:
+        split_csv = base_dir / f"{split}.csv"
+        if not split_csv.exists():
+            _LOGGER.error("Common Voice ko %s.csv not found: %s", split, split_csv)
+            continue
+
+        with split_csv.open(encoding="utf-8") as f:
+            header = f.readline()
+            if not header:
+                continue
+
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+
+                # Same 8-column pipe layout as CML-TTS.
+                parts = line.split("|")
+                if len(parts) < 8:
+                    skipped += 1
+                    continue
+
+                wav_filename = parts[0].strip()
+                transcript = parts[2].strip()
+                client_id = parts[7].strip()
+
+                if not transcript:
+                    skipped += 1
+                    continue
+
+                wav_path = base_dir / wav_filename
+                if not wav_path.exists():
+                    skipped += 1
+                    continue
+
+                speaker_id_str = f"cv-{client_id}"
+                entries_by_spk.setdefault(speaker_id_str, []).append(
+                    (transcript, str(wav_path))
+                )
+
+    # Apply speaker-level filters.
+    entries: list[tuple[str, str, str]] = []
+    speaker_counts: dict[str, int] = Counter()
+    for speaker_id_str, utts in entries_by_spk.items():
+        # UTMOS gate only applies when utmos.tsv is present.
+        if utmos_by_spk:
+            score = utmos_by_spk.get(speaker_id_str.removeprefix("cv-"))
+            if score is None or score < min_utmos:
+                skipped += len(utts)
+                continue
+        if len(utts) < min_clips_per_spk:
+            skipped += len(utts)
+            continue
+        for text, wav_path in utts:
+            entries.append((text, wav_path, speaker_id_str))
+        speaker_counts[speaker_id_str] = len(utts)
+
+    _LOGGER.info(
+        "Parsed %d Common Voice ko utterances (%d speakers, %d skipped, splits=%s, "
+        "min_clips=%d, min_utmos=%.2f)",
+        len(entries),
+        len(speaker_counts),
+        skipped,
+        ",".join(splits),
+        min_clips_per_spk,
+        min_utmos,
     )
     return entries, dict(speaker_counts)
 
@@ -1186,7 +1556,7 @@ def main():
     )
 
     parser = argparse.ArgumentParser(
-        description="Prepare multilingual (6-language) dataset for Piper TTS"
+        description="Prepare multilingual (up to 7-language) dataset for Piper TTS"
     )
     parser.add_argument(
         "--ja-en-dataset",
@@ -1208,6 +1578,52 @@ def main():
     parser.add_argument(
         "--pt-cml-tts",
         help="Path to CML-TTS Portuguese base directory",
+    )
+    parser.add_argument(
+        "--ko-zeroth",
+        help="Path to Zeroth-Korean base directory (LibriSpeech layout, CC BY 4.0)",
+    )
+    parser.add_argument(
+        "--ko-ksponspeech",
+        help="Path to KsponSpeech base directory (MIT/ETRI consent form; "
+        "PCM converted to WAV expected - see docs/handoff/zero-shot-v8-*.md)",
+    )
+    parser.add_argument(
+        "--ko-cv",
+        help="Path to Common Voice ko export directory (produced by "
+        "`export_common_voice_ko.py`; CC0). Reads cv.csv + utmos.tsv.",
+    )
+    parser.add_argument(
+        "--ko-splits",
+        default=None,
+        help="Comma-separated list of split names shared across Zeroth / "
+        "KsponSpeech / CV ko sources. Defaults per-source (Zeroth: "
+        "train_data_01; KsponSpeech: KsponSpeech_01; CV ko: cv).",
+    )
+    parser.add_argument(
+        "--ko-kspon-cap",
+        type=int,
+        default=60,
+        help="KsponSpeech per-speaker utterance cap (default: 60, matches "
+        "design doc §2 'redistribute budget to speaker diversity').",
+    )
+    parser.add_argument(
+        "--ko-kspon-min-utts",
+        type=int,
+        default=20,
+        help="KsponSpeech minimum utterances per speaker (default: 20).",
+    )
+    parser.add_argument(
+        "--ko-cv-min-clips",
+        type=int,
+        default=20,
+        help="Common Voice ko minimum clips per speaker (default: 20).",
+    )
+    parser.add_argument(
+        "--ko-cv-min-utmos",
+        type=float,
+        default=2.5,
+        help="Common Voice ko UTMOS floor (default: 2.5).",
     )
     parser.add_argument(
         "--output-dir",
@@ -1270,11 +1686,13 @@ def main():
     )
 
     # Check that at least one new language is provided
+    ko_source = args.ko_zeroth or args.ko_ksponspeech or args.ko_cv
     new_langs = {
         "zh": args.zh_aishell3,
         "es": args.es_cml_tts,
         "fr": args.fr_cml_tts,
         "pt": args.pt_cml_tts,
+        "ko": ko_source,
     }
     active_new_langs = {k: v for k, v in new_langs.items() if v}
     if not active_new_langs:
@@ -1448,6 +1866,72 @@ def main():
         lang_stats["pt"] = len(pt_utts)
         lang_speaker_counts["pt"] = len(pt_speakers)
 
+    # KO: Zeroth + KsponSpeech + Common Voice ko (v8 addition, design doc §2)
+    if ko_source:
+        _LOGGER.info("=" * 60)
+        ko_splits_override: tuple[str, ...] | None = None
+        if args.ko_splits:
+            ko_splits_override = tuple(
+                s.strip() for s in args.ko_splits.split(",") if s.strip()
+            )
+
+        ko_entries: list[tuple[str, str, str]] = []
+        ko_speaker_counts: dict[str, int] = Counter()
+
+        if args.ko_zeroth:
+            _LOGGER.info("Processing KO (Zeroth-Korean) from %s", args.ko_zeroth)
+            zeroth_entries, zeroth_speakers = parse_zeroth_korean(
+                Path(args.ko_zeroth),
+                splits=ko_splits_override or ("train_data_01",),
+            )
+            ko_entries.extend(zeroth_entries)
+            for spk, count in zeroth_speakers.items():
+                ko_speaker_counts[spk] += count
+
+        if args.ko_ksponspeech:
+            _LOGGER.info("Processing KO (KsponSpeech) from %s", args.ko_ksponspeech)
+            kspon_entries, kspon_speakers = parse_kspon_speech(
+                Path(args.ko_ksponspeech),
+                splits=ko_splits_override or ("KsponSpeech_01",),
+                min_utts_per_spk=args.ko_kspon_min_utts,
+                cap_per_speaker=args.ko_kspon_cap,
+            )
+            ko_entries.extend(kspon_entries)
+            for spk, count in kspon_speakers.items():
+                ko_speaker_counts[spk] += count
+
+        if args.ko_cv:
+            _LOGGER.info("Processing KO (Common Voice ko) from %s", args.ko_cv)
+            cv_entries, cv_speakers = parse_common_voice_ko(
+                Path(args.ko_cv),
+                splits=ko_splits_override or ("cv",),
+                min_clips_per_spk=args.ko_cv_min_clips,
+                min_utmos=args.ko_cv_min_utmos,
+            )
+            ko_entries.extend(cv_entries)
+            for spk, count in cv_speakers.items():
+                ko_speaker_counts[spk] += count
+
+        ko_utts, ko_speakers = process_new_language(
+            ko_entries,
+            dict(ko_speaker_counts),
+            language="ko",
+            language_id=LANGUAGE_ID_MAP["ko"],
+            speaker_id_offset=next_speaker_id,
+            ml_id_map=ml_id_map,
+            cache_dir=cache_dir,
+            sample_rate=args.sample_rate,
+            workers=args.workers,
+            gpu_spec_device=args.gpu_spec_device,
+            resample_quality=args.resample_quality,
+        )
+        all_utterances.extend(ko_utts)
+        all_speaker_map.update({f"ko_{k}": v for k, v in ko_speakers.items()})
+        if ko_speakers:
+            next_speaker_id = max(ko_speakers.values()) + 1
+        lang_stats["ko"] = len(ko_utts)
+        lang_speaker_counts["ko"] = len(ko_speakers)
+
     # ===================================================================
     # Phase 3: Write merged dataset
     # ===================================================================
@@ -1475,9 +1959,13 @@ def main():
     # Build language_id_map
     config_language_id_map = {lang: LANGUAGE_ID_MAP[lang] for lang in active_languages}
 
-    # Write config.json
+    # Write config.json.
+    # Dataset label reflects the number of ACTIVE (non-empty) languages so that
+    # legacy 6-lang runs (no --ko-*) keep emitting "multilingual-6lang" and the
+    # first 7-lang v8 run emits "multilingual-7lang".
+    dataset_label = f"multilingual-{len(active_languages)}lang"
     config = {
-        "dataset": "multilingual-6lang",
+        "dataset": dataset_label,
         "audio": {"sample_rate": args.sample_rate, "quality": "medium"},
         "language": {"code": "-".join(active_languages)},
         "inference": {"noise_scale": 0.4, "length_scale": 1, "noise_w": 0.5},
