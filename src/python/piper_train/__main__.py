@@ -5,6 +5,7 @@ from pathlib import Path
 from pickle import UnpicklingError
 
 import torch
+import torch.backends.cuda as bcuda
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -615,6 +616,28 @@ def main():
     # under `autocast(enabled=False)`). No-op on sm_75 / CPU. "high" keeps
     # TF32 for matmul while leaving reductions at FP32.
     torch.set_float32_matmul_precision("high")
+
+    # SDPA backend priority explicit control (T5, Issue #527).
+    # PyTorch's scaled_dot_product_attention auto-dispatches to one of
+    # flash / mem_efficient / math / cudnn backends. Explicitly prioritize
+    # the fast fused kernels and down-priority the math (naive) fallback so
+    # that on Ampere+ (sm_80+: A100 / RTX 6000 Ada / RTX 5090) attention
+    # layers take the flash / mem_efficient path (~2x faster, lower VRAM).
+    # On sm_75 (T4) / CPU these calls are no-ops or safely ignored.
+    # torch 2.11 adds cudnn SDPA backend (fastest on Blackwell / Hopper);
+    # enable via hasattr guard so torch < 2.11 still imports cleanly.
+    bcuda.enable_flash_sdp(True)
+    bcuda.enable_mem_efficient_sdp(True)
+    bcuda.enable_math_sdp(False)  # priority down (naive fallback)
+    if hasattr(bcuda, "enable_cudnn_sdp"):
+        bcuda.enable_cudnn_sdp(True)  # torch 2.11+ new backend
+    _LOGGER.info(
+        "SDPA backends: flash=%s mem_efficient=%s math=%s",
+        bcuda.flash_sdp_enabled(),
+        bcuda.mem_efficient_sdp_enabled(),
+        bcuda.math_sdp_enabled(),
+    )
+
     torch.manual_seed(args.seed)
 
     # Multi-GPU configuration
