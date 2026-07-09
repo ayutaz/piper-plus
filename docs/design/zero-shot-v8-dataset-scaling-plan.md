@@ -477,6 +477,85 @@ python -m piper_train \
 #   --enable-length-bucketing  # +34% 逆効果 (Fix B 未再検証)
 ```
 
+### 3.8 残 findings 実装完了 (2026-07-09 追加ランディング)
+
+§3.7 で v8 本走 config を確定した後、 review で未実装だった findings のうち
+コード側で完遂できる 8 施策を追加実装 (commits `3266959c` / `4a2639cf` /
+`3e7a494e` / `08e32fb7` / `1c767dd4` / `747aeda8` / `cd5fd0b7` / `a4ede437`)。
+GPU smoke test は次セッション (vast.ai instance destroy 済のため) で回すが、
+各施策の期待効果は個別の bench / 契約テストで pin 済。
+
+**学習経路 (5 施策)**:
+
+| commit | 施策 | 内容 | 期待効果 |
+|---|---|---|---|
+| `3e7a494e` | **T3 SDPA fast path** | TextEncoder self-attention を `F.scaled_dot_product_attention` に切替 (opt-in `--attn-drop-rel-v`)。 relative-V 補正は drop、 v8 scratch 前提で許容 | **+2-5% throughput**、 activation memory **-60MB/batch** (A100 SXM4 real config) |
+| `08e32fb7` | **T6 hybrid precision** | `--disc-precision {inherit,bf16-mixed,32-true}` で D forward を bf16 に切替つつ SCL/DINO は fp32 維持 (belt-and-suspenders wrap) | **+5-10% throughput** (D forward が dominant conv workload、 A100 SXM4) |
+| `4a2639cf` | T1-ext channels_last MBiSTFT | Generator にも channels_last hparam を propagate (Conv1d のため実効 no-op、 対称性 + 将来 Conv2d 追加時の future-proofing) | 現時点 0%、 将来 Generator に Conv2d を追加した際に自動有効化 |
+| `1c767dd4` | **T-empty 除去** | training_step の 500-batch `torch.cuda.synchronize()` + `empty_cache()` flush を除去 (T4/V100 遺物、 A100 80GB + `expandable_segments:True` で不要) | **+2-3% throughput** (500 batch 毎の GPU 全停止除去) |
+| `3266959c` | **T-npy audio_norm cache** | audio_norm cache を `.pt` (pickle) から `.npy` (raw numpy) に切替 (write 側のみ、 backward-compat 3 段リゾルバで既存 `.pt` は温存) | **+5-10% throughput** (DataLoader load 3-5x 高速化)、 disk usage **-10%** |
+
+**前処理経路 (3 施策)**:
+
+| commit | 施策 | 内容 | 期待効果 |
+|---|---|---|---|
+| `a4ede437` | **P3 zip parallel** | `prepare_moe_speech_plus.py` の 473 zip 展開を `multiprocessing.Pool(spawn)` で並列化 (opt-in `--parallel`、 `pool.imap(chunksize=1)` で順序 preserve、 serial と byte-for-byte 一致) | **30-45 分 → 3-5 分** (~12-16x、 32 vCPU) |
+| `cd5fd0b7` | **P4 per-zip cache** | per-zip pre-filter 生 metadata を `_scan_cache/{zip_stem}.jsonl` に落とし、 `(zip_size, zip_mtime_ns)` で自動 invalidate。 `--min-mos` / `--max-cer` / `--cap` スイープを高速化 | 初回 3-4h → warm 再実行 **5 分スケール** |
+| `747aeda8` | **P5 CAM++ default 化** | `extract_speaker_embedding.py` の fixed_frames=400 + chunked mean pooling + chunk_batch=128 を default 化 (旧 env var `PIPER_EMB_FIXED_FRAMES` 経由から CLI arg に昇格) | 500k utts で **9h → 45-60 分** (9-12x)、 v8 (~1M utts) では **18h → 90-120 分** |
+
+**予測 wall-clock 更新** (5 学習経路施策の累積、 前処理は独立):
+
+現行 baseline (§3.7 smoke2): **10.74 sec/step** @ A100 SXM4 batch=64
+
+| 累積施策 | 期待 sec/step | 単一 A100 (80 epoch) | 4x A100 DDP (80 epoch) |
+|---|---|---|---|
+| §3.7 smoke2 (5 施策 + KL v2、 base) | 10.74 | 51 日 | 9-11 日 |
+| + T-empty (+2-3%) | 10.4-10.5 | 49-50 日 | 8-10 日 |
+| + T-npy (+5-10%) | 9.5-10.0 | 44-48 日 | 8-9 日 |
+| + T3 SDPA (+2-5%) | 9.0-9.7 | 43-46 日 | 7-9 日 |
+| **+ T6 hybrid precision (+5-10%)** | **8.1-9.2** | **38-44 日** | **6-8 日** |
+
+**保守寄りの累積予測**: 現行 10.74 → **7-8 sec/step** (合算 +25-40% throughput、
+掛算ではなく overlap するため保守側で見積)。
+
+- **単一 A100 SXM4 80GB**: **51 日 → 30-38 日** (最良で 30 日)
+- **4x A100 SXM4 DDP (batch=32/GPU × 4)**: **9-11 日 → 6-8 日** (最良で 6 日)
+- **8x A100 SXM4 DDP or H100 SXM 80GB × 2**: 5-6 日 → **4-5 日**
+
+**前処理 wall-clock 更新** (P3/P4/P5 累積、 v8 dataset 再構築時):
+
+- moe-speech-plus prep: 30-45 分 → 3-5 分 (P3)、 スイープ再実行 3-4h → 5 分 (P4)
+- CAM++ 抽出: 18h → 90-120 分 (P5)
+- **全体**: §3.6 の 8-10h 見込 → **2-4h** に短縮 (moe-speech-plus + CAM++ が支配的)
+
+**保守側 caveat**:
+
+- T3 SDPA は attention 実装が SDPA 未使用の TextEncoder self-attention 部にのみ効く。
+  full Generator/Decoder 経路への効果は次 nsys で確認。 activation memory -60MB は
+  larger batch (128+) 化の余地に相当するが、 §3.7 で確認済 batch=64 が compute-bound
+  最適点のため throughput 直接寄与は控えめ
+- T6 hybrid precision は `--precision 32-true` 環境で最大効果 (D forward fp32 → bf16
+  で -5-10%)。 現在の v8 本走 CLI は `--precision bf16-mixed` のため D forward は
+  既に bf16、 追加効果は SCL/DINO が明示 fp32 wrap されて数値安定性が保証される点
+  (belt-and-suspenders)。 32-true 併用時に本領発揮
+- T-npy は既存 `.pt` cache 温存のため、 v8 dataset 再構築時に初めて効く
+  (backward-compat: 既存 `.pt` は再処理せず read、 新規は `.npy`)
+
+**GPU smoke test (次セッション)**:
+
+vast.ai instance が destroy 済 (§3.7 直後) のため、 GPU 上の A/B 実測は次セッション。
+smoke test 計画:
+
+1. smoke2 baseline を rerun (10.74 sec/step 再現確認)
+2. `--attn-drop-rel-v` + `--disc-precision bf16-mixed` を on にして 300 batch
+3. audio_norm cache を `.npy` で pre-materialise (`ignore_cache=True` を短時間走らせる) → DataLoader load 時間の A/B
+4. 合算で予測 7-8 sec/step 達成を確認、 未達なら nsys で bottleneck 再検証
+
+CI 側は 40+ 新規テスト (test_sdpa_attention / test_hybrid_precision /
+test_no_empty_cache_flush / test_audio_norm_npy / test_channels_last 拡張 /
+test_moe_speech_parallel / test_moe_speech_cache / test_extract_speaker_embedding)
+で契約は pin 済、 backward-compat は byte-for-byte 一致テストで保証。
+
 ### 4.1 インスタンス選定基準 (長期稼働の安定性)
 
 7 日級の連続稼働のため、価格最優先ではなく以下で絞り込む:
