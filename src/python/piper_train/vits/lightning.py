@@ -957,7 +957,19 @@ class VitsModel(pl.LightningModule):
             # Clamp SDP NLL to prevent loss_dur from dominating loss_gen_all
             loss_dur = torch.clamp(loss_dur, min=-100.0)
             loss_mel = F.l1_loss(y_mel, y_hat_mel) * self.hparams.c_mel
-            loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * kl_weight
+            # Cap raw kl_loss to 1e4 as an extra safety net independent of the
+            # logs_p / m_p source clamps in models.py. Even with tight source
+            # clamps ([-8, 8] and [-100, 100]), the worst-case
+            # ((z_p - m_p)^2) * exp(-2 * logs_p) product can approach fp32 max
+            # during the first few dozen batches when the flow / prior are
+            # completely random. Capping at 1e4 preserves the gradient
+            # direction (relu-like clip) while preventing runaway magnitudes
+            # that overwhelm gradient_clip_val=1.0. Once training stabilises
+            # (typically < 100 batches) kl_loss falls below 100 and the cap
+            # becomes a no-op. Observed on v8 A100 SXM4 real-config smoke:
+            # without this cap, batch 31 onwards diverges 100% (262/300 skip)
+            # despite the source clamps.
+            loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask).clamp(max=1e4) * kl_weight
 
             loss_fm = feature_loss(fmap_r, fmap_g)
             loss_gen, _losses_gen = generator_loss(y_d_hat_g)

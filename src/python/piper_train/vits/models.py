@@ -955,10 +955,10 @@ class SynthesizerTrn(nn.Module):
         # in fp32 (exp(30) = 1.07e13 vs fp32 max 3.4e38). Applied at source
         # so MAS / KL / inference paths all see the clamped value. No effect
         # once the model converges into the normal range.
-        logs_p = logs_p.clamp(min=-15.0, max=15.0)
+        logs_p = logs_p.clamp(min=-8.0, max=8.0)
 
         z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g)
-        logs_q = logs_q.clamp(min=-15.0, max=15.0)
+        logs_q = logs_q.clamp(min=-8.0, max=8.0)
         z_p = self.flow(z, y_mask, g=g)
 
         with torch.no_grad():
@@ -1011,8 +1011,8 @@ class SynthesizerTrn(nn.Module):
         # is safe because in a converged model attn is essentially one-hot
         # and the post-expansion range already lies inside the pre-expansion
         # range. Also re-clamp m_p to prevent (z_p - m_p)**2 from overflowing.
-        logs_p = logs_p.clamp(min=-15.0, max=15.0)
-        m_p = m_p.clamp(min=-1000.0, max=1000.0)
+        logs_p = logs_p.clamp(min=-8.0, max=8.0)
+        m_p = m_p.clamp(min=-100.0, max=100.0)
 
         z_slice, ids_slice = commons.rand_slice_segments(
             z, y_lengths, self.segment_size
@@ -1070,7 +1070,7 @@ class SynthesizerTrn(nn.Module):
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
         # Match the training-time clamp for consistency between train and
         # inference. See models.py training forward for the rationale.
-        logs_p = logs_p.clamp(min=-15.0, max=15.0)
+        logs_p = logs_p.clamp(min=-8.0, max=8.0)
 
         # Prepare input for duration predictor with prosody features
         x_dp = self._prepare_prosody_input(x, x_mask, prosody_features, lid=lid)
@@ -1100,8 +1100,8 @@ class SynthesizerTrn(nn.Module):
         # inference produces the same numerical range as training. In
         # inference w_ceil is always integer and attn is truly one-hot so
         # this is a no-op after convergence.
-        logs_p = logs_p.clamp(min=-15.0, max=15.0)
-        m_p = m_p.clamp(min=-1000.0, max=1000.0)
+        logs_p = logs_p.clamp(min=-8.0, max=8.0)
+        m_p = m_p.clamp(min=-100.0, max=100.0)
 
         # Use mean only for deterministic ONNX export
         if getattr(self, "onnx_export_mode", False):
