@@ -463,12 +463,23 @@ class SpeakerBalancedBatchSampler:
         例: 20 JA話者 + 310 EN話者 → 各バッチで JA 5話者 + EN 5話者 を保証
 
     length_bucket (opt-in) の動作:
-        - True: 話者スロット内の indices を phoneme_length で pre-sort し、
-          samples_per_speaker 個ずつの隣接バケットを優先して割り当てる。
-          UtteranceCollate 側の padding 総量を減らして step 時間を短縮する狙い。
-          samples_per_speaker=4 の同一話者連続採取 contract は保持。
-          各エポックでバケット順序自体はランダムシャッフルされるため多様性を保つ。
+        - True: **Fix B: length-binned global sampling**。
+          1. 話者ごとに phoneme_length 昇順 sort → samples_per_speaker 個ずつのバケット化
+          2. バケット max_length で N-bin quantile 分割 (デフォルト 4 bin)
+          3. 各バッチは 1 つの bin から distinct 話者を speakers_per_batch 個抽出
+          → バッチ内 max_length variance が bin 幅に制限され、 cudnn.benchmark
+             cache がバッチ間で再利用されやすくなる (v8 scaling で 6.90 → 目標 ~5.0 sec/step)。
+          samples_per_speaker=4 の同一話者連続採取 contract と
+          language_group_balance の言語スロット制約は保持。
+          各エポックで bin 選択順序と bin 内バケット順序がシャッフルされ多様性を保つ。
         - False (デフォルト): 話者スロット内でランダムシャッフル (従来動作)。
+
+    Fix B の履歴:
+        初期実装 (2026-07-07 v8 バッチテスト) は per-speaker bucket 化のみを行い、
+        バッチ組成では速度悪化 (5.15 → 6.90 sec/step、 +34%) が観測された。
+        原因: バッチ内 shape variance を減らせず、 cudnn.benchmark 選定が
+        バッチ毎に thrash していた。 Fix B (per-batch 単一 bin 抽出) で
+        バッチ間の shape 差を bin 幅に抑え込むことで解決を狙う。
 
     DDP (Distributed Data Parallel) 対応:
     - torch.distributedが初期化されている場合、各GPUが異なるバッチを取得
@@ -490,6 +501,13 @@ class SpeakerBalancedBatchSampler:
         language_group_balance=True の場合:
         → JA 4話者 × 4サンプル + EN 4話者 × 4サンプル = 32サンプル/バッチ
     """
+
+    # Fix B: length-binned global sampling で使用する quantile bin 数。
+    # 4 は経験的に良好なバランス点:
+    #   - 少なすぎる (2) → bin 幅が広く shape variance を抑え込みきれない
+    #   - 多すぎる (8+) → bin あたりの候補話者が speakers_per_batch を下回り、
+    #     エポック内で fallback を頻発させる (=有効バッチ数が減る)
+    _LENGTH_BUCKET_N_BINS = 4
 
     def __init__(
         self,
@@ -550,6 +568,10 @@ class SpeakerBalancedBatchSampler:
         self._speaker_to_lengths: dict[int, dict[int, int]] = (
             dict(speaker_to_lengths) if length_bucket else {}
         )
+        # speaker_id -> language_id (Fix B: length-binned global sampling で
+        # 言語スロット制約を強制するために保持。 language_group_balance の
+        # 有無に関わらず常に record する)
+        self._speaker_to_language: dict[int, int] = dict(speaker_to_language)
 
         self.speakers = list(self.speaker_to_indices.keys())
         self.batch_size = batch_size
@@ -639,36 +661,18 @@ class SpeakerBalancedBatchSampler:
         # 各GPUは rank 番目のバッチのみを取得
         rng = random.Random(self.epoch)
 
-        # 各話者のインデックスを準備
         if self.length_bucket:
-            # length_bucket=True: 話者ごとに phoneme_length 昇順で sort し
-            # samples_per_speaker 個ずつのバケットを作り、バケット順序を shuffle。
-            # → 隣接 samples_per_speaker 個の phoneme_length が近くなるため
-            # UtteranceCollate の padding 総量が減る。
-            speaker_indices = {}
-            k = self.samples_per_speaker
-            for spk, indices in self.speaker_to_indices.items():
-                length_map = self._speaker_to_lengths.get(spk, {})
-                # 同一長の tie-breaker として index も key に含めて安定 sort
-                sorted_indices = sorted(
-                    indices, key=lambda i: (length_map.get(i, 0), i)
-                )
-                # k 個ずつバケットに分割 (端数は末尾バケットに残す)
-                buckets = [
-                    sorted_indices[i : i + k] for i in range(0, len(sorted_indices), k)
-                ]
-                # バケット単位でシャッフル (バケット内順序は保持)
-                rng.shuffle(buckets)
-                flat: list[int] = []
-                for b in buckets:
-                    flat.extend(b)
-                speaker_indices[spk] = flat
-        else:
-            # 従来動作: 話者ごとにインデックスを完全 shuffle
-            speaker_indices = {
-                spk: rng.sample(indices, len(indices))
-                for spk, indices in self.speaker_to_indices.items()
-            }
+            # Fix B: length-binned global sampling.
+            # per-speaker bucket 化 → global quantile bin 分割 → per-batch 単一 bin 抽出
+            # の 3 段で、 バッチ間 shape variance を bin 幅に制約する。
+            yield from self._iter_length_binned(rng)
+            return
+
+        # 従来動作: 話者ごとにインデックスを完全 shuffle
+        speaker_indices = {
+            spk: rng.sample(indices, len(indices))
+            for spk, indices in self.speaker_to_indices.items()
+        }
         speaker_pointers = dict.fromkeys(self.speakers, 0)
 
         # 全バッチを先に生成してから world_size の倍数に切り詰める
@@ -722,6 +726,179 @@ class SpeakerBalancedBatchSampler:
         for batch_idx in range(usable):
             if batch_idx % self.world_size == self.rank:
                 yield all_batches[batch_idx]
+
+    def _iter_length_binned(self, rng: random.Random):
+        """Fix B: length-binned global sampling.
+
+        Step 1. 話者ごとに phoneme_length 昇順で sort し、
+                samples_per_speaker 個ずつのバケットを作る (端数バケットは破棄
+                — 同一 shape 保証のため full-k バケットのみ採用)。
+        Step 2. 全バケットの max_length から N-bin quantile 境界を計算し、
+                各バケットを bin に割り当てる。
+        Step 3. 各バッチは 1 つの bin から distinct 話者を speakers_per_batch 個抽出
+                (language_group_balance 有効時は同一 bin 内で言語スロットを充足)。
+        Step 4. bin から候補が枯渇したら次の bin に fallback。 全 bin が
+                制約を満たせなくなったら epoch 終了。
+        Step 5. DDP: world_size の倍数に切り詰めて yield。
+
+        戻り値: 各バッチ (list[int]) を yield する generator。
+        """
+        k = self.samples_per_speaker
+
+        # Step 1: per-speaker length-sorted buckets
+        speaker_buckets: dict[int, list[list[int]]] = {}
+        speaker_bucket_lens: dict[int, list[int]] = {}
+        all_bucket_lens: list[int] = []
+        for spk, indices in self.speaker_to_indices.items():
+            length_map = self._speaker_to_lengths.get(spk, {})
+            # 同一長の tie-breaker として index も key に含めて安定 sort
+            sorted_indices = sorted(
+                indices, key=lambda i: (length_map.get(i, 0), i)
+            )
+            # k 個ずつバケットに分割。 端数バケットは同一 shape 保証を崩すため drop
+            # (Fix B の狙いは per-batch shape 制約 → 不完全バケットは opt-in bucketing の
+            # コスト対効果に見合わない)
+            buckets = [
+                sorted_indices[i : i + k]
+                for i in range(0, len(sorted_indices), k)
+                if i + k <= len(sorted_indices)
+            ]
+            if not buckets:
+                continue
+            maxlens = [
+                max(length_map.get(idx, 0) for idx in b) for b in buckets
+            ]
+            speaker_buckets[spk] = buckets
+            speaker_bucket_lens[spk] = maxlens
+            all_bucket_lens.extend(maxlens)
+
+        # Step 2: N-bin quantile 境界を計算 (bucket max_length ベース)
+        n_bins = self._LENGTH_BUCKET_N_BINS
+        boundaries: list[int] = []
+        if all_bucket_lens:
+            sorted_lens = sorted(all_bucket_lens)
+            total = len(sorted_lens)
+            for i in range(1, n_bins):
+                # i/n_bins quantile を bucket 境界に採用
+                idx = max(0, min(total - 1, (i * total) // n_bins - 1))
+                boundaries.append(sorted_lens[idx])
+
+        def bin_of(length: int) -> int:
+            for b, bound in enumerate(boundaries):
+                if length <= bound:
+                    return b
+            return len(boundaries)
+
+        # Step 3: (bin, lang) 別プールに格納
+        # binned[bin_id][lang_id] = [(spk, bucket_indices), ...]
+        # language_group_balance=False 時は全て lang=0 に集約 (単一プール)
+        binned: dict[int, dict[int, list[tuple[int, list[int]]]]] = defaultdict(
+            lambda: defaultdict(list)
+        )
+        for spk, buckets in speaker_buckets.items():
+            lang = (
+                self._speaker_to_language.get(spk, 0)
+                if self.language_group_balance
+                else 0
+            )
+            for bucket, maxlen in zip(
+                buckets, speaker_bucket_lens[spk], strict=True
+            ):
+                binned[bin_of(maxlen)][lang].append((spk, bucket))
+
+        # bin 内でランダムシャッフル (どの話者が先に消費されるかを epoch 毎に変える)
+        for bin_id in binned:
+            for lang_id in binned[bin_id]:
+                rng.shuffle(binned[bin_id][lang_id])
+
+        # Step 4: 各バッチを 1 つの bin から抽出
+        all_batches: list[list[int]] = []
+        while True:
+            bin_order = list(binned.keys())
+            rng.shuffle(bin_order)
+            picked: list[int] | None = None
+            for bin_id in bin_order:
+                picked = self._pick_batch_from_bin(binned[bin_id])
+                if picked is not None:
+                    break
+            if picked is None:
+                break
+            all_batches.append(picked)
+
+        # Step 5: DDP rank 分配
+        usable = (len(all_batches) // self.world_size) * self.world_size
+        for batch_idx in range(usable):
+            if batch_idx % self.world_size == self.rank:
+                yield all_batches[batch_idx]
+
+    def _pick_batch_from_bin(
+        self,
+        lang_pools: dict[int, list[tuple[int, list[int]]]],
+    ) -> list[int] | None:
+        """1 つの bin から 1 バッチ分の indices を切り出す (in-place で pool を消費)。
+
+        - language_group_balance=True: 各言語スロット数 (self.lang_slots) を
+          distinct 話者で充足する。 いずれかの言語が不足したら None を返し pool は
+          触らない (試行のみで rollback 保証)。
+        - language_group_balance=False: 単一プール (lang=0) から
+          speakers_per_batch 個の distinct 話者を抽出。
+
+        Returns:
+            成功: list[int] of length effective_batch_size (= speakers_per_batch * k)
+            失敗: None (この bin では制約充足不可 → 呼び出し側が別 bin を試す)
+        """
+        if self.language_group_balance:
+            # 全言語のスロット充足を試行 (2-pass: 試行 → 全 OK なら commit)
+            trials: list[tuple[int, list[int], list[int]]] = []
+            # (lang_id, chosen_pool_positions, chosen_flat_indices)
+            for lang_id in sorted(self.lang_slots.keys()):
+                n_slots = self.lang_slots[lang_id]
+                if n_slots <= 0:
+                    continue
+                pool = lang_pools.get(lang_id, [])
+                positions: list[int] = []
+                selected: list[int] = []
+                seen_spks: set[int] = set()
+                for pos, (spk, bucket) in enumerate(pool):
+                    if spk in seen_spks:
+                        continue
+                    seen_spks.add(spk)
+                    positions.append(pos)
+                    selected.extend(bucket)
+                    if len(positions) == n_slots:
+                        break
+                if len(positions) < n_slots:
+                    # この bin では言語スロット充足不可
+                    return None
+                trials.append((lang_id, positions, selected))
+
+            # Commit: 全言語で確保できたので pool から pop する
+            combined: list[int] = []
+            for lang_id, positions, selected in trials:
+                combined.extend(selected)
+                pool = lang_pools[lang_id]
+                for pos in sorted(positions, reverse=True):
+                    pool.pop(pos)
+            return combined
+
+        # 非言語 balance 経路: lang=0 の単一プール
+        pool = lang_pools.get(0, [])
+        positions: list[int] = []
+        selected: list[int] = []
+        seen_spks: set[int] = set()
+        for pos, (spk, bucket) in enumerate(pool):
+            if spk in seen_spks:
+                continue
+            seen_spks.add(spk)
+            positions.append(pos)
+            selected.extend(bucket)
+            if len(positions) == self.speakers_per_batch:
+                break
+        if len(positions) < self.speakers_per_batch:
+            return None
+        for pos in sorted(positions, reverse=True):
+            pool.pop(pos)
+        return selected
 
     def __len__(self) -> int:
         if self.language_group_balance:
