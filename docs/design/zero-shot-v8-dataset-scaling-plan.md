@@ -36,12 +36,20 @@ per-utterance CAM++ embedding → spk_proj 経由。**話者を何人増やし�
 | es | 168,374 / 63 | ~45k / **77** | CML-TTS **フィルタ緩和で corpus 全話者** (cap で発話縮小) | CC BY 4.0 |
 | fr | 107,464 / 28 | ~35k / **45** | CML-TTS **フィルタ緩和で corpus 全話者** | CC BY 4.0 |
 | pt | 34,066 / 8 | ~25k / **30 + CV 数百** | CML-TTS フィルタ緩和 + **Common Voice pt (品質フィルタ選別)** | CC BY 4.0 / CC0 |
-| **計** | **497,519 / 571** | **~340k / ~3,300+** | | |
+| **ko (2026-07-09 追加)** | — | ~110k / **~1,711** | **KsponSpeech** (cap 60 utt/spk, ~1,500 spk / ~90k utts) + **Zeroth-Korean** (~181 spk / ~18k utts) + **Common Voice ko** (UTMOS≥2.5 選別、~30 spk / ~2k utts) | AI-Hub consent / CC BY 4.0 / CC0 |
+| **計 (6-lang v8)** | **497,519 / 571** | **~321k / ~3,578** | | |
+| **計 (7-lang v8 + ko)** | — | **~420k / ~5,100** (source 合算 ~5,289 spk から dedup 後見積) | | |
 
 > **決定 (2026-07-07)**: v8 の ja は moe-speech-plus のみとする (ユーザー決定)。
 > gol-dataset (19,349 話者) は v9 拡張候補として §7 に退避 — 転写有無・品質・gated 承認の
 > 未確認リスクを v8 のクリティカルパスから外し、473 話者での ja 参照 SECS 改善を先に実測する。
 > es/fr/pt の話者は corpus 上限。縮小による es/fr 品質回帰は ep10 SECS で監視。
+>
+> **決定 (2026-07-09)**: **韓国語 (ko) を同一 v8 run で 7-lang 化**。 G2P は 7 ランタイム全てで
+> 既に ready (`docs/spec/language-id-map-contract.toml` の `extended_language_id_map` で
+> `ko=7` を pin 済、 `id_maps.py:_KOREAN_PHONEMES` も組み込み済) のため、 追加コストは
+> **data pipeline (parser 3 種 + CV ko exporter) のみ**。 6-lang 計算量に対する増分は
+> §3.10 に集約。 詳細な pipeline 実装は §6.5。
 
 ### 2.1 ja ソース詳細
 
@@ -84,6 +92,30 @@ v8 では見送り (話者数がそれでも不足なら v9 で speaker-diversit
 multi-speaker LJSpeech (`wavs/ + metadata.csv` 3 列 `filename|speaker|text`) で、
 `piper_train.preprocess --dataset-format ljspeech` (multi-speaker 自動判定) に直結する。
 
+### 2.4 選別フィルタ (ko) — 2026-07-09 追加
+
+ko は 3 ソースを合算するため、 ソースごとに異なる品質特性を吸収するフィルタを併用する。
+実装は `prepare_multilingual_dataset.py:parse_{zeroth_korean,kspon_speech,common_voice_ko}`
+(既存 `parse_aishell3` / `parse_cml_tts` と同一シグネチャ) と
+`export_common_voice_ko.py` (`export_common_voice_pt.py` ミラー、 UTMOS tsv 追加サポート)。
+
+1. **duration**: 1.0–15.0s (全ソース共通、 既存 `cache_audio_parallel` に統一)
+2. **話者あたり発話 ≥ 20** (samples_per_speaker=4 サンプラー要件、 全ソース共通)
+3. **UTMOS フィルタ (Common Voice ko のみ)**: `≥ 2.5`。 クラウドソース mic 品質のため
+   UTMOS tsv (`export_common_voice_ko --utmos-tsv ...` で作成) で足切り。
+   実測通過は ~30 話者想定 (validated ~50 spk → UTMOS 通過 ~30 spk)
+4. **KsponSpeech ETRI notation 除去** (`_clean_kspon_text`):
+   - `(A)/(B)` 表記は **発音形 (B) を採用** (dual-form 前提の学習ノイズを除去)
+   - `b//` / `l//` / `o//` / `n//` / `u//` の ETRI ノイズタグを削除
+   - `+` (反復) / `*` (強調) / stray `/` を削除
+   - raw PCM → 16kHz WAV 変換 (ETRI 提供スクリプト、 事前処理) は parse の前に完了
+5. **話者 ID の prefix**: sources 間でグローバルユニーク化のため
+   `zeroth-<original_id>` / `kspon-<original_id>` / `cv-<original_id>` を parser 側で付与
+
+speechMOS フィルタは KsponSpeech / Zeroth では **適用しない** (Zeroth は読み上げクリーン音源、
+KsponSpeech は自然発話でノイズ含み → MOS フィルタは話者多様性を過度に削るため cap 60/spk
+で分散を確保する方針)。 CV ko のみ UTMOS で品質下限を確保。
+
 ## 3. 学習方式: スクラッチ + smoke test
 
 1. **smoke test**: v7 `epoch=32-step=216326.ckpt` から新データセットで 1 epoch warm-start。
@@ -118,6 +150,15 @@ A100 単一 GPU への移行に伴う **P0 最適化フラグ** をまとめて�
 # --enable-length-bucketing / --no-compile-dynamic は §3.5 の 300 batch A/B で
 # +34% の逆効果を実測、 v8 本走では **使わない** (Fix B [`90f0a68`] で再設計済み、 本走前に再 A/B)
 ```
+
+**LANGUAGE_ID_MAP (7-lang extended、 §6.5 / §2 で ko 追加)**:
+6-lang v8 は `{ja:0, en:1, zh:2, es:3, fr:4, pt:5}` の canonical map を使用していたが、
+**ko 追加後は `docs/spec/language-id-map-contract.toml:extended_language_id_map`**
+(`{ja:0, en:1, zh:2, es:3, fr:4, pt:5, sv:6, ko:7}`) に切替。 ja..pt indices は不変で、
+`sv=6` は将来枠、 `ko=7` が今回投入。 CLI 側 (`--ko-zeroth / --ko-ksponspeech / --ko-cv`
+を `prepare_multilingual_dataset.py` に渡す) で dataset.jsonl に `language_id=7`
+の utts が入り、 `config.json` の `num_languages` は自動的に 7 になり `emb_lang`
+テーブルサイズが 7 次元化 (§6.5)。 学習 CLI 自体は 6-lang と同一。
 
 **削除したフラグ (v7 コマンドから)**:
 - `--no-pin-memory` — v7 は V100×4 で CPU RAM 節約用。 単一 A100 では pageable copy が
@@ -676,6 +717,57 @@ $1.07/hr、 driver 595) を 2 時間 rent (~$7.35 消費) して synthetic datas
 - 来月本走の 4x A100 DDP smoke2 相当 baseline (10.74 sec/step) を rerun して +5-10% 想定効果を実測する
 - 現段階では **§3.8 の "T3/T6 で 30-38 日 → …"予測は synthetic では confirm できず、 保守寄りで確認は本走 smoke に委ねる**
 - **implementation は動作、 crash なし、 数値安定** — 本走で有効化する準備は完了
+
+### 3.10 v8 に韓国語 (ko) 追加 — 追加コスト見積 (2026-07-09)
+
+§2.4 (フィルタ) / §6.5 (data pipeline 実装) の ko 拡張を **同一 v8 run に載せた場合の
+インクリメンタルコスト**。 G2P / language-id contract / phoneme inventory は全て 8-lang
+extended form で pin 済のため、 追加コストは data pipeline 実行 + 訓練時間の増分のみ。
+
+**データ規模の増分** (§2 表と同期):
+
+| 項目 | v8 (6-lang) | v8 + ko (7-lang) | 増分 |
+|---|---|---|---|
+| 話者数 | 3,578 | **~5,100** | **+~1,522 (+43%)** |
+| 発話数 | 321,391 | **~420,000** | **+~99k (+31%)** |
+| 追加 audio (soxr resample 後) | — | +~150-180 GB | ETRI PCM→WAV 変換 (~5-10GB) + Zeroth (~10GB) + CV ko (~2GB) |
+| 追加 CAM++ embedding (192-dim npy) | — | +~76 MB | 99k × 768 B |
+
+**時間・費用の増分** (§4.3 のフェーズ表を 7-lang case で展開):
+
+| フェーズ | v8 (6-lang) | v8 + ko (7-lang) | 増分理由 |
+|---|---|---|---|
+| DL + 前処理 (P2 並列 VAD + P4 zip cache 込) | ~8-10h | **~12-16h** | ETRI PCM→WAV (~3-4h、 事前 batch) + KsponSpeech parse (~2h) + Zeroth + CV ko (~1h) |
+| CAM++ 抽出 (P5 default 化後) | ~30 min | ~45 min | +99k utts × ~1M ops/utt |
+| smoke test (warm-start 1ep + 評価) | ~2h | ~2.5h | +15% batch/epoch |
+| **本走 80 epoch (4x A100 SXM4 DDP)** | **9-11 日** | **12-15 日** | 発話 +31% でほぼ線形 (batch/epoch ~3,300 → ~4,320) |
+| SECS 評価 + ONNX export + HF upload | ~4h | ~5h | ko 未知話者評価セット新設 (§5) を追加 |
+| **計 (v8 想定、 4x A100 SXM4 DDP、 $5.19/hr storage 込)** | **~9-11 日 / ~$672-1,120** | **~12-15 日 / ~$1,050-1,530** | **+3-4 日 / +~$380-410** |
+
+**インスタンス選定への影響 (§4.1)**:
+
+- disk: 1.5TB → **1.7-1.8TB** に増設 (raw ETRI PCM + Zeroth + CV ko の追加ソース分)
+- duration: **≥ 25 日** に引き上げ (7-lang 本走 12-15 日 + 前処理 12-16h + 復旧 margin)
+- 回線: 変更なし (≥ 3Gbps で ko 追加分 ~180GB のダウンロードも十分カバー)
+
+**予算判断のマイルストーン**:
+
+- 現状のユーザー予算 (v8 6-lang $672-1,120) から **+$400 前後** で 7-lang 化。
+  v9 gol-dataset 拡張 ($1,500+ 想定) より低コストで話者多様性 +43% を得られる
+- ko 追加のリスク: KsponSpeech は AI-Hub consent (**商用非公開**) のため、
+  v8 モデル自体を **research use only** で HF private repo に限定して配布
+  (Zeroth CC BY 4.0 + CV ko CC0 のみでの 7-lang 版は将来的に検討可)
+- SECS 目標 (§5): ja 参照 zero-shot ≥ 0.72 に加えて **ko 参照 zero-shot ≥ 0.65**
+  (話者数 ~1,700 は VCTK 級で、 en 参照ほどではないが zh 参照相当を期待)
+
+**開始条件** (§4.5 追加):
+
+- HF token: 変更なし (gated moe-speech-plus の read/write のみ)
+- **KsponSpeech の入手ルート**: AI-Hub アカウント + ETRI consent 承認 (~1-2 週間)。
+  raw PCM zip をローカル DL → ETRI 提供の PCM→WAV script (Python or C) で 16kHz WAV 化
+  → vast.ai instance に rsync (~10GB、 20-30 分)
+- Zeroth-Korean: openslr.org/40 の tar.gz を直 wget (認証不要)
+- CV ko: `export_common_voice_ko.py` + UTMOS tsv 作成 (~30 分)
 
 ## 5. 成功基準と評価
 
