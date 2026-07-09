@@ -423,7 +423,24 @@ PR で必須で入れる。
    - 実測ベース現実値: **51 日 / 単一 A100** (Plan A 想定の 15 倍)、 **9-11 日 / 4x A100 DDP** (Plan A 想定の 3 倍)
    - Plan A の予測が過大だった主因: bucketing 効果 -30-40% が実際は +34% 逆効果、 `--compile` +10-25% が使えず
 
-**v8 本走 wall-clock (実測ベース最終見積、 batch=128 想定)**:
+**batch size 探索実測 (2026-07-09 追加、 A100 SXM4 80GB × 1、 15 batches per size)**:
+
+| batch | VRAM peak | avg sec/step (startup 込) | 推定 utts/sec | 判定 |
+|---|---|---|---|---|
+| 64 (smoke2 baseline) | ~40GB (50%) | 10.74 (300 batches 平均) | **5.96** | ✅ **最高 throughput** |
+| 128 (中断) | 41.5GB (52%) | — | — | 動作確認のみ |
+| 192 | 63GB (78%) | 43.06 | ~5.82 | ✅ VRAM 余裕 |
+| 224 | **73GB (91.6%)** | 53.46 | ~5.15 | ⚠️ ギリギリ、 throughput 悪化 |
+| **256** | — | crash | — | ❌ **OOM (segfault)** |
+
+**意外な発見**: **batch を上げても utt/sec は改善せず** (むしろ悪化)。
+- batch=64 が最高 5.96 utts/sec、 batch=224 は 5.15 utts/sec (-14%)
+- 原因推測: attention の O(T²) スケール、 padding waste、 memory allocator 負荷、 cache pressure
+- **VITS + zero-shot 学習は compute-bound、 batch を上げても forward/backward per-utt が増える**
+
+**DDP スケーリングでは effective batch=128 (32/GPU × 4) が最適** — 単一 GPU での utt throughput 最良点を維持しつつ、 DDP で並列化。 batch=48/GPU × 4 (eff 192) も VRAM 余裕 (~15GB/GPU) だが utt throughput ロス見込み。
+
+**v8 本走 wall-clock (実測ベース最終見積、 batch=32/GPU × 4x DDP 想定)**:
 
 | 構成 | epoch 時間 | 80 epoch | コスト ($1.73/hr storage 込) |
 |---|---|---|---|
