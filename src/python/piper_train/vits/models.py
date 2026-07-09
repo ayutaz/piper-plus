@@ -944,8 +944,21 @@ class SynthesizerTrn(nn.Module):
             sid, lid, speaker_embeddings=speaker_embeddings
         )
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
+        # Safety clamp on log-variance to prevent exp() overflow.
+        # logs_p is fed into `exp(-2 * logs_p)` for both MAS (below) and the
+        # KL loss (losses.kl_loss). At scratch init the TextEncoder projection
+        # can produce logs_p ~ -30, making exp(60) ~ 1e26 and downstream
+        # `((z_p - m_p) ** 2) * exp(-2*logs_p)` overflow to inf — resulting in
+        # 100% NaN skip through the whole warm-up (observed 2026-07-09 on the
+        # v8 A100 SXM4 scratch run). VITS practice: |logs_p| < 5 after
+        # convergence; clamp at [-15, 15] gives 5+ orders of magnitude margin
+        # in fp32 (exp(30) = 1.07e13 vs fp32 max 3.4e38). Applied at source
+        # so MAS / KL / inference paths all see the clamped value. No effect
+        # once the model converges into the normal range.
+        logs_p = logs_p.clamp(min=-15.0, max=15.0)
 
         z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g)
+        logs_q = logs_q.clamp(min=-15.0, max=15.0)
         z_p = self.flow(z, y_mask, g=g)
 
         with torch.no_grad():
@@ -1044,6 +1057,9 @@ class SynthesizerTrn(nn.Module):
             sid, lid, speaker_embeddings=speaker_embeddings
         )
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
+        # Match the training-time clamp for consistency between train and
+        # inference. See models.py training forward for the rationale.
+        logs_p = logs_p.clamp(min=-15.0, max=15.0)
 
         # Prepare input for duration predictor with prosody features
         x_dp = self._prepare_prosody_input(x, x_mask, prosody_features, lid=lid)
