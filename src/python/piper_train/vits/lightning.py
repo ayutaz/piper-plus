@@ -262,6 +262,14 @@ class VitsModel(pl.LightningModule):
         # keeps the D-forward speed win of bf16 (~20-30% expected) without
         # exposing SCL to bf16 numerics.
         disc_precision: str = "inherit",
+        # T3: opt-in SDPA fast path for TextEncoder self-attention. Default OFF
+        # preserves the manual matmul path (bit-parity vs prior checkpoints).
+        # When True, ``TextEncoder.encoder`` (attentions.Encoder) swaps its
+        # per-layer MultiHeadAttention to ``F.scaled_dot_product_attention``
+        # with the relative-K bias folded into ``attn_mask``. The relative-V
+        # correction is dropped (SDPA does not surface p_attn). Expected win:
+        # +2-5% throughput, activation memory -60MB/batch on v8 real config.
+        attn_drop_rel_v: bool = False,
         **kwargs,
     ):
         super().__init__()
@@ -299,6 +307,7 @@ class VitsModel(pl.LightningModule):
             gin_channels=self.hparams.gin_channels,
             use_sdp=self.hparams.use_sdp,
             prosody_dim=self.hparams.prosody_dim,
+            attn_drop_rel_v=self.hparams.attn_drop_rel_v,
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm,
