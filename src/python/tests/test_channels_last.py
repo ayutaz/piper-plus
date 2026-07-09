@@ -2,16 +2,26 @@
 
 Opt-in perf switch: routes DiscriminatorP Conv2d layers through channels_last
 Tensor Core kernels on A100 SXM4 / Ada 6000. Silent fallback on sm_75 (T4).
-DiscriminatorS (Conv1d) and Generator (Conv1d-heavy) are untouched because
-torch.channels_last is only defined for 4D tensors.
+DiscriminatorS (Conv1d) is untouched because torch.channels_last is only
+defined for 4D tensors.
+
+T1 拡張: MBiSTFTGenerator (SynthesizerTrn.dec) にも同一 flag を propagate。
+現状 Generator は Conv1d のみで構成されるため PyTorch の
+``Module.to(memory_format=torch.channels_last)`` が 3D weight を skip し
+silent no-op。 (a) D 側との対称性、 (b) 将来 Generator に Conv2d を追加した
+時の future-proofing、 の 2 目的で通す。
 
 Contract:
 1. CLI flag ``--channels-last`` (default OFF) parses and reaches ``args``.
 2. Flag propagates through ``dict_args["use_channels_last"]`` and lands on the
-   VitsModel hparams / MultiPeriodDiscriminator / DiscriminatorP.
+   VitsModel hparams / MultiPeriodDiscriminator / DiscriminatorP AND on
+   SynthesizerTrn (→ MBiSTFTGenerator).
 3. When enabled, DiscriminatorP Conv2d weights adopt channels_last stride
-   pattern; DiscriminatorS Conv1d weights stay in default layout.
+   pattern; DiscriminatorS Conv1d and MBiSTFTGenerator Conv1d weights stay
+   in default layout (PyTorch's Module.to() skips 3D tensors).
 4. Discriminator forward path is functionally equivalent (deterministic seeds).
+5. MBiSTFTGenerator forward path with flag ON does not crash (Conv1d only,
+   silent no-op).
 """
 
 from __future__ import annotations
@@ -215,3 +225,146 @@ def test_discriminator_forward_functional_parity_cpu() -> None:
             "DiscriminatorP outputs should match between channels_last on/off "
             "when weights are initialized with the same seed."
         )
+
+
+# ---------------------------------------------------------------------------
+# 5. T1 拡張: MBiSTFTGenerator (Conv1d-only) silent no-op plumbing
+# ---------------------------------------------------------------------------
+
+
+def _make_generator(*, use_channels_last: bool, gin_channels: int = 0):
+    """Build a minimal MBiSTFTGenerator; skip if training deps missing.
+
+    Uses tiny channels to keep test fast (no CUDA, no PQMF batch grind).
+    """
+    try:
+        from piper_train.vits.mb_istft import MBiSTFTGenerator
+    except ImportError as e:
+        pytest.skip(f"Training dependencies not available: {e}")
+
+    return MBiSTFTGenerator(
+        initial_channel=8,
+        resblock="1",
+        resblock_kernel_sizes=(3,),
+        resblock_dilation_sizes=((1, 3, 5),),
+        upsample_rates=(4, 4),
+        upsample_initial_channel=16,
+        upsample_kernel_sizes=(8, 8),
+        gin_channels=gin_channels,
+        use_channels_last=use_channels_last,
+    )
+
+
+@pytest.mark.unit
+def test_generator_hparam_default_false() -> None:
+    """MBiSTFTGenerator.use_channels_last defaults to False (opt-in)."""
+    gen = _make_generator(use_channels_last=False)
+    assert gen.use_channels_last is False
+
+
+@pytest.mark.unit
+def test_generator_hparam_true_stored() -> None:
+    """When constructed with use_channels_last=True, the attribute persists.
+
+    This is the plumbing check: even though the flag is a silent no-op for
+    the current Conv1d-only Generator, the attribute must exist so that a
+    future Conv2d addition (or an assertion in downstream code) can inspect it.
+    """
+    gen = _make_generator(use_channels_last=True)
+    assert gen.use_channels_last is True
+
+
+@pytest.mark.unit
+def test_generator_conv1d_weights_untouched_by_flag() -> None:
+    """Enabling channels_last MUST NOT change Conv1d weight layout.
+
+    PyTorch's Module.to(memory_format=torch.channels_last) only converts 4D/5D
+    tensors (source: torch/nn/modules/module.py::_apply → convert:
+    ``t.dim() in (4, 5)`` guard). All Conv1d weights are 3D, so they must
+    remain in default (contiguous) layout even when the flag is True. If this
+    invariant breaks, PyTorch upstream changed behavior and we need to add
+    an explicit dim guard here.
+    """
+    gen = _make_generator(use_channels_last=True, gin_channels=8)
+
+    conv1d_seen = 0
+    for name, param in gen.named_parameters():
+        if param.dim() == 3:  # Conv1d / ConvTranspose1d weight
+            conv1d_seen += 1
+            assert param.is_contiguous(), (
+                f"Conv1d parameter {name} should stay in default contiguous "
+                f"layout when use_channels_last=True (PyTorch skips 3D tensors "
+                f"in Module.to(memory_format=...)). stride={param.stride()}, "
+                f"shape={tuple(param.shape)}"
+            )
+    assert conv1d_seen > 0, (
+        "MBiSTFTGenerator should contain at least one Conv1d parameter "
+        "(conv_pre / ups / resblocks / subband_conv_post)."
+    )
+
+
+@pytest.mark.unit
+def test_generator_forward_functional_parity_cpu() -> None:
+    """Same seed → same Generator output regardless of channels_last flag.
+
+    Since Conv1d weights are unchanged by the flag (see previous test), the
+    forward pass must produce bit-identical output. This is our safety net:
+    if a future refactor accidentally introduces a memory_format-sensitive
+    Conv1d path (or the .to(memory_format=...) call ever mutates 3D weights),
+    this test flags the regression.
+    """
+    torch.manual_seed(0)
+    gen_off = _make_generator(use_channels_last=False, gin_channels=8)
+    torch.manual_seed(0)
+    gen_on = _make_generator(use_channels_last=True, gin_channels=8)
+
+    gen_off.eval()
+    gen_on.eval()
+
+    x = torch.randn(1, 8, 16)  # [B, initial_channel, T_frames]
+    g = torch.randn(1, 8, 1)  # [B, gin_channels, 1]
+
+    with torch.no_grad():
+        out_off = gen_off(x, g)
+        out_on = gen_on(x, g)
+
+    # (fullband, subbands_signal) tuple in training mode
+    fullband_off, sub_off = out_off
+    fullband_on, sub_on = out_on
+
+    assert torch.allclose(fullband_off, fullband_on, atol=1e-5), (
+        "MBiSTFTGenerator fullband output should be bit-identical between "
+        "use_channels_last on/off (Conv1d is a silent no-op)."
+    )
+    assert torch.allclose(sub_off, sub_on, atol=1e-5), (
+        "MBiSTFTGenerator subbands output should be bit-identical between "
+        "use_channels_last on/off (Conv1d is a silent no-op)."
+    )
+
+
+# ---------------------------------------------------------------------------
+# 6. T1 拡張: VitsModel → SynthesizerTrn → MBiSTFTGenerator propagation
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_flag_propagates_to_synthesizer_generator() -> None:
+    """--channels-last=True reaches model_g.dec (MBiSTFTGenerator) attribute.
+
+    Guards the wiring: lightning.py → SynthesizerTrn(use_channels_last=...) →
+    MBiSTFTGenerator(use_channels_last=...). If a future refactor drops the
+    kwarg on any hop, model_g.dec.use_channels_last would silently stay False
+    and the future Conv2d NHWC dispatch would break unnoticed.
+    """
+    model = _make_model(use_channels_last=True)
+    assert model.model_g.dec.use_channels_last is True, (
+        "use_channels_last should propagate from VitsModel through "
+        "SynthesizerTrn to MBiSTFTGenerator (self.model_g.dec)."
+    )
+
+
+@pytest.mark.unit
+def test_flag_off_leaves_generator_flag_off() -> None:
+    """Default (flag omitted) keeps model_g.dec.use_channels_last False."""
+    model = _make_model(use_channels_last=False)
+    assert model.model_g.dec.use_channels_last is False
