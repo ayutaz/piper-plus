@@ -179,6 +179,140 @@ class TestCliArgs:
         assert captured["num_shards"] == 1
         assert captured["update_jsonl"] is True
 
+    def test_default_fast_path_args(self, monkeypatch, tmp_path):
+        """v2 default: --fixed-frames 400, --chunk-batch 128, batch-infer OFF"""
+        ds = tmp_path / "ds"
+        ds.mkdir()
+        (ds / "dataset.jsonl").write_text("", encoding="utf-8")
+
+        self._patch_main_dependencies(monkeypatch)
+
+        captured: dict = {}
+
+        def fake_extract(*args, **kwargs):
+            captured.update(kwargs)
+
+        monkeypatch.setattr(ese, "extract_per_utterance", fake_extract)
+
+        argv = [
+            "piper_train.extract_speaker_embedding",
+            "--encoder",
+            "/dev/null",
+            "--dataset-dir",
+            str(ds),
+            "--per-utterance",
+        ]
+        monkeypatch.setattr(sys, "argv", argv)
+        ese.main()
+
+        # v2 fast-path defaults
+        assert captured["fixed_frames"] == 400, (
+            "default should enable A'' chunked mode (fixed_frames=400)"
+        )
+        assert captured["chunk_batch"] == 128, (
+            "default chunk_batch=128 (A100/A6000 safe)"
+        )
+        assert captured["use_batch_infer"] is False, (
+            "legacy padded batch inference must remain opt-in"
+        )
+        # None = auto (extract_per_utterance decides based on fixed_frames)
+        assert captured["use_length_sort"] is None
+
+    def test_disable_fixed_frames_flag(self, monkeypatch, tmp_path):
+        """--disable-fixed-frames は fixed_frames=0 (legacy per-utt) にする"""
+        ds = tmp_path / "ds"
+        ds.mkdir()
+        (ds / "dataset.jsonl").write_text("", encoding="utf-8")
+
+        self._patch_main_dependencies(monkeypatch)
+
+        captured: dict = {}
+
+        def fake_extract(*args, **kwargs):
+            captured.update(kwargs)
+
+        monkeypatch.setattr(ese, "extract_per_utterance", fake_extract)
+
+        argv = [
+            "piper_train.extract_speaker_embedding",
+            "--encoder",
+            "/dev/null",
+            "--dataset-dir",
+            str(ds),
+            "--per-utterance",
+            "--disable-fixed-frames",
+        ]
+        monkeypatch.setattr(sys, "argv", argv)
+        ese.main()
+
+        assert captured["fixed_frames"] == 0
+
+    def test_explicit_fixed_frames_and_chunk_batch(self, monkeypatch, tmp_path):
+        """--fixed-frames / --chunk-batch を明示指定できる"""
+        ds = tmp_path / "ds"
+        ds.mkdir()
+        (ds / "dataset.jsonl").write_text("", encoding="utf-8")
+
+        self._patch_main_dependencies(monkeypatch)
+
+        captured: dict = {}
+
+        def fake_extract(*args, **kwargs):
+            captured.update(kwargs)
+
+        monkeypatch.setattr(ese, "extract_per_utterance", fake_extract)
+
+        argv = [
+            "piper_train.extract_speaker_embedding",
+            "--encoder",
+            "/dev/null",
+            "--dataset-dir",
+            str(ds),
+            "--per-utterance",
+            "--fixed-frames",
+            "300",
+            "--chunk-batch",
+            "64",
+            "--length-sort",
+        ]
+        monkeypatch.setattr(sys, "argv", argv)
+        ese.main()
+
+        assert captured["fixed_frames"] == 300
+        assert captured["chunk_batch"] == 64
+        assert captured["use_length_sort"] is True
+
+    def test_batch_infer_padded_flag(self, monkeypatch, tmp_path):
+        """--batch-infer-padded は use_batch_infer=True"""
+        ds = tmp_path / "ds"
+        ds.mkdir()
+        (ds / "dataset.jsonl").write_text("", encoding="utf-8")
+
+        self._patch_main_dependencies(monkeypatch)
+
+        captured: dict = {}
+
+        def fake_extract(*args, **kwargs):
+            captured.update(kwargs)
+
+        monkeypatch.setattr(ese, "extract_per_utterance", fake_extract)
+
+        argv = [
+            "piper_train.extract_speaker_embedding",
+            "--encoder",
+            "/dev/null",
+            "--dataset-dir",
+            str(ds),
+            "--per-utterance",
+            "--batch-infer-padded",
+            "--disable-fixed-frames",
+        ]
+        monkeypatch.setattr(sys, "argv", argv)
+        ese.main()
+
+        assert captured["use_batch_infer"] is True
+        assert captured["fixed_frames"] == 0
+
 
 # ---------------------------------------------------------------------------
 # extract_per_utterance: short-circuit branches
@@ -286,3 +420,145 @@ class TestExtractPerUtteranceShortCircuit:
         fake_session = mock.MagicMock()
         with pytest.raises(FileNotFoundError, match=r"dataset\.jsonl"):
             ese.extract_per_utterance(session=fake_session, dataset_dir=ds)
+
+
+# ---------------------------------------------------------------------------
+# extract_per_utterance: default fast-path (fixed_frames=400) smoke test
+# ---------------------------------------------------------------------------
+
+
+class TestDefaultFastPath:
+    """default (fixed_frames=400, chunk_batch=128) の chunked 経路を end-to-end で検証"""
+
+    def _make_dataset_with_pt(self, tmp_path: Path, n_utts: int = 3) -> Path:
+        """dataset.jsonl + 実際に .pt audio tensor を持つ dataset を作る"""
+        import torch as _torch  # local alias
+
+        ds = tmp_path / "ds"
+        ds.mkdir()
+        cache = ds / "cache" / "22050"
+        cache.mkdir(parents=True)
+
+        # 各 utt に対して 22050 Hz の audio tensor (~2-5 秒) を .pt で保存
+        source_sr = 22050
+        durations = [2.0, 3.5, 5.0][:n_utts]
+        entries = []
+        for i, dur in enumerate(durations):
+            n_samples = int(source_sr * dur)
+            audio = _torch.randn(n_samples, dtype=_torch.float32) * 0.1
+            pt_path = cache / f"utt{i}.pt"
+            _torch.save(audio, pt_path)
+            entries.append(
+                {
+                    "audio_norm_path": str(pt_path),
+                    "speaker_id": i % 2,
+                    "language_id": 0,
+                }
+            )
+
+        with open(ds / "dataset.jsonl", "w", encoding="utf-8") as f:
+            for e in entries:
+                json.dump(e, f)
+                f.write("\n")
+
+        return ds
+
+    def _make_fake_session(self, emb_dim: int = 192) -> mock.MagicMock:
+        """[B, T, 80] 入力 → [B, emb_dim] 出力 を返す fake session"""
+        import numpy as _np  # noqa: PLC0415
+
+        session = mock.MagicMock()
+        session.get_providers.return_value = ["CPUExecutionProvider"]
+        input_mock = mock.MagicMock()
+        input_mock.name = "input"
+        session.get_inputs.return_value = [input_mock]
+        output_mock = mock.MagicMock()
+        output_mock.name = "output"
+        session.get_outputs.return_value = [output_mock]
+
+        def _run(_out_names, feed):
+            arr = feed["input"]
+            # arr shape: [B, T, 80] (chunked) or [1, T, 80] (per-utt)
+            batch = arr.shape[0]
+            # deterministic embedding: sum over T+mel, tile to emb_dim
+            base = arr.reshape(batch, -1).sum(axis=1).astype(_np.float32)
+            emb = _np.tile(base[:, None], (1, emb_dim))
+            # add a bias so numerically all rows differ from zero (avoid div-by-0 in norm)
+            emb = emb + _np.arange(emb_dim, dtype=_np.float32)[None, :] * 0.01
+            return [emb]
+
+        session.run.side_effect = _run
+        return session
+
+    def test_default_chunked_path_produces_normalized_embeddings(self, tmp_path):
+        """default (fixed_frames=400 + chunk_batch=128) 経路で .npy が L2 正規化されて保存される"""
+        import numpy as _np  # noqa: PLC0415
+
+        ds = self._make_dataset_with_pt(tmp_path, n_utts=3)
+        session = self._make_fake_session()
+
+        ese.extract_per_utterance(
+            session=session,
+            dataset_dir=ds,
+            source_sr=22050,
+            batch_size=4,
+            num_workers=0,  # in-process for test determinism
+            # 全て default: fixed_frames=400, chunk_batch=128
+        )
+
+        emb_dir = ds / "speaker_embeddings"
+        saved_files = sorted(emb_dir.glob("*.npy"))
+        assert len(saved_files) == 3, f"expected 3 embeddings, got {len(saved_files)}"
+
+        for npy_path in saved_files:
+            emb = _np.load(npy_path)
+            assert emb.shape == (192,), f"{npy_path}: shape {emb.shape} != (192,)"
+            norm = _np.linalg.norm(emb)
+            assert abs(norm - 1.0) < 1e-5, (
+                f"{npy_path}: not L2-normalized (norm={norm})"
+            )
+
+        # dataset.jsonl が in-place で更新されている
+        with open(ds / "dataset.jsonl", encoding="utf-8") as f:
+            entries = [json.loads(line) for line in f]
+        for e in entries:
+            assert "speaker_embedding_path" in e
+            assert e["speaker_embedding_path"].startswith("speaker_embeddings/")
+
+    def test_chunk_batch_argument_is_respected(self, tmp_path):
+        """chunk_batch を小さく指定すると session.run が複数回呼ばれる"""
+        ds = self._make_dataset_with_pt(tmp_path, n_utts=3)
+        session = self._make_fake_session()
+
+        ese.extract_per_utterance(
+            session=session,
+            dataset_dir=ds,
+            source_sr=22050,
+            batch_size=8,  # 全 3 発話が 1 DataLoader batch に収まる
+            num_workers=0,
+            chunk_batch=1,  # 極小: chunk ごとに 1 回 session.run が呼ばれる
+        )
+
+        # 各発話は 2 chunk (2-4s は先頭寄せ/末尾寄せの 2 variant)、~5s は 1 chunk (T>target で 1 chunk)
+        # 3 発話 → 少なくとも 3 回、chunk_batch=1 なので chunk 数だけ session.run が呼ばれる
+        assert session.run.call_count >= 3
+
+    def test_env_var_overrides_cli_default(self, tmp_path, monkeypatch):
+        """PIPER_EMB_FIXED_FRAMES=0 が CLI default (400) を上書きし legacy per-utt に落ちる"""
+        ds = self._make_dataset_with_pt(tmp_path, n_utts=2)
+        session = self._make_fake_session()
+
+        monkeypatch.setenv("PIPER_EMB_FIXED_FRAMES", "0")
+
+        ese.extract_per_utterance(
+            session=session,
+            dataset_dir=ds,
+            source_sr=22050,
+            batch_size=4,
+            num_workers=0,
+            fixed_frames=400,  # CLI では default だが env が上書き
+        )
+
+        # 落ちずに完了することを確認 (legacy per-utt 経路)
+        emb_dir = ds / "speaker_embeddings"
+        assert len(list(emb_dir.glob("*.npy"))) == 2
