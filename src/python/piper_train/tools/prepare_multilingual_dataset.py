@@ -416,26 +416,27 @@ def parse_zeroth_korean(
 def parse_kspon_speech(
     base_dir: Path,
     splits: tuple[str, ...] = ("KsponSpeech_01",),
-    audio_ext: str = ".wav",
+    audio_ext: str = ".pcm",
     min_utts_per_spk: int = 20,
     cap_per_speaker: int | None = 60,
 ) -> tuple[list[tuple[str, str, str]], dict[str, int]]:
     """Parse KsponSpeech corpus (MIT/ETRI consent form, ~969h / ~2000 spk).
 
-    Layout after PCM→WAV conversion (see docs/handoff/zero-shot-v8-*.md):
+    Layout (raw distribution, no PCM→WAV conversion required as of v8):
         base_dir/
           KsponSpeech_01/
             KsponSpeech_0001/               # speaker id
-              KsponSpeech_000001.wav        # or .pcm (16kHz raw)
+              KsponSpeech_000001.pcm        # 16kHz mono s16le PCM
               KsponSpeech_000001.txt        # ETRI transcript (utf-8)
               ...
 
     Params:
-        audio_ext: extension to enumerate. Defaults to ``.wav`` since the raw
-                   distribution ships headerless PCM which soundfile cannot
-                   read directly; users typically convert PCM→WAV first via
-                   the shipping ETRI tool. Pass ``.pcm`` if the downstream
-                   audio loader has custom PCM support.
+        audio_ext: extension to enumerate. Defaults to ``.pcm`` because the
+                   raw distribution ships headerless int16 mono @ 16 kHz PCM
+                   directly and ``norm_audio._read_audio_any`` now reads it
+                   inline (saves the 3-4 h PCM→WAV pre-pass). Pass ``.wav``
+                   if you already converted the corpus to WAV before running
+                   this tool.
         min_utts_per_spk: drop speakers with fewer surviving utterances (the
                    `samples_per_speaker=4` sampler contract needs ≥ 4;
                    default 20 mirrors the Common Voice ko threshold).
@@ -1586,7 +1587,8 @@ def main():
     parser.add_argument(
         "--ko-ksponspeech",
         help="Path to KsponSpeech base directory (MIT/ETRI consent form; "
-        "PCM converted to WAV expected - see docs/handoff/zero-shot-v8-*.md)",
+        "raw 16kHz mono s16le .pcm read directly by norm_audio - no PCM→WAV "
+        "conversion required)",
     )
     parser.add_argument(
         "--ko-cv",
