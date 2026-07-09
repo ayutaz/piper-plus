@@ -282,6 +282,15 @@ def create_parser():
         help="Disable pin_memory in DataLoader (reduces CPU RAM for 4+ GPUs)",
     )
     parser.add_argument(
+        "--prefetch-factor",
+        type=int,
+        default=4,
+        help="DataLoader prefetch_factor (samples pre-loaded per worker, default: 4). "
+        "Raised from PyTorch's default of 2 so the H2D pipeline stays warm now that "
+        "Batch implements pin_memory(). Set lower (e.g. 2) if RAM is tight; only "
+        "meaningful when --num-workers > 0.",
+    )
+    parser.add_argument(
         "--samples-per-speaker",
         type=int,
         default=0,
