@@ -32,6 +32,7 @@ import json
 import logging
 import multiprocessing as mp
 import os
+import shutil
 import unicodedata
 import zipfile
 from collections import Counter
@@ -42,6 +43,27 @@ from tqdm import tqdm
 
 
 _LOGGER = logging.getLogger("prepare_moe_speech_plus")
+
+# ---------------------------------------------------------------------------
+# per-zip scan cache (2026-07-09 追加、opt-in default ON)
+# ---------------------------------------------------------------------------
+#
+# 契約 (contract):
+#   * cache 場所: ``{output-dir}/_scan_cache/{zip_stem}.jsonl`` (per-zip 1 file)。
+#   * cache 内容: 1 zip 分の *pre-filter* 生 metadata (stem / wav_name / dur /
+#     mos / text_aw / cer)。filter しきい値 (--min-mos / --max-cer / --cap /
+#     --min-utts) 変更で cache は無効化されない — filter を record 上で
+#     replay するだけで済む。zip 展開 + JSON parse + Levenshtein CER が
+#     hotspot (473 zip × ~800 utt → 3-4h) のため、 2 回目以降の実行が
+#     数分に短縮される。
+#   * 有効性検証: cache 冒頭行に ``(cache_version, zip_stem, zip_size,
+#     zip_mtime_ns)`` の 3+1 tuple を書き込み、 zip が差し替わっていたら
+#     自動 invalidate。
+#   * `--clear-scan-cache` で cache ディレクトリごと wipe → 強制 full scan。
+#   * cache 有効利用は default ON (backward compat 上の懸念なし: 出力の
+#     wav / metadata.csv は cache 経路でも byte-for-byte 一致する)。
+_CACHE_SUBDIR = "_scan_cache"
+_CACHE_VERSION = 1
 
 _PUNCT_TABLE = str.maketrans(
     "", "", "、。，．・！？!?…‥「」『』（）()[]｛｝{}<>〈〉《》―ー~〜・ 　\t\n\r'\"”“’‘"
@@ -87,18 +109,127 @@ def iter_zip_utterances(zip_path: Path):
             yield Path(name).stem, meta, wav_name
 
 
-def select_utterances(
-    zip_path: Path, args
-) -> tuple[list[tuple[str, str, str]], Counter]:
-    """1 キャラ分の zip から選別。(選抜リスト [(stem, wav_member, text)], 統計) を返す。"""
-    stats: Counter = Counter()
-    candidates = []
+def _cache_verifier(zip_path: Path) -> dict:
+    """cache invalidation 用の (cache_version, stem, size, mtime_ns) verifier。
+
+    zip 内容は不変前提だが、 dataset を差し替えた場合 (再ダウンロード / rsync
+    上書き) には mtime か size のいずれかが変化するため、 その差分で自動
+    invalidate する。zip_path 全体ではなく stem のみ入れるのは cache dir を
+    別ホストに rsync してもキーが一致するように。
+    """
+    st = zip_path.stat()
+    return {
+        "cache_version": _CACHE_VERSION,
+        "zip_stem": zip_path.stem,
+        "zip_size": st.st_size,
+        "zip_mtime_ns": st.st_mtime_ns,
+    }
+
+
+def _cache_file(cache_dir: Path, zip_path: Path) -> Path:
+    return cache_dir / f"{zip_path.stem}.jsonl"
+
+
+def scan_zip_records(zip_path: Path) -> list[dict]:
+    """1 zip の pre-filter 生 metadata を list[dict] で返す (cache write 用)。
+
+    フィルタしきい値に依存しない値のみ抽出:
+      - `stem`, `wav_name` (extract_speaker で wav 展開に必要)
+      - `dur`, `mos` (duration / MOS フィルタと cap 選抜用)
+      - `text_aw` (metadata.csv 出力用)
+      - `cer` (二重転写一致率; text_pk は cache に含めず CER 計算結果のみ保存)
+    """
+    records: list[dict] = []
     for stem, meta, wav_name in iter_zip_utterances(zip_path):
-        stats["total"] += 1
         dur = meta.get("duration")
         mos = meta.get("speechMOS")
         text_aw = (meta.get("anime_whisper_transcription") or "").strip()
         text_pk = (meta.get("parakeet_jp_transcription") or "").strip()
+        # CER は text_pk を消費する — cache には計算済 CER のみ保存し、
+        # 2 回目実行時に parakeet_jp テキストを持ち回らないことで JSONL
+        # サイズ (~1KB/utt → ~200B/utt) と Levenshtein 再計算を削減。
+        cer = char_error_rate(text_aw, text_pk) if text_aw else None
+        records.append(
+            {
+                "stem": stem,
+                "wav_name": wav_name,
+                "dur": dur,
+                "mos": mos,
+                "text_aw": text_aw,
+                "cer": cer,
+            }
+        )
+    return records
+
+
+def _load_or_scan_zip(
+    zip_path: Path,
+    cache_dir: Path | None,
+    *,
+    force_rescan: bool = False,
+) -> list[dict]:
+    """cache 有効時: cache が現行 zip verifier と一致すれば dict 列を返す。 miss なら scan + 書き戻し。"""
+    if cache_dir is None:
+        return scan_zip_records(zip_path)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_path = _cache_file(cache_dir, zip_path)
+    verifier = _cache_verifier(zip_path)
+    if not force_rescan and cache_path.exists():
+        try:
+            with open(cache_path, encoding="utf-8") as f:
+                header_line = f.readline()
+                if not header_line:
+                    raise ValueError("empty cache file")
+                header = json.loads(header_line)
+                if all(header.get(k) == v for k, v in verifier.items()):
+                    return [json.loads(line) for line in f if line.strip()]
+                _LOGGER.info(
+                    "scan cache %s: verifier drift (size/mtime 変化)、 再走査",
+                    cache_path.name,
+                )
+        except (OSError, ValueError, json.JSONDecodeError) as err:
+            _LOGGER.warning(
+                "scan cache %s: 読込失敗 %s、 再走査します", cache_path.name, err
+            )
+    # miss: scan and persist atomically
+    records = scan_zip_records(zip_path)
+    tmp_path = cache_path.with_suffix(cache_path.suffix + ".tmp")
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(verifier, ensure_ascii=False) + "\n")
+            for rec in records:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        # os.replace は POSIX / Windows 双方で atomic
+        os.replace(tmp_path, cache_path)
+    except OSError as err:
+        # cache 書き込み失敗は fatal ではない — 元処理を続行
+        _LOGGER.warning("scan cache 書込失敗 %s: %s", cache_path.name, err)
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+    return records
+
+
+def select_utterances_from_records(
+    records: list[dict], args
+) -> tuple[list[tuple[str, str, str]], Counter]:
+    """cache 済 record 列に対して filter (cache 無関係) を適用。 args から
+    ``min_dur``/``max_dur``/``min_mos``/``max_cer``/``cap``/``min_utts`` を使う。
+
+    ``select_utterances`` (zip を都度開くパス) と本関数 (cache パス) を
+    分割することで、 filter しきい値変更時は zip 再展開が起きず、
+    JSONL replay だけで済むようにしている。
+    """
+    stats: Counter = Counter()
+    candidates = []
+    for rec in records:
+        stats["total"] += 1
+        dur = rec.get("dur")
+        mos = rec.get("mos")
+        text_aw = rec.get("text_aw") or ""
+        cer = rec.get("cer")
         if dur is None or not (args.min_dur <= dur <= args.max_dur):
             stats["reject_duration"] += 1
             continue
@@ -108,11 +239,10 @@ def select_utterances(
         if not text_aw or not normalize_for_cer(text_aw):
             stats["reject_empty_text"] += 1
             continue
-        cer = char_error_rate(text_aw, text_pk)
-        if cer > args.max_cer:
+        if cer is None or cer > args.max_cer:
             stats["reject_cer"] += 1
             continue
-        candidates.append((mos, stem, wav_name, text_aw))
+        candidates.append((mos, rec["stem"], rec["wav_name"], text_aw))
         stats["pass"] += 1
     # speechMOS 上位から cap 件
     candidates.sort(reverse=True)
@@ -121,6 +251,23 @@ def select_utterances(
         stats["speaker_rejected"] = 1
         return [], stats
     return selected, stats
+
+
+def select_utterances(
+    zip_path: Path,
+    args,
+    cache_dir: Path | None = None,
+    *,
+    force_rescan: bool = False,
+) -> tuple[list[tuple[str, str, str]], Counter]:
+    """1 キャラ分の zip から選別。(選抜リスト [(stem, wav_member, text)], 統計) を返す。
+
+    ``cache_dir`` を渡すと per-zip の pre-filter 生 metadata を JSONL に
+    キャッシュし、 2 回目以降の実行は cache から復元 + filter replay のみ。
+    ``force_rescan=True`` で cache を無視して full scan。
+    """
+    records = _load_or_scan_zip(zip_path, cache_dir, force_rescan=force_rescan)
+    return select_utterances_from_records(records, args)
 
 
 def extract_speaker(
@@ -182,14 +329,22 @@ def _process_zip_worker(job):
         job: ``(zip_path, wav_dir_str, filter_kwargs)`` タプル。
             filter_kwargs は SimpleNamespace 復元用の primitive dict
             (Namespace オブジェクトを直接 pickle するより明示的で forward-compat)。
+            optional key: ``cache_dir_str`` (str or None) / ``force_rescan`` (bool)。
+            未指定なら cache 無効 (backward compat)。
 
     Returns:
         ``(zip_stem, rows, stats)`` — main process で writer.writerow() に渡す。
     """
     zip_path, wav_dir_str, filter_kwargs = job
-    args = SimpleNamespace(**filter_kwargs)
+    kwargs = dict(filter_kwargs)  # copy — pop 副作用を避ける
+    cache_dir_str = kwargs.pop("cache_dir_str", None)
+    force_rescan = kwargs.pop("force_rescan", False)
+    args = SimpleNamespace(**kwargs)
     wav_dir = Path(wav_dir_str)
-    selected, stats = select_utterances(zip_path, args)
+    cache_dir = Path(cache_dir_str) if cache_dir_str else None
+    selected, stats = select_utterances(
+        zip_path, args, cache_dir=cache_dir, force_rescan=force_rescan
+    )
     rows: list[tuple[str, str, str]] = []
     if selected:
         rows = extract_speaker(zip_path, selected, wav_dir)
@@ -247,6 +402,21 @@ def main() -> None:
             " 物理コア数程度まで有効。"
         ),
     )
+    parser.add_argument(
+        "--clear-scan-cache",
+        action="store_true",
+        help=(
+            "起動時に {output-dir}/_scan_cache/ を wipe して full scan を強制。"
+            " default では per-zip の pre-filter metadata を JSONL cache に"
+            " 保存し、 --min-mos/--max-cer/--cap 変更で 2 回目以降を数分に"
+            " 短縮する (3-4h → 5min 目標)。"
+        ),
+    )
+    parser.add_argument(
+        "--no-scan-cache",
+        action="store_true",
+        help="scan cache を完全に無効化 (書込も読込もしない)。 debug 用。",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -273,6 +443,22 @@ def main() -> None:
     wav_dir.mkdir(parents=True, exist_ok=True)
     metadata_path = args.output_dir / "metadata.csv"
 
+    # ---- scan cache セットアップ ----
+    # default で {output-dir}/_scan_cache/ を利用 — 再実行時 (--min-mos 等の
+    # しきい値変更) に 3-4h の zip 走査を数分に短縮する。
+    # --no-scan-cache で完全 disable、 --clear-scan-cache で wipe 後 rebuild。
+    cache_dir: Path | None
+    if args.no_scan_cache:
+        cache_dir = None
+        _LOGGER.info("scan cache: 無効 (--no-scan-cache)")
+    else:
+        cache_dir = args.output_dir / _CACHE_SUBDIR
+        if args.clear_scan_cache and cache_dir.exists():
+            _LOGGER.info("scan cache wipe: %s", cache_dir)
+            shutil.rmtree(cache_dir)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        _LOGGER.info("scan cache: %s", cache_dir)
+
     with open(metadata_path, "w", encoding="utf-8", newline="") as meta_f:
         writer = csv.writer(
             meta_f, delimiter="|", quoting=csv.QUOTE_NONE, escapechar="\\"
@@ -281,6 +467,11 @@ def main() -> None:
         if args.parallel:
             # ---- 並列パス (ProcessPool、opt-in) ----
             filter_kwargs = _filter_kwargs_from_args(args)
+            # cache_dir + force_rescan を worker に伝搬 (IPC は str/bool のみ)。
+            # --clear-scan-cache は main で wipe 済みなので worker 側は
+            # 通常 miss → rescan → 書込の順で自動 rebuild する。
+            filter_kwargs["cache_dir_str"] = str(cache_dir) if cache_dir else None
+            filter_kwargs["force_rescan"] = False
             wav_dir_str = str(wav_dir)
             jobs = [(zp, wav_dir_str, filter_kwargs) for zp in zip_paths]
 
@@ -312,7 +503,7 @@ def main() -> None:
         else:
             # ---- serial パス (default、backward compat) ----
             for zp in tqdm(zip_paths, desc="zip", unit="zip"):
-                selected, stats = select_utterances(zp, args)
+                selected, stats = select_utterances(zp, args, cache_dir=cache_dir)
                 grand.update(stats)
                 if selected:
                     kept_speakers += 1
