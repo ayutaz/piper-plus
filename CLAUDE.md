@@ -183,6 +183,28 @@ echo "PID: $!"
 
 ---
 
+## 📦 アーカイブ: v8 zero-shot 学習準備完了 (`feat/zero-shot-v8-dataset-scaling`)
+
+> ⚠️ **現在の作業ブランチは `dev`**。 このセクションは v8 話者数拡張版 (3,578 speakers、 6.3x v7) の準備完了記録。 本走は明示 go 待ち。
+
+**進捗 (2026-07-09 セッション終了時点)**:
+- ✅ **v8 dataset 完成**: 321,391 utts / 3,578 speakers / 6 lang (`/data/piper/dataset-multilingual-6lang-v8/`)
+- ✅ **scratch NaN blocker 解消**: bf16 cuFFT bug fix (`11ff71fc`) + KL 発散防止 3 段 (`d37ccda2` + `61aabe27` + `45060adc`)
+- ✅ **13 commits ランディング**: 5 施策 + KL fix + bucketing 実験 + docs
+- ✅ **実測 -23% throughput**: 14.0 → 10.74 sec/step (bf16 real config、 batch=64)
+- ⏸ **本走待ち**: 4x A100 SXM4 DDP + batch=128 で **9-11 日 / ~$1,120** 見込
+
+**次セッションでの起動**:
+- 全手順: [`docs/handoff/zero-shot-v8-2026-07-09.md`](docs/handoff/zero-shot-v8-2026-07-09.md)
+- CLI 最終版: [design doc §3.7](docs/design/zero-shot-v8-dataset-scaling-plan.md#37-全-smoke-test-完了--最終見積-2026-07-09-セッション終了時点)
+
+**実測で不採用が確定した施策**:
+- `--compile`: torch 2.11 + triton の kernel compile crash
+- `--precomputed-mel`: 学習は GPU-bound で -6.5% 遅い
+- `--enable-length-bucketing`: +34% 逆効果
+
+---
+
 ## 現在の状態
 
 ### 学習済みモデル (6言語マルチリンガル)

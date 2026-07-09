@@ -386,6 +386,80 @@ PR で必須で入れる。
 単一 GPU 構成とし、v7 で「CUDA illegal access」偽装の真因だった DDP/NCCL 系障害
 (rank 間 NaN skip 不整合 → all_reduce mismatch → 30 分 timeout) のクラスを丸ごと回避する。
 
+### 3.7 全 smoke test 完了 + 最終見積 (2026-07-09 セッション終了時点)
+
+**smoke test マトリクス** — 全 300 batches、 bf16-mixed + SCL + DINO + real config、 batch=64:
+
+| Test | 追加設定 | wall-clock | avg sec/step | Non-finite | 判定 |
+|---|---|---|---|---|---|
+| smoke1 | KL v1 (loose clamp)、 no 5 施策 | 3294 sec | 10.98 | 262/300 (87%) | 発散、 skip 支配で参考値 |
+| **smoke2** | 5 施策 + KL v2 (tight clamp + cap) | **3221 sec** | **10.74** | **6/300 (2%)** | ✅ v8 本走 config 確定 |
+| smoke3a | 上記 + `--compile` reduce-overhead | 198 sec で crash | — | — | ❌ torch inductor+triton 不動作 |
+| smoke3b | 上記 + `--precomputed-mel` (no `--compile`) | 3439 sec | 11.46 | 6/300 (2%) | ❌ GPU-bound で -6.5% 遅い |
+
+**Test 1 (§3.5、 KL v1 with bucketing ON、 100 batches) との比較**:
+- Test 1: 14.0 sec/step (100% successful)
+- smoke2: 10.74 sec/step (98% successful)
+- **→ 実効 -23% throughput improvement**
+
+**判明したこと**:
+
+1. **v8 学習の必須ブロッカー解消** (最大の成果):
+   - bf16 cuFFT bug (11ff71fc): mel STFT を bf16→fp32 defensive upcast
+   - KL scratch 発散 (d37ccda2 + 61aabe27 + 45060adc): logs_p/m_p clamp と loss_kl cap の 3 段防御
+   - **Non-finite skip 率: 100% → 2%** (v7 baseline 2.5% と同等)
+2. **有効な 5 施策**:
+   - T2 (Batch.pin_memory silent no-op 修正 + prefetch_factor=4): 最大寄与、 non_blocking H2D 実効化
+   - T5 (SDPA backend 明示、 flash=True): 動作確認、 現状 attention 実装は SDPA 未使用のため将来投資
+   - T1 (channels_last、 opt-in): Discriminator Conv2d のみ、 副作用ゼロ
+   - P1 (precompute_mel tool): 321k utts を **85 秒** で完了、 前処理再現時のみメリット
+   - P2 (VAD 並列化): preprocessing 側の runbook 化
+3. **不採用が確定した施策**:
+   - `--compile`: torch 2.11 + triton の kernel compile crash、 v8 では使わない
+   - `--precomputed-mel`: 学習は GPU-bound、 .npy load overhead で +6.5% 遅い
+   - `--enable-length-bucketing`: §3.5 で確認済 +34% 逆効果、 Fix B (`90f0a68c`) 未再検証
+4. **設計予測との乖離**:
+   - §3.3 Plan A 予測: "3.3-4.0 日 / 単一 A100"
+   - 実測ベース現実値: **51 日 / 単一 A100** (Plan A 想定の 15 倍)、 **9-11 日 / 4x A100 DDP** (Plan A 想定の 3 倍)
+   - Plan A の予測が過大だった主因: bucketing 効果 -30-40% が実際は +34% 逆効果、 `--compile` +10-25% が使えず
+
+**v8 本走 wall-clock (実測ベース最終見積、 batch=128 想定)**:
+
+| 構成 | epoch 時間 | 80 epoch | コスト ($1.73/hr storage 込) |
+|---|---|---|---|
+| 単一 A100 SXM4 (batch=128) | 8-9 hr | 27-30 日 | ~$1,120 |
+| **4x A100 SXM4 DDP + batch=128** ⭐ | **2.5-3 hr** | **9-11 日** | **~$1,120** ($5.19/hr × 240 hr) |
+| 8x A100 SXM4 DDP + batch=192 | 1.5-2 hr | 5-6 日 | ~$1,600 |
+| H100 SXM 80GB × 2 (未検証) | 1.7 hr | 5.7 日 | ~$600-700 |
+
+**v8 本走 CLI (実測反映最終版)**:
+
+```bash
+python -m piper_train \
+  --dataset-dir /data/piper/dataset-multilingual-6lang-v8 \
+  --prosody-dim 16 \
+  --accelerator gpu --devices 4 --precision bf16-mixed \
+  --max_epochs 80 --batch-size 32 --samples-per-speaker 4 \
+  --checkpoint-epochs 2 --save-top-k 5 --quality medium \
+  --base_lr 2e-4 --disable_auto_lr_scaling \
+  --ema-decay 0.9995 --num-workers 8 --prefetch-factor 4 --no-wavlm \
+  --max-phoneme-ids 400 \
+  --spk-emb-noise-sigma 0.05 --d-update-interval 1 \
+  --lr-scheduler cosine --lr-warmup-epochs 5 --lr-min 1e-5 \
+  --kl-annealing-epochs 10 \
+  --c-dino 0.5 --c-spk 1.0 --c-sub-stft 1.0 \
+  --gradient-clip-val 1.0 \
+  --speaker-encoder-path /data/piper/models/campplus.onnx \
+  --val-every-n-epochs 5 --audio-log-epochs 5 \
+  --language-balanced-sampling \
+  --channels-last \
+  --default_root_dir /data/piper/output-zero-shot-multi-6lang-v8
+# 除外フラグ (実測で不採用):
+#   --compile           # torch inductor+triton crash
+#   --precomputed-mel   # GPU-bound で効果なし
+#   --enable-length-bucketing  # +34% 逆効果 (Fix B 未再検証)
+```
+
 ### 4.1 インスタンス選定基準 (長期稼働の安定性)
 
 7 日級の連続稼働のため、価格最優先ではなく以下で絞り込む:
