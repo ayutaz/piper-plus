@@ -38,6 +38,13 @@ class Utterance:
     text: str | None = None
     prosody_features: list[dict | None] | None = None  # A1/A2/A3 per phoneme
     speaker_embedding_path: Path | None = None
+    # Optional precomputed spectrogram (.npy, fp16) — populated by
+    # PiperDataset when ``precomputed_mel_dir`` is supplied and the file is
+    # present on disk. ``__getitem__`` prefers this path when set because
+    # ``np.load`` is 2-3x faster than ``torch.load`` on the ``.spec.pt``
+    # cache (no pickle deserialisation). Backward-compatible: when ``None``
+    # the loader falls back to ``audio_spec_path``.
+    precomputed_mel_path: Path | None = None
 
 
 @dataclass
@@ -125,8 +132,27 @@ class PiperDataset(Dataset):
         max_spec_length: int | None = None,
         filter_length: int = 1024,
         validate_cache: bool = False,
+        precomputed_mel_dir: Path | str | None = None,
     ):
         self.utterances: list[Utterance] = []
+
+        # Resolve the precomputed spectrogram cache directory once. When the
+        # directory does not exist we treat it as absent (falls back to
+        # ``audio_spec_path`` per utterance). This keeps ``--precomputed-mel``
+        # safe to pass even on datasets that were not preprocessed with
+        # ``tools/precompute_mel.py`` — training will simply load from the
+        # legacy ``.spec.pt`` cache and log a debug diagnostic.
+        self.precomputed_mel_dir: Path | None = None
+        if precomputed_mel_dir is not None:
+            resolved = Path(precomputed_mel_dir)
+            if resolved.is_dir():
+                self.precomputed_mel_dir = resolved
+            else:
+                _LOGGER.warning(
+                    "precomputed_mel_dir=%s does not exist; "
+                    "falling back to audio_spec_path for every utterance.",
+                    resolved,
+                )
 
         for dataset_path in dataset_paths:
             dataset_path = Path(dataset_path)
@@ -137,6 +163,7 @@ class PiperDataset(Dataset):
                     max_phoneme_ids=max_phoneme_ids,
                     max_spec_length=max_spec_length,
                     filter_length=filter_length,
+                    precomputed_mel_dir=self.precomputed_mel_dir,
                 )
             )
 
@@ -165,7 +192,12 @@ class PiperDataset(Dataset):
         if audio_norm.dim() == 1:
             audio_norm = audio_norm.unsqueeze(0)
 
-        spectrogram = _load_tensor(utt.audio_spec_path)
+        # Prefer the precomputed ``.mel.npy`` cache when it was resolved by
+        # ``load_utterance``. ``_load_tensor`` handles both the ``.npy`` path
+        # (fast: numpy → torch.from_numpy, no pickle) and the legacy
+        # ``.spec.pt`` fallback (torch.load).
+        spec_path = utt.precomputed_mel_path or utt.audio_spec_path
+        spectrogram = _load_tensor(spec_path)
         # Convert float16 spec to float32 (new caches are saved as float16 to save disk space)
         if spectrogram.dtype == torch.float16:
             spectrogram = spectrogram.float()
@@ -251,6 +283,7 @@ class PiperDataset(Dataset):
         max_phoneme_ids: int | None = None,
         max_spec_length: int | None = None,
         filter_length: int = 1024,
+        precomputed_mel_dir: Path | None = None,
     ) -> Iterable[Utterance]:
         num_skipped_phoneme = 0
         num_skipped_spec = 0
@@ -276,6 +309,19 @@ class PiperDataset(Dataset):
 
                 try:
                     utt = PiperDataset.load_utterance(line, dataset_dir)
+
+                    # Resolve the precomputed spectrogram sibling if a cache
+                    # dir was supplied. We only record the path when the file
+                    # is present so ``__getitem__`` never has to stat again.
+                    # Missing files silently fall back to ``audio_spec_path``
+                    # (backward-compat).
+                    if precomputed_mel_dir is not None:
+                        candidate = PiperDataset._precomputed_mel_path_for(
+                            precomputed_mel_dir, utt.audio_spec_path
+                        )
+                        if candidate.exists():
+                            utt.precomputed_mel_path = candidate
+
                     if (max_phoneme_ids is not None) and (
                         len(utt.phoneme_ids) > max_phoneme_ids
                     ):
@@ -285,11 +331,19 @@ class PiperDataset(Dataset):
                     # Filter by spectrogram length using file size estimation.
                     # Uses os.path.getsize() (a single stat syscall) instead of
                     # loading every spec file at init time.
+                    # When ``precomputed_mel_path`` is populated we size that
+                    # (.npy) file instead of the legacy .spec.pt so the header
+                    # constant matches the actual on-disk format.
                     if max_spec_length is not None:
-                        file_size = os.path.getsize(utt.audio_spec_path)
+                        size_path = (
+                            utt.precomputed_mel_path
+                            if utt.precomputed_mel_path is not None
+                            else utt.audio_spec_path
+                        )
+                        file_size = os.path.getsize(size_path)
                         header_bytes = (
                             spec_header_bytes_npy
-                            if utt.audio_spec_path.suffix == ".npy"
+                            if size_path.suffix == ".npy"
                             else spec_header_bytes_pt
                         )
                         estimated_spec_length = (
@@ -318,6 +372,29 @@ class PiperDataset(Dataset):
                 num_skipped_spec,
                 max_spec_length,
             )
+
+    # Suffixes stripped when composing the sibling ``.mel.npy`` cache path.
+    # Kept aligned with ``tools.precompute_mel._SPEC_SUFFIXES`` — this is the
+    # only integration point between the writer (precompute_mel) and reader
+    # (this dataset), so if you add a new cache extension update both.
+    _MEL_STRIP_SUFFIXES = (".spec.pt", ".spec.npy", ".pt", ".npy")
+
+    @staticmethod
+    def _precomputed_mel_path_for(
+        precomputed_mel_dir: Path,
+        audio_spec_path: Path,
+    ) -> Path:
+        """Compose ``{precomputed_mel_dir}/{cache_id}.mel.npy`` from an
+        ``audio_spec_path``. Mirrors ``tools.precompute_mel.mel_path_for``."""
+        name = audio_spec_path.name
+        cache_id: str | None = None
+        for suffix in PiperDataset._MEL_STRIP_SUFFIXES:
+            if name.endswith(suffix):
+                cache_id = name[: -len(suffix)]
+                break
+        if cache_id is None:
+            cache_id = audio_spec_path.stem
+        return precomputed_mel_dir / f"{cache_id}.mel.npy"
 
     @staticmethod
     def load_utterance(line: str, dataset_dir: Path | None = None) -> Utterance:
