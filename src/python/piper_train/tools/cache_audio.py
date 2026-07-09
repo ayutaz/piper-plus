@@ -24,7 +24,11 @@ import soxr
 import torch
 from tqdm import tqdm
 
-from piper_train.norm_audio import _atomic_torch_save, energy_vad_numpy
+from piper_train.norm_audio import (
+    _atomic_torch_save,
+    default_num_processes,
+    energy_vad_numpy,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -120,9 +124,15 @@ def main() -> None:
     )
     parser.add_argument(
         "--workers",
+        "--num-processes",
+        dest="workers",
         type=int,
-        default=mp.cpu_count(),
-        help="Number of parallel workers (default: cpu_count)",
+        default=default_num_processes(),
+        help=(
+            "Number of parallel workers (default: min(cpu_count//2, 32); "
+            "capped to prevent A100/64-vCPU host thrashing). "
+            "--num-processes is accepted as an alias."
+        ),
     )
     parser.add_argument(
         "--vad-threshold",
