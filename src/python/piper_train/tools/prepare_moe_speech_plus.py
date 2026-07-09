@@ -19,16 +19,27 @@ Usage:
       --input-dir /data/downloads/moe-speech-plus \
       --output-dir /data/piper/moe-speech-plus-selected \
       --stats-only            # まず分布レポートのみ
+
+  # 並列展開 (2026-07-09、v8 dataset prep 高速化、opt-in)
+  python -m piper_train.tools.prepare_moe_speech_plus \
+      --input-dir ... --output-dir ... \
+      --parallel --num-processes 16
 """
 
 import argparse
 import csv
 import json
 import logging
+import multiprocessing as mp
+import os
 import unicodedata
 import zipfile
 from collections import Counter
 from pathlib import Path
+from types import SimpleNamespace
+
+from tqdm import tqdm
+
 
 _LOGGER = logging.getLogger("prepare_moe_speech_plus")
 
@@ -76,7 +87,9 @@ def iter_zip_utterances(zip_path: Path):
             yield Path(name).stem, meta, wav_name
 
 
-def select_utterances(zip_path: Path, args) -> tuple[list[tuple[str, str, str]], Counter]:
+def select_utterances(
+    zip_path: Path, args
+) -> tuple[list[tuple[str, str, str]], Counter]:
     """1 キャラ分の zip から選別。(選抜リスト [(stem, wav_member, text)], 統計) を返す。"""
     stats: Counter = Counter()
     candidates = []
@@ -136,6 +149,70 @@ def collect_mos_histogram(zip_paths, sample_per_zip: int = 200) -> Counter:
     return hist
 
 
+# ---------------------------------------------------------------------------
+# ProcessPool 並列化 (2026-07-09 追加、opt-in `--parallel`)
+# ---------------------------------------------------------------------------
+#
+# 契約 (contract):
+#   * default OFF (serial) — `--parallel` flag で opt-in、backward compat 維持。
+#   * `Pool.imap(chunksize=1)` で input 順序を preserve — serial run と
+#     metadata.csv の行順が byte-for-byte 一致する。
+#   * spawn context を強制 — Windows / macOS Python 3.14 と挙動を揃え、
+#     fork 依存の非決定性を避ける。
+#   * wav 書き込みは worker 側 (`extract_speaker`) が実施。stem は utterance
+#     単位で unique (元 serial 版と同じ) のためロック不要。metadata.csv 書き
+#     込みは main process が imap 結果を逐次 writer.writerow() で集約する
+#     ため、ロックも csv escape 崩れも起きない。
+#
+# 期待効果: moe-speech-plus 473 zip × ~800 utts の展開/フィルタ phase が
+# JSON parse + Levenshtein CER で CPU-bound → 16 プロセスで 12-16x
+# throughput (serial の 30-45 分 → 3-5 分 スケール)。
+
+
+def _default_num_processes() -> int:
+    """`os.cpu_count() // 2`、最低 1、上限 32。VAD 並列化と同じヒューリスティック。"""
+    cpu = os.cpu_count() or 2
+    return max(1, min(cpu // 2, 32))
+
+
+def _process_zip_worker(job):
+    """Pool worker: 1 zip を選別 + wav 展開 (spawn 経由で pickle される)。
+
+    Args:
+        job: ``(zip_path, wav_dir_str, filter_kwargs)`` タプル。
+            filter_kwargs は SimpleNamespace 復元用の primitive dict
+            (Namespace オブジェクトを直接 pickle するより明示的で forward-compat)。
+
+    Returns:
+        ``(zip_stem, rows, stats)`` — main process で writer.writerow() に渡す。
+    """
+    zip_path, wav_dir_str, filter_kwargs = job
+    args = SimpleNamespace(**filter_kwargs)
+    wav_dir = Path(wav_dir_str)
+    selected, stats = select_utterances(zip_path, args)
+    rows: list[tuple[str, str, str]] = []
+    if selected:
+        rows = extract_speaker(zip_path, selected, wav_dir)
+    return zip_path.stem, rows, stats
+
+
+def _filter_kwargs_from_args(args) -> dict:
+    """`argparse.Namespace` からフィルタ関連の primitive dict を抽出。
+
+    Namespace を直接 pickle しても動くが、worker に不要な属性 (input_dir /
+    output_dir / parallel / num_processes / stats_only) を送らないことで
+    IPC ペイロードを最小化する。
+    """
+    return {
+        "min_dur": args.min_dur,
+        "max_dur": args.max_dur,
+        "min_mos": args.min_mos,
+        "max_cer": args.max_cer,
+        "min_utts": args.min_utts,
+        "cap": args.cap,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-dir", type=Path, required=True)
@@ -152,6 +229,24 @@ def main() -> None:
         "--stats-only", action="store_true", help="抽出せず分布レポートのみ"
     )
     parser.add_argument("--limit-speakers", type=int, default=0, help="デバッグ用")
+    parser.add_argument(
+        "--parallel",
+        action="store_true",
+        help=(
+            "ProcessPool で per-zip 並列展開 (opt-in、default OFF)。 "
+            "output は serial と byte-for-byte 一致 (Pool.imap で順序 preserve)。"
+        ),
+    )
+    parser.add_argument(
+        "--num-processes",
+        type=int,
+        default=_default_num_processes(),
+        help=(
+            "--parallel 時のワーカ数 (default = min(cpu_count()/2, 32))。"
+            " zip 展開 + JSON parse + Levenshtein CER が CPU-bound のため"
+            " 物理コア数程度まで有効。"
+        ),
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -177,26 +272,66 @@ def main() -> None:
     wav_dir = args.output_dir / "wavs"
     wav_dir.mkdir(parents=True, exist_ok=True)
     metadata_path = args.output_dir / "metadata.csv"
+
     with open(metadata_path, "w", encoding="utf-8", newline="") as meta_f:
         writer = csv.writer(
             meta_f, delimiter="|", quoting=csv.QUOTE_NONE, escapechar="\\"
         )
-        for zp in zip_paths:
-            selected, stats = select_utterances(zp, args)
-            grand.update(stats)
-            if selected:
-                kept_speakers += 1
-                for row in extract_speaker(zp, selected, wav_dir):
-                    writer.writerow(row)
-                grand["selected_utts"] += len(selected)
+
+        if args.parallel:
+            # ---- 並列パス (ProcessPool、opt-in) ----
+            filter_kwargs = _filter_kwargs_from_args(args)
+            wav_dir_str = str(wav_dir)
+            jobs = [(zp, wav_dir_str, filter_kwargs) for zp in zip_paths]
+
+            # spawn を明示 — fork の non-determinism / Windows 非対応を回避。
+            ctx = mp.get_context("spawn")
             _LOGGER.info(
-                "%s: %d/%d 選抜 %s",
-                zp.stem,
-                len(selected),
-                stats["total"],
-                "(話者除外)" if not selected else "",
+                "並列展開: %d プロセス x %d zip", args.num_processes, len(jobs)
             )
-    _LOGGER.info("=== 完了: 話者 %d/%d、発話 %d ===", kept_speakers, len(zip_paths), grand["selected_utts"])
+            with ctx.Pool(processes=args.num_processes) as pool:
+                # chunksize=1 で input 順序を preserve (metadata.csv の
+                # 話者ブロック順が serial と一致するのを維持)。
+                it = pool.imap(_process_zip_worker, jobs, chunksize=1)
+                for zip_stem, rows, stats in tqdm(
+                    it, total=len(jobs), desc="zip", unit="zip"
+                ):
+                    grand.update(stats)
+                    if rows:
+                        kept_speakers += 1
+                        for row in rows:
+                            writer.writerow(row)
+                        grand["selected_utts"] += len(rows)
+                    _LOGGER.info(
+                        "%s: %d/%d 選抜 %s",
+                        zip_stem,
+                        len(rows),
+                        stats["total"],
+                        "(話者除外)" if not rows else "",
+                    )
+        else:
+            # ---- serial パス (default、backward compat) ----
+            for zp in tqdm(zip_paths, desc="zip", unit="zip"):
+                selected, stats = select_utterances(zp, args)
+                grand.update(stats)
+                if selected:
+                    kept_speakers += 1
+                    for row in extract_speaker(zp, selected, wav_dir):
+                        writer.writerow(row)
+                    grand["selected_utts"] += len(selected)
+                _LOGGER.info(
+                    "%s: %d/%d 選抜 %s",
+                    zp.stem,
+                    len(selected),
+                    stats["total"],
+                    "(話者除外)" if not selected else "",
+                )
+    _LOGGER.info(
+        "=== 完了: 話者 %d/%d、発話 %d ===",
+        kept_speakers,
+        len(zip_paths),
+        grand["selected_utts"],
+    )
     for key in sorted(grand):
         _LOGGER.info("  %s: %d", key, grand[key])
 
