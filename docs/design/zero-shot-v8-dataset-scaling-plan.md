@@ -206,7 +206,65 @@ end-to-end で **~5-6 日 / ~$194** の見込み (§4.3 更新表参照)。
   の実測。 実 GPU (A100) 上でしか意味を持たないため、 v8 本走開始時に取得 → Plan B 設計に
   フィードバックする方針 (別作業)。 ローカルの CI/dev マシンでは skip。
 
-## 4. vast.ai 実行計画
+### 3.4 vast.ai A100 実測結果 (2026-07-09) + scratch NaN blocker 修正
+
+Plan A 反映後の初 GPU 実行で 2 つのバグを発見し、 修正済 (両方 feature branch にコミット):
+
+**Bug #1: cuFFT が BFloat16 で失敗** (commit [`11ff71fc`](https://github.com/ayutaz/piper-plus/commit/11ff71fc))
+- `mel_spectrogram_torch` / `spectrogram_torch` の `torch.stft` が bf16-mixed autocast 下で
+  `RuntimeError: cuFFT doesn't support tensor of type: BFloat16` を吐く。 v7 の `32-true`
+  では発生せず、 A100 bf16-mixed 化で顕在化
+- 修正: STFT 前に bf16/fp16 を fp32 に defensive upcast。 出力 dtype は L1 loss と揃う fp32
+
+**Bug #2: scratch 初期化から KL loss = inf → 100% 全 batch skip** (commit [`d37ccda2`](https://github.com/ayutaz/piper-plus/commit/d37ccda2) + [`61aabe27`](https://github.com/ayutaz/piper-plus/commit/61aabe27))
+- 診断: `_PIPER_DEBUG_LOSS` env-gated print で `loss_kl=inf` を特定。 さらに
+  `_PIPER_KL_DEBUG` で `logs_p_min=-431.9 logs_p_max=521.9` (clamp 対象範囲を大きく超える)、
+  `exp(-2 * logs_p)` が `((z_p - m_p) ** 2)` と積で fp32 max (3.4e38) を超えて inf 化
+- 原因 1: `TextEncoder`/`PosteriorEncoder` projection が scratch init で `logs_p ~ -30` を
+  出力可能。 `enc_p`/`enc_q` 直後で `logs_p, logs_q = clamp(-15, 15)` を追加
+- 原因 2: 上記だけでは不十分。 line 991 の `logs_p = matmul(attn, logs_p)` で MAS 由来の
+  attn が scratch 初期化時に non-one-hot となり pre-clamp の [-15, 15] を 30x 増幅。
+  Super-MAS Triton dispatch や tie-breaking で複数の 1 が 1 行に立つ症状。 → MAS 拡張後
+  にも `logs_p = clamp(-15, 15)`、 `m_p = clamp(-1000, 1000)` を追加
+- 修正後: **Non-finite skip 0 件 / 40 batches** (それ以前は 40/40 で 100% skip)
+- 副次: `loss_kl` の初期絶対値は依然 ~1e14 (KL divergence の理論値どおり scratch では大きい)、
+  gradient_clip_val=1.0 でクリップされ optimizer step は健全。 v7 と同様 数 epoch で収束見込み
+- 収束後は `|logs_p| < 5` が普通なので clamp は no-op、 model の表現力を損なわない
+
+**bucketing A/B の実測** (--precision 32-true / 40 batches / batch_size=32、 KL fix 後):
+
+| run | 設定 | wall-clock | sec/step | Non-finite |
+|---|---|---|---|---|
+| A | bucketing OFF | 433 sec | 10.8 | 0 |
+| B | bucketing ON | 538 sec | 13.5 (**+24% 遅い**) | 0 |
+| C | ON + nsys profile | 350 sec / 20 batches | 17.5 (nsys overhead 込) | 0 |
+
+**bucketing 効果測定は 40 batch サンプルサイズでは不確定**:
+
+- Run B の初回 batch shape (phoneme_max=181, audio_max=180k) は Run A (339 / 293k) より小、
+  epoch 全体の compute total は同等でも batch ごとの分散が異なる
+- cudnn.benchmark が異なる shape ごとに kernel 再選択、 40 batch 初期は選択オーバーヘッドが
+  支配的で **bucketing の padding 削減メリットが埋もれる**
+- **数百 batch 以降** で cudnn.benchmark キャッシュが steady state に達し、 理論通り
+  padding 削減が sec/step 改善として現れる想定
+- 現時点で bucketing の default OFF を維持、 v8 本走で 1 epoch (200+ batches) 走らせて
+  epoch 平均で判断する方針
+
+**nsys GPU 内訳 (Run C、 20 batches、 backward 含む)**:
+
+| カテゴリ | 割合 | 備考 |
+|---|---|---|
+| cudnn nchw↔nhwc 変換 | 12.8% (9.6% + 3.2%) | memory layout 不整合。 channels_last 移行で削減余地 |
+| CUDA memcpy H2D | 5.4% | データローダ側の入力転送 |
+| CUDA memcpy D2H | 5.3% | loss log / checkpoint 用 |
+| cutlass wgrad TF32 | 4.2% | backward の conv 勾配 |
+| sm80_xmma fprop TF32 | 3.9% | forward の conv (計 15%+) |
+| elementwise | 5.2% (2.7% + 2.5%) | 標準的な非線形 / broadcast |
+| その他 (cutlass 各種、 reduction) | ~63% | discriminator / decoder / STFT |
+
+- memcpy 合計 10.7% は tmpfs preload / mmap で削減可能 (§3.3 未実装項目参照)
+- **nchw↔nhwc 変換 12.8% は無視できない**、 v8 完走後の Plan B で `torch.channels_last`
+  移行を検討する価値あり
 
 | 項目 | 値 |
 |---|---|
