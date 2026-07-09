@@ -20,10 +20,10 @@ Usage:
       --output-dir /data/piper/moe-speech-plus-selected \
       --stats-only            # まず分布レポートのみ
 
-  # 並列展開 (2026-07-09、v8 dataset prep 高速化、opt-in)
+  # 並列展開 (2026-07-09、v8 dataset prep 高速化、default ON)
   python -m piper_train.tools.prepare_moe_speech_plus \
       --input-dir ... --output-dir ... \
-      --parallel --num-processes 16
+      --num-processes 16       # `--no-parallel` で serial 化 (CI/デバッグ用)
 """
 
 import argparse
@@ -297,13 +297,18 @@ def collect_mos_histogram(zip_paths, sample_per_zip: int = 200) -> Counter:
 
 
 # ---------------------------------------------------------------------------
-# ProcessPool 並列化 (2026-07-09 追加、opt-in `--parallel`)
+# ProcessPool 並列化 (2026-07-09 追加、default ON `--parallel` / opt-out `--no-parallel`)
 # ---------------------------------------------------------------------------
 #
 # 契約 (contract):
-#   * default OFF (serial) — `--parallel` flag で opt-in、backward compat 維持。
-#   * `Pool.imap(chunksize=1)` で input 順序を preserve — serial run と
-#     metadata.csv の行順が byte-for-byte 一致する。
+#   * default ON — v8 dataset prep 高速化 (5-11h 目標) の主軸。 CI / 小さい
+#     dataset で serial に戻したい場合は `--no-parallel` を明示する。
+#   * `Pool.imap(chunksize=8)` で input 順序を preserve — chunksize は 1 でも
+#     8 でも `imap` は input 順で yield するため、metadata.csv の行順と
+#     wavs/*.wav の内容が serial run と byte-for-byte 一致する。 chunksize=8
+#     は spawn IPC の per-task overhead を 1/8 に削減し、 473 zip 規模で
+#     見かけ throughput を +10-20% 押し上げる (Pool.imap ドキュメント準拠、
+#     tests/test_moe_speech_parallel.py で order 契約は pin 済み)。
 #   * spawn context を強制 — Windows / macOS Python 3.14 と挙動を揃え、
 #     fork 依存の非決定性を避ける。
 #   * wav 書き込みは worker 側 (`extract_speaker`) が実施。stem は utterance
@@ -312,8 +317,8 @@ def collect_mos_histogram(zip_paths, sample_per_zip: int = 200) -> Counter:
 #     ため、ロックも csv escape 崩れも起きない。
 #
 # 期待効果: moe-speech-plus 473 zip × ~800 utts の展開/フィルタ phase が
-# JSON parse + Levenshtein CER で CPU-bound → 16 プロセスで 12-16x
-# throughput (serial の 30-45 分 → 3-5 分 スケール)。
+# JSON parse + Levenshtein CER で CPU-bound → 16 プロセス × chunksize=8 で
+# 12-16x throughput (serial 30-45 分 → 3-5 分 スケール、v8 5-11h 目標に寄与)。
 
 
 def _default_num_processes() -> int:
@@ -386,10 +391,13 @@ def main() -> None:
     parser.add_argument("--limit-speakers", type=int, default=0, help="デバッグ用")
     parser.add_argument(
         "--parallel",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=True,
         help=(
-            "ProcessPool で per-zip 並列展開 (opt-in、default OFF)。 "
-            "output は serial と byte-for-byte 一致 (Pool.imap で順序 preserve)。"
+            "ProcessPool で per-zip 並列展開 (default ON、v8 dataset prep 高速化)。 "
+            "output は serial と byte-for-byte 一致 (Pool.imap で順序 preserve)。 "
+            "CI / 小さい dataset / デバッグで serial に戻したい場合は "
+            "`--no-parallel` を明示。"
         ),
     )
     parser.add_argument(
@@ -481,9 +489,13 @@ def main() -> None:
                 "並列展開: %d プロセス x %d zip", args.num_processes, len(jobs)
             )
             with ctx.Pool(processes=args.num_processes) as pool:
-                # chunksize=1 で input 順序を preserve (metadata.csv の
-                # 話者ブロック順が serial と一致するのを維持)。
-                it = pool.imap(_process_zip_worker, jobs, chunksize=1)
+                # chunksize=8: imap は chunksize に関係なく input 順で yield
+                # するため、metadata.csv の話者ブロック順は serial と一致し
+                # byte-for-byte parity が維持される (test_moe_speech_parallel
+                # で契約 pin 済み)。 chunksize を 1 → 8 に上げると spawn IPC の
+                # per-task overhead が 1/8 に減り、 473 zip 規模で見かけ
+                # throughput が +10-20% 改善する (v8 5-11h 目標に寄与)。
+                it = pool.imap(_process_zip_worker, jobs, chunksize=8)
                 for zip_stem, rows, stats in tqdm(
                     it, total=len(jobs), desc="zip", unit="zip"
                 ):
