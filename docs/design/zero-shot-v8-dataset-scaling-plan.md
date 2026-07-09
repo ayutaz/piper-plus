@@ -109,11 +109,14 @@ A100 単一 GPU への移行に伴う **P0 最適化フラグ** をまとめて�
 --speaker-encoder-path <campplus.onnx>
 --language-balanced-sampling                     # ja/en 話者比 >> pt 30 話者のため必須
 --num-workers 8                                  # A100 host は 32 vCPU、v7 の 2 では GPU 待ち
+--prefetch-factor 4                              # T2 (§3.6): pin_memory + prefetch=4 で H2D queue を warm 保持
+--precomputed-mel                                # P1 (§3.6): 学習前に `python -m piper_train.tools.precompute_mel` を pre-run 必須
 --val-every-n-epochs 5                           # SCL/DINO 込み val は G+D full forward、頻度低下
 --compile --compile-mode reduce-overhead         # torch.compile (§3.5 でリベンチ後 default 維持)
 --no-wavlm                                       # v7 継承 (VRAM 節約 & WavLM 経路 P0 未実装)
+# --channels-last                                # T1 (§3.6): opt-in default OFF、 A/B 実測で -16% sec/step 見込みなら default 化検討
 # --enable-length-bucketing / --no-compile-dynamic は §3.5 の 300 batch A/B で
-# +34% の逆効果を実測、 v8 本走では **使わない**
+# +34% の逆効果を実測、 v8 本走では **使わない** (Fix B [`90f0a68`] で再設計済み、 本走前に再 A/B)
 ```
 
 **削除したフラグ (v7 コマンドから)**:
@@ -329,6 +332,49 @@ bucketing 有害と判明) を基準に、 各要素を分離して見積もる:
 - `--no-compile-dynamic` も削除 (bucketing 前提だったため意味なし)
 - multi-GPU (`--devices 4`) で `--precision bf16-mixed` を継続
 
+### 3.6 immediate 5 施策 + KL 発散防止 (2026-07-09 追加ランディング)
+
+§3.5 の Test 1 実測 (14.0 sec/step、 real config、 batch=64、 bf16-mixed、 bucketing ON、
+`--compile` OFF) を出発点に、 「A100 GPU idle と host 側 I/O ボトルネックの解消」 に絞った
+**immediate 5 施策** (T1 / T2 / T5 / P1 / P2) を feature branch にランディング済み。 加えて
+300 batch smoke で batch 31 以降 100% (262/300) の Non-finite skip が判明 → **KL clamp を
+tighten する追加修正** ([`45060ad`](https://github.com/ayutaz/piper-plus/commit/45060adc))、
+length_bucket を per-batch 単一 bin 抽出に再設計する **Fix B**
+([`90f0a68`](https://github.com/ayutaz/piper-plus/commit/90f0a68c)) も併せて投入。
+
+| # | 分類 | commit | 変更 | 期待効果 |
+|---|------|--------|------|--------|
+| T2 | throughput (I/O) | [`8dc1571`](https://github.com/ayutaz/piper-plus/commit/8dc15711) | `Batch` dataclass に `pin_memory()` を追加 (plain dataclass は DataLoader の `pin_memory=True` で silently no-op だった) + train DataLoader の `prefetch_factor` default 2→4 (`--prefetch-factor` CLI 化) + `on_validation_epoch_end` の `.to(device)` を `non_blocking=True` 化 | **wall-clock -5-15%** (v8 で観測済の 「見えない non_blocking 同期化」 を実効化) |
+| T1 | throughput (kernel layout) | [`bdd4f9e`](https://github.com/ayutaz/piper-plus/commit/bdd4f9e9) | `MultiPeriodDiscriminator` + `DiscriminatorP` に `use_channels_last` opt-in、 CLI `--channels-last` default OFF。 Conv2d weight + 1D→2D view 直後の activation を `torch.channels_last` に統一 | **sec/step -16% 目標** (§3.4 nsys で判明した nchw↔nhwc 変換 12.8% + Conv2d 8% = 20.8% overhead の削減余地)。 実測 A/B 後に default 化判断 |
+| T5 | throughput (attention) | [`fa24218`](https://github.com/ayutaz/piper-plus/commit/fa24218f) | SDPA backend priority を明示制御 (`flash` / `mem_efficient` ON、 `math` OFF、 torch 2.11+ で `cudnn` ON)、 起動 log に有効 backend を出力 | Ada 6000 / RTX 5090 (sm_89 / sm_120) で naive math fallback を防止、 **long-sequence で 2x、 net +1-3%** |
+| P1 | I/O (dataset load) | [`597c5cc`](https://github.com/ayutaz/piper-plus/commit/597c5ccf) | `piper_train.tools.precompute_mel` を新設 (fp16 `.npy` を pre-materialise、 atomic replace)、 `PiperDataset` に `precomputed_mel_dir` opt-in、 CLI `--precomputed-mel` | `torch.load(.spec.pt)` の pickle 経路を numpy path (`np.load → torch.from_numpy`) に置換で **DataLoader step 2-3x**、 80 epoch で **8-12h の I/O 節約** |
+| P2 | I/O (preprocess) | [`4ca0bab`](https://github.com/ayutaz/piper-plus/commit/4ca0babd) | `norm_audio.default_num_processes()` を新設 (`min(cpu_count//2, 32)`)、 `cache_audio` / `prepare_multilingual_dataset` / `prepare_bilingual_dataset` の worker 数 default を統一 + tqdm 進捗バー追加 | 64 vCPU host で `cpu_count()` fan-out すると soxr/torch per-worker state と NFS IOPS で thrash (実効 throughput -30%)。 default 30 worker 相当に固定して **前処理 wall-clock 短縮 + 進捗可視化** |
+| — | bucketing 再設計 (Fix B) | [`90f0a68`](https://github.com/ayutaz/piper-plus/commit/90f0a68c) | `SpeakerBalancedBatchSampler` の length_bucket を per-batch 単一 bin 抽出に変更 (4 quantile bin、 language_group_balance / samples_per_speaker=4 contract 保持) | §3.5 で `+34%` 逆効果だった実装を廃案 → バッチ間 shape 差を bin 幅に閉じ込め cudnn.benchmark cache を再利用可能に。 opt-in default OFF は継続、 v8 本走前に再 A/B |
+| — | KL 発散防止 | [`45060ad`](https://github.com/ayutaz/piper-plus/commit/45060adc) | `logs_p` / `logs_q` clamp を `[-15,15]` → `[-8,8]`、 `m_p` clamp を `[-1000,1000]` → `[-100,100]`、 loss_kl 出力を `1e4` で cap (`SynthesizerTrn.forward` / `infer` / `lightning.py` 3 箇所) | §3.4 の scratch KL inf fix でも 300 batch smoke で batch 31 以降に 100% (262/300) Non-finite skip 再発 → worst case `(z_p-m_p)^2 * exp(-2*logs_p) = 4e17` が fp32 overflow していたため。 clamp 5 桁 down + 出力 cap で **grad direction 安定化**、 `kl_weight=0.1` と `grad_clip=1.0` と多層防御。 収束後は `|logs_p| < 5` で cap は no-op、 表現力を損なわない |
+
+**累積効果 (Test 1 14.0 sec/step 起点で分解、 batch=64 real config)**:
+
+| 適用要素 | sec/step 影響 | 累積 sec/step |
+|---|---|---|
+| Test 1 baseline (bucketing ON、 `--compile` OFF、 bf16-mixed、 batch=64) | — | 14.0 |
+| T2 pin_memory + prefetch=4 (H2D pipeline を実効化) | -5-15% | 12.0-13.3 |
+| P1 precomputed_mel (DataLoader I/O を numpy path 化) | -10-15% | 10.4-12.0 |
+| bucketing OFF (§3.5 の「+34% 逆効果」 実装を切って通常経路に戻す) | -20-25% | 8-9.6 |
+| T5 SDPA flash/mem_efficient (naive math fallback を防止) | -1-3% | **8-9 (目標)** |
+| T1 channels_last (opt-in、 A/B 後に default 化検討) | -10-16% | 7-8 (upside) |
+| Fix B length-binned global sampling (再 A/B で amortize) | -10-20% | 6.5-8 (upside) |
+
+**immediate 5 施策 の v8 本走目標**: Test 1 の 14.0 sec/step から **8-9 sec/step** への短縮
+(-36-43%)。 T1 / Fix B が A/B で有効と判れば **6.5-8 sec/step** (-46-54%) の upside。
+これに batch=64 → 128 (-20-30%) + `--compile` (-10-15%) + Super-MAS (-3-10%) の
+§3.5 系列を重ねると、 A100 SXM4 x1 batch=128 で §3.5 と同じ **5-6 sec/step** に着地する
+見込み (§4.3 コスト表参照)。
+
+**KL 発散防止は wall-clock ではなく「学習継続そのものの成立条件」** で、 これがないと
+scratch 初期化の v8 本走は 100% batch skip で epoch が進まず、 §3.5 で観測した 262/300
+非有限 skip がそのまま 5-6 日級の running cost を焼失させる。 immediate 5 施策 と同じ
+PR で必須で入れる。
+
 | 項目 | 値 |
 |---|---|
 | 推奨インスタンス | **A100 SXM4 80GB × 1、32 vCPU、disk ≥ 1.7TB、回線 ≥ 7Gbps** (~$1.0–1.3/hr) |
@@ -372,17 +418,24 @@ bucketing 有害と判明) を基準に、 各要素を分離して見積もる:
 GPU $1.313/hr + disk 1.5TB × $0.20/GB/月 = +$0.417/hr → **$1.73/hr**)。帯域課金は
 DL 600GB + UL 500GB で ~$4 と無視できる。
 
-**Plan A (§3.3、2026-07-09 実装完了) 反映後の見込み** — bucketing + D concat +
-static_graph + compile 再チューン で epoch 時間 1.5-1.7h → **1.0-1.2h** に短縮:
+**§3.5 (300 batch A/B 実測) + §3.6 (immediate 5 施策) 反映後の見込み**:
+- **前処理**: P2 (`cache_audio` / `prepare_multilingual_dataset` の worker default 統一) + P1
+  (precomputed_mel の pre-run 追加) で **~32h → ~8-10h** に短縮 (soxr/torch worker thrash
+  解消 + mel を fp16 `.npy` に pre-materialise、 §3.6)
+- **本走 sec/step**: Test 1 baseline 14.0 (batch=64 real config) → immediate 5 施策で
+  **8-9 sec/step 目標** (§3.6 累積効果表)。 batch=64 → 128 + `--compile` + Super-MAS を
+  重ねて A100 SXM4 x1 batch=128 では **5-6 sec/step / ~5.4 hr/ep** (§3.5)、
+  A100 SXM4 x4 DDP + static_graph で **~1.6 hr/ep** (§3.5)
 
 | フェーズ | 時間 | コスト ($1.73/hr、storage 込) |
 |---|---|---|
-| DL + 前処理 + embedding 抽出 (CV pt フィルタ含む) | ~1–1.5 日 | ~$42–62 |
-| smoke test (warm-start 1ep + 評価) | ~2h | ~$4 |
-| 本走 80 epoch (**~1.1h/ep、Plan A**) | **~3.3–4.0 日** | **~$137–166** |
+| DL + 前処理 + embedding 抽出 (CV pt フィルタ含む) | **~8-10h** (P2+P1、 従来 ~32h から短縮) | **~$14-17** |
+| smoke test (warm-start 1ep + 評価、 KL fix 込) | ~2h | ~$4 |
+| 本走 80 epoch (A100 SXM4 x1 batch=128、 **~5.4 hr/ep、 §3.5**) | **~18 日** | **~$747** |
+| 本走 80 epoch (**A100 SXM4 x4 DDP、 static_graph、 ~1.6 hr/ep、 §3.5 推奨**) | **~5.4 日** | **~$672** ($5.19/hr × 129h) |
 | SECS 評価 + ONNX export + HF upload | ~4h | ~$7 |
-| **計 (Plan A、v8 想定)** | **~5–6 日** | **~$190–239 (中央値 ~$194)** |
-| 参考: baseline (Plan A 未反映) | ~6.5–7 日 | ~$265–285 |
+| **計 (v8 想定、 4x DDP)** | **~6-7 日** | **~$700-720 (中央値 ~$710)** |
+| 参考: 単一 A100 (batch=128)、 §3.6 未反映 (Test 1 14 sec/step のまま) | ~40+ 日 | ~$1,650+ |
 
 ### 4.4 障害耐性 (多層防御)
 
