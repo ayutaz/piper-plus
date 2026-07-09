@@ -244,8 +244,13 @@ class VitsModel(pl.LightningModule):
         max_spec_length: int = 700,
         # T1: channels_last memory format for Conv2d Discriminator (opt-in, default OFF).
         # Targets NHWC Tensor Core kernels on A100 SXM4 / Ada 6000; silent
-        # fallback on sm_75 (T4) and older. Affects DiscriminatorP only —
-        # DiscriminatorS (Conv1d) and Generator (Conv1d-heavy) are untouched.
+        # fallback on sm_75 (T4) and older. Affects DiscriminatorP (Conv2d)
+        # actively; DiscriminatorS (Conv1d) and Generator (MBiSTFTGenerator,
+        # Conv1d-only) receive the flag as a silent no-op via PyTorch's
+        # ``Module.to(memory_format=...)`` which skips 3D tensors (t.dim() in
+        # (4, 5) guard). T1 拡張: Generator にも propagate することで、 (a) D と G
+        # 間で hparam を対称に扱う、 (b) 将来 Generator に Conv2d を追加した際に
+        # 自動的に NHWC 化される、 の 2 目的を満たす。
         use_channels_last: bool = False,
         # T6: Discriminator forward precision override (hybrid precision, opt-in).
         # "inherit" (default) → D forward follows Lightning trainer precision (status
@@ -308,6 +313,7 @@ class VitsModel(pl.LightningModule):
             use_sdp=self.hparams.use_sdp,
             prosody_dim=self.hparams.prosody_dim,
             attn_drop_rel_v=self.hparams.attn_drop_rel_v,
+            use_channels_last=self.hparams.use_channels_last,
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm,
@@ -315,7 +321,9 @@ class VitsModel(pl.LightningModule):
         )
         if self.hparams.use_channels_last:
             _LOGGER.info(
-                "channels_last enabled for MultiPeriodDiscriminator (DiscriminatorP Conv2d weights → NHWC)"
+                "channels_last enabled: MultiPeriodDiscriminator (DiscriminatorP "
+                "Conv2d → NHWC, active) + SynthesizerTrn.dec (MBiSTFTGenerator, "
+                "Conv1d-only → silent no-op, plumbing for future Conv2d)."
             )
 
         # DINO center buffer for zero-shot speaker embedding regularization

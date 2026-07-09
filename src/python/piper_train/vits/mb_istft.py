@@ -153,6 +153,16 @@ class MBiSTFTGenerator(nn.Module):
         hop_length: int = 4,
         subbands: int = 4,
         pqmf: "PQMF | None" = None,
+        # T1 拡張: MBiSTFTGenerator にも channels_last plumbing を通す (opt-in、 default OFF)。
+        # 現状の Generator は Conv1d/ConvTranspose1d のみで構成されるため、
+        # ``self.to(memory_format=torch.channels_last)`` は 3D weight に対して
+        # silent no-op (PyTorch の ``Module.to()`` は t.dim() in (4, 5) の
+        # tensor のみ NHWC 化する)。 従って本 flag は今すぐの perf 変化を
+        # 意図せず、 (a) Discriminator と CLI/hparam の統一 (b) 将来 Conv2d
+        # 系 (例: 2D spectrogram head) を Generator に追加する時の
+        # future-proofing plumbing、 の 2 目的で通す。 crash-safe: 対象 tensor
+        # がゼロでも torch は例外を出さない。
+        use_channels_last: bool = False,
     ):
         super().__init__()
         self.num_kernels = len(resblock_kernel_sizes)
@@ -161,6 +171,7 @@ class MBiSTFTGenerator(nn.Module):
         self.n_fft = n_fft
         self.hop_length = hop_length
         self.onnx_export_mode = False
+        self.use_channels_last = use_channels_last
 
         # --- conv_pre ---
         self.conv_pre = weight_norm(
@@ -231,6 +242,15 @@ class MBiSTFTGenerator(nn.Module):
                 nn.init.zeros_(layer.weight)
                 nn.init.zeros_(layer.bias)
                 self.cond_layers.append(layer)
+
+        # T1 拡張: channels_last をモジュール全体に伝播。 現状 Generator は
+        # Conv1d のみのため PyTorch は 3D weight に対し memory_format 変換を
+        # skip する (torch/nn/modules/module.py::_apply → convert: t.dim() in
+        # (4, 5) guard)。 従ってこの呼び出しは Conv1d weight tensor を書き換えず、
+        # forward 挙動も bit-identical。 将来 Generator に Conv2d が追加された
+        # 時、 その 4D weight は自動で NHWC 化される (D の T1 実装と同型)。
+        if self.use_channels_last:
+            self.to(memory_format=torch.channels_last)
 
     @staticmethod
     def _apply_film(x: torch.Tensor, scale_shift: torch.Tensor) -> torch.Tensor:
