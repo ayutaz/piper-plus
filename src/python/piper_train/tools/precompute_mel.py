@@ -132,9 +132,15 @@ def compute_spectrogram(
     """Load a cached audio norm tensor and return its linear spec as fp16 numpy.
 
     Broken out from ``_process_one`` so tests can call it directly without
-    setting up worker globals.
+    setting up worker globals.  Handles both the legacy ``.pt`` (torch pickle)
+    and current ``.npy`` (raw numpy) audio_norm cache formats — the write
+    path was switched to ``.npy`` on 2026-07-09 for ~3-5x faster load.
     """
-    audio = torch.load(str(audio_norm_path), weights_only=True, map_location="cpu")
+    p = Path(audio_norm_path)
+    if p.suffix == ".npy":
+        audio = torch.from_numpy(np.load(str(p)))
+    else:
+        audio = torch.load(str(p), weights_only=True, map_location="cpu")
     audio = audio.squeeze()
     if audio.dim() != 1:
         raise ValueError(f"unexpected audio shape {tuple(audio.shape)}")
