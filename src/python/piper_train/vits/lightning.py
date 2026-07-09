@@ -443,6 +443,14 @@ class VitsModel(pl.LightningModule):
 
         validate_cache = self.hparams.get("validate_cache", False)
 
+        # ``--precomputed-mel`` flag → resolve ``{dataset_dir}/mel`` and pass to
+        # PiperDataset. Missing directory falls back to legacy ``.spec.pt`` cache
+        # per utterance (see PiperDataset.__init__ diagnostics).
+        precomputed_mel_dir: Path | None = None
+        if self.hparams.get("precomputed_mel", False):
+            precomputed_mel_dir = Path(self.hparams.dataset_dir) / "mel"
+            _LOGGER.info("Precomputed mel cache enabled: %s", precomputed_mel_dir)
+
         # Try to load fixed test dataset first
         test_utterances_path = self.hparams.dataset_dir / "test_utterances.jsonl"
         if test_utterances_path.exists():
@@ -452,6 +460,7 @@ class VitsModel(pl.LightningModule):
                 self.hparams.dataset,
                 max_phoneme_ids=max_phoneme_ids,
                 validate_cache=validate_cache,
+                precomputed_mel_dir=precomputed_mel_dir,
             )
             valid_set_size = int(len(full_dataset) * validation_split)
             train_set_size = len(full_dataset) - valid_set_size
@@ -470,6 +479,7 @@ class VitsModel(pl.LightningModule):
                 self.hparams.dataset,
                 max_phoneme_ids=max_phoneme_ids,
                 validate_cache=validate_cache,
+                precomputed_mel_dir=precomputed_mel_dir,
             )
             valid_set_size = int(len(full_dataset) * validation_split)
             train_set_size = len(full_dataset) - valid_set_size - num_test_examples
