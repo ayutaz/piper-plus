@@ -490,20 +490,26 @@ def create_parser():
         default=1.0,
         help="Gradient norm clipping value to prevent NaN explosion (default: 1.0). Set 0 to disable.",
     )
-    # T1: channels_last memory format for Conv2d Discriminator (opt-in).
-    # Targets ~-16% sec/step on A100 SXM4 by dispatching Conv2d layers of
-    # DiscriminatorP to NHWC Tensor Core kernels (nsys measured 12.8% nchw↔nhwc
-    # conversion + 8% conv overhead on v8 real-config traces). Safe rollout:
-    # default OFF, silent fallback on sm_75 (T4) and older via PyTorch's
-    # kernel dispatcher.
+    # T1: channels_last memory format (opt-in) — Conv2d Discriminator (active)
+    # + MBiSTFTGenerator (silent no-op, plumbing for future Conv2d).
+    # Targets ~-16% sec/step on A100 SXM4 by dispatching DiscriminatorP Conv2d
+    # layers to NHWC Tensor Core kernels (nsys measured 12.8% nchw↔nhwc
+    # conversion + 8% conv overhead on v8 real-config traces). T1 拡張: 同一 flag
+    # を SynthesizerTrn.dec (MBiSTFTGenerator) にも propagate。 現状は Conv1d のみ
+    # で構成されるため PyTorch の Module.to() が 3D weight を skip し実質 no-op、
+    # ただし将来 Generator 側に Conv2d を追加した際に自動 NHWC 化される
+    # (future-proofing)。 Safe rollout: default OFF、 silent fallback on sm_75
+    # (T4) and older via PyTorch's kernel dispatcher.
     parser.add_argument(
         "--channels-last",
         action="store_true",
         default=False,
         help="Enable torch.channels_last memory format for MultiPeriodDiscriminator "
-        "(Conv2d layers in DiscriminatorP). Opt-in perf switch, targets NHWC Tensor "
-        "Core kernels on A100 SXM4 / Ada 6000 (~-16%% sec/step expected). Silent "
-        "fallback to nchw on sm_75 (T4) and older hardware.",
+        "(DiscriminatorP Conv2d — active) and SynthesizerTrn.dec (MBiSTFTGenerator "
+        "— silent no-op today, plumbing for future Conv2d). Opt-in perf switch, "
+        "targets NHWC Tensor Core kernels on A100 SXM4 / Ada 6000 (~-16%% sec/step "
+        "expected from the D side). Silent fallback to nchw on sm_75 (T4) and "
+        "older hardware.",
     )
     # T6: Hybrid precision — override Discriminator forward precision independently
     # of Lightning's global --precision setting. Default "inherit" keeps the
@@ -802,12 +808,15 @@ def main():
     # T1: propagate CLI --channels-last (argparse hyphen→underscore) to the
     # VitsModel constructor keyword ``use_channels_last``. argparse names the
     # attribute ``channels_last``; the hparam is ``use_channels_last`` to match
-    # the MultiPeriodDiscriminator / DiscriminatorP kwargs.
+    # the MultiPeriodDiscriminator / DiscriminatorP + MBiSTFTGenerator kwargs.
+    # T1 拡張: この 1 個の flag が VitsModel から D 側 (active) と G 側 (silent
+    # no-op) の両方に propagate される (対称性 + future-proofing)。
     dict_args["use_channels_last"] = getattr(args, "channels_last", False)
     if dict_args["use_channels_last"]:
         _LOGGER.info(
             "channels_last memory format enabled (--channels-last): "
-            "DiscriminatorP Conv2d weights and activations use NHWC layout."
+            "DiscriminatorP Conv2d weights → NHWC (active), MBiSTFTGenerator "
+            "Conv1d weights → default layout (silent no-op, future-proofing)."
         )
 
     # T6: propagate CLI --disc-precision (default "inherit" → no override).

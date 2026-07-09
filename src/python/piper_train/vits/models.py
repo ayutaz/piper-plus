@@ -759,6 +759,11 @@ class SynthesizerTrn(nn.Module):
         # T3: TextEncoder self-attention → F.scaled_dot_product_attention.
         # Opt-in perf switch (default False = manual path, regression zero).
         attn_drop_rel_v: bool = False,
+        # T1 拡張: MBiSTFTGenerator にも channels_last plumbing を通す (opt-in、
+        # default OFF)。 現 Generator は Conv1d のみなので実質 no-op だが、
+        # (a) VitsModel の同一 hparam を D と G の両方に propagate する対称性、
+        # (b) 将来 Conv2d を Generator に導入した時の future-proofing、 の 2 目的。
+        use_channels_last: bool = False,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -811,6 +816,7 @@ class SynthesizerTrn(nn.Module):
             upsample_initial_channel=upsample_initial_channel,
             upsample_kernel_sizes=upsample_kernel_sizes,
             gin_channels=gin_channels,
+            use_channels_last=use_channels_last,
         )
         self.enc_q = PosteriorEncoder(
             spec_channels,
