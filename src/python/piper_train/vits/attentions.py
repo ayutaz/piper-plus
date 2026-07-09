@@ -18,6 +18,7 @@ class Encoder(nn.Module):
         kernel_size: int = 1,
         p_dropout: float = 0.0,
         window_size: int = 4,
+        drop_rel_v: bool = False,
         **kwargs,
     ):
         super().__init__()
@@ -28,6 +29,14 @@ class Encoder(nn.Module):
         self.kernel_size = kernel_size
         self.p_dropout = p_dropout
         self.window_size = window_size
+        # T3: propagate SDPA opt-in flag down to every attention sub-layer.
+        # ``drop_rel_v=True`` swaps the manual matmul path for
+        # ``F.scaled_dot_product_attention`` (fuses Q@K^T / softmax / p_attn@V
+        # into a single fused kernel and skips materializing the [B,H,T,T]
+        # attention matrix). The relative-V correction is dropped because SDPA
+        # does not expose ``p_attn`` needed for it. Default False preserves the
+        # existing manual path with bit-parity.
+        self.drop_rel_v = drop_rel_v
 
         self.drop = nn.Dropout(p_dropout)
         self.attn_layers = nn.ModuleList()
@@ -42,6 +51,7 @@ class Encoder(nn.Module):
                     n_heads,
                     p_dropout=p_dropout,
                     window_size=window_size,
+                    drop_rel_v=drop_rel_v,
                 )
             )
             self.norm_layers_1.append(LayerNorm(hidden_channels))
@@ -173,6 +183,7 @@ class MultiHeadAttention(nn.Module):
         block_length: int | None = None,
         proximal_bias: bool = False,
         proximal_init: bool = False,
+        drop_rel_v: bool = False,
     ):
         super().__init__()
         assert channels % n_heads == 0
@@ -186,6 +197,12 @@ class MultiHeadAttention(nn.Module):
         self.block_length = block_length
         self.proximal_bias = proximal_bias
         self.proximal_init = proximal_init
+        # T3: opt-in SDPA fast path (see ``attention()`` for the branch). Skipping
+        # the relative-V correction (which requires ``p_attn``) is what allows
+        # us to drop into ``F.scaled_dot_product_attention`` and save the
+        # [B,H,T,T] activation-memory allocation. Default False preserves the
+        # existing manual path with bit-parity (regression zero).
+        self.drop_rel_v = drop_rel_v
         self.attn = torch.zeros(1)
 
         self.k_channels = channels // n_heads
@@ -231,6 +248,60 @@ class MultiHeadAttention(nn.Module):
         query = query.view(b, self.n_heads, self.k_channels, t_t).transpose(2, 3)
         key = key.view(b, self.n_heads, self.k_channels, t_s).transpose(2, 3)
         value = value.view(b, self.n_heads, self.k_channels, t_s).transpose(2, 3)
+
+        # T3 fast path: F.scaled_dot_product_attention fuses Q@K^T / softmax /
+        # p_attn@V into one kernel and avoids materializing the [B,H,T,T]
+        # activation. The relative-K bias (``scores_local``) and
+        # ``proximal_bias`` are folded into ``attn_mask`` as additive biases.
+        # The relative-V correction is dropped (requires ``p_attn`` which SDPA
+        # does not surface) — this is why the flag is named ``drop_rel_v``.
+        # Fallback to the manual path when ``block_length`` is used because
+        # that pathway needs a second per-position mask that is cheap to add
+        # but currently only exercised by the Decoder (not the TextEncoder).
+        if self.drop_rel_v and self.block_length is None:
+            attn_bias = None
+            if self.window_size is not None:
+                assert t_s == t_t, (
+                    "Relative attention is only available for self-attention."
+                )
+                key_relative_embeddings = self._get_relative_embeddings(
+                    self.emb_rel_k, t_s
+                )
+                rel_logits = self._matmul_with_relative_keys(
+                    query / math.sqrt(self.k_channels), key_relative_embeddings
+                )
+                # scores_local: [B, H, T, T] — additive bias, pre-scaled by 1/sqrt(dk).
+                # SDPA re-applies scale=1/sqrt(dk) to (Q @ K^T) *inside*, so
+                # additive biases are combined post-scale (matches manual math).
+                attn_bias = self._relative_position_to_absolute_position(rel_logits)
+            if self.proximal_bias:
+                assert t_s == t_t, (
+                    "Proximal bias is only available for self-attention."
+                )
+                proximal = self._attention_bias_proximal(t_s).type_as(query)
+                attn_bias = proximal if attn_bias is None else attn_bias + proximal
+            if mask is not None:
+                if attn_bias is None:
+                    # No prior bias: build a pure additive mask (broadcast-safe).
+                    attn_bias = torch.zeros_like(mask, dtype=query.dtype).masked_fill(
+                        mask == 0, -1e4
+                    )
+                else:
+                    attn_bias = attn_bias.masked_fill(mask == 0, -1e4)
+            dropout_p = self.p_dropout if self.training else 0.0
+            output = F.scaled_dot_product_attention(
+                query,
+                key,
+                value,
+                attn_mask=attn_bias,
+                dropout_p=dropout_p,
+                is_causal=False,
+            )
+            # Match manual-path reshape: [B, H, T_t, d_k] -> [B, d, T_t].
+            output = output.transpose(2, 3).contiguous().view(b, d, t_t)
+            # SDPA does not expose p_attn. Return a scalar placeholder so
+            # ``self.attn = ...`` in ``forward()`` stays wired up cheaply.
+            return output, torch.zeros(0, device=output.device, dtype=output.dtype)
 
         scores = torch.matmul(query / math.sqrt(self.k_channels), key.transpose(-2, -1))
         if self.window_size is not None:
