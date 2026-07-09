@@ -153,10 +153,16 @@ def _write_kspon_corpus(
     speaker_utts: dict[str, list[tuple[str, str]]],
     *,
     split: str = "KsponSpeech_01",
-    audio_ext: str = ".wav",
+    audio_ext: str = ".pcm",
     create_audio: bool = True,
 ) -> None:
-    """speaker_utts = {speaker_id: [(utt_id, raw_text_with_ETRI_markup), ...]}."""
+    """speaker_utts = {speaker_id: [(utt_id, raw_text_with_ETRI_markup), ...]}.
+
+    Default extension is ``.pcm`` to mirror the KsponSpeech raw distribution
+    (16 kHz mono s16le, headerless) which ``parse_kspon_speech`` now enumerates
+    directly since the v8 KO enablement.  Pass ``audio_ext=".wav"`` to test the
+    legacy pre-converted layout.
+    """
     for speaker_id, utts in speaker_utts.items():
         spk_dir = base / split / speaker_id
         spk_dir.mkdir(parents=True, exist_ok=True)
@@ -295,6 +301,44 @@ class TestParseKsponSpeech:
 
         assert entries == []
         assert speaker_counts == {}
+
+    def test_default_audio_ext_is_pcm(self, tmp_path: Path) -> None:
+        """Raw KsponSpeech distribution ships headerless .pcm — no WAV conversion."""
+        _write_kspon_corpus(
+            tmp_path,
+            {"KsponSpeech_0001": [("KsponSpeech_000001", "안녕")]},
+            # _write_kspon_corpus default is .pcm now.
+        )
+
+        entries, speaker_counts = parse_kspon_speech(
+            tmp_path, min_utts_per_spk=1, cap_per_speaker=None
+        )
+
+        assert len(entries) == 1
+        _text, audio_path_str, spk = entries[0]
+        assert audio_path_str.endswith(".pcm")
+        assert spk == "kspon-KsponSpeech_0001"
+
+    def test_wav_ext_still_supported_for_pre_converted_corpora(
+        self, tmp_path: Path
+    ) -> None:
+        """Passing audio_ext='.wav' keeps working for users who pre-converted."""
+        _write_kspon_corpus(
+            tmp_path,
+            {"KsponSpeech_0001": [("KsponSpeech_000001", "안녕")]},
+            audio_ext=".wav",
+        )
+
+        entries, _ = parse_kspon_speech(
+            tmp_path,
+            min_utts_per_spk=1,
+            cap_per_speaker=None,
+            audio_ext=".wav",
+        )
+
+        assert len(entries) == 1
+        _text, audio_path_str, _spk = entries[0]
+        assert audio_path_str.endswith(".wav")
 
     def test_skips_empty_transcript_after_cleaning(self, tmp_path: Path) -> None:
         # Text that reduces to empty after ETRI cleaning is dropped.
