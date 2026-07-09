@@ -191,7 +191,8 @@ echo "PID: $!"
 - ✅ **v8 dataset 完成 (6-lang スナップショット)**: 321,391 utts / 3,578 speakers / 6 lang (`/data/piper/dataset-multilingual-6lang-v8/`)
 - ✅ **韓国語 (ko) 拡張 ランディング**: parser 3 種 (Zeroth / KsponSpeech / CV ko) + `export_common_voice_ko.py` + `LANGUAGE_ID_MAP` を 8-lang extended (ko=7) に切替 (commit `c4f384d3`)。 G2P/contract/id_maps は既に 7 ランタイム全てで 8-lang extended 版で pin 済のため、 コード側は data pipeline のみで完遂。 7-lang 目標: **~420k utts / ~5,100 speakers**
 - ✅ **scratch NaN blocker 解消**: bf16 cuFFT bug fix (`11ff71fc`) + KL 発散防止 3 段 (`d37ccda2` + `61aabe27` + `45060adc`)
-- ✅ **24 commits ランディング**: 5 施策 + KL fix + bucketing 実験 + T3/T6/T-npy 他 8 施策 + ko 拡張 + docs
+- ✅ **前処理高速化 4 施策 (§3.11)**: impl1 hf_transfer (`d4f90f19`、 raw DL 3-5x) + impl2 KsponSpeech `.pcm` 直読 (`2aab2258`、 ETRI WAV 変換 3-4h 消去) + impl3 parquet FLAC 直保存 (`7d2f70a0`、 LibriTTS-R/CML export 2-6x) + impl4 moe-speech-plus `--parallel` default ON (`821c112b`、 選抜 12-16x)。 GPU 検証不要な低リスク版のみ、 GPU resample (#3) は SNR 検証必要のため v9 送り。 **前処理 wall-clock 12-18h → 7-10h (7-lang) / 6-9h (6-lang)**
+- ✅ **28 commits ランディング**: 5 施策 + KL fix + bucketing 実験 + T3/T6/T-npy 他 8 施策 + ko 拡張 + 前処理 4 施策 + docs
 - ✅ **実測 -23% throughput**: 14.0 → 10.74 sec/step (bf16 real config、 batch=64)
 - ⏸ **本走待ち**: 4x A100 SXM4 DDP + batch=128 で **6-lang 9-11 日 / ~$672-1,120**、 **7-lang 12-15 日 / ~$1,050-1,530** 見込 (§3.10)
 
