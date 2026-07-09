@@ -35,6 +35,9 @@ from hashlib import sha256 as _sha256
 from pathlib import Path
 
 from piper_plus_g2p.encode.pua import map_token as _map_token
+from tqdm import tqdm
+
+from piper_train.norm_audio import default_num_processes
 
 
 _LOGGER = logging.getLogger("prepare_multilingual")
@@ -911,7 +914,13 @@ def cache_audio_parallel(
                 executor.submit(_resample_batch_worker_no_vad, a): i
                 for i, a in enumerate(batch_args)
             }
-            done = 0
+            pbar = tqdm(
+                total=len(need_caching),
+                desc=f"Resample {language.upper()}",
+                unit="file",
+                dynamic_ncols=True,
+                ascii=True,
+            )
             for future in as_completed(futures):
                 try:
                     for wav_str, norm_str, spec_str in future.result():
@@ -921,16 +930,10 @@ def cache_audio_parallel(
                             _LOGGER.warning(
                                 "Resample failed for %s: %s", wav_str, spec_str
                             )
-                        done += 1
-                        if done % 5000 == 0:
-                            _LOGGER.info(
-                                "Resampled %d/%d %s",
-                                min(done, len(need_caching)),
-                                len(need_caching),
-                                language.upper(),
-                            )
+                        pbar.update(1)
                 except Exception as e:
                     _LOGGER.warning("Resample batch failed: %s", e)
+            pbar.close()
 
         t_resample = time.monotonic() - t0
         _LOGGER.info(
@@ -998,7 +1001,13 @@ def cache_audio_parallel(
                     executor.submit(_cache_audio_batch_worker_no_vad, a): i
                     for i, a in enumerate(batch_args)
                 }
-                done = 0
+                pbar = tqdm(
+                    total=len(need_caching),
+                    desc=f"Cache {language.upper()}",
+                    unit="file",
+                    dynamic_ncols=True,
+                    ascii=True,
+                )
                 for future in as_completed(futures):
                     try:
                         for wav_str, norm_str, spec_str in future.result():
@@ -1008,22 +1017,22 @@ def cache_audio_parallel(
                                 _LOGGER.warning(
                                     "Audio cache failed: %s: %s", wav_str, spec_str
                                 )
-                            done += 1
-                            if done % 5000 == 0:
-                                _LOGGER.info(
-                                    "Cached %d/%d %s",
-                                    min(done, len(need_caching)),
-                                    len(need_caching),
-                                    language.upper(),
-                                )
+                            pbar.update(1)
                     except Exception as e:
                         _LOGGER.warning("Audio cache batch failed: %s", e)
+                pbar.close()
         else:
             from piper_train.norm_audio import (  # noqa: PLC0415
                 cache_norm_audio_no_vad,
             )
 
-            for i, wav_path_str in enumerate(need_caching):
+            for wav_path_str in tqdm(
+                need_caching,
+                desc=f"Cache {language.upper()}",
+                unit="file",
+                dynamic_ncols=True,
+                ascii=True,
+            ):
                 try:
                     norm_path, spec_path = cache_norm_audio_no_vad(
                         wav_path_str,
@@ -1034,10 +1043,6 @@ def cache_audio_parallel(
                     audio_map[wav_path_str] = (str(norm_path), str(spec_path))
                 except Exception as e:
                     _LOGGER.warning("Audio cache failed: %s: %s", wav_path_str, e)
-                if (i + 1) % 1000 == 0:
-                    _LOGGER.info(
-                        "Cached %d/%d %s", i + 1, len(need_caching), language.upper()
-                    )
 
     elapsed = time.monotonic() - t0
     _LOGGER.info(
@@ -1223,9 +1228,15 @@ def main():
     )
     parser.add_argument(
         "--workers",
+        "--num-processes",
+        dest="workers",
         type=int,
-        default=30,
-        help="Number of parallel workers (default: 30)",
+        default=default_num_processes(),
+        help=(
+            "Number of parallel workers (default: min(cpu_count//2, 32); "
+            "capped to prevent A100/64-vCPU host thrashing). "
+            "--num-processes is accepted as an alias."
+        ),
     )
     parser.add_argument(
         "--gpu-spec-device",
