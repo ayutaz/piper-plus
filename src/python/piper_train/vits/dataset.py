@@ -69,6 +69,42 @@ class Batch:
     prosody_features: LongTensor | None = None  # Shape: (batch, max_phonemes, 3)
     speaker_embeddings: FloatTensor | None = None
 
+    def pin_memory(self) -> "Batch":
+        """Pin all tensor fields into page-locked memory.
+
+        DataLoader with ``pin_memory=True`` recursively calls ``pin_memory``
+        on tensors / dicts / lists / tuples / NamedTuples only. A plain
+        ``@dataclass`` falls through PyTorch's ``pin_memory_batch`` unchanged
+        (silently unpinned), which turns the DataLoader ``pin_memory=True``
+        default into a no-op for us.
+
+        Implementing ``pin_memory()`` on this dataclass lets PyTorch's
+        pin_memory pathway (``if hasattr(data, "pin_memory"): return
+        data.pin_memory()``) recognise the batch and pin every tensor field.
+        Pinned host memory enables true async ``.to(device, non_blocking=True)``
+        H2D copies, which is a prerequisite for prefetch to overlap with GPU
+        compute.
+
+        Returns a new ``Batch`` (does not mutate ``self`` — matches Tensor's
+        ``pin_memory()`` semantics of returning a pinned copy).
+        """
+
+        def _pin(t):
+            return t.pin_memory() if isinstance(t, torch.Tensor) else t
+
+        return Batch(
+            phoneme_ids=_pin(self.phoneme_ids),
+            phoneme_lengths=_pin(self.phoneme_lengths),
+            spectrograms=_pin(self.spectrograms),
+            spectrogram_lengths=_pin(self.spectrogram_lengths),
+            audios=_pin(self.audios),
+            audio_lengths=_pin(self.audio_lengths),
+            speaker_ids=_pin(self.speaker_ids),
+            language_ids=_pin(self.language_ids),
+            prosody_features=_pin(self.prosody_features),
+            speaker_embeddings=_pin(self.speaker_embeddings),
+        )
+
 
 class PiperDataset(Dataset):
     """
@@ -752,9 +788,7 @@ class SpeakerBalancedBatchSampler:
         for spk, indices in self.speaker_to_indices.items():
             length_map = self._speaker_to_lengths.get(spk, {})
             # 同一長の tie-breaker として index も key に含めて安定 sort
-            sorted_indices = sorted(
-                indices, key=lambda i: (length_map.get(i, 0), i)
-            )
+            sorted_indices = sorted(indices, key=lambda i: (length_map.get(i, 0), i))
             # k 個ずつバケットに分割。 端数バケットは同一 shape 保証を崩すため drop
             # (Fix B の狙いは per-batch shape 制約 → 不完全バケットは opt-in bucketing の
             # コスト対効果に見合わない)
@@ -765,9 +799,7 @@ class SpeakerBalancedBatchSampler:
             ]
             if not buckets:
                 continue
-            maxlens = [
-                max(length_map.get(idx, 0) for idx in b) for b in buckets
-            ]
+            maxlens = [max(length_map.get(idx, 0) for idx in b) for b in buckets]
             speaker_buckets[spk] = buckets
             speaker_bucket_lens[spk] = maxlens
             all_bucket_lens.extend(maxlens)
@@ -801,9 +833,7 @@ class SpeakerBalancedBatchSampler:
                 if self.language_group_balance
                 else 0
             )
-            for bucket, maxlen in zip(
-                buckets, speaker_bucket_lens[spk], strict=True
-            ):
+            for bucket, maxlen in zip(buckets, speaker_bucket_lens[spk], strict=True):
                 binned[bin_of(maxlen)][lang].append((spk, bucket))
 
         # bin 内でランダムシャッフル (どの話者が先に消費されるかを epoch 毎に変える)

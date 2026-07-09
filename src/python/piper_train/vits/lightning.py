@@ -587,6 +587,11 @@ class VitsModel(pl.LightningModule):
     def train_dataloader(self):
         # Check if pin_memory should be disabled (for memory-constrained multi-GPU setups)
         pin_memory = not getattr(self.hparams, "no_pin_memory", False)
+        # DataLoader prefetch_factor (per worker, only meaningful when num_workers > 0).
+        # Default raised from 2 → 4 to keep the H2D pipeline warm now that Batch pins
+        # memory (see Batch.pin_memory in dataset.py). 4 doubles the queue depth
+        # while staying safely below RAM pressure at typical multi-speaker batch sizes.
+        prefetch_factor_val = int(getattr(self.hparams, "prefetch_factor", 4))
 
         collate_fn = UtteranceCollate(
             is_multispeaker=self.hparams.num_speakers > 1,
@@ -630,7 +635,9 @@ class VitsModel(pl.LightningModule):
                 num_workers=self.hparams.num_workers,
                 pin_memory=pin_memory,
                 persistent_workers=(self.hparams.num_workers > 0),
-                prefetch_factor=(2 if self.hparams.num_workers > 0 else None),
+                prefetch_factor=(
+                    prefetch_factor_val if self.hparams.num_workers > 0 else None
+                ),
             )
         else:
             # 従来の動作（ランダムサンプリング）
@@ -643,7 +650,9 @@ class VitsModel(pl.LightningModule):
                 shuffle=True,
                 pin_memory=pin_memory,
                 persistent_workers=(self.hparams.num_workers > 0),
-                prefetch_factor=(2 if self.hparams.num_workers > 0 else None),
+                prefetch_factor=(
+                    prefetch_factor_val if self.hparams.num_workers > 0 else None
+                ),
             )
 
     def val_dataloader(self):
@@ -652,6 +661,10 @@ class VitsModel(pl.LightningModule):
         # Cap val workers to 2 to avoid RAM exhaustion in DDP multi-GPU setups
         # (total workers = num_workers × devices; val doesn't need many workers)
         num_workers = min(self.hparams.num_workers, 2)
+        # Validation intentionally keeps the legacy prefetch_factor=2. Val runs briefly
+        # and only every --val-every-n-epochs epochs, so a smaller queue reduces peak
+        # RAM without a throughput cost. The train loader (which runs continuously)
+        # is where the raised default matters.
         return DataLoader(
             self._val_dataset,
             collate_fn=UtteranceCollate(
@@ -969,7 +982,9 @@ class VitsModel(pl.LightningModule):
             # becomes a no-op. Observed on v8 A100 SXM4 real-config smoke:
             # without this cap, batch 31 onwards diverges 100% (262/300 skip)
             # despite the source clamps.
-            loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask).clamp(max=1e4) * kl_weight
+            loss_kl = (
+                kl_loss(z_p, logs_q, m_p, logs_p, z_mask).clamp(max=1e4) * kl_weight
+            )
 
             loss_fm = feature_loss(fmap_r, fmap_g)
             loss_gen, _losses_gen = generator_loss(y_d_hat_g)
@@ -1211,11 +1226,17 @@ class VitsModel(pl.LightningModule):
 
                     with torch.no_grad():  # Disable gradient computation
                         for utt_idx, test_utt in enumerate(self._test_dataset):
-                            # Generate audio
-                            text = test_utt.phoneme_ids.unsqueeze(0).to(self.device)
+                            # Generate audio.
+                            # non_blocking=True on H2D copies keeps the pipeline
+                            # non-serializing when the source tensor is pageable
+                            # (safe here: we do not read the destination until the
+                            # infer call below implicitly syncs on the same stream).
+                            text = test_utt.phoneme_ids.unsqueeze(0).to(
+                                self.device, non_blocking=True
+                            )
                             text_lengths = torch.LongTensor(
                                 [len(test_utt.phoneme_ids)]
-                            ).to(self.device)
+                            ).to(self.device, non_blocking=True)
                             scales = [0.4, 1.0, 0.5]
 
                             # Resolve speaker embedding for zero-shot
@@ -1230,7 +1251,7 @@ class VitsModel(pl.LightningModule):
                                 ):
                                     spk_emb = test_utt.speaker_embedding.unsqueeze(
                                         0
-                                    ).to(self.device)
+                                    ).to(self.device, non_blocking=True)
                                 else:
                                     spk_emb = torch.zeros(
                                         1,
@@ -1247,9 +1268,11 @@ class VitsModel(pl.LightningModule):
                                         raw_lid.unsqueeze(0)
                                         if raw_lid.dim() == 0
                                         else raw_lid
-                                    ).to(self.device)
+                                    ).to(self.device, non_blocking=True)
                                 else:
-                                    lid = torch.LongTensor([raw_lid]).to(self.device)
+                                    lid = torch.LongTensor([raw_lid]).to(
+                                        self.device, non_blocking=True
+                                    )
                             else:
                                 lid = None
 
