@@ -1002,6 +1002,17 @@ class SynthesizerTrn(nn.Module):
         # expand prior
         m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
         logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
+        # Re-clamp after MAS expansion: at scratch init the random-init neg_cent
+        # fed to `monotonic_align.maximum_path` can produce an attn whose rows
+        # are effectively soft (multi-hot after Super-MAS dispatch or when
+        # MAS ties break in favour of stacking several 1s per row). The
+        # matmul then amplifies logs_p ~ ±15 → ±500, and
+        # ((z_p - m_p) ** 2) * exp(-2*logs_p) blows up in fp32. Re-clamping
+        # is safe because in a converged model attn is essentially one-hot
+        # and the post-expansion range already lies inside the pre-expansion
+        # range. Also re-clamp m_p to prevent (z_p - m_p)**2 from overflowing.
+        logs_p = logs_p.clamp(min=-15.0, max=15.0)
+        m_p = m_p.clamp(min=-1000.0, max=1000.0)
 
         z_slice, ids_slice = commons.rand_slice_segments(
             z, y_lengths, self.segment_size
@@ -1085,6 +1096,12 @@ class SynthesizerTrn(nn.Module):
         logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(
             1, 2
         )  # [b, t', t], [b, t, d] -> [b, d, t']
+        # Match the training-time post-MAS clamp (see forward()) so ONNX
+        # inference produces the same numerical range as training. In
+        # inference w_ceil is always integer and attn is truly one-hot so
+        # this is a no-op after convergence.
+        logs_p = logs_p.clamp(min=-15.0, max=15.0)
+        m_p = m_p.clamp(min=-1000.0, max=1000.0)
 
         # Use mean only for deterministic ONNX export
         if getattr(self, "onnx_export_mode", False):
