@@ -505,6 +505,27 @@ def create_parser():
         "Core kernels on A100 SXM4 / Ada 6000 (~-16%% sec/step expected). Silent "
         "fallback to nchw on sm_75 (T4) and older hardware.",
     )
+    # T6: Hybrid precision — override Discriminator forward precision independently
+    # of Lightning's global --precision setting. Default "inherit" keeps the
+    # status quo: D forward follows --precision. "bf16-mixed" wraps D forward in
+    # torch.autocast(bf16) so MPD/MSD run at bf16 even under --precision 32-true
+    # (SCL / DINO / loss compute stay fp32 via the outer autocast(enabled=False)
+    # block plus an explicit inner wrap around SCL). "32-true" forces D forward
+    # to fp32 even under --precision bf16-mixed (debug / parity check).
+    parser.add_argument(
+        "--disc-precision",
+        default="inherit",
+        choices=("inherit", "bf16-mixed", "32-true"),
+        help="Discriminator forward autocast precision override (hybrid precision). "
+        "'inherit' (default) uses --precision as-is. 'bf16-mixed' forces D forward "
+        "to bf16 autocast (SCL stays fp32 via the outer autocast(enabled=False) "
+        "block and the explicit inner wrap). '32-true' forces D forward to fp32 "
+        "even under --precision bf16-mixed for numerical parity checks. Motivation: "
+        "on v8 A100 SXM4 real-config traces --precision bf16-mixed regressed to "
+        "14.0 sec/step (vs 32-true simplified 5.15 sec/step) due to SCL / DINO "
+        "bf16 instability; hybrid precision preserves the D-forward bf16 speed win "
+        "(~20-30%% expected) without exposing SCL to bf16 numerics.",
+    )
     parser.add_argument("--seed", type=int, default=1234)
     return parser
 
@@ -764,6 +785,15 @@ def main():
         _LOGGER.info(
             "channels_last memory format enabled (--channels-last): "
             "DiscriminatorP Conv2d weights and activations use NHWC layout."
+        )
+
+    # T6: propagate CLI --disc-precision (default "inherit" → no override).
+    dict_args["disc_precision"] = getattr(args, "disc_precision", "inherit")
+    if dict_args["disc_precision"] != "inherit":
+        _LOGGER.info(
+            "Hybrid precision enabled (--disc-precision=%s): D forward wraps in "
+            "explicit autocast; SCL / DINO / loss compute stay fp32.",
+            dict_args["disc_precision"],
         )
 
     # Warn about deprecated --spk-emb-dropout

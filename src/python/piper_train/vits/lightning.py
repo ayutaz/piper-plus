@@ -1,3 +1,4 @@
+import contextlib
 import copy
 import logging
 from pathlib import Path
@@ -246,6 +247,21 @@ class VitsModel(pl.LightningModule):
         # fallback on sm_75 (T4) and older. Affects DiscriminatorP only —
         # DiscriminatorS (Conv1d) and Generator (Conv1d-heavy) are untouched.
         use_channels_last: bool = False,
+        # T6: Discriminator forward precision override (hybrid precision, opt-in).
+        # "inherit" (default) → D forward follows Lightning trainer precision (status
+        # quo). "bf16-mixed" → wrap D forward (MPD/MSD + optional WavLM disc) in
+        # torch.autocast(bf16) even when trainer runs at ``--precision 32-true``,
+        # keeping SCL / DINO / loss compute at fp32 via the existing outer
+        # ``autocast(enabled=False)`` blocks in ``training_step_g/d`` plus the
+        # explicit inner wrap around the SCL block. "32-true" → forces D forward
+        # to fp32 (``autocast(enabled=False)``) even under ``--precision
+        # bf16-mixed`` for debugging numerical parity vs the 32-true baseline.
+        # Motivation: on v8 A100 SXM4 real-config traces, ``--precision 32-true``
+        # (5.15 sec/step simplified) was faster than ``bf16-mixed`` (14.0 sec/step
+        # real config) due to SCL/DINO instability under bf16; hybrid precision
+        # keeps the D-forward speed win of bf16 (~20-30% expected) without
+        # exposing SCL to bf16 numerics.
+        disc_precision: str = "inherit",
         **kwargs,
     ):
         super().__init__()
@@ -711,6 +727,54 @@ class VitsModel(pl.LightningModule):
             batch_size=self.hparams.batch_size,
         )
 
+    def _disc_autocast_ctx(self):
+        """Return the autocast context wrapping Discriminator forward passes.
+
+        Hybrid-precision knob (``--disc-precision`` / hparam ``disc_precision``):
+
+        - ``"inherit"`` (default): return a ``contextlib.nullcontext`` so the D
+          forward inherits Lightning's global precision setting. This is the
+          status-quo behaviour and matches every existing training config.
+        - ``"bf16-mixed"``: return
+          ``torch.autocast(device_type=self.device.type, dtype=torch.bfloat16)``
+          so MPD/MSD (and optional WavLM disc) run at bf16 even under
+          ``--precision 32-true``. SCL / DINO / loss compute stay at fp32 via
+          the outer ``autocast(enabled=False)`` blocks and the explicit inner
+          ``_scl_autocast_ctx`` wrap.
+        - ``"32-true"``: return
+          ``torch.autocast(device_type=self.device.type, enabled=False)``
+          forcing the D forward to fp32 even under ``--precision bf16-mixed``
+          (useful for debugging numerical parity vs 32-true baseline).
+
+        The autocast object is only meaningful on CUDA. On CPU / MPS it acts as
+        a no-op which is what we want for unit tests.
+        """
+        mode = getattr(self.hparams, "disc_precision", "inherit")
+        if mode == "bf16-mixed":
+            return torch.autocast(
+                device_type=self.device.type,
+                dtype=torch.bfloat16,
+                enabled=True,
+            )
+        if mode == "32-true":
+            return torch.autocast(device_type=self.device.type, enabled=False)
+        # inherit → no override
+        return contextlib.nullcontext()
+
+    def _scl_autocast_ctx(self):
+        """Return an explicit ``autocast(enabled=False)`` context for SCL / DINO.
+
+        SCL and DINO are numerically sensitive (see PR history: CAM++ embedding
+        L2-normalize, DINO center EMA, teacher_emb NaN guard) and any bf16
+        precision leakage risks NaN-masking the loss and stalling training. The
+        outer ``autocast(enabled=False)`` at the top of ``training_step_g``
+        already forces fp32 for the whole loss-compute block, but this helper
+        makes the fp32 requirement visible and unit-testable at the SCL call
+        site itself so a future refactor cannot accidentally hoist SCL out of
+        the fp32 region.
+        """
+        return torch.autocast(device_type=self.device.type, enabled=False)
+
     @staticmethod
     def _ddp_synced_is_finite(loss: torch.Tensor) -> bool:
         """全 rank 同期で loss が有限かを判定する (skip-batch 決定用)。
@@ -970,7 +1034,10 @@ class VitsModel(pl.LightningModule):
         # Save for training_step_d
         self._y = y
 
-        _y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = self.model_d(y, y_hat)
+        # T6: Discriminator forward runs under _disc_autocast_ctx (nullcontext by
+        # default; bf16 or fp32 override when disc_precision != "inherit").
+        with self._disc_autocast_ctx():
+            _y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = self.model_d(y, y_hat)
 
         with autocast(self.device.type, enabled=False):
             # KL annealing: linearly increase from 0.1*c_kl to c_kl
@@ -1018,39 +1085,45 @@ class VitsModel(pl.LightningModule):
                 self._log_with_batch_info("loss_sub_stft", loss_sub_stft, batch)
 
             # --- Speaker Consistency Loss (SCL) ---
-            # CAM++ ONNX encoder path (primary, when speaker_encoder is loaded)
-            if (
-                self.hparams.c_spk > 0
-                and speaker_embeddings is not None
-                and self.speaker_encoder is not None
-            ):
-                with torch.no_grad():
-                    gen_embedding = self.speaker_encoder(y_hat.squeeze(1))
-                loss_spk = (
-                    speaker_consistency_loss(gen_embedding, speaker_embeddings.float())
-                    * self.hparams.c_spk
-                )
-                loss_gen_all = loss_gen_all + loss_spk
-                self._log_with_batch_info("loss_spk", loss_spk, batch)
-            # Mel-domain SCL fallback (differentiable, no external encoder needed)
-            elif (
-                self.hparams.num_speakers > 1
-                and self.hparams.c_spk > 0
-                and self.speaker_encoder is None
-            ):
-                loss_spk = mel_speaker_consistency_loss(
-                    y_hat,
-                    y,
-                    n_fft=self.hparams.filter_length,
-                    n_mels=self.hparams.mel_channels,
-                    hop_length=self.hparams.hop_length,
-                    win_length=self.hparams.win_length,
-                    sample_rate=self.hparams.sample_rate,
-                    mel_fmin=self.hparams.mel_fmin,
-                    mel_fmax=self.hparams.mel_fmax,
-                )
-                loss_gen_all = loss_gen_all + loss_spk * self.hparams.c_spk
-                self._log_with_batch_info("loss_spk", loss_spk, batch)
+            # T6: SCL is explicitly wrapped in _scl_autocast_ctx (= autocast
+            # enabled=False) so a future refactor cannot silently hoist SCL out
+            # of the outer fp32 block and expose it to bf16 numerics.
+            with self._scl_autocast_ctx():
+                # CAM++ ONNX encoder path (primary, when speaker_encoder is loaded)
+                if (
+                    self.hparams.c_spk > 0
+                    and speaker_embeddings is not None
+                    and self.speaker_encoder is not None
+                ):
+                    with torch.no_grad():
+                        gen_embedding = self.speaker_encoder(y_hat.squeeze(1))
+                    loss_spk = (
+                        speaker_consistency_loss(
+                            gen_embedding, speaker_embeddings.float()
+                        )
+                        * self.hparams.c_spk
+                    )
+                    loss_gen_all = loss_gen_all + loss_spk
+                    self._log_with_batch_info("loss_spk", loss_spk, batch)
+                # Mel-domain SCL fallback (differentiable, no external encoder needed)
+                elif (
+                    self.hparams.num_speakers > 1
+                    and self.hparams.c_spk > 0
+                    and self.speaker_encoder is None
+                ):
+                    loss_spk = mel_speaker_consistency_loss(
+                        y_hat,
+                        y,
+                        n_fft=self.hparams.filter_length,
+                        n_mels=self.hparams.mel_channels,
+                        hop_length=self.hparams.hop_length,
+                        win_length=self.hparams.win_length,
+                        sample_rate=self.hparams.sample_rate,
+                        mel_fmin=self.hparams.mel_fmin,
+                        mel_fmax=self.hparams.mel_fmax,
+                    )
+                    loss_gen_all = loss_gen_all + loss_spk * self.hparams.c_spk
+                    self._log_with_batch_info("loss_spk", loss_spk, batch)
 
             # --- DINO Self-Distillation Loss ---
             if (
@@ -1120,9 +1193,11 @@ class VitsModel(pl.LightningModule):
             if self.model_d_wavlm is not None and (
                 self.global_step % self.hparams.wavlm_every_n_steps == 0
             ):
-                _y_d_hat_r_wlm, y_d_hat_g_wlm, fmap_r_wlm, fmap_g_wlm = (
-                    self.model_d_wavlm(y, y_hat)
-                )
+                # T6: WavLM disc forward also honours _disc_autocast_ctx.
+                with self._disc_autocast_ctx():
+                    _y_d_hat_r_wlm, y_d_hat_g_wlm, fmap_r_wlm, fmap_g_wlm = (
+                        self.model_d_wavlm(y, y_hat)
+                    )
                 loss_fm_wavlm = feature_loss(fmap_r_wlm, fmap_g_wlm)
                 loss_gen_wavlm, _ = generator_loss(y_d_hat_g_wlm)
                 # Scale up loss to compensate for reduced frequency
@@ -1153,7 +1228,10 @@ class VitsModel(pl.LightningModule):
         y_hat = self._y_hat
         # Ensure detached tensors are contiguous
         y_hat_detached = y_hat.detach().contiguous()
-        y_d_hat_r, y_d_hat_g, _, _ = self.model_d(y, y_hat_detached)
+        # T6: Discriminator forward runs under _disc_autocast_ctx (nullcontext by
+        # default; bf16 or fp32 override when disc_precision != "inherit").
+        with self._disc_autocast_ctx():
+            y_d_hat_r, y_d_hat_g, _, _ = self.model_d(y, y_hat_detached)
 
         with autocast(self.device.type, enabled=False):
             # Discriminator
@@ -1166,9 +1244,11 @@ class VitsModel(pl.LightningModule):
             if self.model_d_wavlm is not None and (
                 self.global_step % self.hparams.wavlm_every_n_steps == 0
             ):
-                y_d_hat_r_wlm, y_d_hat_g_wlm, _, _ = self.model_d_wavlm(
-                    y, y_hat_detached
-                )
+                # T6: WavLM disc forward also honours _disc_autocast_ctx.
+                with self._disc_autocast_ctx():
+                    y_d_hat_r_wlm, y_d_hat_g_wlm, _, _ = self.model_d_wavlm(
+                        y, y_hat_detached
+                    )
                 loss_disc_wavlm, _, _ = discriminator_loss(y_d_hat_r_wlm, y_d_hat_g_wlm)
                 loss_disc_all = (
                     loss_disc_all
