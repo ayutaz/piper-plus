@@ -111,6 +111,11 @@ ENV PYTHONUNBUFFERED=1
 ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=$CUDA_HOME/bin:$PATH
 ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+# v8 前処理高速化 (#1): huggingface_hub の Rust downloader (hf_transfer) を
+# 有効化。 200-500MB/s の並列 chunk DL に切替、 前処理生データ DL の 3-5x 短縮
+# (DL 3-5h → 1-1.5h)。 依存は builder stage で train extras 経由 install 済み。
+# 挙動を戻したい場合は container 起動時に `-e HF_HUB_ENABLE_HF_TRANSFER=0` で override。
+ENV HF_HUB_ENABLE_HF_TRANSFER=1
 
 # Install runtime dependencies + Python 3.13 via deadsnakes PPA
 RUN apt-get update && apt-get install -y --no-install-recommends \

@@ -45,6 +45,11 @@ train = [
     "onnxsim-prebuilt",
     "onnxscript>=0.7.0",
     "piper-plus-g2p[all]",
+    # v8 前処理高速化 (#1): Rust concurrent chunk downloader で HF Hub DL を
+    # 3-5x 高速化 (200-500MB/s、 単スレッド hf_hub の 40-80MB/s 比)。
+    # 有効化は環境変数 HF_HUB_ENABLE_HF_TRANSFER=1 (Dockerfile / handoff で設定)。
+    # 元となる HF Hub URL / 認可フローは既存 huggingface_hub 側と互換 (backend swap のみ)。
+    "hf_transfer>=0.1.6",
 ]
 
 inference = [
