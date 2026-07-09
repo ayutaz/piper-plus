@@ -2,8 +2,9 @@
 
 `prepare_moe_speech_plus.py` の per-zip 展開 phase は 473 zip × ~800 utts
 の CPU-bound loop (JSON parse + Levenshtein CER) が本命 hotspot。 2026-07-09
-に `--parallel` opt-in を追加、 `Pool.imap(chunksize=1)` で input 順序を
-preserve する契約とした。 本テストはその契約 (serial と並列で:
+に `--parallel` を追加 (P3 で opt-in、 P5 で default ON 化 + chunksize 8)、
+`Pool.imap` の input 順序 preserve 契約で serial parity を保つ設計とした。
+本テストはその契約 (serial と並列で:
 
   1. metadata.csv が byte-for-byte 一致
   2. wavs/*.wav の内容が byte-for-byte 一致
@@ -138,8 +139,14 @@ def _run_extraction(
         "--cap",
         "20",
     ]
+    # 2026-07-09 (P5): `--parallel` は default ON になったため、
+    # serial 側は `--no-parallel` を明示する。 parallel 側は default に
+    # 頼らず `--parallel` を明示することで CLI 契約 (BooleanOptionalAction)
+    # 自体も同時に検証する。
     if parallel:
         argv += ["--parallel", "--num-processes", str(num_processes)]
+    else:
+        argv += ["--no-parallel"]
     old = sys.argv
     sys.argv = argv
     try:
@@ -334,6 +341,81 @@ class TestDefaultNumProcesses:
     def test_default_bounded_1_to_32(self):
         n = p._default_num_processes()
         assert 1 <= n <= 32
+
+
+@pytest.mark.unit
+class TestParallelDefaultOn:
+    """`--parallel` の default が ON、 `--no-parallel` で opt-out できること。
+
+    2026-07-09 (P5) で default OFF → ON に変更。 v8 データ選抜 (30-45min →
+    3-5min) の高速化を default で受けられるようにする契約変更のため、
+    ここで pin する。 CI / 小さい dataset での opt-out 経路も同時に検証。
+
+    実装: `argparse.ArgumentParser.parse_args` を spy して `--parallel` の
+    ns.parallel を捕捉、 main() は `--stats-only` を渡して I/O を最小化。
+    """
+
+    def test_default_is_parallel_on(self, tmp_path: Path, monkeypatch):
+        """argv に `--parallel` / `--no-parallel` を渡さないときは並列 ON。"""
+        input_dir = tmp_path / "in"
+        input_dir.mkdir()
+        # zip を 1 個作って main() を通す。 --stats-only で終わらせて I/O 最小化。
+        _make_mock_zip(input_dir / "spk000.zip", n_utts=3, speaker_seed=0)
+
+        captured: dict = {}
+
+        real_parse = argparse.ArgumentParser.parse_args
+
+        def spy_parse(self, *a, **kw):
+            ns = real_parse(self, *a, **kw)
+            captured["parallel"] = ns.parallel
+            return ns
+
+        monkeypatch.setattr(argparse.ArgumentParser, "parse_args", spy_parse)
+        argv = [
+            "prep",
+            "--input-dir",
+            str(input_dir),
+            "--output-dir",
+            str(tmp_path / "out"),
+            "--stats-only",
+        ]
+        monkeypatch.setattr(sys, "argv", argv)
+        p.main()
+        assert captured["parallel"] is True, (
+            "P5 契約: `--parallel` の argparse default は True でなければならない "
+            "(v8 dataset prep 高速化の主軸)"
+        )
+
+    def test_no_parallel_flag_opts_out(self, tmp_path: Path, monkeypatch):
+        """`--no-parallel` を渡すと BooleanOptionalAction で False になる。"""
+        input_dir = tmp_path / "in"
+        input_dir.mkdir()
+        _make_mock_zip(input_dir / "spk000.zip", n_utts=3, speaker_seed=0)
+
+        captured: dict = {}
+        real_parse = argparse.ArgumentParser.parse_args
+
+        def spy_parse(self, *a, **kw):
+            ns = real_parse(self, *a, **kw)
+            captured["parallel"] = ns.parallel
+            return ns
+
+        monkeypatch.setattr(argparse.ArgumentParser, "parse_args", spy_parse)
+        argv = [
+            "prep",
+            "--input-dir",
+            str(input_dir),
+            "--output-dir",
+            str(tmp_path / "out"),
+            "--stats-only",
+            "--no-parallel",
+        ]
+        monkeypatch.setattr(sys, "argv", argv)
+        p.main()
+        assert captured["parallel"] is False, (
+            "`--no-parallel` は BooleanOptionalAction で False にならなければならない"
+        )
 
 
 # ---------------------------------------------------------------------------
