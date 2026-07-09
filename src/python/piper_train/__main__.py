@@ -526,6 +526,29 @@ def create_parser():
         "bf16 instability; hybrid precision preserves the D-forward bf16 speed win "
         "(~20-30%% expected) without exposing SCL to bf16 numerics.",
     )
+    # T3: SDPA fast path for TextEncoder self-attention (opt-in).
+    # Swaps the manual matmul path (`(Q/sqrt(d)) @ K^T + scores_local +
+    # softmax + relative-V correction`) for
+    # ``F.scaled_dot_product_attention``, folding the relative-K bias into
+    # ``attn_mask``. The relative-V correction is dropped because SDPA does
+    # not surface ``p_attn`` (this is why the flag is named
+    # ``--attn-drop-rel-v``). Default OFF preserves the manual path with
+    # bit-parity vs prior checkpoints. Expected win: +2-5% throughput and
+    # ~60MB/batch activation-memory saving on the v8 real config (only the
+    # TextEncoder attention path is affected; PosteriorEncoder / Flow / Dec
+    # are untouched).
+    parser.add_argument(
+        "--attn-drop-rel-v",
+        action="store_true",
+        default=False,
+        help="Swap TextEncoder MultiHeadAttention for "
+        "F.scaled_dot_product_attention (SDPA) with additive relative-K bias. "
+        "Drops the relative-V correction. Opt-in perf switch (+2-5%% throughput, "
+        "-60MB activation memory / batch). Default OFF preserves the manual "
+        "matmul path with bit-parity vs prior checkpoints. Only affects "
+        "TextEncoder self-attention (Encoder / TextEncoder in vits.models); "
+        "PosteriorEncoder / Flow / MBiSTFTGenerator unaffected.",
+    )
     parser.add_argument("--seed", type=int, default=1234)
     return parser
 
@@ -794,6 +817,20 @@ def main():
             "Hybrid precision enabled (--disc-precision=%s): D forward wraps in "
             "explicit autocast; SCL / DINO / loss compute stay fp32.",
             dict_args["disc_precision"],
+        )
+
+    # T3: propagate CLI --attn-drop-rel-v (argparse hyphen→underscore) to
+    # the VitsModel constructor keyword ``attn_drop_rel_v``. When True, the
+    # TextEncoder self-attention swaps its manual matmul path for
+    # F.scaled_dot_product_attention (relative-K bias folded into attn_mask;
+    # relative-V correction dropped). Default False = manual path (bit-parity
+    # vs prior checkpoints).
+    dict_args["attn_drop_rel_v"] = getattr(args, "attn_drop_rel_v", False)
+    if dict_args["attn_drop_rel_v"]:
+        _LOGGER.info(
+            "SDPA fast path enabled for TextEncoder self-attention "
+            "(--attn-drop-rel-v): relative-K bias fused into attn_mask, "
+            "relative-V correction dropped."
         )
 
     # Warn about deprecated --spk-emb-dropout

@@ -195,6 +195,10 @@ class TextEncoder(nn.Module):
         kernel_size: int,
         p_dropout: float,
         gin_channels: int = 0,
+        # T3: opt-in SDPA fast path for the transformer self-attention.
+        # Default False preserves the manual path (bit-parity with prior
+        # checkpoints). See attentions.MultiHeadAttention for the full contract.
+        attn_drop_rel_v: bool = False,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -211,7 +215,13 @@ class TextEncoder(nn.Module):
         nn.init.normal_(self.emb.weight, 0.0, hidden_channels**-0.5)
 
         self.encoder = attentions.Encoder(
-            hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout
+            hidden_channels,
+            filter_channels,
+            n_heads,
+            n_layers,
+            kernel_size,
+            p_dropout,
+            drop_rel_v=attn_drop_rel_v,
         )
         self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
 
@@ -746,6 +756,9 @@ class SynthesizerTrn(nn.Module):
         # Accepted for backward compat but unused (spk_proj is always used for n_speakers > 1)
         use_zero_shot: bool = True,
         spk_embed_dim: int = 192,
+        # T3: TextEncoder self-attention → F.scaled_dot_product_attention.
+        # Opt-in perf switch (default False = manual path, regression zero).
+        attn_drop_rel_v: bool = False,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -787,6 +800,7 @@ class SynthesizerTrn(nn.Module):
             kernel_size,
             p_dropout,
             gin_channels=gin_channels,
+            attn_drop_rel_v=attn_drop_rel_v,
         )
         self.dec = MBiSTFTGenerator(
             initial_channel=inter_channels,
