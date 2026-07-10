@@ -63,9 +63,15 @@ jobs:
       - name: Install wasm-pack
         # prebuilt binary を取得 (cargo install wasm-pack --locked は
         # ~5 分かかる)。wasm-build.yml の wasm-test job と同じ pin。
+        #
+        # version: 'latest' は 2026-07-10 に jetli/wasm-pack-action@v0.4.0 の
+        # resolver が v0.15.0 → v0.9.1 (2020 release) を返す regression が
+        # 発生。 v0.9.1 は Cargo workspace inheritance (license.workspace = true
+        # 等) を parse できず "invalid type: map, expected a string" で fail する。
+        # 明示的に最新 stable の v0.15.0 に pin して安定化。
         uses: jetli/wasm-pack-action@v0.4.0
         with:
-          version: 'latest'
+          version: 'v0.15.0'
 
       - name: Build WASM (${{ matrix.name }})
         working-directory: src/rust/piper-wasm

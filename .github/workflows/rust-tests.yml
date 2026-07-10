@@ -121,9 +121,12 @@ jobs:
       with:
         node-version: '24'
     - name: Install wasm-pack
+      # 2026-07-10 に 'latest' resolver が v0.15.0 → v0.9.1 (2020) を返す
+      # regression が発生し、 workspace inheritance parse で fail。
+      # build-wasm-reusable.yml と同 pin。
       uses: jetli/wasm-pack-action@v0.4.0
       with:
-        version: 'latest'
+        version: 'v0.15.0'
     - name: Run wasm-bindgen tests in Node (multilingual-external)
       # 22 #[wasm_bindgen_test] functions in src/lib.rs are gated on
       # target_arch = "wasm32" so they only run via wasm-pack — `cargo test`

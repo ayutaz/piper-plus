@@ -38,8 +38,11 @@ public sealed class DotNetG2PEngineFixture : IDisposable
     // だと CS0053 で fail する。 property を internal にして accessibility を
     // 揃える (assembly-internal なので tests 側からは問題なくアクセス可能)。
     internal DotNetG2PEngine JaEngine { get; }
+
     internal DotNetEnglishG2PEngine EnEngine { get; }
+
     internal MultilingualPhonemizer Multilingual { get; }
+
     internal JapanesePhonemizer JaPhonemizer { get; }
 
     public DotNetG2PEngineFixture()
@@ -58,6 +61,7 @@ public sealed class DotNetG2PEngineFixture : IDisposable
     public void Dispose()
     {
         JaEngine.Dispose();
+
         // DotNetEnglishG2PEngine is not IDisposable in v1.8.x.
     }
 }
