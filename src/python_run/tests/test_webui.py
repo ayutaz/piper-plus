@@ -50,11 +50,11 @@ class TestWebUI:
 
     def test_language_detection(self):
         """Test language detection from model path"""
-        # Test Japanese model
-        ja_lang = get_language_from_model("test/models/multilingual-test-medium.onnx")
+        # Test Japanese model (no config file → filename fallback to ja_JP)
+        ja_lang = get_language_from_model("test/models/japanese-voice.onnx")
         assert ja_lang == "ja_JP"
 
-        # Test multilingual model (falls back to en_US)
+        # Test multilingual model (config language.code="multilingual" → en_US fallback)
         en_lang = get_language_from_model("test/models/multilingual-test-medium.onnx")
         assert en_lang == "en_US"
 
@@ -96,9 +96,9 @@ class TestWebUI:
         )
         assert custom_text == ""
 
-        # Test Japanese greeting
+        # Test Japanese greeting (no config file → filename fallback to ja_JP)
         ja_greeting = apply_template(
-            "Greeting (greeting)", "test/models/multilingual-test-medium.onnx"
+            "Greeting (greeting)", "test/models/japanese-voice.onnx"
         )
         assert "こんにちは" in ja_greeting
 
@@ -152,6 +152,7 @@ class TestWebUI:
             "length_scale",
             "noise_scale",
             "noise_w",
+            "language_code",
         ]
         assert params == expected_params
 
