@@ -271,9 +271,14 @@ class TestTrainingIntegration:
         from piper_plus.webui import start_training
 
         with patch("piper_plus.training_manager.subprocess.Popen") as mock_popen:
+            import threading as _threading
+
+            gate = _threading.Event()
             mock_process = Mock()
             mock_process.poll.return_value = None  # Process is running
-            mock_process.stdout.readline.return_value = ""
+            # Block readline until the gate is released so the first training's
+            # monitor thread keeps is_running=True (avoids immediate-EOF race).
+            mock_process.stdout.readline.side_effect = lambda: (gate.wait(), "")[1]
             mock_popen.return_value = mock_process
 
             # Mock dependencies check
