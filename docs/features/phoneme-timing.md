@@ -6,7 +6,7 @@ VITS Duration Predictor から音素ごとの開始時刻・終了時刻・継�
 
 | ランタイム | 計算 | JSON | TSV | SRT | CLI flag | HTTP API |
 |----------|------|------|-----|-----|----------|----------|
-| Python | ✅ | ✅ | ✅ | ✅ | (`piper.synthesize_with_timing()`) | ✅ `/api/phoneme-timing` |
+| Python | ✅ | ✅ | ✅ | ✅ | (`piper_plus.synthesize_with_timing()`) | ✅ `/api/phoneme-timing` |
 | Rust | ✅ | ✅ | ✅ | ✅ | `--output-timing` `--timing-format` | - |
 | Go | ✅ | ✅ | ✅ | ✅ | `--output-timing` `--timing-format` | ✅ |
 | C++ | ✅ | ✅ | ✅ | ✅ | `--output-timing` `--timing-format` | - |

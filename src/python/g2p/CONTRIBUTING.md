@@ -1,4 +1,4 @@
-# Contributing to piper-g2p
+# Contributing to piper-plus-g2p
 
 ## Development Setup
 

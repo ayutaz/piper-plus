@@ -2,7 +2,7 @@
 
 ## 概要
 
-このガイドでは、Windows環境でPiperとOpenJTalkを使用して日本語音声合成を行うための手順を説明します。
+このガイドでは、Windows環境でpiper-plusとOpenJTalkを使用して日本語音声合成を行うための手順を説明します。
 
 > **ビルド不要で使いたい方へ**: [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) からプリビルドバイナリ (`piper-plus-cpp-windows-x64.zip`) をダウンロードすれば、ビルドせずにすぐ使えます。ビルドが必要なのは、ソースコードを変更したい開発者のみです。
 

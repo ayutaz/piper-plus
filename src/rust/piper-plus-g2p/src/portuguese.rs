@@ -1,7 +1,7 @@
 //! Rule-based Brazilian Portuguese phonemizer for Piper TTS.
 //!
 //! Ported from `src/cpp/portuguese_phonemize.cpp` (1004 lines) and
-//! `src/python/piper_train/phonemize/portuguese.py`.
+//! `src/python/g2p/piper_plus_g2p/portuguese.py`.
 //!
 //! Converts Brazilian Portuguese text to IPA phonemes using grapheme-to-phoneme
 //! rules.  No external G2P engine required.

@@ -10,7 +10,7 @@ namespace PiperPlus.Core.Phonemize;
 /// <summary>
 /// Brazilian Portuguese phonemizer that mirrors the Python
 /// <c>phonemize_portuguese_with_prosody()</c> function in
-/// <c>piper_train/phonemize/portuguese.py</c>.
+/// <c>src/python/g2p/piper_plus_g2p/portuguese.py</c>.
 /// <para>
 /// Processing flow (1:1 with the Python implementation):
 /// <list type="number">

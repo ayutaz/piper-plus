@@ -85,8 +85,8 @@ src/python_run/piper_plus/
 | CI/CD | 17 workflow の `src/python_run/piper/**` path filter + module 実行 + C++ バイナリ参照 |
 | docs/README | `./bin/piper` / `python -m piper` / `import piper` の全参照 (9 言語 README + docs) |
 | 共有辞書 dir | `share/piper/` → `share/piper-plus/` (cmake 6 + Rust 4 + Go 2 箇所) |
-| キャッシュ/データ dir | `~/.local/share/piper` 等 → `piper-plus` (C#/Rust の bare piper を統一) |
-| env var prefix | `PIPER_*` → `PIPER_PLUS_*` + HTTP header `x-piper-warning` (cross-runtime) |
+| キャッシュ/データ dir | `~/.local/share/piper` 等 → `piper-plus` (C#/Rust/C++ の bare piper を統一) |
+| env var prefix | `PIPER_*` → `PIPER_PLUS_*` + HTTP header `x-piper-warning` (cross-runtime。 Wyoming Docker container env `PIPER_MODEL/LANGUAGE/SPEAKER_ID/PORT` は Home Assistant 既存ユーザー互換のため据置、 §5.2 参照) |
 | リリースアセット名 | `piper-*.tar.gz` → `piper-plus-cpp-*` (C#/Rust CLI との接頭辞衝突回避に `-cpp-` 識別子) |
 
 ### 5.2 Out of scope (変更しない / 別 issue)
@@ -96,6 +96,7 @@ src/python_run/piper_plus/
 - **推論実装の一本化** (高レベル API engine ↔ runtime PiperVoice の二重実装統合) は別 issue (OQ-1)。
 - **CHANGELOG の歴史的記述** / **rhasspy/piper 帰属** / **`*-piper` downstream 名** / **`dataset:piper` メタ** は据置 (改名対象外、sed 除外リスト必須)。
 - **`__init__.py` の `version("piper-plus")`** は配布名参照なので触らない。
+- **Wyoming Docker container env** (`docker/wyoming/Dockerfile` の `PIPER_MODEL` / `PIPER_LANGUAGE` / `PIPER_SPEAKER_ID` / `PIPER_PORT` / `PIPER_NOISE_SCALE` / `PIPER_LENGTH_SCALE` / `PIPER_NOISE_W` / `PIPER_DEVICE`) は据置。 これは container-level 設定であり、 Home Assistant 既存ユーザーが `.env` / `docker-compose` に設定済みの env var を壊すため rename を見送り。 docker/python-inference (`PIPER_PLUS_API_KEYS` 等) / docker/webui / docker/cpp-inference (`PIPER_PLUS_MODEL_PATH`) は既に `PIPER_PLUS_*` に統一済で cross-runtime 命名一貫性の観点では例外であるが、 互換性優先で本 v2.0 では触らない。 §7-6 の env var 一括改名の scope はこの例外を含む。
 
 ---
 
@@ -127,7 +128,7 @@ src/python_run/piper_plus/
 3. **Python module 実行**: `python -m piper[.webui/.http_server]` → `python -m piper_plus[...]`。
 4. **C++ バイナリ**: `./bin/piper` (`piper.exe`) → `./bin/piper-plus` (`piper-plus.exe`)。
 5. **install-layout** (PR-F): 共有辞書 dir / キャッシュ dir が `piper-plus` に移動 → 既存 DL 資産は再取得が必要。
-6. **env var**: `PIPER_*` → `PIPER_PLUS_*` (全ランタイム)。
+6. **env var**: `PIPER_*` → `PIPER_PLUS_*` (全ランタイム)。 ただし Wyoming Docker container 内の `PIPER_MODEL` / `PIPER_LANGUAGE` / `PIPER_SPEAKER_ID` / `PIPER_PORT` 等は据置 (§5.2 参照、 Home Assistant 既存ユーザー互換のため)。
 7. **リリースアセット名** (PR-F): `piper-linux-x64.tar.gz` 等 → `piper-plus-cpp-*`。新タグの DL URL が変わる (旧タグ添付は per-tag で不変・安全)。
 8. **配布名は不変**: PyPI `piper-plus` はそのまま。変わるのは import 名・コマンド名・バイナリ名・layout。
 

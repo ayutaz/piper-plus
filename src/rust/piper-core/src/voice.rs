@@ -326,7 +326,7 @@ impl PiperVoice {
         }
     }
 
-    /// EnglishPhonemizer を生成する (piper-g2p)。
+    /// EnglishPhonemizer を生成する (piper-plus-g2p)。
     ///
     /// CMU辞書を以下の順で検索:
     /// 1. `CMUDICT_PATH` 環境変数
@@ -348,7 +348,7 @@ impl PiperVoice {
         piper_plus_g2p::english::EnglishPhonemizer::new().map_err(PiperError::from)
     }
 
-    /// ChinesePhonemizer を生成する (piper-g2p)。
+    /// ChinesePhonemizer を生成する (piper-plus-g2p)。
     ///
     /// Pinyin辞書を以下の順で検索:
     /// 1. `PINYIN_SINGLE_PATH` / `PINYIN_PHRASES_PATH` 環境変数
@@ -604,7 +604,7 @@ impl PiperVoice {
         self.phonemizer.detect_primary_language(text)
     }
 
-    /// JapanesePhonemizer を生成する (piper-g2p)。
+    /// JapanesePhonemizer を生成する (piper-plus-g2p)。
     ///
     /// `naist-jdic` feature が有効なら bundled 辞書を使用し、
     /// 無効なら `dictionary_manager::ensure_dictionary()` で外部辞書を

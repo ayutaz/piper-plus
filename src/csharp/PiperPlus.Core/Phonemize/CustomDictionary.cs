@@ -20,9 +20,9 @@ namespace PiperPlus.Core.Phonemize;
 /// </para>
 /// <para>
 /// Mirrors the custom dictionary functionality in the Python
-/// (<c>piper_train/phonemize/custom_dict.py</c>), C++
+/// (<c>src/python/g2p/piper_plus_g2p/custom_dict.py</c>), C++
 /// (<c>src/cpp/custom_dictionary.cpp</c>) and Rust
-/// (<c>src/rust/piper-core/src/phonemize/custom_dict.rs</c>) implementations.
+/// (<c>src/rust/piper-plus-g2p/src/custom_dict.rs</c>) implementations.
 /// </para>
 /// </summary>
 /// <remarks>

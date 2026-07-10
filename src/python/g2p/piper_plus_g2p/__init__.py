@@ -1,4 +1,4 @@
-"""piper-g2p: Multilingual G2P for TTS."""
+"""piper-plus-g2p: Multilingual G2P for TTS."""
 
 __version__ = "0.2.0"
 

@@ -2,7 +2,7 @@
 //
 // Converts English text to IPA phonemes using CMU dictionary lookup +
 // ARPAbet-to-IPA conversion rules.  Output matches the Python
-// piper_train/phonemize/english.py pipeline exactly:
+// src/python/g2p/piper_plus_g2p/english.py pipeline exactly:
 //   - Context-dependent ARPAbet->IPA (AA+R merge, stressed ER, etc.)
 //   - Function-word destressing
 //   - Stress markers (primary/secondary) before vowels

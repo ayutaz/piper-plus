@@ -352,7 +352,7 @@ Phase 1〜4 は全 PASS が必須ゲート。Phase 5〜11 はリリース判断�
 | 7.2 | Rust CLI help/version | `src\rust\target\release\piper-cli.exe --help` / `--version` | 表示 | |
 | 7.3 | Go CLI help | `src\go\bin\piper-plus.exe --help` | 表示 | |
 | 7.4 | C# CLI help | `publish\PiperPlus.Cli.exe --help` | 表示 | |
-| 7.5 | C++ CLI help | `build\Release\piper.exe --help` | 表示 | |
+| 7.5 | C++ CLI help | `build\Release\piper-plus.exe --help` | 表示 | |
 | 7.6 | `--list-models` (言語フィルタ付き) | 各 CLI で実行 | モデル一覧表示 | |
 | 7.7 | モデル名エイリアス解決 | `--model tsukuyomi` (DL 確認) | 自動解決 | |
 | 7.8 | 必須引数欠落 / 不正引数 | 各 CLI で意図的に誤入力 | 明示エラー + 終了コード ≠ 0 | |

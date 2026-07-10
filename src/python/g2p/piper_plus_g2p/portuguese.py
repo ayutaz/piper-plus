@@ -1,4 +1,4 @@
-"""Rule-based Portuguese phonemizer for piper-g2p (BR + EU dialects).
+"""Rule-based Portuguese phonemizer for piper-plus-g2p (BR + EU dialects).
 
 Converts Portuguese text to IPA phonemes using grapheme-to-phoneme rules.
 No external G2P engine required.

@@ -280,7 +280,7 @@ docker run --rm \
 
 ### MODEL_PATH 環境変数
 
-`MODEL_PATH` 環境変数を指定すると、entrypoint スクリプトが自動的に `PIPER_MODEL_PATH` を設定します。
+`MODEL_PATH` 環境変数を指定すると、entrypoint スクリプトが自動的に `PIPER_PLUS_MODEL_PATH` を設定します。
 
 ```bash
 docker run --rm \
@@ -459,7 +459,7 @@ Python 推論イメージと WebUI は GPU なしでも動作します。`--gpus
 | `GRADIO_SERVER_NAME` | WebUI | サーバーバインドアドレス (デフォルト: `0.0.0.0`) |
 | `GRADIO_SERVER_PORT` | WebUI | サーバーポート (デフォルト: `7860`) |
 | `CUDA_VISIBLE_DEVICES` | Python 学習 | CUDA デバイス選択 (ONNX 変換時は `""` を指定) |
-| `MODEL_PATH` | C++ 推論 | モデルファイルパス (entrypoint が `PIPER_MODEL_PATH` に設定) |
+| `MODEL_PATH` | C++ 推論 | モデルファイルパス (entrypoint が `PIPER_PLUS_MODEL_PATH` に設定) |
 | `BUILD_TYPE` | C++ 開発 | CMake ビルドタイプ (デフォルト: `Release`) |
 | `RUN_TESTS` | C++ 開発 | `1` でビルド後にテスト実行 |
 | `COVERAGE` | C++ 開発 | `1` でカバレッジレポート生成 |

@@ -2,7 +2,7 @@
 
 Runtime version for piper-plus inference.
 Converts Spanish text to IPA phonemes using orthographic rules.
-G2P logic is identical to the training side (piper_train.phonemize.spanish).
+G2P logic is identical to the training side (piper_plus_g2p.spanish).
 
 Uses Latin American Spanish pronunciation by default (seseo: c/z → s).
 """

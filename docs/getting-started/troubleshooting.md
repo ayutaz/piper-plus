@@ -1,6 +1,6 @@
-# Piper Troubleshooting Guide
+# Piper-Plus Troubleshooting Guide
 
-This guide helps resolve common issues when using Piper, especially with Japanese text-to-speech functionality.
+This guide helps resolve common issues when using piper-plus, especially with Japanese text-to-speech functionality.
 
 ## Table of Contents
 

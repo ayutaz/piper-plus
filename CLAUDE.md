@@ -333,7 +333,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 - **学習高速化** — Validation 頻度削減、DataLoader 最適化 (num_workers=2, pin_memory)、DDP `find_unused_parameters=True`。CLI: `--val-every-n-epochs`, `--limit-val-batches`, `--num-workers`, `--no-pin-memory`。
 - **WandB Audio Logging** (`vits/lightning.py:on_validation_epoch_end`) — Validation 時に音声サンプルアップロード。CLI: `--audio-log-epochs`, `--num-test-examples`。
 - **エネルギー VAD 高速キャッシュ** (`norm_audio/__init__.py`) — Silero ONNX VAD を numpy エネルギー VAD に置換、~25x 高速化 (~390ms → ~8ms/file)。
-- **Super-MAS Triton-GPU MAS accelerator** (`vits/monotonic_align/__init__.py`) — arXiv:2409.07704 (Park et al., 2024)。 CUDA tensor + `super_monotonic_align` package 利用可能時に Triton kernel に dispatch、 19-72x 高速化 (報告値)。 既存 Cython は CPU / package 未導入 / `PIPER_DISABLE_SUPER_MAS=1` 時のフォールバックとして温存。 推論経路への影響ゼロ (学習時 `SynthesizerTrn.forward` 内 1 箇所のみ呼び出し)。 Opt-in install: `pip install "piper-train[super-mas]"` (PyPI 非配布、 git+https のみ)。 algorithmic equivalence (upstream は bit-identical を明示保証しないが `max_neg_val` edge case 修正済)。
+- **Super-MAS Triton-GPU MAS accelerator** (`vits/monotonic_align/__init__.py`) — arXiv:2409.07704 (Park et al., 2024)。 CUDA tensor + `super_monotonic_align` package 利用可能時に Triton kernel に dispatch、 19-72x 高速化 (報告値)。 既存 Cython は CPU / package 未導入 / `PIPER_PLUS_DISABLE_SUPER_MAS=1` 時のフォールバックとして温存。 推論経路への影響ゼロ (学習時 `SynthesizerTrn.forward` 内 1 箇所のみ呼び出し)。 Opt-in install: `pip install "piper-train[super-mas]"` (PyPI 非配布、 git+https のみ)。 algorithmic equivalence (upstream は bit-identical を明示保証しないが `max_neg_val` edge case 修正済)。
 
 ### ONNX エクスポート
 
@@ -362,7 +362,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 
 > **学習済みモデルは 6 言語 (sv/ko 未含有)、コードは 8 言語対応。**
 
-**実装:** `src/python/g2p/piper_plus_g2p/{multilingual,japanese,english,chinese,korean,spanish,portuguese,french,swedish}.py` (学習側) / `src/python_run/piper/phonemize/` (ランタイム側)。
+**実装:** `src/python/g2p/piper_plus_g2p/{multilingual,japanese,english,chinese,korean,spanish,portuguese,french,swedish}.py` (学習側) / `src/python_run/piper_plus/phonemize/` (ランタイム側)。
 **ABC + レジストリ:** `g2p/piper_plus_g2p/{base,registry}.py`。
 
 ### G2P 詳細機能 (日本語)
@@ -380,17 +380,17 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 
 ### ランタイム共通機能
 
-- **CPU 推論最適化 (Tier 1-2)** — 4 言語実装で ORT セッション設定統一、Warmup 2 回 (100 phonemes、scales=[0.667,1.0,0.8])、`.opt.onnx`+`.ok` キャッシュ、JA 音素化 LRU キャッシュ (Python のみ)。仕様: `docs/spec/ort-session-contract.toml`。CLI: `--no-warmup`。env: `PIPER_DISABLE_WARMUP`, `PIPER_DISABLE_CACHE`, `PIPER_INTRA_THREADS`, `PIPER_G2P_PARALLELISM` (G2P 文単位並列度、`=1` で逐次の旧挙動。Issue #383 / PR #403)。
+- **CPU 推論最適化 (Tier 1-2)** — 4 言語実装で ORT セッション設定統一、Warmup 2 回 (100 phonemes、scales=[0.667,1.0,0.8])、`.opt.onnx`+`.ok` キャッシュ、JA 音素化 LRU キャッシュ (Python のみ)。仕様: `docs/spec/ort-session-contract.toml`。CLI: `--no-warmup`。env: `PIPER_PLUS_DISABLE_WARMUP`, `PIPER_PLUS_DISABLE_CACHE`, `PIPER_PLUS_INTRA_THREADS`, `PIPER_PLUS_G2P_PARALLELISM` (G2P 文単位並列度、`=1` で逐次の旧挙動。Issue #383 / PR #403)。
 - **短テキスト合成品質改善 (Strategy A/B/C)** — 全 6 ランタイム (Python/Rust/C#/Go/WASM/C++) 並列実装。A: Silence Padding + Post-trim、B: Dynamic Scales、C: SSML `<break>` 自動挿入 (SSML 実装ランタイムでのみ)。仕様: `docs/spec/short-text-contract.toml`。
-- **ストリーミング文単位分割** — 終止符 `.`/`!`/`?`/`。`/`！`/`？`/`．` で分割し文ごとに音素化・推論・yield。SSML は単一ユニット。Python: `src/python_run/piper/text_splitter.py`、Rust: `piper-core/src/streaming.rs`、他言語: 同等実装。仕様: `docs/spec/text-splitter-contract.toml`。**Breaking (v1.12.0):** Python `PiperVoice.phonemize()` が単一要素から複数要素へ (詳細: マイグレーションガイド)。
+- **ストリーミング文単位分割** — 終止符 `.`/`!`/`?`/`。`/`！`/`？`/`．` で分割し文ごとに音素化・推論・yield。SSML は単一ユニット。Python: `src/python_run/piper_plus/text_splitter.py`、Rust: `piper-core/src/streaming.rs`、他言語: 同等実装。仕様: `docs/spec/text-splitter-contract.toml`。**Breaking (v1.12.0):** Python `PiperVoice.phonemize()` が単一要素から複数要素へ (詳細: マイグレーションガイド)。
 - **SSML 基本サポート** (Python/Rust/C#/Go/WASM/C++ の 6 ランタイム + G2P-only npm 解析 API) — `<speak>`, `<break>`, `<prosody rate>` を W3C サブセットで実装。実装: `g2p/piper_plus_g2p/ssml.py`, `piper-plus-g2p/src/ssml.rs` (Rust canonical), `PiperPlus.Core/Ssml/SsmlParser.cs`, `go/piperplus/ssml/parser.go`, `wasm/g2p/src/ssml.js` (npm `@piper-plus/g2p`), `src/cpp/ssml.{hpp,cpp}` (CLI `--ssml` 経由、C API 非エクスポート)。 piper-core は `piper-plus-g2p::ssml` を re-export (API 互換維持)。 piper-wasm は同パーサーを `isSsml` / `parseSsml` で WASM expose (TTS 統合は openjtalk-web の `synthesizeSsml` 側で iterate して silence 挿入 + length_scale 切替)。
-- **Phoneme Timing 出力** — 全 6 ランタイム (Python/JS-WASM 新規 + Rust/Go/C++/C# 既存) で JSON/TSV/SRT 出力。`(hop_length / sample_rate) × 1000` で byte-for-byte 互換。Python: `piper.timing` モジュール、`PiperVoice.synthesize_with_timing()`、HTTP `/api/phoneme-timing`。WASM: `AudioResult.timing` (deep frozen)。仕様: `docs/spec/phoneme-timing-contract.toml`。
+- **Phoneme Timing 出力** — 全 6 ランタイム (Python/JS-WASM 新規 + Rust/Go/C++/C# 既存) で JSON/TSV/SRT 出力。`(hop_length / sample_rate) × 1000` で byte-for-byte 互換。Python: `piper_plus.timing` モジュール、`PiperVoice.synthesize_with_timing()`、HTTP `/api/phoneme-timing`。WASM: `AudioResult.timing` (deep frozen)。仕様: `docs/spec/phoneme-timing-contract.toml`。
 
 ### ランタイム別パッケージ
 
 | ランタイム | パッケージ | バージョン | テスト | パス |
 |-----------|----------|----------|-------|------|
-| Python (PyPI) | `piper-plus` | 1.13.0 | pytest 多数 | `src/python_run/piper/` |
+| Python (PyPI) | `piper-plus` | 1.13.0 | pytest 多数 | `src/python_run/piper_plus/` |
 | C# (NuGet) | `PiperPlus.Core` / `PiperPlus.Cli` | 0.4.0 | ~1000 (xUnit v3) | `src/csharp/PiperPlus.{Core,Cli}/` (TFM `net10.0`) |
 | Rust (crates.io) | `piper-plus` / `piper-plus-cli` | 0.5.0 | 多数 | `src/rust/piper-{core,cli,python,wasm}/` |
 | Go (Go module) | `github.com/ayutaz/piper-plus/src/go` | tag-based | 793 | `src/go/piperplus/`, `src/go/cmd/piper-plus/` |
@@ -432,8 +432,8 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 
 | 用途 | パス |
 |------|------|
-| Voice / 音素化 | `src/python_run/piper/{voice,timing,text_splitter}.py`, `src/python_run/piper/phonemize/` |
-| HTTP サーバー | `src/python_run/piper/http_server.py` (FastAPI) |
+| Voice / 音素化 | `src/python_run/piper_plus/{voice,timing,text_splitter}.py`, `src/python_run/piper_plus/phonemize/` |
+| HTTP サーバー | `src/python_run/piper_plus/http_server.py` (FastAPI) |
 | G2P パッケージ | `src/python/g2p/piper_plus_g2p/` (基底: `base.py`, レジストリ: `registry.py`) |
 
 ### 横断的な仕様 / ドキュメント

@@ -762,9 +762,9 @@ repos:
       # drift. Keep this list in sync with the workflow.
       - id: cli-help-docs-drift
         name: CLI --help vs docs/guides/development/cli-usage.md (Python runtime CLI)
-        entry: bash -c 'if ! python -c "import piper" 2>/dev/null; then echo "[skip] piper-plus runtime not importable"; exit 0; fi; tmp=$(mktemp); python -m piper --help > "$tmp" 2>&1 || { echo "[skip] --help failed"; rm -f "$tmp"; exit 0; }; python scripts/check_cli_help_drift.py --help-file "$tmp" --docs docs/guides/development/cli-usage.md --mode stale-only --allow=--custom-dict --allow=--gpu-device-id --allow=--json-input --allow=--language --allow=--model-dir --allow=--output-timing --allow=--phoneme-silence --allow=--quiet --allow=--raw-phonemes --allow=--streaming --allow=--test-mode --allow=--text --allow=--timing-format --allow=--use-cuda; rc=$?; rm -f "$tmp"; exit $rc'
+        entry: bash -c 'if ! python -c "import piper_plus" 2>/dev/null; then echo "[skip] piper-plus runtime not importable"; exit 0; fi; tmp=$(mktemp); python -m piper_plus --help > "$tmp" 2>&1 || { echo "[skip] --help failed"; rm -f "$tmp"; exit 0; }; python scripts/check_cli_help_drift.py --help-file "$tmp" --docs docs/guides/development/cli-usage.md --mode stale-only --allow=--custom-dict --allow=--gpu-device-id --allow=--json-input --allow=--language --allow=--model-dir --allow=--output-timing --allow=--phoneme-silence --allow=--quiet --allow=--raw-phonemes --allow=--streaming --allow=--test-mode --allow=--text --allow=--timing-format --allow=--use-cuda; rc=$?; rm -f "$tmp"; exit $rc'
         language: system
-        files: ^(src/python_run/piper_plus/.*\.py|docs/guides/cli-usage\.md|scripts/check_cli_help_drift\.py)$
+        files: ^(src/python_run/piper_plus/.*\.py|docs/guides/development/cli-usage\.md|scripts/check_cli_help_drift\.py)$
         pass_filenames: false
 
       # Host-specific secret-path leak detection. CLAUDE.md documents the

@@ -1,4 +1,4 @@
-# Piper WebUI
+# Piper-Plus WebUI
 
 Gradio-based web interface for piper-plus inference and training.
 

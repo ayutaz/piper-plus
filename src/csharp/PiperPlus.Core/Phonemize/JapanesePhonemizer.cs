@@ -46,7 +46,7 @@ public interface IJapaneseG2PEngine
 /// <summary>
 /// Japanese phonemizer that mirrors the Python
 /// <c>phonemize_japanese_with_prosody()</c> / <c>phonemize_japanese()</c>
-/// functions in <c>piper_train/phonemize/japanese.py</c>.
+/// functions in <c>src/python/g2p/piper_plus_g2p/japanese.py</c>.
 /// <para>
 /// Processing flow (1:1 with the Python implementation):
 /// <list type="number">

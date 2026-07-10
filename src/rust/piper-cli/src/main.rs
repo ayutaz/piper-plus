@@ -13,7 +13,7 @@ use piper_plus::{
 const SUPPORTED_LANGUAGES: &[&str] = &["ja", "en", "zh", "ko", "es", "fr", "pt", "sv"];
 
 #[derive(Parser, Debug)]
-#[command(name = "piper", version, about = "Piper-Plus TTS inference")]
+#[command(name = "piper-plus-cli", version, about = "Piper-Plus TTS inference")]
 struct Cli {
     /// ONNX モデル (ファイルパス、モデル名、またはエイリアス)
     #[arg(short, long)]

@@ -18,7 +18,7 @@ bool loadCmuDict(const std::string &jsonPath,
 
 // Phonemize English text using CMU dictionary + ARPAbet-to-IPA conversion.
 //
-// Pipeline (matches Python piper_train/phonemize/english.py):
+// Pipeline (matches Python src/python/g2p/piper_plus_g2p/english.py):
 //   1. Tokenize text into words and punctuation
 //   2. Look up each word in the CMU dictionary
 //   3. Convert ARPAbet to IPA with context-dependent rules

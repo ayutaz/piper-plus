@@ -1,5 +1,5 @@
 // Rule-based French grapheme-to-phoneme conversion for Piper TTS.
-// Port of src/python/piper_train/phonemize/french.py to C++.
+// Port of src/python/g2p/piper_plus_g2p/french.py to C++.
 //
 // Converts French text to IPA phonemes using grapheme-to-phoneme rules.
 // No external G2P engine required.

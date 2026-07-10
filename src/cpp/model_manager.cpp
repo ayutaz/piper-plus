@@ -341,24 +341,24 @@ std::filesystem::path getDefaultModelDir() {
 #ifdef _WIN32
     const char* appData = std::getenv("APPDATA");
     if (appData) {
-        return fs::path(appData) / "piper" / "models";
+        return fs::path(appData) / "piper-plus" / "models";
     }
     return fs::path("models");
 #elif defined(__APPLE__)
     const char* home = std::getenv("HOME");
     if (home) {
         return fs::path(home) / "Library" / "Application Support"
-               / "piper" / "models";
+               / "piper-plus" / "models";
     }
     return fs::path("models");
 #else
     const char* xdgData = std::getenv("XDG_DATA_HOME");
     if (xdgData) {
-        return fs::path(xdgData) / "piper" / "models";
+        return fs::path(xdgData) / "piper-plus" / "models";
     }
     const char* home = std::getenv("HOME");
     if (home) {
-        return fs::path(home) / ".local" / "share" / "piper" / "models";
+        return fs::path(home) / ".local" / "share" / "piper-plus" / "models";
     }
     return fs::path("models");
 #endif

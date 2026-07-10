@@ -335,7 +335,7 @@ pub fn trim_padding_by_durations(
 /// helper applies the same drop to every other inference path so long-text
 /// outputs do not retain the audible doubled tail.
 ///
-/// Mirrors `piper.voice._trim_eos_region` so all runtimes produce
+/// Mirrors `piper_plus.voice._trim_eos_region` so all runtimes produce
 /// byte-equal output for the same `(audio, durations[-1], hop_size,
 /// eos_max_frames)` tuple. The sample-count conversion uses `as i64`
 /// truncation to match Python's `int(...)` semantics — cross-runtime

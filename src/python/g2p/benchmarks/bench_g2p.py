@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark suite for piper-g2p.
+"""Benchmark suite for piper-plus-g2p.
 
 Usage:
     uv run python benchmarks/bench_g2p.py
@@ -98,7 +98,7 @@ def benchmark_memory():
 
 
 def main():
-    print("piper-g2p Benchmark Suite")
+    print("piper-plus-g2p Benchmark Suite")
     print("=" * 40 + "\n")
     benchmark_memory()
     benchmark_phonemize()

@@ -1,6 +1,6 @@
-# Piper Environment Variables Reference
+# Piper-Plus Environment Variables Reference
 
-This document lists all environment variables that can be used to configure Piper's behavior.
+This document lists all environment variables that can be used to configure piper-plus's behavior.
 
 ## OpenJTalk Configuration
 

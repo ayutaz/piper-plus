@@ -2,7 +2,7 @@
 
 Runtime version for piper-plus inference.
 Converts English text to phoneme tokens after map_sequence conversion.
-G2P logic is identical to the training side (piper_train.phonemize.english).
+G2P logic is identical to the training side (piper_plus_g2p.english).
 """
 
 import logging

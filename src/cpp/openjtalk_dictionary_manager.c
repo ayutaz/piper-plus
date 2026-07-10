@@ -176,7 +176,7 @@ static const char* get_data_dir() {
     // On Windows, try AppData
     const char* appdata = getenv("APPDATA");
     if (appdata) {
-        snprintf(data_dir, sizeof(data_dir), "%s\\piper", appdata);
+        snprintf(data_dir, sizeof(data_dir), "%s\\piper-plus", appdata);
     } else {
         // Fallback to current directory
         GetCurrentDirectoryA(sizeof(data_dir) - 10, data_dir);
@@ -186,28 +186,28 @@ static const char* get_data_dir() {
     // Android: use app-specific external files dir if set, otherwise /data/local/tmp
     const char* xdg_data = getenv("XDG_DATA_HOME");
     if (xdg_data) {
-        snprintf(data_dir, sizeof(data_dir), "%s/piper", xdg_data);
+        snprintf(data_dir, sizeof(data_dir), "%s/piper-plus", xdg_data);
     } else {
         const char* ext_files = getenv("PIPER_PLUS_DATA_DIR");
         if (ext_files) {
-            snprintf(data_dir, sizeof(data_dir), "%s/piper", ext_files);
+            snprintf(data_dir, sizeof(data_dir), "%s/piper-plus", ext_files);
         } else {
             // Fallback: /data/local/tmp is writable on most devices
-            strcpy(data_dir, "/data/local/tmp/piper");
+            strcpy(data_dir, "/data/local/tmp/piper-plus");
         }
     }
 #else
     // On Unix-like systems, use XDG_DATA_HOME or ~/.local/share
     const char* xdg_data = getenv("XDG_DATA_HOME");
     if (xdg_data) {
-        snprintf(data_dir, sizeof(data_dir), "%s/piper", xdg_data);
+        snprintf(data_dir, sizeof(data_dir), "%s/piper-plus", xdg_data);
     } else {
         const char* home = getenv("HOME");
         if (home) {
-            snprintf(data_dir, sizeof(data_dir), "%s/.local/share/piper", home);
+            snprintf(data_dir, sizeof(data_dir), "%s/.local/share/piper-plus", home);
         } else {
             // Fallback to /tmp
-            strcpy(data_dir, "/tmp/piper");
+            strcpy(data_dir, "/tmp/piper-plus");
         }
     }
 #endif

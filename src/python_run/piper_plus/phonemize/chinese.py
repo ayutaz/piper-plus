@@ -2,7 +2,7 @@
 
 Runtime version for piper-plus inference.
 Converts Chinese text to IPA phonemes via pinyin intermediate representation.
-G2P logic is identical to the training side (piper_train.phonemize.chinese).
+G2P logic is identical to the training side (piper_plus_g2p.chinese).
 """
 
 import functools

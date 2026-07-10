@@ -1,4 +1,4 @@
-"""Rule-based French phonemizer for piper-g2p.
+"""Rule-based French phonemizer for piper-plus-g2p.
 
 Converts French text to IPA phonemes using grapheme-to-phoneme rules.
 No external G2P engine required.

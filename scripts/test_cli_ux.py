@@ -29,11 +29,11 @@ from typing import Optional
 def find_piper_exe() -> Optional[Path]:
     """Find piper executable in common build locations."""
     search_paths = [
-        Path("build/Release/piper.exe"),
+        Path("build/Release/piper-plus.exe"),
         Path("build/Release/piper"),
         Path("build/piper"),
-        Path("build/Debug/piper.exe"),
-        Path("install/bin/piper.exe"),
+        Path("build/Debug/piper-plus.exe"),
+        Path("install/bin/piper-plus.exe"),
         Path("install/bin/piper"),
     ]
 

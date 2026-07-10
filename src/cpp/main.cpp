@@ -1101,7 +1101,7 @@ void printUsage(char *argv[]) {
        << endl;
   cerr << endl;
   cerr << "   Phoneme input: Use [[ phonemes ]] notation to specify exact pronunciation" << endl;
-  cerr << "                  Example: echo \"Hello [[ h ə l oʊ ]] world\" | piper ..." << endl;
+  cerr << "                  Example: echo \"Hello [[ h ə l oʊ ]] world\" | piper-plus ..." << endl;
   cerr << endl;
   cerr << "   --json-input                  stdin input is lines of JSON "
           "instead of plain text"

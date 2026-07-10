@@ -1,7 +1,7 @@
 """Japanese phonemization for inference.
 
 Uses the same Kurihara-method algorithm as the training side
-(piper_train.phonemize.japanese) to ensure phoneme-level consistency.
+(piper_plus_g2p.japanese) to ensure phoneme-level consistency.
 """
 
 import json

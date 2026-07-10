@@ -1,7 +1,7 @@
 //! Rule-based French grapheme-to-phoneme conversion for Piper TTS.
 //!
 //! Port of `src/cpp/french_phonemize.cpp` (1196 lines) and
-//! `src/python/piper_train/phonemize/french.py` to Rust.
+//! `src/python/g2p/piper_plus_g2p/french.py` to Rust.
 //!
 //! Converts French text to IPA phonemes using grapheme-to-phoneme rules.
 //! No external G2P engine required.

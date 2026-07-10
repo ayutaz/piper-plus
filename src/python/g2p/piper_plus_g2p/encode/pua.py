@@ -79,7 +79,7 @@ def check_pua_compat(config: dict) -> None:
     if model_version != PUA_COMPAT_VERSION:
         warnings.warn(
             f"PUA version mismatch: model has pua_compat_version={model_version}, "
-            f"but piper-g2p expects version {PUA_COMPAT_VERSION}. "
+            f"but piper-plus-g2p expects version {PUA_COMPAT_VERSION}. "
             "Some phoneme tokens may not encode correctly.",
             UserWarning,
             stacklevel=2,

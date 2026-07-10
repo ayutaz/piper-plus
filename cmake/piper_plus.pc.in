@@ -3,7 +3,7 @@ exec_prefix=${prefix}
 libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
 includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
 dictdir=${prefix}/share/open_jtalk/dic
-g2p_dictdir=${prefix}/share/piper/dicts
+g2p_dictdir=${prefix}/share/piper-plus/dicts
 
 Name: piper-plus
 Description: piper-plus C API shared library for neural text-to-speech

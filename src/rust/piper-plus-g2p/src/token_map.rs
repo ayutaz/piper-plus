@@ -16,7 +16,7 @@ pub fn check_pua_compat(model_version: Option<u32>) -> Result<(), String> {
         Some(v) if v == PUA_COMPAT_VERSION => Ok(()),
         Some(v) => Err(format!(
             "PUA version mismatch: model has pua_compat_version={v}, \
-             but piper-g2p expects version {PUA_COMPAT_VERSION}"
+             but piper-plus-g2p expects version {PUA_COMPAT_VERSION}"
         )),
     }
 }

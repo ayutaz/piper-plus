@@ -17,7 +17,7 @@ namespace PiperPlus.Core.Phonemize;
 /// </para>
 /// <para>
 /// Output conventions (matching the Python <c>phonemize_french()</c> in
-/// <c>piper_train/phonemize/french.py</c>):
+/// <c>src/python/g2p/piper_plus_g2p/french.py</c>):
 /// </para>
 /// <list type="bullet">
 ///   <item>

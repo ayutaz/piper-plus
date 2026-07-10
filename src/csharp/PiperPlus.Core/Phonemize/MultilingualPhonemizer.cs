@@ -14,7 +14,7 @@ namespace PiperPlus.Core.Phonemize;
 /// </para>
 /// <para>
 /// Port of the Python <c>MultilingualPhonemizer</c> in
-/// <c>piper_train/phonemize/multilingual.py</c>.
+/// <c>src/python/g2p/piper_plus_g2p/multilingual.py</c>.
 /// </para>
 /// <para>
 /// <b>Thread safety:</b> A single instance may be used from multiple

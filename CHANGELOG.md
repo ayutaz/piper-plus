@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.0] - 2026-05-25
 
 Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13 + CUDA 12.8 + Ubuntu 24.04** で完全統一する fully-aligned 戦略 migration。 新 GPU (T4 / RTX 6000 Ada / RTX 5090) サポート + TF32 / bf16-mixed default 化。
+加えて Issue #590: **`piper` → `piper_plus` / `piper-plus` フル改名 (クリーンブレーク)** により本家 `piper-tts` (rhasspy/piper) と同一環境への pip 共存が可能に。
 
 ### Breaking
 
@@ -60,6 +61,36 @@ Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13
   New GPU (Ada 6000 / RTX 5090) users get BF16 Tensor Core acceleration
   by default.
   See [bf16-mixed Template default](docs/migration/v1.12-to-v2.0.md#bf16-mixed-template-default).
+- **Python import: `import piper` / `from piper.X import ...` は削除**、
+  `import piper_plus` / `from piper_plus.X import ...` に置換 (Issue #590、
+  互換 shim なし)。 本家 `piper-tts` (rhasspy/piper) を co-install した環境で
+  `from piper import ...` を書くと本家の `PiperVoice` が解決される (当 fork ではない)。
+  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
+- **Python CLI entry-point `piper` は削除**、 `piper-plus` に置換 (Issue #590)。
+  `pip install piper-plus` (v2.0) 後に `piper` コマンドは存在しない。
+  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
+- **Python module 実行**: `python -m piper` / `python -m piper.webui` / `python -m piper.http_server`
+  を削除、 `python -m piper_plus` / `python -m piper_plus.webui` / `python -m piper_plus.http_server`
+  に置換 (Issue #590)。
+  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
+- **C++ プリビルドバイナリ**: `./bin/piper` / `piper.exe` を `./bin/piper-plus` / `piper-plus.exe`
+  に rename (Issue #590)。 CMake target 名 `piper` は据置 (`OUTPUT_NAME "piper-plus"` で出力名のみ変更)。
+  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
+- **リリースアセット名**: `piper-<os>-<arch>.tar.gz` / `.zip` を
+  `piper-plus-cpp-<os>-<arch>.tar.gz` / `.zip` に rename
+  (C# `piper-plus-cli-*` / Rust `piper-plus-rs-cli-*` との接頭辞衝突回避に `-cpp-` 識別子、
+  Issue #590)。 旧タグ添付資産は per-tag で不変。
+  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
+- **共有辞書 / キャッシュ dir**: `share/piper/` / `~/.local/share/piper` / `%APPDATA%\piper` 等を
+  `share/piper-plus/` / `~/.local/share/piper-plus` / `%APPDATA%\piper-plus` に移動
+  (Issue #590)。 既に DL 済みの辞書・モデルは再取得または手動移動が必要。
+  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
+- **環境変数 prefix**: `PIPER_*` (例 `PIPER_MODEL_DIR` / `PIPER_DISABLE_WARMUP`) を
+  `PIPER_PLUS_*` (例 `PIPER_PLUS_MODEL_DIR` / `PIPER_PLUS_DISABLE_WARMUP`) に統一 (Issue #590)。
+  学習側 (`piper_train`) の env var、 Docker container Unix user `piper`、 および
+  Wyoming Docker container 内の PIPER_MODEL / PIPER_LANGUAGE / PIPER_SPEAKER_ID / PIPER_PORT
+  (Home Assistant 既存ユーザー互換性のため据置) は scope 外。
+  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
 
 ### Added
 
@@ -67,6 +98,20 @@ Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13
 - **`torch.backends.cuda.matmul.allow_tf32 = True`** in
   [`src/python/piper_train/__main__.py`](src/python/piper_train/__main__.py)
   (DR-007、 Ada/Blackwell で TF32 Tensor Core 透過適用)。
+- **rhasspy/piper (`piper-tts`) との pip 同一環境共存サポート**
+  ([Issue #590](https://github.com/ayutaz/piper-plus/issues/590)):
+  import 名 / CLI 名 / バイナリ名 / 環境変数 prefix / 共有 dir を全て `piper_plus` /
+  `piper-plus` / `PIPER_PLUS_*` に改名したことで、 本家 `piper-tts` と `piper-plus`
+  を同一 venv に co-install できるようになった。 新メンタルモデル:
+  `import piper` = 本家 rhasspy/piper、 `import piper_plus` = 当 fork
+  (完全独立、 名前空間衝突なし)。
+  See [新メンタルモデル](docs/migration/v1.12-to-v2.0.md#新メンタルモデル-最重要).
+- **高レベル API `piper_plus.api` サブモジュール統合**
+  ([Issue #590](https://github.com/ayutaz/piper-plus/issues/590)):
+  旧 `src/python/piper_plus/` (Wyoming Docker が独自 ONNX 推論エンジンで使用) を
+  `src/python_run/piper_plus/api/` に物理統合。 `from piper_plus.api import PiperPlus`
+  で高レベル API を利用可能。 旧 top-level `piper_plus` (高レベル API) と
+  runtime `piper` (PiperVoice) の名前空間衝突を解消。
 
 ### Changed
 
