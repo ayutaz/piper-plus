@@ -188,15 +188,24 @@ describe("ORT session contract — fixture-only cache pins (WASM N/A)", () => {
 // ---------------------------------------------------------------------------
 
 describe("ORT session contract — fixture-only env var pins (WASM N/A)", () => {
-  it('env_vars.disable_warmup is "PIPER_DISABLE_WARMUP"', () => {
-    assert.strictEqual(fixture.env_vars.disable_warmup, "PIPER_DISABLE_WARMUP");
+  it('env_vars.disable_warmup is "PIPER_PLUS_DISABLE_WARMUP"', () => {
+    assert.strictEqual(
+      fixture.env_vars.disable_warmup,
+      "PIPER_PLUS_DISABLE_WARMUP",
+    );
   });
 
-  it('env_vars.disable_cache is "PIPER_DISABLE_CACHE"', () => {
-    assert.strictEqual(fixture.env_vars.disable_cache, "PIPER_DISABLE_CACHE");
+  it('env_vars.disable_cache is "PIPER_PLUS_DISABLE_CACHE"', () => {
+    assert.strictEqual(
+      fixture.env_vars.disable_cache,
+      "PIPER_PLUS_DISABLE_CACHE",
+    );
   });
 
-  it('env_vars.intra_threads is "PIPER_INTRA_THREADS"', () => {
-    assert.strictEqual(fixture.env_vars.intra_threads, "PIPER_INTRA_THREADS");
+  it('env_vars.intra_threads is "PIPER_PLUS_INTRA_THREADS"', () => {
+    assert.strictEqual(
+      fixture.env_vars.intra_threads,
+      "PIPER_PLUS_INTRA_THREADS",
+    );
   });
 });

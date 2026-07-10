@@ -55,7 +55,7 @@ ultracode 調査 (12 エージェント / 152 findings) で判明した最大の
 
 **決定 (案 B)**: runtime を canonical `piper_plus` とし、高レベル API を `piper_plus.api` サブモジュールに物理統合する。
 
-```
+```text
 src/python_run/piper_plus/
   ├─ voice.py, config.py, timing.py, ...   (runtime: PiperVoice)
   ├─ __main__.py                            (コマンド piper-plus)
