@@ -9,6 +9,55 @@ using Xunit;
 namespace PiperPlus.Cli.Tests;
 
 /// <summary>
+/// xUnit fixture that holds shared <see cref="DotNetG2PEngine"/> and
+/// <see cref="DotNetEnglishG2PEngine"/> instances for the concurrency tests.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <see cref="DotNetG2P.MeCab.MeCabTokenizer"/> holds sys.dic open via
+/// memory-mapped IO and does not implement IDisposable in v1.8.x. When
+/// each test creates its own <see cref="DotNetG2PEngine"/> via
+/// <c>using var engine = new DotNetG2PEngine()</c>, the previous engine's
+/// sys.dic handle is not deterministically released before the next
+/// engine's constructor tries to open it. On macOS this results in
+/// "The process cannot access the file ... because it is being used by
+/// another process." (Ubuntu/Windows have more permissive file share
+/// semantics and tolerate the brief overlap.)
+/// </para>
+/// <para>
+/// Sharing a single engine across tests via <see cref="IClassFixture{T}"/>
+/// keeps sys.dic open exactly once for the lifetime of the test class,
+/// eliminating the ctor-vs-teardown race.
+/// </para>
+/// </remarks>
+public sealed class DotNetG2PEngineFixture : IDisposable
+{
+    public DotNetG2PEngine JaEngine { get; }
+    public DotNetEnglishG2PEngine EnEngine { get; }
+    public MultilingualPhonemizer Multilingual { get; }
+    public JapanesePhonemizer JaPhonemizer { get; }
+
+    public DotNetG2PEngineFixture()
+    {
+        JaEngine = new DotNetG2PEngine();
+        EnEngine = new DotNetEnglishG2PEngine();
+        JaPhonemizer = new JapanesePhonemizer(JaEngine);
+        var phonemizers = new System.Collections.Generic.Dictionary<string, IPhonemizer>
+        {
+            ["ja"] = JaPhonemizer,
+            ["en"] = new EnglishPhonemizer(EnEngine),
+        };
+        Multilingual = new MultilingualPhonemizer(phonemizers, "en");
+    }
+
+    public void Dispose()
+    {
+        JaEngine.Dispose();
+        // DotNetEnglishG2PEngine is not IDisposable in v1.8.x.
+    }
+}
+
+/// <summary>
 /// Concurrency / regression tests for the CLI-side G2P engine adapters
 /// (Issue #383 follow-up).
 /// </summary>
@@ -30,13 +79,25 @@ namespace PiperPlus.Cli.Tests;
 /// (<c>&lt;Compile Link&gt;</c> in the csproj) and exercises it in-process.
 /// This mirrors the approach used by <c>PiperPlus.Bench</c>.
 /// </para>
+/// <para>
+/// Uses <see cref="IClassFixture{T}"/> to share a single engine across all
+/// tests — see <see cref="DotNetG2PEngineFixture"/> for the macOS sys.dic
+/// file-lock rationale.
+/// </para>
 /// </remarks>
-public class DotNetG2PEngineConcurrencyTests
+public class DotNetG2PEngineConcurrencyTests : IClassFixture<DotNetG2PEngineFixture>
 {
     private const string Ja1 = "こんにちは。";
     private const string Ja2 = "東京駅から新幹線で大阪まで約2時間。";
     private const string Ja3 = "桜の花が満開になりました。";
     private const string Ja4 = "明日の午後3時に渋谷で会いましょう。";
+
+    private readonly DotNetG2PEngineFixture _fx;
+
+    public DotNetG2PEngineConcurrencyTests(DotNetG2PEngineFixture fx)
+    {
+        _fx = fx;
+    }
 
     /// <summary>
     /// 16 worker threads × 64 conversions each across a small pool of JA
@@ -46,12 +107,8 @@ public class DotNetG2PEngineConcurrencyTests
     [Fact]
     public void DotNetG2PEngine_ConcurrentJa_NoCrash()
     {
-        using var engine = new DotNetG2PEngine();
+        var engine = _fx.JaEngine;
         var sentences = new[] { Ja1, Ja2, Ja3, Ja4 };
-
-        // macOS で稀に発生する OpenJTalk sys.dic 並列 mmap race を回避するため、
-        // engine を warmup して辞書ロードを serialize する。
-        _ = engine.Convert(Ja1);
 
         const int workers = 16;
         const int iterationsPerWorker = 64;
@@ -90,7 +147,7 @@ public class DotNetG2PEngineConcurrencyTests
     [Fact]
     public void DotNetG2PEngine_ConcurrentJa_DeterministicResult()
     {
-        using var engine = new DotNetG2PEngine();
+        var engine = _fx.JaEngine;
         G2PResult baseline = engine.Convert(Ja2);
 
         const int workers = 12;
@@ -126,8 +183,7 @@ public class DotNetG2PEngineConcurrencyTests
     [Fact]
     public void SentenceParallelEncoder_JaInput_MatchesSerial()
     {
-        using var engine = new DotNetG2PEngine();
-        var phonemizer = new JapanesePhonemizer(engine);
+        var phonemizer = _fx.JaPhonemizer;
 
         var sentences = new[] { Ja1, Ja2, Ja3, Ja4, Ja1, Ja2, Ja3, Ja4 };
 
@@ -168,15 +224,7 @@ public class DotNetG2PEngineConcurrencyTests
     [Fact]
     public void SentenceParallelEncoder_MixedLang_NoCrash()
     {
-        using var jaEngine = new DotNetG2PEngine();
-        var enEngine = new DotNetEnglishG2PEngine();
-
-        var phonemizers = new System.Collections.Generic.Dictionary<string, IPhonemizer>
-        {
-            ["ja"] = new JapanesePhonemizer(jaEngine),
-            ["en"] = new EnglishPhonemizer(enEngine),
-        };
-        var multilingual = new MultilingualPhonemizer(phonemizers, "en");
+        var multilingual = _fx.Multilingual;
 
         var sentences = new[]
         {
@@ -189,12 +237,6 @@ public class DotNetG2PEngineConcurrencyTests
             Ja3,
             Ja4,
         };
-
-        // macOS で稀に発生する OpenJTalk sys.dic の並列 mmap race を回避するため、
-        // 並列ループに入る前に engine を warmup して辞書ロードを serialize する
-        // (dev 2026-06-23 889fefef 以降で観測されている pre-existing flake の対策)。
-        _ = multilingual.Phonemize(Ja1);
-        _ = multilingual.Phonemize("Warmup test");
 
         var exceptions = new ConcurrentBag<Exception>();
         Parallel.For(0, 8, new ParallelOptions { MaxDegreeOfParallelism = 8 }, _ =>
