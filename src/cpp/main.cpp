@@ -1133,10 +1133,10 @@ void printUsage(char *argv[]) {
   cerr << "   -q       --quiet              disable logging" << endl;
   cerr << endl;
   cerr << "environment variables:" << endl;
-  cerr << "   PIPER_DEFAULT_MODEL           default model path (if --model not specified)" << endl;
-  cerr << "   PIPER_DEFAULT_CONFIG          default config file path" << endl;
-  cerr << "   PIPER_MODEL_DIR               default model directory (if --model-dir not specified)" << endl;
-  cerr << "   PIPER_GPU_DEVICE_ID           GPU device ID for CUDA" << endl;
+  cerr << "   PIPER_PLUS_DEFAULT_MODEL      default model path (if --model not specified)" << endl;
+  cerr << "   PIPER_PLUS_DEFAULT_CONFIG     default config file path" << endl;
+  cerr << "   PIPER_PLUS_MODEL_DIR          default model directory (if --model-dir not specified)" << endl;
+  cerr << "   PIPER_PLUS_GPU_DEVICE_ID      GPU device ID for CUDA" << endl;
   cerr << endl;
 }
 
@@ -1152,32 +1152,32 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
   optional<filesystem::path> modelConfigPath;
 
   // Check for GPU device ID environment variable
-  const char* gpuDeviceEnv = std::getenv("PIPER_GPU_DEVICE_ID");
+  const char* gpuDeviceEnv = std::getenv("PIPER_PLUS_GPU_DEVICE_ID");
   if (gpuDeviceEnv != nullptr) {
     try {
       runConfig.gpuDeviceId = std::stoi(gpuDeviceEnv);
       spdlog::debug("GPU device ID set from environment: {}", runConfig.gpuDeviceId);
     } catch (const std::exception& e) {
-      spdlog::warn("Invalid PIPER_GPU_DEVICE_ID environment variable: {}", gpuDeviceEnv);
+      spdlog::warn("Invalid PIPER_PLUS_GPU_DEVICE_ID environment variable: {}", gpuDeviceEnv);
     }
   }
 
   // Check for default model path environment variable
-  const char* defaultModelEnv = std::getenv("PIPER_DEFAULT_MODEL");
+  const char* defaultModelEnv = std::getenv("PIPER_PLUS_DEFAULT_MODEL");
   if (defaultModelEnv != nullptr) {
     runConfig.modelPath = filesystem::path(defaultModelEnv);
     spdlog::debug("Default model path set from environment: {}", runConfig.modelPath.string());
   }
 
   // Check for default config path environment variable
-  const char* defaultConfigEnv = std::getenv("PIPER_DEFAULT_CONFIG");
+  const char* defaultConfigEnv = std::getenv("PIPER_PLUS_DEFAULT_CONFIG");
   if (defaultConfigEnv != nullptr) {
     modelConfigPath = filesystem::path(defaultConfigEnv);
     spdlog::debug("Default config path set from environment: {}", modelConfigPath.value().string());
   }
 
   // Check for model directory environment variable
-  const char* modelDirEnv = std::getenv("PIPER_MODEL_DIR");
+  const char* modelDirEnv = std::getenv("PIPER_PLUS_MODEL_DIR");
   if (modelDirEnv != nullptr) {
     runConfig.modelDir = filesystem::path(modelDirEnv);
     spdlog::debug("Model directory set from environment: {}", runConfig.modelDir.value().string());

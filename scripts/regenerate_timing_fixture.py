@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cross-runtime phoneme timing golden fixture (re)generator.
 
-Source of truth: ``src/python_run/piper/timing.py:durations_to_timing``
+Source of truth: ``src/python_run/piper_plus/timing.py:durations_to_timing``
 Output:          ``tests/fixtures/phoneme_timing/golden_matrix.json``
 
 Each runtime (Python, Rust, Go, C++, C#, WASM/JS) has its own ``timing``
@@ -28,7 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # Make the runtime package importable without installation.
 sys.path.insert(0, str(REPO_ROOT / "src/python_run"))
 
-from piper.timing import durations_to_timing  # noqa: E402
+from piper_plus.timing import durations_to_timing  # noqa: E402
 
 
 FIXTURE_PATH = REPO_ROOT / "tests/fixtures/phoneme_timing/golden_matrix.json"
@@ -132,7 +132,7 @@ def build_fixture() -> dict:
         "comment": (
             "Cross-runtime phoneme timing golden fixture. "
             "Regenerate via `python scripts/regenerate_timing_fixture.py`. "
-            "Source: src/python_run/piper/timing.py:durations_to_timing. "
+            "Source: src/python_run/piper_plus/timing.py:durations_to_timing. "
             "Spec: docs/spec/phoneme-timing-contract.toml. Do not edit by hand."
         ),
         "calculation_formula": "frame_time_ms = (hop_length / sample_rate) * 1000",
@@ -176,7 +176,7 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 1
-        print(f"OK: {rel} is up-to-date with src/python_run/piper/timing.py.")
+        print(f"OK: {rel} is up-to-date with src/python_run/piper_plus/timing.py.")
         return 0
 
     FIXTURE_PATH.parent.mkdir(parents=True, exist_ok=True)

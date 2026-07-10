@@ -5,8 +5,8 @@
 [meta]
 generator = "scripts/build_spec_implementation_map.py"
 forward_compat_policy = "accept_unknown_fields"
-spec_count = 24
-unique_paths = 88
+spec_count = 32
+unique_paths = 115
 
 # Forward index: spec → paths
 
@@ -15,6 +15,18 @@ paths = []
 
 [spec."audio-format-contract.toml"]
 paths = []
+
+[spec."audio-parity-contract.toml"]
+paths = [
+    ".github/workflows/runtime-parity-deep.yml",
+    "scripts/audio_parity.py",
+    "src/index.js",
+]
+
+[spec."cargo-lock-duplicates-baseline.toml"]
+paths = [
+    "src/rust/Cargo.lock",
+]
 
 [spec."chinese-tone-contract.toml"]
 paths = [
@@ -34,7 +46,7 @@ paths = [
     "src/csharp/PiperPlus.Cli/Program.cs",
     "src/go/cmd/piper-plus/main.go",
     "src/python/piper_train/infer_onnx.py",
-    "src/python_run/piper/__main__.py",
+    "src/python_run/piper_plus/__main__.py",
     "src/rust/piper-cli/src/main.rs",
 ]
 
@@ -55,7 +67,7 @@ paths = [
     "src/go/phonemize/data/zh_en_loanword.json",
     "src/python/g2p/piper_plus_g2p/data/pua.json",
     "src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json",
-    "src/python_run/piper/phonemize/data/zh_en_loanword.json",
+    "src/python_run/piper_plus/phonemize/data/zh_en_loanword.json",
     "src/rust/piper-core/data/zh_en_loanword.json",
     "src/rust/piper-plus-g2p/data/cmudict_data.json",
     "src/rust/piper-plus-g2p/data/pinyin_phrases.json",
@@ -64,6 +76,13 @@ paths = [
     "src/wasm/g2p/data/zh_en_loanword.json",
     "src/wasm/openjtalk-web/assets/pinyin_phrases.json",
     "src/wasm/openjtalk-web/assets/pinyin_single.json",
+]
+
+[spec."doc-examples-contract.toml"]
+paths = [
+    "scripts/check_doc_examples.py",
+    "tests/fixtures/doc_examples_audit/audit.json",
+    "tests/fixtures/doc_examples_audit/audit.schema.json",
 ]
 
 [spec."inference-input-contract.toml"]
@@ -87,7 +106,7 @@ paths = [
     "src/csharp/PiperPlus.Core/Config/PiperConfig.cs",
     "src/go/piperplus/testdata/valid_multilingual_config.json",
     "src/python/piper_train/tools/prepare_multilingual_dataset.py",
-    "src/python_run/piper/voice.py",
+    "src/python_run/piper_plus/voice.py",
     "src/rust/piper-core/src/config.rs",
     "src/rust/piper-core/src/wasm.rs",
     "src/rust/piper-wasm/src/lib.rs",
@@ -106,7 +125,7 @@ paths = [
     "src/go/phonemize/data/zh_en_loanword.json",
     "src/go/phonemize/testdata/zh_en_loanword_matrix.json",
     "src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json",
-    "src/python_run/piper/phonemize/data/zh_en_loanword.json",
+    "src/python_run/piper_plus/phonemize/data/zh_en_loanword.json",
     "src/rust/piper-core/data/zh_en_loanword.json",
     "src/rust/piper-core/tests/fixtures/zh_en_loanword_matrix.json",
     "src/rust/piper-plus-g2p/data/zh_en_loanword.json",
@@ -115,6 +134,15 @@ paths = [
     "src/wasm/g2p/test/fixtures/zh_en_loanword_matrix.json",
     "tests/PiperPlusG2PTests/Fixtures/zh_en_loanword_matrix.json",
     "tests/fixtures/g2p/zh_en_loanword_matrix.json",
+]
+
+[spec."lockfile-size-baseline.toml"]
+paths = [
+    "src/go/go.sum",
+    "src/python/g2p/uv.lock",
+    "src/rust/Cargo.lock",
+    "src/wasm/g2p/package-lock.json",
+    "src/wasm/openjtalk-web/package-lock.json",
 ]
 
 [spec."model-sha256-manifest.toml"]
@@ -142,7 +170,7 @@ paths = [
 paths = [
     "src/csharp/PiperPlus.Core/Inference/TimingWriter.cs",
     "src/go/piperplus/timing.go",
-    "src/python_run/piper/timing.py",
+    "src/python_run/piper_plus/timing.py",
     "src/python_run/tests/test_http_timing.py",
     "src/python_run/tests/test_phoneme_timing.py",
     "src/python_run/tests/test_voice_timing.py",
@@ -159,7 +187,7 @@ paths = [
     "src/go/phonemize/portuguese.go",
     "src/python/g2p/piper_plus_g2p/portuguese.py",
     "src/python/g2p/piper_plus_g2p/registry.py",
-    "src/python_run/piper/phonemize/portuguese.py",
+    "src/python_run/piper_plus/phonemize/portuguese.py",
     "src/rust/piper-core/src/phonemize/portuguese.rs",
     "src/rust/piper-plus-g2p/src/portuguese.rs",
     "src/wasm/g2p/src/pt/index.js",
@@ -192,13 +220,43 @@ paths = []
 [spec."streaming-api-contract.toml"]
 paths = []
 
+[spec."swedish-lid-mirrors.toml"]
+paths = [
+    "src/cpp/data/sv_function_words.json",
+    "src/cpp/tests/fixtures/swedish_lid_matrix.json",
+    "src/csharp/PiperPlus.Core.Tests/Phonemize/TestData/swedish_lid_matrix.json",
+    "src/csharp/PiperPlus.Core/Phonemize/Data/sv_function_words.json",
+    "src/go/phonemize/data/sv_function_words.json",
+    "src/go/phonemize/testdata/swedish_lid_matrix.json",
+    "src/python/g2p/piper_plus_g2p/data/sv_function_words.json",
+    "src/python_run/piper_plus/phonemize/data/sv_function_words.json",
+    "src/rust/piper-core/data/sv_function_words.json",
+    "src/rust/piper-core/tests/fixtures/swedish_lid_matrix.json",
+    "src/rust/piper-plus-g2p/data/sv_function_words.json",
+    "src/rust/piper-plus-g2p/tests/fixtures/swedish_lid_matrix.json",
+    "src/wasm/g2p/data/sv_function_words.json",
+    "src/wasm/g2p/test/fixtures/swedish_lid_matrix.json",
+    "tests/fixtures/g2p/swedish_lid_matrix.json",
+]
+
 [spec."swift-g2p-contract.toml"]
 paths = [
     "Sources/PiperPlusG2P/PUAMap.swift",
     "tests/fixtures/g2p/phoneme_test_cases.json",
 ]
 
+[spec."test-flake-retry-contract.toml"]
+paths = [
+    ".github/workflows/test-webassembly.yml",
+]
+
 [spec."text-splitter-contract.toml"]
+paths = []
+
+[spec."unwrap-density-budget.toml"]
+paths = []
+
+[spec."wave3-deferred-proposals.toml"]
 paths = []
 
 # Reverse index: path → specs that mention it
@@ -206,6 +264,16 @@ paths = []
 [path.".github/workflows/pua-consistency.yml"]
 specs = [
     "pua-contract.toml",
+]
+
+[path.".github/workflows/runtime-parity-deep.yml"]
+specs = [
+    "audio-parity-contract.toml",
+]
+
+[path.".github/workflows/test-webassembly.yml"]
+specs = [
+    "test-flake-retry-contract.toml",
 ]
 
 [path."Package.swift"]
@@ -240,9 +308,19 @@ specs = [
     "loanword-mirrors.toml",
 ]
 
+[path."scripts/audio_parity.py"]
+specs = [
+    "audio-parity-contract.toml",
+]
+
 [path."scripts/check_cli_flag_parity.py"]
 specs = [
     "cli-flag-contract.toml",
+]
+
+[path."scripts/check_doc_examples.py"]
+specs = [
+    "doc-examples-contract.toml",
 ]
 
 [path."scripts/check_language_id_map_contract.py"]
@@ -263,6 +341,11 @@ specs = [
 [path."src/cpp/chinese_phonemize.cpp"]
 specs = [
     "chinese-tone-contract.toml",
+]
+
+[path."src/cpp/data/sv_function_words.json"]
+specs = [
+    "swedish-lid-mirrors.toml",
 ]
 
 [path."src/cpp/data/zh_en_loanword.json"]
@@ -296,6 +379,11 @@ specs = [
     "pt-dialect-contract.toml",
 ]
 
+[path."src/cpp/tests/fixtures/swedish_lid_matrix.json"]
+specs = [
+    "swedish-lid-mirrors.toml",
+]
+
 [path."src/cpp/tests/fixtures/zh_en_loanword_matrix.json"]
 specs = [
     "loanword-mirrors.toml",
@@ -309,6 +397,11 @@ specs = [
 [path."src/csharp/PiperPlus.Cli/Program.cs"]
 specs = [
     "cli-flag-contract.toml",
+]
+
+[path."src/csharp/PiperPlus.Core.Tests/Phonemize/TestData/swedish_lid_matrix.json"]
+specs = [
+    "swedish-lid-mirrors.toml",
 ]
 
 [path."src/csharp/PiperPlus.Core.Tests/Phonemize/TestData/zh_en_loanword_matrix.json"]
@@ -332,6 +425,11 @@ specs = [
     "japanese-n-variant-contract.toml",
 ]
 
+[path."src/csharp/PiperPlus.Core/Phonemize/Data/sv_function_words.json"]
+specs = [
+    "swedish-lid-mirrors.toml",
+]
+
 [path."src/csharp/PiperPlus.Core/Phonemize/Data/zh_en_loanword.json"]
 specs = [
     "dictionary-versions.toml",
@@ -353,9 +451,19 @@ specs = [
     "cli-flag-contract.toml",
 ]
 
+[path."src/go/go.sum"]
+specs = [
+    "lockfile-size-baseline.toml",
+]
+
 [path."src/go/phonemize/data/cmudict_data.json"]
 specs = [
     "dictionary-versions.toml",
+]
+
+[path."src/go/phonemize/data/sv_function_words.json"]
+specs = [
+    "swedish-lid-mirrors.toml",
 ]
 
 [path."src/go/phonemize/data/zh_en_loanword.json"]
@@ -375,6 +483,11 @@ specs = [
     "japanese-n-variant-contract.toml",
 ]
 
+[path."src/go/phonemize/testdata/swedish_lid_matrix.json"]
+specs = [
+    "swedish-lid-mirrors.toml",
+]
+
 [path."src/go/phonemize/testdata/zh_en_loanword_matrix.json"]
 specs = [
     "loanword-mirrors.toml",
@@ -390,6 +503,11 @@ specs = [
     "phoneme-timing-contract.toml",
 ]
 
+[path."src/index.js"]
+specs = [
+    "audio-parity-contract.toml",
+]
+
 [path."src/python/g2p/piper_plus_g2p/chinese.py"]
 specs = [
     "chinese-tone-contract.toml",
@@ -400,6 +518,11 @@ specs = [
     "dictionary-versions.toml",
     "phoneme-set-version.toml",
     "pua-contract.toml",
+]
+
+[path."src/python/g2p/piper_plus_g2p/data/sv_function_words.json"]
+specs = [
+    "swedish-lid-mirrors.toml",
 ]
 
 [path."src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json"]
@@ -428,6 +551,11 @@ specs = [
     "pt-dialect-contract.toml",
 ]
 
+[path."src/python/g2p/uv.lock"]
+specs = [
+    "lockfile-size-baseline.toml",
+]
+
 [path."src/python/piper_train/export_onnx.py"]
 specs = [
     "onnx-export-contract.toml",
@@ -443,28 +571,33 @@ specs = [
     "language-id-map-contract.toml",
 ]
 
-[path."src/python_run/piper/__main__.py"]
+[path."src/python_run/piper_plus/__main__.py"]
 specs = [
     "cli-flag-contract.toml",
 ]
 
-[path."src/python_run/piper/phonemize/data/zh_en_loanword.json"]
+[path."src/python_run/piper_plus/phonemize/data/sv_function_words.json"]
+specs = [
+    "swedish-lid-mirrors.toml",
+]
+
+[path."src/python_run/piper_plus/phonemize/data/zh_en_loanword.json"]
 specs = [
     "dictionary-versions.toml",
     "loanword-mirrors.toml",
 ]
 
-[path."src/python_run/piper/phonemize/portuguese.py"]
+[path."src/python_run/piper_plus/phonemize/portuguese.py"]
 specs = [
     "pt-dialect-contract.toml",
 ]
 
-[path."src/python_run/piper/timing.py"]
+[path."src/python_run/piper_plus/timing.py"]
 specs = [
     "phoneme-timing-contract.toml",
 ]
 
-[path."src/python_run/piper/voice.py"]
+[path."src/python_run/piper_plus/voice.py"]
 specs = [
     "language-id-map-contract.toml",
 ]
@@ -484,6 +617,12 @@ specs = [
     "phoneme-timing-contract.toml",
 ]
 
+[path."src/rust/Cargo.lock"]
+specs = [
+    "cargo-lock-duplicates-baseline.toml",
+    "lockfile-size-baseline.toml",
+]
+
 [path."src/rust/Cargo.toml"]
 specs = [
     "release-versions.toml",
@@ -492,6 +631,11 @@ specs = [
 [path."src/rust/piper-cli/src/main.rs"]
 specs = [
     "cli-flag-contract.toml",
+]
+
+[path."src/rust/piper-core/data/sv_function_words.json"]
+specs = [
+    "swedish-lid-mirrors.toml",
 ]
 
 [path."src/rust/piper-core/data/zh_en_loanword.json"]
@@ -520,6 +664,11 @@ specs = [
     "language-id-map-contract.toml",
 ]
 
+[path."src/rust/piper-core/tests/fixtures/swedish_lid_matrix.json"]
+specs = [
+    "swedish-lid-mirrors.toml",
+]
+
 [path."src/rust/piper-core/tests/fixtures/zh_en_loanword_matrix.json"]
 specs = [
     "loanword-mirrors.toml",
@@ -538,6 +687,11 @@ specs = [
 [path."src/rust/piper-plus-g2p/data/pinyin_single.json"]
 specs = [
     "dictionary-versions.toml",
+]
+
+[path."src/rust/piper-plus-g2p/data/sv_function_words.json"]
+specs = [
+    "swedish-lid-mirrors.toml",
 ]
 
 [path."src/rust/piper-plus-g2p/data/zh_en_loanword.json"]
@@ -567,6 +721,11 @@ specs = [
     "japanese-n-variant-contract.toml",
 ]
 
+[path."src/rust/piper-plus-g2p/tests/fixtures/swedish_lid_matrix.json"]
+specs = [
+    "swedish-lid-mirrors.toml",
+]
+
 [path."src/rust/piper-plus-g2p/tests/fixtures/zh_en_loanword_matrix.json"]
 specs = [
     "loanword-mirrors.toml",
@@ -577,10 +736,20 @@ specs = [
     "language-id-map-contract.toml",
 ]
 
+[path."src/wasm/g2p/data/sv_function_words.json"]
+specs = [
+    "swedish-lid-mirrors.toml",
+]
+
 [path."src/wasm/g2p/data/zh_en_loanword.json"]
 specs = [
     "dictionary-versions.toml",
     "loanword-mirrors.toml",
+]
+
+[path."src/wasm/g2p/package-lock.json"]
+specs = [
+    "lockfile-size-baseline.toml",
 ]
 
 [path."src/wasm/g2p/package.json"]
@@ -597,6 +766,11 @@ specs = [
 specs = [
     "chinese-tone-contract.toml",
     "japanese-n-variant-contract.toml",
+]
+
+[path."src/wasm/g2p/test/fixtures/swedish_lid_matrix.json"]
+specs = [
+    "swedish-lid-mirrors.toml",
 ]
 
 [path."src/wasm/g2p/test/fixtures/zh_en_loanword_matrix.json"]
@@ -634,6 +808,11 @@ specs = [
     "language-id-map-contract.toml",
 ]
 
+[path."src/wasm/openjtalk-web/package-lock.json"]
+specs = [
+    "lockfile-size-baseline.toml",
+]
+
 [path."src/wasm/openjtalk-web/package.json"]
 specs = [
     "release-versions.toml",
@@ -649,10 +828,25 @@ specs = [
     "loanword-mirrors.toml",
 ]
 
+[path."tests/fixtures/doc_examples_audit/audit.json"]
+specs = [
+    "doc-examples-contract.toml",
+]
+
+[path."tests/fixtures/doc_examples_audit/audit.schema.json"]
+specs = [
+    "doc-examples-contract.toml",
+]
+
 [path."tests/fixtures/g2p/phoneme_test_cases.json"]
 specs = [
     "phoneme-set-version.toml",
     "swift-g2p-contract.toml",
+]
+
+[path."tests/fixtures/g2p/swedish_lid_matrix.json"]
+specs = [
+    "swedish-lid-mirrors.toml",
 ]
 
 [path."tests/fixtures/g2p/zh_en_loanword_matrix.json"]

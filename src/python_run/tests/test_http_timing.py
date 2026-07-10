@@ -15,9 +15,8 @@ pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient  # noqa: E402
-
-from piper.http_server import create_app  # noqa: E402
-from piper.timing import PhonemeTimingInfo, TimingResult  # noqa: E402
+from piper_plus.http_server import create_app  # noqa: E402
+from piper_plus.timing import PhonemeTimingInfo, TimingResult  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -387,7 +386,7 @@ class TestRequestBodySizeLimit:
     """POST bodies above the configured cap are rejected with 413."""
 
     def test_oversized_body_rejected(self, mock_timing_result):
-        from piper.http_server import MAX_TEXT_BYTES
+        from piper_plus.http_server import MAX_TEXT_BYTES
 
         voice = _make_voice(mock_timing_result)
         client = TestClient(create_app(voice, synthesize_args={}))
@@ -398,7 +397,7 @@ class TestRequestBodySizeLimit:
         assert "error" in body
 
     def test_oversized_body_rejected_for_timing(self, mock_timing_result):
-        from piper.http_server import MAX_TEXT_BYTES
+        from piper_plus.http_server import MAX_TEXT_BYTES
 
         voice = _make_voice(mock_timing_result)
         client = TestClient(create_app(voice, synthesize_args={}))
@@ -415,7 +414,7 @@ class TestRequestBodySizeLimit:
         """
         import asyncio
 
-        from piper.http_server import MAX_TEXT_BYTES, _read_text, _RequestTooLarge
+        from piper_plus.http_server import MAX_TEXT_BYTES, _read_text, _RequestTooLarge
 
         request = MagicMock()
         request.method = "GET"
@@ -428,7 +427,7 @@ class TestRequestBodySizeLimit:
         """Sanity check: GET ``?text=`` under the cap passes through."""
         import asyncio
 
-        from piper.http_server import _read_text
+        from piper_plus.http_server import _read_text
 
         request = MagicMock()
         request.method = "GET"
@@ -479,7 +478,7 @@ class TestStreamingExceptionHandling:
         voice.synthesize_stream_raw.side_effect = _broken_stream
         client = TestClient(create_app(voice, synthesize_args={}))
 
-        with caplog.at_level(logging.ERROR, logger="piper.http_server"):
+        with caplog.at_level(logging.ERROR, logger="piper_plus.http_server"):
             with pytest.raises(RuntimeError):
                 with client.stream("POST", "/?streaming=true", content="hello") as resp:
                     list(resp.iter_bytes())
@@ -519,7 +518,7 @@ class TestTimingEndpointSpeakerEmbedding:
 
     These tests describe the intended contract for the /api/phoneme-timing
     endpoint when accepting a JSON request body. The current production
-    implementation in ``piper/http_server.py`` only reads the raw body as
+    implementation in ``piper_plus/http_server.py`` only reads the raw body as
     UTF-8 text, so these tests are marked ``xfail`` until POST-body JSON
     parsing (with ``speaker_embedding`` forwarding) is added.
     """
@@ -577,17 +576,17 @@ class TestPublicBindWarning:
     def test_warns_for_wildcard_address(self, caplog):
         import logging
 
-        from piper.http_server import _warn_if_public_bind
+        from piper_plus.http_server import _warn_if_public_bind
 
-        with caplog.at_level(logging.WARNING, logger="piper.http_server"):
+        with caplog.at_level(logging.WARNING, logger="piper_plus.http_server"):
             _warn_if_public_bind("0.0.0.0")
         assert any("authentication" in r.message for r in caplog.records)
 
     def test_no_warning_for_loopback(self, caplog):
         import logging
 
-        from piper.http_server import _warn_if_public_bind
+        from piper_plus.http_server import _warn_if_public_bind
 
-        with caplog.at_level(logging.WARNING, logger="piper.http_server"):
+        with caplog.at_level(logging.WARNING, logger="piper_plus.http_server"):
             _warn_if_public_bind("127.0.0.1")
         assert not any("authentication" in r.message for r in caplog.records)

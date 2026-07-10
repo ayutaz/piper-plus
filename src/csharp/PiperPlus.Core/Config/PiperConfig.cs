@@ -91,7 +91,7 @@ public sealed class PiperConfig
     /// Locate config.json using the standard search order:
     /// <list type="number">
     ///   <item><description><paramref name="explicitPath"/> if provided</description></item>
-    ///   <item><description><c>PIPER_DEFAULT_CONFIG</c> environment variable</description></item>
+    ///   <item><description><c>PIPER_PLUS_DEFAULT_CONFIG</c> environment variable</description></item>
     ///   <item><description><c>{modelPath}.json</c> (e.g. model.onnx.json)</description></item>
     ///   <item><description><c>{modelDir}/config.json</c></description></item>
     /// </list>
@@ -105,8 +105,8 @@ public sealed class PiperConfig
             return File.Exists(explicitPath) ? explicitPath : null;
         }
 
-        // 2. PIPER_DEFAULT_CONFIG environment variable
-        var envPath = Environment.GetEnvironmentVariable("PIPER_DEFAULT_CONFIG");
+        // 2. PIPER_PLUS_DEFAULT_CONFIG environment variable
+        var envPath = Environment.GetEnvironmentVariable("PIPER_PLUS_DEFAULT_CONFIG");
         if (!string.IsNullOrEmpty(envPath) && File.Exists(envPath))
         {
             return envPath;

@@ -337,9 +337,9 @@ Phase 1〜4 は全 PASS が必須ゲート。Phase 5〜11 はリリース判断�
 | 6.6.1 | モデルファイル不在 | 明示エラー (スタックトレースなし) | |
 | 6.6.2 | config JSON 不正 / 不在 | 明示エラー | |
 | 6.6.3 | 破損 ONNX ファイル | 明示エラー | |
-| 6.6.4 | `PIPER_DISABLE_WARMUP=1` | warmup スキップ、結果不変 | |
-| 6.6.5 | `PIPER_DISABLE_CACHE=1` | `.opt.onnx` キャッシュ未生成 | |
-| 6.6.6 | `PIPER_INTRA_THREADS` 変更 | 反映 / クラッシュなし | |
+| 6.6.4 | `PIPER_PLUS_DISABLE_WARMUP=1` | warmup スキップ、結果不変 | |
+| 6.6.5 | `PIPER_PLUS_DISABLE_CACHE=1` | `.opt.onnx` キャッシュ未生成 | |
+| 6.6.6 | `PIPER_PLUS_INTRA_THREADS` 変更 | 反映 / クラッシュなし | |
 | 6.6.7 | 並行推論 (複数スレッド同時) | スレッド安全 (Rust/Go/C# runtime) | |
 
 ---

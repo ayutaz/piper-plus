@@ -381,7 +381,7 @@ class TestTrimEosRegion:
     """Tier 1 EOS-region trim (Issue #499).
 
     Mirrors src/python_run/tests/test_short_text_mitigation.py::TestTrimEosRegion
-    to keep the training (infer_onnx) and runtime (piper.voice) implementations
+    to keep the training (infer_onnx) and runtime (piper_plus.voice) implementations
     behaviourally identical (cross-runtime contract — Issue #499).
 
     Background: ``VitsModel.infer()`` expands attention with ``ceil(w)`` but

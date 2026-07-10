@@ -18,11 +18,9 @@ from io import BytesIO
 from unittest.mock import MagicMock
 
 import numpy as np
-import pytest
-
-from piper.config import PhonemeType, PiperConfig
-from piper.timing import PhonemeTimingInfo, TimingResult
-from piper.voice import PiperVoice
+from piper_plus.config import PhonemeType, PiperConfig
+from piper_plus.timing import PhonemeTimingInfo, TimingResult
+from piper_plus.voice import PiperVoice
 
 
 # ---------------------------------------------------------------------------
@@ -326,13 +324,19 @@ class TestSynthesizeWithTimingAdvanced:
         voice = _make_mock_voice(has_durations=True, phoneme_ids_len=5)
         voice.phonemize = MagicMock(return_value=[["a"], ["k"]])
 
-        _, timing_no_silence = voice.synthesize_with_timing("a. b.", sentence_silence=0.0)
-        _, timing_with_silence = voice.synthesize_with_timing("a. b.", sentence_silence=0.5)
+        _, timing_no_silence = voice.synthesize_with_timing(
+            "a. b.", sentence_silence=0.0
+        )
+        _, timing_with_silence = voice.synthesize_with_timing(
+            "a. b.", sentence_silence=0.5
+        )
 
         assert timing_no_silence is not None
         assert timing_with_silence is not None
         # With silence should have larger total duration
-        assert timing_with_silence.total_duration_ms > timing_no_silence.total_duration_ms
+        assert (
+            timing_with_silence.total_duration_ms > timing_no_silence.total_duration_ms
+        )
 
     def test_hop_size_from_config(self):
         """Timing should use hop_size from PiperConfig."""
@@ -395,9 +399,7 @@ class TestSynthesizeWithTimingParameters:
 
     def test_speaker_id_parameter_forwarded_to_session(self):
         """speaker_id reaches the ONNX session.run call for multi-speaker models."""
-        voice = _make_mock_voice(
-            num_speakers=3, has_durations=True, phoneme_ids_len=5
-        )
+        voice = _make_mock_voice(num_speakers=3, has_durations=True, phoneme_ids_len=5)
         voice.phonemize = MagicMock(return_value=[["a"]])
 
         # Add 'sid' to the mock model's input names so the speaker_id path is taken.
@@ -528,7 +530,7 @@ class TestSynthesizeCoreShortText:
 
     def test_short_ids_reduce_noise_scale(self):
         """Phoneme sequences shorter than MIN_PHONEME_IDS reduce noise_scale."""
-        from piper.voice import MIN_PHONEME_IDS, PiperVoice
+        from piper_plus.voice import PiperVoice
 
         voice = _make_mock_voice(has_durations=True, phoneme_ids_len=50)
 
@@ -542,12 +544,12 @@ class TestSynthesizeCoreShortText:
         feeds = call_args[0][1]
         scales = feeds["scales"]
         assert scales[0] < 0.667  # noise_scale reduced
-        assert scales[2] < 0.8    # noise_w reduced
+        assert scales[2] < 0.8  # noise_w reduced
         assert abs(scales[1] - 1.0) < 1e-6  # length_scale unchanged
 
     def test_long_ids_keep_default_scales(self):
         """Phoneme sequences >= MIN_PHONEME_IDS use the default scales."""
-        from piper.voice import MIN_PHONEME_IDS, PiperVoice
+        from piper_plus.voice import MIN_PHONEME_IDS, PiperVoice
 
         voice = _make_mock_voice(has_durations=True, phoneme_ids_len=50)
 
@@ -632,7 +634,7 @@ class TestSpeakerEmbeddingDefaults:
 
     def test_warmup_supplies_speaker_embedding_inputs(self):
         """_warmup_session feeds zero speaker_embedding + mask=0 when required."""
-        from piper.voice import _warmup_session
+        from piper_plus.voice import _warmup_session
 
         voice = _make_mock_voice(
             has_speaker_embedding=True,

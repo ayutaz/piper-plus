@@ -640,18 +640,18 @@ spdlog::debug("zh_en dispatch: type={} text={} count={}", "acronym", "GPS", 4);
 console.debug("[zh_en] dispatch", { type: "acronym", text: "GPS", count: 4 });
 ```
 
-**デバッグフラグ**: `PIPER_DEBUG_ZH_EN=1` (全ランタイム共通の環境変数)
+**デバッグフラグ**: `PIPER_PLUS_DEBUG_ZH_EN=1` (全ランタイム共通の環境変数)
 
 ```python
 # Python
 import os
-if os.environ.get("PIPER_DEBUG_ZH_EN"):
+if os.environ.get("PIPER_PLUS_DEBUG_ZH_EN"):
     logging.getLogger("piper_plus_g2p.chinese").setLevel(logging.DEBUG)
 ```
 
 ```rust
 // Rust: 既存 RUST_LOG=debug でも有効
-// 追加: PIPER_DEBUG_ZH_EN=1 で当該モジュールのみ DEBUG
+// 追加: PIPER_PLUS_DEBUG_ZH_EN=1 で当該モジュールのみ DEBUG
 ```
 
 **性能影響対策**:

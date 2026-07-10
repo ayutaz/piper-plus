@@ -4,9 +4,9 @@ on:
   pull_request:
     branches: [ dev ]
     paths:
-      - 'src/python_run/piper/webui.py'
-      - 'src/python_run/piper/sample_texts.py'
-      - 'src/python_run/piper/training_manager.py'
+      - 'src/python_run/piper_plus/webui.py'
+      - 'src/python_run/piper_plus/sample_texts.py'
+      - 'src/python_run/piper_plus/training_manager.py'
       - 'src/python_run/requirements_webui.txt'
       - 'docker/webui/**'
       - 'src/python_run/tests/test_webui.py'
@@ -15,9 +15,9 @@ on:
   push:
     branches: [ dev ]
     paths:
-      - 'src/python_run/piper/webui.py'
-      - 'src/python_run/piper/sample_texts.py'
-      - 'src/python_run/piper/training_manager.py'
+      - 'src/python_run/piper_plus/webui.py'
+      - 'src/python_run/piper_plus/sample_texts.py'
+      - 'src/python_run/piper_plus/training_manager.py'
       - 'src/python_run/requirements_webui.txt'
       - 'docker/webui/**'
       - 'src/python_run/tests/test_webui.py'
@@ -62,28 +62,28 @@ jobs:
       - name: Test WebUI imports
         run: |
           cd src/python_run
-          python -c "from piper.webui import create_interface, get_available_models; print('WebUI imports successful')"
+          python -c "from piper_plus.webui import create_interface, get_available_models; print('WebUI imports successful')"
 
       - name: Test model detection
         run: |
           cd src/python_run
-          python -c "from pathlib import Path; from piper.webui import get_available_models; models = get_available_models(Path('../../test/models')); print(f'Found {len(models)} test models'); [print(f'  - {name}') for name, path in models]"
+          python -c "from pathlib import Path; from piper_plus.webui import get_available_models; models = get_available_models(Path('../../test/models')); print(f'Found {len(models)} test models'); [print(f'  - {name}') for name, path in models]"
 
       - name: Test interface creation
         run: |
           cd src/python_run
           # Skip actual interface creation in CI environment as it requires display
-          python -c "from pathlib import Path; from piper.webui import create_interface; print('Interface creation function imported successfully')"
+          python -c "from pathlib import Path; from piper_plus.webui import create_interface; print('Interface creation function imported successfully')"
 
       - name: Test template system
         run: |
           cd src/python_run
-          python -c "from piper.webui import TEMPLATES, get_language_from_model; print(f'Available languages: {list(TEMPLATES.keys())}'); lang = get_language_from_model('test/models/multilingual-test-medium.onnx'); print(f'Japanese model detected as: {lang}')"
+          python -c "from piper_plus.webui import TEMPLATES, get_language_from_model; print(f'Available languages: {list(TEMPLATES.keys())}'); lang = get_language_from_model('test/models/multilingual-test-medium.onnx'); print(f'Japanese model detected as: {lang}')"
 
       - name: Test sample texts
         run: |
           cd src/python_run
-          python -c "from piper.sample_texts import SAMPLE_TEXTS, get_sample_by_category; print(f'Sample text languages: {list(SAMPLE_TEXTS.keys())}'); sample = get_sample_by_category('ja_JP', 'greeting', 0); print(f'Japanese greeting: {sample}')"
+          python -c "from piper_plus.sample_texts import SAMPLE_TEXTS, get_sample_by_category; print(f'Sample text languages: {list(SAMPLE_TEXTS.keys())}'); sample = get_sample_by_category('ja_JP', 'greeting', 0); print(f'Japanese greeting: {sample}')"
 
       - name: Run pytest for WebUI
         run: |

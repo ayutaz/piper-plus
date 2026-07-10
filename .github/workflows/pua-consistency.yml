@@ -15,7 +15,7 @@ on:
     paths:
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'src/python/g2p/piper_plus_g2p/encode/**'
-      - 'src/python_run/piper/phonemize/token_mapper.py'
+      - 'src/python_run/piper_plus/phonemize/token_mapper.py'
       - 'src/rust/piper-plus-g2p/src/token_map.rs'
       - 'src/go/phonemize/pua.go'
       - 'src/go/phonemize/pua_test.go'
@@ -31,7 +31,7 @@ on:
     paths:
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'src/python/g2p/piper_plus_g2p/encode/**'
-      - 'src/python_run/piper/phonemize/token_mapper.py'
+      - 'src/python_run/piper_plus/phonemize/token_mapper.py'
       - 'src/rust/piper-plus-g2p/src/token_map.rs'
       - 'src/go/phonemize/pua.go'
       - 'src/go/phonemize/pua_test.go'
@@ -246,7 +246,7 @@ jobs:
           # package __init__ (and its heavier optional deps). This dict is the
           # single source of truth for which models we distribute.
           spec = importlib.util.spec_from_file_location(
-              "_model_resolver", "src/python/piper_plus/_model_resolver.py")
+              "_model_resolver", "src/python_run/piper_plus/api/_model_resolver.py")
           mod = importlib.util.module_from_spec(spec)
           spec.loader.exec_module(mod)
           aliases = mod.MODEL_ALIASES

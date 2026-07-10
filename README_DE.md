@@ -111,51 +111,51 @@ Laden Sie die passende Version für Ihr Betriebssystem herunter und entpacken Si
 **Windows (PowerShell):**
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/ayutaz/piper-plus/releases/latest/download/piper-windows-x64.zip" -OutFile piper.zip
-Expand-Archive piper.zip -DestinationPath .
-cd piper
+Invoke-WebRequest -Uri "https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-windows-x64.zip" -OutFile piper-plus-cpp.zip
+Expand-Archive piper-plus-cpp.zip -DestinationPath .
+cd piper-plus
 ```
 
 **macOS (Apple Silicon):**
 
 ```bash
-curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-macos-arm64.tar.gz
-tar xzf piper.tar.gz
-cd piper
+curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-macos-arm64.tar.gz
+tar xzf piper-plus-cpp.tar.gz
+cd piper-plus
 xattr -cr .
 ```
 
 **Linux (x86_64):**
 
 ```bash
-curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-x64.tar.gz
-tar xzf piper.tar.gz
-cd piper
+curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-x64.tar.gz
+tar xzf piper-plus-cpp.tar.gz
+cd piper-plus
 ```
 
 **Linux (ARM64, Raspberry Pi 4/5):**
 
 ```bash
-curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-arm64.tar.gz
-tar xzf piper.tar.gz
-cd piper
+curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
+tar xzf piper-plus-cpp.tar.gz
+cd piper-plus
 ```
 
 **2. Modell herunterladen & Sprache generieren**
 
 ```sh
 # Tsukuyomi-chan Modell herunterladen
-./bin/piper --download-model tsukuyomi
+./bin/piper-plus --download-model tsukuyomi
 
 # Sprache generieren (nur der Modellname reicht — heruntergeladene Modelle werden automatisch aufgeloest)
-./bin/piper --model tsukuyomi --text "こんにちは、今日は良い天気ですね。" --output_file output.wav
+./bin/piper-plus --model tsukuyomi --text "こんにちは、今日は良い天気ですね。" --output_file output.wav
 ```
 
-> **Hinweis zur Windows cmd-Codepage:** Die Option `--text` verwendet intern `GetCommandLineW()` (UTF-16) und funktioniert daher unabhängig von der Codepage. Nur bei Pipe-Eingabe (`echo ... | piper`) müssen Sie vorher mit `chcp 65001` auf UTF-8 umschalten.
+> **Hinweis zur Windows cmd-Codepage:** Die Option `--text` verwendet intern `GetCommandLineW()` (UTF-16) und funktioniert daher unabhängig von der Codepage. Nur bei Pipe-Eingabe (`echo ... | piper-plus`) müssen Sie vorher mit `chcp 65001` auf UTF-8 umschalten.
 >
-> **Ausgabeort von output.wav:** Die Datei wird im aktuellen Verzeichnis erstellt (dort, wo Sie `cd piper` ausgeführt haben).
+> **Ausgabeort von output.wav:** Die Datei wird im aktuellen Verzeichnis erstellt (dort, wo Sie `cd piper-plus` ausgeführt haben).
 
-> **Welches Binary soll ich wählen?** Die Releases enthalten außerdem `piper-plus-cli-*` (C# .NET) und `piper-plus-rs-cli-*` (Rust) CLIs. Der obige Schnellstart verwendet **C++ CLI (`piper-*`)**, das die breiteste Plattformunterstützung bietet und für die meisten Nutzer empfohlen wird. Details siehe [Auswahl eines CLI-Binarys](docs/getting-started/binary-selection.md).
+> **Welches Binary soll ich wählen?** Die Releases enthalten außerdem `piper-plus-cli-*` (C# .NET) und `piper-plus-rs-cli-*` (Rust) CLIs. Der obige Schnellstart verwendet **C++ CLI (`piper-plus-cpp-*`)**, das die breiteste Plattformunterstützung bietet und für die meisten Nutzer empfohlen wird. Details siehe [Auswahl eines CLI-Binarys](docs/getting-started/binary-selection.md).
 
 ### Python-Inferenz
 
@@ -187,15 +187,15 @@ Wichtige Optionen: `--speaker-id` (Sprecher-ID), `--device auto|cpu|gpu`, `--noi
 
 ```bash
 # Modellliste anzeigen
-python -m piper --list-models
-python -m piper --list-models ja
+python -m piper_plus --list-models
+python -m piper_plus --list-models ja
 
 # Modell herunterladen
-python -m piper --download-model tsukuyomi
-python -m piper --download-model ja_JP-tsukuyomi-chan-medium
+python -m piper_plus --download-model tsukuyomi
+python -m piper_plus --download-model ja_JP-tsukuyomi-chan-medium
 
 # Nach dem Download verwenden
-python -m piper --model ja_JP-tsukuyomi-chan-medium --text "こんにちは" -f output.wav
+python -m piper_plus --model ja_JP-tsukuyomi-chan-medium --text "こんにちは" -f output.wav
 ```
 
 ### WebUI
@@ -203,7 +203,7 @@ python -m piper --model ja_JP-tsukuyomi-chan-medium --text "こんにちは" -f 
 ```bash
 uv pip install -r src/python_run/requirements_webui.txt
 cd src/python_run
-python -m piper.webui --data-dir /path/to/models
+python -m piper_plus.webui --data-dir /path/to/models
 # → http://localhost:7860
 ```
 
@@ -424,41 +424,41 @@ Mit der Option `--text` können Sie Text direkt ohne Pipe eingeben:
 
 ```sh
 # Sprache aus Text generieren
-./bin/piper --model model.onnx --text "Hello, how are you?" -f output.wav
+./bin/piper-plus --model model.onnx --text "Hello, how are you?" -f output.wav
 
 # Japanischer Text (umgeht Encoding-Probleme unter Windows)
-bin\piper.exe --model models\tsukuyomi.onnx --text "こんにちは、今日は良い天気ですね。" -f output.wav
+bin\piper-plus.exe --model models\tsukuyomi.onnx --text "こんにちは、今日は良い天気ですね。" -f output.wav
 
 # Sprecher angeben
-./bin/piper --model model.onnx --text "Hello" --speaker 3 -f output.wav
+./bin/piper-plus --model model.onnx --text "Hello" --speaker 3 -f output.wav
 ```
 
 #### Pipe-Eingabe
 
 ```sh
 # Grundlegend
-echo "こんにちは" | ./bin/piper --model ja_model.onnx --output_file output.wav
+echo "こんにちは" | ./bin/piper-plus --model ja_model.onnx --output_file output.wav
 
 # Streaming (geringe Latenz)
-echo "長いテキスト..." | ./bin/piper --model ja_model.onnx --output_file output.wav --streaming
+echo "長いテキスト..." | ./bin/piper-plus --model ja_model.onnx --output_file output.wav --streaming
 
 # GPU-Inferenz
-echo "Hello" | ./bin/piper --model en_model.onnx --use-cuda --output_file output.wav
+echo "Hello" | ./bin/piper-plus --model en_model.onnx --use-cuda --output_file output.wav
 
 # Phonem-Timing-Ausgabe (fuer Lippensynchronisation und Untertitel)
-echo "Hello world" | ./bin/piper --model en_model.onnx -f speech.wav --output-timing timing.json
+echo "Hello world" | ./bin/piper-plus --model en_model.onnx -f speech.wav --output-timing timing.json
 
 # Benutzerdefiniertes Woerterbuch
-echo "DockerとGitHubを使います" | ./bin/piper --model ja_model.onnx --custom-dict my_dict.json -f output.wav
+echo "DockerとGitHubを使います" | ./bin/piper-plus --model ja_model.onnx --custom-dict my_dict.json -f output.wav
 
 # Inline-Phoneingabe
-echo 'Hello [[ h ə l oʊ ]] world' | ./bin/piper --model en_model.onnx -f output.wav
+echo 'Hello [[ h ə l oʊ ]] world' | ./bin/piper-plus --model en_model.onnx -f output.wav
 
 # Direkte Phoneingabe
-echo 'h ə l oʊ _ w ɜː l d' | ./bin/piper --model en_model.onnx --raw-phonemes -f output.wav
+echo 'h ə l oʊ _ w ɜː l d' | ./bin/piper-plus --model en_model.onnx --raw-phonemes -f output.wav
 
 # Streaming (Raw-Audio-Ausgabe)
-echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
+echo 'Long text...' | ./bin/piper-plus --model en_model.onnx --output-raw | \
   aplay -r 22050 -f S16_LE -t raw -
 ```
 
@@ -495,12 +495,12 @@ Wichtige Optionen:
 | `--quiet/-q` | Logging deaktivieren | aus |
 | `--version` | Version anzeigen | - |
 
-Alle Optionen mit `piper --help` anzeigen.
+Alle Optionen mit `piper-plus --help` anzeigen.
 
 > **Empfohlene Einstellungen für WavLM-Modelle:** Für Modelle, die mit dem WavLM Discriminator trainiert wurden, wird `--noise-scale 0.5` empfohlen (Standard ist 0.667).
 >
 > ```sh
-> echo "こんにちは" | ./bin/piper --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav
+> echo "こんにちは" | ./bin/piper-plus --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav
 > ```
 
 ### JSON-Eingabe
@@ -518,35 +518,35 @@ Mit dem Flag `--json-input` wird JSON-Eingabe unterstützt:
 
 ```bash
 # Verfuegbare Modelle auflisten
-./bin/piper --list-models
+./bin/piper-plus --list-models
 
 # Nach Sprache filtern
-./bin/piper --list-models ja
-./bin/piper --list-models en
+./bin/piper-plus --list-models ja
+./bin/piper-plus --list-models en
 ```
 
 #### Modelle herunterladen
 
 ```bash
 # Modell per Name herunterladen (Aliase werden unterstuetzt)
-./bin/piper --download-model tsukuyomi
-./bin/piper --download-model en_US-lessac-medium
+./bin/piper-plus --download-model tsukuyomi
+./bin/piper-plus --download-model en_US-lessac-medium
 
 # Zielverzeichnis angeben
-./bin/piper --download-model tsukuyomi --model-dir /path/to/models
+./bin/piper-plus --download-model tsukuyomi --model-dir /path/to/models
 
 # Nach dem Download per Modellname inferieren (kein vollstaendiger Pfad noetig)
-./bin/piper --model tsukuyomi --text "こんにちは"
+./bin/piper-plus --model tsukuyomi --text "こんにちは"
 ```
 
 ### Umgebungsvariablen (C++ CLI)
 
 | Variable | Beschreibung | Beispiel |
 |---|---|---|
-| `PIPER_DEFAULT_MODEL` | Standard-Modellpfad, wenn `--model` nicht angegeben | `/path/to/model.onnx` |
-| `PIPER_DEFAULT_CONFIG` | Standard-Konfigurationsdateipfad, wenn `--config` nicht angegeben | `/path/to/config.json` |
-| `PIPER_MODEL_DIR` | Speicherverzeichnis für heruntergeladene Modelle | `~/.local/share/piper/models` |
-| `PIPER_GPU_DEVICE_ID` | CUDA-GPU-Geräte-ID | `0` |
+| `PIPER_PLUS_DEFAULT_MODEL` | Standard-Modellpfad, wenn `--model` nicht angegeben | `/path/to/model.onnx` |
+| `PIPER_PLUS_DEFAULT_CONFIG` | Standard-Konfigurationsdateipfad, wenn `--config` nicht angegeben | `/path/to/config.json` |
+| `PIPER_PLUS_MODEL_DIR` | Speicherverzeichnis für heruntergeladene Modelle | `~/.local/share/piper-plus/models` |
+| `PIPER_PLUS_GPU_DEVICE_ID` | CUDA-GPU-Geräte-ID | `0` |
 
 ### Hilfsskripte (Windows)
 
@@ -701,8 +701,8 @@ Hochwertige japanische Sprachsynthese durch OpenJTalk-Integration. Wörterbuch u
 | Variable | Beschreibung |
 |---|---|
 | `OPENJTALK_DICTIONARY_PATH` | OpenJTalk-Wörterbuchpfad (bei fehlender Angabe automatischer Download) |
-| `PIPER_AUTO_DOWNLOAD_DICT` | `0` zum Deaktivieren des automatischen Downloads |
-| `PIPER_OFFLINE_MODE` | `1` für den Offline-Modus |
+| `PIPER_PLUS_AUTO_DOWNLOAD_DICT` | `0` zum Deaktivieren des automatischen Downloads |
+| `PIPER_PLUS_OFFLINE_MODE` | `1` für den Offline-Modus |
 
 Weitere Details im Japanischen Sprachsynthesehandbuch und in der [Phonem-Mapping-Referenz](docs/api-reference/phoneme-mapping.md).
 
@@ -725,7 +725,7 @@ xattr -cr piper/
 x64 / arm64 werden unterstützt. Das OpenJTalk-Wörterbuch wird beim ersten Start automatisch heruntergeladen. Weitere Details in der [Windows-Setup-Anleitung](docs/getting-started/windows-setup.md).
 
 ```cmd
-piper.exe --model en_US-lessac-medium.onnx -f output.wav
+piper-plus.exe --model en_US-lessac-medium.onnx -f output.wav
 ```
 
 ### WebAssembly

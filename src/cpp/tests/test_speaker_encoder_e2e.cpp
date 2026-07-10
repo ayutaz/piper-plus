@@ -5,7 +5,7 @@
 //
 // Opt-in: skips by default unless both
 //   1. The fixture has an e2e_cosine_gate block, AND
-//   2. PIPER_SPEAKER_ENCODER_ONNX_PATH points at a local encoder ONNX.
+//   2. PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH points at a local encoder ONNX.
 //
 // The C API speaker encoder is currently a stub (see piper_plus_c_api.cpp:1104
 // "EXPERIMENTAL — not yet implemented"). This test exercises the encoder
@@ -14,7 +14,7 @@
 // stub is replaced by a real impl, this test will continue to pass against
 // the same fixture.
 //
-// Run: PIPER_SPEAKER_ENCODER_ONNX_PATH=/path/to/encoder.onnx
+// Run: PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH=/path/to/encoder.onnx
 //      ctest -R test_speaker_encoder_e2e
 
 #include <gtest/gtest.h>
@@ -361,13 +361,13 @@ TEST(SpeakerEncoderE2E, CosineGateAgainstPinnedEmbedding) {
     }
     const std::string gate = "{" + gate_block + "}";
 
-    const char* env_path = std::getenv("PIPER_SPEAKER_ENCODER_ONNX_PATH");
+    const char* env_path = std::getenv("PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH");
     if (!env_path || env_path[0] == '\0') {
-        GTEST_SKIP() << "PIPER_SPEAKER_ENCODER_ONNX_PATH not set — opt-in test";
+        GTEST_SKIP() << "PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH not set — opt-in test";
     }
     const std::string encoder_path = env_path;
     if (!file_exists(encoder_path)) {
-        FAIL() << "PIPER_SPEAKER_ENCODER_ONNX_PATH=" << encoder_path << " does not exist";
+        FAIL() << "PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH=" << encoder_path << " does not exist";
     }
 
     auto wav_block = extract_value_after(gate, "reference_wav");

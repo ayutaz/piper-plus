@@ -14,7 +14,7 @@ import pytest
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from piper.training_manager import TrainingManager, TrainingStatus
+from piper_plus.training_manager import TrainingManager, TrainingStatus
 
 
 class TestTrainingStatus:
@@ -109,7 +109,7 @@ class TestTrainingManager:
         assert "test" in manager.callbacks
         assert manager.callbacks["test"] == callback
 
-    @patch("piper.training_manager.subprocess.Popen")
+    @patch("piper_plus.training_manager.subprocess.Popen")
     def test_start_training_success(self, mock_popen, manager, test_dataset, tmp_path):
         """Test successful training start"""
         # Mock the process; use a blocking readline so the monitor thread
@@ -170,10 +170,12 @@ class TestTrainingManager:
     def test_start_training_while_running(self, manager, test_dataset, tmp_path):
         """Test starting training while already running"""
         block = threading.Event()
-        with patch("piper.training_manager.subprocess.Popen") as mock_popen:
+        with patch("piper_plus.training_manager.subprocess.Popen") as mock_popen:
             mock_process = MagicMock()
             mock_process.poll.return_value = None
-            mock_process.stdout.readline.side_effect = lambda: (block.wait() and "") or ""
+            mock_process.stdout.readline.side_effect = lambda: (
+                (block.wait() and "") or ""
+            )
             mock_process.returncode = 0
             mock_popen.return_value = mock_process
 
@@ -282,7 +284,7 @@ class TestTrainingManager:
         good_callback.assert_called_once()
         bad_callback.assert_called_once()
 
-    @patch("piper.training_manager.subprocess.Popen")
+    @patch("piper_plus.training_manager.subprocess.Popen")
     def test_monitor_process_success(self, mock_popen, manager, test_dataset, tmp_path):
         """Test monitoring a successful process"""
         # Mock process that outputs some lines then exits successfully
@@ -317,7 +319,7 @@ class TestTrainingManager:
         assert any("Starting training" in log for log in logs)
         assert any("Epoch 1/10" in log for log in logs)
 
-    @patch("piper.training_manager.subprocess.Popen")
+    @patch("piper_plus.training_manager.subprocess.Popen")
     def test_stop_training_success(self, mock_popen, manager, test_dataset, tmp_path):
         """Test stopping training successfully"""
         block = threading.Event()
@@ -357,7 +359,7 @@ class TestTrainingWebUIIntegration:
 
     def test_check_training_dependencies(self):
         """Test dependency checking function"""
-        from piper.webui import check_training_dependencies
+        from piper_plus.webui import check_training_dependencies
 
         # Test with mocked imports
         with patch.dict(sys.modules, {"pytorch_lightning": None, "torch": None}):
@@ -367,7 +369,7 @@ class TestTrainingWebUIIntegration:
 
     def test_start_training_webui_invalid_dataset(self):
         """Test WebUI start_training with invalid dataset"""
-        from piper.webui import start_training
+        from piper_plus.webui import start_training
 
         result = start_training(
             dataset_path="/non/existent/path",
@@ -389,7 +391,7 @@ class TestTrainingWebUIIntegration:
         """Test getting training status for WebUI"""
         from datetime import datetime
 
-        from piper.webui import get_training_status, training_manager
+        from piper_plus.webui import get_training_status, training_manager
 
         # Set up a mock status
         training_manager.status = TrainingStatus(

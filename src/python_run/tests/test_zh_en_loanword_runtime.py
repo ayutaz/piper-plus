@@ -1,7 +1,7 @@
 """Runtime tests for ZH-EN code-switching (Issue #384).
 
 Mirrors src/python/g2p/tests/test_zh_en_loanword.py but exercises the
-inference-side ``piper.phonemize.chinese`` and ``piper.phonemize.multilingual``
+inference-side ``piper_plus.phonemize.chinese`` and ``piper_plus.phonemize.multilingual``
 modules. These produce PUA-encoded tokens and do not return prosody.
 """
 
@@ -19,7 +19,7 @@ def _require_g2p_en():
 def test_phonemize_embedded_english_acronym():
     """GPS produces PUA-mapped tokens with tone markers (mapped to PUA)."""
     _require_pypinyin()
-    from piper.phonemize.chinese import _phonemize_embedded_english_raw
+    from piper_plus.phonemize.chinese import _phonemize_embedded_english_raw
 
     raw = _phonemize_embedded_english_raw("GPS")
     assert len(raw) > 0
@@ -28,7 +28,7 @@ def test_phonemize_embedded_english_acronym():
 def test_phonemize_embedded_english_loanword_python():
     """Python loanword is recognised case-sensitively."""
     _require_pypinyin()
-    from piper.phonemize.chinese import _phonemize_embedded_english_raw
+    from piper_plus.phonemize.chinese import _phonemize_embedded_english_raw
 
     raw = _phonemize_embedded_english_raw("Python")
     assert len(raw) > 0
@@ -37,7 +37,7 @@ def test_phonemize_embedded_english_loanword_python():
 def test_phonemize_embedded_english_letter_fallback():
     """Unknown token falls back to letter-by-letter conversion."""
     _require_pypinyin()
-    from piper.phonemize.chinese import _phonemize_embedded_english_raw
+    from piper_plus.phonemize.chinese import _phonemize_embedded_english_raw
 
     raw = _phonemize_embedded_english_raw("ZZ")
     # Should produce tokens (Z = zi4 -> "ts ɨ tone4")
@@ -47,7 +47,7 @@ def test_phonemize_embedded_english_letter_fallback():
 def test_phonemize_embedded_english_empty():
     """Empty string returns empty list."""
     _require_pypinyin()
-    from piper.phonemize.chinese import _phonemize_embedded_english_raw
+    from piper_plus.phonemize.chinese import _phonemize_embedded_english_raw
 
     assert _phonemize_embedded_english_raw("") == []
 
@@ -55,7 +55,7 @@ def test_phonemize_embedded_english_empty():
 def test_phonemize_embedded_english_public_api_has_bos_eos():
     """Public phonemize_embedded_english adds BOS/EOS like phonemize_chinese."""
     _require_pypinyin()
-    from piper.phonemize.chinese import phonemize_embedded_english
+    from piper_plus.phonemize.chinese import phonemize_embedded_english
 
     tokens = phonemize_embedded_english("AI")
     assert len(tokens) >= 2  # at least ^ ... $
@@ -64,7 +64,7 @@ def test_phonemize_embedded_english_public_api_has_bos_eos():
 def test_multilingual_dispatch_zh_en_zh():
     """[zh, en, zh] pattern in zh-en multilingual routes EN through embedded path."""
     _require_pypinyin()
-    from piper.phonemize.multilingual import MultilingualPhonemizer
+    from piper_plus.phonemize.multilingual import MultilingualPhonemizer
 
     p = MultilingualPhonemizer(["zh", "en"], default_latin_language="en")
     # 让我用 ChatGPT 写代码
@@ -75,7 +75,7 @@ def test_multilingual_dispatch_zh_en_zh():
 def test_multilingual_dispatch_zh_then_en():
     """[zh, en] pattern routes EN through embedded path."""
     _require_pypinyin()
-    from piper.phonemize.multilingual import MultilingualPhonemizer
+    from piper_plus.phonemize.multilingual import MultilingualPhonemizer
 
     p = MultilingualPhonemizer(["zh", "en"], default_latin_language="en")
     tokens = p.phonemize("请打开 GPS")
@@ -85,7 +85,7 @@ def test_multilingual_dispatch_zh_then_en():
 def test_multilingual_dispatch_en_then_zh():
     """[en, zh] pattern routes EN through embedded path."""
     _require_pypinyin()
-    from piper.phonemize.multilingual import MultilingualPhonemizer
+    from piper_plus.phonemize.multilingual import MultilingualPhonemizer
 
     p = MultilingualPhonemizer(["zh", "en"], default_latin_language="en")
     tokens = p.phonemize("GPS 在哪里")
@@ -96,8 +96,8 @@ def test_multilingual_pure_english_uses_english_path():
     """Pure EN text in zh-en multilingual goes to EnglishPhonemizer (no zh context)."""
     _require_pypinyin()
     _require_g2p_en()
-    from piper.phonemize.chinese import phonemize_embedded_english
-    from piper.phonemize.multilingual import MultilingualPhonemizer
+    from piper_plus.phonemize.chinese import phonemize_embedded_english
+    from piper_plus.phonemize.multilingual import MultilingualPhonemizer
 
     p = MultilingualPhonemizer(["zh", "en"], default_latin_language="en")
     en_path = p.phonemize("Hello world")
@@ -110,8 +110,8 @@ def test_multilingual_pure_english_uses_english_path():
 def test_multilingual_pure_zh_unaffected():
     """Pure ZH text behaves identically before/after the change (regression)."""
     _require_pypinyin()
-    from piper.phonemize.chinese import phonemize_chinese
-    from piper.phonemize.multilingual import MultilingualPhonemizer
+    from piper_plus.phonemize.chinese import phonemize_chinese
+    from piper_plus.phonemize.multilingual import MultilingualPhonemizer
 
     p = MultilingualPhonemizer(["zh", "en"], default_latin_language="en")
     text = "今天天气很好"
@@ -127,7 +127,7 @@ def test_multilingual_pure_zh_unaffected():
 def test_phonemize_embedded_english_punctuation_invariant():
     """Trailing punctuation does not change the embedded-english output."""
     _require_pypinyin()
-    from piper.phonemize.chinese import _phonemize_embedded_english_raw
+    from piper_plus.phonemize.chinese import _phonemize_embedded_english_raw
 
     a = _phonemize_embedded_english_raw("GPS")
     b = _phonemize_embedded_english_raw("GPS,")
@@ -138,7 +138,7 @@ def test_phonemize_embedded_english_punctuation_invariant():
 def test_phonemize_embedded_english_digits_dropped():
     """Digits in letter_fallback path are silently dropped."""
     _require_pypinyin()
-    from piper.phonemize.chinese import _phonemize_embedded_english_raw
+    from piper_plus.phonemize.chinese import _phonemize_embedded_english_raw
 
     a = _phonemize_embedded_english_raw("ZZ")
     b = _phonemize_embedded_english_raw("Z2Z9")
@@ -152,7 +152,7 @@ def test_phonemize_embedded_english_priority_loanword():
     -> letter_fallback) must produce different sequence lengths.
     """
     _require_pypinyin()
-    from piper.phonemize.chinese import _phonemize_embedded_english_raw
+    from piper_plus.phonemize.chinese import _phonemize_embedded_english_raw
 
     py = _phonemize_embedded_english_raw("Python")
     upper = _phonemize_embedded_english_raw("PYTHON")
@@ -163,7 +163,7 @@ def test_phonemize_embedded_english_priority_loanword():
 def test_multilingual_punctuation_after_embedded_en():
     """Trailing punctuation in dispatched segment keeps the embedded path."""
     _require_pypinyin()
-    from piper.phonemize.multilingual import MultilingualPhonemizer
+    from piper_plus.phonemize.multilingual import MultilingualPhonemizer
 
     p = MultilingualPhonemizer(["zh", "en"], default_latin_language="en")
     a = p.phonemize("请打开 GPS")
@@ -177,7 +177,7 @@ def test_multilingual_punctuation_after_embedded_en():
 def test_multilingual_two_embedded_en_segments():
     """[zh, en, zh, en, zh] -- both EN segments dispatched to embedded path."""
     _require_pypinyin()
-    from piper.phonemize.multilingual import MultilingualPhonemizer
+    from piper_plus.phonemize.multilingual import MultilingualPhonemizer
 
     p = MultilingualPhonemizer(["zh", "en"], default_latin_language="en")
     full = p.phonemize("让我用 ChatGPT 和 Python 写代码")
@@ -196,9 +196,8 @@ def test_runtime_training_consistency_for_embedded_english():
     pytest.importorskip(
         "piper_plus_g2p", reason="training-side g2p package not installed"
     )
+    from piper_plus.phonemize.chinese import _phonemize_embedded_english_raw
     from piper_plus_g2p.chinese import phonemize_embedded_english as train_fn
-
-    from piper.phonemize.chinese import _phonemize_embedded_english_raw
 
     train_tokens, _ = train_fn("GPS")
     runtime_tokens = _phonemize_embedded_english_raw("GPS")

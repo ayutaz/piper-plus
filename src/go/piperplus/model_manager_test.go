@@ -17,8 +17,8 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestDefaultCacheDir(t *testing.T) {
-	// Ensure PIPER_MODEL_DIR is not set so we get the platform default.
-	t.Setenv("PIPER_MODEL_DIR", "")
+	// Ensure PIPER_PLUS_MODEL_DIR is not set so we get the platform default.
+	t.Setenv("PIPER_PLUS_MODEL_DIR", "")
 
 	dir := DefaultCacheDir()
 	if dir == "" {
@@ -31,7 +31,7 @@ func TestDefaultCacheDir(t *testing.T) {
 
 func TestDefaultCacheDir_EnvOverride(t *testing.T) {
 	want := "/custom/model/path"
-	t.Setenv("PIPER_MODEL_DIR", want)
+	t.Setenv("PIPER_PLUS_MODEL_DIR", want)
 
 	got := DefaultCacheDir()
 	if got != want {
@@ -225,8 +225,8 @@ func TestModelManager_CacheDir(t *testing.T) {
 }
 
 func TestModelManager_CacheDir_DefaultWhenEmpty(t *testing.T) {
-	// Ensure PIPER_MODEL_DIR is not set so we get the platform default.
-	t.Setenv("PIPER_MODEL_DIR", "")
+	// Ensure PIPER_PLUS_MODEL_DIR is not set so we get the platform default.
+	t.Setenv("PIPER_PLUS_MODEL_DIR", "")
 
 	mgr := NewModelManager("", slog.Default())
 	got := mgr.CacheDir()

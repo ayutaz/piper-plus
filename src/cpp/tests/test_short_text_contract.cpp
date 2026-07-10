@@ -60,7 +60,7 @@ constexpr float NOISE_W_MIN_RATIO = 0.4f;
 // ---------------------------------------------------------------------------
 
 fs::path findFixturePath() {
-  if (const char* env = std::getenv("PIPER_SHORT_TEXT_FIXTURE")) {
+  if (const char* env = std::getenv("PIPER_PLUS_SHORT_TEXT_FIXTURE")) {
     return fs::path(env);
   }
 
@@ -86,7 +86,7 @@ json loadFixture() {
   EXPECT_TRUE(stream.is_open())
       << "Cannot open short-text contract fixture: " << fixture_path
       << " (cwd=" << fs::current_path()
-      << "). Set PIPER_SHORT_TEXT_FIXTURE if the default search path doesn't "
+      << "). Set PIPER_PLUS_SHORT_TEXT_FIXTURE if the default search path doesn't "
          "apply.";
   std::stringstream buffer;
   buffer << stream.rdbuf();

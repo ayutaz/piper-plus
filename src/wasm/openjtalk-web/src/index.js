@@ -176,7 +176,7 @@ export function padPhonemeIds(phonemeIds, prosodyFeatures) {
 
 /**
  * Strategy A precise post-trim using the model's duration output.
- * Mirrors the Python reference (src/python_run/piper/voice.py
+ * Mirrors the Python reference (src/python_run/piper_plus/voice.py
  * `_trim_padding_by_durations`) so all runtimes produce byte-equal output
  * for the same inputs (issue #356).
  *
@@ -266,7 +266,7 @@ export function trimPaddingByDurations(
  * helper applies the same drop to every other inference path so long-text
  * outputs do not retain the audible doubled tail.
  *
- * Mirrors `src/python_run/piper/voice.py::_trim_eos_region` so all runtimes
+ * Mirrors `src/python_run/piper_plus/voice.py::_trim_eos_region` so all runtimes
  * produce byte-equal output for the same `(audio, durations[-1], hopSize,
  * eosMaxFrames)` tuple. The sample-count conversion uses `Math.trunc()` to
  * match Python's `int(...)` semantics — cross-runtime contract (Issue #499).

@@ -1449,9 +1449,9 @@ void appendUtf8(std::string &out, uint32_t cp) {
 
 // Lookup a dictionary file in the engine-less G2P search path:
 //   1. <dictDir>/<filename>   if dictDir is non-empty
-//   2. PIPER_DICTIONARIES_PATH/<filename>
+//   2. PIPER_PLUS_DICTIONARIES_PATH/<filename>
 // Returns "" when not found. Engine-less callers don't have an exe-relative
-// share/piper/dicts path, so we skip that branch.
+// share/piper-plus/dicts path, so we skip that branch.
 std::string findG2pDictFile(const std::string &filename,
                              const std::string &dictDir) {
     namespace fs = std::filesystem;
@@ -1460,7 +1460,7 @@ std::string findG2pDictFile(const std::string &filename,
         std::error_code ec;
         if (fs::exists(p, ec) && !ec) return p.string();
     }
-    const char *envPath = std::getenv("PIPER_DICTIONARIES_PATH");
+    const char *envPath = std::getenv("PIPER_PLUS_DICTIONARIES_PATH");
     if (envPath && envPath[0] != '\0') {
         fs::path p = fs::path(envPath) / filename;
         std::error_code ec;

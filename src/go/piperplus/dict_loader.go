@@ -20,8 +20,8 @@ type dictData struct {
 
 // findDictionaryFile searches for a dictionary file using a 3-tier strategy:
 //  1. Model directory (modelDir/filename)
-//  2. Executable-relative path (exe/../share/piper/dicts/filename)
-//  3. PIPER_DICTIONARIES_PATH environment variable
+//  2. Executable-relative path (exe/../share/piper-plus/dicts/filename)
+//  3. PIPER_PLUS_DICTIONARIES_PATH environment variable
 //
 // Returns the first existing path, or an empty string if not found.
 func findDictionaryFile(filename, modelDir string) string {
@@ -36,18 +36,18 @@ func findDictionaryFile(filename, modelDir string) string {
 
 	// Tier 2: executable-relative path.
 	if exePath, err := os.Executable(); err == nil {
-		candidate := filepath.Join(filepath.Dir(exePath), "..", "share", "piper", "dicts", filename)
+		candidate := filepath.Join(filepath.Dir(exePath), "..", "share", "piper-plus", "dicts", filename)
 		if _, err := os.Stat(candidate); err == nil {
 			slog.Debug("dictionary found relative to executable", "file", filename, "path", candidate)
 			return candidate
 		}
 	}
 
-	// Tier 3: PIPER_DICTIONARIES_PATH environment variable.
-	if envDir := os.Getenv("PIPER_DICTIONARIES_PATH"); envDir != "" {
+	// Tier 3: PIPER_PLUS_DICTIONARIES_PATH environment variable.
+	if envDir := os.Getenv("PIPER_PLUS_DICTIONARIES_PATH"); envDir != "" {
 		candidate := filepath.Join(envDir, filename)
 		if _, err := os.Stat(candidate); err == nil {
-			slog.Debug("dictionary found via PIPER_DICTIONARIES_PATH", "file", filename, "path", candidate)
+			slog.Debug("dictionary found via PIPER_PLUS_DICTIONARIES_PATH", "file", filename, "path", candidate)
 			return candidate
 		}
 	}

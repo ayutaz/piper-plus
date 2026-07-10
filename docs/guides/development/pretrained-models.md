@@ -71,8 +71,8 @@ High-quality Japanese speech synthesis with OpenJTalk integration. The dictionar
 | Variable | Description |
 |---|---|
 | `OPENJTALK_DICTIONARY_PATH` | OpenJTalk dictionary path (auto-downloads if not set) |
-| `PIPER_AUTO_DOWNLOAD_DICT` | Set to `0` to disable auto-download |
-| `PIPER_OFFLINE_MODE` | Set to `1` for offline mode |
+| `PIPER_PLUS_AUTO_DOWNLOAD_DICT` | Set to `0` to disable auto-download |
+| `PIPER_PLUS_OFFLINE_MODE` | Set to `1` for offline mode |
 
 See the Japanese Usage Guide and [Phoneme Mapping Reference](../../api-reference/phoneme-mapping.md).
 

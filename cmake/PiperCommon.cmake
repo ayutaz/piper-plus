@@ -83,7 +83,7 @@ endif()
 # ZH-EN code-switching loanword data (TICKET-05 P5, Issue #384)
 #
 # Desktop (Linux / macOS / Windows): the JSON is installed under
-# share/piper/dicts/ and loaded at runtime from <exe-dir>/data/.
+# share/piper-plus/dicts/ and loaded at runtime from <exe-dir>/data/.
 # Apple-embedded (iOS / tvOS / watchOS / visionOS) and Android: the JSON is
 # converted into a C unsigned-char array at configure time via
 # `file(READ HEX)`, so libpiper_plus.a / .aar are self-contained — no xxd /
@@ -161,9 +161,9 @@ else()
   # Desktop install: ship the JSON next to the binary so
   # piper_plus_get_exe_dir() can resolve <exe-dir>/data/zh_en_loanword.json.
   install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/data/zh_en_loanword.json"
-          DESTINATION share/piper/dicts)
+          DESTINATION share/piper-plus/dicts)
   # Same for the Swedish per-word LID function-word list (Issue #539),
   # resolved at runtime from <exe-dir>/data/sv_function_words.json.
   install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/data/sv_function_words.json"
-          DESTINATION share/piper/dicts)
+          DESTINATION share/piper-plus/dicts)
 endif()

@@ -185,7 +185,7 @@ jobs:
           path: ${{ github.workspace }}/${{ matrix.artifact }}.${{ matrix.archive_ext }}
 
   # ---------------------------------------------------------------------
-  # Issue #426 release smoke: confirm the released Windows piper.exe feeds
+  # Issue #426 release smoke: confirm the released Windows piper-plus.exe feeds
   # speaker_embedding / speaker_embedding_mask for MB-iSTFT-VITS2 models.
   # ---------------------------------------------------------------------
   # PR #443 fixed the runtime to feed a zero embedding + mask=0 when a model
@@ -240,16 +240,16 @@ jobs:
         with:
           name: mb-istft-speaker-embedding-fixture
           path: fixture
-      - name: Extract release archive and locate piper.exe
+      - name: Extract release archive and locate piper-plus.exe
         shell: pwsh
         run: |
           $zip = Get-ChildItem release-artifact -Filter *.zip | Select-Object -First 1
           if (-not $zip) { Write-Error "windows-x64 .zip artifact not found"; exit 1 }
           # bsdtar (Windows `tar`) reads the POSIX-path zip the build job produced.
           tar -xf $zip.FullName -C release-artifact
-          $exe = Get-ChildItem release-artifact -Recurse -Filter piper.exe | Select-Object -First 1
-          if (-not $exe) { Write-Error "piper.exe not found in released artifact"; exit 1 }
-          Write-Output "piper.exe: $($exe.FullName)"
+          $exe = Get-ChildItem release-artifact -Recurse -Filter piper-plus.exe | Select-Object -First 1
+          if (-not $exe) { Write-Error "piper-plus.exe not found in released artifact"; exit 1 }
+          Write-Output "piper-plus.exe: $($exe.FullName)"
           "PIPER_EXE=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Smoke synthesize a speaker_embedding model
         shell: pwsh
@@ -262,7 +262,7 @@ jobs:
           $wav = "smoke.wav"
           "speaker embedding smoke test" | & "$env:PIPER_EXE" --model fixture/model.onnx --output_file $wav
           if ($LASTEXITCODE -ne 0) {
-            Write-Error "piper.exe exited $LASTEXITCODE — likely missing the speaker_embedding feed (Issue #426 regression)"
+            Write-Error "piper-plus.exe exited $LASTEXITCODE — likely missing the speaker_embedding feed (Issue #426 regression)"
             exit 1
           }
           if (-not (Test-Path $wav)) { Write-Error "no WAV produced"; exit 1 }
@@ -272,7 +272,7 @@ jobs:
             Write-Error "WAV invalid (len=$len, header=$hdr)"
             exit 1
           }
-          Write-Output "OK: released piper.exe synthesized a $len-byte RIFF WAV from a speaker_embedding model"
+          Write-Output "OK: released piper-plus.exe synthesized a $len-byte RIFF WAV from a speaker_embedding model"
 
   build-ios:
     name: Build iOS ${{ matrix.slice }}

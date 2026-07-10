@@ -192,17 +192,17 @@
   "platform_specific": {
     "linux": {
       "library_path_var": "LD_LIBRARY_PATH",
-      "binary_name": "piper",
+      "binary_name": "piper-plus",
       "requirements": []
     },
     "macos": {
       "library_path_var": "DYLD_LIBRARY_PATH",
-      "binary_name": "piper",
+      "binary_name": "piper-plus",
       "requirements": ["Remove quarantine attributes with xattr -cr"]
     },
     "windows": {
       "library_path_var": "PATH",
-      "binary_name": "piper.exe",
+      "binary_name": "piper-plus.exe",
       "requirements": ["Visual C++ Redistributables"],
       "unsupported_languages": ["zh_CN", "ja_JP", "ar_JO", "ko_KR"]
     }

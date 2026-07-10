@@ -50,10 +50,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// Resolve model path: flag > env.
 	resolvedModel := modelPath
 	if resolvedModel == "" {
-		resolvedModel = os.Getenv("PIPER_DEFAULT_MODEL")
+		resolvedModel = os.Getenv("PIPER_PLUS_DEFAULT_MODEL")
 	}
 	if resolvedModel == "" {
-		return fmt.Errorf("model path required: specify --model or set $PIPER_DEFAULT_MODEL")
+		return fmt.Errorf("model path required: specify --model or set $PIPER_PLUS_DEFAULT_MODEL")
 	}
 
 	// Try resolving model name/alias if file doesn't exist.

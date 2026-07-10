@@ -9,8 +9,7 @@ cross-runtime byte-for-byte compatibility on the same input.
 import time
 
 import pytest
-
-from piper.text_splitter import split_sentences
+from piper_plus.text_splitter import split_sentences
 
 
 class TestSplitSentencesBasics:

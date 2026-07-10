@@ -10,12 +10,12 @@ from pathlib import Path
 
 import numpy as np
 
-from piper_plus._model_resolver import (
+from piper_plus.api._model_resolver import (
     MODEL_ALIASES,
     resolve_model,
 )
-from piper_plus.audio import AudioResult
-from piper_plus.engine import (
+from piper_plus.api.audio import AudioResult
+from piper_plus.api.engine import (
     create_ort_session,
     load_config,
     synthesize as engine_synthesize,

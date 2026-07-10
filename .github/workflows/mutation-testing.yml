@@ -80,13 +80,13 @@ jobs:
         # を残す。初回は text_splitter から。
         run: |
           uvx mutmut run \
-            --paths-to-mutate src/python_run/piper/text_splitter.py \
+            --paths-to-mutate src/python_run/piper_plus/text_splitter.py \
             || echo "mutmut exit code $? (warn-only: baseline 未確定)"
 
       - name: Run mutmut (timing)
         run: |
           uvx mutmut run \
-            --paths-to-mutate src/python_run/piper/timing.py \
+            --paths-to-mutate src/python_run/piper_plus/timing.py \
             || echo "mutmut exit code $? (warn-only)"
 
       - name: Run mutmut (g2p ssml + multilingual + base)

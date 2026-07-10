@@ -23,7 +23,7 @@
 //     at piper.cpp:264/272 for SynthesisConfig; v1.12.0 で全 runtime 統一)
 //
 // The C++ runtime does NOT implement model-cache (.opt.onnx[.ok]) nor the
-// PIPER_DISABLE_WARMUP / PIPER_DISABLE_CACHE / PIPER_INTRA_THREADS env
+// PIPER_PLUS_DISABLE_WARMUP / PIPER_PLUS_DISABLE_CACHE / PIPER_PLUS_INTRA_THREADS env
 // vars; those rows are pinned to the fixture for forward-compat drift
 // detection only. See docs/spec/ort-session-contract.toml [env_vars.implementation_status].
 
@@ -77,7 +77,7 @@ constexpr float WARMUP_NOISE_W = 0.5f;
 // ---------------------------------------------------------------------------
 
 fs::path findFixturePath() {
-  if (const char* env = std::getenv("PIPER_ORT_SESSION_FIXTURE")) {
+  if (const char* env = std::getenv("PIPER_PLUS_ORT_SESSION_FIXTURE")) {
     return fs::path(env);
   }
 
@@ -103,7 +103,7 @@ json loadFixture() {
   EXPECT_TRUE(stream.is_open())
       << "Cannot open ORT session contract fixture: " << fixture_path
       << " (cwd=" << fs::current_path()
-      << "). Set PIPER_ORT_SESSION_FIXTURE if the default search path doesn't "
+      << "). Set PIPER_PLUS_ORT_SESSION_FIXTURE if the default search path doesn't "
          "apply.";
   std::stringstream buffer;
   buffer << stream.rdbuf();
@@ -263,25 +263,25 @@ TEST(OrtSessionContract, Cache_SentinelContent_FixtureValue) {
 // 5. Env vars — NOT implemented in C++.
 //
 // The C++ runtime gates warmup via `--no-warmup` (main.cpp:935) only; it
-// does not honour PIPER_DISABLE_WARMUP / PIPER_DISABLE_CACHE /
-// PIPER_INTRA_THREADS. These cases pin the contract values so any rename
+// does not honour PIPER_PLUS_DISABLE_WARMUP / PIPER_PLUS_DISABLE_CACHE /
+// PIPER_PLUS_INTRA_THREADS. These cases pin the contract values so any rename
 // trips the test before drift hits a multi-runtime release.
 // ---------------------------------------------------------------------------
 
 TEST(OrtSessionContract, EnvVars_DisableWarmup_FixtureValue) {
   const auto fixture = loadFixture();
   EXPECT_EQ(fixture["env_vars"]["disable_warmup"].get<std::string>(),
-            "PIPER_DISABLE_WARMUP");
+            "PIPER_PLUS_DISABLE_WARMUP");
 }
 
 TEST(OrtSessionContract, EnvVars_DisableCache_FixtureValue) {
   const auto fixture = loadFixture();
   EXPECT_EQ(fixture["env_vars"]["disable_cache"].get<std::string>(),
-            "PIPER_DISABLE_CACHE");
+            "PIPER_PLUS_DISABLE_CACHE");
 }
 
 TEST(OrtSessionContract, EnvVars_IntraThreads_FixtureValue) {
   const auto fixture = loadFixture();
   EXPECT_EQ(fixture["env_vars"]["intra_threads"].get<std::string>(),
-            "PIPER_INTRA_THREADS");
+            "PIPER_PLUS_INTRA_THREADS");
 }

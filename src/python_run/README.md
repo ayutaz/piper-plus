@@ -36,21 +36,21 @@ Python 3.11+ が必要です。
 
 ```bash
 # モデル一覧を表示
-piper --list-models
-piper --list-models ja
+piper-plus --list-models
+piper-plus --list-models ja
 
 # モデルをダウンロード
-piper --download-model tsukuyomi
+piper-plus --download-model tsukuyomi
 
 # 音声を生成
-piper --model tsukuyomi --text "こんにちは、今日は良い天気ですね。" --output_file output.wav
+piper-plus --model tsukuyomi --text "こんにちは、今日は良い天気ですね。" --output_file output.wav
 ```
 
 ### Python API
 
 ```python
 import wave
-from piper import PiperVoice
+from piper_plus import PiperVoice
 
 voice = PiperVoice.load("path/to/model.onnx", config_path="path/to/config.json")
 with wave.open("output.wav", "wb") as wav_file:
@@ -64,8 +64,8 @@ piper-plus は VITS Duration Predictor から音素レベルのタイミング�
 ### Python API
 
 ```python
-from piper import PiperVoice
-from piper.timing import (
+from piper_plus import PiperVoice
+from piper_plus.timing import (
     PhonemeTimingInfo,
     TimingResult,
     durations_to_timing,
@@ -113,7 +113,7 @@ if voice.has_duration_output:
 
 ### HTTP エンドポイント
 
-`piper.http_server` を起動すると `/api/phoneme-timing` エンドポイントが利用可能になります:
+`piper_plus.http_server` を起動すると `/api/phoneme-timing` エンドポイントが利用可能になります:
 
 ```bash
 # JSON で取得
@@ -147,8 +147,8 @@ curl "http://localhost:5000/api/phoneme-timing?text=Hello&language=en&format=jso
 
 | モデル | 言語 | 話者数 | ダウンロード |
 |--------|------|--------|-------------|
-| [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) | 6言語 (ja/en/zh/es/fr/pt) | 571 | `piper --download-model base` |
-| [tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) | 6言語 (ja/en/zh/es/fr/pt) | 1 | `piper --download-model tsukuyomi` |
+| [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) | 6言語 (ja/en/zh/es/fr/pt) | 571 | `piper-plus --download-model base` |
+| [tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) | 6言語 (ja/en/zh/es/fr/pt) | 1 | `piper-plus --download-model tsukuyomi` |
 
 ## 対応言語
 

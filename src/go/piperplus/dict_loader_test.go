@@ -35,7 +35,7 @@ func TestFindDictionaryFile_EnvVarFound(t *testing.T) {
 	}
 
 	// Use an empty modelDir so tier 1 is skipped.
-	t.Setenv("PIPER_DICTIONARIES_PATH", envDir)
+	t.Setenv("PIPER_PLUS_DICTIONARIES_PATH", envDir)
 
 	got := findDictionaryFile(filename, "")
 	if got != path {
@@ -45,7 +45,7 @@ func TestFindDictionaryFile_EnvVarFound(t *testing.T) {
 
 func TestFindDictionaryFile_NotFoundAnywhere(t *testing.T) {
 	// Clear env var so tier 3 is skipped too.
-	t.Setenv("PIPER_DICTIONARIES_PATH", "")
+	t.Setenv("PIPER_PLUS_DICTIONARIES_PATH", "")
 
 	got := findDictionaryFile("nonexistent.json", t.TempDir())
 	if got != "" {
@@ -58,7 +58,7 @@ func TestFindDictionaryFile_EmptyFilename(t *testing.T) {
 	// directory itself, which passes os.Stat. This is by design: the caller
 	// is responsible for providing a non-empty filename. Pin the current
 	// behavior explicitly so any future change is intentional.
-	t.Setenv("PIPER_DICTIONARIES_PATH", "")
+	t.Setenv("PIPER_PLUS_DICTIONARIES_PATH", "")
 
 	modelDir := t.TempDir()
 	got := findDictionaryFile("", modelDir)
@@ -79,7 +79,7 @@ func TestFindDictionaryFile_EmptyModelDir(t *testing.T) {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
-	t.Setenv("PIPER_DICTIONARIES_PATH", envDir)
+	t.Setenv("PIPER_PLUS_DICTIONARIES_PATH", envDir)
 
 	got := findDictionaryFile(filename, "")
 	if got != path {
@@ -102,7 +102,7 @@ func TestFindDictionaryFile_ModelDirPriority(t *testing.T) {
 		t.Fatalf("failed to create env file: %v", err)
 	}
 
-	t.Setenv("PIPER_DICTIONARIES_PATH", envDir)
+	t.Setenv("PIPER_PLUS_DICTIONARIES_PATH", envDir)
 
 	got := findDictionaryFile(filename, modelDir)
 	if got != modelPath {
@@ -510,7 +510,7 @@ func TestLoadPinyinDicts_MultiCharPhrase(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestLoadDictionaries_ENLanguage(t *testing.T) {
-	t.Setenv("PIPER_DICTIONARIES_PATH", "")
+	t.Setenv("PIPER_PLUS_DICTIONARIES_PATH", "")
 
 	dir := t.TempDir()
 	// Create a valid CMU dict in the model dir.
@@ -541,7 +541,7 @@ func TestLoadDictionaries_ENLanguage(t *testing.T) {
 }
 
 func TestLoadDictionaries_ZHLanguage(t *testing.T) {
-	t.Setenv("PIPER_DICTIONARIES_PATH", "")
+	t.Setenv("PIPER_PLUS_DICTIONARIES_PATH", "")
 
 	dir := t.TempDir()
 	// Create valid pinyin dicts in the model dir.
@@ -576,7 +576,7 @@ func TestLoadDictionaries_ZHLanguage(t *testing.T) {
 }
 
 func TestLoadDictionaries_NeitherENnorZH(t *testing.T) {
-	t.Setenv("PIPER_DICTIONARIES_PATH", "")
+	t.Setenv("PIPER_PLUS_DICTIONARIES_PATH", "")
 
 	dir := t.TempDir()
 	languages := map[string]int64{"es": 3, "fr": 4}
@@ -598,7 +598,7 @@ func TestLoadDictionaries_NeitherENnorZH(t *testing.T) {
 }
 
 func TestLoadDictionaries_BothENandZH(t *testing.T) {
-	t.Setenv("PIPER_DICTIONARIES_PATH", "")
+	t.Setenv("PIPER_PLUS_DICTIONARIES_PATH", "")
 
 	dir := t.TempDir()
 
@@ -637,7 +637,7 @@ func TestLoadDictionaries_BothENandZH(t *testing.T) {
 }
 
 func TestLoadDictionaries_DictFilesExist(t *testing.T) {
-	t.Setenv("PIPER_DICTIONARIES_PATH", "")
+	t.Setenv("PIPER_PLUS_DICTIONARIES_PATH", "")
 
 	dir := t.TempDir()
 
@@ -672,7 +672,7 @@ func TestLoadDictionaries_DictFilesExist(t *testing.T) {
 }
 
 func TestLoadDictionaries_DictFilesMissing(t *testing.T) {
-	t.Setenv("PIPER_DICTIONARIES_PATH", "")
+	t.Setenv("PIPER_PLUS_DICTIONARIES_PATH", "")
 
 	// Use an empty temp dir -- no dict files present.
 	dir := t.TempDir()
@@ -707,7 +707,7 @@ func TestLoadDictionaries_DictFilesMissing(t *testing.T) {
 }
 
 func TestLoadDictionaries_NilLogger(t *testing.T) {
-	t.Setenv("PIPER_DICTIONARIES_PATH", "")
+	t.Setenv("PIPER_PLUS_DICTIONARIES_PATH", "")
 
 	dir := t.TempDir()
 	languages := map[string]int64{"en": 1}
@@ -720,7 +720,7 @@ func TestLoadDictionaries_NilLogger(t *testing.T) {
 }
 
 func TestLoadDictionaries_EmptyLanguages(t *testing.T) {
-	t.Setenv("PIPER_DICTIONARIES_PATH", "")
+	t.Setenv("PIPER_PLUS_DICTIONARIES_PATH", "")
 
 	dir := t.TempDir()
 	languages := map[string]int64{}
@@ -742,7 +742,7 @@ func TestLoadDictionaries_EmptyLanguages(t *testing.T) {
 }
 
 func TestLoadDictionaries_NilLanguages(t *testing.T) {
-	t.Setenv("PIPER_DICTIONARIES_PATH", "")
+	t.Setenv("PIPER_PLUS_DICTIONARIES_PATH", "")
 
 	dir := t.TempDir()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))

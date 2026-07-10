@@ -263,7 +263,7 @@ TEST(ModelSpeakerDetectionTest, SpeakerEmbeddingOrderAfterProsody) {
 
 TEST(ModelSpeakerDetectionTest, SpeakerEmbeddingDefaultDim256) {
     // ECAPA-TDNN canonical fallback when the ONNX graph uses a dynamic
-    // axis for emb_dim. Mirrors src/python_run/piper/voice.py:200-208 and
+    // axis for emb_dim. Mirrors src/python_run/piper_plus/voice.py:200-208 and
     // docker/python-inference/inference.py.
     TestModelSession session;
     EXPECT_EQ(session.speakerEmbeddingDim, 256);

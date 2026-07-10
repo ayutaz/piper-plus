@@ -440,7 +440,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
   --speaker-encoder /data/piper/models/campplus.onnx
 
 # C++ / C# / Rust: pre-generated .npy embedding file
-./piper -m model.onnx -c config.json \
+./piper-plus -m model.onnx -c config.json \
   --text "こんにちは" \
   --speaker-embedding /path/to/speaker.npy \
   -f output.wav
@@ -890,7 +890,7 @@ If the export is successful, you can now use your voice with Piper:
 
 ```sh
 echo 'This is a test.' | \
-  piper -m /path/to/model.onnx --output_file test.wav
+  piper-plus -m /path/to/model.onnx --output_file test.wav
 ```
 
 ### CLI Options Reference

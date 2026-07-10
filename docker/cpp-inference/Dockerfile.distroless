@@ -22,9 +22,9 @@
 #   * Canonical uses /entrypoint.sh + bash for CLI args handling. Under
 #     distroless there is no /bin/sh and no /bin/bash, so we cannot
 #     execute the existing entrypoint.sh.
-#   * Trial substitutes ENTRYPOINT ["/usr/local/bin/piper"] directly,
+#   * Trial substitutes ENTRYPOINT ["/usr/local/bin/piper-plus"] directly,
 #     which is what entrypoint.sh ultimately exec'd. CLI flags from
-#     `docker run ... -- ...` flow through to piper unchanged.
+#     `docker run ... -- ...` flow through to piper-plus unchanged.
 #   * Anything entrypoint.sh did beyond exec'ing piper (which is
 #     nothing today) would need to be ported into the binary or done
 #     via docker-compose env vars before promotion.
@@ -46,7 +46,7 @@
 #     ubuntu builder require GLIBC_2.38+ symbols that aren't in the
 #     distroless final stage — the runtime fails with
 #     "libc.so.6: version `GLIBC_2.38' not found" the moment
-#     /usr/local/bin/piper is invoked.
+#     /usr/local/bin/piper-plus is invoked.
 #   * debian:12-slim shares the same glibc minor as the distroless
 #     final stage, so symbol versions in the linked binary stay
 #     resolvable. This is the same ABI-pinning logic that
@@ -137,24 +137,24 @@ WORKDIR /app
 #     this var, so ENV is sufficient.
 #
 # What canonical entrypoint.sh ALSO did that we DO NOT replicate here:
-#   * $MODEL_PATH -> $PIPER_MODEL_PATH var remap. This was historical
+#   * $MODEL_PATH -> $PIPER_PLUS_MODEL_PATH var remap. This was historical
 #     compatibility for users who set MODEL_PATH; the canonical
-#     `piper` binary itself takes `--model <path>` (no env var lookup).
+#     `piper-plus` binary itself takes `--model <path>` (no env var lookup).
 #     Existing users who relied on MODEL_PATH must switch to passing
 #     `--model "$MODEL_PATH"` in their docker-compose / run command,
-#     or set PIPER_MODEL_PATH directly. The breakage is documented in
+#     or set PIPER_PLUS_MODEL_PATH directly. The breakage is documented in
 #     the promotion PR's Test Plan as a known migration step.
-#   * The `if [ "${1#-}" != "$1" ]` heuristic that prepended `piper`
+#   * The `if [ "${1#-}" != "$1" ]` heuristic that prepended `piper-plus`
 #     when the first arg started with `-`. Distroless ENTRYPOINT IS
-#     /usr/local/bin/piper now, so `docker run <image> --version`
-#     already routes to `piper --version`. The shell heuristic was a
+#     /usr/local/bin/piper-plus now, so `docker run <image> --version`
+#     already routes to `piper-plus --version`. The shell heuristic was a
 #     workaround for the canonical image's `CMD ["/bin/bash"]`
 #     default; we replace that here with `CMD ["--version"]` so the
 #     argument-prepend logic is unnecessary.
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
 # distroless has no shell. CMD form is exec-form, ENTRYPOINT is the
-# piper binary directly — any flags after `docker run <image>` flow
-# to piper.
-ENTRYPOINT ["/usr/local/bin/piper"]
+# piper-plus binary directly — any flags after `docker run <image>` flow
+# to piper-plus.
+ENTRYPOINT ["/usr/local/bin/piper-plus"]
 CMD ["--version"]

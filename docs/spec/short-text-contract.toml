@@ -26,7 +26,7 @@
 #
 # Implementations:
 #   Python (piper_train): src/python/piper_train/infer_onnx.py          (A, B)
-#   Python (runtime):     src/python_run/piper/voice.py                 (A, B, C)
+#   Python (runtime):     src/python_run/piper_plus/voice.py                 (A, B, C)
 #   Rust:                 src/rust/piper-core/src/engine.rs             (A, B)
 #                         src/rust/piper-core/src/short_text.rs         (C)
 #   Go:                   src/go/piperplus/short_text.go                (A, B, C)

@@ -15,7 +15,7 @@ def test_japanese_phonemize_real():
     )
     del pyopenjtalk  # only needed for the skip check
 
-    from piper.phonemize.japanese import phonemize_japanese
+    from piper_plus.phonemize.japanese import phonemize_japanese
 
     result = phonemize_japanese("こんにちは")
     assert len(result) > 5, f"Expected > 5 tokens, got {len(result)}: {result}"
@@ -26,7 +26,7 @@ def test_english_phonemize_real():
     """Call phonemize_english with real g2p_en and verify output."""
     pytest.importorskip("g2p_en", reason="g2p_en not installed")
 
-    from piper.phonemize.english import phonemize_english
+    from piper_plus.phonemize.english import phonemize_english
 
     result = phonemize_english("Hello")
     assert len(result) > 3, f"Expected > 3 tokens, got {len(result)}: {result}"
@@ -38,7 +38,7 @@ def test_chinese_phonemize_real():
     """Call phonemize_chinese with real pypinyin and verify output."""
     pytest.importorskip("pypinyin", reason="pypinyin not installed")
 
-    from piper.phonemize.chinese import phonemize_chinese
+    from piper_plus.phonemize.chinese import phonemize_chinese
 
     result = phonemize_chinese("你好")
     assert len(result) > 3, f"Expected > 3 tokens, got {len(result)}: {result}"
@@ -48,7 +48,7 @@ def test_chinese_phonemize_real():
 
 def test_spanish_phonemize_real():
     """Call phonemize_spanish (rule-based) and verify output."""
-    from piper.phonemize.spanish import phonemize_spanish
+    from piper_plus.phonemize.spanish import phonemize_spanish
 
     result = phonemize_spanish("Hola")
     assert len(result) > 3, f"Expected > 3 tokens, got {len(result)}: {result}"
@@ -58,7 +58,7 @@ def test_spanish_phonemize_real():
 
 def test_french_phonemize_real():
     """Call phonemize_french (rule-based) and verify output."""
-    from piper.phonemize.french import phonemize_french
+    from piper_plus.phonemize.french import phonemize_french
 
     result = phonemize_french("Bonjour")
     assert len(result) > 3, f"Expected > 3 tokens, got {len(result)}: {result}"
@@ -68,7 +68,7 @@ def test_french_phonemize_real():
 
 def test_portuguese_phonemize_real():
     """Call phonemize_portuguese (rule-based) and verify output."""
-    from piper.phonemize.portuguese import phonemize_portuguese
+    from piper_plus.phonemize.portuguese import phonemize_portuguese
 
     result = phonemize_portuguese("Ola")
     assert len(result) > 3, f"Expected > 3 tokens, got {len(result)}: {result}"
@@ -84,7 +84,7 @@ def test_japanese_long_text_splitting():
     )
     del pyopenjtalk
 
-    from piper.phonemize.japanese import phonemize_japanese
+    from piper_plus.phonemize.japanese import phonemize_japanese
 
     # ~3000 chars — exceeds OpenJTalk's ~2700 char buffer limit
     long_text = "これはテストです。" * 350
@@ -95,7 +95,7 @@ def test_japanese_long_text_splitting():
 
 def test_japanese_question_markers():
     """Verify question type markers in jp_id_map match phonemizer output."""
-    from piper.phonemize.jp_id_map import SPECIAL_TOKENS
+    from piper_plus.phonemize.jp_id_map import SPECIAL_TOKENS
 
     # Confirm the markers exist in the ID map
     for marker in ("?!", "?.", "?~"):
@@ -104,7 +104,7 @@ def test_japanese_question_markers():
 
 def test_japanese_n_variants_in_id_map():
     """Verify N phoneme variants in jp_id_map."""
-    from piper.phonemize.jp_id_map import JAPANESE_PHONEMES
+    from piper_plus.phonemize.jp_id_map import JAPANESE_PHONEMES
 
     for variant in ("N_m", "N_n", "N_ng", "N_uvular"):
         assert variant in JAPANESE_PHONEMES, f"Missing N variant: {variant}"
@@ -119,7 +119,7 @@ def test_multilingual_phonemizer_all_languages():
     pytest.importorskip("g2p_en", reason="g2p_en not installed")
     pytest.importorskip("pypinyin", reason="pypinyin not installed")
 
-    from piper.phonemize.multilingual import MultilingualPhonemizer
+    from piper_plus.phonemize.multilingual import MultilingualPhonemizer
 
     mp = MultilingualPhonemizer(languages=["ja", "en", "zh", "es", "fr", "pt"])
 
@@ -145,7 +145,7 @@ def test_multilingual_code_switching():
     )
     pytest.importorskip("g2p_en", reason="g2p_en not installed")
 
-    from piper.phonemize.multilingual import MultilingualPhonemizer
+    from piper_plus.phonemize.multilingual import MultilingualPhonemizer
 
     mp = MultilingualPhonemizer(languages=["ja", "en"])
 
@@ -178,7 +178,7 @@ def test_training_runtime_consistency():
         reason="piper_train not installed (dev-only)",
     )
 
-    from piper.phonemize.multilingual import (
+    from piper_plus.phonemize.multilingual import (
         MultilingualPhonemizer as RuntimeMP,
     )
 

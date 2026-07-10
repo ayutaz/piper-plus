@@ -126,7 +126,7 @@ export WANDB_MODE=disabled                    # WANDB 不要なら disabled
 export NCCL_DEBUG=WARN
 export NCCL_P2P_DISABLE=1
 export NCCL_IB_DISABLE=1
-export PIPER_FORCE_CPU_ORT=1                  # SCL CAM++ を CPU 強制 (GPU 共有競合回避)
+export PIPER_PLUS_FORCE_CPU_ORT=1                  # SCL CAM++ を CPU 強制 (GPU 共有競合回避)
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # ORT が PyTorch 同梱 cuDNN を見つけられない問題回避 (任意)
@@ -414,7 +414,7 @@ export NCCL_DEBUG=WARN
 export NCCL_P2P_DISABLE=1
 export NCCL_IB_DISABLE=1
 export PYTHONPATH=/data/piper-plus-zero-shot/src/python
-export PIPER_FORCE_CPU_ORT=1
+export PIPER_PLUS_FORCE_CPU_ORT=1
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 cd /data/piper-plus-zero-shot
@@ -472,7 +472,7 @@ echo "PID: $!"
 export WANDB_MODE=disabled
 export NCCL_DEBUG=WARN
 export PYTHONPATH=/data/piper-plus-zero-shot/src/python
-export PIPER_FORCE_CPU_ORT=1
+export PIPER_PLUS_FORCE_CPU_ORT=1
 
 cd /data/piper-plus-zero-shot
 nohup /data/piper/.venv/bin/python -u -m piper_train \
@@ -674,7 +674,7 @@ else:
 | 学習速度が遅い (A100/RTX/T4) | 逆に `--precision bf16-mixed` 必須 |
 | ONNX 変換エラー | `CUDA_VISIBLE_DEVICES=""` で CPU モード |
 | HiFi-GAN ckpt resume 失敗 | v1.12.0 で `Generator` 削除。MB-iSTFT base から再 FT が必要 |
-| SCL CAM++ ONNX が GPU で動かない | `PIPER_FORCE_CPU_ORT=1` で CPU 強制。最新ブランチ (commit `a3614cf`) は GPU 化対応 |
+| SCL CAM++ ONNX が GPU で動かない | `PIPER_PLUS_FORCE_CPU_ORT=1` で CPU 強制。最新ブランチ (commit `a3614cf`) は GPU 化対応 |
 | Per-utterance embedding 抽出が遅い | shard 並列 (commit `f9c18f6`) を使う。4 shard × T4 で 4x 高速 |
 
 ---

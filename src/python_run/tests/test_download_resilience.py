@@ -1,4 +1,4 @@
-"""Network resilience tests for piper.download.
+"""Network resilience tests for piper_plus.download.
 
 Covers error paths that the existing test_cli_models.py suite does not exercise:
     - urlopen timeout
@@ -8,7 +8,7 @@ Covers error paths that the existing test_cli_models.py suite does not exercise:
 
 All network I/O is mocked. No real HuggingFace requests are issued.
 Style follows test_cli_models.py: classes, tempfile.TemporaryDirectory, and
-``with patch("piper.download.urlopen", ...)`` to intercept the urllib call site.
+``with patch("piper_plus.download.urlopen", ...)`` to intercept the urllib call site.
 """
 
 import io
@@ -25,7 +25,7 @@ import pytest
 # Add the parent directory to the path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from piper.download import (  # noqa: E402
+from piper_plus.download import (  # noqa: E402
     ensure_voice_exists,
     get_voices,
 )
@@ -71,7 +71,7 @@ class TestDownloadTimeout:
         # and accept both types on the assertion side for cross-version safety.
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch(
-                "piper.download.urlopen",
+                "piper_plus.download.urlopen",
                 side_effect=TimeoutError("connection timed out"),
             ):
                 with pytest.raises((socket.timeout, TimeoutError)):
@@ -84,7 +84,7 @@ class TestDownloadTimeout:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch(
-                "piper.download.urlopen",
+                "piper_plus.download.urlopen",
                 side_effect=URLError("Temporary failure in name resolution"),
             ):
                 with pytest.raises(URLError):
@@ -107,7 +107,7 @@ class TestDownloadHTTPErrors:
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("piper.download.urlopen", side_effect=http_500):
+            with patch("piper_plus.download.urlopen", side_effect=http_500):
                 with pytest.raises(HTTPError) as exc_info:
                     ensure_voice_exists("test-voice", [tmpdir], tmpdir, voices)
                 assert exc_info.value.code == 500
@@ -125,7 +125,7 @@ class TestDownloadHTTPErrors:
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("piper.download.urlopen", side_effect=http_404):
+            with patch("piper_plus.download.urlopen", side_effect=http_404):
                 with pytest.raises(HTTPError) as exc_info:
                     ensure_voice_exists("test-voice", [tmpdir], tmpdir, voices)
                 assert exc_info.value.code == 404
@@ -149,7 +149,7 @@ class TestPartialDownload:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             with patch(
-                "piper.download.urlopen",
+                "piper_plus.download.urlopen",
                 return_value=_FakeResponse(truncated),
             ):
                 ensure_voice_exists("test-voice", [tmpdir], tmpdir, voices)
@@ -160,7 +160,7 @@ class TestPartialDownload:
 
             # Second call should observe wrong size and try to re-download.
             recheck_mock = MagicMock(side_effect=URLError("simulated re-download"))
-            with patch("piper.download.urlopen", recheck_mock):
+            with patch("piper_plus.download.urlopen", recheck_mock):
                 with pytest.raises(URLError):
                     ensure_voice_exists("test-voice", [tmpdir], tmpdir, voices)
             assert recheck_mock.called, "wrong-size file should trigger re-download"
@@ -214,7 +214,7 @@ class TestDiskFull:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch(
-                "piper.download.urlopen",
+                "piper_plus.download.urlopen",
                 return_value=_FakeResponse(payload),
             ):
                 with pytest.raises(OSError) as exc_info:
@@ -228,7 +228,7 @@ class TestGetVoicesNetworkFailure:
     def test_update_voices_propagates_urlerror(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch(
-                "piper.download.urlopen",
+                "piper_plus.download.urlopen",
                 side_effect=URLError("network down"),
             ):
                 with pytest.raises(URLError):
@@ -240,7 +240,7 @@ class TestGetVoicesNetworkFailure:
             url_mock = MagicMock(
                 side_effect=AssertionError("urlopen should not be called"),
             )
-            with patch("piper.download.urlopen", url_mock):
+            with patch("piper_plus.download.urlopen", url_mock):
                 voices = get_voices(tmpdir, update_voices=False)
             assert "ja_JP-tsukuyomi-chan-medium" in voices
             assert not url_mock.called
@@ -259,7 +259,7 @@ class TestRedownloadOnSizeMismatch:
             (tmp_path / "model.onnx").write_bytes(b"short")
 
             url_mock = MagicMock(return_value=_FakeResponse(b"y" * 1024))
-            with patch("piper.download.urlopen", url_mock):
+            with patch("piper_plus.download.urlopen", url_mock):
                 ensure_voice_exists("test-voice", [tmpdir], tmpdir, voices)
 
             # Exactly one urlopen call for the missing/wrong file.

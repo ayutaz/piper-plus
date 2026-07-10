@@ -98,8 +98,12 @@ COPY --from=builder /usr/local /usr/local
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data
 ENV NLTK_DATA=/usr/share/nltk_data
 
-# Copy piper_plus and piper_wyoming source (not included in piper_train package)
-COPY src/python/piper_plus/ /app/piper_plus/
+# Copy piper_plus and piper_wyoming source (not included in piper_train package).
+# The high-level PiperPlus API now lives at piper_plus.api (physically merged into
+# the runtime package under src/python_run/piper_plus/api/), so copy the whole
+# runtime package. `import piper_plus` only pulls numpy + onnxruntime at import time
+# (heavy G2P deps are lazy-loaded), so the smoke test below stays green.
+COPY src/python_run/piper_plus/ /app/piper_plus/
 COPY src/python/piper_wyoming/ /app/piper_wyoming/
 
 # Add /app to PYTHONPATH so piper_plus and piper_wyoming are importable

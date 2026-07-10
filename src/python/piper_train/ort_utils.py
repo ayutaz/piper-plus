@@ -53,7 +53,7 @@ def create_session_options(
     Args:
         intra_op_threads: Override for intra-op thread count.  When *None*
             (the default), computed as ``min(logical_cores // 2, 4)``.
-            The environment variable ``PIPER_INTRA_THREADS`` takes
+            The environment variable ``PIPER_PLUS_INTRA_THREADS`` takes
             precedence over both this argument and the auto-detection.
         inter_op_threads: Inter-op thread count (default 1).  VITS has
             a linear graph with no parallel sub-graphs, so 1 is optimal.
@@ -67,14 +67,14 @@ def create_session_options(
     opts.execution_mode = onnxruntime.ExecutionMode.ORT_SEQUENTIAL
 
     # Thread settings (matching C#/Rust engines)
-    # Priority: PIPER_INTRA_THREADS env > intra_op_threads arg > auto-detect
-    env_threads = os.environ.get("PIPER_INTRA_THREADS")
+    # Priority: PIPER_PLUS_INTRA_THREADS env > intra_op_threads arg > auto-detect
+    env_threads = os.environ.get("PIPER_PLUS_INTRA_THREADS")
     if env_threads is not None:
         try:
             opts.intra_op_num_threads = max(1, min(int(env_threads), MAX_INTRA_THREADS))
         except ValueError:
             _LOGGER.warning(
-                "Ignoring invalid PIPER_INTRA_THREADS=%r; using auto-detected thread count",
+                "Ignoring invalid PIPER_PLUS_INTRA_THREADS=%r; using auto-detected thread count",
                 env_threads,
             )
             env_threads = None  # fall through to auto-detect
@@ -160,7 +160,7 @@ def create_session_with_cache(
     with ``ORT_DISABLE_ALL``.  A sentinel file (``.ok``) guards against
     incomplete caches from interrupted processes.
 
-    Set ``PIPER_DISABLE_CACHE=1`` to bypass caching entirely.
+    Set ``PIPER_PLUS_DISABLE_CACHE=1`` to bypass caching entirely.
     """
     opts = create_session_options(
         intra_op_threads=intra_op_threads,
@@ -169,8 +169,8 @@ def create_session_with_cache(
     providers = get_providers(device)
 
     # Cache disabled via env var
-    if os.environ.get("PIPER_DISABLE_CACHE", "").lower() in ("1", "true", "yes"):
-        _LOGGER.info("Model cache disabled via PIPER_DISABLE_CACHE")
+    if os.environ.get("PIPER_PLUS_DISABLE_CACHE", "").lower() in ("1", "true", "yes"):
+        _LOGGER.info("Model cache disabled via PIPER_PLUS_DISABLE_CACHE")
         return onnxruntime.InferenceSession(
             str(model_path), sess_options=opts, providers=providers
         )
@@ -267,9 +267,9 @@ def warmup_onnx_session(
     point.  Running a small dummy input before real traffic eliminates
     that cold-start penalty.
 
-    Set the environment variable ``PIPER_DISABLE_WARMUP=1`` to skip.
+    Set the environment variable ``PIPER_PLUS_DISABLE_WARMUP=1`` to skip.
     """
-    if os.environ.get("PIPER_DISABLE_WARMUP", "").lower() in ("1", "true", "yes"):
+    if os.environ.get("PIPER_PLUS_DISABLE_WARMUP", "").lower() in ("1", "true", "yes"):
         return
     if runs <= 0:
         return

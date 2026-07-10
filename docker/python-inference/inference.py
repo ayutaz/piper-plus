@@ -9,7 +9,7 @@ Server mode exposes:
     ``GET /v1/models``, ``GET /v1/audio/speech/languages`` so existing OpenAI
     clients can drop in unchanged
 - ``POST /api/phoneme-timing`` — phoneme timing JSON output (parity with
-    ``piper.http_server``; available when the ONNX model exposes a
+    ``piper_plus.http_server``; available when the ONNX model exposes a
     ``durations`` output tensor)
 - ``GET /health`` for orchestrator health checks
 
@@ -55,10 +55,10 @@ def _sanitize_for_log(value: str) -> str:
 
 
 # Sentence terminators / closers mirror
-# ``src/python_run/piper/text_splitter.py`` and the spec at
+# ``src/python_run/piper_plus/text_splitter.py`` and the spec at
 # ``docs/spec/text-splitter-contract.toml``. Kept inline here because the
 # docker image installs ``piper_train`` + ``piper_plus_g2p`` only — not the
-# ``piper`` runtime package — so we can't import ``piper.text_splitter``.
+# ``piper_plus`` runtime package — so we can't import ``piper_plus.text_splitter``.
 _SENTENCE_TERMINATORS: frozenset[str] = frozenset(
     {".", "!", "?", "。", "！", "？", "．"}
 )
@@ -70,7 +70,7 @@ _CLOSING_PUNCTUATION: frozenset[str] = frozenset(
 def _split_sentences(text: str) -> list[str]:
     """Sentence-level split for streaming synthesis.
 
-    Mirrors ``piper.text_splitter.split_sentences``. SSML (``<speak>...``) is
+    Mirrors ``piper_plus.text_splitter.split_sentences``. SSML (``<speak>...``) is
     treated as a single unit — the SSML parser is invoked downstream by the
     phonemizer and must not be torn across chunk boundaries.
     """
@@ -105,7 +105,7 @@ def _split_sentences(text: str) -> list[str]:
     return sentences
 
 
-# Streaming WAV constants (mirrors piper.http_server).
+# Streaming WAV constants (mirrors piper_plus.http_server).
 _WAV_CHANNELS = 1
 _WAV_BIT_DEPTH = 16
 
@@ -119,7 +119,7 @@ def _build_streaming_wav_header(
 
     Browsers, ``ffmpeg``, and ``soundfile`` accept ``0xFFFFFFFF`` as the
     conventional "unknown length" sentinel for chunked WAV streams.
-    Mirrors ``piper.http_server._build_streaming_wav_header``.
+    Mirrors ``piper_plus.http_server._build_streaming_wav_header``.
     """
     byte_rate = sample_rate * channels * bit_depth // 8
     block_align = channels * bit_depth // 8
@@ -318,7 +318,7 @@ class PiperInferenceEngine:
             # the model falls back to emb_g(sid) — see
             # `src/python/piper_train/vits/models.py` (`use_se = mask >= 1`)
             # and the matching runtime path in
-            # `src/python_run/piper/voice.py`.
+            # `src/python_run/piper_plus/voice.py`.
             emb_dim = self.speaker_emb_dim or 256
             inputs["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
             inputs["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
@@ -381,7 +381,7 @@ class PiperInferenceEngine:
         cross-runtime ``TimingResult`` shape: ``{phonemes, total_duration_ms,
         sample_rate}`` with millisecond timestamps computed from
         ``hop_length / sample_rate * 1000``. Byte-for-byte compatible with
-        the Rust/Go/C++/C#/Python piper.timing implementations
+        the Rust/Go/C++/C#/Python piper_plus.timing implementations
         (see ``docs/spec/phoneme-timing-contract.toml``).
         """
         if not self.has_durations:
@@ -526,7 +526,7 @@ def main():
     parser.add_argument(
         "--webui",
         action="store_true",
-        help="Run Gradio WebUI (also enabled by PIPER_WEBUI=1 env var)",
+        help="Run Gradio WebUI (also enabled by PIPER_PLUS_WEBUI=1 env var)",
     )
     parser.add_argument(
         "--model-dir",
@@ -544,7 +544,7 @@ def main():
     args = parser.parse_args()
 
     # Check for WebUI mode (flag or env var)
-    webui_mode = args.webui or os.environ.get("PIPER_WEBUI", "").strip() in (
+    webui_mode = args.webui or os.environ.get("PIPER_PLUS_WEBUI", "").strip() in (
         "1",
         "true",
     )
@@ -592,7 +592,7 @@ def main():
 
 
 def _parse_api_keys(raw: str | None) -> set[str]:
-    """Parse PIPER_API_KEYS env var (comma-separated).
+    """Parse PIPER_PLUS_API_KEYS env var (comma-separated).
 
     Empty / unset → empty set (auth disabled). Whitespace and empty entries
     are stripped so trailing commas don't accidentally allow blank tokens.
@@ -614,15 +614,15 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
     """Create the FastAPI application with all endpoints.
 
     Auth (optional bearer token):
-        Set ``PIPER_API_KEYS`` to a comma-separated list of accepted tokens.
+        Set ``PIPER_PLUS_API_KEYS`` to a comma-separated list of accepted tokens.
         If unset/empty, auth is disabled and all requests pass (backward
         compatible). ``/health`` is always exempt for load-balancer probes.
 
     Rate limiting (slowapi, per-IP):
-        ``PIPER_RATE_LIMIT_ENABLED`` (default ``true``) — master switch.
-        ``PIPER_RATE_LIMIT_SPEECH`` (default ``30/minute``) — heavy synth
+        ``PIPER_PLUS_RATE_LIMIT_ENABLED`` (default ``true``) — master switch.
+        ``PIPER_PLUS_RATE_LIMIT_SPEECH`` (default ``30/minute``) — heavy synth
         endpoints.
-        ``PIPER_RATE_LIMIT_LIGHT`` (default ``600/minute``) — metadata
+        ``PIPER_PLUS_RATE_LIMIT_LIGHT`` (default ``600/minute``) — metadata
         endpoints (``/v1/models``, ``/v1/audio/speech/languages``).
         ``/health`` is never rate-limited.
 
@@ -667,7 +667,7 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
         stream: bool = False
 
     class PhonemeTimingRequest(BaseModel):
-        """Phoneme-timing request schema (parity with ``piper.http_server``).
+        """Phoneme-timing request schema (parity with ``piper_plus.http_server``).
 
         ``voice`` is accepted for OpenAI-style symmetry but currently ignored:
         the server is bound to a single model at startup, so cross-voice
@@ -683,17 +683,17 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
         noise_w: float = 0.8
 
     # --- Auth / rate-limit configuration (resolved at app-build time) ---
-    api_keys: set[str] = _parse_api_keys(os.environ.get("PIPER_API_KEYS"))
+    api_keys: set[str] = _parse_api_keys(os.environ.get("PIPER_PLUS_API_KEYS"))
     auth_enabled: bool = bool(api_keys)
-    rate_limit_enabled: bool = _env_flag("PIPER_RATE_LIMIT_ENABLED", default=True)
-    speech_limit: str = os.environ.get("PIPER_RATE_LIMIT_SPEECH", "30/minute")
-    light_limit: str = os.environ.get("PIPER_RATE_LIMIT_LIGHT", "600/minute")
+    rate_limit_enabled: bool = _env_flag("PIPER_PLUS_RATE_LIMIT_ENABLED", default=True)
+    speech_limit: str = os.environ.get("PIPER_PLUS_RATE_LIMIT_SPEECH", "30/minute")
+    light_limit: str = os.environ.get("PIPER_PLUS_RATE_LIMIT_LIGHT", "600/minute")
 
     if auth_enabled:
         _LOGGER.info("Bearer auth enabled (%d key(s) configured)", len(api_keys))
     else:
         _LOGGER.info(
-            "Bearer auth disabled (PIPER_API_KEYS unset). Set the env var to "
+            "Bearer auth disabled (PIPER_PLUS_API_KEYS unset). Set the env var to "
             "enable per-key authentication."
         )
 
@@ -708,12 +708,12 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
             light_limit,
         )
     else:
-        _LOGGER.info("Rate limit disabled (PIPER_RATE_LIMIT_ENABLED=false)")
+        _LOGGER.info("Rate limit disabled (PIPER_PLUS_RATE_LIMIT_ENABLED=false)")
 
     def verify_api_key(
         authorization: str | None = Header(default=None),
     ) -> None:
-        """FastAPI dependency: enforce Bearer auth when PIPER_API_KEYS is set.
+        """FastAPI dependency: enforce Bearer auth when PIPER_PLUS_API_KEYS is set.
 
         - No keys configured: no-op (backward compatible).
         - Keys configured: require ``Authorization: Bearer <key>``;
@@ -811,7 +811,7 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
             buf.seek(0)
             headers = {}
             if _is_short_text(text):
-                headers["X-Piper-Warning"] = "short-text-input"
+                headers["X-Piper-Plus-Warning"] = "short-text-input"
                 _LOGGER.warning(
                     "Short text input detected (%d chars excl. spaces): %r",
                     len(text.replace(" ", "").replace("\u3000", "").strip()),
@@ -838,7 +838,7 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
 
         headers: dict[str, str] = {}
         if _is_short_text(req.input):
-            headers["X-Piper-Warning"] = "short-text-input"
+            headers["X-Piper-Plus-Warning"] = "short-text-input"
             _LOGGER.warning(
                 "Short text input detected (%d chars excl. spaces): %r",
                 len(req.input.replace(" ", "").replace("\u3000", "").strip()),
@@ -915,8 +915,8 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
 
     # --- Phoneme timing endpoint ---
     #
-    # Parity with the ``piper.http_server`` endpoint of the same name (see
-    # ``src/python_run/piper/http_server.py``). Returns the
+    # Parity with the ``piper_plus.http_server`` endpoint of the same name (see
+    # ``src/python_run/piper_plus/http_server.py``). Returns the
     # cross-runtime-canonical TimingResult shape (matches Rust / Go / C++ /
     # C# byte-for-byte: ``(hop_length / sample_rate) * 1000`` ms per frame).
     # Falls back to 400 when the model has no ``durations`` output — older

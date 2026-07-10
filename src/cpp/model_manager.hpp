@@ -30,10 +30,10 @@ struct VoiceInfo {
 };
 
 // Get the default model directory (platform-specific)
-// Windows: %APPDATA%\piper\models
-// Linux: ~/.local/share/piper/models (or $XDG_DATA_HOME/piper/models)
-// macOS: ~/Library/Application Support/piper/models
-// Override: PIPER_MODEL_DIR environment variable
+// Windows: %APPDATA%\piper-plus\models
+// Linux: ~/.local/share/piper-plus/models (or $XDG_DATA_HOME/piper-plus/models)
+// macOS: ~/Library/Application Support/piper-plus/models
+// Override: PIPER_PLUS_MODEL_DIR environment variable
 std::filesystem::path getDefaultModelDir();
 
 // Load and merge voice catalogs

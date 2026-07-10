@@ -1,4 +1,4 @@
-"""Tests for piper_plus.engine -- standalone ONNX inference engine.
+"""Tests for piper_plus.api.engine -- standalone ONNX inference engine.
 
 Verifies session creation, audio conversion, config loading, warmup,
 and the synthesize() entry point using mock ORT sessions.
@@ -16,9 +16,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import onnxruntime
 import pytest
-
-from piper_plus.engine import (
-    MAX_INTRA_THREADS,
+from piper_plus.api.engine import (
     WARMUP_PHONEME_LENGTH,
     _get_logical_core_count,
     _get_providers,
@@ -240,7 +238,7 @@ class TestGetProviders:
         assert providers == ["CPUExecutionProvider"]
 
     @patch(
-        "piper_plus.engine.ort.get_available_providers",
+        "piper_plus.api.engine.ort.get_available_providers",
         return_value=["CUDAExecutionProvider", "CPUExecutionProvider"],
     )
     def test_gpu_with_cuda_available(self, _mock):
@@ -249,7 +247,7 @@ class TestGetProviders:
         assert "CPUExecutionProvider" in providers
 
     @patch(
-        "piper_plus.engine.ort.get_available_providers",
+        "piper_plus.api.engine.ort.get_available_providers",
         return_value=["CPUExecutionProvider"],
     )
     def test_gpu_without_cuda_falls_back_to_cpu(self, _mock):
@@ -271,7 +269,7 @@ class TestGetProviders:
 class TestCreateOrtSession:
     """create_ort_session configures ORT options per the contract spec."""
 
-    @patch("piper_plus.engine.ort.InferenceSession")
+    @patch("piper_plus.api.engine.ort.InferenceSession")
     def test_sets_graph_optimization_to_enable_all(self, mock_cls, tmp_path):
         model = tmp_path / "model.onnx"
         model.write_bytes(b"dummy")
@@ -280,9 +278,12 @@ class TestCreateOrtSession:
 
         call_args = mock_cls.call_args
         opts = call_args[0][1]
-        assert opts.graph_optimization_level == onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+        assert (
+            opts.graph_optimization_level
+            == onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+        )
 
-    @patch("piper_plus.engine.ort.InferenceSession")
+    @patch("piper_plus.api.engine.ort.InferenceSession")
     def test_sets_sequential_execution_mode(self, mock_cls, tmp_path):
         model = tmp_path / "model.onnx"
         model.write_bytes(b"dummy")
@@ -292,7 +293,7 @@ class TestCreateOrtSession:
         opts = mock_cls.call_args[0][1]
         assert opts.execution_mode == onnxruntime.ExecutionMode.ORT_SEQUENTIAL
 
-    @patch("piper_plus.engine.ort.InferenceSession")
+    @patch("piper_plus.api.engine.ort.InferenceSession")
     def test_inter_op_threads_is_one(self, mock_cls, tmp_path):
         model = tmp_path / "model.onnx"
         model.write_bytes(b"dummy")
@@ -302,7 +303,7 @@ class TestCreateOrtSession:
         opts = mock_cls.call_args[0][1]
         assert opts.inter_op_num_threads == 1
 
-    @patch("piper_plus.engine.ort.InferenceSession")
+    @patch("piper_plus.api.engine.ort.InferenceSession")
     def test_explicit_intra_threads_override(self, mock_cls, tmp_path):
         model = tmp_path / "model.onnx"
         model.write_bytes(b"dummy")
@@ -312,8 +313,8 @@ class TestCreateOrtSession:
         opts = mock_cls.call_args[0][1]
         assert opts.intra_op_num_threads == 3
 
-    @patch.dict("os.environ", {"PIPER_INTRA_THREADS": "2"})
-    @patch("piper_plus.engine.ort.InferenceSession")
+    @patch.dict("os.environ", {"PIPER_PLUS_INTRA_THREADS": "2"})
+    @patch("piper_plus.api.engine.ort.InferenceSession")
     def test_env_piper_intra_threads_overrides_arg(self, mock_cls, tmp_path):
         model = tmp_path / "model.onnx"
         model.write_bytes(b"dummy")
@@ -323,8 +324,8 @@ class TestCreateOrtSession:
         opts = mock_cls.call_args[0][1]
         assert opts.intra_op_num_threads == 2
 
-    @patch.dict("os.environ", {"PIPER_INTRA_THREADS": "invalid"})
-    @patch("piper_plus.engine.ort.InferenceSession")
+    @patch.dict("os.environ", {"PIPER_PLUS_INTRA_THREADS": "invalid"})
+    @patch("piper_plus.api.engine.ort.InferenceSession")
     def test_env_invalid_piper_intra_threads_falls_through(self, mock_cls, tmp_path):
         model = tmp_path / "model.onnx"
         model.write_bytes(b"dummy")
@@ -334,7 +335,7 @@ class TestCreateOrtSession:
         opts = mock_cls.call_args[0][1]
         assert opts.intra_op_num_threads >= 1
 
-    @patch("piper_plus.engine.ort.InferenceSession")
+    @patch("piper_plus.api.engine.ort.InferenceSession")
     def test_memory_arena_and_pattern_enabled(self, mock_cls, tmp_path):
         model = tmp_path / "model.onnx"
         model.write_bytes(b"dummy")
@@ -376,7 +377,7 @@ class TestWarmupSession:
 
         session.run.assert_not_called()
 
-    @patch.dict("os.environ", {"PIPER_DISABLE_WARMUP": "1"})
+    @patch.dict("os.environ", {"PIPER_PLUS_DISABLE_WARMUP": "1"})
     def test_warmup_skipped_when_env_disable(self):
         session = _make_mock_session()
 
@@ -384,7 +385,7 @@ class TestWarmupSession:
 
         session.run.assert_not_called()
 
-    @patch.dict("os.environ", {"PIPER_DISABLE_WARMUP": "true"})
+    @patch.dict("os.environ", {"PIPER_PLUS_DISABLE_WARMUP": "true"})
     def test_warmup_skipped_with_env_true(self):
         session = _make_mock_session()
 
@@ -409,9 +410,9 @@ class TestWarmupSession:
         feed = session.run.call_args[0][1]
         ids = feed["input"]
         assert ids.shape == (1, WARMUP_PHONEME_LENGTH)
-        assert ids[0, 0] == 1   # BOS
+        assert ids[0, 0] == 1  # BOS
         assert ids[0, -1] == 2  # EOS
-        assert ids[0, 1] == 8   # filler
+        assert ids[0, 1] == 8  # filler
 
     def test_warmup_includes_sid_when_session_has_sid_input(self):
         session = _make_mock_session(has_sid=True)
@@ -525,8 +526,11 @@ class TestSynthesize:
         session = _make_mock_session()
 
         synthesize(
-            session, [1, 8, 2],
-            noise_scale=0.5, length_scale=1.2, noise_w=0.3,
+            session,
+            [1, 8, 2],
+            noise_scale=0.5,
+            length_scale=1.2,
+            noise_w=0.3,
         )
 
         feed = session.run.call_args[0][1]
@@ -563,7 +567,8 @@ class TestSynthesize:
         session = _make_mock_session(has_prosody=True)
 
         synthesize(
-            session, [1, 8, 2],
+            session,
+            [1, 8, 2],
             prosody_features=[None, {"a1": 1, "a2": 2, "a3": 3}, None],
         )
 

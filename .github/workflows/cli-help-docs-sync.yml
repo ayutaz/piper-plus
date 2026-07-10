@@ -1,7 +1,7 @@
 name: "CLI Help / Docs Drift Gate"
 
 # Verifies that every flag listed in the user-facing CLI reference doc
-# (docs/guides/development/cli-usage.md) is still advertised by `python -m piper --help`.
+# (docs/guides/development/cli-usage.md) is still advertised by `python -m piper_plus --help`.
 # Without this gate, v1.12.0-style breaking changes (e.g. removal of
 # `--mb-istft` when HiFi-GAN was deleted) can leave stale flag-table rows
 # in the markdown: users then copy a command that the CLI no longer accepts
@@ -19,14 +19,14 @@ on:
   push:
     branches: [dev, main]
     paths:
-      - 'src/python_run/piper/**/*.py'
+      - 'src/python_run/piper_plus/**/*.py'
       - 'docs/guides/development/cli-usage.md'
       - 'docs/**/*.md'
       - 'scripts/check_cli_help_drift.py'
       - '.github/workflows/cli-help-docs-sync.yml'
   pull_request:
     paths:
-      - 'src/python_run/piper/**/*.py'
+      - 'src/python_run/piper_plus/**/*.py'
       - 'docs/guides/development/cli-usage.md'
       - 'docs/**/*.md'
       - 'scripts/check_cli_help_drift.py'
@@ -43,7 +43,7 @@ permissions:
 
 jobs:
   python-cli-help-drift:
-    name: python -m piper --help vs docs/guides/development/cli-usage.md
+    name: python -m piper_plus --help vs docs/guides/development/cli-usage.md
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -60,7 +60,7 @@ jobs:
 
       - name: Install piper-plus (python_run) for --help capture
         # Minimal editable install of the runtime package: argparse parsing
-        # in `python -m piper --help` only needs the package to be importable,
+        # in `python -m piper_plus --help` only needs the package to be importable,
         # which transitively pulls in onnxruntime / pyopenjtalk-plus. The
         # `[all]` extra is intentionally avoided to keep the job under 2
         # minutes; the drift check never invokes inference.
@@ -68,14 +68,14 @@ jobs:
           uv pip install --system -e "src/python/g2p"
           uv pip install --system -e "src/python_run"
 
-      - name: Capture `python -m piper --help`
+      - name: Capture `python -m piper_plus --help`
         id: capture
         # Redirect both streams: argparse writes usage to stdout, but uv may
         # emit deprecation warnings on stderr. The drift script filters
         # non-option text via its option-line regex, so capturing both is
         # safe and yields a single source-of-truth artifact.
         run: |
-          python -m piper --help > piper_help.txt 2>&1 || true
+          python -m piper_plus --help > piper_help.txt 2>&1 || true
           echo '--- captured help ---'
           cat piper_help.txt
 
@@ -137,7 +137,7 @@ jobs:
           script: |
             const fs = require('fs');
             let body = '## CLI Help / Docs Drift detected\n\n';
-            body += 'The user-facing CLI doc references flags that `python -m piper --help` ';
+            body += 'The user-facing CLI doc references flags that `python -m piper_plus --help` ';
             body += 'no longer exposes. This usually means a flag was removed or renamed ';
             body += '(see v1.12.0 `--mb-istft` removal as a precedent) but the markdown ';
             body += 'flag-table row was not updated.\n\n';

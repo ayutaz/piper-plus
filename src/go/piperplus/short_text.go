@@ -98,7 +98,7 @@ func padPhonemeIDs(ids []int64) ([]int64, bool, int, int) {
 }
 
 // trimPaddingByDurations performs the Strategy A precise post-trim using the
-// model's duration output. Mirrors src/python_run/piper/voice.py
+// model's duration output. Mirrors src/python_run/piper_plus/voice.py
 // _trim_padding_by_durations so all runtimes produce byte-equal output for
 // the same inputs (issue #356, cross-runtime contract).
 //
@@ -181,7 +181,7 @@ func trimPaddingByDurations(audio []int16, durations []float32, frontPad, backPa
 // other inference path so long-text outputs do not retain the audible
 // doubled tail.
 //
-// Mirrors src/python_run/piper/voice.py _trim_eos_region so all runtimes
+// Mirrors src/python_run/piper_plus/voice.py _trim_eos_region so all runtimes
 // produce byte-equal output for the same (audio, durations[-1], hopSize,
 // eosMaxFrames) tuple. The sample-count conversion uses int(...) truncation
 // to match the Python reference — cross-runtime contract (Issue #499).

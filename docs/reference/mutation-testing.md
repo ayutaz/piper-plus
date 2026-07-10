@@ -33,7 +33,7 @@
 | Tool | [`mutmut`](https://github.com/boxed/mutmut) >= 2.4 (stable、 pytest 互換) |
 | 候補比較 | `cosmic-ray` は機能豊富だが設定が重い。 `mutmut` は CLI が簡潔で `paths_to_mutate` に絞れる |
 | 設定ファイル | `.mutmut.toml` (repo root) |
-| Target | `src/python/g2p/piper_plus_g2p/multilingual.py`, `ssml.py`, `base.py` / `src/python_run/piper/text_splitter.py`, `timing.py` |
+| Target | `src/python/g2p/piper_plus_g2p/multilingual.py`, `ssml.py`, `base.py` / `src/python_run/piper_plus/text_splitter.py`, `timing.py` |
 | Test runner | `uv run pytest src/python/g2p/tests src/python_run/tests -x -q --no-cov` |
 | Cache | `.mutmut-cache` (`.gitignore` 済) |
 
@@ -47,7 +47,7 @@ pip install 'mutmut>=2.4,<3'   # or: uvx mutmut --version
 uvx mutmut run
 
 # 特定 file のみ
-uvx mutmut run --paths-to-mutate src/python_run/piper/text_splitter.py
+uvx mutmut run --paths-to-mutate src/python_run/piper_plus/text_splitter.py
 
 # 結果確認
 uvx mutmut results        # survived/killed の summary

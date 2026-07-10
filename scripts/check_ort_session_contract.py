@@ -92,9 +92,9 @@ def main() -> int:
     # Substring checks: env_vars and dynamic_block_base do not appear as
     # top-level constants but as inline literals. Verify they exist.
     substring_checks: list[tuple[str, str]] = [
-        ("PIPER_DISABLE_WARMUP env var", contract["env_vars"]["disable_warmup"]),
-        ("PIPER_DISABLE_CACHE env var", contract["env_vars"]["disable_cache"]),
-        ("PIPER_INTRA_THREADS env var", contract["env_vars"]["intra_threads"]),
+        ("PIPER_PLUS_DISABLE_WARMUP env var", contract["env_vars"]["disable_warmup"]),
+        ("PIPER_PLUS_DISABLE_CACHE env var", contract["env_vars"]["disable_cache"]),
+        ("PIPER_PLUS_INTRA_THREADS env var", contract["env_vars"]["intra_threads"]),
         ("dynamic_block_base config key", "session.dynamic_block_base"),
         ("dynamic_block_base value", f'"{contract["session"]["dynamic_block_base"]}"'),
     ]

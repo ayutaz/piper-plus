@@ -89,6 +89,6 @@ jobs:
             ':!:**/SwedishPhonemizerTests.cs' ':!:**/ChinesePhonemizerTests.cs' \
             ':!:**/FrenchPhonemizerTests.cs' ':!:**/SpanishPhonemizerTests.cs' \
             ':!:**/PortuguesePhonemizerTests.cs' \
-            ':!:src/python_run/piper/sample_texts.py' \
-            ':!:src/python_run/piper/webui.py' \
+            ':!:src/python_run/piper_plus/sample_texts.py' \
+            ':!:src/python_run/piper_plus/webui.py' \
             | xargs --no-run-if-empty codespell

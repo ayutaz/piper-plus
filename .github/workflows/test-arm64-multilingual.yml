@@ -92,7 +92,7 @@ jobs:
             bash -c "
               echo '=== Testing German TTS on ARM64 ==='
               export LD_LIBRARY_PATH=/build/install/lib:$LD_LIBRARY_PATH
-              echo 'Guten Tag, wie geht es Ihnen?' | timeout 30 /build/install/bin/piper \
+              echo 'Guten Tag, wie geht es Ihnen?' | timeout 30 /build/install/bin/piper-plus \
                 --model /test/models/de_DE-thorsten-high.onnx \
                 --output_file /test/german_arm64.wav || {
                 echo '⚠️ German TTS timed out or failed (QEMU limitation)'
@@ -117,7 +117,7 @@ jobs:
             bash -c "
               echo '=== Testing French TTS on ARM64 ==='
               export LD_LIBRARY_PATH=/build/install/lib:$LD_LIBRARY_PATH
-              echo 'Bonjour, comment allez-vous?' | timeout 30 /build/install/bin/piper \
+              echo 'Bonjour, comment allez-vous?' | timeout 30 /build/install/bin/piper-plus \
                 --model /test/models/fr_FR-siwis-medium.onnx \
                 --output_file /test/french_arm64.wav || {
                 echo '⚠️ French TTS timed out or failed (QEMU limitation)'
@@ -142,7 +142,7 @@ jobs:
               echo '=== Testing espeak-ng availability ==='
 
               # Check if espeak-ng library is linked
-              ldd /build/install/bin/piper | grep -q espeak && \
+              ldd /build/install/bin/piper-plus | grep -q espeak && \
                 echo '✅ espeak-ng library linked' || \
                 echo '❌ espeak-ng library not found'
 

@@ -177,7 +177,7 @@ func WithConfig(path string) LoadOption {
 
 // WithDictDir sets an explicit directory to search for dictionary files
 // (cmudict_data.json, pinyin_single.json, pinyin_phrases.json).
-// This takes priority over the model directory and PIPER_DICTIONARIES_PATH.
+// This takes priority over the model directory and PIPER_PLUS_DICTIONARIES_PATH.
 func WithDictDir(dir string) LoadOption {
 	return func(o *LoadOptions) { o.DictDir = dir }
 }

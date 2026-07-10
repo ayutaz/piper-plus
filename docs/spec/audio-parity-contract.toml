@@ -40,7 +40,7 @@ sample_rate = 22050            # piper-plus uses 22.05 kHz mono throughout
 # `id` keys must match the matrix entries in runtime-parity-deep.yml.
 # Phase 2 (PR #511): all 6 inference-capable runtimes expose a JSONL
 # phoneme_ids stdin contract and are gated for cross-parity.
-#   - python:  src/python_run/piper/__main__.py --json-input
+#   - python:  src/python_run/piper_plus/__main__.py --json-input
 #   - rust:    src/rust/piper-cli (stdin JSONL auto-detect)
 #   - go:      src/go/cmd/piper-plus --json-input
 #   - csharp:  src/csharp/PiperPlus.Cli --json-input
@@ -48,12 +48,12 @@ sample_rate = 22050            # piper-plus uses 22.05 kHz mono throughout
 #   - wasm:    src/wasm/openjtalk-web/bin/piper-cli.js --json-input
 #              (Node bin via onnxruntime-node; browser `src/index.js` is
 #              still fetch/IndexedDB-only and is not the parity surface)
-python  = { id = "python",  cli = "uv run python -m piper", supports_dump_wav = true }
+python  = { id = "python",  cli = "uv run python -m piper_plus", supports_dump_wav = true }
 rust    = { id = "rust",    cli = "piper-plus",             supports_dump_wav = true }
 csharp  = { id = "csharp",  cli = "piper-plus-cli",         supports_dump_wav = true }
 go      = { id = "go",      cli = "piper-plus",             supports_dump_wav = true }
 wasm    = { id = "wasm",    cli = "node bin/piper-cli.js",  supports_dump_wav = true }
-cpp     = { id = "cpp",     cli = "piper",                  supports_dump_wav = true }
+cpp     = { id = "cpp",     cli = "piper-plus",             supports_dump_wav = true }
 # iOS Swift / Android Kotlin G2P bindings are excluded; they do not load
 # the ONNX decoder so cross-runtime WAV parity does not apply.
 

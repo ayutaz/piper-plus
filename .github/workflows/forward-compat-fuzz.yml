@@ -13,7 +13,7 @@ on:
     branches: [dev]
     paths:
       - 'src/python/g2p/**'
-      - 'src/python_run/piper/phonemize/**'
+      - 'src/python_run/piper_plus/phonemize/**'
       - 'scripts/fuzz_forward_compat.py'
       - '.github/workflows/forward-compat-fuzz.yml'
   push:

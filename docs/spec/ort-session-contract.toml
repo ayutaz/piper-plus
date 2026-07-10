@@ -60,9 +60,9 @@ device_label_cuda_format = "cuda{device_id}"  # "cuda0", "cuda1" (no dots)
 [env_vars]
 # Environment variables for runtime control
 # Priority: CLI flag > env var > auto-detect
-disable_warmup = "PIPER_DISABLE_WARMUP"   # "1", "true", "yes" to disable
-disable_cache = "PIPER_DISABLE_CACHE"     # "1", "true", "yes" to disable
-intra_threads = "PIPER_INTRA_THREADS"     # integer, overrides auto-detect
+disable_warmup = "PIPER_PLUS_DISABLE_WARMUP"   # "1", "true", "yes" to disable
+disable_cache = "PIPER_PLUS_DISABLE_CACHE"     # "1", "true", "yes" to disable
+intra_threads = "PIPER_PLUS_INTRA_THREADS"     # integer, overrides auto-detect
 
 [env_vars.implementation_status]
 # Which implementations support each control mechanism

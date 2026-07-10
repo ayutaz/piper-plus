@@ -9,6 +9,11 @@
 if(NOT ANDROID AND NOT PIPER_APPLE_EMBEDDED)
   add_executable(piper src/cpp/main.cpp)
   add_executable(test_piper src/cpp/test.cpp)
+  # Ship the CLI binary as `piper-plus` (not `piper`) so it never collides
+  # with upstream rhasspy/piper's `piper` binary on PATH. The CMake target
+  # name stays `piper` (all install(TARGETS piper ...) references unchanged);
+  # only the emitted file name changes via OUTPUT_NAME.
+  set_target_properties(piper PROPERTIES OUTPUT_NAME "piper-plus")
   # Link the piper_common STATIC library (was OBJECT before issue #377 fix).
   target_link_libraries(piper PRIVATE piper_common)
   target_link_libraries(test_piper PRIVATE piper_common)

@@ -35,7 +35,7 @@ forward_compat_policy = "strict"
 [[runtimes]]
 key = "python_runtime"
 label = "Python runtime CLI"
-path = "src/python_run/piper/__main__.py"
+path = "src/python_run/piper_plus/__main__.py"
 
 [[runtimes]]
 key = "python_train"

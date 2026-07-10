@@ -54,8 +54,8 @@ force_utf8_output()
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 LANG_TO_SOURCES: dict[str, list[str]] = {
-    "python": ["src/python_run/piper/", "src/python/piper_train/"],
-    "py": ["src/python_run/piper/", "src/python/piper_train/"],
+    "python": ["src/python_run/piper_plus/", "src/python/piper_train/"],
+    "py": ["src/python_run/piper_plus/", "src/python/piper_train/"],
     "javascript": ["src/wasm/openjtalk-web/src/", "src/wasm/g2p/src/"],
     "js": ["src/wasm/openjtalk-web/src/", "src/wasm/g2p/src/"],
     "typescript": ["src/wasm/openjtalk-web/src/", "src/wasm/g2p/src/"],

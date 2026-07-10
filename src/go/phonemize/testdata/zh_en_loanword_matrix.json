@@ -3,7 +3,7 @@
   "description": "Cross-runtime test matrix for ZH-EN code-switching (Issue #384). All runtimes must produce identical token-count behavior. The exact IPA token sequences are produced by the Python reference and verified per-runtime in each ticket's mirror tests.",
   "metadata": {
     "source": "Python piper_plus_g2p (PR #397)",
-    "py_runtime": "src/python_run/piper/phonemize/chinese.py:phonemize_embedded_english",
+    "py_runtime": "src/python_run/piper_plus/phonemize/chinese.py:phonemize_embedded_english",
     "version": 1
   },
   "cases": [

@@ -66,16 +66,16 @@ class TestSessionConstants:
 
     def test_session_options_intra_threads_capped_to_max(self, contract: dict) -> None:
         # Asking for 100 must be capped to MAX_INTRA_THREADS via env var.
-        env_save = os.environ.get("PIPER_INTRA_THREADS")
-        os.environ["PIPER_INTRA_THREADS"] = "100"
+        env_save = os.environ.get("PIPER_PLUS_INTRA_THREADS")
+        os.environ["PIPER_PLUS_INTRA_THREADS"] = "100"
         try:
             opts = create_session_options()
             assert opts.intra_op_num_threads == contract["session"]["max_intra_threads"]
         finally:
             if env_save is None:
-                del os.environ["PIPER_INTRA_THREADS"]
+                del os.environ["PIPER_PLUS_INTRA_THREADS"]
             else:
-                os.environ["PIPER_INTRA_THREADS"] = env_save
+                os.environ["PIPER_PLUS_INTRA_THREADS"] = env_save
 
     def test_session_options_memory_arena_and_pattern_enabled(self, contract: dict) -> None:
         opts = create_session_options(intra_op_threads=2)
@@ -108,13 +108,13 @@ class TestCacheConventions:
 @pytest.mark.unit
 class TestEnvVars:
     def test_disable_warmup_name(self, contract: dict) -> None:
-        assert contract["env_vars"]["disable_warmup"] == "PIPER_DISABLE_WARMUP"
+        assert contract["env_vars"]["disable_warmup"] == "PIPER_PLUS_DISABLE_WARMUP"
 
     def test_disable_cache_name(self, contract: dict) -> None:
-        assert contract["env_vars"]["disable_cache"] == "PIPER_DISABLE_CACHE"
+        assert contract["env_vars"]["disable_cache"] == "PIPER_PLUS_DISABLE_CACHE"
 
     def test_intra_threads_name(self, contract: dict) -> None:
-        assert contract["env_vars"]["intra_threads"] == "PIPER_INTRA_THREADS"
+        assert contract["env_vars"]["intra_threads"] == "PIPER_PLUS_INTRA_THREADS"
 
 
 @pytest.mark.unit

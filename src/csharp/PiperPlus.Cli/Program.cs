@@ -340,7 +340,7 @@ internal static class Program
 
                     DirectoryInfo? dlModelDir = parseResult.GetValue(modelDirOption);
                     string targetDir = dlModelDir?.FullName
-                        ?? Environment.GetEnvironmentVariable("PIPER_MODEL_DIR")
+                        ?? Environment.GetEnvironmentVariable("PIPER_PLUS_MODEL_DIR")
                         ?? ModelManager.GetDefaultModelDir();
 
                     LogInfo(quiet, $"Downloading model '{resolvedName}' to {targetDir}...");
@@ -385,27 +385,27 @@ internal static class Program
                 bool noWarmup = parseResult.GetValue(noWarmupOption);
                 bool testMode = parseResult.GetValue(testModeOption);
 
-                // --model-dir: resolve from CLI > PIPER_MODEL_DIR env
+                // --model-dir: resolve from CLI > PIPER_PLUS_MODEL_DIR env
                 DirectoryInfo? modelDirInfo = parseResult.GetValue(modelDirOption);
                 if (modelDirInfo is null)
                 {
-                    var envModelDir = Environment.GetEnvironmentVariable("PIPER_MODEL_DIR");
+                    var envModelDir = Environment.GetEnvironmentVariable("PIPER_PLUS_MODEL_DIR");
                     if (!string.IsNullOrEmpty(envModelDir))
                     {
                         modelDirInfo = new DirectoryInfo(envModelDir);
-                        LogDebug(debug, quiet, $"PIPER_MODEL_DIR: {envModelDir}");
+                        LogDebug(debug, quiet, $"PIPER_PLUS_MODEL_DIR: {envModelDir}");
                     }
                 }
 
-                // --gpu-device-id: resolve from CLI > PIPER_GPU_DEVICE_ID env
+                // --gpu-device-id: resolve from CLI > PIPER_PLUS_GPU_DEVICE_ID env
                 // (SessionFactory also handles this, but we resolve here for logging)
                 if (gpuDeviceId == 0)
                 {
-                    var envGpu = Environment.GetEnvironmentVariable("PIPER_GPU_DEVICE_ID");
+                    var envGpu = Environment.GetEnvironmentVariable("PIPER_PLUS_GPU_DEVICE_ID");
                     if (!string.IsNullOrEmpty(envGpu) && int.TryParse(envGpu, out int envGpuId))
                     {
                         gpuDeviceId = envGpuId;
-                        LogDebug(debug, quiet, $"PIPER_GPU_DEVICE_ID: {envGpuId}");
+                        LogDebug(debug, quiet, $"PIPER_PLUS_GPU_DEVICE_ID: {envGpuId}");
                     }
                 }
 
@@ -443,7 +443,7 @@ internal static class Program
 
                 if (string.IsNullOrEmpty(modelPath))
                 {
-                    var envModel = Environment.GetEnvironmentVariable("PIPER_DEFAULT_MODEL");
+                    var envModel = Environment.GetEnvironmentVariable("PIPER_PLUS_DEFAULT_MODEL");
                     if (!string.IsNullOrEmpty(envModel))
                     {
                         modelPath = envModel;
@@ -453,7 +453,7 @@ internal static class Program
                 // --test-mode does not require a real model when --text is used
                 if (string.IsNullOrEmpty(modelPath) && !testMode)
                 {
-                    LogError("--model is required (or set PIPER_DEFAULT_MODEL).");
+                    LogError("--model is required (or set PIPER_PLUS_DEFAULT_MODEL).");
                     Environment.ExitCode = 1;
                     return Environment.ExitCode;
                 }
@@ -816,7 +816,7 @@ internal static class Program
                 // ============================================================
                 if (string.IsNullOrEmpty(modelPath))
                 {
-                    LogError("--model is required (or set PIPER_DEFAULT_MODEL).");
+                    LogError("--model is required (or set PIPER_PLUS_DEFAULT_MODEL).");
                     Environment.ExitCode = 1;
                     return Environment.ExitCode;
                 }
@@ -1122,7 +1122,7 @@ internal static class Program
                             // (Phase 1, issue #383) and then run ORT inference sequentially.
                             // This keeps audio order stable and shaves the ~19~26% G2P
                             // cost on cold-cache multi-sentence inputs. Set
-                            // PIPER_G2P_PARALLELISM=1 to fall back to the prior
+                            // PIPER_PLUS_G2P_PARALLELISM=1 to fall back to the prior
                             // strictly-serial path.
                             (string OriginalText, bool IsShort, long[] PhonemeIds, long[]? Prosody)[] encoded = SentenceParallelEncoder.EncodeAll(
                                 sentences,

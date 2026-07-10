@@ -22,7 +22,7 @@ on:
     - cron: '0 5 * * 1'  # Monday 05:00 UTC, 1h after T-002 action-sha-drift.
   pull_request:
     paths:
-      - 'src/python_run/piper/**/*.py'
+      - 'src/python_run/piper_plus/**/*.py'
       - 'src/rust/piper-cli/**'
       - 'src/csharp/PiperPlus.Cli/**'
       - 'src/go/cmd/piper-plus/**'
@@ -75,7 +75,7 @@ jobs:
         if: matrix.runtime == 'python'
         run: |
           mkdir -p /tmp/cli-help
-          python -m piper --help > /tmp/cli-help/python-raw.txt 2>&1
+          python -m piper_plus --help > /tmp/cli-help/python-raw.txt 2>&1
         shell: bash
 
       - name: Setup Rust
@@ -175,7 +175,7 @@ jobs:
             exit 0
           fi
           case "$rt" in
-            python) src='python -m piper --help' ;;
+            python) src='python -m piper_plus --help' ;;
             rust)   src='piper-plus-cli --help' ;;
             csharp) src='dotnet PiperPlus.Cli/bin/Release/net10.0/PiperPlus.Cli.dll --help' ;;
             go)     src='piper-plus --help' ;;

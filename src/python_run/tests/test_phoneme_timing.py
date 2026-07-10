@@ -1,12 +1,11 @@
-"""Comprehensive tests for piper.timing module."""
+"""Comprehensive tests for piper_plus.timing module."""
 
 from __future__ import annotations
 
 import json
 
 import pytest
-
-from piper.timing import (
+from piper_plus.timing import (
     DEFAULT_HOP_LENGTH,
     TimingResult,
     build_phoneme_id_reverse_map,
@@ -15,6 +14,7 @@ from piper.timing import (
     timing_to_json_compact,
     timing_to_tsv,
 )
+
 
 # Pre-computed frame time for the standard 22050 Hz / 256 hop configuration.
 FRAME_TIME_22050 = (256 / 22050) * 1000.0  # ~11.60998 ms
@@ -252,7 +252,7 @@ def test_build_reverse_map_basic():
 
 def test_build_reverse_map_pua():
     """PUA characters are resolved via pua_to_multi_char mapping."""
-    pua_char = "\uE019"
+    pua_char = "\ue019"
     phoneme_id_map = {pua_char: [50], "a": [10]}
     pua_map = {pua_char: "N_m"}
 
@@ -264,7 +264,7 @@ def test_build_reverse_map_pua():
 
 def test_build_reverse_map_pua_without_mapping():
     """PUA characters without an explicit mapping render as U+XXXX."""
-    pua_char = "\uE020"
+    pua_char = "\ue020"
     phoneme_id_map = {pua_char: [60]}
 
     rmap = build_phoneme_id_reverse_map(phoneme_id_map)
@@ -311,9 +311,10 @@ def test_single_phoneme():
 
 # --- SRT format tests ---
 
+
 def test_srt_basic_format():
     """SRT output contains sequential numbering and --> separator."""
-    from piper.timing import timing_to_srt
+    from piper_plus.timing import timing_to_srt
 
     result = durations_to_timing([5.0, 10.0, 15.0], ["a", "b", "c"], 22050)
     srt = timing_to_srt(result)
@@ -326,7 +327,7 @@ def test_srt_basic_format():
 
 def test_srt_timestamp_format():
     """SRT timestamps use HH:MM:SS,mmm format."""
-    from piper.timing import timing_to_srt
+    from piper_plus.timing import timing_to_srt
 
     result = durations_to_timing([10.0], ["a"], 22050)
     srt = timing_to_srt(result)
@@ -338,7 +339,7 @@ def test_srt_timestamp_format():
 
 def test_srt_blank_lines_between_entries():
     """SRT entries are separated by blank lines."""
-    from piper.timing import timing_to_srt
+    from piper_plus.timing import timing_to_srt
 
     result = durations_to_timing([5.0, 10.0], ["a", "b"], 22050)
     srt = timing_to_srt(result)
@@ -348,7 +349,7 @@ def test_srt_blank_lines_between_entries():
 
 def test_srt_empty_input():
     """Empty input produces empty SRT string."""
-    from piper.timing import timing_to_srt
+    from piper_plus.timing import timing_to_srt
 
     result = durations_to_timing([], [], 22050)
     srt = timing_to_srt(result)
@@ -356,6 +357,7 @@ def test_srt_empty_input():
 
 
 # --- Edge case tests ---
+
 
 def test_very_large_duration():
     """1_000_000 frames should produce duration > 40 seconds."""
@@ -446,7 +448,7 @@ def test_build_reverse_map_empty_phoneme_id_map():
 
 def test_build_reverse_map_none_pua_mapping():
     """Passing None for pua_to_multi_char is equivalent to omitting it."""
-    phoneme_id_map = {"a": [1], "\uE000": [2]}
+    phoneme_id_map = {"a": [1], "\ue000": [2]}
     rmap_none = build_phoneme_id_reverse_map(phoneme_id_map, None)
     rmap_default = build_phoneme_id_reverse_map(phoneme_id_map)
     assert rmap_none == rmap_default

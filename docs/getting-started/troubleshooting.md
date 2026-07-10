@@ -53,7 +53,7 @@ Model config doesn't exist
 2. `--config` オプションで明示的に指定:
 
    ```bash
-   piper --model models/model.onnx --config /path/to/config.json --output_file out.wav
+   piper-plus --model models/model.onnx --config /path/to/config.json --output_file out.wav
    ```
 
 3. 同一ディレクトリに複数モデルがあり `config.json` では区別できない場合、モデルごとにリネーム:
@@ -89,7 +89,7 @@ Model config doesn't exist
 
    ```bash
    # Enable auto-download
-   export PIPER_AUTO_DOWNLOAD_DICT=1
+   export PIPER_PLUS_AUTO_DOWNLOAD_DICT=1
 
    # Or specify manually
    export OPENJTALK_DICTIONARY_PATH=/path/to/dictionary
@@ -115,8 +115,8 @@ Auto-download is disabled. Please download and install the dictionary manually.
 1. **Enable auto-download**:
 
    ```bash
-   unset PIPER_AUTO_DOWNLOAD_DICT  # Remove if set to 0
-   unset PIPER_OFFLINE_MODE        # Remove if set to 1
+   unset PIPER_PLUS_AUTO_DOWNLOAD_DICT  # Remove if set to 0
+   unset PIPER_PLUS_OFFLINE_MODE        # Remove if set to 1
    ```
 
 2. **Manual download**:
@@ -126,8 +126,8 @@ Auto-download is disabled. Please download and install the dictionary manually.
    wget https://github.com/r9y9/open_jtalk/releases/download/v1.11.1/open_jtalk_dic_utf_8-1.11.tar.gz
 
    # Extract to data directory
-   # Windows: %APPDATA%\piper\
-   # Linux/macOS: ~/.local/share/piper/
+   # Windows: %APPDATA%\piper-plus\
+   # Linux/macOS: ~/.local/share/piper-plus/
    tar -xzf open_jtalk_dic_utf_8-1.11.tar.gz
    ```
 
@@ -184,7 +184,7 @@ REM Set console to UTF-8
 chcp 65001
 
 REM Use PowerShell instead
-powershell -Command "echo 'こんにちは' | .\piper.exe --model model.onnx --output_file out.wav"
+powershell -Command "echo 'こんにちは' | .\piper-plus.exe --model model.onnx --output_file out.wav"
 ```
 
 #### Windows で日本語テキストが文字化けする（No phoneme エラー）
@@ -199,7 +199,7 @@ powershell -Command "echo 'こんにちは' | .\piper.exe --model model.onnx --o
 
    ```cmd
    chcp 65001
-   echo こんにちは | piper.exe --model model.onnx --config config.json --output_file out.wav
+   echo こんにちは | piper-plus.exe --model model.onnx --config config.json --output_file out.wav
    ```
 
 2. **ファイル経由で入力** (最も確実):
@@ -209,18 +209,18 @@ powershell -Command "echo 'こんにちは' | .\piper.exe --model model.onnx --o
    powershell -Command "$utf8 = New-Object System.Text.UTF8Encoding($false); [System.IO.File]::WriteAllText('input.txt', 'こんにちは', $utf8)"
 
    chcp 65001
-   type input.txt | piper.exe --model model.onnx --config config.json --output_file out.wav
+   type input.txt | piper-plus.exe --model model.onnx --config config.json --output_file out.wav
    ```
 
-3. **v1.5.5以降**: piper.exe 内部で `SetConsoleCP(CP_UTF8)` が呼び出されますが、一部の環境ではパイプ入力に効かない場合があります。その場合は方法2を使用してください。
+3. **v1.5.5以降**: piper-plus.exe 内部で `SetConsoleCP(CP_UTF8)` が呼び出されますが、一部の環境ではパイプ入力に効かない場合があります。その場合は方法2を使用してください。
 
 #### "The filename, directory name, or volume label syntax is incorrect"
 
 **Solutions**:
 
 1. Use short paths without spaces
-2. Quote all paths: `"C:\Program Files\piper\bin\piper.exe"`
-3. Use forward slashes: `C:/piper/bin/piper.exe`
+2. Quote all paths: `"C:\Program Files\piper-plus\bin\piper-plus.exe"`
+3. Use forward slashes: `C:/piper-plus/bin/piper-plus.exe`
 
 #### PowerShell Execution Policy
 
@@ -250,7 +250,7 @@ xattr -cr /path/to/piper/
 
 ```bash
 # Make executable
-chmod +x piper/bin/piper
+chmod +x piper-plus/bin/piper-plus
 
 # Check SELinux (if applicable)
 sudo setenforce 0  # Temporary disable to test
@@ -308,7 +308,7 @@ cmake .. -DONNXRUNTIME_DIR=/path/to/onnxruntime
 
 1. Process text in smaller chunks
 2. Use streaming mode for long texts
-3. Monitor with: `piper --debug`
+3. Monitor with: `piper-plus --debug`
 
 ### Slow Synthesis
 
@@ -323,7 +323,7 @@ cmake .. -DONNXRUNTIME_DIR=/path/to/onnxruntime
 Enable debug output for more information:
 
 ```bash
-piper --debug --model model.onnx < input.txt
+piper-plus --debug --model model.onnx < input.txt
 ```
 
 ## Getting Help
@@ -331,7 +331,7 @@ piper --debug --model model.onnx < input.txt
 If issues persist:
 
 1. **Check logs**: Look for error messages and warnings
-2. **Version info**: Include `piper --version` output
+2. **Version info**: Include `piper-plus --version` output
 3. **System info**: Include OS, architecture, installation method
 4. **Reproduction steps**: Provide minimal example
 5. **Report issue**: <https://github.com/ayutaz/piper-plus/issues>

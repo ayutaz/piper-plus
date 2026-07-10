@@ -29,7 +29,7 @@ func BenchmarkResolve_Auto(b *testing.B) {
 	}
 }
 
-// BenchmarkResolve_ForceSerial covers the PIPER_G2P_PARALLELISM=1 path
+// BenchmarkResolve_ForceSerial covers the PIPER_PLUS_G2P_PARALLELISM=1 path
 // callers hit when they opt out of parallelism.
 func BenchmarkResolve_ForceSerial(b *testing.B) {
 	b.Setenv(EnvVarName, "1")
@@ -56,7 +56,7 @@ func benchSentences(n int) []string {
 }
 
 // BenchmarkMap_Serial / BenchmarkMap_Parallel quantify the speedup the
-// streaming code gets when len(sentences) >= 2 and PIPER_G2P_PARALLELISM is
+// streaming code gets when len(sentences) >= 2 and PIPER_PLUS_G2P_PARALLELISM is
 // not forced to 1. With a 5 ms fakeG2P, parallelism=4 should hit roughly a
 // 3.5–4× wall-clock improvement on a multi-core host.
 

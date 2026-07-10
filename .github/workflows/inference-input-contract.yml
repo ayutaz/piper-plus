@@ -10,7 +10,7 @@ on:
     branches: [dev, main]
     paths:
       - 'docs/spec/inference-input-contract.toml'
-      - 'src/python_run/piper/http_server.py'
+      - 'src/python_run/piper_plus/http_server.py'
       - 'src/python/piper_train/infer_onnx.py'
       - 'src/python/piper_train/speaker_encoder/ecapa_tdnn.py'
       - 'scripts/check_inference_input_contract.py'
@@ -18,7 +18,7 @@ on:
   pull_request:
     paths:
       - 'docs/spec/inference-input-contract.toml'
-      - 'src/python_run/piper/http_server.py'
+      - 'src/python_run/piper_plus/http_server.py'
       - 'src/python/piper_train/infer_onnx.py'
       - 'src/python/piper_train/speaker_encoder/ecapa_tdnn.py'
       - 'scripts/check_inference_input_contract.py'

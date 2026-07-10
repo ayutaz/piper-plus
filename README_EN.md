@@ -140,15 +140,15 @@ Key options: `--speaker-id` (speaker ID), `--device auto|cpu|gpu`, `--noise-scal
 
 ```bash
 # List available models
-python -m piper --list-models
-python -m piper --list-models ja
+python -m piper_plus --list-models
+python -m piper_plus --list-models ja
 
 # Download a model
-python -m piper --download-model tsukuyomi
-python -m piper --download-model ja_JP-tsukuyomi-chan-medium
+python -m piper_plus --download-model tsukuyomi
+python -m piper_plus --download-model ja_JP-tsukuyomi-chan-medium
 
 # Use after downloading
-python -m piper --model ja_JP-tsukuyomi-chan-medium --text "Hello" -f output.wav
+python -m piper_plus --model ja_JP-tsukuyomi-chan-medium --text "Hello" -f output.wav
 ```
 
 ### WebUI
@@ -156,7 +156,7 @@ python -m piper --model ja_JP-tsukuyomi-chan-medium --text "Hello" -f output.wav
 ```bash
 uv pip install -r src/python_run/requirements_webui.txt
 cd src/python_run
-python -m piper.webui --data-dir /path/to/models
+python -m piper_plus.webui --data-dir /path/to/models
 # → http://localhost:7860
 ```
 
@@ -171,51 +171,51 @@ Download and extract for your OS:
 **Windows (PowerShell):**
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/ayutaz/piper-plus/releases/latest/download/piper-windows-x64.zip" -OutFile piper.zip
-Expand-Archive piper.zip -DestinationPath .
-cd piper
+Invoke-WebRequest -Uri "https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-windows-x64.zip" -OutFile piper-plus-cpp.zip
+Expand-Archive piper-plus-cpp.zip -DestinationPath .
+cd piper-plus
 ```
 
 **macOS (Apple Silicon):**
 
 ```bash
-curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-macos-arm64.tar.gz
-tar xzf piper.tar.gz
-cd piper
+curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-macos-arm64.tar.gz
+tar xzf piper-plus-cpp.tar.gz
+cd piper-plus
 xattr -cr .
 ```
 
 **Linux (x86_64):**
 
 ```bash
-curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-x64.tar.gz
-tar xzf piper.tar.gz
-cd piper
+curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-x64.tar.gz
+tar xzf piper-plus-cpp.tar.gz
+cd piper-plus
 ```
 
 **Linux (ARM64, Raspberry Pi 4/5):**
 
 ```bash
-curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-arm64.tar.gz
-tar xzf piper.tar.gz
-cd piper
+curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
+tar xzf piper-plus-cpp.tar.gz
+cd piper-plus
 ```
 
 **2. Download a model & generate speech**
 
 ```sh
 # Download the Tsukuyomi-chan model
-./bin/piper --download-model tsukuyomi
+./bin/piper-plus --download-model tsukuyomi
 
 # Generate speech (just the model name is enough — downloaded models are auto-resolved)
-./bin/piper --model tsukuyomi --text "Hello, how are you today?" --output_file output.wav
+./bin/piper-plus --model tsukuyomi --text "Hello, how are you today?" --output_file output.wav
 ```
 
-> **Windows cmd code page note:** The `--text` option internally uses `GetCommandLineW()` (UTF-16), so it works regardless of code page. Only when using pipe input (`echo ... | piper`) do you need to switch to UTF-8 first with `chcp 65001`.
+> **Windows cmd code page note:** The `--text` option internally uses `GetCommandLineW()` (UTF-16), so it works regardless of code page. Only when using pipe input (`echo ... | piper-plus`) do you need to switch to UTF-8 first with `chcp 65001`.
 >
-> **output.wav location:** Generated in the current directory (where you ran `cd piper`).
+> **output.wav location:** Generated in the current directory (where you ran `cd piper-plus`).
 
-> **Which binary should I pick?** Releases also include `piper-plus-cli-*` (C# .NET) and `piper-plus-rs-cli-*` (Rust) CLIs. The Quick Start above uses **C++ CLI (`piper-*`)**, which has the widest platform support and is recommended for most users. See [Choosing a CLI binary](docs/getting-started/binary-selection.md) for details.
+> **Which binary should I pick?** Releases also include `piper-plus-cli-*` (C# .NET) and `piper-plus-rs-cli-*` (Rust) CLIs. The Quick Start above uses **C++ CLI (`piper-plus-cpp-*`)**, which has the widest platform support and is recommended for most users. See [Choosing a CLI binary](docs/getting-started/binary-selection.md) for details.
 
 ### Docker
 
@@ -336,7 +336,7 @@ For detailed C++ CLI command-line options, JSON input format, model management, 
 Simple example:
 
 ```bash
-./bin/piper --model tsukuyomi --text "Hello" --output_file hello.wav
+./bin/piper-plus --model tsukuyomi --text "Hello" --output_file hello.wav
 ```
 
 ---

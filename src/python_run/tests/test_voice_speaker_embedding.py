@@ -6,7 +6,7 @@ Mainline runtimes must feed zero embedding + mask=0 so the model falls back
 to `emb_g(sid)` (`vits/models.py:1015-1037`); otherwise ORT raises
 "Required inputs missing".
 
-This file documents the contract for `src/python_run/piper/voice.py`:
+This file documents the contract for `src/python_run/piper_plus/voice.py`:
 - `PiperVoice.synthesize_audio()` (line ~973) — production path.
 - `warmup_session()` (line ~200) — preload path.
 
@@ -19,9 +19,8 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import numpy as np
-
-from piper.config import PhonemeType, PiperConfig
-from piper.voice import PiperVoice
+from piper_plus.config import PhonemeType, PiperConfig
+from piper_plus.voice import PiperVoice
 
 
 def _make_input_mock(name: str, shape):
@@ -175,7 +174,7 @@ class TestStreamRawThreadsSpeakerEmbedding:
 
     Regression for a NameError discovered during PR #222 local verification
     on 2026-06-20: `_stream_phonemes_to_audio` referenced `speaker_embedding`
-    without declaring it in the signature, so `python -m piper
+    without declaring it in the signature, so `python -m piper_plus
     --speaker-embedding emb.npy` crashed with
     ``NameError: name 'speaker_embedding' is not defined``.
 
@@ -193,12 +192,8 @@ class TestStreamRawThreadsSpeakerEmbedding:
                 ("speaker_embedding_mask", ["batch", 1]),
             ]
         )
-        voice._split_sentences = MagicMock(
-            return_value=["hi"] * num_sentences
-        )
-        voice._phonemize_one_factory = MagicMock(
-            return_value=lambda s: ["a"]
-        )
+        voice._split_sentences = MagicMock(return_value=["hi"] * num_sentences)
+        voice._phonemize_one_factory = MagicMock(return_value=lambda s: ["a"])
         return voice, session
 
     def test_serial_path_threads_speaker_embedding(self):
@@ -225,8 +220,9 @@ class TestStreamRawThreadsSpeakerEmbedding:
     def test_parallel_path_threads_speaker_embedding(self):
         """parallelism>1 + multi-sentence path forwards the embedding."""
         import os
-        old = os.environ.get("PIPER_G2P_PARALLELISM")
-        os.environ["PIPER_G2P_PARALLELISM"] = "2"
+
+        old = os.environ.get("PIPER_PLUS_G2P_PARALLELISM")
+        os.environ["PIPER_PLUS_G2P_PARALLELISM"] = "2"
         try:
             voice, session = self._setup_voice(num_sentences=3)
             emb = np.full(192, 0.25, dtype=np.float32)
@@ -242,21 +238,19 @@ class TestStreamRawThreadsSpeakerEmbedding:
             assert session.run.call_count >= 3
             for call in session.run.call_args_list:
                 feed = call[0][1]
-                np.testing.assert_array_equal(
-                    feed["speaker_embedding"][0], emb
-                )
+                np.testing.assert_array_equal(feed["speaker_embedding"][0], emb)
         finally:
             if old is None:
-                del os.environ["PIPER_G2P_PARALLELISM"]
+                del os.environ["PIPER_PLUS_G2P_PARALLELISM"]
             else:
-                os.environ["PIPER_G2P_PARALLELISM"] = old
+                os.environ["PIPER_PLUS_G2P_PARALLELISM"] = old
 
 
 class TestWarmupFeedsSpeakerEmbedding:
     """`_warmup_session()` must obey the same contract as synthesize."""
 
     def test_warmup_passes_zero_emb_and_mask_zero(self):
-        from piper.voice import _warmup_session  # noqa: PLC0415
+        from piper_plus.voice import _warmup_session  # noqa: PLC0415
 
         session = MagicMock()
         session.get_inputs.return_value = [

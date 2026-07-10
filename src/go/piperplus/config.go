@@ -105,7 +105,7 @@ func LoadConfig(path string) (*VoiceConfig, error) {
 
 // FindConfigPath resolves the config file path using the following search order:
 //  1. explicitPath (if non-empty, must exist)
-//  2. PIPER_DEFAULT_CONFIG env var (if set and file exists)
+//  2. PIPER_PLUS_DEFAULT_CONFIG env var (if set and file exists)
 //  3. {modelPath}.json (sidecar)
 //  4. {modelDir}/config.json
 func FindConfigPath(explicitPath, modelPath string) (string, error) {
@@ -118,11 +118,11 @@ func FindConfigPath(explicitPath, modelPath string) (string, error) {
 	}
 
 	// 2. Environment variable — if explicitly set, file must exist.
-	if envPath := os.Getenv("PIPER_DEFAULT_CONFIG"); envPath != "" {
+	if envPath := os.Getenv("PIPER_PLUS_DEFAULT_CONFIG"); envPath != "" {
 		if _, err := os.Stat(envPath); err != nil {
 			return "", &ConfigError{
 				Path: envPath,
-				Err:  fmt.Errorf("PIPER_DEFAULT_CONFIG set but file not found: %w", err),
+				Err:  fmt.Errorf("PIPER_PLUS_DEFAULT_CONFIG set but file not found: %w", err),
 			}
 		}
 		return envPath, nil

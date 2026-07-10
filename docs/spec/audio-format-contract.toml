@@ -18,9 +18,9 @@
 # values manually.
 #
 # Implementations:
-#   Python (runtime):   src/python_run/piper/voice.py            (wave.Wave_write.setsampwidth/setnchannels/setframerate)
-#                       src/python_run/piper/http_server.py      (_build_streaming_wav_header — manual RIFF assembly)
-#                       src/python_run/piper/webui.py            (Gradio output)
+#   Python (runtime):   src/python_run/piper_plus/voice.py            (wave.Wave_write.setsampwidth/setnchannels/setframerate)
+#                       src/python_run/piper_plus/http_server.py      (_build_streaming_wav_header — manual RIFF assembly)
+#                       src/python_run/piper_plus/webui.py            (Gradio output)
 #   Rust:               src/rust/piper-core/src/engine.rs        (synth → f32 → i16 → WAV)
 #   Go:                 src/go/piperplus/synthesize.go           (encoding/binary little-endian writes)
 #   C#:                 src/csharp/PiperPlus.Core/Inference/PiperSession.cs  (BinaryWriter)
@@ -35,7 +35,7 @@ last_updated = "2026-05-09"
 contract_version = 1
 status = "stable"
 applies_to = ["python", "rust", "go", "csharp", "cpp", "wasm-js", "swift"]
-canonical_source = "src/python_run/piper/http_server.py:_build_streaming_wav_header"
+canonical_source = "src/python_run/piper_plus/http_server.py:_build_streaming_wav_header"
 forward_compat_policy = "strict"
 
 # ===========================================================================

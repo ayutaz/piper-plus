@@ -295,8 +295,8 @@ func (td *TextDictionary) Len() int {
 
 // FindDefaultDicts searches for default dictionary JSON files in standard locations:
 //  1. modelDir/dictionaries/*.json
-//  2. <exe_dir>/../share/piper/dictionaries/*.json
-//  3. $PIPER_CUSTOM_DICT_PATH/*.json
+//  2. <exe_dir>/../share/piper-plus/dictionaries/*.json
+//  3. $PIPER_PLUS_CUSTOM_DICT_PATH/*.json
 //
 // Returns a sorted list of found JSON file paths.
 func FindDefaultDicts(modelDir string) []string {
@@ -325,14 +325,14 @@ func FindDefaultDicts(modelDir string) []string {
 		addGlob(filepath.Join(modelDir, "dictionaries", "*.json"))
 	}
 
-	// 2. <exe_dir>/../share/piper/dictionaries/*.json
+	// 2. <exe_dir>/../share/piper-plus/dictionaries/*.json
 	if exe, err := os.Executable(); err == nil {
 		exeDir := filepath.Dir(exe)
-		addGlob(filepath.Join(exeDir, "..", "share", "piper", "dictionaries", "*.json"))
+		addGlob(filepath.Join(exeDir, "..", "share", "piper-plus", "dictionaries", "*.json"))
 	}
 
-	// 3. $PIPER_CUSTOM_DICT_PATH/*.json
-	if envPath := os.Getenv("PIPER_CUSTOM_DICT_PATH"); envPath != "" {
+	// 3. $PIPER_PLUS_CUSTOM_DICT_PATH/*.json
+	if envPath := os.Getenv("PIPER_PLUS_CUSTOM_DICT_PATH"); envPath != "" {
 		addGlob(filepath.Join(envPath, "*.json"))
 	}
 

@@ -19,7 +19,7 @@ use crate::phonemize::adapter::G2pAdapter;
 // Auto cap is 4 because (a) the ONNX session uses ~4 intra-op threads which
 // we do not want to oversubscribe, and (b) most G2P backends wrap C code
 // where 2~4 threads already saturate the available work. Setting
-// `PIPER_G2P_PARALLELISM=1` restores the strictly-serial path for users who
+// `PIPER_PLUS_G2P_PARALLELISM=1` restores the strictly-serial path for users who
 // hit a thread-safety issue in a third-party G2P backend.
 const G2P_AUTO_PARALLELISM_CAP: usize = 4;
 
@@ -30,14 +30,14 @@ const G2P_AUTO_PARALLELISM_CAP: usize = 4;
 /// * Returns `>= 2` to use the threaded path with that many workers.
 ///
 /// Resolution order mirrors the Python runtime
-/// (`src/python_run/piper/voice.py::_resolve_g2p_parallelism`):
-///   * `PIPER_G2P_PARALLELISM=1`: force serial.
-///   * `PIPER_G2P_PARALLELISM=N` (N >= 2): force N workers (capped at
+/// (`src/python_run/piper_plus/voice.py::_resolve_g2p_parallelism`):
+///   * `PIPER_PLUS_G2P_PARALLELISM=1`: force serial.
+///   * `PIPER_PLUS_G2P_PARALLELISM=N` (N >= 2): force N workers (capped at
 ///     `n_sentences`).
 ///   * Otherwise (auto): `min(n_sentences, max(2, cores / 2),
 ///     G2P_AUTO_PARALLELISM_CAP)`. Falls back to 1 when `n_sentences <= 1`.
 pub fn resolve_g2p_parallelism(n_sentences: usize) -> usize {
-    let raw = std::env::var("PIPER_G2P_PARALLELISM").unwrap_or_default();
+    let raw = std::env::var("PIPER_PLUS_G2P_PARALLELISM").unwrap_or_default();
     let raw = raw.trim();
     if !raw.is_empty() {
         match raw.parse::<usize>() {
@@ -45,7 +45,7 @@ pub fn resolve_g2p_parallelism(n_sentences: usize) -> usize {
             Ok(n) => return n.min(n_sentences).max(1),
             Err(_) => {
                 tracing::warn!(
-                    "Invalid PIPER_G2P_PARALLELISM={:?}; falling back to auto",
+                    "Invalid PIPER_PLUS_G2P_PARALLELISM={:?}; falling back to auto",
                     raw
                 );
             }
@@ -332,7 +332,7 @@ impl PiperVoice {
     /// 1. `CMUDICT_PATH` 環境変数
     /// 2. `{model_dir}/cmudict_data.json`
     /// 3. `./cmudict_data.json`
-    /// 4. `/usr/share/piper/cmudict_data.json`
+    /// 4. `/usr/share/piper-plus/cmudict_data.json`
     fn create_english_phonemizer(
         model_dir: Option<&Path>,
     ) -> Result<piper_plus_g2p::english::EnglishPhonemizer, PiperError> {
@@ -536,7 +536,7 @@ impl PiperVoice {
     /// 各文に対する [`Self::phonemize_to_ids`] を `std::thread::scope` で
     /// 並列実行する。出力は入力と同じ順序を保つ。
     ///
-    /// 並列度は環境変数 `PIPER_G2P_PARALLELISM` で制御可能
+    /// 並列度は環境変数 `PIPER_PLUS_G2P_PARALLELISM` で制御可能
     /// ([`resolve_g2p_parallelism`] 参照)。1 文時 / `parallelism=1` 時は
     /// スレッドを一切 spawn せず、`phonemize_to_ids` を順次呼び出すだけ。
     ///
@@ -1304,11 +1304,11 @@ mod tests {
     // === Issue #383 Phase 1 — resolve_g2p_parallelism / map_sentences_parallel ===
     //
     // These tests serialise on a single env mutex because Rust's tests run in
-    // parallel by default and `PIPER_G2P_PARALLELISM` is process-global.
+    // parallel by default and `PIPER_PLUS_G2P_PARALLELISM` is process-global.
 
     fn with_env_var<R>(key: &str, value: Option<&str>, f: impl FnOnce() -> R) -> R {
         // SAFETY: tests share the env, but the lock guarantees no other
-        // test in this module mutates PIPER_G2P_PARALLELISM concurrently.
+        // test in this module mutates PIPER_PLUS_G2P_PARALLELISM concurrently.
         use std::sync::Mutex;
         static ENV_LOCK: Mutex<()> = Mutex::new(());
         let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
@@ -1333,7 +1333,7 @@ mod tests {
 
     #[test]
     fn test_resolve_returns_1_for_zero_or_one_sentence() {
-        with_env_var("PIPER_G2P_PARALLELISM", None, || {
+        with_env_var("PIPER_PLUS_G2P_PARALLELISM", None, || {
             assert_eq!(resolve_g2p_parallelism(0), 1);
             assert_eq!(resolve_g2p_parallelism(1), 1);
         });
@@ -1341,7 +1341,7 @@ mod tests {
 
     #[test]
     fn test_resolve_auto_parallel_for_multiple_sentences() {
-        with_env_var("PIPER_G2P_PARALLELISM", None, || {
+        with_env_var("PIPER_PLUS_G2P_PARALLELISM", None, || {
             let n = resolve_g2p_parallelism(8);
             assert!(
                 (2..=G2P_AUTO_PARALLELISM_CAP).contains(&n),
@@ -1354,21 +1354,21 @@ mod tests {
 
     #[test]
     fn test_resolve_auto_capped_by_n_sentences() {
-        with_env_var("PIPER_G2P_PARALLELISM", None, || {
+        with_env_var("PIPER_PLUS_G2P_PARALLELISM", None, || {
             assert!(resolve_g2p_parallelism(2) <= 2);
         });
     }
 
     #[test]
     fn test_resolve_explicit_1_forces_serial() {
-        with_env_var("PIPER_G2P_PARALLELISM", Some("1"), || {
+        with_env_var("PIPER_PLUS_G2P_PARALLELISM", Some("1"), || {
             assert_eq!(resolve_g2p_parallelism(10), 1);
         });
     }
 
     #[test]
     fn test_resolve_explicit_n_overrides_auto() {
-        with_env_var("PIPER_G2P_PARALLELISM", Some("8"), || {
+        with_env_var("PIPER_PLUS_G2P_PARALLELISM", Some("8"), || {
             // capped at n_sentences
             assert_eq!(resolve_g2p_parallelism(3), 3);
             assert_eq!(resolve_g2p_parallelism(20), 8);
@@ -1377,7 +1377,7 @@ mod tests {
 
     #[test]
     fn test_resolve_invalid_falls_back_to_auto() {
-        with_env_var("PIPER_G2P_PARALLELISM", Some("not_a_number"), || {
+        with_env_var("PIPER_PLUS_G2P_PARALLELISM", Some("not_a_number"), || {
             let n = resolve_g2p_parallelism(8);
             assert!(n >= 2);
         });
@@ -1385,7 +1385,7 @@ mod tests {
 
     #[test]
     fn test_resolve_zero_treated_as_serial() {
-        with_env_var("PIPER_G2P_PARALLELISM", Some("0"), || {
+        with_env_var("PIPER_PLUS_G2P_PARALLELISM", Some("0"), || {
             assert_eq!(resolve_g2p_parallelism(10), 1);
         });
     }

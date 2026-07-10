@@ -104,7 +104,7 @@ func (r *TimingResult) ToTSV() string {
 // timestamps in HH:MM:SS,mmm form, and the phoneme as the cue text. Cues
 // are separated by a blank line ("\n\n"). Cross-runtime parity with
 // Rust (src/rust/piper-core/src/timing.rs:55-77) and Python
-// (src/python_run/piper/timing.py:174-204).
+// (src/python_run/piper_plus/timing.py:174-204).
 func (r *TimingResult) ToSRT() string {
 	var b strings.Builder
 	for i, p := range r.Phonemes {

@@ -134,28 +134,28 @@ jobs:
       - name: Create ARM64 archive if needed
         run: |
           # Check if tar.gz exists, if not create it from build output
-          if [ -f /tmp/arm64-build/dist/piper_arm64.tar.gz ]; then
+          if [ -f /tmp/arm64-build/dist/piper-plus-cpp-arm64.tar.gz ]; then
             echo "Archive found in dist directory"
-            cp /tmp/arm64-build/dist/piper_arm64.tar.gz /tmp/
+            cp /tmp/arm64-build/dist/piper-plus-cpp-arm64.tar.gz /tmp/
           elif [ -d /tmp/arm64-build/install ]; then
             echo "Creating archive from install directory"
             cd /tmp/arm64-build
-            tar -czf /tmp/piper_arm64.tar.gz install/
+            tar -czf /tmp/piper-plus-cpp-arm64.tar.gz install/
           elif [ -d /tmp/arm64-build/build/install ]; then
             echo "Creating archive from build/install directory"
             cd /tmp/arm64-build/build
-            tar -czf /tmp/piper_arm64.tar.gz install/
+            tar -czf /tmp/piper-plus-cpp-arm64.tar.gz install/
           else
             echo "No suitable directory found for archiving"
             find /tmp/arm64-build -type d | head -20
             exit 1
           fi
-          ls -la /tmp/piper_arm64.tar.gz
+          ls -la /tmp/piper-plus-cpp-arm64.tar.gz
 
       - name: Upload ARM64 artifacts
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: piper-arm64-binary
+          name: piper-plus-cpp-arm64-binary
           path: |
-            /tmp/piper_arm64.tar.gz
+            /tmp/piper-plus-cpp-arm64.tar.gz
           if-no-files-found: error

@@ -116,7 +116,7 @@ jobs:
       - run: go test -v -race -count=1 -tags integration ./...
         env:
           ONNX_RUNTIME_SHARED_LIBRARY_PATH: ${{ github.workspace }}/onnxruntime/lib/libonnxruntime.so
-          PIPER_TEST_MODEL: ${{ github.workspace }}/test/models/multilingual-test-medium.onnx
+          PIPER_PLUS_TEST_MODEL: ${{ github.workspace }}/test/models/multilingual-test-medium.onnx
 
   build:
     runs-on: ${{ matrix.os }}

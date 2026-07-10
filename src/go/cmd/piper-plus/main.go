@@ -78,7 +78,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	// Persistent flags shared across subcommands (synthesize + serve).
 	pf := rootCmd.PersistentFlags()
-	pf.StringVarP(&modelPath, "model", "m", "", "path to ONNX model file (or $PIPER_DEFAULT_MODEL)")
+	pf.StringVarP(&modelPath, "model", "m", "", "path to ONNX model file (or $PIPER_PLUS_DEFAULT_MODEL)")
 	pf.StringVarP(&configPath, "config", "c", "", "path to config.json (auto-detected if omitted)")
 	pf.StringVar(&device, "device", "cpu", "inference device (cpu, cuda, coreml, directml)")
 	pf.BoolVar(&debug, "debug", false, "enable debug logging")
@@ -182,10 +182,10 @@ func runSynthesize(cmd *cobra.Command, args []string) error {
 
 	// Resolve model path: flag > env.
 	if modelPath == "" {
-		modelPath = os.Getenv("PIPER_DEFAULT_MODEL")
+		modelPath = os.Getenv("PIPER_PLUS_DEFAULT_MODEL")
 	}
 	if modelPath == "" {
-		return fmt.Errorf("model path required: specify --model /path/to/model.onnx or set $PIPER_DEFAULT_MODEL")
+		return fmt.Errorf("model path required: specify --model /path/to/model.onnx or set $PIPER_PLUS_DEFAULT_MODEL")
 	}
 
 	// Try resolving model name/alias if file doesn't exist.

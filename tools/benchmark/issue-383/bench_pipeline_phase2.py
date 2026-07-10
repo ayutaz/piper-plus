@@ -33,8 +33,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "src" / "python_run"))
 sys.path.insert(0, str(REPO_ROOT / "src" / "python"))
 
-from piper.phonemize.japanese import clear_phonemize_cache  # noqa: E402
-from piper.voice import PiperVoice  # noqa: E402
+from piper_plus.phonemize.japanese import clear_phonemize_cache  # noqa: E402
+from piper_plus.voice import PiperVoice  # noqa: E402
 
 
 @dataclass

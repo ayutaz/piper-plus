@@ -395,7 +395,7 @@ version = {file = "VERSION"}
 branch = true
 source = [
     "src/python/piper_train",
-    "src/python_run/piper",
+    "src/python_run/piper_plus",
     "src/python/g2p/piper_plus_g2p",
 ]
 omit = [

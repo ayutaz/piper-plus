@@ -109,51 +109,51 @@
 **Windows (PowerShell):**
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/ayutaz/piper-plus/releases/latest/download/piper-windows-x64.zip" -OutFile piper.zip
-Expand-Archive piper.zip -DestinationPath .
-cd piper
+Invoke-WebRequest -Uri "https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-windows-x64.zip" -OutFile piper-plus-cpp.zip
+Expand-Archive piper-plus-cpp.zip -DestinationPath .
+cd piper-plus
 ```
 
 **macOS (Apple Silicon):**
 
 ```bash
-curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-macos-arm64.tar.gz
-tar xzf piper.tar.gz
-cd piper
+curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-macos-arm64.tar.gz
+tar xzf piper-plus-cpp.tar.gz
+cd piper-plus
 xattr -cr .
 ```
 
 **Linux (x86_64):**
 
 ```bash
-curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-x64.tar.gz
-tar xzf piper.tar.gz
-cd piper
+curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-x64.tar.gz
+tar xzf piper-plus-cpp.tar.gz
+cd piper-plus
 ```
 
 **Linux (ARM64，树莓派 4/5):**
 
 ```bash
-curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-arm64.tar.gz
-tar xzf piper.tar.gz
-cd piper
+curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
+tar xzf piper-plus-cpp.tar.gz
+cd piper-plus
 ```
 
 **2. 下载模型并生成语音**
 
 ```sh
 # 下载 Tsukuyomi-chan 模型
-./bin/piper --download-model tsukuyomi
+./bin/piper-plus --download-model tsukuyomi
 
 # 生成语音（只需模型名 — 自动解析已下载的模型）
-./bin/piper --model tsukuyomi --text "こんにちは、今日は良い天気ですね。" --output_file output.wav
+./bin/piper-plus --model tsukuyomi --text "こんにちは、今日は良い天気ですね。" --output_file output.wav
 ```
 
-> **关于 Windows cmd 代码页：** `--text` 选项内部使用 `GetCommandLineW()` (UTF-16)，不依赖代码页，可直接使用。仅在使用管道输入（`echo ... | piper`）时，需要先运行 `chcp 65001` 切换到 UTF-8。
+> **关于 Windows cmd 代码页：** `--text` 选项内部使用 `GetCommandLineW()` (UTF-16)，不依赖代码页，可直接使用。仅在使用管道输入（`echo ... | piper-plus`）时，需要先运行 `chcp 65001` 切换到 UTF-8。
 >
-> **output.wav 输出位置：** 生成在当前目录（即 `cd piper` 后的位置）。
+> **output.wav 输出位置：** 生成在当前目录（即 `cd piper-plus` 后的位置）。
 
-> **应该选择哪个二进制文件？** Releases 中还提供 `piper-plus-cli-*`（C# .NET）和 `piper-plus-rs-cli-*`（Rust）CLI。上述快速入门使用的是 **C++ CLI（`piper-*`）**，它支持的平台最广，推荐大多数用户使用。详情请参阅[选择 CLI 二进制文件](docs/getting-started/binary-selection.md)。
+> **应该选择哪个二进制文件？** Releases 中还提供 `piper-plus-cli-*`（C# .NET）和 `piper-plus-rs-cli-*`（Rust）CLI。上述快速入门使用的是 **C++ CLI（`piper-plus-cpp-*`）**，它支持的平台最广，推荐大多数用户使用。详情请参阅[选择 CLI 二进制文件](docs/getting-started/binary-selection.md)。
 
 ### Python 推理
 
@@ -185,15 +185,15 @@ uv run python -m piper_train.infer_onnx \
 
 ```bash
 # 显示模型列表
-python -m piper --list-models
-python -m piper --list-models ja
+python -m piper_plus --list-models
+python -m piper_plus --list-models ja
 
 # 下载模型
-python -m piper --download-model tsukuyomi
-python -m piper --download-model ja_JP-tsukuyomi-chan-medium
+python -m piper_plus --download-model tsukuyomi
+python -m piper_plus --download-model ja_JP-tsukuyomi-chan-medium
 
 # 下载后使用
-python -m piper --model ja_JP-tsukuyomi-chan-medium --text "こんにちは" -f output.wav
+python -m piper_plus --model ja_JP-tsukuyomi-chan-medium --text "こんにちは" -f output.wav
 ```
 
 ### WebUI
@@ -201,7 +201,7 @@ python -m piper --model ja_JP-tsukuyomi-chan-medium --text "こんにちは" -f 
 ```bash
 uv pip install -r src/python_run/requirements_webui.txt
 cd src/python_run
-python -m piper.webui --data-dir /path/to/models
+python -m piper_plus.webui --data-dir /path/to/models
 # → http://localhost:7860
 ```
 
@@ -211,7 +211,7 @@ python -m piper.webui --data-dir /path/to/models
 
 ```sh
 echo 'Welcome to the world of speech synthesis!' | \
-  ./bin/piper --model en_US-lessac-medium.onnx --output_file welcome.wav
+  ./bin/piper-plus --model en_US-lessac-medium.onnx --output_file welcome.wav
 ```
 
 ### Docker
@@ -431,41 +431,41 @@ cargo test -p piper-plus
 
 ```sh
 # 从文本生成语音
-./bin/piper --model model.onnx --text "Hello, how are you?" -f output.wav
+./bin/piper-plus --model model.onnx --text "Hello, how are you?" -f output.wav
 
 # 日语文本（避免 Windows 编码问题）
-bin\piper.exe --model models\tsukuyomi.onnx --text "こんにちは、今日は良い天気ですね。" -f output.wav
+bin\piper-plus.exe --model models\tsukuyomi.onnx --text "こんにちは、今日は良い天気ですね。" -f output.wav
 
 # 指定说话人
-./bin/piper --model model.onnx --text "Hello" --speaker 3 -f output.wav
+./bin/piper-plus --model model.onnx --text "Hello" --speaker 3 -f output.wav
 ```
 
 #### 管道输入
 
 ```sh
 # 基本用法
-echo "こんにちは" | ./bin/piper --model ja_model.onnx --output_file output.wav
+echo "こんにちは" | ./bin/piper-plus --model ja_model.onnx --output_file output.wav
 
 # 流式处理（低延迟）
-echo "长文本..." | ./bin/piper --model ja_model.onnx --output_file output.wav --streaming
+echo "长文本..." | ./bin/piper-plus --model ja_model.onnx --output_file output.wav --streaming
 
 # GPU 推理
-echo "Hello" | ./bin/piper --model en_model.onnx --use-cuda --output_file output.wav
+echo "Hello" | ./bin/piper-plus --model en_model.onnx --use-cuda --output_file output.wav
 
 # 音素时间输出（用于口型同步、字幕同步）
-echo "Hello world" | ./bin/piper --model en_model.onnx -f speech.wav --output-timing timing.json
+echo "Hello world" | ./bin/piper-plus --model en_model.onnx -f speech.wav --output-timing timing.json
 
 # 自定义词典
-echo "DockerとGitHubを使います" | ./bin/piper --model ja_model.onnx --custom-dict my_dict.json -f output.wav
+echo "DockerとGitHubを使います" | ./bin/piper-plus --model ja_model.onnx --custom-dict my_dict.json -f output.wav
 
 # 内联音素输入
-echo 'Hello [[ h ə l oʊ ]] world' | ./bin/piper --model en_model.onnx -f output.wav
+echo 'Hello [[ h ə l oʊ ]] world' | ./bin/piper-plus --model en_model.onnx -f output.wav
 
 # 原始音素输入
-echo 'h ə l oʊ _ w ɜː l d' | ./bin/piper --model en_model.onnx --raw-phonemes -f output.wav
+echo 'h ə l oʊ _ w ɜː l d' | ./bin/piper-plus --model en_model.onnx --raw-phonemes -f output.wav
 
 # 流式处理（原始音频输出）
-echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
+echo 'Long text...' | ./bin/piper-plus --model en_model.onnx --output-raw | \
   aplay -r 22050 -f S16_LE -t raw -
 ```
 
@@ -502,12 +502,12 @@ echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
 | `--debug` | 启用调试日志 | off |
 | `--quiet` / `-q` | 禁用日志输出 | off |
 
-运行 `piper --help` 查看所有选项。
+运行 `piper-plus --help` 查看所有选项。
 
 > **WavLM 模型推荐设置：** 使用 WavLM Discriminator 训练的模型建议设置 `--noise-scale 0.5`（默认值为 0.667）。
 >
 > ```sh
-> echo "こんにちは" | ./bin/piper --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav
+> echo "こんにちは" | ./bin/piper-plus --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav
 > ```
 
 ### JSON 输入
@@ -525,35 +525,35 @@ echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
 
 ```bash
 # 显示可用模型列表
-./bin/piper --list-models
+./bin/piper-plus --list-models
 
 # 按语言筛选
-./bin/piper --list-models ja
-./bin/piper --list-models en
+./bin/piper-plus --list-models ja
+./bin/piper-plus --list-models en
 ```
 
 #### 下载模型
 
 ```bash
 # 指定模型名下载（也可使用别名）
-./bin/piper --download-model tsukuyomi
-./bin/piper --download-model en_US-lessac-medium
+./bin/piper-plus --download-model tsukuyomi
+./bin/piper-plus --download-model en_US-lessac-medium
 
 # 指定下载目录
-./bin/piper --download-model tsukuyomi --model-dir /path/to/models
+./bin/piper-plus --download-model tsukuyomi --model-dir /path/to/models
 
 # 下载后使用模型名推理（无需完整路径）
-./bin/piper --model tsukuyomi --text "こんにちは"
+./bin/piper-plus --model tsukuyomi --text "こんにちは"
 ```
 
 ### 环境变量 (C++ CLI)
 
 | 变量名 | 说明 | 示例 |
 |---|---|---|
-| `PIPER_DEFAULT_MODEL` | `--model` 未指定时的默认模型路径 | `/path/to/model.onnx` |
-| `PIPER_DEFAULT_CONFIG` | `--config` 未指定时的默认配置文件路径 | `/path/to/config.json` |
-| `PIPER_MODEL_DIR` | 下载模型的保存目录 | `~/.local/share/piper/models` |
-| `PIPER_GPU_DEVICE_ID` | CUDA GPU 设备 ID | `0` |
+| `PIPER_PLUS_DEFAULT_MODEL` | `--model` 未指定时的默认模型路径 | `/path/to/model.onnx` |
+| `PIPER_PLUS_DEFAULT_CONFIG` | `--config` 未指定时的默认配置文件路径 | `/path/to/config.json` |
+| `PIPER_PLUS_MODEL_DIR` | 下载模型的保存目录 | `~/.local/share/piper-plus/models` |
+| `PIPER_PLUS_GPU_DEVICE_ID` | CUDA GPU 设备 ID | `0` |
 
 ### 辅助脚本 (Windows)
 
@@ -713,8 +713,8 @@ curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyo
 | 变量名 | 说明 |
 |---|---|
 | `OPENJTALK_DICTIONARY_PATH` | OpenJTalk 词典路径（未设置时自动下载） |
-| `PIPER_AUTO_DOWNLOAD_DICT` | 设为 `0` 禁用自动下载 |
-| `PIPER_OFFLINE_MODE` | 设为 `1` 启用离线模式 |
+| `PIPER_PLUS_AUTO_DOWNLOAD_DICT` | 设为 `0` 禁用自动下载 |
+| `PIPER_PLUS_OFFLINE_MODE` | 设为 `1` 启用离线模式 |
 
 详情请参阅日语使用指南和[音素映射参考](docs/api-reference/phoneme-mapping.md)。
 
@@ -737,7 +737,7 @@ xattr -cr piper/
 支持 x64 / arm64。OpenJTalk 词典在首次启动时自动下载。详情请参阅 [Windows 设置指南](docs/getting-started/windows-setup.md)。
 
 ```cmd
-piper.exe --model en_US-lessac-medium.onnx -f output.wav
+piper-plus.exe --model en_US-lessac-medium.onnx -f output.wav
 ```
 
 ### WebAssembly

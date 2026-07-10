@@ -100,7 +100,7 @@
 - **主張:** sub-80ms チャンクの低レイテンシ条件で最高スループット (最低 RTF)、 シングル CPU スレッド (AMD EPYC 7302) / ONNX Runtime 上で HiFi-GAN・iSTFTNet・Vocos・**MS-iSTFTNet (piper-plus MB-iSTFT の直接対応物) を凌駕**。
 - **数値:** **0.332M params = HiFi-GAN V1 の 2.4%** という極小サイズ。 MOS は自然音声に匹敵 (causal/non-causal 両条件)。 全比較 vocoder は torch.stft/istft を conv 実装に置換して ONNX 化＝**piper-plus が `vits/stft_onnx.py` で既に使っている手法と同一** (ONNX export リスク低減)。
 - **コスト・リスク (M):** スタンドアロン vocoder のため統合が必要。 **優位性は低レイテンシ領域に限定** (大きいチャンクでは 2D conv のデータ転送増で Vocos が勝つ)。 piper-plus の text-splitter streaming モードが使う領域とは合致。 dual vocoder 構成 (既存 MB-iSTFT を通常モードに温存しつつ MS-Wavehax を streaming 専用に追加) と保守負荷 / モード切替境界の詳細は companion §3.4-3.6 を参照。
-- **piper-plus 該当箇所:** `src/python/piper_train/vits/stft_onnx.py`, `src/python_run/piper/text_splitter.py`
+- **piper-plus 該当箇所:** `src/python/piper_train/vits/stft_onnx.py`, `src/python_run/piper_plus/text_splitter.py`
 - **出典:** [arXiv 2506.03554](https://arxiv.org/html/2506.03554) (Yoneyama et al., Interspeech 2025, Wavehax 著者) / 確信度 high・3-0/2-1
 
 ### A-3. ZSE-VITS 型 prosody predictor — 加算的拡張 ★★

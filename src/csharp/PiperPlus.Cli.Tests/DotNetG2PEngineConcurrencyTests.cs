@@ -115,7 +115,7 @@ public class DotNetG2PEngineConcurrencyTests
     /// End-to-end Phase 1 contract: feed a multi-sentence JA input through
     /// <see cref="JapanesePhonemizer"/> (which holds a single
     /// <see cref="DotNetG2PEngine"/>) under both serial
-    /// (<c>PIPER_G2P_PARALLELISM=1</c>) and auto modes — outputs must match
+    /// (<c>PIPER_PLUS_G2P_PARALLELISM=1</c>) and auto modes — outputs must match
     /// sentence-by-sentence. This is the regression scenario the original
     /// Phase 1 tests missed (synthetic delegate didn't touch MeCab).
     /// </summary>

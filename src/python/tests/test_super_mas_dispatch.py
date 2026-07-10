@@ -216,7 +216,7 @@ class TestPublicMaximumPathDispatch:
 
 
 class TestEnvDisableImportTime:
-    """Verify PIPER_DISABLE_SUPER_MAS=1 is honoured at import time.
+    """Verify PIPER_PLUS_DISABLE_SUPER_MAS=1 is honoured at import time.
 
     The toggle is module-level (read once on import), so we re-import in a
     fresh subprocess with the env var set. This is the only way to assert
@@ -252,9 +252,9 @@ class TestEnvDisableImportTime:
         env["PYTHONPATH"] = src_python + os.pathsep + env.get("PYTHONPATH", "")
         # Configure the toggle under test
         if env_value is None:
-            env.pop("PIPER_DISABLE_SUPER_MAS", None)
+            env.pop("PIPER_PLUS_DISABLE_SUPER_MAS", None)
         else:
-            env["PIPER_DISABLE_SUPER_MAS"] = env_value
+            env["PIPER_PLUS_DISABLE_SUPER_MAS"] = env_value
 
         proc = subprocess.run(
             [sys.executable, "-c", code],

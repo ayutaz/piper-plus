@@ -26,9 +26,9 @@ import pytest
 # Guard: skip entire module when onnxruntime is unavailable
 ort = pytest.importorskip("onnxruntime", reason="onnxruntime is required")
 
-from piper.config import PhonemeType, PiperConfig  # noqa: E402
-from piper.inference_config import InferenceConfig  # noqa: E402
-from piper.voice import PiperVoice  # noqa: E402
+from piper_plus.config import PhonemeType, PiperConfig  # noqa: E402
+from piper_plus.inference_config import InferenceConfig  # noqa: E402
+from piper_plus.voice import PiperVoice  # noqa: E402
 
 
 # Absolute path to the real test model shipped with the repo
@@ -65,7 +65,7 @@ class TestSessionOptions:
         config_path.write_text(json.dumps(config_dict), encoding="utf-8")
 
         # Mock InferenceSession to capture the sess_options argument
-        with patch("piper.voice.onnxruntime.InferenceSession") as mock_cls:
+        with patch("piper_plus.voice.onnxruntime.InferenceSession") as mock_cls:
             mock_cls.return_value = MagicMock()
             PiperVoice.load(model_path)
 
@@ -340,17 +340,20 @@ class TestMultilingualPhonemizerImport:
         mock_mp_instance.phonemize.return_value = ["a"]
         mock_mp_class = MagicMock(return_value=mock_mp_instance)
 
-        with patch(
-            "piper.voice.MultilingualPhonemizer",
-            mock_mp_class,
-            create=True,
-        ), patch.dict(
-            "sys.modules",
-            {
-                "piper.phonemize.multilingual": MagicMock(
-                    MultilingualPhonemizer=mock_mp_class,
-                )
-            },
+        with (
+            patch(
+                "piper_plus.voice.MultilingualPhonemizer",
+                mock_mp_class,
+                create=True,
+            ),
+            patch.dict(
+                "sys.modules",
+                {
+                    "piper_plus.phonemize.multilingual": MagicMock(
+                        MultilingualPhonemizer=mock_mp_class,
+                    )
+                },
+            ),
         ):
             result = voice.phonemize("test")
 
@@ -394,17 +397,20 @@ class TestMultilingualPhonemizerImport:
         mock_mp_instance.phonemize.return_value = ["a"]
         mock_mp_class = MagicMock(return_value=mock_mp_instance)
 
-        with patch(
-            "piper.voice.MultilingualPhonemizer",
-            mock_mp_class,
-            create=True,
-        ), patch.dict(
-            "sys.modules",
-            {
-                "piper.phonemize.multilingual": MagicMock(
-                    MultilingualPhonemizer=mock_mp_class,
-                )
-            },
+        with (
+            patch(
+                "piper_plus.voice.MultilingualPhonemizer",
+                mock_mp_class,
+                create=True,
+            ),
+            patch.dict(
+                "sys.modules",
+                {
+                    "piper_plus.phonemize.multilingual": MagicMock(
+                        MultilingualPhonemizer=mock_mp_class,
+                    )
+                },
+            ),
         ):
             result = voice.phonemize("test")
 
@@ -454,7 +460,7 @@ class TestMultilingualPhonemizerImport:
             # Block re-import by injecting a sentinel that raises ImportError
             with patch.dict(
                 "sys.modules",
-                {"piper.phonemize.multilingual": None},
+                {"piper_plus.phonemize.multilingual": None},
             ):
                 # The phonemize method should not raise ImportError --
                 # it should fall back to JA phonemizer or eSpeak.
@@ -507,16 +513,16 @@ class TestVoiceInlineWarmup:
 
     @pytest.mark.unit
     def test_warmup_calls_session_run(self):
-        from piper.voice import _warmup_session
+        from piper_plus.voice import _warmup_session
 
         session = self._make_mock_session()
         _warmup_session(session)
         assert session.run.call_count == 2
 
     @pytest.mark.unit
-    @patch.dict("os.environ", {"PIPER_DISABLE_WARMUP": "1"})
+    @patch.dict("os.environ", {"PIPER_PLUS_DISABLE_WARMUP": "1"})
     def test_warmup_disabled(self):
-        from piper.voice import _warmup_session
+        from piper_plus.voice import _warmup_session
 
         session = self._make_mock_session()
         _warmup_session(session)
@@ -524,7 +530,7 @@ class TestVoiceInlineWarmup:
 
     @pytest.mark.unit
     def test_warmup_failure_non_fatal(self):
-        from piper.voice import _warmup_session
+        from piper_plus.voice import _warmup_session
 
         session = self._make_mock_session()
         session.run.side_effect = RuntimeError("ORT error")
@@ -532,7 +538,7 @@ class TestVoiceInlineWarmup:
 
     @pytest.mark.unit
     def test_warmup_optional_inputs(self):
-        from piper.voice import _warmup_session
+        from piper_plus.voice import _warmup_session
 
         session = self._make_mock_session(has_sid=True, has_lid=True, has_prosody=True)
         _warmup_session(session, runs=1)
@@ -563,7 +569,7 @@ class TestPiperConfigHopSize:
 
     def test_hop_size_default_when_missing(self):
         """hop_size defaults to 256 when not present in config.json."""
-        from piper.config import PiperConfig
+        from piper_plus.config import PiperConfig
 
         config_dict = self._base_config_dict()
         # No audio.hop_size key
@@ -572,7 +578,7 @@ class TestPiperConfigHopSize:
 
     def test_hop_size_explicit_value_from_config(self):
         """hop_size is read from config['audio']['hop_size'] when provided."""
-        from piper.config import PiperConfig
+        from piper_plus.config import PiperConfig
 
         config_dict = self._base_config_dict()
         config_dict["audio"]["hop_size"] = 512
@@ -581,7 +587,7 @@ class TestPiperConfigHopSize:
 
     def test_hop_size_zero_in_config(self):
         """hop_size of 0 in config is preserved (PiperConfig does not validate)."""
-        from piper.config import PiperConfig
+        from piper_plus.config import PiperConfig
 
         config_dict = self._base_config_dict()
         config_dict["audio"]["hop_size"] = 0
@@ -590,7 +596,7 @@ class TestPiperConfigHopSize:
 
     def test_hop_size_small_value(self):
         """hop_size can be set to small values like 128."""
-        from piper.config import PiperConfig
+        from piper_plus.config import PiperConfig
 
         config_dict = self._base_config_dict()
         config_dict["audio"]["hop_size"] = 128
@@ -599,7 +605,7 @@ class TestPiperConfigHopSize:
 
     def test_hop_size_attribute_accessible_from_instance(self):
         """PiperConfig instances expose hop_size as a regular attribute."""
-        from piper.config import PiperConfig
+        from piper_plus.config import PiperConfig
 
         config_dict = self._base_config_dict()
         config_dict["audio"]["hop_size"] = 256

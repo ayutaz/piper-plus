@@ -42,7 +42,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONTRACT = REPO_ROOT / "docs/spec/inference-input-contract.toml"
 
-HTTP_SERVER = REPO_ROOT / "src/python_run/piper/http_server.py"
+HTTP_SERVER = REPO_ROOT / "src/python_run/piper_plus/http_server.py"
 INFER_ONNX = REPO_ROOT / "src/python/piper_train/infer_onnx.py"
 ECAPA = REPO_ROOT / "src/python/piper_train/speaker_encoder/ecapa_tdnn.py"
 

@@ -142,7 +142,7 @@ function find_config(onnx_path, explicit_config=None):
 
 ### 環境変数オーバーライド
 
-`PIPER_MODEL_DIR` 環境変数が設定されている場合、それをキャッシュディレクトリとして使用する。
+`PIPER_PLUS_MODEL_DIR` 環境変数が設定されている場合、それをキャッシュディレクトリとして使用する。
 
 ### Platform Default
 
@@ -217,7 +217,7 @@ function find_config(onnx_path, explicit_config=None):
 
 | 実装 | パス |
 |------|------|
-| Python (高レベル API) | `src/python/piper_plus/_model_resolver.py` |
+| Python (高レベル API) | `src/python_run/piper_plus/api/_model_resolver.py` |
 | Python (学習/推論) | `src/python/piper_train/model_manager.py` |
 | Rust | `src/rust/piper-core/src/model_download.rs` |
 | C# | `src/csharp/PiperPlus.Core/Config/ModelManager.cs` |

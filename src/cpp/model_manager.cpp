@@ -277,16 +277,16 @@ static bool downloadFile(const std::string& url,
     // inherits the parent environment, and env values are never re-parsed as
     // code (injection-safe, so no shell-quoting concerns). The variables are
     // cleared immediately after the spawn returns.
-    _putenv_s("PIPER_DL_URI", url.c_str());
-    _putenv_s("PIPER_DL_OUT", outStr.c_str());
+    _putenv_s("PIPER_PLUS_DL_URI", url.c_str());
+    _putenv_s("PIPER_PLUS_DL_OUT", outStr.c_str());
     const char* argv[] = {
         "powershell", "-NoProfile", "-Command",
-        "Invoke-WebRequest -Uri $env:PIPER_DL_URI -OutFile $env:PIPER_DL_OUT",
+        "Invoke-WebRequest -Uri $env:PIPER_PLUS_DL_URI -OutFile $env:PIPER_PLUS_DL_OUT",
         nullptr,
     };
     int rc = piper_run_argv(argv);
-    _putenv_s("PIPER_DL_URI", "");
-    _putenv_s("PIPER_DL_OUT", "");
+    _putenv_s("PIPER_PLUS_DL_URI", "");
+    _putenv_s("PIPER_PLUS_DL_OUT", "");
     return rc == 0;
 #else
     // Prefer curl, fall back to wget. Look up the binary on PATH locations
@@ -333,7 +333,7 @@ static bool downloadFile(const std::string& url,
 
 std::filesystem::path getDefaultModelDir() {
     // Environment variable takes precedence
-    const char* envDir = std::getenv("PIPER_MODEL_DIR");
+    const char* envDir = std::getenv("PIPER_PLUS_MODEL_DIR");
     if (envDir && envDir[0] != '\0') {
         return fs::path(envDir);
     }

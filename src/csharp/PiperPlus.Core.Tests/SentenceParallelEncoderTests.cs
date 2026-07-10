@@ -13,7 +13,7 @@ namespace PiperPlus.Core.Tests;
 public class SentenceParallelEncoderTests
 {
     /// <summary>
-    /// Set PIPER_G2P_PARALLELISM for the duration of the test, restoring on Dispose.
+    /// Set PIPER_PLUS_G2P_PARALLELISM for the duration of the test, restoring on Dispose.
     /// </summary>
     private sealed class EnvScope : IDisposable
     {

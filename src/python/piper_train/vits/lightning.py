@@ -76,11 +76,11 @@ def _select_ort_providers() -> list:
     CPU 固定だとボトルネックになる (V100×4 環境で 14 sec/step を観測)。
     GPU が利用可能なら CUDA を優先し、速度を 5-10× 改善する。
 
-    環境変数 ``PIPER_FORCE_CPU_ORT=1`` で CPU 固定 (デバッグ・低 VRAM 環境用)。
+    環境変数 ``PIPER_PLUS_FORCE_CPU_ORT=1`` で CPU 固定 (デバッグ・低 VRAM 環境用)。
     """
     import os
 
-    if os.environ.get("PIPER_FORCE_CPU_ORT", "0") == "1":
+    if os.environ.get("PIPER_PLUS_FORCE_CPU_ORT", "0") == "1":
         return ["CPUExecutionProvider"]
 
     import onnxruntime as ort

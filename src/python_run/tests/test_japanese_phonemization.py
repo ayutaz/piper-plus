@@ -12,7 +12,7 @@ class TestTokenMapper:
 
     def test_fixed_pua_mapping(self):
         """Test that fixed PUA mappings are correctly defined"""
-        from piper.phonemize.token_mapper import FIXED_PUA_MAPPING
+        from piper_plus.phonemize.token_mapper import FIXED_PUA_MAPPING
 
         # Check essential mappings exist
         assert "a:" in FIXED_PUA_MAPPING
@@ -42,7 +42,7 @@ class TestTokenMapper:
 
     def test_register_function(self):
         """Test the register function for token mapping"""
-        from piper.phonemize.token_mapper import CHAR2TOKEN, TOKEN2CHAR, register
+        from piper_plus.phonemize.token_mapper import CHAR2TOKEN, TOKEN2CHAR, register
 
         # Test single character token (should return as-is)
         result = register("a")
@@ -60,7 +60,7 @@ class TestTokenMapper:
 
     def test_map_sequence(self):
         """Test mapping a sequence of phonemes"""
-        from piper.phonemize.token_mapper import map_sequence
+        from piper_plus.phonemize.token_mapper import map_sequence
 
         # Test sequence with mixed single and multi-character tokens
         input_seq = ["k", "o", "N", "n", "i", "ch", "i", "w", "a"]
@@ -77,7 +77,7 @@ class TestTokenMapper:
 
     def test_dynamic_allocation(self):
         """Test dynamic PUA allocation for unknown tokens"""
-        from piper.phonemize.token_mapper import register
+        from piper_plus.phonemize.token_mapper import register
 
         # Register a new multi-character token not in fixed mapping
         new_token = "xyz"  # This shouldn't be in fixed mapping
@@ -88,7 +88,7 @@ class TestTokenMapper:
         assert ord(result) >= 0xE020  # Dynamic range starts after fixed
 
         # Should be retrievable
-        from piper.phonemize.token_mapper import TOKEN2CHAR
+        from piper_plus.phonemize.token_mapper import TOKEN2CHAR
 
         assert new_token in TOKEN2CHAR
         assert TOKEN2CHAR[new_token] == result
@@ -99,7 +99,7 @@ class TestJpIdMap:
 
     def test_japanese_phonemes_list(self):
         """Test that Japanese phoneme list is complete"""
-        from piper.phonemize.jp_id_map import JAPANESE_PHONEMES, SPECIAL_TOKENS
+        from piper_plus.phonemize.jp_id_map import JAPANESE_PHONEMES, SPECIAL_TOKENS
 
         # Check essential phonemes exist
         essential_phonemes = [
@@ -149,7 +149,7 @@ class TestJpIdMap:
 
     def test_get_japanese_id_map(self):
         """Test ID map generation"""
-        from piper.phonemize.jp_id_map import get_japanese_id_map
+        from piper_plus.phonemize.jp_id_map import get_japanese_id_map
 
         id_map = get_japanese_id_map()
 
@@ -164,7 +164,7 @@ class TestJpIdMap:
 
         # Check that pause token has ID 0 (padding convention)
         # The mapped version might be PUA, so we need to check the actual mapping
-        from piper.phonemize.token_mapper import register
+        from piper_plus.phonemize.token_mapper import register
 
         pause_mapped = register("_")
         assert pause_mapped in id_map
@@ -175,7 +175,7 @@ class TestJpIdMap:
 
     def test_id_map_consistency(self):
         """Test that ID map is consistent across calls"""
-        from piper.phonemize.jp_id_map import get_japanese_id_map
+        from piper_plus.phonemize.jp_id_map import get_japanese_id_map
 
         map1 = get_japanese_id_map()
         map2 = get_japanese_id_map()
@@ -193,7 +193,7 @@ class TestJapanesePhonemizerModule:
 
     def test_custom_dictionary_class(self):
         """Test CustomDictionary class"""
-        from piper.phonemize.japanese import CustomDictionary
+        from piper_plus.phonemize.japanese import CustomDictionary
 
         # Test empty dictionary
         dict_obj = CustomDictionary()
@@ -206,7 +206,7 @@ class TestJapanesePhonemizerModule:
 
     def test_custom_dictionary_loading(self, tmp_path):
         """Test loading custom dictionary from file"""
-        from piper.phonemize.japanese import CustomDictionary
+        from piper_plus.phonemize.japanese import CustomDictionary
 
         # Create test dictionary file
         dict_file = tmp_path / "test_dict.json"
@@ -226,17 +226,17 @@ class TestJapanesePhonemizerModule:
 
     def test_phonemize_japanese_without_pyopenjtalk(self):
         """Test that phonemize_japanese raises error without pyopenjtalk"""
-        from piper.phonemize.japanese import phonemize_japanese
+        from piper_plus.phonemize.japanese import phonemize_japanese
 
-        with patch("piper.phonemize.japanese.HAS_PYOPENJTALK", False):
+        with patch("piper_plus.phonemize.japanese.HAS_PYOPENJTALK", False):
             with pytest.raises(RuntimeError, match="pyopenjtalk"):
                 phonemize_japanese("こんにちは")
 
     def test_phonemize_japanese_simple(self):
         """Test simple phonemization without prosody"""
         # Mock the module-level pyopenjtalk
-        import piper.phonemize.japanese as jp_module
-        from piper.phonemize.japanese import phonemize_japanese
+        import piper_plus.phonemize.japanese as jp_module
+        from piper_plus.phonemize.japanese import phonemize_japanese
 
         # Create a mock pyopenjtalk module
         mock_pyopenjtalk = MagicMock()
@@ -261,8 +261,8 @@ class TestJapanesePhonemizerModule:
 
     def test_phonemize_japanese_with_prosody(self):
         """Test phonemization with prosody marks"""
-        import piper.phonemize.japanese as jp_module
-        from piper.phonemize.japanese import phonemize_japanese
+        import piper_plus.phonemize.japanese as jp_module
+        from piper_plus.phonemize.japanese import phonemize_japanese
 
         # Create a mock pyopenjtalk module with extract_fullcontext
         mock_pyopenjtalk = MagicMock()
@@ -295,14 +295,14 @@ class TestJapanesePhonemizerModule:
 
     def test_get_default_dictionary(self):
         """Test getting default dictionary"""
-        from piper.phonemize.japanese import get_default_dictionary
+        from piper_plus.phonemize.japanese import get_default_dictionary
 
         # This might return None if dictionary doesn't exist
         dict_obj = get_default_dictionary()
 
         # Should return either CustomDictionary or None
         if dict_obj is not None:
-            from piper.phonemize.japanese import CustomDictionary
+            from piper_plus.phonemize.japanese import CustomDictionary
 
             assert isinstance(dict_obj, CustomDictionary)
 
@@ -313,7 +313,7 @@ class TestPhonemizerCache:
     @staticmethod
     def _ensure_pyopenjtalk():
         """Ensure pyopenjtalk is available on the module after mock-based tests."""
-        import piper.phonemize.japanese as jp_mod
+        import piper_plus.phonemize.japanese as jp_mod
 
         if not hasattr(jp_mod, "pyopenjtalk") or jp_mod.pyopenjtalk is None:
             try:
@@ -329,7 +329,10 @@ class TestPhonemizerCache:
     def test_cache_hit_returns_same_result(self):
         """同一テキストの2回呼び出しで同一結果."""
         self._ensure_pyopenjtalk()
-        from piper.phonemize.japanese import clear_phonemize_cache, phonemize_japanese
+        from piper_plus.phonemize.japanese import (
+            clear_phonemize_cache,
+            phonemize_japanese,
+        )
 
         clear_phonemize_cache()
         result1 = phonemize_japanese("こんにちは")
@@ -339,7 +342,7 @@ class TestPhonemizerCache:
     def test_cache_prosody_flag_separate(self):
         """prosody=True と prosody=False で別キャッシュ."""
         self._ensure_pyopenjtalk()
-        from piper.phonemize.japanese import (
+        from piper_plus.phonemize.japanese import (
             _phonemize_sentence_cached,
             clear_phonemize_cache,
         )
@@ -353,7 +356,7 @@ class TestPhonemizerCache:
     def test_clear_cache(self):
         """cache_clear() 後に再計算."""
         self._ensure_pyopenjtalk()
-        from piper.phonemize.japanese import (
+        from piper_plus.phonemize.japanese import (
             _phonemize_sentence_cached,
             clear_phonemize_cache,
         )
@@ -369,7 +372,7 @@ class TestPhonemizerCache:
     def test_cache_info_stats(self):
         """キャッシュ統計が正しい."""
         self._ensure_pyopenjtalk()
-        from piper.phonemize.japanese import (
+        from piper_plus.phonemize.japanese import (
             _phonemize_sentence_cached,
             clear_phonemize_cache,
         )
@@ -388,8 +391,8 @@ class TestVoiceIntegration:
 
     def test_voice_imports_phonemize_module(self):
         """Test that voice.py can import the phonemize module"""
-        from piper.config import PhonemeType
-        from piper.voice import PiperVoice
+        from piper_plus.config import PhonemeType
+        from piper_plus.voice import PiperVoice
 
         # Create mock config for Japanese
         mock_config = MagicMock()
@@ -404,29 +407,30 @@ class TestVoiceIntegration:
         # produced sentence list, so stub _split_sentences explicitly and
         # let _phonemize_one_factory run unmocked.
         voice._split_sentences = MagicMock(return_value=["こんにちは"])
-        voice._phonemize_one_factory = (
-            lambda: PiperVoice._phonemize_one_factory(voice)
-        )
+        voice._phonemize_one_factory = lambda: PiperVoice._phonemize_one_factory(voice)
 
         # Test that phonemize method uses the JA phonemizer
-        with patch("piper.phonemize.japanese.phonemize_japanese") as mock_phonemize:
+        with patch(
+            "piper_plus.phonemize.japanese.phonemize_japanese"
+        ) as mock_phonemize:
             mock_phonemize.return_value = ["k", "o", "n", "n", "i", "ch", "i", "w", "a"]
             with patch(
-                "piper.phonemize.japanese.get_default_dictionary", return_value=None
+                "piper_plus.phonemize.japanese.get_default_dictionary",
+                return_value=None,
             ):
                 PiperVoice.phonemize(voice, "こんにちは")
                 assert mock_phonemize.called
 
     def test_multi_char_to_pua_consistency(self):
         """Test that MULTI_CHAR_TO_PUA in voice.py matches token_mapper"""
-        from piper.phonemize.token_mapper import FIXED_PUA_MAPPING
-        from piper.voice import MULTI_CHAR_TO_PUA
+        from piper_plus.phonemize.token_mapper import FIXED_PUA_MAPPING
+        from piper_plus.voice import MULTI_CHAR_TO_PUA
 
         # Convert FIXED_PUA_MAPPING to same format as MULTI_CHAR_TO_PUA
         fixed_as_chars = {k: chr(v) for k, v in FIXED_PUA_MAPPING.items()}
 
         # They should be identical
-        assert MULTI_CHAR_TO_PUA == fixed_as_chars, (
+        assert fixed_as_chars == MULTI_CHAR_TO_PUA, (
             "PUA mappings don't match between modules"
         )
 
@@ -437,18 +441,18 @@ class TestPackageStructure:
     def test_phonemize_package_exists(self):
         """Test that phonemize package can be imported"""
         try:
-            import piper.phonemize
+            import piper_plus.phonemize
 
-            assert piper.phonemize is not None
+            assert piper_plus.phonemize is not None
         except ImportError:
-            pytest.fail("Cannot import piper.phonemize package")
+            pytest.fail("Cannot import piper_plus.phonemize package")
 
     def test_all_modules_importable(self):
         """Test that all phonemize modules can be imported"""
         modules = [
-            "piper.phonemize.token_mapper",
-            "piper.phonemize.jp_id_map",
-            "piper.phonemize.japanese",
+            "piper_plus.phonemize.token_mapper",
+            "piper_plus.phonemize.jp_id_map",
+            "piper_plus.phonemize.japanese",
         ]
 
         for module_name in modules:
@@ -459,7 +463,7 @@ class TestPackageStructure:
 
     def test_public_api(self):
         """Test that public API is accessible"""
-        from piper.phonemize import (
+        from piper_plus.phonemize import (
             get_japanese_id_map,
             map_sequence,
             phonemize_japanese,

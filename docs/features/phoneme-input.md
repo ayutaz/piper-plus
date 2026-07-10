@@ -16,7 +16,7 @@ The phoneme input feature allows users to directly specify phonemes using the `[
 Wrap phonemes in double square brackets:
 
 ```bash
-echo "Hello [[ h ə l oʊ ]] world" | piper --model en_US-lessac-medium.onnx -f output.wav
+echo "Hello [[ h ə l oʊ ]] world" | piper-plus --model en_US-lessac-medium.onnx -f output.wav
 ```
 
 ### Examples
@@ -27,20 +27,20 @@ echo "Hello [[ h ə l oʊ ]] world" | piper --model en_US-lessac-medium.onnx -f 
 
 ```bash
 # Custom pronunciation for a name
-echo "My name is [[ dʒ ɒ n ]] (John)" | piper --model en_US-lessac-medium.onnx -f john.wav
+echo "My name is [[ dʒ ɒ n ]] (John)" | piper-plus --model en_US-lessac-medium.onnx -f john.wav
 
 # Technical acronym
-echo "The [[ aɪ diː iː ]] (IDE) is ready" | piper --model en_US-lessac-medium.onnx -f ide.wav
+echo "The [[ aɪ diː iː ]] (IDE) is ready" | piper-plus --model en_US-lessac-medium.onnx -f ide.wav
 ```
 
 #### Japanese (OpenJTalk phonemes)
 
 ```bash
 # Hiragana with custom reading
-echo "今日は [[ ky o o w a ]] いい天気です" | piper --model multilingual-test-medium.onnx -f weather.wav
+echo "今日は [[ ky o o w a ]] いい天気です" | piper-plus --model multilingual-test-medium.onnx -f weather.wav
 
 # Foreign name in katakana context
-echo "私は [[ m a i k u r u ]] です" | piper --model multilingual-test-medium.onnx -f michael.wav
+echo "私は [[ m a i k u r u ]] です" | piper-plus --model multilingual-test-medium.onnx -f michael.wav
 ```
 
 ### Phoneme Systems
@@ -69,40 +69,40 @@ echo "私は [[ m a i k u r u ]] です" | piper --model multilingual-test-mediu
 
 ```bash
 # Mandarin with tone markers
-echo "今天 [[ tɕ in tone1 tʰ iaŋ tone1 ]] 很好" | piper --model multilingual-test-medium.onnx -f today.wav
+echo "今天 [[ tɕ in tone1 tʰ iaŋ tone1 ]] 很好" | piper-plus --model multilingual-test-medium.onnx -f today.wav
 
 # Pinyin "拼音"
-echo "[[ pʰ in tone1 i in tone1 ]]" | piper --model multilingual-test-medium.onnx -f pinyin.wav
+echo "[[ pʰ in tone1 i in tone1 ]]" | piper-plus --model multilingual-test-medium.onnx -f pinyin.wav
 ```
 
 #### Spanish (rule-based IPA)
 
 ```bash
 # Standard greeting
-echo "[[ ˈ o l a ]]" | piper --model multilingual-test-medium.onnx -f hola.wav
+echo "[[ ˈ o l a ]]" | piper-plus --model multilingual-test-medium.onnx -f hola.wav
 
 # Mixed text and phoneme override
-echo "Buenos [[ d i a s ]]" | piper --model multilingual-test-medium.onnx -f buenos_dias.wav
+echo "Buenos [[ d i a s ]]" | piper-plus --model multilingual-test-medium.onnx -f buenos_dias.wav
 ```
 
 #### Portuguese (Brazilian IPA)
 
 ```bash
 # "obrigado" with nasal vowel
-echo "[[ o b ɾ i ɡ a d u ]]" | piper --model multilingual-test-medium.onnx -f obrigado.wav
+echo "[[ o b ɾ i ɡ a d u ]]" | piper-plus --model multilingual-test-medium.onnx -f obrigado.wav
 
 # Nasal vowel example: "bom"
-echo "[[ b õ ]]" | piper --model multilingual-test-medium.onnx -f bom.wav
+echo "[[ b õ ]]" | piper-plus --model multilingual-test-medium.onnx -f bom.wav
 ```
 
 #### French (rule-based IPA)
 
 ```bash
 # "bonjour"
-echo "[[ b ɔ̃ ʒ u ʁ ]]" | piper --model multilingual-test-medium.onnx -f bonjour.wav
+echo "[[ b ɔ̃ ʒ u ʁ ]]" | piper-plus --model multilingual-test-medium.onnx -f bonjour.wav
 
 # Nasal vowel example: "vin blanc"
-echo "[[ v ɛ̃ b l ɑ̃ ]]" | piper --model multilingual-test-medium.onnx -f vin_blanc.wav
+echo "[[ v ɛ̃ b l ɑ̃ ]]" | piper-plus --model multilingual-test-medium.onnx -f vin_blanc.wav
 ```
 
 ### Phoneme System Details
@@ -338,16 +338,16 @@ echo "[[ v ɛ̃ b l ɑ̃ ]]" | piper --model multilingual-test-medium.onnx -f vi
 
 ```bash
 # English with specific pronunciation hints
-echo "The word 'read' can be [[ r iː d ]] or [[ r ɛ d ]]" | piper --model en_US-lessac-medium.onnx -f read.wav
+echo "The word 'read' can be [[ r iː d ]] or [[ r ɛ d ]]" | piper-plus --model en_US-lessac-medium.onnx -f read.wav
 
 # Japanese with furigana-like pronunciation
-echo "漢字[[ k a N j i ]]の読み方" | piper --model multilingual-test-medium.onnx -f kanji.wav
+echo "漢字[[ k a N j i ]]の読み方" | piper-plus --model multilingual-test-medium.onnx -f kanji.wav
 ```
 
 #### Multiple Phoneme Segments
 
 ```bash
-echo "Say [[ h ə l oʊ ]] and [[ g ʊ d b aɪ ]]" | piper --model en_US-lessac-medium.onnx -f greetings.wav
+echo "Say [[ h ə l oʊ ]] and [[ g ʊ d b aɪ ]]" | piper-plus --model en_US-lessac-medium.onnx -f greetings.wav
 ```
 
 ## Implementation Details
@@ -490,7 +490,7 @@ These multi-character phonemes are shared across Spanish, Portuguese, and French
 Enable debug logging to see phoneme processing:
 
 ```bash
-echo "Test [[ t ɛ s t ]]" | piper --model model.onnx --debug -f test.wav
+echo "Test [[ t ɛ s t ]]" | piper-plus --model model.onnx --debug -f test.wav
 ```
 
 ## See Also

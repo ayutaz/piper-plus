@@ -90,8 +90,8 @@ jobs:
             -v ${{ github.workspace }}/tests/fixtures/mb_istft_speaker_embedding:/fixture:ro \
             -v /tmp/output:/output \
             -e CUDA_VISIBLE_DEVICES="" \
-            -e PIPER_DISABLE_CACHE=1 \
-            -e PIPER_DISABLE_WARMUP=1 \
+            -e PIPER_PLUS_DISABLE_CACHE=1 \
+            -e PIPER_PLUS_DISABLE_WARMUP=1 \
             piper-python-inference:e2e-426 \
             python inference.py \
               --model /fixture/model.onnx \
@@ -125,8 +125,8 @@ jobs:
             -p 8000:8000 \
             -v ${{ github.workspace }}/tests/fixtures/mb_istft_speaker_embedding:/fixture:ro \
             -e CUDA_VISIBLE_DEVICES="" \
-            -e PIPER_DISABLE_CACHE=1 \
-            -e PIPER_DISABLE_WARMUP=1 \
+            -e PIPER_PLUS_DISABLE_CACHE=1 \
+            -e PIPER_PLUS_DISABLE_WARMUP=1 \
             piper-python-inference:e2e-426 \
             python /app/inference.py --server \
               --model /fixture/model.onnx \

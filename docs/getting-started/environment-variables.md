@@ -10,9 +10,9 @@ This document lists all environment variables that can be used to configure Pipe
 - **Used by**: C++, C#, Go, Rust (dictionary download manager)
 - **Default**: Auto-downloaded to user data directory
 - **Platform defaults**:
-  - Windows: `%APPDATA%\piper\open_jtalk_dic_utf_8-1.11`
-  - Linux: `~/.local/share/piper/open_jtalk_dic_utf_8-1.11`
-  - macOS: `~/.local/share/piper/open_jtalk_dic_utf_8-1.11`
+  - Windows: `%APPDATA%\piper-plus\open_jtalk_dic_utf_8-1.11`
+  - Linux: `~/.local/share/piper-plus/open_jtalk_dic_utf_8-1.11`
+  - macOS: `~/.local/share/piper-plus/open_jtalk_dic_utf_8-1.11`
 - **Example**:
 
   ```bash
@@ -40,15 +40,15 @@ This document lists all environment variables that can be used to configure Pipe
 
 ## Dictionary Paths
 
-### PIPER_DICTIONARIES_PATH
+### PIPER_PLUS_DICTIONARIES_PATH
 
 - **Description**: Path to a directory containing custom dictionary files (JSON v1.0/v2.0 format). Used as a fallback search location when dictionaries are not found next to the model or executable.
 - **Used by**: C++, Go
-- **Search order**: model directory -> executable-relative directory -> `PIPER_DICTIONARIES_PATH`
+- **Search order**: model directory -> executable-relative directory -> `PIPER_PLUS_DICTIONARIES_PATH`
 - **Example**:
 
   ```bash
-  export PIPER_DICTIONARIES_PATH=/opt/piper/dictionaries
+  export PIPER_PLUS_DICTIONARIES_PATH=/opt/piper/dictionaries
   ```
 
 ### JPREPROCESS_DICT
@@ -100,7 +100,7 @@ This document lists all environment variables that can be used to configure Pipe
 
 ## Download Control
 
-### PIPER_AUTO_DOWNLOAD_DICT
+### PIPER_PLUS_AUTO_DOWNLOAD_DICT
 
 - **Description**: Control automatic download of OpenJTalk dictionary files
 - **Values**:
@@ -110,10 +110,10 @@ This document lists all environment variables that can be used to configure Pipe
 
   ```bash
   # Disable auto-download
-  export PIPER_AUTO_DOWNLOAD_DICT=0
+  export PIPER_PLUS_AUTO_DOWNLOAD_DICT=0
   ```
 
-### PIPER_OFFLINE_MODE
+### PIPER_PLUS_OFFLINE_MODE
 
 - **Description**: Enable offline mode (no network access)
 - **Values**:
@@ -123,12 +123,12 @@ This document lists all environment variables that can be used to configure Pipe
 
   ```bash
   # Enable offline mode
-  export PIPER_OFFLINE_MODE=1
+  export PIPER_PLUS_OFFLINE_MODE=1
   ```
 
 ## Model Configuration
 
-### PIPER_DEFAULT_MODEL
+### PIPER_PLUS_DEFAULT_MODEL
 
 - **Description**: Default ONNX model path, used when `--model` is not specified on the command line
 - **Used by**: Rust, C#
@@ -137,13 +137,13 @@ This document lists all environment variables that can be used to configure Pipe
 
   ```bash
   # Windows
-  set PIPER_DEFAULT_MODEL=C:\models\ja_JP-tsukuyomi-medium.onnx
+  set PIPER_PLUS_DEFAULT_MODEL=C:\models\ja_JP-tsukuyomi-medium.onnx
 
   # Linux/macOS
-  export PIPER_DEFAULT_MODEL=/opt/piper/models/ja_JP-tsukuyomi-medium.onnx
+  export PIPER_PLUS_DEFAULT_MODEL=/opt/piper/models/ja_JP-tsukuyomi-medium.onnx
   ```
 
-### PIPER_DEFAULT_CONFIG
+### PIPER_PLUS_DEFAULT_CONFIG
 
 - **Description**: Default model configuration file path (JSON), used when `--config` is not specified on the command line
 - **Used by**: Rust, C#
@@ -152,28 +152,28 @@ This document lists all environment variables that can be used to configure Pipe
 
   ```bash
   # Windows
-  set PIPER_DEFAULT_CONFIG=C:\models\ja_JP-tsukuyomi-medium.onnx.json
+  set PIPER_PLUS_DEFAULT_CONFIG=C:\models\ja_JP-tsukuyomi-medium.onnx.json
 
   # Linux/macOS
-  export PIPER_DEFAULT_CONFIG=/opt/piper/models/ja_JP-tsukuyomi-medium.onnx.json
+  export PIPER_PLUS_DEFAULT_CONFIG=/opt/piper/models/ja_JP-tsukuyomi-medium.onnx.json
   ```
 
-### PIPER_MODEL_DIR
+### PIPER_PLUS_MODEL_DIR
 
 - **Description**: Directory where models are downloaded to, used when `--model-dir` is not specified on the command line
 - **Used by**: Rust, C#
 - **Default**: Platform-specific user data directory
-  - Windows: `%APPDATA%\piper\models`
-  - Linux: `~/.local/share/piper/models`
-  - macOS: `~/.local/share/piper/models`
+  - Windows: `%APPDATA%\piper-plus\models`
+  - Linux: `~/.local/share/piper-plus/models`
+  - macOS: `~/.local/share/piper-plus/models`
 - **Example**:
 
   ```bash
   # Windows
-  set PIPER_MODEL_DIR=D:\piper-models
+  set PIPER_PLUS_MODEL_DIR=D:\piper-models
 
   # Linux/macOS
-  export PIPER_MODEL_DIR=/opt/piper/models
+  export PIPER_PLUS_MODEL_DIR=/opt/piper/models
   ```
 
 ## Runtime Configuration
@@ -184,7 +184,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Status**: **Legacy / preprocessing only** — the default piper-plus runtime no longer uses eSpeak-ng for phonemization, which is handled by the in-house G2P stack (Python/Rust/C#/Go). However, this variable may still be referenced by legacy, bundled, or preprocessing workflows that rely on `espeak-ng`.
 - **Legacy note**: Historically required by upstream `piper`, and still relevant for any remaining espeak-based tooling or preprocessing paths in this repository.
 
-### PIPER_GPU_DEVICE_ID
+### PIPER_PLUS_GPU_DEVICE_ID
 
 - **Description**: GPU device ID to use for CUDA inference
 - **Default**: `0` (first GPU)
@@ -192,10 +192,10 @@ This document lists all environment variables that can be used to configure Pipe
 
   ```bash
   # Use the second GPU
-  export PIPER_GPU_DEVICE_ID=1
+  export PIPER_PLUS_GPU_DEVICE_ID=1
   ```
 
-### PIPER_DISABLE_WARMUP
+### PIPER_PLUS_DISABLE_WARMUP
 
 - **Description**: Disable ONNX Runtime warmup (dummy inference runs). Accepts `1`, `true`, or `yes` to disable. Default is enabled (warmup runs on startup).
 - **Used by**: Python inference scripts (`infer_onnx.py`, `voice.py`, Docker inference, WebUI)
@@ -203,10 +203,10 @@ This document lists all environment variables that can be used to configure Pipe
 - **Example**:
 
   ```bash
-  export PIPER_DISABLE_WARMUP=1
+  export PIPER_PLUS_DISABLE_WARMUP=1
   ```
 
-### PIPER_DISABLE_CACHE
+### PIPER_PLUS_DISABLE_CACHE
 
 - **Description**: Disable ONNX Runtime optimized model cache (`.opt.onnx` files). Accepts `1`, `true`, or `yes` to disable. Default is enabled (cache files are generated).
 - **Used by**: Python inference scripts
@@ -214,10 +214,10 @@ This document lists all environment variables that can be used to configure Pipe
 - **Example**:
 
   ```bash
-  export PIPER_DISABLE_CACHE=1
+  export PIPER_PLUS_DISABLE_CACHE=1
   ```
 
-### PIPER_INTRA_THREADS
+### PIPER_PLUS_INTRA_THREADS
 
 - **Description**: Explicitly set the number of ONNX Runtime intra-op threads. When not set, defaults to `min(logical_cores / 2, 4)`.
 - **Used by**: Python inference scripts
@@ -225,7 +225,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Example**:
 
   ```bash
-  export PIPER_INTRA_THREADS=2
+  export PIPER_PLUS_INTRA_THREADS=2
   ```
 
 ### ONNX_RUNTIME_SHARED_LIBRARY_PATH
@@ -238,7 +238,7 @@ This document lists all environment variables that can be used to configure Pipe
   export ONNX_RUNTIME_SHARED_LIBRARY_PATH=/usr/lib/libonnxruntime.so
   ```
 
-### PIPER_PHONEMIZE_DEBUG
+### PIPER_PLUS_PHONEMIZE_DEBUG
 
 - **Description**: Enable debug output for the legacy bundled piper-phonemize module
 - **Status**: **Legacy / preprocessing only** — only recognized by `src/piper_phonemize_bundled/` (used by `preprocess.py` for eSpeak-based phoneme types). Not available in the main Python inference path (`src/python_run/`) or any other runtime.
@@ -247,7 +247,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Example**:
 
   ```bash
-  export PIPER_PHONEMIZE_DEBUG=1
+  export PIPER_PLUS_PHONEMIZE_DEBUG=1
   ```
 
 ### LD_LIBRARY_PATH (Linux)
@@ -276,7 +276,7 @@ This document lists all environment variables that can be used to configure Pipe
 
 ```bash
 # No environment variables needed - will auto-download on first use
-echo "こんにちは" | piper --model ja_JP-model.onnx --output_file hello.wav
+echo "こんにちは" | piper-plus --model ja_JP-model.onnx --output_file hello.wav
 ```
 
 ### Custom dictionary location
@@ -284,20 +284,20 @@ echo "こんにちは" | piper --model ja_JP-model.onnx --output_file hello.wav
 ```bash
 # Windows
 set OPENJTALK_DICTIONARY_PATH=C:\my-dictionary
-echo "テスト" | piper --model ja_JP-model.onnx --output_file test.wav
+echo "テスト" | piper-plus --model ja_JP-model.onnx --output_file test.wav
 
 # Linux/macOS
 export OPENJTALK_DICTIONARY_PATH=/opt/my-dictionary
-echo "テスト" | piper --model ja_JP-model.onnx --output_file test.wav
+echo "テスト" | piper-plus --model ja_JP-model.onnx --output_file test.wav
 ```
 
 ### Offline mode (no downloads)
 
 ```bash
 # Must have dictionary files already installed
-export PIPER_OFFLINE_MODE=1
+export PIPER_PLUS_OFFLINE_MODE=1
 export OPENJTALK_DICTIONARY_PATH=/path/to/existing/dictionary
-echo "オフライン" | piper --model ja_JP-model.onnx --output_file offline.wav
+echo "オフライン" | piper-plus --model ja_JP-model.onnx --output_file offline.wav
 ```
 
 ## Precedence Order
@@ -312,14 +312,14 @@ Environment variables are checked in the following order:
 
 ### Dictionary not found
 
-1. Check if `PIPER_AUTO_DOWNLOAD_DICT=0` is set
+1. Check if `PIPER_PLUS_AUTO_DOWNLOAD_DICT=0` is set
 2. Verify `OPENJTALK_DICTIONARY_PATH` points to valid directory
 3. Ensure dictionary files exist (sys.dic, unk.dic, etc.)
 
 ### Download failures
 
 1. Check internet connection
-2. Verify `PIPER_OFFLINE_MODE` is not set to 1
+2. Verify `PIPER_PLUS_OFFLINE_MODE` is not set to 1
 3. Check write permissions to data directory
 4. Look for proxy/firewall issues
 

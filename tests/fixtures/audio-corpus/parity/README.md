@@ -25,7 +25,7 @@ runtime CLI もこれに揃える):
 `[1, 10, 0, 11, 0, 12, 0, 13, 0, 14, 0, 2]` は `test/models/multilingual-test-medium.onnx`
 の `phoneme_id_map` で `^ a _ i _ u _ e _ o _ $` に相当する 12-ID 列。
 `PhonemeType.MULTILINGUAL` の intersperse padding 慣例
-(`src/python_run/piper/voice.py:phonemes_to_ids`) を踏襲。
+(`src/python_run/piper_plus/voice.py:phonemes_to_ids`) を踏襲。
 
 ## zero_shot_phoneme_ids.jsonl + test_speaker.npy
 

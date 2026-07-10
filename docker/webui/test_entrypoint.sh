@@ -45,11 +45,11 @@ run_test "set -e present" "grep -q 'set -e' '$ENTRYPOINT'"
 # 5. Uses exec to replace shell process
 run_test "exec used for app launch" "grep -q 'exec python' '$ENTRYPOINT'"
 
-# 6. References PIPER_MODEL env var
-run_test "PIPER_MODEL check" "grep -q 'PIPER_MODEL' '$ENTRYPOINT'"
+# 6. References PIPER_PLUS_MODEL env var
+run_test "PIPER_PLUS_MODEL check" "grep -q 'PIPER_PLUS_MODEL' '$ENTRYPOINT'"
 
-# 7. References PIPER_MODEL_DIR with default
-run_test "PIPER_MODEL_DIR default /models" "grep -q 'PIPER_MODEL_DIR:-/models' '$ENTRYPOINT'"
+# 7. References PIPER_PLUS_MODEL_DIR with default
+run_test "PIPER_PLUS_MODEL_DIR default /models" "grep -q 'PIPER_PLUS_MODEL_DIR:-/models' '$ENTRYPOINT'"
 
 # 8. Passes model-dir and output-dir to app.py
 run_test "passes --model-dir" "grep -q '\-\-model-dir' '$ENTRYPOINT'"
@@ -67,10 +67,10 @@ DOCKERFILE="$SCRIPT_DIR/Dockerfile"
 run_test "Dockerfile copies entrypoint.sh" "grep -q 'entrypoint.sh' '$DOCKERFILE'"
 run_test "Dockerfile sets ENTRYPOINT" "grep -q 'ENTRYPOINT' '$DOCKERFILE'"
 
-# 12. docker-compose.yml passes PIPER_MODEL
+# 12. docker-compose.yml passes PIPER_PLUS_MODEL
 COMPOSE="$SCRIPT_DIR/docker-compose.yml"
-run_test "compose passes PIPER_MODEL" "grep -q 'PIPER_MODEL' '$COMPOSE'"
-run_test "compose passes PIPER_MODEL_DIR" "grep -q 'PIPER_MODEL_DIR' '$COMPOSE'"
+run_test "compose passes PIPER_PLUS_MODEL" "grep -q 'PIPER_PLUS_MODEL' '$COMPOSE'"
+run_test "compose passes PIPER_PLUS_MODEL_DIR" "grep -q 'PIPER_PLUS_MODEL_DIR' '$COMPOSE'"
 
 echo ""
 echo "=== Summary ==="

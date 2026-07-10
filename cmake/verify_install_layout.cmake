@@ -93,7 +93,7 @@ endif()
 check_exists("${PREFIX}/lib/cmake/PiperPlus/PiperPlusConfigVersion.cmake" "CMake ConfigVersion")
 
 # G2P dictionaries
-check_exists("${PREFIX}/share/piper/dicts/cmudict_data.json" "CMU English dictionary")
+check_exists("${PREFIX}/share/piper-plus/dicts/cmudict_data.json" "CMU English dictionary")
 
 # ONNX Runtime license
 if(IS_DIRECTORY "${PREFIX}/share/licenses/onnxruntime")

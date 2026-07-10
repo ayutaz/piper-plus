@@ -1,5 +1,5 @@
 // Command bench-pipeline measures the effect of issue #383 Phase 1
-// (parallel G2P) on Voice.SynthesizeStream by comparing PIPER_G2P_PARALLELISM=1
+// (parallel G2P) on Voice.SynthesizeStream by comparing PIPER_PLUS_G2P_PARALLELISM=1
 // (serial path) against unset (auto = up to 4 workers).
 //
 // Usage:
@@ -101,12 +101,12 @@ func run() error {
 
 	for _, cfg := range []string{"serial", "auto"} {
 		if cfg == "serial" {
-			if err := os.Setenv("PIPER_G2P_PARALLELISM", "1"); err != nil {
-				return fmt.Errorf("setenv PIPER_G2P_PARALLELISM: %w", err)
+			if err := os.Setenv("PIPER_PLUS_G2P_PARALLELISM", "1"); err != nil {
+				return fmt.Errorf("setenv PIPER_PLUS_G2P_PARALLELISM: %w", err)
 			}
 		} else {
-			if err := os.Unsetenv("PIPER_G2P_PARALLELISM"); err != nil {
-				return fmt.Errorf("unsetenv PIPER_G2P_PARALLELISM: %w", err)
+			if err := os.Unsetenv("PIPER_PLUS_G2P_PARALLELISM"); err != nil {
+				return fmt.Errorf("unsetenv PIPER_PLUS_G2P_PARALLELISM: %w", err)
 			}
 		}
 

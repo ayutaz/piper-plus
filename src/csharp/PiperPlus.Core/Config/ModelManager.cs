@@ -31,16 +31,16 @@ public static class ModelManager
     /// <summary>
     /// Returns the OS-specific default model directory.
     /// <list type="bullet">
-    ///   <item><description>Windows: <c>%APPDATA%\piper\models</c></description></item>
-    ///   <item><description>macOS:   <c>~/Library/Application Support/piper/models</c></description></item>
-    ///   <item><description>Linux:   <c>$XDG_DATA_HOME/piper/models</c> or <c>~/.local/share/piper/models</c></description></item>
+    ///   <item><description>Windows: <c>%APPDATA%\piper-plus\models</c></description></item>
+    ///   <item><description>macOS:   <c>~/Library/Application Support/piper-plus/models</c></description></item>
+    ///   <item><description>Linux:   <c>$XDG_DATA_HOME/piper-plus/models</c> or <c>~/.local/share/piper-plus/models</c></description></item>
     /// </list>
-    /// Override with the <c>PIPER_MODEL_DIR</c> environment variable.
+    /// Override with the <c>PIPER_PLUS_MODEL_DIR</c> environment variable.
     /// </summary>
     /// <returns></returns>
     public static string GetDefaultModelDir()
     {
-        var envDir = Environment.GetEnvironmentVariable("PIPER_MODEL_DIR");
+        var envDir = Environment.GetEnvironmentVariable("PIPER_PLUS_MODEL_DIR");
         if (!string.IsNullOrEmpty(envDir))
         {
             return envDir;
@@ -51,7 +51,7 @@ public static class ModelManager
             var appData = Environment.GetFolderPath(
                 Environment.SpecialFolder.ApplicationData);
             return !string.IsNullOrEmpty(appData)
-                ? Path.Join(appData, "piper", "models")
+                ? Path.Join(appData, "piper-plus", "models")
                 : "models";
         }
 
@@ -61,7 +61,7 @@ public static class ModelManager
                 Environment.SpecialFolder.UserProfile);
             return !string.IsNullOrEmpty(home)
                 ? Path.Join(home, "Library", "Application Support",
-                               "piper", "models")
+                               "piper-plus", "models")
                 : "models";
         }
 
@@ -69,13 +69,13 @@ public static class ModelManager
         var xdgData = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
         if (!string.IsNullOrEmpty(xdgData))
         {
-            return Path.Join(xdgData, "piper", "models");
+            return Path.Join(xdgData, "piper-plus", "models");
         }
 
         var linuxHome = Environment.GetFolderPath(
             Environment.SpecialFolder.UserProfile);
         return !string.IsNullOrEmpty(linuxHome)
-            ? Path.Join(linuxHome, ".local", "share", "piper", "models")
+            ? Path.Join(linuxHome, ".local", "share", "piper-plus", "models")
             : "models";
     }
 

@@ -192,7 +192,7 @@ repos:
         entry: uv run --no-sync python scripts/check_pua_consistency.py --check-version
         language: system
         # Mirror of paths in .github/workflows/pua-consistency.yml
-        files: ^(src/python/g2p/piper_plus_g2p/data/pua\.json|src/python/g2p/piper_plus_g2p/encode/.+|src/python_run/piper/phonemize/token_mapper\.py|src/rust/piper-plus-g2p/src/token_map\.rs|src/go/phonemize/pua\.go|src/go/phonemize/pua_test\.go|src/wasm/g2p/src/pua-map\.js|src/csharp/PiperPlus\.Core/Mapping/OpenJTalkToPiperMapping\.cs|src/cpp/phoneme_parser\.cpp)$
+        files: ^(src/python/g2p/piper_plus_g2p/data/pua\.json|src/python/g2p/piper_plus_g2p/encode/.+|src/python_run/piper_plus/phonemize/token_mapper\.py|src/rust/piper-plus-g2p/src/token_map\.rs|src/go/phonemize/pua\.go|src/go/phonemize/pua_test\.go|src/wasm/g2p/src/pua-map\.js|src/csharp/PiperPlus\.Core/Mapping/OpenJTalkToPiperMapping\.cs|src/cpp/phoneme_parser\.cpp)$
         pass_filenames: false
 
       - id: pua-fixture-drift
@@ -246,7 +246,7 @@ repos:
         name: Streaming API contract (toml meta gate)
         entry: uv run --no-sync python scripts/check_streaming_api_contract.py
         language: system
-        files: ^(docs/spec/streaming-api-contract\.toml|scripts/check_streaming_api_contract\.py|src/python_run/piper/text_splitter\.py|src/rust/piper-core/src/streaming\.rs|src/go/piperplus/streaming\.go)$
+        files: ^(docs/spec/streaming-api-contract\.toml|scripts/check_streaming_api_contract\.py|src/python_run/piper_plus/text_splitter\.py|src/rust/piper-core/src/streaming\.rs|src/go/piperplus/streaming\.go)$
         pass_filenames: false
 
       # Swift G2P xcframework ABI / JSON envelope / default-language の
@@ -326,7 +326,7 @@ repos:
         name: Short-text strategy contract (6 runtimes vs toml)
         entry: uv run --no-sync python scripts/check_short_text_contract.py
         language: system
-        files: ^(docs/spec/short-text-contract\.toml|scripts/check_short_text_contract\.py|src/python_run/piper/voice\.py|src/rust/piper-core/src/short_text\.rs|src/go/piperplus/.*\.go)$
+        files: ^(docs/spec/short-text-contract\.toml|scripts/check_short_text_contract\.py|src/python_run/piper_plus/voice\.py|src/rust/piper-core/src/short_text\.rs|src/go/piperplus/.*\.go)$
         pass_filenames: false
 
       # Text splitter (.!?。！？．) 終止符による文単位分割の cross-runtime
@@ -336,7 +336,7 @@ repos:
         name: Text splitter contract (sentence-boundary parity)
         entry: uv run --no-sync python scripts/check_text_splitter_contract.py
         language: system
-        files: ^(docs/spec/text-splitter-contract\.toml|scripts/check_text_splitter_contract\.py|src/python_run/piper/text_splitter\.py|src/rust/piper-core/src/streaming\.rs)$
+        files: ^(docs/spec/text-splitter-contract\.toml|scripts/check_text_splitter_contract\.py|src/python_run/piper_plus/text_splitter\.py|src/rust/piper-core/src/streaming\.rs)$
         pass_filenames: false
 
       # ONNX export の opset / checker / shape_inference / FP16 / EMA contract
@@ -355,7 +355,7 @@ repos:
         name: Inference input contract (cross-runtime parity)
         entry: uv run --no-sync python scripts/check_inference_input_contract.py
         language: system
-        files: ^(docs/spec/inference-input-contract\.toml|scripts/check_inference_input_contract\.py|src/python_run/piper/voice\.py|src/rust/piper-core/src/(engine|inference)\.rs|src/go/piperplus/synthesize\.go|src/csharp/PiperPlus\.Core/Inference/PiperSession\.cs|src/cpp/piper_plus\.cpp)$
+        files: ^(docs/spec/inference-input-contract\.toml|scripts/check_inference_input_contract\.py|src/python_run/piper_plus/voice\.py|src/rust/piper-core/src/(engine|inference)\.rs|src/go/piperplus/synthesize\.go|src/csharp/PiperPlus\.Core/Inference/PiperSession\.cs|src/cpp/piper_plus\.cpp)$
         pass_filenames: false
 
       # Audio output format (sample_rate=22050 / 16-bit / mono / LE) の
@@ -365,7 +365,7 @@ repos:
         name: Audio output format contract (WAV header parity)
         entry: uv run --no-sync python scripts/check_audio_format_contract.py
         language: system
-        files: ^(docs/spec/audio-format-contract\.toml|scripts/check_audio_format_contract\.py|src/python_run/piper/(voice|http_server|webui)\.py|src/rust/piper-core/src/engine\.rs|src/go/piperplus/synthesize\.go|src/csharp/PiperPlus\.Core/Inference/PiperSession\.cs|src/cpp/piper_plus\.cpp|src/wasm/openjtalk-web/src/index\.js)$
+        files: ^(docs/spec/audio-format-contract\.toml|scripts/check_audio_format_contract\.py|src/python_run/piper_plus/(voice|http_server|webui)\.py|src/rust/piper-core/src/engine\.rs|src/go/piperplus/synthesize\.go|src/csharp/PiperPlus\.Core/Inference/PiperSession\.cs|src/cpp/piper_plus\.cpp|src/wasm/openjtalk-web/src/index\.js)$
         pass_filenames: false
 
       # ORT session warmup / threading / opt_path contract gate。 全 runtime の
@@ -375,7 +375,7 @@ repos:
         name: ORT session initialization contract
         entry: uv run --no-sync python scripts/check_ort_session_contract.py
         language: system
-        files: ^(docs/spec/ort-session-contract\.toml|scripts/check_ort_session_contract\.py|src/python/piper_train/ort_utils\.py|src/python_run/piper/voice\.py|src/rust/piper-core/src/session\.rs|src/go/piperplus/.*\.go)$
+        files: ^(docs/spec/ort-session-contract\.toml|scripts/check_ort_session_contract\.py|src/python/piper_train/ort_utils\.py|src/python_run/piper_plus/voice\.py|src/rust/piper-core/src/session\.rs|src/go/piperplus/.*\.go)$
         pass_filenames: false
 
       # ORT provider (CPU/CUDA/CoreML) parity contract gate。
@@ -597,7 +597,7 @@ repos:
         name: voice catalog parity (canonical vs 5 runtime mirrors)
         entry: uv run --no-sync python scripts/check_voice_catalog_parity.py
         language: system
-        files: ^(test/model_resolution_vectors\.json|src/python_run/piper/download\.py|src/cpp/piper_plus_voices\.json|src/rust/piper-core/src/model_download\.rs|src/csharp/PiperPlus\.Core/Config/VoiceCatalog\.cs|src/go/piperplus/voice_catalog\.go|scripts/check_voice_catalog_parity\.py)$
+        files: ^(test/model_resolution_vectors\.json|src/python_run/piper_plus/download\.py|src/cpp/piper_plus_voices\.json|src/rust/piper-core/src/model_download\.rs|src/csharp/PiperPlus\.Core/Config/VoiceCatalog\.cs|src/go/piperplus/voice_catalog\.go|scripts/check_voice_catalog_parity\.py)$
         pass_filenames: false
 
       # Mirror of .github/workflows/action-pin-gate.yml. Codespell-baseline
@@ -630,7 +630,7 @@ repos:
         name: phoneme-timing formula anchors (6 runtimes vs contract toml)
         entry: uv run --no-sync python scripts/check_phoneme_timing_contract.py
         language: system
-        files: ^(docs/spec/phoneme-timing-contract\.toml|src/python_run/piper/timing\.py|src/rust/piper-core/src/timing\.rs|src/go/piperplus/timing\.go|src/cpp/piper\.cpp|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/wasm/openjtalk-web/src/timing\.js|scripts/check_phoneme_timing_contract\.py)$
+        files: ^(docs/spec/phoneme-timing-contract\.toml|src/python_run/piper_plus/timing\.py|src/rust/piper-core/src/timing\.rs|src/go/piperplus/timing\.go|src/cpp/piper\.cpp|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/wasm/openjtalk-web/src/timing\.js|scripts/check_phoneme_timing_contract\.py)$
         pass_filenames: false
 
       # CLI flag hyphen-form parity across 5 runtime CLIs. Contract data
@@ -640,7 +640,7 @@ repos:
         name: CLI flag hyphen-form parity (5 runtimes vs contract toml)
         entry: uv run --no-sync python scripts/check_cli_flag_parity.py
         language: system
-        files: ^(docs/spec/cli-flag-contract\.toml|src/python_run/piper/__main__\.py|src/python/piper_train/infer_onnx\.py|src/rust/piper-cli/src/main\.rs|src/go/cmd/piper-plus/main\.go|src/csharp/PiperPlus\.Cli/Program\.cs|src/cpp/main\.cpp|scripts/check_cli_flag_parity\.py)$
+        files: ^(docs/spec/cli-flag-contract\.toml|src/python_run/piper_plus/__main__\.py|src/python/piper_train/infer_onnx\.py|src/rust/piper-cli/src/main\.rs|src/go/cmd/piper-plus/main\.go|src/csharp/PiperPlus\.Cli/Program\.cs|src/cpp/main\.cpp|scripts/check_cli_flag_parity\.py)$
         pass_filenames: false
 
       # Mirror of .github/workflows/parity-hub.yml (language-id-map
@@ -650,7 +650,7 @@ repos:
         name: LANGUAGE_ID_MAP contract (canonical TOML vs 6 runtime sources)
         entry: uv run --no-sync python scripts/check_language_id_map_contract.py
         language: system
-        files: ^(docs/spec/language-id-map-contract\.toml|src/python/piper_train/tools/prepare_multilingual_dataset\.py|src/python_run/piper/voice\.py|src/rust/piper-core/src/(config|wasm)\.rs|src/rust/piper-wasm/src/lib\.rs|src/go/piperplus/testdata/valid_multilingual_config\.json|src/wasm/openjtalk-web/models/multilingual-test-medium\.onnx\.json|src/csharp/PiperPlus\.Core/Config/PiperConfig\.cs|src/cpp/piper\.cpp|scripts/check_language_id_map_contract\.py|scripts/regenerate_language_id_map_fixture\.py|tests/fixtures/language_id_map/.*)$
+        files: ^(docs/spec/language-id-map-contract\.toml|src/python/piper_train/tools/prepare_multilingual_dataset\.py|src/python_run/piper_plus/voice\.py|src/rust/piper-core/src/(config|wasm)\.rs|src/rust/piper-wasm/src/lib\.rs|src/go/piperplus/testdata/valid_multilingual_config\.json|src/wasm/openjtalk-web/models/multilingual-test-medium\.onnx\.json|src/csharp/PiperPlus\.Core/Config/PiperConfig\.cs|src/cpp/piper\.cpp|scripts/check_language_id_map_contract\.py|scripts/regenerate_language_id_map_fixture\.py|tests/fixtures/language_id_map/.*)$
         pass_filenames: false
 
       # CHANGELOG [Unreleased] section cleanup gate. After a release tag is
@@ -764,7 +764,7 @@ repos:
         name: CLI --help vs docs/guides/development/cli-usage.md (Python runtime CLI)
         entry: bash -c 'if ! python -c "import piper" 2>/dev/null; then echo "[skip] piper-plus runtime not importable"; exit 0; fi; tmp=$(mktemp); python -m piper --help > "$tmp" 2>&1 || { echo "[skip] --help failed"; rm -f "$tmp"; exit 0; }; python scripts/check_cli_help_drift.py --help-file "$tmp" --docs docs/guides/development/cli-usage.md --mode stale-only --allow=--custom-dict --allow=--gpu-device-id --allow=--json-input --allow=--language --allow=--model-dir --allow=--output-timing --allow=--phoneme-silence --allow=--quiet --allow=--raw-phonemes --allow=--streaming --allow=--test-mode --allow=--text --allow=--timing-format --allow=--use-cuda; rc=$?; rm -f "$tmp"; exit $rc'
         language: system
-        files: ^(src/python_run/piper/.*\.py|docs/guides/cli-usage\.md|scripts/check_cli_help_drift\.py)$
+        files: ^(src/python_run/piper_plus/.*\.py|docs/guides/cli-usage\.md|scripts/check_cli_help_drift\.py)$
         pass_filenames: false
 
       # Host-specific secret-path leak detection. CLAUDE.md documents the
@@ -938,7 +938,7 @@ repos:
         # 無視されるため、pre-commit の filename routing 側でも除外する必要がある。
         # 多言語 README は codespell の英語辞書で大量の false positive を生むので
         # ここで明示的に除外 (ja README.md は英語混在で false positive 少なめ)。
-        exclude: ^(README_(DE|ES|FR|KO|PT|ZH)\.md|src/python_run/piper/(sample_texts|webui)\.py|src/python/g2p/piper_plus_g2p/data/zh_en_loanword\.json)$
+        exclude: ^(README_(DE|ES|FR|KO|PT|ZH)\.md|src/python_run/piper_plus/(sample_texts|webui)\.py|src/python/g2p/piper_plus_g2p/data/zh_en_loanword\.json)$
 
   # ---------------------------------------------------------------------------
   # Secret detection — gitleaks scans for credentials, API keys, and tokens

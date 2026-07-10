@@ -13,11 +13,11 @@ import (
 )
 
 // zeroShotModelPath returns the model path for zero-shot integration tests.
-// It prefers the PIPER_ZERO_SHOT_MODEL env var; otherwise it resolves the
+// It prefers the PIPER_PLUS_ZERO_SHOT_MODEL env var; otherwise it resolves the
 // bundled test model relative to this source file.
 func zeroShotModelPath(t *testing.T) string {
 	t.Helper()
-	if path := os.Getenv("PIPER_ZERO_SHOT_MODEL"); path != "" {
+	if path := os.Getenv("PIPER_PLUS_ZERO_SHOT_MODEL"); path != "" {
 		return path
 	}
 	_, filename, _, ok := runtime.Caller(0)

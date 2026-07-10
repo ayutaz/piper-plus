@@ -100,13 +100,13 @@ else:
 The skip path keeps the gate **opt-in** so it does not break PR CI before
 the ONNX is actually published. Once published, CI lanes opt in via:
 
-- **Python**: `PIPER_SPEAKER_ENCODER_E2E=1 pytest test/test_speaker_encoder_e2e.py`
-- **Rust**: `PIPER_SPEAKER_ENCODER_E2E=1 cargo test --test test_speaker_encoder_e2e`
-- **Go**: `PIPER_SPEAKER_ENCODER_E2E=1 go test ./piperplus -run TestSpeakerEncoderE2ECosine`
-- **C#**: `PIPER_SPEAKER_ENCODER_E2E=1 dotnet test --filter SpeakerEncoderE2ECosine`
+- **Python**: `PIPER_PLUS_SPEAKER_ENCODER_E2E=1 pytest test/test_speaker_encoder_e2e.py`
+- **Rust**: `PIPER_PLUS_SPEAKER_ENCODER_E2E=1 cargo test --test test_speaker_encoder_e2e`
+- **Go**: `PIPER_PLUS_SPEAKER_ENCODER_E2E=1 go test ./piperplus -run TestSpeakerEncoderE2ECosine`
+- **C#**: `PIPER_PLUS_SPEAKER_ENCODER_E2E=1 dotnet test --filter SpeakerEncoderE2ECosine`
 
 The path to a locally-cached encoder ONNX may be supplied via
-`PIPER_SPEAKER_ENCODER_ONNX_PATH` (overrides the HF download). This is the
+`PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH` (overrides the HF download). This is the
 canonical way to run the gate against a *different* encoder without
 modifying the fixture.
 
@@ -135,8 +135,8 @@ This mirrors the TTS model alias pattern (`hf_hub_download` in
 All 6 runtimes share the same skip semantics:
 
 1. Skip when fixture lacks `e2e_cosine_gate` block.
-2. Skip when `PIPER_SPEAKER_ENCODER_ONNX_PATH` is unset (and Python's
-   `PIPER_SPEAKER_ENCODER_E2E=1` HF download path is also unset).
+2. Skip when `PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH` is unset (and Python's
+   `PIPER_PLUS_SPEAKER_ENCODER_E2E=1` HF download path is also unset).
 3. Skip when reference WAV not locally available.
 4. Otherwise: verify encoder ONNX sha256, run inference, assert
    `cosine(actual, expected) >= cosine_threshold`.
@@ -180,7 +180,7 @@ Once the encoder ONNX is published:
        HF_HUB_DISABLE_TELEMETRY: 1
    - name: Run E2E gate
      env:
-       PIPER_SPEAKER_ENCODER_ONNX_PATH: ~/.cache/piper-plus/speaker-encoder.onnx
+       PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH: ~/.cache/piper-plus/speaker-encoder.onnx
      run: <runtime-specific test command>
    ```
 

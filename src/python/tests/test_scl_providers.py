@@ -9,7 +9,6 @@
 
 from __future__ import annotations
 
-import os
 from unittest import mock
 
 import pytest
@@ -26,7 +25,7 @@ class TestSelectOrtProviders:
         """CUDA が available_providers にあれば最優先"""
         from piper_train.vits import lightning
 
-        monkeypatch.delenv("PIPER_FORCE_CPU_ORT", raising=False)
+        monkeypatch.delenv("PIPER_PLUS_FORCE_CPU_ORT", raising=False)
 
         with mock.patch(
             "onnxruntime.get_available_providers",
@@ -45,7 +44,7 @@ class TestSelectOrtProviders:
         """CUDA 不在環境では CPU のみ"""
         from piper_train.vits import lightning
 
-        monkeypatch.delenv("PIPER_FORCE_CPU_ORT", raising=False)
+        monkeypatch.delenv("PIPER_PLUS_FORCE_CPU_ORT", raising=False)
 
         with mock.patch(
             "onnxruntime.get_available_providers",
@@ -56,10 +55,10 @@ class TestSelectOrtProviders:
         assert providers == ["CPUExecutionProvider"]
 
     def test_force_cpu_via_env(self, monkeypatch):
-        """環境変数 PIPER_FORCE_CPU_ORT=1 で CUDA 利用可能でも CPU 固定"""
+        """環境変数 PIPER_PLUS_FORCE_CPU_ORT=1 で CUDA 利用可能でも CPU 固定"""
         from piper_train.vits import lightning
 
-        monkeypatch.setenv("PIPER_FORCE_CPU_ORT", "1")
+        monkeypatch.setenv("PIPER_PLUS_FORCE_CPU_ORT", "1")
 
         # CUDA available でも CPU only を返すべき
         with mock.patch(
@@ -71,10 +70,10 @@ class TestSelectOrtProviders:
         assert providers == ["CPUExecutionProvider"]
 
     def test_force_cpu_disabled_with_zero(self, monkeypatch):
-        """PIPER_FORCE_CPU_ORT=0 では通常選択ロジックが働く"""
+        """PIPER_PLUS_FORCE_CPU_ORT=0 では通常選択ロジックが働く"""
         from piper_train.vits import lightning
 
-        monkeypatch.setenv("PIPER_FORCE_CPU_ORT", "0")
+        monkeypatch.setenv("PIPER_PLUS_FORCE_CPU_ORT", "0")
 
         with mock.patch(
             "onnxruntime.get_available_providers",
@@ -88,7 +87,7 @@ class TestSelectOrtProviders:
         """戻り値は list (ort.InferenceSession の providers 引数互換)"""
         from piper_train.vits import lightning
 
-        monkeypatch.delenv("PIPER_FORCE_CPU_ORT", raising=False)
+        monkeypatch.delenv("PIPER_PLUS_FORCE_CPU_ORT", raising=False)
         with mock.patch(
             "onnxruntime.get_available_providers",
             return_value=["CPUExecutionProvider"],

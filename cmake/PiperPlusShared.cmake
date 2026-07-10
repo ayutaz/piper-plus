@@ -272,7 +272,7 @@ set(_g2p_dict_files
 )
 foreach(_dict ${_g2p_dict_files})
   if(EXISTS "${_dict}")
-    install(FILES "${_dict}" DESTINATION ${CMAKE_INSTALL_DATADIR}/piper/dicts)
+    install(FILES "${_dict}" DESTINATION ${CMAKE_INSTALL_DATADIR}/piper-plus/dicts)
   endif()
 endforeach()
 

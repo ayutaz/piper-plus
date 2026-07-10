@@ -68,7 +68,7 @@ jobs:
           - name: cpp-inference
             canonical_dockerfile: docker/cpp-inference/Dockerfile
             trial_dockerfile: docker/cpp-inference/Dockerfile.distroless
-            smoke_entrypoint: /usr/local/bin/piper
+            smoke_entrypoint: /usr/local/bin/piper-plus
             # piper --version is the canonical smoke for the runtime
             # binary; it exercises the libonnxruntime / libstdc++ /
             # libgomp dlopen path without needing a model.
@@ -198,7 +198,7 @@ jobs:
             echo "- linux/arm64 buildx coverage is handled by \`docker-build.yml\` (\`build-distroless-trials\` matrix)."
             echo "- CVE Trivy diff lives in \`trivy-container-scan.yml\` (per-image SARIF upload)."
             echo "- For \`webui\`: full Gradio cold-start under distroless (a real \`docker run -p 7860:7860\` from \`webui-test.yml\`) is the promotion gate."
-            echo "- For \`cpp-inference\`: end-to-end \`piper --model ... --output_file ...\` with a real model fixture is the promotion gate."
+            echo "- For \`cpp-inference\`: end-to-end \`piper-plus --model ... --output_file ...\` with a real model fixture is the promotion gate."
           } > /tmp/sticky/combined.md
           cat /tmp/sticky/combined.md
 

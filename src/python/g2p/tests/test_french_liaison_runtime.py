@@ -2,7 +2,7 @@
 
 Pins the byte-for-byte equality of the training-side
 (``piper_plus_g2p.french.FrenchPhonemizer``) and runtime-side
-(``piper.phonemize.french``) phonemizers on the 8 canonical cases that
+(``piper_plus.phonemize.french``) phonemizers on the 8 canonical cases that
 exercise the liaison / élision logic ported in commit b5581726.
 
 History
@@ -30,26 +30,26 @@ from pathlib import Path
 
 import pytest
 
-# Ensure the runtime piper package is importable from the python_run tree.
+# Ensure the runtime piper_plus package is importable from the python_run tree.
 _RUNTIME_DIR = Path(__file__).resolve().parents[3] / "python_run"
 if str(_RUNTIME_DIR) not in sys.path:
     sys.path.insert(0, str(_RUNTIME_DIR))
 
-# `piper.phonemize.french` is a leaf module that does NOT depend on
-# onnxruntime, but importing through `piper.phonemize` triggers
-# `piper/__init__.py` → `piper.voice` → `import onnxruntime`.  CI lint /
+# `piper_plus.phonemize.french` is a leaf module that does NOT depend on
+# onnxruntime, but importing through `piper_plus.phonemize` triggers
+# `piper_plus/__init__.py` → `piper_plus.voice` → `import onnxruntime`.  CI lint /
 # pure-G2P jobs install only `g2p[all]` without onnxruntime, so skip the
 # whole module when the runtime stack is unavailable.  PyPI consumers and
 # the inference job both have onnxruntime installed and run these tests.
 pytest.importorskip(
     "onnxruntime",
-    reason="runtime mirror imports go through piper.voice which needs onnxruntime",
+    reason="runtime mirror imports go through piper_plus.voice which needs onnxruntime",
 )
 
-from piper.phonemize.french import (  # noqa: E402
+from piper_plus.phonemize.french import (  # noqa: E402
     _phonemize_french_raw as runtime_phonemize_french_raw,
 )
-from piper.phonemize.token_mapper import CHAR2TOKEN  # noqa: E402
+from piper_plus.phonemize.token_mapper import CHAR2TOKEN  # noqa: E402
 
 from piper_plus_g2p.french import FrenchPhonemizer  # noqa: E402
 
@@ -62,7 +62,7 @@ def _runtime_ipa_tokens(text: str) -> list[str]:
     """Return the runtime IPA token list with PUA codepoints reversed.
 
     The runtime side maps multi-codepoint phonemes (e.g. ``ɛ̃``) into PUA
-    single-codepoint tokens via :func:`piper.phonemize.token_mapper.map_sequence`.
+    single-codepoint tokens via :func:`piper_plus.phonemize.token_mapper.map_sequence`.
     To compare byte-for-byte against the training-side bare IPA output we
     reverse the mapping here using ``CHAR2TOKEN``.
     """
@@ -134,7 +134,7 @@ class TestFrenchLiaisonElisionRuntimeParity:
             f"  training: {training_tokens}\n"
             f"  runtime : {runtime_tokens}\n"
             f"If this fails, the runtime-side liaison / élision logic\n"
-            f"in src/python_run/piper/phonemize/french.py has drifted\n"
+            f"in src/python_run/piper_plus/phonemize/french.py has drifted\n"
             f"from the training side in src/python/g2p/piper_plus_g2p/french.py"
         )
 

@@ -55,7 +55,7 @@
 | ランタイム | ファイル |
 |-----------|---------|
 | Python (G2P) | `src/python/g2p/piper_plus_g2p/encode/pua.py` (`pua.json` を読むので自動) |
-| Python (runtime) | `src/python_run/piper/phonemize/token_mapper.py` |
+| Python (runtime) | `src/python_run/piper_plus/phonemize/token_mapper.py` |
 | Rust | `src/rust/piper-plus-g2p/src/token_map.rs` |
 | Go | `src/go/phonemize/pua.go` |
 | JS / WASM | `src/wasm/g2p/src/pua-map.js` |

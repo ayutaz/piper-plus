@@ -853,7 +853,7 @@ class TestRuntimeBundleSync:
     """The runtime-side JSON copy must stay in sync with the training-side source."""
 
     def test_runtime_copy_matches_source(self):
-        """src/python_run/piper/phonemize/data/zh_en_loanword.json
+        """src/python_run/piper_plus/phonemize/data/zh_en_loanword.json
         must match src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json
         byte-for-byte. The runtime wheel ships its own copy because the
         training-side g2p package is not a runtime dependency.
@@ -865,7 +865,7 @@ class TestRuntimeBundleSync:
             repo_root
             / "src"
             / "python_run"
-            / "piper"
+            / "piper_plus"
             / "phonemize"
             / "data"
             / "zh_en_loanword.json"
@@ -877,7 +877,7 @@ class TestRuntimeBundleSync:
         assert src_bytes == rt_bytes, (
             "Runtime zh_en_loanword.json is out of sync with the training-side "
             "source. Re-run `cp src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json "
-            "src/python_run/piper/phonemize/data/zh_en_loanword.json`."
+            "src/python_run/piper_plus/phonemize/data/zh_en_loanword.json`."
         )
 
 

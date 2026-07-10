@@ -13,14 +13,14 @@ import pytest
 def _clear_phonemize_cache():
     """各テスト前後に音素化キャッシュをクリア."""
     try:
-        from piper.phonemize.japanese import clear_phonemize_cache
+        from piper_plus.phonemize.japanese import clear_phonemize_cache
 
         clear_phonemize_cache()
     except ImportError:
         pass
     yield
     try:
-        from piper.phonemize.japanese import clear_phonemize_cache
+        from piper_plus.phonemize.japanese import clear_phonemize_cache
 
         clear_phonemize_cache()
     except ImportError:

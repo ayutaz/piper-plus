@@ -143,7 +143,7 @@ VITS-based neural TTS model published as part of [piper-plus](https://github.com
 ## Usage
 
 ```python
-from piper import PiperVoice
+from piper_plus import PiperVoice
 
 voice = PiperVoice.load("{name}.onnx", config_path="{name}.onnx.json")
 audio = voice.synthesize_array("Hello, world!", speaker_id=0)

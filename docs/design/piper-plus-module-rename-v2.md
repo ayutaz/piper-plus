@@ -99,23 +99,24 @@ src/python_run/piper_plus/
 
 ---
 
-## 6. 実装フェーズと PR 分割戦略
+## 6. 実装フェーズ (単一ブランチ・単一 PR)
 
-スコープが cross-runtime に拡大したため、**単一の巨大 PR ではなく、依存順の複数 PR** に分割する。CI が silent break しないよう「dir 改名 + path filter + packaging + tests は atomic (同一 PR)」を厳守する。
+**ユーザー方針**: 全対応を本ブランチ `feat/piper-plus-module-rename` の**単一 PR** で実施する。単一 PR のため、path filter の silent stop 問題 (dir 改名と filter 更新の間に CI が空回りする期間) は「全変更が atomic」なので**自然に回避**される。以下は PR 分割ではなく、依存順の**実装フェーズ (コミット単位)** を示す。
 
-| PR | 内容 (ultracode Phase) | 依存 | breaking | 規模 |
-|---|---|---|---|---|
-| **PR-A** | 高レベル API 名前空間統合 (`src/python/piper_plus/`→`piper_plus.api`)。Wyoming import + tests 追随 (Phase 0) | なし | Wyoming 内部のみ | 小 |
-| **PR-B** | **Python コア (atomic)**: runtime dir 改名 + 絶対 import + packaging + tests + CI path filter + module 実行 (Phase 1/2/3/5 の Python 部分) | PR-A | ⚠️ import/コマンド | 大 |
-| **PR-C** | C++ CLI バイナリ改名 + docker cpp-inference lockstep + 関連 CI (Phase 4 + Phase 5 の C++ 部分) | なし (並行可) | ⚠️ バイナリ | 中 |
-| **PR-D** | docs / README 9 言語 + v2.0 移行ガイド新設 (Phase 6) | PR-B, PR-C | ドキュメント | 中 |
-| **PR-E** | deprecation stub 注記 + エコシステム周知 (Phase 7) | PR-D | stub | 小 |
-| **PR-F群** | 周辺 install-layout 統一 (共有辞書 dir / キャッシュ dir / env prefix / アセット名)。issue #590 コアと**独立**に判断・実施できるよう分離 | PR-B, PR-C | ⚠️ layout / 資産 orphan | 大 (更に分割可) |
-| **PR-G** | 本家 `piper-tts` co-install e2e 検証 + 全ランタイム parity 回帰確認 (Phase 8) | 全 PR | — | 小 |
+| フェーズ | 内容 (ultracode Phase) | 依存 | breaking |
+|---|---|---|---|
+| **F1 基盤** | dir 改名 `git mv src/python_run/piper → piper_plus` + 高レベル API 統合 (`src/python/piper_plus/`→`piper_plus/api/`) + runtime 内部絶対 import 修正 (Phase 0/1) | なし | ⚠️ import |
+| **F2 packaging** | pyproject scripts (`piper-plus=piper_plus.__main__:main`) / package-data キー / MANIFEST.in / pytest.ini / setup.py / script/ (Phase 2) | F1 | ⚠️ コマンド |
+| **F3 tests** | import 文 + 文字列ベース mock (`patch("piper.X")` / sys.modules setitem / caplog logger) + subprocess `-m piper` (Phase 3) | F1,F2 | — |
+| **F4 CI/CD** | 17 workflow の `src/python_run/piper/**` path filter + `python -m piper` + C++ バイナリ参照 (Phase 5) | F1,F5 | — |
+| **F5 C++** | cmake `OUTPUT_NAME "piper-plus"` + docker cpp-inference (entrypoint/Dockerfile/distroless/test.sh) lockstep (Phase 4) | なし | ⚠️ バイナリ |
+| **F6 docs** | README 9 言語 + docs/ の `./bin/piper`/`python -m piper`/`import piper` + v2.0 移行ガイド新設 (Phase 6) | F1-F5 | doc |
+| **F7 周辺 layout** | 共有辞書 dir / キャッシュ dir / env prefix `PIPER_*→PIPER_PLUS_*` (cross-runtime) + リリースアセット名 (Phase 7 拡張) | F1,F5 | ⚠️ layout/資産 |
+| **F8 stub+検証** | stub README 注記 + 本家 `piper-tts` co-install e2e + 全ランタイム parity 回帰 (Phase 7/8) | 全て | stub |
 
-> **PR-B が atomic である理由**: 17 workflow・41 箇所の `src/python_run/piper/**` path filter は、dir 改名すると **hard error ではなく silent に trigger 停止**する (CI が単に走らなくなる)。dir 改名と path filter 更新を別 PR にすると、間の期間 CI が空回りする。よって同一 PR 必須。
+> **atomic 制約**: 単一 PR のため CI は最終状態で一括評価される。ただし**中間コミットで CI を green に保つ必要はない**が、レビュー容易性のためフェーズ順にコミットを分ける (F1 の dir 改名を独立コミット、以降フェーズ単位)。path filter (F4) と dir 改名 (F1) が同一 PR に入るため silent stop は発生しない。
 
-> **PR-F群 を分離する理由**: 共有辞書 dir / キャッシュ dir / env prefix の改名は issue #590 の目的 (共存) とは**無関係**で、既存ユーザーの DL 済みモデル・辞書を orphan 化 (再 DL 強制) する。cross-runtime install-layout の breaking も大きい。コア (PR-A〜E) の共存達成とは独立にレビュー・判断できるよう切り出す。
+> **F7 (周辺 layout) の扱い**: 共有辞書 dir / キャッシュ dir / env prefix の改名は issue #590 の目的 (共存) とは無関係で、既存ユーザーの DL 済み資産を orphan 化する。ユーザー方針で本 PR に含めるが、**コミットを明確に分離**し、レビュー時に影響を独立に評価できるようにする。docker image tag / container / Unix user `piper` (OQ-5) は upstream 非衝突のため本 PR では**据置** (別途方針決定)。
 
 ---
 

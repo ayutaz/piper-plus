@@ -10,4 +10,4 @@ _PROGRAM_DIR = _DIR.parent
 _VENV_DIR = _PROGRAM_DIR / ".venv"
 
 context = venv.EnvBuilder().ensure_directories(_VENV_DIR)
-subprocess.check_call([context.env_exe, "-m", "piper"] + sys.argv[1:])
+subprocess.check_call([context.env_exe, "-m", "piper_plus"] + sys.argv[1:])

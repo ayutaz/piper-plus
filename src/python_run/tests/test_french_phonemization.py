@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for French runtime phonemizer (``piper.phonemize.french``).
+"""Tests for French runtime phonemizer (``piper_plus.phonemize.french``).
 
 Includes a strict parity matrix that pins the runtime output against the
 training-side phonemizer (``piper_plus_g2p.french``).  The two
@@ -26,16 +26,15 @@ from pathlib import Path
 
 import pytest
 
+
 # Ensure the runtime piper package is importable from the python_run tree.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from piper.phonemize.french import (  # noqa: E402
+from piper_plus.phonemize.french import (  # noqa: E402  # noqa: E402
     _phonemize_french_raw as runtime_phonemize_french_raw,
-)
-from piper.phonemize.french import (  # noqa: E402
     phonemize_french as runtime_phonemize_french,
 )
-from piper.phonemize.token_mapper import CHAR2TOKEN  # noqa: E402
+from piper_plus.phonemize.token_mapper import CHAR2TOKEN  # noqa: E402
 from piper_plus_g2p.french import (  # noqa: E402
     phonemize_french as training_phonemize_french,
 )

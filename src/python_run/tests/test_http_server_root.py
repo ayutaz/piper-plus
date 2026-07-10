@@ -1,4 +1,4 @@
-"""Direct unit tests for `piper.http_server` helpers and the `/` route.
+"""Direct unit tests for `piper_plus.http_server` helpers and the `/` route.
 
 `test_http_timing.py` already covers `/api/phoneme-timing` end-to-end and the
 happy path of `/`. This file fills the audit gaps:
@@ -18,19 +18,20 @@ from unittest.mock import MagicMock
 
 import pytest
 
+
 pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 pytest.importorskip("uvicorn")
 
 from fastapi.testclient import TestClient  # noqa: E402
-
-from piper.http_server import (  # noqa: E402
+from piper_plus.http_server import (  # noqa: E402
     MAX_TEXT_BYTES,
     _parse_bool_flag,
     _resolve_language_id,
     _warn_if_public_bind,
     create_app,
 )
+
 
 pytestmark = pytest.mark.unit
 
@@ -182,17 +183,15 @@ class TestWarnIfPublicBind:
     def test_public_addresses_warn(self, host, caplog):
         with caplog.at_level(logging.WARNING):
             _warn_if_public_bind(host)
-        assert any(
-            "no authentication" in r.message.lower() for r in caplog.records
-        ), f"expected warning for host={host!r}, got {caplog.records}"
+        assert any("no authentication" in r.message.lower() for r in caplog.records), (
+            f"expected warning for host={host!r}, got {caplog.records}"
+        )
 
     @pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "::1", "10.0.0.1"])
     def test_local_addresses_do_not_warn(self, host, caplog):
         with caplog.at_level(logging.WARNING):
             _warn_if_public_bind(host)
-        assert not any(
-            "no authentication" in r.message.lower() for r in caplog.records
-        )
+        assert not any("no authentication" in r.message.lower() for r in caplog.records)
 
 
 # ---------------------------------------------------------------------------
@@ -230,7 +229,7 @@ class TestRequestSizeCap:
         # the client-side URL length cap, while the canonical 1 MiB limit
         # remains pinned by the POST tests above (where body length is not
         # subject to URL parsing).
-        from piper import http_server
+        from piper_plus import http_server
 
         monkeypatch.setattr(http_server, "MAX_TEXT_BYTES", 256)
         voice = _make_voice(language_id_map={"en": 0, "ja": 1})

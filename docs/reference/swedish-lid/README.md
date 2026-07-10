@@ -42,7 +42,7 @@
 | ランタイム | パス |
 |-----------|------|
 | Python canonical | `src/python/g2p/piper_plus_g2p/data/sv_function_words.json` |
-| Python runtime | `src/python_run/piper/phonemize/data/sv_function_words.json` |
+| Python runtime | `src/python_run/piper_plus/phonemize/data/sv_function_words.json` |
 | Rust (`piper-plus-g2p`) | `src/rust/piper-plus-g2p/data/sv_function_words.json` |
 | Rust (`piper-core`) | `src/rust/piper-core/data/sv_function_words.json` |
 | Go | `src/go/phonemize/data/sv_function_words.json` |

@@ -11,7 +11,7 @@ import pytest
 # Add the parent directory to the path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from piper.download import (  # noqa: E402
+from piper_plus.download import (  # noqa: E402
     _SAFE_REPO_RE,
     PIPER_PLUS_URL_FORMAT,
     PIPER_PLUS_VOICES,
@@ -164,6 +164,7 @@ class TestDownloadModel:
             assert "ja-tsukuyomi" in aliases
             assert aliases["ja-tsukuyomi"]["key"] == "ja_JP-tsukuyomi-chan-medium"
 
+
 class TestFindVoiceFallback:
     """Test find_voice() piper-plus filename fallback."""
 
@@ -186,20 +187,20 @@ class TestVersion:
     """Test __version__ availability."""
 
     def test_version_is_string(self):
-        from piper import __version__
+        from piper_plus import __version__
 
         assert isinstance(__version__, str)
 
     def test_version_not_empty(self):
-        from piper import __version__
+        from piper_plus import __version__
 
         assert len(__version__) > 0
 
     def test_version_not_unknown_if_version_file_exists(self):
-        from piper import __version__
+        from piper_plus import __version__
 
         version_file = (
-            Path(__file__).parent.parent / "piper" / ".." / ".." / ".." / "VERSION"
+            Path(__file__).parent.parent / "piper_plus" / ".." / ".." / ".." / "VERSION"
         )
         # Only assert if VERSION file actually exists in dev environment
         if version_file.resolve().exists():
@@ -269,7 +270,7 @@ class TestUrlValidation:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Patch PIPER_PLUS_URL_FORMAT to produce an http:// URL
             with patch(
-                "piper.download.PIPER_PLUS_URL_FORMAT",
+                "piper_plus.download.PIPER_PLUS_URL_FORMAT",
                 "http://example.com/{repo}/{file}",
             ):
                 with pytest.raises(ValueError, match="non-HTTPS"):

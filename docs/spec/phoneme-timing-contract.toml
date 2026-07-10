@@ -184,9 +184,9 @@ example = "{ '\\uE019': 'N_m', '\\uE00E': 'ch' }"
 # Tracks which runtime implements each format and feature
 
 [implementations.python]
-file = "src/python_run/piper/timing.py"
-voice_integration = "src/python_run/piper/voice.py:synthesize_with_timing"
-http_endpoint = "POST /api/phoneme-timing (src/python_run/piper/http_server.py)"
+file = "src/python_run/piper_plus/timing.py"
+voice_integration = "src/python_run/piper_plus/voice.py:synthesize_with_timing"
+http_endpoint = "POST /api/phoneme-timing (src/python_run/piper_plus/http_server.py)"
 formats = ["json_pretty", "json_compact", "tsv", "srt"]
 test_files = [
   "src/python_run/tests/test_phoneme_timing.py",

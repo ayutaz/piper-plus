@@ -10,18 +10,18 @@ Covers:
 
 import io
 import wave
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
-
-from piper.config import PiperConfig
-from piper.voice import PiperVoice
+from piper_plus.config import PiperConfig
+from piper_plus.voice import PiperVoice
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_config(num_speakers: int = 1) -> PiperConfig:
     """Create a minimal PiperConfig for testing."""
@@ -84,13 +84,18 @@ def _make_voice(
 # Test: synthesize_ids_to_raw — speaker_embedding passthrough
 # ---------------------------------------------------------------------------
 class TestSynthesizeIdsToRaw:
-
     @pytest.mark.unit
     def test_speaker_embedding_passed_to_session(self):
         """When speaker_embedding input exists and embedding provided, tensor shape is [1,192]."""
         voice = _make_voice(
             num_speakers=2,
-            onnx_input_names=["input", "input_lengths", "scales", "sid", "speaker_embedding"],
+            onnx_input_names=[
+                "input",
+                "input_lengths",
+                "scales",
+                "sid",
+                "speaker_embedding",
+            ],
         )
         embedding = np.random.randn(192).astype(np.float32)
 
@@ -148,7 +153,9 @@ class TestSynthesizeIdsToRaw:
         assert flat_embedding.shape == (192,)
 
         long_ids = [1] + [10] * 48 + [2]
-        PiperVoice.synthesize_ids_to_raw(voice, long_ids, speaker_embedding=flat_embedding)
+        PiperVoice.synthesize_ids_to_raw(
+            voice, long_ids, speaker_embedding=flat_embedding
+        )
 
         call_args = voice.session.run.call_args[0][1]
         emb_tensor = call_args["speaker_embedding"]
@@ -216,7 +223,6 @@ class TestSynthesizeIdsToRaw:
 # Test: synthesize_stream_raw — speaker_embedding passthrough
 # ---------------------------------------------------------------------------
 class TestSynthesizeStreamRaw:
-
     @pytest.mark.unit
     def test_speaker_embedding_forwarded_to_ids_to_raw(self):
         """synthesize_stream_raw passes speaker_embedding down to synthesize_ids_to_raw.
@@ -247,7 +253,9 @@ class TestSynthesizeStreamRaw:
 
         embedding = np.random.randn(192).astype(np.float32)
         results = list(
-            PiperVoice.synthesize_stream_raw(voice, "hello world test text here", speaker_embedding=embedding)
+            PiperVoice.synthesize_stream_raw(
+                voice, "hello world test text here", speaker_embedding=embedding
+            )
         )
 
         assert len(results) >= 1
@@ -281,7 +289,9 @@ class TestSynthesizeStreamRaw:
         voice._stream_phonemes_to_audio = fake_stream
 
         results = list(
-            PiperVoice.synthesize_stream_raw(voice, "hello world test text here", speaker_embedding=None)
+            PiperVoice.synthesize_stream_raw(
+                voice, "hello world test text here", speaker_embedding=None
+            )
         )
 
         assert len(results) >= 1
@@ -294,7 +304,6 @@ class TestSynthesizeStreamRaw:
 # Test: synthesize — speaker_embedding passthrough
 # ---------------------------------------------------------------------------
 class TestSynthesize:
-
     @pytest.mark.unit
     def test_synthesize_passes_embedding_to_stream_raw(self):
         """synthesize() passes speaker_embedding to synthesize_stream_raw."""
@@ -309,7 +318,9 @@ class TestSynthesize:
 
         wav_io = io.BytesIO()
         with wave.open(wav_io, "wb") as wav_file:
-            PiperVoice.synthesize(voice, "test text for synthesis", wav_file, speaker_embedding=embedding)
+            PiperVoice.synthesize(
+                voice, "test text for synthesis", wav_file, speaker_embedding=embedding
+            )
 
         voice.synthesize_stream_raw.assert_called_once()
         _, kwargs = voice.synthesize_stream_raw.call_args
@@ -329,7 +340,9 @@ class TestSynthesize:
 
         wav_io = io.BytesIO()
         with wave.open(wav_io, "wb") as wav_file:
-            PiperVoice.synthesize(voice, "test text for synthesis", wav_file, speaker_embedding=None)
+            PiperVoice.synthesize(
+                voice, "test text for synthesis", wav_file, speaker_embedding=None
+            )
 
         voice.synthesize_stream_raw.assert_called_once()
         _, kwargs = voice.synthesize_stream_raw.call_args
@@ -340,11 +353,10 @@ class TestSynthesize:
 # Test: InferenceConfig — speaker_embedding round-trip
 # ---------------------------------------------------------------------------
 class TestInferenceConfig:
-
     @pytest.mark.unit
     def test_speaker_embedding_field_exists(self):
         """InferenceConfig has a speaker_embedding field."""
-        from piper.inference_config import InferenceConfig
+        from piper_plus.inference_config import InferenceConfig
 
         config = InferenceConfig(model_path="/tmp/model.onnx")
         assert hasattr(config, "speaker_embedding")
@@ -353,7 +365,7 @@ class TestInferenceConfig:
     @pytest.mark.unit
     def test_speaker_embedding_round_trip(self):
         """speaker_embedding list is stored and retrieved unchanged."""
-        from piper.inference_config import InferenceConfig
+        from piper_plus.inference_config import InferenceConfig
 
         emb_list = list(np.random.randn(192).astype(np.float64))
         config = InferenceConfig(
@@ -365,7 +377,7 @@ class TestInferenceConfig:
     @pytest.mark.unit
     def test_to_synthesize_args_includes_embedding_as_ndarray(self):
         """to_synthesize_args() converts speaker_embedding list to np.ndarray."""
-        from piper.inference_config import InferenceConfig
+        from piper_plus.inference_config import InferenceConfig
 
         emb_list = [float(i) for i in range(192)]
         config = InferenceConfig(
@@ -378,12 +390,14 @@ class TestInferenceConfig:
         emb = args["speaker_embedding"]
         assert isinstance(emb, np.ndarray)
         assert emb.dtype == np.float32
-        np.testing.assert_array_equal(emb.flatten(), np.array(emb_list, dtype=np.float32))
+        np.testing.assert_array_equal(
+            emb.flatten(), np.array(emb_list, dtype=np.float32)
+        )
 
     @pytest.mark.unit
     def test_to_synthesize_args_omits_embedding_when_none(self):
         """to_synthesize_args() does not include speaker_embedding key when it is None."""
-        from piper.inference_config import InferenceConfig
+        from piper_plus.inference_config import InferenceConfig
 
         config = InferenceConfig(model_path="/tmp/model.onnx")
         args = config.to_synthesize_args()
@@ -392,7 +406,7 @@ class TestInferenceConfig:
     @pytest.mark.unit
     def test_from_args_loads_embedding_from_npy(self, tmp_path):
         """from_args() loads a .npy file and stores it as a list."""
-        from piper.inference_config import InferenceConfig
+        from piper_plus.inference_config import InferenceConfig
 
         embedding = np.random.randn(192).astype(np.float32)
         npy_path = tmp_path / "speaker.npy"
@@ -429,7 +443,7 @@ class TestInferenceConfig:
     @pytest.mark.unit
     def test_from_args_no_embedding_when_none(self):
         """from_args() keeps speaker_embedding as None when arg is not provided."""
-        from piper.inference_config import InferenceConfig
+        from piper_plus.inference_config import InferenceConfig
 
         args = MagicMock()
         args.model = "/tmp/model.onnx"

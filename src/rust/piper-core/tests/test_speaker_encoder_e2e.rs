@@ -6,10 +6,10 @@
 //! This test is **opt-in** and skips by default — it activates only when:
 //! 1. The fixture `test/fixtures/speaker_encoder_golden.json` contains an
 //!    `e2e_cosine_gate` block, AND
-//! 2. `PIPER_SPEAKER_ENCODER_ONNX_PATH` env var points at a local encoder
+//! 2. `PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH` env var points at a local encoder
 //!    ONNX (we do **not** auto-download from HF in Rust tests — opt-in only).
 //!
-//! Run: `PIPER_SPEAKER_ENCODER_ONNX_PATH=/path/to/encoder.onnx \
+//! Run: `PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH=/path/to/encoder.onnx \
 //!       cargo test --features onnx --test test_speaker_encoder_e2e`
 //!
 //! The test body is gated behind the `onnx` feature because `SpeakerEncoder`
@@ -127,11 +127,11 @@ fn e2e_cosine_gate_against_pinned_embedding() {
         }
     };
 
-    let encoder_path = match std::env::var("PIPER_SPEAKER_ENCODER_ONNX_PATH") {
+    let encoder_path = match std::env::var("PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH") {
         Ok(p) => PathBuf::from(p),
         Err(_) => {
             eprintln!(
-                "[skip] PIPER_SPEAKER_ENCODER_ONNX_PATH not set — opt-in test, \
+                "[skip] PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH not set — opt-in test, \
                  skipping by default"
             );
             return;
@@ -139,7 +139,7 @@ fn e2e_cosine_gate_against_pinned_embedding() {
     };
     if !encoder_path.exists() {
         panic!(
-            "PIPER_SPEAKER_ENCODER_ONNX_PATH={} does not exist",
+            "PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH={} does not exist",
             encoder_path.display()
         );
     }

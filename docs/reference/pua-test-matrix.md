@@ -110,7 +110,7 @@ language's nasal vowel), follow this checklist to keep all gates green:
 2. **Bump `version`** in pua.json (and `PUA_COMPAT_VERSION` constants in
    `pua.py`, `token_map.rs`, `pua-map.js`).
 3. **Sync all 6 runtime tables** with the same `(token, codepoint)`:
-   - `src/python_run/piper/phonemize/token_mapper.py`
+   - `src/python_run/piper_plus/phonemize/token_mapper.py`
    - `src/rust/piper-plus-g2p/src/token_map.rs`
    - `src/go/phonemize/pua.go`
    - `src/wasm/g2p/src/pua-map.js`

@@ -586,7 +586,7 @@ class MultilingualTTSTester:
 def main():
     parser = argparse.ArgumentParser(description="Test multilingual TTS with Piper")
     parser.add_argument(
-        "--piper", default="./piper/bin/piper", help="Path to piper executable"
+        "--piper", default="./piper-plus/bin/piper-plus", help="Path to piper executable"
     )
     parser.add_argument(
         "--languages", nargs="+", help="Languages to test (default: all)"

@@ -18,7 +18,7 @@ on:
     paths:
       - 'docker/wyoming/**'
       - 'src/python/piper_wyoming/**'
-      - 'src/python/piper_plus/**'
+      - 'src/python_run/piper_plus/api/**'
       - 'src/python/piper_train/**'
       - 'src/python/g2p/**'
       - 'pyproject.toml'
@@ -28,7 +28,7 @@ on:
     paths:
       - 'docker/wyoming/**'
       - 'src/python/piper_wyoming/**'
-      - 'src/python/piper_plus/**'
+      - 'src/python_run/piper_plus/api/**'
       - 'src/python/piper_train/**'
       - 'src/python/g2p/**'
       - 'pyproject.toml'

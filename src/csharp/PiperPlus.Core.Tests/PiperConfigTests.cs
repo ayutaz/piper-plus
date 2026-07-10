@@ -358,10 +358,10 @@ public sealed class PiperConfigTests : IDisposable
     public void FindConfigPath_EnvironmentVariable_ReturnsIt()
     {
         var configPath = WriteTempConfig("{}", "env_config.json");
-        var originalValue = Environment.GetEnvironmentVariable("PIPER_DEFAULT_CONFIG");
+        var originalValue = Environment.GetEnvironmentVariable("PIPER_PLUS_DEFAULT_CONFIG");
         try
         {
-            Environment.SetEnvironmentVariable("PIPER_DEFAULT_CONFIG", configPath);
+            Environment.SetEnvironmentVariable("PIPER_PLUS_DEFAULT_CONFIG", configPath);
 
             var result = PiperConfig.FindConfigPath(explicitPath: null, modelPath: null);
 
@@ -369,7 +369,7 @@ public sealed class PiperConfigTests : IDisposable
         }
         finally
         {
-            Environment.SetEnvironmentVariable("PIPER_DEFAULT_CONFIG", originalValue);
+            Environment.SetEnvironmentVariable("PIPER_PLUS_DEFAULT_CONFIG", originalValue);
         }
     }
 
@@ -381,10 +381,10 @@ public sealed class PiperConfigTests : IDisposable
         var modelJsonPath = modelPath + ".json";
         File.WriteAllText(modelJsonPath, "{}");
 
-        var originalValue = Environment.GetEnvironmentVariable("PIPER_DEFAULT_CONFIG");
+        var originalValue = Environment.GetEnvironmentVariable("PIPER_PLUS_DEFAULT_CONFIG");
         try
         {
-            Environment.SetEnvironmentVariable("PIPER_DEFAULT_CONFIG", nonExistent);
+            Environment.SetEnvironmentVariable("PIPER_PLUS_DEFAULT_CONFIG", nonExistent);
 
             var result = PiperConfig.FindConfigPath(explicitPath: null, modelPath);
 
@@ -393,7 +393,7 @@ public sealed class PiperConfigTests : IDisposable
         }
         finally
         {
-            Environment.SetEnvironmentVariable("PIPER_DEFAULT_CONFIG", originalValue);
+            Environment.SetEnvironmentVariable("PIPER_PLUS_DEFAULT_CONFIG", originalValue);
         }
     }
 
@@ -406,10 +406,10 @@ public sealed class PiperConfigTests : IDisposable
         var modelJsonPath = modelPath + ".json";
         File.WriteAllText(modelJsonPath, "{}");
 
-        var originalValue = Environment.GetEnvironmentVariable("PIPER_DEFAULT_CONFIG");
+        var originalValue = Environment.GetEnvironmentVariable("PIPER_PLUS_DEFAULT_CONFIG");
         try
         {
-            Environment.SetEnvironmentVariable("PIPER_DEFAULT_CONFIG", envConfigPath);
+            Environment.SetEnvironmentVariable("PIPER_PLUS_DEFAULT_CONFIG", envConfigPath);
 
             var result = PiperConfig.FindConfigPath(explicitPath: null, modelPath);
 
@@ -417,7 +417,7 @@ public sealed class PiperConfigTests : IDisposable
         }
         finally
         {
-            Environment.SetEnvironmentVariable("PIPER_DEFAULT_CONFIG", originalValue);
+            Environment.SetEnvironmentVariable("PIPER_PLUS_DEFAULT_CONFIG", originalValue);
         }
     }
 

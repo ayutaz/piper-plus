@@ -89,7 +89,7 @@ COPY --from=builder /openjtalk-dic /usr/local/share/open_jtalk/dic
 # Environment configuration
 ENV ONNX_RUNTIME_SHARED_LIBRARY_PATH=/usr/lib/libonnxruntime.so
 ENV OPENJTALK_DICTIONARY_PATH=/usr/local/share/open_jtalk/dic
-ENV PIPER_MODEL_DIR=/models
+ENV PIPER_PLUS_MODEL_DIR=/models
 
 RUN mkdir -p /models
 

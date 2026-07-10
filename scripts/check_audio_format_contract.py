@@ -30,8 +30,8 @@ CONTRACT_PATH = REPO_ROOT / "docs/spec/audio-format-contract.toml"
 # any of them is intentionally renamed, update both this list and the
 # contract header in the same PR.
 IMPLEMENTATION_FILES = [
-    "src/python_run/piper/voice.py",
-    "src/python_run/piper/http_server.py",
+    "src/python_run/piper_plus/voice.py",
+    "src/python_run/piper_plus/http_server.py",
     "src/rust/piper-core/src/engine.rs",
     "src/go/piperplus/synthesize.go",
     "src/csharp/PiperPlus.Core/Inference/PiperSession.cs",

@@ -264,7 +264,7 @@ double relativeL2(const std::vector<float>& a,
 // ---------------------------------------------------------------------------
 
 fs::path findFixturePath() {
-  if (const char* env = std::getenv("PIPER_SPEAKER_ENCODER_FIXTURE")) {
+  if (const char* env = std::getenv("PIPER_PLUS_SPEAKER_ENCODER_FIXTURE")) {
     return fs::path(env);
   }
   const fs::path needle =
@@ -289,7 +289,7 @@ json loadFixture() {
   EXPECT_TRUE(stream.is_open())
       << "Cannot open speaker encoder fixture: " << fixture_path
       << " (cwd=" << fs::current_path() << "). Set "
-         "PIPER_SPEAKER_ENCODER_FIXTURE if the default search path doesn't "
+         "PIPER_PLUS_SPEAKER_ENCODER_FIXTURE if the default search path doesn't "
          "apply.";
   std::stringstream buffer;
   buffer << stream.rdbuf();

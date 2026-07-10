@@ -75,12 +75,12 @@ def client(mock_engine, monkeypatch):
     Rate limiting is disabled here so the existing test suite — which
     repeatedly hits /v1/audio/speech — does not start failing once
     slowapi is wired in. Dedicated rate-limit tests build their own
-    app with PIPER_RATE_LIMIT_ENABLED=true.
+    app with PIPER_PLUS_RATE_LIMIT_ENABLED=true.
     """
-    # Ensure no stray PIPER_API_KEYS leaks in from the host env (would
+    # Ensure no stray PIPER_PLUS_API_KEYS leaks in from the host env (would
     # require Authorization on every request and break legacy tests).
-    monkeypatch.delenv("PIPER_API_KEYS", raising=False)
-    monkeypatch.setenv("PIPER_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.delenv("PIPER_PLUS_API_KEYS", raising=False)
+    monkeypatch.setenv("PIPER_PLUS_RATE_LIMIT_ENABLED", "false")
     # Use this test file as a stand-in for stat().st_mtime
     app = create_app(mock_engine, __file__)
     return TestClient(app)
@@ -333,7 +333,7 @@ class TestOpenAISpeechStreaming:
         assert kwargs["speaker_id"] == 7
 
     def test_stream_true_short_text_warning_still_emitted(self, client):
-        """The X-Piper-Warning header must be set BEFORE the body starts
+        """The X-Piper-Plus-Warning header must be set BEFORE the body starts
         streaming — once the first chunk goes on the wire we can't amend
         headers. This regression guard ensures the short-text warning
         propagates on the streaming path too."""
@@ -343,7 +343,7 @@ class TestOpenAISpeechStreaming:
             json={"input": "hi", "stream": True},
         ) as resp:
             assert resp.status_code == 200
-            assert resp.headers.get("x-piper-warning") == "short-text-input"
+            assert resp.headers.get("x-piper-plus-warning") == "short-text-input"
             list(self._read_chunks(resp))
 
     def test_stream_true_unsupported_format_returns_400(self, client):
@@ -410,7 +410,7 @@ class TestExistingEndpoints:
 
 
 class TestShortTextWarning:
-    """Strategy E: X-Piper-Warning header for short text inputs."""
+    """Strategy E: X-Piper-Plus-Warning header for short text inputs."""
 
     def test_short_text_has_warning_header(self, client):
         """Text with <=10 non-space chars should get the warning header."""
@@ -419,7 +419,7 @@ class TestShortTextWarning:
             json={"input": "hello"},  # 5 chars
         )
         assert resp.status_code == 200
-        assert resp.headers.get("x-piper-warning") == "short-text-input"
+        assert resp.headers.get("x-piper-plus-warning") == "short-text-input"
 
     def test_short_text_ja_has_warning_header(self, client):
         """Japanese short text should also trigger the warning."""
@@ -428,7 +428,7 @@ class TestShortTextWarning:
             json={"input": "こんにちは", "language": "ja"},  # 5 chars
         )
         assert resp.status_code == 200
-        assert resp.headers.get("x-piper-warning") == "short-text-input"
+        assert resp.headers.get("x-piper-plus-warning") == "short-text-input"
 
     def test_long_text_no_warning_header(self, client):
         """Text with >10 non-space chars should NOT get the warning header."""
@@ -437,7 +437,7 @@ class TestShortTextWarning:
             json={"input": "This is a sufficiently long sentence for testing."},
         )
         assert resp.status_code == 200
-        assert resp.headers.get("x-piper-warning") is None
+        assert resp.headers.get("x-piper-plus-warning") is None
 
     def test_boundary_10_chars_has_warning(self, client):
         """Exactly 10 non-space chars should still trigger the warning."""
@@ -446,7 +446,7 @@ class TestShortTextWarning:
             json={"input": "1234567890"},  # exactly 10 chars
         )
         assert resp.status_code == 200
-        assert resp.headers.get("x-piper-warning") == "short-text-input"
+        assert resp.headers.get("x-piper-plus-warning") == "short-text-input"
 
     def test_boundary_11_chars_no_warning(self, client):
         """11 non-space chars should NOT trigger the warning."""
@@ -455,7 +455,7 @@ class TestShortTextWarning:
             json={"input": "12345678901"},  # 11 chars
         )
         assert resp.status_code == 200
-        assert resp.headers.get("x-piper-warning") is None
+        assert resp.headers.get("x-piper-plus-warning") is None
 
     def test_spaces_excluded_from_count(self, client):
         """Spaces should not count toward the character threshold."""
@@ -464,7 +464,7 @@ class TestShortTextWarning:
             json={"input": "a b c d e"},  # 5 non-space chars
         )
         assert resp.status_code == 200
-        assert resp.headers.get("x-piper-warning") == "short-text-input"
+        assert resp.headers.get("x-piper-plus-warning") == "short-text-input"
 
     def test_fullwidth_spaces_excluded(self, client):
         """Full-width spaces (U+3000) should not count."""
@@ -473,13 +473,13 @@ class TestShortTextWarning:
             json={"input": "あ\u3000い\u3000う"},  # 3 non-space chars
         )
         assert resp.status_code == 200
-        assert resp.headers.get("x-piper-warning") == "short-text-input"
+        assert resp.headers.get("x-piper-plus-warning") == "short-text-input"
 
     def test_synthesize_get_short_text_warning(self, client):
         """GET /synthesize should also include the warning for short text."""
         resp = client.get("/synthesize", params={"text": "hi"})
         assert resp.status_code == 200
-        assert resp.headers.get("x-piper-warning") == "short-text-input"
+        assert resp.headers.get("x-piper-plus-warning") == "short-text-input"
 
     def test_synthesize_get_long_text_no_warning(self, client):
         """GET /synthesize should NOT include the warning for long text."""
@@ -488,7 +488,7 @@ class TestShortTextWarning:
             params={"text": "This is a long enough sentence."},
         )
         assert resp.status_code == 200
-        assert resp.headers.get("x-piper-warning") is None
+        assert resp.headers.get("x-piper-plus-warning") is None
 
     def test_ssml_short_text_no_warning(self, client):
         """SSML text starting with <speak> should NOT trigger short-text warning."""
@@ -497,7 +497,7 @@ class TestShortTextWarning:
             json={"input": "<speak>Hi</speak>"},
         )
         assert resp.status_code == 200
-        assert resp.headers.get("x-piper-warning") is None
+        assert resp.headers.get("x-piper-plus-warning") is None
 
     def test_ssml_synthesize_get_no_warning(self, client):
         """GET /synthesize with SSML should NOT trigger short-text warning."""
@@ -506,7 +506,7 @@ class TestShortTextWarning:
             params={"text": "<speak>Hi</speak>"},
         )
         assert resp.status_code == 200
-        assert resp.headers.get("x-piper-warning") is None
+        assert resp.headers.get("x-piper-plus-warning") is None
 
 
 # ---- PiperInferenceEngine input feed (issue #426) ----
@@ -516,7 +516,7 @@ class TestShortTextWarning:
 # (PR #320) — are fed the canonical zero-embedding + mask=0 fallback so
 # ONNX Runtime does not reject the call with "Required inputs missing".
 # The shape/dtype contract mirrors
-# `src/python_run/piper/voice.py` and `src/python/piper_train/export_onnx.py`.
+# `src/python_run/piper_plus/voice.py` and `src/python/piper_train/export_onnx.py`.
 
 
 class _FakeOnnxInput:
@@ -624,7 +624,7 @@ class TestSpeakerEmbeddingFeed:
 
     def test_synthesize_feeds_zero_embedding_with_mask_zero(self, engine_factory):
         """Canonical contract: zero embedding + mask=0 → emb_g(sid) fallback.
-        Mirrors src/python_run/piper/voice.py:200-208."""
+        Mirrors src/python_run/piper_plus/voice.py:200-208."""
         engine, session = engine_factory(
             [
                 ("input", ["batch", "seq"]),
@@ -708,8 +708,8 @@ class TestSpeakerEmbeddingFeed:
 
 # ---- Auth (Bearer token) ----
 #
-# PIPER_API_KEYS unset → auth disabled (backward compatible).
-# PIPER_API_KEYS set    → Authorization: Bearer <key> required, else 401.
+# PIPER_PLUS_API_KEYS unset → auth disabled (backward compatible).
+# PIPER_PLUS_API_KEYS set    → Authorization: Bearer <key> required, else 401.
 # /health is always exempt so load balancer probes don't get 401.
 #
 # Auth/rate-limit settings are resolved inside create_app(), so each test
@@ -729,8 +729,8 @@ def make_client(mock_engine, monkeypatch):
                 monkeypatch.setenv(key, val)
         # Disable rate limiting by default for non-rate-limit tests so the
         # 30/minute speech limit doesn't bleed across cases.
-        if "PIPER_RATE_LIMIT_ENABLED" not in env:
-            monkeypatch.setenv("PIPER_RATE_LIMIT_ENABLED", "false")
+        if "PIPER_PLUS_RATE_LIMIT_ENABLED" not in env:
+            monkeypatch.setenv("PIPER_PLUS_RATE_LIMIT_ENABLED", "false")
         app = create_app(mock_engine, __file__)
         return TestClient(app)
 
@@ -738,27 +738,27 @@ def make_client(mock_engine, monkeypatch):
 
 
 class TestAuthDisabledByDefault:
-    """Backward compat: PIPER_API_KEYS unset → no auth required."""
+    """Backward compat: PIPER_PLUS_API_KEYS unset → no auth required."""
 
     def test_speech_no_auth_header_succeeds(self, make_client):
-        client = make_client(PIPER_API_KEYS=None)
+        client = make_client(PIPER_PLUS_API_KEYS=None)
         resp = client.post("/v1/audio/speech", json={"input": "hello"})
         assert resp.status_code == 200
 
     def test_models_no_auth_header_succeeds(self, make_client):
-        client = make_client(PIPER_API_KEYS=None)
+        client = make_client(PIPER_PLUS_API_KEYS=None)
         resp = client.get("/v1/models")
         assert resp.status_code == 200
 
     def test_empty_string_treated_as_unset(self, make_client):
-        """PIPER_API_KEYS='' (empty) must NOT enable auth."""
-        client = make_client(PIPER_API_KEYS="")
+        """PIPER_PLUS_API_KEYS='' (empty) must NOT enable auth."""
+        client = make_client(PIPER_PLUS_API_KEYS="")
         resp = client.post("/v1/audio/speech", json={"input": "hello"})
         assert resp.status_code == 200
 
 
 class TestAuthEnabled:
-    """PIPER_API_KEYS set → Bearer required on protected endpoints."""
+    """PIPER_PLUS_API_KEYS set → Bearer required on protected endpoints."""
 
     # Fixture token used in env vars + Authorization headers below.
     # Intentionally NOT shaped like `sk-...` to avoid generic-api-key
@@ -766,13 +766,13 @@ class TestAuthEnabled:
     KEY = "piper-unit-test-token-00"  # gitleaks:allow
 
     def test_speech_missing_auth_returns_401(self, make_client):
-        client = make_client(PIPER_API_KEYS=self.KEY)
+        client = make_client(PIPER_PLUS_API_KEYS=self.KEY)
         resp = client.post("/v1/audio/speech", json={"input": "hello"})
         assert resp.status_code == 401
         assert resp.headers.get("www-authenticate") == "Bearer"
 
     def test_speech_valid_bearer_returns_200(self, make_client):
-        client = make_client(PIPER_API_KEYS=self.KEY)
+        client = make_client(PIPER_PLUS_API_KEYS=self.KEY)
         resp = client.post(
             "/v1/audio/speech",
             json={"input": "hello"},
@@ -781,7 +781,7 @@ class TestAuthEnabled:
         assert resp.status_code == 200
 
     def test_speech_wrong_key_returns_401(self, make_client):
-        client = make_client(PIPER_API_KEYS=self.KEY)
+        client = make_client(PIPER_PLUS_API_KEYS=self.KEY)
         resp = client.post(
             "/v1/audio/speech",
             json={"input": "hello"},
@@ -790,7 +790,7 @@ class TestAuthEnabled:
         assert resp.status_code == 401
 
     def test_speech_malformed_header_returns_401(self, make_client):
-        client = make_client(PIPER_API_KEYS=self.KEY)
+        client = make_client(PIPER_PLUS_API_KEYS=self.KEY)
         # No "Bearer " prefix
         resp = client.post(
             "/v1/audio/speech",
@@ -800,7 +800,7 @@ class TestAuthEnabled:
         assert resp.status_code == 401
 
     def test_speech_basic_scheme_rejected(self, make_client):
-        client = make_client(PIPER_API_KEYS=self.KEY)
+        client = make_client(PIPER_PLUS_API_KEYS=self.KEY)
         resp = client.post(
             "/v1/audio/speech",
             json={"input": "hello"},
@@ -810,7 +810,7 @@ class TestAuthEnabled:
 
     def test_bearer_scheme_case_insensitive(self, make_client):
         """Authorization scheme matches case-insensitively (RFC 7235)."""
-        client = make_client(PIPER_API_KEYS=self.KEY)
+        client = make_client(PIPER_PLUS_API_KEYS=self.KEY)
         resp = client.post(
             "/v1/audio/speech",
             json={"input": "hello"},
@@ -820,7 +820,7 @@ class TestAuthEnabled:
 
     def test_multiple_keys_any_valid(self, make_client):
         """Comma-separated keys: any one of them authorizes."""
-        client = make_client(PIPER_API_KEYS=f"key-one,{self.KEY},key-three")
+        client = make_client(PIPER_PLUS_API_KEYS=f"key-one,{self.KEY},key-three")
         resp = client.post(
             "/v1/audio/speech",
             json={"input": "hello"},
@@ -830,18 +830,18 @@ class TestAuthEnabled:
 
     def test_health_skips_auth(self, make_client):
         """/health must remain open for load balancer probes."""
-        client = make_client(PIPER_API_KEYS=self.KEY)
+        client = make_client(PIPER_PLUS_API_KEYS=self.KEY)
         resp = client.get("/health")
         assert resp.status_code == 200
         assert resp.json() == {"status": "healthy"}
 
     def test_models_requires_auth(self, make_client):
-        client = make_client(PIPER_API_KEYS=self.KEY)
+        client = make_client(PIPER_PLUS_API_KEYS=self.KEY)
         resp = client.get("/v1/models")
         assert resp.status_code == 401
 
     def test_models_with_auth_succeeds(self, make_client):
-        client = make_client(PIPER_API_KEYS=self.KEY)
+        client = make_client(PIPER_PLUS_API_KEYS=self.KEY)
         resp = client.get(
             "/v1/models",
             headers={"Authorization": f"Bearer {self.KEY}"},
@@ -849,12 +849,12 @@ class TestAuthEnabled:
         assert resp.status_code == 200
 
     def test_languages_requires_auth(self, make_client):
-        client = make_client(PIPER_API_KEYS=self.KEY)
+        client = make_client(PIPER_PLUS_API_KEYS=self.KEY)
         resp = client.get("/v1/audio/speech/languages")
         assert resp.status_code == 401
 
     def test_synthesize_requires_auth(self, make_client):
-        client = make_client(PIPER_API_KEYS=self.KEY)
+        client = make_client(PIPER_PLUS_API_KEYS=self.KEY)
         resp = client.get("/synthesize", params={"text": "hi"})
         assert resp.status_code == 401
 
@@ -863,12 +863,12 @@ class TestAuthEnabled:
 
 
 class TestRateLimitDisabled:
-    """PIPER_RATE_LIMIT_ENABLED=false → no 429 regardless of request volume."""
+    """PIPER_PLUS_RATE_LIMIT_ENABLED=false → no 429 regardless of request volume."""
 
     def test_speech_no_429_when_disabled(self, make_client):
         client = make_client(
-            PIPER_RATE_LIMIT_ENABLED="false",
-            PIPER_RATE_LIMIT_SPEECH="2/minute",
+            PIPER_PLUS_RATE_LIMIT_ENABLED="false",
+            PIPER_PLUS_RATE_LIMIT_SPEECH="2/minute",
         )
         for _ in range(5):
             resp = client.post("/v1/audio/speech", json={"input": "hi"})
@@ -876,13 +876,13 @@ class TestRateLimitDisabled:
 
 
 class TestRateLimitEnabled:
-    """PIPER_RATE_LIMIT_ENABLED=true (default) → 429 after limit exceeded."""
+    """PIPER_PLUS_RATE_LIMIT_ENABLED=true (default) → 429 after limit exceeded."""
 
     def test_speech_429_after_limit(self, make_client):
         # 2/minute keeps the test fast and deterministic without sleeping.
         client = make_client(
-            PIPER_RATE_LIMIT_ENABLED="true",
-            PIPER_RATE_LIMIT_SPEECH="2/minute",
+            PIPER_PLUS_RATE_LIMIT_ENABLED="true",
+            PIPER_PLUS_RATE_LIMIT_SPEECH="2/minute",
         )
         # First two should pass, third should be 429.
         assert client.post("/v1/audio/speech", json={"input": "a"}).status_code == 200
@@ -896,9 +896,9 @@ class TestRateLimitEnabled:
     def test_health_never_rate_limited(self, make_client):
         """/health must never be rate-limited (LB probes hit it every few s)."""
         client = make_client(
-            PIPER_RATE_LIMIT_ENABLED="true",
-            PIPER_RATE_LIMIT_SPEECH="1/minute",
-            PIPER_RATE_LIMIT_LIGHT="1/minute",
+            PIPER_PLUS_RATE_LIMIT_ENABLED="true",
+            PIPER_PLUS_RATE_LIMIT_SPEECH="1/minute",
+            PIPER_PLUS_RATE_LIMIT_LIGHT="1/minute",
         )
         # Hit /health well beyond any plausible limit.
         for _ in range(20):
@@ -908,8 +908,8 @@ class TestRateLimitEnabled:
     def test_synthesize_get_shares_speech_limit(self, make_client):
         """GET /synthesize uses the same heavy limit as POST /v1/audio/speech."""
         client = make_client(
-            PIPER_RATE_LIMIT_ENABLED="true",
-            PIPER_RATE_LIMIT_SPEECH="1/minute",
+            PIPER_PLUS_RATE_LIMIT_ENABLED="true",
+            PIPER_PLUS_RATE_LIMIT_SPEECH="1/minute",
         )
         assert client.get("/synthesize", params={"text": "a"}).status_code == 200
         resp = client.get("/synthesize", params={"text": "b"})
@@ -918,9 +918,9 @@ class TestRateLimitEnabled:
     def test_light_endpoint_has_separate_limit(self, make_client):
         """/v1/models uses the light limit, independent of speech limit."""
         client = make_client(
-            PIPER_RATE_LIMIT_ENABLED="true",
-            PIPER_RATE_LIMIT_SPEECH="1/minute",
-            PIPER_RATE_LIMIT_LIGHT="3/minute",
+            PIPER_PLUS_RATE_LIMIT_ENABLED="true",
+            PIPER_PLUS_RATE_LIMIT_SPEECH="1/minute",
+            PIPER_PLUS_RATE_LIMIT_LIGHT="3/minute",
         )
         # Exhaust speech limit — should not affect /v1/models.
         client.post("/v1/audio/speech", json={"input": "a"})
@@ -934,7 +934,7 @@ class TestRateLimitEnabled:
 
 # ---- /api/phoneme-timing ----
 #
-# Parity with the endpoint exposed by ``piper.http_server`` (in
+# Parity with the endpoint exposed by ``piper_plus.http_server`` (in
 # ``src/python_run/``). Required for downstream consumers (Wyoming, Home
 # Assistant, browser captions) that need phoneme-level timestamps for
 # subtitle alignment and karaoke. The /v1/audio/speech path is OpenAI-shaped

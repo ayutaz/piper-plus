@@ -115,7 +115,7 @@ def create_ort_session(
     * ``inter_op_num_threads``: ``1``
     * Memory arena and pattern: enabled
 
-    The environment variable ``PIPER_INTRA_THREADS`` overrides
+    The environment variable ``PIPER_PLUS_INTRA_THREADS`` overrides
     *intra_threads* and auto-detection.
 
     Args:
@@ -128,14 +128,14 @@ def create_ort_session(
     opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
 
     # Thread settings -- priority: env > arg > auto-detect
-    env_threads = os.environ.get("PIPER_INTRA_THREADS")
+    env_threads = os.environ.get("PIPER_PLUS_INTRA_THREADS")
     resolved_threads: int | None = None
     if env_threads is not None:
         try:
             resolved_threads = max(1, min(int(env_threads), MAX_INTRA_THREADS))
         except ValueError:
             logger.warning(
-                "Ignoring invalid PIPER_INTRA_THREADS=%r; using auto-detected value",
+                "Ignoring invalid PIPER_PLUS_INTRA_THREADS=%r; using auto-detected value",
                 env_threads,
             )
 
@@ -161,7 +161,7 @@ def create_ort_session(
 
 
 # ---------------------------------------------------------------------------
-# Optional input filling (cross-runtime parity with src/python_run/piper/voice.py)
+# Optional input filling (cross-runtime parity with src/python_run/piper_plus/voice.py)
 # ---------------------------------------------------------------------------
 
 
@@ -181,7 +181,7 @@ def _fill_speaker_embedding_inputs(
         ValueError: Required inputs (['speaker_embedding', 'speaker_embedding_mask'])
         are missing from input feed (['input', 'input_lengths', 'scales', 'lid', ...])
 
-    Mirror of ``src/python_run/piper/voice.py:742-756``. When changing this, keep
+    Mirror of ``src/python_run/piper_plus/voice.py:742-756``. When changing this, keep
     both paths in sync (the Wyoming smoke test will catch drift).
     """
     if "speaker_embedding" not in input_names:
@@ -212,9 +212,9 @@ def warmup_session(
 ) -> None:
     """Run *runs* dummy inferences to eliminate JIT cold-start latency.
 
-    Set ``PIPER_DISABLE_WARMUP=1`` to skip.
+    Set ``PIPER_PLUS_DISABLE_WARMUP=1`` to skip.
     """
-    if os.environ.get("PIPER_DISABLE_WARMUP", "").lower() in ("1", "true", "yes"):
+    if os.environ.get("PIPER_PLUS_DISABLE_WARMUP", "").lower() in ("1", "true", "yes"):
         return
     if runs <= 0:
         return

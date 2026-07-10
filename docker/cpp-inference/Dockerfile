@@ -28,10 +28,10 @@ COPY src/cpp/ src/cpp/
 # Phonemizer dictionaries (CMU English, Chinese pinyin) live with the
 # Rust G2P crate so both Rust's include_bytes! and CMake's install rules
 # read from a single source. cpp-inference doesn't compile the Rust crate,
-# but cmake/Install.cmake still installs these JSONs to share/piper/dicts/.
+# but cmake/Install.cmake still installs these JSONs to share/piper-plus/dicts/.
 COPY src/rust/piper-plus-g2p/data/ src/rust/piper-plus-g2p/data/
 
-# Build piper (all C++ deps resolved via CMake ExternalProject)
+# Build piper-plus (all C++ deps resolved via CMake ExternalProject)
 RUN mkdir -p build && cd build && \
     cmake .. \
         -G Ninja \
@@ -83,7 +83,7 @@ COPY docker/cpp-inference/test.sh /test.sh
 RUN chmod +x /entrypoint.sh /test.sh
 
 # Verify installation
-RUN piper --version || echo "Piper not found, will be mounted at runtime"
+RUN piper-plus --version || echo "Piper not found, will be mounted at runtime"
 
 # Verify OpenJTalk dictionary is available for Japanese TTS
 RUN test -d /usr/local/share/open_jtalk/dic && \
@@ -92,7 +92,7 @@ RUN test -d /usr/local/share/open_jtalk/dic && \
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD piper --version || exit 1
+  CMD piper-plus --version || exit 1
 
 # Run as non-root user for security
 # ubuntu:24.04 has a default 'ubuntu' user with UID 1000; remove it first to avoid collision

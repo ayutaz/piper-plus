@@ -14,9 +14,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 try:
     import gradio as gr
-
-    from piper.sample_texts import SAMPLE_TEXTS, get_sample_by_category
-    from piper.webui import (
+    from piper_plus.sample_texts import SAMPLE_TEXTS, get_sample_by_category
+    from piper_plus.webui import (
         TEMPLATES,
         apply_template,
         create_interface,

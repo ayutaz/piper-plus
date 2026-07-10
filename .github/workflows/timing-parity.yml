@@ -26,7 +26,7 @@ on:
   pull_request:
     branches: [ dev ]
     paths:
-      - 'src/python_run/piper/timing.py'
+      - 'src/python_run/piper_plus/timing.py'
       - 'tests/fixtures/phoneme_timing/**'
       - 'scripts/regenerate_timing_fixture.py'
       - 'docs/spec/phoneme-timing-contract.toml'
@@ -34,7 +34,7 @@ on:
   push:
     branches: [ dev ]
     paths:
-      - 'src/python_run/piper/timing.py'
+      - 'src/python_run/piper_plus/timing.py'
       - 'tests/fixtures/phoneme_timing/**'
       - 'scripts/regenerate_timing_fixture.py'
       - 'docs/spec/phoneme-timing-contract.toml'

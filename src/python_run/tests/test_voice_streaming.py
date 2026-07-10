@@ -11,9 +11,8 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import numpy as np
-
-from piper.config import PhonemeType, PiperConfig
-from piper.voice import PiperVoice
+from piper_plus.config import PhonemeType, PiperConfig
+from piper_plus.voice import PiperVoice
 
 
 def _make_mock_voice(*, sample_rate: int = 22050) -> PiperVoice:
@@ -118,14 +117,14 @@ class TestPhonemizeReturnsPerSentence:
                 captured.append(sentence)
                 return [f"ph_{sentence}"]
 
-        from piper.phonemize import multilingual as ml
+        from piper_plus.phonemize import multilingual as ml
 
         original = ml.MultilingualPhonemizer
         ml.MultilingualPhonemizer = FakeMP  # type: ignore[assignment]
         return original, captured
 
     def _restore_multilingual(self, original):
-        from piper.phonemize import multilingual as ml
+        from piper_plus.phonemize import multilingual as ml
 
         ml.MultilingualPhonemizer = original  # type: ignore[assignment]
 
@@ -180,7 +179,7 @@ class TestPhonemizeReturnsPerSentence:
         voice = _make_mock_voice()
         original, captured = self._patch_multilingual(self)
         try:
-            ssml = "<speak\n  lang=\"ja\">Hello. World.</speak>"
+            ssml = '<speak\n  lang="ja">Hello. World.</speak>'
             sentences = voice.phonemize(ssml)
         finally:
             self._restore_multilingual(original)
@@ -192,7 +191,7 @@ class TestPhonemizeReturnsPerSentence:
         voice = _make_mock_voice()
         original, captured = self._patch_multilingual(self)
         try:
-            ssml = "<speak\tversion=\"1.0\">Hi.</speak>"
+            ssml = '<speak\tversion="1.0">Hi.</speak>'
             sentences = voice.phonemize(ssml)
         finally:
             self._restore_multilingual(original)

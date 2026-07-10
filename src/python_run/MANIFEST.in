@@ -8,6 +8,6 @@
 # VERSION を src/python_run/ にコピーする build hook を導入する。
 include requirements.txt
 include README.md
-include piper/voices.json
-include piper/phonemize/data/zh_en_loanword.json
-include piper/phonemize/data/sv_function_words.json
+include piper_plus/voices.json
+include piper_plus/phonemize/data/zh_en_loanword.json
+include piper_plus/phonemize/data/sv_function_words.json

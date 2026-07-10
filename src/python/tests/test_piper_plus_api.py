@@ -15,9 +15,8 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-
-from piper_plus.api import PiperPlus, _split_sentences
-from piper_plus.audio import AudioResult
+from piper_plus.api.api import PiperPlus, _split_sentences
+from piper_plus.api.audio import AudioResult
 
 
 # ===================================================================
@@ -130,10 +129,10 @@ class TestSplitSentences:
 class TestPiperPlusInit:
     """PiperPlus initialization loads model, config, and creates ORT session."""
 
-    @patch("piper_plus.api.warmup_session")
-    @patch("piper_plus.api.create_ort_session")
-    @patch("piper_plus.api.load_config")
-    @patch("piper_plus.api.resolve_model")
+    @patch("piper_plus.api.api.warmup_session")
+    @patch("piper_plus.api.api.create_ort_session")
+    @patch("piper_plus.api.api.load_config")
+    @patch("piper_plus.api.api.resolve_model")
     def test_init_with_direct_path(
         self, mock_resolve, mock_load_config, mock_create, mock_warmup, tmp_path
     ):
@@ -150,10 +149,10 @@ class TestPiperPlusInit:
         mock_create.assert_called_once()
         mock_warmup.assert_called_once_with(mock_session, mock_load_config.return_value)
 
-    @patch("piper_plus.api.warmup_session")
-    @patch("piper_plus.api.create_ort_session")
-    @patch("piper_plus.api.load_config")
-    @patch("piper_plus.api.resolve_model")
+    @patch("piper_plus.api.api.warmup_session")
+    @patch("piper_plus.api.api.create_ort_session")
+    @patch("piper_plus.api.api.load_config")
+    @patch("piper_plus.api.api.resolve_model")
     def test_sample_rate_from_config(
         self, mock_resolve, mock_load_config, mock_create, mock_warmup, tmp_path
     ):
@@ -166,10 +165,10 @@ class TestPiperPlusInit:
 
         assert tts.sample_rate == 44100
 
-    @patch("piper_plus.api.warmup_session")
-    @patch("piper_plus.api.create_ort_session")
-    @patch("piper_plus.api.load_config")
-    @patch("piper_plus.api.resolve_model")
+    @patch("piper_plus.api.api.warmup_session")
+    @patch("piper_plus.api.api.create_ort_session")
+    @patch("piper_plus.api.api.load_config")
+    @patch("piper_plus.api.api.resolve_model")
     def test_languages_from_language_id_map(
         self, mock_resolve, mock_load_config, mock_create, mock_warmup, tmp_path
     ):
@@ -184,10 +183,10 @@ class TestPiperPlusInit:
 
         assert sorted(tts.languages) == ["en", "ja", "zh"]
 
-    @patch("piper_plus.api.warmup_session")
-    @patch("piper_plus.api.create_ort_session")
-    @patch("piper_plus.api.load_config")
-    @patch("piper_plus.api.resolve_model")
+    @patch("piper_plus.api.api.warmup_session")
+    @patch("piper_plus.api.api.create_ort_session")
+    @patch("piper_plus.api.api.load_config")
+    @patch("piper_plus.api.api.resolve_model")
     def test_speakers_from_speaker_id_map(
         self, mock_resolve, mock_load_config, mock_create, mock_warmup, tmp_path
     ):
@@ -202,10 +201,10 @@ class TestPiperPlusInit:
 
         assert tts.speakers == {"alice": 0, "bob": 1}
 
-    @patch("piper_plus.api.warmup_session")
-    @patch("piper_plus.api.create_ort_session")
-    @patch("piper_plus.api.load_config")
-    @patch("piper_plus.api.resolve_model")
+    @patch("piper_plus.api.api.warmup_session")
+    @patch("piper_plus.api.api.create_ort_session")
+    @patch("piper_plus.api.api.load_config")
+    @patch("piper_plus.api.api.resolve_model")
     def test_speakers_empty_for_single_speaker_model(
         self, mock_resolve, mock_load_config, mock_create, mock_warmup, tmp_path
     ):
@@ -218,10 +217,10 @@ class TestPiperPlusInit:
 
         assert tts.speakers == {}
 
-    @patch("piper_plus.api.warmup_session")
-    @patch("piper_plus.api.create_ort_session")
-    @patch("piper_plus.api.load_config")
-    @patch("piper_plus.api.resolve_model")
+    @patch("piper_plus.api.api.warmup_session")
+    @patch("piper_plus.api.api.create_ort_session")
+    @patch("piper_plus.api.api.load_config")
+    @patch("piper_plus.api.api.resolve_model")
     def test_default_scales(
         self, mock_resolve, mock_load_config, mock_create, mock_warmup, tmp_path
     ):
@@ -236,10 +235,10 @@ class TestPiperPlusInit:
         assert tts.length_scale == pytest.approx(1.0)
         assert tts.noise_scale_w == pytest.approx(0.8)
 
-    @patch("piper_plus.api.warmup_session")
-    @patch("piper_plus.api.create_ort_session")
-    @patch("piper_plus.api.load_config")
-    @patch("piper_plus.api.resolve_model")
+    @patch("piper_plus.api.api.warmup_session")
+    @patch("piper_plus.api.api.create_ort_session")
+    @patch("piper_plus.api.api.load_config")
+    @patch("piper_plus.api.api.resolve_model")
     def test_custom_scales(
         self, mock_resolve, mock_load_config, mock_create, mock_warmup, tmp_path
     ):
@@ -249,8 +248,11 @@ class TestPiperPlusInit:
         mock_create.return_value = _make_mock_session()
 
         tts = PiperPlus(
-            str(onnx), device="cpu",
-            noise_scale=0.5, length_scale=1.5, noise_scale_w=0.3,
+            str(onnx),
+            device="cpu",
+            noise_scale=0.5,
+            length_scale=1.5,
+            noise_scale_w=0.3,
         )
 
         assert tts.noise_scale == pytest.approx(0.5)
@@ -269,10 +271,10 @@ def _build_tts(tmp_path, *, config=None, session=None):
     config = config or _make_config()
     session = session or _make_mock_session()
     with (
-        patch("piper_plus.api.resolve_model", return_value=(onnx, cfg)),
-        patch("piper_plus.api.load_config", return_value=config),
-        patch("piper_plus.api.create_ort_session", return_value=session),
-        patch("piper_plus.api.warmup_session"),
+        patch("piper_plus.api.api.resolve_model", return_value=(onnx, cfg)),
+        patch("piper_plus.api.api.load_config", return_value=config),
+        patch("piper_plus.api.api.create_ort_session", return_value=session),
+        patch("piper_plus.api.api.warmup_session"),
     ):
         return PiperPlus(str(onnx), device="cpu")
 
@@ -284,7 +286,9 @@ class TestPiperPlusSynthesize:
     def test_synthesize_returns_audio_result(self, tmp_path):
         tts = _build_tts(tmp_path)
         # Mock _phonemize to return deterministic data
-        tts._phonemize = MagicMock(return_value=([1, 8, 5, 2], [None, None, None, None], None))
+        tts._phonemize = MagicMock(
+            return_value=([1, 8, 5, 2], [None, None, None, None], None)
+        )
 
         result = tts.synthesize("test text")
 

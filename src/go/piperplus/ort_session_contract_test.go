@@ -177,17 +177,17 @@ func TestOrtSessionContract_CacheConventions(t *testing.T) {
 
 func TestOrtSessionContract_EnvVarNames(t *testing.T) {
 	c := loadOrtSessionContract(t)
-	if c.EnvVars.DisableWarmup != "PIPER_DISABLE_WARMUP" {
+	if c.EnvVars.DisableWarmup != "PIPER_PLUS_DISABLE_WARMUP" {
 		t.Errorf("env_vars.disable_warmup: got %q, want %q",
-			c.EnvVars.DisableWarmup, "PIPER_DISABLE_WARMUP")
+			c.EnvVars.DisableWarmup, "PIPER_PLUS_DISABLE_WARMUP")
 	}
-	if c.EnvVars.DisableCache != "PIPER_DISABLE_CACHE" {
+	if c.EnvVars.DisableCache != "PIPER_PLUS_DISABLE_CACHE" {
 		t.Errorf("env_vars.disable_cache: got %q, want %q",
-			c.EnvVars.DisableCache, "PIPER_DISABLE_CACHE")
+			c.EnvVars.DisableCache, "PIPER_PLUS_DISABLE_CACHE")
 	}
-	if c.EnvVars.IntraThreads != "PIPER_INTRA_THREADS" {
+	if c.EnvVars.IntraThreads != "PIPER_PLUS_INTRA_THREADS" {
 		t.Errorf("env_vars.intra_threads: got %q, want %q",
-			c.EnvVars.IntraThreads, "PIPER_INTRA_THREADS")
+			c.EnvVars.IntraThreads, "PIPER_PLUS_INTRA_THREADS")
 	}
 }
 

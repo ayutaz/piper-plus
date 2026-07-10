@@ -89,7 +89,7 @@ flags:
     carryforward: true
   python_runtime:
     paths:
-      - src/python_run/piper/
+      - src/python_run/piper_plus/
     carryforward: true
   g2p:
     paths:
@@ -164,13 +164,13 @@ ignore:
   # ---- piper_train norm_audio (audio I/O 必須) ----
   - "src/python/piper_train/norm_audio/**"
   # ---- piper runtime CLI / E2E (unit test 不可) ----
-  - "src/python_run/piper/__main__.py"
-  - "src/python_run/piper/webui.py"
-  - "src/python_run/piper/http_server.py"
-  - "src/python_run/piper/training_manager.py"
-  - "src/python_run/piper/download.py"
-  - "src/python_run/piper/sample_texts.py"
-  - "src/python_run/piper/phonemize/ssml.py"
+  - "src/python_run/piper_plus/__main__.py"
+  - "src/python_run/piper_plus/webui.py"
+  - "src/python_run/piper_plus/http_server.py"
+  - "src/python_run/piper_plus/training_manager.py"
+  - "src/python_run/piper_plus/download.py"
+  - "src/python_run/piper_plus/sample_texts.py"
+  - "src/python_run/piper_plus/phonemize/ssml.py"
 
 # -----------------------------------------------------------------------------
 # PR 上に表示するコメント

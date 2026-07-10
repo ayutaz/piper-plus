@@ -12,7 +12,7 @@ import asyncio
 import logging
 from functools import partial
 
-from piper_plus import PiperPlus
+from piper_plus.api import PiperPlus
 from wyoming.audio import AudioChunk, AudioStart, AudioStop
 from wyoming.event import Event
 from wyoming.info import Describe

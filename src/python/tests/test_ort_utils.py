@@ -141,23 +141,23 @@ class TestCreateSessionOptionsParams:
 
 @pytest.mark.unit
 class TestPiperIntraThreadsEnv:
-    """PIPER_INTRA_THREADS 環境変数オーバーライドのテスト."""
+    """PIPER_PLUS_INTRA_THREADS 環境変数オーバーライドのテスト."""
 
-    @patch.dict("os.environ", {"PIPER_INTRA_THREADS": "2"})
+    @patch.dict("os.environ", {"PIPER_PLUS_INTRA_THREADS": "2"})
     def test_env_overrides_auto_detection(self):
         """環境変数が自動検出より優先される."""
         opts = create_session_options()
         assert opts.intra_op_num_threads == 2
 
-    @patch.dict("os.environ", {"PIPER_INTRA_THREADS": "3"})
+    @patch.dict("os.environ", {"PIPER_PLUS_INTRA_THREADS": "3"})
     def test_env_overrides_explicit_arg(self):
         """環境変数が引数 intra_op_threads より優先される."""
         opts = create_session_options(intra_op_threads=1)
         assert opts.intra_op_num_threads == 3
 
-    @patch.dict("os.environ", {"PIPER_INTRA_THREADS": "not_a_number"})
+    @patch.dict("os.environ", {"PIPER_PLUS_INTRA_THREADS": "not_a_number"})
     def test_env_invalid_value_falls_through(self):
-        """不正な PIPER_INTRA_THREADS は無視され自動検出にフォールバック."""
+        """不正な PIPER_PLUS_INTRA_THREADS は無視され自動検出にフォールバック."""
         opts = create_session_options()
         assert opts.intra_op_num_threads >= 1
 
@@ -302,23 +302,23 @@ class TestWarmup:
             warmup_onnx_session(session)
         assert "Warmup failed (non-fatal)" in caplog.text
 
-    @patch.dict("os.environ", {"PIPER_DISABLE_WARMUP": "1"})
+    @patch.dict("os.environ", {"PIPER_PLUS_DISABLE_WARMUP": "1"})
     def test_disable_warmup_env_1(self):
-        """PIPER_DISABLE_WARMUP=1 でスキップ."""
+        """PIPER_PLUS_DISABLE_WARMUP=1 でスキップ."""
         session = _make_mock_session()
         warmup_onnx_session(session)
         session.run.assert_not_called()
 
-    @patch.dict("os.environ", {"PIPER_DISABLE_WARMUP": "true"})
+    @patch.dict("os.environ", {"PIPER_PLUS_DISABLE_WARMUP": "true"})
     def test_disable_warmup_env_true(self):
-        """PIPER_DISABLE_WARMUP=true でスキップ."""
+        """PIPER_PLUS_DISABLE_WARMUP=true でスキップ."""
         session = _make_mock_session()
         warmup_onnx_session(session)
         session.run.assert_not_called()
 
-    @patch.dict("os.environ", {"PIPER_DISABLE_WARMUP": "yes"})
+    @patch.dict("os.environ", {"PIPER_PLUS_DISABLE_WARMUP": "yes"})
     def test_disable_warmup_env_yes(self):
-        """PIPER_DISABLE_WARMUP=yes でスキップ."""
+        """PIPER_PLUS_DISABLE_WARMUP=yes でスキップ."""
         session = _make_mock_session()
         warmup_onnx_session(session)
         session.run.assert_not_called()
@@ -629,9 +629,9 @@ class TestModelCache:
         assert session is mock_session
         assert call_count == 2  # 1回目失敗 + 2回目成功
 
-    @patch.dict("os.environ", {"PIPER_DISABLE_CACHE": "1"})
+    @patch.dict("os.environ", {"PIPER_PLUS_DISABLE_CACHE": "1"})
     def test_disable_cache_env(self, tmp_path):
-        """PIPER_DISABLE_CACHE=1 でキャッシュ生成なし."""
+        """PIPER_PLUS_DISABLE_CACHE=1 でキャッシュ生成なし."""
         model = tmp_path / "model.onnx"
         model.write_bytes(b"dummy")
         mock_session = MagicMock(spec=onnxruntime.InferenceSession)
@@ -645,9 +645,9 @@ class TestModelCache:
         assert not (tmp_path / "model.cpu.opt.onnx").exists()
         assert not (tmp_path / "model.cpu.opt.onnx.ok").exists()
 
-    @patch.dict("os.environ", {"PIPER_DISABLE_CACHE": "true"})
+    @patch.dict("os.environ", {"PIPER_PLUS_DISABLE_CACHE": "true"})
     def test_disable_cache_env_true(self, tmp_path):
-        """PIPER_DISABLE_CACHE=true でキャッシュ生成なし."""
+        """PIPER_PLUS_DISABLE_CACHE=true でキャッシュ生成なし."""
         model = tmp_path / "model.onnx"
         model.write_bytes(b"dummy")
         mock_session = MagicMock(spec=onnxruntime.InferenceSession)
@@ -660,9 +660,9 @@ class TestModelCache:
 
         assert not (tmp_path / "model.cpu.opt.onnx").exists()
 
-    @patch.dict("os.environ", {"PIPER_DISABLE_CACHE": "yes"})
+    @patch.dict("os.environ", {"PIPER_PLUS_DISABLE_CACHE": "yes"})
     def test_disable_cache_env_yes(self, tmp_path):
-        """PIPER_DISABLE_CACHE=yes でキャッシュ生成なし."""
+        """PIPER_PLUS_DISABLE_CACHE=yes でキャッシュ生成なし."""
         model = tmp_path / "model.onnx"
         model.write_bytes(b"dummy")
         mock_session = MagicMock(spec=onnxruntime.InferenceSession)

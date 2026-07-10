@@ -1,7 +1,7 @@
 //! Issue #383 Phase 1 ベンチ — Rust ランタイムで G2P の serial vs parallel を計測。
 //!
 //! Voice::phonemize_sentences_to_ids() は piper-core の Phase 1 公開 API。
-//! このベンチはその関数を N 文の sentence slice で呼び、`PIPER_G2P_PARALLELISM`
+//! このベンチはその関数を N 文の sentence slice で呼び、`PIPER_PLUS_G2P_PARALLELISM`
 //! の値に従って serial / auto-parallel いずれかを実行する。
 //!
 //! 1 プロセス = 1 mode (env はプロセスグローバル) なので、PowerShell ラッパー
@@ -65,12 +65,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         })
         .unwrap_or_else(|| vec![1usize, 2, 5, 10, 20]);
 
-    let env_value = env::var("PIPER_G2P_PARALLELISM").unwrap_or_default();
+    let env_value = env::var("PIPER_PLUS_G2P_PARALLELISM").unwrap_or_default();
     let mode_label = if env_value == "1" { "serial" } else { "auto" };
 
     eprintln!("=== Issue #383 Phase 1 Rust bench ===");
     eprintln!("mode  : {}", mode_label);
-    eprintln!("env   : PIPER_G2P_PARALLELISM={:?}", env_value);
+    eprintln!("env   : PIPER_PLUS_G2P_PARALLELISM={:?}", env_value);
     eprintln!("model : {}", model_path.display());
     eprintln!("ns    : {:?}", ns);
     eprintln!();

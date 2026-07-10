@@ -2,16 +2,16 @@
 
 > Index: [`README.md`](README.md)
 
-Python は ZH-EN code-switching の **canonical source of truth**。学習側 (`src/python/g2p/piper_plus_g2p/`) とランタイム側 (`src/python_run/piper/phonemize/`) 両方で実装済 (PR #397)。他 5 ランタイムは Python から byte-for-byte 同期。
+Python は ZH-EN code-switching の **canonical source of truth**。学習側 (`src/python/g2p/piper_plus_g2p/`) とランタイム側 (`src/python_run/piper_plus/phonemize/`) 両方で実装済 (PR #397)。他 5 ランタイムは Python から byte-for-byte 同期。
 
 ## 1. 実装ファイル
 
 | 用途 | パス |
 |------|------|
 | Phonemizer 本体 (学習側) | `src/python/g2p/piper_plus_g2p/chinese.py` |
-| Phonemizer 本体 (ランタイム側) | `src/python_run/piper/phonemize/chinese.py` |
+| Phonemizer 本体 (ランタイム側) | `src/python_run/piper_plus/phonemize/chinese.py` |
 | 辞書データ (canonical) | `src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json` |
-| 辞書データ (mirror) | `src/python_run/piper/phonemize/data/zh_en_loanword.json` |
+| 辞書データ (mirror) | `src/python_run/piper_plus/phonemize/data/zh_en_loanword.json` |
 | テスト | `src/python/g2p/tests/test_zh_en_loanword.py` (~698 行) |
 
 ## 2. JSON 同期 CI 戦略
@@ -64,7 +64,7 @@ jobs:
           SOURCE=src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json
           HASH=$(sha256sum "$SOURCE" | cut -d' ' -f1)
           COPIES=(
-            src/python_run/piper/phonemize/data/zh_en_loanword.json
+            src/python_run/piper_plus/phonemize/data/zh_en_loanword.json
             src/rust/piper-plus-g2p/data/zh_en_loanword.json
             src/rust/piper-core/data/zh_en_loanword.json
             src/go/phonemize/data/zh_en_loanword.json

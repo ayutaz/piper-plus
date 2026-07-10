@@ -20,7 +20,7 @@
 #   Rust:   src/rust/piper-core/src/engine.rs
 #   C#:     src/csharp/PiperPlus.Core/Inference/SessionFactory.cs
 #   C++:    src/cpp/piper.cpp
-#   Python: src/python/piper_train/ort_utils.py, src/python_run/piper/voice.py
+#   Python: src/python/piper_train/ort_utils.py, src/python_run/piper_plus/voice.py
 #   Go:     src/go/piperplus/engine.go
 #   WASM:   src/wasm/openjtalk-web/src/index.js  (CPU only via ort-web)
 
@@ -245,7 +245,7 @@ sources_of_drift = ["TRT engine builder picks per-build tactics", "FP16/INT8 qua
 # (CUDA / CoreML) require host-specific runtime libs.
 
 [parity_test]
-opt_in_env = "PIPER_ORT_PROVIDER_PARITY"
+opt_in_env = "PIPER_PLUS_ORT_PROVIDER_PARITY"
 opt_in_values = ["1", "true", "yes"]
 test_phoneme_length = 100
 test_scales = [0.667, 1.0, 0.8]

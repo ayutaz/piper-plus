@@ -4,8 +4,7 @@ Tests for existing utility function implementations
 
 import numpy as np
 import pytest
-
-from piper.util import audio_float_to_int16
+from piper_plus.util import audio_float_to_int16
 
 
 class TestUtilImplementation:

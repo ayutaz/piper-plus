@@ -1,8 +1,8 @@
 """Distroless entrypoint for the WebUI image.
 
 The canonical Bash `docker/webui/entrypoint.sh`:
-  1. Resolves $PIPER_MODEL_DIR (default `/models`).
-  2. If $PIPER_MODEL is set, looks the model up under $PIPER_MODEL_DIR;
+  1. Resolves $PIPER_PLUS_MODEL_DIR (default `/models`).
+  2. If $PIPER_PLUS_MODEL is set, looks the model up under $PIPER_PLUS_MODEL_DIR;
      downloads it via `piper_train.model_manager.download_model` if it
      isn't already there.
   3. Exec's `python /app/app.py --model-dir <dir> --output-dir <out>`
@@ -16,8 +16,8 @@ so `docker run` extra args reach app.py untouched (just like the Bash
 version's `"$@"`).
 
 Behavioural parity:
-  * Same env-var contract: $PIPER_MODEL / $PIPER_MODEL_DIR /
-    $PIPER_OUTPUT_DIR.
+  * Same env-var contract: $PIPER_PLUS_MODEL / $PIPER_PLUS_MODEL_DIR /
+    $PIPER_PLUS_OUTPUT_DIR.
   * Same exit codes on download failure (non-zero with a stderr line).
   * Same `exec`-style hand-off: this wrapper uses os.execvp so the
     Python interpreter for app.py replaces this process and signals
@@ -36,16 +36,16 @@ import sys
 
 
 def _maybe_download_model() -> int:
-    """Mirror entrypoint.sh's PIPER_MODEL download block.
+    """Mirror entrypoint.sh's PIPER_PLUS_MODEL download block.
 
     Returns the exit code we should propagate (0 on success or when no
     model name was provided; non-zero from the canonical script otherwise).
     """
-    model_name = os.environ.get("PIPER_MODEL", "").strip()
+    model_name = os.environ.get("PIPER_PLUS_MODEL", "").strip()
     if not model_name:
         return 0
 
-    model_dir = os.environ.get("PIPER_MODEL_DIR", "/models")
+    model_dir = os.environ.get("PIPER_PLUS_MODEL_DIR", "/models")
     print(f"Checking model: {model_name}", file=sys.stderr)
 
     # Lazy import inside the function: keeps the no-model path
@@ -72,8 +72,8 @@ def main(argv: list[str]) -> int:
     if rc != 0:
         return rc
 
-    model_dir = os.environ.get("PIPER_MODEL_DIR", "/models")
-    output_dir = os.environ.get("PIPER_OUTPUT_DIR", "/output")
+    model_dir = os.environ.get("PIPER_PLUS_MODEL_DIR", "/models")
+    output_dir = os.environ.get("PIPER_PLUS_OUTPUT_DIR", "/output")
 
     # Hand off to app.py with the same flag layout the canonical
     # entrypoint.sh used. argv[1:] are the trailing args passed via
