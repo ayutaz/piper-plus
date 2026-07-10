@@ -32,10 +32,15 @@ namespace PiperPlus.Cli.Tests;
 /// </remarks>
 public sealed class DotNetG2PEngineFixture : IDisposable
 {
-    public DotNetG2PEngine JaEngine { get; }
-    public DotNetEnglishG2PEngine EnEngine { get; }
-    public MultilingualPhonemizer Multilingual { get; }
-    public JapanesePhonemizer JaPhonemizer { get; }
+    // DotNetG2PEngine と DotNetEnglishG2PEngine は PiperPlus.Cli で
+    // internal sealed。 xUnit の IClassFixture DI (Activator.CreateInstance)
+    // は fixture class を public にする必要があるが、 property 型が internal
+    // だと CS0053 で fail する。 property を internal にして accessibility を
+    // 揃える (assembly-internal なので tests 側からは問題なくアクセス可能)。
+    internal DotNetG2PEngine JaEngine { get; }
+    internal DotNetEnglishG2PEngine EnEngine { get; }
+    internal MultilingualPhonemizer Multilingual { get; }
+    internal JapanesePhonemizer JaPhonemizer { get; }
 
     public DotNetG2PEngineFixture()
     {
