@@ -37,7 +37,11 @@ jobs:
             dist_subdir: rust-wasm-ja
             artifact: piper-plus-wasm-ja
           - name: ja-lite
-            features: '--no-default-features --features ja-external'
+            # `--no-default-features` は wasm-pack が直接受け付けないため
+            # `--` 以降で cargo build に転送する (wasm-pack CLI 仕様)。
+            # 従前は wasm-pack が透過的に処理していたが 2026-07 リリース
+            # で挙動が変わり ja-lite variant のみ回帰したため明示化する。
+            features: '-- --no-default-features --features ja-external'
             dist_subdir: rust-wasm-ja-lite
             artifact: piper-plus-wasm-ja-lite
     steps:
