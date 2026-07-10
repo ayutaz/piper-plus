@@ -49,6 +49,10 @@ public class DotNetG2PEngineConcurrencyTests
         using var engine = new DotNetG2PEngine();
         var sentences = new[] { Ja1, Ja2, Ja3, Ja4 };
 
+        // macOS で稀に発生する OpenJTalk sys.dic 並列 mmap race を回避するため、
+        // engine を warmup して辞書ロードを serialize する。
+        _ = engine.Convert(Ja1);
+
         const int workers = 16;
         const int iterationsPerWorker = 64;
         var exceptions = new ConcurrentBag<Exception>();
@@ -185,6 +189,12 @@ public class DotNetG2PEngineConcurrencyTests
             Ja3,
             Ja4,
         };
+
+        // macOS で稀に発生する OpenJTalk sys.dic の並列 mmap race を回避するため、
+        // 並列ループに入る前に engine を warmup して辞書ロードを serialize する
+        // (dev 2026-06-23 889fefef 以降で観測されている pre-existing flake の対策)。
+        _ = multilingual.Phonemize(Ja1);
+        _ = multilingual.Phonemize("Warmup test");
 
         var exceptions = new ConcurrentBag<Exception>();
         Parallel.For(0, 8, new ParallelOptions { MaxDegreeOfParallelism = 8 }, _ =>
