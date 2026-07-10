@@ -54,6 +54,12 @@ paths = [
 regexes = [
     # HuggingFace model IDs (org/name).
     '''ayousanz/piper-plus-[a-z0-9-]+''',
+    # CI artifact-name / cache-key-prefix identifiers (dev-build-all.yml 等)。
+    # v2.0 改名で piper-cpp-* → piper-plus-cpp-* に値が伸び、macos-arm64 が
+    # generic-api-key の entropy 閾値 (~3.56) を超えた false positive。
+    # `piper-plus-cpp-` prefix 固定で全 platform 変種を allow (実 secret が
+    # `piper-plus-cpp-` prefix で始まることはない)。
+    '''piper-plus-cpp-[A-Za-z0-9._-]+''',
     # ORT release hashes referenced in docs.
     '''onnxruntime-(android|osx|linux|win)-[a-z0-9.-]+''',
     # Sample WandB key placeholder used in docs.
