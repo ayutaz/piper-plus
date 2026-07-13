@@ -48,9 +48,9 @@ short[] audio = piper.Synthesize(new SynthesisInput(
     SpeakerId: 0,
     LanguageId: 0,
     ProsodyFeatures: model.HasProsody ? prosody : null,
-    NoiseScale: 0.667f,
+    NoiseScale: 0.4f,
     LengthScale: 1.0f,
-    NoiseW: 0.8f));
+    NoiseW: 0.5f));
 
 // 4. Persist as WAV (16-bit PCM, sample rate from config)
 WavWriter.Write("hello.wav", audio, model.SampleRate);

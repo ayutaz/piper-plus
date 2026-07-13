@@ -143,7 +143,7 @@ def export_encoder(args, model_g):
         speaker_embeddings = torch.zeros(1, 192, dtype=torch.float32)
 
     # noise, noise_w, length
-    scales = torch.FloatTensor([0.667, 1.0, 0.8])
+    scales = torch.FloatTensor([0.4, 1.0, 0.5])
     dummy_input = (sequences, sequence_lengths, scales, speaker_embeddings)
 
     input_names = ["input", "input_lengths", "scales"]

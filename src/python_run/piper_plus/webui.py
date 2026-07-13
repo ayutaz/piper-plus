@@ -609,7 +609,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                                 label="Noise Scale",
                                 minimum=0.0,
                                 maximum=1.0,
-                                value=0.667,
+                                value=0.4,
                                 step=0.01,
                                 info="Higher = more expressive",
                             )
@@ -618,7 +618,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                                 label="Noise Width",
                                 minimum=0.0,
                                 maximum=1.0,
-                                value=0.8,
+                                value=0.5,
                                 step=0.01,
                             )
 

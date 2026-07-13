@@ -225,7 +225,7 @@ def warmup_session(
         dummy_ids[0, 0] = 1  # BOS
         dummy_ids[0, -1] = 2  # EOS
         dummy_lengths = np.array([WARMUP_PHONEME_LENGTH], dtype=np.int64)
-        dummy_scales = np.array([0.667, 1.0, 0.8], dtype=np.float32)
+        dummy_scales = np.array([0.4, 1.0, 0.5], dtype=np.float32)
 
         feed: dict[str, np.ndarray] = {
             "input": dummy_ids,
@@ -265,9 +265,9 @@ def synthesize(
     config: dict | None = None,
     speaker_id: int = 0,
     language_id: int | None = None,
-    noise_scale: float = 0.667,
+    noise_scale: float = 0.4,
     length_scale: float = 1.0,
-    noise_w: float = 0.8,
+    noise_w: float = 0.5,
     prosody_features: list[dict | None] | None = None,
 ) -> np.ndarray:
     """Run ONNX inference and return **int16** PCM audio samples.
@@ -347,9 +347,9 @@ def synthesize_float(
     *,
     speaker_id: int = 0,
     language_id: int | None = None,
-    noise_scale: float = 0.667,
+    noise_scale: float = 0.4,
     length_scale: float = 1.0,
-    noise_w: float = 0.8,
+    noise_w: float = 0.5,
     prosody_features: list[dict | None] | None = None,
 ) -> np.ndarray:
     """Like :func:`synthesize` but return **float32** audio in [-1, 1].

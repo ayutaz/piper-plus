@@ -81,11 +81,11 @@ export interface PiperPlusOptions {
 export interface SynthesizeOptions {
   /** Target language. Omit for auto-detection. */
   language?: Language;
-  /** Controls speaker variation. Default: 0.667. */
+  /** Controls speaker variation. Default: 0.4. */
   noiseScale?: number;
   /** Controls speech speed. Default: 1.0. */
   lengthScale?: number;
-  /** Controls phoneme duration variation. Default: 0.8. */
+  /** Controls phoneme duration variation. Default: 0.5. */
   noiseW?: number;
   /**
    * Optional speaker embedding for voice cloning (typically 256-dim,

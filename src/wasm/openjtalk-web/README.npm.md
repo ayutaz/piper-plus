@@ -303,9 +303,9 @@ Synthesize speech from text.
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `language` | `string` | auto-detect | `'ja'` \| `'en'` \| `'zh'` \| `'ko'` \| `'es'` \| `'fr'` \| `'pt'` \| `'sv'` |
-| `noiseScale` | `number` | `0.667` | Controls voice variation. |
+| `noiseScale` | `number` | `0.4` | Controls voice variation. |
 | `lengthScale` | `number` | `1.0` | Controls speech speed (lower = faster). |
-| `noiseW` | `number` | `0.8` | Controls phoneme duration variation. |
+| `noiseW` | `number` | `0.5` | Controls phoneme duration variation. |
 
 Returns `Promise<AudioResult>`.
 
@@ -316,9 +316,9 @@ Streaming synthesis that splits text into sentences and delivers audio chunks vi
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `language` | `string` | auto-detect | Target language code. |
-| `noiseScale` | `number` | `0.667` | Controls voice variation. |
+| `noiseScale` | `number` | `0.4` | Controls voice variation. |
 | `lengthScale` | `number` | `1.0` | Controls speech speed. |
-| `noiseW` | `number` | `0.8` | Controls phoneme duration variation. |
+| `noiseW` | `number` | `0.5` | Controls phoneme duration variation. |
 | `onChunk` | `function` | -- | Callback receiving a `Float32Array` of PCM samples per sentence. |
 
 Returns `Promise<void>`.

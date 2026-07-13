@@ -52,7 +52,7 @@ piper-plus --model tsukuyomi \
 | `--output_dir`, `-d` | Output directory (default: cwd) |
 | `--output_raw` | Raw 16-bit PCM stdout (no WAV header) |
 | `--streaming` | Sentence-level streaming raw PCM to stdout |
-| `--noise_scale` / `--length_scale` / `--noise_w` | Synthesis params (defaults `0.667 / 1.0 / 0.8`) |
+| `--noise_scale` / `--length_scale` / `--noise_w` | Synthesis params (defaults `0.4 / 1.0 / 0.5`) |
 | `--sentence_silence` | Silence after each sentence (default: `0.2` s) |
 | `--phoneme_silence` | Insert silence around specific phonemes (`"<phoneme> <seconds>"`) |
 | `--custom-dict` | Comma-separated custom dictionary files (JSON v1.0/v2.0 + TSV) |

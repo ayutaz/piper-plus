@@ -63,9 +63,9 @@ class PiperPlus:
         device: Inference device: ``"cpu"``, ``"gpu"``, or ``"auto"``.
         download: Whether to download the model if not found locally.
         cache_dir: Override the default model cache directory.
-        noise_scale: Controls phoneme-level variability (default 0.667).
+        noise_scale: Controls phoneme-level variability (default 0.4).
         length_scale: Controls speaking speed (default 1.0).
-        noise_scale_w: Controls stochastic duration variability (default 0.8).
+        noise_scale_w: Controls stochastic duration variability (default 0.5).
     """
 
     def __init__(
@@ -76,9 +76,9 @@ class PiperPlus:
         device: str = "auto",
         download: bool = True,
         cache_dir: Path | None = None,
-        noise_scale: float = 0.667,
+        noise_scale: float = 0.4,
         length_scale: float = 1.0,
-        noise_scale_w: float = 0.8,
+        noise_scale_w: float = 0.5,
     ) -> None:
         # Resolve model path
         onnx_path, config_path = resolve_model(
