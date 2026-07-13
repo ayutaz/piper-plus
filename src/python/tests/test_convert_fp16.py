@@ -11,7 +11,7 @@ import pytest
 onnx = pytest.importorskip("onnx")
 
 
-def _onnx_inference(onnx_path, phoneme_ids, prosody_features, noise_scale=0.667):
+def _onnx_inference(onnx_path, phoneme_ids, prosody_features, noise_scale=0.4):
     """Run ONNX inference and return audio output.
 
     phoneme_ids/prosody_features を指定した場合はそれを使用し、
@@ -34,7 +34,7 @@ def _onnx_inference(onnx_path, phoneme_ids, prosody_features, noise_scale=0.667)
     text = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
     inputs["input"] = text
     inputs["input_lengths"] = np.array([text.shape[1]], dtype=np.int64)
-    inputs["scales"] = np.array([noise_scale, 1.0, 0.8], dtype=np.float32)
+    inputs["scales"] = np.array([noise_scale, 1.0, 0.5], dtype=np.float32)
 
     # prosody_features の上書き
     input_names = [inp.name for inp in session.get_inputs()]
@@ -45,9 +45,7 @@ def _onnx_inference(onnx_path, phoneme_ids, prosody_features, noise_scale=0.667)
                 pf.append([0, 0, 0])
             else:
                 pf.append([feat["a1"], feat["a2"], feat["a3"]])
-        inputs["prosody_features"] = np.expand_dims(
-            np.array(pf, dtype=np.int64), 0
-        )
+        inputs["prosody_features"] = np.expand_dims(np.array(pf, dtype=np.int64), 0)
 
     outputs = session.run(None, inputs)
     return outputs[0].squeeze()

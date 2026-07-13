@@ -29,9 +29,9 @@ def _make_config(num_speakers: int = 1) -> PiperConfig:
         num_symbols=100,
         num_speakers=num_speakers,
         sample_rate=22050,
-        noise_scale=0.667,
+        noise_scale=0.4,
         length_scale=1.0,
-        noise_w=0.8,
+        noise_w=0.5,
         phoneme_id_map={"_": [0], "^": [1], "$": [2], "a": [10]},
         phoneme_type="multilingual",
     )

@@ -59,9 +59,9 @@ def pytorch_inference(
     phoneme_ids: list[int],
     prosody_features: list[dict | None] | None = None,
     speaker_id: int | None = None,
-    noise_scale: float = 0.667,
+    noise_scale: float = 0.4,
     length_scale: float = 1.0,
-    noise_scale_w: float = 0.8,
+    noise_scale_w: float = 0.5,
 ) -> np.ndarray:
     """PyTorch推論を実行して音声を返す
 
@@ -105,9 +105,9 @@ def onnx_inference(
     phoneme_ids: list[int],
     prosody_features: list[dict | None] | None = None,
     speaker_id: int | None = None,
-    noise_scale: float = 0.667,
+    noise_scale: float = 0.4,
     length_scale: float = 1.0,
-    noise_scale_w: float = 0.8,
+    noise_scale_w: float = 0.5,
 ) -> np.ndarray:
     """ONNX推論を実行して音声を返す
 
@@ -332,10 +332,10 @@ class TestPyTorchONNXParity:
     @pytest.mark.parametrize(
         "noise_scale,length_scale,noise_scale_w",
         [
-            (0.667, 1.0, 0.8),  # デフォルト
-            (0.5, 1.0, 0.8),  # noise_scale変更
-            (0.667, 1.2, 0.8),  # length_scale変更
-            (0.667, 1.0, 1.0),  # noise_scale_w変更
+            (0.4, 1.0, 0.5),  # デフォルト
+            (0.5, 1.0, 0.5),  # noise_scale変更
+            (0.4, 1.2, 0.5),  # length_scale変更
+            (0.4, 1.0, 1.0),  # noise_scale_w変更
         ],
     )
     def test_different_scales(

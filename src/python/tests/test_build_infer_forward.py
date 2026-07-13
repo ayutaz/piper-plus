@@ -11,7 +11,9 @@ Tests verify:
 
 import pytest
 
-torch = pytest.importorskip("torch", reason="torch required for build_infer_forward tests")
+torch = pytest.importorskip(
+    "torch", reason="torch required for build_infer_forward tests"
+)
 
 
 @pytest.mark.unit
@@ -42,7 +44,7 @@ class TestBuildInferForward:
 
         text = torch.randint(0, 50, (1, 10), dtype=torch.long)
         text_lengths = torch.LongTensor([10])
-        scales = torch.FloatTensor([0.667, 1.0, 0.8])
+        scales = torch.FloatTensor([0.4, 1.0, 0.5])
         prosody = torch.zeros(1, 10, 3, dtype=torch.long)
 
         with torch.no_grad():
@@ -60,14 +62,14 @@ class TestBuildInferForward:
 
         text = torch.randint(0, 50, (1, 10), dtype=torch.long)
         text_lengths = torch.LongTensor([10])
-        scales = torch.FloatTensor([0.667, 1.0, 0.8])
+        scales = torch.FloatTensor([0.4, 1.0, 0.5])
         prosody = torch.zeros(1, 10, 3, dtype=torch.long)
 
         with torch.no_grad():
             audio1, _ = fn(text, text_lengths, scales, prosody_features=prosody)
             audio2, _ = fn(text, text_lengths, scales, prosody_features=prosody)
 
-        # With noise_scale=0.667, outputs should differ
+        # With noise_scale=0.4, outputs should differ
         assert not torch.equal(audio1, audio2), (
             "Stochastic mode should produce different outputs across runs"
         )
@@ -80,7 +82,7 @@ class TestBuildInferForward:
 
         text = torch.randint(0, 50, (1, 10), dtype=torch.long)
         text_lengths = torch.LongTensor([10])
-        scales = torch.FloatTensor([0.667, 1.0, 0.8])
+        scales = torch.FloatTensor([0.4, 1.0, 0.5])
         prosody = torch.zeros(1, 10, 3, dtype=torch.long)
 
         with torch.no_grad():
@@ -98,7 +100,7 @@ class TestBuildInferForward:
         phoneme_length = 10
         text = torch.randint(0, 50, (1, phoneme_length), dtype=torch.long)
         text_lengths = torch.LongTensor([phoneme_length])
-        scales = torch.FloatTensor([0.667, 1.0, 0.8])
+        scales = torch.FloatTensor([0.4, 1.0, 0.5])
         prosody = torch.zeros(1, phoneme_length, 3, dtype=torch.long)
 
         with torch.no_grad():
@@ -116,13 +118,17 @@ class TestBuildInferForward:
 
         text = torch.randint(0, 50, (1, 10), dtype=torch.long)
         text_lengths = torch.LongTensor([10])
-        scales = torch.FloatTensor([0.667, 1.0, 0.8])
+        scales = torch.FloatTensor([0.4, 1.0, 0.5])
         prosody = torch.zeros(1, 10, 3, dtype=torch.long)
 
         with torch.no_grad():
             audio, durations = fn(
-                text, text_lengths, scales,
-                sid=None, lid=None, prosody_features=prosody,
+                text,
+                text_lengths,
+                scales,
+                sid=None,
+                lid=None,
+                prosody_features=prosody,
             )
 
         assert audio.shape[0] == 1
@@ -137,15 +143,19 @@ class TestBuildInferForward:
 
         text = torch.randint(0, 50, (1, 10), dtype=torch.long)
         text_lengths = torch.LongTensor([10])
-        scales = torch.FloatTensor([0.667, 1.0, 0.8])
+        scales = torch.FloatTensor([0.4, 1.0, 0.5])
         sid = torch.LongTensor([0])
         lid = torch.LongTensor([0])
         prosody = torch.zeros(1, 10, 3, dtype=torch.long)
 
         with torch.no_grad():
             audio, durations = fn(
-                text, text_lengths, scales,
-                sid=sid, lid=lid, prosody_features=prosody,
+                text,
+                text_lengths,
+                scales,
+                sid=sid,
+                lid=lid,
+                prosody_features=prosody,
             )
 
         assert audio.ndim == 3, f"Expected audio.ndim == 3, got {audio.ndim}"
@@ -207,22 +217,29 @@ def test_parity_with_model_infer():
 
     # --- Path 1: model.infer() (deterministic via onnx_export_mode + noise_scale=0) ---
     with torch.no_grad():
-        audio_infer, _attn, _y_mask, (_z, _z_p, _m_p, _logs_p), _durations = model.infer(
-            text,
-            text_lengths,
-            noise_scale=0.0,
-            noise_scale_w=0.0,
-            length_scale=1.0,
-            prosody_features=prosody,
+        audio_infer, _attn, _y_mask, (_z, _z_p, _m_p, _logs_p), _durations = (
+            model.infer(
+                text,
+                text_lengths,
+                noise_scale=0.0,
+                noise_scale_w=0.0,
+                length_scale=1.0,
+                prosody_features=prosody,
+            )
         )
 
     # --- Path 2: build_infer_forward (deterministic, stochastic=False) ---
     infer_fn = build_infer_forward(model, stochastic=False)
-    scales = torch.FloatTensor([0.0, 1.0, 0.0])  # noise_scale, length_scale, noise_scale_w
+    scales = torch.FloatTensor(
+        [0.0, 1.0, 0.0]
+    )  # noise_scale, length_scale, noise_scale_w
 
     with torch.no_grad():
         audio_export, _durations = infer_fn(
-            text, text_lengths, scales, prosody_features=prosody,
+            text,
+            text_lengths,
+            scales,
+            prosody_features=prosody,
         )
 
     # Both paths should produce identical audio

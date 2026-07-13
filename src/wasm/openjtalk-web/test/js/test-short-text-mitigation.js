@@ -67,7 +67,7 @@ function createMockInstance(overrides = {}) {
 
   instance._config = overrides.config || {
     audio: { sample_rate: 22050 },
-    inference: { noise_scale: 0.667, length_scale: 1.0, noise_w: 0.8 },
+    inference: { noise_scale: 0.4, length_scale: 1.0, noise_w: 0.5 },
     phoneme_id_map: { _: [0], "^": [1], $: [2], " ": [3], a: [4] },
   };
 
@@ -668,27 +668,27 @@ describe("trimSilence (Strategy A - post-trim)", { skip }, () => {
 
 describe("adjustScalesForShortInput (Strategy B)", { skip }, () => {
   it("does not adjust when phonemeCount >= MIN_PHONEME_IDS", () => {
-    const result = adjustScalesForShortInput(MIN_PHONEME_IDS, 0.667, 0.8);
+    const result = adjustScalesForShortInput(MIN_PHONEME_IDS, 0.4, 0.5);
 
-    assert.equal(result.noiseScale, 0.667);
-    assert.equal(result.noiseW, 0.8);
+    assert.equal(result.noiseScale, 0.4);
+    assert.equal(result.noiseW, 0.5);
   });
 
   it("does not adjust when phonemeCount > MIN_PHONEME_IDS", () => {
-    const result = adjustScalesForShortInput(MIN_PHONEME_IDS + 50, 0.667, 0.8);
+    const result = adjustScalesForShortInput(MIN_PHONEME_IDS + 50, 0.4, 0.5);
 
-    assert.equal(result.noiseScale, 0.667);
-    assert.equal(result.noiseW, 0.8);
+    assert.equal(result.noiseScale, 0.4);
+    assert.equal(result.noiseW, 0.5);
   });
 
   it("reduces noiseScale for short input", () => {
     // Half of MIN_PHONEME_IDS — both ratios clamp to their floors at this point.
     const len = Math.floor(MIN_PHONEME_IDS / 2);
-    const result = adjustScalesForShortInput(len, 0.667, 0.8);
+    const result = adjustScalesForShortInput(len, 0.4, 0.5);
     const ratio = len / MIN_PHONEME_IDS;
-    const expected = 0.667 * Math.max(0.5, ratio);
+    const expected = 0.4 * Math.max(0.5, ratio);
 
-    assert.ok(result.noiseScale < 0.667, "noiseScale should be reduced");
+    assert.ok(result.noiseScale < 0.4, "noiseScale should be reduced");
     assert.ok(
       Math.abs(result.noiseScale - expected) < 1e-6,
       `noiseScale should be ${expected}, got ${result.noiseScale}`
@@ -697,11 +697,11 @@ describe("adjustScalesForShortInput (Strategy B)", { skip }, () => {
 
   it("reduces noiseW for short input", () => {
     const len = Math.floor(MIN_PHONEME_IDS / 2);
-    const result = adjustScalesForShortInput(len, 0.667, 0.8);
+    const result = adjustScalesForShortInput(len, 0.4, 0.5);
     const ratio = len / MIN_PHONEME_IDS;
-    const expected = 0.8 * Math.max(0.4, ratio);
+    const expected = 0.5 * Math.max(0.4, ratio);
 
-    assert.ok(result.noiseW < 0.8, "noiseW should be reduced");
+    assert.ok(result.noiseW < 0.5, "noiseW should be reduced");
     assert.ok(
       Math.abs(result.noiseW - expected) < 1e-6,
       `noiseW should be ${expected}, got ${result.noiseW}`
@@ -710,32 +710,32 @@ describe("adjustScalesForShortInput (Strategy B)", { skip }, () => {
 
   it("clamps noiseScale multiplier at 0.5 for very short input", () => {
     // 1 phoneme — far below the noiseScale floor (0.5).
-    const result = adjustScalesForShortInput(1, 0.667, 0.8);
+    const result = adjustScalesForShortInput(1, 0.4, 0.5);
 
-    const expected = 0.667 * 0.5;
+    const expected = 0.4 * 0.5;
     assert.ok(
       Math.abs(result.noiseScale - expected) < 1e-6,
-      `noiseScale should clamp at 0.5 * 0.667 = ${expected}, got ${result.noiseScale}`
+      `noiseScale should clamp at 0.5 * 0.4 = ${expected}, got ${result.noiseScale}`
     );
   });
 
   it("clamps noiseW multiplier at 0.4 for very short input", () => {
     // 1 phoneme — far below the noiseW floor (0.4).
-    const result = adjustScalesForShortInput(1, 0.667, 0.8);
+    const result = adjustScalesForShortInput(1, 0.4, 0.5);
 
-    const expected = 0.8 * 0.4;
+    const expected = 0.5 * 0.4;
     assert.ok(
       Math.abs(result.noiseW - expected) < 1e-6,
-      `noiseW should clamp at 0.4 * 0.8 = ${expected}, got ${result.noiseW}`
+      `noiseW should clamp at 0.4 * 0.5 = ${expected}, got ${result.noiseW}`
     );
   });
 
   it("handles zero phonemes gracefully", () => {
     // 0 phonemes -> ratio = 0, max(0.5, 0) = 0.5, max(0.4, 0) = 0.4
-    const result = adjustScalesForShortInput(0, 0.667, 0.8);
+    const result = adjustScalesForShortInput(0, 0.4, 0.5);
 
-    assert.ok(Math.abs(result.noiseScale - 0.667 * 0.5) < 1e-6);
-    assert.ok(Math.abs(result.noiseW - 0.8 * 0.4) < 1e-6);
+    assert.ok(Math.abs(result.noiseScale - 0.4 * 0.5) < 1e-6);
+    assert.ok(Math.abs(result.noiseW - 0.5 * 0.4) < 1e-6);
   });
 
   it("applies linear scaling in the mid-range", () => {
@@ -798,10 +798,10 @@ describe("synthesize() short-text mitigation integration", { skip }, () => {
 
     // Strategy B: noiseScale and noiseW should be adjusted (ratio < 1).
     const scales = Array.from(capturedFeeds.scales.data);
-    assert.ok(scales[0] < 0.667, `noiseScale should be reduced: ${scales[0]}`);
+    assert.ok(scales[0] < 0.4, `noiseScale should be reduced: ${scales[0]}`);
     // lengthScale should be unchanged
     assert.ok(Math.abs(scales[1] - 1.0) < 1e-6, "lengthScale unchanged");
-    assert.ok(scales[2] < 0.8, `noiseW should be reduced: ${scales[2]}`);
+    assert.ok(scales[2] < 0.5, `noiseW should be reduced: ${scales[2]}`);
   });
 
   it("does NOT pad or adjust scales for long phonemeIds", async () => {
@@ -825,8 +825,8 @@ describe("synthesize() short-text mitigation integration", { skip }, () => {
     assert.equal(inputIds.length, longLen, "should NOT be padded");
 
     const scales = Array.from(capturedFeeds.scales.data);
-    assert.ok(Math.abs(scales[0] - 0.667) < 1e-6, "noiseScale unchanged");
-    assert.ok(Math.abs(scales[2] - 0.8) < 1e-6, "noiseW unchanged");
+    assert.ok(Math.abs(scales[0] - 0.4) < 1e-6, "noiseScale unchanged");
+    assert.ok(Math.abs(scales[2] - 0.5) < 1e-6, "noiseW unchanged");
   });
 
   it("applies post-trim when padding was applied", async () => {
@@ -881,7 +881,7 @@ describe("synthesize() short-text mitigation integration", { skip }, () => {
     const instance = createMockInstance({
       config: {
         audio: { sample_rate: 44100 },
-        inference: { noise_scale: 0.667, length_scale: 1.0, noise_w: 0.8 },
+        inference: { noise_scale: 0.4, length_scale: 1.0, noise_w: 0.5 },
         phoneme_id_map: { _: [0] },
       },
       // body must be >= MIN_BODY_FOR_STRATEGY_A so the path exercises padding too.
@@ -906,7 +906,7 @@ describe("synthesize() short-text mitigation integration", { skip }, () => {
     const instance = createMockInstance({
       config: {
         audio: { sample_rate: 22050 },
-        inference: { noise_scale: 0.667, length_scale: 1.0, noise_w: 0.8 },
+        inference: { noise_scale: 0.4, length_scale: 1.0, noise_w: 0.5 },
         phoneme_id_map: { _: [0] },
         prosody_id_map: { a1: 0, a2: 1, a3: 2 },
       },
@@ -947,8 +947,8 @@ describe("synthesize() short-text mitigation integration", { skip }, () => {
 
     const scales = Array.from(capturedFeeds.scales.data);
     const ratio = ids.length / MIN_PHONEME_IDS;
-    const expectedNoise = 0.667 * Math.max(0.5, ratio);
-    const expectedNoiseW = 0.8 * Math.max(0.4, ratio);
+    const expectedNoise = 0.4 * Math.max(0.5, ratio);
+    const expectedNoiseW = 0.5 * Math.max(0.4, ratio);
     assert.ok(
       Math.abs(scales[0] - expectedNoise) < 1e-4,
       `noiseScale: expected ~${expectedNoise}, got ${scales[0]}`

@@ -94,9 +94,9 @@ export function createDefaultConfig(overrides = {}) {
       oU: [21],
     },
     inference: {
-      noise_scale: 0.667,
+      noise_scale: 0.4,
       length_scale: 1.0,
-      noise_w: 0.8,
+      noise_w: 0.5,
     },
     ...overrides,
   };

@@ -4,8 +4,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
 
+from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
 from piper_train.infer_onnx import (
     MIN_BODY_FOR_STRATEGY_A,
     MIN_PHONEME_IDS,
@@ -525,42 +525,42 @@ class TestAdjustScalesForShortInput:
     def test_no_adjustment_when_long_enough(self):
         """Scales should not change for sequences >= MIN_PHONEME_IDS."""
         ids = list(range(MIN_PHONEME_IDS))
-        ns, ls, nw = _adjust_scales_for_short_input(ids, 0.667, 0.8, 1.0)
-        assert ns == pytest.approx(0.667)
+        ns, ls, nw = _adjust_scales_for_short_input(ids, 0.4, 0.5, 1.0)
+        assert ns == pytest.approx(0.4)
         assert ls == pytest.approx(1.0)
-        assert nw == pytest.approx(0.8)
+        assert nw == pytest.approx(0.5)
 
     def test_adjustment_applied_when_short(self):
         """Scales should be reduced for short sequences."""
         # Pick a length below MIN_PHONEME_IDS but above the noise_scale floor
         # (ratio = len/MIN >= 0.5 keeps us off the noise_scale clamp).
         ids = list(range(MIN_PHONEME_IDS - 1))
-        ns, ls, nw = _adjust_scales_for_short_input(ids, 0.667, 0.8, 1.0)
+        ns, ls, nw = _adjust_scales_for_short_input(ids, 0.4, 0.5, 1.0)
         # noise_scale should be reduced
-        assert ns < 0.667
+        assert ns < 0.4
         # length_scale should be unchanged
         assert ls == pytest.approx(1.0)
         # noise_w should be reduced
-        assert nw < 0.8
+        assert nw < 0.5
 
     def test_noise_scale_floor_at_half(self):
         """noise_scale multiplier should not go below 0.5."""
         ids = [1]  # very short
-        ns, _, _ = _adjust_scales_for_short_input(ids, 0.667, 0.8, 1.0)
+        ns, _, _ = _adjust_scales_for_short_input(ids, 0.4, 0.5, 1.0)
         # ratio = 1/MIN_PHONEME_IDS, well below 0.5 floor
-        assert ns == pytest.approx(0.667 * 0.5)
+        assert ns == pytest.approx(0.4 * 0.5)
 
     def test_noise_w_floor_at_04(self):
         """noise_w multiplier should not go below 0.4."""
         ids = [1]  # very short
-        _, _, nw = _adjust_scales_for_short_input(ids, 0.667, 0.8, 1.0)
+        _, _, nw = _adjust_scales_for_short_input(ids, 0.4, 0.5, 1.0)
         # ratio = 1/MIN_PHONEME_IDS, well below 0.4 floor
-        assert nw == pytest.approx(0.8 * 0.4)
+        assert nw == pytest.approx(0.5 * 0.4)
 
     def test_length_scale_unchanged(self):
         """length_scale should never be modified."""
         ids = [1]
-        _, ls, _ = _adjust_scales_for_short_input(ids, 0.667, 0.8, 2.5)
+        _, ls, _ = _adjust_scales_for_short_input(ids, 0.4, 0.5, 2.5)
         assert ls == pytest.approx(2.5)
 
     def test_ratio_proportional(self):
@@ -572,8 +572,8 @@ class TestAdjustScalesForShortInput:
         ids_high = list(range(high))
         ids_low = list(range(low))
 
-        ns_high, _, nw_high = _adjust_scales_for_short_input(ids_high, 0.667, 0.8, 1.0)
-        ns_low, _, nw_low = _adjust_scales_for_short_input(ids_low, 0.667, 0.8, 1.0)
+        ns_high, _, nw_high = _adjust_scales_for_short_input(ids_high, 0.4, 0.5, 1.0)
+        ns_low, _, nw_low = _adjust_scales_for_short_input(ids_low, 0.4, 0.5, 1.0)
 
         # Longer input should have less reduction than shorter input.
         assert ns_high > ns_low
@@ -581,32 +581,32 @@ class TestAdjustScalesForShortInput:
 
     def test_empty_input(self):
         """Empty phoneme_ids should use floor values."""
-        ns, ls, nw = _adjust_scales_for_short_input([], 0.667, 0.8, 1.0)
-        assert ns == pytest.approx(0.667 * 0.5)
+        ns, ls, nw = _adjust_scales_for_short_input([], 0.4, 0.5, 1.0)
+        assert ns == pytest.approx(0.4 * 0.5)
         assert ls == pytest.approx(1.0)
-        assert nw == pytest.approx(0.8 * 0.4)
+        assert nw == pytest.approx(0.5 * 0.4)
 
     def test_original_len_overrides_phoneme_ids_length(self):
         """When original_len is given, it should be used instead of len(phoneme_ids)."""
         # phoneme_ids has 40 elements (>= MIN_PHONEME_IDS), but original_len=5
         padded_ids = list(range(MIN_PHONEME_IDS))
         ns, ls, nw = _adjust_scales_for_short_input(
-            padded_ids, 0.667, 0.8, 1.0, original_len=5
+            padded_ids, 0.4, 0.5, 1.0, original_len=5
         )
         # ratio = 5/40 = 0.125, clamped to floor -> noise*0.5, noise_w*0.4
-        assert ns == pytest.approx(0.667 * 0.5)
-        assert nw == pytest.approx(0.8 * 0.4)
+        assert ns == pytest.approx(0.4 * 0.5)
+        assert nw == pytest.approx(0.5 * 0.4)
         assert ls == pytest.approx(1.0)
 
     def test_original_len_no_adjustment_when_large(self):
         """When original_len >= MIN_PHONEME_IDS, no adjustment should happen."""
         short_ids = [1, 2, 3]
         ns, ls, nw = _adjust_scales_for_short_input(
-            short_ids, 0.667, 0.8, 1.0, original_len=MIN_PHONEME_IDS
+            short_ids, 0.4, 0.5, 1.0, original_len=MIN_PHONEME_IDS
         )
-        assert ns == pytest.approx(0.667)
+        assert ns == pytest.approx(0.4)
         assert ls == pytest.approx(1.0)
-        assert nw == pytest.approx(0.8)
+        assert nw == pytest.approx(0.5)
 
 
 @pytest.mark.unit
@@ -634,11 +634,11 @@ class TestStrategyBUsesPrePaddingLength:
 
         # Strategy B with original_len (correct behavior)
         ns, ls, nw = _adjust_scales_for_short_input(
-            padded_ids, 0.667, 0.8, 1.0, original_len=original_len
+            padded_ids, 0.4, 0.5, 1.0, original_len=original_len
         )
         # Short original_len → ratio well below the noise floors.
-        assert ns == pytest.approx(0.667 * 0.5)
-        assert nw == pytest.approx(0.8 * 0.4)
+        assert ns == pytest.approx(0.4 * 0.5)
+        assert nw == pytest.approx(0.5 * 0.4)
         assert ls == pytest.approx(1.0)
 
     def test_strategy_b_without_original_len_is_noop_after_padding(self):
@@ -655,9 +655,9 @@ class TestStrategyBUsesPrePaddingLength:
 
         # Strategy B without original_len: uses len(padded_ids) == MIN_PHONEME_IDS
         # so it does NOT adjust (this was the bug)
-        ns, ls, nw = _adjust_scales_for_short_input(padded_ids, 0.667, 0.8, 1.0)
-        assert ns == pytest.approx(0.667)  # no reduction -- the old bug
-        assert nw == pytest.approx(0.8)  # no reduction -- the old bug
+        ns, ls, nw = _adjust_scales_for_short_input(padded_ids, 0.4, 0.5, 1.0)
+        assert ns == pytest.approx(0.4)  # no reduction -- the old bug
+        assert nw == pytest.approx(0.5)  # no reduction -- the old bug
 
     def test_combined_strategy_a_b_varying_lengths(self):
         """Shorter original inputs should get more aggressive scale reduction."""
@@ -670,13 +670,13 @@ class TestStrategyBUsesPrePaddingLength:
         ids_low = [1] + list(range(10, 10 + low - 2)) + [2]
         padded_low, _, _, _, _ = _pad_phoneme_ids(ids_low, None)
         ns_low, _, nw_low = _adjust_scales_for_short_input(
-            padded_low, 0.667, 0.8, 1.0, original_len=len(ids_low)
+            padded_low, 0.4, 0.5, 1.0, original_len=len(ids_low)
         )
 
         ids_high = [1] + list(range(10, 10 + high - 2)) + [2]
         padded_high, _, _, _, _ = _pad_phoneme_ids(ids_high, None)
         ns_high, _, nw_high = _adjust_scales_for_short_input(
-            padded_high, 0.667, 0.8, 1.0, original_len=len(ids_high)
+            padded_high, 0.4, 0.5, 1.0, original_len=len(ids_high)
         )
 
         # Longer original input should have less reduction than shorter.
@@ -684,8 +684,8 @@ class TestStrategyBUsesPrePaddingLength:
         assert nw_high > nw_low
 
         # Both should be less than the unadjusted values.
-        assert ns_high < 0.667
-        assert ns_low < 0.667
+        assert ns_high < 0.4
+        assert ns_low < 0.4
 
     def test_no_adjustment_when_original_at_threshold(self):
         """No adjustment when original length is exactly MIN_PHONEME_IDS."""
@@ -695,11 +695,11 @@ class TestStrategyBUsesPrePaddingLength:
         assert not was_padded
 
         ns, ls, nw = _adjust_scales_for_short_input(
-            padded, 0.667, 0.8, 1.0, original_len=MIN_PHONEME_IDS
+            padded, 0.4, 0.5, 1.0, original_len=MIN_PHONEME_IDS
         )
-        assert ns == pytest.approx(0.667)
+        assert ns == pytest.approx(0.4)
         assert ls == pytest.approx(1.0)
-        assert nw == pytest.approx(0.8)
+        assert nw == pytest.approx(0.5)
 
 
 # ---------------------------------------------------------------------------

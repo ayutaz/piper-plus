@@ -46,7 +46,7 @@ def mock_model_path(temp_dir):
     config_content = {
         "audio": {"sample_rate": 22050},
         "espeak": {"voice": "en-us"},
-        "inference": {"noise_scale": 0.667, "length_scale": 1, "noise_w": 0.8},
+        "inference": {"noise_scale": 0.4, "length_scale": 1, "noise_w": 0.5},
         "phoneme_id_map": {"_": [0], "a": [1]},
     }
 
@@ -67,7 +67,7 @@ def mock_japanese_model_path(temp_dir):
     config_path = temp_dir / "ja_JP_test.onnx.json"
     config_content = {
         "audio": {"sample_rate": 22050},
-        "inference": {"noise_scale": 0.667, "length_scale": 1, "noise_w": 0.8},
+        "inference": {"noise_scale": 0.4, "length_scale": 1, "noise_w": 0.5},
         "phoneme_type": "openjtalk",
         "language": {"code": "ja"},
         "phoneme_id_map": {

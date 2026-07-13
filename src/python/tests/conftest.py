@@ -206,7 +206,7 @@ def temp_onnx_model(mock_vits_model, tmp_path_factory):
     dummy_input_length = 10
     sequences = torch.randint(0, 50, (1, dummy_input_length), dtype=torch.long)
     sequence_lengths = torch.LongTensor([dummy_input_length])
-    scales = torch.FloatTensor([0.667, 1.0, 0.8])
+    scales = torch.FloatTensor([0.4, 1.0, 0.5])
     prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.long)
 
     # Enable ONNX export mode for deterministic output
@@ -269,7 +269,7 @@ def temp_onnx_model_stochastic(mock_vits_model, tmp_path_factory):
     dummy_input_length = 10
     sequences = torch.randint(0, 50, (1, dummy_input_length), dtype=torch.long)
     sequence_lengths = torch.LongTensor([dummy_input_length])
-    scales = torch.FloatTensor([0.667, 1.0, 0.8])
+    scales = torch.FloatTensor([0.4, 1.0, 0.5])
     prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.long)
 
     mock_vits_model.onnx_export_mode = True
@@ -389,7 +389,7 @@ def temp_onnx_model_unified_emb_lang(mock_vits_model_multilingual, tmp_path_fact
     dummy_input_length = 10
     sequences = torch.randint(0, 50, (1, dummy_input_length), dtype=torch.long)
     sequence_lengths = torch.LongTensor([dummy_input_length])
-    scales = torch.FloatTensor([0.667, 1.0, 0.8])
+    scales = torch.FloatTensor([0.4, 1.0, 0.5])
     lid = torch.LongTensor([0])
     prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.long)
 
@@ -575,7 +575,7 @@ def sample_prosody_features():
 def inference_params():
     """推論パラメータのデフォルト値"""
     return {
-        "noise_scale": 0.667,
+        "noise_scale": 0.4,
         "length_scale": 1.0,
-        "noise_scale_w": 0.8,
+        "noise_scale_w": 0.5,
     }

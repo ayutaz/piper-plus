@@ -56,7 +56,7 @@ class TestPiperConfig:
             "num_speakers": 1,
             "phoneme_type": "multilingual",
             "phoneme_id_map": {"_": [0], "a": [10]},
-            "inference": {"noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8},
+            "inference": {"noise_scale": 0.4, "length_scale": 1.0, "noise_w": 0.5},
         }
         cfg = PiperConfig.from_dict(config_dict)
 
@@ -65,9 +65,9 @@ class TestPiperConfig:
         assert cfg.num_symbols == 100
         assert cfg.num_speakers == 1
         assert cfg.hop_size == 256
-        assert cfg.noise_scale == pytest.approx(0.667)
+        assert cfg.noise_scale == pytest.approx(0.4)
         assert cfg.length_scale == pytest.approx(1.0)
-        assert cfg.noise_w == pytest.approx(0.8)
+        assert cfg.noise_w == pytest.approx(0.5)
         assert cfg.phoneme_type is PhonemeType.MULTILINGUAL
         assert cfg.phoneme_id_map == {"_": [0], "a": [10]}
         assert cfg.num_languages == 1
@@ -103,7 +103,7 @@ class TestPiperConfig:
     def test_config_from_dict_zero_noise_scale_preserved(self):
         """Regression: noise_scale=0.0 must NOT be overridden by the default.
 
-        Pre-fix, an `inference.get("noise_scale", 0.667)` could swallow
+        Pre-fix, an `inference.get("noise_scale", 0.4)` could swallow
         an explicit zero. Verify the explicit value reaches the config.
         """
         from piper_plus.config import PiperConfig
@@ -143,9 +143,9 @@ class TestPiperConfig:
                     "\ue00f": [31],  # ts
                 },
                 "inference": {
-                    "noise_scale": 0.667,
+                    "noise_scale": 0.4,
                     "length_scale": 1.0,
-                    "noise_w": 0.8,
+                    "noise_w": 0.5,
                 },
             }
         )

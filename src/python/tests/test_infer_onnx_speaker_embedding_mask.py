@@ -73,7 +73,7 @@ def _write_minimal_config(model_path: Path) -> Path:
         "speaker_id_map": {"default": 0},
         "language_map": {},
         "espeak": {"voice": "en-us"},
-        "inference": {"noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8},
+        "inference": {"noise_scale": 0.4, "length_scale": 1.0, "noise_w": 0.5},
     }
     cfg_path = model_path.with_suffix(model_path.suffix + ".json")
     cfg_path.write_text(json.dumps(cfg))

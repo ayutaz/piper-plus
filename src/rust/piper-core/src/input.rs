@@ -129,8 +129,8 @@ mod tests {
     fn test_to_request_defaults() {
         let line = r#"{"phoneme_ids": [1, 2, 3]}"#;
         let utt = JsonlUtterance::parse(line).unwrap();
-        let req = utt.to_request(0.667, 1.0, 0.8);
-        assert_eq!(req.noise_scale, 0.667);
+        let req = utt.to_request(0.4, 1.0, 0.5);
+        assert_eq!(req.noise_scale, 0.4);
         assert_eq!(req.length_scale, 1.0);
         assert!(req.speaker_id.is_none());
     }
@@ -139,7 +139,7 @@ mod tests {
     fn test_speaker_embedding_preserved_in_to_request() {
         let line = r#"{"phoneme_ids": [1, 2, 3], "speaker_embedding": [0.1, 0.2, 0.3]}"#;
         let utt = JsonlUtterance::parse(line).unwrap();
-        let req = utt.to_request(0.667, 1.0, 0.8);
+        let req = utt.to_request(0.4, 1.0, 0.5);
         let emb = req
             .speaker_embedding
             .expect("speaker_embedding must not be None");

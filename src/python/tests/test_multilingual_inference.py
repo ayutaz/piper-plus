@@ -407,9 +407,7 @@ class TestOnnxOutputShape:
         )
 
         if not _SHIPPED_MODEL.exists():
-            pytest.skip(
-                f"Shipped test model not found: {_SHIPPED_MODEL}"
-            )
+            pytest.skip(f"Shipped test model not found: {_SHIPPED_MODEL}")
 
         import numpy as np
 
@@ -421,7 +419,7 @@ class TestOnnxOutputShape:
         # A short phoneme_ids sequence (BOS + a few IDs + EOS)
         phoneme_ids = np.array([[1, 0, 10, 0, 11, 0, 2]], dtype=np.int64)
         phoneme_lengths = np.array([phoneme_ids.shape[1]], dtype=np.int64)
-        scales = np.array([0.667, 1.0, 0.8], dtype=np.float32)
+        scales = np.array([0.4, 1.0, 0.5], dtype=np.float32)
 
         args = {
             "input": phoneme_ids,
@@ -435,9 +433,7 @@ class TestOnnxOutputShape:
             args["lid"] = np.array([0], dtype=np.int64)
         if "prosody_features" in input_names:
             num_phonemes = phoneme_ids.shape[1]
-            args["prosody_features"] = np.zeros(
-                (1, num_phonemes, 3), dtype=np.int64
-            )
+            args["prosody_features"] = np.zeros((1, num_phonemes, 3), dtype=np.int64)
 
         outputs = session.run(None, args)
         audio_output = outputs[0]

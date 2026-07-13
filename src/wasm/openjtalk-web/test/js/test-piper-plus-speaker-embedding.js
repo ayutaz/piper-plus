@@ -53,7 +53,7 @@ function createMockInstance(overrides = {}) {
 
   instance._config = overrides.config || {
     audio: { sample_rate: 22050 },
-    inference: { noise_scale: 0.667, length_scale: 1.0, noise_w: 0.8 },
+    inference: { noise_scale: 0.4, length_scale: 1.0, noise_w: 0.5 },
     phoneme_id_map: { _: [0], "^": [1], $: [2], k: [10], o: [11], n: [12] },
   };
 

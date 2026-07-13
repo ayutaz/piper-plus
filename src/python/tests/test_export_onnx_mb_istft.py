@@ -103,7 +103,7 @@ def _build_dummy_inputs():
     """Return (tuple_of_tensors, input_names, dynamic_axes) for ONNX export."""
     sequences = torch.randint(0, 97, (1, _DUMMY_INPUT_LENGTH), dtype=torch.long)
     sequence_lengths = torch.LongTensor([_DUMMY_INPUT_LENGTH])
-    scales = torch.FloatTensor([0.667, 1.0, 0.8])
+    scales = torch.FloatTensor([0.4, 1.0, 0.5])
     sid = torch.LongTensor([0])
     lid = torch.LongTensor([0])
 
@@ -232,7 +232,7 @@ def test_onnx_export_output_shape_b1t():
         all_feeds = {
             "input": np.expand_dims(phoneme_ids.astype(np.int64), 0),
             "input_lengths": np.array([_DUMMY_INPUT_LENGTH], dtype=np.int64),
-            "scales": np.array([0.667, 1.0, 0.8], dtype=np.float32),
+            "scales": np.array([0.4, 1.0, 0.5], dtype=np.float32),
             "sid": np.array([0], dtype=np.int64),
             "lid": np.array([0], dtype=np.int64),
         }

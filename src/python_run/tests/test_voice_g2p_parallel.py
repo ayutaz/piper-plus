@@ -139,8 +139,8 @@ def test_synthesize_stream_raw_early_break_cancels_queued_g2p(monkeypatch):
         num_speakers=1,
         sample_rate=22050,
         length_scale=1.0,
-        noise_scale=0.667,
-        noise_w=0.8,
+        noise_scale=0.4,
+        noise_w=0.5,
         phoneme_id_map={"_": [0], "^": [1], "$": [2], "a": [10]},
         phoneme_type=PhonemeType.MULTILINGUAL,
     )
@@ -211,8 +211,8 @@ def test_synthesize_stream_raw_bounded_pipeline_caps_in_flight(monkeypatch):
         num_speakers=1,
         sample_rate=22050,
         length_scale=1.0,
-        noise_scale=0.667,
-        noise_w=0.8,
+        noise_scale=0.4,
+        noise_w=0.5,
         phoneme_id_map={"_": [0], "^": [1], "$": [2], "a": [10]},
         phoneme_type=PhonemeType.MULTILINGUAL,
     )
