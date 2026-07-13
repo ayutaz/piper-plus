@@ -3,6 +3,7 @@
 > **前提**: `feat/wavenext-decoder-ablation` (dev 起点、`d594cea2`) で独立実施、v8 本走との干渉なし
 > **ゴール**: 各 Stage で明確な GO/NO-GO 判断基準を設け、次 Stage 着手を実測データで gate 化
 > **全 Stage 完走見込み**: Stage 0-2 で 6-9 週間、Stage 3 追加時は +2-3 ヶ月
+> **更新 (2026-07-14)**: Stage 0 着手前検証 ([`04-pre-stage0-verification.md`](04-pre-stage0-verification.md)) の確定事項を反映済み — 行番号更新 / tri-state マーカー仕様確定 / opset 方針変更 / loss 計画修正 / loader 仕様明記 / Stage 3 数値確定
 
 ---
 
@@ -14,16 +15,26 @@
 
 | ファイル:行 | 変更 |
 |-----------|------|
-| `src/python/piper_train/__main__.py:39-53` | `_is_legacy_hifigan_checkpoint()` を **tri-state 分類器 (`mb_istft` / `hifigan` / `wavenext`)** に refactor。positive detection: (a) ckpt hparams に `decoder_arch` タグがあればそれを採用、(b) fallback で state_dict のマーカー (`subband_conv_post`/`pqmf` → mb_istft, `convnext_blocks.*`/`head.linear_1` → wavenext, HiFi-GAN 固有 `conv_post` → hifigan) を検出 |
+| `src/python/piper_train/__main__.py:39-53` | `_is_legacy_hifigan_checkpoint()` を **tri-state 分類器 (`mb_istft` / `hifigan` / `wavenext`)** に refactor。positive detection: (a) `checkpoint["hyper_parameters"].get("decoder_arch")` タグがあればそれを採用 (state_dict マーカーと矛盾時は **warning log + タグ採用**)、(b) fallback で state_dict マーカーを判定 (下記「マーカー仕様」参照)。**decoder キーが 1 つもない部分 ckpt は `None` を返し raise しない** (第 4 状態 — 現行 False 挙動保存、v8 部分 transfer 保護)。**bool 互換 wrapper を維持**し既存 tests (`test_hifigan_ckpt_rejection.py` 12 + `test_export_onnx.py` 1 + `test_python313_migration.py` 1) を無変更 PASS |
 | `src/python/piper_train/__main__.py:285-291` | `--decoder-arch {mb_istft,wavenext,wavenext2}` CLI flag 追加 (default `mb_istft`)。`VitsModel.add_model_specific_args` にも同 arg を追加し hparams.yaml に永続化 |
-| `src/python/piper_train/__main__.py:607,981,1063` | `_is_legacy_hifigan_checkpoint(...)` 呼び出しを新 tri-state 分類器に置換、arch mismatch 時は `WRONG_DECODER_ARCH_MESSAGE` (新規、partial-transfer FT 手順への URL 込) を raise |
-| `src/python/piper_train/__main__.py:891-896` | `dict_args['upsample_rates']=(4,4)` / `upsample_kernel_sizes=(16,16)` を `if args.decoder_arch == 'mb_istft':` で gate 化 (WaveNeXt 分岐は Stage 1 で追加) |
-| `src/python/piper_train/vits/models.py:810-820` | `SynthesizerTrn.__init__` で factory dispatch: `if decoder_arch == 'mb_istft': self.dec = MBiSTFTGenerator(...) elif decoder_arch == 'wavenext': self.dec = WaveNeXtGenerator(...)` (WaveNeXtGenerator は Stage 1 で追加、Stage 0 では `NotImplementedError` stub) |
+| `src/python/piper_train/__main__.py:479,854` | `_is_legacy_hifigan_checkpoint(...)` の call site は **2 箇所のみ**: `479` (`load_multispeaker_checkpoint`、無条件) と `854` (trainer.fit 失敗後の graceful-resume fallback 内のみ)。旧記載の 607/981/1063 は stale。呼び出しを新 tri-state 分類器に置換、arch mismatch 時は `WRONG_DECODER_ARCH_MESSAGE` (新規、partial-transfer FT 手順への URL 込) を raise |
+| `src/python/piper_train/__main__.py:696-697` | `dict_args['upsample_rates']=(4,4)` / `upsample_kernel_sizes=(16,16)` を `if args.decoder_arch == 'mb_istft':` で gate 化 (WaveNeXt 分岐は Stage 1 で追加) |
+| `src/python/piper_train/vits/models.py:757-766` | `SynthesizerTrn.__init__` で factory dispatch: `if decoder_arch == 'mb_istft': self.dec = MBiSTFTGenerator(...) elif decoder_arch == 'wavenext': self.dec = WaveNeXtGenerator(...)` (WaveNeXtGenerator は Stage 1 で追加、Stage 0 では `NotImplementedError` stub)。旧記載の 810-820 は stale (810 は emb_lang 領域)。**`decoder_arch` 引数は必ず default='mb_istft' の keyword 引数にする** — `tests/fixtures/mb_istft_speaker_embedding/build_fixture.py` が e2e-issue-426 / integration-tests-issue-426 / release-shared-lib の 3 CI workflow で毎回 `SynthesizerTrn` を直接 instantiate するため、後方互換なしでは即赤化 (逆にこの fixture が factory の無償 smoke test になる) |
+| `src/python/piper_train/vits/lightning.py:320` | (Stage 1 実装だが**正当性要件として Stage 0 で明文化**) `self.model_g.dec.pqmf = self.pqmf` は decoder 種別によらず**無条件実行**される。gate し忘れると WaveNeXt ckpt に `model_g.dec.pqmf.*` buffer が混入 → tri-state fallback マーカーが mb_istft に**誤分類** (かつ現行 bi-state ではこの blocker 自体が発火しない → Stage 1 gating への暗黙依存)。cleanliness ではなく**正当性要件** |
+
+**tri-state マーカー仕様 (04 doc で確定)**:
+
+- マーカーは**完全修飾 prefix + 末尾ドット必須**:
+  - mb_istft: `startswith(("model_g.dec.subband_conv_post.", "model_g.dec.pqmf.", "model_g.dec.istft."))` を hifigan 判定より**先に**評価 (`istft.inverse_basis` にマッチする `model_g.dec.istft.` を第 3 マーカーとして追加)
+  - wavenext: `startswith(("model_g.dec.convnext.", "model_g.dec.head."))` (モジュール命名は wetdog/BSC-LT 準拠に pin — Stage 1 参照。旧記載の `convnext_blocks.*` は実装名と不一致のため訂正)
+  - hifigan: 上記いずれもなく `model_g.dec.ups.` 系が存在
+- **footgun**: `conv_post` は `subband_conv_post` の部分文字列 — substring (`in`) 判定は**禁止**
 
 ### テスト
 
-- 既存 `test_hifigan_ckpt_rejection.py` を tri-state 化に合わせて更新
+- 既存 `test_hifigan_ckpt_rejection.py` (12 tests) + `test_export_onnx.py` (1) + `test_python313_migration.py` (1) は **bool 互換 wrapper 維持により無変更 PASS** (更新不要 — 04 doc verify で確認)
 - 新規 `test_decoder_arch_dispatch.py`: `--decoder-arch mb_istft` で MB-iSTFT が instantiate されることを確認
+- 新規: **wavenext ckpt (模擬 state_dict) に `model_g.dec.pqmf.*` が無い**ことを assert (pqmf 注入 gate の正当性要件。Stage 1 で実 ckpt に対して再検証)
 
 ### GO/NO-GO 判断
 
@@ -45,10 +56,17 @@
 
 ```python
 # 概要 (実装スケルトン)
+# モジュール命名は wetdog/BSC-LT 準拠に pin (04 doc):
+#   embed (Conv1d) / norm / convnext (ModuleList) / final_layer_norm / head
+#   - "conv_pre" 命名は HiFi-GAN / MB-iSTFT / WaveNeXt の 3 アーキ衝突で禁止
+#   - BSC-LT キー backbone.convnext.{N}.* とのリネームマップも最小化できる
 class ConvNeXtBlock(nn.Module):
     """
     depthwise Conv1d(k=7, groups=dim) → LayerNorm → Linear(dim, intermediate_dim)
-      → GELU → Linear(intermediate_dim, dim) → LayerScale(γ_init=1e-6) → residual
+      → GELU → Linear(intermediate_dim, dim)
+      → LayerScale(γ_init = 1/num_layers = 0.125)  # wetdog models.py L57 default
+                                                    # (旧記載の 1e-6 は誤り — 04 doc)
+      → residual
     """
     def __init__(self, dim=512, intermediate_dim=1536, adanorm_num_embeddings=0):
         ...  # AdaLayerNorm 経路は speaker/language conditioning 用に予約
@@ -56,19 +74,29 @@ class ConvNeXtBlock(nn.Module):
 class WaveNextHead(nn.Module):
     """
     Linear(512, 1026) → Linear(1026, hop_length=256, bias=False)
-      → view(B, -1) → clip(-1, 1) → unsqueeze(1)  # [B, 1, T]
+      → view(B, -1) → clip(-1, 1)
     """
 
 class WaveNeXtGenerator(nn.Module):
     """
     Input:  z * y_mask  [B, inter_channels=192, L]
     Output: waveform    [B, 1, T=L*hop_length]
+      # unsqueeze(1) は infer 出口ではなく generator forward 内で実施 —
+      # MPD/WavLM/SCL/mel の全 loss が [B,1,T] rank-3 前提のため training 経路でも必須
+
+    返却契約 (04 doc で確定): training 時は (o, None) の 2-tuple /
+      onnx_export_mode 時は single tensor
+      → models.py:990/1100 のハード unpack と lightning.py:883 の既存 guard が
+        無変更で成立する
 
     Pipeline:
-      Conv1d(192, 512, k=1)  # input projection
-      → 8 × ConvNeXtBlock(dim=512, intermediate_dim=1536)
-      → LayerNorm
-      → WaveNextHead
+      embed = Conv1d(192, 512, k=7, padding=3)  # wetdog 準拠 (k=1 ではない)。
+                                                 # この意図的選択は wavenext.py の
+                                                 # コメントに明記予定
+      → norm = LayerNorm                         # post-embed LayerNorm (wetdog 準拠)
+      → convnext = 8 × ConvNeXtBlock(dim=512, intermediate_dim=1536)
+      → final_layer_norm = LayerNorm
+      → head = WaveNextHead
     """
     def remove_weight_norm(self):
         pass  # no-op stub (export_onnx.py などから呼ばれるため必須)
@@ -80,42 +108,59 @@ class WaveNeXtGenerator(nn.Module):
     # 各 ConvNeXtBlock の LayerNorm に注入 (v7 の speaker conditioning 経路)
 ```
 
+**`wavenext.py` ヘッダ attribution 要件 (04 doc)**: (1) Vocos (Copyright 2023 Charactr Inc., MIT)、(2) wetdog/wavenext_pytorch@d45d544 (WaveNextHead 追加分、MIT)、(3) Okamoto et al. ASRU 2023 (DOI 10.1109/ASRU57964.2023.10389765)。BSC-LT 重み利用時は Apache-2.0 NOTICE 保持。
+
 ### 統合ポイント
 
 | ファイル:行 | 変更 |
 |-----------|------|
 | `src/python/piper_train/vits/models.py:11` | `from .wavenext import WaveNeXtGenerator` 追加 |
-| `src/python/piper_train/vits/models.py:810-820` | Stage 0 で用意した factory dispatch の `wavenext` 分岐を有効化 |
-| `src/python/piper_train/vits/models.py:1068,1187` | `dec_out = self.dec(...); o, o_mb = dec_out if isinstance(dec_out, tuple) else (dec_out, None)` に書き換え |
-| `src/python/piper_train/vits/models.py:1160-1163` | `SynthesizerTrn.infer` 出口で `if o.dim() == 2: o = o.unsqueeze(1)` を挿入 (rank-3 復元) |
-| `src/python/piper_train/__main__.py:891-896` | WaveNeXt 分岐で `wavenext_dim=512 / intermediate_dim=1536 / num_blocks=8 / head_hop_length=256` を注入 |
+| `src/python/piper_train/vits/models.py:757-766` | Stage 0 で用意した factory dispatch の `wavenext` 分岐を有効化 |
+| `src/python/piper_train/vits/models.py:990,1100` | **書き換え不要 (04 doc で確定)** — 返却契約「training=(o, None) 2-tuple / onnx_export_mode=single」により 990/1100 のハード unpack は無変更で成立。~~旧記載の 1068,1187 isinstance 書き換え~~ は不要 (infer 1073-1076 は既に isinstance 対応済) |
+| `src/python/piper_train/vits/wavenext.py` (generator forward) | `unsqueeze(1)` は **generator forward 内**で実施 — ~~旧記載の `SynthesizerTrn.infer` 出口挿入~~ は撤回 (MPD/WavLM/SCL/mel の全 loss が `[B,1,T]` rank-3 前提のため training 経路でも必須) |
+| `src/python/piper_train/__main__.py:696-697` | WaveNeXt 分岐で `wavenext_dim=512 / intermediate_dim=1536 / num_blocks=8 / head_hop_length=256` を注入 |
 | `src/python/piper_train/vits/lightning.py:24,31` | import を gate 化: WaveNeXt 選択時は `PQMF` / `MultiResolutionSTFTLoss` (sub-band 用) を skip |
-| `src/python/piper_train/vits/lightning.py:361-368` | `if decoder_arch == 'wavenext':` で PQMF / sub_stft_loss の instantiate を skip、代わりに `MelSpecReconstructionLoss` (128-mel, coeff=45) + `MultiResolutionDiscriminator` (fft 2048/1024/512, hinge, coeff=0.1) を追加 |
-| `src/python/piper_train/vits/lightning.py:1017-1022` | `if o_mb is not None:` guard は既存、`decoder_arch='wavenext'` で `o_mb=None` なら自動 skip → fullband path で `loss_mrstft` + `loss_mrd_gen + loss_mrd_fm` を追加 |
-| `src/python/piper_train/export_onnx.py:27` | OPSET_VERSION 15 → 17 (opset 15 でも動作するが LayerNorm native op の cleanliness で推奨) |
+| `src/python/piper_train/vits/lightning.py:320` | pqmf 注入 `self.model_g.dec.pqmf = self.pqmf` を `decoder_arch == 'mb_istft'` で gate 化 — **正当性要件** (gate し忘れると WaveNeXt ckpt に `model_g.dec.pqmf.*` 混入 → tri-state マーカー誤分類。Stage 0 節参照) |
+| `src/python/piper_train/vits/lightning.py:317-325` | `if decoder_arch == 'wavenext':` で PQMF / sub_stft_loss の instantiate を skip。mel loss は「追加」ではなく**維持 or 置換の明示的設計判断** — wetdog の `MelSpecReconstructionLoss` (一次確認: 128-mel / f_max 11025 / slaney / clip 1e-5 / L1、coeff=45) をそのまま追加すると既存 `loss_mel` (80-mel L1 log-mel、`c_mel=45`、`lightning.py:874`) と**二重計上**になる。`MultiResolutionDiscriminator` (DAC band-split 型、fft 2048/1024/512、channels 32、hinge、coeff=0.1) を追加 |
+| `src/python/piper_train/vits/lightning.py:883-887` | `if o_mb is not None:` guard は既存 (`lightning.py:883`)、`decoder_arch='wavenext'` で `o_mb=None` なら自動 skip → fullband path で `loss_mrstft` + `loss_mrd_gen + loss_mrd_fm` を追加 (fullband MR-STFT は既存 `MultiResolutionSTFTLoss` の別サイズ再インスタンスで済む) |
+| `src/python/piper_train/vits/lightning.py:1264-1267,693-696` | `configure_optimizers` の d_params (1264-1267) と D grad clip (693-696) に MRD パラメータを追加 |
+| `src/python/piper_train/export_onnx.py:27` | ~~OPSET_VERSION 15 → 17 の一括 bump~~ は**撤回 (本計画で唯一の確定 CI 赤化要因、04 doc)** — `scripts/check_onnx_export_contract.py:27` の `EXPECTED_TTS_OPSET=15` ハードコードで model-quality-gate (blocking) が確定的に落ち、`onnx-export-contract.toml:116-118` の「opset bump = 全公式 ONNX 再生成 + 全 7 runtime 検証」義務が発火する。対応: **wavenext 分岐のみ opset 17** とし、新定数名は check script の regex `OPSET_VERSION\s*=\s*(\d+)` (re.search 先頭一致、部分文字列にもマッチ) を踏まない命名 (例 `OPSET_VERSION_WAVENEXT`) にするか、contract toml + check script を同 PR で更新。rationale は「機能的必然」ではなく「convert_fp16 の LN keep-list safeguard 有効化 + ORT fusion/.opt.onnx キャッシュ非依存化」(opset 15 でも動作は PoC 実証済: 314 nodes→ORT fusion / opset 17 なら native LN で 214 nodes / parity 1.13e-06)。互換性: 全 8 runtime pin (min ORT>=1.20、Rust は ort rc.12 + api-24 feature = ORT 1.24 ターゲット) で opset 17 受理を確認済み、既存 opset 15 配布物との混在も可 → **既存モデル再 export 不要** |
 
 ### 新規 loss module
 
-**`src/python/piper_train/vits/wavenext_losses.py`**:
-- `MelSpecReconstructionLoss` (128-mel bin analysis、Vocos 準拠)
-- `MultiResolutionDiscriminator` (DAC-style、fft 2048/1024/512)
+**`src/python/piper_train/vits/wavenext_losses.py`** — 新規実装スコープは **MRD 本体 + hinge loss (採用時) に縮小** (04 doc §6):
+- `MultiResolutionDiscriminator` 本体 (DAC band-split 型、fft 2048/1024/512、channels 32) + hinge loss (採用時)
+- mel loss は新規実装ではなく既存 `loss_mel` との**維持 or 置換判断** (統合ポイント参照)。**128-mel 採用時は `mel_processing.py` の global cache 使用禁止** — cache キーが fmax のみで num_mels を無視するため silent に 80-mel basis が返る。`losses.py:_get_mel_basis` を使用
+- fullband MR-STFT は既存 `MultiResolutionSTFTLoss` の別サイズ再インスタンスで済む (新規実装不要)
 - feature matching loss (既存を再利用可能なら流用)
+- **GAN loss 形式の明示的設計判断 (Stage 1)**: wetdog は hinge + sub-discriminator 数正規化 (MPD /5、MRD /3)、piper 既存は LSGAN 非正規化和 — 係数 45/0.1 の実効スケールが異なるため、**一本化 (LSGAN=diff 最小) or ablation** を Stage 1 で確定する
+- **optimizer 差分 (design decision として注記)**: wetdog は AdamW betas=(0.8,0.9) + cosine warmup 500 step (piper 既存設定と異なる)
 
 ### テスト
 
 - `test_wavenext_generator.py`: forward pass shape 検証、gin_channels 条件付け、`remove_weight_norm()` no-op 動作
 - `test_synthesizer_trn_wavenext.py`: `decoder_arch='wavenext'` で SynthesizerTrn が正常構築
-- `test_export_onnx_wavenext.py`: opset 17 で export 成功、output shape `[1, 1, T]`
+- `test_export_onnx_wavenext.py`: opset 17 (wavenext 分岐) で export 成功、output shape `[1, 1, T]`、**`LayerNormalization` node ×10 (post-embed 1 + block 8 + final 1) 存在** assert
+- **wavenext ckpt に `model_g.dec.pqmf.*` buffer が混入しない**ことを assert (pqmf 注入 gate の正当性要件、Stage 0 の模擬 state_dict テストを実 ckpt で再検証)
 - 既存 `test_*_mb_istft.py` 系は `decoder_arch='mb_istft'` を明示して継続動作
 
 ### Smoke 学習
 
 **環境**: A100×1、bf16-mixed、6-lang partial-transfer FT
 
+**`--wavenext-init` loader 仕様 (04 doc で確定、BSC-LT `pytorch_model.bin` = 83 keys / 13.72M params)**:
+
+- (a) `feature_extractor.*` 2 buffer を **drop**
+- (b) `backbone.embed.weight` (512,80,7) を **skip** し 192ch スクラッチ init (`embed.bias` 再利用は選択制)
+- (c) BSC-LT キー名 `backbone.convnext.{N}.*` → piper モジュール名への**リネームマップ**
+- 転送可能テンソルは **83 中 80**
+- **standalone sanity check の注意**: piper の `mel_spectrogram_torch` デフォルト (fmax=None) は使用禁止 — f_max=8000/slaney で計算するか同梱 `mel_spec_22khz_wavenext.onnx` を使用する
+- `pytorch_model.bin` は **generator のみで discriminator を含まない** → Stage 1 の MPD/MRD は**必ずスクラッチ**
+
 ```bash
 # Option A: BSC-LT/wavenext-mel init から (推奨)
 # 1. HF から BSC-LT/wavenext-mel の decoder weight を download
-# 2. 入力 Conv1d (192-latent) のみスクラッチ、backbone + head は BSC-LT init
+# 2. 入力 embed (192-latent) のみスクラッチ、backbone + head は BSC-LT init (上記 loader 仕様)
 
 python -m piper_train \
     --dataset-dir /data/piper/dataset-multilingual-6lang-filtered \
@@ -135,13 +180,17 @@ python -m piper_train \
 
 期間目安: A100×1 で 3-5 日 (batch=32、6-lang 50k steps 想定)。
 
+> **コマンド注記 (04 doc)**: `--mel-loss-coeff 45` は既存 `c_mel=45` (80-mel) との関係 (**置換 or 維持**) を確定してから記載する (mel loss 二重化罠 — 上記 loss 節参照)。`--pretrain-mel-steps 5000` は wetdog default 0 からの **piper 側変更**である (機構自体は wetdog experiment.py L289-293 に存在)。
+
 ### 評価
 
 - **SECS (CAM++)**: v7 zero-shot ep32 baseline **0.6879 (未知話者)** と比較
-- **CPU RTF**: `docker/python-inference/inference.py` で 25 phoneme 英文 x 30 runs、Xeon E5-2650 v4 相当環境で計測、現行 MB-iSTFT `~27ms` baseline と比較
-- **ONNX size**: FP16 export 後のファイルサイズ、現行と比較
+- **CPU RTF**: `docker/python-inference/inference.py` で 25 phoneme 英文 x 30 runs、**canonical Xeon E5-2650 v4 相当環境 + ORT session contract 準拠スレッド設定 (intra=4/inter=1/SEQUENTIAL、`ort-session-contract.toml:23-24`) + 短尺 (25 phoneme 相当) レジーム込み**で実測、現行 MB-iSTFT `~27ms` baseline と比較 — ローカル PoC (04 doc) は contract 準拠で 30-40% 遅い**負方向 prior**あり
+- **ONNX size**: FP16 export 後のファイルサイズ、現行と比較 (04 doc PoC: decoder 単体 fp32 で 8.5x 増の prior)
 - **PESQ/STOI (JA/ZH サ行)**: 既知話者音声との A/B、既知弱点音素の退化検出
 - **主観 A/B**: つくよみちゃん FT ONNX の再現、MB-iSTFT 版と聴き比べ
+- **学習後の head bias floor**: z=0 出力 RMS vs `_trim_silence` 閾値 0.01 の再測定 (PoC 時 init 状態で abs_max 0.045 — 04 doc)
+- **FP16 export 品質**: 学習後の LayerScale γ 分布確認 (init 0.125 が subnormal 域に落ちていないか) + `convert_fp16 --validate` 通過
 
 ### GO/NO-GO 判断基準
 
@@ -150,6 +199,8 @@ python -m piper_train \
 | SECS ≥ 0.6879 && CPU RTF < 現行 && MOS 同等 | ✅ GO (default 昇格候補) | Stage 2 で統合強化 + 6-lang scratch で本格投入 |
 | SECS ~ 0.65-0.68 && 速度 win / 品質同等 | 🟡 CONDITIONAL GO (opt-in flag) | Stage 2 で Multi-scale FiLM 移植を試す、駄目なら opt-in flag として merge |
 | SECS < 0.65 or JA/ZH サ行大幅退化 | ❌ NO-GO (Stage 2 に進まない) | 知見を Matcha-TTS / iSTFTNet2-MB / StyleTTS2 の設計判断に転用、ablation を `docs/research/` に log |
+
+> 「CPU RTF < 現行」gate は、ローカル PoC (04 doc) の**負方向 prior (contract 準拠で 30-40% 遅い)** を明記した上で、canonical Xeon 環境 (contract 準拠スレッド設定) の実測で判定する。
 
 ---
 
@@ -200,7 +251,7 @@ Stage 1 で「WaveNeXt v1 が動くが v7 baseline に届かない」の場合�
 
 ## Stage 3: WaveNeXt 2 反復版 (2-3 ヶ月、Stage 2 が明確に superior な場合のみ)
 
-Stage 2 で WaveNeXt v1 が v1.13 default 候補になった場合のみ、更なる品質改善候補として WaveNeXt 2 の 3-pass 反復版を検討。
+Stage 2 で WaveNeXt v1 が v1.13 default 候補になった場合のみ、更なる品質改善候補として WaveNeXt 2 の反復版 (paper headline は 4 sub-models — 04 doc で確定) を検討。
 
 ### 実装内容 (paper §2-3 からの再実装)
 
@@ -208,19 +259,20 @@ Stage 2 で WaveNeXt v1 が v1.13 default 候補になった場合のみ、更�
 - Generator は noise `n_t` を予測、`y_{t-1} = y_t - n_t` で feedback
 - 前波形の STFT (real + imag、Hann window) を auxiliary input として mel-spec と concat
 
-**S3-B. Sub-modeling (3-pass fixed-point iteration)**
-- WaveFit-style unrolled iteration を ONNX single-pass に展開
+**S3-B. Sub-modeling (4 sub-models — paper headline 構成、04 doc で確定)**
+- WaveFit-style unrolled iteration を ONNX single-pass に展開 — ~~旧記載の「3-pass fixed-point iteration」~~ は誤りで、headline は **4 sub-models** (paper Table 1 で 2-5 を ablation 済、5 は UTMOS 向上なしで param のみ増)
 - opset 17 の native `STFT` op を利用 (float32 only、FP16 STFT 非対応)
-- **sub-model weight 共有 vs 独立**の 2 案 ablation (paper 内不明確なため)
+- ~~sub-model weight 共有 vs 独立の 2 案 ablation~~ → **de-scope (04 doc)**: paper 準拠は **weight 独立で確定** (Table 1 の param 線形性)。共有版 (~15M×4 compute) は param 削減目的の **piper 独自 optional** に降格
 
-**S3-C. WaveFit loss 逆算**
-- WaveFit paper §3.3 を読み込み、STFT loss (multi-resolution mag+phase) + fixed-point unrolling loss の係数 λ を pin
+**S3-C. WaveFit loss 係数 (pin 済 — 逆算不要、04 doc で完了扱い)**
+- ~~WaveFit paper §3.3 を読み込み係数 λ を逆算~~ → 誤ポインタだった。**§4.2 (定義) / §4.4 (STFT resolution) / §5.1 (λ 値) で pin 済**。係数セット (LibriTTS 構成): **λ_FM=10 / λ_STFT=2.5 / mel-MAE 除外 / adversarial は MelGAN MSD×3 (raw/2x/4x downsample) hinge / MR-STFT win 360/900/1800・hop 80/150/300・fft 512/1024/2048 / 全 T output の 1/T 平均 / gain adjustment・初期ノイズなし**
+- **discriminator セット非互換の注記**: Stage 1 (Vocos 系 MPD+MRD) と Stage 3 (WaveFit MelGAN MSD×3、MPD/MRD 不使用) は非互換 — Stage 3 で Stage 1 の D を流用すると paper 再現から乖離する
 - Diff-WaveNeXt 2 (Diff mode) は Stage 3 では対象外 (paper の UTMOS 3.87 < GAN mode 4.04 のため実利小)
 
 ### リスク
 
 - IEEE copyright、公式 reference 実装なし → 実装差異による品質 drift の判別困難
-- 3-4x パラメータ数 (59.94M) → CPU on-device / mobile fit で不利
+- 4x パラメータ数 (**59.94M = 4×14.99M、weight 独立で確定** — 隠れ倍率なし、04 doc) → CPU on-device / mobile fit で不利
 - 24kHz → 22050Hz 適合検証で追加の学習リソース必要
 
 ### GO/NO-GO 判断基準
@@ -265,7 +317,9 @@ Stage 単位ではなく、review しやすい粒度で分割:
 
 - **v8 本走との干渉ゼロ**: 独立ブランチ、v8 は MB-iSTFT のまま完走
 - **v7/v8 ckpt の BC 維持**: `decoder_arch` default `mb_istft` で silent load、DeprecationWarning + accept-but-ignore で hparams 互換
-- **CI 赤化リスク回避**: fixture 再生成は Stage 2 完了後の PR #5 でまとめて、PR #1-3 は既存 fixture のまま緑維持
+- **CI 赤化リスク回避**: opt-in 追加なら**既存 fixture 再生成ゼロ** (04 doc で旧 D8 blocker を格下げ)。WaveNeXt 新 fixture (tiny ONNX 1 個 + parity contract 1 エントリ + manifest 1 エントリ、additive) は Stage 2 以降に先送り可。fixture 再生成 / HF 再アップが必要になるのは完全置換時のみ (PR #5)、PR #1-3 は既存 fixture のまま緑維持
+- **将来 hop≠256 化 (Stage 3 / 24kHz) の前提整理**: hop_length のハードコードが 4 箇所 (WASM `index.js:1070` / Rust `main.rs:637-641` / Go `main.go:599` / C# `TimingWriter.cs:76` + `Program.cs` 2 経路) + `phoneme-timing-contract.toml:26` に存在 — config 読み取り化が別途必要。WaveNeXt v1 は hop=256 維持のため Stage 1 では非該当 (`audio.hop_size` の config.json 明示 emit は `preprocess.py:292-306` / `prepare_multilingual_dataset.py:1428-1447` での optional hygiene fix)
+- **`decoder_arch` の config.json stamp**: 全 6 runtime lenient 確認済でゼロリスク (optional provenance、04 doc)
 - **GPU コスト管理**: Stage 1 smoke (A100×1 で 3-5 日) の結果で全体 go/no-go 判断、無駄な A100×4 週次投入を回避
 - **公式実装 drift 対応**: 将来 Okamoto 氏公式実装が出た場合の re-sync PR 用に `wavenext.py` に paper 参照 comment を残す
 

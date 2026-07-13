@@ -3,12 +3,13 @@
 > **前提**: WaveNeXt 2 paper (arXiv:2605.25506) の実測値 + workflow findings + BSC-LT/wavenext-mel の実装調査を統合
 > **数値の出所**: paper Figure 4 / Table 1 (LibriTTS-R 24kHz、単一 GPU / CPU 計測)
 > **piper-plus 側 baseline**: `CLAUDE.md` Benchmark 表 (Xeon E5-2650 v4 / 25 phoneme / warmup 5 + 30 runs で 27ms) + v7 SECS 0.6879 (zero-shot 未知話者)
+> **更新 (2026-07-14)**: Stage 0 着手前検証 ([`04-pre-stage0-verification.md`](04-pre-stage0-verification.md)) の PoC 実測により **M1/M2 の速度・サイズ前提を下方修正、D5/D6 の数値を確定、D7 の発火条件を訂正、D8 の fixture blocker を撤回**。各節に反映済み
 
 ---
 
 ## 1. メリット (置換で得られるもの)
 
-### M1. CPU 速度: **4x 高速化の可能性** (最大の実利)
+### M1. CPU 速度: ~~4x 高速化の可能性~~ → **PoC 実測で反転 (最重要の下方修正、04 doc)**
 
 paper 実測 CPU RTF (LibriTTS-R 24kHz):
 
@@ -20,12 +21,12 @@ paper 実測 CPU RTF (LibriTTS-R 24kHz):
 | WaveFit (5 iter) | 5.36 | 0.0226 | 15.51M |
 | FastDiff | 0.80 | 0.0282 | 62.52M |
 
-- **HiFi-GAN 比で 4x CPU 高速化** (0.80 → 0.20)
-- **WaveNeXt v1** は iSTFT/PQMF がないぶん、MB-iSTFT より **10-15% 高速** (推定、workflow Requirements Phase)
-- piper-plus 現行 end-to-end 27ms/25phoneme が実測 4x 高速なら **~7ms/25phoneme** 帯到達
-- **組込 / mobile / Wyoming HA / エッジ配布での意味が決定的**
+- ~~HiFi-GAN 比で 4x CPU 高速化~~ → **paper の「CPU 4x」は WaveNeXt 2 vs HiFi-GAN の値**。piper-plus は既に HiFi-GAN 比 2.21x の MB-iSTFT であり、この数字は MB-iSTFT 比較には適用できない (旧記載の根本的誤り)
+- ~~WaveNeXt v1 は MB-iSTFT より 10-15% 高速 (推定)~~ → **撤回 (04 doc PoC 実測)**: ORT session contract 準拠 (intra=4/inter=1/SEQUENTIAL、`docs/spec/ort-session-contract.toml:23-24`) では WaveNeXt v1 (op17) が **MB-iSTFT 比 30-40% 遅い** (T=200 p50 41.7ms vs 29.2ms、T=60 でも劣位、adversarial verify で 2 回独立再現)。default threading (~12 threads) では同等
+- ~~実測 4x 高速なら ~7ms/25phoneme 帯到達~~ → 撤回。**GO/NO-GO の最終速度判定は canonical 環境 (Xeon E5-2650 v4 相当、contract 準拠) での end-to-end 実測待ち** — ローカル PoC は負方向 prior
+- パラメータ実測 (04 doc): WaveNeXt v1 (z=192) **14,124,034** vs MB-iSTFT decoder (medium、remove_weight_norm 後) **1,647,752** = **8.57x 増**
 
-### M2. ONNX グラフの 30-40% 縮小 + 保守負荷減
+### M2. ~~ONNX グラフの 30-40% 縮小~~ → iSTFT/PQMF/complex トリック ~630 行削除による保守負荷減 + bf16 安定化に縮小 (04 doc)
 
 置換で消えるコンポーネント:
 - `mb_istft.py` (351 行) の PQMF + iSTFT 実装
@@ -34,7 +35,7 @@ paper 実測 CPU RTF (LibriTTS-R 24kHz):
 - complex tensor 分離 / exp(mag) / sin(phase) 演算
 - PQMF analysis/synthesis filter 定数
 
-**合計 ~630 行削除** + ONNX 定数テンソル削減 → **モデル配布サイズも FP16 で 5-10% 縮小見込**。
+**合計 ~630 行削除** — M2 の実利はこの**保守負荷減 + bf16 安定化 (M4)** のみに縮小。~~モデル配布サイズも FP16 で 5-10% 縮小見込~~ は **撤回 (04 doc PoC 実測)**: decoder 単体 ONNX は **6.3MB → 53.8MB fp32 (8.5x 増)**、FP16 でも +20MB 超の増加見込 (未実測)。ノード数も decoder 単体比較で **134 → 214 (op17)** と縮小しない。
 
 ### M3. 6 ランタイム変更ゼロ (最大の隠れメリット)
 
@@ -68,7 +69,7 @@ decoder-agnostic で無変更継続:
 
 ### M6. WaveNeXt 2 本命への足場
 
-WaveNeXt 2 は IEEE + 公式実装なしで直接着手は XL リスク。しかし WaveNeXt v1 が動く branch があれば、そこに **residual denoising + 3-pass iteration を差分実装**するだけで v2 到達可能 (v1 の reference 実装は BSC-LT の Apache-2.0 で入手可能)。
+WaveNeXt 2 は IEEE + 公式実装なしで直接着手は XL リスク。しかし WaveNeXt v1 が動く branch があれば、そこに **residual denoising + sub-modeling (4 sub-models 反復) を差分実装**するだけで v2 到達可能 (v1 の reference 実装は BSC-LT の Apache-2.0 で入手可能)。
 
 **v1 検証は v2 実装コストを L → M に下げる**。
 
@@ -97,7 +98,7 @@ paper 実測 UTMOS / NISQA (LibriTTS-R):
 
 state_dict 名 overlap:
 - MB-iSTFT: `subband_conv_post` / `ups` / `resblocks` / `pqmf` / `cond_layers`
-- WaveNeXt: `convnext_blocks.*` / `head.linear_{1,2}` / `norm`
+- WaveNeXt: `embed` / `norm` / `convnext.*` (ModuleList) / `final_layer_norm` / `head.linear_{1,2}` (wetdog/BSC-LT 準拠命名に pin — 旧記載の `convnext_blocks.*` は実装名と不一致、03 doc 参照)
 - **overlap = 数学的にゼロ**
 
 影響:
@@ -124,17 +125,17 @@ SECS 退化する場合、Multi-scale FiLM を ConvNeXtBlock ラッパーとし�
 ### D5. WaveNeXt 2 は公式実装なし / IEEE copyright
 
 - 公式 GitHub / HF なし、community port もなし
-- GAN mode の sub-model weight 共有可否が paper 内不明確 (最悪 3x パラメータ数 = **~179M**)
-- 損失係数 λ が「WaveFit と同じ」としか書かれず、WaveFit paper §3.3 から逆算作業必要
+- ~~GAN mode の sub-model weight 共有可否が paper 内不明確 (最悪 3x = ~179M)~~ → **04 doc で確定**: sub-model は **weight 独立** (Table 1 の param 線形性)、**59.94M = 4×14.99M が確定総数** (隠れ倍率なし)
+- ~~損失係数 λ を WaveFit §3.3 から逆算作業必要~~ → **04 doc で確定**: WaveFit **§4.2/§4.4/§5.1 で pin 済、逆算不要**
 - 24kHz/hop=300 は piper-plus 22050Hz/hop=256 と非互換 → 22050Hz 適合検証コスト
 - **WaveNeXt 2 実装は XL 規模 (半年〜1年)** → v1.13 では現実的候補は WaveNeXt v1 のみ
 
-### D6. パラメータ数の増加 (WaveNeXt 2 の場合のみ)
+### D6. パラメータ数の増加 (v1 でも decoder 部分は 8.57x 増 — 04 doc 実測で正確化)
 
 | Model | Params |
 |---|---|
-| MB-iSTFT-VITS2 decoder 部分 | ~15M 相当 |
-| **WaveNeXt v1 (BSC-LT)** | **13.68M** ← 現行同等 |
+| MB-iSTFT-VITS2 decoder 部分 | **実測 1.65M** (旧記載の「~15M 相当」は誤り) |
+| **WaveNeXt v1 (BSC-LT)** | **13.72M (80-mel 実測) / 14.12M (z=192)** — ~~現行同等~~ ではなく **decoder 部分では 8.57x 増** |
 | **GAN-WaveNeXt 2 (4 iter)** | **59.94M (4x!)** |
 | GAN-WaveNeXt 2 (5 iter) | 74.93M |
 | Diff-WaveNeXt 2 | 57.68M |
@@ -143,18 +144,24 @@ paper 自身が "The overall parameters will grow with the number of sub-models.
 
 ### D7. Critical blocker (silent bomb)
 
-`_is_legacy_hifigan_checkpoint()` (`src/python/piper_train/__main__.py:39-53`) が `subband_conv_post`/`pqmf` 欠如を「レガシー HiFi-GAN」と誤検出 → **WaveNeXt ckpt 書き出し瞬間に `--resume-from-multispeaker-checkpoint` と graceful resume 両経路で `RuntimeError` 発生**。
+`_is_legacy_hifigan_checkpoint()` (`src/python/piper_train/__main__.py:39-53`) が `subband_conv_post`/`pqmf` 欠如を「レガシー HiFi-GAN」と誤検出。発火は ~~WaveNeXt ckpt 書き出し瞬間~~ ではなく**読み込み時の 2 経路** (04 doc で訂正): `--resume-from-multispeaker-checkpoint` (`__main__.py:479`) は**即時 raise**、`--resume_from_checkpoint` は **trainer.fit 失敗後の graceful-resume fallback (`:854`) 内でのみ raise**。
+
+なお `lightning.py:320` の pqmf 注入が ungated のままだと WaveNeXt ckpt にも `model_g.dec.pqmf.*` が混入するため、現行 bi-state 判定は False になり **blocker 自体が発火しない** — つまりこの blocker の顕在化は Stage 1 の pqmf gating に暗黙依存している (03 doc で正当性要件に格上げ)。
 
 手を付ける前に必ず先行修正 (幸い副作用ゼロで v8 branch にも先行適用可)。
 
-### D8. Cross-runtime fixture の大量再生成
+### D8. ~~Cross-runtime fixture の大量再生成~~ → 04 doc で格下げ: opt-in 追加なら既存 fixture 再生成ゼロ
 
-- audio-parity-contract.toml の Tier-1 SHA256 fixture 4 モデル × 6 runtime = **24 個の ONNX 再エクスポート**
-- `tests/fixtures/mb_istft_speaker_embedding/model.onnx` (Rust/C#/C++ 統合テスト参照)
-- `test_*_mb_istft.py` 系 **~11 モジュール**の再生成 / 書き換え
-- HF リポジトリ 6 件 (`piper-plus-base` / `piper-plus-tsukuyomi-chan` / `piper-plus-css10-ja-6lang` / `piper-plus-zero-shot-multi-6lang-v7` / `piper-plus-zero-shot-tsukuyomi` / CAM++ mirror) 再アップロード
+~~Tier-1 fixture 4 モデル × 6 runtime = 24 個再エクスポート、CI 1-2 週間赤化 (medium)~~ は**完全置換時のみ**の話で、opt-in 追加には適用されない (04 doc の検証で反転):
 
-**CI が landing 前後で 1-2 週間赤化するリスク**、PR 分割設計失敗で review コスト膨大。
+- committed 共有 ONNX は実質 `multilingual-test-medium.onnx` (3 箇所 tracked、byte-identical) + `zero-shot-test.onnx` の 2 種のみ
+- runtime-parity-deep は**同一未変更モデルの runtime 間相互比較**かつ全 7 job continue-on-error (informational)
+- `tests/fixtures/mb_istft_speaker_embedding/model.onnx` は CI 毎回自動生成で手動再生成不要
+- WaveNeXt 新 fixture (tiny ONNX 1 個 + parity contract 1 エントリ + manifest 1 エントリ、additive) は Stage 2 以降に先送り可
+- HF リポジトリ 6 件 (`piper-plus-base` / `piper-plus-tsukuyomi-chan` / `piper-plus-css10-ja-6lang` / `piper-plus-zero-shot-multi-6lang-v7` / `piper-plus-zero-shot-tsukuyomi` / CAM++ mirror) の再アップロードも**完全置換時のみ**
+- `test_*_mb_istft.py` 系 ~11 モジュールは opt-in 追加では `decoder_arch='mb_istft'` 明示で継続動作
+
+CI caveat: `required_status_check_gate.yml` — multi-runtime-rtf / memory-regression は warn-only でも、**infra 失敗・timeout・cancel は blocking gate 経由で赤化**する点には引き続き注意。
 
 ### D9. hparams 互換性の落とし穴
 
@@ -170,13 +177,13 @@ MB-iSTFT 系 11 test module を deprecated branch として維持 → WaveNeXt �
 
 | 軸 | **WaveNeXt v1 opt-in 並走** (推奨) | **WaveNeXt 2 完全移植** |
 |---|---|---|
-| **CPU 速度** | ✅ +10-15% (BSC-LT init) | ✅ +50-60% (paper 実測 4x vs HiFi-GAN) |
+| **CPU 速度** | ❌ contract 準拠実測で **30-40% 遅い** (04 doc PoC、canonical Xeon 実測で最終判定) | 🟡 paper の 4x は vs **HiFi-GAN** (MB-iSTFT 比は未実証) |
 | **品質 MOS** | 🟡 未検証 (paper データなし) | 🟡 HiFi-GAN と同等 (統計誤差内) |
 | **Zero-shot SECS** | 🟡 v7 の 0.6879 を超えるか未検証 | 🟡 同左 |
 | **JA/ZH サ行** | 🟡 sub-band 廃止で退化リスク | 🟡 同左 |
-| **ONNX 保守** | ✅ 30-40% グラフ縮小 | ✅ 同左 (+反復展開で複雑化) |
+| **ONNX 保守** | ✅ iSTFT/PQMF/complex トリック ~630 行撤去 (~~グラフ縮小~~ は撤回: 134→214 nodes / fp32 8.5x 増) | 🟡 同左 (+反復展開で複雑化) |
 | **6 ランタイム修正** | ✅ 変更ゼロ | ✅ 変更ゼロ (opset 17 STFT だけ注意) |
-| **パラメータ数** | ✅ 13.68M (現行同等) | ❌ 59.94M (4x) |
+| **パラメータ数** | 🟡 13.72M / 14.12M (z=192) — decoder 部分では 8.57x 増 | ❌ 59.94M (4 sub-models、weight 独立で確定) |
 | **公式実装** | 🟡 unofficial (MIT/Apache-2.0) | ❌ なし (IEEE copyright) |
 | **v7/v8 warm-start** | ❌ decoder 再学習必須 | ❌ 同左 |
 | **Effort** | M (4-6 週) | XL (半年〜1年) |
@@ -185,21 +192,22 @@ MB-iSTFT 系 11 test module を deprecated branch として維持 → WaveNeXt �
 
 ## 4. Risk-adjusted 総合判定
 
-**メリット中で確度の高いもの (paper 実測 / workflow 検証済)**:
-1. CPU 4x 高速化 (paper 実測、piper-plus で追試すれば白黒つく)
-2. ONNX グラフ 30-40% 縮小 (workflow で確認済、計算可能)
-3. 6 ランタイム変更ゼロ (ORT op coverage で確認済)
+**メリット中で確度の高いもの (paper 実測 / workflow・04 doc 検証済)**:
+1. ~~CPU 4x 高速化~~ → **04 doc PoC で反転**: contract 準拠設定で 30-40% 遅い (canonical Xeon 実測で最終判定)
+2. ~~ONNX グラフ 30-40% 縮小~~ → **撤回** (134→214 nodes / fp32 8.5x 増)。残る実利は ~630 行の保守負荷減
+3. 6 ランタイム変更ゼロ (ORT op coverage で確認済 + 04 doc PoC parity 1.13e-06)
 4. bf16 数値安定化 (cuFFT complex 演算の消失、確実)
 5. 学習補助機構の維持 (workflow で 8 dim × file:line 確認済)
 
-**デメリット中で確度の高いもの (paper 実測 / workflow 検証済)**:
+**デメリット中で確度の高いもの (paper 実測 / workflow・04 doc 検証済)**:
 1. 品質 MOS 改善はゼロ (paper 実測、誤差範囲内)
 2. v7/v8 decoder warm-start 不可 (weight overlap 数学的にゼロ、確実)
 3. WaveNeXt 2 は IEEE + 公式実装なし (fact、変更不可)
-4. Fixture 大量再生成 (workflow で 24 個 + 11 test module 特定済)
+4. ~~Fixture 大量再生成~~ → **04 doc で撤回** (opt-in 追加なら既存 fixture 再生成ゼロ、D8 参照)
+5. CPU 速度は contract 準拠設定で 30-40% 遅い (04 doc PoC、2 回独立再現)
 
-**メリット中で不確実 (smoke 学習で解消要)**:
-- CPU 4x が piper-plus 6lang 条件でも成り立つか
+**メリット中で不確実 (smoke 学習 / canonical 実測で解消要)**:
+- canonical 環境 (Xeon E5-2650 v4 相当、contract 準拠) の end-to-end 実測で速度劣位がどこまで縮む/覆るか (ローカル PoC は負方向 prior)
 - BSC-LT init からの partial-transfer FT が v7 SECS baseline を超えるか
 
 **デメリット中で不確実 (smoke 学習で解消要)**:
@@ -207,7 +215,7 @@ MB-iSTFT 系 11 test module を deprecated branch として維持 → WaveNeXt �
 - JA/ZH サ行子音品質退化するか
 - Multi-scale FiLM 経路の再実装が必要か
 
-**判定**: 「メリット中の確度の高いもの (5 軸)」× 「デメリット中の確度の高いもの (4 軸)」を天秤にかけると、**品質改善がゼロでも 6 ランタイム変更ゼロ + CPU 4x + bf16 安定化の実利は大きい**。ただし v7/v8 decoder 再学習の GPU コストが確実に発生するため、**opt-in flag として merge し、default 昇格は v7 SECS baseline 超えを smoke 学習で確認できた場合のみ**という段階設計が最も期待値が高い。
+**判定**: 04 doc の PoC 実測で速度・サイズ前提が反転したため、確度の高い実利は **6 ランタイム変更ゼロ + bf16 安定化 + iSTFT/PQMF/complex トリック ~630 行撤去の保守負荷減 + WaveNeXt 2 への足場**に縮小した。それでも v7/v8 decoder 再学習の GPU コストと天秤にかけたうえで、**opt-in flag として merge し、default 昇格は v7 SECS baseline 超え + canonical 環境 (contract 準拠) での CPU RTF 実測を smoke 学習で確認できた場合のみ**という段階設計が最も期待値が高い (速度はローカル PoC の負方向 prior を明記して実測判定)。
 
 不確実性 (品質・zero-shot・サ行) は **A100×1 で 3-5 日の smoke 学習で決着可能** — 検証しないまま WaveNeXt を諦めるのは決定コストの見合いが取れない。
 
