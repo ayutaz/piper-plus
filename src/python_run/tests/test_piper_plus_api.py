@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
+
 from piper_plus.api.api import PiperPlus, _split_sentences
 from piper_plus.api.audio import AudioResult
 
@@ -485,7 +486,6 @@ class TestPiperPlusListModels:
     def test_contains_known_aliases(self):
         models = PiperPlus.list_models()
         assert "tsukuyomi" in models
-        assert "base" in models
 
     def test_returns_copy_not_reference(self):
         """Mutating the returned dict does not affect internal state."""

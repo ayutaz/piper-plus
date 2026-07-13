@@ -11,15 +11,17 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # Well-known model aliases
+#
+# Note: The `piper-plus-base` HF repo currently hosts only the training
+# checkpoint (`model.ckpt`) for fine-tuning; there is no `.onnx` file for
+# direct inference. A `"base"` alias was therefore removed to avoid a
+# HF 404 on `piper-plus --download-model base`. See docs/guides/development/
+# pretrained-models.md for the canonical model catalog. Add a `"base"`
+# alias back here once a base 6lang ONNX is uploaded to that repo.
 MODEL_ALIASES: dict[str, dict[str, str]] = {
     "tsukuyomi": {
         "repo_id": "ayousanz/piper-plus-tsukuyomi-chan",
         "onnx_file": "tsukuyomi-chan-6lang-fp16.onnx",
-        "config_file": "config.json",
-    },
-    "base": {
-        "repo_id": "ayousanz/piper-plus-base",
-        "onnx_file": "piper-plus-base-6lang-fp16.onnx",
         "config_file": "config.json",
     },
 }

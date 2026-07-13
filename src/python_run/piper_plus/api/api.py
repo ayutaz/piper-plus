@@ -57,7 +57,7 @@ class PiperPlus:
         print(f"Duration: {result.duration:.2f}s")
 
     Args:
-        model: Model file path, alias (``"tsukuyomi"``, ``"base"``),
+        model: Model file path, alias (``"tsukuyomi"``),
             or HuggingFace repo ID (``"ayousanz/piper-plus-tsukuyomi-chan"``).
         config: Explicit config.json path.  Auto-detected when *None*.
         device: Inference device: ``"cpu"``, ``"gpu"``, or ``"auto"``.

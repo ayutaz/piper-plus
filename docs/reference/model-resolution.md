@@ -96,8 +96,9 @@ Cache directory 内で `{model_str}/*.onnx` または `{model_str}.onnx` を探�
 | Alias | Repo ID | ONNX File |
 |-------|---------|-----------|
 | `tsukuyomi` | `ayousanz/piper-plus-tsukuyomi-chan` | `tsukuyomi-chan-6lang-fp16.onnx` |
-| `base` | `ayousanz/piper-plus-base` | `piper-plus-base-6lang-fp16.onnx` |
 | `css10` | `ayousanz/piper-plus-css10-ja-6lang` | `css10-ja-6lang-fp16.onnx` |
+
+> `base` alias は v2.0 で削除されました。 HF `ayousanz/piper-plus-base` repo は現在 training checkpoint (`model.ckpt`) のみ公開しており、 直接推論用の ONNX が未 upload のため。 base 6lang ONNX 公開後に再登録予定。
 
 ---
 

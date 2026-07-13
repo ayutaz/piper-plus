@@ -36,8 +36,11 @@ exclude = [
   "^https?://example\\.com",
   "^https?://example\\.org",
   "^https?://your-",
-  # HuggingFace gated/auth-required model files (return 200 only with token)
-  "^https?://huggingface\\.co/.*/resolve/.*\\.onnx",
+  # HuggingFace public repos の ONNX は明示的に狭く exclude 対象を絞る
+  # (以前は `.*/resolve/.*\.onnx` で全 HF ONNX を silent skip していたが、
+  #  Issue #590 audit で public repo の broken link (`piper-plus-base-6lang-fp16.onnx` 等)
+  #  が CI で検知できない状態になっていたため縮小)。 現在の除外対象は
+  #  private / auth-required repo のみ (下の zero-shot 系ブロックで管理)。
   # HuggingFace private repos for zero-shot TTS staging (will be unlisted once made public).
   # campplus-onnx: speaker encoder pretrained weights (vendor redistribution gating)
   # piper-plus-zero-shot-multi-6lang-v7: 6lang zero-shot base ckpt (still in training/audit)

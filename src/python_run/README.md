@@ -147,8 +147,9 @@ curl "http://localhost:5000/api/phoneme-timing?text=Hello&language=en&format=jso
 
 | モデル | 言語 | 話者数 | ダウンロード |
 |--------|------|--------|-------------|
-| [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) | 6言語 (ja/en/zh/es/fr/pt) | 571 | `piper-plus --download-model base` |
 | [tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) | 6言語 (ja/en/zh/es/fr/pt) | 1 | `piper-plus --download-model tsukuyomi` |
+
+> [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) はファインチューニング用の training checkpoint (`model.ckpt`) のみ公開。 直接推論用 ONNX は今後アップロード予定 (別途 `piper-plus --download-model base` 対応)。
 
 ## 対応言語
 

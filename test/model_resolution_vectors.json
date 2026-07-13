@@ -7,13 +7,9 @@
       "repo_id": "ayousanz/piper-plus-tsukuyomi-chan",
       "onnx_file": "tsukuyomi-chan-6lang-fp16.onnx",
       "config_file": "config.json"
-    },
-    "base": {
-      "repo_id": "ayousanz/piper-plus-base",
-      "onnx_file": "piper-plus-base-6lang-fp16.onnx",
-      "config_file": "config.json"
     }
   },
+  "_removed_aliases_comment": "The `base` alias was removed in v2.0 because HF ayousanz/piper-plus-base hosts only model.ckpt (training checkpoint), not an ONNX. Re-add once the base 6lang ONNX is published.",
   "voice_catalog": {
     "_comment": "Canonical catalog entries used across implementations. Aliases and file metadata should match.",
     "ja_JP-tsukuyomi-chan-medium": {
@@ -51,14 +47,6 @@
       "expected_repo": "ayousanz/piper-plus-tsukuyomi-chan",
       "expected_onnx": "tsukuyomi-chan-6lang-fp16.onnx",
       "description": "Well-known alias resolves to HuggingFace repo"
-    },
-    {
-      "id": "alias_base",
-      "input": "base",
-      "type": "alias",
-      "expected_repo": "ayousanz/piper-plus-base",
-      "expected_onnx": "piper-plus-base-6lang-fp16.onnx",
-      "description": "Base model alias"
     },
     {
       "id": "alias_css10",

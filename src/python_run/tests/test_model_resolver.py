@@ -133,7 +133,6 @@ class TestResolveModelAlias:
 
     def test_known_aliases_exist(self):
         assert "tsukuyomi" in MODEL_ALIASES
-        assert "base" in MODEL_ALIASES
 
     def test_alias_has_required_keys(self):
         for alias_name, alias in MODEL_ALIASES.items():

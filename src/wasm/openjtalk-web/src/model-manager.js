@@ -21,7 +21,9 @@ const MODEL_REGISTRY = {
   "tsukuyomi-chan": "ayousanz/piper-plus-tsukuyomi-chan",
   css10: "ayousanz/piper-plus-css10-ja-6lang",
   "css10-ja": "ayousanz/piper-plus-css10-ja-6lang",
-  base: "ayousanz/piper-plus-base",
+  // Note: `base` alias was removed in v2.0. The HF `ayousanz/piper-plus-base`
+  // repo currently hosts only a training checkpoint (`model.ckpt`); no `.onnx`
+  // for direct inference. Re-add once a base 6lang ONNX is uploaded.
 };
 
 /**
