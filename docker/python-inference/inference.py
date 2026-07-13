@@ -39,8 +39,8 @@ from pathlib import Path
 
 import numpy as np
 import soundfile as sf
-from piper_plus_g2p.registry import get_phonemizer
 
+from piper_plus_g2p.registry import get_phonemizer
 from piper_train.ort_utils import create_session_with_cache, warmup_onnx_session
 
 

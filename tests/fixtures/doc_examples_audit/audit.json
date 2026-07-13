@@ -2,14 +2,14 @@
   "schema_version": 1,
   "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
-    "executable": 221,
+    "executable": 222,
     "needs_placeholder": 6,
-    "skip_warranted": 236,
-    "total": 463
+    "skip_warranted": 238,
+    "total": 466
   },
   "by_language": {
     "bash": {
-      "executable": 162,
+      "executable": 163,
       "needs_placeholder": 6,
       "skip_warranted": 44
     },
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 191
+      "skip_warranted": 193
     },
     "wasm": {
       "executable": 10,
@@ -2127,8 +2127,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 38,
-      "line_end": 42,
+      "line_start": 40,
+      "line_end": 44,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2142,8 +2142,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 46,
-      "line_end": 50,
+      "line_start": 48,
+      "line_end": 52,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -4263,7 +4263,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "f0e032afc4b87cc0d51832d0bf2b5e03615a2114"
+      "hash_sha1": "45ce728c9fec4fb24842528cee2ab9bcb11ff574"
     },
     {
       "file": "docs/guides/training/wavlm-guide.md",
@@ -4748,8 +4748,51 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 79,
-      "line_end": 81,
+      "line_start": 84,
+      "line_end": 93,
+      "language_raw": "yaml",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "669ace77d6445894c1d5d603cd1ca4f15f474fa1"
+    },
+    {
+      "file": "docs/migration/v1.12-to-v2.0.md",
+      "line_start": 111,
+      "line_end": 117,
+      "language_raw": "sh",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "15650d737d274d0192159d11fe577905c05d3467"
+    },
+    {
+      "file": "docs/migration/v1.12-to-v2.0.md",
+      "line_start": 121,
+      "line_end": 124,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "1dbdf1fa8991b06e6b5dd680e14362846470f5a4"
+    },
+    {
+      "file": "docs/migration/v1.12-to-v2.0.md",
+      "line_start": 149,
+      "line_end": 151,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -4763,8 +4806,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 87,
-      "line_end": 89,
+      "line_start": 157,
+      "line_end": 159,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4776,8 +4819,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 95,
-      "line_end": 97,
+      "line_start": 165,
+      "line_end": 167,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -4791,8 +4834,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 103,
-      "line_end": 107,
+      "line_start": 173,
+      "line_end": 186,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4800,12 +4843,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "f79b27b4131b402fe28536624825b91464f94bf8"
+      "hash_sha1": "47ed5c9d49c4d82a116a8c138f016663ed985050"
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 155,
-      "line_end": 159,
+      "line_start": 236,
+      "line_end": 240,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4817,8 +4860,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 178,
-      "line_end": 181,
+      "line_start": 259,
+      "line_end": 262,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4832,8 +4875,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 191,
-      "line_end": 193,
+      "line_start": 272,
+      "line_end": 274,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4847,8 +4890,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 202,
-      "line_end": 207,
+      "line_start": 283,
+      "line_end": 288,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4860,8 +4903,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 249,
-      "line_end": 253,
+      "line_start": 330,
+      "line_end": 334,
       "language_raw": "sh",
       "language": "bash",
       "category": "needs_placeholder",
@@ -4871,12 +4914,12 @@
       ],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "6c817a4113876f303b85542376aaea4a76f37763"
+      "hash_sha1": "b65f2327b69181ac84682083905507fd26a1ee7e"
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 259,
-      "line_end": 266,
+      "line_start": 340,
+      "line_end": 347,
       "language_raw": "sh",
       "language": "bash",
       "category": "needs_placeholder",
@@ -4890,8 +4933,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 288,
-      "line_end": 294,
+      "line_start": 369,
+      "line_end": 375,
       "language_raw": "dockerfile",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4905,8 +4948,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 304,
-      "line_end": 309,
+      "line_start": 385,
+      "line_end": 390,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4918,8 +4961,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 321,
-      "line_end": 324,
+      "line_start": 402,
+      "line_end": 405,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4931,8 +4974,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 339,
-      "line_end": 344,
+      "line_start": 420,
+      "line_end": 425,
       "language_raw": "diff",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4946,8 +4989,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 352,
-      "line_end": 357,
+      "line_start": 433,
+      "line_end": 438,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4959,8 +5002,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 363,
-      "line_end": 367,
+      "line_start": 444,
+      "line_end": 448,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4972,8 +5015,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 373,
-      "line_end": 376,
+      "line_start": 454,
+      "line_end": 457,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -5283,8 +5326,8 @@
     },
     {
       "file": "docs/reference/model-resolution.md",
-      "line_start": 108,
-      "line_end": 128,
+      "line_start": 109,
+      "line_end": 129,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5298,8 +5341,8 @@
     },
     {
       "file": "docs/reference/model-resolution.md",
-      "line_start": 159,
-      "line_end": 164,
+      "line_start": 160,
+      "line_end": 165,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5313,8 +5356,8 @@
     },
     {
       "file": "docs/reference/model-resolution.md",
-      "line_start": 168,
-      "line_end": 173,
+      "line_start": 169,
+      "line_end": 174,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",

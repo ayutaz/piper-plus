@@ -546,8 +546,17 @@ public sealed class ChineseEmbeddedEnglishTests
         // Spawn a reader that polls the flag while a writer flips it. The
         // reader must observe at least one `false` reading (via volatile reads
         // — without volatile, optimizers could hoist the read out of the loop).
+        //
+        // Timeout: 10s (bumped from 2s in PR #598). The reader Task runs on
+        // the ThreadPool; on cold Windows CI runners the ThreadPool worker
+        // may take 500ms–1s to actually start, leaving <1s of real spinning
+        // in the original 2s budget. dev branch showed sporadic flakes on
+        // windows-latest with the same visibility test (SHA 605093c0 /
+        // 889fefef). 10s is generous enough to survive ThreadPool cold-start
+        // while still fast on green runs (the assertion returns as soon as
+        // the reader observes false, typically within a few ms).
         using var stop = new System.Threading.CancellationTokenSource(
-            TimeSpan.FromSeconds(2));
+            TimeSpan.FromSeconds(10));
         var observedFalse = false;
         var reader = System.Threading.Tasks.Task.Run(
             () =>

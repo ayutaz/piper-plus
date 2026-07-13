@@ -42,6 +42,7 @@ except ImportError:
 
 try:
     import pyopenjtalk  # noqa: F401
+
     from piper_plus_g2p import ProsodyInfo  # noqa: F401
     from piper_plus_g2p.encode.pua import map_token as _map_token
     from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
