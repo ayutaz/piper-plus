@@ -200,9 +200,9 @@ class TestBuildSessionInputs:
             speaker_id=0,
             language="ja",
             language_id_map={"ja": 0},
-            noise_scale=0.667,
+            noise_scale=0.4,
             length_scale=1.0,
-            noise_scale_w=0.8,
+            noise_scale_w=0.5,
         )
         assert set(inputs) == {"input", "input_lengths", "scales"}
         assert inputs["input"].dtype == np.int64
@@ -228,9 +228,9 @@ class TestBuildSessionInputs:
             speaker_id=0,
             language="ja",
             language_id_map={"ja": 0},
-            noise_scale=0.667,
+            noise_scale=0.4,
             length_scale=1.0,
-            noise_scale_w=0.8,
+            noise_scale_w=0.5,
         )
         assert "speaker_embedding" in inputs
         assert "speaker_embedding_mask" in inputs
@@ -263,9 +263,9 @@ class TestBuildSessionInputs:
             speaker_id=0,
             language="ja",
             language_id_map={"ja": 0},
-            noise_scale=0.667,
+            noise_scale=0.4,
             length_scale=1.0,
-            noise_scale_w=0.8,
+            noise_scale_w=0.5,
         )
         assert "speaker_embedding" not in inputs
         assert "speaker_embedding_mask" not in inputs
@@ -287,9 +287,9 @@ class TestBuildSessionInputs:
             speaker_id=0,
             language="ja",
             language_id_map={"ja": 0},
-            noise_scale=0.667,
+            noise_scale=0.4,
             length_scale=1.0,
-            noise_scale_w=0.8,
+            noise_scale_w=0.5,
         )
         assert inputs["speaker_embedding"].shape == (1, 256)
 
@@ -318,9 +318,9 @@ class TestBuildSessionInputs:
             speaker_id=7,
             language="en",
             language_id_map={"ja": 0, "en": 1},
-            noise_scale=0.667,
+            noise_scale=0.4,
             length_scale=1.0,
-            noise_scale_w=0.8,
+            noise_scale_w=0.5,
         )
         assert inputs["sid"].tolist() == [7]
         assert inputs["lid"].tolist() == [1]
@@ -350,9 +350,9 @@ class TestBuildSessionInputs:
                 speaker_id=0,
                 language="ja",
                 language_id_map={"ja": 0},
-                noise_scale=0.667,
+                noise_scale=0.4,
                 length_scale=1.0,
-                noise_scale_w=0.8,
+                noise_scale_w=0.5,
             )
 
     def test_malformed_export_only_mask_raises(self):
@@ -374,7 +374,7 @@ class TestBuildSessionInputs:
                 speaker_id=0,
                 language="ja",
                 language_id_map={"ja": 0},
-                noise_scale=0.667,
+                noise_scale=0.4,
                 length_scale=1.0,
-                noise_scale_w=0.8,
+                noise_scale_w=0.5,
             )
