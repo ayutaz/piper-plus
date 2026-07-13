@@ -1429,7 +1429,7 @@ def main():
         "dataset": "multilingual-6lang",
         "audio": {"sample_rate": args.sample_rate, "quality": "medium"},
         "language": {"code": "-".join(active_languages)},
-        "inference": {"noise_scale": 0.667, "length_scale": 1, "noise_w": 0.8},
+        "inference": {"noise_scale": 0.4, "length_scale": 1, "noise_w": 0.5},
         "phoneme_type": "multilingual",
         "phoneme_map": {},
         "phoneme_id_map": ml_id_map,

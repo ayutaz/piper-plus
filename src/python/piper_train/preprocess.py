@@ -303,7 +303,7 @@ def main() -> None:
                 "language": {
                     "code": args.language,
                 },
-                "inference": {"noise_scale": 0.667, "length_scale": 1, "noise_w": 0.8},
+                "inference": {"noise_scale": 0.4, "length_scale": 1, "noise_w": 0.5},
                 "phoneme_type": args.phoneme_type.value,
                 "phoneme_map": {},
                 "phoneme_id_map": (

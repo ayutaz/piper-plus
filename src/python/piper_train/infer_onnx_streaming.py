@@ -141,8 +141,8 @@ def main():
         "--decoder", required=True, help="Path to decoder  model (.onnx)"
     )
     parser.add_argument("--sample-rate", type=int, default=22050)
-    parser.add_argument("--noise-scale", type=float, default=0.667)
-    parser.add_argument("--noise-scale-w", type=float, default=0.8)
+    parser.add_argument("--noise-scale", type=float, default=0.4)
+    parser.add_argument("--noise-scale-w", type=float, default=0.5)
     parser.add_argument("--length-scale", type=float, default=1.0)
     parser.add_argument(
         "--chunk-size",

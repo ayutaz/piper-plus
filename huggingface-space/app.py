@@ -109,8 +109,8 @@ def synthesize_speech(
     model_name: str,
     speaker_id: int = 0,
     length_scale: float = 1.0,
-    noise_scale: float = 0.667,
-    noise_w: float = 0.8,
+    noise_scale: float = 0.4,
+    noise_w: float = 0.5,
 ) -> tuple[int, np.ndarray]:
     """Generate speech from text using selected model"""
 
@@ -261,7 +261,7 @@ def create_interface():
                     label="Expressiveness",
                     minimum=0.0,
                     maximum=1.0,
-                    value=0.667,
+                    value=0.4,
                     step=0.01,
                 )
 
@@ -269,7 +269,7 @@ def create_interface():
                     label="Phoneme Duration Variance",
                     minimum=0.0,
                     maximum=1.0,
-                    value=0.8,
+                    value=0.5,
                     step=0.01,
                 )
 
@@ -366,7 +366,7 @@ def create_minimal_interface():
         )
 
         synthesize_btn.click(
-            fn=lambda text, model: synthesize_speech(text, model, 0, 1.0, 0.667, 0.8),
+            fn=lambda text, model: synthesize_speech(text, model, 0, 1.0, 0.4, 0.5),
             inputs=[text_input, model_dropdown],
             outputs=audio_output,
         )

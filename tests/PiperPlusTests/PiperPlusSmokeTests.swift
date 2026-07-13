@@ -116,16 +116,16 @@ final class PiperPlusSmokeTests: XCTestCase {
     // MARK: - Default options
 
     func testDefaultSynthOptionsAreDocumented() {
-        // Header docstring: defaults are noise_scale=0.667, length_scale=1.0,
-        // noise_w=0.8, sentence_silence_sec=0.2, speaker_id=0,
+        // Header docstring: defaults are noise_scale=0.4, length_scale=1.0,
+        // noise_w=0.5, sentence_silence_sec=0.2, speaker_id=0,
         // language_id=-1 (auto), speaker_embedding_dim=0.
         let opts = piper_plus_default_options()
-        XCTAssertEqual(opts.noise_scale, 0.667, accuracy: 1e-3,
-                       "noise_scale default = 0.667")
+        XCTAssertEqual(opts.noise_scale, 0.4, accuracy: 1e-3,
+                       "noise_scale default = 0.4")
         XCTAssertEqual(opts.length_scale, 1.0, accuracy: 1e-3,
                        "length_scale default = 1.0")
-        XCTAssertEqual(opts.noise_w, 0.8, accuracy: 1e-3,
-                       "noise_w default = 0.8")
+        XCTAssertEqual(opts.noise_w, 0.5, accuracy: 1e-3,
+                       "noise_w default = 0.5")
         XCTAssertEqual(opts.sentence_silence_sec, 0.2, accuracy: 1e-3,
                        "sentence_silence_sec default = 0.2")
         XCTAssertEqual(opts.speaker_id, 0, "speaker_id default = 0")

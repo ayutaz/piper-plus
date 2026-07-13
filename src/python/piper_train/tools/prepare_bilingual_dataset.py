@@ -1009,7 +1009,7 @@ def main():
         "dataset": "bilingual-ja-en",
         "audio": {"sample_rate": args.sample_rate, "quality": "medium"},
         "language": {"code": "ja-en"},
-        "inference": {"noise_scale": 0.667, "length_scale": 1, "noise_w": 0.8},
+        "inference": {"noise_scale": 0.4, "length_scale": 1, "noise_w": 0.5},
         "phoneme_type": "bilingual",
         "phoneme_map": {},
         "phoneme_id_map": bilingual_id_map,

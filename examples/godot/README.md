@@ -100,7 +100,7 @@ curl -LO https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/
 | `config_path` | String | `""` | Path to `.json` config (auto-detected if empty) |
 | `speaker_id` | int | `0` | Speaker index |
 | `language_id` | int | `-1` | Language index (`-1` = auto-detect) |
-| `noise_scale` | float | `0.667` | VITS noise scale |
+| `noise_scale` | float | `0.4` | VITS noise scale |
 | `length_scale` | float | `1.0` | VITS length scale (speed) |
 
 ### Methods
