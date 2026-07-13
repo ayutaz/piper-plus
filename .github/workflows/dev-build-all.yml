@@ -187,6 +187,14 @@ jobs:
         run: |
           python -m build --wheel --outdir ../../dist/
 
+      # Gate 2 (Issue #590 / rename design §9): open the just-built wheel and
+      # verify (a) required package-data JSON files are bundled and (b) no
+      # stray top-level `piper/` directory leaked in — either regression is
+      # invisible to unit tests but breaks downstream co-install with the
+      # legacy `piper-tts` package on PyPI. ~1s, no extra deps.
+      - name: Verify wheel bundles required package-data (Gate 2)
+        run: python scripts/check_wheel_data_bundling.py --wheel dist/piper_plus-*.whl
+
       - name: List built wheels
         run: ls -la dist/
 

@@ -228,6 +228,22 @@ repos:
         files: ^(\.pre-commit-config\.yaml|scripts/check_precommit_file_regex\.py)$
         pass_filenames: false
 
+      # v2.0 `piper` -> `piper_plus` rename (commit b86df3f9) の carryover
+      # risk 対策 — Issue #590 / docs/design/piper-plus-module-rename-v2.md §9。
+      # `import piper` / `from piper import` が repo 内 .py に再侵入した場合、
+      # 我々の wheel と upstream `piper-tts` の同時 install 環境で silent に
+      # 上流モジュールへ解決されるため (webui.py 事案類型)、 grep-only の
+      # 軽量 gate として commit 時に fail-fast する。 `piper_train` /
+      # `piper_plus` / `piper_plus_g2p` / `piper_phonemize` / `piper_wyoming`
+      # は false-positive を避けるためスクリプト側 regex で除外。 doc / markdown
+      # / TOML は scope 外 (migration guide が legacy 形式を prose で引用可)。
+      - id: no-legacy-piper-imports
+        name: no legacy `import piper` / `from piper import` (v2.0 rename gate)
+        entry: uv run --no-sync python scripts/check_no_legacy_piper_imports.py
+        language: system
+        files: \.py$
+        pass_filenames: true
+
       # SSML subset 仕様 byte-for-byte 三方向 drift gate。
       # toml ↔ Python canonical ↔ JSON fixture が乖離していないか。
       # 既存 CI workflow を pre-commit 化、 PR 時点ではなく commit 時点で
