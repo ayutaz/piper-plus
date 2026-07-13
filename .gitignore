@@ -218,6 +218,9 @@ check_*.py
 !scripts/verify_hf_space_runtime.py
 # GitHub Pages post-deploy 404 detection gate
 !scripts/verify_pages_assets.py
+# Post-rename hardening gates (Issue #590 / follow-up to PR #598)
+!scripts/check_no_legacy_piper_imports.py
+!scripts/check_wheel_data_bundling.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

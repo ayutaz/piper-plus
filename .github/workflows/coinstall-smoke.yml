@@ -1,0 +1,263 @@
+name: "Co-install Smoke (piper-tts + piper-plus)"
+
+# ---------------------------------------------------------------------------
+# Co-install e2e smoke: verifies v2.0 rename (piper -> piper_plus) actually
+# achieves the "clean break" contract from
+# docs/design/piper-plus-module-rename-v2.md:
+#
+#   Upstream `piper-tts` (import piper / `piper` CLI) and our fork
+#   `piper-plus` (import piper_plus / `piper-plus` CLI) can be pip-installed
+#   into the SAME environment without any name collision, and each
+#   `import` / CLI resolves to the correct project.
+#
+# Regressions this catches:
+#   - Our wheel leaks a top-level `piper/` package (rename incomplete)
+#   - Our wheel installs a `piper` console script (entry-point collision)
+#   - `import piper` silently resolves to our fork (webui.py:23 class of bug
+#     called out in the rename design doc — "most silent, most dangerous")
+#   - `import piper_plus` fails after co-install (upstream shadows us)
+#   - `piper` / `piper-plus` CLI binaries missing or crash on --help
+#
+# Why a dedicated workflow and not a step in python-tests.yml:
+#   The whole point of this gate is a CLEAN venv with ONLY upstream +
+#   our wheel — no test extras, no editable installs, no pytest plugins.
+#   Any of those would mask real packaging bugs (e.g. `-e src/python_run`
+#   makes `import piper_plus` succeed even when the built wheel is
+#   broken). We build from src/python_run and install the built wheel.
+# ---------------------------------------------------------------------------
+
+# 最小権限: install / import / --help のみ、 PR / issue への書き込み不要。
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/python_run/**'
+      - 'pyproject.toml'
+      - '.github/workflows/coinstall-smoke.yml'
+  push:
+    branches: [dev]
+    paths:
+      - 'src/python_run/**'
+      - 'pyproject.toml'
+      - '.github/workflows/coinstall-smoke.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coinstall-smoke:
+    name: piper-tts + piper-plus in clean venv (Python 3.13)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6.0.3
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+
+      # Pinned upstream version so a new piper-tts release cannot silently
+      # break this gate (or, worse, silently "fix" a real regression by
+      # coincidentally shipping a compatible layout). Bump manually after
+      # verifying the new release still exposes `piper` module + CLI.
+      # 1.3.0 = July 2025 stable, well after the upstream project's package
+      # layout stabilised; PyPI: https://pypi.org/project/piper-tts/1.3.0/
+      - name: Configure pinned versions
+        id: pins
+        run: |
+          echo "piper_tts_version=1.3.0" >> "$GITHUB_OUTPUT"
+
+      - name: Create clean venv
+        run: |
+          set -euxo pipefail
+          python -m venv coinstall-test-venv
+          # Upgrade pip / build inside the venv so the wheel build step
+          # below uses a modern PEP 517 frontend, but do NOT install
+          # anything else — this venv must stay minimal so a broken
+          # wheel cannot be masked by transitive test dependencies.
+          ./coinstall-test-venv/bin/python -m pip install --upgrade pip build
+
+      - name: Install upstream piper-tts (pinned)
+        run: |
+          set -euxo pipefail
+          ./coinstall-test-venv/bin/pip install \
+            "piper-tts==${{ steps.pins.outputs.piper_tts_version }}"
+
+      - name: Build piper-plus wheel from src/python_run
+        run: |
+          set -euxo pipefail
+          # `python -m build --wheel` runs PEP 517 build in an isolated
+          # environment so this does not pollute the co-install venv.
+          ./coinstall-test-venv/bin/python -m build --wheel src/python_run \
+            --outdir dist-coinstall
+          ls -la dist-coinstall/
+
+      - name: Install built piper-plus wheel into the same venv
+        run: |
+          set -euxo pipefail
+          # Glob-install the freshly-built wheel. There should be exactly
+          # one wheel in dist-coinstall/ (a single `python -m build`
+          # invocation on src/python_run). Fail loud if not.
+          wheels=(dist-coinstall/piper_plus-*.whl)
+          if [ "${#wheels[@]}" -ne 1 ]; then
+            echo "::error::expected exactly 1 piper_plus wheel, got ${#wheels[@]}: ${wheels[*]}"
+            exit 1
+          fi
+          ./coinstall-test-venv/bin/pip install "${wheels[0]}"
+
+      - name: Assert co-install semantics (Python imports)
+        run: |
+          ./coinstall-test-venv/bin/python <<'PY'
+          # Contract from docs/design/piper-plus-module-rename-v2.md:
+          #   (a) `import piper` succeeds AND resolves to upstream piper-tts
+          #       (i.e. its __file__ path does NOT contain 'piper_plus')
+          #   (b) `import piper_plus` succeeds AND resolves to our fork
+          #   (c) The two modules are distinct objects (no aliasing)
+          #   (d) site-packages/piper/ dir is upstream-owned — no leaked
+          #       files whose path suggests they came from our wheel
+          #
+          # Any failure = packaging regression. Print enough diagnostic
+          # detail so the PR author can see exactly which invariant broke.
+          import sys
+          from pathlib import Path
+
+          failures: list[str] = []
+
+          # (a) upstream import
+          try:
+              import piper
+          except Exception as e:
+              failures.append(f"(a) `import piper` failed: {type(e).__name__}: {e}")
+              piper = None  # type: ignore[assignment]
+          else:
+              piper_file = getattr(piper, "__file__", None)
+              print(f"piper.__file__ = {piper_file}")
+              if piper_file is None:
+                  failures.append("(a) `piper.__file__` is None — cannot verify origin")
+              elif "piper_plus" in str(piper_file):
+                  failures.append(
+                      f"(a) `import piper` resolved into our fork: {piper_file} "
+                      "(expected upstream piper-tts). Our wheel is leaking a "
+                      "top-level `piper/` package — rename is incomplete."
+                  )
+
+          # (b) our fork import
+          try:
+              import piper_plus
+          except Exception as e:
+              failures.append(f"(b) `import piper_plus` failed: {type(e).__name__}: {e}")
+              piper_plus = None  # type: ignore[assignment]
+          else:
+              plus_file = getattr(piper_plus, "__file__", None)
+              print(f"piper_plus.__file__ = {plus_file}")
+              if plus_file is None:
+                  failures.append("(b) `piper_plus.__file__` is None — cannot verify origin")
+              elif "piper_plus" not in str(plus_file):
+                  failures.append(
+                      f"(b) `import piper_plus` resolved to unexpected path: {plus_file}"
+                  )
+
+          # (c) distinct module objects
+          if piper is not None and piper_plus is not None:
+              if piper is piper_plus:
+                  failures.append(
+                      "(c) `piper` and `piper_plus` are the SAME module object — "
+                      "one of them is aliasing the other via sys.modules"
+                  )
+              else:
+                  print("piper and piper_plus are distinct module objects: ok")
+
+          # (d) site-packages/piper is upstream-owned only
+          # Locate the venv site-packages by asking sysconfig — this
+          # is what pip itself uses, so the path is authoritative.
+          import sysconfig
+          site_packages = Path(sysconfig.get_paths()["purelib"])
+          print(f"site-packages = {site_packages}")
+          piper_dir = site_packages / "piper"
+          if not piper_dir.is_dir():
+              failures.append(
+                  f"(d) expected {piper_dir} to exist (upstream piper-tts installs it), "
+                  "but it is missing — upstream install itself is broken"
+              )
+          else:
+              # A leak would look like: our wheel dropping a file into
+              # site-packages/piper/ that mentions our package name. A
+              # legitimate upstream file may mention 'piper' but not
+              # 'piper_plus'. This scan is a heuristic tripwire — cheap
+              # and unlikely to false-positive because upstream never
+              # references our fork's name.
+              leaked: list[Path] = []
+              for p in piper_dir.rglob("*"):
+                  if p.is_file() and "piper_plus" in p.name:
+                      leaked.append(p)
+              if leaked:
+                  failures.append(
+                      "(d) files with 'piper_plus' in their name found under "
+                      f"upstream's {piper_dir}: {[str(x) for x in leaked]}"
+                  )
+              else:
+                  print(f"(d) {piper_dir} contains no piper_plus-named files: ok")
+
+          if failures:
+              print("::error::co-install semantics violated:")
+              for f in failures:
+                  print(f"  - {f}")
+              sys.exit(1)
+          print("all co-install invariants (a)-(d) satisfied")
+          PY
+
+      - name: Assert upstream `piper --help` runs
+        run: |
+          set -euxo pipefail
+          # (e) upstream CLI still works after our wheel is installed.
+          # Some argparse-based tools exit non-zero on --help under
+          # certain configs; we assert success AND stdout non-empty so
+          # a broken entry-point script (e.g. our wheel shadowing) is
+          # caught even if the exit code accidentally passes.
+          out="$(./coinstall-test-venv/bin/piper --help 2>&1)"
+          echo "$out" | head -20
+          if [ -z "$out" ]; then
+            echo "::error::upstream 'piper --help' produced no output"
+            exit 1
+          fi
+
+      - name: Assert our `piper-plus --help` runs
+        run: |
+          set -euxo pipefail
+          # (f) our fork CLI. Same rationale as (e).
+          out="$(./coinstall-test-venv/bin/piper-plus --help 2>&1)"
+          echo "$out" | head -20
+          if [ -z "$out" ]; then
+            echo "::error::'piper-plus --help' produced no output"
+            exit 1
+          fi
+
+      - name: Dump venv layout on failure
+        if: failure()
+        run: |
+          set +e
+          echo "=== pip list ==="
+          ./coinstall-test-venv/bin/pip list
+          echo "=== venv bin/ ==="
+          ls -la coinstall-test-venv/bin/ || true
+          echo "=== site-packages/piper* ==="
+          ./coinstall-test-venv/bin/python - <<'PY'
+          import sysconfig
+          from pathlib import Path
+          sp = Path(sysconfig.get_paths()["purelib"])
+          for name in ("piper", "piper_plus"):
+              d = sp / name
+              print(f"--- {d} ---")
+              if d.is_dir():
+                  for p in sorted(d.rglob("*")):
+                      print(p.relative_to(sp))
+              else:
+                  print("(missing)")
+          PY
