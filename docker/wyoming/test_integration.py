@@ -21,6 +21,7 @@ from unittest.mock import AsyncMock, MagicMock
 import numpy as np
 import pytest
 
+
 # ---------------------------------------------------------------------------
 # Stub wyoming and piper_plus *before* importing piper_wyoming.
 # This is the same strategy used by test_wyoming_handler.py.
@@ -79,7 +80,11 @@ def _ensure_stubs() -> None:
         def event(self):
             return SimpleNamespace(
                 type="audio-start",
-                data={"rate": self.rate, "width": self.width, "channels": self.channels},
+                data={
+                    "rate": self.rate,
+                    "width": self.width,
+                    "channels": self.channels,
+                },
             )
 
     class _AudioChunk:
@@ -92,7 +97,11 @@ def _ensure_stubs() -> None:
         def event(self):
             return SimpleNamespace(
                 type="audio-chunk",
-                data={"rate": self.rate, "width": self.width, "channels": self.channels},
+                data={
+                    "rate": self.rate,
+                    "width": self.width,
+                    "channels": self.channels,
+                },
                 audio=self.audio,
             )
 
@@ -159,8 +168,14 @@ def _ensure_stubs() -> None:
     }
     sys.modules.update(modules)
 
+    # v2.0 改名で piper_wyoming.__main__ が `from piper_plus.api import PiperPlus` を
+    # 行うため、 subpackage `piper_plus.api` も sys.modules に登録する。
     if "piper_plus" not in sys.modules:
-        sys.modules["piper_plus"] = MagicMock()
+        pp = MagicMock()
+        api = MagicMock()
+        pp.api = api
+        sys.modules["piper_plus"] = pp
+        sys.modules["piper_plus.api"] = api
 
 
 _ensure_stubs()
@@ -168,8 +183,6 @@ _ensure_stubs()
 from piper_wyoming.__main__ import PiperPlusEventHandler  # noqa: E402
 from piper_wyoming.handler import (  # noqa: E402
     SUPPORTED_LANGUAGES,
-    build_info,
-    resolve_language,
 )
 
 
@@ -178,7 +191,9 @@ from piper_wyoming.handler import (  # noqa: E402
 # ---------------------------------------------------------------------------
 
 
-def _make_synthesize_event(text: str, *, language: str | None = None, name: str | None = None):
+def _make_synthesize_event(
+    text: str, *, language: str | None = None, name: str | None = None
+):
     """Build a mock Wyoming Synthesize event."""
     voice = None
     if language or name:
@@ -259,9 +274,7 @@ def _patch_synthesize_dispatch(handler, synth_event):
     orig_describe = wyoming_main.Describe
 
     wyoming_main.Synthesize = _PatchedSynthesize
-    wyoming_main.Describe = SimpleNamespace(
-        is_type=lambda t: t == "describe"
-    )
+    wyoming_main.Describe = SimpleNamespace(is_type=lambda t: t == "describe")
 
     def restore():
         wyoming_main.Synthesize = orig_synth
@@ -293,13 +306,9 @@ class TestWyomingProtocolMessages:
         from piper_wyoming import __main__ as wyoming_main
 
         orig_describe = wyoming_main.Describe
-        wyoming_main.Describe = SimpleNamespace(
-            is_type=lambda t: t == "describe"
-        )
+        wyoming_main.Describe = SimpleNamespace(is_type=lambda t: t == "describe")
         orig_synth = wyoming_main.Synthesize
-        wyoming_main.Synthesize = SimpleNamespace(
-            is_type=lambda t: False
-        )
+        wyoming_main.Synthesize = SimpleNamespace(is_type=lambda t: False)
 
         try:
             result = _run(handler.handle_event(event))
@@ -338,9 +347,7 @@ class TestWyomingProtocolMessages:
         """Language from Synthesize event is forwarded to PiperPlus."""
         tts = _make_tts_mock()
         handler = _make_handler(tts, default_language="ja")
-        event = _make_synthesize_event(
-            "Bonjour, comment allez-vous?", language="fr"
-        )
+        event = _make_synthesize_event("Bonjour, comment allez-vous?", language="fr")
 
         restore = _patch_synthesize_dispatch(handler, event)
         try:
@@ -358,9 +365,7 @@ class TestWyomingProtocolMessages:
         """Voice name 'piper-plus-es' resolves to language 'es'."""
         tts = _make_tts_mock()
         handler = _make_handler(tts, default_language="ja")
-        event = _make_synthesize_event(
-            "Hola, como estas?", name="piper-plus-es"
-        )
+        event = _make_synthesize_event("Hola, como estas?", name="piper-plus-es")
 
         restore = _patch_synthesize_dispatch(handler, event)
         try:
@@ -476,8 +481,8 @@ class TestWyomingDockerConfig:
     @pytest.mark.integration
     def test_default_port_is_10200(self):
         """Default --uri uses port 10200."""
-        from piper_wyoming.__main__ import main
         import argparse
+
 
         # Inspect the argparse defaults without running the server
         parser = argparse.ArgumentParser()

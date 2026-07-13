@@ -72,7 +72,7 @@ note = "Windows GitHub Actions runner workspace paths."
 [[rules]]
 runtime = "python"
 pattern = "^usage: __main__\\.py "
-replace_with = "usage: python -m piper "
+replace_with = "usage: python -m piper_plus "
 note = "Normalize argparse prog from __main__.py to invocation form."
 
 # Python: package version string.

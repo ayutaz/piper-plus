@@ -13,7 +13,7 @@ namespace PiperPlus.Core.Phonemize;
 /// </para>
 /// <para>
 /// Output conventions (matching the Python <c>phonemize_swedish()</c> in
-/// <c>piper_train/phonemize/swedish.py</c>):
+/// <c>src/python/g2p/piper_plus_g2p/swedish.py</c>):
 /// </para>
 /// <list type="bullet">
 ///   <item>

@@ -1,6 +1,6 @@
-"""Integration tests for `python -m piper --json-input` JSONL phoneme_ids path.
+"""Integration tests for `python -m piper_plus --json-input` JSONL phoneme_ids path.
 
-PR #511 Phase 2 で `src/python_run/piper/__main__.py:260-317` に追加した
+PR #511 Phase 2 で `src/python_run/piper_plus/__main__.py:260-317` に追加した
 JSONL phoneme_ids 経路 (G2P を bypass する cross-runtime parity contract)
 を CLI subprocess で end-to-end 検証する。 Rust / Go / C# / C++ / WASM の
 類似テストと対称な coverage を担保する (cross-runtime parity 監査で本経路
@@ -38,7 +38,7 @@ pytestmark = pytest.mark.skipif(
 
 
 def _run_piper(args, stdin_text: str | bytes, *, binary: bool = False):
-    """Spawn `python -m piper <args>` with stdin piped."""
+    """Spawn `python -m piper_plus <args>` with stdin piped."""
     kwargs = {
         "input": stdin_text,
         "capture_output": True,
@@ -48,7 +48,7 @@ def _run_piper(args, stdin_text: str | bytes, *, binary: bool = False):
     if not binary:
         kwargs["text"] = True
     return subprocess.run(  # noqa: S603 — sys.executable / args are trusted
-        [sys.executable, "-m", "piper", *args],
+        [sys.executable, "-m", "piper_plus", *args],
         **kwargs,
     )
 
@@ -172,8 +172,8 @@ class TestJsonInputSpeakerEmbedding:
 import json
 from pathlib import Path
 
-import piper
-from piper.inference_config import InferenceConfig as _IC
+import piper_plus
+from piper_plus.inference_config import InferenceConfig as _IC
 
 _DUMP = Path(r{str(kwargs_dump)!r})
 
@@ -215,11 +215,11 @@ def _fake_load(model_path, config_path=None, use_cuda=False):
     return _FakeVoice()
 
 
-piper.PiperVoice.load = staticmethod(_fake_load)
-# Re-bind the name imported into piper.__main__ if already imported
+piper_plus.PiperVoice.load = staticmethod(_fake_load)
+# Re-bind the name imported into piper_plus.__main__ if already imported
 try:
-    import piper.__main__ as _m
-    _m.PiperVoice = piper.PiperVoice
+    import piper_plus.__main__ as _m
+    _m.PiperVoice = piper_plus.PiperVoice
 except Exception:
     pass
 """,
@@ -243,7 +243,7 @@ except Exception:
             [
                 sys.executable,
                 "-m",
-                "piper",
+                "piper_plus",
                 "--model",
                 str(MODEL),
                 "--config",

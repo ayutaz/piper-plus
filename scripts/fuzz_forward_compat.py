@@ -15,7 +15,7 @@ informational tier で検査する。
 
 サブコマンド:
 
-* ``fuzz``   — Python loader (`piper.phonemize.zh_en_loanword` 等) に対し
+* ``fuzz``   — Python loader (`piper_plus.phonemize.zh_en_loanword` 等) に対し
                 future schema JSON を投げ、 ``Exception`` の有無を集計
 * ``record`` — `docs/ci-dashboard/data/forward-compat-fuzz.jsonl` に
                 結果を 1 行追記 (run_id / pass_count / fail_count / seed)

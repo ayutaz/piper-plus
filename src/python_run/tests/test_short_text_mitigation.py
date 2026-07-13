@@ -8,8 +8,7 @@ Strategy C: Auto-inject silence padding around short plain text
 
 import numpy as np
 import pytest
-
-from piper.voice import (
+from piper_plus.voice import (
     MIN_BODY_FOR_STRATEGY_A,
     MIN_PHONEME_IDS,
     SHORT_TEXT_CHARS,
@@ -419,7 +418,7 @@ class TestDynamicScales:
         """Verify that noise_scale and noise_w are reduced for short sequences."""
         from unittest.mock import MagicMock
 
-        from piper.config import PiperConfig
+        from piper_plus.config import PiperConfig
 
         config = PiperConfig(
             num_symbols=100,
@@ -444,7 +443,7 @@ class TestDynamicScales:
         # Short phoneme_ids (< MIN_PHONEME_IDS)
         short_ids = [1, 10, 10, 10, 2]  # BOS + 3 phonemes + EOS
 
-        from piper.voice import PiperVoice
+        from piper_plus.voice import PiperVoice
 
         PiperVoice._synthesize_ids_core(voice, short_ids)
 
@@ -465,7 +464,7 @@ class TestDynamicScales:
         """For sequences >= MIN_PHONEME_IDS, scales should not be modified."""
         from unittest.mock import MagicMock
 
-        from piper.config import PiperConfig
+        from piper_plus.config import PiperConfig
 
         config = PiperConfig(
             num_symbols=100,
@@ -489,7 +488,7 @@ class TestDynamicScales:
         # Long phoneme_ids (>= MIN_PHONEME_IDS)
         long_ids = [1] + [10] * (MIN_PHONEME_IDS - 1) + [2]
 
-        from piper.voice import PiperVoice
+        from piper_plus.voice import PiperVoice
 
         PiperVoice._synthesize_ids_core(voice, long_ids)
 
@@ -505,7 +504,7 @@ class TestDynamicScales:
 # Strategy C: Short-text detection in synthesize_stream_raw
 # ---------------------------------------------------------------
 class TestShortTextDetection:
-    """Exercise the canonical ``piper.voice.is_short_text`` helper.
+    """Exercise the canonical ``piper_plus.voice.is_short_text`` helper.
 
     Each test invokes the real production helper directly; if the inline
     SHORT_TEXT_CHARS / SSML fast-path policy in voice.py drifts, these
@@ -571,8 +570,8 @@ class TestShortTextDetection:
         """synthesize_stream_raw should prepend/append silence for short text."""
         from unittest.mock import MagicMock
 
-        from piper.config import PiperConfig
-        from piper.voice import PiperVoice
+        from piper_plus.config import PiperConfig
+        from piper_plus.voice import PiperVoice
 
         config = PiperConfig(
             num_symbols=100,
@@ -622,8 +621,8 @@ class TestShortTextDetection:
         """synthesize_stream_raw should NOT add breaks for long text."""
         from unittest.mock import MagicMock
 
-        from piper.config import PiperConfig
-        from piper.voice import PiperVoice
+        from piper_plus.config import PiperConfig
+        from piper_plus.voice import PiperVoice
 
         config = PiperConfig(
             num_symbols=100,

@@ -20,14 +20,14 @@ notes / changelogs via ``--ignore-docs`` or simply omit them.
 Usage (CI invocation):
 
     # Capture --help, then diff against docs:
-    uv run python -m piper --help > /tmp/piper.help 2>&1
+    uv run python -m piper_plus --help > /tmp/piper.help 2>&1
     python scripts/check_cli_help_drift.py \\
         --help-file /tmp/piper.help \\
         --docs docs/guides/cli-usage.md
 
     # Or pass a command for the script to run itself:
     python scripts/check_cli_help_drift.py \\
-        --help-cmd "uv run python -m piper --help" \\
+        --help-cmd "uv run python -m piper_plus --help" \\
         --docs docs/guides/cli-usage.md
 
 Multiple docs are supported (`--docs a.md b.md`). The gate is one-sided
@@ -162,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
     src = parser.add_mutually_exclusive_group(required=True)
     src.add_argument(
         "--help-cmd",
-        help="Shell command whose stdout is the --help text (e.g. 'uv run python -m piper --help').",
+        help="Shell command whose stdout is the --help text (e.g. 'uv run python -m piper_plus --help').",
     )
     src.add_argument(
         "--help-file",

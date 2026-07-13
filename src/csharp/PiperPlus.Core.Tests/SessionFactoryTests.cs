@@ -11,8 +11,8 @@ namespace PiperPlus.Core.Tests;
 /// </summary>
 /// <remarks>
 /// Member of the <c>EnvVars</c> collection: many tests in this class mutate
-/// process-wide environment variables (PIPER_GPU_DEVICE_ID, PIPER_INTRA_THREADS,
-/// PIPER_DISABLE_WARMUP, PIPER_DISABLE_CACHE). xUnit v3 runs tests across
+/// process-wide environment variables (PIPER_PLUS_GPU_DEVICE_ID, PIPER_PLUS_INTRA_THREADS,
+/// PIPER_PLUS_DISABLE_WARMUP, PIPER_PLUS_DISABLE_CACHE). xUnit v3 runs tests across
 /// classes in parallel by default, so they MUST be serialised with other
 /// env-var-mutating classes (<see cref="DictionaryManagerTests"/>) to avoid
 /// observation drift.
@@ -78,10 +78,10 @@ public sealed class SessionFactoryTests
     [Fact]
     public void ResolveGpuDeviceId_EnvVar_WhenCliIsZero()
     {
-        string? original = Environment.GetEnvironmentVariable("PIPER_GPU_DEVICE_ID");
+        string? original = Environment.GetEnvironmentVariable("PIPER_PLUS_GPU_DEVICE_ID");
         try
         {
-            Environment.SetEnvironmentVariable("PIPER_GPU_DEVICE_ID", "2");
+            Environment.SetEnvironmentVariable("PIPER_PLUS_GPU_DEVICE_ID", "2");
 
             int resolved = InvokeResolveGpuDeviceId(cliDeviceId: 0);
 
@@ -89,17 +89,17 @@ public sealed class SessionFactoryTests
         }
         finally
         {
-            Environment.SetEnvironmentVariable("PIPER_GPU_DEVICE_ID", original);
+            Environment.SetEnvironmentVariable("PIPER_PLUS_GPU_DEVICE_ID", original);
         }
     }
 
     [Fact]
     public void ResolveGpuDeviceId_InvalidEnvValue_DefaultsToZero()
     {
-        string? original = Environment.GetEnvironmentVariable("PIPER_GPU_DEVICE_ID");
+        string? original = Environment.GetEnvironmentVariable("PIPER_PLUS_GPU_DEVICE_ID");
         try
         {
-            Environment.SetEnvironmentVariable("PIPER_GPU_DEVICE_ID", "invalid");
+            Environment.SetEnvironmentVariable("PIPER_PLUS_GPU_DEVICE_ID", "invalid");
 
             int resolved = InvokeResolveGpuDeviceId(cliDeviceId: 0);
 
@@ -107,17 +107,17 @@ public sealed class SessionFactoryTests
         }
         finally
         {
-            Environment.SetEnvironmentVariable("PIPER_GPU_DEVICE_ID", original);
+            Environment.SetEnvironmentVariable("PIPER_PLUS_GPU_DEVICE_ID", original);
         }
     }
 
     [Fact]
     public void ResolveGpuDeviceId_NonZeroCli_SkipsEnvVar()
     {
-        string? original = Environment.GetEnvironmentVariable("PIPER_GPU_DEVICE_ID");
+        string? original = Environment.GetEnvironmentVariable("PIPER_PLUS_GPU_DEVICE_ID");
         try
         {
-            Environment.SetEnvironmentVariable("PIPER_GPU_DEVICE_ID", "5");
+            Environment.SetEnvironmentVariable("PIPER_PLUS_GPU_DEVICE_ID", "5");
 
             int resolved = InvokeResolveGpuDeviceId(cliDeviceId: 3);
 
@@ -126,17 +126,17 @@ public sealed class SessionFactoryTests
         }
         finally
         {
-            Environment.SetEnvironmentVariable("PIPER_GPU_DEVICE_ID", original);
+            Environment.SetEnvironmentVariable("PIPER_PLUS_GPU_DEVICE_ID", original);
         }
     }
 
     [Fact]
     public void ResolveGpuDeviceId_EmptyEnvVar_DefaultsToZero()
     {
-        string? original = Environment.GetEnvironmentVariable("PIPER_GPU_DEVICE_ID");
+        string? original = Environment.GetEnvironmentVariable("PIPER_PLUS_GPU_DEVICE_ID");
         try
         {
-            Environment.SetEnvironmentVariable("PIPER_GPU_DEVICE_ID", string.Empty);
+            Environment.SetEnvironmentVariable("PIPER_PLUS_GPU_DEVICE_ID", string.Empty);
 
             int resolved = InvokeResolveGpuDeviceId(cliDeviceId: 0);
 
@@ -144,7 +144,7 @@ public sealed class SessionFactoryTests
         }
         finally
         {
-            Environment.SetEnvironmentVariable("PIPER_GPU_DEVICE_ID", original);
+            Environment.SetEnvironmentVariable("PIPER_PLUS_GPU_DEVICE_ID", original);
         }
     }
 
@@ -409,8 +409,8 @@ public sealed class SessionFactoryTests
     }
 
     // ================================================================
-    // Environment variable contract — PIPER_INTRA_THREADS / PIPER_DISABLE_WARMUP
-    // / PIPER_DISABLE_CACHE. Mirrors Python ort_utils.py behaviour.
+    // Environment variable contract — PIPER_PLUS_INTRA_THREADS / PIPER_PLUS_DISABLE_WARMUP
+    // / PIPER_PLUS_DISABLE_CACHE. Mirrors Python ort_utils.py behaviour.
     // ================================================================
 
     /// <summary>
@@ -431,20 +431,20 @@ public sealed class SessionFactoryTests
         }
     }
 
-    // ---- PIPER_INTRA_THREADS -----------------------------------------------
+    // ---- PIPER_PLUS_INTRA_THREADS -----------------------------------------------
     [Fact]
     public void EnvIntraThreads_ValidValue_AppliedToSessionOptions()
     {
         // "2" is a valid positive integer ≤ MaxIntraThreads (4), so it should
         // override the auto-detected default unconditionally.
-        WithEnv("PIPER_INTRA_THREADS", "2", () =>
+        WithEnv("PIPER_PLUS_INTRA_THREADS", "2", () =>
         {
             using SessionOptions options = SessionFactory.ConfigureSessionOptions();
             Assert.Equal(2, options.IntraOpNumThreads);
         });
 
         // Also verify the clamp: a value above the cap is clamped to MaxIntraThreads (4).
-        WithEnv("PIPER_INTRA_THREADS", "16", () =>
+        WithEnv("PIPER_PLUS_INTRA_THREADS", "16", () =>
         {
             using SessionOptions options = SessionFactory.ConfigureSessionOptions();
             Assert.Equal(4, options.IntraOpNumThreads);
@@ -458,7 +458,7 @@ public sealed class SessionFactoryTests
         int autoDefault = Math.Max(Math.Min(Environment.ProcessorCount / 2, 4), 1);
 
         // Non-numeric env value → ignored, fall back to auto.
-        WithEnv("PIPER_INTRA_THREADS", "not-a-number", () =>
+        WithEnv("PIPER_PLUS_INTRA_THREADS", "not-a-number", () =>
         {
             using SessionOptions options = SessionFactory.ConfigureSessionOptions();
             Assert.Equal(autoDefault, options.IntraOpNumThreads);
@@ -466,27 +466,27 @@ public sealed class SessionFactoryTests
 
         // Zero / negative → ignored, fall back to auto (parse succeeds but
         // value < 1 fails the validity guard in ResolveIntraOpThreads).
-        WithEnv("PIPER_INTRA_THREADS", "0", () =>
+        WithEnv("PIPER_PLUS_INTRA_THREADS", "0", () =>
         {
             using SessionOptions options = SessionFactory.ConfigureSessionOptions();
             Assert.Equal(autoDefault, options.IntraOpNumThreads);
         });
 
-        WithEnv("PIPER_INTRA_THREADS", "-3", () =>
+        WithEnv("PIPER_PLUS_INTRA_THREADS", "-3", () =>
         {
             using SessionOptions options = SessionFactory.ConfigureSessionOptions();
             Assert.Equal(autoDefault, options.IntraOpNumThreads);
         });
 
         // Empty string is treated as unset → auto.
-        WithEnv("PIPER_INTRA_THREADS", string.Empty, () =>
+        WithEnv("PIPER_PLUS_INTRA_THREADS", string.Empty, () =>
         {
             using SessionOptions options = SessionFactory.ConfigureSessionOptions();
             Assert.Equal(autoDefault, options.IntraOpNumThreads);
         });
     }
 
-    // ---- PIPER_DISABLE_WARMUP ----------------------------------------------
+    // ---- PIPER_PLUS_DISABLE_WARMUP ----------------------------------------------
 
     /// <summary>
     /// Reflection probe for the private <c>IsTruthyEnv</c> helper. Used by the
@@ -512,11 +512,11 @@ public sealed class SessionFactoryTests
         // branch — when it returns true, Warmup() returns before touching ORT.
         foreach (var v in new[] { "1", "true", "TRUE", "True", "yes", "YES" })
         {
-            WithEnv("PIPER_DISABLE_WARMUP", v, () =>
+            WithEnv("PIPER_PLUS_DISABLE_WARMUP", v, () =>
             {
                 Assert.True(
-                    InvokeIsTruthyEnv("PIPER_DISABLE_WARMUP"),
-                    $"PIPER_DISABLE_WARMUP={v} should be detected as truthy");
+                    InvokeIsTruthyEnv("PIPER_PLUS_DISABLE_WARMUP"),
+                    $"PIPER_PLUS_DISABLE_WARMUP={v} should be detected as truthy");
 
                 // Calling Warmup with a null session normally throws
                 // ArgumentNullException; if the env-skip path is reached
@@ -537,29 +537,29 @@ public sealed class SessionFactoryTests
         // When the env var is unset, IsTruthyEnv returns false, so Warmup
         // proceeds past the guard into the body (which then either runs the
         // dummy inferences or — with runs <= 0 — returns harmlessly).
-        WithEnv("PIPER_DISABLE_WARMUP", null, () =>
+        WithEnv("PIPER_PLUS_DISABLE_WARMUP", null, () =>
         {
-            Assert.False(InvokeIsTruthyEnv("PIPER_DISABLE_WARMUP"));
+            Assert.False(InvokeIsTruthyEnv("PIPER_PLUS_DISABLE_WARMUP"));
         });
 
         // Also: empty string and arbitrary non-truthy strings should NOT skip.
         foreach (var v in new[] { string.Empty, "0", "false", "no", "off", "maybe" })
         {
-            WithEnv("PIPER_DISABLE_WARMUP", v, () =>
+            WithEnv("PIPER_PLUS_DISABLE_WARMUP", v, () =>
             {
                 Assert.False(
-                    InvokeIsTruthyEnv("PIPER_DISABLE_WARMUP"),
-                    $"PIPER_DISABLE_WARMUP={v} must NOT be treated as truthy");
+                    InvokeIsTruthyEnv("PIPER_PLUS_DISABLE_WARMUP"),
+                    $"PIPER_PLUS_DISABLE_WARMUP={v} must NOT be treated as truthy");
             });
         }
     }
 
-    // ---- PIPER_DISABLE_CACHE -----------------------------------------------
+    // ---- PIPER_PLUS_DISABLE_CACHE -----------------------------------------------
     [Fact]
     public void EnvDisableCache_True_SkipsCacheReadAndWrite()
     {
         // Stage a fake cache pair (.opt.onnx + .ok) next to a tiny "model"
-        // file. With PIPER_DISABLE_CACHE=1, Create() should NOT touch either
+        // file. With PIPER_PLUS_DISABLE_CACHE=1, Create() should NOT touch either
         // file: it should not attempt to read the .opt.onnx (which would
         // explode because it isn't a real ONNX) and it should not write the
         // sentinel. Since Create() also fails on a missing real model, we
@@ -584,9 +584,9 @@ public sealed class SessionFactoryTests
 
         try
         {
-            WithEnv("PIPER_DISABLE_CACHE", "1", () =>
+            WithEnv("PIPER_PLUS_DISABLE_CACHE", "1", () =>
             {
-                Assert.True(InvokeIsTruthyEnv("PIPER_DISABLE_CACHE"));
+                Assert.True(InvokeIsTruthyEnv("PIPER_PLUS_DISABLE_CACHE"));
 
                 // Create() will throw because modelPath is not real ONNX,
                 // but it must do so AFTER bypassing the cache load. The
@@ -597,19 +597,19 @@ public sealed class SessionFactoryTests
 
                 Assert.True(
                     File.Exists(optPath),
-                    "PIPER_DISABLE_CACHE=1 must not delete cache files");
+                    "PIPER_PLUS_DISABLE_CACHE=1 must not delete cache files");
                 Assert.True(
                     File.Exists(sentinelPath),
-                    "PIPER_DISABLE_CACHE=1 must not delete sentinel files");
+                    "PIPER_PLUS_DISABLE_CACHE=1 must not delete sentinel files");
             });
 
             foreach (var v in new[] { "true", "yes", "TRUE", "Yes" })
             {
-                WithEnv("PIPER_DISABLE_CACHE", v, () =>
+                WithEnv("PIPER_PLUS_DISABLE_CACHE", v, () =>
                 {
                     Assert.True(
-                        InvokeIsTruthyEnv("PIPER_DISABLE_CACHE"),
-                        $"PIPER_DISABLE_CACHE={v} should be detected as truthy");
+                        InvokeIsTruthyEnv("PIPER_PLUS_DISABLE_CACHE"),
+                        $"PIPER_PLUS_DISABLE_CACHE={v} should be detected as truthy");
                 });
             }
         }
@@ -637,18 +637,18 @@ public sealed class SessionFactoryTests
         // When the env var is unset (or set to any non-truthy value), the
         // cache path is taken: IsTruthyEnv returns false and Create() will
         // try to read .opt.onnx + .ok if both exist, or write them on miss.
-        WithEnv("PIPER_DISABLE_CACHE", null, () =>
+        WithEnv("PIPER_PLUS_DISABLE_CACHE", null, () =>
         {
-            Assert.False(InvokeIsTruthyEnv("PIPER_DISABLE_CACHE"));
+            Assert.False(InvokeIsTruthyEnv("PIPER_PLUS_DISABLE_CACHE"));
         });
 
         foreach (var v in new[] { string.Empty, "0", "false", "no", "off" })
         {
-            WithEnv("PIPER_DISABLE_CACHE", v, () =>
+            WithEnv("PIPER_PLUS_DISABLE_CACHE", v, () =>
             {
                 Assert.False(
-                    InvokeIsTruthyEnv("PIPER_DISABLE_CACHE"),
-                    $"PIPER_DISABLE_CACHE={v} must NOT be treated as truthy");
+                    InvokeIsTruthyEnv("PIPER_PLUS_DISABLE_CACHE"),
+                    $"PIPER_PLUS_DISABLE_CACHE={v} must NOT be treated as truthy");
             });
         }
     }

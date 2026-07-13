@@ -1,6 +1,6 @@
 """Cross-platform G2P consistency tests.
 
-Validates Python piper-g2p output against the shared fixture
+Validates Python piper-plus-g2p output against the shared fixture
 ``tests/fixtures/g2p/phoneme_test_cases.json``, which is the single
 source of truth for Python, Rust, and JS runtimes.
 

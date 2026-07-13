@@ -1,4 +1,4 @@
-"""Rule-based Swedish G2P (grapheme-to-phoneme) module for piper-g2p.
+"""Rule-based Swedish G2P (grapheme-to-phoneme) module for piper-plus-g2p.
 
 Converts Swedish text to IPA phonemes using orthographic rules.
 No external dependencies required.
@@ -12,7 +12,7 @@ Pipeline (per word):
 
 Known limitations
 -----------------
-* Dictionary lookup is not included in piper-g2p (available in piper_train).
+* Dictionary lookup is not included in piper-plus-g2p (available in piper_train).
 * The rule-based system handles common Swedish orthography well but may
   produce incorrect results for irregular loanwords not covered by the
   suffix/prefix rules.

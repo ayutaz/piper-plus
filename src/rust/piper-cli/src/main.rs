@@ -13,7 +13,7 @@ use piper_plus::{
 const SUPPORTED_LANGUAGES: &[&str] = &["ja", "en", "zh", "ko", "es", "fr", "pt", "sv"];
 
 #[derive(Parser, Debug)]
-#[command(name = "piper", version, about = "Piper-Plus TTS inference")]
+#[command(name = "piper-plus-cli", version, about = "Piper-Plus TTS inference")]
 struct Cli {
     /// ONNX モデル (ファイルパス、モデル名、またはエイリアス)
     #[arg(short, long)]
@@ -180,21 +180,23 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Apply environment variable defaults
-    let model_arg = cli
-        .model
-        .clone()
-        .or_else(|| std::env::var("PIPER_DEFAULT_MODEL").ok().map(PathBuf::from));
-
-    let config_arg = cli.config.clone().or_else(|| {
-        std::env::var("PIPER_DEFAULT_CONFIG")
+    let model_arg = cli.model.clone().or_else(|| {
+        std::env::var("PIPER_PLUS_DEFAULT_MODEL")
             .ok()
             .map(PathBuf::from)
     });
 
-    let model_dir_arg = cli
-        .model_dir
-        .clone()
-        .or_else(|| std::env::var("PIPER_MODEL_DIR").ok().map(PathBuf::from));
+    let config_arg = cli.config.clone().or_else(|| {
+        std::env::var("PIPER_PLUS_DEFAULT_CONFIG")
+            .ok()
+            .map(PathBuf::from)
+    });
+
+    let model_dir_arg = cli.model_dir.clone().or_else(|| {
+        std::env::var("PIPER_PLUS_MODEL_DIR")
+            .ok()
+            .map(PathBuf::from)
+    });
 
     // ログ初期化
     let env_filter = if cli.quiet {
@@ -290,11 +292,11 @@ fn main() -> Result<()> {
         anyhow::bail!("--speaker-id and --speaker-embedding are mutually exclusive");
     }
 
-    // --model は standalone コマンド以外では必須 (env: PIPER_DEFAULT_MODEL)
+    // --model は standalone コマンド以外では必須 (env: PIPER_PLUS_DEFAULT_MODEL)
     // ファイルパス、モデル名、エイリアスのいずれかで指定可能
     let model_path = {
         let model_str = model_arg.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("--model is required for synthesis (or set PIPER_DEFAULT_MODEL env var). Only --list-devices, --list-models, and --download-model work without it.")
+            anyhow::anyhow!("--model is required for synthesis (or set PIPER_PLUS_DEFAULT_MODEL env var). Only --list-devices, --list-models, and --download-model work without it.")
         })?;
         piper_plus::model_download::resolve_model_path(
             &model_str.to_string_lossy(),
@@ -303,7 +305,7 @@ fn main() -> Result<()> {
         .context("Failed to resolve model")?
     };
 
-    // config.json 検出 (env: PIPER_DEFAULT_CONFIG)
+    // config.json 検出 (env: PIPER_PLUS_DEFAULT_CONFIG)
     let config_path = config::VoiceConfig::resolve_config_path(&model_path, config_arg.as_deref())
         .context("config.json not found")?;
 

@@ -19,7 +19,7 @@ Python 推論イメージは **GPL-free** です。espeak-ng / piper-phonemize �
 | Wyoming | `docker/wyoming/Dockerfile` | `python:3.13.13-slim-trixie` (multi-stage) | Home Assistant Wyoming Protocol TTS | 不要 |
 | Go | `src/go/docker/Dockerfile` | `golang:1.26 -> debian:trixie-slim` (multi-stage, multi-arch amd64/arm64) | HTTP API サーバー + CLI (piper-plus-go), `serve` サブコマンド対応 | 不要 |
 
-ルートの `Dockerfile` はマルチアーキテクチャ (amd64/arm64/armv7) 対応の C++ バイナリビルド用です。`debian:trixie` ベースの multi-stage ビルドで、CI/CD パイプラインからリリースアーカイブ (`piper-linux-*.tar.gz`) を生成します。ccache によるビルドキャッシュ、アーキテクチャ別の最適化フラグ、クロスコンパイルツールチェインを内蔵しています。
+ルートの `Dockerfile` はマルチアーキテクチャ (amd64/arm64/armv7) 対応の C++ バイナリビルド用です。`debian:trixie` ベースの multi-stage ビルドで、CI/CD パイプラインからリリースアーカイブ (`piper-plus-cpp-*.tar.gz`) を生成します。ccache によるビルドキャッシュ、アーキテクチャ別の最適化フラグ、クロスコンパイルツールチェインを内蔵しています。
 
 ## クイックスタート
 
@@ -250,7 +250,7 @@ docker run -p 7860:7860 \
 
 ## C++ 推論
 
-C++ バイナリ (`piper`) による CPU 推論環境です。CMake ExternalProject で必要な依存関係（ONNX Runtime と OpenJTalk のみ、espeak-ng 不使用）を自動ビルドし、ランタイムステージにコピーする multi-stage ビルドです。GPU は不要で、CPU のみで高速に推論を実行できます。
+C++ バイナリ (`piper-plus`) による CPU 推論環境です。CMake ExternalProject で必要な依存関係（ONNX Runtime と OpenJTalk のみ、espeak-ng 不使用）を自動ビルドし、ランタイムステージにコピーする multi-stage ビルドです。GPU は不要で、CPU のみで高速に推論を実行できます。
 
 ### ビルド
 
@@ -265,7 +265,7 @@ docker run --rm \
   -v $(pwd)/models:/app/models:ro \
   -v $(pwd)/output:/app/output \
   piper-cpp \
-  bash -c 'echo "Hello world" | piper --model /app/models/model.onnx --output_file /app/output/output.wav'
+  bash -c 'echo "Hello world" | piper-plus --model /app/models/model.onnx --output_file /app/output/output.wav'
 ```
 
 日本語モデルの場合:
@@ -275,12 +275,12 @@ docker run --rm \
   -v $(pwd)/models:/app/models:ro \
   -v $(pwd)/output:/app/output \
   piper-cpp \
-  bash -c 'echo "こんにちは" | piper --model /app/models/model.onnx --output_file /app/output/output.wav'
+  bash -c 'echo "こんにちは" | piper-plus --model /app/models/model.onnx --output_file /app/output/output.wav'
 ```
 
 ### MODEL_PATH 環境変数
 
-`MODEL_PATH` 環境変数を指定すると、entrypoint スクリプトが自動的に `PIPER_MODEL_PATH` を設定します。
+`MODEL_PATH` 環境変数を指定すると、entrypoint スクリプトが自動的に `PIPER_PLUS_MODEL_PATH` を設定します。
 
 ```bash
 docker run --rm \
@@ -459,7 +459,7 @@ Python 推論イメージと WebUI は GPU なしでも動作します。`--gpus
 | `GRADIO_SERVER_NAME` | WebUI | サーバーバインドアドレス (デフォルト: `0.0.0.0`) |
 | `GRADIO_SERVER_PORT` | WebUI | サーバーポート (デフォルト: `7860`) |
 | `CUDA_VISIBLE_DEVICES` | Python 学習 | CUDA デバイス選択 (ONNX 変換時は `""` を指定) |
-| `MODEL_PATH` | C++ 推論 | モデルファイルパス (entrypoint が `PIPER_MODEL_PATH` に設定) |
+| `MODEL_PATH` | C++ 推論 | モデルファイルパス (entrypoint が `PIPER_PLUS_MODEL_PATH` に設定) |
 | `BUILD_TYPE` | C++ 開発 | CMake ビルドタイプ (デフォルト: `Release`) |
 | `RUN_TESTS` | C++ 開発 | `1` でビルド後にテスト実行 |
 | `COVERAGE` | C++ 開発 | `1` でカバレッジレポート生成 |
@@ -475,19 +475,19 @@ GitHub Actions で全イメージが自動ビルドされ、GitHub Container Reg
 
 ```bash
 # Python 推論
-docker pull ghcr.io/ayutaz/piper-plus/python-inference:main
+docker pull ghcr.io/ayutaz/piper-plus/python-inference:dev
 
 # Python 学習
-docker pull ghcr.io/ayutaz/piper-plus/python-train:main
+docker pull ghcr.io/ayutaz/piper-plus/python-train:dev
 
 # WebUI
-docker pull ghcr.io/ayutaz/piper-plus/webui:main
+docker pull ghcr.io/ayutaz/piper-plus/webui:dev
 
 # C++ 推論
-docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:main
+docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:dev
 
 # C++ 開発
-docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:main
+docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
 ```
 
 タグには `main` (最新の main ブランチ)、セマンティックバージョン (`v1.0.0` 等)、コミット SHA が使用できます。

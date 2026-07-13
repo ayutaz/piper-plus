@@ -27,7 +27,7 @@ on:
       # Python targets and harness
       - "src/python/g2p/piper_plus_g2p/ssml.py"
       - "src/python/g2p/piper_plus_g2p/encode/pua.py"
-      - "src/python_run/piper/text_splitter.py"
+      - "src/python_run/piper_plus/text_splitter.py"
       - "tests/fuzz/**"
       # The workflow itself
       - ".github/workflows/fuzz-smoke.yml"

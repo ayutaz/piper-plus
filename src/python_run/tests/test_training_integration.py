@@ -70,7 +70,7 @@ class TestTrainingIntegration:
         """Test complete training lifecycle"""
         import threading as _threading
 
-        from piper.training_manager import TrainingManager
+        from piper_plus.training_manager import TrainingManager
 
         manager = TrainingManager()
         output_dir = tmp_path / "output"
@@ -112,7 +112,7 @@ class TestTrainingIntegration:
         _readline_side_effect._next = _next
 
         # Mock subprocess to simulate training
-        with patch("piper.training_manager.subprocess.Popen") as mock_popen:
+        with patch("piper_plus.training_manager.subprocess.Popen") as mock_popen:
             # Create mock process
             mock_process = Mock()
             mock_process.poll.return_value = None
@@ -168,11 +168,11 @@ class TestTrainingIntegration:
 
     def test_training_error_handling(self, create_test_dataset, tmp_path):
         """Test handling of training errors"""
-        from piper.training_manager import TrainingManager
+        from piper_plus.training_manager import TrainingManager
 
         manager = TrainingManager()
 
-        with patch("piper.training_manager.subprocess.Popen") as mock_popen:
+        with patch("piper_plus.training_manager.subprocess.Popen") as mock_popen:
             # Simulate process that fails immediately
             mock_process = Mock()
             mock_process.poll.return_value = 1  # Non-zero exit code
@@ -212,7 +212,7 @@ class TestTrainingIntegration:
     )
     def test_webui_training_flow(self, create_test_dataset, tmp_path):
         """Test complete WebUI training flow"""
-        from piper.webui import (
+        from piper_plus.webui import (
             get_training_status,
             start_training,
             stop_training,
@@ -224,10 +224,10 @@ class TestTrainingIntegration:
         training_manager.status.is_running = False
 
         # Check dependencies (mocked)
-        with patch("piper.webui.check_training_dependencies") as mock_check:
+        with patch("piper_plus.webui.check_training_dependencies") as mock_check:
             mock_check.return_value = []  # No missing dependencies
 
-            with patch("piper.training_manager.subprocess.Popen") as mock_popen:
+            with patch("piper_plus.training_manager.subprocess.Popen") as mock_popen:
                 # Mock successful process
                 mock_process = Mock()
                 mock_process.poll.return_value = None
@@ -268,16 +268,21 @@ class TestTrainingIntegration:
     )
     def test_concurrent_training_prevention(self, create_test_dataset, tmp_path):
         """Test that concurrent training is prevented"""
-        from piper.webui import start_training
+        from piper_plus.webui import start_training
 
-        with patch("piper.training_manager.subprocess.Popen") as mock_popen:
+        with patch("piper_plus.training_manager.subprocess.Popen") as mock_popen:
+            import threading as _threading
+
+            gate = _threading.Event()
             mock_process = Mock()
             mock_process.poll.return_value = None  # Process is running
-            mock_process.stdout.readline.return_value = ""
+            # Block readline until the gate is released so the first training's
+            # monitor thread keeps is_running=True (avoids immediate-EOF race).
+            mock_process.stdout.readline.side_effect = lambda: (gate.wait(), "")[1]
             mock_popen.return_value = mock_process
 
             # Mock dependencies check
-            with patch("piper.webui.check_training_dependencies") as mock_check:
+            with patch("piper_plus.webui.check_training_dependencies") as mock_check:
                 mock_check.return_value = []
 
                 # Start first training
@@ -321,7 +326,7 @@ class TestTrainingIntegration:
     )
     def test_real_piper_train_invocation(self, create_test_dataset, tmp_path):
         """Test with real piper_train (if available)"""
-        from piper.training_manager import TrainingManager
+        from piper_plus.training_manager import TrainingManager
 
         manager = TrainingManager()
 

@@ -11,7 +11,7 @@ namespace PiperPlus.Core.Phonemize;
 /// <remarks>
 /// <para>
 /// This is Phase 1 of issue #383. The Python runtime ships the same design
-/// (see <c>src/python_run/piper/voice.py</c>: <c>_resolve_g2p_parallelism</c> /
+/// (see <c>src/python_run/piper_plus/voice.py</c>: <c>_resolve_g2p_parallelism</c> /
 /// <c>_map_sentences</c>). The G2P pass typically accounts for 19~26% of cold-cache
 /// total latency on multi-sentence inputs; parallelising it leaves the ORT
 /// inference pipeline unchanged while shaving that fraction.
@@ -26,7 +26,7 @@ namespace PiperPlus.Core.Phonemize;
 /// <b>Auto cap = 4.</b> Mirrors the Python rationale: ORT typically uses
 /// ~4 intra-op threads, and most G2P backends wrap native code where 2~4
 /// threads already saturate available work. Setting
-/// <c>PIPER_G2P_PARALLELISM=1</c> restores the strictly-serial path.
+/// <c>PIPER_PLUS_G2P_PARALLELISM=1</c> restores the strictly-serial path.
 /// </para>
 /// </remarks>
 public static class SentenceParallelEncoder
@@ -35,7 +35,7 @@ public static class SentenceParallelEncoder
     public const int AutoParallelismCap = 4;
 
     /// <summary>Environment variable that overrides the auto-resolved worker count.</summary>
-    public const string ParallelismEnvVar = "PIPER_G2P_PARALLELISM";
+    public const string ParallelismEnvVar = "PIPER_PLUS_G2P_PARALLELISM";
 
     /// <summary>
     /// Decide how many workers to spend on the G2P pass.
@@ -48,8 +48,8 @@ public static class SentenceParallelEncoder
     /// <remarks>
     /// Resolution order:
     /// <list type="bullet">
-    ///   <item><c>PIPER_G2P_PARALLELISM=1</c>: force serial.</item>
-    ///   <item><c>PIPER_G2P_PARALLELISM=N</c> (N &gt;= 2): force N workers
+    ///   <item><c>PIPER_PLUS_G2P_PARALLELISM=1</c>: force serial.</item>
+    ///   <item><c>PIPER_PLUS_G2P_PARALLELISM=N</c> (N &gt;= 2): force N workers
     ///     (capped at <paramref name="sentenceCount"/>).</item>
     ///   <item>Otherwise (auto): <c>min(sentenceCount, max(2, cores/2),
     ///     <see cref="AutoParallelismCap"/>)</c>. Falls back to 1 when

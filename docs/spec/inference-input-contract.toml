@@ -26,9 +26,9 @@
 # and tests are expected to be kept in sync with these values manually.
 #
 # Implementations:
-#   Python (runtime):   src/python_run/piper/voice.py            (PiperVoice.synthesize / phonemize)
-#                       src/python_run/piper/http_server.py      (MAX_TEXT_BYTES, validation)
-#                       src/python_run/piper/cli.py              (CLI argument parsing)
+#   Python (runtime):   src/python_run/piper_plus/voice.py            (PiperVoice.synthesize / phonemize)
+#                       src/python_run/piper_plus/http_server.py      (MAX_TEXT_BYTES, validation)
+#                       src/python_run/piper_plus/cli.py              (CLI argument parsing)
 #   Python (training):  src/python/piper_train/infer_onnx.py     (--noise-scale / --length-scale defaults)
 #   Rust:               src/rust/piper-core/src/engine.rs        (PiperEngine::synthesize)
 #                       src/rust/piper-core/src/config.rs        (config validation)
@@ -47,7 +47,7 @@ last_updated = "2026-05-09"
 contract_version = 1
 status = "stable"
 applies_to = ["python", "rust", "go", "csharp", "cpp", "wasm-js", "swift"]
-canonical_source = "src/python_run/piper/voice.py:PiperVoice.synthesize"
+canonical_source = "src/python_run/piper_plus/voice.py:PiperVoice.synthesize"
 forward_compat_policy = "strict"
 
 # ===========================================================================
@@ -83,7 +83,7 @@ library_max_chars = 0          # 0 = unlimited; cap is the caller's responsibili
 # RECOMMENDED PER-UTTERANCE LIMIT (post-text-splitter): 8000 characters.
 # Above this, callers SHOULD pre-split via text_splitter (which terminates
 # on `.` / `!` / `?` / `。` / `！` / `？`).
-http_max_bytes = 1048576       # 1 MiB; src/python_run/piper/http_server.py:MAX_TEXT_BYTES
+http_max_bytes = 1048576       # 1 MiB; src/python_run/piper_plus/http_server.py:MAX_TEXT_BYTES
 recommended_per_utterance_chars = 8000  # soft guideline; auto-split above
 encoding = "utf-8"
 normalization = "NFC"          # Unicode NFC pre-normalization in language-specific

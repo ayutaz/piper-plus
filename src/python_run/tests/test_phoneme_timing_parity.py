@@ -1,7 +1,7 @@
 """Cross-runtime phoneme timing parity test for the canonical Python runtime.
 
 Loads ``tests/fixtures/phoneme_timing/golden_matrix.json`` (generated from
-``src/python_run/piper/timing.py:durations_to_timing`` via
+``src/python_run/piper_plus/timing.py:durations_to_timing`` via
 ``scripts/regenerate_timing_fixture.py``) and asserts that the canonical
 Python implementation self-agrees with every case in the fixture.
 
@@ -29,8 +29,7 @@ import json
 from pathlib import Path
 
 import pytest
-
-from piper.timing import (
+from piper_plus.timing import (
     durations_to_timing,
     timing_to_json,
     timing_to_json_compact,
@@ -123,7 +122,9 @@ def test_canonical_python_matches_fixture(case: dict):
     )
 
     # total_duration_ms parity (cursor-walk semantics per spec)
-    assert abs(result.total_duration_ms - expected["total_duration_ms"]) < TOLERANCE_MS, (
+    assert (
+        abs(result.total_duration_ms - expected["total_duration_ms"]) < TOLERANCE_MS
+    ), (
         f"case '{case['name']}': total_duration_ms mismatch — "
         f"Python={result.total_duration_ms}, expected={expected['total_duration_ms']}"
     )

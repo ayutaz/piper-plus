@@ -94,12 +94,12 @@ class TestInferOnnxSpeakerEmbeddingFallback:
         # phoneme_ids: 1 = BOS, 2 = EOS, others arbitrary in [0, 50).
         request = json.dumps({"phoneme_ids": [1, 10, 20, 30, 40, 2], "speaker_id": 0})
 
-        # PIPER_DISABLE_WARMUP keeps the test fast — the warmup path is
+        # PIPER_PLUS_DISABLE_WARMUP keeps the test fast — the warmup path is
         # covered separately by test_voice_speaker_embedding.py.
         import os
 
         env = os.environ.copy()
-        env["PIPER_DISABLE_WARMUP"] = "1"
+        env["PIPER_PLUS_DISABLE_WARMUP"] = "1"
         env["CUDA_VISIBLE_DEVICES"] = ""
 
         result = subprocess.run(

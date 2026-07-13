@@ -11,12 +11,12 @@ import (
 	"testing"
 )
 
-// testModelPath returns the PIPER_TEST_MODEL env var or skips the test.
+// testModelPath returns the PIPER_PLUS_TEST_MODEL env var or skips the test.
 func testModelPath(t *testing.T) string {
 	t.Helper()
-	path := os.Getenv("PIPER_TEST_MODEL")
+	path := os.Getenv("PIPER_PLUS_TEST_MODEL")
 	if path == "" {
-		t.Skip("PIPER_TEST_MODEL not set")
+		t.Skip("PIPER_PLUS_TEST_MODEL not set")
 	}
 	return path
 }

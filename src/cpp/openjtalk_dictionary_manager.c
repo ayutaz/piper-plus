@@ -44,14 +44,14 @@ static int verify_checksum(const char* file_path, const char* expected_sha256) {
     // $args (only -File does), so the previous "-Path $args[0]" form left the
     // path empty. Pass it via an environment variable instead: it is inherited
     // by the child process and never re-parsed as code (injection-safe).
-    _putenv_s("PIPER_HASH_PATH", file_path);
+    _putenv_s("PIPER_PLUS_HASH_PATH", file_path);
     const char* const argv[] = {
         "powershell", "-NoProfile", "-Command",
-        "(Get-FileHash -Path $env:PIPER_HASH_PATH -Algorithm SHA256).Hash",
+        "(Get-FileHash -Path $env:PIPER_PLUS_HASH_PATH -Algorithm SHA256).Hash",
         NULL,
     };
     spawn_rc = piper_capture_argv(argv, result, sizeof(result), &bytes_read);
-    _putenv_s("PIPER_HASH_PATH", "");
+    _putenv_s("PIPER_PLUS_HASH_PATH", "");
 #else
     // Probe for sha256sum / shasum at fixed paths (skip `which`, which
     // would re-introduce a shell sink that CodeQL flags).
@@ -176,7 +176,7 @@ static const char* get_data_dir() {
     // On Windows, try AppData
     const char* appdata = getenv("APPDATA");
     if (appdata) {
-        snprintf(data_dir, sizeof(data_dir), "%s\\piper", appdata);
+        snprintf(data_dir, sizeof(data_dir), "%s\\piper-plus", appdata);
     } else {
         // Fallback to current directory
         GetCurrentDirectoryA(sizeof(data_dir) - 10, data_dir);
@@ -186,28 +186,28 @@ static const char* get_data_dir() {
     // Android: use app-specific external files dir if set, otherwise /data/local/tmp
     const char* xdg_data = getenv("XDG_DATA_HOME");
     if (xdg_data) {
-        snprintf(data_dir, sizeof(data_dir), "%s/piper", xdg_data);
+        snprintf(data_dir, sizeof(data_dir), "%s/piper-plus", xdg_data);
     } else {
-        const char* ext_files = getenv("PIPER_DATA_DIR");
+        const char* ext_files = getenv("PIPER_PLUS_DATA_DIR");
         if (ext_files) {
-            snprintf(data_dir, sizeof(data_dir), "%s/piper", ext_files);
+            snprintf(data_dir, sizeof(data_dir), "%s/piper-plus", ext_files);
         } else {
             // Fallback: /data/local/tmp is writable on most devices
-            strcpy(data_dir, "/data/local/tmp/piper");
+            strcpy(data_dir, "/data/local/tmp/piper-plus");
         }
     }
 #else
     // On Unix-like systems, use XDG_DATA_HOME or ~/.local/share
     const char* xdg_data = getenv("XDG_DATA_HOME");
     if (xdg_data) {
-        snprintf(data_dir, sizeof(data_dir), "%s/piper", xdg_data);
+        snprintf(data_dir, sizeof(data_dir), "%s/piper-plus", xdg_data);
     } else {
         const char* home = getenv("HOME");
         if (home) {
-            snprintf(data_dir, sizeof(data_dir), "%s/.local/share/piper", home);
+            snprintf(data_dir, sizeof(data_dir), "%s/.local/share/piper-plus", home);
         } else {
             // Fallback to /tmp
-            strcpy(data_dir, "/tmp/piper");
+            strcpy(data_dir, "/tmp/piper-plus");
         }
     }
 #endif
@@ -367,16 +367,16 @@ static int download_and_extract_dictionary() {
         // URL / OutFile via environment variables (inherited by the child, not
         // re-parsed as code) instead. See model_manager.cpp downloadFile() for
         // the full rationale.
-        _putenv_s("PIPER_DL_URI", DICTIONARY_URL);
-        _putenv_s("PIPER_DL_OUT", archive_path);
+        _putenv_s("PIPER_PLUS_DL_URI", DICTIONARY_URL);
+        _putenv_s("PIPER_PLUS_DL_OUT", archive_path);
         const char* const argv[] = {
             "powershell", "-NoProfile", "-Command",
-            "Invoke-WebRequest -Uri $env:PIPER_DL_URI -OutFile $env:PIPER_DL_OUT",
+            "Invoke-WebRequest -Uri $env:PIPER_PLUS_DL_URI -OutFile $env:PIPER_PLUS_DL_OUT",
             NULL,
         };
         download_rc = piper_run_argv(argv);
-        _putenv_s("PIPER_DL_URI", "");
-        _putenv_s("PIPER_DL_OUT", "");
+        _putenv_s("PIPER_PLUS_DL_URI", "");
+        _putenv_s("PIPER_PLUS_DL_OUT", "");
     }
 #else
     // Probe for curl / wget at fixed paths (avoids shell-based `which`).
@@ -460,7 +460,7 @@ int ensure_openjtalk_dictionary() {
     }
 
     // Check if we're in offline mode
-    const char* offline_mode = getenv("PIPER_OFFLINE_MODE");
+    const char* offline_mode = getenv("PIPER_PLUS_OFFLINE_MODE");
     if (offline_mode && strcmp(offline_mode, "1") == 0) {
         fprintf(stderr, "Failed to ensure OpenJTalk dictionary: Offline mode is enabled. Please download and install the dictionary manually.\n");
         return -1;
@@ -475,7 +475,7 @@ int ensure_openjtalk_dictionary() {
 #endif
 
     // Check if auto-download is disabled
-    const char* auto_download = getenv("PIPER_AUTO_DOWNLOAD_DICT");
+    const char* auto_download = getenv("PIPER_PLUS_AUTO_DOWNLOAD_DICT");
     if (auto_download && strcmp(auto_download, "0") == 0) {
         fprintf(stderr, "Failed to ensure OpenJTalk dictionary: Auto-download is disabled. Please download and install the dictionary manually.\n");
         return -1;

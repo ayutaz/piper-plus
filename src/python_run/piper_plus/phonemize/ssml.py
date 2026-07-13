@@ -10,7 +10,7 @@ fallback is bundled here so that the runtime stays self-contained.
 
 Usage at synthesis time::
 
-    from piper.phonemize.ssml import process_ssml, SynthesisSegment
+    from piper_plus.phonemize.ssml import process_ssml, SynthesisSegment
 
     segments = process_ssml(text)
     for seg in segments:

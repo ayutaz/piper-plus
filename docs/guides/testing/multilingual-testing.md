@@ -129,7 +129,7 @@ Integration tests (requires ONNX Runtime and test model):
 
 ```bash
 cd src/go && ONNX_RUNTIME_SHARED_LIBRARY_PATH=/path/to/libonnxruntime.so \
-  PIPER_TEST_MODEL=/path/to/multilingual-test-medium.onnx \
+  PIPER_PLUS_TEST_MODEL=/path/to/multilingual-test-medium.onnx \
   go test -v -race -count=1 -tags integration ./...
 ```
 

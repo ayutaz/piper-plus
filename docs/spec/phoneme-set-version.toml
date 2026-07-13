@@ -24,7 +24,7 @@
 #
 # Implementations:
 #   - Python (canonical):  src/python/g2p/piper_plus_g2p/data/pua.json
-#   - Python runtime:      src/python_run/piper/phonemize/token_mapper.py
+#   - Python runtime:      src/python_run/piper_plus/phonemize/token_mapper.py
 #   - Rust:                src/rust/piper-plus-g2p/src/token_map.rs
 #   - Go:                  src/go/phonemize/pua.go
 #   - C#:                  src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs

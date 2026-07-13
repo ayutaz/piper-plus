@@ -19,8 +19,8 @@ namespace PiperPlus.Core.Config;
 /// </list>
 /// <para>Control flags:</para>
 /// <list type="bullet">
-///   <item><c>PIPER_OFFLINE_MODE=1</c> disables all network access</item>
-///   <item><c>PIPER_AUTO_DOWNLOAD_DICT=0</c> disables dictionary auto-download</item>
+///   <item><c>PIPER_PLUS_OFFLINE_MODE=1</c> disables all network access</item>
+///   <item><c>PIPER_PLUS_AUTO_DOWNLOAD_DICT=0</c> disables dictionary auto-download</item>
 /// </list>
 /// </remarks>
 public static class DictionaryManager
@@ -125,14 +125,14 @@ public static class DictionaryManager
             if (IsOfflineMode())
             {
                 throw new InvalidOperationException(
-                    "OpenJTalk dictionary not found and offline mode is enabled (PIPER_OFFLINE_MODE=1). " +
+                    "OpenJTalk dictionary not found and offline mode is enabled (PIPER_PLUS_OFFLINE_MODE=1). " +
                     "Please download the dictionary manually or set OPENJTALK_DICTIONARY_PATH.");
             }
 
             if (IsAutoDownloadDisabled())
             {
                 throw new InvalidOperationException(
-                    "OpenJTalk dictionary not found and auto-download is disabled (PIPER_AUTO_DOWNLOAD_DICT=0). " +
+                    "OpenJTalk dictionary not found and auto-download is disabled (PIPER_PLUS_AUTO_DOWNLOAD_DICT=0). " +
                     "Please download the dictionary manually or set OPENJTALK_DICTIONARY_PATH.");
             }
 
@@ -263,20 +263,20 @@ public static class DictionaryManager
             var appData = Environment.GetFolderPath(
                 Environment.SpecialFolder.ApplicationData);
             return !string.IsNullOrEmpty(appData)
-                ? Path.Join(appData, "piper")
+                ? Path.Join(appData, "piper-plus")
                 : Path.Join(Environment.CurrentDirectory, "data");
         }
 
-        // Unix: XDG_DATA_HOME or ~/.local/share/piper
+        // Unix: XDG_DATA_HOME or ~/.local/share/piper-plus
         var xdgData = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
         if (!string.IsNullOrEmpty(xdgData))
         {
-            return Path.Join(xdgData, "piper");
+            return Path.Join(xdgData, "piper-plus");
         }
 
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         return !string.IsNullOrEmpty(home)
-            ? Path.Join(home, ".local", "share", "piper")
+            ? Path.Join(home, ".local", "share", "piper-plus")
             : Path.Join(Environment.CurrentDirectory, "data");
     }
 
@@ -285,13 +285,13 @@ public static class DictionaryManager
     // ---------------------------------------------------------------
     private static bool IsOfflineMode()
     {
-        var value = Environment.GetEnvironmentVariable("PIPER_OFFLINE_MODE");
+        var value = Environment.GetEnvironmentVariable("PIPER_PLUS_OFFLINE_MODE");
         return string.Equals(value, "1", StringComparison.Ordinal);
     }
 
     private static bool IsAutoDownloadDisabled()
     {
-        var value = Environment.GetEnvironmentVariable("PIPER_AUTO_DOWNLOAD_DICT");
+        var value = Environment.GetEnvironmentVariable("PIPER_PLUS_AUTO_DOWNLOAD_DICT");
         return string.Equals(value, "0", StringComparison.Ordinal);
     }
 

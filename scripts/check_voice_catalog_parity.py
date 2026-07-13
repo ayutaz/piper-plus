@@ -44,10 +44,10 @@ CANONICAL = REPO_ROOT / "test/model_resolution_vectors.json"
 # Python and C++ are JSON; Rust/C#/Go are source code. The check is identical
 # (substring presence) for all five.
 MIRRORS: dict[str, Path] = {
-    # NOTE: `src/python_run/piper/voices.json` contains the 97-language
+    # NOTE: `src/python_run/piper_plus/voices.json` contains the 97-language
     # rhasspy upstream catalog only; piper-plus-specific models live in
     # `download.py`'s `PIPER_PLUS_MODELS` registry instead.
-    "Python download.py": REPO_ROOT / "src/python_run/piper/download.py",
+    "Python download.py": REPO_ROOT / "src/python_run/piper_plus/download.py",
     "C++ piper_plus_voices.json": REPO_ROOT / "src/cpp/piper_plus_voices.json",
     "Rust model_download.rs": REPO_ROOT / "src/rust/piper-core/src/model_download.rs",
     "C# VoiceCatalog.cs": REPO_ROOT

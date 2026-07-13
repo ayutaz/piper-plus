@@ -28,8 +28,8 @@
     "device_label_cuda_format": "cuda{device_id}"
   },
   "env_vars": {
-    "disable_warmup": "PIPER_DISABLE_WARMUP",
-    "disable_cache": "PIPER_DISABLE_CACHE",
-    "intra_threads": "PIPER_INTRA_THREADS"
+    "disable_warmup": "PIPER_PLUS_DISABLE_WARMUP",
+    "disable_cache": "PIPER_PLUS_DISABLE_CACHE",
+    "intra_threads": "PIPER_PLUS_INTRA_THREADS"
   }
 }

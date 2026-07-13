@@ -612,7 +612,7 @@ impl EnglishPhonemizer {
     /// Search order:
     /// 1. `CMUDICT_PATH` environment variable
     /// 2. `./cmudict_data.json` (local development)
-    /// 3. `/usr/share/piper/cmudict_data.json` (system install)
+    /// 3. `/usr/share/piper-plus/cmudict_data.json` (system install)
     pub fn new() -> Result<Self, G2pError> {
         let dict_path = Self::find_dictionary()?;
         Self::new_with_dict(&dict_path)
@@ -684,7 +684,7 @@ impl EnglishPhonemizer {
         }
 
         // 3. System install path
-        let system = std::path::PathBuf::from("/usr/share/piper/cmudict_data.json");
+        let system = std::path::PathBuf::from("/usr/share/piper-plus/cmudict_data.json");
         if system.exists() {
             return Ok(system);
         }

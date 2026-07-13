@@ -337,9 +337,9 @@ Phase 1〜4 は全 PASS が必須ゲート。Phase 5〜11 はリリース判断�
 | 6.6.1 | モデルファイル不在 | 明示エラー (スタックトレースなし) | |
 | 6.6.2 | config JSON 不正 / 不在 | 明示エラー | |
 | 6.6.3 | 破損 ONNX ファイル | 明示エラー | |
-| 6.6.4 | `PIPER_DISABLE_WARMUP=1` | warmup スキップ、結果不変 | |
-| 6.6.5 | `PIPER_DISABLE_CACHE=1` | `.opt.onnx` キャッシュ未生成 | |
-| 6.6.6 | `PIPER_INTRA_THREADS` 変更 | 反映 / クラッシュなし | |
+| 6.6.4 | `PIPER_PLUS_DISABLE_WARMUP=1` | warmup スキップ、結果不変 | |
+| 6.6.5 | `PIPER_PLUS_DISABLE_CACHE=1` | `.opt.onnx` キャッシュ未生成 | |
+| 6.6.6 | `PIPER_PLUS_INTRA_THREADS` 変更 | 反映 / クラッシュなし | |
 | 6.6.7 | 並行推論 (複数スレッド同時) | スレッド安全 (Rust/Go/C# runtime) | |
 
 ---
@@ -352,7 +352,7 @@ Phase 1〜4 は全 PASS が必須ゲート。Phase 5〜11 はリリース判断�
 | 7.2 | Rust CLI help/version | `src\rust\target\release\piper-cli.exe --help` / `--version` | 表示 | |
 | 7.3 | Go CLI help | `src\go\bin\piper-plus.exe --help` | 表示 | |
 | 7.4 | C# CLI help | `publish\PiperPlus.Cli.exe --help` | 表示 | |
-| 7.5 | C++ CLI help | `build\Release\piper.exe --help` | 表示 | |
+| 7.5 | C++ CLI help | `build\Release\piper-plus.exe --help` | 表示 | |
 | 7.6 | `--list-models` (言語フィルタ付き) | 各 CLI で実行 | モデル一覧表示 | |
 | 7.7 | モデル名エイリアス解決 | `--model tsukuyomi` (DL 確認) | 自動解決 | |
 | 7.8 | 必須引数欠落 / 不正引数 | 各 CLI で意図的に誤入力 | 明示エラー + 終了コード ≠ 0 | |

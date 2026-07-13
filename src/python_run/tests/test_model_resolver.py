@@ -1,4 +1,4 @@
-"""Tests for piper_plus._model_resolver -- model resolution and download logic.
+"""Tests for piper_plus.api._model_resolver -- model resolution and download logic.
 
 Verifies direct path resolution, alias lookup, config auto-detection,
 cache directory handling, and error conditions.
@@ -9,15 +9,15 @@ and triangulation with multiple resolution paths.
 from __future__ import annotations
 
 import importlib
-import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
+
 _has_huggingface_hub = importlib.util.find_spec("huggingface_hub") is not None
 
-from piper_plus._model_resolver import (
+from piper_plus.api._model_resolver import (
     DEFAULT_CACHE_DIR,
     MODEL_ALIASES,
     ModelNotFoundError,
@@ -55,9 +55,7 @@ class TestResolveModelDirectPath:
         onnx.write_bytes(b"fake-onnx")
         config.write_text("{}", encoding="utf-8")
 
-        resolved_onnx, resolved_config = resolve_model(
-            str(onnx), config=str(config)
-        )
+        resolved_onnx, resolved_config = resolve_model(str(onnx), config=str(config))
 
         assert resolved_onnx == onnx
         assert resolved_config == config
@@ -135,7 +133,6 @@ class TestResolveModelAlias:
 
     def test_known_aliases_exist(self):
         assert "tsukuyomi" in MODEL_ALIASES
-        assert "base" in MODEL_ALIASES
 
     def test_alias_has_required_keys(self):
         for alias_name, alias in MODEL_ALIASES.items():
@@ -143,7 +140,7 @@ class TestResolveModelAlias:
             assert "onnx_file" in alias, f"{alias_name} missing onnx_file"
             assert "config_file" in alias, f"{alias_name} missing config_file"
 
-    @patch("piper_plus._model_resolver._download_from_hf")
+    @patch("piper_plus.api._model_resolver._download_from_hf")
     def test_alias_triggers_hf_download(self, mock_download, tmp_path):
         mock_onnx = tmp_path / "model.onnx"
         mock_config = tmp_path / "config.json"
@@ -156,7 +153,7 @@ class TestResolveModelAlias:
         assert result == (mock_onnx, mock_config)
         mock_download.assert_called_once()
 
-    @patch("piper_plus._model_resolver._download_from_hf")
+    @patch("piper_plus.api._model_resolver._download_from_hf")
     def test_alias_passes_correct_repo_id(self, mock_download, tmp_path):
         mock_download.return_value = (tmp_path / "m.onnx", tmp_path / "c.json")
 
@@ -175,7 +172,7 @@ class TestResolveModelAlias:
 class TestResolveModelHuggingFaceRepoId:
     """resolve_model detects HuggingFace repo IDs (strings with '/')."""
 
-    @patch("piper_plus._model_resolver._download_from_hf")
+    @patch("piper_plus.api._model_resolver._download_from_hf")
     def test_repo_id_with_slash_triggers_download(self, mock_download, tmp_path):
         mock_download.return_value = (tmp_path / "m.onnx", tmp_path / "c.json")
 
@@ -203,9 +200,7 @@ class TestResolveModelCacheDir:
         onnx.write_bytes(b"fake-onnx")
         config.write_text("{}", encoding="utf-8")
 
-        resolved_onnx, resolved_config = resolve_model(
-            "mymodel", cache_dir=cache_dir
-        )
+        resolved_onnx, resolved_config = resolve_model("mymodel", cache_dir=cache_dir)
 
         assert resolved_onnx == onnx
         assert resolved_config == config
@@ -248,7 +243,7 @@ class TestDownloadFromHf:
     )
     def test_returns_cached_files_without_redownload(self, tmp_path):
         """If files already exist in model_dir, no download is attempted."""
-        from piper_plus._model_resolver import _download_from_hf
+        from piper_plus.api._model_resolver import _download_from_hf
 
         model_dir = tmp_path / "user--repo"
         model_dir.mkdir()
@@ -263,7 +258,7 @@ class TestDownloadFromHf:
         assert config == model_dir / "config.json"
 
     def test_raises_when_download_disabled(self, tmp_path):
-        from piper_plus._model_resolver import _download_from_hf
+        from piper_plus.api._model_resolver import _download_from_hf
 
         with pytest.raises(ModelNotFoundError, match="download=False"):
             _download_from_hf(
@@ -271,7 +266,7 @@ class TestDownloadFromHf:
             )
 
     def test_raises_import_error_when_hf_hub_missing(self, tmp_path):
-        from piper_plus._model_resolver import _download_from_hf
+        from piper_plus.api._model_resolver import _download_from_hf
 
         with patch.dict("sys.modules", {"huggingface_hub": None}):
             with pytest.raises(ImportError, match="huggingface-hub"):
@@ -290,7 +285,7 @@ class TestDefaultCacheDir:
     """DEFAULT_CACHE_DIR is under ~/.cache/piper-plus/models."""
 
     def test_default_cache_dir_is_under_home(self):
-        assert DEFAULT_CACHE_DIR == Path.home() / ".cache" / "piper-plus" / "models"
+        assert Path.home() / ".cache" / "piper-plus" / "models" == DEFAULT_CACHE_DIR
 
 
 # ===================================================================

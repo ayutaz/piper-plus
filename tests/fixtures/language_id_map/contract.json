@@ -81,7 +81,7 @@
     },
     {
       "runtime": "python_runtime",
-      "path": "src/python_run/piper/voice.py",
+      "path": "src/python_run/piper_plus/voice.py",
       "kind": "python_list_literal_inline",
       "expected": "trained_languages"
     },

@@ -47,7 +47,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 LOANWORD_SOURCE = REPO_ROOT / "src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json"
 LOANWORD_FIRST_MIRROR = (
-    REPO_ROOT / "src/python_run/piper/phonemize/data/zh_en_loanword.json"
+    REPO_ROOT / "src/python_run/piper_plus/phonemize/data/zh_en_loanword.json"
 )
 PUA_SOURCE = REPO_ROOT / "src/python/g2p/piper_plus_g2p/data/pua.json"
 

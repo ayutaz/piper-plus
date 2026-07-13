@@ -567,7 +567,7 @@ func TestFindDefaultDicts_EnvVar(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Setenv("PIPER_CUSTOM_DICT_PATH", dir)
+	t.Setenv("PIPER_PLUS_CUSTOM_DICT_PATH", dir)
 
 	results := FindDefaultDicts("")
 	found := false
@@ -578,13 +578,13 @@ func TestFindDefaultDicts_EnvVar(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("FindDefaultDicts did not find env_dict.json in PIPER_CUSTOM_DICT_PATH results: %v", results)
+		t.Errorf("FindDefaultDicts did not find env_dict.json in PIPER_PLUS_CUSTOM_DICT_PATH results: %v", results)
 	}
 }
 
 func TestFindDefaultDicts_EmptyModelDir(t *testing.T) {
 	// Unset env var to avoid interference.
-	t.Setenv("PIPER_CUSTOM_DICT_PATH", "")
+	t.Setenv("PIPER_PLUS_CUSTOM_DICT_PATH", "")
 
 	results := FindDefaultDicts("")
 	// Should not panic; may return empty or find exe-relative dicts.

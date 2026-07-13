@@ -39,7 +39,7 @@ on:
       - 'tests/fixtures/ssml/**'
       - 'tests/fixtures/text_splitter/**'
       # cli-flag-parity runtime sources
-      - 'src/python_run/piper/__main__.py'
+      - 'src/python_run/piper_plus/__main__.py'
       - 'src/python/piper_train/infer_onnx.py'
       - 'src/rust/piper-cli/src/main.rs'
       - 'src/go/cmd/piper-plus/main.go'
@@ -47,7 +47,7 @@ on:
       - 'src/cpp/main.cpp'
       # language-id-map runtime sources
       - 'src/python/piper_train/tools/prepare_multilingual_dataset.py'
-      - 'src/python_run/piper/voice.py'
+      - 'src/python_run/piper_plus/voice.py'
       - 'src/rust/piper-core/src/config.rs'
       - 'src/rust/piper-core/src/wasm.rs'
       - 'src/rust/piper-wasm/src/lib.rs'
@@ -61,9 +61,9 @@ on:
       - 'src/python/g2p/piper_plus_g2p/ssml.py'
       - 'src/wasm/g2p/src/ssml.js'
       # text-splitter canonical
-      - 'src/python_run/piper/text_splitter.py'
+      - 'src/python_run/piper_plus/text_splitter.py'
       # voice-catalog mirrors
-      - 'src/python_run/piper/download.py'
+      - 'src/python_run/piper_plus/download.py'
       - 'src/cpp/piper_plus_voices.json'
       - 'src/rust/piper-core/src/model_download.rs'
       - 'src/csharp/PiperPlus.Core/Config/VoiceCatalog.cs'

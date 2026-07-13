@@ -25,7 +25,7 @@
 # Implementations:
 #   Python (training):  src/python/piper_train/phonemize/                 (japanese, english, chinese, korean)
 #   Python (G2P pkg):   src/python/g2p/piper_plus_g2p/                    (canonical 8-language)
-#   Python (runtime):   src/python_run/piper/phonemize/                   (mirrors g2p package)
+#   Python (runtime):   src/python_run/piper_plus/phonemize/                   (mirrors g2p package)
 #   Rust:               src/rust/piper-plus-g2p/                          (cmudict / pinyin / jpreprocess + naist-jdic)
 #   Go:                 src/go/phonemize/                                 (cmudict / pinyin mirrors)
 #   C#:                 src/csharp/PiperPlus.Core/Phonemize/              (DotNetG2P / NuGet)
@@ -237,7 +237,7 @@ size_categories = { acronyms = 66, loanwords = 40, letter_fallback = 26 }
 license = "MIT (this repository)"
 mirrors_canonical_plus_runtimes = [
     "src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json",                # canonical
-    "src/python_run/piper/phonemize/data/zh_en_loanword.json",               # Python runtime
+    "src/python_run/piper_plus/phonemize/data/zh_en_loanword.json",               # Python runtime
     "src/rust/piper-plus-g2p/data/zh_en_loanword.json",                      # Rust G2P
     "src/rust/piper-core/data/zh_en_loanword.json",                          # Rust core
     "src/go/phonemize/data/zh_en_loanword.json",                             # Go

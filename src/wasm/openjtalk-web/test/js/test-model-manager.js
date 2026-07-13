@@ -727,9 +727,9 @@ describe("ModelManager", { skip }, () => {
 
       const mgr = new ModelManager();
       const urlsTsukuyomi = await mgr._resolveUrls("tsukuyomi");
-      const urlsBase = await mgr._resolveUrls("base");
+      const urlsCss10 = await mgr._resolveUrls("css10");
 
-      assert.notEqual(urlsTsukuyomi.cacheKey, urlsBase.cacheKey);
+      assert.notEqual(urlsTsukuyomi.cacheKey, urlsCss10.cacheKey);
     });
 
     it("同じレジストリエイリアスは同じキーに解決される", async () => {

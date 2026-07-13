@@ -99,7 +99,7 @@ query-filters:
   - exclude:
       id: cpp/potentially-dangerous-function
   # py/path-injection: piper-plus の Python ランタイムは CLI ツール
-  # (piper_train.export_onnx, piper.voice CLI, piper.webui Gradio) であり、
+  # (piper_train.export_onnx, piper_plus.voice CLI, piper_plus.webui Gradio) であり、
   # ユーザーが --model や --output 等で明示指定したパスを ONNX/cache 操作で
   # 使うことが本来の動作。Path(p).resolve(strict=True) で canonical 化と
   # 存在確認を行い、`..` traversal は早期に弾いている (PR #401, ort_utils.py:142
@@ -111,9 +111,9 @@ query-filters:
   #
   # 該当ファイル (CLI tool only — no untrusted input source):
   #   src/python/piper_train/ort_utils.py  (--model 由来 path → cache file)
-  #   src/python_run/piper/voice.py        (--model 由来 path → cache file)
-  #   src/python_run/piper/training_manager.py (CLI subprocess wrapper)
-  #   src/python_run/piper/webui.py        (Gradio local UI, no public deploy)
+  #   src/python_run/piper_plus/voice.py        (--model 由来 path → cache file)
+  #   src/python_run/piper_plus/training_manager.py (CLI subprocess wrapper)
+  #   src/python_run/piper_plus/webui.py        (Gradio local UI, no public deploy)
   - exclude:
       id: py/path-injection
   # py/command-line-injection: training_manager.py:140 で subprocess.Popen に

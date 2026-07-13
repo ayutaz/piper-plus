@@ -1,8 +1,6 @@
 """Tests for piper_train.model_manager."""
 
 import os
-import sys
-import tempfile
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,6 +12,7 @@ from piper_train.model_manager import (
     list_models,
     resolve_model_path,
 )
+
 
 pytestmark = pytest.mark.unit
 
@@ -57,14 +56,14 @@ class TestGetDefaultModelDir:
         assert len(result) > 0
 
     def test_env_override(self):
-        with patch.dict(os.environ, {"PIPER_MODEL_DIR": "/custom/path"}):
+        with patch.dict(os.environ, {"PIPER_PLUS_MODEL_DIR": "/custom/path"}):
             assert get_default_model_dir() == "/custom/path"
 
     def test_contains_piper(self):
         with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("PIPER_MODEL_DIR", None)
+            os.environ.pop("PIPER_PLUS_MODEL_DIR", None)
             result = get_default_model_dir()
-            assert "piper" in result.lower()
+            assert "piper-plus" in result.lower()
 
 
 class TestListModels:
@@ -127,7 +126,9 @@ class TestDownloadModel:
             os.truncate(f, file_info["size_bytes"])
 
         mock_dl = MagicMock()
-        with patch.dict("sys.modules", {"huggingface_hub": MagicMock(hf_hub_download=mock_dl)}):
+        with patch.dict(
+            "sys.modules", {"huggingface_hub": MagicMock(hf_hub_download=mock_dl)}
+        ):
             result = download_model("tsukuyomi", str(tmp_path))
 
         assert result is True
@@ -180,8 +181,13 @@ class TestDownloadModel:
         mock_hf = MagicMock(hf_hub_download=mock_dl)
         default_model_dir = str(tmp_path)
 
-        with patch.dict("sys.modules", {"huggingface_hub": mock_hf}), \
-             patch("piper_train.model_manager.get_default_model_dir", return_value=default_model_dir):
+        with (
+            patch.dict("sys.modules", {"huggingface_hub": mock_hf}),
+            patch(
+                "piper_train.model_manager.get_default_model_dir",
+                return_value=default_model_dir,
+            ),
+        ):
             download_model("tsukuyomi")
 
         for call_args in mock_dl.call_args_list:

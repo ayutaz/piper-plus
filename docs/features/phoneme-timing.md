@@ -6,7 +6,7 @@ VITS Duration Predictor から音素ごとの開始時刻・終了時刻・継�
 
 | ランタイム | 計算 | JSON | TSV | SRT | CLI flag | HTTP API |
 |----------|------|------|-----|-----|----------|----------|
-| Python | ✅ | ✅ | ✅ | ✅ | (`piper.synthesize_with_timing()`) | ✅ `/api/phoneme-timing` |
+| Python | ✅ | ✅ | ✅ | ✅ | (`piper_plus.synthesize_with_timing()`) | ✅ `/api/phoneme-timing` |
 | Rust | ✅ | ✅ | ✅ | ✅ | `--output-timing` `--timing-format` | - |
 | Go | ✅ | ✅ | ✅ | ✅ | `--output-timing` `--timing-format` | ✅ |
 | C++ | ✅ | ✅ | ✅ | ✅ | `--output-timing` `--timing-format` | - |
@@ -85,8 +85,8 @@ VLC など標準的な字幕プレイヤーで再生可能。
 ### Python
 
 ```python
-from piper import PiperVoice
-from piper.timing import timing_to_json, timing_to_srt
+from piper_plus import PiperVoice
+from piper_plus.timing import timing_to_json, timing_to_srt
 
 voice = PiperVoice.load("model.onnx", config_path="config.json")
 wav_bytes, timing = voice.synthesize_with_timing("こんにちは")
@@ -132,11 +132,11 @@ piper-plus --model model.onnx --text "Hello" \
 ### C++ CLI
 
 ```bash
-echo "Hello" | piper --model model.onnx -f speech.wav \
+echo "Hello" | piper-plus --model model.onnx -f speech.wav \
   --output-timing timing.json --timing-format json
 ```
 
-### HTTP API (Python `piper.http_server`)
+### HTTP API (Python `piper_plus.http_server`)
 
 ```bash
 curl "http://localhost:5000/api/phoneme-timing?text=Hello&format=json"

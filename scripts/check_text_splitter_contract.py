@@ -3,7 +3,7 @@
 
 The contract toml lists canonical closing-punctuation + sentence-terminator
 codepoints. This script verifies the Python canonical implementation
-(``src/python_run/piper/text_splitter.py``) matches the *python* runtime row
+(``src/python_run/piper_plus/text_splitter.py``) matches the *python* runtime row
 projected by ``regenerate_text_splitter_fixture.py``.
 
 Per-runtime divergences (Rust / Go / C# / C++) are tracked in
@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SPLITTER_PATH = REPO_ROOT / "src/python_run/piper/text_splitter.py"
+SPLITTER_PATH = REPO_ROOT / "src/python_run/piper_plus/text_splitter.py"
 
 # Lazy import so this script doesn't need the runtime in PYTHONPATH.
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
@@ -135,7 +135,7 @@ def main() -> int:
 
     print(
         "OK: text-splitter contract (docs/spec/text-splitter-contract.toml) "
-        "matches Python canonical (src/python_run/piper/text_splitter.py)."
+        "matches Python canonical (src/python_run/piper_plus/text_splitter.py)."
     )
     return 0
 

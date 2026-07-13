@@ -1,6 +1,6 @@
-# Third-Party Licenses — piper-g2p (Rust)
+# Third-Party Licenses — piper-plus-g2p (Rust)
 
-piper-g2p is licensed under MIT. Below are the licenses of its
+piper-plus-g2p is licensed under MIT. Below are the licenses of its
 direct dependencies.
 
 ## Required Dependencies

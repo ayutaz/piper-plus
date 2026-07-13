@@ -143,14 +143,14 @@ fn test_env_var_names() {
     let fixture = load_fixture();
     assert_eq!(
         fixture["env_vars"]["disable_warmup"].as_str().unwrap(),
-        "PIPER_DISABLE_WARMUP"
+        "PIPER_PLUS_DISABLE_WARMUP"
     );
     assert_eq!(
         fixture["env_vars"]["disable_cache"].as_str().unwrap(),
-        "PIPER_DISABLE_CACHE"
+        "PIPER_PLUS_DISABLE_CACHE"
     );
     assert_eq!(
         fixture["env_vars"]["intra_threads"].as_str().unwrap(),
-        "PIPER_INTRA_THREADS"
+        "PIPER_PLUS_INTRA_THREADS"
     );
 }

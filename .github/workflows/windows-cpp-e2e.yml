@@ -1,7 +1,7 @@
 name: "Windows C++ E2E (real tsukuyomi model)"
 
 # End-to-end gate that exercises the exact path that let bugs ①②③ ship to
-# Windows users: build the C++ piper.exe, `--download-model tsukuyomi` the real
+# Windows users: build the C++ piper-plus.exe, `--download-model tsukuyomi` the real
 # distributed 6lang model, and synthesize Japanese text to a WAV. No existing
 # CI runs the *real* distributed model through the C++ runtime on Windows —
 # fixtures and pre-staged models hid all three regressions.
@@ -31,7 +31,7 @@ concurrency:
 
 jobs:
   windows-real-model-e2e:
-    name: tsukuyomi 6lang -> WAV on Windows C++ piper.exe
+    name: tsukuyomi 6lang -> WAV on Windows C++ piper-plus.exe
     runs-on: windows-2022
     timeout-minutes: 40
     steps:
@@ -51,12 +51,12 @@ jobs:
         shell: pwsh
         run: cmake --build build --config Release -j $env:NUMBER_OF_PROCESSORS
 
-      - name: Locate piper.exe
+      - name: Locate piper-plus.exe
         shell: pwsh
         run: |
-          $exe = Get-ChildItem build -Recurse -Filter piper.exe | Select-Object -First 1
-          if (-not $exe) { Write-Error "piper.exe was not built"; exit 1 }
-          Write-Output "piper.exe: $($exe.FullName)"
+          $exe = Get-ChildItem build -Recurse -Filter piper-plus.exe | Select-Object -First 1
+          if (-not $exe) { Write-Error "piper-plus.exe was not built"; exit 1 }
+          Write-Output "piper-plus.exe: $($exe.FullName)"
           & $exe.FullName --version
           "PIPER_EXE=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
@@ -101,7 +101,7 @@ jobs:
             Write-Error "invalid WAV (len=$len, header=$hdr)"
             exit 1
           }
-          Write-Output "OK: tsukuyomi 6lang -> $len-byte RIFF WAV via Windows C++ piper.exe"
+          Write-Output "OK: tsukuyomi 6lang -> $len-byte RIFF WAV via Windows C++ piper-plus.exe"
 
       - name: Upload synthesized WAV (diagnostic)
         if: always()

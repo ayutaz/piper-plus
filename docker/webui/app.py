@@ -128,7 +128,7 @@ def _build_session_inputs(
     """Build the ONNX input feed for `session.run(None, ...)`.
 
     Mirrors the dynamic-input-detection contract used by
-    `src/python_run/piper/voice.py:200-208` and
+    `src/python_run/piper_plus/voice.py:200-208` and
     `docker/python-inference/inference.py`. MB-iSTFT-VITS2 / Voice-Cloning
     exports declare `speaker_embedding` + `speaker_embedding_mask`
     unconditionally (PR #320); feeding zero embedding + mask=0 routes the

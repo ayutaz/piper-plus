@@ -10,7 +10,7 @@ namespace PiperPlus.Core.Phonemize;
 /// <summary>
 /// Spanish phonemizer that mirrors the Python
 /// <c>phonemize_spanish_with_prosody()</c> function in
-/// <c>piper_train/phonemize/spanish.py</c>.
+/// <c>src/python/g2p/piper_plus_g2p/spanish.py</c>.
 /// <para>
 /// Processing flow (1:1 with the Python implementation):
 /// <list type="number">

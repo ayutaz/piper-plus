@@ -10,7 +10,7 @@ package piperplus
 // state in either Phase 1 parallelism scaffolding or the underlying
 // phonemize backend.
 //
-// Skips when PIPER_TEST_MODEL is unset (no CGO model fixture available).
+// Skips when PIPER_PLUS_TEST_MODEL is unset (no CGO model fixture available).
 // The `//go:build integration` tag matches engine_test.go / init_test.go so
 // the model-loading helpers (testModelPath, TestMain runtime init) are
 // visible — without it `go vet` and golangci-lint can't see them and fail
@@ -53,7 +53,7 @@ func TestSynthesizeStream_JaConcurrent(t *testing.T) {
 		t.Skip("skipping stress test in -short mode")
 	}
 
-	modelPath := testModelPath(t) // skips if PIPER_TEST_MODEL unset
+	modelPath := testModelPath(t) // skips if PIPER_PLUS_TEST_MODEL unset
 
 	voice, err := LoadVoice(context.Background(), modelPath)
 	if err != nil {
@@ -116,7 +116,7 @@ func TestSynthesizeStream_JaConcurrent(t *testing.T) {
 }
 
 // TestSynthesizeStream_JaConcurrentBothModes asserts that running the same
-// JA workload under PIPER_G2P_PARALLELISM=1 (serial) and unset (auto
+// JA workload under PIPER_PLUS_G2P_PARALLELISM=1 (serial) and unset (auto
 // parallel) both succeed without crashing. Combined with -race this
 // catches regressions where only the parallel path is broken.
 func TestSynthesizeStream_JaConcurrentBothModes(t *testing.T) {
@@ -141,9 +141,9 @@ func TestSynthesizeStream_JaConcurrentBothModes(t *testing.T) {
 	} {
 		t.Run(mode.name, func(t *testing.T) {
 			if mode.env == "" {
-				t.Setenv("PIPER_G2P_PARALLELISM", "")
+				t.Setenv("PIPER_PLUS_G2P_PARALLELISM", "")
 			} else {
-				t.Setenv("PIPER_G2P_PARALLELISM", mode.env)
+				t.Setenv("PIPER_PLUS_G2P_PARALLELISM", mode.env)
 			}
 
 			text := jaStressSentences[0] + jaStressSentences[1] +

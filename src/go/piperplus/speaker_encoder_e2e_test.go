@@ -17,7 +17,7 @@ import (
 //
 // This test is opt-in: it skips by default unless both
 //   1. The fixture has an "e2e_cosine_gate" block, AND
-//   2. PIPER_SPEAKER_ENCODER_ONNX_PATH points at a local encoder ONNX.
+//   2. PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH points at a local encoder ONNX.
 
 type e2eEncoderRef struct {
 	HFRepo     string `json:"hf_repo"`
@@ -105,13 +105,13 @@ func TestSpeakerEncoderE2ECosineGate(t *testing.T) {
 	}
 	gate := fx.E2ECosineGate
 
-	encoderPath := os.Getenv("PIPER_SPEAKER_ENCODER_ONNX_PATH")
+	encoderPath := os.Getenv("PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH")
 	if encoderPath == "" {
-		t.Skip("PIPER_SPEAKER_ENCODER_ONNX_PATH not set — opt-in test, " +
+		t.Skip("PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH not set — opt-in test, " +
 			"skipping by default")
 	}
 	if _, err := os.Stat(encoderPath); err != nil {
-		t.Fatalf("PIPER_SPEAKER_ENCODER_ONNX_PATH=%s does not exist: %v",
+		t.Fatalf("PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH=%s does not exist: %v",
 			encoderPath, err)
 	}
 

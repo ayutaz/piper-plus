@@ -33,8 +33,8 @@ jobs:
     with:
       os: ubuntu-24.04
       build-type: Release
-      artifact-name: piper-linux-x64
-      cache-key-prefix: piper-linux-x64
+      artifact-name: piper-plus-cpp-linux-x64
+      cache-key-prefix: piper-plus-cpp-linux-x64
 
   build_macos_arm64:
     name: Build macOS ARM64
@@ -42,8 +42,8 @@ jobs:
     with:
       os: macos-14
       build-type: Release
-      artifact-name: piper-macos-arm64
-      cache-key-prefix: piper-macos-arm64
+      artifact-name: piper-plus-cpp-macos-arm64
+      cache-key-prefix: piper-plus-cpp-macos-arm64
 
   build_windows_x64:
     name: Build Windows x64
@@ -51,8 +51,8 @@ jobs:
     with:
       os: windows-2022
       build-type: Release
-      artifact-name: piper-windows-x64
-      cache-key-prefix: piper-windows-x64
+      artifact-name: piper-plus-cpp-windows-x64
+      cache-key-prefix: piper-plus-cpp-windows-x64
 
   # ARM builds still need custom Docker-based build
   build_linux_armv7:
@@ -89,31 +89,31 @@ jobs:
               cmake .. -DCMAKE_BUILD_TYPE=Release -GNinja
               ninja -j1
               cd ..
-              mkdir -p dist/piper/bin dist/piper/lib dist/piper/share
-              cp build/piper dist/piper/bin/
-              find build -name '*.so*' -type f -exec cp {} dist/piper/lib/ \; 2>/dev/null || true
+              mkdir -p dist/piper-plus/bin dist/piper-plus/lib dist/piper-plus/share
+              cp build/piper-plus dist/piper-plus/bin/
+              find build -name '*.so*' -type f -exec cp {} dist/piper-plus/lib/ \; 2>/dev/null || true
 
               # Copy espeak-ng-data if available
               if [ -d /usr/share/espeak-ng-data ]; then
-                cp -r /usr/share/espeak-ng-data dist/piper/share/
+                cp -r /usr/share/espeak-ng-data dist/piper-plus/share/
               fi
 
-              cd dist && tar czf piper-linux-armv7.tar.gz piper/
+              cd dist && tar czf piper-plus-cpp-linux-armv7.tar.gz piper-plus/
             "
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: piper-linux-armv7
-          path: dist/piper-linux-armv7.tar.gz
+          name: piper-plus-cpp-linux-armv7
+          path: dist/piper-plus-cpp-linux-armv7.tar.gz
 
       - name: Upload to release
         if: inputs.release_upload_url != '' && inputs.release_upload_url != null
         uses: ./.github/actions/retry-upload
         with:
           upload_url: ${{ inputs.release_upload_url }}
-          asset_path: dist/piper-linux-armv7.tar.gz
-          asset_name: piper-linux-armv7.tar.gz
+          asset_path: dist/piper-plus-cpp-linux-armv7.tar.gz
+          asset_name: piper-plus-cpp-linux-armv7.tar.gz
 
   build_linux_arm64:
     name: Build Linux ARM64
@@ -144,16 +144,16 @@ jobs:
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: piper-linux-arm64
-          path: dist/piper-linux-arm64.tar.gz
+          name: piper-plus-cpp-linux-arm64
+          path: dist/piper-plus-cpp-linux-arm64.tar.gz
 
       - name: Upload to release
         if: inputs.release_upload_url != '' && inputs.release_upload_url != null
         uses: ./.github/actions/retry-upload
         with:
           upload_url: ${{ inputs.release_upload_url }}
-          asset_path: dist/piper-linux-arm64.tar.gz
-          asset_name: piper-linux-arm64.tar.gz
+          asset_path: dist/piper-plus-cpp-linux-arm64.tar.gz
+          asset_name: piper-plus-cpp-linux-arm64.tar.gz
 
   # Build Python wheels for PyPI
   build_python_wheels:
@@ -230,7 +230,7 @@ jobs:
           PYTHONUTF8: '1'
         run: |
           python -c "
-          from piper.phonemize.multilingual import MultilingualPhonemizer
+          from piper_plus.phonemize.multilingual import MultilingualPhonemizer
           mp = MultilingualPhonemizer(languages=['ja', 'en', 'zh', 'es', 'fr', 'pt', 'sv'])
           for lang, text in [('ja', 'こんにちは'), ('en', 'Hello'), ('zh', '你好'), ('es', 'Hola'), ('fr', 'Bonjour'), ('pt', 'Ola'), ('sv', 'Hej')]:
               result = mp.phonemize(text)
@@ -247,12 +247,12 @@ jobs:
     strategy:
       matrix:
         include:
-          - artifact: piper-linux-x64
-            asset_name: piper-linux-x64.tar.gz
-          - artifact: piper-macos-arm64
-            asset_name: piper-macos-arm64.tar.gz
-          - artifact: piper-windows-x64
-            asset_name: piper-windows-x64.zip
+          - artifact: piper-plus-cpp-linux-x64
+            asset_name: piper-plus-cpp-linux-x64.tar.gz
+          - artifact: piper-plus-cpp-macos-arm64
+            asset_name: piper-plus-cpp-macos-arm64.tar.gz
+          - artifact: piper-plus-cpp-windows-x64
+            asset_name: piper-plus-cpp-windows-x64.zip
     steps:
       - uses: actions/checkout@v6.0.3
 
@@ -268,17 +268,17 @@ jobs:
       - name: Fix artifact names
         run: |
           # Rename downloaded artifacts to match expected names
-          if [ -f "dist/piper-Linux.tar.gz" ]; then
-            mv dist/piper-Linux.tar.gz dist/piper-linux-x64.tar.gz
-            echo "Renamed piper-Linux.tar.gz to piper-linux-x64.tar.gz"
+          if [ -f "dist/piper-plus-cpp-Linux.tar.gz" ]; then
+            mv dist/piper-plus-cpp-Linux.tar.gz dist/piper-plus-cpp-linux-x64.tar.gz
+            echo "Renamed piper-plus-cpp-Linux.tar.gz to piper-plus-cpp-linux-x64.tar.gz"
           fi
-          if [ -f "dist/piper-macOS.tar.gz" ]; then
-            mv dist/piper-macOS.tar.gz dist/piper-macos-arm64.tar.gz
-            echo "Renamed piper-macOS.tar.gz to piper-macos-arm64.tar.gz"
+          if [ -f "dist/piper-plus-cpp-macOS.tar.gz" ]; then
+            mv dist/piper-plus-cpp-macOS.tar.gz dist/piper-plus-cpp-macos-arm64.tar.gz
+            echo "Renamed piper-plus-cpp-macOS.tar.gz to piper-plus-cpp-macos-arm64.tar.gz"
           fi
-          if [ -f "dist/piper-Windows.zip" ]; then
-            mv dist/piper-Windows.zip dist/piper-windows-x64.zip
-            echo "Renamed piper-Windows.zip to piper-windows-x64.zip"
+          if [ -f "dist/piper-plus-cpp-Windows.zip" ]; then
+            mv dist/piper-plus-cpp-Windows.zip dist/piper-plus-cpp-windows-x64.zip
+            echo "Renamed piper-plus-cpp-Windows.zip to piper-plus-cpp-windows-x64.zip"
           fi
           echo "Final dist contents:"
           ls -la dist/

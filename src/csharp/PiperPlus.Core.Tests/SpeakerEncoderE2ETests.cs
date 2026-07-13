@@ -17,7 +17,7 @@ namespace PiperPlus.Core.Tests;
 /// This test is opt-in: it skips by default unless both
 /// <list type="number">
 ///   <item>The fixture has an <c>e2e_cosine_gate</c> block, AND</item>
-///   <item><c>PIPER_SPEAKER_ENCODER_ONNX_PATH</c> points at a local encoder ONNX.</item>
+///   <item><c>PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH</c> points at a local encoder ONNX.</item>
 /// </list>
 /// </summary>
 public class SpeakerEncoderE2ETests
@@ -133,10 +133,10 @@ public class SpeakerEncoderE2ETests
 
         E2EGate gate = fixture.E2ECosineGate;
 
-        string? encoderPath = Environment.GetEnvironmentVariable("PIPER_SPEAKER_ENCODER_ONNX_PATH");
+        string? encoderPath = Environment.GetEnvironmentVariable("PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH");
         if (string.IsNullOrEmpty(encoderPath))
         {
-            Assert.Skip("PIPER_SPEAKER_ENCODER_ONNX_PATH not set — opt-in test, " +
+            Assert.Skip("PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH not set — opt-in test, " +
                         "skipping by default");
             return;
         }
@@ -144,7 +144,7 @@ public class SpeakerEncoderE2ETests
         if (!File.Exists(encoderPath))
         {
             throw new FileNotFoundException(
-                $"PIPER_SPEAKER_ENCODER_ONNX_PATH={encoderPath} does not exist");
+                $"PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH={encoderPath} does not exist");
         }
 
         if (!string.IsNullOrEmpty(gate.EncoderOnnx.Sha256))

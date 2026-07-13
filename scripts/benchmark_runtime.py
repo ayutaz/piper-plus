@@ -24,7 +24,7 @@ Why a separate script (vs ``scripts/benchmark.py``):
 Usage:
     uv run python scripts/benchmark_runtime.py \\
         --runtime python \\
-        --cli-cmd "uv run python -m piper" \\
+        --cli-cmd "uv run python -m piper_plus" \\
         --model test/models/multilingual-test-medium.onnx \\
         --config test/models/multilingual-test-medium.onnx.json \\
         --text-file tests/fixtures/benchmark-texts.json \\
@@ -75,7 +75,7 @@ RUNTIME_PROFILES: dict[str, dict] = {
         "stdin_text": True,
         "output_flag": "--output_file",
         "config_flag": "--config",
-        # python -m piper has no --quiet flag (only --debug); omit to avoid
+        # python -m piper_plus has no --quiet flag (only --debug); omit to avoid
         # "unrecognized argument" error that silently fails every cell.
         "extra_args": [],
     },
@@ -398,7 +398,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         required=True,
         help=(
             "CLI command prefix (shell-tokenized). "
-            "Example: 'uv run python -m piper' or "
+            "Example: 'uv run python -m piper_plus' or "
             "'./target/release/piper-plus'."
         ),
     )

@@ -432,13 +432,13 @@ typedef struct PiperPlusG2pHandle PiperPlusG2pHandle;
  *  English/Chinese/Korean/Spanish/French/Portuguese/Swedish all work without
  *  any external dictionary (rules and embedded data are statically linked).
  *  Japanese requires an OpenJTalk dictionary; pass its directory in `dict_dir`
- *  or set the dictionary via the usual auto-detect / `PIPER_OPENJTALK_DICT_DIR`
+ *  or set the dictionary via the usual auto-detect / `PIPER_PLUS_OPENJTALK_DICT_DIR`
  *  environment variable mechanism.
  *
  *  CMU / pinyin auxiliary dictionaries (cmudict_data.json, pinyin_single.json,
  *  pinyin_phrases.json) are searched in `dict_dir` first (if non-NULL), then
- *  the `PIPER_DICTIONARIES_PATH` environment variable. The exe-relative
- *  `<exe>/../share/piper/dicts/` branch used by the CLI is intentionally NOT
+ *  the `PIPER_PLUS_DICTIONARIES_PATH` environment variable. The exe-relative
+ *  `<exe>/../share/piper-plus/dicts/` branch used by the CLI is intentionally NOT
  *  consulted by the engine-less G2P path because callers (Android AAR, JNI
  *  consumers) have no installed exe to anchor on. When not found,
  *  English/Chinese fall back to the embedded loanword dataset and rule-based

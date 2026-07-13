@@ -9,7 +9,7 @@ namespace PiperPlus.Core.Phonemize;
 /// <para>
 /// C# port of the Python <c>UnicodeLanguageDetector</c> class and
 /// <c>_segment_text_multilingual()</c> function in
-/// <c>piper_train/phonemize/multilingual.py</c>.
+/// <c>src/python/g2p/piper_plus_g2p/multilingual.py</c>.
 /// </para>
 /// <para>
 /// Supports CJK disambiguation (JA vs ZH) by checking for kana presence in context.

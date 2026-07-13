@@ -7,15 +7,13 @@ triangulation with multiple data points.
 
 from __future__ import annotations
 
-import struct
 import wave
 from io import BytesIO
 from pathlib import Path
 
 import numpy as np
 import pytest
-
-from piper_plus.audio import AudioResult
+from piper_plus.api.audio import AudioResult
 
 
 # ---------------------------------------------------------------------------
@@ -39,17 +37,13 @@ class TestAudioResultDuration:
 
     def test_duration_returns_one_second_for_22050_samples(self):
         # Arrange
-        result = AudioResult(
-            audio=np.zeros(22050, dtype=np.int16), sample_rate=22050
-        )
+        result = AudioResult(audio=np.zeros(22050, dtype=np.int16), sample_rate=22050)
 
         # Act / Assert
         assert result.duration == pytest.approx(1.0)
 
     def test_duration_returns_half_second_for_11025_samples(self):
-        result = AudioResult(
-            audio=np.zeros(11025, dtype=np.int16), sample_rate=22050
-        )
+        result = AudioResult(audio=np.zeros(11025, dtype=np.int16), sample_rate=22050)
         assert result.duration == pytest.approx(0.5)
 
     def test_duration_scales_with_sample_rate(self):

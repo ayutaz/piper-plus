@@ -30,7 +30,7 @@ allowed-tools: Agent Bash(git diff *) Bash(git log *) Bash(git status *) Read Gl
 ## フェーズ 1: 変更サマリ収集
 
 1. `git diff --name-only` で変更ファイルをカテゴリ分類:
-   - **実装** (`src/python_run/piper/*.py`, `src/python/g2p/**`, `src/rust/piper-core/**`, `src/cpp/*.cpp`, `src/csharp/**`, `src/go/**`, `src/wasm/openjtalk-web/src/*.js`)
+   - **実装** (`src/python_run/piper_plus/*.py`, `src/python/g2p/**`, `src/rust/piper-core/**`, `src/cpp/*.cpp`, `src/csharp/**`, `src/go/**`, `src/wasm/openjtalk-web/src/*.js`)
    - **テスト** (`*/tests/**`, `*/test/**`)
    - **ビルド** (`*.toml`, `*.json`, `CMakeLists.txt`, `*.yml`)
    - **ドキュメント** (`*.md`, `docs/**`)

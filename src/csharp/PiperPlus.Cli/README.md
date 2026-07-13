@@ -37,7 +37,7 @@ piper-plus --model tsukuyomi \
            --output_file mixed.wav
 ```
 
-`--model` accepts either a file path (`models/tsukuyomi.onnx`) or a model name / alias (`tsukuyomi`); aliases are resolved against the bundled voice catalog and downloaded on demand. Set `PIPER_DEFAULT_MODEL` / `PIPER_MODEL_DIR` to override defaults.
+`--model` accepts either a file path (`models/tsukuyomi.onnx`) or a model name / alias (`tsukuyomi`); aliases are resolved against the bundled voice catalog and downloaded on demand. Set `PIPER_PLUS_DEFAULT_MODEL` / `PIPER_PLUS_MODEL_DIR` to override defaults.
 
 ## Common options
 

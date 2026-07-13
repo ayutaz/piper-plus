@@ -183,7 +183,7 @@ jobs:
       run: |
         cd src/python_run
         # Wave 4: --reruns 1 で HTTP server bind race / ONNX warmup / threading-related flake を retry。
-        pytest tests/test_config_fallback.py tests/test_english_phonemization.py tests/test_runtime.py tests/test_util_impl.py tests/test_cli_models.py tests/test_training_manager.py tests/test_training_integration.py tests/test_phoneme_timing.py tests/test_voice_timing.py tests/test_http_timing.py tests/test_http_server_root.py tests/test_voice_streaming.py tests/test_text_splitter.py tests/test_text_splitter_contract.py tests/test_voice_g2p_parallel.py tests/test_short_text_mitigation.py tests/test_zh_en_loanword_runtime.py tests/test_webui.py -v --tb=short --override-ini="addopts=" --reruns 1 --reruns-delay 1
+        pytest tests/test_config_fallback.py tests/test_english_phonemization.py tests/test_runtime.py tests/test_util_impl.py tests/test_cli_models.py tests/test_training_manager.py tests/test_training_integration.py tests/test_phoneme_timing.py tests/test_voice_timing.py tests/test_http_timing.py tests/test_http_server_root.py tests/test_voice_streaming.py tests/test_text_splitter.py tests/test_text_splitter_contract.py tests/test_voice_g2p_parallel.py tests/test_short_text_mitigation.py tests/test_zh_en_loanword_runtime.py tests/test_webui.py tests/test_audio_result.py tests/test_model_resolver.py tests/test_piper_plus_api.py tests/test_piper_plus_engine.py -v --tb=short --override-ini="addopts=" --reruns 1 --reruns-delay 1
       env:
         PYTHONUTF8: '1'
 

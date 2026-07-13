@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "comment": "Cross-runtime phoneme timing golden fixture. Regenerate via `python scripts/regenerate_timing_fixture.py`. Source: src/python_run/piper/timing.py:durations_to_timing. Spec: docs/spec/phoneme-timing-contract.toml. Do not edit by hand.",
+  "comment": "Cross-runtime phoneme timing golden fixture. Regenerate via `python scripts/regenerate_timing_fixture.py`. Source: src/python_run/piper_plus/timing.py:durations_to_timing. Spec: docs/spec/phoneme-timing-contract.toml. Do not edit by hand.",
   "calculation_formula": "frame_time_ms = (hop_length / sample_rate) * 1000",
   "cases": [
     {

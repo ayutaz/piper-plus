@@ -204,7 +204,7 @@ describe("Speaker Encoder — mel parity (layer 1)", () => {
       }
       assert.equal(audio.length, tc.audio_samples_count);
 
-      const fullDft = process.env.PIPER_SPEAKER_ENCODER_FULL_DFT === "1";
+      const fullDft = process.env.PIPER_PLUS_SPEAKER_ENCODER_FULL_DFT === "1";
       if (!fullDft) {
         // Cheap smoke: 5-frame slice. Shape only, no values.
         const slice = audio.slice(0, N_FFT + 4 * 160);

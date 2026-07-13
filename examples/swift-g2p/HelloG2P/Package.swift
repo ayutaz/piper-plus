@@ -21,7 +21,7 @@ let package = Package(
     // macOS-only: the executable target needs a host runtime, and iOS
     // executables can't be `swift run`. PiperPlusG2P itself supports both
     // iOS and macOS (xcframework ships all three slices since v1.14.0) —
-    // see docs/guides/swift-g2p-integration.md for iOS app integration.
+    // see docs/guides/platform/swift-g2p-integration.md for iOS app integration.
     platforms: [.macOS(.v13)],
     dependencies: [
         // Tag-based dependency. Replace with the local `path:` form below

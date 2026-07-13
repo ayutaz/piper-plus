@@ -10,8 +10,8 @@ namespace PiperPlus.Core.Tests;
 /// <remarks>
 /// Member of the <c>EnvVars</c> collection: every test in this class mutates
 /// process-wide environment variables (OPENJTALK_DICTIONARY_PATH,
-/// DOTNETG2P_NAIST_JDIC_PATH, NAIST_JDIC_PATH, PIPER_OFFLINE_MODE,
-/// PIPER_AUTO_DOWNLOAD_DICT, XDG_DATA_HOME). xUnit v3 runs tests across
+/// DOTNETG2P_NAIST_JDIC_PATH, NAIST_JDIC_PATH, PIPER_PLUS_OFFLINE_MODE,
+/// PIPER_PLUS_AUTO_DOWNLOAD_DICT, XDG_DATA_HOME). xUnit v3 runs tests across
 /// classes in parallel by default, so they MUST be serialised with other
 /// env-var-mutating classes (<see cref="SessionFactoryTests"/>).
 /// </remarks>
@@ -31,8 +31,8 @@ public sealed class DictionaryManagerTests : IDisposable
         _origOpenJtalk = Environment.GetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH");
         _origDotNetG2P = Environment.GetEnvironmentVariable("DOTNETG2P_NAIST_JDIC_PATH");
         _origNaistJdic = Environment.GetEnvironmentVariable("NAIST_JDIC_PATH");
-        _origOffline = Environment.GetEnvironmentVariable("PIPER_OFFLINE_MODE");
-        _origAutoDownload = Environment.GetEnvironmentVariable("PIPER_AUTO_DOWNLOAD_DICT");
+        _origOffline = Environment.GetEnvironmentVariable("PIPER_PLUS_OFFLINE_MODE");
+        _origAutoDownload = Environment.GetEnvironmentVariable("PIPER_PLUS_AUTO_DOWNLOAD_DICT");
         _origXdgDataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
     }
 
@@ -41,8 +41,8 @@ public sealed class DictionaryManagerTests : IDisposable
         Environment.SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", _origOpenJtalk);
         Environment.SetEnvironmentVariable("DOTNETG2P_NAIST_JDIC_PATH", _origDotNetG2P);
         Environment.SetEnvironmentVariable("NAIST_JDIC_PATH", _origNaistJdic);
-        Environment.SetEnvironmentVariable("PIPER_OFFLINE_MODE", _origOffline);
-        Environment.SetEnvironmentVariable("PIPER_AUTO_DOWNLOAD_DICT", _origAutoDownload);
+        Environment.SetEnvironmentVariable("PIPER_PLUS_OFFLINE_MODE", _origOffline);
+        Environment.SetEnvironmentVariable("PIPER_PLUS_AUTO_DOWNLOAD_DICT", _origAutoDownload);
         Environment.SetEnvironmentVariable("XDG_DATA_HOME", _origXdgDataHome);
     }
 
@@ -240,7 +240,7 @@ public sealed class DictionaryManagerTests : IDisposable
         Environment.SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", null);
         Environment.SetEnvironmentVariable("DOTNETG2P_NAIST_JDIC_PATH", null);
         Environment.SetEnvironmentVariable("NAIST_JDIC_PATH", null);
-        Environment.SetEnvironmentVariable("PIPER_OFFLINE_MODE", "1");
+        Environment.SetEnvironmentVariable("PIPER_PLUS_OFFLINE_MODE", "1");
 
         // If a real dictionary exists on the system, this test will pass
         // (FindDictionary succeeds before reaching download check).
@@ -266,7 +266,7 @@ public sealed class DictionaryManagerTests : IDisposable
         Environment.SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", null);
         Environment.SetEnvironmentVariable("DOTNETG2P_NAIST_JDIC_PATH", null);
         Environment.SetEnvironmentVariable("NAIST_JDIC_PATH", null);
-        Environment.SetEnvironmentVariable("PIPER_AUTO_DOWNLOAD_DICT", "0");
+        Environment.SetEnvironmentVariable("PIPER_PLUS_AUTO_DOWNLOAD_DICT", "0");
 
         try
         {
@@ -363,11 +363,11 @@ public sealed class DictionaryManagerTests : IDisposable
         Environment.SetEnvironmentVariable("NAIST_JDIC_PATH", null);
 
         // "1" should be offline, but "0" should not be
-        // Set PIPER_OFFLINE_MODE=0 and PIPER_AUTO_DOWNLOAD_DICT=0
+        // Set PIPER_PLUS_OFFLINE_MODE=0 and PIPER_PLUS_AUTO_DOWNLOAD_DICT=0
         // If "0" were treated as offline, we'd get "offline mode" error;
         // instead we should get "auto-download is disabled" error.
-        Environment.SetEnvironmentVariable("PIPER_OFFLINE_MODE", "0");
-        Environment.SetEnvironmentVariable("PIPER_AUTO_DOWNLOAD_DICT", "0");
+        Environment.SetEnvironmentVariable("PIPER_PLUS_OFFLINE_MODE", "0");
+        Environment.SetEnvironmentVariable("PIPER_PLUS_AUTO_DOWNLOAD_DICT", "0");
 
         try
         {
@@ -397,7 +397,7 @@ public sealed class DictionaryManagerTests : IDisposable
             File.WriteAllBytes(Path.Join(dir, "unk.dic"), new byte[] { 0 });
 
             Environment.SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", dir);
-            Environment.SetEnvironmentVariable("PIPER_OFFLINE_MODE", "1");
+            Environment.SetEnvironmentVariable("PIPER_PLUS_OFFLINE_MODE", "1");
 
             string result = await DictionaryManager.EnsureDictionaryAsync(CancellationToken.None);
             Assert.Equal(dir, result);
@@ -423,7 +423,7 @@ public sealed class DictionaryManagerTests : IDisposable
         // We verify that FindDictionary checks the data-dir candidate by creating a
         // valid dictionary there and clearing all other env-var candidates.
         var baseDir = Path.Join(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
-        var piperDir = Path.Join(baseDir, "piper");
+        var piperDir = Path.Join(baseDir, "piper-plus");
         var dictDir = Path.Join(piperDir, "open_jtalk_dic_utf_8-1.11");
         try
         {
@@ -439,7 +439,7 @@ public sealed class DictionaryManagerTests : IDisposable
             Environment.SetEnvironmentVariable("NAIST_JDIC_PATH", null);
 
             // Point the data directory to our temp location.
-            // On non-Windows: GetDataDir() reads XDG_DATA_HOME -> <XDG_DATA_HOME>/piper
+            // On non-Windows: GetDataDir() reads XDG_DATA_HOME -> <XDG_DATA_HOME>/piper-plus
             // On Windows: GetDataDir() reads %APPDATA% (not overridable via env var)
             if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
                     System.Runtime.InteropServices.OSPlatform.Windows))
@@ -448,7 +448,7 @@ public sealed class DictionaryManagerTests : IDisposable
             }
             else
             {
-                // On Windows, GetDataDir() returns %APPDATA%/piper which we cannot
+                // On Windows, GetDataDir() returns %APPDATA%/piper-plus which we cannot
                 // override easily. Skip assertion but verify the method does not throw.
                 _ = DictionaryManager.FindDictionary();
                 return;

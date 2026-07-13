@@ -17,7 +17,7 @@ Opt-in install (training-only, GPU-only):
 
 Disable at runtime via env (forces Cython for debugging / reproducibility):
 
-    PIPER_DISABLE_SUPER_MAS=1
+    PIPER_PLUS_DISABLE_SUPER_MAS=1
 """
 
 import os
@@ -39,7 +39,7 @@ _LARGE_MATRIX_THRESHOLD = 500000  # ~700x700
 # Env override is read at import time so process-wide settings are honoured
 # without affecting subsequent calls; tests that mock the dispatcher can
 # patch ``_super_mas_fn`` directly.
-_SUPER_MAS_DISABLED = os.environ.get("PIPER_DISABLE_SUPER_MAS", "").lower() in (
+_SUPER_MAS_DISABLED = os.environ.get("PIPER_PLUS_DISABLE_SUPER_MAS", "").lower() in (
     "1",
     "true",
     "yes",

@@ -18,7 +18,7 @@
 #   Python (training, canonical):
 #     src/python/piper_train/tools/prepare_multilingual_dataset.py     (LANGUAGE_ID_MAP)
 #   Python (runtime, 6-lang trained subset):
-#     src/python_run/piper/voice.py                                    (multilingual phonemizer language list)
+#     src/python_run/piper_plus/voice.py                                    (multilingual phonemizer language list)
 #   Rust (piper-core test fixtures):
 #     src/rust/piper-core/src/config.rs                                (test JSON literals)
 #     src/rust/piper-core/src/wasm.rs                                  (test JSON literal)
@@ -107,7 +107,7 @@ expected = "all_languages"
 
 [[runtime_sources.entries]]
 runtime = "python_runtime"
-path = "src/python_run/piper/voice.py"
+path = "src/python_run/piper_plus/voice.py"
 kind = "python_list_literal_inline"
 # voice.py uses an inline list literal (no top-level constant); we look for
 # the 6-lang literal directly.

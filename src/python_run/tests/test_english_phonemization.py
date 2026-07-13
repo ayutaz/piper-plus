@@ -2,7 +2,7 @@
 """Test English phonemization functionality.
 
 Note: piper-plus does NOT depend on espeak-ng at runtime.  English G2P uses
-``g2p-en`` (Apache-2.0); see ``piper/phonemize/english.py``.  The legacy
+``g2p-en`` (Apache-2.0); see ``piper_plus/phonemize/english.py``.  The legacy
 ``espeak_phonemizer.py`` module was removed as dead code.
 """
 
@@ -13,15 +13,16 @@ from unittest.mock import MagicMock
 
 import pytest
 
+
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from piper.config import PhonemeType, PiperConfig
+from piper_plus.config import PhonemeType, PiperConfig
 
 
 # Import PiperVoice separately to avoid import issues during testing
 try:
-    from piper.voice import PiperVoice
+    from piper_plus.voice import PiperVoice
 except ImportError:
     PiperVoice = None
 
@@ -65,9 +66,9 @@ class TestVoicePhonemizerIntegration:
         # Test with IPA phonemes
         test_phonemes = ["h", "ə", "l", "ˈ", "o", "ʊ"]
 
-        import piper.voice
+        import piper_plus.voice
 
-        ids = piper.voice.PiperVoice.phonemes_to_ids(voice, test_phonemes)
+        ids = piper_plus.voice.PiperVoice.phonemes_to_ids(voice, test_phonemes)
 
         # Should start with BOS
         assert ids[0] == 1  # BOS = ^
@@ -106,12 +107,12 @@ class TestCLIIntegration:
             / "multilingual-test-medium.onnx"
         )
 
-        # Run piper CLI
+        # Run piper-plus CLI
         result = subprocess.run(
             [
                 sys.executable,
                 "-m",
-                "piper",
+                "piper_plus",
                 "--model",
                 str(model_path),
                 "--output_file",

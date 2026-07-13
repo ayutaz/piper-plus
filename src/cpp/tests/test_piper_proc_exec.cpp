@@ -236,15 +236,15 @@ TEST(PiperProcExec, PowerShellEnvVarBindingDeliversValue) {
     // NEW (fixed) pattern: deliver the value via an environment variable and
     // reference it as $env:VAR. The _spawnvp child inherits the parent
     // environment, so the comparison succeeds and the script exits 0.
-    _putenv_s("PIPER_PROC_EXEC_TEST_VAL", "PIPER_TOK");
+    _putenv_s("PIPER_PLUS_PROC_EXEC_TEST_VAL", "PIPER_TOK");
     const char* argv[] = {
         "powershell", "-NoProfile", "-Command",
-        "if ($env:PIPER_PROC_EXEC_TEST_VAL -eq 'PIPER_TOK') "
+        "if ($env:PIPER_PLUS_PROC_EXEC_TEST_VAL -eq 'PIPER_TOK') "
         "{ exit 0 } else { exit 7 }",
         nullptr,
     };
     int rc = piper_run_argv(argv);
-    _putenv_s("PIPER_PROC_EXEC_TEST_VAL", "");  // clear
+    _putenv_s("PIPER_PLUS_PROC_EXEC_TEST_VAL", "");  // clear
     EXPECT_EQ(rc, 0)
         << "PowerShell must resolve $env:VAR from the inherited environment "
            "(how the fixed download path passes URL/OutFile); rc=" << rc;

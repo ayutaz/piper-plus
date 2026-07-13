@@ -40,9 +40,9 @@ func NewModelManager(cacheDir string, logger *slog.Logger) *ModelManager {
 }
 
 // DefaultCacheDir returns the platform-specific default model cache directory.
-// Override with the PIPER_MODEL_DIR environment variable.
+// Override with the PIPER_PLUS_MODEL_DIR environment variable.
 func DefaultCacheDir() string {
-	if env := os.Getenv("PIPER_MODEL_DIR"); env != "" {
+	if env := os.Getenv("PIPER_PLUS_MODEL_DIR"); env != "" {
 		return env
 	}
 

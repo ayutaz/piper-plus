@@ -35,7 +35,7 @@
 
 **問題**: デスクトップ (Linux/macOS/Windows) は `std::ifstream` で実行時読込で OK だが、iOS xcframework / Android aar は別パターン。既存パターンの調査結果:
 
-- 現状の G2P 辞書 (`cmudict_data.json` 3.7MB, `pinyin_single.json` 704KB 等) は **Linux/macOS/Windows のみ** `share/piper/dicts/` にインストール (`PiperPlusShared.cmake:263-273`)
+- 現状の G2P 辞書 (`cmudict_data.json` 3.7MB, `pinyin_single.json` 704KB 等) は **Linux/macOS/Windows のみ** `share/piper-plus/dicts/` にインストール (`PiperPlusShared.cmake:263-273`)
 - iOS/Android では `NOT PIPER_APPLE_EMBEDDED` 条件で **インストール対象外**
 - C API (`piper_plus.h:PiperPlusConfig.dict_dir`) は **呼び出し側責任**でパス指定する設計
 
@@ -142,7 +142,7 @@ endif()
 |----------|------|------|
 | iOS xcframework | static embed | CMake `file(READ HEX)` → `.h` |
 | Android .aar | static embed | 同上 |
-| Linux/macOS/Windows | runtime load | `std::ifstream` (`share/piper/dicts/` 既存パターン) |
+| Linux/macOS/Windows | runtime load | `std::ifstream` (`share/piper-plus/dicts/` 既存パターン) |
 
 **ARM 系の注意点**:
 

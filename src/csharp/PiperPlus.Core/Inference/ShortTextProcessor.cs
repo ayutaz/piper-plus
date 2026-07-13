@@ -212,7 +212,7 @@ public static class ShortTextProcessor
 
     /// <summary>
     /// Strategy A precise post-trim using the model's duration output.
-    /// Mirrors the Python reference (<c>src/python_run/piper/voice.py</c>
+    /// Mirrors the Python reference (<c>src/python_run/piper_plus/voice.py</c>
     /// <c>_trim_padding_by_durations</c>) so all runtimes produce
     /// byte-equal output for the same inputs (issue #356).
     /// <para>
@@ -327,7 +327,7 @@ public static class ShortTextProcessor
     /// </para>
     /// <para>
     /// Mirrors the Python reference
-    /// (<c>src/python_run/piper/voice.py::_trim_eos_region</c>) so every
+    /// (<c>src/python_run/piper_plus/voice.py::_trim_eos_region</c>) so every
     /// runtime produces byte-equal output for the same
     /// (audio, durations[-1], hopSize, eosMaxFrames) tuple. The
     /// sample-count conversion uses <c>(int)</c> truncation to match Python.

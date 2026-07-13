@@ -44,8 +44,8 @@ protected:
         // Save original environment variables
         original_home = getenv("HOME");
         original_dict_dir = getenv("OPENJTALK_DICTIONARY_PATH");
-        original_auto_download = getenv("PIPER_AUTO_DOWNLOAD_DICT");
-        original_offline = getenv("PIPER_OFFLINE_MODE");
+        original_auto_download = getenv("PIPER_PLUS_AUTO_DOWNLOAD_DICT");
+        original_offline = getenv("PIPER_PLUS_OFFLINE_MODE");
 
         // Set test HOME
 #ifdef _WIN32
@@ -87,29 +87,29 @@ protected:
 
         if (original_auto_download) {
 #ifdef _WIN32
-            SetEnvironmentVariableA("PIPER_AUTO_DOWNLOAD_DICT", original_auto_download);
+            SetEnvironmentVariableA("PIPER_PLUS_AUTO_DOWNLOAD_DICT", original_auto_download);
 #else
-            setenv("PIPER_AUTO_DOWNLOAD_DICT", original_auto_download, 1);
+            setenv("PIPER_PLUS_AUTO_DOWNLOAD_DICT", original_auto_download, 1);
 #endif
         } else {
 #ifdef _WIN32
-            SetEnvironmentVariableA("PIPER_AUTO_DOWNLOAD_DICT", NULL);
+            SetEnvironmentVariableA("PIPER_PLUS_AUTO_DOWNLOAD_DICT", NULL);
 #else
-            unsetenv("PIPER_AUTO_DOWNLOAD_DICT");
+            unsetenv("PIPER_PLUS_AUTO_DOWNLOAD_DICT");
 #endif
         }
 
         if (original_offline) {
 #ifdef _WIN32
-            SetEnvironmentVariableA("PIPER_OFFLINE_MODE", original_offline);
+            SetEnvironmentVariableA("PIPER_PLUS_OFFLINE_MODE", original_offline);
 #else
-            setenv("PIPER_OFFLINE_MODE", original_offline, 1);
+            setenv("PIPER_PLUS_OFFLINE_MODE", original_offline, 1);
 #endif
         } else {
 #ifdef _WIN32
-            SetEnvironmentVariableA("PIPER_OFFLINE_MODE", NULL);
+            SetEnvironmentVariableA("PIPER_PLUS_OFFLINE_MODE", NULL);
 #else
-            unsetenv("PIPER_OFFLINE_MODE");
+            unsetenv("PIPER_PLUS_OFFLINE_MODE");
 #endif
         }
 
@@ -220,9 +220,9 @@ TEST_F(DictionaryManagerTest, OfflineMode) {
     force_openjtalk_dictionary_path("/nonexistent_dict_path_for_test");
 
 #ifdef _WIN32
-    SetEnvironmentVariableA("PIPER_OFFLINE_MODE", "1");
+    SetEnvironmentVariableA("PIPER_PLUS_OFFLINE_MODE", "1");
 #else
-    setenv("PIPER_OFFLINE_MODE", "1", 1);
+    setenv("PIPER_PLUS_OFFLINE_MODE", "1", 1);
 #endif
 
     // Should fail: dictionary doesn't exist and offline mode blocks download
@@ -235,9 +235,9 @@ TEST_F(DictionaryManagerTest, AutoDownloadDisabled) {
     force_openjtalk_dictionary_path("/nonexistent_dict_path_for_test");
 
 #ifdef _WIN32
-    SetEnvironmentVariableA("PIPER_AUTO_DOWNLOAD_DICT", "0");
+    SetEnvironmentVariableA("PIPER_PLUS_AUTO_DOWNLOAD_DICT", "0");
 #else
-    setenv("PIPER_AUTO_DOWNLOAD_DICT", "0", 1);
+    setenv("PIPER_PLUS_AUTO_DOWNLOAD_DICT", "0", 1);
 #endif
 
     // Should fail: dictionary doesn't exist and auto-download is disabled

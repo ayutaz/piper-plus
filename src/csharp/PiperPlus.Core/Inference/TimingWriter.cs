@@ -82,7 +82,7 @@ public static class TimingWriter
         // spec [validation.length_consistency]: phoneme_tokens (when provided)
         // and durations must have the same length. Cross-runtime parity:
         //   - Rust:   src/rust/piper-core/src/timing.rs:95-99
-        //   - Python: src/python_run/piper/timing.py:99-101 (ValueError)
+        //   - Python: src/python_run/piper_plus/timing.py:99-101 (ValueError)
         //   - Go:     src/go/piperplus/timing.go:33-34
         // ArgumentException is the .NET equivalent of Python ValueError.
         if (phonemeIds.Length != durations.Length)

@@ -7,7 +7,7 @@ noise_scale_min_ratio, noise_w_min_ratio) that all 7 runtimes must agree on.
 This script verifies the Python canonical implementations match the contract.
 
 Two source files are checked:
-  - src/python_run/piper/voice.py (runtime — Strategy A/B/C)
+  - src/python_run/piper_plus/voice.py (runtime — Strategy A/B/C)
   - src/python/piper_train/infer_onnx.py (training — Strategy A/B)
 
 Usage:
@@ -25,7 +25,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONTRACT_PATH = REPO_ROOT / "docs/spec/short-text-contract.toml"
-VOICE_PATH = REPO_ROOT / "src/python_run/piper/voice.py"
+VOICE_PATH = REPO_ROOT / "src/python_run/piper_plus/voice.py"
 INFER_ONNX_PATH = REPO_ROOT / "src/python/piper_train/infer_onnx.py"
 
 

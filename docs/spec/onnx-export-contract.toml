@@ -16,7 +16,7 @@
 # Implementations:
 #   Main TTS model:   src/python/piper_train/export_onnx.py
 #   Speaker encoder:  src/python/piper_train/speaker_encoder/export_encoder.py
-#   Runtime loaders:  src/python_run/piper/voice.py (config + ONNX session)
+#   Runtime loaders:  src/python_run/piper_plus/voice.py (config + ONNX session)
 #                     src/rust/piper-core/src/engine.rs
 #                     src/csharp/PiperPlus.Core/Inference/SessionFactory.cs
 #                     src/cpp/piper.cpp

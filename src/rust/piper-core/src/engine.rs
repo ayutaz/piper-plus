@@ -252,7 +252,7 @@ pub fn pad_short_phonemes(
 /// Strategy A 精密 post-trim: モデルの `durations` 出力から padding に
 /// 起因するサンプル数を計算して切り落とす。
 ///
-/// Python (`src/python_run/piper/voice.py::_trim_padding_by_durations`)
+/// Python (`src/python_run/piper_plus/voice.py::_trim_padding_by_durations`)
 /// と同じロジック・truncation で実装し、全ランタイムが同じ入力に対して
 /// バイト一致の音声を返せるようにする (issue #356, クロスランタイム契約)。
 ///
@@ -335,7 +335,7 @@ pub fn trim_padding_by_durations(
 /// helper applies the same drop to every other inference path so long-text
 /// outputs do not retain the audible doubled tail.
 ///
-/// Mirrors `piper.voice._trim_eos_region` so all runtimes produce
+/// Mirrors `piper_plus.voice._trim_eos_region` so all runtimes produce
 /// byte-equal output for the same `(audio, durations[-1], hop_size,
 /// eos_max_frames)` tuple. The sample-count conversion uses `as i64`
 /// truncation to match Python's `int(...)` semantics — cross-runtime
@@ -895,7 +895,7 @@ impl OnnxEngine {
                 0
             };
             // shape (1, 1) — matches export_onnx.py:506 and the Python
-            // runtime (`src/python_run/piper/voice.py:208`). The fixture
+            // runtime (`src/python_run/piper_plus/voice.py:208`). The fixture
             // ONNX requires rank 2; passing rank 1 raises "Invalid rank
             // for input: speaker_embedding_mask".
             Some(

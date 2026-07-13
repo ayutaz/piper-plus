@@ -52,28 +52,32 @@ _BUILTIN_CATALOG = {
 def get_default_model_dir() -> str:
     """Return the default model directory (OS-specific).
 
-    Checks PIPER_MODEL_DIR env var first, then falls back to:
-    - Windows: %APPDATA%/piper/models
-    - macOS: ~/Library/Application Support/piper/models
-    - Linux: $XDG_DATA_HOME/piper/models or ~/.local/share/piper/models
+    Checks PIPER_PLUS_MODEL_DIR env var first, then falls back to:
+    - Windows: %APPDATA%/piper-plus/models
+    - macOS: ~/Library/Application Support/piper-plus/models
+    - Linux: $XDG_DATA_HOME/piper-plus/models or ~/.local/share/piper-plus/models
     """
-    env_dir = os.environ.get("PIPER_MODEL_DIR")
+    env_dir = os.environ.get("PIPER_PLUS_MODEL_DIR")
     if env_dir:
         return env_dir
 
     if sys.platform == "win32":
         base = os.environ.get("APPDATA", os.path.expanduser("~"))
-        return os.path.join(base, "piper", "models")
+        return os.path.join(base, "piper-plus", "models")
     elif sys.platform == "darwin":
         return os.path.join(
-            os.path.expanduser("~"), "Library", "Application Support", "piper", "models"
+            os.path.expanduser("~"),
+            "Library",
+            "Application Support",
+            "piper-plus",
+            "models",
         )
     else:
         xdg = os.environ.get("XDG_DATA_HOME")
         if xdg:
-            return os.path.join(xdg, "piper", "models")
+            return os.path.join(xdg, "piper-plus", "models")
         return os.path.join(
-            os.path.expanduser("~"), ".local", "share", "piper", "models"
+            os.path.expanduser("~"), ".local", "share", "piper-plus", "models"
         )
 
 

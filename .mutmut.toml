@@ -20,8 +20,8 @@ paths_to_mutate = [
     "src/python/g2p/piper_plus_g2p/multilingual.py",
     "src/python/g2p/piper_plus_g2p/ssml.py",
     "src/python/g2p/piper_plus_g2p/base.py",
-    "src/python_run/piper/text_splitter.py",
-    "src/python_run/piper/timing.py",
+    "src/python_run/piper_plus/text_splitter.py",
+    "src/python_run/piper_plus/timing.py",
 ]
 
 # Test runner: g2p と python_run の両方を走らせる。

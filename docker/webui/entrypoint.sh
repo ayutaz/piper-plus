@@ -1,17 +1,17 @@
 #!/bin/bash
 set -e
 
-MODEL_DIR="${PIPER_MODEL_DIR:-/models}"
+MODEL_DIR="${PIPER_PLUS_MODEL_DIR:-/models}"
 
-# Download model if PIPER_MODEL is specified
-if [ -n "$PIPER_MODEL" ]; then
-    echo "Checking model: $PIPER_MODEL"
+# Download model if PIPER_PLUS_MODEL is specified
+if [ -n "$PIPER_PLUS_MODEL" ]; then
+    echo "Checking model: $PIPER_PLUS_MODEL"
     python -c "
 from piper_train.model_manager import resolve_model_path, download_model
 import sys, os
 
-model_name = os.environ['PIPER_MODEL']
-model_dir = os.environ.get('PIPER_MODEL_DIR', '/models')
+model_name = os.environ['PIPER_PLUS_MODEL']
+model_dir = os.environ.get('PIPER_PLUS_MODEL_DIR', '/models')
 
 # Already downloaded?
 path = resolve_model_path(model_name, model_dir)
@@ -26,4 +26,4 @@ if not download_model(model_name, model_dir):
 "
 fi
 
-exec python /app/app.py --model-dir "$MODEL_DIR" --output-dir "${PIPER_OUTPUT_DIR:-/output}" "$@"
+exec python /app/app.py --model-dir "$MODEL_DIR" --output-dir "${PIPER_PLUS_OUTPUT_DIR:-/output}" "$@"

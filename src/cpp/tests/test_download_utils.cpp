@@ -195,23 +195,23 @@ TEST(DownloadUtilsTest, ExtractModelNameNoQuality) {
 TEST(DownloadUtilsTest, ModelDownloadPath) {
     namespace fs = std::filesystem;
 
-    fs::path modelDir = "/tmp/piper/models";
+    fs::path modelDir = "/tmp/piper-plus/models";
     std::string filename = "tsukuyomi-chan-6lang-fp16.onnx";
 
     // Flat directory layout: files go directly into modelDir (matches Python behavior)
     fs::path expectedPath = modelDir / filename;
-    EXPECT_EQ(expectedPath, fs::path("/tmp/piper/models/tsukuyomi-chan-6lang-fp16.onnx"));
+    EXPECT_EQ(expectedPath, fs::path("/tmp/piper-plus/models/tsukuyomi-chan-6lang-fp16.onnx"));
 }
 
 TEST(DownloadUtilsTest, ConfigDownloadPath) {
     namespace fs = std::filesystem;
 
-    fs::path modelDir = "/tmp/piper/models";
+    fs::path modelDir = "/tmp/piper-plus/models";
     std::string filename = "config.json";
 
     // Flat directory layout: files go directly into modelDir (matches Python behavior)
     fs::path expectedPath = modelDir / filename;
-    EXPECT_EQ(expectedPath, fs::path("/tmp/piper/models/config.json"));
+    EXPECT_EQ(expectedPath, fs::path("/tmp/piper-plus/models/config.json"));
 }
 
 // ============================================
@@ -245,13 +245,13 @@ TEST(DownloadUtilsTest, DataDirectoryPath) {
 #ifdef _WIN32
     const char* appData = std::getenv("APPDATA");
     if (appData) {
-        std::filesystem::path expected = std::filesystem::path(appData) / "piper" / "models";
+        std::filesystem::path expected = std::filesystem::path(appData) / "piper-plus" / "models";
         EXPECT_FALSE(expected.empty());
     }
 #else
     const char* home = std::getenv("HOME");
     if (home) {
-        std::filesystem::path expected = std::filesystem::path(home) / ".local" / "share" / "piper" / "models";
+        std::filesystem::path expected = std::filesystem::path(home) / ".local" / "share" / "piper-plus" / "models";
         EXPECT_FALSE(expected.empty());
     }
 #endif
@@ -294,8 +294,8 @@ TEST(SecurityValidationTest, WindowsPathAccepted) {
 }
 
 TEST(SecurityValidationTest, UnixPathAccepted) {
-    EXPECT_TRUE(isSafeForShellPath("/home/user/.local/share/piper/model.onnx"));
-    EXPECT_TRUE(isSafeForShellPath("/tmp/piper/models/config.json"));
+    EXPECT_TRUE(isSafeForShellPath("/home/user/.local/share/piper-plus/model.onnx"));
+    EXPECT_TRUE(isSafeForShellPath("/tmp/piper-plus/models/config.json"));
 }
 
 // ============================================

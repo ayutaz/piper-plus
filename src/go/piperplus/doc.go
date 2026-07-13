@@ -163,10 +163,10 @@
 //
 //   - ONNX_RUNTIME_SHARED_LIBRARY_PATH: Path to the ONNX Runtime shared
 //     library. Used by [Init] when no explicit path is provided.
-//   - PIPER_DEFAULT_MODEL: Default model path.
-//   - PIPER_DEFAULT_CONFIG: Default config.json path, checked by
+//   - PIPER_PLUS_DEFAULT_MODEL: Default model path.
+//   - PIPER_PLUS_DEFAULT_CONFIG: Default config.json path, checked by
 //     [FindConfigPath].
-//   - PIPER_MODEL_DIR: Override the default model cache directory
+//   - PIPER_PLUS_MODEL_DIR: Override the default model cache directory
 //     used by [ModelManager].
 //
 // # Key Types

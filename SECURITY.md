@@ -121,7 +121,7 @@ artifacts for inference: ONNX models do not execute arbitrary Python on load.
 
 ### Do not expose the HTTP server on `0.0.0.0` without authentication
 
-The bundled FastAPI server (`src/python_run/piper/http_server.py`) and the
+The bundled FastAPI server (`src/python_run/piper_plus/http_server.py`) and the
 OpenAI-compatible TTS API (`docker/python-inference/inference.py`) are intended
 for trusted local use. They do not ship with built-in authentication. If you
 must expose them beyond `localhost`, place them behind a reverse proxy

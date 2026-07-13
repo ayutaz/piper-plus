@@ -172,7 +172,7 @@ class TestIsShortText:
 
 # ---------------------------------------------------------------------------
 # Issue #426: speaker_embedding feed parity with docker/python-inference
-# and src/python_run/piper/voice.py.
+# and src/python_run/piper_plus/voice.py.
 # ---------------------------------------------------------------------------
 # MB-iSTFT-VITS2 + Voice-Cloning exports declare speaker_embedding /
 # speaker_embedding_mask unconditionally (PR #320). When the WebUI fed a

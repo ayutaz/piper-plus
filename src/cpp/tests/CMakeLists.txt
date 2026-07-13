@@ -80,7 +80,7 @@ endif()
 if(EXISTS "${ORT_INCLUDE_DIR}/onnxruntime_cxx_api.h" OR EXISTS "${CMAKE_BINARY_DIR}/pi/include/onnxruntime_cxx_api.h")
     list(APPEND TEST_SOURCES test_prosody_inference.cpp)
     # Speaker Encoder E2E gate also requires ONNX Runtime (skips at runtime
-    # when PIPER_SPEAKER_ENCODER_ONNX_PATH is unset, but compilation needs
+    # when PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH is unset, but compilation needs
     # the C++ API headers).
     list(APPEND TEST_SOURCES test_speaker_encoder_e2e.cpp)
 endif()

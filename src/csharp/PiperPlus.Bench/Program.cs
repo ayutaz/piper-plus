@@ -1,5 +1,5 @@
 // Issue #383 Phase 1 — C# 実機ベンチハーネス。
-// 直列 (PIPER_G2P_PARALLELISM=1) と auto 並列 (未設定) の synthesize 全体
+// 直列 (PIPER_PLUS_G2P_PARALLELISM=1) と auto 並列 (未設定) の synthesize 全体
 // time を比較する。CLI ではなく PiperPlus.Core API を直接叩いて
 // プロセス起動コストを除外する。
 
@@ -58,11 +58,11 @@ foreach (var cfg in new[] { "serial", "parallel" })
 {
     if (cfg == "serial")
     {
-        Environment.SetEnvironmentVariable("PIPER_G2P_PARALLELISM", "1");
+        Environment.SetEnvironmentVariable("PIPER_PLUS_G2P_PARALLELISM", "1");
     }
     else
     {
-        Environment.SetEnvironmentVariable("PIPER_G2P_PARALLELISM", null);
+        Environment.SetEnvironmentVariable("PIPER_PLUS_G2P_PARALLELISM", null);
     }
 
     Console.WriteLine($"\n[bench] === {cfg} ===");

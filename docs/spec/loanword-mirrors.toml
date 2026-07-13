@@ -25,7 +25,7 @@ schema_version = 1
 name = "zh_en_loanword runtime data (10 mirrors)"
 canonical = "src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json"
 mirrors = [
-  "src/python_run/piper/phonemize/data/zh_en_loanword.json",
+  "src/python_run/piper_plus/phonemize/data/zh_en_loanword.json",
   # Rust 2 crate (§8.5: piper-plus-g2p と piper-core の重複維持)
   "src/rust/piper-plus-g2p/data/zh_en_loanword.json",
   "src/rust/piper-core/data/zh_en_loanword.json",

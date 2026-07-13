@@ -10,7 +10,7 @@ History
     those inputs outright.
 - PR #320 / Issue #426: MB-iSTFT-VITS2 + Voice Cloning support makes
     `speaker_embedding` / `speaker_embedding_mask` *always-declared*
-    inputs. Mainline CLI runtimes (`src/python_run/piper/voice.py`,
+    inputs. Mainline CLI runtimes (`src/python_run/piper_plus/voice.py`,
     `docker/python-inference/inference.py`, Rust, Go, C#) now feed zero
     embedding + mask=0 so the model falls back to `emb_g(sid)`
     (`src/python/piper_train/vits/models.py`). The two tensors are

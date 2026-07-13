@@ -68,7 +68,7 @@ jobs:
           mkdir -p /tmp/parity
           # piper-plus is the installed entry point name; use the module path
           # to avoid bin shadowing if multiple wheels are present.
-          python -m piper \
+          python -m piper_plus \
             --model "$MODEL_PATH" \
             --config "$CONFIG_PATH" \
             --json-input \
@@ -232,7 +232,7 @@ jobs:
       - name: Synthesize via --json-input
         run: |
           mkdir -p /tmp/parity
-          ./build/piper \
+          ./build/piper-plus \
             --model "$MODEL_PATH" \
             --json-input \
             --output_file /tmp/parity/cpp.wav \

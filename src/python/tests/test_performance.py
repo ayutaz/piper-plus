@@ -218,7 +218,7 @@ class TestPerformance:
             import tempfile
             from pathlib import Path
 
-            from piper.voice import PiperVoice
+            from piper_plus.voice import PiperVoice
 
             model_path = Path("test/models/multilingual-test-medium.onnx")
             if not model_path.exists():

@@ -530,7 +530,7 @@ def main():
         description="Test Japanese TTS functionality in piper"
     )
     parser.add_argument(
-        "--piper", default="piper/bin/piper", help="Path to piper executable"
+        "--piper", default="piper-plus/bin/piper-plus", help="Path to piper executable"
     )
     parser.add_argument(
         "--model", help="Path to Japanese TTS model (will download if not provided)"

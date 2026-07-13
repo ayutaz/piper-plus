@@ -1,7 +1,7 @@
 """Swedish per-word LID (conservative policy) — Python *runtime* mirror.
 
 Issue #539 Phase 1: regression tests for the runtime package
-(``piper.phonemize.multilingual``), mirroring the canonical g2p tests in
+(``piper_plus.phonemize.multilingual``), mirroring the canonical g2p tests in
 ``src/python/g2p/tests/test_swedish_lid.py``.
 
 The runtime ``MultilingualPhonemizer`` intentionally has a different public
@@ -16,8 +16,7 @@ dependency), so these tests run unconditionally — no ``importorskip`` needed.
 """
 
 import pytest
-
-from piper.phonemize.multilingual import (
+from piper_plus.phonemize.multilingual import (
     UnicodeLanguageDetector,
     _segment_text_multilingual,
 )

@@ -8,6 +8,6 @@ endif()
 
 set(PiperPlus_VERSION "@piper_version@")
 set(PiperPlus_DICT_DIR "${PACKAGE_PREFIX_DIR}/share/open_jtalk/dic")
-set(PiperPlus_G2P_DICT_DIR "${PACKAGE_PREFIX_DIR}/share/piper/dicts")
+set(PiperPlus_G2P_DICT_DIR "${PACKAGE_PREFIX_DIR}/share/piper-plus/dicts")
 
 check_required_components(PiperPlus)

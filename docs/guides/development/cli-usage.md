@@ -1,6 +1,6 @@
 # CLI Usage
 
-This guide covers detailed usage of the C++ CLI (`piper`), including command-line options, JSON input format, model management, environment variables, and Windows helper scripts.
+This guide covers detailed usage of the C++ CLI (`piper-plus`), including command-line options, JSON input format, model management, environment variables, and Windows helper scripts.
 
 ## C++ CLI
 
@@ -10,41 +10,41 @@ The `--text` option allows direct text input without piping:
 
 ```sh
 # Simple text-to-speech
-./bin/piper --model model.onnx --text "Hello, how are you?" -f output.wav
+./bin/piper-plus --model model.onnx --text "Hello, how are you?" -f output.wav
 
 # Japanese text (no encoding issues on Windows)
-bin\piper.exe --model models\tsukuyomi.onnx --text "こんにちは、今日は良い天気ですね。" -f output.wav
+bin\piper-plus.exe --model models\tsukuyomi.onnx --text "こんにちは、今日は良い天気ですね。" -f output.wav
 
 # With speaker selection
-./bin/piper --model model.onnx --text "Hello" --speaker 3 -f output.wav
+./bin/piper-plus --model model.onnx --text "Hello" --speaker 3 -f output.wav
 ```
 
 ### Pipe Input
 
 ```sh
 # Basic usage
-echo "Hello world" | ./bin/piper --model en_model.onnx --output_file output.wav
+echo "Hello world" | ./bin/piper-plus --model en_model.onnx --output_file output.wav
 
 # Streaming (low latency)
-echo "Long text..." | ./bin/piper --model en_model.onnx --output_file output.wav --streaming
+echo "Long text..." | ./bin/piper-plus --model en_model.onnx --output_file output.wav --streaming
 
 # GPU inference
-echo "Hello" | ./bin/piper --model en_model.onnx --use-cuda --output_file output.wav
+echo "Hello" | ./bin/piper-plus --model en_model.onnx --use-cuda --output_file output.wav
 
 # Phoneme timing output (for lip-sync, subtitles)
-echo "Hello world" | ./bin/piper --model en_model.onnx -f speech.wav --output-timing timing.json
+echo "Hello world" | ./bin/piper-plus --model en_model.onnx -f speech.wav --output-timing timing.json
 
 # Custom dictionary
-echo "DockerとGitHubを使います" | ./bin/piper --model ja_model.onnx --custom-dict my_dict.json -f output.wav
+echo "DockerとGitHubを使います" | ./bin/piper-plus --model ja_model.onnx --custom-dict my_dict.json -f output.wav
 
 # Inline phoneme input
-echo 'Hello [[ h ə l oʊ ]] world' | ./bin/piper --model en_model.onnx -f output.wav
+echo 'Hello [[ h ə l oʊ ]] world' | ./bin/piper-plus --model en_model.onnx -f output.wav
 
 # Raw phoneme input
-echo 'h ə l oʊ _ w ɜː l d' | ./bin/piper --model en_model.onnx --raw-phonemes -f output.wav
+echo 'h ə l oʊ _ w ɜː l d' | ./bin/piper-plus --model en_model.onnx --raw-phonemes -f output.wav
 
 # Streaming raw audio output
-echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
+echo 'Long text...' | ./bin/piper-plus --model en_model.onnx --output-raw | \
   aplay -r 22050 -f S16_LE -t raw -
 ```
 
@@ -81,7 +81,7 @@ Key options:
 | `--quiet/-q` | Suppress non-essential output | off |
 | `--version` | Show version | - |
 
-Run `piper --help` for all options.
+Run `piper-plus --help` for all options.
 
 ## JSON Input
 
@@ -98,35 +98,35 @@ Use `--json-input` flag for JSON input:
 
 ```bash
 # List all available models
-./bin/piper --list-models
+./bin/piper-plus --list-models
 
 # Filter by language
-./bin/piper --list-models ja
-./bin/piper --list-models en
+./bin/piper-plus --list-models ja
+./bin/piper-plus --list-models en
 ```
 
 ### Download Models
 
 ```bash
 # Download a model by name (aliases also work)
-./bin/piper --download-model tsukuyomi
-./bin/piper --download-model en_US-lessac-medium
+./bin/piper-plus --download-model tsukuyomi
+./bin/piper-plus --download-model en_US-lessac-medium
 
 # Specify download directory
-./bin/piper --download-model tsukuyomi --model-dir /path/to/models
+./bin/piper-plus --download-model tsukuyomi --model-dir /path/to/models
 
 # After download, use by model name (no full path needed)
-./bin/piper --model tsukuyomi --text "こんにちは"
+./bin/piper-plus --model tsukuyomi --text "こんにちは"
 ```
 
 ## Environment Variables (C++ CLI)
 
 | Variable | Description | Example |
 |---|---|---|
-| `PIPER_DEFAULT_MODEL` | Default model path when `--model` is not specified | `/path/to/model.onnx` |
-| `PIPER_DEFAULT_CONFIG` | Default config path when `--config` is not specified | `/path/to/config.json` |
-| `PIPER_MODEL_DIR` | Directory for downloaded models | `~/.local/share/piper/models` |
-| `PIPER_GPU_DEVICE_ID` | GPU device ID for CUDA | `0` |
+| `PIPER_PLUS_DEFAULT_MODEL` | Default model path when `--model` is not specified | `/path/to/model.onnx` |
+| `PIPER_PLUS_DEFAULT_CONFIG` | Default config path when `--config` is not specified | `/path/to/config.json` |
+| `PIPER_PLUS_MODEL_DIR` | Directory for downloaded models | `~/.local/share/piper-plus/models` |
+| `PIPER_PLUS_GPU_DEVICE_ID` | GPU device ID for CUDA | `0` |
 
 ## Helper Scripts (Windows)
 

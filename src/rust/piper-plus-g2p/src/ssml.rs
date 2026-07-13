@@ -181,7 +181,10 @@ impl SsmlParser {
                     // Other self-closing tags are ignored (no text content).
                 }
                 Ok(Event::Text(ref e)) => {
-                    let text = e.unescape().unwrap_or_default().trim().to_string();
+                    // quick-xml 0.41: BytesText::unescape() が削除され、`decode()` が
+                    // Reader の decoder を経由して UTF-8 化 + entity unescape を一括で行う
+                    // (`&amp;` → `&` 等)。旧 0.37 の `unescape()` と同義。
+                    let text = e.decode().unwrap_or_default().trim().to_string();
                     if !text.is_empty() {
                         segments.push(SsmlSegment {
                             text,

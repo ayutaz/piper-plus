@@ -227,30 +227,30 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 
 # アーカイブの作成
 WORKDIR /dist
-RUN mkdir -p piper && \
-    cp -dR /build/install/* ./piper/ && \
+RUN mkdir -p piper-plus && \
+    cp -dR /build/install/* ./piper-plus/ && \
     echo "TARGETARCH=${TARGETARCH}, TARGETVARIANT=${TARGETVARIANT}" && \
     if [ "$TARGETARCH" = "arm" ]; then \
         if [ "$TARGETVARIANT" = "v7" ] || [ "$TARGETVARIANT" = "7" ]; then \
             echo "Creating ARMv7 tarball..." && \
-            tar -czf "piper-linux-armv7.tar.gz" piper/; \
+            tar -czf "piper-plus-cpp-linux-armv7.tar.gz" piper-plus/; \
         elif [ -z "$TARGETVARIANT" ]; then \
             echo "ARM architecture with no variant specified, defaulting to ARMv7..." && \
-            tar -czf "piper-linux-armv7.tar.gz" piper/; \
+            tar -czf "piper-plus-cpp-linux-armv7.tar.gz" piper-plus/; \
         else \
             echo "Unknown ARM variant: $TARGETVARIANT" && \
-            tar -czf "piper-linux-arm-${TARGETVARIANT}.tar.gz" piper/; \
+            tar -czf "piper-plus-cpp-linux-arm-${TARGETVARIANT}.tar.gz" piper-plus/; \
         fi \
     elif [ "$TARGETARCH" = "arm64" ] || [ "$TARGETARCH" = "aarch64" ]; then \
         echo "Creating ARM64 tarball..." && \
-        tar -czf "piper-linux-arm64.tar.gz" piper/; \
+        tar -czf "piper-plus-cpp-linux-arm64.tar.gz" piper-plus/; \
     else \
         echo "Creating generic tarball for arch: $TARGETARCH" && \
-        tar -czf "piper_${TARGETARCH}.tar.gz" piper/; \
+        tar -czf "piper-plus-cpp-${TARGETARCH}.tar.gz" piper-plus/; \
     fi
 
 # Add an alias for backward compatibility
 FROM builder AS build
 
 FROM scratch
-COPY --from=build /dist/piper*.tar.gz ./
+COPY --from=build /dist/piper-plus-cpp-*.tar.gz ./

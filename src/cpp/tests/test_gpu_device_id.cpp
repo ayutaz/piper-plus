@@ -20,26 +20,26 @@ class GPUDeviceIdTest : public ::testing::Test {
 protected:
     void SetUp() override {
         // Clear environment variable before each test
-        unsetenv("PIPER_GPU_DEVICE_ID");
+        unsetenv("PIPER_PLUS_GPU_DEVICE_ID");
     }
 
     void TearDown() override {
         // Clean up environment variable
-        unsetenv("PIPER_GPU_DEVICE_ID");
+        unsetenv("PIPER_PLUS_GPU_DEVICE_ID");
     }
 };
 
 // Test environment variable parsing
 TEST_F(GPUDeviceIdTest, EnvironmentVariableParsing) {
     // Test valid integer
-    setenv("PIPER_GPU_DEVICE_ID", "2", 1);
-    const char* env_value = std::getenv("PIPER_GPU_DEVICE_ID");
+    setenv("PIPER_PLUS_GPU_DEVICE_ID", "2", 1);
+    const char* env_value = std::getenv("PIPER_PLUS_GPU_DEVICE_ID");
     ASSERT_NE(env_value, nullptr);
     EXPECT_EQ(std::stoi(env_value), 2);
 
     // Test invalid values don't crash
-    setenv("PIPER_GPU_DEVICE_ID", "invalid", 1);
-    env_value = std::getenv("PIPER_GPU_DEVICE_ID");
+    setenv("PIPER_PLUS_GPU_DEVICE_ID", "invalid", 1);
+    env_value = std::getenv("PIPER_PLUS_GPU_DEVICE_ID");
     ASSERT_NE(env_value, nullptr);
     // Should not crash when trying to parse
     try {
@@ -54,7 +54,7 @@ TEST_F(GPUDeviceIdTest, EnvironmentVariableParsing) {
 // Test default GPU device ID value
 TEST_F(GPUDeviceIdTest, DefaultGPUDeviceId) {
     // When no environment variable is set, default should be 0
-    const char* env_value = std::getenv("PIPER_GPU_DEVICE_ID");
+    const char* env_value = std::getenv("PIPER_PLUS_GPU_DEVICE_ID");
     EXPECT_EQ(env_value, nullptr);
 
     // In actual usage, the default value in RunConfig should be 0
@@ -64,22 +64,22 @@ TEST_F(GPUDeviceIdTest, DefaultGPUDeviceId) {
 // Test that large device IDs are accepted
 TEST_F(GPUDeviceIdTest, LargeDeviceIds) {
     // GPU device IDs can be large in multi-GPU systems
-    setenv("PIPER_GPU_DEVICE_ID", "7", 1);
-    const char* env_value = std::getenv("PIPER_GPU_DEVICE_ID");
+    setenv("PIPER_PLUS_GPU_DEVICE_ID", "7", 1);
+    const char* env_value = std::getenv("PIPER_PLUS_GPU_DEVICE_ID");
     ASSERT_NE(env_value, nullptr);
     EXPECT_EQ(std::stoi(env_value), 7);
 
     // Test a very large ID
-    setenv("PIPER_GPU_DEVICE_ID", "255", 1);
-    env_value = std::getenv("PIPER_GPU_DEVICE_ID");
+    setenv("PIPER_PLUS_GPU_DEVICE_ID", "255", 1);
+    env_value = std::getenv("PIPER_PLUS_GPU_DEVICE_ID");
     ASSERT_NE(env_value, nullptr);
     EXPECT_EQ(std::stoi(env_value), 255);
 }
 
 // Test negative device IDs (should be handled by CUDA runtime)
 TEST_F(GPUDeviceIdTest, NegativeDeviceIds) {
-    setenv("PIPER_GPU_DEVICE_ID", "-1", 1);
-    const char* env_value = std::getenv("PIPER_GPU_DEVICE_ID");
+    setenv("PIPER_PLUS_GPU_DEVICE_ID", "-1", 1);
+    const char* env_value = std::getenv("PIPER_PLUS_GPU_DEVICE_ID");
     ASSERT_NE(env_value, nullptr);
     EXPECT_EQ(std::stoi(env_value), -1);
 
@@ -89,8 +89,8 @@ TEST_F(GPUDeviceIdTest, NegativeDeviceIds) {
 
 // Test empty string handling
 TEST_F(GPUDeviceIdTest, EmptyStringHandling) {
-    setenv("PIPER_GPU_DEVICE_ID", "", 1);
-    const char* env_value = std::getenv("PIPER_GPU_DEVICE_ID");
+    setenv("PIPER_PLUS_GPU_DEVICE_ID", "", 1);
+    const char* env_value = std::getenv("PIPER_PLUS_GPU_DEVICE_ID");
 #ifdef _WIN32
     // Windows _putenv_s("name", "") removes the variable entirely
     if (env_value == nullptr) {
@@ -113,8 +113,8 @@ TEST_F(GPUDeviceIdTest, EmptyStringHandling) {
 
 // Test zero device ID
 TEST_F(GPUDeviceIdTest, ZeroDeviceId) {
-    setenv("PIPER_GPU_DEVICE_ID", "0", 1);
-    const char* env_value = std::getenv("PIPER_GPU_DEVICE_ID");
+    setenv("PIPER_PLUS_GPU_DEVICE_ID", "0", 1);
+    const char* env_value = std::getenv("PIPER_PLUS_GPU_DEVICE_ID");
     ASSERT_NE(env_value, nullptr);
     EXPECT_EQ(std::stoi(env_value), 0);
 }

@@ -34,7 +34,7 @@ class TestTextSplitterContract:
         assert "runtimes" in contract and "python" in contract["runtimes"]
 
     def test_python_closing_punctuation_matches_fixture(self, contract):
-        from piper.text_splitter import _CLOSING_PUNCTUATION
+        from piper_plus.text_splitter import _CLOSING_PUNCTUATION
 
         expected = {
             chr(cp) for cp in contract["runtimes"]["python"]["closing_punctuation"]
@@ -42,7 +42,7 @@ class TestTextSplitterContract:
         assert set(_CLOSING_PUNCTUATION) == expected
 
     def test_python_sentence_terminators_match_fixture(self, contract):
-        from piper.text_splitter import _SENTENCE_TERMINATORS
+        from piper_plus.text_splitter import _SENTENCE_TERMINATORS
 
         expected = {
             chr(cp) for cp in contract["runtimes"]["python"]["sentence_terminators"]
@@ -52,7 +52,7 @@ class TestTextSplitterContract:
     def test_python_strategy_is_post_consume(self, contract):
         # Behavioural assertion: after a terminator, a closing-punct codepoint
         # is greedily consumed into the same sentence chunk.
-        from piper.text_splitter import split_sentences
+        from piper_plus.text_splitter import split_sentences
 
         # Use the fullwidth right corner bracket 」 (in python's set).
         chunks = split_sentences("彼は「元気です。」次の文。")

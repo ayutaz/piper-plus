@@ -2,10 +2,10 @@
 #
 # Usage:
 #   1. Place your .onnx model + config.json in ./models/
-#   2. Set PIPER_MODEL to the model filename:
-#        PIPER_MODEL=your-model.onnx docker compose up --build
+#   2. Set PIPER_PLUS_MODEL to the model filename:
+#        PIPER_PLUS_MODEL=your-model.onnx docker compose up --build
 #      Or export it:
-#        export PIPER_MODEL=your-model.onnx
+#        export PIPER_PLUS_MODEL=your-model.onnx
 #        docker compose up --build
 #
 # GPU support:
@@ -39,7 +39,7 @@ services:
       - inference.py
       - --server
       - --model
-      - /app/models/${PIPER_MODEL:-model.onnx}
+      - /app/models/${PIPER_PLUS_MODEL:-model.onnx}
       - --port
       - "8000"
 

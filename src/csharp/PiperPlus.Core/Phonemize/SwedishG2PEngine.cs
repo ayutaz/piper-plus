@@ -20,7 +20,7 @@ namespace PiperPlus.Core.Phonemize;
 /// </para>
 /// <para>
 /// Matches the Python <c>phonemize_swedish()</c> in
-/// <c>piper_train/phonemize/swedish.py</c> exactly.
+/// <c>src/python/g2p/piper_plus_g2p/swedish.py</c> exactly.
 /// </para>
 /// </summary>
 public sealed class SwedishG2PEngine : ISwedishG2PEngine

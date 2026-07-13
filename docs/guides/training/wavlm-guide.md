@@ -163,7 +163,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
 ### C++ CLI 推論
 
 ```bash
-echo "こんにちは" | ./piper --model model.onnx --noise_scale 0.5 --output_file out.wav
+echo "こんにちは" | ./piper-plus --model model.onnx --noise-scale 0.5 --output-file out.wav
 ```
 
 ### noise_scale の調整目安

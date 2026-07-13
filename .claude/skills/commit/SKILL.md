@@ -41,7 +41,7 @@ CLAUDE.md のコミット規約に従い、ステージ済みまたは指定フ�
 以下のいずれかに該当する場合、**`/sync-docs` skill を呼び出すことを強く推奨**:
 
 - [ ] `git diff --stat` の変更行数が **100 行以上**
-- [ ] `src/python_run/piper/` / `src/python/g2p/` / `src/rust/piper-core/` / `src/cpp/` / `src/csharp/` / `src/go/` / `src/wasm/openjtalk-web/src/` に新規ファイルが追加されている
+- [ ] `src/python_run/piper_plus/` / `src/python/g2p/` / `src/rust/piper-core/` / `src/cpp/` / `src/csharp/` / `src/go/` / `src/wasm/openjtalk-web/src/` に新規ファイルが追加されている
 - [ ] 公開 API (関数シグネチャ、クラス、メソッド、HTTP エンドポイント) に変更がある
 - [ ] `piper_train` / `timing` / `voice` / `phonemize` / `config` などのコアモジュールが変更されている
 - [ ] 新規テストファイル (`tests/test_*.py`, `test/js/test-*.js`, etc.) が 3 つ以上追加されている

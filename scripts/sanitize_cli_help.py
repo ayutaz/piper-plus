@@ -18,7 +18,7 @@ The output is plain text. The header has exactly four lines:
 Usage:
     python scripts/sanitize_cli_help.py \\
         --runtime python \\
-        --source 'python -m piper --help' \\
+        --source 'python -m piper_plus --help' \\
         --in /tmp/piper-raw.txt \\
         --out docs/reference/cli-help/python.txt
 """

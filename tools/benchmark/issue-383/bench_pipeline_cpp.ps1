@@ -1,6 +1,6 @@
 # Issue #383 C++ Phase 1 実機ベンチ
 #
-# piper.exe を serial (PIPER_G2P_PARALLELISM=1) と parallel (auto) で呼び、
+# piper-plus.exe を serial (PIPER_PLUS_G2P_PARALLELISM=1) と parallel (auto) で呼び、
 # total wall-clock を計測する。warmup 1 + repeats 3、median を採用。
 #
 # Usage (from repo root):
@@ -9,13 +9,13 @@
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = (Resolve-Path "$PSScriptRoot/../../..").Path
-$Piper = Join-Path $RepoRoot "build/Release/piper.exe"
+$Piper = Join-Path $RepoRoot "build/Release/piper-plus.exe"
 $Model = Join-Path $RepoRoot "test/models/multilingual-test-medium.onnx"
 $TextFile = Join-Path $RepoRoot "tools/benchmark/texts/ja.txt"
 $OutDir = Join-Path $RepoRoot "tools/benchmark/issue-383/cpp_bench_tmp"
 $ResultsJson = Join-Path $RepoRoot "tools/benchmark/issue-383/cpp_bench_results.json"
 
-if (-not (Test-Path $Piper)) { throw "piper.exe not found: $Piper" }
+if (-not (Test-Path $Piper)) { throw "piper-plus.exe not found: $Piper" }
 if (-not (Test-Path $Model)) { throw "model not found: $Model" }
 if (-not (Test-Path $TextFile)) { throw "text not found: $TextFile" }
 
@@ -39,11 +39,11 @@ function Build-Text([int]$N) {
 }
 
 function Run-Once([string]$Text, [string]$OutWav) {
-    # piper.exe は --text 引数で直接テキストを取る (Windows のコマンドライン
+    # piper-plus.exe は --text 引数で直接テキストを取る (Windows のコマンドライン
     # 長制限があるが N=50 までならまず安全)。
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     & $Piper -m $Model -t $Text -f $OutWav --quiet | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "piper.exe failed (exit=$LASTEXITCODE) for text length $($Text.Length)" }
+    if ($LASTEXITCODE -ne 0) { throw "piper-plus.exe failed (exit=$LASTEXITCODE) for text length $($Text.Length)" }
     $sw.Stop()
     return $sw.Elapsed.TotalMilliseconds
 }
@@ -64,9 +64,9 @@ $Results = @{}
 foreach ($cfg in $Configs) {
     Write-Host "`n[bench] === config: $($cfg.Name) ==="
     if ($null -eq $cfg.Env) {
-        Remove-Item Env:PIPER_G2P_PARALLELISM -ErrorAction SilentlyContinue
+        Remove-Item Env:PIPER_PLUS_G2P_PARALLELISM -ErrorAction SilentlyContinue
     } else {
-        $env:PIPER_G2P_PARALLELISM = $cfg.Env
+        $env:PIPER_PLUS_G2P_PARALLELISM = $cfg.Env
     }
 
     $cfgResults = @{}
@@ -97,7 +97,7 @@ foreach ($cfg in $Configs) {
 }
 
 # Restore env (clean exit)
-Remove-Item Env:PIPER_G2P_PARALLELISM -ErrorAction SilentlyContinue
+Remove-Item Env:PIPER_PLUS_G2P_PARALLELISM -ErrorAction SilentlyContinue
 
 # Save JSON
 $payload = @{

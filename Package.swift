@@ -42,8 +42,8 @@
 //
 // For consumer-facing usage, see:
 //   - examples/swift/README.md  (SPM quick start + manual drag-and-drop)
-//   - docs/guides/ios-integration.md  (cross-runtime guide)
-//   - docs/spec/ios-shared-lib.md  (specification)
+//   - docs/guides/platform/ios-integration.md  (cross-runtime guide)
+//   - docs/reference/ios-shared-lib.md  (specification)
 
 import PackageDescription
 
@@ -85,7 +85,7 @@ let package = Package(
     // be consumed from `swift run` / macOS CLI targets without forcing the
     // consumer to drop iOS-only references entirely. visionOS / Mac
     // Catalyst slices are not yet supported (see
-    // docs/spec/ios-shared-lib.md §6 and docs/spec/swift-g2p.md §7.1).
+    // docs/reference/ios-shared-lib.md §6 and docs/reference/swift-g2p.md §7.1).
     platforms: [
         .iOS(.v15),
         .macOS(.v13),
@@ -96,7 +96,7 @@ let package = Package(
             targets: ["PiperPlus"]
         ),
         // G2P-only product — no ONNX Runtime dependency. See
-        // docs/guides/swift-g2p-integration.md for usage.
+        // docs/guides/platform/swift-g2p-integration.md for usage.
         .library(
             name: "PiperPlusG2P",
             targets: ["PiperPlusG2P"]

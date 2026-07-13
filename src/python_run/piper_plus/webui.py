@@ -20,9 +20,9 @@ except ImportError:
 
 
 try:
-    from piper import PiperVoice
+    from piper_plus import PiperVoice
 except ImportError:
-    # For testing UI without piper installed
+    # For testing UI without piper-plus installed
     PiperVoice = None
 
 from .training_manager import training_manager

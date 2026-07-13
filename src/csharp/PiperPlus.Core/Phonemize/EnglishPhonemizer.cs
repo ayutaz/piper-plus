@@ -37,7 +37,7 @@ public interface IEnglishG2PEngine
 /// <summary>
 /// English phonemizer that mirrors the Python
 /// <c>phonemize_english_with_prosody()</c> / <c>phonemize_english()</c>
-/// functions in <c>piper_train/phonemize/english.py</c>.
+/// functions in <c>src/python/g2p/piper_plus_g2p/english.py</c>.
 /// <para>
 /// Processing flow (1:1 with the Python implementation):
 /// <list type="number">

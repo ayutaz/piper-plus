@@ -91,7 +91,7 @@ pua_contract = "docs/spec/pua-contract.toml"
 # this file (PT phonemes are word-level, not table-based); each
 # runtime's test suite is the contract enforcer.
 python_canonical = "src/python/g2p/piper_plus_g2p/portuguese.py"
-python_runtime_mirror = "src/python_run/piper/phonemize/portuguese.py"
+python_runtime_mirror = "src/python_run/piper_plus/phonemize/portuguese.py"
 rust_core = "src/rust/piper-core/src/phonemize/portuguese.rs"
 rust_g2p = "src/rust/piper-plus-g2p/src/portuguese.rs"
 go = "src/go/phonemize/portuguese.go"

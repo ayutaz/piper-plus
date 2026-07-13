@@ -95,7 +95,7 @@ test = [
 #
 #     pip install "piper-train[super-mas]"
 #
-# Disable at runtime with PIPER_DISABLE_SUPER_MAS=1 (forces Cython). PyPI
+# Disable at runtime with PIPER_PLUS_DISABLE_SUPER_MAS=1 (forces Cython). PyPI
 # distribution does not exist upstream — install is git-only.
 #
 # Pinned to a specific commit SHA (not HEAD) for reproducibility and

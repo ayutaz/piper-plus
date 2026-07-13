@@ -5,8 +5,7 @@ Tests actual implementation without excessive mocking
 
 import numpy as np
 import pytest
-
-from piper.util import audio_float_to_int16
+from piper_plus.util import audio_float_to_int16
 
 
 class TestAudioUtils:
@@ -49,7 +48,7 @@ class TestPiperConfig:
         update.  This replaces the previous tautology that only inspected
         the input dict without ever calling production code.
         """
-        from piper.config import PhonemeType, PiperConfig
+        from piper_plus.config import PhonemeType, PiperConfig
 
         config_dict = {
             "audio": {"sample_rate": 22050, "hop_size": 256},
@@ -83,15 +82,17 @@ class TestPiperConfig:
         directly \u2014 not the dict \u2014 so this test fails if anyone changes
         the defaults without bumping the doc.
         """
-        from piper.config import PiperConfig
+        from piper_plus.config import PiperConfig
 
-        cfg = PiperConfig.from_dict({
-            "audio": {"sample_rate": 22050},
-            "num_symbols": 50,
-            "num_speakers": 1,
-            "phoneme_id_map": {"_": [0]},
-            # No "inference" key at all.
-        })
+        cfg = PiperConfig.from_dict(
+            {
+                "audio": {"sample_rate": 22050},
+                "num_symbols": 50,
+                "num_speakers": 1,
+                "phoneme_id_map": {"_": [0]},
+                # No "inference" key at all.
+            }
+        )
         assert cfg.noise_scale == pytest.approx(0.4)
         assert cfg.length_scale == pytest.approx(1.0)
         assert cfg.noise_w == pytest.approx(0.5)
@@ -105,15 +106,17 @@ class TestPiperConfig:
         Pre-fix, an `inference.get("noise_scale", 0.667)` could swallow
         an explicit zero. Verify the explicit value reaches the config.
         """
-        from piper.config import PiperConfig
+        from piper_plus.config import PiperConfig
 
-        cfg = PiperConfig.from_dict({
-            "audio": {"sample_rate": 22050},
-            "num_symbols": 50,
-            "num_speakers": 1,
-            "phoneme_id_map": {"_": [0]},
-            "inference": {"noise_scale": 0.0, "length_scale": 1.0, "noise_w": 0.0},
-        })
+        cfg = PiperConfig.from_dict(
+            {
+                "audio": {"sample_rate": 22050},
+                "num_symbols": 50,
+                "num_speakers": 1,
+                "phoneme_id_map": {"_": [0]},
+                "inference": {"noise_scale": 0.0, "length_scale": 1.0, "noise_w": 0.0},
+            }
+        )
         assert cfg.noise_scale == 0.0
         assert cfg.noise_w == 0.0
 
@@ -126,20 +129,26 @@ class TestPiperConfig:
         `PiperConfig.from_dict()` path so a future regression in PUA-key
         preservation is caught.
         """
-        from piper.config import PhonemeType, PiperConfig
+        from piper_plus.config import PhonemeType, PiperConfig
 
-        cfg = PiperConfig.from_dict({
-            "audio": {"sample_rate": 22050},
-            "num_symbols": 100,
-            "num_speakers": 1,
-            "phoneme_type": "openjtalk",
-            "phoneme_id_map": {
-                "_": [0],
-                "\ue00e": [30],  # ch
-                "\ue00f": [31],  # ts
-            },
-            "inference": {"noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8},
-        })
+        cfg = PiperConfig.from_dict(
+            {
+                "audio": {"sample_rate": 22050},
+                "num_symbols": 100,
+                "num_speakers": 1,
+                "phoneme_type": "openjtalk",
+                "phoneme_id_map": {
+                    "_": [0],
+                    "\ue00e": [30],  # ch
+                    "\ue00f": [31],  # ts
+                },
+                "inference": {
+                    "noise_scale": 0.667,
+                    "length_scale": 1.0,
+                    "noise_w": 0.8,
+                },
+            }
+        )
         assert cfg.phoneme_type is PhonemeType.OPENJTALK
         assert "\ue00e" in cfg.phoneme_id_map
         assert "\ue00f" in cfg.phoneme_id_map
@@ -152,19 +161,33 @@ class TestPiperConfig:
     @pytest.mark.unit
     def test_config_from_dict_with_language_id_map(self):
         """language_id_map round-trips through from_dict()."""
-        from piper.config import PiperConfig
+        from piper_plus.config import PiperConfig
 
-        cfg = PiperConfig.from_dict({
-            "audio": {"sample_rate": 22050},
-            "num_symbols": 50,
-            "num_speakers": 1,
-            "phoneme_id_map": {"_": [0]},
-            "num_languages": 6,
-            "language_id_map": {"ja": 0, "en": 1, "zh": 2, "es": 3, "fr": 4, "pt": 5},
-        })
+        cfg = PiperConfig.from_dict(
+            {
+                "audio": {"sample_rate": 22050},
+                "num_symbols": 50,
+                "num_speakers": 1,
+                "phoneme_id_map": {"_": [0]},
+                "num_languages": 6,
+                "language_id_map": {
+                    "ja": 0,
+                    "en": 1,
+                    "zh": 2,
+                    "es": 3,
+                    "fr": 4,
+                    "pt": 5,
+                },
+            }
+        )
         assert cfg.num_languages == 6
         assert cfg.language_id_map == {
-            "ja": 0, "en": 1, "zh": 2, "es": 3, "fr": 4, "pt": 5
+            "ja": 0,
+            "en": 1,
+            "zh": 2,
+            "es": 3,
+            "fr": 4,
+            "pt": 5,
         }
 
 
@@ -175,7 +198,7 @@ class TestFileHash:
     def test_file_hash_calculation(self, temp_dir):
         """Test file hash calculation"""
         try:
-            from piper.file_hash import get_file_hash
+            from piper_plus.file_hash import get_file_hash
         except ImportError:
             pytest.skip("File hash module not available")
 

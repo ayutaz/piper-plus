@@ -148,7 +148,7 @@ piper-plus -m model.onnx -t "Hello" --streaming | aplay -r 22050 -f S16_LE
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `-m, --model` | `$PIPER_DEFAULT_MODEL` | Path to ONNX model file |
+| `-m, --model` | `$PIPER_PLUS_DEFAULT_MODEL` | Path to ONNX model file |
 | `-c, --config` | auto-detected | Path to config.json |
 | `-t, --text` | | Text to synthesize (single utterance) |
 | `--language` | | Language code (ja, en, zh, ko, es, fr, pt, pt-PT, sv) |
@@ -170,7 +170,7 @@ piper-plus -m model.onnx -t "Hello" --streaming | aplay -r 22050 -f S16_LE
 | `--reference-audio` | | Voice cloning: extract `speaker_embedding` from this WAV |
 | `--speaker-embedding` | | Voice cloning: load a pre-computed 256-dim embedding (.bin / .npy) |
 | `--speaker-encoder-model` | | Voice cloning: ECAPA-TDNN ONNX model used with `--reference-audio` |
-| `--model-dir` | `${PIPER_MODEL_DIR}` | Model cache directory (defaults to `~/.cache/piper-plus`) |
+| `--model-dir` | `${PIPER_PLUS_MODEL_DIR}` | Model cache directory (defaults to `~/.cache/piper-plus`) |
 | `--list-models` | | List available pre-trained models (optionally filtered by language) |
 | `--download-model` | | Download a model by alias (e.g. `tsukuyomi`) and exit |
 | `--version` | | Print version (resolved from build ldflags) and exit |
@@ -247,7 +247,7 @@ piper-plus -m model.onnx -t "Hello" --streaming | aplay -r 22050 -f S16_LE
 | Function / Method | Description |
 |-------------------|-------------|
 | `piperplus.NewModelManager(cacheDir, logger) *ModelManager` | Create a model manager. Uses platform default cache dir if empty. |
-| `piperplus.DefaultCacheDir() string` | Platform-specific cache: `~/Library/Application Support/piper-plus/models` (macOS), `~/.local/share/piper-plus/models` (Linux), `%APPDATA%\piper-plus\models` (Windows). Override with `PIPER_MODEL_DIR`. |
+| `piperplus.DefaultCacheDir() string` | Platform-specific cache: `~/Library/Application Support/piper-plus/models` (macOS), `~/.local/share/piper-plus/models` (Linux), `%APPDATA%\piper-plus\models` (Windows). Override with `PIPER_PLUS_MODEL_DIR`. |
 | `manager.ListModels() ([]ModelInfo, error)` | List all cached `.onnx` models. |
 | `manager.FindModel(name) (string, error)` | Locate a model by name in the cache. |
 | `manager.DownloadModel(ctx, url) (string, error)` | Download a model to the cache (atomic write). |
@@ -457,9 +457,9 @@ docker run -p 8080:8080 -v /path/to/models:/models \
 | Variable | Description |
 |----------|-------------|
 | `ONNX_RUNTIME_SHARED_LIBRARY_PATH` | Path to the ONNX Runtime shared library. Required unless passed to `Init()`. |
-| `PIPER_DEFAULT_MODEL` | Default model path when `--model` is not specified. |
-| `PIPER_DEFAULT_CONFIG` | Default config.json path. Used when no explicit config is provided and no sidecar/directory config is found. |
-| `PIPER_MODEL_DIR` | Override the default model cache directory for `ModelManager`. |
+| `PIPER_PLUS_DEFAULT_MODEL` | Default model path when `--model` is not specified. |
+| `PIPER_PLUS_DEFAULT_CONFIG` | Default config.json path. Used when no explicit config is provided and no sidecar/directory config is found. |
+| `PIPER_PLUS_MODEL_DIR` | Override the default model cache directory for `ModelManager`. |
 
 ## Error Types / エラー型
 
@@ -540,7 +540,7 @@ src/go/
 When no explicit config path is provided, `LoadVoice` searches in this order:
 
 1. `--config` flag or `WithConfig()` option (must exist)
-2. `PIPER_DEFAULT_CONFIG` environment variable (if set and file exists)
+2. `PIPER_PLUS_DEFAULT_CONFIG` environment variable (if set and file exists)
 3. `{modelPath}.json` sidecar (e.g., `model.onnx.json`)
 4. `{modelDir}/config.json`
 

@@ -109,51 +109,51 @@
 **Windows (PowerShell):**
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/ayutaz/piper-plus/releases/latest/download/piper-windows-x64.zip" -OutFile piper.zip
-Expand-Archive piper.zip -DestinationPath .
-cd piper
+Invoke-WebRequest -Uri "https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-windows-x64.zip" -OutFile piper-plus-cpp.zip
+Expand-Archive piper-plus-cpp.zip -DestinationPath .
+cd piper-plus
 ```
 
 **macOS (Apple Silicon):**
 
 ```bash
-curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-macos-arm64.tar.gz
-tar xzf piper.tar.gz
-cd piper
+curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-macos-arm64.tar.gz
+tar xzf piper-plus-cpp.tar.gz
+cd piper-plus
 xattr -cr .
 ```
 
 **Linux (x86_64):**
 
 ```bash
-curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-x64.tar.gz
-tar xzf piper.tar.gz
-cd piper
+curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-x64.tar.gz
+tar xzf piper-plus-cpp.tar.gz
+cd piper-plus
 ```
 
 **Linux (ARM64, 라즈베리 파이 4/5):**
 
 ```bash
-curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-arm64.tar.gz
-tar xzf piper.tar.gz
-cd piper
+curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
+tar xzf piper-plus-cpp.tar.gz
+cd piper-plus
 ```
 
 **2. 모델 다운로드 및 음성 생성**
 
 ```sh
 # 츠쿠요미짱 모델 다운로드
-./bin/piper --download-model tsukuyomi
+./bin/piper-plus --download-model tsukuyomi
 
 # 음성 생성 (모델 이름만으로 OK — 다운로드된 모델을 자동 검색)
-./bin/piper --model tsukuyomi --text "こんにちは、今日は良い天気ですね。" --output_file output.wav
+./bin/piper-plus --model tsukuyomi --text "こんにちは、今日は良い天気ですね。" --output_file output.wav
 ```
 
-> **Windows cmd의 코드 페이지에 대해:** `--text` 옵션은 내부적으로 `GetCommandLineW()` (UTF-16)를 사용하므로 코드 페이지에 관계없이 그대로 동작합니다. 파이프 입력(`echo ... | piper`)을 사용하는 경우에만 `chcp 65001`로 UTF-8로 전환해 주세요.
+> **Windows cmd의 코드 페이지에 대해:** `--text` 옵션은 내부적으로 `GetCommandLineW()` (UTF-16)를 사용하므로 코드 페이지에 관계없이 그대로 동작합니다. 파이프 입력(`echo ... | piper-plus`)을 사용하는 경우에만 `chcp 65001`로 UTF-8로 전환해 주세요.
 >
-> **output.wav 출력 위치:** 현재 디렉터리(`cd piper`한 위치)에 생성됩니다.
+> **output.wav 출력 위치:** 현재 디렉터리(`cd piper-plus`한 위치)에 생성됩니다.
 
-> **어떤 바이너리를 선택해야 하나요?** 릴리스에는 `piper-plus-cli-*` (C# .NET) 및 `piper-plus-rs-cli-*` (Rust) CLI도 포함되어 있습니다. 위의 빠른 시작은 **C++ CLI (`piper-*`)**를 사용하며, 가장 폭넓은 플랫폼을 지원하므로 대부분의 사용자에게 권장됩니다. 자세한 내용은 [CLI 바이너리 선택하기](docs/getting-started/binary-selection.md)를 참조하세요.
+> **어떤 바이너리를 선택해야 하나요?** 릴리스에는 `piper-plus-cli-*` (C# .NET) 및 `piper-plus-rs-cli-*` (Rust) CLI도 포함되어 있습니다. 위의 빠른 시작은 **C++ CLI (`piper-plus-cpp-*`)**를 사용하며, 가장 폭넓은 플랫폼을 지원하므로 대부분의 사용자에게 권장됩니다. 자세한 내용은 [CLI 바이너리 선택하기](docs/getting-started/binary-selection.md)를 참조하세요.
 
 ### Python 추론
 
@@ -185,15 +185,15 @@ uv run python -m piper_train.infer_onnx \
 
 ```bash
 # 모델 목록 표시
-python -m piper --list-models
-python -m piper --list-models ja
+python -m piper_plus --list-models
+python -m piper_plus --list-models ja
 
 # 모델 다운로드
-python -m piper --download-model tsukuyomi
-python -m piper --download-model ja_JP-tsukuyomi-chan-medium
+python -m piper_plus --download-model tsukuyomi
+python -m piper_plus --download-model ja_JP-tsukuyomi-chan-medium
 
 # 다운로드 후 사용
-python -m piper --model ja_JP-tsukuyomi-chan-medium --text "こんにちは" -f output.wav
+python -m piper_plus --model ja_JP-tsukuyomi-chan-medium --text "こんにちは" -f output.wav
 ```
 
 ### WebUI
@@ -201,7 +201,7 @@ python -m piper --model ja_JP-tsukuyomi-chan-medium --text "こんにちは" -f 
 ```bash
 uv pip install -r src/python_run/requirements_webui.txt
 cd src/python_run
-python -m piper.webui --data-dir /path/to/models
+python -m piper_plus.webui --data-dir /path/to/models
 # → http://localhost:7860
 ```
 
@@ -422,41 +422,41 @@ cargo test -p piper-plus
 
 ```sh
 # 텍스트에서 음성 생성
-./bin/piper --model model.onnx --text "Hello, how are you?" -f output.wav
+./bin/piper-plus --model model.onnx --text "Hello, how are you?" -f output.wav
 
 # 일본어 텍스트 (Windows에서의 인코딩 문제 회피)
-bin\piper.exe --model models\tsukuyomi.onnx --text "こんにちは、今日は良い天気ですね。" -f output.wav
+bin\piper-plus.exe --model models\tsukuyomi.onnx --text "こんにちは、今日は良い天気ですね。" -f output.wav
 
 # 화자 지정
-./bin/piper --model model.onnx --text "Hello" --speaker 3 -f output.wav
+./bin/piper-plus --model model.onnx --text "Hello" --speaker 3 -f output.wav
 ```
 
 #### 파이프 입력
 
 ```sh
 # 기본
-echo "こんにちは" | ./bin/piper --model ja_model.onnx --output_file output.wav
+echo "こんにちは" | ./bin/piper-plus --model ja_model.onnx --output_file output.wav
 
 # 스트리밍 (저지연)
-echo "長いテキスト..." | ./bin/piper --model ja_model.onnx --output_file output.wav --streaming
+echo "長いテキスト..." | ./bin/piper-plus --model ja_model.onnx --output_file output.wav --streaming
 
 # GPU 추론
-echo "Hello" | ./bin/piper --model en_model.onnx --use-cuda --output_file output.wav
+echo "Hello" | ./bin/piper-plus --model en_model.onnx --use-cuda --output_file output.wav
 
 # 음소 타이밍 출력 (립싱크, 자막 동기화용)
-echo "Hello world" | ./bin/piper --model en_model.onnx -f speech.wav --output-timing timing.json
+echo "Hello world" | ./bin/piper-plus --model en_model.onnx -f speech.wav --output-timing timing.json
 
 # 커스텀 사전
-echo "DockerとGitHubを使います" | ./bin/piper --model ja_model.onnx --custom-dict my_dict.json -f output.wav
+echo "DockerとGitHubを使います" | ./bin/piper-plus --model ja_model.onnx --custom-dict my_dict.json -f output.wav
 
 # 인라인 음소 입력
-echo 'Hello [[ h ə l oʊ ]] world' | ./bin/piper --model en_model.onnx -f output.wav
+echo 'Hello [[ h ə l oʊ ]] world' | ./bin/piper-plus --model en_model.onnx -f output.wav
 
 # 원시 음소 입력
-echo 'h ə l oʊ _ w ɜː l d' | ./bin/piper --model en_model.onnx --raw-phonemes -f output.wav
+echo 'h ə l oʊ _ w ɜː l d' | ./bin/piper-plus --model en_model.onnx --raw-phonemes -f output.wav
 
 # 스트리밍 (raw audio 출력)
-echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
+echo 'Long text...' | ./bin/piper-plus --model en_model.onnx --output-raw | \
   aplay -r 22050 -f S16_LE -t raw -
 ```
 
@@ -493,12 +493,12 @@ echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
 | `--debug` | 디버그 로그 활성화 | off |
 | `--quiet` / `-q` | 로그 비활성화 | off |
 
-`piper --help`로 전체 옵션을 확인할 수 있습니다.
+`piper-plus --help`로 전체 옵션을 확인할 수 있습니다.
 
 > **WavLM 모델 권장 설정:** WavLM 판별기로 학습된 모델은 `--noise-scale 0.5`를 권장합니다 (기본값은 0.667).
 >
 > ```sh
-> echo "こんにちは" | ./bin/piper --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav
+> echo "こんにちは" | ./bin/piper-plus --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav
 > ```
 
 ### JSON 입력
@@ -516,35 +516,35 @@ echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
 
 ```bash
 # 사용 가능한 모델 목록 표시
-./bin/piper --list-models
+./bin/piper-plus --list-models
 
 # 언어별 필터링
-./bin/piper --list-models ja
-./bin/piper --list-models en
+./bin/piper-plus --list-models ja
+./bin/piper-plus --list-models en
 ```
 
 #### 모델 다운로드
 
 ```bash
 # 모델 이름을 지정하여 다운로드 (별칭도 사용 가능)
-./bin/piper --download-model tsukuyomi
-./bin/piper --download-model en_US-lessac-medium
+./bin/piper-plus --download-model tsukuyomi
+./bin/piper-plus --download-model en_US-lessac-medium
 
 # 다운로드 디렉터리 지정
-./bin/piper --download-model tsukuyomi --model-dir /path/to/models
+./bin/piper-plus --download-model tsukuyomi --model-dir /path/to/models
 
 # 다운로드 후 모델 이름으로 추론 (전체 경로 불필요)
-./bin/piper --model tsukuyomi --text "こんにちは"
+./bin/piper-plus --model tsukuyomi --text "こんにちは"
 ```
 
 ### 환경 변수 (C++ CLI)
 
 | 변수명 | 설명 | 예시 |
 |---|---|---|
-| `PIPER_DEFAULT_MODEL` | `--model` 미지정 시 기본 모델 경로 | `/path/to/model.onnx` |
-| `PIPER_DEFAULT_CONFIG` | `--config` 미지정 시 기본 설정 파일 경로 | `/path/to/config.json` |
-| `PIPER_MODEL_DIR` | 다운로드 모델 저장 디렉터리 | `~/.local/share/piper/models` |
-| `PIPER_GPU_DEVICE_ID` | CUDA GPU 디바이스 ID | `0` |
+| `PIPER_PLUS_DEFAULT_MODEL` | `--model` 미지정 시 기본 모델 경로 | `/path/to/model.onnx` |
+| `PIPER_PLUS_DEFAULT_CONFIG` | `--config` 미지정 시 기본 설정 파일 경로 | `/path/to/config.json` |
+| `PIPER_PLUS_MODEL_DIR` | 다운로드 모델 저장 디렉터리 | `~/.local/share/piper-plus/models` |
+| `PIPER_PLUS_GPU_DEVICE_ID` | CUDA GPU 디바이스 ID | `0` |
 
 ### 헬퍼 스크립트 (Windows)
 
@@ -699,8 +699,8 @@ OpenJTalk 통합에 의한 고품질 일본어 음성 합성. 사전 및 음성 
 | 변수명 | 설명 |
 |---|---|
 | `OPENJTALK_DICTIONARY_PATH` | OpenJTalk 사전 경로 (미설정 시 자동 다운로드) |
-| `PIPER_AUTO_DOWNLOAD_DICT` | `0`으로 자동 다운로드 비활성화 |
-| `PIPER_OFFLINE_MODE` | `1`로 오프라인 모드 |
+| `PIPER_PLUS_AUTO_DOWNLOAD_DICT` | `0`으로 자동 다운로드 비활성화 |
+| `PIPER_PLUS_OFFLINE_MODE` | `1`로 오프라인 모드 |
 
 자세한 내용은 일본어 음성 합성 가이드 및 [음소 매핑 레퍼런스](docs/api-reference/phoneme-mapping.md)를 참조하세요.
 
@@ -723,7 +723,7 @@ xattr -cr piper/
 x64 / arm64이 지원됩니다. OpenJTalk 사전은 첫 실행 시 자동으로 다운로드됩니다. 자세한 내용은 [Windows 설정 가이드](docs/getting-started/windows-setup.md)를 참조하세요.
 
 ```cmd
-piper.exe --model en_US-lessac-medium.onnx -f output.wav
+piper-plus.exe --model en_US-lessac-medium.onnx -f output.wav
 ```
 
 ### WebAssembly

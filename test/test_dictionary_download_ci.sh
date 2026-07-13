@@ -15,7 +15,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 if [ -n "$PIPER_BIN_PATH" ]; then
     PIPER_BIN="$PIPER_BIN_PATH"
 else
-    PIPER_BIN="$PROJECT_ROOT/piper/bin/piper"
+    PIPER_BIN="$PROJECT_ROOT/piper-plus/bin/piper-plus"
 fi
 
 # Check if piper binary exists
@@ -24,12 +24,12 @@ if [ ! -f "$PIPER_BIN" ]; then
     echo "Current directory: $(pwd)"
     echo "Directory contents:"
     ls -la
-    if [ -d "piper" ]; then
+    if [ -d "piper-plus" ]; then
         echo "Piper directory contents:"
-        ls -la piper/
-        if [ -d "piper/bin" ]; then
+        ls -la piper-plus/
+        if [ -d "piper-plus/bin" ]; then
             echo "Piper bin directory contents:"
-            ls -la piper/bin/
+            ls -la piper-plus/bin/
         fi
     fi
     exit 1

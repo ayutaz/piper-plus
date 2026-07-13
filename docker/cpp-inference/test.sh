@@ -4,13 +4,13 @@ set -e
 echo "=== C++ Inference Container Test ==="
 echo ""
 
-# Test 1: Check piper binary
+# Test 1: Check piper-plus binary
 echo "--- Piper Binary Test ---"
-if command -v piper &> /dev/null; then
-    echo "✓ piper binary found: $(which piper)"
-    piper --version || echo "Warning: Could not get version"
+if command -v piper-plus &> /dev/null; then
+    echo "✓ piper-plus binary found: $(which piper-plus)"
+    piper-plus --version || echo "Warning: Could not get version"
 else
-    echo "✗ piper binary not found"
+    echo "✗ piper-plus binary not found"
     exit 1
 fi
 
@@ -42,20 +42,20 @@ echo ""
 
 # Test 3: Check native G2P (self-contained, no espeak-ng dependency)
 echo "--- Native G2P Test ---"
-if piper --help 2>&1 | grep -qi "model\|help\|usage"; then
-    echo "✓ piper binary responds to --help (native G2P built-in)"
+if piper-plus --help 2>&1 | grep -qi "model\|help\|usage"; then
+    echo "✓ piper-plus binary responds to --help (native G2P built-in)"
 else
-    echo "✗ piper --help did not produce expected output"
+    echo "✗ piper-plus --help did not produce expected output"
 fi
 
 echo ""
 
 # Test 4: Help command test
 echo "--- Help Command Test ---"
-if piper --help &> /dev/null; then
-    echo "✓ piper --help works"
+if piper-plus --help &> /dev/null; then
+    echo "✓ piper-plus --help works"
 else
-    echo "✗ piper --help failed"
+    echo "✗ piper-plus --help failed"
     exit 1
 fi
 
@@ -79,4 +79,4 @@ echo ""
 echo "=== Summary ==="
 echo "Container is ready for inference!"
 echo "Mount your models to /app/models and run:"
-echo "  piper --model /app/models/your_model.onnx --output_file output.wav"
+echo "  piper-plus --model /app/models/your_model.onnx --output_file output.wav"

@@ -41,12 +41,12 @@ param(
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $env:PYTHONIOENCODING = "utf-8"
 
-# Find piper.exe
+# Find piper-plus.exe
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $piperLocations = @(
-    (Join-Path $scriptDir "piper.exe"),
-    (Join-Path $scriptDir "..\bin\piper.exe"),
-    (Join-Path $scriptDir "build\Release\piper.exe")
+    (Join-Path $scriptDir "piper-plus.exe"),
+    (Join-Path $scriptDir "..\bin\piper-plus.exe"),
+    (Join-Path $scriptDir "build\Release\piper-plus.exe")
 )
 
 $piperExe = $null
@@ -58,7 +58,7 @@ foreach ($loc in $piperLocations) {
 }
 
 if (-not $piperExe) {
-    Write-Error "piper.exe not found. Place this script in the same directory as piper.exe."
+    Write-Error "piper-plus.exe not found. Place this script in the same directory as piper-plus.exe."
     exit 1
 }
 
@@ -82,7 +82,7 @@ Write-Host "Generating speech..." -ForegroundColor Cyan
 & $piperExe @piperArgs
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "piper.exe failed with exit code $LASTEXITCODE"
+    Write-Error "piper-plus.exe failed with exit code $LASTEXITCODE"
     exit 1
 }
 

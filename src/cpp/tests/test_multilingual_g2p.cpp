@@ -451,8 +451,8 @@ namespace {
 
 // Replicates piper.cpp findDictionaryFile() search logic:
 //   1. modelDir/<filename>
-//   2. <exeDir>/../share/piper/dicts/<filename>  (skipped here — no exe context)
-//   3. PIPER_DICTIONARIES_PATH/<filename>
+//   2. <exeDir>/../share/piper-plus/dicts/<filename>  (skipped here — no exe context)
+//   3. PIPER_PLUS_DICTIONARIES_PATH/<filename>
 // Returns first existing path, or empty string.
 std::string findDictionaryFileTestImpl(const std::string &filename,
                                        const std::string &modelDir) {
@@ -467,7 +467,7 @@ std::string findDictionaryFileTestImpl(const std::string &filename,
     // 2. (exe-relative path skipped in test context)
 
     // 3. Environment variable
-    const char *envPath = std::getenv("PIPER_DICTIONARIES_PATH");
+    const char *envPath = std::getenv("PIPER_PLUS_DICTIONARIES_PATH");
     if (envPath && envPath[0] != '\0') {
         fs::path p3 = fs::path(envPath) / filename;
         if (fs::exists(p3)) {
@@ -531,13 +531,13 @@ TEST(FindDictionaryFileTest, EnvVarOverride) {
     std::ofstream(tmpDir.path() / filename) << "{}";
 
     // Set environment variable to point to the temp directory
-    ScopedEnvVar env("PIPER_DICTIONARIES_PATH", tmpDir.path().string());
+    ScopedEnvVar env("PIPER_PLUS_DICTIONARIES_PATH", tmpDir.path().string());
 
     // Model dir does NOT contain the file -> should fall through to env var
     TempDir emptyModelDir;
     std::string result = findDictionaryFileTestImpl(filename, emptyModelDir.path().string());
 
-    EXPECT_FALSE(result.empty()) << "Dictionary should be found via PIPER_DICTIONARIES_PATH";
+    EXPECT_FALSE(result.empty()) << "Dictionary should be found via PIPER_PLUS_DICTIONARIES_PATH";
     EXPECT_NE(result.find(filename), std::string::npos);
 }
 
@@ -546,7 +546,7 @@ TEST(FindDictionaryFileTest, NonexistentPathReturnsEmpty) {
     std::string bogusDir = "/no/such/directory/piper_test_bogus_12345";
 
     // Make sure env var is not set or points to a nonexistent path
-    ScopedEnvVar env("PIPER_DICTIONARIES_PATH", bogusDir);
+    ScopedEnvVar env("PIPER_PLUS_DICTIONARIES_PATH", bogusDir);
 
     std::string result = findDictionaryFileTestImpl("cmudict_data.json", bogusDir);
     EXPECT_TRUE(result.empty()) << "Should return empty string for nonexistent paths";
@@ -562,14 +562,14 @@ TEST(FindDictionaryFileTest, ModelDirHasPriority) {
     std::ofstream(modelDir.path() / filename) << "{\"source\": \"model\"}";
     std::ofstream(envDir.path() / filename) << "{\"source\": \"env\"}";
 
-    ScopedEnvVar env("PIPER_DICTIONARIES_PATH", envDir.path().string());
+    ScopedEnvVar env("PIPER_PLUS_DICTIONARIES_PATH", envDir.path().string());
 
     std::string result = findDictionaryFileTestImpl(filename, modelDir.path().string());
 
     EXPECT_FALSE(result.empty());
     // Model dir path should win (priority 1 over priority 3)
     EXPECT_NE(result.find(modelDir.path().string()), std::string::npos)
-        << "Model directory should have priority over PIPER_DICTIONARIES_PATH";
+        << "Model directory should have priority over PIPER_PLUS_DICTIONARIES_PATH";
 }
 
 // =========================================================================

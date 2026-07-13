@@ -110,7 +110,7 @@ L2 再正規化を入れた v6 でも `loss_dino` が step ~1249 で突如 0.00 
 export WANDB_MODE=disabled
 export NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1
 export PYTHONPATH=/data/piper-plus-zero-shot/src/python
-export PIPER_FORCE_CPU_ORT=1
+export PIPER_PLUS_FORCE_CPU_ORT=1
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 # LD_LIBRARY_PATH: PyTorch 同梱 cuDNN を ORT に見せる (memory/env_setup.md 参照)
 

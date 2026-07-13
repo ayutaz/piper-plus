@@ -277,7 +277,7 @@ ignore = [
 
 # isort互換設定
 [tool.ruff.lint.isort]
-known-first-party = ["piper", "piper_train"]
+known-first-party = ["piper_plus", "piper_plus_g2p", "piper_train"]
 combine-as-imports = true
 lines-after-imports = 2
 
@@ -395,7 +395,7 @@ version = {file = "VERSION"}
 branch = true
 source = [
     "src/python/piper_train",
-    "src/python_run/piper",
+    "src/python_run/piper_plus",
     "src/python/g2p/piper_plus_g2p",
 ]
 omit = [
@@ -431,7 +431,7 @@ omit = [
     # ----- (a) vendored scipy.io.wavfile (read/write のみ使用、形式判定の大部分は dead branch) -----
     "*/piper_train/vits/wavfile.py",
     # ----- (a) SSML fallback shim (canonical は piper_plus_g2p.ssml 側、ランタイム側は import re-export のみ) -----
-    "*/piper/phonemize/ssml.py",
+    "*/piper_plus/phonemize/ssml.py",
     # ----- (c) Data preprocessing scripts -----
     "*/piper_train/preprocess.py",
     "*/piper_train/tools/prepare_bilingual_dataset.py",
@@ -457,12 +457,12 @@ omit = [
     "*/piper_train/norm_audio/trim.py",
     "*/piper_train/norm_audio/vad.py",
     # ----- (a) Runtime CLI entries -----
-    "*/piper/__main__.py",
-    "*/piper/webui.py",                                    # Gradio UI
-    "*/piper/http_server.py",                              # FastAPI server (E2E test で cover)
-    "*/piper/training_manager.py",                         # subprocess train 起動
-    "*/piper/download.py",                                 # (d) HuggingFace network 必須
-    "*/piper/sample_texts.py",                             # WebUI 用 constant データ (制御フローなし)
+    "*/piper_plus/__main__.py",
+    "*/piper_plus/webui.py",                               # Gradio UI
+    "*/piper_plus/http_server.py",                         # FastAPI server (E2E test で cover)
+    "*/piper_plus/training_manager.py",                    # subprocess train 起動
+    "*/piper_plus/download.py",                            # (d) HuggingFace network 必須
+    "*/piper_plus/sample_texts.py",                        # WebUI 用 constant データ (制御フローなし)
     # ----- (a) Resource finder (importlib.resources、env 依存) -----
     "*/piper_train/_resources.py",
     "*/piper_train/model_manager.py",                      # (d) HuggingFace catalog network 必須

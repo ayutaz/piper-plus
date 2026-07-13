@@ -52,7 +52,7 @@ public class TextSplitterContractTests
         }
 
         throw new FileNotFoundException(
-            "Could not locate tests/fixtures/text_splitter/contract.json. Set PIPER_TEXT_SPLITTER_FIXTURE or copy via PiperPlus.runsettings.");
+            "Could not locate tests/fixtures/text_splitter/contract.json. Set PIPER_PLUS_TEXT_SPLITTER_FIXTURE or copy via PiperPlus.runsettings.");
     }
 
     private static JsonElement LoadFixture()

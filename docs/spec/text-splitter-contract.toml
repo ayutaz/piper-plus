@@ -17,7 +17,7 @@
 #   Rust:   src/rust/piper-core/src/streaming.rs           is_closing_punctuation()
 #   C#:     src/csharp/PiperPlus.Core/Phonemize/TextSplitter.cs  IsClosingPunctuation()
 #   Go:     src/go/piperplus/text_splitter.go              isClosingPunctuation()
-#   Python: src/python_run/piper/text_splitter.py          _CLOSING_PUNCTUATION
+#   Python: src/python_run/piper_plus/text_splitter.py          _CLOSING_PUNCTUATION
 #   WASM:   (uses Rust via piper-wasm)
 #
 # Related:

@@ -17,17 +17,27 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Install Python 3.13 via deadsnakes PPA. Ubuntu 24.04 (Noble) の apt
 # 標準は python3.12、 3.13 は deadsnakes PPA (CPython core dev maintained)
 # 経由で取得。 Issue #527 / DR-001 で deadsnakes 採用が確定。
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
-    && add-apt-repository -y ppa:deadsnakes/ppa \
-    && apt-get update && apt-get install -y --no-install-recommends \
-    python3.13 \
-    python3.13-venv \
-    python3-pip \
-    libsndfile1 \
-    && update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 \
-    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1 \
-    && rm -rf /var/lib/apt/lists/*
+#
+# apt-get retry loop (max 3): CI で稀に Ubuntu package server が
+# TimeoutError で unreachable になる flake 対策 (2026-07-10 PR #598 observed)。
+# apt-get 自体は retry 機能を持たないため shell で明示的に wrap する。
+RUN for i in 1 2 3; do \
+        apt-get update && apt-get install -y --no-install-recommends \
+            software-properties-common \
+        && break || { echo "apt retry $i/3"; sleep 15; }; \
+    done && \
+    add-apt-repository -y ppa:deadsnakes/ppa && \
+    for i in 1 2 3; do \
+        apt-get update && apt-get install -y --no-install-recommends \
+            python3.13 \
+            python3.13-venv \
+            python3-pip \
+            libsndfile1 \
+        && break || { echo "apt retry $i/3"; sleep 15; }; \
+    done && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1 && \
+    rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip / setuptools / wheel to clear Trivy supply-chain CVEs.
 # Run before installing uv so the upgraded pip is what bootstraps the rest.

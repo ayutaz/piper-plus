@@ -2,9 +2,9 @@
 
 ## 概要
 
-このガイドでは、Windows環境でPiperとOpenJTalkを使用して日本語音声合成を行うための手順を説明します。
+このガイドでは、Windows環境でpiper-plusとOpenJTalkを使用して日本語音声合成を行うための手順を説明します。
 
-> **ビルド不要で使いたい方へ**: [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) からプリビルドバイナリ (`piper-windows-x64.zip`) をダウンロードすれば、ビルドせずにすぐ使えます。ビルドが必要なのは、ソースコードを変更したい開発者のみです。
+> **ビルド不要で使いたい方へ**: [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) からプリビルドバイナリ (`piper-plus-cpp-windows-x64.zip`) をダウンロードすれば、ビルドせずにすぐ使えます。ビルドが必要なのは、ソースコードを変更したい開発者のみです。
 
 ## 前提条件
 
@@ -105,7 +105,7 @@ REM ビルド結果の確認
 dir Release\*.exe
 ```
 
-> **ビルド中の警告について**: `warning C4996` (strcpy/fopen 関連) が大量に表示されますが、これは正常です。最終的に `piper.exe` が生成されていれば、ビルドは成功しています。`error` ではなく `warning` であれば無視して問題ありません。
+> **ビルド中の警告について**: `warning C4996` (strcpy/fopen 関連) が大量に表示されますが、これは正常です。最終的に `piper-plus.exe` が生成されていれば、ビルドは成功しています。`error` ではなく `warning` であれば無視して問題ありません。
 
 ### 4. ビルド後の確認
 
@@ -114,7 +114,7 @@ dir Release\*.exe
 ```powershell
 # 必須ファイルの確認
 $requiredFiles = @(
-    "Release\piper.exe",
+    "Release\piper-plus.exe",
     "Release\*.dll"
 )
 
@@ -135,7 +135,7 @@ OpenJTalkは自動的にビルドされ、必要な辞書 (NAIST-JDIC) は初回
 
 ```powershell
 # 自動ダウンロードのテスト
-.\Release\piper.exe --help
+.\Release\piper-plus.exe --help
 # 初回実行時に辞書が自動ダウンロードされます
 ```
 
@@ -145,7 +145,7 @@ OpenJTalkは自動的にビルドされ、必要な辞書 (NAIST-JDIC) は初回
 
 ```powershell
 # 辞書ディレクトリを作成
-$dictPath = "$env:APPDATA\piper\openjtalk_dic"
+$dictPath = "$env:APPDATA\piper-plus\openjtalk_dic"
 New-Item -ItemType Directory -Path $dictPath -Force
 
 # 辞書をダウンロード（別のPCでダウンロードしてコピー）
@@ -155,7 +155,7 @@ New-Item -ItemType Directory -Path $dictPath -Force
 [Environment]::SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", $dictPath, [EnvironmentVariableTarget]::User)
 
 # オフラインモードを有効化
-[Environment]::SetEnvironmentVariable("PIPER_OFFLINE_MODE", "1", [EnvironmentVariableTarget]::User)
+[Environment]::SetEnvironmentVariable("PIPER_PLUS_OFFLINE_MODE", "1", [EnvironmentVariableTarget]::User)
 ```
 
 ### C# CLI のセットアップ (オプション)
@@ -183,7 +183,7 @@ dotnet run --project src\csharp\PiperPlus.Cli -- --model path\to\model.onnx --te
 
 ```powershell
 # 日本語テキストを音声ファイルに変換
-echo "こんにちは世界" | .\piper.exe --model ja_JP-voice.onnx --output_file hello.wav
+echo "こんにちは世界" | .\piper-plus.exe --model ja_JP-voice.onnx --output_file hello.wav
 ```
 
 **コマンドプロンプト (cmd):**
@@ -191,7 +191,7 @@ echo "こんにちは世界" | .\piper.exe --model ja_JP-voice.onnx --output_fil
 ```cmd
 REM 日本語テキストを音声ファイルに変換（chcp 65001でUTF-8に切り替え）
 chcp 65001
-echo こんにちは世界 | piper.exe --model ja_JP-voice.onnx --output_file hello.wav
+echo こんにちは世界 | piper-plus.exe --model ja_JP-voice.onnx --output_file hello.wav
 ```
 
 ### C++から使用する例
@@ -233,7 +233,7 @@ param(
 )
 
 # Piperのパス
-$piperPath = ".\build\Release\piper.exe"
+$piperPath = ".\build\Release\piper-plus.exe"
 $modelPath = ".\models\ja_JP-voice.onnx"
 
 # テキストを音声に変換
@@ -274,20 +274,20 @@ uv run python -m piper_train.infer_onnx --help
 
 エラー: `OpenJTalk dictionary not found` または初回実行時に辞書の自動ダウンロードが失敗する場合
 
-> **注意**: OpenJTalk は `piper.exe` に静的リンク済みです。別途バイナリは不要です。このエラーは辞書ファイルが見つからない場合に発生します。
+> **注意**: OpenJTalk は `piper-plus.exe` に静的リンク済みです。別途バイナリは不要です。このエラーは辞書ファイルが見つからない場合に発生します。
 
 解決方法：
 
 ```powershell
-# 1. piper.exeの存在確認（念のため）
-if (Test-Path ".\Release\piper.exe") {
-    Write-Host "piper.exe OK" -ForegroundColor Green
+# 1. piper-plus.exeの存在確認（念のため）
+if (Test-Path ".\Release\piper-plus.exe") {
+    Write-Host "piper-plus.exe OK" -ForegroundColor Green
 } else {
-    Write-Host "piper.exe not found. Rebuild with: cmake --build . --config Release" -ForegroundColor Red
+    Write-Host "piper-plus.exe not found. Rebuild with: cmake --build . --config Release" -ForegroundColor Red
 }
 
 # 2. OpenJTalk辞書ディレクトリの確認
-$dictPath = "$env:APPDATA\piper\open_jtalk_dic_utf_8-1.11"
+$dictPath = "$env:APPDATA\piper-plus\open_jtalk_dic_utf_8-1.11"
 if (Test-Path $dictPath) {
     Write-Host "辞書ディレクトリが見つかりました: $dictPath" -ForegroundColor Green
 } else {
@@ -295,13 +295,13 @@ if (Test-Path $dictPath) {
 }
 
 # 3. 辞書を手動でダウンロード・展開する（自動DLが失敗した場合）
-New-Item -ItemType Directory -Path "$env:APPDATA\piper" -Force | Out-Null
+New-Item -ItemType Directory -Path "$env:APPDATA\piper-plus" -Force | Out-Null
 Invoke-WebRequest -Uri "https://jaist.dl.sourceforge.net/project/open-jtalk/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz" `
     -OutFile "$env:TEMP\open_jtalk_dic_utf_8-1.11.tar.gz"
-tar -xzf "$env:TEMP\open_jtalk_dic_utf_8-1.11.tar.gz" -C "$env:APPDATA\piper"
+tar -xzf "$env:TEMP\open_jtalk_dic_utf_8-1.11.tar.gz" -C "$env:APPDATA\piper-plus"
 
 # 4. 辞書パスを環境変数で明示指定
-[Environment]::SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", "$env:APPDATA\piper\open_jtalk_dic_utf_8-1.11", [EnvironmentVariableTarget]::User)
+[Environment]::SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", "$env:APPDATA\piper-plus\open_jtalk_dic_utf_8-1.11", [EnvironmentVariableTarget]::User)
 Write-Host "OPENJTALK_DICTIONARY_PATH を設定しました。PowerShellを再起動してください。" -ForegroundColor Green
 ```
 
@@ -327,12 +327,12 @@ Test-NetConnection -ComputerName "jaist.dl.sourceforge.net" -Port 443
 Invoke-WebRequest -Uri "https://jaist.dl.sourceforge.net/project/open-jtalk/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz" -OutFile "openjtalk_dic.tar.gz"
 
 # 5. 解凍（7-Zipまたはtarコマンドを使用）
-tar -xzf openjtalk_dic.tar.gz -C "$env:APPDATA\piper"
+tar -xzf openjtalk_dic.tar.gz -C "$env:APPDATA\piper-plus"
 ```
 
 ### 日本語テキストの文字化け・文字化けによる音声生成失敗
 
-症状: 日本語テキストをパイプで `piper.exe` に渡すと、文字化けして正しい音声が生成されない
+症状: 日本語テキストをパイプで `piper-plus.exe` に渡すと、文字化けして正しい音声が生成されない
 
 **原因**: WindowsのコンソールはデフォルトでShift_JIS (コードページ932) を使用するため、UTF-8の日本語テキストがパイプ経由で渡される際に破損します。
 
@@ -340,7 +340,7 @@ tar -xzf openjtalk_dic.tar.gz -C "$env:APPDATA\piper"
 
 ```cmd
 chcp 65001
-echo こんにちは世界 | piper.exe --model ja_JP-voice.onnx --output_file hello.wav
+echo こんにちは世界 | piper-plus.exe --model ja_JP-voice.onnx --output_file hello.wav
 ```
 
 #### 解決方法2: ファイル経由で入力
@@ -355,14 +355,14 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText("input.txt", "こんにちは世界", $utf8NoBom)
 
 # ファイルからパイプで入力
-Get-Content "input.txt" -Encoding UTF8 | .\Release\piper.exe --model ja_JP-voice.onnx --output_file output.wav
+Get-Content "input.txt" -Encoding UTF8 | .\Release\piper-plus.exe --model ja_JP-voice.onnx --output_file output.wav
 ```
 
 **コマンドプロンプト (cmd):**
 
 ```cmd
 chcp 65001
-type input.txt | piper.exe --model ja_JP-voice.onnx --output_file output.wav
+type input.txt | piper-plus.exe --model ja_JP-voice.onnx --output_file output.wav
 ```
 
 #### 解決方法3: `speak.bat` スクリプトを使用（推奨）
@@ -387,7 +387,7 @@ powershell -NoProfile -Command "param($t,$f); $utf8 = New-Object System.Text.UTF
 
 pushd "%PIPER_DIR%"
 chcp 65001 >nul
-type "input_utf8.txt" | piper.exe --model "%MODEL%" --config "%CONFIG%" --output_file output.wav
+type "input_utf8.txt" | piper-plus.exe --model "%MODEL%" --config "%CONFIG%" --output_file output.wav
 popd
 
 if exist "%TMPFILE%" del "%TMPFILE%" >nul 2>&1
@@ -455,7 +455,7 @@ $chunks = Split-TextForTTS -Text $longText
 
 $i = 0
 foreach ($chunk in $chunks) {
-    $chunk | .\Release\piper.exe --model ja_JP-voice.onnx --output_file "output_$i.wav"
+    $chunk | .\Release\piper-plus.exe --model ja_JP-voice.onnx --output_file "output_$i.wav"
     $i++
 }
 
@@ -468,9 +468,9 @@ foreach ($chunk in $chunks) {
 | 変数名 | 説明 | デフォルト |
 |--------|------|-----------|
 | `OPENJTALK_DICTIONARY_PATH` | 辞書ディレクトリのパス | 自動検出 |
-| `OPENJTALK_DATA_DIR` | データファイルの保存先 | `%APPDATA%\piper` |
-| `PIPER_OFFLINE_MODE` | オフラインモード（1で有効） | 0 |
-| `PIPER_AUTO_DOWNLOAD_DICT` | 自動ダウンロード（0で無効） | 1 |
+| `OPENJTALK_DATA_DIR` | データファイルの保存先 | `%APPDATA%\piper-plus` |
+| `PIPER_PLUS_OFFLINE_MODE` | オフラインモード（1で有効） | 0 |
+| `PIPER_PLUS_AUTO_DOWNLOAD_DICT` | 自動ダウンロード（0で無効） | 1 |
 
 ## パフォーマンスチューニング
 
@@ -486,7 +486,7 @@ foreach ($chunk in $chunks) {
    複数のテキストを一度に処理する場合は、プロセスの起動を最小限に：
 
    ```powershell
-   Get-Content texts.txt | .\piper.exe --model ja_JP-voice.onnx --output_raw > output.pcm
+   Get-Content texts.txt | .\piper-plus.exe --model ja_JP-voice.onnx --output_raw > output.pcm
    ```
 
 ## 既知の問題と回避策
@@ -510,7 +510,7 @@ foreach ($chunk in $chunks) {
   try {
       $mutex.WaitOne() | Out-Null
       # Piper実行
-      .\Release\piper.exe --model ja_JP-voice.onnx --output_file output.wav
+      .\Release\piper-plus.exe --model ja_JP-voice.onnx --output_file output.wav
   } finally {
       $mutex.ReleaseMutex()
   }
@@ -543,7 +543,7 @@ $jobs = @()
 foreach ($text in $texts) {
     $job = Start-Job -ScriptBlock {
         param($text, $index)
-        $text | & "C:\workspace\piper\build\Release\piper.exe" `
+        $text | & "C:\workspace\piper\build\Release\piper-plus.exe" `
             --model "C:\workspace\piper\models\ja_JP-voice.onnx" `
             --output_file "output_$index.wav"
     } -ArgumentList $text, $texts.IndexOf($text)

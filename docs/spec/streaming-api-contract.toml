@@ -20,7 +20,7 @@
 # and until automated contract-verification tests are added.
 #
 # Implementations:
-#   Python:   src/python_run/piper/voice.py            PiperVoice.synthesize_stream
+#   Python:   src/python_run/piper_plus/voice.py            PiperVoice.synthesize_stream
 #   Rust:     src/rust/piper-core/src/streaming.rs     PiperVoice::synthesize_stream
 #   C#:       src/csharp/PiperPlus.Core/Inference/PiperSession.cs  ISynthesizer.SynthesizeStream
 #   Go:       src/go/piperplus/streaming.go            Synthesizer.SynthesizeStream

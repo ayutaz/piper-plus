@@ -44,7 +44,7 @@ func SplitSentences(text string) []string {
 // SplitSentences after stripping any SSML envelope (or directly when no
 // envelope is present). Implements the post-consume strategy defined by
 // docs/spec/text-splitter-contract.toml — see the canonical Python
-// implementation in src/python_run/piper/text_splitter.py::split_sentences.
+// implementation in src/python_run/piper_plus/text_splitter.py::split_sentences.
 //
 // Note: Go currently recognizes all 7 sentence terminators including
 // U+FF0E (．), whereas Rust/C# omit U+FF0E (tracked as a separate parity

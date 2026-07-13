@@ -17,9 +17,9 @@ import (
 // FindConfigPath is called first; with a non-existent model path and no
 // sidecar/dir-config, it returns *ConfigError before any ONNX work.
 func TestLoadVoice_MissingModelPath(t *testing.T) {
-	// Hermetic: clear PIPER_DEFAULT_CONFIG so the host environment cannot
+	// Hermetic: clear PIPER_PLUS_DEFAULT_CONFIG so the host environment cannot
 	// redirect FindConfigPath to a real config file and mask the missing model.
-	t.Setenv("PIPER_DEFAULT_CONFIG", "")
+	t.Setenv("PIPER_PLUS_DEFAULT_CONFIG", "")
 
 	ctx := context.Background()
 

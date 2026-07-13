@@ -90,19 +90,19 @@ TEST(ModelManagerTest, DefaultModelDirContainsPiper) {
 }
 
 TEST(ModelManagerTest, DefaultModelDirEnvOverride) {
-    EnvVarGuard guard("PIPER_MODEL_DIR");
+    EnvVarGuard guard("PIPER_PLUS_MODEL_DIR");
 
     std::string customPath = "/tmp/piper_test_custom_models";
     guard.set(customPath);
 
     auto dir = piper::getDefaultModelDir();
     EXPECT_EQ(dir.string(), customPath)
-        << "PIPER_MODEL_DIR override not respected. Got: " << dir.string();
+        << "PIPER_PLUS_MODEL_DIR override not respected. Got: " << dir.string();
 }
 
 TEST(ModelManagerTest, DefaultModelDirEnvOverrideEmpty) {
-    // When PIPER_MODEL_DIR is set to empty, should fall back to platform default
-    EnvVarGuard guard("PIPER_MODEL_DIR");
+    // When PIPER_PLUS_MODEL_DIR is set to empty, should fall back to platform default
+    EnvVarGuard guard("PIPER_PLUS_MODEL_DIR");
     guard.set("");
 
     auto dir = piper::getDefaultModelDir();

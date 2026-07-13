@@ -62,7 +62,7 @@ TRIM_MIN_SAMPLES = 2205  # 22050 Hz * 0.1 s
 # threads which we do not want to oversubscribe, and (b) most G2P backends
 # wrap C code (pyopenjtalk-plus, pypinyin) where 2~4 threads already saturate
 # the available work given GIL handoffs around C calls. Setting
-# ``PIPER_G2P_PARALLELISM=1`` restores the pre-issue-383 strictly-serial path
+# ``PIPER_PLUS_G2P_PARALLELISM=1`` restores the pre-issue-383 strictly-serial path
 # for users who hit a thread-safety issue in a third-party G2P backend.
 _G2P_AUTO_PARALLELISM_CAP = 4
 
@@ -82,19 +82,20 @@ def _resolve_g2p_parallelism(n_sentences: int) -> int:
     given worker count.
 
     Resolution order:
-        * ``PIPER_G2P_PARALLELISM=1``: force serial.
-        * ``PIPER_G2P_PARALLELISM=N`` (N >= 2): force N workers (capped at
+        * ``PIPER_PLUS_G2P_PARALLELISM=1``: force serial.
+        * ``PIPER_PLUS_G2P_PARALLELISM=N`` (N >= 2): force N workers (capped at
         ``n_sentences``).
         * Otherwise (auto): ``min(n_sentences, max(2, cores // 2),
         _G2P_AUTO_PARALLELISM_CAP)``. Falls back to 1 when ``n_sentences <= 1``.
     """
-    raw = os.environ.get("PIPER_G2P_PARALLELISM", "").strip()
+    raw = os.environ.get("PIPER_PLUS_G2P_PARALLELISM", "").strip()
     if raw:
         try:
             n = int(raw)
         except ValueError:
             _LOGGER.warning(
-                "Ignoring invalid PIPER_G2P_PARALLELISM=%r; falling back to auto", raw
+                "Ignoring invalid PIPER_PLUS_G2P_PARALLELISM=%r; falling back to auto",
+                raw,
             )
         else:
             if n <= 1:
@@ -172,7 +173,7 @@ def _warmup_session(
 
     Keep in sync with piper_train.ort_utils.warmup_onnx_session().
     """
-    if os.environ.get("PIPER_DISABLE_WARMUP", "").lower() in ("1", "true", "yes"):
+    if os.environ.get("PIPER_PLUS_DISABLE_WARMUP", "").lower() in ("1", "true", "yes"):
         return
     if runs <= 0:
         return
@@ -251,14 +252,14 @@ def _load_session_inline(
     sess_options.execution_mode = onnxruntime.ExecutionMode.ORT_SEQUENTIAL
 
     # Thread settings: env var > auto-detect (sched_getaffinity > cpu_count)
-    env_threads = os.environ.get("PIPER_INTRA_THREADS")
+    env_threads = os.environ.get("PIPER_PLUS_INTRA_THREADS")
     intra_threads: int | None = None
     if env_threads is not None:
         try:
             intra_threads = max(1, min(int(env_threads), 4))
         except ValueError:
             _LOGGER.warning(
-                "Ignoring invalid PIPER_INTRA_THREADS=%r; using auto-detected thread count",
+                "Ignoring invalid PIPER_PLUS_INTRA_THREADS=%r; using auto-detected thread count",
                 env_threads,
             )
 
@@ -280,7 +281,7 @@ def _load_session_inline(
     sess_options.add_session_config_entry("session.dynamic_block_base", "4")
 
     # === Model cache logic: Keep in sync with piper_train.ort_utils.create_session_with_cache() ===
-    _disable_cache = os.environ.get("PIPER_DISABLE_CACHE", "").lower() in (
+    _disable_cache = os.environ.get("PIPER_PLUS_DISABLE_CACHE", "").lower() in (
         "1",
         "true",
         "yes",
@@ -297,7 +298,7 @@ def _load_session_inline(
     use_cached = not _disable_cache and cache_path.exists() and sentinel_path.exists()
 
     if _disable_cache:
-        _LOGGER.info("Model cache disabled via PIPER_DISABLE_CACHE")
+        _LOGGER.info("Model cache disabled via PIPER_PLUS_DISABLE_CACHE")
         effective_model_path = str(model_path)
     elif use_cached:
         _LOGGER.info("Loading pre-optimized model from %s", cache_path)
@@ -772,7 +773,7 @@ class PiperVoice:
         """Synthesize raw audio per sentence from text.
 
         Yields one PCM 16-bit mono audio chunk per sentence. Sentence
-        boundaries are detected by :func:`piper.text_splitter.split_sentences`
+        boundaries are detected by :func:`piper_plus.text_splitter.split_sentences`
         (mirrors the Rust / C# / Go / C++ implementations) so a single call
         with multi-sentence input produces multiple chunks suitable for
         streaming clients (e.g. HTTP ``?streaming=true``).
@@ -815,7 +816,7 @@ class PiperVoice:
         if parallelism <= 1 or len(sentences) <= 1:
             # Strictly serial path — zero ThreadPoolExecutor overhead. Used
             # for SSML / single-sentence input and when the user sets
-            # PIPER_G2P_PARALLELISM=1.
+            # PIPER_PLUS_G2P_PARALLELISM=1.
             phonemes_iter: Iterable[list[str]] = (phonemize_one(s) for s in sentences)
             yield from self._stream_phonemes_to_audio(
                 phonemes_iter,
@@ -1211,7 +1212,7 @@ class PiperVoice:
             ``(wav_bytes, timing_result)`` where:
 
             - ``wav_bytes`` : Complete WAV file content (RIFF header + PCM).
-            - ``timing_result`` : :class:`piper.timing.TimingResult` with
+            - ``timing_result`` : :class:`piper_plus.timing.TimingResult` with
                 per-phoneme entries, or ``None`` if the model does not output
                 a ``durations`` tensor (check ``self.has_duration_output``).
 

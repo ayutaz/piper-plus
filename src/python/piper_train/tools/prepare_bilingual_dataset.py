@@ -22,7 +22,6 @@ from pathlib import Path
 
 from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
 from piper_plus_g2p.multilingual import MultilingualPhonemizer
-
 from piper_train.norm_audio import cache_norm_audio, make_silence_detector
 
 

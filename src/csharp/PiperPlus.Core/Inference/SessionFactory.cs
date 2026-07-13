@@ -31,32 +31,32 @@ public static class SessionFactory
     /// <summary>
     /// Environment variable name for the default GPU device ID.
     /// Checked when <paramref name="gpuDeviceId"/> is left at its default value of 0.
-    /// Mirrors the C++ <c>PIPER_GPU_DEVICE_ID</c> environment variable.
+    /// Mirrors the C++ <c>PIPER_PLUS_GPU_DEVICE_ID</c> environment variable.
     /// </summary>
-    private const string GpuDeviceIdEnvVar = "PIPER_GPU_DEVICE_ID";
+    private const string GpuDeviceIdEnvVar = "PIPER_PLUS_GPU_DEVICE_ID";
 
     /// <summary>
     /// Environment variable to override the intra-op thread count. When set to a
     /// valid positive integer, the value is clamped to <see cref="MaxIntraThreads"/>
     /// and overrides the auto-detected default. Invalid values are ignored.
-    /// Mirrors the Python <c>PIPER_INTRA_THREADS</c> behaviour (ort_utils.py).
+    /// Mirrors the Python <c>PIPER_PLUS_INTRA_THREADS</c> behaviour (ort_utils.py).
     /// </summary>
-    internal const string IntraThreadsEnvVar = "PIPER_INTRA_THREADS";
+    internal const string IntraThreadsEnvVar = "PIPER_PLUS_INTRA_THREADS";
 
     /// <summary>
     /// Environment variable to skip ORT warmup. When set to <c>"1"</c>, <c>"true"</c>
     /// or <c>"yes"</c> (case-insensitive) <see cref="Warmup"/> returns immediately.
-    /// Mirrors the Python <c>PIPER_DISABLE_WARMUP</c> behaviour (ort_utils.py).
+    /// Mirrors the Python <c>PIPER_PLUS_DISABLE_WARMUP</c> behaviour (ort_utils.py).
     /// </summary>
-    internal const string DisableWarmupEnvVar = "PIPER_DISABLE_WARMUP";
+    internal const string DisableWarmupEnvVar = "PIPER_PLUS_DISABLE_WARMUP";
 
     /// <summary>
     /// Environment variable to skip the optimized model cache (.opt.onnx + .ok).
     /// When set to <c>"1"</c>, <c>"true"</c> or <c>"yes"</c> (case-insensitive),
     /// the cache is neither read nor written. Mirrors the Python
-    /// <c>PIPER_DISABLE_CACHE</c> behaviour (ort_utils.py).
+    /// <c>PIPER_PLUS_DISABLE_CACHE</c> behaviour (ort_utils.py).
     /// </summary>
-    internal const string DisableCacheEnvVar = "PIPER_DISABLE_CACHE";
+    internal const string DisableCacheEnvVar = "PIPER_PLUS_DISABLE_CACHE";
 
     /// <summary>
     /// Default number of warmup inference runs.
@@ -86,7 +86,7 @@ public static class SessionFactory
     /// </param>
     /// <param name="gpuDeviceId">
     /// CUDA device index. Defaults to <c>0</c>. When <c>0</c>, the factory also
-    /// checks the <c>PIPER_GPU_DEVICE_ID</c> environment variable for a fallback
+    /// checks the <c>PIPER_PLUS_GPU_DEVICE_ID</c> environment variable for a fallback
     /// value, matching the C++ CLI behaviour.
     /// </param>
     /// <param name="testMode">
@@ -147,7 +147,7 @@ public static class SessionFactory
         var sentinelPath = optimizedPath + ".ok";
         string effectiveModelPath;
 
-        // PIPER_DISABLE_CACHE: スキップキャッシュ読み書き (Python ort_utils.py と整合)
+        // PIPER_PLUS_DISABLE_CACHE: スキップキャッシュ読み書き (Python ort_utils.py と整合)
         bool cacheDisabled = IsTruthyEnv(DisableCacheEnvVar);
 
         // キャッシュ有効: .opt.onnx と .ok の両方が存在する場合のみ
@@ -256,7 +256,7 @@ public static class SessionFactory
         ArgumentNullException.ThrowIfNull(session);
         logger ??= NullLogger.Instance;
 
-        // PIPER_DISABLE_WARMUP: 環境変数で warmup をスキップ
+        // PIPER_PLUS_DISABLE_WARMUP: 環境変数で warmup をスキップ
         // (Python ort_utils.py と整合: "1" / "true" / "yes" で skip)。
         if (IsTruthyEnv(DisableWarmupEnvVar))
         {
@@ -405,7 +405,7 @@ public static class SessionFactory
         options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
 
         // COLD-M1: VITS は小モデルのためスレッド数を制限する。
-        // 優先順位: PIPER_INTRA_THREADS env > 自動検出 (Python ort_utils.py と整合)。
+        // 優先順位: PIPER_PLUS_INTRA_THREADS env > 自動検出 (Python ort_utils.py と整合)。
         // 物理コア数の半分（最大4）を intra-op スレッドに割り当て。
         int autoIntraThreads = Math.Max(
             Math.Min(Environment.ProcessorCount / 2, MaxIntraThreads), 1);
@@ -429,7 +429,7 @@ public static class SessionFactory
     /// Returns <c>true</c> when the named environment variable is set to one of
     /// <c>"1"</c>, <c>"true"</c>, or <c>"yes"</c> (case-insensitive). Mirrors the
     /// Python <c>ort_utils.py</c> truthiness contract used for
-    /// <c>PIPER_DISABLE_WARMUP</c> / <c>PIPER_DISABLE_CACHE</c>.
+    /// <c>PIPER_PLUS_DISABLE_WARMUP</c> / <c>PIPER_PLUS_DISABLE_CACHE</c>.
     /// </summary>
     private static bool IsTruthyEnv(string name)
     {
@@ -444,7 +444,7 @@ public static class SessionFactory
     }
 
     /// <summary>
-    /// Resolves the intra-op thread count. When <c>PIPER_INTRA_THREADS</c> is set
+    /// Resolves the intra-op thread count. When <c>PIPER_PLUS_INTRA_THREADS</c> is set
     /// to a valid positive integer, returns that value clamped to
     /// <c>[1, MaxIntraThreads]</c>. Otherwise returns <paramref name="autoDetected"/>.
     /// Mirrors Python <c>ort_utils.create_session_options</c>.
@@ -469,7 +469,7 @@ public static class SessionFactory
 
     /// <summary>
     /// Resolves the effective GPU device ID. When <paramref name="cliDeviceId"/>
-    /// is 0 (the default), checks <c>PIPER_GPU_DEVICE_ID</c> for an override.
+    /// is 0 (the default), checks <c>PIPER_PLUS_GPU_DEVICE_ID</c> for an override.
     /// </summary>
     private static int ResolveGpuDeviceId(int cliDeviceId, ILogger logger)
     {

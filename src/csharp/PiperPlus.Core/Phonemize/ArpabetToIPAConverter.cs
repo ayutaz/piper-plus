@@ -9,7 +9,7 @@ namespace PiperPlus.Core.Phonemize;
 /// Converts ARPAbet tokens to espeak-ng-compatible IPA symbols.
 /// <para>
 /// This is a 1:1 port of the Python module
-/// <c>piper_train/phonemize/english.py</c>. It provides:
+/// <c>src/python/g2p/piper_plus_g2p/english.py</c>. It provides:
 /// <list type="bullet">
 ///   <item>Single-token ARPAbet-to-IPA conversion (<see cref="ConvertToken"/>).</item>
 ///   <item>Context-dependent word-level conversion (<see cref="ConvertWord"/>).</item>

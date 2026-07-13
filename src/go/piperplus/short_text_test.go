@@ -194,7 +194,7 @@ func TestPadProsodyFeatures_PaddingApplied(t *testing.T) {
 // Strategy A: trimPaddingByDurations (precise post-trim, issue #356)
 // ---------------------------------------------------------------------------
 
-// Mirrors the Python reference (src/python_run/piper/voice.py and
+// Mirrors the Python reference (src/python_run/piper_plus/voice.py and
 // src/python/piper_train/infer_onnx.py) so the cross-runtime contract holds.
 
 func TestTrimPaddingByDurations_NoOpWhenNoPadding(t *testing.T) {

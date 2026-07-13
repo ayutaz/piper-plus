@@ -25,7 +25,7 @@
 # is created.
 #
 # Implementations:
-#   Python:    src/python_run/piper/download.py
+#   Python:    src/python_run/piper_plus/download.py
 #   Rust:      src/rust/piper-cli/src/download.rs
 #   C#:        src/csharp/PiperPlus.Cli/Download/ModelDownloader.cs
 #   Go:        src/go/cmd/piper-plus/download.go

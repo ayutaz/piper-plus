@@ -96,8 +96,9 @@ Cache directory 内で `{model_str}/*.onnx` または `{model_str}.onnx` を探�
 | Alias | Repo ID | ONNX File |
 |-------|---------|-----------|
 | `tsukuyomi` | `ayousanz/piper-plus-tsukuyomi-chan` | `tsukuyomi-chan-6lang-fp16.onnx` |
-| `base` | `ayousanz/piper-plus-base` | `piper-plus-base-6lang-fp16.onnx` |
 | `css10` | `ayousanz/piper-plus-css10-ja-6lang` | `css10-ja-6lang-fp16.onnx` |
+
+> `base` alias は v2.0 で削除されました。 HF `ayousanz/piper-plus-base` repo は現在 training checkpoint (`model.ckpt`) のみ公開しており、 直接推論用の ONNX が未 upload のため。 base 6lang ONNX 公開後に再登録予定。
 
 ---
 
@@ -142,7 +143,7 @@ function find_config(onnx_path, explicit_config=None):
 
 ### 環境変数オーバーライド
 
-`PIPER_MODEL_DIR` 環境変数が設定されている場合、それをキャッシュディレクトリとして使用する。
+`PIPER_PLUS_MODEL_DIR` 環境変数が設定されている場合、それをキャッシュディレクトリとして使用する。
 
 ### Platform Default
 
@@ -217,7 +218,7 @@ function find_config(onnx_path, explicit_config=None):
 
 | 実装 | パス |
 |------|------|
-| Python (高レベル API) | `src/python/piper_plus/_model_resolver.py` |
+| Python (高レベル API) | `src/python_run/piper_plus/api/_model_resolver.py` |
 | Python (学習/推論) | `src/python/piper_train/model_manager.py` |
 | Rust | `src/rust/piper-core/src/model_download.rs` |
 | C# | `src/csharp/PiperPlus.Core/Config/ModelManager.cs` |

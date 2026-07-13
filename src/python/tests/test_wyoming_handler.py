@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 import numpy as np
 import pytest
 
+
 # ---------------------------------------------------------------------------
 # Mock the wyoming package before importing piper_wyoming modules.
 # The handler and __main__ import from wyoming at module level,
@@ -154,11 +155,17 @@ def _ensure_wyoming_stubs() -> None:
 
 
 # Also stub piper_plus if not installed (only PiperPlus class is used)
+# v2.0 改名で piper_wyoming.__main__ が `from piper_plus.api import PiperPlus` を行うため、
+# subpackage `piper_plus.api` も sys.modules に登録して MagicMock stub で subpackage
+# import を満たす。 registration が無いと `ModuleNotFoundError: piper_plus is not a package`。
 def _ensure_piper_plus_stub() -> None:
     if "piper_plus" in sys.modules:
         return
     pp = MagicMock()
+    api = MagicMock()
+    pp.api = api
     sys.modules["piper_plus"] = pp
+    sys.modules["piper_plus.api"] = api
 
 
 # Install stubs before any piper_wyoming import
@@ -167,12 +174,11 @@ _ensure_piper_plus_stub()
 
 
 # Now safe to import piper_wyoming
+from piper_wyoming.__main__ import PiperPlusEventHandler  # noqa: E402
 from piper_wyoming.handler import (  # noqa: E402
-    SUPPORTED_LANGUAGES,
     build_info,
     resolve_language,
 )
-from piper_wyoming.__main__ import PiperPlusEventHandler  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -244,15 +250,11 @@ class TestWyomingHandler:
     def test_resolve_language_returns_valid_code(self):
         """既知の言語コードで正しい値を返すべき."""
         # voice.language is set to a supported language
-        event = SimpleNamespace(
-            voice=SimpleNamespace(language="en", name=None)
-        )
+        event = SimpleNamespace(voice=SimpleNamespace(language="en", name=None))
         assert resolve_language(event) == "en"
 
         # voice.name is a bare language code
-        event = SimpleNamespace(
-            voice=SimpleNamespace(language=None, name="fr")
-        )
+        event = SimpleNamespace(voice=SimpleNamespace(language=None, name="fr"))
         assert resolve_language(event) == "fr"
 
         # voice.name is "piper-plus-zh"
@@ -265,9 +267,7 @@ class TestWyomingHandler:
     def test_resolve_language_unknown_returns_none(self):
         """未知の言語コードでデフォルト値を返すべき."""
         # Unknown language code -> falls back to default
-        event = SimpleNamespace(
-            voice=SimpleNamespace(language="xx", name=None)
-        )
+        event = SimpleNamespace(voice=SimpleNamespace(language="xx", name=None))
         assert resolve_language(event) == "ja"  # default
 
         # No voice at all
@@ -325,9 +325,7 @@ class TestWyomingHandler:
         assert call_args[0][0] == "Hello world"
 
         # Should have written AudioStart, at least one AudioChunk, AudioStop
-        event_types = [
-            call.args[0].type for call in handler.write_event.call_args_list
-        ]
+        event_types = [call.args[0].type for call in handler.write_event.call_args_list]
         assert "audio-start" in event_types
         assert "audio-stop" in event_types
 
@@ -375,9 +373,7 @@ class TestWyomingHandler:
         mock_piper_plus.synthesize.assert_not_called()
 
         # Should still write AudioStart + AudioStop (empty audio)
-        event_types = [
-            call.args[0].type for call in handler.write_event.call_args_list
-        ]
+        event_types = [call.args[0].type for call in handler.write_event.call_args_list]
         assert "audio-start" in event_types
         assert "audio-stop" in event_types
 
@@ -469,7 +465,5 @@ class TestResolveLanguageEdgeCases:
     @pytest.mark.unit
     def test_empty_voice_name(self):
         """空のvoice.nameでデフォルトを返すべき."""
-        event = SimpleNamespace(
-            voice=SimpleNamespace(language=None, name="")
-        )
+        event = SimpleNamespace(voice=SimpleNamespace(language=None, name=""))
         assert resolve_language(event) == "ja"

@@ -615,8 +615,8 @@ static std::filesystem::path getExeDir() {
 
 // Search for a dictionary file in multiple locations:
 //   1. modelDir/<filename>              (model-local)
-//   2. <exe_dir>/../share/piper/dicts/<filename>  (installed)
-//   3. PIPER_DICTIONARIES_PATH/<filename>          (env override)
+//   2. <exe_dir>/../share/piper-plus/dicts/<filename>  (installed)
+//   3. PIPER_PLUS_DICTIONARIES_PATH/<filename>          (env override)
 // Returns the first path that exists, or empty string if not found.
 static std::string findDictionaryFile(const std::string &filename,
                                       const std::string &modelDir) {
@@ -629,10 +629,10 @@ static std::string findDictionaryFile(const std::string &filename,
     return p1.string();
   }
 
-  // 2. Exe-relative path: <exe_dir>/../share/piper/dicts/<filename>
+  // 2. Exe-relative path: <exe_dir>/../share/piper-plus/dicts/<filename>
   auto exeDir = getExeDir();
   if (!exeDir.empty()) {
-    fs::path p2 = exeDir / ".." / "share" / "piper" / "dicts" / filename;
+    fs::path p2 = exeDir / ".." / "share" / "piper-plus" / "dicts" / filename;
     if (fs::exists(p2)) {
       std::error_code ec;
       auto resolved = fs::weakly_canonical(p2, ec);
@@ -642,12 +642,12 @@ static std::string findDictionaryFile(const std::string &filename,
     }
   }
 
-  // 3. Environment variable PIPER_DICTIONARIES_PATH
-  const char *envPath = std::getenv("PIPER_DICTIONARIES_PATH");
+  // 3. Environment variable PIPER_PLUS_DICTIONARIES_PATH
+  const char *envPath = std::getenv("PIPER_PLUS_DICTIONARIES_PATH");
   if (envPath && envPath[0] != '\0') {
     fs::path p3 = fs::path(envPath) / filename;
     if (fs::exists(p3)) {
-      spdlog::debug("Dictionary '{}' found via PIPER_DICTIONARIES_PATH: {}", filename, p3.string());
+      spdlog::debug("Dictionary '{}' found via PIPER_PLUS_DICTIONARIES_PATH: {}", filename, p3.string());
       return p3.string();
     }
   }
@@ -700,7 +700,7 @@ void loadVoice(PiperConfig &config, std::string modelPath,
   }
 
   // Load language-specific dictionaries for multilingual models
-  // Search order: model dir -> exe-relative -> PIPER_DICTIONARIES_PATH
+  // Search order: model dir -> exe-relative -> PIPER_PLUS_DICTIONARIES_PATH
   std::string modelDir = std::filesystem::path(modelPath).parent_path().string();
 
   // English: CMU dictionary. sanitizeCliPath rejects `..` paths; treat
@@ -816,7 +816,7 @@ static bool padPhonemeIds(std::vector<PhonemeId> &phonemeIds,
 }
 
 // Strategy A precise post-trim using the model's duration output.
-// Mirrors the Python reference (src/python_run/piper/voice.py
+// Mirrors the Python reference (src/python_run/piper_plus/voice.py
 // _trim_padding_by_durations) so all runtimes produce byte-equal output for
 // the same inputs (issue #356, cross-runtime contract).
 //
@@ -940,7 +940,7 @@ static void trimPaddingByDurationsFloat(std::vector<float> &audioBuffer,
 // every other inference path so long-text outputs do not retain the
 // audible doubled tail.
 //
-// Mirrors src/python_run/piper/voice.py _trim_eos_region so every runtime
+// Mirrors src/python_run/piper_plus/voice.py _trim_eos_region so every runtime
 // produces byte-equal output for the same (audio, durations.back(),
 // hopSize, eosMaxFrames) tuple. The sample-count conversion uses
 // static_cast<int>(...) truncation to match Python's int(...) semantics.

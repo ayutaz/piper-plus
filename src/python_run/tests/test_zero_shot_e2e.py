@@ -47,7 +47,7 @@ model_skip = pytest.mark.skipif(
 )
 
 # Note: These tests use raw onnxruntime.InferenceSession (not PiperVoice),
-# so PIPER_DISABLE_WARMUP / PIPER_DISABLE_CACHE have no effect here. They
+# so PIPER_PLUS_DISABLE_WARMUP / PIPER_PLUS_DISABLE_CACHE have no effect here. They
 # are intentionally NOT set at module load to avoid polluting the environment
 # for unrelated tests (e.g. test_config_fallback.TestVoiceInlineWarmup).
 

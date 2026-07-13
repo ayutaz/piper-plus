@@ -20,7 +20,7 @@ uv add "piper-plus[http]"
 ## 起動
 
 ```sh
-.venv/bin/python3 -m piper.http_server --model ...
+.venv/bin/python3 -m piper_plus.http_server --model ...
 ```
 
 `--help` で全オプション一覧。デフォルトは `--host 0.0.0.0 --port 5000`。

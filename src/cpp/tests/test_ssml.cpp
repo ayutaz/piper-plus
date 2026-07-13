@@ -463,8 +463,8 @@ TEST(SsmlParse, EntityDecodingInText) {
 namespace {
 
 fs::path resolveFixturePath() {
-  // 1) PIPER_SSML_FIXTURE env override
-  if (const char *env = std::getenv("PIPER_SSML_FIXTURE")) {
+  // 1) PIPER_PLUS_SSML_FIXTURE env override
+  if (const char *env = std::getenv("PIPER_PLUS_SSML_FIXTURE")) {
     return fs::path(env);
   }
   // 2) Search upwards from the current working directory for
@@ -488,7 +488,7 @@ fs::path resolveFixturePath() {
 TEST(SsmlContract, FixtureMatchesCppConstants) {
   fs::path fixturePath = resolveFixturePath();
   if (fixturePath.empty() || !fs::exists(fixturePath)) {
-    GTEST_SKIP() << "SSML contract fixture not found (set PIPER_SSML_FIXTURE "
+    GTEST_SKIP() << "SSML contract fixture not found (set PIPER_PLUS_SSML_FIXTURE "
                     "or run from repo root)";
   }
 

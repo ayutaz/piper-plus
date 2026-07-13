@@ -50,7 +50,7 @@ import com.piperplus.g2p.PiperPlusG2pException
  *
  * Japanese is shown but reports a hint when the OpenJTalk dictionary is
  * absent. The dictionary distribution is documented in
- * `docs/guides/android-g2p-dictionary.md`.
+ * `docs/guides/platform/android-g2p-dictionary.md`.
  */
 class MainActivity : ComponentActivity() {
 
@@ -238,7 +238,7 @@ private fun HelperText() {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
                 text = "Tip: Japanese requires the OpenJTalk dictionary " +
-                    "(see docs/guides/android-g2p-dictionary.md). The other " +
+                    "(see docs/guides/platform/android-g2p-dictionary.md). The other " +
                     "seven languages run with no dictionary.",
                 style = MaterialTheme.typography.bodySmall,
             )

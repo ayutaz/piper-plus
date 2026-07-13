@@ -245,15 +245,15 @@ func TestFindConfigPath_NotFound(t *testing.T) {
 }
 
 func TestFindConfigPath_EnvVarFileNotFound(t *testing.T) {
-	// When PIPER_DEFAULT_CONFIG is explicitly set but the file doesn't exist,
+	// When PIPER_PLUS_DEFAULT_CONFIG is explicitly set but the file doesn't exist,
 	// FindConfigPath should return an error instead of silently falling through.
-	t.Setenv("PIPER_DEFAULT_CONFIG", "/nonexistent/path/config.json")
+	t.Setenv("PIPER_PLUS_DEFAULT_CONFIG", "/nonexistent/path/config.json")
 
 	dir := t.TempDir()
 	modelPath := filepath.Join(dir, "model.onnx")
 	_, err := FindConfigPath("", modelPath)
 	if err == nil {
-		t.Fatal("FindConfigPath should return an error when PIPER_DEFAULT_CONFIG points to a non-existent file")
+		t.Fatal("FindConfigPath should return an error when PIPER_PLUS_DEFAULT_CONFIG points to a non-existent file")
 	}
 
 	var cfgErr *ConfigError
@@ -270,7 +270,7 @@ func TestFindConfigPath_EnvVar(t *testing.T) {
 	}
 
 	// t.Setenv automatically restores the original value after the test.
-	t.Setenv("PIPER_DEFAULT_CONFIG", envConfig)
+	t.Setenv("PIPER_PLUS_DEFAULT_CONFIG", envConfig)
 
 	modelPath := filepath.Join(dir, "model.onnx")
 	got, err := FindConfigPath("", modelPath)

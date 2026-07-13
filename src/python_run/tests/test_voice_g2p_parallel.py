@@ -7,8 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
 import pytest
-
-from piper.voice import (
+from piper_plus.voice import (
     _G2P_AUTO_PARALLELISM_CAP,
     _map_sentences,
     _resolve_g2p_parallelism,
@@ -22,8 +21,8 @@ from piper.voice import (
 
 @pytest.fixture
 def clean_env(monkeypatch):
-    """Drop PIPER_G2P_PARALLELISM so we exercise the auto path."""
-    monkeypatch.delenv("PIPER_G2P_PARALLELISM", raising=False)
+    """Drop PIPER_PLUS_G2P_PARALLELISM so we exercise the auto path."""
+    monkeypatch.delenv("PIPER_PLUS_G2P_PARALLELISM", raising=False)
     return monkeypatch
 
 
@@ -45,19 +44,19 @@ def test_resolve_auto_capped_by_n_sentences(clean_env):
 
 
 def test_resolve_explicit_1_forces_serial(monkeypatch):
-    monkeypatch.setenv("PIPER_G2P_PARALLELISM", "1")
+    monkeypatch.setenv("PIPER_PLUS_G2P_PARALLELISM", "1")
     assert _resolve_g2p_parallelism(10) == 1
 
 
 def test_resolve_explicit_n_overrides_auto(monkeypatch):
-    monkeypatch.setenv("PIPER_G2P_PARALLELISM", "8")
+    monkeypatch.setenv("PIPER_PLUS_G2P_PARALLELISM", "8")
     # capped at n_sentences
     assert _resolve_g2p_parallelism(3) == 3
     assert _resolve_g2p_parallelism(20) == 8
 
 
 def test_resolve_invalid_falls_back_to_auto(monkeypatch):
-    monkeypatch.setenv("PIPER_G2P_PARALLELISM", "garbage")
+    monkeypatch.setenv("PIPER_PLUS_G2P_PARALLELISM", "garbage")
     n = _resolve_g2p_parallelism(8)
     assert n >= 2
 
@@ -132,8 +131,8 @@ def test_synthesize_stream_raw_early_break_cancels_queued_g2p(monkeypatch):
     import time
     from unittest.mock import MagicMock
 
-    from piper.config import PhonemeType, PiperConfig
-    from piper.voice import PiperVoice
+    from piper_plus.config import PhonemeType, PiperConfig
+    from piper_plus.voice import PiperVoice
 
     config = PiperConfig(
         num_symbols=100,
@@ -168,13 +167,11 @@ def test_synthesize_stream_raw_early_break_cancels_queued_g2p(monkeypatch):
 
     voice._phonemize_one_factory = MagicMock(return_value=slow_phonemize)
     voice.phonemes_to_ids = MagicMock(return_value=[1, 10, 2])
-    voice._stream_phonemes_to_audio = (
-        lambda phonemes_iter, break_b, silence_b, **kw: (
-            break_b + b"AUDIO" + break_b + silence_b for _ in phonemes_iter
-        )
+    voice._stream_phonemes_to_audio = lambda phonemes_iter, break_b, silence_b, **kw: (
+        break_b + b"AUDIO" + break_b + silence_b for _ in phonemes_iter
     )
 
-    monkeypatch.setenv("PIPER_G2P_PARALLELISM", "4")
+    monkeypatch.setenv("PIPER_PLUS_G2P_PARALLELISM", "4")
 
     gen = PiperVoice.synthesize_stream_raw(voice, "x" * 200)  # bypass short-text
     # Pull just one chunk and abandon.
@@ -206,8 +203,8 @@ def test_synthesize_stream_raw_bounded_pipeline_caps_in_flight(monkeypatch):
     import threading
     from unittest.mock import MagicMock
 
-    from piper.config import PhonemeType, PiperConfig
-    from piper.voice import PiperVoice
+    from piper_plus.config import PhonemeType, PiperConfig
+    from piper_plus.voice import PiperVoice
 
     config = PiperConfig(
         num_symbols=100,
@@ -249,14 +246,13 @@ def test_synthesize_stream_raw_bounded_pipeline_caps_in_flight(monkeypatch):
         for phonemes in phonemes_iter:
             with counter_lock:
                 in_flight = submit_count - yielded
-                if in_flight > max_in_flight:
-                    max_in_flight = in_flight
+                max_in_flight = max(max_in_flight, in_flight)
             yielded += 1
             yield break_b + b"AUDIO" + break_b + silence_b
 
     voice._stream_phonemes_to_audio = tracking_stream
 
-    monkeypatch.setenv("PIPER_G2P_PARALLELISM", str(parallelism))
+    monkeypatch.setenv("PIPER_PLUS_G2P_PARALLELISM", str(parallelism))
 
     chunks = list(PiperVoice.synthesize_stream_raw(voice, "x" * 500))
 
@@ -280,7 +276,12 @@ def test_synthesize_stream_raw_bounded_pipeline_caps_in_flight(monkeypatch):
 
 
 _MODEL_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", "test", "models",
+    os.path.dirname(__file__),
+    "..",
+    "..",
+    "..",
+    "test",
+    "models",
     "multilingual-test-medium.onnx",
 )
 
@@ -292,7 +293,7 @@ _MODEL_PATH = os.path.join(
 def test_phonemize_parallel_matches_serial_multilingual(monkeypatch):
     pyopenjtalk = pytest.importorskip("pyopenjtalk")
     del pyopenjtalk  # availability check only
-    from piper.voice import PiperVoice
+    from piper_plus.voice import PiperVoice
 
     voice = PiperVoice.load(_MODEL_PATH)
 
@@ -304,10 +305,10 @@ def test_phonemize_parallel_matches_serial_multilingual(monkeypatch):
         "桜の花が満開になると、多くの人々が公園でお花見を楽しみます。"
     )
 
-    monkeypatch.setenv("PIPER_G2P_PARALLELISM", "1")
+    monkeypatch.setenv("PIPER_PLUS_G2P_PARALLELISM", "1")
     serial = voice.phonemize(text)
 
-    monkeypatch.setenv("PIPER_G2P_PARALLELISM", "4")
+    monkeypatch.setenv("PIPER_PLUS_G2P_PARALLELISM", "4")
     parallel = voice.phonemize(text)
 
     assert len(serial) == 5
@@ -326,7 +327,7 @@ def test_phonemize_concurrent_callers_safe(monkeypatch):
     """
     pyopenjtalk = pytest.importorskip("pyopenjtalk")
     del pyopenjtalk
-    from piper.voice import PiperVoice
+    from piper_plus.voice import PiperVoice
 
     voice = PiperVoice.load(_MODEL_PATH)
 
@@ -337,14 +338,14 @@ def test_phonemize_concurrent_callers_safe(monkeypatch):
         "桜の花が満開になると、多くの人々が公園でお花見を楽しみます。",
     ] * 5  # 20 sentences
 
-    monkeypatch.setenv("PIPER_G2P_PARALLELISM", "1")
+    monkeypatch.setenv("PIPER_PLUS_G2P_PARALLELISM", "1")
     expected = [voice.phonemize(s) for s in sentences]
 
     # Run the same per-sentence calls from a thread pool. Each call processes
     # exactly one sentence (n_sentences == 1) so we exercise concurrent
     # callers, not internal parallelism — which is exactly the regime
     # Phase 1 makes the public phonemize() exposed to.
-    monkeypatch.setenv("PIPER_G2P_PARALLELISM", "1")
+    monkeypatch.setenv("PIPER_PLUS_G2P_PARALLELISM", "1")
     with ThreadPoolExecutor(max_workers=4) as pool:
         actual = list(pool.map(voice.phonemize, sentences))
 

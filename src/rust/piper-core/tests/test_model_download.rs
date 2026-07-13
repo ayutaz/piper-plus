@@ -67,12 +67,12 @@ fn test_default_model_dir_is_absolute() {
 }
 
 #[test]
-fn test_default_model_dir_contains_piper() {
+fn test_default_model_dir_contains_piper_plus() {
     let dir = default_model_dir();
     let path_str = dir.to_string_lossy();
     assert!(
-        path_str.contains("piper"),
-        "default_model_dir should contain 'piper' in the path, got: {path_str}"
+        path_str.contains("piper-plus"),
+        "default_model_dir should contain 'piper-plus' in the path, got: {path_str}"
     );
 }
 

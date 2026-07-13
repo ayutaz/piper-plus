@@ -116,14 +116,14 @@ ENV GRADIO_SERVER_PORT=7860
 
 # Bring in the WebUI entrypoint and the Python port of the Bash
 # wrapper. The canonical docker/webui/entrypoint.sh has real logic:
-#   * resolves $PIPER_MODEL_DIR (default /models)
-#   * if $PIPER_MODEL is set, downloads the model via
+#   * resolves $PIPER_PLUS_MODEL_DIR (default /models)
+#   * if $PIPER_PLUS_MODEL is set, downloads the model via
 #     piper_train.model_manager.download_model
 #   * exec's `python /app/app.py --model-dir <dir> --output-dir <out> $@`
 # Distroless has no shell, so we port that to entrypoint_distroless.py
 # (kept beside app.py in the repo) and ENTRYPOINT into the Python
-# interpreter directly. Behavioural parity for $PIPER_MODEL /
-# $PIPER_MODEL_DIR / $PIPER_OUTPUT_DIR is preserved.
+# interpreter directly. Behavioural parity for $PIPER_PLUS_MODEL /
+# $PIPER_PLUS_MODEL_DIR / $PIPER_PLUS_OUTPUT_DIR is preserved.
 COPY docker/webui/app.py /app/app.py
 COPY docker/webui/entrypoint_distroless.py /app/entrypoint_distroless.py
 

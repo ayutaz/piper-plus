@@ -26,7 +26,7 @@ on:
     branches: [dev]
     paths:
       - 'src/python/piper_train/**'
-      - 'src/python_run/piper/**'
+      - 'src/python_run/piper_plus/**'
       - 'scripts/benchmark.py'
       - 'scripts/benchmark_to_action_bench.py'
       - 'test/models/multilingual-test-medium.onnx*'
@@ -35,7 +35,7 @@ on:
     branches: [dev]
     paths:
       - 'src/python/piper_train/**'
-      - 'src/python_run/piper/**'
+      - 'src/python_run/piper_plus/**'
       - 'scripts/benchmark.py'
       - 'scripts/benchmark_to_action_bench.py'
       # Review #458: ベンチマーク対象モデルが更新された場合も baseline

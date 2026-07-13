@@ -42,7 +42,7 @@ public record struct ProsodyInfo(int A1, int A2, int A3);
 /// Language-agnostic phonemizer contract.
 /// <para>
 /// Mirrors the Python <c>Phonemizer</c> ABC defined in
-/// <c>piper_train/phonemize/base.py</c>. Each language implements
+/// <c>src/python/g2p/piper_plus_g2p/base.py</c>. Each language implements
 /// this interface and is resolved through the phonemizer registry.
 /// </para>
 /// </summary>

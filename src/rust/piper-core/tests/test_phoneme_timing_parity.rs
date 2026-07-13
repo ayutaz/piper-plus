@@ -1,7 +1,7 @@
 //! Cross-runtime parity test for phoneme timing extraction.
 //!
 //! Loads `tests/fixtures/phoneme_timing/golden_matrix.json` (canonical
-//! Python output produced by `src/python_run/piper/timing.py:durations_to_timing`)
+//! Python output produced by `src/python_run/piper_plus/timing.py:durations_to_timing`)
 //! and asserts that the Rust implementation in
 //! `piper_core::timing::durations_to_timing` produces byte-equivalent
 //! timing values.

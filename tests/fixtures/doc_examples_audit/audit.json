@@ -2,14 +2,14 @@
   "schema_version": 1,
   "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
-    "executable": 221,
+    "executable": 222,
     "needs_placeholder": 6,
-    "skip_warranted": 235,
-    "total": 462
+    "skip_warranted": 238,
+    "total": 466
   },
   "by_language": {
     "bash": {
-      "executable": 162,
+      "executable": 163,
       "needs_placeholder": 6,
       "skip_warranted": 44
     },
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 190
+      "skip_warranted": 193
     },
     "wasm": {
       "executable": 10,
@@ -159,7 +159,22 @@
       "env_dependencies": [
         "/data/piper/"
       ],
-      "hash_sha1": "07f432b4fe96f257eb76713edeec543bfd69e1bc"
+      "hash_sha1": "9ff3ff81106381bbee3daaae66a58f5d340961e7"
+    },
+    {
+      "file": "docs/design/piper-plus-module-rename-v2.md",
+      "line_start": 58,
+      "line_end": 66,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "4a6a28df1e75be441fbc537e7d875a3a6eb9fbfc"
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
@@ -256,7 +271,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "db8f4accd46a3348331057de1c4bf871527a4a8d"
+      "hash_sha1": "ce4b493cbb862c6c5885e47f33c76e3c26e75531"
     },
     {
       "file": "docs/features/phoneme-input.md",
@@ -269,7 +284,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "2e3978d57c0c0a1677d3951e7a60dce398bd190b"
+      "hash_sha1": "eb4a202e8b958b5b0ceaf1c10e9acc2601488017"
     },
     {
       "file": "docs/features/phoneme-input.md",
@@ -282,7 +297,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "ce0a096bd2d3c50e304b8a169173ed22f4ee5142"
+      "hash_sha1": "1d292e2a907c65aa3935a5c78414ef86221fa872"
     },
     {
       "file": "docs/features/phoneme-input.md",
@@ -295,7 +310,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "0529fd27d56afc3432f984b90eabd672af14d1e3"
+      "hash_sha1": "098419c8f90f54715aa01e406630852dac5387cf"
     },
     {
       "file": "docs/features/phoneme-input.md",
@@ -308,7 +323,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "7db65f5e1ae89e76c8dd47c011adbb7146065037"
+      "hash_sha1": "80e62f0fb6ae31409a767d0e9022630cdebd42bc"
     },
     {
       "file": "docs/features/phoneme-input.md",
@@ -321,7 +336,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "6aaa6467e416a837e260e38da961c4b417392464"
+      "hash_sha1": "0469f08de04ad9d62e334f982777487afb01195f"
     },
     {
       "file": "docs/features/phoneme-input.md",
@@ -334,7 +349,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "cb953ea4e944781249ee23725a695959f6d70000"
+      "hash_sha1": "1d859f395f1f476d74365786bf232f21adadc0da"
     },
     {
       "file": "docs/features/phoneme-input.md",
@@ -347,7 +362,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "e469c2e5638e52928481aeb6f38c468c1436b903"
+      "hash_sha1": "d4c6ee5217728cbcf02277efc86f42051d8c82d4"
     },
     {
       "file": "docs/features/phoneme-input.md",
@@ -360,7 +375,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "7b66dd3b501eb5001b1ec215ee8e8e45497c213d"
+      "hash_sha1": "e0ae7593ad4aac752dc9cd5a65bfe27871be3763"
     },
     {
       "file": "docs/features/phoneme-input.md",
@@ -373,7 +388,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "366e63f8a3e2243e939ed4e0af590deb052f3a2e"
+      "hash_sha1": "021e64a9f516b0b6f4b78c2e4f1b40f51611498a"
     },
     {
       "file": "docs/features/phoneme-timing.md",
@@ -446,7 +461,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "94f21c9a8fec2b7e8266aedae635557d591a39d7"
+      "hash_sha1": "889136852eaa38b72257b633bcf600fe875b4922"
     },
     {
       "file": "docs/features/phoneme-timing.md",
@@ -498,7 +513,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "09971450a89ba5b3d3c70064d95d0c01e7723986"
+      "hash_sha1": "2cfaa8962f53dc0dde7c960ab034e0ca57369b22"
     },
     {
       "file": "docs/features/phoneme-timing.md",
@@ -576,7 +591,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "3baffe0ec58e15a246dbd0e6d26cf0d0c756b6e5"
+      "hash_sha1": "5496ce8b5abeb883a7579db6e82f9f4a0fb48a5d"
     },
     {
       "file": "docs/features/webui.md",
@@ -591,7 +606,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "3fde035189d209435f7e975d33c2252de7714ab3"
+      "hash_sha1": "cd7cac45bc590be51da17301b8f5a7b7cc01cae0"
     },
     {
       "file": "docs/features/webui.md",
@@ -617,7 +632,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "f6111ad59b04d459639f70d017f64ab9939de6be"
+      "hash_sha1": "e0aec94d1a8dfbdc2454020dec8ce53058bcd036"
     },
     {
       "file": "docs/getting-started/binary-selection.md",
@@ -658,7 +673,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "807ed2b045869c08b41779ea411affdabadfc26d"
+      "hash_sha1": "b6e522dfde8e219af3a2bdc63e391d743ca5c149"
     },
     {
       "file": "docs/getting-started/binary-selection.md",
@@ -671,7 +686,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "a52d6c8c1fea61eb2647e5d96476a5f74bb85e8c"
+      "hash_sha1": "39467b2554c209509e1e13eff9d432e5ad8341c1"
     },
     {
       "file": "docs/getting-started/environment-variables.md",
@@ -710,7 +725,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "b1a87af11f963dd7c0a950cf9eef907450e1eb4d"
+      "hash_sha1": "bf191f5f6fa77b27f02e877b93fe59ca3be20656"
     },
     {
       "file": "docs/getting-started/environment-variables.md",
@@ -775,7 +790,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "1401d9ef2364f6c77a78b41205fb9d4378db972d"
+      "hash_sha1": "2c0eb3b6633e3b886b78119152a42acab9b3957d"
     },
     {
       "file": "docs/getting-started/environment-variables.md",
@@ -788,7 +803,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "3b9af56b1d9e5c7f364985043ce9958dc46222ed"
+      "hash_sha1": "bc0cca9db97cd2ec386d6b861f5ed3a139737aeb"
     },
     {
       "file": "docs/getting-started/environment-variables.md",
@@ -801,7 +816,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "75e0fa6c3a6b9862206937fb27be02420e9dcd51"
+      "hash_sha1": "f0e92067b7607a3fb16387c07de9ccef3c38656d"
     },
     {
       "file": "docs/getting-started/environment-variables.md",
@@ -814,7 +829,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "ff6b931a420025291e0d19a5015d118a25323a3f"
+      "hash_sha1": "94af9ee512a10d227c6907b4a18547dadc875c44"
     },
     {
       "file": "docs/getting-started/environment-variables.md",
@@ -827,7 +842,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "dde33a607c05795202320a20c4e4905b753e5f66"
+      "hash_sha1": "b4b607010f4e5aa729cb4fdd73e2ab1ab9cc0bed"
     },
     {
       "file": "docs/getting-started/environment-variables.md",
@@ -840,7 +855,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "b3954cca213c639b3f7e526622634d761a017dd7"
+      "hash_sha1": "8655230b6a9d8cb845025edfc4545a144c7efbc8"
     },
     {
       "file": "docs/getting-started/environment-variables.md",
@@ -853,7 +868,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "a947659559c2fa1174e5f8d414f571f525093013"
+      "hash_sha1": "9b00d23e4b2d875032512cc7ad8d00e18f4be990"
     },
     {
       "file": "docs/getting-started/environment-variables.md",
@@ -866,7 +881,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "4764360498a3ca0ec6ed73103509b93ccda9ae5e"
+      "hash_sha1": "77679f312322a1d34133755d18954be05a24f6a9"
     },
     {
       "file": "docs/getting-started/environment-variables.md",
@@ -879,7 +894,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "37b10a76098fb59462b93caf2aa4fa2795a162d2"
+      "hash_sha1": "d876dfa0dcb0dfe740c639b515957422eb1ddea6"
     },
     {
       "file": "docs/getting-started/environment-variables.md",
@@ -905,7 +920,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "40e9225ecbbcdcfb224cdc50f8df5c9dfc03ca54"
+      "hash_sha1": "4574e6661c7a6a6c18a0d3b3ac3251cf66901c0a"
     },
     {
       "file": "docs/getting-started/environment-variables.md",
@@ -944,7 +959,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "d90fd21035b638f656994647e2ca385820d9db78"
+      "hash_sha1": "c5718892d16877916c98b6b79e0d1fc5277cc30a"
     },
     {
       "file": "docs/getting-started/environment-variables.md",
@@ -957,7 +972,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "a7502542b7226f2dd8aa3fe961d75dfe070cc6ab"
+      "hash_sha1": "a11b0a7e6462f0fb87d937da5d84e7343293f7ec"
     },
     {
       "file": "docs/getting-started/environment-variables.md",
@@ -970,7 +985,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "14ed44767351d7095f480df19af12c15284050dc"
+      "hash_sha1": "671a2e603087befc2d2603c015f944defa22ba92"
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
@@ -1013,7 +1028,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "1c6350327a9e6aa7f04e4478854969e2c4307690"
+      "hash_sha1": "8136f7d2d43db6f3a59806afa2b6d363277ef4a9"
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
@@ -1054,7 +1069,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "1e3cbd471f1de9f22a476c428ece002eb32db822"
+      "hash_sha1": "6ba25f3ec83cacec8edffe770005b420ac5643da"
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
@@ -1082,7 +1097,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "90a72149d9580dc4ba1478c6514adc59e2e884ce"
+      "hash_sha1": "ca36100ac18cde51de5c08e27f8ec98892149c45"
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
@@ -1095,7 +1110,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "10a424b24a4181e8090053d21b6e0fbdbfdd2140"
+      "hash_sha1": "a9f41ef6622f84042d4465dba826f0ecb253f21b"
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
@@ -1138,7 +1153,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "8e97d3641d21011ddc2a902cb18a98445e771244"
+      "hash_sha1": "1e0a39a857462899fb6736af41764561fddedcb8"
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
@@ -1153,7 +1168,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "f70a6b353cd8ebe480a4634298810c6119289dba"
+      "hash_sha1": "f4dfa419301493338e388094998dd5dc629e83f9"
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
@@ -1168,7 +1183,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "9aae029d87af9985c12108cd83556db2548c3029"
+      "hash_sha1": "2544d27ac6f0710d0e46a3e84328ffc36f13a3f9"
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
@@ -1209,7 +1224,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "8ce012476547bd69db4fe3d035c209330ee8f916"
+      "hash_sha1": "4a1fa209eed574dd1c2e79b65b22cb190033025d"
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
@@ -1261,7 +1276,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "0e80c7613bbf9d315d5cca6df000cb5435984761"
+      "hash_sha1": "67c54a310cbaa8b5fa42b1edfd526eb815134509"
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
@@ -1489,7 +1504,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "0a0958585c8ea7fd59d13a8f520582e12043d39f"
+      "hash_sha1": "fe36f57638c6fa47f70859488b59ae880de94355"
     },
     {
       "file": "docs/getting-started/windows-setup.md",
@@ -1504,7 +1519,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "79c0b3f6f8a608eb56ac42ec54e81f5f37441a42"
+      "hash_sha1": "39d0ffc80f11199da484f9afd1cf8474dcc36567"
     },
     {
       "file": "docs/getting-started/windows-setup.md",
@@ -1519,7 +1534,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "26729e0775f46811c42c3498605b2bfe3d102155"
+      "hash_sha1": "0202352bdeda52223185017de7483ebc4d98f968"
     },
     {
       "file": "docs/getting-started/windows-setup.md",
@@ -1564,7 +1579,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "0dc1270ee15d4f1eac4de6abd0b9f5d6f4033f6c"
+      "hash_sha1": "187449bdeee6f1206a82ea506dfd086a77755692"
     },
     {
       "file": "docs/getting-started/windows-setup.md",
@@ -1579,7 +1594,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "7609b3cda1968592c326cc19daac84611c18c034"
+      "hash_sha1": "11f941fe8699c6a817082a3fca78eb1353684238"
     },
     {
       "file": "docs/getting-started/windows-setup.md",
@@ -1609,7 +1624,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "a5996c7d1d32d0d98c950109740524bd431b1f4b"
+      "hash_sha1": "2480978eca3adb05f4b4a667cdb462c0f933bf19"
     },
     {
       "file": "docs/getting-started/windows-setup.md",
@@ -1654,7 +1669,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "38039a9a25babafdb415d237aaf480d37a676ee3"
+      "hash_sha1": "7c14823366c4d902a0fd22fecdd9b194553908fc"
     },
     {
       "file": "docs/getting-started/windows-setup.md",
@@ -1669,7 +1684,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "85f5b24db8112df687425f794b8acfd6f5d39e95"
+      "hash_sha1": "717880d1a5b2c747f98ac0a627cd808d777d742a"
     },
     {
       "file": "docs/getting-started/windows-setup.md",
@@ -1684,7 +1699,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "365d98d52bbc20f7cb0de52f511ccedf14486682"
+      "hash_sha1": "95302f99ebcd99935fc77adb88e64e4d903264a5"
     },
     {
       "file": "docs/getting-started/windows-setup.md",
@@ -1699,7 +1714,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "e54242f82098586d177d52ad03587b13ceb5c991"
+      "hash_sha1": "1ab43443f3de18de59f28901de82a9e17463a618"
     },
     {
       "file": "docs/getting-started/windows-setup.md",
@@ -1714,7 +1729,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "cfc8a37e70411bab7c57d599d5ea4f7db2acd2ee"
+      "hash_sha1": "e3c42e3648dcf59762efb1e8cc4a1fb6fbc4e3f7"
     },
     {
       "file": "docs/getting-started/windows-setup.md",
@@ -1729,7 +1744,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "878c591c51c58f926505e86faffe60910875ac37"
+      "hash_sha1": "7e2b55de640e616eacc95d50bf0ff049dd046bcf"
     },
     {
       "file": "docs/getting-started/windows-setup.md",
@@ -1774,7 +1789,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "5554ef6d751ed9ee433306bf83dac6e9090905ad"
+      "hash_sha1": "353242220520e3e2b9d0b6ced79bc1cba058dd10"
     },
     {
       "file": "docs/getting-started/windows-setup.md",
@@ -1804,7 +1819,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "52763e00afc8c344cb59b58d36ff2c6d3e45da72"
+      "hash_sha1": "11f5084247236251248ba9157d30a236953d2067"
     },
     {
       "file": "docs/getting-started/windows-setup.md",
@@ -1819,7 +1834,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "f62eda0a9b20aa849f5e7c78bb268e237b35fd7b"
+      "hash_sha1": "a079d23ea8ad86a52f457303ada9e154a07a8594"
     },
     {
       "file": "docs/getting-started/windows-setup.md",
@@ -1849,7 +1864,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "27fe0c80f5cdf7f581fce104dd7ffc13677b604e"
+      "hash_sha1": "0ed1d44e48181829bd7c2aeee08f6d091b7f3508"
     },
     {
       "file": "docs/guides/development/adding-pua-codepoint.md",
@@ -2024,7 +2039,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "db7b21bcbf681d5d0927654bc162b20a79bebcb7"
+      "hash_sha1": "3a2961dfdaf3a4874508f31fbf45b8e111572715"
     },
     {
       "file": "docs/guides/development/cli-usage.md",
@@ -2037,7 +2052,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "610a63992dd31fa219f88b30a5fafa41e2ea081f"
+      "hash_sha1": "bca5c6867365be3df43ed81e315de1ff139593ad"
     },
     {
       "file": "docs/guides/development/cli-usage.md",
@@ -2065,7 +2080,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "857325836224ba19ed870a2e44da2bb244e24464"
+      "hash_sha1": "5660701113e8950cb0239dc1111d3b309805204d"
     },
     {
       "file": "docs/guides/development/cli-usage.md",
@@ -2078,7 +2093,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "e2477379cde75c69fecb0c66629ca967d4fb6bfd"
+      "hash_sha1": "0ac1876dd0bcee2e7eae921289170bf04035cfb3"
     },
     {
       "file": "docs/guides/development/cli-usage.md",
@@ -2112,8 +2127,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 38,
-      "line_end": 42,
+      "line_start": 40,
+      "line_end": 44,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2127,8 +2142,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 46,
-      "line_end": 50,
+      "line_start": 48,
+      "line_end": 52,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -3476,7 +3491,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "b3d27b041e6b67f1587061638f3ce96d89eb97a5"
+      "hash_sha1": "4056d7b7911a2e4848f51b0f5703e806add90752"
     },
     {
       "file": "docs/guides/testing/multilingual-testing.md",
@@ -3757,7 +3772,7 @@
         "/data/piper/",
         "CUDA_VISIBLE_DEVICES"
       ],
-      "hash_sha1": "6d89d17437e8724bf5e928a3c457bf241545fa0a"
+      "hash_sha1": "8357a47af1134179dd1408cd1928f3ca334941ac"
     },
     {
       "file": "docs/guides/training/training-guide.md",
@@ -4099,7 +4114,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "58ffe0a98a742ffe5aa1d9448a98ad669775d013"
+      "hash_sha1": "795fd8a1dd9ce339263087297ea1d609c2bb7fcd"
     },
     {
       "file": "docs/guides/training/training-guide.md",
@@ -4248,7 +4263,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "f0e032afc4b87cc0d51832d0bf2b5e03615a2114"
+      "hash_sha1": "45ce728c9fec4fb24842528cee2ab9bcb11ff574"
     },
     {
       "file": "docs/guides/training/wavlm-guide.md",
@@ -4375,7 +4390,7 @@
       "env_dependencies": [
         "/data/piper/"
       ],
-      "hash_sha1": "efd5c879b10cc507b148a3ce8a1a27b69e794e83"
+      "hash_sha1": "539b8c276d1956e53ab08c4da2a47a8def839567"
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
@@ -4509,7 +4524,7 @@
       "env_dependencies": [
         "/data/piper/"
       ],
-      "hash_sha1": "140598fd6ae614d9e762800cf4f9e5f346a5f69d"
+      "hash_sha1": "fd37f3fb610873e35325b0436b69c46b3b83a9ba"
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
@@ -4524,7 +4539,7 @@
       "env_dependencies": [
         "/data/piper/"
       ],
-      "hash_sha1": "690b5300aa57fdc634948709e5321705706839ef"
+      "hash_sha1": "8a4ae7cfca89982fd1bef96cbac16a79b20f80c3"
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
@@ -4733,8 +4748,51 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 24,
-      "line_end": 26,
+      "line_start": 84,
+      "line_end": 93,
+      "language_raw": "yaml",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "669ace77d6445894c1d5d603cd1ca4f15f474fa1"
+    },
+    {
+      "file": "docs/migration/v1.12-to-v2.0.md",
+      "line_start": 111,
+      "line_end": 117,
+      "language_raw": "sh",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "15650d737d274d0192159d11fe577905c05d3467"
+    },
+    {
+      "file": "docs/migration/v1.12-to-v2.0.md",
+      "line_start": 121,
+      "line_end": 124,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "1dbdf1fa8991b06e6b5dd680e14362846470f5a4"
+    },
+    {
+      "file": "docs/migration/v1.12-to-v2.0.md",
+      "line_start": 149,
+      "line_end": 151,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -4748,8 +4806,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 32,
-      "line_end": 34,
+      "line_start": 157,
+      "line_end": 159,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4761,8 +4819,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 40,
-      "line_end": 42,
+      "line_start": 165,
+      "line_end": 167,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -4776,8 +4834,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 48,
-      "line_end": 52,
+      "line_start": 173,
+      "line_end": 186,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4785,12 +4843,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "f79b27b4131b402fe28536624825b91464f94bf8"
+      "hash_sha1": "47ed5c9d49c4d82a116a8c138f016663ed985050"
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 100,
-      "line_end": 104,
+      "line_start": 236,
+      "line_end": 240,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4802,8 +4860,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 123,
-      "line_end": 126,
+      "line_start": 259,
+      "line_end": 262,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4817,8 +4875,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 136,
-      "line_end": 138,
+      "line_start": 272,
+      "line_end": 274,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4832,8 +4890,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 147,
-      "line_end": 152,
+      "line_start": 283,
+      "line_end": 288,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4845,8 +4903,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 194,
-      "line_end": 198,
+      "line_start": 330,
+      "line_end": 334,
       "language_raw": "sh",
       "language": "bash",
       "category": "needs_placeholder",
@@ -4856,12 +4914,12 @@
       ],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "6c817a4113876f303b85542376aaea4a76f37763"
+      "hash_sha1": "b65f2327b69181ac84682083905507fd26a1ee7e"
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 204,
-      "line_end": 211,
+      "line_start": 340,
+      "line_end": 347,
       "language_raw": "sh",
       "language": "bash",
       "category": "needs_placeholder",
@@ -4875,8 +4933,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 233,
-      "line_end": 239,
+      "line_start": 369,
+      "line_end": 375,
       "language_raw": "dockerfile",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4890,8 +4948,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 249,
-      "line_end": 254,
+      "line_start": 385,
+      "line_end": 390,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4903,8 +4961,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 266,
-      "line_end": 269,
+      "line_start": 402,
+      "line_end": 405,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4916,8 +4974,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 284,
-      "line_end": 289,
+      "line_start": 420,
+      "line_end": 425,
       "language_raw": "diff",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4931,8 +4989,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 297,
-      "line_end": 302,
+      "line_start": 433,
+      "line_end": 438,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4944,8 +5002,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 308,
-      "line_end": 312,
+      "line_start": 444,
+      "line_end": 448,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4957,8 +5015,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 318,
-      "line_end": 321,
+      "line_start": 454,
+      "line_end": 457,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -5268,8 +5326,8 @@
     },
     {
       "file": "docs/reference/model-resolution.md",
-      "line_start": 108,
-      "line_end": 128,
+      "line_start": 109,
+      "line_end": 129,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5283,8 +5341,8 @@
     },
     {
       "file": "docs/reference/model-resolution.md",
-      "line_start": 159,
-      "line_end": 164,
+      "line_start": 160,
+      "line_end": 165,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5298,8 +5356,8 @@
     },
     {
       "file": "docs/reference/model-resolution.md",
-      "line_start": 168,
-      "line_end": 173,
+      "line_start": 169,
+      "line_end": 174,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5322,7 +5380,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "29d2d62b6c79f6e1c458449834fcceae80228980"
+      "hash_sha1": "01de963c6792df6d27151bfb1ada917f477c6dc6"
     },
     {
       "file": "docs/reference/mutation-testing.md",
@@ -5434,7 +5492,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "c808d9b46ee94c33e65d98021798a8914eb427da"
+      "hash_sha1": "cdcbe9978c6fd1600292486f5a0a9c0f69c6122d"
     },
     {
       "file": "docs/reference/swift-g2p.md",
@@ -5817,7 +5875,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "4484564ae05fe2939930f6a2f2555f39906a4334"
+      "hash_sha1": "8ad1ffe4de3ba9691982b849dcc126892e0a7d43"
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
@@ -5830,7 +5888,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "fea1996dfa85ad408b6956b7041e6fef9360e29a"
+      "hash_sha1": "c49e418bc0a59af5fa4bf8d17543a25eacc95ff1"
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
@@ -6120,7 +6178,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "77200b8e7965462f89c79296e5b370dcfe493e02"
+      "hash_sha1": "1ae2f8c7d713e189e541877f39a5115dfcbc6c5e"
     },
     {
       "file": "docs/reference/zh-en-loanword/python.md",

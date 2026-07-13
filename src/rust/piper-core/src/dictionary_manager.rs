@@ -19,8 +19,8 @@
 //!
 //! ## Control flags
 //!
-//! - `PIPER_OFFLINE_MODE=1` — disable all downloads
-//! - `PIPER_AUTO_DOWNLOAD_DICT=0` — disable dictionary auto-download
+//! - `PIPER_PLUS_OFFLINE_MODE=1` — disable all downloads
+//! - `PIPER_PLUS_AUTO_DOWNLOAD_DICT=0` — disable dictionary auto-download
 
 use std::path::{Path, PathBuf};
 
@@ -107,13 +107,13 @@ pub fn ensure_dictionary() -> Result<PathBuf, PiperError> {
     // Check control flags before attempting download.
     if is_offline_mode() {
         return Err(PiperError::DictionaryLoad {
-            path: "OpenJTalk dictionary not found and PIPER_OFFLINE_MODE=1 is set".to_string(),
+            path: "OpenJTalk dictionary not found and PIPER_PLUS_OFFLINE_MODE=1 is set".to_string(),
         });
     }
 
     if !is_auto_download_enabled() {
         return Err(PiperError::DictionaryLoad {
-            path: "OpenJTalk dictionary not found and PIPER_AUTO_DOWNLOAD_DICT=0 is set. \
+            path: "OpenJTalk dictionary not found and PIPER_PLUS_AUTO_DOWNLOAD_DICT=0 is set. \
                    Set OPENJTALK_DICTIONARY_PATH or enable auto-download"
                 .to_string(),
         });
@@ -131,8 +131,8 @@ pub fn ensure_dictionary() -> Result<PathBuf, PiperError> {
 ///
 /// Search order:
 /// - `OPENJTALK_DATA_DIR` environment variable
-/// - Windows: `%APPDATA%\piper`
-/// - Unix: `$XDG_DATA_HOME/piper` → `$HOME/.local/share/piper` → `/tmp/piper`
+/// - Windows: `%APPDATA%\piper-plus`
+/// - Unix: `$XDG_DATA_HOME/piper-plus` → `$HOME/.local/share/piper-plus` → `/tmp/piper-plus`
 fn get_data_dir() -> PathBuf {
     // 1. Explicit override
     if let Ok(dir) = std::env::var("OPENJTALK_DATA_DIR") {
@@ -143,7 +143,7 @@ fn get_data_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
         if let Ok(appdata) = std::env::var("APPDATA") {
-            return PathBuf::from(appdata).join("piper");
+            return PathBuf::from(appdata).join("piper-plus");
         }
         // Fallback: current directory
         PathBuf::from(".").join("data")
@@ -151,19 +151,19 @@ fn get_data_dir() -> PathBuf {
 
     #[cfg(not(target_os = "windows"))]
     {
-        // XDG_DATA_HOME/piper
+        // XDG_DATA_HOME/piper-plus
         if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
-            return PathBuf::from(xdg).join("piper");
+            return PathBuf::from(xdg).join("piper-plus");
         }
-        // $HOME/.local/share/piper
+        // $HOME/.local/share/piper-plus
         if let Ok(home) = std::env::var("HOME") {
             return PathBuf::from(home)
                 .join(".local")
                 .join("share")
-                .join("piper");
+                .join("piper-plus");
         }
         // Last resort
-        PathBuf::from("/tmp/piper")
+        PathBuf::from("/tmp/piper-plus")
     }
 }
 
@@ -225,18 +225,18 @@ fn is_valid_dictionary(path: &Path) -> bool {
 // Control flags
 // ---------------------------------------------------------------------------
 
-/// Returns `true` if offline mode is enabled (`PIPER_OFFLINE_MODE=1`).
+/// Returns `true` if offline mode is enabled (`PIPER_PLUS_OFFLINE_MODE=1`).
 fn is_offline_mode() -> bool {
-    std::env::var("PIPER_OFFLINE_MODE")
+    std::env::var("PIPER_PLUS_OFFLINE_MODE")
         .map(|v| v == "1")
         .unwrap_or(false)
 }
 
 /// Returns `true` if auto-download is enabled (default: true).
 ///
-/// Disabled when `PIPER_AUTO_DOWNLOAD_DICT=0`.
+/// Disabled when `PIPER_PLUS_AUTO_DOWNLOAD_DICT=0`.
 fn is_auto_download_enabled() -> bool {
-    std::env::var("PIPER_AUTO_DOWNLOAD_DICT")
+    std::env::var("PIPER_PLUS_AUTO_DOWNLOAD_DICT")
         .map(|v| v != "0")
         .unwrap_or(true)
 }
@@ -752,11 +752,11 @@ mod tests {
 
         // SAFETY: serialized by ENV_MUTEX; restored immediately.
         unsafe {
-            std::env::set_var("PIPER_OFFLINE_MODE", "1");
+            std::env::set_var("PIPER_PLUS_OFFLINE_MODE", "1");
         }
         assert!(is_offline_mode());
         unsafe {
-            std::env::remove_var("PIPER_OFFLINE_MODE");
+            std::env::remove_var("PIPER_PLUS_OFFLINE_MODE");
         }
     }
 
@@ -766,7 +766,7 @@ mod tests {
 
         // SAFETY: serialized by ENV_MUTEX; restored immediately.
         unsafe {
-            std::env::remove_var("PIPER_OFFLINE_MODE");
+            std::env::remove_var("PIPER_PLUS_OFFLINE_MODE");
         }
         assert!(!is_offline_mode());
     }
@@ -777,15 +777,15 @@ mod tests {
 
         // SAFETY: serialized by ENV_MUTEX; restored immediately.
         unsafe {
-            std::env::set_var("PIPER_OFFLINE_MODE", "0");
+            std::env::set_var("PIPER_PLUS_OFFLINE_MODE", "0");
         }
         assert!(!is_offline_mode());
         unsafe {
-            std::env::set_var("PIPER_OFFLINE_MODE", "true");
+            std::env::set_var("PIPER_PLUS_OFFLINE_MODE", "true");
         }
         assert!(!is_offline_mode());
         unsafe {
-            std::env::remove_var("PIPER_OFFLINE_MODE");
+            std::env::remove_var("PIPER_PLUS_OFFLINE_MODE");
         }
     }
 
@@ -795,7 +795,7 @@ mod tests {
 
         // SAFETY: serialized by ENV_MUTEX; restored immediately.
         unsafe {
-            std::env::remove_var("PIPER_AUTO_DOWNLOAD_DICT");
+            std::env::remove_var("PIPER_PLUS_AUTO_DOWNLOAD_DICT");
         }
         assert!(is_auto_download_enabled());
     }
@@ -806,11 +806,11 @@ mod tests {
 
         // SAFETY: serialized by ENV_MUTEX; restored immediately.
         unsafe {
-            std::env::set_var("PIPER_AUTO_DOWNLOAD_DICT", "0");
+            std::env::set_var("PIPER_PLUS_AUTO_DOWNLOAD_DICT", "0");
         }
         assert!(!is_auto_download_enabled());
         unsafe {
-            std::env::remove_var("PIPER_AUTO_DOWNLOAD_DICT");
+            std::env::remove_var("PIPER_PLUS_AUTO_DOWNLOAD_DICT");
         }
     }
 
@@ -820,15 +820,15 @@ mod tests {
 
         // SAFETY: serialized by ENV_MUTEX; restored immediately.
         unsafe {
-            std::env::set_var("PIPER_AUTO_DOWNLOAD_DICT", "1");
+            std::env::set_var("PIPER_PLUS_AUTO_DOWNLOAD_DICT", "1");
         }
         assert!(is_auto_download_enabled());
         unsafe {
-            std::env::set_var("PIPER_AUTO_DOWNLOAD_DICT", "false");
+            std::env::set_var("PIPER_PLUS_AUTO_DOWNLOAD_DICT", "false");
         }
         assert!(is_auto_download_enabled());
         unsafe {
-            std::env::remove_var("PIPER_AUTO_DOWNLOAD_DICT");
+            std::env::remove_var("PIPER_PLUS_AUTO_DOWNLOAD_DICT");
         }
     }
 

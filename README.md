@@ -132,51 +132,51 @@ Python / Rust / Go / C# / C++ / WASM の 6 ランタイムを `multilingual-test
 **Windows (PowerShell):**
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/ayutaz/piper-plus/releases/latest/download/piper-windows-x64.zip" -OutFile piper.zip
-Expand-Archive piper.zip -DestinationPath .
-cd piper
+Invoke-WebRequest -Uri "https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-windows-x64.zip" -OutFile piper-plus-cpp.zip
+Expand-Archive piper-plus-cpp.zip -DestinationPath .
+cd piper-plus
 ```
 
 **macOS (Apple Silicon):**
 
 ```bash
-curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-macos-arm64.tar.gz
-tar xzf piper.tar.gz
-cd piper
+curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-macos-arm64.tar.gz
+tar xzf piper-plus-cpp.tar.gz
+cd piper-plus
 xattr -cr .
 ```
 
 **Linux (x86_64):**
 
 ```bash
-curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-x64.tar.gz
-tar xzf piper.tar.gz
-cd piper
+curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-x64.tar.gz
+tar xzf piper-plus-cpp.tar.gz
+cd piper-plus
 ```
 
 **Linux (ARM64, Raspberry Pi 4/5):**
 
 ```bash
-curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-arm64.tar.gz
-tar xzf piper.tar.gz
-cd piper
+curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
+tar xzf piper-plus-cpp.tar.gz
+cd piper-plus
 ```
 
 **2. モデルをダウンロード & 音声を生成**
 
 ```sh
 # つくよみちゃんモデルをダウンロード
-./bin/piper --download-model tsukuyomi
+./bin/piper-plus --download-model tsukuyomi
 
 # 音声を生成 (モデル名だけで OK — ダウンロード済みモデルを自動解決)
-./bin/piper --model tsukuyomi --text "こんにちは、今日は良い天気ですね。" --output_file output.wav
+./bin/piper-plus --model tsukuyomi --text "こんにちは、今日は良い天気ですね。" --output_file output.wav
 ```
 
-> **Windows cmd のコードページについて:** `--text` オプションは内部で `GetCommandLineW()` (UTF-16) を使用するため、コードページに依存せずそのまま動作します。パイプ入力（`echo ... | piper`）を使う場合のみ、事前に `chcp 65001` で UTF-8 に切り替えてください。
+> **Windows cmd のコードページについて:** `--text` オプションは内部で `GetCommandLineW()` (UTF-16) を使用するため、コードページに依存せずそのまま動作します。パイプ入力（`echo ... | piper-plus`）を使う場合のみ、事前に `chcp 65001` で UTF-8 に切り替えてください。
 >
-> **output.wav の出力先:** カレントディレクトリ（`cd piper` した場所）に生成されます。
+> **output.wav の出力先:** カレントディレクトリ（`cd piper-plus` した場所）に生成されます。
 
-> **どのバイナリを選べばよい？** Releases には `piper-*` (C++) のほか、`piper-plus-cli-*` (C# .NET) と `piper-plus-rs-cli-*` (Rust) のCLIもあります。上記のクイックスタートで使っている **C++ CLI (`piper-*`)** が最も多くのプラットフォームに対応していて推奨です。詳しくは [CLIバイナリの選び方](docs/getting-started/binary-selection.md) を参照。
+> **どのバイナリを選べばよい？** Releases には `piper-plus-cpp-*` (C++) のほか、`piper-plus-cli-*` (C# .NET) と `piper-plus-rs-cli-*` (Rust) のCLIもあります。上記のクイックスタートで使っている **C++ CLI (`piper-plus-cpp-*`)** が最も多くのプラットフォームに対応していて推奨です。詳しくは [CLIバイナリの選び方](docs/getting-started/binary-selection.md) を参照。
 
 ### Python推論
 
@@ -208,15 +208,15 @@ uv run python -m piper_train.infer_onnx \
 
 ```bash
 # モデル一覧表示
-python -m piper --list-models
-python -m piper --list-models ja
+python -m piper_plus --list-models
+python -m piper_plus --list-models ja
 
 # モデルダウンロード
-python -m piper --download-model tsukuyomi
-python -m piper --download-model ja_JP-tsukuyomi-chan-medium
+python -m piper_plus --download-model tsukuyomi
+python -m piper_plus --download-model ja_JP-tsukuyomi-chan-medium
 
 # ダウンロード後に使用
-python -m piper --model ja_JP-tsukuyomi-chan-medium -f output.wav "こんにちは"
+python -m piper_plus --model ja_JP-tsukuyomi-chan-medium -f output.wav "こんにちは"
 ```
 
 ### WebUI
@@ -224,7 +224,7 @@ python -m piper --model ja_JP-tsukuyomi-chan-medium -f output.wav "こんにち�
 ```bash
 uv pip install -r src/python_run/requirements_webui.txt
 cd src/python_run
-python -m piper.webui --data-dir /path/to/models
+python -m piper_plus.webui --data-dir /path/to/models
 # → http://localhost:7860
 ```
 
@@ -347,7 +347,7 @@ C++ CLI の詳細なコマンドラインオプション、JSON 入力フォー�
 簡単な使用例:
 
 ```bash
-./bin/piper --model tsukuyomi --text "こんにちは" --output_file hello.wav
+./bin/piper-plus --model tsukuyomi --text "こんにちは" --output_file hello.wav
 ```
 
 ---

@@ -51,7 +51,7 @@ env:
   MODEL_VERSION: "v1.0.0"
   # Test settings
   TEST_TIMEOUT: 300
-  CACHE_DIR: ~/.cache/piper
+  CACHE_DIR: ~/.cache/piper-plus
 
 jobs:
   # Build piper for dictionary tests (Linux and macOS only)
@@ -88,57 +88,57 @@ jobs:
 
       - name: Extract piper and prepare environment
         run: |
-          tar -xzf piper-${{ runner.os }}.tar.gz
+          tar -xzf piper-plus-cpp-${{ runner.os }}.tar.gz
 
           # Make binaries executable if they exist
-          if [ -f "piper/bin/piper" ]; then
-            chmod +x piper/bin/piper
+          if [ -f "piper-plus/bin/piper-plus" ]; then
+            chmod +x piper-plus/bin/piper-plus
           else
             echo "Warning: piper binary not found in package"
             # Check what's in the package
             echo "Package contents:"
-            find piper -type f 2>/dev/null | head -20
+            find piper-plus -type f 2>/dev/null | head -20
             # Skip the test
             echo "SKIP_TESTS=true" >> $GITHUB_ENV
           fi
-          [ -f "piper/bin/open_jtalk" ] && chmod +x piper/bin/open_jtalk || true
+          [ -f "piper-plus/bin/open_jtalk" ] && chmod +x piper-plus/bin/open_jtalk || true
 
           # Set up paths
-          export PATH="${{ github.workspace }}/piper/bin:$PATH"
-          echo "PATH=${{ github.workspace }}/piper/bin:$PATH" >> $GITHUB_ENV
+          export PATH="${{ github.workspace }}/piper-plus/bin:$PATH"
+          echo "PATH=${{ github.workspace }}/piper-plus/bin:$PATH" >> $GITHUB_ENV
 
           # Set library path for Linux and macOS
           if [ "${{ runner.os }}" = "Linux" ]; then
-            export LD_LIBRARY_PATH="${{ github.workspace }}/piper/lib:${LD_LIBRARY_PATH}"
-            echo "LD_LIBRARY_PATH=${{ github.workspace }}/piper/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+            export LD_LIBRARY_PATH="${{ github.workspace }}/piper-plus/lib:${LD_LIBRARY_PATH}"
+            echo "LD_LIBRARY_PATH=${{ github.workspace }}/piper-plus/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
           elif [ "${{ runner.os }}" = "macOS" ]; then
-            export DYLD_LIBRARY_PATH="${{ github.workspace }}/piper/lib:${DYLD_LIBRARY_PATH}"
-            echo "DYLD_LIBRARY_PATH=${{ github.workspace }}/piper/lib:${DYLD_LIBRARY_PATH}" >> $GITHUB_ENV
+            export DYLD_LIBRARY_PATH="${{ github.workspace }}/piper-plus/lib:${DYLD_LIBRARY_PATH}"
+            echo "DYLD_LIBRARY_PATH=${{ github.workspace }}/piper-plus/lib:${DYLD_LIBRARY_PATH}" >> $GITHUB_ENV
           fi
 
           # Set espeak data path
-          if [ -d "${{ github.workspace }}/piper/share/espeak-ng-data" ]; then
-            export ESPEAK_DATA_PATH="${{ github.workspace }}/piper/share/espeak-ng-data"
-            echo "ESPEAK_DATA_PATH=${{ github.workspace }}/piper/share/espeak-ng-data" >> $GITHUB_ENV
+          if [ -d "${{ github.workspace }}/piper-plus/share/espeak-ng-data" ]; then
+            export ESPEAK_DATA_PATH="${{ github.workspace }}/piper-plus/share/espeak-ng-data"
+            echo "ESPEAK_DATA_PATH=${{ github.workspace }}/piper-plus/share/espeak-ng-data" >> $GITHUB_ENV
           fi
 
           # Verify binaries and libraries
-          echo "Checking piper binary..."
-          which piper || echo "piper not in PATH"
-          ls -la piper/bin/piper 2>/dev/null || echo "piper binary not found"
+          echo "Checking piper-plus binary..."
+          which piper-plus || echo "piper-plus not in PATH"
+          ls -la piper-plus/bin/piper-plus 2>/dev/null || echo "piper-plus binary not found"
 
           echo "Checking libraries..."
-          ls -la piper/lib/ 2>/dev/null || echo "No lib directory"
+          ls -la piper-plus/lib/ 2>/dev/null || echo "No lib directory"
 
           echo "Checking open_jtalk binary..."
           which open_jtalk || echo "open_jtalk not in PATH"
-          ls -la piper/bin/open_jtalk 2>/dev/null || echo "open_jtalk not found"
+          ls -la piper-plus/bin/open_jtalk 2>/dev/null || echo "open_jtalk not found"
 
       - name: Remove bundled dictionary for download tests
         run: |
           # Remove the bundled dictionary so we can test auto-download and offline behavior
-          echo "Removing bundled dictionary at piper/share/open_jtalk/dic..."
-          rm -rf piper/share/open_jtalk/dic
+          echo "Removing bundled dictionary at piper-plus/share/open_jtalk/dic..."
+          rm -rf piper-plus/share/open_jtalk/dic
           echo "Bundled dictionary removed"
         if: env.SKIP_TESTS != 'true'
 
@@ -156,7 +156,7 @@ jobs:
           fi
         env:
           CI: true
-          PIPER_BIN_PATH: ${{ github.workspace }}/piper/bin/piper
+          PIPER_BIN_PATH: ${{ github.workspace }}/piper-plus/bin/piper-plus
 
       - name: Run comprehensive dictionary tests
         if: success()
@@ -181,11 +181,11 @@ jobs:
           mkdir -p $HOME
 
           echo "Testing checksum verification..."
-          if echo "テスト" | piper --model ./test/models/multilingual-test-medium.onnx --output_file /tmp/test_checksum.wav 2>&1 | tee /tmp/checksum_log.txt; then
+          if echo "テスト" | piper-plus --model ./test/models/multilingual-test-medium.onnx --output_file /tmp/test_checksum.wav 2>&1 | tee /tmp/checksum_log.txt; then
             echo "✓ Piper executed successfully"
 
             # Check if dictionary was downloaded
-            if [ -d "$HOME/.local/share/piper/open_jtalk_dic_utf_8-1.11" ]; then
+            if [ -d "$HOME/.local/share/piper-plus/open_jtalk_dic_utf_8-1.11" ]; then
               echo "✓ Dictionary was downloaded"
 
               # Verify checksum log
@@ -217,15 +217,15 @@ jobs:
           export HOME=/tmp/test_offline_$$
           mkdir -p "$HOME"
           unset OPENJTALK_DICTIONARY_PATH
-          export PIPER_OFFLINE_MODE=1
+          export PIPER_PLUS_OFFLINE_MODE=1
 
           echo "Testing offline mode..."
           # Should not download dictionary in offline mode
-          echo "オフライン" | piper --model ./test/models/multilingual-test-medium.onnx --output_file /tmp/test_offline.wav 2>&1 | tee /tmp/offline_log.txt || true
+          echo "オフライン" | piper-plus --model ./test/models/multilingual-test-medium.onnx --output_file /tmp/test_offline.wav 2>&1 | tee /tmp/offline_log.txt || true
 
           # Primary check: dictionary must NOT have been downloaded
-          if [ -d "$HOME/.local/share/piper/open_jtalk_dic_utf_8-1.11" ]; then
-            echo "✗ Dictionary was downloaded despite PIPER_OFFLINE_MODE=1"
+          if [ -d "$HOME/.local/share/piper-plus/open_jtalk_dic_utf_8-1.11" ]; then
+            echo "✗ Dictionary was downloaded despite PIPER_PLUS_OFFLINE_MODE=1"
             exit 1
           fi
           echo "✓ Dictionary was not downloaded (offline mode correctly prevents download)"
@@ -248,19 +248,19 @@ jobs:
             echo "Skipping environment variable test due to missing piper binary"
             exit 0
           fi
-          # Test PIPER_AUTO_DOWNLOAD_DICT=0
+          # Test PIPER_PLUS_AUTO_DOWNLOAD_DICT=0
           export HOME=/tmp/test_env_$$
           mkdir -p "$HOME"
           unset OPENJTALK_DICTIONARY_PATH
-          export PIPER_AUTO_DOWNLOAD_DICT=0
+          export PIPER_PLUS_AUTO_DOWNLOAD_DICT=0
 
           echo "Testing auto-download disable..."
-          echo "環境変数" | piper --model ./test/models/multilingual-test-medium.onnx --output_file /tmp/test_env.wav 2>&1 | tee /tmp/env_log.txt || true
+          echo "環境変数" | piper-plus --model ./test/models/multilingual-test-medium.onnx --output_file /tmp/test_env.wav 2>&1 | tee /tmp/env_log.txt || true
 
           # Primary check: dictionary must NOT have been downloaded
-          # (proving PIPER_AUTO_DOWNLOAD_DICT=0 prevented the download)
-          if [ -d "$HOME/.local/share/piper/open_jtalk_dic_utf_8-1.11" ]; then
-            echo "✗ Dictionary was downloaded despite PIPER_AUTO_DOWNLOAD_DICT=0"
+          # (proving PIPER_PLUS_AUTO_DOWNLOAD_DICT=0 prevented the download)
+          if [ -d "$HOME/.local/share/piper-plus/open_jtalk_dic_utf_8-1.11" ]; then
+            echo "✗ Dictionary was downloaded despite PIPER_PLUS_AUTO_DOWNLOAD_DICT=0"
             exit 1
           fi
           echo "✓ Dictionary was not downloaded (auto-download correctly disabled)"
@@ -275,7 +275,7 @@ jobs:
             echo "Log contents:"
             cat /tmp/env_log.txt
           fi
-          echo "✓ PIPER_AUTO_DOWNLOAD_DICT=0 works correctly"
+          echo "✓ PIPER_PLUS_AUTO_DOWNLOAD_DICT=0 works correctly"
         env:
           CI: true
 
@@ -313,7 +313,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     env:
-      OPENJTALK_DICTIONARY_PATH: ${{ github.workspace }}/piper/share/open_jtalk/dic
+      OPENJTALK_DICTIONARY_PATH: ${{ github.workspace }}/piper-plus/share/open_jtalk/dic
 
     steps:
       - uses: actions/checkout@v6.0.3
@@ -326,30 +326,30 @@ jobs:
       - name: Extract piper (Unix)
         if: runner.os != 'Windows'
         run: |
-          tar -xzf piper-${{ runner.os }}.tar.gz
-          chmod +x piper/bin/piper
+          tar -xzf piper-plus-cpp-${{ runner.os }}.tar.gz
+          chmod +x piper-plus/bin/piper-plus
 
           # Set library path for Linux and macOS
           if [ "${{ runner.os }}" = "Linux" ]; then
-            export LD_LIBRARY_PATH="${PWD}/piper/lib:${LD_LIBRARY_PATH}"
-            echo "LD_LIBRARY_PATH=${PWD}/piper/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+            export LD_LIBRARY_PATH="${PWD}/piper-plus/lib:${LD_LIBRARY_PATH}"
+            echo "LD_LIBRARY_PATH=${PWD}/piper-plus/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
           elif [ "${{ runner.os }}" = "macOS" ]; then
-            export DYLD_LIBRARY_PATH="${PWD}/piper/lib:${DYLD_LIBRARY_PATH}"
-            echo "DYLD_LIBRARY_PATH=${PWD}/piper/lib:${DYLD_LIBRARY_PATH}" >> $GITHUB_ENV
+            export DYLD_LIBRARY_PATH="${PWD}/piper-plus/lib:${DYLD_LIBRARY_PATH}"
+            echo "DYLD_LIBRARY_PATH=${PWD}/piper-plus/lib:${DYLD_LIBRARY_PATH}" >> $GITHUB_ENV
           fi
 
       - name: Extract piper (Windows)
         if: runner.os == 'Windows'
         run: |
-          Expand-Archive -Path piper-Windows.zip -DestinationPath . -Force
+          Expand-Archive -Path piper-plus-cpp-Windows.zip -DestinationPath . -Force
 
       - name: Run multilingual tests
         shell: bash
         run: |
           if [ "${{ runner.os }}" = "Windows" ]; then
-            PIPER="${{ github.workspace }}/piper/bin/piper.exe"
+            PIPER="${{ github.workspace }}/piper-plus/bin/piper-plus.exe"
           else
-            PIPER="${{ github.workspace }}/piper/bin/piper"
+            PIPER="${{ github.workspace }}/piper-plus/bin/piper-plus"
           fi
           MODEL="${{ github.workspace }}/test/models/multilingual-test-medium.onnx"
 

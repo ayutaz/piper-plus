@@ -10,16 +10,18 @@ Pre-trained models for multilingual TTS and fine-tuning are available on Hugging
 
 | Model | Languages | Speakers | Description | Download |
 |---|---|---|---|---|
-| Tsukuyomi-chan 6lang-v2 | JA/EN/ZH/ES/FR/PT | 1 | Tsukuyomi-chan voice, 6-language, FP16. **500 epochs (2026-03-16)**, fine-tuned from 6-language base with `freeze-dp` + `emb_lang` unify for voice consistency across all 6 languages. ONNX size 75 MB. | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
-| Tsukuyomi-chan MB-iSTFT | JA/EN/ZH/ES/FR/PT | 1 | Tsukuyomi-chan with MB-iSTFT decoder, 6-language. **500 epochs (2026-05-02)**, fine-tuned from 6-lang MB-iSTFT base. **2.21x faster CPU inference** (61.9 ms p50). | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) (MB-iSTFT variant: `tsukuyomi-mb-istft-500epoch.onnx`) |
+| Tsukuyomi-chan 6lang (canonical) | JA/EN/ZH/ES/FR/PT | 1 | Tsukuyomi-chan voice, 6-language, FP16. **500 epochs (2026-03-16)**, fine-tuned from 6-language base with `freeze-dp` + `emb_lang` unify for voice consistency across all 6 languages. Actual HF file: `tsukuyomi-chan-6lang-fp16.onnx`. ONNX size 75 MB. | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
 | CSS10 Japanese 6lang | JA/EN/ZH/ES/FR/PT | 1 | CSS10 Japanese voice, 6-language, FP16. 50 epochs from 6-language base, 6,841 utterances. | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang) |
+
+> **MB-iSTFT / 6lang-v2 variants (upcoming)**: `tsukuyomi-mb-istft-500epoch.onnx` (500 epoch MB-iSTFT FT、 2.21x faster CPU inference) と `tsukuyomi-6lang-v2-fixed.onnx` (v3→v4→v2 段階改善版) は学習完了済みですが、 HF への upload はまだ実施されていません。 現在 canonical な推論用 ONNX は `tsukuyomi-chan-6lang-fp16.onnx` のみです。 進捗は [Issue #590](https://github.com/ayutaz/piper-plus/issues/590) / follow-up model publish tracking 参照。
 
 **Base Models (for fine-tuning):**
 
 | Model | Languages | Speakers | Description | Download |
 |---|---|---|---|---|
-| 6-Language Base | JA/EN/ZH/ES/FR/PT | 571 | Multilingual pre-trained (508,187 utterances, VITS + Prosody). **75 epochs / ~282K gradient steps (2026-03-16)**, language-balanced sampling, WavLM-disabled (V100 friendly). Checkpoint `epoch=74-step=504712.ckpt`. | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
-| 6-lang MB-iSTFT Base | JA/EN/ZH/ES/FR/PT | 571 | Multilingual pre-trained with MB-iSTFT decoder. **75 epochs (2026-04-16)**, scratch-trained. **2.21x faster CPU inference** vs HiFi-GAN. Issue #268. | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) (MB-iSTFT variant: `multilingual-6lang-mb-istft-scratch-75epoch.onnx` / `*.ckpt` in the same repo) |
+| 6-Language Base (HiFi-GAN) | JA/EN/ZH/ES/FR/PT | 571 | Multilingual pre-trained (508,187 utterances, VITS + Prosody). **75 epochs / ~282K gradient steps (2026-03-16)**, language-balanced sampling, WavLM-disabled (V100 friendly). Actual HF file: `model.ckpt` (training checkpoint for FT). | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
+
+> **6-lang MB-iSTFT Base (upcoming)**: `multilingual-6lang-mb-istft-scratch-75epoch.onnx` / `*.ckpt` (75 epoch scratch、 2.21x faster CPU inference、 Issue #268) は学習完了済みですが、 HF への upload はまだ実施されていません。 v2.0 では canonical FT base として `piper-plus-base` の `model.ckpt` (HiFi-GAN 系) を使用してください。 MB-iSTFT variant の upload は [Issue #590](https://github.com/ayutaz/piper-plus/issues/590) follow-up にて予定。
 
 **Zero-Shot TTS Models (PR #222, v7 multi-6lang scratch + Tsukuyomi FT):**
 
@@ -71,8 +73,8 @@ High-quality Japanese speech synthesis with OpenJTalk integration. The dictionar
 | Variable | Description |
 |---|---|
 | `OPENJTALK_DICTIONARY_PATH` | OpenJTalk dictionary path (auto-downloads if not set) |
-| `PIPER_AUTO_DOWNLOAD_DICT` | Set to `0` to disable auto-download |
-| `PIPER_OFFLINE_MODE` | Set to `1` for offline mode |
+| `PIPER_PLUS_AUTO_DOWNLOAD_DICT` | Set to `0` to disable auto-download |
+| `PIPER_PLUS_OFFLINE_MODE` | Set to `1` for offline mode |
 
 See the Japanese Usage Guide and [Phoneme Mapping Reference](../../api-reference/phoneme-mapping.md).
 

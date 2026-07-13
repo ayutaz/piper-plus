@@ -22,18 +22,18 @@ import (
 // 4 for the same reason: the ORT session uses ~4 intra-op threads we do not
 // want to oversubscribe, and the Japanese G2P engine serializes on a mutex
 // around MeCab, so high parallelism degrades to lock contention. Setting
-// PIPER_G2P_PARALLELISM=1 restores the strictly-serial path.
+// PIPER_PLUS_G2P_PARALLELISM=1 restores the strictly-serial path.
 const AutoParallelismCap = 4
 
 // EnvVarName is the environment variable consulted by Resolve.
-const EnvVarName = "PIPER_G2P_PARALLELISM"
+const EnvVarName = "PIPER_PLUS_G2P_PARALLELISM"
 
 // Resolve returns the effective worker count for parallel G2P across
 // nSentences sentences. Mirrors voice.py:_resolve_g2p_parallelism.
 //
 // Resolution order:
-//   - PIPER_G2P_PARALLELISM=1     → 1 (serial, zero-overhead path)
-//   - PIPER_G2P_PARALLELISM=N≥2   → N (capped at nSentences)
+//   - PIPER_PLUS_G2P_PARALLELISM=1     → 1 (serial, zero-overhead path)
+//   - PIPER_PLUS_G2P_PARALLELISM=N≥2   → N (capped at nSentences)
 //   - unset / invalid             → auto = min(nSentences, max(2, cores/2),
 //     AutoParallelismCap)
 //   - nSentences ≤ 1              → 1
@@ -45,7 +45,7 @@ func Resolve(nSentences int) int {
 	if raw := strings.TrimSpace(os.Getenv(EnvVarName)); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil {
-			slog.Warn("ignoring invalid PIPER_G2P_PARALLELISM; falling back to auto",
+			slog.Warn("ignoring invalid PIPER_PLUS_G2P_PARALLELISM; falling back to auto",
 				"value", raw)
 		} else {
 			if n <= 1 {

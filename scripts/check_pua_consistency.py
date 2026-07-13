@@ -6,7 +6,7 @@ documented in docs/spec/pua-contract.toml. It parses each runtime's
 hardcoded PUA table and compares it against the canonical pua.json.
 
 Runtimes covered:
-  - Python (src/python_run/piper/phonemize/token_mapper.py)
+  - Python (src/python_run/piper_plus/phonemize/token_mapper.py)
   - Python G2P (src/python/g2p/piper_plus_g2p/encode/pua.py -- loads pua.json)
   - Rust (src/rust/piper-plus-g2p/src/token_map.rs)
   - Go (src/go/phonemize/pua.go)
@@ -34,7 +34,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 CANONICAL = REPO_ROOT / "src/python/g2p/piper_plus_g2p/data/pua.json"
 
-PYTHON_RUNTIME = REPO_ROOT / "src/python_run/piper/phonemize/token_mapper.py"
+PYTHON_RUNTIME = REPO_ROOT / "src/python_run/piper_plus/phonemize/token_mapper.py"
 PYTHON_G2P_PUA = REPO_ROOT / "src/python/g2p/piper_plus_g2p/encode/pua.py"
 RUST_TOKEN_MAP = REPO_ROOT / "src/rust/piper-plus-g2p/src/token_map.rs"
 GO_PUA = REPO_ROOT / "src/go/phonemize/pua.go"

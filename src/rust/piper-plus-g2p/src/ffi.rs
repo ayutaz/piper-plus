@@ -1,4 +1,4 @@
-//! C FFI for piper-g2p — foundation for mobile (UniFFI) bindings.
+//! C FFI for piper-plus-g2p — foundation for mobile (UniFFI) bindings.
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;

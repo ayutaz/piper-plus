@@ -55,7 +55,7 @@ public sealed class ModelManagerTests : IDisposable
         string dir = ModelManager.GetDefaultModelDir();
         string lower = dir.ToLowerInvariant();
 
-        Assert.Contains("piper", lower);
+        Assert.Contains("piper-plus", lower);
         Assert.Contains("models", lower);
     }
 
@@ -208,11 +208,11 @@ public sealed class ModelManagerTests : IDisposable
     [Fact]
     public void GetDefaultModelDir_EnvVarOverride()
     {
-        string? original = Environment.GetEnvironmentVariable("PIPER_MODEL_DIR");
+        string? original = Environment.GetEnvironmentVariable("PIPER_PLUS_MODEL_DIR");
         try
         {
             const string customDir = "/tmp/test-piper-models";
-            Environment.SetEnvironmentVariable("PIPER_MODEL_DIR", customDir);
+            Environment.SetEnvironmentVariable("PIPER_PLUS_MODEL_DIR", customDir);
 
             string dir = ModelManager.GetDefaultModelDir();
 
@@ -220,29 +220,29 @@ public sealed class ModelManagerTests : IDisposable
         }
         finally
         {
-            Environment.SetEnvironmentVariable("PIPER_MODEL_DIR", original);
+            Environment.SetEnvironmentVariable("PIPER_PLUS_MODEL_DIR", original);
         }
     }
 
     [Fact]
     public void GetDefaultModelDir_EnvVarEmpty_UsesOSDefault()
     {
-        string? original = Environment.GetEnvironmentVariable("PIPER_MODEL_DIR");
+        string? original = Environment.GetEnvironmentVariable("PIPER_PLUS_MODEL_DIR");
         try
         {
-            Environment.SetEnvironmentVariable("PIPER_MODEL_DIR", string.Empty);
+            Environment.SetEnvironmentVariable("PIPER_PLUS_MODEL_DIR", string.Empty);
 
             string dir = ModelManager.GetDefaultModelDir();
 
-            // With empty env var, should fall back to OS-specific path containing "piper" and "models"
+            // With empty env var, should fall back to OS-specific path containing "piper-plus" and "models"
             Assert.False(string.IsNullOrEmpty(dir));
             string lower = dir.ToLowerInvariant();
-            Assert.Contains("piper", lower);
+            Assert.Contains("piper-plus", lower);
             Assert.Contains("models", lower);
         }
         finally
         {
-            Environment.SetEnvironmentVariable("PIPER_MODEL_DIR", original);
+            Environment.SetEnvironmentVariable("PIPER_PLUS_MODEL_DIR", original);
         }
     }
 
@@ -501,8 +501,8 @@ public sealed class ModelManagerTests : IDisposable
         var tempDir = Path.Combine(Path.GetTempPath(), $"resolve_default_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
 
-        var originalEnv = Environment.GetEnvironmentVariable("PIPER_MODEL_DIR");
-        Environment.SetEnvironmentVariable("PIPER_MODEL_DIR", tempDir);
+        var originalEnv = Environment.GetEnvironmentVariable("PIPER_PLUS_MODEL_DIR");
+        Environment.SetEnvironmentVariable("PIPER_PLUS_MODEL_DIR", tempDir);
         try
         {
             var cachedPath = Path.Combine(tempDir, Path.GetFileName(onnxFile!.RelativePath));
@@ -516,7 +516,7 @@ public sealed class ModelManagerTests : IDisposable
         }
         finally
         {
-            Environment.SetEnvironmentVariable("PIPER_MODEL_DIR", originalEnv);
+            Environment.SetEnvironmentVariable("PIPER_PLUS_MODEL_DIR", originalEnv);
             try
             {
                 Directory.Delete(tempDir, true);

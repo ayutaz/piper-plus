@@ -25,7 +25,7 @@ on:
       - 'docker/webui/app.py'
       - 'src/python/piper_train/export_onnx.py'
       - 'src/python/piper_train/infer_onnx.py'
-      - 'src/python_run/piper/voice.py'
+      - 'src/python_run/piper_plus/voice.py'
       - 'src/cpp/piper.cpp'
       - 'src/cpp/piper.hpp'
       - 'src/rust/piper-core/src/engine.rs'

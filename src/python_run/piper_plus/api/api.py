@@ -10,12 +10,12 @@ from pathlib import Path
 
 import numpy as np
 
-from piper_plus._model_resolver import (
+from piper_plus.api._model_resolver import (
     MODEL_ALIASES,
     resolve_model,
 )
-from piper_plus.audio import AudioResult
-from piper_plus.engine import (
+from piper_plus.api.audio import AudioResult
+from piper_plus.api.engine import (
     create_ort_session,
     load_config,
     synthesize as engine_synthesize,
@@ -57,7 +57,7 @@ class PiperPlus:
         print(f"Duration: {result.duration:.2f}s")
 
     Args:
-        model: Model file path, alias (``"tsukuyomi"``, ``"base"``),
+        model: Model file path, alias (``"tsukuyomi"``),
             or HuggingFace repo ID (``"ayousanz/piper-plus-tsukuyomi-chan"``).
         config: Explicit config.json path.  Auto-detected when *None*.
         device: Inference device: ``"cpu"``, ``"gpu"``, or ``"auto"``.

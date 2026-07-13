@@ -27,7 +27,7 @@ PR #391 → PR #443 の事故パターン:
 | Canonical (Python) | 対応する他ランタイム file |
 |---|---|
 | `src/python/piper_train/export_onnx.py` | (ONNX export 自体は Python 専用、ただし出力スキーマを変える場合は下記の loader も更新必要) |
-| `src/python/piper_train/vits/models.py:VitsModel.infer` | `src/python_run/piper/voice.py` (Python runtime) |
+| `src/python/piper_train/vits/models.py:VitsModel.infer` | `src/python_run/piper_plus/voice.py` (Python runtime) |
 | ONNX グラフ入出力名 (`speaker_embedding` / `prosody_features` / `language_id`) | `src/rust/piper-core/src/engine.rs` (Rust) |
 | 同上 | `src/go/piperplus/synth.go` (Go) |
 | 同上 | `src/csharp/PiperPlus.Core/Inference/PiperSession.cs` (C#) |
@@ -54,7 +54,7 @@ echo "Canonical 変更検出: $CANONICAL_TOUCHED"
 
 ```bash
 RUNTIME_FILES=(
-  "src/python_run/piper/voice.py"
+  "src/python_run/piper_plus/voice.py"
   "src/rust/piper-core/src/engine.rs"
   "src/go/piperplus/synth.go"
   "src/csharp/PiperPlus.Core/Inference/PiperSession.cs"

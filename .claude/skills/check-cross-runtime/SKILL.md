@@ -1,6 +1,6 @@
 ---
 name: check-cross-runtime
-description: Python canonical (`src/python_run/piper/`, `src/python/piper_train/`, `src/python/g2p/piper_plus_g2p/`) を変更した PR で、 ONNX I/O 以外の追随漏れ (phonemizer / config schema / CLI flag / data 形式 / API 変更) を 7 ランタイム + 2 docker image 範囲で fail-fast 検出する。PR #443 (Python のみ修正 → 4 runtime + 2 docker で同バグ) / PR #391 (Python のみ修正 → 5 runtime 古いまま) の silent regression パターンへの対策。`/check-runtime-parity` (ONNX グラフ I/O 限定) と `/check-new-runtime-asset` (新規アセット配布) を補完する 3 つ目の sibling skill。
+description: Python canonical (`src/python_run/piper_plus/`, `src/python/piper_train/`, `src/python/g2p/piper_plus_g2p/`) を変更した PR で、 ONNX I/O 以外の追随漏れ (phonemizer / config schema / CLI flag / data 形式 / API 変更) を 7 ランタイム + 2 docker image 範囲で fail-fast 検出する。PR #443 (Python のみ修正 → 4 runtime + 2 docker で同バグ) / PR #391 (Python のみ修正 → 5 runtime 古いまま) の silent regression パターンへの対策。`/check-runtime-parity` (ONNX グラフ I/O 限定) と `/check-new-runtime-asset` (新規アセット配布) を補完する 3 つ目の sibling skill。
 disable-model-invocation: true
 allowed-tools: Bash(git diff *) Bash(git status *) Bash(grep *) Bash(ls *) Bash(python *) Bash(uv run *)
 ---
@@ -9,7 +9,7 @@ allowed-tools: Bash(git diff *) Bash(git status *) Bash(grep *) Bash(ls *) Bash(
 
 # Python 変更 → N ランタイム追随漏れチェック
 
-`src/python_run/piper/*.py`、 `src/python/piper_train/*.py`、 または
+`src/python_run/piper_plus/*.py`、 `src/python/piper_train/*.py`、 または
 `src/python/g2p/piper_plus_g2p/*.py` を変更した PR で、 他 7 ランタイム
 (C# / Rust × 2 crate / Go / JS-WASM / C API / iOS SPM / Kotlin-Android /
 Swift G2P) + 2 docker image (python-inference / webui) が **同じ振る舞いに
@@ -50,7 +50,7 @@ Swift G2P) + 2 docker image (python-inference / webui) が **同じ振る舞い�
 
 | カテゴリ | パス | 対応する他ランタイム |
 |---|---|---|
-| **A. ランタイム推論** | `src/python_run/piper/*.py` (voice.py, http_server.py, text_splitter.py, timing.py, model_manager.py) | C# / Rust core / Go / WASM / C API / iOS SPM |
+| **A. ランタイム推論** | `src/python_run/piper_plus/*.py` (voice.py, http_server.py, text_splitter.py, timing.py, model_manager.py) | C# / Rust core / Go / WASM / C API / iOS SPM |
 | **B. G2P / phonemizer** | `src/python/g2p/piper_plus_g2p/*.py` (japanese.py, chinese.py, multilingual.py, ssml.py 等) | Rust piper-plus-g2p / Go phonemize / C# Phonemize / WASM g2p / C++ *_phonemize.cpp / Kotlin / Swift G2P |
 | **C. モデルエクスポート / 学習** | `src/python/piper_train/*.py` (export_onnx.py / vits/models.py / infer_onnx.py) | **ONNX I/O 変更なら `/check-runtime-parity` を使う**。 それ以外の周辺ロジック (chunking / scaling / sentence split 等) が本 skill 対象 |
 
@@ -80,7 +80,7 @@ Swift G2P) + 2 docker image (python-inference / webui) が **同じ振る舞い�
 ### 1. canonical Python が触られているか確認
 
 ```bash
-CANONICAL_PATTERN='^(src/python_run/piper/|src/python/piper_train/|src/python/g2p/piper_plus_g2p/).*\.py$'
+CANONICAL_PATTERN='^(src/python_run/piper_plus/|src/python/piper_train/|src/python/g2p/piper_plus_g2p/).*\.py$'
 
 CANONICAL_TOUCHED=$(git diff --name-only origin/dev...HEAD | grep -E "$CANONICAL_PATTERN" || true)
 
@@ -111,7 +111,7 @@ fi
 
 ```bash
 declare -A RUNTIME_PATHS=(
-  ["Python runtime"]="src/python_run/piper/"
+  ["Python runtime"]="src/python_run/piper_plus/"
   ["C# Core"]="src/csharp/PiperPlus.Core/"
   ["C# CLI"]="src/csharp/PiperPlus.Cli/"
   ["Rust core"]="src/rust/piper-core/"
@@ -146,11 +146,11 @@ done
 
 ### 4. カテゴリ別 grep ヒント (詳細調査)
 
-#### A. ランタイム推論 (`src/python_run/piper/` を変更したとき)
+#### A. ランタイム推論 (`src/python_run/piper_plus/` を変更したとき)
 
 ```bash
 # 変更された関数名を抽出
-git diff origin/dev...HEAD -- src/python_run/piper/voice.py | \
+git diff origin/dev...HEAD -- src/python_run/piper_plus/voice.py | \
   grep -E '^[+-][[:space:]]*def ' | sort -u
 
 # 同名 / 類似シグネチャを他 runtime で grep
@@ -256,7 +256,7 @@ uv run python scripts/check_pt_dialect_contract.py
 
 ### 7. Docker image の追随確認 (PR #443 の盲点)
 
-`src/python_run/piper/` 変更時は、 ベースとなる docker image 2 個も touch されて
+`src/python_run/piper_plus/` 変更時は、 ベースとなる docker image 2 個も touch されて
 いるかを確認 (Python ランタイムを wheel として再 install するだけで OK な場合と、
 recipe を変える必要がある場合がある):
 

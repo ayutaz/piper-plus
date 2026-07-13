@@ -1,4 +1,4 @@
-# Piper WebUI
+# Piper-Plus WebUI
 
 Gradio-based web interface for piper-plus inference and training.
 
@@ -26,10 +26,10 @@ uv pip install ".[train]"
 
 ```bash
 cd src/python_run
-python -m piper.webui --data-dir ../../test/models
+python -m piper_plus.webui --data-dir ../../test/models
 
 # Or with custom settings
-python -m piper.webui \
+python -m piper_plus.webui \
   --data-dir /path/to/models \
   --host 0.0.0.0 \
   --port 8080 \
@@ -71,12 +71,12 @@ python -m piper.webui \
 
 There are two independent WebUI implementations:
 
-**Local development version** (`src/python_run/piper/webui.py`) -- uses `PiperVoice` runtime for inference and includes a training management tab via `training_manager.py`.
+**Local development version** (`src/python_run/piper_plus/webui.py`) -- uses `PiperVoice` runtime for inference and includes a training management tab via `training_manager.py`.
 
 **Docker version** (`docker/webui/app.py`) -- a standalone Gradio app that uses `piper_train.infer_onnx` and `piper_train.ort_utils` directly for ONNX inference. Inference only, no training tab. Includes session caching and warmup via `create_session_with_cache`.
 
 ```text
-src/python_run/piper/
+src/python_run/piper_plus/
 ├── webui.py              # Local WebUI (inference + training)
 ├── training_manager.py   # Training management backend
 ├── sample_texts.py       # Sample text collections
@@ -95,7 +95,7 @@ docker/webui/
 - **Gradio Framework**: ML-optimized UI components with built-in audio playback
 - **Language Detection**: Automatic model-to-language mapping with template adaptation
 - **Lazy Model Loading**: Models loaded on synthesis, not on startup
-- **Two implementations**: Local version depends on the `piper` runtime package; Docker version depends on `piper_train` directly, avoiding the runtime dependency
+- **Two implementations**: Local version depends on the `piper-plus` runtime package; Docker version depends on `piper_train` directly, avoiding the runtime dependency
 
 ## Docker Usage
 
@@ -118,9 +118,9 @@ cd docker/webui && docker-compose up
 |----------|---------|-------------|
 | `MODELS_DIR` | `./models` | Host path to model directory (docker-compose volume) |
 | `OUTPUT_DIR` | `./output` | Host path to output directory (docker-compose volume) |
-| `PIPER_MODEL` | (none) | Specific model to load (passed to entrypoint) |
-| `PIPER_MODEL_DIR` | `/models` | Model directory inside the container |
-| `PIPER_OUTPUT_DIR` | `/output` | Output directory inside the container (used by entrypoint.sh) |
+| `PIPER_PLUS_MODEL` | (none) | Specific model to load (passed to entrypoint) |
+| `PIPER_PLUS_MODEL_DIR` | `/models` | Model directory inside the container |
+| `PIPER_PLUS_OUTPUT_DIR` | `/output` | Output directory inside the container (used by entrypoint.sh) |
 
 > **Note:** `docker-compose.yml` sets `GRADIO_SERVER_NAME` and `GRADIO_SERVER_PORT`, but `app.py` launches Gradio with explicit `--host` / `--port` CLI args (defaults: `0.0.0.0` and `7860`), so those env vars have no effect. To change the bind address or port, override the entrypoint command args instead.
 

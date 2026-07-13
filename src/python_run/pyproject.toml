@@ -86,7 +86,7 @@ test = [
 ]
 
 [project.scripts]
-piper = "piper.__main__:main"
+piper-plus = "piper_plus.__main__:main"
 
 # Note: `dynamic = ["version", "dependencies"]` の実解決は setup.py が担当する。
 # `[tool.setuptools.dynamic]` の file 参照は setuptools の `_assert_local` で
@@ -95,10 +95,11 @@ piper = "piper.__main__:main"
 # 参照できる (現状の挙動を維持)。
 
 [tool.setuptools.packages.find]
+include = ["piper_plus*"]
 exclude = ["tests*", "build*"]
 
 [tool.setuptools.package-data]
-piper = [
+piper_plus = [
     "voices.json",
     "phonemize/data/zh_en_loanword.json",
     "phonemize/data/sv_function_words.json",
@@ -115,7 +116,7 @@ warn_unused_configs = true
 # strict = true
 # disallow_untyped_defs = true
 # disallow_incomplete_defs = true
-files = ["piper"]
+files = ["piper_plus"]
 
 # 既存 mypy.ini の override を保持 (third-party stub 不在の依存)
 [[tool.mypy.overrides]]

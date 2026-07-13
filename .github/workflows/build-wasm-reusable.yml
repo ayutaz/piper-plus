@@ -37,7 +37,11 @@ jobs:
             dist_subdir: rust-wasm-ja
             artifact: piper-plus-wasm-ja
           - name: ja-lite
-            features: '--no-default-features --features ja-external'
+            # `--no-default-features` は wasm-pack が直接受け付けないため
+            # `--` 以降で cargo build に転送する (wasm-pack CLI 仕様)。
+            # 従前は wasm-pack が透過的に処理していたが 2026-07 リリース
+            # で挙動が変わり ja-lite variant のみ回帰したため明示化する。
+            features: '-- --no-default-features --features ja-external'
             dist_subdir: rust-wasm-ja-lite
             artifact: piper-plus-wasm-ja-lite
     steps:
@@ -59,9 +63,15 @@ jobs:
       - name: Install wasm-pack
         # prebuilt binary を取得 (cargo install wasm-pack --locked は
         # ~5 分かかる)。wasm-build.yml の wasm-test job と同じ pin。
+        #
+        # version: 'latest' は 2026-07-10 に jetli/wasm-pack-action@v0.4.0 の
+        # resolver が v0.15.0 → v0.9.1 (2020 release) を返す regression が
+        # 発生。 v0.9.1 は Cargo workspace inheritance (license.workspace = true
+        # 等) を parse できず "invalid type: map, expected a string" で fail する。
+        # 明示的に最新 stable の v0.15.0 に pin して安定化。
         uses: jetli/wasm-pack-action@v0.4.0
         with:
-          version: 'latest'
+          version: 'v0.15.0'
 
       - name: Build WASM (${{ matrix.name }})
         working-directory: src/rust/piper-wasm

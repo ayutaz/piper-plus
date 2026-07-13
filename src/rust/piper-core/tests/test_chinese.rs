@@ -18,7 +18,7 @@ fn try_create() -> Option<ChinesePhonemizer> {
         return ChinesePhonemizer::new(&single, &phrase).ok();
     }
     // Try env var
-    if let Ok(dir) = std::env::var("PIPER_DICT_DIR") {
+    if let Ok(dir) = std::env::var("PIPER_PLUS_DICT_DIR") {
         let dir = std::path::PathBuf::from(dir);
         let s = dir.join("pinyin_single.json");
         let p = dir.join("pinyin_phrases.json");

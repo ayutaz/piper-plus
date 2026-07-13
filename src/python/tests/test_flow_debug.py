@@ -23,10 +23,10 @@ except ImportError:
 pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
 
 # Path to checkpoint for flow.reverse diagnostic.
-# Set PIPER_FLOW_DEBUG_CKPT env var to point at an actual local checkpoint.
+# Set PIPER_PLUS_FLOW_DEBUG_CKPT env var to point at an actual local checkpoint.
 # Default is intentionally empty so CI / non-maintainer environments skip
 # instead of leaking host-specific paths (pre-commit secret-path detector).
-CKPT_PATH = os.environ.get("PIPER_FLOW_DEBUG_CKPT", "")
+CKPT_PATH = os.environ.get("PIPER_PLUS_FLOW_DEBUG_CKPT", "")
 
 
 def _stats(t, name=""):
@@ -50,7 +50,7 @@ def _print_stats(s):
     if s["nan_count"] > 0 or s["inf_count"] > 0:
         flag = f"  *** NaN={s['nan_count']}, Inf={s['inf_count']} ***"
     print(
-        f"  {s['name']:45s} shape={str(s['shape']):20s} "
+        f"  {s['name']:45s} shape={s['shape']!s:20s} "
         f"mean={s['mean']:+10.5f}  std={s['std']:10.5f}  "
         f"min={s['min']:+10.5f}  max={s['max']:+10.5f}{flag}"
     )
@@ -62,7 +62,7 @@ def loaded_model():
     if not CKPT_PATH or not Path(CKPT_PATH).exists():
         pytest.skip(
             "Checkpoint not found "
-            "(set PIPER_FLOW_DEBUG_CKPT env var to enable this maintainer-only test)"
+            "(set PIPER_PLUS_FLOW_DEBUG_CKPT env var to enable this maintainer-only test)"
         )
 
     ckpt = torch.load(CKPT_PATH, map_location="cpu", weights_only=False)

@@ -216,7 +216,7 @@ public class OrtSessionContractTests
     {
         JsonElement fixture = LoadFixture();
         Assert.Equal(
-            "PIPER_DISABLE_WARMUP",
+            "PIPER_PLUS_DISABLE_WARMUP",
             fixture.GetProperty("env_vars").GetProperty("disable_warmup").GetString());
     }
 
@@ -225,7 +225,7 @@ public class OrtSessionContractTests
     {
         JsonElement fixture = LoadFixture();
         Assert.Equal(
-            "PIPER_DISABLE_CACHE",
+            "PIPER_PLUS_DISABLE_CACHE",
             fixture.GetProperty("env_vars").GetProperty("disable_cache").GetString());
     }
 
@@ -234,7 +234,7 @@ public class OrtSessionContractTests
     {
         JsonElement fixture = LoadFixture();
         Assert.Equal(
-            "PIPER_INTRA_THREADS",
+            "PIPER_PLUS_INTRA_THREADS",
             fixture.GetProperty("env_vars").GetProperty("intra_threads").GetString());
     }
 }

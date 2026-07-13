@@ -26,7 +26,7 @@ on:
     branches: [dev]
     paths:
       - 'src/python/piper_train/**'
-      - 'src/python_run/piper/**'
+      - 'src/python_run/piper_plus/**'
       - 'scripts/benchmark.py'
       - 'tests/fixtures/memory-baseline.json'
       - 'test/models/multilingual-test-medium.onnx*'
@@ -35,7 +35,7 @@ on:
     branches: [dev]
     paths:
       - 'src/python/piper_train/**'
-      - 'src/python_run/piper/**'
+      - 'src/python_run/piper_plus/**'
       - 'scripts/benchmark.py'
       - 'tests/fixtures/memory-baseline.json'
       - 'test/models/multilingual-test-medium.onnx*'
