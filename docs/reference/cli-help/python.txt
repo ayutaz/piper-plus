@@ -4,8 +4,8 @@
 # Version: <VERSION>
 usage: python -m piper_plus [-h] [-m MODEL] [-c CONFIG] [-f OUTPUT_FILE]
                    [-d OUTPUT_DIR] [--output-raw] [-s SPEAKER]
-                   [--length-scale LENGTH_SCALE] [--noise-scale NOISE_SCALE]
-                   [--noise-w NOISE_W] [--cuda]
+                   [--speaker-embedding FILE] [--length-scale LENGTH_SCALE]
+                   [--noise-scale NOISE_SCALE] [--noise-w NOISE_W] [--cuda]
                    [--sentence-silence SENTENCE_SILENCE] [--data-dir DATA_DIR]
                    [--download-dir DOWNLOAD_DIR] [--update-voices]
                    [--volume VOLUME] [--auto-play] [--input-file INPUT_FILE]
@@ -29,6 +29,9 @@ options:
                         Stream raw audio to stdout
   -s, --speaker SPEAKER
                         Id of speaker (default: 0)
+  --speaker-embedding, --speaker_embedding FILE
+                        Path to speaker embedding file (.npy, 192-dim float32)
+                        for zero-shot TTS
   --length-scale, --length_scale LENGTH_SCALE
                         Phoneme length
   --noise-scale, --noise_scale NOISE_SCALE

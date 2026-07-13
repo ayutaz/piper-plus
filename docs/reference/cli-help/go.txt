@@ -25,10 +25,10 @@ Flags:
       --language string                language code (e.g. ja, en, zh, ko)
       --length-scale float32           speech rate (length scale) (default 1)
       --list-models                    list downloaded models in cache directory
-  -m, --model string                   path to ONNX model file (or $PIPER_DEFAULT_MODEL)
+  -m, --model string                   path to ONNX model file (or $PIPER_PLUS_DEFAULT_MODEL)
       --model-dir string               model cache directory override
-      --noise-scale float32            generation noise scale (default 0.667)
-      --noise-w float32                duration predictor noise scale (default 0.8)
+      --noise-scale float32            generation noise scale (default 0.4)
+      --noise-w float32                duration predictor noise scale (default 0.5)
   -d, --output-dir string              output directory for generated files (default ".")
   -f, --output-file string             output WAV path (- for stdout)
       --output-raw                     output raw PCM audio to stdout (no WAV header)
