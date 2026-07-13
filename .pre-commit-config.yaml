@@ -745,7 +745,7 @@ repos:
       # Mirror of .github/workflows/cli-help-docs-sync.yml. Catches v1.12.0-
       # style breaking changes (e.g. `--mb-istft` removed when HiFi-GAN was
       # deleted) where the user-facing CLI doc would otherwise carry a flag
-      # `python -m piper --help` no longer accepts.
+      # `python -m piper_plus --help` no longer accepts.
       #
       # Capturing --help requires the piper-plus runtime to be importable
       # (onnxruntime + pyopenjtalk-plus). On a fresh clone these may be

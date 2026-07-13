@@ -139,7 +139,7 @@ def _trim_padding_by_durations(
 ) -> np.ndarray:
     """Strategy A post-trim using model durations (precise method).
 
-    Mirrors :func:`piper.voice._trim_padding_by_durations` so the runtime and
+    Mirrors :func:`piper_plus.voice._trim_padding_by_durations` so the runtime and
     training paths share the same trimming behaviour. The padded sequence
     layout is::
 
@@ -199,7 +199,7 @@ def _trim_eos_region(
 ) -> np.ndarray:
     """Trim the EOS region from the tail of an audio buffer (Issue #499).
 
-    Mirrors :func:`piper.voice._trim_eos_region` so the runtime and
+    Mirrors :func:`piper_plus.voice._trim_eos_region` so the runtime and
     training paths share the same EOS-region trimming behaviour. See
     that function for the rationale; in short: ``VitsModel.infer()``
     expands attention with ``ceil(w)`` but exposes raw float ``w`` as

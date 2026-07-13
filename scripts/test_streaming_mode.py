@@ -10,11 +10,11 @@ from pathlib import Path
 
 
 def get_piper_path():
-    """Find the piper executable."""
+    """Find the piper-plus executable."""
     build_dir = Path(__file__).parent.parent / "build"
-    piper_path = build_dir / "piper"
+    piper_path = build_dir / "piper-plus"
     if not piper_path.exists():
-        print(f"Error: piper executable not found at {piper_path}")
+        print(f"Error: piper-plus executable not found at {piper_path}")
         sys.exit(1)
     return str(piper_path)
 

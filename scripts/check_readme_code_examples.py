@@ -17,7 +17,7 @@ grep ベースで検証する。
 
 検出対象:
 
-  - ```python … piper.PiperVoice(...).method_name(...)
+  - ```python … piper_plus.PiperVoice(...).method_name(...)
   - ```javascript … import { foo, bar } from '@piper-plus/g2p'
                     piper.synthesizeFromReferenceAudio(...)
   - ```rust       … piper_core::PiperVoice::method_name

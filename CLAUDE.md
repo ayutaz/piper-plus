@@ -123,10 +123,10 @@ export NCCL_DEBUG=WARN
 export NCCL_P2P_DISABLE=1
 export NCCL_IB_DISABLE=1
 export PYTHONPATH=/data/piper-plus-zero-shot/src/python
-export PIPER_FORCE_CPU_ORT=1            # SCL CAM++ ONNX を CPU 強制 (GPU 共有競合回避)
+export PIPER_PLUS_FORCE_CPU_ORT=1       # SCL CAM++ ONNX を CPU 強制 (GPU 共有競合回避)
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-# ---- ORT に PyTorch 同梱 cuDNN を見せる (CAM++ GPU 化したい場合は CPU_ORT を unset) ----
+# ---- ORT に PyTorch 同梱 cuDNN を見せる (CAM++ GPU 化したい場合は PIPER_PLUS_FORCE_CPU_ORT を unset) ----
 CUDNN=/data/piper/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib
 CUBLAS=/data/piper/.venv/lib/python3.12/site-packages/nvidia/cublas/lib
 NVRTC=/data/piper/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib
@@ -390,7 +390,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 
 | ランタイム | パッケージ | バージョン | テスト | パス |
 |-----------|----------|----------|-------|------|
-| Python (PyPI) | `piper-plus` | 1.13.0 | pytest 多数 | `src/python_run/piper_plus/` |
+| Python (PyPI) | `piper-plus` | 2.0.0 (VERSION 経由 dynamic) | pytest 多数 | `src/python_run/piper_plus/` |
 | C# (NuGet) | `PiperPlus.Core` / `PiperPlus.Cli` | 0.4.0 | ~1000 (xUnit v3) | `src/csharp/PiperPlus.{Core,Cli}/` (TFM `net10.0`) |
 | Rust (crates.io) | `piper-plus` / `piper-plus-cli` | 0.5.0 | 多数 | `src/rust/piper-{core,cli,python,wasm}/` |
 | Go (Go module) | `github.com/ayutaz/piper-plus/src/go` | tag-based | 793 | `src/go/piperplus/`, `src/go/cmd/piper-plus/` |

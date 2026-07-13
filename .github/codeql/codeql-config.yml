@@ -99,7 +99,7 @@ query-filters:
   - exclude:
       id: cpp/potentially-dangerous-function
   # py/path-injection: piper-plus の Python ランタイムは CLI ツール
-  # (piper_train.export_onnx, piper.voice CLI, piper.webui Gradio) であり、
+  # (piper_train.export_onnx, piper_plus.voice CLI, piper_plus.webui Gradio) であり、
   # ユーザーが --model や --output 等で明示指定したパスを ONNX/cache 操作で
   # 使うことが本来の動作。Path(p).resolve(strict=True) で canonical 化と
   # 存在確認を行い、`..` traversal は早期に弾いている (PR #401, ort_utils.py:142

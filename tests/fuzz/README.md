@@ -16,7 +16,7 @@ These tests are intentionally placed OUTSIDE the per-package `tests/` directorie
 | File | Module under test | Why |
 |------|-------------------|-----|
 | `test_ssml_fuzz.py` | `piper_plus_g2p.ssml.SSMLParser` | XML parse + regex fallback |
-| `test_text_splitter_fuzz.py` | `piper.text_splitter.split_sentences` | Unicode boundary edge cases |
+| `test_text_splitter_fuzz.py` | `piper_plus.text_splitter.split_sentences` | Unicode boundary edge cases |
 | `test_pua_fuzz.py` | `piper_plus_g2p.encode.pua.map_token` | token -> codepoint mapping invariants |
 
 ## Running locally

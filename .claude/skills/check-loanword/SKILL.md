@@ -14,7 +14,7 @@ ZH-EN code-switching (Issue #384) で使う loanword 辞書 (`zh_en_loanword.jso
 `docs/reference/zh-en-loanword/README.md` の不変条件:
 
 1. **7 mirror byte-for-byte sync** — Python source と以下の 6 mirror が SHA256 一致:
-   - Python runtime (`src/python_run/piper/phonemize/data/zh_en_loanword.json`)
+   - Python runtime (`src/python_run/piper_plus/phonemize/data/zh_en_loanword.json`)
    - Rust 2 crate (`src/rust/piper-plus-g2p/data/`, `src/rust/piper-core/data/`)
    - Go (`src/go/phonemize/data/zh_en_loanword.json`)
    - C# (`src/csharp/PiperPlus.Core/Phonemize/Data/zh_en_loanword.json`)

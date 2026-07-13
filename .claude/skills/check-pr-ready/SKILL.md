@@ -50,7 +50,7 @@ PR を出す前にすべての品質チェックを実行し、問題があれ�
    - 大きな機能追加なら未更新を警告
 
 4. **docstring カバレッジ確認** (Python の場合):
-   - `git diff dev..HEAD --name-only -- 'src/python_run/piper/*.py' 'src/python/g2p/*.py'`
+   - `git diff dev..HEAD --name-only -- 'src/python_run/piper_plus/*.py' 'src/python/g2p/*.py'`
    - 新規 public 関数/クラスに docstring があるかチェック (簡易)
 
 ### Phase 4: PR 本文ドラフト

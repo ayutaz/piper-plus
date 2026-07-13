@@ -1,8 +1,8 @@
 #!/bin/bash
-# Piper日本語音声合成の使用例
+# piper-plus 日本語音声合成の使用例
 
-# Piperの実行ファイルパス（環境に合わせて変更してください）
-PIPER_BIN="./piper/bin/piper"
+# piper-plus の実行ファイルパス（環境に合わせて変更してください）
+PIPER_BIN="./piper-plus/bin/piper-plus"
 
 # 日本語モデルのパス（環境に合わせて変更してください）
 MODEL_PATH="path/to/your/japanese_model.onnx"

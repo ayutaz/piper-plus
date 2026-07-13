@@ -6,12 +6,12 @@
  *
  * Opt-in: skips by default unless both
  *   1. The fixture has an e2e_cosine_gate block, AND
- *   2. PIPER_SPEAKER_ENCODER_ONNX_PATH points at a local encoder ONNX,
+ *   2. PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH points at a local encoder ONNX,
  *   3. `onnxruntime-node` is installed (peerDep, only loaded when test
  *      activates).
  *
  * Run:
- *   PIPER_SPEAKER_ENCODER_ONNX_PATH=/path/to/encoder.onnx \
+ *   PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH=/path/to/encoder.onnx \
  *     node --test src/wasm/openjtalk-web/test/js/test-speaker-encoder-e2e.js
  */
 
@@ -122,13 +122,13 @@ describe("Speaker Encoder — E2E cosine gate (layer 2)", () => {
       return;
     }
 
-    const encoderPath = process.env.PIPER_SPEAKER_ENCODER_ONNX_PATH;
+    const encoderPath = process.env.PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH;
     if (!encoderPath) {
-      t.skip("PIPER_SPEAKER_ENCODER_ONNX_PATH not set — opt-in test, " + "skipping by default");
+      t.skip("PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH not set — opt-in test, " + "skipping by default");
       return;
     }
     if (!existsSync(encoderPath)) {
-      throw new Error(`PIPER_SPEAKER_ENCODER_ONNX_PATH=${encoderPath} does not exist`);
+      throw new Error(`PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH=${encoderPath} does not exist`);
     }
 
     if (gate.encoder_onnx?.sha256) {

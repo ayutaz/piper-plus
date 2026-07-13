@@ -1,4 +1,4 @@
-"""Property-based tests for ``piper.text_splitter.split_sentences``.
+"""Property-based tests for ``piper_plus.text_splitter.split_sentences``.
 
 Invariants:
 
@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 from hypothesis import given, strategies as st
 
-ts = pytest.importorskip("piper.text_splitter")
+ts = pytest.importorskip("piper_plus.text_splitter")
 
 split_sentences = ts.split_sentences
 

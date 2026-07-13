@@ -7,8 +7,8 @@ skips by default — it activates only when:
    ``e2e_cosine_gate`` block (i.e. someone ran the generator with
    ``--encoder-onnx`` populated), AND
 2. A local encoder ONNX is available — either via env var
-   ``PIPER_SPEAKER_ENCODER_ONNX_PATH`` or via HF Hub download (the latter
-   only when ``PIPER_SPEAKER_ENCODER_E2E=1`` is set, to avoid hitting the
+   ``PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH`` or via HF Hub download (the latter
+   only when ``PIPER_PLUS_SPEAKER_ENCODER_E2E=1`` is set, to avoid hitting the
    network on every CI run).
 
 Test semantics: compute embedding from the reference WAV using the local
@@ -38,17 +38,17 @@ def _resolve_encoder_path(gate: dict) -> Path | None:
     """Locate the encoder ONNX. Returns None to signal `skip`.
 
     Priority:
-      1. ``PIPER_SPEAKER_ENCODER_ONNX_PATH`` env var (explicit override).
-      2. HF Hub download, only when ``PIPER_SPEAKER_ENCODER_E2E=1``.
+      1. ``PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH`` env var (explicit override).
+      2. HF Hub download, only when ``PIPER_PLUS_SPEAKER_ENCODER_E2E=1``.
     """
-    env_path = os.environ.get("PIPER_SPEAKER_ENCODER_ONNX_PATH")
+    env_path = os.environ.get("PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH")
     if env_path:
         p = Path(env_path)
         if p.exists():
             return p
-        pytest.skip(f"PIPER_SPEAKER_ENCODER_ONNX_PATH={env_path} does not exist")
+        pytest.skip(f"PIPER_PLUS_SPEAKER_ENCODER_ONNX_PATH={env_path} does not exist")
 
-    if os.environ.get("PIPER_SPEAKER_ENCODER_E2E") != "1":
+    if os.environ.get("PIPER_PLUS_SPEAKER_ENCODER_E2E") != "1":
         return None  # opt-in only — skip silently
 
     try:
@@ -105,7 +105,7 @@ def test_e2e_cosine_gate_against_pinned_embedding() -> None:
     encoder_path = _resolve_encoder_path(gate)
     if encoder_path is None:
         pytest.skip(
-            "encoder ONNX not available locally and PIPER_SPEAKER_ENCODER_E2E "
+            "encoder ONNX not available locally and PIPER_PLUS_SPEAKER_ENCODER_E2E "
             "is not set — opt-in test, skipping by default"
         )
 

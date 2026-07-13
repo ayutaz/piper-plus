@@ -7,7 +7,7 @@ Tests:
 2. --list-models: Model catalog listing
 3. --download-model: Model download functionality
 4. --help: Updated help text includes new options
-5. Environment variables: PIPER_DEFAULT_MODEL, PIPER_MODEL_DIR
+5. Environment variables: PIPER_PLUS_DEFAULT_MODEL, PIPER_PLUS_MODEL_DIR
 
 Usage:
     python scripts/test_cli_ux.py [--piper-exe PATH]
@@ -251,14 +251,14 @@ def test_version_still_works(piper_exe: Path) -> TestResult:
 
 
 def test_model_dir_env_var(piper_exe: Path) -> TestResult:
-    """Test PIPER_MODEL_DIR environment variable."""
-    result = TestResult("PIPER_MODEL_DIR env var")
+    """Test PIPER_PLUS_MODEL_DIR environment variable."""
+    result = TestResult("PIPER_PLUS_MODEL_DIR env var")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         proc = run_piper(
             piper_exe,
             ["--list-models"],
-            env={"PIPER_MODEL_DIR": tmpdir}
+            env={"PIPER_PLUS_MODEL_DIR": tmpdir}
         )
 
         # Should not crash

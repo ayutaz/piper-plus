@@ -21,8 +21,8 @@
  *   - session.* — onnxruntime-web's WebGPU EP forces graphOptimizationLevel
  *     to 'extended' (see src/webgpu-session-manager.js:53) and exposes no
  *     intra/inter-thread / dynamic_block settings. The WASM runtime does
- *     not implement caching nor PIPER_DISABLE_* / PIPER_INTRA_THREADS env
- *     vars. Pinning the fixture rows guards against silent contract-side
+ *     not implement caching nor PIPER_PLUS_DISABLE_* / PIPER_PLUS_INTRA_THREADS
+ *     env vars. Pinning the fixture rows guards against silent contract-side
  *     renames that would later catch the runtime out.
  */
 
