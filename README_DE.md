@@ -179,9 +179,9 @@ uv run python -m piper_train.infer_onnx \
   --language en
 ```
 
-Wichtige Optionen: `--speaker-id` (Sprecher-ID), `--device auto|cpu|gpu`, `--noise-scale` (Sprachvariation), `--noise-scale-w` (Phonemlängenvariation, Standard: 0.8), `--length-scale` (Sprechgeschwindigkeit)
+Wichtige Optionen: `--speaker-id` (Sprecher-ID), `--device auto|cpu|gpu`, `--noise-scale` (Sprachvariation), `--noise-scale-w` (Phonemlängenvariation, Standard: 0.5), `--length-scale` (Sprechgeschwindigkeit)
 
-> **Empfohlene Einstellungen für WavLM-Modelle:** Modelle, die mit dem WavLM Discriminator trainiert wurden (z.B. Tsukuyomi-chan), erreichen mit `--noise-scale 0.5` optimale Audioqualität (Standard ist 0.667).
+> **Empfohlene Einstellungen für WavLM-Modelle:** Modelle, die mit dem WavLM Discriminator trainiert wurden (z.B. Tsukuyomi-chan), erreichen mit `--noise-scale 0.5` optimale Audioqualität (Standard ist 0.4).
 
 #### Python CLI Modellverwaltung
 
@@ -472,8 +472,8 @@ Wichtige Optionen:
 | `--use-cuda` | CUDA-GPU-Inferenz aktivieren | aus |
 | `--gpu-device-id NUM` | GPU-Geräte-ID | 0 |
 | `--length-scale VAL` | Sprechgeschwindigkeit (kleiner = schneller) | 1.0 |
-| `--noise-scale VAL` | Steuerung der Sprachvariation | 0.667 |
-| `--noise-w VAL` | Steuerung der Phonemlängen-Variation | 0.8 |
+| `--noise-scale VAL` | Steuerung der Sprachvariation | 0.4 |
+| `--noise-w VAL` | Steuerung der Phonemlängen-Variation | 0.5 |
 | `--sentence-silence SEC` | Pause zwischen Sätzen (Sekunden) | 0.2 |
 | `--speaker NUM` | Sprechernummer für Multi-Speaker-Modelle | 0 |
 | `--phoneme-silence PHONEME SEC` | Pausendauer für bestimmte Phoneme | - |
@@ -497,7 +497,7 @@ Wichtige Optionen:
 
 Alle Optionen mit `piper-plus --help` anzeigen.
 
-> **Empfohlene Einstellungen für WavLM-Modelle:** Für Modelle, die mit dem WavLM Discriminator trainiert wurden, wird `--noise-scale 0.5` empfohlen (Standard ist 0.667).
+> **Empfohlene Einstellungen für WavLM-Modelle:** Für Modelle, die mit dem WavLM Discriminator trainiert wurden, wird `--noise-scale 0.5` empfohlen (Standard ist 0.4).
 >
 > ```sh
 > echo "こんにちは" | ./bin/piper-plus --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav

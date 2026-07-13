@@ -177,9 +177,9 @@ uv run python -m piper_train.infer_onnx \
   --language en
 ```
 
-주요 옵션: `--speaker-id`(화자 ID), `--device auto|cpu|gpu`, `--noise-scale`(음성 변동), `--noise-scale-w`(음소 길이 변동, 기본값: 0.8), `--length-scale`(말하기 속도)
+주요 옵션: `--speaker-id`(화자 ID), `--device auto|cpu|gpu`, `--noise-scale`(음성 변동), `--noise-scale-w`(음소 길이 변동, 기본값: 0.5), `--length-scale`(말하기 속도)
 
-> **WavLM 모델 권장 설정:** WavLM 판별기로 학습된 모델 (츠쿠요미짱 등)은 `--noise-scale 0.5`에서 최적의 음질을 얻을 수 있습니다 (기본값은 0.667).
+> **WavLM 모델 권장 설정:** WavLM 판별기로 학습된 모델 (츠쿠요미짱 등)은 `--noise-scale 0.5`에서 최적의 음질을 얻을 수 있습니다 (기본값은 0.4).
 
 #### Python CLI 모델 관리
 
@@ -470,8 +470,8 @@ echo 'Long text...' | ./bin/piper-plus --model en_model.onnx --output-raw | \
 | `--use-cuda` | CUDA GPU 추론 활성화 | off |
 | `--gpu-device-id NUM` | GPU 디바이스 ID | 0 |
 | `--length-scale VAL` | 말하기 속도 조정 (작을수록 빠름) | 1.0 |
-| `--noise-scale VAL` | 음성 변동 제어 | 0.667 |
-| `--noise-w VAL` | 음소 길이 변동 제어 | 0.8 |
+| `--noise-scale VAL` | 음성 변동 제어 | 0.4 |
+| `--noise-w VAL` | 음소 길이 변동 제어 | 0.5 |
 | `--sentence-silence SEC` | 문장 사이 무음 (초) | 0.2 |
 | `--speaker NUM` | 다중 화자 모델의 화자 번호 | 0 |
 | `--phoneme-silence PHONEME SEC` | 특정 음소의 무음 시간 설정 | - |
@@ -495,7 +495,7 @@ echo 'Long text...' | ./bin/piper-plus --model en_model.onnx --output-raw | \
 
 `piper-plus --help`로 전체 옵션을 확인할 수 있습니다.
 
-> **WavLM 모델 권장 설정:** WavLM 판별기로 학습된 모델은 `--noise-scale 0.5`를 권장합니다 (기본값은 0.667).
+> **WavLM 모델 권장 설정:** WavLM 판별기로 학습된 모델은 `--noise-scale 0.5`를 권장합니다 (기본값은 0.4).
 >
 > ```sh
 > echo "こんにちは" | ./bin/piper-plus --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav

@@ -63,8 +63,8 @@ Key options:
 | `--gpu-device-id NUM` | GPU device ID | 0 |
 | `--language/-l LANG` | Language code(s) (e.g. `ja`, `en`, `ja-en-zh`) | - |
 | `--length-scale VAL` | Speech speed (smaller = faster) | 1.0 |
-| `--noise-scale VAL` | Audio variation control | 0.667 |
-| `--noise-w VAL` | Phoneme duration variation | 0.8 |
+| `--noise-scale VAL` | Audio variation control | 0.4 |
+| `--noise-w VAL` | Phoneme duration variation | 0.5 |
 | `--sentence-silence SEC` | Silence between sentences | 0.2 |
 | `--speaker NUM` | Speaker number for multi-speaker models | 0 |
 | `--phoneme-silence PHONEME SEC` | Silence duration for specific phonemes | - |

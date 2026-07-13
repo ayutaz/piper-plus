@@ -179,9 +179,9 @@ uv run python -m piper_train.infer_onnx \
   --language en
 ```
 
-Opciones principales: `--speaker-id` (ID del hablante), `--device auto|cpu|gpu`, `--noise-scale` (variación de voz), `--noise-scale-w` (variación de longitud de fonema, predeterminado: 0.8), `--length-scale` (velocidad de habla)
+Opciones principales: `--speaker-id` (ID del hablante), `--device auto|cpu|gpu`, `--noise-scale` (variación de voz), `--noise-scale-w` (variación de longitud de fonema, predeterminado: 0.5), `--length-scale` (velocidad de habla)
 
-> **Configuración recomendada para modelos WavLM:** Los modelos entrenados con WavLM Discriminator (como Tsukuyomi-chan) obtienen la mejor calidad de audio con `--noise-scale 0.5` (el valor predeterminado es 0.667).
+> **Configuración recomendada para modelos WavLM:** Los modelos entrenados con WavLM Discriminator (como Tsukuyomi-chan) obtienen la mejor calidad de audio con `--noise-scale 0.5` (el valor predeterminado es 0.4).
 
 #### Gestión de modelos con Python CLI
 
@@ -472,8 +472,8 @@ Opciones principales:
 | `--use-cuda` | Activar inferencia GPU con CUDA | desactivado |
 | `--gpu-device-id NUM` | ID del dispositivo GPU | 0 |
 | `--length-scale VAL` | Ajuste de velocidad de habla (menor=más rápido) | 1.0 |
-| `--noise-scale VAL` | Control de variación de voz | 0.667 |
-| `--noise-w VAL` | Control de variación de duración de fonemas | 0.8 |
+| `--noise-scale VAL` | Control de variación de voz | 0.4 |
+| `--noise-w VAL` | Control de variación de duración de fonemas | 0.5 |
 | `--sentence-silence SEC` | Silencio entre oraciones (segundos) | 0.2 |
 | `--speaker NUM` | Número de hablante en modelos multihablante | 0 |
 | `--phoneme-silence PHONEME SEC` | Configuración de silencio para fonemas específicos | - |
@@ -497,7 +497,7 @@ Opciones principales:
 
 Ejecuta `piper-plus --help` para ver todas las opciones.
 
-> **Configuración recomendada para modelos WavLM:** Se recomienda `--noise-scale 0.5` para modelos entrenados con WavLM Discriminator (el predeterminado es 0.667).
+> **Configuración recomendada para modelos WavLM:** Se recomienda `--noise-scale 0.5` para modelos entrenados con WavLM Discriminator (el predeterminado es 0.4).
 >
 > ```sh
 > echo "こんにちは" | ./bin/piper-plus --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav

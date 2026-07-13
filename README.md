@@ -200,9 +200,9 @@ uv run python -m piper_train.infer_onnx \
     --language en
 ```
 
-主なオプション: `--speaker-id`(話者ID)、`--device auto|cpu|gpu`、`--noise-scale`(音声バリエーション)、`--length-scale`(話速)、`--noise-scale-w`(音素長バリエーション、デフォルト: 0.8)
+主なオプション: `--speaker-id`(話者ID)、`--device auto|cpu|gpu`、`--noise-scale`(音声バリエーション)、`--length-scale`(話速)、`--noise-scale-w`(音素長バリエーション、デフォルト: 0.5)
 
-> **WavLMモデルの推奨設定:** WavLM Discriminatorで学習されたモデル (つくよみちゃん等) は `--noise-scale 0.5` で最適な音質になります (デフォルトは 0.667)。
+> **WavLMモデルの推奨設定:** WavLM Discriminatorで学習されたモデル (つくよみちゃん等) は `--noise-scale 0.5` で最適な音質になります (デフォルトは 0.4)。
 
 #### Python CLI モデル管理
 
