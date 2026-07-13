@@ -132,6 +132,13 @@ Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13
 - **`monotonic_align/setup.py`**: `from distutils.core import setup` →
   `from setuptools import setup`。 distutils は Python 3.12 で stdlib から
   削除済 (PEP 632)、 setuptools shim 経由で偶然動いていた状態を明示化。
+- **Rust security bump** (Issue #590 / PR #598 内): `piper-plus-g2p` の
+  `quick-xml` を 0.37 → 0.41 に bump し
+  [RUSTSEC-2026-0194 / 0195](https://rustsec.org) (Severity 7.5)、
+  および `crossbeam-epoch` 0.9.18 → 0.9.20 を解消。 併せて `piper-core`
+  の SSML parser 実装を `piper_plus_g2p::ssml` の re-export へ切替、
+  `piper-core` 側の `quick-xml` 直接依存を除去 (downstream `piper-plus`
+  クレートの dep tree 縮小 / attack surface 減)。
 
 ## [1.13.0] - 2026-06-13
 
