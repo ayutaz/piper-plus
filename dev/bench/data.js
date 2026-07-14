@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783923969732,
+  "lastUpdate": 1783996072533,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -637,6 +637,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Cold Start (en)",
             "value": 1397.3,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 206.5,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0cc1491a13ccd5d47b9302028b8beb1f4d1ed3cf",
+          "message": "docs(cli-help): regenerate canonical for python/go/rust (#597) (#602)\n\n* docs(cli-help): regenerate canonical for python/go/rust (#597)\n\nweekly cli-help-extract workflow が検出した 3 ランタイムの drift を解消:\n\n- python.txt: --speaker-embedding オプション (zero-shot TTS 用) を追加\n- go.txt: noise-scale 0.667→0.4, noise-w 0.8→0.5,\n  $PIPER_DEFAULT_MODEL → $PIPER_PLUS_DEFAULT_MODEL (rename PR #598 の残 drift)\n- rust.txt: noise-scale 0.667→0.4, noise-w 0.8→0.5\n\n実装側は既に更新済み。 scripts/sanitize_cli_help.py で actual --help を\n処理し canonical と byte-for-byte 一致することを確認。\n\nCloses #597\n\n* docs: update noise-scale/w defaults 0.667/0.8 → 0.4/0.5 across user-facing docs\n\ncanonical CLI help (docs/reference/cli-help/) は前 commit で修正済だが、\n以下の user-facing doc に古い default が残存していたため一括修正:\n\n- README.md (JA) + 7 言語版 (DE/EN/ES/FR/KO/PT/ZH): options 一覧行、\n  options 表、 WavLM 推奨設定の parenthetical\n- docs/guides/development/cli-usage.md: options 表 (C++ CLI 表記)\n\nZero-Shot v7 学習で決定された 0.4/0.5 default は Python/Go/Rust/C++/C API\nの全実装に浸透済み (WASM parity bin のみ意図的に 0.667/0.8 保持)。\n\nRefs #597, #601 (weekly cli-help-drift report). WavLM 推奨値 0.5 の\nempirical 発見自体は default 変更と独立のため、 推奨自体は保持し\nparenthetical のみ更新。\n\n* feat(docker,spec): unify noise-scale/w defaults 0.667/0.8 → 0.4/0.5\n\nDocker server / WebUI / spec の残 default 群も CLI ランタイム\n(Python/Go/Rust/C++/C API) の Zero-Shot v7 default 0.4/0.5 に統一。\n\n- docker/python-inference/inference.py: PiperEngine の 3 メソッド default、\n  argparse --noise-scale/--noise-w default、 SpeechRequest / PhonemeTimingRequest\n  BaseModel、 /synthesize GET Query default (計 14 箇所)\n- docker/wyoming/Dockerfile: ENV PIPER_NOISE_SCALE / PIPER_NOISE_W\n- docker/webui/app.py: Gradio Slider initial value\n- docker/webui/test_app.py: _build_session_inputs 呼出のテスト入力\n  (assertion ではないが production default と揃える)\n- docs/spec/model-sha256-manifest.toml: config_schema コメントの\n  「default 0.667 / 0.8」を実 default に反映\n\nBehavior change (Docker/server 系): 既存 API user が noise_scale/noise_w を\n明示指定していない場合、 サーバー default が 0.4/0.5 に切り替わる。\nCLI ランタイムは前 PR で既に 0.4/0.5 化済みのため cross-runtime 一貫性が\nむしろ回復する方向。 config.json に inference block を持つモデル (旧配布分)\nは従来通り config 値が優先されるため無影響。\n\nRefs #597, #601 (weekly cli-help-drift の派生調査で発見した残 drift 群)\n\n* fix(defaults): unify noise-scale/w 0.667/0.8 → 0.4/0.5 (training tmpl / HF space / Godot / legacy CLI / Swift test)\n\n追加調査で発見した 15 ファイルの 0.667/0.8 残存を CLI 実装 (0.4/0.5) に統一。\n\n- Swift smoke test drift: C API 実装は既に 0.4/0.5 だが XCTAssert が\n  0.667/0.8 を要求しており release-shared-lib CI が確実に失敗する状態\n  だったため修正 (PiperPlusSmokeTests.swift)\n- training config.json template (preprocess.py / prepare_multilingual /\n  prepare_bilingual / jp_phoneme_map / train_config_japanese.json) —\n  新規学習でモデルの config.json に 0.4/0.5 が書かれる\n- HuggingFace Spaces デモアプリ (app.py 3 箇所 + download_models.py)\n- Godot GDExtension example (piper_tts_node.h + README options 表)\n- MOS ベンチマークサンプル生成 (tools/benchmark/generate_samples.py)\n- legacy infer CLI (piper_train.infer / piper_train.infer_onnx_streaming\n  の --noise-scale / --noise-scale-w default)\n- WebUI CI test (webui-test.yml) と CLI UX test fixture\n  (scripts/test_cli_ux.py) を新 default に揃える\n\n* test(fixtures): sweep noise-scale/w 0.667/0.8 → 0.4/0.5 across 37 test fixtures (Python/Rust/WASM)\n\n追加調査で残っていた test fixture 内の 0.667/0.8 (VITS noise_scale/noise_w\n用途に限定) を一括で新 default 0.4/0.5 に統一。 assertion / 期待値 /\nscales tuple も一貫して更新。 意図的維持箇所は無変更:\n\n- algo floor 定数 (`ratio.max(0.5)` / `ratio.max(0.4)`) はアルゴリズムの\n  内部下限で default 値とは無関係のため保持\n- test_streaming.rs の alpha crossfade 数学 (1/3 / 2/3 = 0.333 / 0.667)\n  は VITS scale ではなく crossfade blend ratio のため保持\n- StochasticDurationPredictor の内部 noise_scale=0.8 は VITS の\n  推論 noise_scale とは別概念 (m3_inference_pipeline.py) のため保持\n- parity contract の test_scales = [0.667, 1.0, 0.8]\n  (docs/spec/ort-provider-contract.toml) は regression 検出用の\n  意図的固定値のため保持\n- WASM parity CLI bin (src/wasm/openjtalk-web/bin/piper-cli.js) と\n  対応 canonical (docs/reference/cli-help/wasm.txt) は上記契約と一致\n  させるため 0.667/0.8 を保持\n- benchmark baseline (scripts/benchmark.py DEFAULT_SCALES,\n  src/benchmark/benchmark_*.py _NOISE_SCALE) は履歴 baseline との\n  比較性維持のため保持\n- torchscript/ONNX export の dummy input 値は shape 推論用の\n  意味のない float のため保持\n- CHANGELOG.md / QA-RELEASE-CHECKLIST.md / docs/handoff/ /\n  docs/design/ の履歴記述は immutable として保持\n\n* fix(runtime): PiperPlus API / engine 等の noise-scale/w default 0.667/0.8 → 0.4/0.5 (real drift)\n\nWave 5 で test fixture を 0.4/0.5 に更新済みだが、対応する runtime API 実装本体\n(PiperPlus クラス default kwargs, engine.synthesize/synthesize_float, warmup dummy_scales\n等) が未更新で Windows python-tests 3.11/3.12/3.13 が FAILED\n(test_default_scales expected 0.4 got 0.667)。 本コミットで source と test の乖離を解消。\n\n修正対象 (11 ファイル):\n\nruntime source (真の drift):\n- src/python_run/piper_plus/api/api.py — PiperPlus.__init__ default + docstring\n- src/python_run/piper_plus/api/engine.py — synthesize / synthesize_float default + warmup dummy_scales\n- src/python_run/piper_plus/webui.py — Gradio Slider default value\n\ntraining tool (probe/dummy 入力の canonical 統一):\n- src/python/piper_train/tools/convert_fp16.py — FP16 conversion probe scales\n- src/python/piper_train/export_onnx_streaming.py — streaming export dummy scales\n- src/python/piper_train/export_torchscript.py — torchscript trace dummy scales\n- src/python/piper_train/infer_torchscript.py — torchscript inference default\n\nuser-facing docs (residual drift):\n- src/csharp/PiperPlus.Cli/README.md — CLI option table default column\n- src/csharp/PiperPlus.Core/README.md — code sample NoiseScale/NoiseW\n- src/wasm/openjtalk-web/README.npm.md — synthesize / synthesizeStreaming options\n- src/wasm/openjtalk-web/types/index.d.ts — TS docstring \"Default: X\"\n\n* fix(model-configs): shipped model config.json inference default 0.667/0.8 → 0.4/0.5\n\nRound 3 深部調査で 3 個の git-tracked model config.json (multilingual-test-medium\n系) が Zero-Shot v7 canonical (noise_scale=0.4, noise_w=0.5) に未追従だったことを検出。\nruntime が config を優先読み込みするため、 CLI で --noise-scale を省略した際に旧値\n(0.667/0.8) で合成される drift だった。\n\n修正:\n- huggingface-space/models/multilingual-test-medium.onnx.json — HF Space 配布モデル config\n- src/wasm/openjtalk-web/models/multilingual-test-medium.onnx.json — WASM demo モデル config\n- test/models/multilingual-test-medium.onnx.json — repo-root テストモデル config\n\n未対応 (意図的 skip):\n- models/config.json — .gitignore で untracked (ユーザー local download 用)\n- tests/fixtures/mb_istft_speaker_embedding/model.onnx.json — build_fixture.py で\n  動的生成される untracked fixture (assertion 側は 0.4/0.5 で inline 定義済み)\n- test/models/zero-shot-test.onnx.json — 既に 0.4/0.5 (canonical)\n\n備考: WASM test-audio-regression.js は当該 config から phoneme_id_map のみ読むため\ninference 変更の regression 影響なし。 SHA256 manifest の hash は publish 時計算のため\n影響なし。 language-id-map contract は language_id_map field のみ検証。\n\n* fix(wasm,parity): piper-cli.js + wasm.txt + ort-provider-contract を canonical 0.4/0.5 に統一\n\n「意図的に維持」 と分類していた 3 箇所も canonical 統一が正しいと判明したため対応:\n\n背景:\n- Round 3 で shipped model の config.json inference default を 0.4/0.5 に更新\n- runtime-parity-deep workflow は test/models/multilingual-test-medium.onnx.json を\n  読み全 6 ランタイム CLI で --json-input parity 比較 (--noise-scale 未指定)\n- 他 CLI (Python/Rust/Go/C#/C++) は config.inference から noise_scale を読み込むが\n  wasm/openjtalk-web/bin/piper-cli.js は sample_rate/num_speakers/num_languages のみ\n  読み inference は無視して hardcoded default を使う設計\n- Round 3 で config を 0.4/0.5 に変えた結果、 wasm だけ 0.667/0.8 のまま乖離する\n  可能性 (parity FAIL の潜在リスク)\n\n修正:\n- src/wasm/openjtalk-web/bin/piper-cli.js — hardcoded default noiseScale/noiseW を\n  0.4/0.5 に統一 (parseArgs opts default + docstring + HELP 文字列 3 箇所)\n- docs/reference/cli-help/wasm.txt — piper-cli.js に対応する canonical snapshot\n- docs/spec/ort-provider-contract.toml — test_scales の [0.667,1.0,0.8] を\n  [0.4,1.0,0.5] に更新 (CPU vs CUDA/CoreML の cross-provider parity 比較用スケール)\n  + コメント内 \"same scales = ...\" も同期\n\nこれで 6 ランタイム CLI + 3 shipped model config + parity contract が全て\nZero-Shot v7 canonical (0.4/0.5) に整列。\n\n* test(csharp,go,fixtures,webui,notebook): 残存 0.667/0.8 の canonical sweep\n\nRound 4 深部再走査で判明した residual drift を最終掃引:\n\nC#/Go test fixtures (Wave 5 で Python/Rust は済みだが C#/Go 未対応だった):\n- src/go/piperplus/short_text_test.go — adjustScalesForShortText 7 テスト x\n  input scales (0.667, 0.8) → (0.4, 0.5) + expected NS/NW / エラーメッセージ\n- src/csharp/PiperPlus.Core.Tests/ShortTextContractTests.cs — AdjustScales\n  no-treatment テスト 1 箇所 (input + expected の 4 値)\n- src/csharp/PiperPlus.Core.Tests/TestHelpers.cs — sample config.json fixture の\n  inference default\n\nFixture 生成スクリプト:\n- tests/fixtures/mb_istft_speaker_embedding/build_fixture.py — cross-runtime\n  fixture generator の config.inference (未 track model.onnx.json の生成元)\n\nRuntime demo:\n- src/python_run/piper_plus/webui.py — Gradio Examples テーブルの canonical 行\n  (default noise_scale/noise_w column) 8 行を canonical 化。 length_scale 変動\n  showcase 行 (0.8, 0.9, 1.1 等) は demo 意図を保存\n\nNotebook:\n- notebooks/finetune.ipynb — Colab finetune サンプルの推論テストコマンドの\n  --noise-scale 引数\n\n残置:\n- CHANGELOG.md :607 — \"0.667/0.8 → 0.4/0.5\" 変更の説明文 (誤 update すると意味崩壊)\n- QA-RELEASE-CHECKLIST.md :292 — 境界値テスト値 (0 / 0.667 / 1.5 / 負値)\n- test/fixtures/speaker_encoder_golden.json — golden vector の numeric 値 (無関係)\n\n* test(cpp,csharp,wasm): 短テキスト mitigation / PiperConfig fixtures を canonical に統一\n\nC++/C#/WASM の短テキスト mitigation テストと C# PiperConfig JSON fixture の\n0.667f/0.8f を Zero-Shot v7 canonical (0.4f/0.5f) に統一。 Wave 5 で Python/Rust は\n更新済みだったが、 C++/C#/WASM の並列実装で見落としがあった。\n\n修正内容:\n- src/cpp/tests/test_short_text_mitigation.cpp — 16 箇所 (テストごとの\n  noiseScale/noiseW 初期値 + 期待値の 0.667f * ratio 計算式)\n- src/csharp/PiperPlus.Core.Tests/ShortTextProcessorTests.cs — 11 箇所\n  (AdjustScales input + 期待値の 6 テスト)\n- src/csharp/PiperPlus.Core.Tests/PiperConfigTests.cs — 16 箇所 (12 個の\n  sample JSON config fixture の inference field + 2 個の assertion)\n- src/wasm/openjtalk-web/test/js/test-short-text-contract.js — 3 箇所\n  (adjustScalesForShortInput no-treatment テスト)\n\n備考:\n- src/rust/piper-core/tests/test_streaming.rs の 0.667 は crossfade alpha\n  (2/3=0.667) のため意図的に据置\n- src/cpp/tests/test_c_api.cpp:1029 の 0.667 は \"was 0.667 in v1.11\" コメント\n- src/benchmark/*.py の DEFAULT_SCALES=0.667 は regression baseline",
+          "timestamp": "2026-07-14T11:22:41+09:00",
+          "tree_id": "5c1442916e8d3889684a313253bc174afcf0395d",
+          "url": "https://github.com/ayutaz/piper-plus/commit/0cc1491a13ccd5d47b9302028b8beb1f4d1ed3cf"
+        },
+        "date": 1783996070051,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0975,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 24.9,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 25.3,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1454.8,
             "unit": "ms"
           },
           {
