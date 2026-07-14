@@ -109,9 +109,11 @@ def to_fp16(src: Path, dst: Path) -> bool:
         from onnxconverter_common import float16
 
         model = onnx.load(str(src))
-        model_fp16 = float16.convert_float_to_float16(
-            model, keep_io_types=True, op_block_list=["LayerNormalization"]
-        )
+        # op_block_list は使わない: LayerNormalization を block すると
+        # onnxconverter-common が initializer だけ fp16 化して invalid graph を
+        # 生成する (Identity 型不一致)。速度ベンチ目的では全 op fp16 で十分
+        # (数値品質は本番 export_onnx.py の keep-list 経路が担当)。
+        model_fp16 = float16.convert_float_to_float16(model, keep_io_types=True)
         onnx.save(model_fp16, str(dst))
         return True
     except Exception as exc:  # noqa: BLE001 - fp16 is best-effort
@@ -238,12 +240,16 @@ def main() -> None:
 
     bench = []
     for arch, precision, path in variants:
-        sess = contract_session(path)
-        for t in args.t_frames:
-            row = {"arch": arch, "precision": precision, **bench_session(sess, t, args.warmup, args.runs)}
-            bench.append(row)
-            print(f"  {arch:9s} {precision} T={t:4d}: p50={row['p50_ms']}ms rtf={row['rtf_p50']}", file=sys.stderr)
-        del sess
+        # 1 variant の失敗 (fp16 変換不良等) で本命の fp32 A/B を道連れにしない
+        try:
+            sess = contract_session(path)
+            for t in args.t_frames:
+                row = {"arch": arch, "precision": precision, **bench_session(sess, t, args.warmup, args.runs)}
+                bench.append(row)
+                print(f"  {arch:9s} {precision} T={t:4d}: p50={row['p50_ms']}ms rtf={row['rtf_p50']}", file=sys.stderr)
+            del sess
+        except Exception as exc:  # noqa: BLE001
+            print(f"variant {arch}/{precision} failed: {exc}", file=sys.stderr)
     results["decoder_bench"] = bench
 
     shipped = REPO_ROOT / "test" / "models" / "multilingual-test-medium.onnx"

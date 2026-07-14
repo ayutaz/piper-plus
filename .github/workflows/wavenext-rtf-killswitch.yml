@@ -39,7 +39,9 @@ jobs:
           pip install onnx onnxruntime onnxconverter-common numpy
 
       - name: Run kill-switch bench (contract threading)
+        shell: bash
         run: |
+          set -o pipefail
           python scripts/bench_wavenext_rtf.py --output wavenext_rtf_results.json | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload results
@@ -47,3 +49,4 @@ jobs:
         with:
           name: wavenext-rtf-results
           path: wavenext_rtf_results.json
+          if-no-files-found: error
