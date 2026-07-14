@@ -21,6 +21,7 @@
 | [`02-pros-cons-analysis.md`](02-pros-cons-analysis.md) | 置換によるメリット (6 軸) / デメリット (10 軸) の対照分析、paper 実測 MOS/RTF 数値含む |
 | [`03-ablation-plan.md`](03-ablation-plan.md) | 3-stage 実装計画 (Stage 1: WaveNeXt v1 baseline / Stage 2: piper-plus 統合強化 / Stage 3: WaveNeXt 2 反復版)、blocker 解消 PR から始まる段階着手 |
 | [`04-pre-stage0-verification.md`](04-pre-stage0-verification.md) | Stage 0 着手前検証 (15-agent workflow + ローカル PoC) の結果 — 速度・サイズ前提の反転、fixture blocker 撤回、tri-state 分類器仕様確定、01-03 への正誤表 |
+| [`05-smoke-runbook.md`](05-smoke-runbook.md) | Stage 1 smoke 学習の GPU 実行手順 — Phase A (Tsukuyomi 前哨、半日) → Phase B (6-lang 本番、3-5 日)。handoff doc からの WaveNeXt 差分のみ記載 |
 
 ## Quick reference
 
