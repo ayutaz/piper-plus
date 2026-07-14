@@ -65,7 +65,7 @@ private:
     godot::String m_config_path;
     int m_speaker_id = 0;
     int m_language_id = -1;  // -1 = auto-detect
-    float m_noise_scale = 0.667f;
+    float m_noise_scale = 0.4f;
     float m_length_scale = 1.0f;
 };
 

@@ -24,9 +24,9 @@ globalThis.fetch = async (url) => {
       json: async () => ({
         audio: { sample_rate: 22050 },
         inference: {
-          noise_scale: 0.667,
+          noise_scale: 0.4,
           length_scale: 1.0,
-          noise_w: 0.8,
+          noise_w: 0.5,
         },
         phoneme_id_map: {
           _: [0],
@@ -164,9 +164,9 @@ function createMockedInstance(overrides = {}) {
   instance._config = {
     audio: { sample_rate: 22050 },
     inference: {
-      noise_scale: 0.667,
+      noise_scale: 0.4,
       length_scale: 1.0,
-      noise_w: 0.8,
+      noise_w: 0.5,
     },
     phoneme_id_map: {
       _: [0],

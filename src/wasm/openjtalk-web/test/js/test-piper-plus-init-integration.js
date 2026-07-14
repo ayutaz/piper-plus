@@ -28,9 +28,9 @@ const _origIndexedDB = globalThis.indexedDB;
 const BASE_CONFIG = {
   audio: { sample_rate: 22050 },
   inference: {
-    noise_scale: 0.667,
+    noise_scale: 0.4,
     length_scale: 1.0,
-    noise_w: 0.8,
+    noise_w: 0.5,
   },
   phoneme_id_map: {
     _: [0],
@@ -60,7 +60,7 @@ const CONFIG_WITH_BAD_PUA = {
 
 const CONFIG_NO_PHONEME_MAP = {
   audio: { sample_rate: 22050 },
-  inference: { noise_scale: 0.667, length_scale: 1.0, noise_w: 0.8 },
+  inference: { noise_scale: 0.4, length_scale: 1.0, noise_w: 0.5 },
   num_speakers: 1,
   num_languages: 1,
 };

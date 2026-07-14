@@ -172,7 +172,7 @@ def create_model_config(model_path="ja_JP-openjtalk-medium"):
         "audio": {"sample_rate": 22050, "quality": "medium"},
         "espeak": {"voice": "ja"},
         "language": {"code": "ja"},
-        "inference": {"noise_scale": 0.667, "length_scale": 1, "noise_w": 0.8},
+        "inference": {"noise_scale": 0.4, "length_scale": 1, "noise_w": 0.5},
         "phoneme_type": "openjtalk",
         "phoneme_map": {},
         "phoneme_id_map": phoneme_id_map,

@@ -33,16 +33,16 @@ class TestInferSpeakerEmbedding:
         spk_emb = torch.randn(1, 192)  # CAM++ 192-dim embedding
 
         with torch.no_grad():
-            o, attn, y_mask, _, _ = model.infer(
-                x, x_len, speaker_embeddings=spk_emb
-            )
+            o, attn, y_mask, _, _ = model.infer(x, x_len, speaker_embeddings=spk_emb)
 
         assert o.dim() == 3
         assert o.shape[0] == 1
         assert o.shape[2] > 0, "Audio length should be > 0"
 
     @pytest.mark.unit
-    def test_infer_requires_speaker_embeddings_for_multi_speaker(self, make_synthesizer_trn):
+    def test_infer_requires_speaker_embeddings_for_multi_speaker(
+        self, make_synthesizer_trn
+    ):
         """Multi-speaker models require speaker_embeddings; omitting raises AssertionError."""
         gin = 256
         model = make_synthesizer_trn(n_speakers=2, gin_channels=gin)
@@ -162,11 +162,17 @@ class TestSpeakerEmbeddingProjection:
 
         with torch.no_grad():
             o1, _, _, _, _ = model.infer(
-                x, x_len, noise_scale=0.0, noise_scale_w=0.0,
+                x,
+                x_len,
+                noise_scale=0.0,
+                noise_scale_w=0.0,
                 speaker_embeddings=spk_emb,
             )
             o2, _, _, _, _ = model.infer(
-                x, x_len, noise_scale=0.0, noise_scale_w=0.0,
+                x,
+                x_len,
+                noise_scale=0.0,
+                noise_scale_w=0.0,
                 speaker_embeddings=spk_emb,
             )
 
@@ -194,9 +200,7 @@ class TestSpeakerEmbeddingWithLanguage:
         spk_emb = torch.randn(1, 192)  # 192-dim CAM++ embedding
 
         with torch.no_grad():
-            o, _, _, _, _ = model.infer(
-                x, x_len, lid=lid, speaker_embeddings=spk_emb
-            )
+            o, _, _, _, _ = model.infer(x, x_len, lid=lid, speaker_embeddings=spk_emb)
 
         assert o.dim() == 3
         assert o.shape[0] == 1
@@ -224,7 +228,10 @@ class TestForwardSpeakerEmbedding:
 
         with torch.no_grad():
             result = model(
-                x, x_lengths, spec, spec_lengths,
+                x,
+                x_lengths,
+                spec,
+                spec_lengths,
                 speaker_embeddings=spk_emb,
             )
 
@@ -251,7 +258,10 @@ class TestOnnxExportSpeakerEmbedding:
         spk_emb_dim = 256  # same as gin_channels -> no projection needed
 
         model = make_synthesizer_trn(
-            n_speakers=2, gin_channels=gin_channels, use_sdp=True, prosody_dim=0,
+            n_speakers=2,
+            gin_channels=gin_channels,
+            use_sdp=True,
+            prosody_dim=0,
         )
         model.eval()
         model.onnx_export_mode = True
@@ -264,12 +274,11 @@ class TestOnnxExportSpeakerEmbedding:
         dummy_len = 10
         sequences = torch.randint(0, 50, (1, dummy_len), dtype=torch.long)
         seq_lengths = torch.LongTensor([dummy_len])
-        scales = torch.FloatTensor([0.667, 1.0, 0.8])
+        scales = torch.FloatTensor([0.4, 1.0, 0.5])
         sid = torch.LongTensor([0])
         spk_emb = torch.zeros(1, spk_emb_dim, dtype=torch.float32)
 
-        def infer_forward(text, text_lengths, scales_t, sid_t,
-                          speaker_embedding):
+        def infer_forward(text, text_lengths, scales_t, sid_t, speaker_embedding):
             length_scale = scales_t[1]
             noise_scale_w = scales_t[2]
 
@@ -294,12 +303,10 @@ class TestOnnxExportSpeakerEmbedding:
             ).type_as(x_mask)
             attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
             attn = commons.generate_path(w_ceil, attn_mask)
-            m_p = torch.matmul(
-                attn.squeeze(1), m_p.transpose(1, 2)
-            ).transpose(1, 2)
-            logs_p = torch.matmul(
-                attn.squeeze(1), logs_p.transpose(1, 2)
-            ).transpose(1, 2)
+            m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
+            logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(
+                1, 2
+            )
             z_p = m_p
             z = model.flow(z_p, y_mask, g=g, reverse=True)
             o = model.dec((z * y_mask), g=g)
@@ -316,7 +323,10 @@ class TestOnnxExportSpeakerEmbedding:
                 str(onnx_path),
                 opset_version=15,
                 input_names=[
-                    "input", "input_lengths", "scales", "sid",
+                    "input",
+                    "input_lengths",
+                    "scales",
+                    "sid",
                     "speaker_embedding",
                 ],
                 output_names=["output", "durations"],

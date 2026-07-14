@@ -609,7 +609,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                                 label="Noise Scale",
                                 minimum=0.0,
                                 maximum=1.0,
-                                value=0.667,
+                                value=0.4,
                                 step=0.01,
                                 info="Higher = more expressive",
                             )
@@ -618,7 +618,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                                 label="Noise Width",
                                 minimum=0.0,
                                 maximum=1.0,
-                                value=0.8,
+                                value=0.5,
                                 step=0.01,
                             )
 
@@ -662,8 +662,8 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             en_model_path,
                             0,
                             1.0,
-                            0.667,
-                            0.8,
+                            0.4,
+                            0.5,
                             "en",
                         ],
                         [
@@ -672,7 +672,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             0,
                             0.8,
                             0.5,
-                            0.8,
+                            0.5,
                             "en",
                         ],
                         [
@@ -680,8 +680,8 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             en_model_path,
                             0,
                             1.0,
-                            0.667,
-                            0.8,
+                            0.4,
+                            0.5,
                             "en",
                         ],
                         [
@@ -690,7 +690,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             0,
                             0.9,
                             0.7,
-                            0.8,
+                            0.5,
                             "en",
                         ],
                         [
@@ -698,8 +698,8 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             en_model_path,
                             0,
                             1.0,
-                            0.667,
-                            0.8,
+                            0.4,
+                            0.5,
                             "en",
                         ],
                         # Japanese examples with Japanese model
@@ -708,8 +708,8 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             ja_model_path,
                             0,
                             1.0,
-                            0.667,
-                            0.8,
+                            0.4,
+                            0.5,
                             "ja",
                         ],
                         [
@@ -717,8 +717,8 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             ja_model_path,
                             0,
                             1.0,
-                            0.667,
-                            0.8,
+                            0.4,
+                            0.5,
                             "ja",
                         ],
                         [
@@ -726,8 +726,8 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             ja_model_path,
                             0,
                             0.9,
-                            0.667,
-                            0.8,
+                            0.4,
+                            0.5,
                             "ja",
                         ],
                         [
@@ -736,7 +736,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             0,
                             1.1,
                             0.7,
-                            0.8,
+                            0.5,
                             "ja",
                         ],
                         [
@@ -744,8 +744,8 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             ja_model_path,
                             0,
                             1.0,
-                            0.667,
-                            0.8,
+                            0.4,
+                            0.5,
                             "ja",
                         ],
                     ],

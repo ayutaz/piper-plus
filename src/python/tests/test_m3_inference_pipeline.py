@@ -122,7 +122,7 @@ class TestExportOnnxZeroShot:
         dummy_input_length = 50
         sequences = torch.randint(0, 50, (1, dummy_input_length), dtype=torch.long)
         sequence_lengths = torch.LongTensor([dummy_input_length])
-        scales = torch.FloatTensor([0.667, 1.0, 0.8])
+        scales = torch.FloatTensor([0.4, 1.0, 0.5])
         dummy_speaker_embedding = torch.randn(1, 192, dtype=torch.float32)
         prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.long)
 
@@ -177,7 +177,7 @@ class TestExportOnnxZeroShot:
             np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], dtype=np.int64), 0
         )
         text_lengths_np = np.array([text_np.shape[1]], dtype=np.int64)
-        scales_np = np.array([0.667, 1.0, 0.8], dtype=np.float32)
+        scales_np = np.array([0.4, 1.0, 0.5], dtype=np.float32)
         spk_emb_np = np.random.randn(1, 192).astype(np.float32)
         prosody_np = np.zeros((1, text_np.shape[1], 3), dtype=np.int64)
 
@@ -250,7 +250,7 @@ class TestExportOnnxZeroShot:
         dummy_input_length = 50
         sequences = torch.randint(0, 50, (1, dummy_input_length), dtype=torch.long)
         sequence_lengths = torch.LongTensor([dummy_input_length])
-        scales = torch.FloatTensor([0.667, 1.0, 0.8])
+        scales = torch.FloatTensor([0.4, 1.0, 0.5])
         dummy_speaker_embedding = torch.randn(1, 192, dtype=torch.float32)
         prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.long)
 
@@ -333,7 +333,9 @@ class TestExportOnnxZeroShot:
             g = zs_model._get_speaker_condition(speaker_embeddings=speaker_embedding)
             x, m_p, logs_p, x_mask = zs_model.enc_p(text, text_lengths, g=g)
             x_dp = zs_model._prepare_prosody_input(x, x_mask, prosody_features)
-            logw = zs_model.dp(x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w)
+            logw = zs_model.dp(
+                x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
+            )
             w = torch.exp(logw) * x_mask * length_scale
             w_ceil = torch.ceil(w)
             y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
@@ -356,7 +358,7 @@ class TestExportOnnxZeroShot:
         dummy_input_length = 50
         sequences = torch.randint(0, 50, (1, dummy_input_length), dtype=torch.long)
         sequence_lengths = torch.LongTensor([dummy_input_length])
-        scales = torch.FloatTensor([0.667, 1.0, 0.8])
+        scales = torch.FloatTensor([0.4, 1.0, 0.5])
         dummy_speaker_embedding = torch.randn(1, 192, dtype=torch.float32)
         prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.long)
 

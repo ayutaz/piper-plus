@@ -134,7 +134,7 @@ uv run python -m piper_train.infer_onnx \
   --language en
 ```
 
-Key options: `--speaker-id` (speaker ID), `--device auto|cpu|gpu`, `--noise-scale` (audio variation), `--noise-scale-w` (phoneme length variation, default: 0.8), `--length-scale` (speech speed)
+Key options: `--speaker-id` (speaker ID), `--device auto|cpu|gpu`, `--noise-scale` (audio variation), `--noise-scale-w` (phoneme length variation, default: 0.5), `--length-scale` (speech speed)
 
 #### Python CLI Model Management
 

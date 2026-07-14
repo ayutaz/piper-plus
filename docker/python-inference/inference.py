@@ -330,9 +330,9 @@ class PiperInferenceEngine:
         text: str,
         language: str = "ja",
         speaker_id: int = 0,
-        noise_scale: float = 0.667,
+        noise_scale: float = 0.4,
         length_scale: float = 1.0,
-        noise_scale_w: float = 0.8,
+        noise_scale_w: float = 0.5,
     ) -> np.ndarray:
         """Synthesize text to int16 audio array."""
         phoneme_ids, prosody_features_data = text_to_phoneme_ids_and_prosody(
@@ -370,9 +370,9 @@ class PiperInferenceEngine:
         text: str,
         language: str = "ja",
         speaker_id: int = 0,
-        noise_scale: float = 0.667,
+        noise_scale: float = 0.4,
         length_scale: float = 1.0,
-        noise_scale_w: float = 0.8,
+        noise_scale_w: float = 0.5,
     ) -> dict | None:
         """Synthesize and return phoneme timing metadata.
 
@@ -463,9 +463,9 @@ class PiperInferenceEngine:
         text: str,
         language: str = "ja",
         speaker_id: int = 0,
-        noise_scale: float = 0.667,
+        noise_scale: float = 0.4,
         length_scale: float = 1.0,
-        noise_scale_w: float = 0.8,
+        noise_scale_w: float = 0.5,
     ) -> Iterator[bytes]:
         """Yield raw PCM (int16, little-endian) per sentence.
 
@@ -511,9 +511,9 @@ def main():
         choices=["ja", "en", "zh", "es", "fr", "pt"],
         help="Language",
     )
-    parser.add_argument("--noise-scale", type=float, default=0.667)
+    parser.add_argument("--noise-scale", type=float, default=0.4)
     parser.add_argument("--length-scale", type=float, default=1.0)
-    parser.add_argument("--noise-w", type=float, default=0.8)
+    parser.add_argument("--noise-w", type=float, default=0.5)
     parser.add_argument("--sample-rate", type=int, default=22050)
     parser.add_argument(
         "--device",
@@ -658,8 +658,8 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
         # piper-plus extensions
         speaker_id: int = 0
         language: str = "ja"
-        noise_scale: float = 0.667
-        noise_w: float = 0.8
+        noise_scale: float = 0.4
+        noise_w: float = 0.5
         # ``stream=true`` (piper-plus extension) → chunked WAV response: a
         # streaming WAV header followed by per-sentence PCM frames. Defaults
         # to ``false`` so the response is a buffered WAV (original behaviour),
@@ -678,9 +678,9 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
         language: str = "ja"
         voice: str = "default"
         speaker_id: int = 0
-        noise_scale: float = 0.667
+        noise_scale: float = 0.4
         length_scale: float = 1.0
-        noise_w: float = 0.8
+        noise_w: float = 0.5
 
     # --- Auth / rate-limit configuration (resolved at app-build time) ---
     api_keys: set[str] = _parse_api_keys(os.environ.get("PIPER_PLUS_API_KEYS"))
@@ -793,9 +793,9 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
         text: str = Query(...),
         speaker_id: int = Query(0),
         language: str = Query("ja"),
-        noise_scale: float = Query(0.667),
+        noise_scale: float = Query(0.4),
         length_scale: float = Query(1.0),
-        noise_w: float = Query(0.8),
+        noise_w: float = Query(0.5),
     ):
         try:
             audio = engine.synthesize(

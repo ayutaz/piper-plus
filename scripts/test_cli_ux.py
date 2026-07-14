@@ -172,7 +172,7 @@ def test_text_option_with_test_mode(piper_exe: Path) -> TestResult:
     config = {
         "audio": {"sample_rate": 22050},
         "espeak": {"voice": "en-us"},
-        "inference": {"noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8},
+        "inference": {"noise_scale": 0.4, "length_scale": 1.0, "noise_w": 0.5},
         "phoneme_type": "espeak",
         "phoneme_id_map": {"_": [0], "^": [1], "$": [2], " ": [3], "a": [4]},
         "num_speakers": 1

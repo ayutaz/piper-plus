@@ -30,9 +30,9 @@ const _origIndexedDB = globalThis.indexedDB;
 const MOCK_CONFIG = {
   audio: { sample_rate: 22050 },
   inference: {
-    noise_scale: 0.667,
+    noise_scale: 0.4,
     length_scale: 1.0,
-    noise_w: 0.8,
+    noise_w: 0.5,
   },
   phoneme_id_map: {
     _: [0],
@@ -333,7 +333,7 @@ describe("PiperPlus.initialize() 正常系", { skip }, () => {
     assert.equal(instance.config.audio.sample_rate, 22050, "sample_rate should match");
     assert.deepStrictEqual(
       instance.config.inference,
-      { noise_scale: 0.667, length_scale: 1.0, noise_w: 0.8 },
+      { noise_scale: 0.4, length_scale: 1.0, noise_w: 0.5 },
       "inference config should match"
     );
     assert.ok(instance.config.phoneme_id_map, "phoneme_id_map should be populated");

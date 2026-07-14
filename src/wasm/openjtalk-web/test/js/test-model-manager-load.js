@@ -601,9 +601,9 @@ describe("ModelManager.loadModel() 成功ケース", { skip }, () => {
         $: [2],
       },
       inference: {
-        noise_scale: 0.667,
+        noise_scale: 0.4,
         length_scale: 1.0,
-        noise_w: 0.8,
+        noise_w: 0.5,
       },
     };
 
@@ -643,9 +643,9 @@ describe("ModelManager.loadModel() 成功ケース", { skip }, () => {
     assert.deepEqual(result.config.phoneme_id_map["^"], [1]);
 
     // Verify inference params
-    assert.equal(result.config.inference.noise_scale, 0.667);
+    assert.equal(result.config.inference.noise_scale, 0.4);
     assert.equal(result.config.inference.length_scale, 1.0);
-    assert.equal(result.config.inference.noise_w, 0.8);
+    assert.equal(result.config.inference.noise_w, 0.5);
   });
 
   // =====================================================================

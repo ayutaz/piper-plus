@@ -124,7 +124,7 @@ uv run python -m piper_train.infer_onnx \
 
 Options principales : `--speaker-id` (ID locuteur), `--device auto|cpu|gpu`, `--noise-scale` (variation audio), `--noise-scale-w` (variation de durée des phonèmes), `--length-scale` (vitesse)
 
-> **Réglage recommandé pour les modèles WavLM :** Les modèles entraînés avec WavLM Discriminator (comme Tsukuyomi-chan) offrent une qualité optimale avec `--noise-scale 0.5` (défaut : 0.667).
+> **Réglage recommandé pour les modèles WavLM :** Les modèles entraînés avec WavLM Discriminator (comme Tsukuyomi-chan) offrent une qualité optimale avec `--noise-scale 0.5` (défaut : 0.4).
 
 #### Gestion des modèles (Python CLI)
 
@@ -472,8 +472,8 @@ Options principales :
 | `--use-cuda` | Activer l'inférence GPU CUDA | off |
 | `--gpu-device-id NUM` | ID du périphérique GPU | 0 |
 | `--length-scale VAL` | Vitesse de parole (plus petit = plus rapide) | 1.0 |
-| `--noise-scale VAL` | Contrôle de la variation audio | 0.667 |
-| `--noise-w VAL` | Variation de la durée des phonèmes | 0.8 |
+| `--noise-scale VAL` | Contrôle de la variation audio | 0.4 |
+| `--noise-w VAL` | Variation de la durée des phonèmes | 0.5 |
 | `--sentence-silence SEC` | Silence entre les phrases | 0.2 |
 | `--speaker NUM` | Numéro de locuteur pour les modèles multi-locuteurs | 0 |
 | `--phoneme-silence PHONEME SEC` | Durée de silence pour des phonèmes spécifiques | - |
@@ -488,7 +488,7 @@ Options principales :
 
 Exécutez `piper-plus --help` pour toutes les options.
 
-> **Réglage recommandé pour les modèles WavLM :** Les modèles entraînés avec WavLM Discriminator offrent une qualité optimale avec `--noise-scale 0.5` (défaut : 0.667).
+> **Réglage recommandé pour les modèles WavLM :** Les modèles entraînés avec WavLM Discriminator offrent une qualité optimale avec `--noise-scale 0.5` (défaut : 0.4).
 >
 > ```sh
 > echo "こんにちは" | ./bin/piper-plus --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav

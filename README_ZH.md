@@ -177,9 +177,9 @@ uv run python -m piper_train.infer_onnx \
   --language en
 ```
 
-主要选项：`--speaker-id`（说话人 ID）、`--device auto|cpu|gpu`、`--noise-scale`（音频变化）、`--length-scale`（语速）、`--noise-scale-w`（音素长度变化，默认：0.8）
+主要选项：`--speaker-id`（说话人 ID）、`--device auto|cpu|gpu`、`--noise-scale`（音频变化）、`--length-scale`（语速）、`--noise-scale-w`（音素长度变化，默认：0.5）
 
-> **WavLM 模型推荐设置：** 使用 WavLM Discriminator 训练的模型（如 Tsukuyomi-chan 等）建议设置 `--noise-scale 0.5` 以获得最佳音质（默认值为 0.667）。
+> **WavLM 模型推荐设置：** 使用 WavLM Discriminator 训练的模型（如 Tsukuyomi-chan 等）建议设置 `--noise-scale 0.5` 以获得最佳音质（默认值为 0.4）。
 
 #### Python CLI 模型管理
 
@@ -479,8 +479,8 @@ echo 'Long text...' | ./bin/piper-plus --model en_model.onnx --output-raw | \
 | `--use-cuda` | 启用 CUDA GPU 推理 | off |
 | `--gpu-device-id NUM` | GPU 设备 ID | 0 |
 | `--length-scale VAL` | 语速调节（越小越快） | 1.0 |
-| `--noise-scale VAL` | 音频变化控制 | 0.667 |
-| `--noise-w VAL` | 音素时长变化控制 | 0.8 |
+| `--noise-scale VAL` | 音频变化控制 | 0.4 |
+| `--noise-w VAL` | 音素时长变化控制 | 0.5 |
 | `--sentence-silence SEC` | 句间静音（秒） | 0.2 |
 | `--speaker NUM` | 多说话人模型的说话人编号 | 0 |
 | `--phoneme-silence PHONEME SEC` | 特定音素的静音时间 | - |
@@ -504,7 +504,7 @@ echo 'Long text...' | ./bin/piper-plus --model en_model.onnx --output-raw | \
 
 运行 `piper-plus --help` 查看所有选项。
 
-> **WavLM 模型推荐设置：** 使用 WavLM Discriminator 训练的模型建议设置 `--noise-scale 0.5`（默认值为 0.667）。
+> **WavLM 模型推荐设置：** 使用 WavLM Discriminator 训练的模型建议设置 `--noise-scale 0.5`（默认值为 0.4）。
 >
 > ```sh
 > echo "こんにちは" | ./bin/piper-plus --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav

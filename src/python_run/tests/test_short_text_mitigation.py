@@ -8,6 +8,7 @@ Strategy C: Auto-inject silence padding around short plain text
 
 import numpy as np
 import pytest
+
 from piper_plus.voice import (
     MIN_BODY_FOR_STRATEGY_A,
     MIN_PHONEME_IDS,
@@ -424,9 +425,9 @@ class TestDynamicScales:
             num_symbols=100,
             num_speakers=1,
             sample_rate=22050,
-            noise_scale=0.667,
+            noise_scale=0.4,
             length_scale=1.0,
-            noise_w=0.8,
+            noise_w=0.5,
             phoneme_id_map={"_": [0], "^": [1], "$": [2], "a": [10]},
             phoneme_type="multilingual",
         )
@@ -452,12 +453,12 @@ class TestDynamicScales:
         call_args = voice.session.run.call_args[0][1]
         scales = call_args["scales"]
 
-        # noise_scale should be reduced (< original 0.667)
-        assert scales[0] < 0.667
+        # noise_scale should be reduced (< original 0.4)
+        assert scales[0] < 0.4
         # length_scale should be unchanged
         assert scales[1] == pytest.approx(1.0)
-        # noise_w should be reduced (< original 0.8)
-        assert scales[2] < 0.8
+        # noise_w should be reduced (< original 0.5)
+        assert scales[2] < 0.5
 
     @pytest.mark.unit
     def test_scales_unchanged_for_long_ids(self):
@@ -470,9 +471,9 @@ class TestDynamicScales:
             num_symbols=100,
             num_speakers=1,
             sample_rate=22050,
-            noise_scale=0.667,
+            noise_scale=0.4,
             length_scale=1.0,
-            noise_w=0.8,
+            noise_w=0.5,
             phoneme_id_map={"_": [0], "^": [1], "$": [2], "a": [10]},
             phoneme_type="multilingual",
         )
@@ -495,9 +496,9 @@ class TestDynamicScales:
         call_args = voice.session.run.call_args[0][1]
         scales = call_args["scales"]
 
-        assert scales[0] == pytest.approx(0.667)
+        assert scales[0] == pytest.approx(0.4)
         assert scales[1] == pytest.approx(1.0)
-        assert scales[2] == pytest.approx(0.8)
+        assert scales[2] == pytest.approx(0.5)
 
 
 # ---------------------------------------------------------------
@@ -577,9 +578,9 @@ class TestShortTextDetection:
             num_symbols=100,
             num_speakers=1,
             sample_rate=22050,
-            noise_scale=0.667,
+            noise_scale=0.4,
             length_scale=1.0,
-            noise_w=0.8,
+            noise_w=0.5,
             phoneme_id_map={"_": [0], "^": [1], "$": [2], "a": [10]},
             phoneme_type="multilingual",
         )
@@ -628,9 +629,9 @@ class TestShortTextDetection:
             num_symbols=100,
             num_speakers=1,
             sample_rate=22050,
-            noise_scale=0.667,
+            noise_scale=0.4,
             length_scale=1.0,
-            noise_w=0.8,
+            noise_w=0.5,
             phoneme_id_map={"_": [0], "^": [1], "$": [2], "a": [10]},
             phoneme_type="multilingual",
         )

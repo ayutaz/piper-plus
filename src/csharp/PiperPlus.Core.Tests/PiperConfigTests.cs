@@ -54,7 +54,7 @@ public sealed class PiperConfigTests : IDisposable
             "a": [10]
           },
           "audio": { "sample_rate": 22050 },
-          "inference": { "noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8 }
+          "inference": { "noise_scale": 0.4, "length_scale": 1.0, "noise_w": 0.5 }
         }
         """;
 
@@ -69,9 +69,9 @@ public sealed class PiperConfigTests : IDisposable
         Assert.Equal([2], config.PhonemeIdMap["$"]);
         Assert.Equal([10], config.PhonemeIdMap["a"]);
         Assert.Equal(22050, config.Audio.SampleRate);
-        Assert.Equal(0.667f, config.Inference.NoiseScale);
+        Assert.Equal(0.4f, config.Inference.NoiseScale);
         Assert.Equal(1.0f, config.Inference.LengthScale);
-        Assert.Equal(0.8f, config.Inference.NoiseW);
+        Assert.Equal(0.5f, config.Inference.NoiseW);
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public sealed class PiperConfigTests : IDisposable
             "\uE01C": [63]
           },
           "audio": { "sample_rate": 22050 },
-          "inference": { "noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8 }
+          "inference": { "noise_scale": 0.4, "length_scale": 1.0, "noise_w": 0.5 }
         }
         """;
 
@@ -129,7 +129,7 @@ public sealed class PiperConfigTests : IDisposable
             "b": ["b"]
           },
           "audio": { "sample_rate": 22050, "hop_size": 256 },
-          "inference": { "noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8 },
+          "inference": { "noise_scale": 0.4, "length_scale": 1.0, "noise_w": 0.5 },
           "speaker_id_map": { "speaker_0": 0, "speaker_1": 1 },
           "prosody_num_symbols": 11,
           "prosody_id_map": {
@@ -146,9 +146,9 @@ public sealed class PiperConfigTests : IDisposable
         Assert.Equal(8, config.PhonemeIdMap.Count);
         Assert.Equal(22050, config.Audio.SampleRate);
         Assert.Equal(256, config.Audio.HopSize);
-        Assert.Equal(0.667f, config.Inference.NoiseScale);
+        Assert.Equal(0.4f, config.Inference.NoiseScale);
         Assert.Equal(1.0f, config.Inference.LengthScale);
-        Assert.Equal(0.8f, config.Inference.NoiseW);
+        Assert.Equal(0.5f, config.Inference.NoiseW);
 
         // Optional fields
         Assert.Equal("openjtalk", config.PhonemeType);
@@ -178,7 +178,7 @@ public sealed class PiperConfigTests : IDisposable
         {
           "num_speakers": 1,
           "phoneme_id_map": { "_": [0] },
-          "inference": { "noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8 }
+          "inference": { "noise_scale": 0.4, "length_scale": 1.0, "noise_w": 0.5 }
         }
         """;
 
@@ -194,7 +194,7 @@ public sealed class PiperConfigTests : IDisposable
         {
           "num_speakers": 1,
           "audio": { "sample_rate": 22050 },
-          "inference": { "noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8 }
+          "inference": { "noise_scale": 0.4, "length_scale": 1.0, "noise_w": 0.5 }
         }
         """;
 
@@ -211,7 +211,7 @@ public sealed class PiperConfigTests : IDisposable
           "num_speakers": 3,
           "phoneme_id_map": { "_": [0] },
           "audio": { "sample_rate": 22050 },
-          "inference": { "noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8 },
+          "inference": { "noise_scale": 0.4, "length_scale": 1.0, "noise_w": 0.5 },
           "speaker_id_map": {
             "alice": 0,
             "bob": 1,
@@ -238,7 +238,7 @@ public sealed class PiperConfigTests : IDisposable
           "num_speakers": 1,
           "phoneme_id_map": { "_": [0] },
           "audio": { "sample_rate": 22050 },
-          "inference": { "noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8 },
+          "inference": { "noise_scale": 0.4, "length_scale": 1.0, "noise_w": 0.5 },
           "prosody_num_symbols": 11,
           "prosody_id_map": {
             "0": [0], "1": [1], "2": [2], "3": [3], "4": [4],
@@ -268,7 +268,7 @@ public sealed class PiperConfigTests : IDisposable
           "num_speakers": 1,
           "phoneme_id_map": { "_": [0], "a": [10] },
           "audio": { "sample_rate": 22050 },
-          "inference": { "noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8 },
+          "inference": { "noise_scale": 0.4, "length_scale": 1.0, "noise_w": 0.5 },
           "unknown_field": "should be ignored",
           "another_future_field": { "nested": true },
           "dataset": "some-dataset-name"
@@ -460,7 +460,7 @@ public sealed class PiperConfigTests : IDisposable
           "num_speakers": 1,
           "phoneme_id_map": { "_": [0] },
           "audio": {},
-          "inference": { "noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8 }
+          "inference": { "noise_scale": 0.4, "length_scale": 1.0, "noise_w": 0.5 }
         }
         """;
 
@@ -502,7 +502,7 @@ public sealed class PiperConfigTests : IDisposable
           "num_speakers": 1,
           "phoneme_id_map": {},
           "audio": { "sample_rate": 22050 },
-          "inference": { "noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8 }
+          "inference": { "noise_scale": 0.4, "length_scale": 1.0, "noise_w": 0.5 }
         }
         """;
 
@@ -522,7 +522,7 @@ public sealed class PiperConfigTests : IDisposable
             "a": [10, 11, 12]
           },
           "audio": { "sample_rate": 22050 },
-          "inference": { "noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8 }
+          "inference": { "noise_scale": 0.4, "length_scale": 1.0, "noise_w": 0.5 }
         }
         """;
 
@@ -565,7 +565,7 @@ public sealed class PiperConfigTests : IDisposable
           "num_speakers": 1,
           "phoneme_id_map": { "_": [0] },
           "audio": { "sample_rate": 22050 },
-          "inference": { "noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8 }
+          "inference": { "noise_scale": 0.4, "length_scale": 1.0, "noise_w": 0.5 }
         }
         """;
 

@@ -1768,40 +1768,40 @@ mod tests {
 
     #[test]
     fn test_adjust_scales_above_threshold() {
-        let (ns, nw) = adjust_scales_for_short_text(MIN_PHONEME_IDS, 0.667, 0.8);
-        assert!((ns - 0.667).abs() < 1e-6);
-        assert!((nw - 0.8).abs() < 1e-6);
+        let (ns, nw) = adjust_scales_for_short_text(MIN_PHONEME_IDS, 0.4, 0.5);
+        assert!((ns - 0.4).abs() < 1e-6);
+        assert!((nw - 0.5).abs() < 1e-6);
     }
 
     #[test]
     fn test_adjust_scales_below_threshold() {
         // 50% of MIN_PHONEME_IDS — exactly at the noise_scale floor (0.5).
         let len = MIN_PHONEME_IDS / 2;
-        let (ns, nw) = adjust_scales_for_short_text(len, 0.667, 0.8);
+        let (ns, nw) = adjust_scales_for_short_text(len, 0.4, 0.5);
         let ratio = len as f32 / MIN_PHONEME_IDS as f32;
         let ns_ratio = ratio.max(0.5);
         let nw_ratio = ratio.max(0.4);
-        assert!((ns - 0.667 * ns_ratio).abs() < 1e-4);
-        assert!((nw - 0.8 * nw_ratio).abs() < 1e-4);
+        assert!((ns - 0.4 * ns_ratio).abs() < 1e-4);
+        assert!((nw - 0.5 * nw_ratio).abs() < 1e-4);
     }
 
     #[test]
     fn test_adjust_scales_very_short() {
         // 1 phoneme — far below both floors so they fully clamp.
         let len = 1;
-        let (ns, nw) = adjust_scales_for_short_text(len, 0.667, 0.8);
+        let (ns, nw) = adjust_scales_for_short_text(len, 0.4, 0.5);
         // ratio is below both floors (0.5 / 0.4)
-        assert!((ns - 0.667 * 0.5).abs() < 1e-4);
-        assert!((nw - 0.8 * 0.4).abs() < 1e-4);
+        assert!((ns - 0.4 * 0.5).abs() < 1e-4);
+        assert!((nw - 0.5 * 0.4).abs() < 1e-4);
     }
 
     #[test]
     fn test_adjust_scales_zero_length() {
-        let (ns, nw) = adjust_scales_for_short_text(0, 0.667, 0.8);
+        let (ns, nw) = adjust_scales_for_short_text(0, 0.4, 0.5);
         // ratio = 0.0, clamped at max(0.0, 0.5) = 0.5 for ns
-        assert!((ns - 0.667 * 0.5).abs() < 1e-4);
+        assert!((ns - 0.4 * 0.5).abs() < 1e-4);
         // ratio = 0.0, clamped at max(0.0, 0.4) = 0.4 for nw
-        assert!((nw - 0.8 * 0.4).abs() < 1e-4);
+        assert!((nw - 0.5 * 0.4).abs() < 1e-4);
     }
 
     #[test]

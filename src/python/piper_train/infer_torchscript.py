@@ -54,9 +54,9 @@ def main():
                 text,
                 text_lengths,
                 sid,
-                torch.FloatTensor([0.667]),
+                torch.FloatTensor([0.4]),
                 torch.FloatTensor([1.0]),
-                torch.FloatTensor([0.8]),
+                torch.FloatTensor([0.5]),
             )[0]
             .detach()
             .numpy()

@@ -333,7 +333,7 @@ def _create_dummy_inputs(session) -> dict[str, np.ndarray] | None:
         elif name == "input_lengths":
             inputs[name] = np.array([phoneme_length], dtype=np.int64)
         elif name == "scales":
-            inputs[name] = np.array([0.667, 1.0, 0.8], dtype=np.float32)
+            inputs[name] = np.array([0.4, 1.0, 0.5], dtype=np.float32)
         elif name == "sid":
             inputs[name] = np.array([0], dtype=np.int64)
         elif name == "lid":

@@ -1016,9 +1016,9 @@ mod tests {
             speaker_id: Some(0),
             speaker_embedding: None,
             language_id: None,
-            noise_scale: 0.667,
+            noise_scale: 0.4,
             length_scale: 1.0,
-            noise_w: 0.8,
+            noise_w: 0.5,
         };
         assert_eq!(request.phoneme_ids, ids);
         assert!(request.prosody_features.is_none());
@@ -1054,9 +1054,9 @@ mod tests {
             speaker_id: Some(100),
             speaker_embedding: None,
             language_id: Some(2), // zh
-            noise_scale: 0.667,
+            noise_scale: 0.4,
             length_scale: 1.0,
-            noise_w: 0.8,
+            noise_w: 0.5,
         };
         assert_eq!(request.language_id, Some(2));
         assert_eq!(request.speaker_id, Some(100));

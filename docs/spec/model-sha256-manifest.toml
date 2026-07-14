@@ -58,9 +58,9 @@ forward_compat_policy = "strict"
 required_fields = [
     "audio.sample_rate",         # int (Hz) — typically 22050
     "espeak.voice",              # str — language code for legacy espeak compat
-    "inference.noise_scale",     # float — default 0.667
+    "inference.noise_scale",     # float — default 0.4
     "inference.length_scale",    # float — default 1.0
-    "inference.noise_w",         # float — default 0.8
+    "inference.noise_w",         # float — default 0.5
     "phoneme_id_map",            # object — single-codepoint string -> int[]
     "phoneme_type",              # str — typically "espeak" or "text"
     "num_symbols",               # int — vocabulary size

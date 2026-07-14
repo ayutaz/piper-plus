@@ -206,9 +206,9 @@ def _synthesize_piper_plus(
     prosody_features: list[dict | None],
     speaker_id: int = 0,
     language_id: int = 0,
-    noise_scale: float = 0.667,
+    noise_scale: float = 0.4,
     length_scale: float = 1.0,
-    noise_scale_w: float = 0.8,
+    noise_scale_w: float = 0.5,
 ) -> tuple[np.ndarray, float]:
     """Run ONNX inference and return (int16_audio, inference_seconds)."""
     text = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)

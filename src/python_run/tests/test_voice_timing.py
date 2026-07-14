@@ -18,6 +18,7 @@ from io import BytesIO
 from unittest.mock import MagicMock
 
 import numpy as np
+
 from piper_plus.config import PhonemeType, PiperConfig
 from piper_plus.timing import PhonemeTimingInfo, TimingResult
 from piper_plus.voice import PiperVoice
@@ -60,8 +61,8 @@ def _make_mock_voice(
         num_speakers=num_speakers,
         sample_rate=sample_rate,
         length_scale=1.0,
-        noise_scale=0.667,
-        noise_w=0.8,
+        noise_scale=0.4,
+        noise_w=0.5,
         phoneme_id_map={
             "_": [0],
             "^": [1],
@@ -538,13 +539,13 @@ class TestSynthesizeCoreShortText:
         short_ids = [1, 10, 10, 2]
         PiperVoice._synthesize_ids_core(voice, short_ids)
 
-        # Verify scales[0] (noise_scale) was reduced below the default 0.667
+        # Verify scales[0] (noise_scale) was reduced below the default 0.4
         call_args = voice.session.run.call_args
         assert call_args is not None
         feeds = call_args[0][1]
         scales = feeds["scales"]
-        assert scales[0] < 0.667  # noise_scale reduced
-        assert scales[2] < 0.8  # noise_w reduced
+        assert scales[0] < 0.4  # noise_scale reduced
+        assert scales[2] < 0.5  # noise_w reduced
         assert abs(scales[1] - 1.0) < 1e-6  # length_scale unchanged
 
     def test_long_ids_keep_default_scales(self):
@@ -561,9 +562,9 @@ class TestSynthesizeCoreShortText:
         feeds = call_args[0][1]
         scales = feeds["scales"]
         # Default values preserved
-        assert abs(scales[0] - 0.667) < 1e-6
+        assert abs(scales[0] - 0.4) < 1e-6
         assert abs(scales[1] - 1.0) < 1e-6
-        assert abs(scales[2] - 0.8) < 1e-6
+        assert abs(scales[2] - 0.5) < 1e-6
 
     def test_original_phoneme_ids_preserved_after_padding(self):
         """_synthesize_ids_core returns the original (pre-padding) phoneme IDs."""

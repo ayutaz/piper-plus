@@ -22,9 +22,9 @@
  *   --config <path>        config.json (required for sample_rate / num_languages)
  *   --json-input           Treat stdin as JSONL with phoneme_ids (required)
  *   --output-file <path>   Output WAV path (or "-" for stdout)
- *   --noise-scale <float>  Default 0.667
+ *   --noise-scale <float>  Default 0.4
  *   --length-scale <float> Default 1.0
- *   --noise-w <float>      Default 0.8
+ *   --noise-w <float>      Default 0.5
  *   --help                 Print this help
  *
  * JSONL fields (per line):
@@ -48,9 +48,9 @@ Flags:
   --config <path>         config.json (required)
   --json-input            Treat stdin as JSONL with phoneme_ids (required)
   --output-file <path>    Output WAV path (or "-" for stdout)
-  --noise-scale <float>   Default 0.667
+  --noise-scale <float>   Default 0.4
   --length-scale <float>  Default 1.0
-  --noise-w <float>       Default 0.8
+  --noise-w <float>       Default 0.5
   --help                  Print this help
 `;
 
@@ -60,9 +60,9 @@ function parseArgs(args) {
     config: null,
     jsonInput: false,
     outputFile: null,
-    noiseScale: 0.667,
+    noiseScale: 0.4,
     lengthScale: 1.0,
-    noiseW: 0.8,
+    noiseW: 0.5,
     help: false,
   };
   for (let i = 0; i < args.length; i++) {

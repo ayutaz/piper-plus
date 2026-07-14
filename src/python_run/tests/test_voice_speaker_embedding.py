@@ -41,8 +41,8 @@ def _make_voice_with_inputs(
         num_speakers=1,
         sample_rate=sample_rate,
         length_scale=1.0,
-        noise_scale=0.667,
-        noise_w=0.8,
+        noise_scale=0.4,
+        noise_w=0.5,
         phoneme_id_map={
             "_": [0],
             "^": [1],

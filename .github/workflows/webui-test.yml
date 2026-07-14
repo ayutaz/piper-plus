@@ -164,7 +164,7 @@ jobs:
           models = find_models('/models')
           assert models, 'No models found in /models'
           model = models[0]
-          result = synthesize('こんにちは、今日は良い天気ですね。', model, 0, 'ja', 0.667, 1.0, 0.8)
+          result = synthesize('こんにちは、今日は良い天気ですね。', model, 0, 'ja', 0.4, 1.0, 0.5)
           assert result is not None, 'synthesize returned None'
           sr, audio = result
           sf.write('/output/test_ja.wav', audio, sr)
@@ -191,7 +191,7 @@ jobs:
           import soundfile as sf
           models = find_models('/models')
           model = models[0]
-          result = synthesize('Hello, how are you today?', model, 0, 'en', 0.667, 1.0, 0.8)
+          result = synthesize('Hello, how are you today?', model, 0, 'en', 0.4, 1.0, 0.5)
           assert result is not None, 'synthesize returned None'
           sr, audio = result
           sf.write('/output/test_en.wav', audio, sr)

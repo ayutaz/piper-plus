@@ -18,11 +18,11 @@ Options:
   -s, --speaker <SPEAKER>
           話者 ID (デフォルト: 0)
       --noise-scale <NOISE_SCALE>
-          生成ノイズスケール [default: 0.667]
+          生成ノイズスケール [default: 0.4]
       --length-scale <LENGTH_SCALE>
           音素長さスケール [default: 1]
       --noise-w <NOISE_W>
-          音素幅ノイズ [default: 0.8]
+          音素幅ノイズ [default: 0.5]
       --device <DEVICE>
           実行デバイス [default: auto]
       --debug

@@ -232,9 +232,9 @@ class TestPiperPlusInit:
 
         tts = PiperPlus(str(onnx), device="cpu")
 
-        assert tts.noise_scale == pytest.approx(0.667)
+        assert tts.noise_scale == pytest.approx(0.4)
         assert tts.length_scale == pytest.approx(1.0)
-        assert tts.noise_scale_w == pytest.approx(0.8)
+        assert tts.noise_scale_w == pytest.approx(0.5)
 
     @patch("piper_plus.api.api.warmup_session")
     @patch("piper_plus.api.api.create_ort_session")

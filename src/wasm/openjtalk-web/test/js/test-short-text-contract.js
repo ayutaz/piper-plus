@@ -147,9 +147,9 @@ describe("short-text contract — WASM/JS behavioural parity", () => {
   });
 
   it("adjustScalesForShortInput passes through when phonemeCount >= MIN_PHONEME_IDS", () => {
-    const out = adjustScalesForShortInput(MIN_PHONEME_IDS, 0.667, 0.8);
-    assert.strictEqual(out.noiseScale, 0.667);
-    assert.strictEqual(out.noiseW, 0.8);
+    const out = adjustScalesForShortInput(MIN_PHONEME_IDS, 0.4, 0.5);
+    assert.strictEqual(out.noiseScale, 0.4);
+    assert.strictEqual(out.noiseW, 0.5);
   });
 });
 
