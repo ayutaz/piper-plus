@@ -26,6 +26,18 @@ _LOGGER = logging.getLogger("piper_train.export_onnx")
 
 OPSET_VERSION = 15
 
+# WaveNeXt (decoder_arch='wavenext') は opset 17 で export する:
+# native LayerNormalization node が立つことで convert_fp16 の LN keep-list
+# safeguard (tools/convert_fp16.py DEFAULT_KEEP_FP32_OPS) が有効になり、
+# ORT fusion / .opt.onnx キャッシュへの依存もなくなる (opset 15 でも動作
+# 自体は PoC 実証済み — docs/design/wavenext-decoder-ablation/
+# 04-pre-stage0-verification.md §4)。
+# 命名注意: scripts/check_onnx_export_contract.py の regex
+# `OPSET_VERSION\s*=\s*(\d+)` (blocking gate、main opset=15 を pin) に
+# マッチしない suffix 形にすること。prefix 形 (WAVENEXT_OPSET_VERSION) は
+# 部分文字列マッチして gate を壊すため禁止。
+OPSET_VERSION_WAVENEXT = 17
+
 
 def build_infer_forward(
     model: SynthesizerTrn,
@@ -724,12 +736,23 @@ def main() -> None:
     # Export - always include durations output
     output_names = ["output", "durations"]
 
+    opset_version = (
+        OPSET_VERSION_WAVENEXT
+        if getattr(model_g, "decoder_arch", "mb_istft") == "wavenext"
+        else OPSET_VERSION
+    )
+    _LOGGER.info(
+        "Exporting with opset %d (decoder_arch=%s)",
+        opset_version,
+        getattr(model_g, "decoder_arch", "mb_istft"),
+    )
+
     torch.onnx.export(
         model=model_g,
         args=dummy_input,
         f=str(args.output),
         verbose=False,
-        opset_version=OPSET_VERSION,
+        opset_version=opset_version,
         input_names=input_names,
         output_names=output_names,
         dynamic_axes=dynamic_axes,

@@ -10,8 +10,9 @@ Stage 0 of the WaveNeXt decoder ablation
   over state_dict markers (warning on mismatch).
 - ``_is_legacy_hifigan_checkpoint`` stays a bool-compatible wrapper so the
   existing rejection tests keep passing unchanged.
-- ``SynthesizerTrn(decoder_arch=...)`` dispatches to MBiSTFTGenerator and
-  raises NotImplementedError for the not-yet-implemented WaveNeXt archs.
+- ``SynthesizerTrn(decoder_arch=...)`` dispatches to MBiSTFTGenerator /
+  WaveNeXtGenerator (Stage 1); ``wavenext2`` keeps raising
+  NotImplementedError until Stage 3.
 """
 
 import argparse
@@ -123,9 +124,7 @@ class TestDetectDecoderArchFromStateDict:
         # Pin the Stage 1 expectation itself: a proper WaveNeXt checkpoint
         # contains no model_g.dec.pqmf.* keys (re-verified against a real
         # checkpoint in Stage 1).
-        assert not any(
-            k.startswith("model_g.dec.pqmf.") for k in _WAVENEXT_STATE_DICT
-        )
+        assert not any(k.startswith("model_g.dec.pqmf.") for k in _WAVENEXT_STATE_DICT)
 
 
 @pytest.mark.unit
@@ -171,14 +170,16 @@ class TestBoolWrapperCompat:
         assert _is_legacy_hifigan_checkpoint(_WAVENEXT_STATE_DICT) is False
 
     def test_partial_ckpt_is_false(self):
-        assert _is_legacy_hifigan_checkpoint({"model_g.spk_proj.0.weight": None}) is False
+        assert (
+            _is_legacy_hifigan_checkpoint({"model_g.spk_proj.0.weight": None}) is False
+        )
 
 
 @pytest.mark.unit
 class TestValidateCheckpointDecoderArch:
     def test_hifigan_raises_legacy_message(self):
         checkpoint = {"state_dict": _HIFIGAN_STATE_DICT}
-        with pytest.raises(RuntimeError, match="v1.12.0"):
+        with pytest.raises(RuntimeError, match=r"v1\.12\.0"):
             _validate_checkpoint_decoder_arch(
                 checkpoint, _fake_model("mb_istft"), "/foo/legacy.ckpt"
             )
@@ -225,27 +226,27 @@ class TestValidateCheckpointDecoderArch:
 def _make_synthesizer(**overrides):
     from piper_train.vits.models import SynthesizerTrn
 
-    kwargs = dict(
-        n_vocab=97,
-        spec_channels=513,
-        segment_size=32,
-        inter_channels=192,
-        hidden_channels=192,
-        filter_channels=768,
-        n_heads=2,
-        n_layers=6,
-        kernel_size=3,
-        p_dropout=0.1,
-        resblock="2",
-        resblock_kernel_sizes=(3, 5, 7),
-        resblock_dilation_sizes=((1, 2), (2, 6), (3, 12)),
-        upsample_rates=(4, 4),
-        upsample_initial_channel=256,
-        upsample_kernel_sizes=(16, 16),
-        n_speakers=1,
-        n_languages=1,
-        gin_channels=0,
-    )
+    kwargs = {
+        "n_vocab": 97,
+        "spec_channels": 513,
+        "segment_size": 32,
+        "inter_channels": 192,
+        "hidden_channels": 192,
+        "filter_channels": 768,
+        "n_heads": 2,
+        "n_layers": 6,
+        "kernel_size": 3,
+        "p_dropout": 0.1,
+        "resblock": "2",
+        "resblock_kernel_sizes": (3, 5, 7),
+        "resblock_dilation_sizes": ((1, 2), (2, 6), (3, 12)),
+        "upsample_rates": (4, 4),
+        "upsample_initial_channel": 256,
+        "upsample_kernel_sizes": (16, 16),
+        "n_speakers": 1,
+        "n_languages": 1,
+        "gin_channels": 0,
+    }
     kwargs.update(overrides)
     return SynthesizerTrn(**kwargs)
 
@@ -265,7 +266,14 @@ class TestSynthesizerTrnFactory:
         model = _make_synthesizer(decoder_arch="mb_istft")
         assert isinstance(model.dec, MBiSTFTGenerator)
 
-    @pytest.mark.parametrize("arch", ["wavenext", "wavenext2"])
+    def test_wavenext_dispatches_to_wavenext_generator(self):
+        from piper_train.vits.wavenext import WaveNeXtGenerator
+
+        model = _make_synthesizer(decoder_arch="wavenext")
+        assert model.decoder_arch == "wavenext"
+        assert isinstance(model.dec, WaveNeXtGenerator)
+
+    @pytest.mark.parametrize("arch", ["wavenext2"])
     def test_wavenext_archs_raise_not_implemented(self, arch):
         with pytest.raises(NotImplementedError, match=arch):
             _make_synthesizer(decoder_arch=arch)

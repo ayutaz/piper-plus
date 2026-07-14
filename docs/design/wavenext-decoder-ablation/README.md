@@ -1,7 +1,7 @@
 # WaveNeXt Decoder Ablation (piper-plus v1.13+ 検討)
 
 > **ブランチ**: `feat/wavenext-decoder-ablation` (dev から派生、起点 commit `d594cea2`、2026-07-14)
-> **ステータス**: Stage 0 実装完了 (`a50d2b59`: tri-state 分類器 + `--decoder-arch` factory) → Stage 1 (wavenext.py 移植) 未着手。**本 ablation は単一ブランチ内で進行、途中 PR なし** (2026-07-14 方針)
+> **ステータス**: Stage 1 コード実装完了 (wavenext.py + MRD + opset 17 export + tests 125 green) → **smoke 学習 (GPU) 待ち**。**本 ablation は単一ブランチ内で進行、途中 PR なし** (2026-07-14 方針)
 > **目的**: 現行 MB-iSTFT-VITS2 decoder を GAN-WaveNeXt2 / WaveNeXt v1 に置換可能かを検証し、CPU 速度・保守負荷・zero-shot 品質のトレードオフを実測する
 
 ---
@@ -62,6 +62,7 @@
 | 2026-07-14 | 独立検証方針で合意、`feat/wavenext-decoder-ablation` branch 作成 |
 | 2026-07-14 | Stage 0 着手前検証 (15-agent workflow + ローカル PoC) 完了 → [`04-pre-stage0-verification.md`](04-pre-stage0-verification.md) |
 | 2026-07-14 | Stage 0 実装完了 (`a50d2b59`): tri-state 分類器 + `--decoder-arch` factory + tests 32 件 (blocker 解消) |
-| — 未実施 — | Stage 1: WaveNeXt v1 baseline 実装 + smoke 学習 |
+| 2026-07-14 | Stage 1 コード実装完了 (7-agent workflow): `wavenext.py` + `wavenext_losses.py` (MRD) + lightning/export 統合 + tests 52 件新規 (計 125 green) |
+| — 未実施 — | Stage 1 smoke 学習 (GPU、A100×1 で 3-5 日) + GO/NO-GO 評価 |
 | — 未実施 — | Stage 2: piper-plus 統合強化 (Multi-scale FiLM 移植等) |
 | — 未実施 — | Stage 3: WaveNeXt 2 反復版 (Stage 2 の go サイン後のみ) |

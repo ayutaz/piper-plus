@@ -86,9 +86,7 @@ def _detect_decoder_arch(checkpoint: dict) -> "str | None":
     ``hyper_parameters`` の ``decoder_arch`` タグを最優先し、state_dict
     マーカーと矛盾する場合は warning を出してタグを採用する。
     """
-    marker_arch = _detect_decoder_arch_from_state_dict(
-        checkpoint.get("state_dict", {})
-    )
+    marker_arch = _detect_decoder_arch_from_state_dict(checkpoint.get("state_dict", {}))
     hparams = checkpoint.get("hyper_parameters") or {}
     tag = hparams.get("decoder_arch") if hasattr(hparams, "get") else None
     if tag is not None:
@@ -131,9 +129,7 @@ _WRONG_DECODER_ARCH_MESSAGE = (
 )
 
 
-def _validate_checkpoint_decoder_arch(
-    checkpoint: dict, model, checkpoint_path
-) -> None:
+def _validate_checkpoint_decoder_arch(checkpoint: dict, model, checkpoint_path) -> None:
     """resume / transfer 元 ckpt の decoder アーキテクチャを検証する。
 
     decoder 系キーを持たない部分 ckpt (``None``) は許容する。
@@ -156,6 +152,30 @@ def _validate_checkpoint_decoder_arch(
                 model_arch=model_arch,
             )
         ) from None
+
+
+_ENCODER_ONLY_DROP_PREFIXES = (
+    "model_g.dec.",
+    "model_d.",
+    "model_d_wavlm.",
+    "model_mrd.",
+)
+
+
+def _filter_encoder_only_state_dict(state_dict: dict) -> dict:
+    """--resume-encoder-only 用: decoder と discriminator の重みを落とす。
+
+    decoder キーが無くなるため tri-state 分類器は None を返し
+    (partial-ckpt 扱い)、decoder_arch が異なる ckpt からの encoder
+    部分転移が検証を通る。学習済み D × scratch decoder の GAN 不均衡も
+    避ける (Stage 1 の MPD/MRD は必ずスクラッチ —
+    docs/design/wavenext-decoder-ablation/04-pre-stage0-verification.md §7)。
+    """
+    return {
+        k: v
+        for k, v in state_dict.items()
+        if not k.startswith(_ENCODER_ONLY_DROP_PREFIXES)
+    }
 
 
 def calculate_effective_batch_size(batch_size, num_gpus=1):
@@ -307,6 +327,24 @@ def create_parser():
         "and preserves original language embeddings. "
         "Optimizer state is reset (training starts from epoch 0). "
         "Automatically enables --freeze-dp.",
+    )
+    parser.add_argument(
+        "--resume-encoder-only",
+        action="store_true",
+        help="With --resume-from-multispeaker-checkpoint: transfer only "
+        "non-decoder weights (drops model_g.dec.*, model_d.*, "
+        "model_d_wavlm.*) and lift the single-speaker restriction. "
+        "For cross-decoder-arch partial transfer (WaveNeXt ablation "
+        "Stage 1, docs/design/wavenext-decoder-ablation/03-ablation-plan.md).",
+    )
+    parser.add_argument(
+        "--wavenext-init",
+        default=None,
+        help="Path to BSC-LT/wavenext-mel pytorch_model.bin to warm-start "
+        "the WaveNeXt decoder (requires --decoder-arch wavenext). "
+        "feature_extractor.* is dropped and backbone.embed.weight is kept "
+        "scratch-initialised for the 192-ch VITS latent "
+        "(docs/design/wavenext-decoder-ablation/04-pre-stage0-verification.md §7).",
     )
     parser.add_argument(
         "--save-top-k",
@@ -658,6 +696,14 @@ def main():
     args = parser.parse_args()
     _LOGGER.debug(args)
 
+    if (
+        getattr(args, "resume_encoder_only", False)
+        and not args.resume_from_multispeaker_checkpoint
+    ):
+        parser.error(
+            "--resume-encoder-only requires --resume-from-multispeaker-checkpoint"
+        )
+
     args.dataset_dir = Path(args.dataset_dir)
 
     # Set default values for Trainer arguments
@@ -824,6 +870,27 @@ def main():
         **dict_args,
     )
 
+    # BSC-LT/wavenext-mel warm-start (--wavenext-init)。torch.compile より
+    # 前に適用する (OptimizedModule 経由の属性アクセス依存を避けるため)。
+    if getattr(args, "wavenext_init", None):
+        if args.decoder_arch != "wavenext":
+            parser.error("--wavenext-init requires --decoder-arch wavenext")
+        from .vits.wavenext import load_bsc_lt_generator_weights  # noqa: PLC0415
+
+        wavenext_sd = torch.load(
+            args.wavenext_init, map_location="cpu", weights_only=True
+        )
+        loaded, skipped, dropped = load_bsc_lt_generator_weights(
+            model.model_g.dec, wavenext_sd
+        )
+        _LOGGER.info(
+            "WaveNeXt BSC-LT init: %d loaded / %d skipped / %d dropped "
+            "(expected 80/1/2)",
+            loaded,
+            skipped,
+            dropped,
+        )
+
     if getattr(args, "no_compile", False):
         args.compile = False
     if args.compile:
@@ -868,10 +935,12 @@ def main():
         )
 
     if args.resume_from_multispeaker_checkpoint:
-        assert num_speakers == 1, (
-            "--resume-from-multispeaker-checkpoint はシングルスピーカーモデル専用です。"
-            "マルチスピーカーへの転移には --resume_from_single_speaker_checkpoint を使用してください。"
-        )
+        if not getattr(args, "resume_encoder_only", False):
+            # --resume-encoder-only は multi→multi の encoder 部分転移を許可する
+            assert num_speakers == 1, (
+                "--resume-from-multispeaker-checkpoint はシングルスピーカーモデル専用です。"
+                "マルチスピーカーへの転移には --resume_from_single_speaker_checkpoint を使用してください。"
+            )
         _LOGGER.info(
             "Resuming from multispeaker checkpoint: %s",
             args.resume_from_multispeaker_checkpoint,
@@ -884,6 +953,20 @@ def main():
             args.resume_from_multispeaker_checkpoint,
             map_location="cpu",
             weights_only=False,
+        )
+        if getattr(args, "resume_encoder_only", False):
+            checkpoint = dict(checkpoint)
+            checkpoint["state_dict"] = _filter_encoder_only_state_dict(
+                checkpoint["state_dict"]
+            )
+            # decoder を意図的に落とすため arch タグは検証対象から外す
+            checkpoint["hyper_parameters"] = {}
+        # Stage 0 の実装ギャップ修正: この live path は従来 HiFi-GAN /
+        # arch-mismatch ckpt も silent に strict=False ロードしていた。
+        # 検証を持つ load_multispeaker_checkpoint は呼び出し元ゼロの dead code
+        # のため、ここで直接検証する。
+        _validate_checkpoint_decoder_arch(
+            checkpoint, model, args.resume_from_multispeaker_checkpoint
         )
         remapped_sd = remap_weight_norm_keys(
             checkpoint["state_dict"], model.state_dict()

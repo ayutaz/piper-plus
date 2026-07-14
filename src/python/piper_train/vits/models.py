@@ -9,6 +9,7 @@ from torch.nn.utils import spectral_norm, weight_norm
 from . import attentions, commons, modules, monotonic_align
 from .commons import get_padding
 from .mb_istft import MBiSTFTGenerator
+from .wavenext import WaveNeXtGenerator
 
 
 class InferOutput(NamedTuple):
@@ -716,6 +717,10 @@ class SynthesizerTrn(nn.Module):
         # default: tests/fixtures/mb_istft_speaker_embedding/build_fixture.py
         # instantiates SynthesizerTrn directly in 3 CI workflows.
         decoder_arch: str = "mb_istft",
+        # WaveNeXt decoder dims (decoder_arch='wavenext' でのみ使用)
+        wavenext_dim: int = 512,
+        wavenext_intermediate_dim: int = 1536,
+        wavenext_num_blocks: int = 8,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -770,13 +775,21 @@ class SynthesizerTrn(nn.Module):
                 upsample_kernel_sizes=upsample_kernel_sizes,
                 gin_channels=gin_channels,
             )
-        elif decoder_arch in ("wavenext", "wavenext2"):
-            # Stage 1+ of the WaveNeXt ablation
+        elif decoder_arch == "wavenext":
+            self.dec = WaveNeXtGenerator(
+                in_channels=inter_channels,
+                dim=wavenext_dim,
+                intermediate_dim=wavenext_intermediate_dim,
+                num_blocks=wavenext_num_blocks,
+                n_fft=(spec_channels - 1) * 2,  # 513 → 1024
+                gin_channels=gin_channels,
+            )
+        elif decoder_arch == "wavenext2":
+            # Stage 3 of the WaveNeXt ablation
             # (docs/design/wavenext-decoder-ablation/03-ablation-plan.md)
             raise NotImplementedError(
-                f"decoder_arch={decoder_arch!r} is reserved for the WaveNeXt "
-                "decoder ablation and is not implemented yet. Use the default "
-                "'mb_istft'."
+                "decoder_arch='wavenext2' is reserved for Stage 3 of the "
+                "WaveNeXt decoder ablation and is not implemented yet."
             )
         else:
             raise ValueError(

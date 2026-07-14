@@ -172,7 +172,7 @@ python -m piper_train \
     --max_epochs 20 --batch-size 32 --samples-per-speaker 2 \
     --base_lr 1e-4 --disable_auto_lr_scaling \
     --ema-decay 0.9995 --max-phoneme-ids 400 \
-    --c-mrstft 1.0 --c-mrd 0.1 --mel-loss-coeff 45 \
+    --c-mrstft 1.0 --c-mrd 0.1 \
     --pretrain-mel-steps 5000 \
     --default_root_dir /data/piper/output-wavenext-v1-smoke \
     > wavenext-smoke.log 2>&1 &
@@ -180,7 +180,7 @@ python -m piper_train \
 
 期間目安: A100×1 で 3-5 日 (batch=32、6-lang 50k steps 想定)。
 
-> **コマンド注記 (04 doc)**: `--mel-loss-coeff 45` は既存 `c_mel=45` (80-mel) との関係 (**置換 or 維持**) を確定してから記載する (mel loss 二重化罠 — 上記 loss 節参照)。`--pretrain-mel-steps 5000` は wetdog default 0 からの **piper 側変更**である (機構自体は wetdog experiment.py L289-293 に存在)。
+> **コマンド注記 (Stage 1 実装で確定)**: mel loss は既存 `loss_mel` (80-mel, `c_mel=45`) を**維持**に確定 — `--mel-loss-coeff` flag は存在しない (128-mel MelSpecReconstructionLoss は二重化罠 + mel cache バグ回避のため不採用、04 doc §6)。`--c-mrstft` は **default 0.0 (OFF)** — 上記コマンドの `1.0` は Unknown #9 (JA/ZH サ行) 保険の明示 opt-in。`--pretrain-mel-steps 5000` は wetdog default 0 からの **piper 側変更** (機構自体は wetdog experiment.py L289-293 に存在)。pretrain 窓では MPD/MRD/WavLM の adversarial 項と D 更新のみを skip し、**SCL/DINO は gate しない** (CAM++ SCL は no_grad で勾配なし、DINO は decoder 非依存の spk_proj 学習のため停止する理由がない — 意図的決定)。
 
 ### 評価
 

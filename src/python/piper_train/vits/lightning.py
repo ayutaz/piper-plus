@@ -231,9 +231,19 @@ class VitsModel(pl.LightningModule):
         sub_stft_fft_sizes: tuple[int, ...] = (171, 384, 683),
         sub_stft_hop_sizes: tuple[int, ...] = (10, 30, 60),
         sub_stft_win_sizes: tuple[int, ...] = (60, 150, 300),
-        # Decoder architecture ('mb_istft' is the only implemented path;
-        # 'wavenext'/'wavenext2' are Stage 1+ of the WaveNeXt ablation and
-        # currently raise NotImplementedError in SynthesizerTrn)
+        # WaveNeXt decoder options (Stage 1; decoder_arch='wavenext' 時のみ有効)
+        c_mrd: float = 0.1,
+        c_mrstft: float = 0.0,  # fullband MR-STFT。default off (Unknown #9 は smoke で ablation)
+        fullband_stft_fft_sizes: tuple[int, ...] = (1024, 2048, 512),
+        fullband_stft_hop_sizes: tuple[int, ...] = (120, 240, 50),
+        fullband_stft_win_sizes: tuple[int, ...] = (600, 1200, 240),
+        pretrain_mel_steps: int = 0,
+        wavenext_dim: int = 512,
+        wavenext_intermediate_dim: int = 1536,
+        wavenext_num_blocks: int = 8,
+        # Decoder architecture ('mb_istft' is the default; 'wavenext' is
+        # implemented in Stage 1 of the WaveNeXt ablation; 'wavenext2' still
+        # raises NotImplementedError in SynthesizerTrn until Stage 3)
         decoder_arch: str = "mb_istft",
         # Training loop optimization
         # D:G update ratio (D updates every step, G updates every d_update_interval steps)
@@ -277,6 +287,9 @@ class VitsModel(pl.LightningModule):
             use_sdp=self.hparams.use_sdp,
             prosody_dim=self.hparams.prosody_dim,
             decoder_arch=self.hparams.decoder_arch,
+            wavenext_dim=self.hparams.wavenext_dim,
+            wavenext_intermediate_dim=self.hparams.wavenext_intermediate_dim,
+            wavenext_num_blocks=self.hparams.wavenext_num_blocks,
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm
@@ -319,15 +332,43 @@ class VitsModel(pl.LightningModule):
                 source_sample_rate=self.hparams.sample_rate,
             )
 
-        # MB-iSTFT: PQMF for GT analysis + sub-band STFT loss
-        self.pqmf = PQMF(subbands=4)
-        # Share PQMF instance with the decoder to avoid duplicate buffers
-        self.model_g.dec.pqmf = self.pqmf
-        self.sub_stft_loss = MultiResolutionSTFTLoss(
-            fft_sizes=self.hparams.sub_stft_fft_sizes,
-            hop_sizes=self.hparams.sub_stft_hop_sizes,
-            win_sizes=self.hparams.sub_stft_win_sizes,
-        )
+        # Decoder-arch 別の学習用モジュール
+        self.pqmf = None
+        self.sub_stft_loss = None
+        self.model_mrd = None
+        self.fullband_stft_loss = None
+        if self.hparams.decoder_arch == "mb_istft":
+            # MB-iSTFT: PQMF for GT analysis + sub-band STFT loss
+            self.pqmf = PQMF(subbands=4)
+            # Share PQMF instance with the decoder to avoid duplicate buffers
+            self.model_g.dec.pqmf = self.pqmf
+            self.sub_stft_loss = MultiResolutionSTFTLoss(
+                fft_sizes=self.hparams.sub_stft_fft_sizes,
+                hop_sizes=self.hparams.sub_stft_hop_sizes,
+                win_sizes=self.hparams.sub_stft_win_sizes,
+            )
+        elif self.hparams.decoder_arch == "wavenext":
+            # 正当性要件: ここで dec.pqmf を注入すると WaveNeXt ckpt に
+            # model_g.dec.pqmf.* buffer が混入し、tri-state 分類器が
+            # mb_istft に誤分類する (docs/design/wavenext-decoder-ablation/
+            # 04-pre-stage0-verification.md §3-7)。PQMF / sub-band loss は
+            # instantiate しない。
+            from .wavenext import WAVENEXT_HOP_LENGTH  # noqa: PLC0415
+            from .wavenext_losses import MultiResolutionDiscriminator  # noqa: PLC0415
+
+            if self.hparams.hop_length != WAVENEXT_HOP_LENGTH:
+                raise ValueError(
+                    f"decoder_arch='wavenext' requires hop_length="
+                    f"{WAVENEXT_HOP_LENGTH} (got {self.hparams.hop_length}); "
+                    "hop != 256 is Stage 3 scope"
+                )
+            self.model_mrd = MultiResolutionDiscriminator(fft_sizes=(2048, 1024, 512))
+            if self.hparams.c_mrstft > 0:
+                self.fullband_stft_loss = MultiResolutionSTFTLoss(
+                    fft_sizes=self.hparams.fullband_stft_fft_sizes,
+                    hop_sizes=self.hparams.fullband_stft_hop_sizes,
+                    win_sizes=self.hparams.fullband_stft_win_sizes,
+                )
 
         # Dataset splits
         self._train_dataset: Dataset | None = None
@@ -622,7 +663,14 @@ class VitsModel(pl.LightningModule):
         # but G backward+step only runs every d_update_interval steps.
         d_update_interval = self.hparams.d_update_interval
         grad_clip = getattr(self.hparams, "grad_clip", None)
-        update_generator = self.global_step % d_update_interval == 0
+        # Mel-only pretrain window (--pretrain-mel-steps): adversarial/FM 項と
+        # D 更新を skip し、reconstruction loss だけで scratch decoder を安定化
+        # させる。manual optimization 下の global_step は optimizer step 数
+        # ベースのため閾値は近似的 (pretrain 中は D step が走らない = G step
+        # 換算になる)。
+        pretrain = self.global_step < self.hparams.pretrain_mel_steps
+        # pretrain 中は G を毎 step 更新する (D-only step が存在しないため)
+        update_generator = pretrain or (self.global_step % d_update_interval == 0)
 
         # Periodic batch-info log for debugging (CUDA illegal access の発生位置特定用)
         if batch_idx % 50 == 0:
@@ -674,6 +722,13 @@ class VitsModel(pl.LightningModule):
             # Skip G update on this step (D-only step)
             self._log_with_batch_info("g_step_skipped", 1.0, batch)
 
+        if pretrain:
+            # mel-only pretrain window: D 更新を丸ごと skip
+            self._log_with_batch_info("pretrain_mel", 1.0, batch)
+            self._y = None
+            self._y_hat = None
+            return
+
         # Train discriminator (every step)
         opt_d.zero_grad()
         loss_d = self.training_step_d(batch)
@@ -698,6 +753,8 @@ class VitsModel(pl.LightningModule):
             d_params = list(self.model_d.parameters())
             if self.model_d_wavlm is not None:
                 d_params = d_params + list(self.model_d_wavlm.parameters())
+            if self.model_mrd is not None:
+                d_params = d_params + list(self.model_mrd.parameters())
             torch.nn.utils.clip_grad_norm_(d_params, grad_clip)
         opt_d.step()
 
@@ -858,7 +915,11 @@ class VitsModel(pl.LightningModule):
         # Save for training_step_d
         self._y = y
 
-        _y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = self.model_d(y, y_hat)
+        # Mel-only pretrain window (--pretrain-mel-steps) では adversarial/FM
+        # 項を skip する (D forward も省略)
+        adv_enabled = self.global_step >= self.hparams.pretrain_mel_steps
+        if adv_enabled:
+            _y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = self.model_d(y, y_hat)
 
         with autocast(self.device.type, enabled=False):
             # KL annealing: linearly increase from 0.1*c_kl to c_kl
@@ -879,8 +940,12 @@ class VitsModel(pl.LightningModule):
             loss_mel = F.l1_loss(y_mel, y_hat_mel) * self.hparams.c_mel
             loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * kl_weight
 
-            loss_fm = feature_loss(fmap_r, fmap_g)
-            loss_gen, _losses_gen = generator_loss(y_d_hat_g)
+            if adv_enabled:
+                loss_fm = feature_loss(fmap_r, fmap_g)
+                loss_gen, _losses_gen = generator_loss(y_d_hat_g)
+            else:
+                loss_fm = torch.zeros((), device=y.device)
+                loss_gen = torch.zeros((), device=y.device)
 
             loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl
 
@@ -890,6 +955,23 @@ class VitsModel(pl.LightningModule):
                 loss_sub_stft = self.sub_stft_loss(o_mb, y_mb) * self.hparams.c_sub_stft
                 loss_gen_all = loss_gen_all + loss_sub_stft
                 self._log_with_batch_info("loss_sub_stft", loss_sub_stft, batch)
+
+            # WaveNeXt: fullband MRD (LSGAN + FM、c_mrd を G 側 gen+fm に乗算
+            # — Vocos 慣例で G/D 双方に同係数)
+            if self.model_mrd is not None and adv_enabled:
+                _y_d_r_mrd, y_d_g_mrd, fmap_r_mrd, fmap_g_mrd = self.model_mrd(y, y_hat)
+                loss_gen_mrd, _ = generator_loss(y_d_g_mrd)
+                loss_fm_mrd = feature_loss(fmap_r_mrd, fmap_g_mrd)
+                loss_mrd = (loss_gen_mrd + loss_fm_mrd) * self.hparams.c_mrd
+                loss_gen_all = loss_gen_all + loss_mrd
+                self._log_with_batch_info("loss_gen_mrd", loss_gen_mrd, batch)
+                self._log_with_batch_info("loss_fm_mrd", loss_fm_mrd, batch)
+
+            # WaveNeXt: fullband MR-STFT loss (optional, c_mrstft > 0 のみ)
+            if self.fullband_stft_loss is not None:
+                loss_mrstft = self.fullband_stft_loss(y_hat, y) * self.hparams.c_mrstft
+                loss_gen_all = loss_gen_all + loss_mrstft
+                self._log_with_batch_info("loss_mrstft", loss_mrstft, batch)
 
             # --- Speaker Consistency Loss (SCL) ---
             # CAM++ ONNX encoder path (primary, when speaker_encoder is loaded)
@@ -991,8 +1073,10 @@ class VitsModel(pl.LightningModule):
                             )
 
             # WavLM Discriminator loss (optional, computed every N steps)
-            if self.model_d_wavlm is not None and (
-                self.global_step % self.hparams.wavlm_every_n_steps == 0
+            if (
+                self.model_d_wavlm is not None
+                and adv_enabled
+                and (self.global_step % self.hparams.wavlm_every_n_steps == 0)
             ):
                 _y_d_hat_r_wlm, y_d_hat_g_wlm, fmap_r_wlm, fmap_g_wlm = (
                     self.model_d_wavlm(y, y_hat)
@@ -1053,6 +1137,13 @@ class VitsModel(pl.LightningModule):
 
                 # Log WavLM discriminator loss
                 self._log_with_batch_info("loss_disc_wavlm", loss_disc_wavlm, batch)
+
+            # WaveNeXt: fullband MRD (D 側)
+            if self.model_mrd is not None:
+                y_d_r_mrd, y_d_g_mrd, _, _ = self.model_mrd(y, y_hat_detached)
+                loss_disc_mrd, _, _ = discriminator_loss(y_d_r_mrd, y_d_g_mrd)
+                loss_disc_all = loss_disc_all + loss_disc_mrd * self.hparams.c_mrd
+                self._log_with_batch_info("loss_disc_mrd", loss_disc_mrd, batch)
 
             self._log_with_batch_info("loss_disc_all", loss_disc_all, batch)
 
@@ -1266,10 +1357,12 @@ class VitsModel(pl.LightningModule):
         # Collect generator parameters (exclude frozen DP params when freeze_dp)
         g_params = [p for p in self.model_g.parameters() if p.requires_grad]
 
-        # Collect discriminator parameters (including WavLM if enabled)
+        # Collect discriminator parameters (including WavLM/MRD if enabled)
         d_params = list(self.model_d.parameters())
         if self.model_d_wavlm is not None:
             d_params = d_params + list(self.model_d_wavlm.parameters())
+        if self.model_mrd is not None:
+            d_params = d_params + list(self.model_mrd.parameters())
 
         optimizers = [
             torch.optim.AdamW(
@@ -1404,8 +1497,31 @@ class VitsModel(pl.LightningModule):
             type=str,
             default="mb_istft",
             choices=["mb_istft", "wavenext", "wavenext2"],
-            help="Decoder architecture (default: mb_istft). 'wavenext' and "
-            "'wavenext2' are reserved for the WaveNeXt decoder ablation "
-            "(Stage 1+) and currently raise NotImplementedError.",
+            help="Decoder architecture (default: mb_istft). 'wavenext' is the "
+            "Stage 1 WaveNeXt ablation decoder; 'wavenext2' is reserved for "
+            "Stage 3 and currently raises NotImplementedError.",
+        )
+        parser.add_argument(
+            "--c-mrd",
+            type=float,
+            default=0.1,
+            help="Multi-Resolution Discriminator loss weight "
+            "(decoder_arch=wavenext only, default: 0.1)",
+        )
+        parser.add_argument(
+            "--c-mrstft",
+            type=float,
+            default=0.0,
+            help="Fullband multi-resolution STFT loss weight "
+            "(decoder_arch=wavenext only). Default 0.0 = disabled; Stage 1 "
+            "smoke may enable with 1.0 (Unknown #9 ablation)",
+        )
+        parser.add_argument(
+            "--pretrain-mel-steps",
+            type=int,
+            default=0,
+            help="Disable adversarial/FM losses and D updates for the first "
+            "N optimizer steps (wetdog default 0; piper-side change for "
+            "scratch-decoder stabilisation)",
         )
         return parent_parser

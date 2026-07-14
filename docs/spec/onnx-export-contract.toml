@@ -25,7 +25,7 @@
 
 [meta]
 spec_version = "1.0"
-last_updated = "2026-05-09"
+last_updated = "2026-07-14"
 applies_to = ["python-export", "all-runtime-loaders"]
 canonical_source = "src/python/piper_train/export_onnx.py"
 forward_compat_policy = "strict"
@@ -109,17 +109,19 @@ purpose = "model size reduction"
 # ============================================================================
 # Opset version pinning
 # ============================================================================
-# The two export paths use different ONNX opset versions; the divergence is
+# The export paths use different ONNX opset versions; the divergence is
 # intentional and must NOT be silently aligned. Loader-side constraints in
-# every runtime accept opset >= the lower of the two values.
+# every runtime accept opset >= the lower of the values.
 #
-# Bumping either opset is a coordinated change: Python export -> regenerate
+# Bumping any opset is a coordinated change: Python export -> regenerate
 # every official ONNX -> verify all 7 runtimes load without warnings ->
 # update [opset] table -> publish.
 
 [opset]
 main_tts_model = 15
-main_tts_source = "src/python/piper_train/export_onnx.py:31"
+main_tts_source = "src/python/piper_train/export_onnx.py:27"
+main_tts_model_wavenext = 17
+main_tts_wavenext_source = "src/python/piper_train/export_onnx.py:39"
 speaker_encoder = 17
 speaker_encoder_source = "src/python/piper_train/speaker_encoder/export_encoder.py:35"
 
@@ -132,6 +134,17 @@ speaker encoder cannot legally export below 17. The main TTS model contains
 no STFT op (MB-iSTFT is implemented as Conv1d kernels, not as the ONNX STFT
 op) and is pinned at 15 to maximize compatibility with older ORT releases
 embedded in mobile / edge runtimes.
+
+Exception: the WaveNeXt decoder ablation path (decoder_arch = "wavenext",
+OPSET_VERSION_WAVENEXT) exports the main TTS model at opset 17 so that
+nn.LayerNorm lowers to a native `LayerNormalization` node. This makes the
+FP16 keep-list safeguard (src/python/piper_train/tools/convert_fp16.py
+DEFAULT_KEEP_FP32_OPS) fire
+on the decoder's LayerNorms and removes the dependency on ORT fusion /
+.opt.onnx caching. The model also works at opset 15 (PoC-verified), so this
+is a quality/robustness choice, not an op-availability constraint — see
+docs/design/wavenext-decoder-ablation/04-pre-stage0-verification.md §4.
+The mb_istft (default) path stays pinned at 15.
 """
 
 [opset.runtime_min_required]
