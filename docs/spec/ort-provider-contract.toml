@@ -171,7 +171,7 @@ log_level_on_fallback = "warning"
 # ============================================================================
 # Numerical-equivalence target between providers, measured on the warmup
 # phoneme sequence (see ort-session-contract.toml [warmup]) using the
-# same scales = [0.667, 1.0, 0.8]. The metric is RMS difference of the
+# same scales = [0.4, 1.0, 0.5]. The metric is RMS difference of the
 # audio output tensor.
 
 [output_equivalence.cpu_vs_cuda]
@@ -248,7 +248,7 @@ sources_of_drift = ["TRT engine builder picks per-build tactics", "FP16/INT8 qua
 opt_in_env = "PIPER_PLUS_ORT_PROVIDER_PARITY"
 opt_in_values = ["1", "true", "yes"]
 test_phoneme_length = 100
-test_scales = [0.667, 1.0, 0.8]
+test_scales = [0.4, 1.0, 0.5]
 test_speaker_id = 0
 test_language_id = 0
 
