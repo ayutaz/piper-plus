@@ -58,6 +58,7 @@
 - torch CPU の速度方向は run 間ノイズと同オーダーで頑健でない (方向の言及は無意味)。
 - paper の「CPU 4x」は WaveNeXt 2 vs **HiFi-GAN** の値。piper-plus は既に HiFi-GAN 比 2.21x の MB-iSTFT なので、この数字は本比較に適用不能 (02 doc 旧 M1 の根本的誤り)。
 - 本ベンチはこのマシン内の相対比較のみ有効。**GO/NO-GO の最終速度判定は canonical 環境 (Xeon E5-2650 v4 相当、contract 準拠) での end-to-end 実測待ち** — ただしローカルの負方向 prior は明記した上で臨む。
+- **【追記 2026-07-14: キルスイッチ測定で確定】** canonical 実機は ssh 到達不可のため CI runner (ubuntu-24.04 / **AMD EPYC 7763 4vCPU**、multi-runtime-rtf gate と同一環境) を代理採用し、`scripts/bench_wavenext_rtf.py` (run `29306153982`) で実測: **decoder 単体 p50 ratio = fp32 1.24-1.26x / fp16 1.34-1.39x 劣位 (T=60/150/400 全一貫)**。配布実モデル (multilingual-test-medium.onnx FP16) の ORT profiling で decoder ノード時間比 **~0.338** → **end-to-end 影響 +8〜12% 推定**。fp16 で劣位が拡大するのは MatMul 中心グラフの fp16 cast オーバーヘッドによる (MB-iSTFT はほぼ無影響)。2 環境 (Ryzen/EPYC) で方向一貫 + 重み非依存のため、この判定は学習後も覆らない。
 
 ### export 検証 (op 互換)
 

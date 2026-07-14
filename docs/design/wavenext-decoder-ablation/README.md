@@ -1,7 +1,7 @@
 # WaveNeXt Decoder Ablation (piper-plus v1.13+ 検討)
 
 > **ブランチ**: `feat/wavenext-decoder-ablation` (dev から派生、起点 commit `d594cea2`、2026-07-14)
-> **ステータス**: Stage 1 コード実装完了 (wavenext.py + MRD + opset 17 export + tests 125 green) → **smoke 学習 (GPU) 待ち**。**本 ablation は単一ブランチ内で進行、途中 PR なし** (2026-07-14 方針)
+> **ステータス**: Stage 1 コード実装完了 (tests 125 green) + **RTF キルスイッチ測定済み → 「CPU RTF < 現行」gate ❌ 不成立が確定** (decoder 1.24-1.39x 劣位、end-to-end +8〜12% 推定)。smoke 学習 (GPU、品質同等の確認のみが残る動機) に進むかは**ユーザー判断待ち**。**本 ablation は単一ブランチ内で進行、途中 PR なし** (2026-07-14 方針)
 > **目的**: 現行 MB-iSTFT-VITS2 decoder を GAN-WaveNeXt2 / WaveNeXt v1 に置換可能かを検証し、CPU 速度・保守負荷・zero-shot 品質のトレードオフを実測する
 
 ---
@@ -37,7 +37,7 @@
 | Model | Params | CPU RTF | UTMOS | 公式実装 | 22050Hz compat |
 |---|---|---|---|---|---|
 | **MB-iSTFT-VITS2** (現行) | ~30M (decoder 単体 1.65M 実測) | (27ms/25phoneme baseline) | 未計測 | ✅ piper-plus 内 | ✅ |
-| **WaveNeXt v1** (Okamoto ASRU 2023) | 13.72M (80-mel 実測) / 14.12M (z=192) | PoC 実測: contract 準拠 (intra=4) で **MB-iSTFT 比 30-40% 遅い**、default threading では同等 (canonical Xeon 実測待ち、04 doc) | 未計測 | 🟡 unofficial (wetdog MIT / BSC-LT Apache-2.0) | ✅ (mel 設定は f_max のみ非互換 (8000 vs None→11025)、他は完全一致 — warm-start 可否は不変) |
+| **WaveNeXt v1** (Okamoto ASRU 2023) | 13.72M (80-mel 実測) / 14.12M (z=192) | **確定: MB-iSTFT 比 decoder fp32 1.24-1.26x / fp16 1.34-1.39x 劣位** (canonical 代理 CI EPYC 4vCPU + ローカル Ryzen の 2 環境一貫、contract 準拠。end-to-end +8〜12% 推定、03 doc 評価節) | 未計測 | 🟡 unofficial (wetdog MIT / BSC-LT Apache-2.0) | ✅ (mel 設定は f_max のみ非互換 (8000 vs None→11025)、他は完全一致 — warm-start 可否は不変) |
 | **GAN-WaveNeXt 2** (paper arXiv:2605.25506) | **59.94M (4 iter)** | 0.20 (paper 実測) | 4.04 ± 0.09 | ❌ **なし (IEEE)** | ❌ (24kHz/hop=300) |
 | HiFi-GAN V1 (参考) | 13.9M | 0.80 (paper 実測) | 4.05 ± 0.11 | ✅ | — |
 
@@ -63,6 +63,7 @@
 | 2026-07-14 | Stage 0 着手前検証 (15-agent workflow + ローカル PoC) 完了 → [`04-pre-stage0-verification.md`](04-pre-stage0-verification.md) |
 | 2026-07-14 | Stage 0 実装完了 (`a50d2b59`): tri-state 分類器 + `--decoder-arch` factory + tests 32 件 (blocker 解消) |
 | 2026-07-14 | Stage 1 コード実装完了 (7-agent workflow): `wavenext.py` + `wavenext_losses.py` (MRD) + lightning/export 統合 + tests 52 件新規 (計 125 green) |
-| — 未実施 — | Stage 1 smoke 学習 (GPU、A100×1 で 3-5 日) + GO/NO-GO 評価 |
+| 2026-07-14 | RTF キルスイッチ測定 (CI EPYC 4vCPU、run 29306153982): decoder 1.24-1.39x 劣位確定 → 「CPU RTF < 現行」gate ❌、✅ GO (default 昇格) は到達不能に |
+| — 判断待ち — | Stage 1 smoke 学習 (GPU、A100×1 で 3-5 日) — 残る動機は品質同等の確認 (🟡 CONDITIONAL GO 狙い) のみ |
 | — 未実施 — | Stage 2: piper-plus 統合強化 (Multi-scale FiLM 移植等) |
 | — 未実施 — | Stage 3: WaveNeXt 2 反復版 (Stage 2 の go サイン後のみ) |

@@ -185,7 +185,7 @@ python -m piper_train \
 ### 評価
 
 - **SECS (CAM++)**: v7 zero-shot ep32 baseline **0.6879 (未知話者)** と比較
-- **CPU RTF**: `docker/python-inference/inference.py` で 25 phoneme 英文 x 30 runs、**canonical Xeon E5-2650 v4 相当環境 + ORT session contract 準拠スレッド設定 (intra=4/inter=1/SEQUENTIAL、`ort-session-contract.toml:23-24`) + 短尺 (25 phoneme 相当) レジーム込み**で実測、現行 MB-iSTFT `~27ms` baseline と比較 — ローカル PoC (04 doc) は contract 準拠で 30-40% 遅い**負方向 prior**あり
+- **CPU RTF**: ✅ **キルスイッチ測定済み (2026-07-14、GPU 投資前に確定)** — canonical 実機 (Xeon E5-2650 v4) は ssh 到達不可のため **CI runner (ubuntu-24.04 / AMD EPYC 7763 4vCPU、multi-runtime-rtf gate と同一環境) を canonical 代理**に採用、`scripts/bench_wavenext_rtf.py` + `.github/workflows/wavenext-rtf-killswitch.yml` (run 29306153982) で contract 準拠実測。**decoder 単体 p50 ratio (WaveNeXt/MB-iSTFT): fp32 1.24-1.26x / fp16 1.34-1.39x 劣位 (T=60/150/400 全て一貫)**。配布実モデルの ORT profiling で decoder ノード時間比 ~0.34 → **end-to-end 影響は +8〜12% 程度と推定** (27ms → ~30ms 相当)。絶対 RTF は両者とも 0.012-0.017 で real-time 比 60-85x 高速。学習後モデルでの再計測は不要 (速度はグラフ構造のみに依存)
 - **ONNX size**: FP16 export 後のファイルサイズ、現行と比較 (04 doc PoC: decoder 単体 fp32 で 8.5x 増の prior)
 - **PESQ/STOI (JA/ZH サ行)**: 既知話者音声との A/B、既知弱点音素の退化検出
 - **主観 A/B**: つくよみちゃん FT ONNX の再現、MB-iSTFT 版と聴き比べ
@@ -200,7 +200,7 @@ python -m piper_train \
 | SECS ~ 0.65-0.68 && 速度 win / 品質同等 | 🟡 CONDITIONAL GO (opt-in flag) | Stage 2 で Multi-scale FiLM 移植を試す、駄目なら opt-in flag として merge |
 | SECS < 0.65 or JA/ZH サ行大幅退化 | ❌ NO-GO (Stage 2 に進まない) | 知見を Matcha-TTS / iSTFTNet2-MB / StyleTTS2 の設計判断に転用、ablation を `docs/research/` に log |
 
-> 「CPU RTF < 現行」gate は、ローカル PoC (04 doc) の**負方向 prior (contract 準拠で 30-40% 遅い)** を明記した上で、canonical Xeon 環境 (contract 準拠スレッド設定) の実測で判定する。
+> **「CPU RTF < 現行」gate は判定済み: ❌ 不成立** (2026-07-14 キルスイッチ測定、上記「評価」節)。ローカル Ryzen (30-40% 劣位) と canonical 代理 EPYC (24-39% 劣位) の 2 環境で一貫しており、学習結果に依存しないため覆らない。したがって **✅ GO (default 昇格) の行は到達不能**で、残る現実的ゴールは 🟡 CONDITIONAL GO (opt-in flag、品質同等 + 保守性/bf16/WaveNeXt 2 足場が動機、end-to-end +8〜12% の速度コストを許容) か ❌ NO-GO。smoke 学習に進むかは「品質同等の確認に A100×1 3-5 日を投資する価値があるか」の判断となる。
 
 ---
 
