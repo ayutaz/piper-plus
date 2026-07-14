@@ -593,8 +593,8 @@ public class ShortTextProcessorTests
     [Fact]
     public void AdjustScales_LongSequence_NoChange()
     {
-        float noiseScale = 0.667f;
-        float noiseW = 0.8f;
+        float noiseScale = 0.4f;
+        float noiseW = 0.5f;
 
         (float adjNoise, float adjW) = ShortTextProcessor.AdjustScales(
             ShortTextProcessor.MinPhonemeIds, noiseScale, noiseW);
@@ -606,8 +606,8 @@ public class ShortTextProcessorTests
     [Fact]
     public void AdjustScales_AboveMinimum_NoChange()
     {
-        float noiseScale = 0.667f;
-        float noiseW = 0.8f;
+        float noiseScale = 0.4f;
+        float noiseW = 0.5f;
 
         (float adjNoise, float adjW) = ShortTextProcessor.AdjustScales(100, noiseScale, noiseW);
 
@@ -618,8 +618,8 @@ public class ShortTextProcessorTests
     [Fact]
     public void AdjustScales_ShortSequence_ReducesScales()
     {
-        float noiseScale = 0.667f;
-        float noiseW = 0.8f;
+        float noiseScale = 0.4f;
+        float noiseW = 0.5f;
 
         (float adjNoise, float adjW) = ShortTextProcessor.AdjustScales(10, noiseScale, noiseW);
 
@@ -667,8 +667,8 @@ public class ShortTextProcessorTests
     [Fact]
     public void AdjustScales_ZeroLength_UsesFloor()
     {
-        float noiseScale = 0.667f;
-        float noiseW = 0.8f;
+        float noiseScale = 0.4f;
+        float noiseW = 0.5f;
 
         (float adjNoise, float adjW) = ShortTextProcessor.AdjustScales(0, noiseScale, noiseW);
 
@@ -682,7 +682,7 @@ public class ShortTextProcessorTests
     {
         // LengthScale is not part of AdjustScales; just verify the API
         // doesn't affect it implicitly by returning only noiseScale + noiseW.
-        (float adjNoise, float adjW) = ShortTextProcessor.AdjustScales(10, 0.667f, 0.8f);
+        (float adjNoise, float adjW) = ShortTextProcessor.AdjustScales(10, 0.4f, 0.5f);
 
         // Both returned values should be positive
         Assert.True(adjNoise > 0f);
@@ -954,8 +954,8 @@ public class ShortTextProcessorTests
     public void AdjustScales_DefaultScales_ShortInput_ReducedButPositive()
     {
         // Default VITS scales
-        float noiseScale = 0.667f;
-        float noiseW = 0.8f;
+        float noiseScale = 0.4f;
+        float noiseW = 0.5f;
 
         (float adjNoise, float adjW) = ShortTextProcessor.AdjustScales(5, noiseScale, noiseW);
 

@@ -583,8 +583,8 @@ class DynamicScalesTest : public ::testing::Test {};
 
 TEST_F(DynamicScalesTest, NoAdjustmentForLongInput) {
   const int len = MIN_PHONEME_IDS + 10;
-  float noiseScale = 0.667f;
-  float noiseW = 0.8f;
+  float noiseScale = 0.4f;
+  float noiseW = 0.5f;
 
   // No adjustment when len >= MIN_PHONEME_IDS
   float ratio = std::clamp(static_cast<float>(len) /
@@ -603,8 +603,8 @@ TEST_F(DynamicScalesTest, NoAdjustmentForLongInput) {
 TEST_F(DynamicScalesTest, AdjustsForShortInput) {
   // Half of MIN_PHONEME_IDS — noise_scale floor (0.5) engages exactly.
   const int len = MIN_PHONEME_IDS / 2;
-  float noiseScale = 0.667f;
-  float noiseW = 0.8f;
+  float noiseScale = 0.4f;
+  float noiseW = 0.5f;
 
   float ratio = std::clamp(static_cast<float>(len) /
                                 static_cast<float>(MIN_PHONEME_IDS),
@@ -619,8 +619,8 @@ TEST_F(DynamicScalesTest, AdjustsForShortInput) {
 
 TEST_F(DynamicScalesTest, FloorClampForVeryShortInput) {
   const int len = 1;  // Far below both floors
-  float noiseScale = 0.667f;
-  float noiseW = 0.8f;
+  float noiseScale = 0.4f;
+  float noiseW = 0.5f;
 
   float ratio = std::clamp(static_cast<float>(len) /
                                 static_cast<float>(MIN_PHONEME_IDS),
@@ -636,8 +636,8 @@ TEST_F(DynamicScalesTest, FloorClampForVeryShortInput) {
 
 TEST_F(DynamicScalesTest, RatioIsZeroForEmptyInput) {
   const int len = 0;
-  float noiseScale = 0.667f;
-  float noiseW = 0.8f;
+  float noiseScale = 0.4f;
+  float noiseW = 0.5f;
 
   float ratio = std::clamp(static_cast<float>(len) /
                                 static_cast<float>(MIN_PHONEME_IDS),
@@ -653,8 +653,8 @@ TEST_F(DynamicScalesTest, RatioIsZeroForEmptyInput) {
 }
 
 TEST_F(DynamicScalesTest, GradualScaling) {
-  float noiseScale = 0.667f;
-  float noiseW = 0.8f;
+  float noiseScale = 0.4f;
+  float noiseW = 0.5f;
 
   // Test that scales increase monotonically with length
   float prevNS = 0.0f;
@@ -676,8 +676,8 @@ TEST_F(DynamicScalesTest, GradualScaling) {
 
 TEST_F(DynamicScalesTest, ExactBoundaryAtMinPhonemeIds) {
   const int len = MIN_PHONEME_IDS;
-  float noiseScale = 0.667f;
-  float noiseW = 0.8f;
+  float noiseScale = 0.4f;
+  float noiseW = 0.5f;
 
   float ratio = std::clamp(static_cast<float>(len) /
                                 static_cast<float>(MIN_PHONEME_IDS),
@@ -712,12 +712,12 @@ TEST_F(ShortTextIntegrationTest, PaddingAndScalesApplyTogether) {
   float ratio = std::clamp(static_cast<float>(originalLen) /
                                 static_cast<float>(MIN_PHONEME_IDS),
                             0.0f, 1.0f);
-  float noiseScale = 0.667f * std::max(0.5f, ratio);
-  float noiseW = 0.8f * std::max(0.4f, ratio);
+  float noiseScale = 0.4f * std::max(0.5f, ratio);
+  float noiseW = 0.5f * std::max(0.4f, ratio);
 
   // Both should be reduced
-  EXPECT_LT(noiseScale, 0.667f);
-  EXPECT_LT(noiseW, 0.8f);
+  EXPECT_LT(noiseScale, 0.4f);
+  EXPECT_LT(noiseW, 0.5f);
 }
 
 TEST_F(ShortTextIntegrationTest, LongInputUnchanged) {
