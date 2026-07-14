@@ -210,9 +210,9 @@ def write_config(path: Path) -> None:
         "language_map": {},
         "espeak": {"voice": "en-us"},
         "inference": {
-            "noise_scale": 0.667,
+            "noise_scale": 0.4,
             "length_scale": 1.0,
-            "noise_w": 0.8,
+            "noise_w": 0.5,
         },
     }
     path.write_text(json.dumps(cfg, indent=2))

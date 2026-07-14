@@ -484,22 +484,22 @@ func TestWindowRMS_EmptySlice(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAdjustScales_NoAdjustment(t *testing.T) {
-	ns, nw := adjustScalesForShortText(minPhonemeIDs, 0.667, 0.8)
-	if ns != 0.667 {
-		t.Errorf("expected noiseScale=0.667, got %f", ns)
+	ns, nw := adjustScalesForShortText(minPhonemeIDs, 0.4, 0.5)
+	if ns != 0.4 {
+		t.Errorf("expected noiseScale=0.4, got %f", ns)
 	}
-	if nw != 0.8 {
-		t.Errorf("expected noiseW=0.8, got %f", nw)
+	if nw != 0.5 {
+		t.Errorf("expected noiseW=0.5, got %f", nw)
 	}
 }
 
 func TestAdjustScales_AboveMinimum(t *testing.T) {
-	ns, nw := adjustScalesForShortText(minPhonemeIDs+10, 0.667, 0.8)
-	if ns != 0.667 {
-		t.Errorf("expected noiseScale=0.667, got %f", ns)
+	ns, nw := adjustScalesForShortText(minPhonemeIDs+10, 0.4, 0.5)
+	if ns != 0.4 {
+		t.Errorf("expected noiseScale=0.4, got %f", ns)
 	}
-	if nw != 0.8 {
-		t.Errorf("expected noiseW=0.8, got %f", nw)
+	if nw != 0.5 {
+		t.Errorf("expected noiseW=0.5, got %f", nw)
 	}
 }
 
@@ -509,10 +509,10 @@ func TestAdjustScales_VeryShort(t *testing.T) {
 	if n < 1 {
 		n = 1
 	}
-	ns, nw := adjustScalesForShortText(n, 0.667, 0.8)
+	ns, nw := adjustScalesForShortText(n, 0.4, 0.5)
 
-	expectedNS := float32(0.667 * 0.5)
-	expectedNW := float32(0.8 * 0.4)
+	expectedNS := float32(0.4 * 0.5)
+	expectedNW := float32(0.5 * 0.4)
 
 	if math.Abs(float64(ns-expectedNS)) > 0.001 {
 		t.Errorf("expected noiseScale~%f, got %f", expectedNS, ns)
@@ -525,13 +525,13 @@ func TestAdjustScales_VeryShort(t *testing.T) {
 func TestAdjustScales_HalfMinimum(t *testing.T) {
 	// At the noiseScale floor (ratio = 0.5).
 	n := minPhonemeIDs / 2
-	ns, nw := adjustScalesForShortText(n, 0.667, 0.8)
+	ns, nw := adjustScalesForShortText(n, 0.4, 0.5)
 
 	ratio := float32(n) / float32(minPhonemeIDs)
 	nsRatio := float32(math.Max(0.5, float64(ratio)))
 	nwRatio := float32(math.Max(0.4, float64(ratio)))
-	expectedNS := float32(0.667) * nsRatio
-	expectedNW := float32(0.8) * nwRatio
+	expectedNS := float32(0.4) * nsRatio
+	expectedNW := float32(0.5) * nwRatio
 
 	if math.Abs(float64(ns-expectedNS)) > 0.001 {
 		t.Errorf("expected noiseScale~%f, got %f", expectedNS, ns)
@@ -547,13 +547,13 @@ func TestAdjustScales_MostlyFull(t *testing.T) {
 	if n < 1 {
 		n = 1
 	}
-	ns, nw := adjustScalesForShortText(n, 0.667, 0.8)
+	ns, nw := adjustScalesForShortText(n, 0.4, 0.5)
 
 	ratio := float32(n) / float32(minPhonemeIDs)
 	nsRatio := float32(math.Max(0.5, float64(ratio)))
 	nwRatio := float32(math.Max(0.4, float64(ratio)))
-	expectedNS := float32(0.667) * nsRatio
-	expectedNW := float32(0.8) * nwRatio
+	expectedNS := float32(0.4) * nsRatio
+	expectedNW := float32(0.5) * nwRatio
 
 	if math.Abs(float64(ns-expectedNS)) > 0.001 {
 		t.Errorf("expected noiseScale~%f, got %f", expectedNS, ns)
@@ -1124,10 +1124,10 @@ func TestWindowRMS_MixedSignal(t *testing.T) {
 
 func TestAdjustScales_ZeroPhonemes(t *testing.T) {
 	// Edge case: 0 phonemes.
-	ns, nw := adjustScalesForShortText(0, 0.667, 0.8)
+	ns, nw := adjustScalesForShortText(0, 0.4, 0.5)
 	// ratio = 0, clamped floors: noiseScale *= 0.5, noiseW *= 0.4
-	expectedNS := float32(0.667 * 0.5)
-	expectedNW := float32(0.8 * 0.4)
+	expectedNS := float32(0.4 * 0.5)
+	expectedNW := float32(0.5 * 0.4)
 	if math.Abs(float64(ns-expectedNS)) > 0.001 {
 		t.Errorf("expected noiseScale~%f, got %f", expectedNS, ns)
 	}
@@ -1152,10 +1152,10 @@ func TestAdjustScales_OnePhoneme(t *testing.T) {
 func TestAdjustScales_JustBelowMinimum(t *testing.T) {
 	// minPhonemeIDs - 1 phonemes -> ratio = (min-1)/min, no floor clamp.
 	n := minPhonemeIDs - 1
-	ns, nw := adjustScalesForShortText(n, 0.667, 0.8)
+	ns, nw := adjustScalesForShortText(n, 0.4, 0.5)
 	ratio := float32(n) / float32(minPhonemeIDs)
-	expectedNS := float32(0.667) * ratio
-	expectedNW := float32(0.8) * ratio
+	expectedNS := float32(0.4) * ratio
+	expectedNW := float32(0.5) * ratio
 	if math.Abs(float64(ns-expectedNS)) > 0.001 {
 		t.Errorf("expected noiseScale~%f, got %f", expectedNS, ns)
 	}

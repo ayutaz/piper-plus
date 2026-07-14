@@ -231,10 +231,10 @@ public sealed class ShortTextContractTests
         // Sequences >= MinPhonemeIds must not be touched by AdjustScales.
         (float noiseScale, float noiseW) = ShortTextProcessor.AdjustScales(
             phonemeIdCount: ShortTextProcessor.MinPhonemeIds + 5,
-            noiseScale: 0.667f,
-            noiseW: 0.8f);
-        Assert.Equal(0.667f, noiseScale, precision: 5);
-        Assert.Equal(0.8f, noiseW, precision: 5);
+            noiseScale: 0.4f,
+            noiseW: 0.5f);
+        Assert.Equal(0.4f, noiseScale, precision: 5);
+        Assert.Equal(0.5f, noiseW, precision: 5);
     }
 
     // ------------------------------------------------------------------
