@@ -1,7 +1,7 @@
 # WaveNeXt Decoder Ablation (piper-plus v1.13+ 検討)
 
 > **ブランチ**: `feat/wavenext-decoder-ablation` (dev から派生、起点 commit `d594cea2`、2026-07-14)
-> **ステータス**: Stage 1 コード実装完了 (tests 125 green) + **RTF キルスイッチ測定済み → 「CPU RTF < 現行」gate ❌ 不成立が確定** (decoder 1.24-1.39x 劣位、end-to-end +8〜12% 推定)。smoke 学習 (GPU、品質同等の確認のみが残る動機) に進むかは**ユーザー判断待ち**。**本 ablation は単一ブランチ内で進行、途中 PR なし** (2026-07-14 方針)
+> **ステータス**: ❌ **クローズ (2026-07-14、ユーザー判断)** — RTF キルスイッチで速度 gate 不成立が確定し (decoder 1.24-1.39x 劣位、end-to-end +8〜12% 推定)、残メリット (保守性は完全置換時のみ / bf16 は fix 済み / WaveNeXt 2 は動機薄) では smoke 学習 (Phase A 含む) の投資を正当化できないと判断。**Stage 1 実装コード (tests 125 green) と調査 doc 一式は本ブランチにアーカイブ**。Stage 0 の tri-state 分類器 + decoder factory 基盤は将来の任意の decoder 実験 (Vocos / iSTFTNet2-MB / Matcha-TTS 等) に転用可能な恒久資産 — 必要時に dev へ cherry-pick 可
 > **目的**: 現行 MB-iSTFT-VITS2 decoder を GAN-WaveNeXt2 / WaveNeXt v1 に置換可能かを検証し、CPU 速度・保守負荷・zero-shot 品質のトレードオフを実測する
 
 ---
@@ -65,6 +65,4 @@
 | 2026-07-14 | Stage 0 実装完了 (`a50d2b59`): tri-state 分類器 + `--decoder-arch` factory + tests 32 件 (blocker 解消) |
 | 2026-07-14 | Stage 1 コード実装完了 (7-agent workflow): `wavenext.py` + `wavenext_losses.py` (MRD) + lightning/export 統合 + tests 52 件新規 (計 125 green) |
 | 2026-07-14 | RTF キルスイッチ測定 (CI EPYC 4vCPU、run 29306153982): decoder 1.24-1.39x 劣位確定 → 「CPU RTF < 現行」gate ❌、✅ GO (default 昇格) は到達不能に |
-| — 判断待ち — | Stage 1 smoke 学習 (GPU、A100×1 で 3-5 日) — 残る動機は品質同等の確認 (🟡 CONDITIONAL GO 狙い) のみ |
-| — 未実施 — | Stage 2: piper-plus 統合強化 (Multi-scale FiLM 移植等) |
-| — 未実施 — | Stage 3: WaveNeXt 2 反復版 (Stage 2 の go サイン後のみ) |
+| 2026-07-14 | **クローズ判断 (ユーザー)**: smoke 学習は実施しない。速度劣位確定後の残メリットが GPU 投資 (Phase A 半日〜Phase B 1 週間) を正当化しないため。Stage 2/3 は不実施 |
