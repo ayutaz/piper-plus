@@ -133,7 +133,7 @@ jobs:
 
       - name: Set up .NET
         if: matrix.runtime == 'csharp'
-        uses: actions/setup-dotnet@v5.3.0
+        uses: actions/setup-dotnet@v5.4.0
         with:
           dotnet-version: '10.0.x'
 
@@ -172,7 +172,7 @@ jobs:
 
       - name: Set up Node
         if: matrix.runtime == 'wasm'
-        uses: actions/setup-node@v6.4.0
+        uses: actions/setup-node@v6.5.0
         with:
           node-version: '20'
 
