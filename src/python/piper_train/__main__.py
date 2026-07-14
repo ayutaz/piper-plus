@@ -35,21 +35,81 @@ except ImportError:
 _LOGGER = logging.getLogger(__package__)
 
 
-def _is_legacy_hifigan_checkpoint(state_dict: dict) -> bool:
-    """v1.11.0 以前の HiFi-GAN ベース ckpt を検出する。
+# state_dict 判定マーカー。完全修飾 prefix + 末尾ドット必須:
+# "conv_post" は "subband_conv_post" の部分文字列なので、substring 判定は
+# HiFi-GAN ckpt を MB-iSTFT に誤分類する (startswith + 末尾ドットのみ許可)。
+_MB_ISTFT_MARKERS = (
+    "model_g.dec.subband_conv_post.",
+    "model_g.dec.pqmf.",
+    "model_g.dec.istft.",
+)
+_WAVENEXT_MARKERS = (
+    "model_g.dec.convnext.",
+    "model_g.dec.head.",
+)
 
-    v1.12.0 で Decoder は MB-iSTFT-VITS2 に統一された。MB-iSTFT decoder は
-    ``model_g.dec.subband_conv_post.*`` または ``model_g.dec.pqmf.*`` を持つが、
-    HiFi-GAN decoder にはこれらが存在しない。decoder 系キーがあるのに
-    MB-iSTFT のマーカーが無い場合、HiFi-GAN ckpt とみなす。
+
+def _detect_decoder_arch_from_state_dict(state_dict: dict) -> "str | None":
+    """state_dict のキーから decoder アーキテクチャを判定する。
+
+    MB-iSTFT マーカーは他より優先して評価する。WaveNeXt ckpt に
+    ``model_g.dec.pqmf.*`` buffer が混入すると mb_istft 側に倒れるため、
+    lightning.py 側の PQMF 注入を decoder 種別で gate することは
+    cleanliness ではなく正当性要件 (docs/design/wavenext-decoder-ablation/
+    04-pre-stage0-verification.md §3)。
+
+    Returns:
+        ``"mb_istft"`` / ``"wavenext"`` / ``"hifigan"``。decoder 系キーが
+        1 つもない部分 ckpt (spk_proj のみ等) は ``None`` — partial transfer
+        を壊さないため呼び出し側も raise してはならない。
     """
-    has_decoder_keys = any(k.startswith("model_g.dec.") for k in state_dict)
-    has_mbistft_marker = any(
-        k.startswith("model_g.dec.subband_conv_post")
-        or k.startswith("model_g.dec.pqmf")
-        for k in state_dict
+    has_decoder_keys = False
+    has_wavenext_marker = False
+    for key in state_dict:
+        if not key.startswith("model_g.dec."):
+            continue
+        has_decoder_keys = True
+        if key.startswith(_MB_ISTFT_MARKERS):
+            return "mb_istft"
+        if key.startswith(_WAVENEXT_MARKERS):
+            has_wavenext_marker = True
+    if has_wavenext_marker:
+        return "wavenext"
+    if has_decoder_keys:
+        return "hifigan"
+    return None
+
+
+def _detect_decoder_arch(checkpoint: dict) -> "str | None":
+    """checkpoint 全体から decoder アーキテクチャを判定する。
+
+    ``hyper_parameters`` の ``decoder_arch`` タグを最優先し、state_dict
+    マーカーと矛盾する場合は warning を出してタグを採用する。
+    """
+    marker_arch = _detect_decoder_arch_from_state_dict(
+        checkpoint.get("state_dict", {})
     )
-    return has_decoder_keys and not has_mbistft_marker
+    hparams = checkpoint.get("hyper_parameters") or {}
+    tag = hparams.get("decoder_arch") if hasattr(hparams, "get") else None
+    if tag is not None:
+        if marker_arch is not None and tag != marker_arch:
+            _LOGGER.warning(
+                "decoder_arch mismatch: hyper_parameters tag %r != state_dict "
+                "marker %r; trusting the tag",
+                tag,
+                marker_arch,
+            )
+        return tag
+    return marker_arch
+
+
+def _is_legacy_hifigan_checkpoint(state_dict: dict) -> bool:
+    """v1.11.0 以前の HiFi-GAN ベース ckpt を検出する (bool 互換 wrapper)。
+
+    v1.12.0 で Decoder は MB-iSTFT-VITS2 に統一された。実体は tri-state
+    分類器 :func:`_detect_decoder_arch_from_state_dict` に委譲する。
+    """
+    return _detect_decoder_arch_from_state_dict(state_dict) == "hifigan"
 
 
 _LEGACY_HIFIGAN_MESSAGE = (
@@ -59,6 +119,43 @@ _LEGACY_HIFIGAN_MESSAGE = (
     "    https://huggingface.co/ayousanz/piper-plus-base/resolve/main/model.ckpt\n"
     "See docs/migration/v1.11-to-v1.12.md for the full migration guide."
 )
+
+_WRONG_DECODER_ARCH_MESSAGE = (
+    "Checkpoint {path!r} was trained with decoder_arch={ckpt_arch!r}, but this "
+    "run uses decoder_arch={model_arch!r}. Decoder weights are not transferable "
+    "between architectures (zero tensor-name overlap), so resuming would "
+    "silently re-initialize the decoder. Either pass --decoder-arch "
+    "{ckpt_arch} to keep the checkpoint's decoder, or follow the "
+    "partial-transfer fine-tuning procedure in "
+    "docs/design/wavenext-decoder-ablation/03-ablation-plan.md."
+)
+
+
+def _validate_checkpoint_decoder_arch(
+    checkpoint: dict, model, checkpoint_path
+) -> None:
+    """resume / transfer 元 ckpt の decoder アーキテクチャを検証する。
+
+    decoder 系キーを持たない部分 ckpt (``None``) は許容する。
+
+    Raises:
+        RuntimeError: legacy HiFi-GAN ckpt、または学習対象 model と異なる
+            decoder_arch の ckpt を検出した場合。
+    """
+    ckpt_arch = _detect_decoder_arch(checkpoint)
+    if ckpt_arch == "hifigan":
+        raise RuntimeError(
+            _LEGACY_HIFIGAN_MESSAGE.format(path=str(checkpoint_path))
+        ) from None
+    model_arch = model.hparams.get("decoder_arch", "mb_istft")
+    if ckpt_arch is not None and ckpt_arch != model_arch:
+        raise RuntimeError(
+            _WRONG_DECODER_ARCH_MESSAGE.format(
+                path=str(checkpoint_path),
+                ckpt_arch=ckpt_arch,
+                model_arch=model_arch,
+            )
+        ) from None
 
 
 def calculate_effective_batch_size(batch_size, num_gpus=1):
@@ -476,8 +573,7 @@ def load_multispeaker_checkpoint(checkpoint_path: str, model: VitsModel) -> None
         map_location="cpu",
         weights_only=False,
     )
-    if _is_legacy_hifigan_checkpoint(checkpoint["state_dict"]):
-        raise RuntimeError(_LEGACY_HIFIGAN_MESSAGE.format(path=str(checkpoint_path)))
+    _validate_checkpoint_decoder_arch(checkpoint, model, checkpoint_path)
     missing, unexpected = model.load_state_dict(checkpoint["state_dict"], strict=False)
     _LOGGER.info(
         "Weights loaded (strict=False). Missing keys: %s. Unexpected keys: %s.",
@@ -689,12 +785,14 @@ def main():
     else:
         dict_args["learning_rate"] = getattr(args, "base_lr", 2e-4)
 
-    # MB-iSTFT decoder is the only generator path. Total upsample factor is
+    # MB-iSTFT decoder: total upsample factor is
     # 256x = upsample_rates(16x) * iSTFT_hop(4x) * PQMF_subbands(4x); the
     # quality preset adjusts resblock complexity and channel count, but not
-    # the upsample structure.
-    dict_args["upsample_rates"] = (4, 4)
-    dict_args["upsample_kernel_sizes"] = (16, 16)
+    # the upsample structure. Other decoder archs (wavenext: Stage 1+) do not
+    # use ConvTranspose upsampling, so these overrides only apply to mb_istft.
+    if getattr(args, "decoder_arch", "mb_istft") == "mb_istft":
+        dict_args["upsample_rates"] = (4, 4)
+        dict_args["upsample_kernel_sizes"] = (16, 16)
 
     if args.quality == "x-low":
         dict_args["hidden_channels"] = 96
@@ -851,12 +949,9 @@ def main():
             checkpoint = torch.load(
                 args.resume_from_checkpoint, map_location="cpu", weights_only=False
             )
-            if _is_legacy_hifigan_checkpoint(checkpoint["state_dict"]):
-                raise RuntimeError(
-                    _LEGACY_HIFIGAN_MESSAGE.format(
-                        path=str(args.resume_from_checkpoint)
-                    )
-                ) from None
+            _validate_checkpoint_decoder_arch(
+                checkpoint, model, args.resume_from_checkpoint
+            )
             remapped_sd = remap_weight_norm_keys(
                 checkpoint["state_dict"], model.state_dict()
             )

@@ -712,6 +712,10 @@ class SynthesizerTrn(nn.Module):
         # Accepted for backward compat but unused (spk_proj is always used for n_speakers > 1)
         use_zero_shot: bool = True,
         spk_embed_dim: int = 192,
+        # Decoder architecture selector. Must stay a keyword arg with this
+        # default: tests/fixtures/mb_istft_speaker_embedding/build_fixture.py
+        # instantiates SynthesizerTrn directly in 3 CI workflows.
+        decoder_arch: str = "mb_istft",
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -741,6 +745,7 @@ class SynthesizerTrn(nn.Module):
         )
 
         self.use_sdp = use_sdp
+        self.decoder_arch = decoder_arch
         self.onnx_export_mode = False
 
         self.enc_p = TextEncoder(
@@ -754,16 +759,30 @@ class SynthesizerTrn(nn.Module):
             p_dropout,
             gin_channels=gin_channels,
         )
-        self.dec = MBiSTFTGenerator(
-            initial_channel=inter_channels,
-            resblock=resblock,
-            resblock_kernel_sizes=resblock_kernel_sizes,
-            resblock_dilation_sizes=resblock_dilation_sizes,
-            upsample_rates=upsample_rates,
-            upsample_initial_channel=upsample_initial_channel,
-            upsample_kernel_sizes=upsample_kernel_sizes,
-            gin_channels=gin_channels,
-        )
+        if decoder_arch == "mb_istft":
+            self.dec = MBiSTFTGenerator(
+                initial_channel=inter_channels,
+                resblock=resblock,
+                resblock_kernel_sizes=resblock_kernel_sizes,
+                resblock_dilation_sizes=resblock_dilation_sizes,
+                upsample_rates=upsample_rates,
+                upsample_initial_channel=upsample_initial_channel,
+                upsample_kernel_sizes=upsample_kernel_sizes,
+                gin_channels=gin_channels,
+            )
+        elif decoder_arch in ("wavenext", "wavenext2"):
+            # Stage 1+ of the WaveNeXt ablation
+            # (docs/design/wavenext-decoder-ablation/03-ablation-plan.md)
+            raise NotImplementedError(
+                f"decoder_arch={decoder_arch!r} is reserved for the WaveNeXt "
+                "decoder ablation and is not implemented yet. Use the default "
+                "'mb_istft'."
+            )
+        else:
+            raise ValueError(
+                f"Unknown decoder_arch: {decoder_arch!r} "
+                "(expected 'mb_istft', 'wavenext', or 'wavenext2')"
+            )
         self.enc_q = PosteriorEncoder(
             spec_channels,
             inter_channels,

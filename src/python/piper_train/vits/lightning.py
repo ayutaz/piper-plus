@@ -231,6 +231,10 @@ class VitsModel(pl.LightningModule):
         sub_stft_fft_sizes: tuple[int, ...] = (171, 384, 683),
         sub_stft_hop_sizes: tuple[int, ...] = (10, 30, 60),
         sub_stft_win_sizes: tuple[int, ...] = (60, 150, 300),
+        # Decoder architecture ('mb_istft' is the only implemented path;
+        # 'wavenext'/'wavenext2' are Stage 1+ of the WaveNeXt ablation and
+        # currently raise NotImplementedError in SynthesizerTrn)
+        decoder_arch: str = "mb_istft",
         # Training loop optimization
         # D:G update ratio (D updates every step, G updates every d_update_interval steps)
         d_update_interval: int = 2,
@@ -272,6 +276,7 @@ class VitsModel(pl.LightningModule):
             gin_channels=self.hparams.gin_channels,
             use_sdp=self.hparams.use_sdp,
             prosody_dim=self.hparams.prosody_dim,
+            decoder_arch=self.hparams.decoder_arch,
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm
@@ -1393,5 +1398,14 @@ class VitsModel(pl.LightningModule):
             default=1.0,
             help="Weight for mel speaker consistency loss (default: 1.0). "
             "Active only for multi-speaker models. Set to 0 to disable.",
+        )
+        parser.add_argument(
+            "--decoder-arch",
+            type=str,
+            default="mb_istft",
+            choices=["mb_istft", "wavenext", "wavenext2"],
+            help="Decoder architecture (default: mb_istft). 'wavenext' and "
+            "'wavenext2' are reserved for the WaveNeXt decoder ablation "
+            "(Stage 1+) and currently raise NotImplementedError.",
         )
         return parent_parser
