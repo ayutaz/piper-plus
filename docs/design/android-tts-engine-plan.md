@@ -485,7 +485,7 @@ git commit -m "feat(android): speechRate から length_scale への変換を追�
   - `ModelPaths(filesDir: File)`
   - `.modelDir(modelId: String): File` / `.modelFile(modelId)` / `.configFile(modelId)` / `.dictDir(): File`
   - `.isInstalled(modelId: String): Boolean`
-  - `ModelPaths.DEFAULT_MODEL_ID: String` = `"tsukuyomi-chan-6lang"`
+  - `ModelPaths.DEFAULT_MODEL_ID: String` = `"css10-6lang"`
 
 - [ ] **Step 1: 失敗するテストを書く**
 
@@ -564,7 +564,7 @@ class ModelPathsTest {
 
     @Test
     fun `exposes the default model id`() {
-        assertEquals("tsukuyomi-chan-6lang", ModelPaths.DEFAULT_MODEL_ID)
+        assertEquals("css10-6lang", ModelPaths.DEFAULT_MODEL_ID)
     }
 }
 ```
@@ -615,8 +615,13 @@ class ModelPaths(private val filesDir: File) {
         modelFile(modelId).isFile && configFile(modelId).isFile && dictDir().isDirectory
 
     companion object {
-        /** 初版で使う既定モデル (6 言語すべてを話す)。 */
-        const val DEFAULT_MODEL_ID = "tsukuyomi-chan-6lang"
+        /**
+         * 初版で使う既定モデル (6 言語すべてを話す)。
+         *
+         * `piper-core` の組込みレジストリ (`model_download.rs:builtin_registry`)
+         * のモデル名と一致させてある。
+         */
+        const val DEFAULT_MODEL_ID = "css10-6lang"
 
         private const val MODELS_DIR = "models"
         private const val MODEL_FILE = "model.onnx"
@@ -1595,7 +1600,7 @@ M3 の完了時点では、モデルを `adb push` などで手動配置する�
 
 - `ModelCatalog` — 配布モデルの定義 (HF repo / ファイル名 / SHA256 / サイズ)
 - `ModelDownloader` — HF からの取得、進捗通知、チェックサム検証、一時ファイル経由の atomic move
-- `SettingsActivity` — モデル一覧・ダウンロード・削除 UI、つくよみちゃん利用規約への同意フロー
+- `SettingsActivity` — モデル一覧・ダウンロード・削除 UI、モデルごとのライセンス表示 (利用規約を持つモデルは同意を必須にする)
 - `res/xml/tts_engine.xml` に `android:settingsActivity` を追加
 
 **M5: 配布**
