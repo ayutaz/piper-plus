@@ -1005,12 +1005,31 @@ Java_com_piperplus_PiperPlusNative_nativeSynthStartWithOptions(
 
 - [ ] **Step 5: ビルドが通ることを確認**
 
-Run: `cd android && ./gradlew :piper-plus:compileDebugKotlin`
+Run: `cd android && ./gradlew :piper-plus:compileDebugKotlin :piper-plus:testDebugUnitTest`
 Expected: BUILD SUCCESSFUL
 
 > ネイティブのビルドには `jniLibs/<abi>/libpiper_plus.so` が必要 (Task 9 で CI から供給する)。ローカルに `.so` がない場合、`assembleDebug` は失敗するが Kotlin のコンパイルは通る。
 
-- [ ] **Step 6: コミット**
+- [ ] **Step 6: C++ の構文をローカルで検証**
+
+Gradle は `.so` が無いと native ビルドをスキップするため、上記だけでは C++ の
+構文エラーが CI まで発見できない。NDK の clang で構文チェックだけ回す。
+
+```bash
+CLANG=~/Library/Android/sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++
+"$CLANG" -fsyntax-only -std=c++17 --target=aarch64-linux-android24 \
+  -I<repo>/src/cpp \
+  <repo>/android/piper-plus/src/main/cpp/piper_plus_jni.cpp
+echo "exit=$?"
+```
+
+Expected: `exit=0`
+
+> NDK のバージョンは環境にあるものでよい (構文チェックのみのため CI の r26c と
+> 厳密に一致させる必要はない)。`clang++` は `clang` への symlink なので
+> `find -type f` では見つからない点に注意。
+
+- [ ] **Step 7: コミット**
 
 ```bash
 git add android/piper-plus/src/main/cpp/piper_plus_jni.cpp \
@@ -1532,14 +1551,20 @@ git commit -m "feat(android): TextToSpeechService を実装"
 
 - [ ] **Step 2: CI に AAR + APK ビルド job を追加**
 
-`.github/workflows/android-build.yml` の末尾に job を追加する。既存の `build-android` job が
-`piper-plus-android-<abi>` という名前で `libpiper_plus.so` を artifact として上げているので、
-それを `jniLibs/<abi>/` に展開してから Gradle を回す。
+`.github/workflows/android-build.yml` の末尾に job を追加する。
+
+既存の `package-android` job (133 行) が 3 ABI の artifact を集約し、**`<abi>/*.so` という
+jniLibs レイアウトに再編成した `piper-plus-android` という結合 artifact** を既に作っている。
+これをそのまま `android/piper-plus/src/main/jniLibs` へダウンロードすればよく、
+ABI ごとの手動コピーは不要。
+
+action のバージョンは同ファイル内の既存 step と揃えること
+(`checkout@v6.0.3` / `setup-java@v4.8.0` / `download-artifact@v8.0.1` / `upload-artifact@v4.6.2`)。
 
 ```yaml
   build-tts-engine:
     name: Build TTS engine APK
-    needs: build-android
+    needs: package-android
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -1548,32 +1573,31 @@ git commit -m "feat(android): TextToSpeechService を実装"
           submodules: true
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v4.8.0
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: 17
 
-      - name: Download native libraries
-        uses: actions/download-artifact@v4
+      # package-android が jniLibs レイアウト (<abi>/*.so) に再編成済みなので、
+      # そのまま展開先に指定できる。CMakeLists.txt は libpiper_plus.so を
+      # IMPORTED として参照するため、AAR のビルド前に配置されている必要がある。
+      - name: Download native libraries into jniLibs
+        uses: actions/download-artifact@v8.0.1
         with:
-          pattern: piper-plus-android-*
-          path: native-artifacts
+          name: piper-plus-android
+          path: android/piper-plus/src/main/jniLibs
 
-      - name: Stage libpiper_plus.so into jniLibs
+      - name: Verify jniLibs layout
         run: |
           set -euo pipefail
           for abi in arm64-v8a armeabi-v7a x86_64; do
-            dest="android/piper-plus/src/main/jniLibs/${abi}"
-            mkdir -p "${dest}"
-            find native-artifacts -path "*${abi}*" -name "libpiper_plus.so" \
-              -exec cp {} "${dest}/" \;
-            find native-artifacts -path "*${abi}*" -name "libonnxruntime.so" \
-              -exec cp {} "${dest}/" \;
-            test -f "${dest}/libpiper_plus.so" || {
+            so="android/piper-plus/src/main/jniLibs/${abi}/libpiper_plus.so"
+            if [ ! -f "${so}" ]; then
               echo "::error::libpiper_plus.so missing for ${abi}"
               exit 1
-            }
+            fi
           done
+          find android/piper-plus/src/main/jniLibs -type f | sort
 
       - name: Run unit tests
         working-directory: android
@@ -1584,7 +1608,7 @@ git commit -m "feat(android): TextToSpeechService を実装"
         run: ./gradlew :piper-plus-tts-engine:assembleDebug
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: piper-plus-tts-engine-debug
           path: android/piper-plus-tts-engine/build/outputs/apk/debug/*.apk
