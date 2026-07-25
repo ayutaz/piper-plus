@@ -2,14 +2,14 @@
   "schema_version": 1,
   "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
-    "executable": 222,
+    "executable": 232,
     "needs_placeholder": 6,
-    "skip_warranted": 238,
-    "total": 466
+    "skip_warranted": 273,
+    "total": 511
   },
   "by_language": {
     "bash": {
-      "executable": 163,
+      "executable": 173,
       "needs_placeholder": 6,
       "skip_warranted": 44
     },
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 193
+      "skip_warranted": 228
     },
     "wasm": {
       "executable": 10,
@@ -130,6 +130,661 @@
       ],
       "env_dependencies": [],
       "hash_sha1": "2120a3bd7543ea08915070a99717bd1b755f8230"
+    },
+    {
+      "file": "docs/design/android-tts-engine-design.md",
+      "line_start": 109,
+      "line_end": 130,
+      "language_raw": "",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "562503a8a7d1d48a80023ef310a10d7e2907a890"
+    },
+    {
+      "file": "docs/design/android-tts-engine-design.md",
+      "line_start": 134,
+      "line_end": 155,
+      "language_raw": "",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "ef8385937dacb07454e600b19562f148de9f907c"
+    },
+    {
+      "file": "docs/design/android-tts-engine-design.md",
+      "line_start": 183,
+      "line_end": 196,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "2b8521524767e507ef9da1ce401073018b4ed00b"
+    },
+    {
+      "file": "docs/design/android-tts-engine-design.md",
+      "line_start": 204,
+      "line_end": 212,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "781191196e3ddba270ca6eaf5c18bac055904e90"
+    },
+    {
+      "file": "docs/design/android-tts-engine-design.md",
+      "line_start": 280,
+      "line_end": 301,
+      "language_raw": "",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "a4164db795ead6cfc2c325217680f55b1c3fc8e6"
+    },
+    {
+      "file": "docs/design/android-tts-engine-design.md",
+      "line_start": 342,
+      "line_end": 345,
+      "language_raw": "",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "365c6490c7365f64179fe4a9d8c9aa887dd439c5"
+    },
+    {
+      "file": "docs/design/android-tts-engine-design.md",
+      "line_start": 363,
+      "line_end": 366,
+      "language_raw": "yaml",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "b5fd2d3f689be3ac073c8765c6fae86c46212af2"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 66,
+      "line_end": 71,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "9545b45700d1fa75d97570c6fcc2d01764cab3b5"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 77,
+      "line_end": 126,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "d38df0f962e50223f162ce1ce38300c9d51bf74c"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 132,
+      "line_end": 136,
+      "language_raw": "proguard",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "1dc2a5db49b83f55ac8458e5a1eeea780db239d6"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 142,
+      "line_end": 166,
+      "language_raw": "xml",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "b517ef9efb72338e347f33f03e907ce5f60f5d6c"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 172,
+      "line_end": 175,
+      "language_raw": "xml",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "2718aca96beb1872a830a66a5ac1924869235835"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 185,
+      "line_end": 194,
+      "language_raw": "gitignore",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "8aef96823e199f4e8ec6a39eca9002d326008650"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 200,
+      "line_end": 213,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "c751da2164b186c531f414bd76e24530629e4869"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 230,
+      "line_end": 233,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "7f029fa732677bf21871cbea015caa178e77dcab"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 254,
+      "line_end": 324,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "7070c7a41f930e4868045c62ae8384cf32747a42"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 335,
+      "line_end": 381,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "380b65e6df843794029631e3fc62e753c5b66cb8"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 390,
+      "line_end": 394,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "5e53836c57b887ecbf3627785d3c1916935b14d0"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 414,
+      "line_end": 452,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "56c49578c7e721e538d812d6723f181d4ae70259"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 463,
+      "line_end": 482,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "48254c3216b0452c1a6979f249f272beae39561d"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 491,
+      "line_end": 495,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "2125a801aebf288ba108e6fa90611585d222eeb3"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 517,
+      "line_end": 593,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "3e4bb3afffa03c32653bc1b673119217c9263120"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 604,
+      "line_end": 655,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "54621bb0ca0febce9216ec0b399a9a13fa995673"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 664,
+      "line_end": 668,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "0ced47939e7fd99d5850cd886b86cce3f676a4b8"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 688,
+      "line_end": 720,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "7d29f58abec624c77010d0183cda8b165cd36de0"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 731,
+      "line_end": 754,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "936a691fa99c7fb114bc47a5a505fd2e0d843e0f"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 763,
+      "line_end": 767,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "378d1fe3e99d66c0e9597458d300fb5d14c5720c"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 792,
+      "line_end": 843,
+      "language_raw": "cpp",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "73ec20c281cca5186f192a877baa088d5c5442cc"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 850,
+      "line_end": 893,
+      "language_raw": "cpp",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "41607c7a07ca9272a8acd8ff1e2f480a324a782a"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 899,
+      "line_end": 931,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "c1f5ed2d91eb73f358653c68e85015e88e9a61d3"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 937,
+      "line_end": 1004,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "f0569dc415d938d84ec0492c4d2f09d79e44f1bc"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 1018,
+      "line_end": 1024,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "38026324c248b34ad7ed218d25aec75098ccb0ea"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 1034,
+      "line_end": 1039,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "b1fc71698170d18140ce30a793792c8f1182d876"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 1064,
+      "line_end": 1183,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "a0a20ff7f78f1ff2760cb2fb000e3c923180ba7e"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 1194,
+      "line_end": 1265,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "30f01fdc70d157297951ecda7af9a91db209e24d"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 1274,
+      "line_end": 1278,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "c47563632887321cd94b074fb2dac228b7f54ef3"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 1296,
+      "line_end": 1449,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "7c871030e9ce90205f3a4d0c12477fbdf637badd"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 1460,
+      "line_end": 1500,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "b97fd37a32bbcb1bfa7e76505107fc2301d5edc4"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 1504,
+      "line_end": 1507,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "b771a11d7124f370ca1851965993e5c3ead9845a"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 1511,
+      "line_end": 1513,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "6fac3644a83ae4f5b45364a126bde6574baf2626"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 1524,
+      "line_end": 1527,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "a725b27c632ce7a9764962aa7b5c8cdf729b2365"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 1545,
+      "line_end": 1550,
+      "language_raw": "kotlin",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "c46b07a7e95344011f2514126607b2e571dbf205"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 1564,
+      "line_end": 1615,
+      "language_raw": "yaml",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "bedc7fd6711e28da52f2bbad8ecee8492ccca5da"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 1626,
+      "line_end": 1631,
+      "language_raw": "markdown",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "b2b0aef57c501b4be7213121da61c0491df30e1e"
+    },
+    {
+      "file": "docs/design/android-tts-engine-plan.md",
+      "line_start": 1635,
+      "line_end": 1638,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "82259f609d77b99a44b1b39a1ad8b6dc07fd7fd7"
     },
     {
       "file": "docs/design/multi-6lang-zero-shot-v7-training-results.md",
