@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 rootProject.name = "piper-plus-android"
 include(":piper-plus")
 include(":piper-plus-g2p")
+include(":piper-plus-tts-engine")
