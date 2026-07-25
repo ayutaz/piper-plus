@@ -40,7 +40,13 @@ internal class SynthesisSession(
      * @param iso3       ISO-639-3 の言語コード (`request.language`)
      * @param text       合成するテキスト
      * @param speechRate システム設定の読み上げ速度 (100 = 等速)
+     *
+     * `ReturnCount` を抑止しているのは、早期 return がガード節 (非対応言語 /
+     * モデル未導入 / 空文字) だから。ネストに畳むと本来の合成経路が
+     * 読みにくくなるだけで、何も良くならない。
+     * `TooGenericExceptionCaught` の理由は下の catch のコメントを参照。
      */
+    @Suppress("ReturnCount", "TooGenericExceptionCaught")
     fun run(
         iso3: String,
         text: String,
@@ -92,8 +98,11 @@ internal class SynthesisSession(
                     .collect { chunk -> PcmEmitter.emit(callback, chunk) { stopRequested.get() } }
             }
             callback.done()
+            // ネイティブ層が投げうる例外は網羅できない (ONNX Runtime / OpenJTalk /
+            // ファイル I/O が JNI 越しに上がってくる)。ここで取りこぼすと
+            // framework の合成スレッドまで抜けてサービスごと落ちるため、
+            // 意図して広く受ける。
         } catch (e: Exception) {
-            // ネイティブ層の失敗でサービスを落とさない。
             Log.e(TAG, "Synthesis failed", e)
             callback.error(TextToSpeech.ERROR_SERVICE)
         } catch (e: LinkageError) {

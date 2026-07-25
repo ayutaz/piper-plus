@@ -1,4 +1,11 @@
-# detekt config for piper-plus-g2p (Android) — Wave 1 quality gate.
+# detekt config shared by every Android module (Wave 1 quality gate):
+#   :piper-plus-g2p / :piper-plus / :piper-plus-tts-engine
+#
+# CI gates :piper-plus and :piper-plus-tts-engine (android-build.yml).
+# :piper-plus-g2p applies the plugin but is NOT gated: it currently reports 47
+# findings (mostly detekt-formatting rules in DictionaryDownloader.kt), which
+# predate this config and belong to a separate cleanup. Fix those before adding
+# it to the CI gate — do not raise the thresholds here to make them disappear.
 #
 # Used together with `buildUponDefaultConfig = true`, so this file only
 # overrides what we want to deviate from upstream defaults. Run:
@@ -7,8 +14,8 @@
 #   ./gradlew detektGenerateConfig
 # to regenerate the upstream defaults if you need to compare.
 #
-# Versions are kept in sync with android/piper-plus-g2p/build.gradle.kts
-# (toolVersion = "1.23.7") — bump both together.
+# Versions are kept in sync with each module's build.gradle.kts
+# (toolVersion = "1.23.7") — bump them together.
 
 build:
   maxIssues: 0
@@ -27,7 +34,8 @@ complexity:
   ComplexInterface:
     active: true
     threshold: 10
-  ComplexMethod:
+  # 1.23 で ComplexMethod から改名された (旧名は deprecation 警告を出す)。
+  CyclomaticComplexMethod:
     active: true
     threshold: 15
   LongMethod:

@@ -5,7 +5,13 @@ package com.piperplus
  *
  * All methods throw [PiperPlusException] on native errors.
  * This class is internal -- use [PiperPlus] for the public API.
+ *
+ * `TooManyFunctions` is suppressed because there is one declaration per
+ * exported C symbol -- the count tracks the C API surface, not this object's
+ * complexity. Splitting it would break the 1:1 correspondence that
+ * `PiperPlusNativeBridgeTest` verifies against `piper_plus_jni.cpp`.
  */
+@Suppress("TooManyFunctions")
 internal object PiperPlusNative {
     init {
         System.loadLibrary("piper_plus_jni")

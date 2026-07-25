@@ -157,7 +157,7 @@ class EngineHolderTest {
         val holder =
             EngineHolder(paths) { _, _, _ ->
                 calls++
-                if (calls == 2) throw IllegalStateException("model is corrupt")
+                if (calls == 2) error("model is corrupt")
                 FakeEngine().also { engines.add(it) }
             }
 

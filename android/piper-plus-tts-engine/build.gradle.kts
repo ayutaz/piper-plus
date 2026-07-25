@@ -4,6 +4,14 @@ plugins {
     // :piper-plus-g2p と同じ設定・同じバージョンで揃える。片方だけ lint が
     // 掛かっていない状態はスタイルのドリフトを生む。
     id("org.jlleitschuh.gradle.ktlint") version "12.3.0"
+    id("io.gitlab.arturbosch.detekt") version "1.23.8"
+}
+
+detekt {
+    toolVersion = "1.23.7"
+    config.setFrom(files("$rootDir/detekt.yml"))
+    buildUponDefaultConfig = true
+    autoCorrect = false
 }
 
 ktlint {
@@ -74,4 +82,8 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
+    // detekt-formatting bundles the ktlint ruleset into detekt so the
+    // `formatting` section in the shared detekt.yml has rules to operate on.
+    // The version must match `detekt { toolVersion = ... }` above.
+    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
 }

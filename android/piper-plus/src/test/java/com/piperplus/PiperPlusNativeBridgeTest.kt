@@ -220,16 +220,19 @@ class PiperPlusNativeBridgeTest {
         val open = source.indexOf('{', signatureEnd)
         if (open < 0) return ""
         var depth = 0
+        // 対応が取れないまま終端に達したら、残り全部を本体とみなす。
+        var close = source.length - 1
         for (i in open until source.length) {
             when (source[i]) {
                 '{' -> depth++
-                '}' -> {
-                    depth--
-                    if (depth == 0) return source.substring(open, i + 1)
-                }
+                '}' -> depth--
+            }
+            if (depth == 0) {
+                close = i
+                break
             }
         }
-        return source.substring(open)
+        return source.substring(open, close + 1)
     }
 
     private fun splitArgs(raw: String): List<String> = raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }

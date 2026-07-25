@@ -12,5 +12,10 @@ object SynthesisParams {
      * 「大きいほど遅い」ため逆数を取る。
      * 0 以下は不正値として等速にフォールバックする (ゼロ除算の回避も兼ねる)。
      */
-    fun lengthScaleOf(speechRate: Int): Float = if (speechRate <= 0) 1.0f else NORMAL_SPEECH_RATE.toFloat() / speechRate.toFloat()
+    fun lengthScaleOf(speechRate: Int): Float =
+        if (speechRate <= 0) {
+            1.0f
+        } else {
+            NORMAL_SPEECH_RATE.toFloat() / speechRate.toFloat()
+        }
 }

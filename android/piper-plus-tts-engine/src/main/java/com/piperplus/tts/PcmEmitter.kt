@@ -17,6 +17,9 @@ internal object PcmEmitter {
     /** 16bit PCM の 1 サンプルあたりのバイト数。 */
     const val BYTES_PER_SAMPLE = 2
 
+    private const val BYTE_MASK = 0xFF
+    private const val BITS_PER_BYTE = 8
+
     /**
      * [chunk] を little-endian のバイト列にして [callback] へ渡す。
      *
@@ -35,8 +38,8 @@ internal object PcmEmitter {
         val bytes = ByteArray(chunk.size * BYTES_PER_SAMPLE)
         for (i in chunk.indices) {
             val value = chunk[i].toInt()
-            bytes[i * BYTES_PER_SAMPLE] = (value and 0xFF).toByte()
-            bytes[i * BYTES_PER_SAMPLE + 1] = ((value shr 8) and 0xFF).toByte()
+            bytes[i * BYTES_PER_SAMPLE] = (value and BYTE_MASK).toByte()
+            bytes[i * BYTES_PER_SAMPLE + 1] = ((value shr BITS_PER_BYTE) and BYTE_MASK).toByte()
         }
 
         // AOSP の実装はいずれも 8192 を返すが、0 以下を返す callback を

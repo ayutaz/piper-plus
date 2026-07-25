@@ -119,11 +119,10 @@ class PiperPlus private constructor(
          */
         private fun extractDictIfNeeded(context: Context): String? {
             val destDir = File(context.filesDir, DICT_ASSET_DIR)
-            if (destDir.exists() && destDir.isDirectory) {
-                val files = destDir.listFiles()
-                if (files != null && files.isNotEmpty()) {
-                    return destDir.absolutePath
-                }
+            // isDirectory implies exists(), and isNullOrEmpty() covers both the
+            // null (I/O error) and empty cases listFiles() can return.
+            if (destDir.isDirectory && !destDir.listFiles().isNullOrEmpty()) {
+                return destDir.absolutePath
             }
 
             // Attempt to extract from assets. If the assets directory does
@@ -131,19 +130,30 @@ class PiperPlus private constructor(
             // auto-detect or fail gracefully.
             return try {
                 val assetFiles = context.assets.list(DICT_ASSET_DIR)
-                if (assetFiles.isNullOrEmpty()) return null
-
-                destDir.mkdirs()
-                for (filename in assetFiles) {
-                    context.assets.open("$DICT_ASSET_DIR/$filename").use { input ->
-                        FileOutputStream(File(destDir, filename)).use { output ->
-                            input.copyTo(output)
-                        }
-                    }
+                if (assetFiles.isNullOrEmpty()) {
+                    null
+                } else {
+                    copyAssetsTo(context, assetFiles, destDir)
+                    destDir.absolutePath
                 }
-                destDir.absolutePath
             } catch (_: Exception) {
                 null
+            }
+        }
+
+        /** Copy every named asset from [DICT_ASSET_DIR] into [destDir]. */
+        private fun copyAssetsTo(
+            context: Context,
+            assetFiles: Array<String>,
+            destDir: File,
+        ) {
+            destDir.mkdirs()
+            for (filename in assetFiles) {
+                context.assets.open("$DICT_ASSET_DIR/$filename").use { input ->
+                    FileOutputStream(File(destDir, filename)).use { output ->
+                        input.copyTo(output)
+                    }
+                }
             }
         }
     }

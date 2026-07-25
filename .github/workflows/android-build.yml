@@ -211,6 +211,10 @@ jobs:
         working-directory: android
         run: ./gradlew :piper-plus:ktlintCheck :piper-plus-tts-engine:ktlintCheck
 
+      - name: detekt
+        working-directory: android
+        run: ./gradlew :piper-plus:detekt :piper-plus-tts-engine:detekt
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4.6.2

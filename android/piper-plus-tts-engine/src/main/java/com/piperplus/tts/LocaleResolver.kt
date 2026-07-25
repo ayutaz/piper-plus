@@ -13,7 +13,14 @@ import android.speech.tts.TextToSpeech
  * `LANG_COUNTRY_AVAILABLE` は返さない。
  */
 object LocaleResolver {
-    /** ISO-639-3 → language_id。`cmn` は Android が返す `zho` の別名として受理する。 */
+    /**
+     * ISO-639-3 → language_id。`cmn` は Android が返す `zho` の別名として受理する。
+     *
+     * 値は学習済みモデルの `language_id_map` そのもので、任意に変えてよい数字
+     * ではない。canonical は `docs/spec/language-id-map-contract.toml` にあり、
+     * この表との一致は `parity (language-id-map)` gate が強制している。
+     */
+    @Suppress("MagicNumber")
     private val ISO3_TO_LANGUAGE_ID: Map<String, Int> =
         mapOf(
             "jpn" to 0,
