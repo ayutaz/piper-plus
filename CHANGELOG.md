@@ -15,6 +15,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enforces this automatically.
 -->
 
+### Added
+
+- **Android システム TTS エンジン** (`android/piper-plus-tts-engine`)。
+  任意のアプリ・アクセシビリティ機能から piper-plus をオフライン音声合成として
+  利用できる。6 言語 (ja/en/zh/es/fr/pt) に対応し、`Locale` から `language_id` を
+  解決する。設計は [Android TTS エンジン設計書](docs/design/android-tts-engine-design.md)。
+- `com.piperplus.SynthOptions` — Android AAR から `language_id` / `length_scale` /
+  `noise_scale` / `noise_w` / `sentence_silence_sec` を指定できる合成オプション。
+  従来の `synthesize(text, speakerId)` は後方互換のため維持。
+
+### Changed
+
+- Android AAR (`android/piper-plus`) の `abiFilters` を 3 ABI
+  (`arm64-v8a` / `armeabi-v7a` / `x86_64`) に拡張。`release-shared-lib.yml` および
+  `android-build.yml` のビルド対象と揃えた。
+
 ## [2.0.0] - 2026-05-25
 
 Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13 + CUDA 12.8 + Ubuntu 24.04** で完全統一する fully-aligned 戦略 migration。 新 GPU (T4 / RTX 6000 Ada / RTX 5090) サポート + TF32 / bf16-mixed default 化。

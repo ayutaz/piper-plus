@@ -20,8 +20,8 @@ android {
         }
 
         ndk {
-            // arm64-v8a only for now; add "armeabi-v7a", "x86_64" as needed
-            abiFilters += "arm64-v8a"
+            // release-shared-lib.yml / android-build.yml と同じ 3 ABI
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
     }
 

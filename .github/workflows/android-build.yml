@@ -172,3 +172,54 @@ jobs:
         with:
           name: piper-plus-android
           path: release/piper-plus-android/
+
+  build-tts-engine:
+    name: Build TTS engine APK
+    needs: package-android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          submodules: true
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4.8.0
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # package-android が jniLibs レイアウト (<abi>/*.so) に再編成済みなので、
+      # そのまま展開先に指定できる。CMakeLists.txt は libpiper_plus.so を
+      # IMPORTED として参照するため、AAR のビルド前に配置されている必要がある。
+      - name: Download native libraries into jniLibs
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: piper-plus-android
+          path: android/piper-plus/src/main/jniLibs
+
+      - name: Verify jniLibs layout
+        run: |
+          set -euo pipefail
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            so="android/piper-plus/src/main/jniLibs/${abi}/libpiper_plus.so"
+            if [ ! -f "${so}" ]; then
+              echo "::error::libpiper_plus.so missing for ${abi}"
+              exit 1
+            fi
+          done
+          find android/piper-plus/src/main/jniLibs -type f | sort
+
+      - name: Run unit tests
+        working-directory: android
+        run: ./gradlew :piper-plus:testDebugUnitTest :piper-plus-tts-engine:testDebugUnitTest
+
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew :piper-plus-tts-engine:assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: piper-plus-tts-engine-debug
+          path: android/piper-plus-tts-engine/build/outputs/apk/debug/*.apk
