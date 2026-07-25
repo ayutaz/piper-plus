@@ -1,10 +1,10 @@
 package com.piperplus.tts
 
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 /**
  * PCM の詰め替えと分割を固定する。
@@ -13,7 +13,6 @@ import org.junit.Test
  * 型検査も他のテストも APK ビルドも通ったまま、端末でだけ音が壊れる。
  */
 class PcmEmitterTest {
-
     @Test
     fun `packs samples as little endian`() {
         val callback = FakeSynthesisCallback()
@@ -27,10 +26,14 @@ class PcmEmitterTest {
         // 全端末でホワイトノイズになる。
         assertArrayEquals(
             byteArrayOf(
-                0x02, 0x01, // 0x0102
-                0xFF.toByte(), 0xFF.toByte(), // -1
-                0x00, 0x80.toByte(), // Short.MIN_VALUE
-                0xFF.toByte(), 0x7F, // Short.MAX_VALUE
+                0x02,
+                0x01, // 0x0102
+                0xFF.toByte(),
+                0xFF.toByte(), // -1
+                0x00,
+                0x80.toByte(), // Short.MIN_VALUE
+                0xFF.toByte(),
+                0x7F, // Short.MAX_VALUE
             ),
             callback.audioBytes(),
         )
@@ -47,7 +50,8 @@ class PcmEmitterTest {
         PcmEmitter.emit(callback, samples) { false }
 
         val readBack = ShortArray(samples.size)
-        ByteBuffer.wrap(callback.audioBytes())
+        ByteBuffer
+            .wrap(callback.audioBytes())
             .order(ByteOrder.LITTLE_ENDIAN)
             .asShortBuffer()
             .get(readBack)
@@ -82,7 +86,11 @@ class PcmEmitterTest {
         PcmEmitter.emit(callback, samples) { false }
 
         val expected = ByteArray(samples.size * 2)
-        ByteBuffer.wrap(expected).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(samples)
+        ByteBuffer
+            .wrap(expected)
+            .order(ByteOrder.LITTLE_ENDIAN)
+            .asShortBuffer()
+            .put(samples)
         assertArrayEquals(expected, callback.audioBytes())
     }
 

@@ -4,7 +4,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SynthesisParamsTest {
-
     @Test
     fun `maps the default speech rate to a unit length scale`() {
         assertEquals(1.0f, SynthesisParams.lengthScaleOf(100), TOLERANCE)

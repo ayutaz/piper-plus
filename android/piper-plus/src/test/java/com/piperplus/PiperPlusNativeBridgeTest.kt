@@ -1,10 +1,10 @@
 package com.piperplus
 
-import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 /**
  * Kotlin の `external` 宣言と JNI 側の C++ 定義が一致していることを固定する。
@@ -24,23 +24,24 @@ import org.junit.Test
  * C++ のソースを読むことがこのテストの本体である。
  */
 class PiperPlusNativeBridgeTest {
-
     // ------------------------------------------------------------ 期待する対応
 
     /** Kotlin の型 → JNI の型。 */
-    private val paramTypes = mapOf(
-        "Long" to "jlong",
-        "String" to "jstring",
-        "Int" to "jint",
-        "Float" to "jfloat",
-    )
+    private val paramTypes =
+        mapOf(
+            "Long" to "jlong",
+            "String" to "jstring",
+            "Int" to "jint",
+            "Float" to "jfloat",
+        )
 
-    private val returnTypes = mapOf(
-        "Long" to "jlong",
-        "Int" to "jint",
-        "ShortArray" to "jshortArray",
-        "Unit" to "void",
-    )
+    private val returnTypes =
+        mapOf(
+            "Long" to "jlong",
+            "Int" to "jint",
+            "ShortArray" to "jshortArray",
+            "Unit" to "void",
+        )
 
     // ------------------------------------------------------------------ 検証
 
@@ -95,8 +96,10 @@ class PiperPlusNativeBridgeTest {
     fun `each option field is assigned from the identically named parameter`() {
         // opts.noise_w = noiseScale のような本体側の取り違えを捕まえる。
         // 引数の並びが合っていても、代入で入れ替われば同じことが起きる。
-        val assignments = parseNative().values
-            .flatMap { fn -> OPTS_ASSIGN.findAll(fn.body).map { fn.name to it } }
+        val assignments =
+            parseNative()
+                .values
+                .flatMap { fn -> OPTS_ASSIGN.findAll(fn.body).map { fn.name to it } }
 
         assertTrue("opts への代入が 1 つも見つからない", assignments.isNotEmpty())
 
@@ -116,9 +119,11 @@ class PiperPlusNativeBridgeTest {
         val native = parseNative()
 
         for (name in listOf("nativeSynthesizeWithOptions", "nativeSynthStartWithOptions")) {
-            val assigned = OPTS_ASSIGN.findAll(native.getValue(name).body)
-                .map { snakeToCamel(it.groupValues[1]) }
-                .toSet()
+            val assigned =
+                OPTS_ASSIGN
+                    .findAll(native.getValue(name).body)
+                    .map { snakeToCamel(it.groupValues[1]) }
+                    .toSet()
             assertEquals(
                 "$name: SynthOptions のフィールドが JNI に渡されていない " +
                     "(追加したフィールドの配線漏れ)",
@@ -152,7 +157,10 @@ class PiperPlusNativeBridgeTest {
 
     // ------------------------------------------------------------------ 解析
 
-    private data class Param(val type: String, val name: String)
+    private data class Param(
+        val type: String,
+        val name: String,
+    )
 
     private data class KotlinFun(
         val name: String,
@@ -171,10 +179,11 @@ class PiperPlusNativeBridgeTest {
         val source = sourceFile("src/main/java/com/piperplus/PiperPlusNative.kt").readText()
         return EXTERNAL_FUN.findAll(source).associate { match ->
             val name = match.groupValues[1]
-            val params = splitArgs(match.groupValues[2]).map { arg ->
-                val (paramName, rawType) = arg.split(":", limit = 2)
-                Param(rawType.trim().removeSuffix("?"), paramName.trim())
-            }
+            val params =
+                splitArgs(match.groupValues[2]).map { arg ->
+                    val (paramName, rawType) = arg.split(":", limit = 2)
+                    Param(rawType.trim().removeSuffix("?"), paramName.trim())
+                }
             val returnType = match.groupValues[3].ifEmpty { "Unit" }.removeSuffix("?")
             name to KotlinFun(name, params, returnType)
         }
@@ -188,21 +197,26 @@ class PiperPlusNativeBridgeTest {
             // 名前がコメントアウトされている (JNIEnv * /* env */) こともあるため
             // 位置で落とす。
             val declared = splitArgs(match.groupValues[3].replace(BLOCK_COMMENT, " "))
-            val params = declared.drop(2).map { arg ->
-                val tokens = arg.split(Regex("[\\s*]+")).filter { it.isNotBlank() }
-                Param(tokens.first(), tokens.last())
-            }
-            name to NativeFun(
-                name = name,
-                params = params,
-                returnType = match.groupValues[1],
-                body = bodyAfter(source, match.range.last),
-            )
+            val params =
+                declared.drop(2).map { arg ->
+                    val tokens = arg.split(Regex("[\\s*]+")).filter { it.isNotBlank() }
+                    Param(tokens.first(), tokens.last())
+                }
+            name to
+                NativeFun(
+                    name = name,
+                    params = params,
+                    returnType = match.groupValues[1],
+                    body = bodyAfter(source, match.range.last),
+                )
         }
     }
 
     /** 関数シグネチャ直後の `{ ... }` を波括弧の対応をとって切り出す。 */
-    private fun bodyAfter(source: String, signatureEnd: Int): String {
+    private fun bodyAfter(
+        source: String,
+        signatureEnd: Int,
+    ): String {
         val open = source.indexOf('{', signatureEnd)
         if (open < 0) return ""
         var depth = 0
@@ -218,13 +232,14 @@ class PiperPlusNativeBridgeTest {
         return source.substring(open)
     }
 
-    private fun splitArgs(raw: String): List<String> =
-        raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    private fun splitArgs(raw: String): List<String> = raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
 
     private fun snakeToCamel(value: String): String =
-        value.split("_").mapIndexed { index, part ->
-            if (index == 0) part else part.replaceFirstChar { it.uppercase() }
-        }.joinToString("")
+        value
+            .split("_")
+            .mapIndexed { index, part ->
+                if (index == 0) part else part.replaceFirstChar { it.uppercase() }
+            }.joinToString("")
 
     /** [SynthOptions] のプロパティ名。フィールド追加時の配線漏れを検出するため。 */
     private fun synthOptionsFields(): Set<String> =
@@ -255,12 +270,14 @@ class PiperPlusNativeBridgeTest {
     }
 
     private companion object {
-        val EXTERNAL_FUN = Regex(
-            """external fun\s+(\w+)\s*\(([^)]*)\)\s*(?::\s*([\w]+\??))?""",
-        )
-        val JNI_FUN = Regex(
-            """JNIEXPORT\s+(\w+)\s+JNICALL\s+Java_com_piperplus_PiperPlusNative_(\w+)\s*\(([^)]*)\)""",
-        )
+        val EXTERNAL_FUN =
+            Regex(
+                """external fun\s+(\w+)\s*\(([^)]*)\)\s*(?::\s*([\w]+\??))?""",
+            )
+        val JNI_FUN =
+            Regex(
+                """JNIEXPORT\s+(\w+)\s+JNICALL\s+Java_com_piperplus_PiperPlusNative_(\w+)\s*\(([^)]*)\)""",
+            )
         val OPTS_ASSIGN = Regex("""opts\.(\w+)\s*=\s*(?:static_cast<[^>]+>\()?(\w+)""")
         val NAMED_OPTION_ARG = Regex("""(\w+)\s*=\s*options\.(\w+)""")
         val BLOCK_COMMENT = Regex("""/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL)

@@ -2,6 +2,19 @@ plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
     id("maven-publish")
+    // :piper-plus-g2p と同じ設定・同じバージョンで揃える。片方だけ lint が
+    // 掛かっていない状態はスタイルのドリフトを生む。
+    id("org.jlleitschuh.gradle.ktlint") version "12.3.0"
+}
+
+ktlint {
+    version.set("1.3.1")
+    android.set(true)
+    outputColorName.set("RED")
+    ignoreFailures.set(false)
+    filter {
+        exclude("**/generated/**", "**/build/**")
+    }
 }
 
 android {
@@ -30,7 +43,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }

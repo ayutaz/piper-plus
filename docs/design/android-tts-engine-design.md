@@ -196,13 +196,25 @@ data class SynthOptions(
     val sentenceSilenceSec: Float = 0.2f,
 )
 
-fun synthesize(text: String, options: SynthOptions = SynthOptions()): ShortArray
-fun synthesizeStream(text: String, options: SynthOptions = SynthOptions()): Flow<ShortArray>
+fun synthesize(text: String, options: SynthOptions): ShortArray
+fun synthesizeStream(text: String, options: SynthOptions): Flow<ShortArray>
 ```
 
-既存の `synthesize(text, speakerId)` は `@Deprecated` を付けて残し、後方互換を保つ。
+⚠️ **`options` に既定値を付けないこと。** 既存の `synthesize(text, speakerId: Int = 0)`
+と併存するため、両方に既定値があると `synthesize("text")` がどちらにも解決でき
+コンパイルエラーになる。
+
+既存の `synthesize(text, speakerId)` はそのまま残す。**`@Deprecated` は付けない** —
+単一話者モデルを既定設定で鳴らす用途では今も最短の書き方であり、非推奨にすると
+既存利用者に移行の実益がない警告を出すことになる。
+
+呼び出し側は named argument で書く。`SynthOptions` の末尾 4 フィールドはすべて
+`Float` で、位置引数のままだと並べ替えても型検査を通ってしまう
+(`lengthScale` と `noiseScale` が入れ替わると常時 2.5 倍速になる)。
+
 JNI 側は `PiperPlusSynthOptions` 構造体を組み立てて `piper_plus_synthesize` に渡す。
-`_reserved[5]` はゼロ埋めを厳守する (ヘッダの規約)。
+`_reserved[5]` はゼロ埋めを厳守する (ヘッダの規約)。この Kotlin ↔ C++ の対応は
+`PiperPlusNativeBridgeTest` がソース照合で固定している。
 
 ### 6.3 TextToSpeechService
 

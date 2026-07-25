@@ -1048,7 +1048,7 @@ repos:
         name: ktlint --android (Kotlin)
         # Non-blocking until baseline is established. Falls back to a warning
         # when gradlew is absent (e.g. partial checkouts).
-        entry: bash -c 'cd android && if [ -f gradlew ]; then ./gradlew :piper-plus-g2p:ktlintCheck -q || echo "::warning::ktlint check failed (non-blocking)"; else echo "::warning::gradlew missing, skipping ktlint"; fi'
+        entry: bash -c 'cd android && if [ -f gradlew ]; then ./gradlew :piper-plus-g2p:ktlintCheck :piper-plus:ktlintCheck :piper-plus-tts-engine:ktlintCheck -q || echo "::warning::ktlint check failed (non-blocking)"; else echo "::warning::gradlew missing, skipping ktlint"; fi'
         language: system
         files: \.kt$
         pass_filenames: false

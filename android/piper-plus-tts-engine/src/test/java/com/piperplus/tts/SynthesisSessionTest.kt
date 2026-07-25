@@ -4,8 +4,6 @@ import android.media.AudioFormat
 import android.speech.tts.TextToSpeech
 import com.piperplus.SynthOptions
 import com.piperplus.tts.model.ModelPaths
-import java.io.File
-import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import org.junit.Assert.assertEquals
@@ -13,6 +11,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 合成 1 発話分の振る舞いを固定する。
@@ -21,7 +21,6 @@ import org.junit.rules.TemporaryFolder
  * [SynthesisSession] は request をほどいた引数を受けるので、ここで検証できる。
  */
 class SynthesisSessionTest {
-
     @get:Rule
     val temp = TemporaryFolder()
 
@@ -38,7 +37,10 @@ class SynthesisSessionTest {
         /** 上流が実際に生成したチャンク数。中断が上流まで届いたかの判定に使う。 */
         val produced = AtomicInteger(0)
 
-        override fun synthesizeStream(text: String, options: SynthOptions): Flow<ShortArray> {
+        override fun synthesizeStream(
+            text: String,
+            options: SynthOptions,
+        ): Flow<ShortArray> {
             seenTexts += text
             seenOptions += options
             return flow {
@@ -66,11 +68,12 @@ class SynthesisSessionTest {
         /** 非 null ならエンジン生成時にこれを投げる。 */
         var failure: (() -> Throwable)? = null
 
-        val engines = EngineHolder(paths) { _, _, _ ->
-            factoryCalls += 1
-            failure?.let { throw it() }
-            engine
-        }
+        val engines =
+            EngineHolder(paths) { _, _, _ ->
+                factoryCalls += 1
+                failure?.let { throw it() }
+                engine
+            }
 
         val session = SynthesisSession(paths, engines)
 
@@ -228,10 +231,11 @@ class SynthesisSessionTest {
     fun `stop halts partway through a chunk`() {
         val h = Harness(temp.root, chunks = listOf(ShortArray(5)))
         h.installModel()
-        val callback = FakeSynthesisCallback(
-            bufferSize = 2,
-            onAudioAvailable = { callCount -> if (callCount == 2) h.session.stop() },
-        )
+        val callback =
+            FakeSynthesisCallback(
+                bufferSize = 2,
+                onAudioAvailable = { callCount -> if (callCount == 2) h.session.stop() },
+            )
 
         h.session.run("jpn", "長い文", 100, callback)
 

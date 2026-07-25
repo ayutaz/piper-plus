@@ -21,7 +21,6 @@ internal class FakeSynthesisCallback(
     private val bufferSize: Int = DEFAULT_BUFFER_SIZE,
     private val onAudioAvailable: (callCount: Int) -> Unit = {},
 ) : SynthesisCallback {
-
     /** 呼び出し列。`start` / `audio(offset=..,length=..)` / `done` / `error(..)`。 */
     val events = mutableListOf<String>()
 
@@ -49,14 +48,22 @@ internal class FakeSynthesisCallback(
 
     override fun getMaxBufferSize(): Int = bufferSize
 
-    override fun start(sampleRateInHz: Int, audioFormat: Int, channelCount: Int): Int {
+    override fun start(
+        sampleRateInHz: Int,
+        audioFormat: Int,
+        channelCount: Int,
+    ): Int {
         started = true
         startArgs = Triple(sampleRateInHz, audioFormat, channelCount)
         events += "start"
         return TextToSpeech.SUCCESS
     }
 
-    override fun audioAvailable(buffer: ByteArray, offset: Int, length: Int): Int {
+    override fun audioAvailable(
+        buffer: ByteArray,
+        offset: Int,
+        length: Int,
+    ): Int {
         // production は :emit で確保した 1 本の配列を全反復で共有するため、
         // 参照のまま保持すると全チャンクが同一内容に見えてしまう。
         audio += buffer.copyOfRange(offset, offset + length)

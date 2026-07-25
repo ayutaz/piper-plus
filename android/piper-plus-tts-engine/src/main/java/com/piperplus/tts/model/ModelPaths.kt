@@ -14,8 +14,9 @@ import java.io.File
  *
  * @param filesDir アプリの内部ストレージルート (`context.filesDir`)
  */
-class ModelPaths(private val filesDir: File) {
-
+class ModelPaths(
+    private val filesDir: File,
+) {
     fun modelDir(modelId: String): File = File(File(filesDir, MODELS_DIR), modelId)
 
     fun modelFile(modelId: String): File = File(modelDir(modelId), MODEL_FILE)
@@ -30,8 +31,7 @@ class ModelPaths(private val filesDir: File) {
      * 辞書は日本語合成にのみ必要だが、初版では言語によらず必須として扱う
      * (言語ごとの遅延取得は複雑さに見合わない)。
      */
-    fun isInstalled(modelId: String): Boolean =
-        modelFile(modelId).isFile && configFile(modelId).isFile && dictDir().isDirectory
+    fun isInstalled(modelId: String): Boolean = modelFile(modelId).isFile && configFile(modelId).isFile && dictDir().isDirectory
 
     companion object {
         /**

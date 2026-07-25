@@ -6,10 +6,10 @@ import android.speech.tts.TextToSpeech
 import android.util.Log
 import com.piperplus.SynthOptions
 import com.piperplus.tts.model.ModelPaths
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 1 発話分の合成を実行する。
@@ -27,7 +27,6 @@ internal class SynthesisSession(
     private val engines: EngineHolder,
     private val modelId: String = ModelPaths.DEFAULT_MODEL_ID,
 ) {
-
     private val stopRequested = AtomicBoolean(false)
 
     /** 進行中の合成を打ち切る。[PiperPlusTtsService.onStop] から呼ばれる。 */
@@ -42,7 +41,12 @@ internal class SynthesisSession(
      * @param text       合成するテキスト
      * @param speechRate システム設定の読み上げ速度 (100 = 等速)
      */
-    fun run(iso3: String, text: String, speechRate: Int, callback: SynthesisCallback) {
+    fun run(
+        iso3: String,
+        text: String,
+        speechRate: Int,
+        callback: SynthesisCallback,
+    ) {
         // 前回の停止要求を持ち越さない。これを忘れると、ユーザーが一度でも
         // 停止ボタンを押した時点で以降すべての発話が無音になる
         // (start / done は正常に呼ばれるため成功として通知される)。
@@ -66,10 +70,11 @@ internal class SynthesisSession(
             return
         }
 
-        val options = SynthOptions(
-            languageId = languageId,
-            lengthScale = SynthesisParams.lengthScaleOf(speechRate),
-        )
+        val options =
+            SynthOptions(
+                languageId = languageId,
+                lengthScale = SynthesisParams.lengthScaleOf(speechRate),
+            )
 
         try {
             val engine = engines.acquire(modelId)
@@ -81,7 +86,8 @@ internal class SynthesisSession(
                 // takeWhile で打ち切ることで、onStop 後に残りのチャンクを
                 // 生成し続けないようにする (collect 内の早期 return では
                 // 上流の生成が止まらない)。
-                engine.synthesizeStream(text = text, options = options)
+                engine
+                    .synthesizeStream(text = text, options = options)
                     .takeWhile { !stopRequested.get() }
                     .collect { chunk -> PcmEmitter.emit(callback, chunk) { stopRequested.get() } }
             }

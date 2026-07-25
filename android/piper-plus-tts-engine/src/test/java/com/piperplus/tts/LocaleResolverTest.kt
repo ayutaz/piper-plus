@@ -6,7 +6,6 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class LocaleResolverTest {
-
     @Test
     fun `maps all six supported languages to their language ids`() {
         assertEquals(0, LocaleResolver.languageIdOf("jpn"))

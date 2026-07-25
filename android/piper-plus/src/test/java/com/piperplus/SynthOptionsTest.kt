@@ -1,12 +1,11 @@
 package com.piperplus
 
-import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class SynthOptionsTest {
-
     @Test
     fun `defaults match piper_plus_default_options in the C API`() {
         // JNI は piper_plus_default_options() を呼んだ直後に 6 フィールド
@@ -54,9 +53,10 @@ class SynthOptionsTest {
         val end = source.indexOf("\n}", start)
         val body = source.substring(start, if (end >= 0) end else source.length)
 
-        val defaults = ASSIGNMENT.findAll(body).associate { match ->
-            snakeToCamel(match.groupValues[1]) to match.groupValues[2].removeSuffix("f").toDouble()
-        }
+        val defaults =
+            ASSIGNMENT.findAll(body).associate { match ->
+                snakeToCamel(match.groupValues[1]) to match.groupValues[2].removeSuffix("f").toDouble()
+            }
         assertTrue("既定値の代入が読み取れていない", defaults.isNotEmpty())
         return defaults
     }
@@ -72,9 +72,11 @@ class SynthOptionsTest {
     }
 
     private fun snakeToCamel(value: String): String =
-        value.split("_").mapIndexed { index, part ->
-            if (index == 0) part else part.replaceFirstChar { it.uppercase() }
-        }.joinToString("")
+        value
+            .split("_")
+            .mapIndexed { index, part ->
+                if (index == 0) part else part.replaceFirstChar { it.uppercase() }
+            }.joinToString("")
 
     private fun sourceFile(relative: String): File {
         var dir: File? = File(System.getProperty("user.dir") ?: ".").absoluteFile

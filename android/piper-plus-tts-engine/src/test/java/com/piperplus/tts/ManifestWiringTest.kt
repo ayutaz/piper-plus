@@ -1,11 +1,10 @@
 package com.piperplus.tts
 
 import android.speech.tts.TextToSpeechService
-import java.io.File
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 /**
  * manifest の Service 配線を固定する。
@@ -15,7 +14,6 @@ import org.junit.Test
  * 端末の 設定 → 音声出力 にエンジンが 1 つも現れない。
  */
 class ManifestWiringTest {
-
     private val manifest: String by lazy { manifestFile().readText() }
 
     @Test
@@ -25,11 +23,12 @@ class ManifestWiringTest {
 
         // ".PiperPlusTtsService" のような相対名を applicationId で絶対名にする。
         // namespace を変えたときに黙って陳腐化しないよう、ハードコードしない。
-        val absolute = if (declared!!.startsWith(".")) {
-            BuildConfig.APPLICATION_ID + declared
-        } else {
-            declared
-        }
+        val absolute =
+            if (declared!!.startsWith(".")) {
+                BuildConfig.APPLICATION_ID + declared
+            } else {
+                declared
+            }
 
         val loaded = Class.forName(absolute, false, javaClass.classLoader)
         assertTrue(

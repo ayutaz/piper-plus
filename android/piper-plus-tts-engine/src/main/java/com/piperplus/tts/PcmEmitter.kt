@@ -14,7 +14,6 @@ import android.speech.tts.SynthesisCallback
  * Service を起動せずに検証できるようにするため。
  */
 internal object PcmEmitter {
-
     /** 16bit PCM の 1 サンプルあたりのバイト数。 */
     const val BYTES_PER_SAMPLE = 2
 
@@ -28,7 +27,11 @@ internal object PcmEmitter {
      * @param chunk     1 文分の PCM サンプル
      * @param isStopped 停止要求の有無を返す関数
      */
-    fun emit(callback: SynthesisCallback, chunk: ShortArray, isStopped: () -> Boolean) {
+    fun emit(
+        callback: SynthesisCallback,
+        chunk: ShortArray,
+        isStopped: () -> Boolean,
+    ) {
         val bytes = ByteArray(chunk.size * BYTES_PER_SAMPLE)
         for (i in chunk.indices) {
             val value = chunk[i].toInt()

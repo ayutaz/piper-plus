@@ -205,6 +205,12 @@ jobs:
         working-directory: android
         run: ./gradlew :piper-plus:testDebugUnitTest :piper-plus-tts-engine:testDebugUnitTest
 
+      # pre-commit の ktlint hook は non-blocking なので、ここを blocking gate
+      # にする (:piper-plus-g2p は kotlin-g2p-ci.yml 側で扱う)。
+      - name: ktlint
+        working-directory: android
+        run: ./gradlew :piper-plus:ktlintCheck :piper-plus-tts-engine:ktlintCheck
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4.6.2

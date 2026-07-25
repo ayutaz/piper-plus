@@ -7,8 +7,8 @@ import android.speech.tts.TextToSpeechService
 import com.piperplus.PiperPlus
 import com.piperplus.SynthOptions
 import com.piperplus.tts.model.ModelPaths
-import java.util.Locale
 import kotlinx.coroutines.flow.Flow
+import java.util.Locale
 
 /**
  * piper-plus を Android のシステム TTS エンジンとして公開する。
@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.Flow
  * request をほどく責務だけをここに残している。
  */
 class PiperPlusTtsService : TextToSpeechService() {
-
     // framework は super.onCreate() の中で既定ロケールを読むために
     // onLoadLanguage → onIsLanguageAvailable を呼ぶ。lateinit だと
     // 初期化順を 1 行動かしただけで bind 時に即死するため lazy にする。
@@ -44,13 +43,21 @@ class PiperPlusTtsService : TextToSpeechService() {
         super.onDestroy()
     }
 
-    override fun onIsLanguageAvailable(lang: String?, country: String?, variant: String?): Int =
+    override fun onIsLanguageAvailable(
+        lang: String?,
+        country: String?,
+        variant: String?,
+    ): Int =
         LocaleResolver.availability(
             lang.orEmpty(),
             paths.isInstalled(ModelPaths.DEFAULT_MODEL_ID),
         )
 
-    override fun onLoadLanguage(lang: String?, country: String?, variant: String?): Int {
+    override fun onLoadLanguage(
+        lang: String?,
+        country: String?,
+        variant: String?,
+    ): Int {
         val result = onIsLanguageAvailable(lang, country, variant)
         if (result == TextToSpeech.LANG_AVAILABLE) {
             currentIso3 = lang.orEmpty().lowercase(Locale.ROOT)
@@ -64,7 +71,10 @@ class PiperPlusTtsService : TextToSpeechService() {
         session.stop()
     }
 
-    override fun onSynthesizeText(request: SynthesisRequest?, callback: SynthesisCallback?) {
+    override fun onSynthesizeText(
+        request: SynthesisRequest?,
+        callback: SynthesisCallback?,
+    ) {
         if (request == null || callback == null) return
         session.run(
             iso3 = request.language.orEmpty(),
@@ -75,15 +85,19 @@ class PiperPlusTtsService : TextToSpeechService() {
     }
 
     /** [PiperPlus] を [PiperPlusEngine] 境界に適合させる薄いラッパー。 */
-    private class NativeEngine(private val native: PiperPlus) : PiperPlusEngine {
+    private class NativeEngine(
+        private val native: PiperPlus,
+    ) : PiperPlusEngine {
         override val sampleRate: Int get() = native.sampleRate
 
         // named argument で固定する。PiperPlus には
         // synthesizeStream(text, speakerId = 0) が併存しており、
         // 位置引数のままだと options を落とす版に黙って解決されうる
         // (コンパイルは通り、全非日本語が日本語音韻・固定速度になる)。
-        override fun synthesizeStream(text: String, options: SynthOptions): Flow<ShortArray> =
-            native.synthesizeStream(text = text, options = options)
+        override fun synthesizeStream(
+            text: String,
+            options: SynthOptions,
+        ): Flow<ShortArray> = native.synthesizeStream(text = text, options = options)
 
         override fun close() = native.close()
     }

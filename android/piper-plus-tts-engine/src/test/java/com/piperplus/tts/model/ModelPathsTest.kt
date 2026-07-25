@@ -8,7 +8,6 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class ModelPathsTest {
-
     @get:Rule
     val temp = TemporaryFolder()
 

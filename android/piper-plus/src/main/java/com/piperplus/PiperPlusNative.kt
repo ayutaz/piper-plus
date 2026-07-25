@@ -20,7 +20,11 @@ internal object PiperPlusNative {
      * @return Native handle (pointer as Long). Never 0 on success.
      * @throws PiperPlusException on creation failure.
      */
-    external fun nativeCreate(modelPath: String, configPath: String?, dictDir: String?): Long
+    external fun nativeCreate(
+        modelPath: String,
+        configPath: String?,
+        dictDir: String?,
+    ): Long
 
     /**
      * One-shot synthesis.
@@ -31,7 +35,11 @@ internal object PiperPlusNative {
      * @return PCM 16-bit audio samples.
      * @throws PiperPlusException on synthesis failure.
      */
-    external fun nativeSynthesize(handle: Long, text: String, speakerId: Int): ShortArray
+    external fun nativeSynthesize(
+        handle: Long,
+        text: String,
+        speakerId: Int,
+    ): ShortArray
 
     /**
      * One-shot synthesis with explicit options.
@@ -63,7 +71,11 @@ internal object PiperPlusNative {
      * @return Sample rate in Hz.
      * @throws PiperPlusException on failure.
      */
-    external fun nativeSynthStart(handle: Long, text: String, speakerId: Int): Int
+    external fun nativeSynthStart(
+        handle: Long,
+        text: String,
+        speakerId: Int,
+    ): Int
 
     /**
      * Start iterator-based streaming synthesis with explicit options.

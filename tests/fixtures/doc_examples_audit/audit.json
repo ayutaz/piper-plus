@@ -174,12 +174,12 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "2b8521524767e507ef9da1ce401073018b4ed00b"
+      "hash_sha1": "44494df1c5993c23cf0da857b4f07f2ecef187a0"
     },
     {
       "file": "docs/design/android-tts-engine-design.md",
-      "line_start": 209,
-      "line_end": 217,
+      "line_start": 221,
+      "line_end": 229,
       "language_raw": "kotlin",
       "language": "unknown",
       "category": "skip_warranted",
@@ -193,8 +193,8 @@
     },
     {
       "file": "docs/design/android-tts-engine-design.md",
-      "line_start": 285,
-      "line_end": 306,
+      "line_start": 297,
+      "line_end": 318,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -208,8 +208,8 @@
     },
     {
       "file": "docs/design/android-tts-engine-design.md",
-      "line_start": 349,
-      "line_end": 352,
+      "line_start": 361,
+      "line_end": 364,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -223,8 +223,8 @@
     },
     {
       "file": "docs/design/android-tts-engine-design.md",
-      "line_start": 370,
-      "line_end": 373,
+      "line_start": 382,
+      "line_end": 385,
       "language_raw": "yaml",
       "language": "unknown",
       "category": "skip_warranted",

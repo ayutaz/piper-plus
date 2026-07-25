@@ -15,21 +15,27 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class EngineHolderTest {
-
     @get:Rule
     val temp = TemporaryFolder()
 
     private class FakeEngine : PiperPlusEngine {
         override val sampleRate: Int = 22050
         var closed = false
-        override fun synthesizeStream(text: String, options: SynthOptions): Flow<ShortArray> =
-            flowOf(ShortArray(4))
+
+        override fun synthesizeStream(
+            text: String,
+            options: SynthOptions,
+        ): Flow<ShortArray> = flowOf(ShortArray(4))
+
         override fun close() {
             closed = true
         }
     }
 
-    private fun installModel(paths: ModelPaths, modelId: String) {
+    private fun installModel(
+        paths: ModelPaths,
+        modelId: String,
+    ) {
         paths.modelDir(modelId).mkdirs()
         paths.modelFile(modelId).writeText("onnx")
         paths.configFile(modelId).writeText("{}")
@@ -41,7 +47,11 @@ class EngineHolderTest {
         val paths = ModelPaths(temp.root)
         installModel(paths, "voice-a")
         var created = 0
-        val holder = EngineHolder(paths) { _, _, _ -> created++; FakeEngine() }
+        val holder =
+            EngineHolder(paths) { _, _, _ ->
+                created++
+                FakeEngine()
+            }
 
         holder.acquire("voice-a")
 
@@ -53,7 +63,11 @@ class EngineHolderTest {
         val paths = ModelPaths(temp.root)
         installModel(paths, "voice-a")
         var created = 0
-        val holder = EngineHolder(paths) { _, _, _ -> created++; FakeEngine() }
+        val holder =
+            EngineHolder(paths) { _, _, _ ->
+                created++
+                FakeEngine()
+            }
 
         val first = holder.acquire("voice-a")
         val second = holder.acquire("voice-a")
@@ -85,12 +99,13 @@ class EngineHolderTest {
         var seenModel = ""
         var seenConfig = ""
         var seenDict = ""
-        val holder = EngineHolder(paths) { model, config, dict ->
-            seenModel = model
-            seenConfig = config
-            seenDict = dict
-            FakeEngine()
-        }
+        val holder =
+            EngineHolder(paths) { model, config, dict ->
+                seenModel = model
+                seenConfig = config
+                seenDict = dict
+                FakeEngine()
+            }
 
         holder.acquire("voice-a")
 
@@ -139,11 +154,12 @@ class EngineHolderTest {
         installModel(paths, "voice-b")
         val engines = mutableListOf<FakeEngine>()
         var calls = 0
-        val holder = EngineHolder(paths) { _, _, _ ->
-            calls++
-            if (calls == 2) throw IllegalStateException("model is corrupt")
-            FakeEngine().also { engines.add(it) }
-        }
+        val holder =
+            EngineHolder(paths) { _, _, _ ->
+                calls++
+                if (calls == 2) throw IllegalStateException("model is corrupt")
+                FakeEngine().also { engines.add(it) }
+            }
 
         val first = holder.acquire("voice-a")
         assertThrows(IllegalStateException::class.java) { holder.acquire("voice-b") }

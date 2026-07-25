@@ -20,13 +20,21 @@ interface PiperPlusEngine {
      */
     val sampleRate: Int
 
-    fun synthesizeStream(text: String, options: SynthOptions): Flow<ShortArray>
+    fun synthesizeStream(
+        text: String,
+        options: SynthOptions,
+    ): Flow<ShortArray>
+
     fun close()
 }
 
 /** モデルのパスからエンジンを生成する。 */
 fun interface EngineFactory {
-    fun create(modelPath: String, configPath: String, dictDir: String): PiperPlusEngine
+    fun create(
+        modelPath: String,
+        configPath: String,
+        dictDir: String,
+    ): PiperPlusEngine
 }
 
 /**
@@ -48,31 +56,34 @@ class EngineHolder(
      *
      * @throws IllegalStateException モデルまたは辞書が未インストールの場合
      */
-    fun acquire(modelId: String): PiperPlusEngine = synchronized(lock) {
-        val cached = engine
-        if (cached != null && loadedModelId == modelId) {
-            return cached
+    fun acquire(modelId: String): PiperPlusEngine =
+        synchronized(lock) {
+            val cached = engine
+            if (cached != null && loadedModelId == modelId) {
+                return cached
+            }
+            check(paths.isInstalled(modelId)) { "Model is not installed: $modelId" }
+
+            cached?.close()
+            engine = null
+            loadedModelId = null
+
+            val created =
+                factory.create(
+                    paths.modelFile(modelId).absolutePath,
+                    paths.configFile(modelId).absolutePath,
+                    paths.dictDir().absolutePath,
+                )
+            engine = created
+            loadedModelId = modelId
+            return created
         }
-        check(paths.isInstalled(modelId)) { "Model is not installed: $modelId" }
-
-        cached?.close()
-        engine = null
-        loadedModelId = null
-
-        val created = factory.create(
-            paths.modelFile(modelId).absolutePath,
-            paths.configFile(modelId).absolutePath,
-            paths.dictDir().absolutePath,
-        )
-        engine = created
-        loadedModelId = modelId
-        return created
-    }
 
     /** キャッシュ中のエンジンを解放する。複数回呼んでも安全。 */
-    fun release() = synchronized(lock) {
-        engine?.close()
-        engine = null
-        loadedModelId = null
-    }
+    fun release() =
+        synchronized(lock) {
+            engine?.close()
+            engine = null
+            loadedModelId = null
+        }
 }
