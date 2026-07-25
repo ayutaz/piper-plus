@@ -68,10 +68,9 @@ sherpa-onnx への上流貢献は本設計のスコープ外とし、別途 Issu
 | 辞書ダウンローダ | `android/piper-plus-g2p/.../DictionaryDownloader.kt` | HF host allowlist 付き実装済 | OpenJTalk 辞書取得に流用 |
 | 3 ABI ビルド CI | `.github/workflows/release-shared-lib.yml` | `build-android` job あり (arm64-v8a / armeabi-v7a / x86_64)、16 KB page 対応済 | `.so` の供給元。**リリース配布の追加が必要** |
 
-配布可能な推論用モデル ([pretrained-models.md](../guides/development/pretrained-models.md)):
-
 配布可能な推論用モデルは `piper-core` の組込みレジストリ
-(`src/rust/piper-core/src/model_download.rs:builtin_registry`) に定義された 2 つ。
+(`src/rust/piper-core/src/model_download.rs:builtin_registry`) に定義された 2 つ
+([pretrained-models.md](../guides/development/pretrained-models.md))。
 
 | モデル | レジストリ名 | HF リポジトリ / ファイル | サイズ | 言語 |
 |-------|------------|----------------------|-------|------|
@@ -106,7 +105,7 @@ sherpa-onnx への上流貢献は本設計のスコープ外とし、別途 Issu
 
 ## 5. アーキテクチャ
 
-```
+```text
 ┌─────────────────────────────────────────────┐
 │ Android システム (TalkBack / 読み上げアプリ)  │
 └───────────────────┬─────────────────────────┘
@@ -131,7 +130,7 @@ sherpa-onnx への上流貢献は本設計のスコープ外とし、別途 Issu
 
 ### 5.1 モジュール構成
 
-```
+```text
 android/
   settings.gradle.kts          ← :piper-plus-tts-engine を追加
   piper-plus/                  (既存 AAR)
@@ -277,7 +276,7 @@ class PiperPlusTtsService : TextToSpeechService() {
 
 ## 7. データフロー
 
-```
+```text
 読み上げアプリ
    │ speak("こんにちは")
    ▼
@@ -339,7 +338,7 @@ VITS に対応するパラメータがない。初版では**無視する**。�
 
 外部の開発者が AAR を単体で利用する場合に必要。3 ABI をリリースに添付する。
 
-```
+```text
 piper-plus-android-<abi>.tar.gz      (arm64-v8a / armeabi-v7a / x86_64)
 piper-plus-android-<abi>.tar.gz.cosign.bundle
 ```

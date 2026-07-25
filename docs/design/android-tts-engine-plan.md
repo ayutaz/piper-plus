@@ -48,6 +48,7 @@
 ## Task 1: TTS エンジンモジュールの雛形
 
 **Files:**
+
 - Modify: `android/settings.gradle.kts`
 - Create: `android/piper-plus-tts-engine/build.gradle.kts`
 - Create: `android/piper-plus-tts-engine/src/main/AndroidManifest.xml`
@@ -56,6 +57,7 @@
 - Test: `android/piper-plus-tts-engine/src/test/java/com/piperplus/tts/ModuleSanityTest.kt`
 
 **Interfaces:**
+
 - Consumes: なし (最初のタスク)
 - Produces: Gradle モジュール `:piper-plus-tts-engine`、パッケージ `com.piperplus.tts`
 
@@ -237,10 +239,12 @@ git commit -m "feat(android): TTS エンジンモジュールの雛形を追加"
 ## Task 2: LocaleResolver
 
 **Files:**
+
 - Create: `android/piper-plus-tts-engine/src/main/java/com/piperplus/tts/LocaleResolver.kt`
 - Test: `android/piper-plus-tts-engine/src/test/java/com/piperplus/tts/LocaleResolverTest.kt`
 
 **Interfaces:**
+
 - Consumes: Task 1 のモジュール
 - Produces:
   - `LocaleResolver.languageIdOf(iso3Language: String): Int?`
@@ -398,10 +402,12 @@ git commit -m "feat(android): ISO-3 言語コードから language_id を解決�
 ## Task 3: SynthesisParams (speechRate → lengthScale)
 
 **Files:**
+
 - Create: `android/piper-plus-tts-engine/src/main/java/com/piperplus/tts/SynthesisParams.kt`
 - Test: `android/piper-plus-tts-engine/src/test/java/com/piperplus/tts/SynthesisParamsTest.kt`
 
 **Interfaces:**
+
 - Consumes: Task 1 のモジュール
 - Produces: `SynthesisParams.lengthScaleOf(speechRate: Int): Float`
 
@@ -499,10 +505,12 @@ git commit -m "feat(android): speechRate から length_scale への変換を追�
 ## Task 4: ModelPaths
 
 **Files:**
+
 - Create: `android/piper-plus-tts-engine/src/main/java/com/piperplus/tts/model/ModelPaths.kt`
 - Test: `android/piper-plus-tts-engine/src/test/java/com/piperplus/tts/model/ModelPathsTest.kt`
 
 **Interfaces:**
+
 - Consumes: Task 1 のモジュール
 - Produces:
   - `ModelPaths(filesDir: File)`
@@ -672,10 +680,12 @@ git commit -m "feat(android): モデルと辞書のパス解決を追加"
 ## Task 5: AAR に合成オプションを追加 (Kotlin 側)
 
 **Files:**
+
 - Create: `android/piper-plus/src/main/java/com/piperplus/SynthOptions.kt`
 - Test: `android/piper-plus/src/test/java/com/piperplus/SynthOptionsTest.kt`
 
 **Interfaces:**
+
 - Consumes: なし
 - Produces: `com.piperplus.SynthOptions(speakerId, languageId, lengthScale, noiseScale, noiseW, sentenceSilenceSec)`
 
@@ -771,11 +781,13 @@ git commit -m "feat(android): 合成オプションのデータクラスを追�
 ## Task 6: JNI に合成オプションを通す
 
 **Files:**
+
 - Modify: `android/piper-plus/src/main/cpp/piper_plus_jni.cpp`
 - Modify: `android/piper-plus/src/main/java/com/piperplus/PiperPlusNative.kt`
 - Modify: `android/piper-plus/src/main/java/com/piperplus/PiperPlus.kt:158-206`
 
 **Interfaces:**
+
 - Consumes: `SynthOptions` (Task 5)
 - Produces:
   - `PiperPlusNative.nativeSynthesizeWithOptions(handle, text, speakerId, languageId, lengthScale, noiseScale, noiseW, sentenceSilenceSec): ShortArray`
@@ -1043,10 +1055,12 @@ git commit -m "feat(android): JNI 境界に language_id と length_scale を通�
 ## Task 7: EngineHolder
 
 **Files:**
+
 - Create: `android/piper-plus-tts-engine/src/main/java/com/piperplus/tts/EngineHolder.kt`
 - Test: `android/piper-plus-tts-engine/src/test/java/com/piperplus/tts/EngineHolderTest.kt`
 
 **Interfaces:**
+
 - Consumes: `ModelPaths` (Task 4)、`com.piperplus.PiperPlus`
 - Produces:
   - `EngineHolder(paths: ModelPaths, factory: EngineFactory)`
@@ -1282,10 +1296,12 @@ git commit -m "feat(android): エンジンインスタンスの生存管理を�
 ## Task 8: PiperPlusTtsService
 
 **Files:**
+
 - Create: `android/piper-plus-tts-engine/src/main/java/com/piperplus/tts/PiperPlusTtsService.kt`
 - Test: `android/piper-plus-tts-engine/src/androidTest/java/com/piperplus/tts/PiperPlusTtsServiceTest.kt`
 
 **Interfaces:**
+
 - Consumes: `LocaleResolver` (Task 2)、`SynthesisParams` (Task 3)、`ModelPaths` (Task 4)、`SynthOptions` (Task 5)、`EngineHolder` / `PiperPlusEngine` (Task 7)
 - Produces: `com.piperplus.tts.PiperPlusTtsService`
 
@@ -1531,10 +1547,12 @@ git commit -m "feat(android): TextToSpeechService を実装"
 ## Task 9: 3 ABI 対応と CI 統合
 
 **Files:**
+
 - Modify: `android/piper-plus/build.gradle.kts:24-27`
 - Modify: `.github/workflows/android-build.yml`
 
 **Interfaces:**
+
 - Consumes: Task 1-8 のすべて
 - Produces: CI で APK がビルドされること
 
