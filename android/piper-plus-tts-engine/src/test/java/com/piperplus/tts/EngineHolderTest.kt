@@ -6,7 +6,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -120,5 +122,35 @@ class EngineHolderTest {
         val holder = EngineHolder(ModelPaths(temp.root)) { _, _, _ -> FakeEngine() }
         holder.release()
         holder.release()
+    }
+
+    @Test
+    fun `a failed load leaves no stale engine behind`() {
+        // モデル切替の途中で新しいモデルのロードが失敗したとき、キャッシュに
+        // close 済みの旧インスタンスが残ってはならない。残ると次の acquire が
+        // 早期 return でそれを返し、PiperPlus.checkNotClosed が毎回投げて
+        // Service が破棄されるまで恒久的に合成不能になる。
+        //
+        // ModelPaths.isInstalled はファイルの存在しか見ないため、途中で切れた
+        // model.onnx でも installed 判定になり、この経路は現実に踏まれる。
+        val paths = ModelPaths(temp.root)
+        installModel(paths, "voice-a")
+        installModel(paths, "voice-b")
+        val engines = mutableListOf<FakeEngine>()
+        var calls = 0
+        val holder = EngineHolder(paths) { _, _, _ ->
+            calls++
+            if (calls == 2) throw IllegalStateException("model is corrupt")
+            FakeEngine().also { engines.add(it) }
+        }
+
+        val first = holder.acquire("voice-a")
+        assertThrows(IllegalStateException::class.java) { holder.acquire("voice-b") }
+
+        val retried = holder.acquire("voice-a")
+
+        assertTrue("旧インスタンスは close 済みのはず", engines[0].closed)
+        assertEquals("キャッシュが残っていると factory が呼ばれない", 3, calls)
+        assertNotSame("close 済みのインスタンスを返してはならない", first, retried)
     }
 }

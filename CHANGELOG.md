@@ -24,12 +24,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `com.piperplus.SynthOptions` — Android AAR から `language_id` / `length_scale` /
   `noise_scale` / `noise_w` / `sentence_silence_sec` を指定できる合成オプション。
   従来の `synthesize(text, speakerId)` は後方互換のため維持。
+- `piper_plus_synth_abort()` — 途中で放棄した iterator を解放する C API。
+  `piper_plus_synth_start()` は engine を busy にしたまま返り、解放するのは
+  `piper_plus_synth_next()` が終端に達したときだけだったため、チャンクの取得を
+  途中でやめた呼び出し元は engine を恒久的に busy のまま残していた。
+  何も進行していないときに呼んでも安全なので、無条件のクリーンアップ経路に置ける。
+
+### Fixed
+
+- Android で読み上げを停止すると、以降の合成がすべて失敗するようになる問題。
+  `PiperPlus.synthesizeStream` が打ち切られた際にネイティブ iterator を解放せず、
+  次回以降の `synth_start` が `ERR_BUSY` を返していた。プロセスが再起動するまで
+  復旧しなかった。`finally` から `piper_plus_synth_abort()` を呼ぶよう修正。
+- 非対応 ABI の端末で TTS サービスがクラッシュする問題。`System.loadLibrary` の
+  失敗は `UnsatisfiedLinkError` / `NoClassDefFoundError` として送出され
+  `catch (Exception)` をすり抜けていた。`catch (LinkageError)` を追加し、
+  設計どおり `callback.error(ERROR_SERVICE)` として扱うようにした。
 
 ### Changed
 
 - Android AAR (`android/piper-plus`) の `abiFilters` を 3 ABI
   (`arm64-v8a` / `armeabi-v7a` / `x86_64`) に拡張。`release-shared-lib.yml` および
   `android-build.yml` のビルド対象と揃えた。
+- `android-build.yml` の `paths` に `android/piper-plus/**` と
+  `android/piper-plus-tts-engine/**` を追加し、`push: branches: [dev]` を
+  `kotlin-g2p-ci.yml` に揃えた。これらを含んでいなかったため、Kotlin / JNI だけを
+  変更した PR ではユニットテストが 1 件も実行されていなかった。
+  併せて JVM ユニットテストを `kotlin-unit-tests` job に分離し、3 ABI の
+  ネイティブビルド (45-60 分) への従属を外した。
+- `PiperPlusTtsService` の合成処理を `SynthesisSession` と `PcmEmitter` に分離。
+  `android.speech.tts.SynthesisRequest` は final かつ全 getter がスタブのため、
+  Service を直接呼ぶ形では JVM ユニットテストが 1 分岐にしか到達できなかった。
+  詳細は[テスト戦略 §10.1](docs/design/android-tts-engine-design.md#101-テスト可能性のための設計上の制約)。
 
 ## [2.0.0] - 2026-05-25
 

@@ -161,7 +161,9 @@ android/
 
 | コンポーネント | 責務 | 依存 |
 |--------------|------|------|
-| `PiperPlusTtsService` | Android TTS のライフサイクル実装。合成要求を `EngineHolder` に委譲 | すべて |
+| `PiperPlusTtsService` | Android TTS のライフサイクル実装。`SynthesisRequest` をほどいて `SynthesisSession` に渡すだけのアダプタ | すべて |
+| `SynthesisSession` | 1 発話分の合成。可用性判定 → `SynthOptions` 組み立て → ストリーム収集 → `callback` への通知。停止フラグを所有 | `EngineHolder`, `PcmEmitter` |
+| `PcmEmitter` | `ShortArray` を little-endian のバイト列にして `maxBufferSize` 以下に分割 | なし (Android 型は `SynthesisCallback` のみ) |
 | `LocaleResolver` | `(lang, country, variant)` → `language_id` / 可用性判定。純関数、副作用なし | なし |
 | `VoiceRegistry` | インストール済みモデルと `Voice` オブジェクトの対応付け | `ModelManager` |
 | `EngineHolder` | `PiperPlus` インスタンスの生成・キャッシュ・破棄。スレッド安全 | `android/piper-plus` |
@@ -172,6 +174,10 @@ android/
 
 各コンポーネントは単体でテスト可能な粒度に保つ。特に `LocaleResolver` は
 Android 依存を持たない純粋な Kotlin にして JVM ユニットテストで網羅する。
+
+`SynthesisSession` と `PcmEmitter` が `PiperPlusTtsService` から分かれているのは、
+テスト可能性のための意図的な分割である。理由は
+[§10.1](#101-テスト可能性のための設計上の制約) を参照。
 
 ### 6.2 AAR の拡張 (前提作業)
 
@@ -308,10 +314,12 @@ callback.audioAvailable(...) × N → callback.done()
 | モデル未導入で合成要求 | `onLoadLanguage` が `LANG_MISSING_DATA`。`onSynthesizeText` は `callback.error(ERROR_NOT_INSTALLED_YET)` |
 | 非対応言語 | `LANG_NOT_SUPPORTED` / `callback.error(ERROR_INVALID_REQUEST)` |
 | ネイティブ初期化失敗 | `callback.error(ERROR_SERVICE)`。`PiperPlusException` をログに残しクラッシュさせない |
+| 非対応 ABI でのライブラリロード失敗 | 同上。`System.loadLibrary` は `UnsatisfiedLinkError` / `NoClassDefFoundError` を投げ `catch (Exception)` をすり抜けるため、`catch (LinkageError)` を併記する。`Throwable` にはしない (`OutOfMemoryError` まで飲み込む) |
 | ダウンロード失敗 | UI にエラー表示 + リトライ。一時ファイルを削除 |
 | チェックサム不一致 | 破棄してエラー表示。正規パスには一切書かない |
 | ストレージ不足 | ダウンロード開始前に必要容量を確認し、不足なら事前に通知 |
-| `onStop()` 中の合成 | ストリーム collect を打ち切り、`callback.done()` で正常終了扱い |
+| `onStop()` 中の合成 | ストリーム collect を `takeWhile` で打ち切り、`callback.done()` で正常終了扱い。停止フラグは次の発話の入口でリセットする |
+| 打ち切られた iterator | `PiperPlus.synthesizeStream` の `finally` から `piper_plus_synth_abort` を呼ぶ。`synth_start` は engine を busy にしたまま返り、解放するのは `synth_next` が終端に達したときだけなので、これが無いと停止ボタン 1 回で以降の全合成が `ERR_BUSY` になる |
 
 **pitch について**: Android TTS はユーザー設定の `request.pitch` を渡してくるが、
 VITS に対応するパラメータがない。初版では**無視する**。設定画面に「ピッチ設定は
@@ -373,17 +381,54 @@ SherpaTTS も同条件で掲載されており、掲載自体の障害にはな�
 
 ## 10. テスト戦略
 
-| 層 | 対象 | 実行環境 |
-|---|------|---------|
-| JVM ユニット | `LocaleResolver` の全 6 言語 + 非対応言語 + 国コード変種 | `./gradlew :piper-plus-tts-engine:test` |
-| JVM ユニット | `ModelCatalog` の定義整合、`ModelManager` のパス解決 | 同上 |
-| JVM ユニット | `speechRate` → `lengthScale` 変換 (境界値: 0, 100, 400) | 同上 |
-| Instrumented | Service バインド、`onIsLanguageAvailable` の戻り値 | `connectedAndroidTest` (エミュレータ) |
-| Instrumented | 実モデルでの合成 → PCM 長・非無音の検証 | 同上 (モデルは CI でキャッシュ) |
-| CI | 3 ABI ビルド + APK 生成 | `android-build.yml` を拡張 |
-
 音声の正しさは既存の C++ / Python テストが担保しているため、エンジン側は
 **橋渡しが正しいか**に絞る。合成結果の音響的検証は再実装しない。
+
+ただし「橋渡し」には、壊れても静かに通り抜ける箇所が集まっている。
+PCM のバイト順、8 引数 JNI の並び、`SynthesisCallback` の呼び出しプロトコル、
+manifest の配線は、いずれも**壊しても型検査もリンクも APK ビルドも成功する**。
+テストの重みはそこに置く。
+
+| 層 | 対象 | 実行環境 |
+|---|------|---------|
+| JVM ユニット | `PcmEmitter` — little-endian 詰め替え、`maxBufferSize` 分割、中断 | `./gradlew :piper-plus-tts-engine:testDebugUnitTest` |
+| JVM ユニット | `SynthesisSession` — 早期エラーの判定順、callback プロトコル、`SynthOptions` 配線、停止フラグ、例外/`LinkageError` の遮断 | 同上 |
+| JVM ユニット | `LocaleResolver` の全 6 言語 + 非対応言語 + 大文字小文字 | 同上 |
+| JVM ユニット | `EngineHolder` の生存管理と、ロード失敗時に古いインスタンスを残さないこと | 同上 |
+| JVM ユニット | `ModelPaths` のパス解決とインストール判定 | 同上 |
+| JVM ユニット | `speechRate` → `lengthScale` 変換 (境界値: 0, 負値, 100, 400) | 同上 |
+| JVM 契約 | `ManifestWiringTest` — `android:name` が実在の `TextToSpeechService` に解決し、TTS の intent-filter が正しいこと | 同上 |
+| JVM 契約 | `PiperPlusNativeBridgeTest` — Kotlin `external` 宣言 ↔ `piper_plus_jni.cpp` の C++ 定義をソース照合 | `./gradlew :piper-plus:testDebugUnitTest` |
+| JVM 契約 | `SynthOptionsTest` — 既定値を `piper_plus_default_options()` の実ソースと突き合わせ | 同上 |
+| C++ 統合 | iterator を途中で放棄しても engine が busy のまま残らないこと | `test_c_api_integration` |
+| CI | Kotlin ユニットテスト (native ビルドに従属しない独立 job) | `android-build.yml` の `kotlin-unit-tests` |
+| CI | 3 ABI ビルド + APK 生成 | `android-build.yml` の `build-tts-engine` |
+
+### 10.1 テスト可能性のための設計上の制約
+
+`android.speech.tts.SynthesisRequest` は final で、全 getter が
+`RuntimeException("Stub!")` を投げるスタブしか持たない。reflection でも
+中身を詰められないため、`onSynthesizeText(request, callback)` を直接呼ぶ形では
+JVM ユニットテストが**「非対応言語 → error」の 1 分岐にしか到達できない**。
+
+このため合成の本体は [`SynthesisSession`](#61-責務分割) に切り出し、
+`PiperPlusTtsService` は request をほどくだけのアダプタに保つ。
+Robolectric や mockk は導入しない — この境界があれば手書きの fake で足りる。
+
+### 10.2 ミューテーションによる検証
+
+テストが「通ること」は価値の証明にならない。上記のテストは、対応する
+production コードに以下の変異を入れて**実際に落ちること**を確認してある。
+
+バイト順の反転 / `shr 8` を `/ 256` に / `audioAvailable` の offset 落とし /
+`maxBufferSize` 下限ガードの除去 / 停止フラグのリセット除去 /
+`takeWhile` を collect 内 return に / エラーコードの取り違え / 判定順の入れ替え /
+`catch (LinkageError)` の除去 / `speechRate` の無視 / `isBlank` を `isEmpty` に /
+JNI 引数の並べ替え / JNI 側だけの rename / `opts` 代入の取り違え /
+呼び出し側 named argument の取り違え / フィールドの配線落とし / 引数型の変更 /
+Kotlin 宣言だけの引数追加 / `EngineHolder` の失敗時クリア除去 /
+manifest のクラス名タイポ / intent action の綴りミス /
+C 側と Kotlin 側の既定値の片側変更
 
 ---
 

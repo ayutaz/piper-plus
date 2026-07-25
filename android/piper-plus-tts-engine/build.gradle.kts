@@ -17,6 +17,12 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    buildFeatures {
+        // ManifestWiringTest が applicationId を参照して manifest の
+        // 相対クラス名を絶対名に解決するため。
+        buildConfig = true
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -37,8 +43,14 @@ android {
     }
 
     testOptions {
-        // android.jar のスタブメソッドが例外を投げず既定値を返すようにする。
-        // LocaleResolver のテストで TextToSpeech の定数を参照するため必要。
+        // android.jar のスタブメソッドが RuntimeException("Stub!") ではなく
+        // 既定値を返すようにする。SynthesisSession の catch 節が Log.e を
+        // 呼ぶため必要 (TextToSpeech.LANG_* / ERROR_* は static final int で
+        // コンパイル時にインライン展開されるので、定数の参照には不要)。
+        //
+        // 副作用として android.jar 由来のオブジェクトはすべて無害な既定値を
+        // 返す。SynthesisCallback をテストに渡す際に実スタブを使うと
+        // maxBufferSize が 0 になるため、必ず FakeSynthesisCallback を使うこと。
         unitTests.isReturnDefaultValues = true
     }
 }

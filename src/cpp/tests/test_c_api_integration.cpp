@@ -302,6 +302,75 @@ TEST_F(CApiIntegrationTest, BusyDuringIterator) {
     piper_plus_free(engine);
 }
 
+// An iterator that is abandoned partway must not strand the engine as busy.
+// synth_start leaves inProgress=true for synth_next to consume, and only
+// synth_next clears it on reaching the end of the queue -- so a caller that
+// stops pulling (a user pressing stop, a cancelled coroutine) would otherwise
+// make every later synthesis on this engine fail with ERR_BUSY.
+TEST_F(CApiIntegrationTest, AbortReleasesAbandonedIterator) {
+    auto* engine = createEngine();
+    ASSERT_NE(engine, nullptr);
+
+    auto opts = piper_plus_default_options();
+    ASSERT_EQ(piper_plus_synth_start(engine, "One. Two. Three.", &opts),
+              PIPER_PLUS_OK);
+
+    // Take a single chunk, then walk away without draining.
+    PiperPlusAudioChunk chunk = {};
+    ASSERT_EQ(piper_plus_synth_next(engine, &chunk), PIPER_PLUS_OK);
+
+    // Still mid-iteration, so the engine is legitimately busy.
+    EXPECT_EQ(piper_plus_synth_start(engine, "x", &opts), PIPER_PLUS_ERR_BUSY);
+
+    EXPECT_EQ(piper_plus_synth_abort(engine), PIPER_PLUS_OK);
+
+    // The engine is usable again.
+    EXPECT_EQ(piper_plus_synth_start(engine, "Four. Five.", &opts),
+              PIPER_PLUS_OK);
+    for (;;) {
+        PiperPlusAudioChunk next = {};
+        PiperPlusStatus rc = piper_plus_synth_next(engine, &next);
+        if (rc == PIPER_PLUS_DONE) break;
+        ASSERT_NE(rc, PIPER_PLUS_ERR);
+    }
+
+    float* s = nullptr; int32_t n = 0, r = 0;
+    EXPECT_EQ(piper_plus_synthesize(engine, "Hello.", &opts, &s, &n, &r),
+              PIPER_PLUS_OK);
+    EXPECT_GT(n, 0);
+    piper_plus_free_audio(s);
+    piper_plus_free(engine);
+}
+
+// Abort belongs in an unconditional cleanup path, so it must tolerate being
+// called when nothing is in flight and after the iterator already drained.
+TEST_F(CApiIntegrationTest, AbortIsIdempotentWhenNothingIsInFlight) {
+    auto* engine = createEngine();
+    ASSERT_NE(engine, nullptr);
+
+    auto opts = piper_plus_default_options();
+
+    EXPECT_EQ(piper_plus_synth_abort(engine), PIPER_PLUS_OK);
+
+    ASSERT_EQ(piper_plus_synth_start(engine, "Hello world.", &opts),
+              PIPER_PLUS_OK);
+    for (;;) {
+        PiperPlusAudioChunk chunk = {};
+        PiperPlusStatus rc = piper_plus_synth_next(engine, &chunk);
+        if (rc == PIPER_PLUS_DONE) break;
+        ASSERT_NE(rc, PIPER_PLUS_ERR);
+    }
+
+    EXPECT_EQ(piper_plus_synth_abort(engine), PIPER_PLUS_OK);
+    EXPECT_EQ(piper_plus_synth_abort(engine), PIPER_PLUS_OK);
+
+    float* s = nullptr; int32_t n = 0, r = 0;
+    EXPECT_EQ(piper_plus_synthesize(engine, "Hello.", &opts, &s, &n, &r),
+              PIPER_PLUS_OK);
+    piper_plus_free_audio(s);
+    piper_plus_free(engine);
+}
+
 TEST_F(CApiIntegrationTest, IteratorReuse) {
     auto* engine = createEngine();
     ASSERT_NE(engine, nullptr);

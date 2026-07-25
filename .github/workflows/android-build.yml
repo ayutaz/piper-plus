@@ -6,6 +6,16 @@ on:
     paths:
       - 'src/cpp/**'
       - 'CMakeLists.txt'
+      - 'android/piper-plus/**'
+      - 'android/piper-plus-tts-engine/**'
+      - '.github/workflows/android-build.yml'
+  push:
+    branches: [dev]
+    paths:
+      - 'src/cpp/**'
+      - 'CMakeLists.txt'
+      - 'android/piper-plus/**'
+      - 'android/piper-plus-tts-engine/**'
       - '.github/workflows/android-build.yml'
   workflow_dispatch:
 
@@ -173,6 +183,37 @@ jobs:
           name: piper-plus-android
           path: release/piper-plus-android/
 
+  # JVM ユニットテストは jniLibs も NDK ビルドも要さない
+  # (externalNativeBuild を駆動するのは assemble 系タスクのみ)。
+  # build-tts-engine に相乗りさせると needs: package-android を経由して
+  # 3 ABI のネイティブビルド 45-60 分に従属し、Kotlin 1 ファイルの変更でも
+  # 結果が出るまで 1 時間待つことになるため独立させる。
+  kotlin-unit-tests:
+    name: Kotlin unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6.0.3
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4.8.0
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Run unit tests
+        working-directory: android
+        run: ./gradlew :piper-plus:testDebugUnitTest :piper-plus-tts-engine:testDebugUnitTest
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: kotlin-unit-test-reports
+          path: |
+            android/piper-plus/build/reports/tests/
+            android/piper-plus-tts-engine/build/reports/tests/
+
   build-tts-engine:
     name: Build TTS engine APK
     needs: package-android
@@ -210,10 +251,8 @@ jobs:
           done
           find android/piper-plus/src/main/jniLibs -type f | sort
 
-      - name: Run unit tests
-        working-directory: android
-        run: ./gradlew :piper-plus:testDebugUnitTest :piper-plus-tts-engine:testDebugUnitTest
-
+      # ユニットテストは kotlin-unit-tests job が独立に回すため、ここでは
+      # APK のパッケージングだけを検証する。
       - name: Build APK
         working-directory: android
         run: ./gradlew :piper-plus-tts-engine:assembleDebug

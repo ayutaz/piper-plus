@@ -95,6 +95,19 @@ internal object PiperPlusNative {
     external fun nativeSynthNext(handle: Long): ShortArray?
 
     /**
+     * Abandon an in-progress streaming iteration and release the engine.
+     *
+     * [nativeSynthStart] marks the engine busy and only [nativeSynthNext]
+     * clears it, on reaching the end of the sentence queue. A collector that
+     * stops early must call this or every later start fails with ERR_BUSY.
+     *
+     * Safe to call when no iteration is active (0 is a no-op).
+     *
+     * @param handle Native engine handle.
+     */
+    external fun nativeSynthAbort(handle: Long)
+
+    /**
      * Free the native engine. Safe to call multiple times (idempotent after first call).
      *
      * @param handle Native engine handle (0 is a no-op).

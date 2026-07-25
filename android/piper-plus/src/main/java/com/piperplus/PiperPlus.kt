@@ -174,15 +174,18 @@ class PiperPlus private constructor(
     fun synthesize(text: String, options: SynthOptions): ShortArray {
         synchronized(lock) {
             checkNotClosed()
+            // 末尾 4 つはすべて Float なので、位置引数だと並べ替えても
+            // 型検査を通ってしまう (length_scale と noise_scale が
+            // 入れ替わると常時 2.5 倍速になる)。named argument で固定する。
             return PiperPlusNative.nativeSynthesizeWithOptions(
-                nativeHandle,
-                text,
-                options.speakerId,
-                options.languageId,
-                options.lengthScale,
-                options.noiseScale,
-                options.noiseW,
-                options.sentenceSilenceSec,
+                handle = nativeHandle,
+                text = text,
+                speakerId = options.speakerId,
+                languageId = options.languageId,
+                lengthScale = options.lengthScale,
+                noiseScale = options.noiseScale,
+                noiseW = options.noiseW,
+                sentenceSilenceSec = options.sentenceSilenceSec,
             )
         }
     }
@@ -226,6 +229,7 @@ class PiperPlus private constructor(
                 emit(chunk)
             }
         } finally {
+            releaseIterator()
             synthesizing = false
         }
     }.flowOn(Dispatchers.IO)
@@ -250,15 +254,16 @@ class PiperPlus private constructor(
         }
         try {
             synchronized(lock) {
+                // named argument の理由は synthesize(text, options) と同じ。
                 PiperPlusNative.nativeSynthStartWithOptions(
-                    nativeHandle,
-                    text,
-                    options.speakerId,
-                    options.languageId,
-                    options.lengthScale,
-                    options.noiseScale,
-                    options.noiseW,
-                    options.sentenceSilenceSec,
+                    handle = nativeHandle,
+                    text = text,
+                    speakerId = options.speakerId,
+                    languageId = options.languageId,
+                    lengthScale = options.lengthScale,
+                    noiseScale = options.noiseScale,
+                    noiseW = options.noiseW,
+                    sentenceSilenceSec = options.sentenceSilenceSec,
                 )
             }
 
@@ -273,9 +278,29 @@ class PiperPlus private constructor(
                 emit(chunk)
             }
         } finally {
+            releaseIterator()
             synthesizing = false
         }
     }.flowOn(Dispatchers.IO)
+
+    /**
+     * Hand the native iterator back when collection ends early.
+     *
+     * `synth_start` marks the engine busy and only `synth_next` clears it, on
+     * reaching the end of the sentence queue. A collector that stops early --
+     * a cancelled coroutine, a `takeWhile` that stops on a user's stop button --
+     * would otherwise strand the engine as busy, and every later synthesis on
+     * it fails with ERR_BUSY until the process dies.
+     *
+     * A no-op when the iterator already ran to completion.
+     */
+    private fun releaseIterator() {
+        synchronized(lock) {
+            if (nativeHandle != 0L) {
+                PiperPlusNative.nativeSynthAbort(nativeHandle)
+            }
+        }
+    }
 
     /**
      * Release native resources. Safe to call multiple times.

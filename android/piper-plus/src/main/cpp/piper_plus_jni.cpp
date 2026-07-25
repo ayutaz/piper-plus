@@ -379,6 +379,23 @@ Java_com_piperplus_PiperPlusNative_nativeSynthNext(
 }
 
 /**
+ * Abandon an in-progress iteration and release the engine.
+ *
+ * Without this, a collector that stops early (user pressed stop) leaves the
+ * engine marked busy and every later synth_start returns ERR_BUSY.
+ * Safe to call with 0 or when no iteration is active.
+ */
+JNIEXPORT void JNICALL
+Java_com_piperplus_PiperPlusNative_nativeSynthAbort(
+        JNIEnv * /* env */,
+        jobject /* thiz */,
+        jlong handle) {
+    if (handle != 0) {
+        piper_plus_synth_abort(reinterpret_cast<PiperPlusEngine *>(handle));
+    }
+}
+
+/**
  * Free the native engine. Safe to call with 0 (no-op).
  */
 JNIEXPORT void JNICALL
