@@ -176,7 +176,24 @@ dependencies {
 
 > `android:settingsActivity` は設定画面を実装する後続計画 (M4) で追加する。
 
-- [ ] **Step 6: サニティテストを書く**
+- [ ] **Step 6: .gitignore を更新**
+
+`.gitignore` には `android/piper-plus-g2p/` のビルド成果物しか登録されていない
+(262-273 行)。同じブロックの末尾に、`piper-plus` / `piper-plus-tts-engine` の
+成果物と、マシン固有の SDK パスを追加する。
+
+```gitignore
+android/piper-plus/build/
+android/piper-plus/.cxx/
+# CI が build-android artifact から配置する native ライブラリ (Task 9)
+android/piper-plus/src/main/jniLibs/
+android/piper-plus-tts-engine/build/
+android/piper-plus-tts-engine/.cxx/
+# Android SDK の場所はマシン固有。コミットしない
+android/local.properties
+```
+
+- [ ] **Step 7: サニティテストを書く**
 
 `android/piper-plus-tts-engine/src/test/java/com/piperplus/tts/ModuleSanityTest.kt`:
 
@@ -195,17 +212,23 @@ class ModuleSanityTest {
 }
 ```
 
-- [ ] **Step 7: テストを実行して通ることを確認**
+- [ ] **Step 8: テストを実行して通ることを確認**
 
 Run: `cd android && ./gradlew :piper-plus-tts-engine:testDebugUnitTest`
 Expected: PASS (1 test)
 
 このタスクの時点では Service クラスがまだ存在しないため、`assembleDebug` は失敗する。ユニットテストのみ実行すること。
 
-- [ ] **Step 8: コミット**
+> **前提**: Android Gradle Plugin 8.x は JDK 17 以上を要求する。`java -version` が
+> 1.8 を返す環境では `brew install --cask temurin@17` などで JDK 17 を入れ、
+> `JAVA_HOME=$(/usr/libexec/java_home -v 17)` を設定してから実行する。
+> Android SDK の場所は `android/local.properties` に `sdk.dir=/path/to/sdk` として
+> 書くか、`ANDROID_HOME` を設定する。
+
+- [ ] **Step 9: コミット**
 
 ```bash
-git add android/settings.gradle.kts android/piper-plus-tts-engine
+git add .gitignore android/settings.gradle.kts android/piper-plus-tts-engine
 git commit -m "feat(android): TTS エンジンモジュールの雛形を追加"
 ```
 
