@@ -119,6 +119,14 @@
       "expected": "trained_language_id_map"
     },
     {
+      "runtime": "kotlin_android",
+      "path": "android/piper-plus-tts-engine/src/main/java/com/piperplus/tts/LocaleResolver.kt",
+      "kind": "kotlin_iso3_map",
+      "symbol": "ISO3_TO_LANGUAGE_ID",
+      "expected": "trained_language_id_map",
+      "note": "The Android TTS engine receives ISO-639-3 codes from the framework (SynthesisRequest.language), so this is the one mirror that cannot use the canonical ISO-639-1 keys. [iso639_3_aliases] normalises it before comparison. Note the sweep in check_language_id_map_contract.py only walks src/, so this entry is what keeps android/ covered."
+    },
+    {
       "runtime": "csharp",
       "path": "src/csharp/PiperPlus.Core/Config/PiperConfig.cs",
       "kind": "none",

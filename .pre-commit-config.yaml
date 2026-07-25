@@ -666,7 +666,7 @@ repos:
         name: LANGUAGE_ID_MAP contract (canonical TOML vs 6 runtime sources)
         entry: uv run --no-sync python scripts/check_language_id_map_contract.py
         language: system
-        files: ^(docs/spec/language-id-map-contract\.toml|src/python/piper_train/tools/prepare_multilingual_dataset\.py|src/python_run/piper_plus/voice\.py|src/rust/piper-core/src/(config|wasm)\.rs|src/rust/piper-wasm/src/lib\.rs|src/go/piperplus/testdata/valid_multilingual_config\.json|src/wasm/openjtalk-web/models/multilingual-test-medium\.onnx\.json|src/csharp/PiperPlus\.Core/Config/PiperConfig\.cs|src/cpp/piper\.cpp|scripts/check_language_id_map_contract\.py|scripts/regenerate_language_id_map_fixture\.py|tests/fixtures/language_id_map/.*)$
+        files: ^(docs/spec/language-id-map-contract\.toml|src/python/piper_train/tools/prepare_multilingual_dataset\.py|src/python_run/piper_plus/voice\.py|src/rust/piper-core/src/(config|wasm)\.rs|src/rust/piper-wasm/src/lib\.rs|src/go/piperplus/testdata/valid_multilingual_config\.json|src/wasm/openjtalk-web/models/multilingual-test-medium\.onnx\.json|src/csharp/PiperPlus\.Core/Config/PiperConfig\.cs|src/cpp/piper\.cpp|android/piper-plus-tts-engine/src/main/java/com/piperplus/tts/LocaleResolver\.kt|scripts/check_language_id_map_contract\.py|scripts/regenerate_language_id_map_fixture\.py|tests/fixtures/language_id_map/.*)$
         pass_filenames: false
 
       # CHANGELOG [Unreleased] section cleanup gate. After a release tag is

@@ -77,6 +77,23 @@ values_unique = true                # no duplicate IDs
 ja_is_zero = true                   # ja=0 is load-bearing for legacy ckpts
 en_is_one = true                    # en=1 is load-bearing for legacy ckpts
 
+[iso639_3_aliases]
+# Android hands TTS engines ISO-639-3 codes, not the ISO-639-1 codes the
+# canonical map is written in. Mirrors that must speak ISO-639-3 declare their
+# table in those terms; the checker normalises through this table before
+# comparing, so the canonical map stays the single source of truth.
+#
+# `cmn` (Mandarin) maps to the same language as `zho` (macrolanguage Chinese):
+# both must resolve to the same id, and the checker rejects the file if they
+# disagree.
+to_canonical.jpn = "ja"
+to_canonical.eng = "en"
+to_canonical.zho = "zh"
+to_canonical.cmn = "zh"
+to_canonical.spa = "es"
+to_canonical.fra = "fr"
+to_canonical.por = "pt"
+
 [runtime_sources]
 # Per-runtime files containing a literal language_id_map. The drift checker
 # parses these and asserts they match either `canonical.language_id_map`
@@ -89,6 +106,8 @@ en_is_one = true                    # en=1 is load-bearing for legacy ckpts
 #   inline_substring_7lang  — file must contain the 7-lang JSON literal
 #   inline_substring_8lang  — file must contain the 8-lang JSON literal (sv+ko)
 #   json_field              — JSON file's `language_id_map` field
+#   kotlin_iso3_map         — Kotlin `mapOf("jpn" to 0, ...)` keyed by ISO-639-3
+#                             (normalised via [iso639_3_aliases] before compare)
 #   none                    — data-driven from config; nothing to verify here
 
 [[runtime_sources.entries]]
@@ -145,6 +164,20 @@ path = "src/wasm/openjtalk-web/models/multilingual-test-medium.onnx.json"
 kind = "json_field"
 field = "language_id_map"
 expected = "trained_language_id_map"
+
+[[runtime_sources.entries]]
+runtime = "kotlin_android"
+path = "android/piper-plus-tts-engine/src/main/java/com/piperplus/tts/LocaleResolver.kt"
+kind = "kotlin_iso3_map"
+symbol = "ISO3_TO_LANGUAGE_ID"
+expected = "trained_language_id_map"
+note = """
+The Android TTS engine receives ISO-639-3 codes from the framework \
+(SynthesisRequest.language), so this is the one mirror that cannot use the \
+canonical ISO-639-1 keys. [iso639_3_aliases] normalises it before comparison. \
+Note the sweep in check_language_id_map_contract.py only walks src/, so this \
+entry is what keeps android/ covered.\
+"""
 
 # C# and C++ runtimes parse language_id_map from the model config at runtime
 # and have NO source-level literal to verify. They are intentionally listed
