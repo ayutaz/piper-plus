@@ -319,6 +319,13 @@ TEST(CApiIterator, SynthNextNullChunk) {
     EXPECT_EQ(rc, PIPER_PLUS_ERR);
 }
 
+TEST(CApiIterator, SynthAbortNullEngine) {
+    PiperPlusStatus rc = piper_plus_synth_abort(nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+    const char* err = piper_plus_get_last_error();
+    EXPECT_NE(err, nullptr);
+}
+
 // --- Iterator: state machine ---
 
 TEST(CApiIterator, SynthStartRepeatedNullEngine) {

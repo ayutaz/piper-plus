@@ -55,6 +55,7 @@ on:
       - 'src/wasm/openjtalk-web/models/multilingual-test-medium.onnx.json'
       - 'src/csharp/PiperPlus.Core/Config/PiperConfig.cs'
       - 'src/cpp/piper.cpp'
+      - 'android/piper-plus-tts-engine/src/main/java/com/piperplus/tts/LocaleResolver.kt'
       # ort-session canonical
       - 'src/python/piper_train/ort_utils.py'
       # ssml canonical

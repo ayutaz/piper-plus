@@ -124,6 +124,61 @@ def _extract_json_field(path: Path, field: str) -> object:
     return obj.get(field)
 
 
+_KOTLIN_MAP_ENTRY = re.compile(r'"(?P<key>[a-z]{2,3})"\s+to\s+(?P<value>\d+)')
+
+
+def _extract_kotlin_iso3_map(
+    path: Path, symbol: str, aliases: dict[str, str]
+) -> dict[str, int] | None:
+    """Extract a Kotlin `mapOf("jpn" to 0, ...)` literal, keyed by ISO-639-3.
+
+    The Android TTS engine receives ISO-639-3 codes from the Android framework
+    (`SynthesisRequest.language`), so its table cannot use the ISO-639-1 keys
+    the canonical map is written in. `aliases` maps each ISO-639-3 code back to
+    its canonical key; the returned map is in canonical terms so the caller can
+    compare it directly.
+
+    Returns None when the symbol is absent or an entry uses an unknown code.
+    """
+    text = path.read_text(encoding="utf-8")
+    marker = f"{symbol}"
+    start = text.find(marker)
+    if start < 0:
+        return None
+    open_paren = text.find("mapOf(", start)
+    if open_paren < 0:
+        return None
+
+    depth = 0
+    end = -1
+    for i in range(open_paren + len("mapOf"), len(text)):
+        if text[i] == "(":
+            depth += 1
+        elif text[i] == ")":
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    if end < 0:
+        return None
+
+    result: dict[str, int] = {}
+    for match in _KOTLIN_MAP_ENTRY.finditer(text[open_paren:end]):
+        iso3 = match.group("key")
+        canonical_key = aliases.get(iso3)
+        if canonical_key is None:
+            # An unmapped code means the alias table and the source have
+            # drifted; surface it rather than silently ignoring the entry.
+            return None
+        value = int(match.group("value"))
+        existing = result.get(canonical_key)
+        if existing is not None and existing != value:
+            # e.g. `zho` and `cmn` must resolve to the same id.
+            return None
+        result[canonical_key] = value
+    return result or None
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -289,6 +344,24 @@ def main() -> int:
                 )
             elif args.verbose:
                 print(f"  OK [{runtime}] {rel_path}.{entry['field']} = {actual!r}")
+
+        elif kind == "kotlin_iso3_map":
+            aliases = contract["iso639_3_aliases"]["to_canonical"]
+            actual = _extract_kotlin_iso3_map(path, entry["symbol"], aliases)
+            if actual is None:
+                errors.append(
+                    f"  [{runtime}] could not extract {entry['symbol']!r} from "
+                    f"{rel_path} (missing symbol, unknown ISO-639-3 code, or "
+                    f"two codes mapping to the same language with different ids)"
+                )
+            elif actual != expected:
+                errors.append(
+                    f"  [{runtime}] {entry['symbol']} in {rel_path} "
+                    f"(normalised to canonical keys): "
+                    f"actual={actual!r} != expected={expected!r}"
+                )
+            elif args.verbose:
+                print(f"  OK [{runtime}] {entry['symbol']} = {actual!r}")
 
         else:
             errors.append(f"  [{runtime}] unknown extractor kind={kind!r}")

@@ -5,4 +5,6 @@ package com.piperplus
  *
  * The [message] contains the error string from `piper_plus_get_last_error()`.
  */
-class PiperPlusException(message: String) : RuntimeException(message)
+class PiperPlusException(
+    message: String,
+) : RuntimeException(message)

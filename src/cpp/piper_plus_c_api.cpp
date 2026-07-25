@@ -851,6 +851,27 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synth_next(
     }
 }
 
+PIPER_PLUS_API PiperPlusStatus piper_plus_synth_abort(PiperPlusEngine *engine)
+{
+    if (!engine) {
+        set_error("engine is NULL");
+        return PIPER_PLUS_ERR;
+    }
+
+    // Already finished (or never started): nothing to release. Idempotent so
+    // that callers can put this in an unconditional cleanup path.
+    if (!engine->iterState.active) {
+        return PIPER_PLUS_OK;
+    }
+
+    // synth_start leaves inProgress=true for synth_next to consume, and
+    // finish() is the only place that clears it. A caller that stops
+    // pulling chunks early would otherwise strand the engine as busy for
+    // the rest of its life.
+    engine->iterState.finish(engine->voice.synthesisConfig, engine->inProgress);
+    return PIPER_PLUS_OK;
+}
+
 PIPER_PLUS_API PiperPlusStatus piper_plus_synthesize_streaming(
     PiperPlusEngine *engine,
     const char *text,

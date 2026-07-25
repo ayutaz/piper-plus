@@ -223,6 +223,59 @@ Java_com_piperplus_PiperPlusNative_nativeSynthesize(
 }
 
 /**
+ * Synthesis with explicit options.
+ *
+ * Mirrors nativeSynthesize but lets the caller set every field of
+ * PiperPlusSynthOptions except speaker_embedding (voice cloning is not
+ * exposed through the Android TTS engine).
+ */
+JNIEXPORT jshortArray JNICALL
+Java_com_piperplus_PiperPlusNative_nativeSynthesizeWithOptions(
+        JNIEnv *env,
+        jobject /* thiz */,
+        jlong handle,
+        jstring text,
+        jint speakerId,
+        jint languageId,
+        jfloat lengthScale,
+        jfloat noiseScale,
+        jfloat noiseW,
+        jfloat sentenceSilenceSec) {
+
+    auto *engine = reinterpret_cast<PiperPlusEngine *>(handle);
+    JNIStringGuard textUtf8(env, text);
+    if (!textUtf8) { throwPiperException(env, PIPER_PLUS_ERR); return nullptr; }
+
+    // piper_plus_default_options() zeroes _reserved[5] as the header requires.
+    PiperPlusSynthOptions opts = piper_plus_default_options();
+    opts.speaker_id           = static_cast<int32_t>(speakerId);
+    opts.language_id          = static_cast<int32_t>(languageId);
+    opts.length_scale         = lengthScale;
+    opts.noise_scale          = noiseScale;
+    opts.noise_w              = noiseW;
+    opts.sentence_silence_sec = sentenceSilenceSec;
+
+    float   *samples     = nullptr;
+    int32_t  numSamples  = 0;
+    int32_t  sampleRate  = 0;
+
+    PiperPlusStatus status = piper_plus_synthesize(
+            engine, textUtf8.get(), &opts,
+            &samples, &numSamples, &sampleRate);
+
+    // JNIStringGuard destructor releases textUtf8 here.
+
+    if (status != PIPER_PLUS_OK) {
+        throwPiperException(env, status);
+        return nullptr;
+    }
+
+    jshortArray result = floatsToShortArray(env, samples, numSamples);
+    piper_plus_free_audio(samples);
+    return result;
+}
+
+/**
  * Start iterator-based streaming synthesis.
  * Returns the sample rate (> 0) on success, or throws.
  */
@@ -240,6 +293,49 @@ Java_com_piperplus_PiperPlusNative_nativeSynthStart(
 
     PiperPlusSynthOptions opts = piper_plus_default_options();
     opts.speaker_id = static_cast<int32_t>(speakerId);
+
+    PiperPlusStatus status = piper_plus_synth_start(engine, textUtf8.get(), &opts);
+
+    // JNIStringGuard destructor releases textUtf8 here.
+
+    if (status != PIPER_PLUS_OK) {
+        throwPiperException(env, status);
+        return 0;
+    }
+    return piper_plus_sample_rate(engine);
+}
+
+/**
+ * Start iterator-based streaming synthesis with explicit options.
+ * Returns the sample rate (> 0) on success, or throws.
+ *
+ * Chunk retrieval is shared with nativeSynthNext -- only the start call
+ * needs an options-aware variant.
+ */
+JNIEXPORT jint JNICALL
+Java_com_piperplus_PiperPlusNative_nativeSynthStartWithOptions(
+        JNIEnv *env,
+        jobject /* thiz */,
+        jlong handle,
+        jstring text,
+        jint speakerId,
+        jint languageId,
+        jfloat lengthScale,
+        jfloat noiseScale,
+        jfloat noiseW,
+        jfloat sentenceSilenceSec) {
+
+    auto *engine = reinterpret_cast<PiperPlusEngine *>(handle);
+    JNIStringGuard textUtf8(env, text);
+    if (!textUtf8) { throwPiperException(env, PIPER_PLUS_ERR); return 0; }
+
+    PiperPlusSynthOptions opts = piper_plus_default_options();
+    opts.speaker_id           = static_cast<int32_t>(speakerId);
+    opts.language_id          = static_cast<int32_t>(languageId);
+    opts.length_scale         = lengthScale;
+    opts.noise_scale          = noiseScale;
+    opts.noise_w              = noiseW;
+    opts.sentence_silence_sec = sentenceSilenceSec;
 
     PiperPlusStatus status = piper_plus_synth_start(engine, textUtf8.get(), &opts);
 
@@ -280,6 +376,23 @@ Java_com_piperplus_PiperPlusNative_nativeSynthNext(
         return floatsToShortArray(env, chunk.samples, chunk.num_samples);
     }
     return nullptr; // End of stream
+}
+
+/**
+ * Abandon an in-progress iteration and release the engine.
+ *
+ * Without this, a collector that stops early (user pressed stop) leaves the
+ * engine marked busy and every later synth_start returns ERR_BUSY.
+ * Safe to call with 0 or when no iteration is active.
+ */
+JNIEXPORT void JNICALL
+Java_com_piperplus_PiperPlusNative_nativeSynthAbort(
+        JNIEnv * /* env */,
+        jobject /* thiz */,
+        jlong handle) {
+    if (handle != 0) {
+        piper_plus_synth_abort(reinterpret_cast<PiperPlusEngine *>(handle));
+    }
 }
 
 /**

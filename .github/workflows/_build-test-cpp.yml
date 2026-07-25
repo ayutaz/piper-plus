@@ -395,6 +395,7 @@ jobs:
             piper_plus_synthesize
             piper_plus_synth_start
             piper_plus_synth_next
+            piper_plus_synth_abort
             piper_plus_synthesize_streaming
             piper_plus_free_audio
             piper_plus_default_options

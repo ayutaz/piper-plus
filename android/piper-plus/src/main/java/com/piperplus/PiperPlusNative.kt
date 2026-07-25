@@ -5,7 +5,13 @@ package com.piperplus
  *
  * All methods throw [PiperPlusException] on native errors.
  * This class is internal -- use [PiperPlus] for the public API.
+ *
+ * `TooManyFunctions` is suppressed because there is one declaration per
+ * exported C symbol -- the count tracks the C API surface, not this object's
+ * complexity. Splitting it would break the 1:1 correspondence that
+ * `PiperPlusNativeBridgeTest` verifies against `piper_plus_jni.cpp`.
  */
+@Suppress("TooManyFunctions")
 internal object PiperPlusNative {
     init {
         System.loadLibrary("piper_plus_jni")
@@ -20,7 +26,11 @@ internal object PiperPlusNative {
      * @return Native handle (pointer as Long). Never 0 on success.
      * @throws PiperPlusException on creation failure.
      */
-    external fun nativeCreate(modelPath: String, configPath: String?, dictDir: String?): Long
+    external fun nativeCreate(
+        modelPath: String,
+        configPath: String?,
+        dictDir: String?,
+    ): Long
 
     /**
      * One-shot synthesis.
@@ -31,7 +41,32 @@ internal object PiperPlusNative {
      * @return PCM 16-bit audio samples.
      * @throws PiperPlusException on synthesis failure.
      */
-    external fun nativeSynthesize(handle: Long, text: String, speakerId: Int): ShortArray
+    external fun nativeSynthesize(
+        handle: Long,
+        text: String,
+        speakerId: Int,
+    ): ShortArray
+
+    /**
+     * One-shot synthesis with explicit options.
+     *
+     * Mirrors [nativeSynthesize] but exposes every field of the C API's
+     * `PiperPlusSynthOptions` except `speaker_embedding`.
+     *
+     * @return PCM 16-bit audio samples.
+     * @throws PiperPlusException on synthesis failure.
+     */
+    @Suppress("LongParameterList")
+    external fun nativeSynthesizeWithOptions(
+        handle: Long,
+        text: String,
+        speakerId: Int,
+        languageId: Int,
+        lengthScale: Float,
+        noiseScale: Float,
+        noiseW: Float,
+        sentenceSilenceSec: Float,
+    ): ShortArray
 
     /**
      * Start iterator-based streaming synthesis.
@@ -42,7 +77,31 @@ internal object PiperPlusNative {
      * @return Sample rate in Hz.
      * @throws PiperPlusException on failure.
      */
-    external fun nativeSynthStart(handle: Long, text: String, speakerId: Int): Int
+    external fun nativeSynthStart(
+        handle: Long,
+        text: String,
+        speakerId: Int,
+    ): Int
+
+    /**
+     * Start iterator-based streaming synthesis with explicit options.
+     *
+     * Chunk retrieval is shared with [nativeSynthNext].
+     *
+     * @return Sample rate in Hz.
+     * @throws PiperPlusException on failure.
+     */
+    @Suppress("LongParameterList")
+    external fun nativeSynthStartWithOptions(
+        handle: Long,
+        text: String,
+        speakerId: Int,
+        languageId: Int,
+        lengthScale: Float,
+        noiseScale: Float,
+        noiseW: Float,
+        sentenceSilenceSec: Float,
+    ): Int
 
     /**
      * Get the next audio chunk from the streaming iterator.
@@ -52,6 +111,19 @@ internal object PiperPlusNative {
      * @throws PiperPlusException on failure.
      */
     external fun nativeSynthNext(handle: Long): ShortArray?
+
+    /**
+     * Abandon an in-progress streaming iteration and release the engine.
+     *
+     * [nativeSynthStart] marks the engine busy and only [nativeSynthNext]
+     * clears it, on reaching the end of the sentence queue. A collector that
+     * stops early must call this or every later start fails with ERR_BUSY.
+     *
+     * Safe to call when no iteration is active (0 is a no-op).
+     *
+     * @param handle Native engine handle.
+     */
+    external fun nativeSynthAbort(handle: Long)
 
     /**
      * Free the native engine. Safe to call multiple times (idempotent after first call).

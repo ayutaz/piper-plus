@@ -200,6 +200,9 @@ typedef _SynthNextC = Int32 Function(
 typedef _SynthNextDart = int Function(
     Pointer<PiperPlusEngine>, Pointer<PiperPlusAudioChunk>);
 
+typedef _SynthAbortC = Int32 Function(Pointer<PiperPlusEngine>);
+typedef _SynthAbortDart = int Function(Pointer<PiperPlusEngine>);
+
 // ---------------------------------------------------------------------------
 // Bindings class
 // ---------------------------------------------------------------------------
@@ -288,4 +291,13 @@ class PiperPlusBindings {
   late final piper_plus_synth_next =
       _lib.lookupFunction<_SynthNextC, _SynthNextDart>(
           'piper_plus_synth_next');
+
+  /// Release an iteration you stop consuming early.
+  ///
+  /// synth_start marks the engine busy and only synth_next clears that mark,
+  /// on reaching the end of the queue. Stop pulling chunks without calling
+  /// this and every later synth_start returns PIPER_PLUS_ERR_BUSY.
+  late final piper_plus_synth_abort =
+      _lib.lookupFunction<_SynthAbortC, _SynthAbortDart>(
+          'piper_plus_synth_abort');
 }

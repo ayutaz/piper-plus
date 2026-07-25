@@ -271,6 +271,14 @@ android/piper-plus-g2p/src/main/jniLibs/
 android/piper-plus-g2p/.cxx/
 android/piper-plus-g2p/build/
 android/.gradle/
+android/piper-plus/build/
+android/piper-plus/.cxx/
+# CI が build-android artifact から配置する native ライブラリ
+android/piper-plus/src/main/jniLibs/
+android/piper-plus-tts-engine/build/
+android/piper-plus-tts-engine/.cxx/
+# Android SDK の場所はマシン固有。コミットしない
+android/local.properties
 
 # Swift Package Manager: Package.resolved is auto-generated when SPM
 # resolves dependencies. piper-plus ships libraries (PiperPlus /

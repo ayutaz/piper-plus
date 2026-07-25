@@ -42,9 +42,8 @@ import kotlin.coroutines.coroutineContext
  * @property numLanguages Number of languages available in the model.
  */
 class PiperPlus private constructor(
-    private var nativeHandle: Long
+    private var nativeHandle: Long,
 ) : AutoCloseable {
-
     /**
      * Lock object for all native engine access.
      * The C API is NOT thread-safe per engine, so every call must be serialised.
@@ -57,24 +56,27 @@ class PiperPlus private constructor(
 
     /** Sample rate of the loaded model in Hz. */
     val sampleRate: Int
-        get() = synchronized(lock) {
-            checkNotClosed()
-            PiperPlusNative.nativeSampleRate(nativeHandle)
-        }
+        get() =
+            synchronized(lock) {
+                checkNotClosed()
+                PiperPlusNative.nativeSampleRate(nativeHandle)
+            }
 
     /** Number of speakers available in the loaded model. */
     val numSpeakers: Int
-        get() = synchronized(lock) {
-            checkNotClosed()
-            PiperPlusNative.nativeNumSpeakers(nativeHandle)
-        }
+        get() =
+            synchronized(lock) {
+                checkNotClosed()
+                PiperPlusNative.nativeNumSpeakers(nativeHandle)
+            }
 
     /** Number of languages available in the loaded model. */
     val numLanguages: Int
-        get() = synchronized(lock) {
-            checkNotClosed()
-            PiperPlusNative.nativeNumLanguages(nativeHandle)
-        }
+        get() =
+            synchronized(lock) {
+                checkNotClosed()
+                PiperPlusNative.nativeNumLanguages(nativeHandle)
+            }
 
     companion object {
         /** Default subdirectory name for the OpenJTalk dictionary inside app files. */
@@ -102,7 +104,7 @@ class PiperPlus private constructor(
             context: Context,
             modelPath: String,
             configPath: String? = null,
-            dictDir: String? = null
+            dictDir: String? = null,
         ): PiperPlus {
             val resolvedDictDir = dictDir ?: extractDictIfNeeded(context)
             val handle = PiperPlusNative.nativeCreate(modelPath, configPath, resolvedDictDir)
@@ -117,11 +119,10 @@ class PiperPlus private constructor(
          */
         private fun extractDictIfNeeded(context: Context): String? {
             val destDir = File(context.filesDir, DICT_ASSET_DIR)
-            if (destDir.exists() && destDir.isDirectory) {
-                val files = destDir.listFiles()
-                if (files != null && files.isNotEmpty()) {
-                    return destDir.absolutePath
-                }
+            // isDirectory implies exists(), and isNullOrEmpty() covers both the
+            // null (I/O error) and empty cases listFiles() can return.
+            if (destDir.isDirectory && !destDir.listFiles().isNullOrEmpty()) {
+                return destDir.absolutePath
             }
 
             // Attempt to extract from assets. If the assets directory does
@@ -129,19 +130,30 @@ class PiperPlus private constructor(
             // auto-detect or fail gracefully.
             return try {
                 val assetFiles = context.assets.list(DICT_ASSET_DIR)
-                if (assetFiles.isNullOrEmpty()) return null
-
-                destDir.mkdirs()
-                for (filename in assetFiles) {
-                    context.assets.open("$DICT_ASSET_DIR/$filename").use { input ->
-                        FileOutputStream(File(destDir, filename)).use { output ->
-                            input.copyTo(output)
-                        }
-                    }
+                if (assetFiles.isNullOrEmpty()) {
+                    null
+                } else {
+                    copyAssetsTo(context, assetFiles, destDir)
+                    destDir.absolutePath
                 }
-                destDir.absolutePath
             } catch (_: Exception) {
                 null
+            }
+        }
+
+        /** Copy every named asset from [DICT_ASSET_DIR] into [destDir]. */
+        private fun copyAssetsTo(
+            context: Context,
+            assetFiles: Array<String>,
+            destDir: File,
+        ) {
+            destDir.mkdirs()
+            for (filename in assetFiles) {
+                context.assets.open("$DICT_ASSET_DIR/$filename").use { input ->
+                    FileOutputStream(File(destDir, filename)).use { output ->
+                        input.copyTo(output)
+                    }
+                }
             }
         }
     }
@@ -155,10 +167,44 @@ class PiperPlus private constructor(
      * @throws PiperPlusException on synthesis failure.
      * @throws IllegalStateException if the engine has been closed.
      */
-    fun synthesize(text: String, speakerId: Int = 0): ShortArray {
+    fun synthesize(
+        text: String,
+        speakerId: Int = 0,
+    ): ShortArray {
         synchronized(lock) {
             checkNotClosed()
             return PiperPlusNative.nativeSynthesize(nativeHandle, text, speakerId)
+        }
+    }
+
+    /**
+     * Synthesize text to audio in one shot with explicit options.
+     *
+     * @param text    Text to synthesize (UTF-8). May contain multiple sentences.
+     * @param options Synthesis options (language, speed, noise scales).
+     * @return PCM 16-bit audio samples at [sampleRate] Hz.
+     * @throws PiperPlusException on synthesis failure.
+     * @throws IllegalStateException if the engine has been closed.
+     */
+    fun synthesize(
+        text: String,
+        options: SynthOptions,
+    ): ShortArray {
+        synchronized(lock) {
+            checkNotClosed()
+            // 末尾 4 つはすべて Float なので、位置引数だと並べ替えても
+            // 型検査を通ってしまう (length_scale と noise_scale が
+            // 入れ替わると常時 2.5 倍速になる)。named argument で固定する。
+            return PiperPlusNative.nativeSynthesizeWithOptions(
+                handle = nativeHandle,
+                text = text,
+                speakerId = options.speakerId,
+                languageId = options.languageId,
+                lengthScale = options.lengthScale,
+                noiseScale = options.noiseScale,
+                noiseW = options.noiseW,
+                sentenceSilenceSec = options.sentenceSilenceSec,
+            )
         }
     }
 
@@ -179,31 +225,110 @@ class PiperPlus private constructor(
      * @throws PiperPlusException on synthesis failure.
      * @throws IllegalStateException if the engine has been closed.
      */
-    fun synthesizeStream(text: String, speakerId: Int = 0): Flow<ShortArray> = flow {
-        synchronized(lock) {
-            checkNotClosed()
-            check(!synthesizing) { "A streaming synthesis is already in progress" }
-            synthesizing = true
-        }
-        try {
+    fun synthesizeStream(
+        text: String,
+        speakerId: Int = 0,
+    ): Flow<ShortArray> =
+        flow {
             synchronized(lock) {
-                PiperPlusNative.nativeSynthStart(nativeHandle, text, speakerId)
+                checkNotClosed()
+                check(!synthesizing) { "A streaming synthesis is already in progress" }
+                synthesizing = true
             }
+            try {
+                synchronized(lock) {
+                    PiperPlusNative.nativeSynthStart(nativeHandle, text, speakerId)
+                }
 
-            while (true) {
-                // Check for coroutine cancellation between chunks so that
-                // a cancelled collector does not keep driving the native iterator.
-                coroutineContext.ensureActive()
+                while (true) {
+                    // Check for coroutine cancellation between chunks so that
+                    // a cancelled collector does not keep driving the native iterator.
+                    coroutineContext.ensureActive()
 
-                val chunk = synchronized(lock) {
-                    PiperPlusNative.nativeSynthNext(nativeHandle)
-                } ?: break
-                emit(chunk)
+                    val chunk =
+                        synchronized(lock) {
+                            PiperPlusNative.nativeSynthNext(nativeHandle)
+                        } ?: break
+                    emit(chunk)
+                }
+            } finally {
+                releaseIterator()
+                synthesizing = false
             }
-        } finally {
-            synthesizing = false
+        }.flowOn(Dispatchers.IO)
+
+    /**
+     * Synthesize text as a [Flow] of chunks with explicit options.
+     *
+     * Semantics match [synthesizeStream] (String, Int): one chunk per sentence,
+     * cancellation-safe via try-finally, collected on [Dispatchers.IO].
+     *
+     * @param text    Text to synthesize (UTF-8). Will be split into sentences.
+     * @param options Synthesis options (language, speed, noise scales).
+     * @return Cold [Flow] of PCM 16-bit audio chunks.
+     * @throws PiperPlusException on synthesis failure.
+     * @throws IllegalStateException if the engine has been closed.
+     */
+    fun synthesizeStream(
+        text: String,
+        options: SynthOptions,
+    ): Flow<ShortArray> =
+        flow {
+            synchronized(lock) {
+                checkNotClosed()
+                check(!synthesizing) { "A streaming synthesis is already in progress" }
+                synthesizing = true
+            }
+            try {
+                synchronized(lock) {
+                    // named argument の理由は synthesize(text, options) と同じ。
+                    PiperPlusNative.nativeSynthStartWithOptions(
+                        handle = nativeHandle,
+                        text = text,
+                        speakerId = options.speakerId,
+                        languageId = options.languageId,
+                        lengthScale = options.lengthScale,
+                        noiseScale = options.noiseScale,
+                        noiseW = options.noiseW,
+                        sentenceSilenceSec = options.sentenceSilenceSec,
+                    )
+                }
+
+                while (true) {
+                    // Check for coroutine cancellation between chunks so that
+                    // a cancelled collector does not keep driving the native iterator.
+                    coroutineContext.ensureActive()
+
+                    val chunk =
+                        synchronized(lock) {
+                            PiperPlusNative.nativeSynthNext(nativeHandle)
+                        } ?: break
+                    emit(chunk)
+                }
+            } finally {
+                releaseIterator()
+                synthesizing = false
+            }
+        }.flowOn(Dispatchers.IO)
+
+    /**
+     * Hand the native iterator back when collection ends early.
+     *
+     * `synth_start` marks the engine busy and only `synth_next` clears it, on
+     * reaching the end of the sentence queue. A collector that stops early --
+     * a cancelled coroutine, a `takeWhile` that stops on a user's stop button --
+     * would otherwise strand the engine as busy, and every later synthesis on
+     * it fails with ERR_BUSY until the process dies.
+     *
+     * A no-op when the iterator already ran to completion.
+     */
+    private fun releaseIterator() {
+        synchronized(lock) {
+            if (nativeHandle != 0L) {
+                PiperPlusNative.nativeSynthAbort(nativeHandle)
+            }
         }
-    }.flowOn(Dispatchers.IO)
+    }
 
     /**
      * Release native resources. Safe to call multiple times.

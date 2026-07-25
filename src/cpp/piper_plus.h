@@ -217,6 +217,23 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synth_next(
     PiperPlusEngine      *engine,
     PiperPlusAudioChunk  *out_chunk);
 
+/**
+ * Abandon an in-progress iteration and release the engine.
+ *
+ * piper_plus_synth_start() marks the engine busy and only
+ * piper_plus_synth_next() clears that mark, when it reaches the end of the
+ * sentence queue. A caller that stops pulling chunks early (a user pressing
+ * stop, a cancelled coroutine) must call this, or every later
+ * piper_plus_synth_start() on the same engine returns PIPER_PLUS_ERR_BUSY.
+ *
+ * Safe to call when no iteration is active, so it fits an unconditional
+ * cleanup path.
+ *
+ * @return PIPER_PLUS_OK, or PIPER_PLUS_ERR when engine is NULL.
+ */
+PIPER_PLUS_API PiperPlusStatus piper_plus_synth_abort(
+    PiperPlusEngine      *engine);
+
 /* ===== Streaming callback synthesis ===== */
 
 /** Audio callback for streaming synthesis.

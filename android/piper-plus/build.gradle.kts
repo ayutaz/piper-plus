@@ -2,6 +2,27 @@ plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
     id("maven-publish")
+    // :piper-plus-g2p と同じ設定・同じバージョンで揃える。片方だけ lint が
+    // 掛かっていない状態はスタイルのドリフトを生む。
+    id("org.jlleitschuh.gradle.ktlint") version "12.3.0"
+    id("io.gitlab.arturbosch.detekt") version "1.23.8"
+}
+
+detekt {
+    toolVersion = "1.23.7"
+    config.setFrom(files("$rootDir/detekt.yml"))
+    buildUponDefaultConfig = true
+    autoCorrect = false
+}
+
+ktlint {
+    version.set("1.3.1")
+    android.set(true)
+    outputColorName.set("RED")
+    ignoreFailures.set(false)
+    filter {
+        exclude("**/generated/**", "**/build/**")
+    }
 }
 
 android {
@@ -20,8 +41,8 @@ android {
         }
 
         ndk {
-            // arm64-v8a only for now; add "armeabi-v7a", "x86_64" as needed
-            abiFilters += "arm64-v8a"
+            // release-shared-lib.yml / android-build.yml と同じ 3 ABI
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
     }
 
@@ -30,7 +51,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -63,6 +84,10 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
+    // detekt-formatting bundles the ktlint ruleset into detekt so the
+    // `formatting` section in the shared detekt.yml has rules to operate on.
+    // The version must match `detekt { toolVersion = ... }` above.
+    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
 }
 
 afterEvaluate {
