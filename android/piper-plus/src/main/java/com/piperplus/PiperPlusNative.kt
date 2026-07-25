@@ -34,6 +34,27 @@ internal object PiperPlusNative {
     external fun nativeSynthesize(handle: Long, text: String, speakerId: Int): ShortArray
 
     /**
+     * One-shot synthesis with explicit options.
+     *
+     * Mirrors [nativeSynthesize] but exposes every field of the C API's
+     * `PiperPlusSynthOptions` except `speaker_embedding`.
+     *
+     * @return PCM 16-bit audio samples.
+     * @throws PiperPlusException on synthesis failure.
+     */
+    @Suppress("LongParameterList")
+    external fun nativeSynthesizeWithOptions(
+        handle: Long,
+        text: String,
+        speakerId: Int,
+        languageId: Int,
+        lengthScale: Float,
+        noiseScale: Float,
+        noiseW: Float,
+        sentenceSilenceSec: Float,
+    ): ShortArray
+
+    /**
      * Start iterator-based streaming synthesis.
      *
      * @param handle    Native engine handle.
@@ -43,6 +64,26 @@ internal object PiperPlusNative {
      * @throws PiperPlusException on failure.
      */
     external fun nativeSynthStart(handle: Long, text: String, speakerId: Int): Int
+
+    /**
+     * Start iterator-based streaming synthesis with explicit options.
+     *
+     * Chunk retrieval is shared with [nativeSynthNext].
+     *
+     * @return Sample rate in Hz.
+     * @throws PiperPlusException on failure.
+     */
+    @Suppress("LongParameterList")
+    external fun nativeSynthStartWithOptions(
+        handle: Long,
+        text: String,
+        speakerId: Int,
+        languageId: Int,
+        lengthScale: Float,
+        noiseScale: Float,
+        noiseW: Float,
+        sentenceSilenceSec: Float,
+    ): Int
 
     /**
      * Get the next audio chunk from the streaming iterator.

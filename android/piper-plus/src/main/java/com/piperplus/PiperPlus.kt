@@ -163,6 +163,31 @@ class PiperPlus private constructor(
     }
 
     /**
+     * Synthesize text to audio in one shot with explicit options.
+     *
+     * @param text    Text to synthesize (UTF-8). May contain multiple sentences.
+     * @param options Synthesis options (language, speed, noise scales).
+     * @return PCM 16-bit audio samples at [sampleRate] Hz.
+     * @throws PiperPlusException on synthesis failure.
+     * @throws IllegalStateException if the engine has been closed.
+     */
+    fun synthesize(text: String, options: SynthOptions): ShortArray {
+        synchronized(lock) {
+            checkNotClosed()
+            return PiperPlusNative.nativeSynthesizeWithOptions(
+                nativeHandle,
+                text,
+                options.speakerId,
+                options.languageId,
+                options.lengthScale,
+                options.noiseScale,
+                options.noiseW,
+                options.sentenceSilenceSec,
+            )
+        }
+    }
+
+    /**
      * Synthesize text to audio as a [Flow] of chunks (sentence-by-sentence).
      *
      * Each emitted [ShortArray] is one sentence's worth of PCM 16-bit audio.
@@ -188,6 +213,53 @@ class PiperPlus private constructor(
         try {
             synchronized(lock) {
                 PiperPlusNative.nativeSynthStart(nativeHandle, text, speakerId)
+            }
+
+            while (true) {
+                // Check for coroutine cancellation between chunks so that
+                // a cancelled collector does not keep driving the native iterator.
+                coroutineContext.ensureActive()
+
+                val chunk = synchronized(lock) {
+                    PiperPlusNative.nativeSynthNext(nativeHandle)
+                } ?: break
+                emit(chunk)
+            }
+        } finally {
+            synthesizing = false
+        }
+    }.flowOn(Dispatchers.IO)
+
+    /**
+     * Synthesize text as a [Flow] of chunks with explicit options.
+     *
+     * Semantics match [synthesizeStream] (String, Int): one chunk per sentence,
+     * cancellation-safe via try-finally, collected on [Dispatchers.IO].
+     *
+     * @param text    Text to synthesize (UTF-8). Will be split into sentences.
+     * @param options Synthesis options (language, speed, noise scales).
+     * @return Cold [Flow] of PCM 16-bit audio chunks.
+     * @throws PiperPlusException on synthesis failure.
+     * @throws IllegalStateException if the engine has been closed.
+     */
+    fun synthesizeStream(text: String, options: SynthOptions): Flow<ShortArray> = flow {
+        synchronized(lock) {
+            checkNotClosed()
+            check(!synthesizing) { "A streaming synthesis is already in progress" }
+            synthesizing = true
+        }
+        try {
+            synchronized(lock) {
+                PiperPlusNative.nativeSynthStartWithOptions(
+                    nativeHandle,
+                    text,
+                    options.speakerId,
+                    options.languageId,
+                    options.lengthScale,
+                    options.noiseScale,
+                    options.noiseW,
+                    options.sentenceSilenceSec,
+                )
             }
 
             while (true) {
