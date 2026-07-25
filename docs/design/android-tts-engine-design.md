@@ -162,7 +162,7 @@ android/
 | コンポーネント | 責務 | 依存 |
 |--------------|------|------|
 | `PiperPlusTtsService` | Android TTS のライフサイクル実装。`SynthesisRequest` をほどいて `SynthesisSession` に渡すだけのアダプタ | すべて |
-| `SynthesisSession` | 1 発話分の合成。可用性判定 → `SynthOptions` 組み立て → ストリーム収集 → `callback` への通知。停止フラグを所有 | `EngineHolder`, `PcmEmitter` |
+| `SynthesisSession` | 1 発話分の合成。可用性判定 → `SynthOptions` 組み立て → ストリーム収集 → `callback` への通知。停止フラグを所有。サンプルレートはモデルの実値を申告する (固定値だと 22050Hz 以外のモデルで全発話のピッチがずれる) | `EngineHolder`, `PcmEmitter` |
 | `PcmEmitter` | `ShortArray` を little-endian のバイト列にして `maxBufferSize` 以下に分割 | なし (Android 型は `SynthesisCallback` のみ) |
 | `LocaleResolver` | `(lang, country, variant)` → `language_id` / 可用性判定。純関数、副作用なし | なし |
 | `VoiceRegistry` | インストール済みモデルと `Voice` オブジェクトの対応付け | `ModelManager` |

@@ -76,6 +76,8 @@ class PiperPlusTtsService : TextToSpeechService() {
 
     /** [PiperPlus] を [PiperPlusEngine] 境界に適合させる薄いラッパー。 */
     private class NativeEngine(private val native: PiperPlus) : PiperPlusEngine {
+        override val sampleRate: Int get() = native.sampleRate
+
         // named argument で固定する。PiperPlus には
         // synthesizeStream(text, speakerId = 0) が併存しており、
         // 位置引数のままだと options を落とす版に黙って解決されうる

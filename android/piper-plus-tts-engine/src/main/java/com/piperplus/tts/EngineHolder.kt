@@ -12,6 +12,14 @@ import kotlinx.coroutines.flow.Flow
  * この境界を挟んでテスト時に差し替えられるようにする。
  */
 interface PiperPlusEngine {
+    /**
+     * ロード済みモデルのサンプルレート (Hz)。
+     *
+     * `callback.start()` に渡す値なので、モデルの実値と食い違うと
+     * 全発話がピッチのずれた音として再生される。
+     */
+    val sampleRate: Int
+
     fun synthesizeStream(text: String, options: SynthOptions): Flow<ShortArray>
     fun close()
 }

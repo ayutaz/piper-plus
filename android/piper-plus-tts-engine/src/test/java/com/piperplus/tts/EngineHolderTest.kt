@@ -20,6 +20,7 @@ class EngineHolderTest {
     val temp = TemporaryFolder()
 
     private class FakeEngine : PiperPlusEngine {
+        override val sampleRate: Int = 22050
         var closed = false
         override fun synthesizeStream(text: String, options: SynthOptions): Flow<ShortArray> =
             flowOf(ShortArray(4))

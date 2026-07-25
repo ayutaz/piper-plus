@@ -59,8 +59,9 @@ internal class SynthesisSession(
         }
 
         if (text.isBlank()) {
-            // モデルをロードせずに空の発話として完了する。
-            callback.start(SAMPLE_RATE, AudioFormat.ENCODING_PCM_16BIT, CHANNEL_COUNT)
+            // モデルをロードせずに空の発話として完了する。音声を 1 バイトも
+            // 出さないので、ここだけは既定のサンプルレートを申告してよい。
+            callback.start(FALLBACK_SAMPLE_RATE, AudioFormat.ENCODING_PCM_16BIT, CHANNEL_COUNT)
             callback.done()
             return
         }
@@ -72,7 +73,9 @@ internal class SynthesisSession(
 
         try {
             val engine = engines.acquire(modelId)
-            callback.start(SAMPLE_RATE, AudioFormat.ENCODING_PCM_16BIT, CHANNEL_COUNT)
+            // モデルの実値を申告する。固定値にすると、22050Hz 以外のモデルを
+            // 入れたときに全発話がピッチのずれた音で再生される。
+            callback.start(engine.sampleRate, AudioFormat.ENCODING_PCM_16BIT, CHANNEL_COUNT)
 
             runBlocking {
                 // takeWhile で打ち切ることで、onStop 後に残りのチャンクを
@@ -99,7 +102,8 @@ internal class SynthesisSession(
     }
 
     companion object {
-        const val SAMPLE_RATE = 22050
+        /** 音声を出さない経路でのみ使う。実際の合成はモデルの実値を申告する。 */
+        const val FALLBACK_SAMPLE_RATE = 22050
         const val CHANNEL_COUNT = 1
         private const val TAG = "PiperPlusTts"
     }

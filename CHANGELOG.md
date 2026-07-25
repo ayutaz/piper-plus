@@ -40,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   失敗は `UnsatisfiedLinkError` / `NoClassDefFoundError` として送出され
   `catch (Exception)` をすり抜けていた。`catch (LinkageError)` を追加し、
   設計どおり `callback.error(ERROR_SERVICE)` として扱うようにした。
+- Android TTS エンジンが `callback.start()` にサンプルレート 22050 を固定で
+  申告していた問題。22050Hz 以外のモデルを配置すると、全発話がピッチのずれた
+  音として再生される (エラーにならないため気付きにくい)。
+  `PiperPlus.sampleRate` の実値を渡すよう修正。
 
 ### Changed
 

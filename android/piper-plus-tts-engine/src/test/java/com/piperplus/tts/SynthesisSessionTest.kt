@@ -28,7 +28,10 @@ class SynthesisSessionTest {
     // ---------------------------------------------------------------- fakes
 
     /** 渡された [SynthOptions] と、実際に生成したチャンク数を記録するエンジン。 */
-    private class RecordingEngine(private val chunks: List<ShortArray>) : PiperPlusEngine {
+    private class RecordingEngine(
+        private val chunks: List<ShortArray>,
+        override val sampleRate: Int = 22050,
+    ) : PiperPlusEngine {
         val seenTexts = mutableListOf<String>()
         val seenOptions = mutableListOf<SynthOptions>()
 
@@ -52,9 +55,10 @@ class SynthesisSessionTest {
     private class Harness(
         root: File,
         chunks: List<ShortArray> = listOf(ShortArray(2)),
+        sampleRate: Int = 22050,
     ) {
         val paths = ModelPaths(root)
-        val engine = RecordingEngine(chunks)
+        val engine = RecordingEngine(chunks, sampleRate)
 
         /** エンジン生成回数。モデルの再ロードが起きていないかの判定に使う。 */
         var factoryCalls = 0
@@ -138,7 +142,7 @@ class SynthesisSessionTest {
     // --------------------------------------------------------- 正常系の配線
 
     @Test
-    fun `starts the stream as 22050 Hz PCM16 mono`() {
+    fun `starts the stream as PCM16 mono`() {
         val h = Harness(temp.root)
         h.installModel()
         val callback = FakeSynthesisCallback()
@@ -151,6 +155,20 @@ class SynthesisSessionTest {
         )
         assertTrue(callback.events.first() == "start")
         assertEquals("done", callback.events.last())
+    }
+
+    @Test
+    fun `reports the sample rate of the loaded model`() {
+        // 定数に固定すると、22050Hz 以外のモデルを入れたときに
+        // 全発話がピッチのずれた音で再生される。エラーにもならないので
+        // 「なんとなく声が高い」としか気付けない。
+        val h = Harness(temp.root, sampleRate = 16000)
+        h.installModel()
+        val callback = FakeSynthesisCallback()
+
+        h.session.run(iso3 = "jpn", text = "こんにちは", speechRate = 100, callback = callback)
+
+        assertEquals(16000, callback.startArgs?.first)
     }
 
     @Test
