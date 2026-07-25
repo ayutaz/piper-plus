@@ -312,17 +312,30 @@ VITS に対応するパラメータがない。初版では**無視する**。�
 
 ## 9. 配布戦略
 
-### 9.1 前提作業: `libpiper_plus.so` のリリース配布
+### 9.1 前提作業: `libpiper_plus.so` の供給
 
-`build-android` job は 3 ABI をビルドしているが、リリースアセットに含まれていない
-(v1.13.0 で確認済)。エンジンアプリはこれに依存するため、配布を追加する。
+`android/piper-plus/src/main/cpp/CMakeLists.txt` は `libpiper_plus.so` を `IMPORTED`
+として宣言しており、AAR のビルド時点で `jniLibs/<abi>/libpiper_plus.so` が既に
+存在している必要がある (CMake がソースからビルドするのは JNI ラッパーのみ)。
+
+前提作業は 2 段階に分かれる。
+
+**(a) CI 内での供給 — M1、必須**
+
+`android-build.yml` の `build-android` job が artifact として上げている `.so` を
+`jniLibs/<abi>/` へ展開してから Gradle を回す。これがないと APK をビルドできない。
+
+**(b) リリースアセットとしての配布 — M5、任意**
+
+外部の開発者が AAR を単体で利用する場合に必要。3 ABI をリリースに添付する。
 
 ```
 piper-plus-android-<abi>.tar.gz      (arm64-v8a / armeabi-v7a / x86_64)
 piper-plus-android-<abi>.tar.gz.cosign.bundle
 ```
 
-既存の cosign 署名フローに合わせる。
+既存の cosign 署名フローに合わせる。(b) はエンジンアプリの成立条件ではないため
+M5 に置く。
 
 ### 9.2 GitHub Releases
 
@@ -382,7 +395,7 @@ SherpaTTS も同条件で掲載されており、掲載自体の障害にはな�
 
 | マイルストーン | 内容 | 完了条件 |
 |--------------|------|---------|
-| M1 | `.so` の 3 ABI リリース配布 (§9.1) | リリースアセットに Android 3 ABI が並ぶ |
+| M1 | CI での `.so` 供給と AAR の 3 ABI 対応 (§9.1a) | CI で TTS エンジン APK がビルドできる |
 | M2 | AAR の合成オプション拡張 (§6.2) | `SynthOptions` 経由で `language_id` / `lengthScale` が効く |
 | M3 | TTS Service 最小実装 (日本語のみ、モデルは手動配置) | システム TTS で日本語が喋る |
 | M4 | モデル管理 + 設定 UI (§6.5) | アプリ内で DL → 6 言語が喋る |
