@@ -4,8 +4,9 @@ UTMOS + 話者フィルタで選別し、prepare_multilingual_dataset.py の
 `parse_common_voice_ko` が読める CML-TTS 形式 (`cv.csv` + `utmos.tsv` +
 `audios/cv_<client_prefix>/*.wav`) として出力する。
 
-v8 dataset scaling plan §2.2 参照 — Korean は Zeroth (~181 spk) と
-KsponSpeech (~2000 spk) が主力で、CV ko は追加話者多様性目的 (~50 spk 想定)。
+v8 dataset scaling plan §2.2 参照 — Korean は Zeroth-Korean (~181 spk) が主力で、
+CV ko は追加話者多様性目的 (~30-50 spk 想定)。KsponSpeech (AI-Hub、
+research-only ライセンス) は v8 から除外確定 (2026-08-02)。
 
 選別:
   1. validated.tsv のみ (コミュニティ検証済み)
