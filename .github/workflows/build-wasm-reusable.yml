@@ -45,7 +45,7 @@ jobs:
             dist_subdir: rust-wasm-ja-lite
             artifact: piper-plus-wasm-ja-lite
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       - uses: dtolnay/rust-toolchain@stable
         with:

@@ -64,7 +64,7 @@ jobs:
       matrix:
         target: [fuzz_ssml, fuzz_text_splitter]
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       - name: Install nightly Rust (cargo-fuzz requires nightly)
         run: |
@@ -132,7 +132,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       - name: Set up Python
         uses: actions/setup-python@v6.2.0

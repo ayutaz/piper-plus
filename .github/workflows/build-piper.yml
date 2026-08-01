@@ -47,7 +47,7 @@ jobs:
       build-path: ${{ steps.set-build-path.outputs.path }}
 
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       - name: Set artifact name
         id: set-artifact-name

@@ -33,7 +33,7 @@ jobs:
       ONNXRUNTIME_VERSION: "1.20.0"
 
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
         with:
           submodules: true
 

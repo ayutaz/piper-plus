@@ -63,7 +63,7 @@ jobs:
         abi: [arm64-v8a, armeabi-v7a, x86_64]
 
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
         with:
           submodules: true
 
@@ -163,18 +163,18 @@ jobs:
       contents: read
       pull-requests: write  # sticky comment via actions/github-script
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       # -- toolchains ----------------------------------------------------
       - uses: astral-sh/setup-uv@v6.8.0
         with:
           python-version: '3.13'
 
-      - uses: actions/setup-node@v6.4.0
+      - uses: actions/setup-node@v6.5.0
         with:
           node-version: '22'
 
-      - uses: actions/setup-dotnet@v5.3.0
+      - uses: actions/setup-dotnet@v5.4.0
         with:
           dotnet-version: '10.0.x'
 
