@@ -259,7 +259,7 @@ class _FbankDataset(torch.utils.data.Dataset):
     各ワーカープロセスで独立にCPU前処理（torch.load → resample → fbank）を実行し、
     メインプロセスでONNX推論に個別に渡す（ゼロパディング回避）。
 
-    PIPER_EMB_FIXED_FRAMES=N (default 0=off) で固定フレーム長にクロップ/pad する。
+    PIPER_PLUS_EMB_FIXED_FRAMES=N (default 0=off) で固定フレーム長にクロップ/pad する。
     N=400 (4秒 @ 16kHz, 10ms hop) が VoxCeleb 系の標準値。**A' 案**:
     - 発話 <= N frames: 全体を 1 chunk として reflect pad
     - 発話 > N frames: 重複ありで N frames の chunks に分割 (hop=N//2 = 2秒)
@@ -487,8 +487,8 @@ def extract_per_utterance(
     - ``fixed_frames=0``: legacy per-utterance 経路 (IO binding、 個別推論、 backward compat)
     - ``use_batch_infer=True``: padded batch 推論 (fixed_frames=0 前提、 精度リスクあり)
 
-    Backward compat: 環境変数 ``PIPER_EMB_FIXED_FRAMES`` / ``PIPER_EMB_BATCH_INFER`` /
-    ``PIPER_EMB_LENGTH_SORT`` が set されていれば CLI 引数を上書きする (v1 挙動保持)。
+    Backward compat: 環境変数 ``PIPER_PLUS_EMB_FIXED_FRAMES`` / ``PIPER_PLUS_EMB_BATCH_INFER`` /
+    ``PIPER_PLUS_EMB_LENGTH_SORT`` が set されていれば CLI 引数を上書きする (v1 挙動保持)。
 
     最適化:
     1. DataLoader (num_workers) でCPU前処理を並列化 (GIL回避)
@@ -589,16 +589,16 @@ def extract_per_utterance(
     # items を fbank 長 (audio_norm .pt サイズ) でソートしてバッチ内の pad 差を最小化
     # v2 default: fixed_frames=400 (A''案) + chunk_batch=128 で GPU batched inference
     # 環境変数は backward compat のため CLI 引数を上書きする (v1 挙動保持)
-    #   PIPER_EMB_FIXED_FRAMES=N     -- CLI --fixed-frames を上書き
-    #   PIPER_EMB_BATCH_INFER=1      -- CLI --batch-infer-padded を上書き
-    #   PIPER_EMB_LENGTH_SORT=1      -- CLI --length-sort を強制有効化
-    env_fixed_frames = os.environ.get("PIPER_EMB_FIXED_FRAMES")
+    #   PIPER_PLUS_EMB_FIXED_FRAMES=N     -- CLI --fixed-frames を上書き
+    #   PIPER_PLUS_EMB_BATCH_INFER=1      -- CLI --batch-infer-padded を上書き
+    #   PIPER_PLUS_EMB_LENGTH_SORT=1      -- CLI --length-sort を強制有効化
+    env_fixed_frames = os.environ.get("PIPER_PLUS_EMB_FIXED_FRAMES")
     if env_fixed_frames is not None:
         fixed_frames = int(env_fixed_frames)
-    env_batch_infer = os.environ.get("PIPER_EMB_BATCH_INFER")
+    env_batch_infer = os.environ.get("PIPER_PLUS_EMB_BATCH_INFER")
     if env_batch_infer is not None:
         use_batch_infer = env_batch_infer == "1"
-    env_length_sort = os.environ.get("PIPER_EMB_LENGTH_SORT")
+    env_length_sort = os.environ.get("PIPER_PLUS_EMB_LENGTH_SORT")
     if use_length_sort is None:
         # auto: fixed_frames > 0 なら bucket sort (chunk 化と直交だが数値的に無害)
         use_length_sort = fixed_frames > 0 or use_batch_infer
