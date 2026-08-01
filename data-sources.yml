@@ -137,31 +137,10 @@ datasets:
       - "multi-7lang-v8"
       - "multilingual-7lang-v8"
 
-  - id: kspon-speech
-    languages: [ko]
-    title: "KsponSpeech"
-    speakers: 2000
-    utterances: 620000
-    license:
-      spdx: "OTHER"
-      verified: false
-      url: "https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=123"
-      note: |
-        AI-Hub license — free for research after signing the ETRI/AI-Hub
-        consent form (Korean nationals or overseas researchers). NOT a
-        standard OSI license; downstream distribution is restricted.
-    source:
-      url: "https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=123"
-      commit_or_version: "v1.0 (ETRI, 2019)"
-    attribution_required: true
-    attribution_text: |
-      KsponSpeech corpus, distributed by ETRI via AI-Hub (aihub.or.kr).
-      Use requires signing the AI-Hub consent form; downstream model
-      redistribution requires acknowledging KsponSpeech as a training
-      source and MUST NOT rehost the raw audio.
-    used_only_in:
-      - "multi-7lang-v8"
-      - "multilingual-7lang-v8"
+  # NOTE (2026-08-02): KsponSpeech (AI-Hub / ETRI) は v8 から除外。
+  # v8 は public + 商用利用可の open-model として公開する方針が確定し、
+  # AI-Hub ライセンス (research-only、配布制限) と両立しないため。
+  # エントリ本体は git 履歴 (この行の blame) を参照。
 
   - id: common-voice-ko
     languages: [ko]
