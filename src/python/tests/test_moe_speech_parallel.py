@@ -11,7 +11,7 @@
   3. 統計 (kept_speakers, selected_utts) が一致
 
 ) を mock zip 3 個で pin する。 これが drift すると v8 学習の再現性
-(571 → 3,250 話者スケーリング) が壊れる。
+(571 → ~3,790 話者 / 7-lang スケーリング) が壊れる。
 """
 
 from __future__ import annotations

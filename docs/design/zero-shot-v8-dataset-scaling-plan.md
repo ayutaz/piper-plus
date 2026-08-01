@@ -1,6 +1,10 @@
 # Zero-Shot TTS v8 — 話者数スケーリング学習計画
 
-> 作成日: 2026-07-07 / **状態: 確定 (実行待ち — ブロッカーは HF トークンのみ、§4.5)**
+> 作成日: 2026-07-07 / 最終更新: 2026-08-02 / **状態: 再開 — smoke test 待ち (開始ブロッカーなし、§4.5)**
+> 2026-08-02: origin/dev (`2412e370`、v2.0 piper→piper_plus 改名込) へのリベース完了。
+> **KsponSpeech は v8 から除外確定** (public + 商用利用可の open-model 方針、§6.5 冒頭) —
+> ko は Zeroth-Korean + Common Voice ko のみ (7-lang 計 話者 ~3,790 / 発話 ~346k、§2)。
+> インスタンスは **4x A100 SXM4 40GB $3.43/hr (storage 込) を承認済み** (§4.1)。smoke 自動 go 基準は §3.8。
 > 前提: v7 multi-6lang zero-shot (epoch 32、SECS 既知 0.6619 / zero-shot 0.6879) の後継。
 > コードは `dev` にマージ済み (PR #222 / #579)。学習は vast.ai レンタル GPU で実施予定。
 > 関連: [`multi-6lang-zero-shot-v7-training-results.md`](multi-6lang-zero-shot-v7-training-results.md) /
@@ -30,15 +34,15 @@ per-utterance CAM++ embedding → spk_proj 経由。**話者を何人増やし�
 
 | 言語 | v7 (発話/話者) | v8 案 (発話/話者) | 追加ソース | ライセンス |
 |---|---|---|---|---|
-| ja | 59,694 / 20 | ~55k / **473** | **moe-speech-plus** (全473話者、cap ~120 utt/spk) | 研究用途限定 (gated) |
+| ja | 59,694 / 20 | ~55k / **473** | **moe-speech-plus** (全473話者、cap ~120 utt/spk) | moe-speech license (gated manual、学習済モデルの public 配布可 — 下の 2026-08-02 決定参照) |
 | en | 64,698 / 310 | ~110k / **2,456** | LibriTTS-R **全話者** (cap ~50 utt/spk) | CC BY 4.0 |
 | zh | 63,223 / 142 | ~70k / **218** | AISHELL-3 フィルタ緩和 (全話者) | Apache 2.0 |
 | es | 168,374 / 63 | ~45k / **77** | CML-TTS **フィルタ緩和で corpus 全話者** (cap で発話縮小) | CC BY 4.0 |
 | fr | 107,464 / 28 | ~35k / **45** | CML-TTS **フィルタ緩和で corpus 全話者** | CC BY 4.0 |
 | pt | 34,066 / 8 | ~25k / **30 + CV 数百** | CML-TTS フィルタ緩和 + **Common Voice pt (品質フィルタ選別)** | CC BY 4.0 / CC0 |
-| **ko (2026-07-09 追加)** | — | ~110k / **~1,711** | **KsponSpeech** (cap 60 utt/spk, ~1,500 spk / ~90k utts) + **Zeroth-Korean** (~181 spk / ~18k utts) + **Common Voice ko** (UTMOS≥2.5 選別、~30 spk / ~2k utts) | AI-Hub consent / CC BY 4.0 / CC0 |
+| **ko (2026-07-09 追加 / 2026-08-02 縮小確定)** | — | ~25k / **~210** | **Zeroth-Korean** (openslr.org/40、~181 spk / ~22.2k utts) + **Common Voice ko** (UTMOS≥2.5 + ≥20 clips + cap 60 選別、~30-50 spk / ~3k utts)。KsponSpeech は除外 (§6.5 冒頭の 2026-08-02 決定) | CC BY 4.0 / CC0 |
 | **計 (6-lang v8)** | **497,519 / 571** | **~321k / ~3,578** | | |
-| **計 (7-lang v8 + ko)** | — | **~420k / ~5,100** (source 合算 ~5,289 spk から dedup 後見積) | | |
+| **計 (7-lang v8 + ko)** | — | **~346k / ~3,790** (6-lang 321,391 utts + ko ~25k utts / 6-lang 3,578 spk + ko ~210 spk) | | |
 
 > **決定 (2026-07-07)**: v8 の ja は moe-speech-plus のみとする (ユーザー決定)。
 > gol-dataset (19,349 話者) は v9 拡張候補として §7 に退避 — 転写有無・品質・gated 承認の
@@ -50,6 +54,17 @@ per-utterance CAM++ embedding → spk_proj 経由。**話者を何人増やし�
 > `ko=7` を pin 済、 `id_maps.py:_KOREAN_PHONEMES` も組み込み済) のため、 追加コストは
 > **data pipeline (parser 3 種 + CV ko exporter) のみ**。 6-lang 計算量に対する増分は
 > §3.10 に集約。 詳細な pipeline 実装は §6.5。
+>
+> **決定 (2026-08-02)**: **KsponSpeech (AI-Hub、research-only ライセンス) を v8 から除外**。
+> v8 を過去の piper-plus 事前学習モデル同様 **public + 商用利用可の open-model として公開**
+> する方針が確定したため (詳細は §6.5 冒頭の注記)。ko は Zeroth-Korean + Common Voice ko
+> のみ (~210 spk / ~25k utts) となり、7-lang 合計は **話者 ~3,790 / 発話 ~346k** (上表反映済)。
+> §2.4 / §3.10 / §6.5 内の KsponSpeech 前提の記述は歴史記録として保持。
+> あわせて上表 ja のライセンス欄の旧表記「研究用途限定 (gated)」を訂正 — これは raw データ
+> セットのアクセス条件 (gated manual) とモデル配布条件を混同した表記で、moe-speech を学習
+> データに含む学習済みモデルの public + 商用利用可配布は、過去の piper-plus 事前学習モデル
+> (6lang base / v7、いずれも MOE-Speech 系 ja データ含有) と同様に可能であり open-model
+> 方針と両立する。research-only でモデル配布と両立しないのは KsponSpeech のみ (→ v8 除外済)。
 
 ### 2.1 ja ソース詳細
 
@@ -104,11 +119,12 @@ ko は 3 ソースを合算するため、 ソースごとに異なる品質特�
 3. **UTMOS フィルタ (Common Voice ko のみ)**: `≥ 2.5`。 クラウドソース mic 品質のため
    UTMOS tsv (`export_common_voice_ko --utmos-tsv ...` で作成) で足切り。
    実測通過は ~30 話者想定 (validated ~50 spk → UTMOS 通過 ~30 spk)
-4. **KsponSpeech ETRI notation 除去** (`_clean_kspon_text`):
+4. **KsponSpeech ETRI notation 除去** (`_clean_kspon_text`) — **⚠️ KsponSpeech は v8 では
+   除外 (§6.5 冒頭の 2026-08-02 決定参照)。以下はコード残置分 (research 用途) の仕様**:
    - `(A)/(B)` 表記は **発音形 (B) を採用** (dual-form 前提の学習ノイズを除去)
    - `b//` / `l//` / `o//` / `n//` / `u//` の ETRI ノイズタグを削除
    - `+` (反復) / `*` (強調) / stray `/` を削除
-   - **raw `.pcm` (16 kHz mono s16le) を直読** (§3.11 impl2、 commit `2aab2258`)。
+   - **raw `.pcm` (16 kHz mono s16le) を直読** (§3.11 impl2、 commit `c2f59ec0`)。
      従来必要だった ETRI PCM→WAV 事前変換 (~3-4h wall) は `norm_audio._read_pcm16_mono`
      dispatcher (`.pcm` 拡張子で int16 → float32/32768 直変換) で不要化。
      既に WAV 化済のユーザは `audio_ext=".wav"` を渡せば従来経路も維持
@@ -151,7 +167,7 @@ A100 単一 GPU への移行に伴う **P0 最適化フラグ** をまとめて�
 --no-wavlm                                       # v7 継承 (VRAM 節約 & WavLM 経路 P0 未実装)
 # --channels-last                                # T1 (§3.6): opt-in default OFF、 A/B 実測で -16% sec/step 見込みなら default 化検討
 # --enable-length-bucketing / --no-compile-dynamic は §3.5 の 300 batch A/B で
-# +34% の逆効果を実測、 v8 本走では **使わない** (Fix B [`90f0a68`] で再設計済み、 本走前に再 A/B)
+# +34% の逆効果を実測、 v8 本走では **使わない** (Fix B [`a5fa6f2`] で再設計済み、 本走前に再 A/B)
 ```
 
 **LANGUAGE_ID_MAP (7-lang extended、 §6.5 / §2 で ko 追加)**:
@@ -178,9 +194,9 @@ A100 単一 GPU への移行に伴う **P0 最適化フラグ** をまとめて�
 
 | 最適化 | 変更点 | 期待効果 | 反映方法 |
 |---|---|---|---|
-| TF32 matmul (torch 2.x canonical) | `torch.set_float32_matmul_precision('high')` を `__main__.py` に追加 | +1-3% | commit `56116cca` |
-| mel debug print の GPU sync 削除 | `torch.min(y) < -1.0` / `torch.max(y) > 1.0` を `mel_processing.py` から削除 | +1-2% | commit `56116cca` |
-| Super-MAS Triton kernel を docker に取り込み | `docker/python-train/Dockerfile` に `[super-mas]` extra 追加 | MAS block +3-10% | commit `ddb76289` |
+| TF32 matmul (torch 2.x canonical) | `torch.set_float32_matmul_precision('high')` を `__main__.py` に追加 | +1-3% | commit `81f88817` |
+| mel debug print の GPU sync 削除 | `torch.min(y) < -1.0` / `torch.max(y) > 1.0` を `mel_processing.py` から削除 | +1-2% | commit `81f88817` |
+| Super-MAS Triton kernel を docker に取り込み | `docker/python-train/Dockerfile` に `[super-mas]` extra 追加 | MAS block +3-10% | commit `168d22e2` |
 | pin_memory 有効化 | `--no-pin-memory` を **付けない** | +5-10% (host→GPU DMA) | CLI 変更 |
 | checkpoint rolling window | `--save-top-k 5` + `--checkpoint-epochs 2` | disk full 回避 (75GB → 5GB) + 保存 sync 5-10s/epoch 節約 | CLI 変更 |
 | torch.compile | `--compile` | warmup 3-5 分後 +10-25% | CLI 変更 |
@@ -197,8 +213,8 @@ A100 単一 GPU への移行に伴う **P0 最適化フラグ** をまとめて�
 
 **過去に検証済で不採用**:
 
-- CAM++ `cudnn_conv_algo_search=EXHAUSTIVE` (revert `530d68ce`) — session 作成 15 分 hang
-- CAM++ 真の GPU batched inference default 化 (`320e9568` は opt-in 維持) — cosine 0.27 破損
+- CAM++ `cudnn_conv_algo_search=EXHAUSTIVE` (revert `faafa13d`) — session 作成 15 分 hang
+- CAM++ 真の GPU batched inference default 化 (`79cb9afb` は opt-in 維持) — cosine 0.27 破損
 - `num_workers` 自動調整 (PR #164 で削除) — shared memory 枯渇
 - V100 で `--precision 16-mixed` — backward 5x 遅い、必ず `32-true` (V100) / `bf16-mixed` (A100+)
 
@@ -210,10 +226,10 @@ A100 単一 GPU への移行に伴う **P0 最適化フラグ** をまとめて�
 
 | # | commit | 変更 | 対象ファイル | 期待効果 |
 |---|--------|------|-------------|---------|
-| 1/4 | [`161ed1b9`](https://github.com/ayutaz/piper-plus/commit/161ed1b9ff118f60addbfeb624b4018c52bf40de) | MPD の y/y_hat を batch dim で concat して 12→6 kernel launch | `src/python/piper_train/vits/models.py` (+13/-7)、 `src/python/tests/test_d_batch_concat.py` (+152 新規) | **D backward +5-10%** (launch overhead 削減、 allclose atol=1e-5 で等価性検証済) |
-| 2/4 | [`37ea0158`](https://github.com/ayutaz/piper-plus/commit/37ea015884d68729d33c92f651c0774e1e3245ff) | `DDPStrategy` に `static_graph=True` 追加 | `src/python/piper_train/__main__.py` (+7/-1)、 `src/python/tests/test_ddp_strategy.py` (+20/-5) | **multi-GPU throughput +5-8%** (VITS GAN 交互最適化の unused-param 集合が step ごとに固定 → iteration 1 の graph を再利用) |
-| 3/4 | [`1bfd64ac`](https://github.com/ayutaz/piper-plus/commit/1bfd64ac5c26c05baa7302ba274113013fd8365d) | `SpeakerBalancedBatchSampler` に length_bucket opt-in | `src/python/piper_train/vits/dataset.py` (+66/-2)、 `src/python/piper_train/__main__.py` (+12)、 `src/python/piper_train/vits/lightning.py` (+6/-1)、 `src/python/tests/test_length_bucketing.py` (+276 新規) | **step time -30-40% (padding 削減による 1.4-1.6x)**。 `samples_per_speaker=4` contract は保持、 intra-speaker length spread が半減することを test で保証。 CLI: `--enable-length-bucketing` |
-| 4/4 | [`fe65f60b`](https://github.com/ayutaz/piper-plus/commit/fe65f60b18402cc6d19158a9691de549f191f6af) | torch.compile mode/dynamic を CLI 化 | `src/python/piper_train/__main__.py` (+37/-3) | **compile 再チューン +5-10%** (length_bucketing で shape 固定 → `--compile-mode=max-autotune` + `--no-compile-dynamic` で CUDA Graph capture 可能化)。 default は既存挙動 `reduce-overhead` + `dynamic=True` を維持 |
+| 1/4 | [`355f89eb`](https://github.com/ayutaz/piper-plus/commit/355f89ebee41b07b991de9f51a89aad30b6a6cb9) | MPD の y/y_hat を batch dim で concat して 12→6 kernel launch | `src/python/piper_train/vits/models.py` (+13/-7)、 `src/python/tests/test_d_batch_concat.py` (+152 新規) | **D backward +5-10%** (launch overhead 削減、 allclose atol=1e-5 で等価性検証済) |
+| 2/4 | [`14847fe7`](https://github.com/ayutaz/piper-plus/commit/14847fe7962f379de86a07506bfc5f0aca08ec0a) | `DDPStrategy` に `static_graph=True` 追加 | `src/python/piper_train/__main__.py` (+7/-1)、 `src/python/tests/test_ddp_strategy.py` (+20/-5) | **multi-GPU throughput +5-8%** (VITS GAN 交互最適化の unused-param 集合が step ごとに固定 → iteration 1 の graph を再利用) |
+| 3/4 | [`dbdef2d2`](https://github.com/ayutaz/piper-plus/commit/dbdef2d2cd6a849e2c29f992cf5f1073f32a18a2) | `SpeakerBalancedBatchSampler` に length_bucket opt-in | `src/python/piper_train/vits/dataset.py` (+66/-2)、 `src/python/piper_train/__main__.py` (+12)、 `src/python/piper_train/vits/lightning.py` (+6/-1)、 `src/python/tests/test_length_bucketing.py` (+276 新規) | **step time -30-40% (padding 削減による 1.4-1.6x)**。 `samples_per_speaker=4` contract は保持、 intra-speaker length spread が半減することを test で保証。 CLI: `--enable-length-bucketing` |
+| 4/4 | [`15b33fd8`](https://github.com/ayutaz/piper-plus/commit/15b33fd8846714ff2c01bceb77e8a2e9b3153ed2) | torch.compile mode/dynamic を CLI 化 | `src/python/piper_train/__main__.py` (+37/-3) | **compile 再チューン +5-10%** (length_bucketing で shape 固定 → `--compile-mode=max-autotune` + `--no-compile-dynamic` で CUDA Graph capture 可能化)。 default は既存挙動 `reduce-overhead` + `dynamic=True` を維持 |
 
 **Plan A の CLI 推奨組み合わせ** (§3.1 の学習コマンド末尾に反映済み):
 
@@ -257,13 +273,13 @@ end-to-end で **~5-6 日 / ~$194** の見込み (§4.3 更新表参照)。
 
 Plan A 反映後の初 GPU 実行で 2 つのバグを発見し、 修正済 (両方 feature branch にコミット):
 
-**Bug #1: cuFFT が BFloat16 で失敗** (commit [`11ff71fc`](https://github.com/ayutaz/piper-plus/commit/11ff71fc))
+**Bug #1: cuFFT が BFloat16 で失敗** (commit [`3dcabd57`](https://github.com/ayutaz/piper-plus/commit/3dcabd57))
 - `mel_spectrogram_torch` / `spectrogram_torch` の `torch.stft` が bf16-mixed autocast 下で
   `RuntimeError: cuFFT doesn't support tensor of type: BFloat16` を吐く。 v7 の `32-true`
   では発生せず、 A100 bf16-mixed 化で顕在化
 - 修正: STFT 前に bf16/fp16 を fp32 に defensive upcast。 出力 dtype は L1 loss と揃う fp32
 
-**Bug #2: scratch 初期化から KL loss = inf → 100% 全 batch skip** (commit [`d37ccda2`](https://github.com/ayutaz/piper-plus/commit/d37ccda2) + [`61aabe27`](https://github.com/ayutaz/piper-plus/commit/61aabe27))
+**Bug #2: scratch 初期化から KL loss = inf → 100% 全 batch skip** (commit [`1a86aa55`](https://github.com/ayutaz/piper-plus/commit/1a86aa55) + [`563f8361`](https://github.com/ayutaz/piper-plus/commit/563f8361))
 - 診断: `_PIPER_DEBUG_LOSS` env-gated print で `loss_kl=inf` を特定。 さらに
   `_PIPER_KL_DEBUG` で `logs_p_min=-431.9 logs_p_max=521.9` (clamp 対象範囲を大きく超える)、
   `exp(-2 * logs_p)` が `((z_p - m_p) ** 2)` と積で fp32 max (3.4e38) を超えて inf 化
@@ -382,19 +398,19 @@ bucketing 有害と判明) を基準に、 各要素を分離して見積もる:
 `--compile` OFF) を出発点に、 「A100 GPU idle と host 側 I/O ボトルネックの解消」 に絞った
 **immediate 5 施策** (T1 / T2 / T5 / P1 / P2) を feature branch にランディング済み。 加えて
 300 batch smoke で batch 31 以降 100% (262/300) の Non-finite skip が判明 → **KL clamp を
-tighten する追加修正** ([`45060ad`](https://github.com/ayutaz/piper-plus/commit/45060adc))、
+tighten する追加修正** ([`1f625a4`](https://github.com/ayutaz/piper-plus/commit/1f625a42))、
 length_bucket を per-batch 単一 bin 抽出に再設計する **Fix B**
-([`90f0a68`](https://github.com/ayutaz/piper-plus/commit/90f0a68c)) も併せて投入。
+([`a5fa6f2`](https://github.com/ayutaz/piper-plus/commit/a5fa6f2b)) も併せて投入。
 
 | # | 分類 | commit | 変更 | 期待効果 |
 |---|------|--------|------|--------|
-| T2 | throughput (I/O) | [`8dc1571`](https://github.com/ayutaz/piper-plus/commit/8dc15711) | `Batch` dataclass に `pin_memory()` を追加 (plain dataclass は DataLoader の `pin_memory=True` で silently no-op だった) + train DataLoader の `prefetch_factor` default 2→4 (`--prefetch-factor` CLI 化) + `on_validation_epoch_end` の `.to(device)` を `non_blocking=True` 化 | **wall-clock -5-15%** (v8 で観測済の 「見えない non_blocking 同期化」 を実効化) |
-| T1 | throughput (kernel layout) | [`bdd4f9e`](https://github.com/ayutaz/piper-plus/commit/bdd4f9e9) | `MultiPeriodDiscriminator` + `DiscriminatorP` に `use_channels_last` opt-in、 CLI `--channels-last` default OFF。 Conv2d weight + 1D→2D view 直後の activation を `torch.channels_last` に統一 | **sec/step -16% 目標** (§3.4 nsys で判明した nchw↔nhwc 変換 12.8% + Conv2d 8% = 20.8% overhead の削減余地)。 実測 A/B 後に default 化判断 |
-| T5 | throughput (attention) | [`fa24218`](https://github.com/ayutaz/piper-plus/commit/fa24218f) | SDPA backend priority を明示制御 (`flash` / `mem_efficient` ON、 `math` OFF、 torch 2.11+ で `cudnn` ON)、 起動 log に有効 backend を出力 | Ada 6000 / RTX 5090 (sm_89 / sm_120) で naive math fallback を防止、 **long-sequence で 2x、 net +1-3%** |
-| P1 | I/O (dataset load) | [`597c5cc`](https://github.com/ayutaz/piper-plus/commit/597c5ccf) | `piper_train.tools.precompute_mel` を新設 (fp16 `.npy` を pre-materialise、 atomic replace)、 `PiperDataset` に `precomputed_mel_dir` opt-in、 CLI `--precomputed-mel` | `torch.load(.spec.pt)` の pickle 経路を numpy path (`np.load → torch.from_numpy`) に置換で **DataLoader step 2-3x**、 80 epoch で **8-12h の I/O 節約** |
-| P2 | I/O (preprocess) | [`4ca0bab`](https://github.com/ayutaz/piper-plus/commit/4ca0babd) | `norm_audio.default_num_processes()` を新設 (`min(cpu_count//2, 32)`)、 `cache_audio` / `prepare_multilingual_dataset` / `prepare_bilingual_dataset` の worker 数 default を統一 + tqdm 進捗バー追加 | 64 vCPU host で `cpu_count()` fan-out すると soxr/torch per-worker state と NFS IOPS で thrash (実効 throughput -30%)。 default 30 worker 相当に固定して **前処理 wall-clock 短縮 + 進捗可視化** |
-| — | bucketing 再設計 (Fix B) | [`90f0a68`](https://github.com/ayutaz/piper-plus/commit/90f0a68c) | `SpeakerBalancedBatchSampler` の length_bucket を per-batch 単一 bin 抽出に変更 (4 quantile bin、 language_group_balance / samples_per_speaker=4 contract 保持) | §3.5 で `+34%` 逆効果だった実装を廃案 → バッチ間 shape 差を bin 幅に閉じ込め cudnn.benchmark cache を再利用可能に。 opt-in default OFF は継続、 v8 本走前に再 A/B |
-| — | KL 発散防止 | [`45060ad`](https://github.com/ayutaz/piper-plus/commit/45060adc) | `logs_p` / `logs_q` clamp を `[-15,15]` → `[-8,8]`、 `m_p` clamp を `[-1000,1000]` → `[-100,100]`、 loss_kl 出力を `1e4` で cap (`SynthesizerTrn.forward` / `infer` / `lightning.py` 3 箇所) | §3.4 の scratch KL inf fix でも 300 batch smoke で batch 31 以降に 100% (262/300) Non-finite skip 再発 → worst case `(z_p-m_p)^2 * exp(-2*logs_p) = 4e17` が fp32 overflow していたため。 clamp 5 桁 down + 出力 cap で **grad direction 安定化**、 `kl_weight=0.1` と `grad_clip=1.0` と多層防御。 収束後は `|logs_p| < 5` で cap は no-op、 表現力を損なわない |
+| T2 | throughput (I/O) | [`3fba827`](https://github.com/ayutaz/piper-plus/commit/3fba8275) | `Batch` dataclass に `pin_memory()` を追加 (plain dataclass は DataLoader の `pin_memory=True` で silently no-op だった) + train DataLoader の `prefetch_factor` default 2→4 (`--prefetch-factor` CLI 化) + `on_validation_epoch_end` の `.to(device)` を `non_blocking=True` 化 | **wall-clock -5-15%** (v8 で観測済の 「見えない non_blocking 同期化」 を実効化) |
+| T1 | throughput (kernel layout) | [`597f589`](https://github.com/ayutaz/piper-plus/commit/597f589c) | `MultiPeriodDiscriminator` + `DiscriminatorP` に `use_channels_last` opt-in、 CLI `--channels-last` default OFF。 Conv2d weight + 1D→2D view 直後の activation を `torch.channels_last` に統一 | **sec/step -16% 目標** (§3.4 nsys で判明した nchw↔nhwc 変換 12.8% + Conv2d 8% = 20.8% overhead の削減余地)。 実測 A/B 後に default 化判断 |
+| T5 | throughput (attention) | [`25c3263`](https://github.com/ayutaz/piper-plus/commit/25c32636) | SDPA backend priority を明示制御 (`flash` / `mem_efficient` ON、 `math` OFF、 torch 2.11+ で `cudnn` ON)、 起動 log に有効 backend を出力 | Ada 6000 / RTX 5090 (sm_89 / sm_120) で naive math fallback を防止、 **long-sequence で 2x、 net +1-3%** |
+| P1 | I/O (dataset load) | [`5102404`](https://github.com/ayutaz/piper-plus/commit/51024040) | `piper_train.tools.precompute_mel` を新設 (fp16 `.npy` を pre-materialise、 atomic replace)、 `PiperDataset` に `precomputed_mel_dir` opt-in、 CLI `--precomputed-mel` | `torch.load(.spec.pt)` の pickle 経路を numpy path (`np.load → torch.from_numpy`) に置換で **DataLoader step 2-3x**、 80 epoch で **8-12h の I/O 節約** |
+| P2 | I/O (preprocess) | [`d5960b2`](https://github.com/ayutaz/piper-plus/commit/d5960b2a) | `norm_audio.default_num_processes()` を新設 (`min(cpu_count//2, 32)`)、 `cache_audio` / `prepare_multilingual_dataset` / `prepare_bilingual_dataset` の worker 数 default を統一 + tqdm 進捗バー追加 | 64 vCPU host で `cpu_count()` fan-out すると soxr/torch per-worker state と NFS IOPS で thrash (実効 throughput -30%)。 default 30 worker 相当に固定して **前処理 wall-clock 短縮 + 進捗可視化** |
+| — | bucketing 再設計 (Fix B) | [`a5fa6f2`](https://github.com/ayutaz/piper-plus/commit/a5fa6f2b) | `SpeakerBalancedBatchSampler` の length_bucket を per-batch 単一 bin 抽出に変更 (4 quantile bin、 language_group_balance / samples_per_speaker=4 contract 保持) | §3.5 で `+34%` 逆効果だった実装を廃案 → バッチ間 shape 差を bin 幅に閉じ込め cudnn.benchmark cache を再利用可能に。 opt-in default OFF は継続、 v8 本走前に再 A/B |
+| — | KL 発散防止 | [`1f625a4`](https://github.com/ayutaz/piper-plus/commit/1f625a42) | `logs_p` / `logs_q` clamp を `[-15,15]` → `[-8,8]`、 `m_p` clamp を `[-1000,1000]` → `[-100,100]`、 loss_kl 出力を `1e4` で cap (`SynthesizerTrn.forward` / `infer` / `lightning.py` 3 箇所) | §3.4 の scratch KL inf fix でも 300 batch smoke で batch 31 以降に 100% (262/300) Non-finite skip 再発 → worst case `(z_p-m_p)^2 * exp(-2*logs_p) = 4e17` が fp32 overflow していたため。 clamp 5 桁 down + 出力 cap で **grad direction 安定化**、 `kl_weight=0.1` と `grad_clip=1.0` と多層防御。 収束後は `|logs_p| < 5` で cap は no-op、 表現力を損なわない |
 
 **累積効果 (Test 1 14.0 sec/step 起点で分解、 batch=64 real config)**:
 
@@ -449,8 +465,8 @@ PR で必須で入れる。
 **判明したこと**:
 
 1. **v8 学習の必須ブロッカー解消** (最大の成果):
-   - bf16 cuFFT bug (11ff71fc): mel STFT を bf16→fp32 defensive upcast
-   - KL scratch 発散 (d37ccda2 + 61aabe27 + 45060adc): logs_p/m_p clamp と loss_kl cap の 3 段防御
+   - bf16 cuFFT bug (3dcabd57): mel STFT を bf16→fp32 defensive upcast
+   - KL scratch 発散 (1a86aa55 + 563f8361 + 1f625a42): logs_p/m_p clamp と loss_kl cap の 3 段防御
    - **Non-finite skip 率: 100% → 2%** (v7 baseline 2.5% と同等)
 2. **有効な 5 施策**:
    - T2 (Batch.pin_memory silent no-op 修正 + prefetch_factor=4): 最大寄与、 non_blocking H2D 実効化
@@ -461,7 +477,7 @@ PR で必須で入れる。
 3. **不採用が確定した施策**:
    - `--compile`: torch 2.11 + triton の kernel compile crash、 v8 では使わない
    - `--precomputed-mel`: 学習は GPU-bound、 .npy load overhead で +6.5% 遅い
-   - `--enable-length-bucketing`: §3.5 で確認済 +34% 逆効果、 Fix B (`90f0a68c`) 未再検証
+   - `--enable-length-bucketing`: §3.5 で確認済 +34% 逆効果、 Fix B (`a5fa6f2b`) 未再検証
 4. **設計予測との乖離**:
    - §3.3 Plan A 予測: "3.3-4.0 日 / 単一 A100"
    - 実測ベース現実値: **51 日 / 単一 A100** (Plan A 想定の 15 倍)、 **9-11 日 / 4x A100 DDP** (Plan A 想定の 3 倍)
@@ -493,6 +509,11 @@ PR で必須で入れる。
 | 8x A100 SXM4 DDP + batch=192 | 1.5-2 hr | 5-6 日 | ~$1,600 |
 | H100 SXM 80GB × 2 (未検証) | 1.7 hr | 5.7 日 | ~$600-700 |
 
+> **2026-08-02 注記**: 上表のレート ($1.73/hr / $5.19/hr) は 2026-07 時点の市場価格で失効
+> (§4.1 の 2026-08-02 市場注記参照)。現行の承認済み構成は **4x A100 SXM4 40GB $3.43/hr
+> (storage 込)** で、本走見積は **7-9 日 / ~$600-750** (§4.3 の 2026-08-02 更新参照。§3.8 の
+> 7-8 sec/step 達成前提、smoke2 実測 10.74 sec/step のままなら +30%)。
+
 **v8 本走 CLI (実測反映最終版)**:
 
 ```bash
@@ -521,11 +542,25 @@ python -m piper_train \
 #   --enable-length-bucketing  # +34% 逆効果 (Fix B 未再検証)
 ```
 
+> **2026-08-02 注記 (CLI 読み替え — 本走 launch 前に必読)**: 上の CLI は 6-lang
+> スナップショット (`dataset-multilingual-6lang-v8`) 時点の記録。実際の本走 (ko 込み
+> 7-lang、KsponSpeech 除外) では以下を読み替える:
+>
+> 1. `--dataset-dir` は 7-lang データセット構築後の
+>    **`/data/piper/dataset-multilingual-7lang-v8/`** に読み替え
+>    (`prepare_multilingual_dataset.py` に `--ko-zeroth` / `--ko-cv` を追加して構築、
+>    config.json の dataset label は `multilingual-7lang` に自動切替 — §6.5)。
+>    `--default_root_dir` と HF ckpt 退避 repo は作成済みの `multi-6lang-v8` 名を維持 (§4.4)
+> 2. インスタンス/レートは §4.1 / §4.3 の 2026-08-02 注記の承認済み構成
+>    **4x A100 SXM4 40GB $3.43/hr (本走 7-9 日 / ~$600-750)** に読み替え。
+>    batch=32/GPU の VRAM は 40GB で未検証のため smoke を VRAM gate とし、
+>    溢れたら `--batch-size 24` に下げるか 80GB ($7.68/hr) に乗換 (§3.8 の自動 go 基準)
+
 ### 3.8 残 findings 実装完了 (2026-07-09 追加ランディング)
 
 §3.7 で v8 本走 config を確定した後、 review で未実装だった findings のうち
-コード側で完遂できる 8 施策を追加実装 (commits `3266959c` / `4a2639cf` /
-`3e7a494e` / `08e32fb7` / `1c767dd4` / `747aeda8` / `cd5fd0b7` / `a4ede437`)。
+コード側で完遂できる 8 施策を追加実装 (commits `e12d0be8` / `fc59900c` /
+`c0e4e0e3` / `7657a93c` / `e17d1f8e` / `cc7c20a6` / `3ced31a8` / `acdcca36`)。
 GPU smoke test は次セッション (vast.ai instance destroy 済のため) で回すが、
 各施策の期待効果は個別の bench / 契約テストで pin 済。
 
@@ -533,19 +568,19 @@ GPU smoke test は次セッション (vast.ai instance destroy 済のため) で
 
 | commit | 施策 | 内容 | 期待効果 |
 |---|---|---|---|
-| `3e7a494e` | **T3 SDPA fast path** | TextEncoder self-attention を `F.scaled_dot_product_attention` に切替 (opt-in `--attn-drop-rel-v`)。 relative-V 補正は drop、 v8 scratch 前提で許容 | **+2-5% throughput**、 activation memory **-60MB/batch** (A100 SXM4 real config) |
-| `08e32fb7` | **T6 hybrid precision** | `--disc-precision {inherit,bf16-mixed,32-true}` で D forward を bf16 に切替つつ SCL/DINO は fp32 維持 (belt-and-suspenders wrap) | **+5-10% throughput** (D forward が dominant conv workload、 A100 SXM4) |
-| `4a2639cf` | T1-ext channels_last MBiSTFT | Generator にも channels_last hparam を propagate (Conv1d のため実効 no-op、 対称性 + 将来 Conv2d 追加時の future-proofing) | 現時点 0%、 将来 Generator に Conv2d を追加した際に自動有効化 |
-| `1c767dd4` | **T-empty 除去** | training_step の 500-batch `torch.cuda.synchronize()` + `empty_cache()` flush を除去 (T4/V100 遺物、 A100 80GB + `expandable_segments:True` で不要) | **+2-3% throughput** (500 batch 毎の GPU 全停止除去) |
-| `3266959c` | **T-npy audio_norm cache** | audio_norm cache を `.pt` (pickle) から `.npy` (raw numpy) に切替 (write 側のみ、 backward-compat 3 段リゾルバで既存 `.pt` は温存) | **+5-10% throughput** (DataLoader load 3-5x 高速化)、 disk usage **-10%** |
+| `c0e4e0e3` | **T3 SDPA fast path** | TextEncoder self-attention を `F.scaled_dot_product_attention` に切替 (opt-in `--attn-drop-rel-v`)。 relative-V 補正は drop、 v8 scratch 前提で許容 | **+2-5% throughput**、 activation memory **-60MB/batch** (A100 SXM4 real config) |
+| `7657a93c` | **T6 hybrid precision** | `--disc-precision {inherit,bf16-mixed,32-true}` で D forward を bf16 に切替つつ SCL/DINO は fp32 維持 (belt-and-suspenders wrap) | **+5-10% throughput** (D forward が dominant conv workload、 A100 SXM4) |
+| `fc59900c` | T1-ext channels_last MBiSTFT | Generator にも channels_last hparam を propagate (Conv1d のため実効 no-op、 対称性 + 将来 Conv2d 追加時の future-proofing) | 現時点 0%、 将来 Generator に Conv2d を追加した際に自動有効化 |
+| `e17d1f8e` | **T-empty 除去** | training_step の 500-batch `torch.cuda.synchronize()` + `empty_cache()` flush を除去 (T4/V100 遺物、 A100 80GB + `expandable_segments:True` で不要) | **+2-3% throughput** (500 batch 毎の GPU 全停止除去) |
+| `e12d0be8` | **T-npy audio_norm cache** | audio_norm cache を `.pt` (pickle) から `.npy` (raw numpy) に切替 (write 側のみ、 backward-compat 3 段リゾルバで既存 `.pt` は温存) | **+5-10% throughput** (DataLoader load 3-5x 高速化)、 disk usage **-10%** |
 
 **前処理経路 (3 施策)**:
 
 | commit | 施策 | 内容 | 期待効果 |
 |---|---|---|---|
-| `a4ede437` | **P3 zip parallel** | `prepare_moe_speech_plus.py` の 473 zip 展開を `multiprocessing.Pool(spawn)` で並列化 (opt-in `--parallel`、 `pool.imap(chunksize=1)` で順序 preserve、 serial と byte-for-byte 一致) | **30-45 分 → 3-5 分** (~12-16x、 32 vCPU) |
-| `cd5fd0b7` | **P4 per-zip cache** | per-zip pre-filter 生 metadata を `_scan_cache/{zip_stem}.jsonl` に落とし、 `(zip_size, zip_mtime_ns)` で自動 invalidate。 `--min-mos` / `--max-cer` / `--cap` スイープを高速化 | 初回 3-4h → warm 再実行 **5 分スケール** |
-| `747aeda8` | **P5 CAM++ default 化** | `extract_speaker_embedding.py` の fixed_frames=400 + chunked mean pooling + chunk_batch=128 を default 化 (旧 env var `PIPER_EMB_FIXED_FRAMES` 経由から CLI arg に昇格) | 500k utts で **9h → 45-60 分** (9-12x)、 v8 (~1M utts) では **18h → 90-120 分** |
+| `acdcca36` | **P3 zip parallel** | `prepare_moe_speech_plus.py` の 473 zip 展開を `multiprocessing.Pool(spawn)` で並列化 (opt-in `--parallel`、 `pool.imap(chunksize=1)` で順序 preserve、 serial と byte-for-byte 一致) | **30-45 分 → 3-5 分** (~12-16x、 32 vCPU) |
+| `3ced31a8` | **P4 per-zip cache** | per-zip pre-filter 生 metadata を `_scan_cache/{zip_stem}.jsonl` に落とし、 `(zip_size, zip_mtime_ns)` で自動 invalidate。 `--min-mos` / `--max-cer` / `--cap` スイープを高速化 | 初回 3-4h → warm 再実行 **5 分スケール** |
+| `cc7c20a6` | **P5 CAM++ default 化** | `extract_speaker_embedding.py` の fixed_frames=400 + chunked mean pooling + chunk_batch=128 を default 化 (旧 env var `PIPER_EMB_FIXED_FRAMES` 経由から CLI arg に昇格) | 500k utts で **9h → 45-60 分** (9-12x)、 v8 (~1M utts) では **18h → 90-120 分** |
 
 **予測 wall-clock 更新** (5 学習経路施策の累積、 前処理は独立):
 
@@ -595,6 +630,14 @@ smoke test 計画:
 3. audio_norm cache を `.npy` で pre-materialise (`ignore_cache=True` を短時間走らせる) → DataLoader load 時間の A/B
 4. 合算で予測 7-8 sec/step 達成を確認、 未達なら nsys で bottleneck 再検証
 
+**smoke 自動 go 基準 (2026-08-02 ユーザー承認)** — 4x A100 SXM4 40GB (§4.1) 上の smoke で
+以下 3 条件を全て満たしたら、**報告を待たずに本走を launch** する運用:
+
+1. **sec/step ≤ 8.5**
+2. **Non-finite skip 率 ≤ 3%**
+3. **VRAM が 40GB に収まる** — batch=32/GPU は 40GB で未検証のため smoke を VRAM gate とし、
+   溢れたら batch=24 に下げるか 80GB 構成 ($7.68/hr、§4.1 の 2026-08-02 市場注記) に乗換
+
 CI 側は 40+ 新規テスト (test_sdpa_attention / test_hybrid_precision /
 test_no_empty_cache_flush / test_audio_norm_npy / test_channels_last 拡張 /
 test_moe_speech_parallel / test_moe_speech_cache / test_extract_speaker_embedding)
@@ -616,6 +659,13 @@ test_moe_speech_parallel / test_moe_speech_cache / test_extract_speaker_embeddin
 2026-07-07 時点の検索では上記を満たす筆頭候補は
 `A100 SXM4 / $1.281/hr / disk 2,878GB / reliability 0.9993 / duration 24日 / 上り 6.7Gbps` (US)。
 **オファーは流動的なため、rent 時点で同条件で再検索して最良を取る。**
+
+> **2026-08-02 市場注記 + 決定**: A100 **80GB** 系は **$7.68/hr に高騰** し、2026-07 時点の
+> "$5.19/hr (4x 80GB)" 前提の見積は失効。**4x A100 SXM4 40GB $3.43/hr (storage 1.7TB 込) を
+> 承認済み** — 2026-08-02 時点の筆頭 offer id=44347432 (Slovenia、128 vCPU、disk 1874GB、
+> 上下 4.3-4.5Gbps、reliability 99.52%、duration 161 日)。オファーは流動的のためレンタル時に
+> 再検索する。batch=32/GPU の VRAM は 40GB で未検証 → **smoke test を VRAM gate** とし、
+> 溢れたら batch=24 に下げるか 80GB ($7.68/hr) に乗換 (§3.8 の smoke 自動 go 基準参照)。
 
 ### 4.2 課金モデル (on-demand)
 
@@ -651,6 +701,12 @@ DL 600GB + UL 500GB で ~$4 と無視できる。
 | **計 (v8 想定、 4x DDP)** | **~6-7 日** | **~$700-720 (中央値 ~$710)** |
 | 参考: 単一 A100 (batch=128)、 §3.6 未反映 (Test 1 14 sec/step のまま) | ~40+ 日 | ~$1,650+ |
 
+> **2026-08-02 更新**: 上表のレート ($1.73/hr / $5.19/hr) は 2026-07 時点の市場価格で失効
+> (§4.1 の 2026-08-02 市場注記参照)。承認済み構成 **4x A100 SXM4 40GB $3.43/hr (storage 込)**
+> での現行見積は **本走 7-9 日 / ~$600-750** (§3.8 の 7-8 sec/step 達成前提。smoke2 実測
+> 10.74 sec/step のままなら +30%)。KsponSpeech 除外 (§6.5 冒頭) 後の 7-lang は発話 ~346k で
+> 6-lang 比 +8% に留まるため、6-lang 前提の本走時間見積とほぼ同水準に収まる。
+
 ### 4.4 障害耐性 (多層防御)
 
 インスタンス安定性 (§4.1) に頼り切らず、ホスト消失を前提に損失を限定する:
@@ -658,8 +714,8 @@ DL 600GB + UL 500GB で ~$4 と無視できる。
 | 層 | 対策 | 最悪ケースの損失 |
 |---|---|---|
 | 1 | on-demand 契約 (横取りなし) | — |
-| 2 | `--checkpoint-epochs 1` + **epoch ごと HF private upload** (`ayousanz/piper-plus-zero-shot-multi-6lang-v8` 新設) | 1 epoch ≈ 2.5h ≈ $3 |
-| 3 | onstart 自動レジューム: 起動時に HF から最新 ckpt を取得し `--resume_from_checkpoint` で継続 (piper_train 対応済み) | 復旧の手作業ゼロ化 |
+| 2 | `--checkpoint-epochs 1` + **epoch ごと HF private upload** (`ayousanz/piper-plus-zero-shot-multi-6lang-v8`、repo は作成済 2026-08-02。自動 upload script は未作成 → §4.5 残 TODO) | 1 epoch ≈ 2.5h ≈ $3 |
+| 3 | onstart 自動レジューム: 起動時に HF から最新 ckpt を取得し `--resume_from_checkpoint` で継続 (piper_train 側は対応済み。onstart script 自体は未作成 → §4.5 残 TODO) | 復旧の手作業ゼロ化 |
 | 4 | 前処理完了時点で処理済みデータ (~400GB tarball) を `vastai cloud copy` で **Backblaze B2 へ退避** ($6/TB/月) | 再前処理 ~1 日 (~$30) をスキップし別マシンで即再開 |
 
 ストレージに関する制約 (2026-07-07 調査):
@@ -674,9 +730,17 @@ DL 600GB + UL 500GB で ~$4 と無視できる。
 
 - HF token はインスタンス env (`HF_TOKEN`) のみに置き、リポジトリ・ログに残さない
   (B2 退避を使う場合は B2 アプリケーションキーも同様)
-- **開始ブロッカー**: ① ユーザーの HF token (gated dataset read + private repo read/write)
-  ② gated dataset (gol / moe-speech-plus) のアクセス承認がユーザー HF アカウントで済んでいること
-- vast.ai API キーはローカル `~/.config/vastai/vast_api_key` に設定済み (2026-07-07、残高 $1,351)
+- **開始ブロッカー: 解消済み (2026-08-02)** — HF token (gated moe-speech-plus read /
+  private repo write) は検証済、WANDB キーも検証済。ckpt 退避 repo
+  `ayousanz/piper-plus-zero-shot-multi-6lang-v8` (private) も作成済み
+- vast.ai API キーはローカル `~/.config/vastai/vast_api_key` に設定済み
+  (残高 $2,483.52、2026-08-02 時点。2026-07-07 時点は $1,351)
+- **残 TODO (本走前)**:
+  1. onstart 自動レジューム script (起動時に HF から最新 ckpt 取得 →
+     `--resume_from_checkpoint`) — 未作成 (§4.4 層 3)
+  2. HF への epoch ごと ckpt 自動 upload script — 未作成 (§4.4 層 2)
+  3. ko データパイプラインは実データ未検証 (synthetic unit test のみ) →
+     instance 上で小規模先行検証してから全量前処理に進む
 
 ### 3.9 T3/T6 検証 smoke A/B/C on synthetic data (2026-07-09 追試、 destroy 済 instance)
 
@@ -685,13 +749,13 @@ correctness と performance 効果を測定するため、 vast.ai A100 SXM4 80G
 $1.07/hr、 driver 595) を 2 時間 rent (~$7.35 消費) して synthetic dataset (2,000 utts /
 100 speakers、 phoneme_max=80、 audio 2-5s、 fake CAM++ embedding) で smoke A/B/C を実施。
 
-**修正した bug 2 件** (実装時に見逃していた回帰、 commit [`e7d080cd`](https://github.com/ayutaz/piper-plus/commit/e7d080cd)):
+**修正した bug 2 件** (実装時に見逃していた回帰、 commit [`d6fc36a5`](https://github.com/ayutaz/piper-plus/commit/d6fc36a5)):
 
 1. **`losses.py:240` の `mel_speaker_consistency_loss._to_mel` の STFT が bf16 で cuFFT crash**:
-   `mel_processing.py` (commit 11ff71fc) と同型だが別 site、 defensive fp32 upcast を追加。
+   `mel_processing.py` (commit 3dcabd57) と同型だが別 site、 defensive fp32 upcast を追加。
    SCL mel-domain fallback 経路で `--precision bf16-mixed + --c-spk 1.0` の組み合わせで
    torch.stft が呼ばれ、 wav の dtype が bf16 のまま cuFFT に渡されていた。
-2. **T5 (fa24218f) の `enable_math_sdp(False)` が T3 SDPA fast path を crash させる**:
+2. **T5 (25c32636) の `enable_math_sdp(False)` が T3 SDPA fast path を crash させる**:
    `--attn-drop-rel-v` で SDPA を呼ぶが、 additive rel-K bias attn_mask が flash/mem-efficient
    の path から fallback → math backend が呼ばれるが disabled で「Invalid backend」で crash。
    `enable_math_sdp(True)` に戻し、 priority は依然 flash/mem-efficient が先。
@@ -722,6 +786,12 @@ $1.07/hr、 driver 595) を 2 時間 rent (~$7.35 消費) して synthetic datas
 - **implementation は動作、 crash なし、 数値安定** — 本走で有効化する準備は完了
 
 ### 3.10 v8 に韓国語 (ko) 追加 — 追加コスト見積 (2026-07-09)
+
+> **⚠️ 2026-08-02 注記**: KsponSpeech は v8 から除外確定 (§6.5 冒頭の決定参照)。本節の
+> kspon 前提の数値 (話者 ~5,100 / 発話 ~420k / 本走 12-15 日 / 増分 +$380-410 /
+> research-only 配布制限 / AI-Hub 入手ルート) は **無効**。現行の確定見積は
+> **4x A100 SXM4 40GB $3.43/hr で本走 7-9 日 / ~$600-750** (§4.1 / §4.3 の 2026-08-02
+> 注記参照、§3.8 の 7-8 sec/step 達成前提)。以下は 7-lang 化を判断した当時の歴史記録。
 
 §2.4 (フィルタ) / §6.5 (data pipeline 実装) の ko 拡張を **同一 v8 run に載せた場合の
 インクリメンタルコスト**。 G2P / language-id contract / phoneme inventory は全て 8-lang
@@ -774,6 +844,12 @@ extended form で pin 済のため、 追加コストは data pipeline 実行 + 
 
 ### 3.11 前処理高速化 4 施策実装完了 (2026-07-09 追加ランディング)
 
+> **2026-08-02 注記**: 本節の 7-lang 規模 (~420k utts / ~5,100 spk) と impl2 (KsponSpeech
+> `.pcm` 直読) の ko 分短縮効果は KsponSpeech 除外 (§6.5 冒頭) 前の前提。現行の 7-lang は
+> **~346k utts / ~3,790 spk** (§2) で kspon 分の前処理がそのまま消えるため、下表の
+> 「7-lang 計 7-10h」は上限側の歴史値 (実際は 6-lang 計 6-9h に Zeroth + CV ko ~1h 加算程度)。
+> impl1/impl3/impl4 は kspon 非依存で現行も有効。
+
 §3.10 で 7-lang 化 (~420k utts / ~5,100 spk) を確定した後、 前処理 wall-clock が
 「12-18h (旧見積) / 10-14h (hf_transfer 単独反映)」で本走 launch までの待ち時間が
 本走コスト (12-15 日) に対して非線形に痛かったため、 **GPU 検証不要 (backend swap /
@@ -782,10 +858,10 @@ GPU resample 施策 (#3) は SNR / 22.05kHz 帯域維持の GPU 検証が必要�
 
 | # | 施策 | commit | 内容 | 期待効果 |
 |---|------|--------|------|---------|
-| impl1 (#1) | **hf_transfer + `HF_HUB_ENABLE_HF_TRANSFER=1`** | [`d4f90f19`](https://github.com/ayutaz/piper-plus/commit/d4f90f19) | `src/python/pyproject.toml` の train extras に `hf_transfer>=0.1.6` 追加、 `docker/python-train/Dockerfile` runtime stage に `ENV HF_HUB_ENABLE_HF_TRANSFER=1` 焼き込み、 handoff §2 に vast.ai bare-VM 用 export 手順を追記 | **raw DL 3-5h → 1-1.5h** (単スレッド hf_hub 40-80MB/s → Rust concurrent chunk 200-500MB/s、 3-5x)、 vast.ai の `inet_up ≥ 3Gbps` 帯域を使い切れるように |
-| impl2 (#2) | **KsponSpeech `.pcm` 直読 (WAV 変換省略)** | [`2aab2258`](https://github.com/ayutaz/piper-plus/commit/2aab2258) | `norm_audio._read_pcm16_mono` (int16 → float32/32768、 s16 PCM spec 準拠) + `_read_audio_any` dispatcher を新設、 全 4 `cache_norm_audio*` entry point + `parse_kspon_speech` default `audio_ext` を `.pcm` に flip、 `test_pcm_read.py` で normalisation / 空 file / 大文字 `.PCM` / WAV passthrough を pin | **ETRI PCM→WAV pre-pass 3-4h → ~0** (raw PCM は既に int16 s16le で soundfile 経由 WAV の decode round-trip と等価、 IO-bound で parallel VAD に融合)。§2.4 の ko 追加分の主要 lever |
-| impl3 (#4) | **parquet `audio.bytes` を FLAC 直保存 (double-decode 消去)** | [`7d2f70a0`](https://github.com/ayutaz/piper-plus/commit/7d2f70a0) | `export_libritts_r_from_parquet.py` / `export_cml_tts_from_parquet.py` に `--output-format {flac,wav}` (default flac) 追加、 FLAC magic (`fLaC`) 一致時は `write_bytes()` で zero-copy 保存 (旧: `sf.read` decode + `sf.write` WAV encode + downstream `sf.read` の 3 段 double-decode)、 duration は `sf.info()` headers-only 解析、 `prepare_bilingual_dataset.process_en_dataset` は `.flac` / `.wav` / 拡張子なし の 3 パターン受理で backward-compat | **LibriTTS-R export 30-60min → 5-10min (2-6x)**、 CML-TTS も 3 言語 (es/fr/pt) で同等 gain、 合計 **-50-100min** |
-| impl4 (#5) | **`prepare_moe_speech_plus.py --parallel` default ON + chunksize=8** | [`821c112b`](https://github.com/ayutaz/piper-plus/commit/821c112b) | `--parallel` を `argparse.BooleanOptionalAction / default=True` に flip、 `Pool.imap` chunksize 1 → 8 (imap は chunksize に依らず input 順序 preserve、 byte-for-byte parity 契約は保持)、 CI / 小規模 dataset は `--no-parallel` で opt-out | **moe-speech 選抜 30-45min → 3-5min (12-16x)**、 呼び出し側 (v8 手順書) を触らずに丸ごと吸収 |
+| impl1 (#1) | **hf_transfer + `HF_HUB_ENABLE_HF_TRANSFER=1`** | [`5b2f53c4`](https://github.com/ayutaz/piper-plus/commit/5b2f53c4) | `src/python/pyproject.toml` の train extras に `hf_transfer>=0.1.6` 追加、 `docker/python-train/Dockerfile` runtime stage に `ENV HF_HUB_ENABLE_HF_TRANSFER=1` 焼き込み、 handoff §2 に vast.ai bare-VM 用 export 手順を追記 | **raw DL 3-5h → 1-1.5h** (単スレッド hf_hub 40-80MB/s → Rust concurrent chunk 200-500MB/s、 3-5x)、 vast.ai の `inet_up ≥ 3Gbps` 帯域を使い切れるように |
+| impl2 (#2) | **KsponSpeech `.pcm` 直読 (WAV 変換省略)** | [`c2f59ec0`](https://github.com/ayutaz/piper-plus/commit/c2f59ec0) | `norm_audio._read_pcm16_mono` (int16 → float32/32768、 s16 PCM spec 準拠) + `_read_audio_any` dispatcher を新設、 全 4 `cache_norm_audio*` entry point + `parse_kspon_speech` default `audio_ext` を `.pcm` に flip、 `test_pcm_read.py` で normalisation / 空 file / 大文字 `.PCM` / WAV passthrough を pin | **ETRI PCM→WAV pre-pass 3-4h → ~0** (raw PCM は既に int16 s16le で soundfile 経由 WAV の decode round-trip と等価、 IO-bound で parallel VAD に融合)。§2.4 の ko 追加分の主要 lever |
+| impl3 (#4) | **parquet `audio.bytes` を FLAC 直保存 (double-decode 消去)** | [`e0fa0d04`](https://github.com/ayutaz/piper-plus/commit/e0fa0d04) | `export_libritts_r_from_parquet.py` / `export_cml_tts_from_parquet.py` に `--output-format {flac,wav}` (default flac) 追加、 FLAC magic (`fLaC`) 一致時は `write_bytes()` で zero-copy 保存 (旧: `sf.read` decode + `sf.write` WAV encode + downstream `sf.read` の 3 段 double-decode)、 duration は `sf.info()` headers-only 解析、 `prepare_bilingual_dataset.process_en_dataset` は `.flac` / `.wav` / 拡張子なし の 3 パターン受理で backward-compat | **LibriTTS-R export 30-60min → 5-10min (2-6x)**、 CML-TTS も 3 言語 (es/fr/pt) で同等 gain、 合計 **-50-100min** |
+| impl4 (#5) | **`prepare_moe_speech_plus.py --parallel` default ON + chunksize=8** | [`b8539de4`](https://github.com/ayutaz/piper-plus/commit/b8539de4) | `--parallel` を `argparse.BooleanOptionalAction / default=True` に flip、 `Pool.imap` chunksize 1 → 8 (imap は chunksize に依らず input 順序 preserve、 byte-for-byte parity 契約は保持)、 CI / 小規模 dataset は `--no-parallel` で opt-out | **moe-speech 選抜 30-45min → 3-5min (12-16x)**、 呼び出し側 (v8 手順書) を触らずに丸ごと吸収 |
 
 **未実装 (今回 deferred)**:
 
@@ -833,10 +909,20 @@ GPU resample 施策 (#3) は SNR / 22.05kHz 帯域維持の GPU 検証が必要�
 v8 用に拡張し、**ja 未知話者の評価セットを新設** (moe-speech-plus の学習除外話者 ~10 名。
 女性偏重の実測のため、可能なら男性キャラを意図的に含める)。
 
+**評価用話者 holdout の運用 (2026-08-02 確定)**: 学習コードに holdout 機構はないため、
+**dataset.jsonl 構築後の post-filter** で学習セットから除外する:
+
+- **ja**: moe-speech-plus から ~10 名 (男性キャラ含む) を学習除外 → ja 未知話者評価セット
+- **ko**: Zeroth-Korean から 5-10 名を学習除外 → **ko 未知話者評価セットを新設**。
+  ko 学習話者は ~210 (KsponSpeech 除外後、§2) のため ko zero-shot 品質は限定的で、
+  §3.10 の「ko 参照 zero-shot ≥ 0.65」目標 (kspon ~1,700 spk 前提) は適用しない —
+  参考測定として記録し、ko データ拡充 (商用可ソース) は v9 課題 (§6.5)
+
 ## 6. オープン課題
 
 - [ ] es/fr/pt 縮小の品質回帰監視 (ep10 SECS で判断、必要なら cap 緩和)
-- [ ] batch 128 での VRAM 実測 (OOM なら 96 に落とす)
+- [ ] batch=32/GPU × 4 (effective 128) の VRAM 実測 @ A100 40GB — smoke test を VRAM gate
+  とし、溢れたら batch=24 に下げるか 80GB 構成に乗換 (§4.1 の 2026-08-02 注記)
 - [ ] moe-speech-plus の speechMOS / CER フィルタ閾値の実分布確認 (通過率が想定を大きく
   外れたら cap・閾値を調整)
 - [ ] v7 前処理で CML-TTS 話者が es 77→63 / fr 45→28 / pt 30→8 に削られた理由の特定
@@ -856,7 +942,7 @@ v8 用に拡張し、**ja 未知話者の評価セットを新設** (moe-speech-
 > 品質は限定的 — ko データ拡充 (商用可ソース) は v9 課題。
 > `--ko-ksponspeech` 経路と `parse_kspon_speech` はコード上残置 (research
 > 用途の第三者利用は可能) だが、v8 公式 run では使わない。
-> CV ko の UTMOS tsv は `tools/score_utmos.py` (SpeechMOS utmos22_strong、
+> CV ko の UTMOS tsv は `piper_train.tools.score_utmos` (SpeechMOS utmos22_strong、
 > 2026-08-02 追加) で生成する。
 
 v8 のクリティカルパス (moe-speech-plus + LibriTTS-R + AISHELL-3 + CML-TTS の
@@ -868,9 +954,9 @@ extended_language_id_map`)、 id_maps.py の `_KOREAN_PHONEMES` も組み込み�
 | ソース | ライセンス | 想定 spk | 想定 utts | prepare 引数 |
 |---|---|---|---|---|
 | **Zeroth-Korean** | CC BY 4.0 (openslr.org/40) | ~181 | ~22k (train_data_01 のみ) | `--ko-zeroth <dir>` |
-| **KsponSpeech** | AI-Hub consent (research use、 商用非公開) | ~2,000 | cap=60/spk で ~120k | `--ko-ksponspeech <dir> --ko-kspon-cap 60` |
-| **Common Voice ko** | CC0 | ~50 (UTMOS≥2.5 + ≥20 clips) | ~3k | `--ko-cv <dir> --ko-cv-min-utmos 2.5` |
-| **計** | | **~2,200** | **~145k** | |
+| KsponSpeech (**v8 除外**、冒頭の 2026-08-02 決定) | AI-Hub consent (research use、 商用非公開) | (~2,000) | (cap=60/spk で ~120k) | `--ko-ksponspeech <dir> --ko-kspon-cap 60` (v8 公式 run では不使用) |
+| **Common Voice ko** | CC0 | ~30-50 (UTMOS≥2.5 + ≥20 clips + cap 60) | ~3k | `--ko-cv <dir> --ko-cv-min-utmos 2.5` |
+| **計 (v8 採用分 = Zeroth + CV ko)** | | **~210** | **~25k** | |
 
 **成果物**:
 
