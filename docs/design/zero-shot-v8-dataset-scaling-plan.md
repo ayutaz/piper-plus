@@ -846,6 +846,19 @@ v8 用に拡張し、**ja 未知話者の評価セットを新設** (moe-speech-
 
 ## 6.5 Korean (ko) 追加 — 2026-07-09 追加ランディング
 
+> **⚠️ 決定 (2026-08-02、ユーザー確定): KsponSpeech は v8 から除外。**
+> v8 は過去の piper-plus 事前学習モデル同様 **public + 商用利用可の
+> open-model として公開する**方針が確定し、KsponSpeech の AI-Hub ライセンス
+> (research-only、モデル配布制限、raw 再ホスト禁止) と両立しないため。
+> v8 の ko は **Zeroth-Korean (CC BY 4.0、~181 spk) + Common Voice ko
+> (CC0、~30-50 spk)** のみで学習する (§3.10 の「Zeroth + CV ko のみでの
+> 7-lang 版」オプションを本線に昇格)。ko 話者 ~210 のため ko zero-shot
+> 品質は限定的 — ko データ拡充 (商用可ソース) は v9 課題。
+> `--ko-ksponspeech` 経路と `parse_kspon_speech` はコード上残置 (research
+> 用途の第三者利用は可能) だが、v8 公式 run では使わない。
+> CV ko の UTMOS tsv は `tools/score_utmos.py` (SpeechMOS utmos22_strong、
+> 2026-08-02 追加) で生成する。
+
 v8 のクリティカルパス (moe-speech-plus + LibriTTS-R + AISHELL-3 + CML-TTS の
 6-lang 学習) は不変のまま、 **同一 v8 run 内で ko=7 も学習** する副次拡張。
 G2P は 7 ランタイム全てで既に ready (`docs/spec/language-id-map-contract.toml:
