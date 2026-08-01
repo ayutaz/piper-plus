@@ -95,7 +95,7 @@ RUN uv pip install "/tmp/src/python[train]"
 # super-mas), so builder stage git is required. Import-safe on CPU-only hosts:
 # the dispatcher in `piper_train/vits/monotonic_align/__init__.py` falls back
 # to Cython whenever tensors are not CUDA. Disable at runtime with
-# `PIPER_DISABLE_SUPER_MAS=1`.
+# `PIPER_PLUS_DISABLE_SUPER_MAS=1`.
 RUN uv pip install "/tmp/src/python[super-mas]"
 
 # Runtime stage

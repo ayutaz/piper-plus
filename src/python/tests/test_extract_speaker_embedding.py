@@ -544,11 +544,11 @@ class TestDefaultFastPath:
         assert session.run.call_count >= 3
 
     def test_env_var_overrides_cli_default(self, tmp_path, monkeypatch):
-        """PIPER_EMB_FIXED_FRAMES=0 が CLI default (400) を上書きし legacy per-utt に落ちる"""
+        """PIPER_PLUS_EMB_FIXED_FRAMES=0 が CLI default (400) を上書きし legacy per-utt に落ちる"""
         ds = self._make_dataset_with_pt(tmp_path, n_utts=2)
         session = self._make_fake_session()
 
-        monkeypatch.setenv("PIPER_EMB_FIXED_FRAMES", "0")
+        monkeypatch.setenv("PIPER_PLUS_EMB_FIXED_FRAMES", "0")
 
         ese.extract_per_utterance(
             session=session,
