@@ -152,8 +152,8 @@ datasets:
       verified: true
       url: "https://creativecommons.org/publicdomain/zero/1.0/"
     source:
-      url: "https://commonvoice.mozilla.org/ko/datasets"
-      commit_or_version: "Common Voice Delta 22.0 (2026-01)"
+      url: "https://huggingface.co/datasets/fsicoli/common_voice_22_0"
+      commit_or_version: "Common Voice 22.0 (via HF fsicoli/common_voice_22_0, ko subset)"
     attribution_required: false
     attribution_text: |
       Common Voice ko subset, distributed under CC0 1.0 by Mozilla and its

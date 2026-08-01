@@ -36,9 +36,9 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from hashlib import sha256 as _sha256
 from pathlib import Path
 
-from piper_plus_g2p.encode.pua import map_token as _map_token
 from tqdm import tqdm
 
+from piper_plus_g2p.encode.pua import map_token as _map_token
 from piper_train.norm_audio import default_num_processes
 
 
@@ -420,7 +420,11 @@ def parse_kspon_speech(
     min_utts_per_spk: int = 20,
     cap_per_speaker: int | None = 60,
 ) -> tuple[list[tuple[str, str, str]], dict[str, int]]:
-    """Parse KsponSpeech corpus (MIT/ETRI consent form, ~969h / ~2000 spk).
+    """Parse KsponSpeech corpus (AI-Hub research-only license, ~969h / ~2000 spk).
+
+    Note: excluded from the v8 public (commercial-OK) release training data
+    because of the research-only license (2026-08-02 decision); the parser is
+    kept for research use.
 
     Layout (raw distribution, no PCM→WAV conversion required as of v8):
         base_dir/
@@ -1586,9 +1590,9 @@ def main():
     )
     parser.add_argument(
         "--ko-ksponspeech",
-        help="Path to KsponSpeech base directory (MIT/ETRI consent form; "
-        "raw 16kHz mono s16le .pcm read directly by norm_audio - no PCM→WAV "
-        "conversion required)",
+        help="Path to KsponSpeech base directory (AI-Hub research-only "
+        "license - excluded from v8 release training; raw 16kHz mono s16le "
+        ".pcm read directly by norm_audio - no PCM→WAV conversion required)",
     )
     parser.add_argument(
         "--ko-cv",

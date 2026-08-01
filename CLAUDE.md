@@ -185,22 +185,31 @@ echo "PID: $!"
 
 ## 📦 アーカイブ: v8 + ko (7-lang) zero-shot 学習準備完了 (`feat/zero-shot-v8-dataset-scaling`)
 
-> ⚠️ **現在の作業ブランチは `dev`**。 このセクションは v8 話者数拡張版 (**5,100 speakers、 8.9x v7、 7-lang** — 6-lang v8 は 3,578 spk 段階でスナップショット) の準備完了記録。 本走は明示 go 待ち。
+> ⚠️ v8 作業は `feat/zero-shot-v8-dataset-scaling` 上で進行中 (2026-08-02 に `origin/dev` v2.0 (piper→piper_plus 改名込) へリベース済)。 **KsponSpeech (AI-Hub research-only) は除外確定**し、 v8 は **public + 商用利用可の open-model として公開する方針** (過去の piper-plus 事前学習モデル同様)。 現在の 7-lang 規模: **~3,790 speakers / ~346k utts** (6-lang 3,578 spk / 321,391 utts + ko ~210 spk / ~25k utts)。 詳細は下記「2026-08-02 更新」。
 
 **進捗 (2026-07-09 セッション終了時点)**:
 - ✅ **v8 dataset 完成 (6-lang スナップショット)**: 321,391 utts / 3,578 speakers / 6 lang (`/data/piper/dataset-multilingual-6lang-v8/`)
-- ✅ **韓国語 (ko) 拡張 ランディング**: parser 3 種 (Zeroth / KsponSpeech / CV ko) + `export_common_voice_ko.py` + `LANGUAGE_ID_MAP` を 8-lang extended (ko=7) に切替 (commit `c4f384d3`)。 G2P/contract/id_maps は既に 7 ランタイム全てで 8-lang extended 版で pin 済のため、 コード側は data pipeline のみで完遂。 7-lang 目標: **~420k utts / ~5,100 speakers**
-- ✅ **scratch NaN blocker 解消**: bf16 cuFFT bug fix (`11ff71fc`) + KL 発散防止 3 段 (`d37ccda2` + `61aabe27` + `45060adc`)
-- ✅ **前処理高速化 4 施策 (§3.11)**: impl1 hf_transfer (`d4f90f19`、 raw DL 3-5x) + impl2 KsponSpeech `.pcm` 直読 (`2aab2258`、 ETRI WAV 変換 3-4h 消去) + impl3 parquet FLAC 直保存 (`7d2f70a0`、 LibriTTS-R/CML export 2-6x) + impl4 moe-speech-plus `--parallel` default ON (`821c112b`、 選抜 12-16x)。 GPU 検証不要な低リスク版のみ、 GPU resample (#3) は SNR 検証必要のため v9 送り。 **前処理 wall-clock 12-18h → 7-10h (7-lang) / 6-9h (6-lang)**
+- ✅ **韓国語 (ko) 拡張 ランディング**: parser 3 種 (Zeroth / KsponSpeech / CV ko) + `export_common_voice_ko.py` + `LANGUAGE_ID_MAP` を 8-lang extended (ko=7) に切替 (commit `963c4c49`)。 G2P/contract/id_maps は既に 7 ランタイム全てで 8-lang extended 版で pin 済のため、 コード側は data pipeline のみで完遂。 7-lang 目標: ~420k utts / ~5,100 speakers (→ 2026-08-02 KsponSpeech 除外確定で **~346k utts / ~3,790 speakers** に縮小)
+- ✅ **scratch NaN blocker 解消**: bf16 cuFFT bug fix (`3dcabd57`) + KL 発散防止 3 段 (`1a86aa55` + `563f8361` + `1f625a42`)
+- ✅ **前処理高速化 4 施策 (§3.11)**: impl1 hf_transfer (`5b2f53c4`、 raw DL 3-5x) + impl2 KsponSpeech `.pcm` 直読 (`c2f59ec0`、 ETRI WAV 変換 3-4h 消去 — KsponSpeech 除外確定後は出番なし) + impl3 parquet FLAC 直保存 (`e0fa0d04`、 LibriTTS-R/CML export 2-6x) + impl4 moe-speech-plus `--parallel` default ON (`b8539de4`、 選抜 12-16x)。 GPU 検証不要な低リスク版のみ、 GPU resample (#3) は SNR 検証必要のため v9 送り。 **前処理 wall-clock 12-18h → 7-10h (7-lang) / 6-9h (6-lang)**
 - ✅ **28 commits ランディング**: 5 施策 + KL fix + bucketing 実験 + T3/T6/T-npy 他 8 施策 + ko 拡張 + 前処理 4 施策 + docs
 - ✅ **実測 -23% throughput**: 14.0 → 10.74 sec/step (bf16 real config、 batch=64)
-- ⏸ **本走待ち**: 4x A100 SXM4 DDP + batch=128 で **6-lang 9-11 日 / ~$672-1,120**、 **7-lang 12-15 日 / ~$1,050-1,530** 見込 (§3.10)
+- ⏸ **本走待ち**: 4x A100 SXM4 DDP + batch=128 で 6-lang 9-11 日 / ~$672-1,120、 7-lang 12-15 日 / ~$1,050-1,530 見込 (§3.10) (→ 2026-08-02 KsponSpeech 除外 + 40GB 案で **7-9 日 / ~$600-750** に更新、 下記)
 
 **次セッションでの起動**:
 - 全手順: [`docs/handoff/zero-shot-v8-2026-07-09.md`](docs/handoff/zero-shot-v8-2026-07-09.md)
 - CLI 最終版: [design doc §3.7](docs/design/zero-shot-v8-dataset-scaling-plan.md#37-全-smoke-test-完了--最終見積-2026-07-09-セッション終了時点)
 - ko 追加コスト分析: [design doc §3.10](docs/design/zero-shot-v8-dataset-scaling-plan.md#310-v8-に韓国語-ko-追加--追加コスト見積-2026-07-09)
-- ko 追加後の前処理: `prepare_multilingual_dataset.py --ko-zeroth ... --ko-ksponspeech ... --ko-cv ...` (§6.5)
+- ko 追加後の前処理: `prepare_multilingual_dataset.py --ko-zeroth ... --ko-cv ...` (§6.5。 `--ko-ksponspeech` は除外確定により使わない。 CV ko の UTMOS フィルタは `piper_train.tools.score_utmos` の per-clip tsv を `export_common_voice_ko --utmos-tsv` に渡す — 渡さないと黙って無効化される)
+
+**2026-08-02 更新 (dev v2.0 リベース + 本走方針確定)**:
+- ✅ **公開方針確定**: v8 は public + 商用利用可の open-model として公開 (KsponSpeech 除外により全データソースのライセンスが両立)。 ko は Zeroth-Korean (CC BY 4.0、 openslr.org/40、 ~181 spk / ~22.2k utts) + Common Voice ko (CC0、 UTMOS≥2.5 + ≥20clips + cap60 で ~30-50 spk / ~3k utts) のみ
+- ✅ **UTMOS スコアラ追加**: `piper_train.tools.score_utmos` (SpeechMOS utmos22_strong、 commit `1eb2a3d0`)
+- ✅ **インスタンス承認済**: 4x A100 SXM4 40GB $3.43/hr (storage 1.7TB 込、 vast.ai。 オファーは流動的でレンタル時に再検索)。 batch=32/GPU の VRAM 40GB は未検証 → smoke を VRAM gate とし、 溢れたら batch=24 に下げるか 80GB ($7.68/hr) に乗換
+- ✅ **smoke 自動 go 基準承認済**: sec/step ≤ 8.5 かつ non-finite skip ≤ 3% かつ VRAM 40GB 内 → 報告を待たず本走 launch
+- ✅ **開始ブロッカー解消**: HF token (gated moe-speech-plus read / private repo write) + WANDB キー検証済。 ckpt 退避 repo `ayousanz/piper-plus-zero-shot-multi-6lang-v8` (private) 作成済
+- ⏳ **本走見積 (7-lang、 40GB 案)**: **7-9 日 / ~$600-750** (7-8 sec/step 達成前提、 10.74 のままなら +30%)
+- 🔜 **残 TODO (本走前)**: onstart 自動レジューム script + HF ckpt epoch ごと自動 upload script が未作成 / ko データパイプラインは実データ未検証 (synthetic unit test のみ) → instance で小規模先行検証 / 評価用話者 holdout はコード機構なし → dataset.jsonl 構築後に post-filter (ja: moe-speech-plus 学習除外 ~10 名・男性含む、 ko: Zeroth 学習除外 5-10 名)
 
 **実測で不採用が確定した施策**:
 - `--compile`: torch 2.11 + triton の kernel compile crash
@@ -387,7 +396,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 > **PT BR/EU 切替:** `pt` と `pt-BR` は Brazilian Portuguese (BR、 後方互換のため `pt` は BR alias を維持)、 `pt-PT`/`pt-pt` は European Portuguese (EU、 全 8 ランタイム実装)。 `PortuguesePhonemizer(dialect=Dialect.BR | Dialect.EU)` で同一クラス内 dialect 切替。 EU は BR との 5 主要差分 (t/d palatalisation / final-e / final-s / coda-l / r-realization) を post-processing で表現。 IPA 専用 codepoint `ɨ` (中央母音) と `ɫ` (velarised lateral) を PUA contract に追加。 仕様: `docs/spec/pt-dialect-contract.toml`。
 
 > **学習済みモデルは 6 言語 (sv/ko 未含有)、コードは 8 言語対応。**
-> **v8 モデルでも ko 対応**: 進行中の v8 (`feat/zero-shot-v8-dataset-scaling`) では KsponSpeech / Zeroth-Korean / Common Voice ko を追加し **7 lang (ja/en/zh/es/fr/pt/ko)** で学習予定。 `LANGUAGE_ID_MAP` は `extended_language_id_map` (`ko=7`、 `sv=6` 予約) に切替済、 `_KOREAN_PHONEMES` (IPA インベントリ) も `id_maps.py` に組み込み済で、 学習前の追加作業は data pipeline (parser 3 種 + CV ko exporter) のみ完遂 (commit `c4f384d3`)。 詳細: [design doc §3.10 / §6.5](docs/design/zero-shot-v8-dataset-scaling-plan.md#310-v8-に韓国語-ko-追加--追加コスト見積-2026-07-09)。
+> **v8 モデルでも ko 対応**: 進行中の v8 (`feat/zero-shot-v8-dataset-scaling`) では Zeroth-Korean + Common Voice ko を追加し **7 lang (ja/en/zh/es/fr/pt/ko)** で学習予定 (KsponSpeech は research-only ライセンスのため 2026-08-02 に除外確定 — v8 は public/商用可の open-model 方針)。 `LANGUAGE_ID_MAP` は `extended_language_id_map` (`ko=7`、 `sv=6` 予約) に切替済、 `_KOREAN_PHONEMES` (IPA インベントリ) も `id_maps.py` に組み込み済で、 学習前の追加作業は data pipeline (parser + CV ko exporter + `piper_train.tools.score_utmos`) のみ完遂 (commit `963c4c49`)。 詳細: [design doc §3.10 / §6.5](docs/design/zero-shot-v8-dataset-scaling-plan.md#310-v8-に韓国語-ko-追加--追加コスト見積-2026-07-09)。
 
 **実装:** `src/python/g2p/piper_plus_g2p/{multilingual,japanese,english,chinese,korean,spanish,portuguese,french,swedish}.py` (学習側) / `src/python_run/piper_plus/phonemize/` (ランタイム側)。
 **ABC + レジストリ:** `g2p/piper_plus_g2p/{base,registry}.py`。
