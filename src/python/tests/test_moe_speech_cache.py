@@ -299,6 +299,11 @@ def _run_main(input_dir: Path, output_dir: Path, extra_argv: list[str]) -> None:
         "5",
         "--cap",
         "20",
+        # cache 契約は serial 経路で pin する (--parallel default ON の spawn
+        # worker には monkeypatch が伝播せず、 scan_zip_records の呼び出し
+        # カウントが常に 0 になるため)。 並列経路の parity 契約は
+        # tests/test_moe_speech_parallel.py が担当。
+        "--no-parallel",
     ] + extra_argv
     old = sys.argv
     sys.argv = argv
