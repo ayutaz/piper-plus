@@ -896,6 +896,76 @@ GPU resample 施策 (#3) は SNR / 22.05kHz 帯域維持の GPU 検証が必要�
 - impl4: `test_moe_speech_parallel.py` (default ON / `--no-parallel` opt-out / imap chunksize / byte-for-byte parity、 10 test)
 - backward-compat: 既存 WAV / `.spec.pt` / serial exec の regression suite は全て PASS 継続
 
+### 3.12 7-lang dataset 構築完了 + 4x DDP 実走 smoke — 通信律速の発見と中断判断 (2026-08-02/03)
+
+vast.ai 4x A100 SXM4 **40GB** (contract 46527250、offer 44347432、$2.93/hr +
+storage) で dataset 再構築 → smoke 実走を実施。**dataset は完成、学習は健全、
+しかし DDP 通信律速で throughput が見積を大幅に下回り、ユーザー判断で
+本走を一旦中断** (2026-08-03)。
+
+**dataset 完成形 (HF 退避済み)**:
+
+| 項目 | 値 |
+|---|---|
+| 総発話 / 話者 | **342,855 / 3,692** (holdout 除外後) |
+| 言語内訳 (utts/spk) | ja 54,476/463・en 93,540/1,942・zh 88,035/218・es 21,698/115・fr 14,704/81・pt 47,736/749・ko 22,666/114 |
+| es の 21.7k | cap 600/spk で 122k を意図的に削減した後の正しい値 (§2 の「~45k」目標は cap 適用を過大計上していた) |
+| holdout | ja 10 話者 1,200 発話 (`holdout/`)。ko holdout は speaker prefix 正規化 (`ko_zeroth-*`) の関係で post-filter が 0 件 → **復元後に要再実行** |
+| config | num_symbols=185 / **num_languages=8** (ko=7、sv=6 欠番のため max+1) / num_speakers=3,692 |
+| CAM++ embedding | 342,855 個 (100%、GPU 抽出) |
+| 退避先 | HF private `ayousanz/piper-plus-zero-shot-multi-6lang-v8` の `dataset-7lang-v8/` (40GB split tar.gz + sha256) |
+
+**再構築中に発見・修正した 7 バグ** (全て feature branch に push 済み、
+「静かな成功」系は fail-fast gate + 契約テストで再発防止):
+
+1. PyPI stale `piper-plus-g2p` (extended inventory 欠落 → ko/zh/ja が黙って欠損)
+2. audio_norm `.npy` cache を読めない旧 `torch.load` リーダー ×5 箇所 (spec 全滅 / CAM++ 全滅)
+3. NLTK data 未 DL (g2p-en が全発話 LookupError、str(e) 改行始まりで「空エラー」)
+4. `num_languages=len(langs)` の欠番バグ (ko=7 が emb_lang 範囲外 → CUDA device assert)
+5. DDP `static_graph=True` (Plan A) が GAN 交互最適化と非互換 → 撤回
+6. hf CLI `--include` 複数パターン構文変更 (es データ 0 件で exit 0)
+7. prosody 長さ不一致 2 発話で bilingual 全体 crash → skip 化
+
+**smoke 実測 (300/100 batch、batch=32/GPU、T3+T6 on、SCL CPU)**:
+
+| 構成 | sec/step | utts/s | 備考 |
+|---|---|---|---|
+| 単一 GPU (batch=32) | **~5.5** | 5.8 | 計算は健全 (80GB batch=64 の 10.74 の半分 = linear) |
+| 4x DDP | **11.11** | 11.5 | Non-finite 0/300、VRAM peak 14.5GB/40GB |
+| 4x DDP + P2P 有効 | ~12.2 | — | 効果なし |
+| 4x DDP + NCCL_ALGO=Tree | crash | — | 不採用 |
+| 4x DDP + 勾配 bf16 圧縮 (`PIPER_PLUS_DDP_BF16_COMPRESS=1`) | ~12.0 | — | 効果なし (opt-in として温存) |
+
+**結論: DDP オーバーヘッド ~5.6 s/step (50%) の通信律速**。当該ホストは
+SXM4 表記だが `nvidia-smi topo -m` で NVLink が見えず (仮想化で無効)、
+GPU 2+2 が別 NUMA (SYS 跨ぎ) で all-reduce が最悪経路。env チューニングでは
+解決しない物理制約。
+
+**見積前提の崩れ (重要な学び)**:
+
+- §3.7 の「4x DDP で 2.5-3h/epoch (9-11 日)」は単一 GPU 実測からの
+  **linear scaling 仮定の外挿**で、DDP 通信を含まない。実測 8.3h/epoch
+- vast.ai のオファー情報では **NVLink の有無を事前に判別できない**
+  (SXM4 表記でも仮想化で無効の場合がある)。レンタル後 `nvidia-smi topo -m` で
+  `NV#` リンクの確認が必須
+- **80 epoch は v7 同等総 step の 1.72 倍** (v8 342,855 utts では v7 32ep 同等
+  = 46 epoch)。50 epoch 前後が品質/コストのバランス点
+
+**中断時点の選択肢 (実測ベース、2026-08-03)**:
+
+| 案 | 工期 | GPU コスト |
+|---|---|---|
+| NVLink ありホスト (要ガチャ) + 50ep | ~10 日 | ~$700 (当初予算内) |
+| 現ホスト級 + 50ep | ~17 日 | ~$1,410 |
+| 現ホスト級 + 80ep | ~28 日 | ~$2,250 |
+
+**復元手順 (再開時)**: HF `dataset-7lang-v8/` の split tar を cat 結合 →
+展開 → sha256 検証 → `/data/piper/dataset-multilingual-7lang-v8/` へ。
+ko holdout の post-filter 再実行 (Zeroth 5-10 spk、speaker 名は
+`ko_zeroth-<id>` 形式に注意) を忘れないこと。学習 launch は
+`/root/v8_train.sh` 相当 (scratchpad `v8_train.sh`、自動 resume +
+ckpt uploader 込み) を使用。
+
 ## 5. 成功基準と評価
 
 | 指標 | v7 baseline | v8 目標 |
