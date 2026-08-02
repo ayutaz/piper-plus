@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import os
 from pathlib import Path
 from pickle import UnpicklingError
 
@@ -79,6 +80,17 @@ def configure_ddp_strategy(num_gpus, user_strategy=None, no_wavlm=False):
             "find_unused_parameters": True,
             "gradient_as_bucket_view": True,
         }
+        # NVLink の無いホスト (NUMA 跨ぎ all-reduce) では勾配通信が律速に
+        # なる (v8 smoke 実測: 11.1 s/step のうち ~5.7s が通信)。opt-in で
+        # 勾配を bf16 圧縮して通信量を半減する。bf16-mixed 学習では勾配の
+        # 数値表現が元々 bf16 精度相当のため品質影響は小さい
+        if os.environ.get("PIPER_PLUS_DDP_BF16_COMPRESS") == "1":
+            from torch.distributed.algorithms.ddp_comm_hooks import (  # noqa: PLC0415
+                default_hooks,
+            )
+
+            ddp_kwargs["ddp_comm_hook"] = default_hooks.bf16_compress_hook
+            _LOGGER.info("DDP comm hook: bf16_compress (gradient all-reduce halved)")
         _LOGGER.info(
             "Using DDPStrategy with find_unused_parameters=True, "
             "gradient_as_bucket_view=True"
