@@ -2018,7 +2018,12 @@ def main():
         "num_symbols": len(ml_id_map),
         "num_speakers": num_speakers,
         "speaker_id_map": config_speaker_map,
-        "num_languages": len(active_languages),
+        # emb_lang の embedding テーブルサイズ。「言語数」ではなく
+        # 「max(language_id) + 1」でなければならない: extended map は
+        # sv=6 を予約欠番にして ko=7 を割り当てるため、7 言語 active でも
+        # language_id=7 が存在する。len() だと emb_lang(7) に index 7 が
+        # 入り CUDA device-side assert で学習が即死する (2026-08-02 実障害)
+        "num_languages": max(config_language_id_map.values()) + 1,
         "language_id_map": config_language_id_map,
         "prosody_num_symbols": 11,
         "prosody_id_map": {str(i): [i] for i in range(11)},
