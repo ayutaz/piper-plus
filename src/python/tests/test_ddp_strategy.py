@@ -1,7 +1,13 @@
 """Tests for DDP strategy configuration.
 
-Verifies that static_graph=True, find_unused_parameters=True, and
-gradient_as_bucket_view=True are always configured for multi-GPU runs.
+Verifies that find_unused_parameters=True and gradient_as_bucket_view=True
+are always configured for multi-GPU runs, and that static_graph is NOT set.
+
+static_graph=True (Plan A) は 4x A100 DDP の v8 smoke (2026-08-02) で
+iteration 2 に「unused parameters ...」RuntimeError を起こすことが実測で
+確定し撤回された。VITS の GAN 交互最適化は G step / D step で unused-param
+集合が交互に変わるため、static graph の「毎 iteration 同一」前提を
+満たさない。
 """
 
 import pytest
@@ -20,28 +26,21 @@ def _import_ddp_deps():
 
 
 @pytest.mark.unit
-def test_ddp_strategy_has_static_graph_true():
-    """static_graph=True を追加して all-reduce bucket 準備コストを削減する
-    (最適化 2/4)。 VITS の GAN 交互最適化は step ごとに unused-param 集合が
-    固定パターンなので safe に有効化できる。"""
-    DDPStrategy, configure_ddp_strategy = _import_ddp_deps()
+def test_ddp_strategy_does_not_set_static_graph():
+    """static_graph は設定しない (GAN 交互最適化と非互換、2026-08-02 実測)。
 
-    strategy = configure_ddp_strategy(num_gpus=4, no_wavlm=True)
-
-    assert isinstance(strategy, DDPStrategy)
-    assert strategy._ddp_kwargs.get("static_graph") is True
-
-
-@pytest.mark.unit
-def test_ddp_strategy_static_graph_regardless_of_wavlm():
-    """WavLM の有無に関わらず static_graph=True が設定されること。"""
+    G step / D step で unused set が交互に変わるため、static_graph=True は
+    4x DDP 実走の iteration 2 で RuntimeError になる。再導入する場合は
+    必ず multi-GPU 実走 smoke で検証すること。
+    """
     DDPStrategy, configure_ddp_strategy = _import_ddp_deps()
 
     for no_wavlm in (True, False):
-        strategy = configure_ddp_strategy(num_gpus=2, no_wavlm=no_wavlm)
+        strategy = configure_ddp_strategy(num_gpus=4, no_wavlm=no_wavlm)
         assert isinstance(strategy, DDPStrategy)
-        assert strategy._ddp_kwargs.get("static_graph") is True, (
-            f"static_graph must be True with no_wavlm={no_wavlm}"
+        assert not strategy._ddp_kwargs.get("static_graph"), (
+            "static_graph must not be enabled: incompatible with GAN "
+            "alternating optimization (proven on 4x A100 DDP, 2026-08-02)"
         )
 
 
