@@ -1501,7 +1501,15 @@ def process_new_language(
 ) -> tuple[list[dict], dict[str, int]]:
     """Process a new language: phonemize, cache audio, assemble."""
     if not entries:
-        return [], {}
+        # CLI でソース dir を指定した言語のみここに到達する。0 件 parse は
+        # レイアウト不一致 (例: hf CLI の --include 構文変更で CSV ごと欠落
+        # → train.csv not found → ES が dataset から黙って消えた 2026-08-01
+        # 実障害)。silent skip にせず fail-fast する
+        raise RuntimeError(
+            f"no {language.upper()} utterances were parsed from the given "
+            "source directory; check the parse-phase ERROR logs above "
+            "(wrong layout / missing CSVs / incomplete download)."
+        )
 
     # Assign speaker IDs
     sorted_speakers = sorted(speaker_counts.items(), key=lambda x: x[1], reverse=True)
@@ -1526,9 +1534,18 @@ def process_new_language(
         workers,
         use_pinyin_shortcut=use_pinyin_shortcut,
     )
-    if not phonemized:
-        _LOGGER.warning("No %s utterances phonemized successfully", language.upper())
-        return [], speaker_id_map
+    # Fail-fast: parse 済み entries があるのに音素化成功率 <50% は環境起因
+    # (例: 旧 piper-plus-g2p で ko inventory 欠落 → 22,266/22,666 skip、
+    # 2026-08-01 v8 再構築の実障害)。少数の低品質発話 skip は正常だが、
+    # 半分以下は「その言語が dataset から黙って消える」silent failure になる
+    if len(phonemized) < len(entries) * 0.5:
+        raise RuntimeError(
+            f"{language.upper()} phonemization succeeded for only "
+            f"{len(phonemized)}/{len(entries)} utterances (<50%); this "
+            "indicates an environment problem (e.g. stale piper-plus-g2p "
+            "without this language's phoneme inventory) rather than bad "
+            "input. Check the 'missing phoneme types' warnings above."
+        )
 
     # Phase 2: Cache audio (two-phase if GPU available)
     audio_map = cache_audio_parallel(
@@ -1545,6 +1562,16 @@ def process_new_language(
     utterances = assemble_utterances(
         phonemized, audio_map, speaker_id_map, language, language_id
     )
+    # Fail-fast: 音素化は成功したのに audio cache / assemble で半分以上
+    # 消えるのは cache reader/writer の形式不整合 (例: .npy cache を
+    # torch.load で読めず GPU spec 全滅 → assembled 0、2026-08-01 実障害)
+    if len(utterances) < len(phonemized) * 0.5:
+        raise RuntimeError(
+            f"{language.upper()} assembled only {len(utterances)}/"
+            f"{len(phonemized)} phonemized utterances (<50%); audio "
+            "caching likely failed wholesale (e.g. audio_norm cache "
+            "format mismatch). Check the cache phase logs above."
+        )
 
     return utterances, speaker_id_map
 
