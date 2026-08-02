@@ -240,6 +240,23 @@ class TestAudioNormSharedLoader:
                         f"piper_train.norm_audio.load_audio_norm_tensor: {line}"
                     )
 
+    def test_num_languages_covers_max_language_id(self):
+        """config の num_languages は max(language_id)+1 であること (静的契約)。
+
+        extended map は sv=6 を予約欠番にして ko=7 を割り当てるため、
+        7-lang (ja..pt + ko) では num_languages=8 が必要。len(languages)=7
+        だと emb_lang(7) に language_id=7 が入り CUDA device-side assert で
+        学習が即死する (2026-08-02 v8 smoke の実障害)。
+        """
+        import inspect
+
+        src = inspect.getsource(pmd.main)
+        assert '"num_languages": max(config_language_id_map.values()) + 1' in src, (
+            "prepare_multilingual_dataset の num_languages は "
+            "max(language_id)+1 で計算すること (len(active_languages) は "
+            "sv=6 欠番のため ko=7 を範囲外にする)"
+        )
+
     def test_shared_loader_reads_both_formats(self, tmp_path: Path):
         from piper_train.norm_audio import load_audio_norm_tensor
 
