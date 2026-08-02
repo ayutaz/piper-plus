@@ -31,9 +31,11 @@ PAD_SIZE = N_FFT // 2  # reflect pad size
 
 
 def _load_pt(path_str: str) -> tuple[str, torch.Tensor | None]:
-    """Load a .pt file, return (path, 1-D tensor) or (path, None) on failure."""
+    """Load an audio_norm cache (.npy or legacy .pt), return (path, 1-D tensor) or (path, None)."""
+    from piper_train.norm_audio import load_audio_norm_tensor
+
     try:
-        t = torch.load(path_str, weights_only=True, map_location="cpu")
+        t = load_audio_norm_tensor(Path(path_str))
         # Flatten to 1-D waveform
         t = t.squeeze()
         if t.dim() != 1:

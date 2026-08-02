@@ -62,6 +62,12 @@ def _load_audio_norm_tensor(path: Path) -> torch.Tensor:
     return torch.load(path, weights_only=True)
 
 
+# Public alias — audio_norm cache を読む全ツール (extract_speaker_embedding /
+# tools/batch_spectrograms) はこれを使うこと。直接 torch.load すると T-npy
+# 切替 (2026-07-09) 後の ``.npy`` cache が読めない (v8 再構築で全滅した実障害)。
+load_audio_norm_tensor = _load_audio_norm_tensor
+
+
 def _atomic_torch_save(obj, path: Path) -> None:
     """Save a tensor to *path* atomically using a temp file + rename.
 
