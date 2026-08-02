@@ -949,7 +949,10 @@ def _compute_specs_gpu_batch(
     """
     import torch  # noqa: PLC0415
 
-    from piper_train.norm_audio import _atomic_torch_save  # noqa: PLC0415
+    from piper_train.norm_audio import (  # noqa: PLC0415
+        _atomic_torch_save,
+        load_audio_norm_tensor,
+    )
     from piper_train.vits.mel_processing import spectrogram_torch  # noqa: PLC0415
 
     # Filter to only items needing spec computation
@@ -980,13 +983,20 @@ def _compute_specs_gpu_batch(
         valid_indices = []
         for j, (norm_p, _spec_p) in enumerate(batch):
             try:
-                t = torch.load(norm_p, weights_only=True)  # (1, T)
+                # audio_norm cache は .npy (T-npy 切替後) / legacy .pt の両形式。
+                # 直接 torch.load すると .npy が読めず全滅する (2026-08-02 実障害)
+                t = load_audio_norm_tensor(Path(norm_p))  # (1, T) or (T,)
                 audio_1d = t.squeeze(0)
                 audios.append(audio_1d)
                 lengths.append(audio_1d.shape[0])
                 valid_indices.append(j)
             except Exception as e:
-                _LOGGER.debug("Failed to load %s: %s", norm_p, e)
+                # debug だと全滅時にログ上の手掛かりがゼロになる。先頭数件は
+                # warning で残し、根因 (形式不整合等) を即特定できるようにする
+                if batch_idx == 0 and j < 3:
+                    _LOGGER.warning("Failed to load %s: %s", norm_p, e)
+                else:
+                    _LOGGER.debug("Failed to load %s: %s", norm_p, e)
 
         if not audios:
             continue
