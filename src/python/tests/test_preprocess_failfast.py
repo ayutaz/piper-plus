@@ -222,16 +222,21 @@ class TestAudioNormSharedLoader:
 
         from piper_train import extract_speaker_embedding as ese
         from piper_train.tools import batch_spectrograms as bs
+        from piper_train.tools import prepare_multilingual_dataset as pmd_mod
 
-        for mod in (ese, bs):
+        # audio_norm cache path を指す変数名の既知パターン。torch.load の
+        # 引数にこれらが現れたら共有ローダー経由に置き換えること
+        # (norm_p は 2026-08-02 に grep 網をすり抜けた実例)
+        cache_var_markers = ("pt_path", "norm_p", "norm_path", "audio_norm")
+        for mod in (ese, bs, pmd_mod):
             src = inspect.getsource(mod)
             for lineno, line in enumerate(src.splitlines(), 1):
                 stripped = line.split("#")[0]
                 if "torch.load(" in stripped:
-                    # ckpt 等の非 audio_norm 用途は pt_path 変数を使わない
-                    assert "pt_path" not in stripped, (
+                    hit = [m for m in cache_var_markers if m in stripped]
+                    assert not hit, (
                         f"{mod.__name__}:{lineno} loads audio_norm cache with "
-                        f"torch.load directly; use "
+                        f"torch.load directly (matched {hit}); use "
                         f"piper_train.norm_audio.load_audio_norm_tensor: {line}"
                     )
 
