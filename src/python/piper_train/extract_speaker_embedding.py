@@ -37,6 +37,8 @@ import soundfile as sf
 import torch
 import torchaudio
 
+from piper_train.norm_audio import load_audio_norm_tensor
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -101,7 +103,7 @@ def _load_audio_from_pt(
     Returns:
         fbank: np.ndarray, shape [T, 80], float32
     """
-    audio_tensor = torch.load(pt_path, weights_only=True, map_location="cpu", mmap=True)
+    audio_tensor = load_audio_norm_tensor(Path(pt_path))
     if audio_tensor.dim() == 1:
         audio_tensor = audio_tensor.unsqueeze(0)
 
@@ -206,9 +208,7 @@ def extract_from_dataset(
         valid_paths = []
         for pt_path in audio_paths:
             try:
-                audio_tensor = torch.load(
-                    pt_path, weights_only=True, map_location="cpu"
-                )
+                audio_tensor = load_audio_norm_tensor(Path(pt_path))
                 num_samples = audio_tensor.shape[-1]
                 duration = num_samples / source_sr
                 if duration >= min_duration:
@@ -345,9 +345,7 @@ class _FbankDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx: int) -> tuple[int, torch.Tensor, str, bool]:
         entry_idx, pt_path, stem = self.items[idx]
         try:
-            audio_tensor = torch.load(
-                pt_path, weights_only=True, map_location="cpu", mmap=True
-            )
+            audio_tensor = load_audio_norm_tensor(Path(pt_path))
             if audio_tensor.dim() == 1:
                 audio_tensor = audio_tensor.unsqueeze(0)
             audio_tensor = self.resampler(audio_tensor)
@@ -780,6 +778,14 @@ def extract_per_utterance(
         fail,
         len(entries),
     )
+
+    if entries and success == 0:
+        # 全滅は環境/コード起因 (例: audio_norm cache の形式不整合) であり、
+        # jsonl に実在しない embedding path を書いて「成功」扱いにしてはならない
+        raise RuntimeError(
+            f"speaker embedding extraction failed for all {len(entries)} entries; "
+            "aborting without updating dataset.jsonl"
+        )
 
     if update_jsonl:
         _write_updated_jsonl(dataset_dir, entries)
