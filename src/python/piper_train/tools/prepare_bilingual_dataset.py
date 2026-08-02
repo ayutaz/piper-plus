@@ -21,10 +21,10 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from hashlib import sha256 as _sha256
 from pathlib import Path
 
-from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
-from piper_plus_g2p.multilingual import MultilingualPhonemizer
 from tqdm import tqdm
 
+from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
+from piper_plus_g2p.multilingual import MultilingualPhonemizer
 from piper_train.norm_audio import (
     cache_norm_audio,
     default_num_processes,
@@ -553,7 +553,9 @@ def _phonemize_en_worker(args: tuple[str, str, str, int]) -> dict:
             "missing": missing,
         }
     except Exception as e:
-        return {"filename": filename, "error": str(e)}
+        # str(e) だけだと NLTK LookupError 等 (メッセージが改行始まり) で
+        # ログ上「空エラー」に見え、根因特定が遅れる (2026-08-02 実障害)
+        return {"filename": filename, "error": f"{type(e).__name__}: {e}"}
 
 
 def process_en_dataset(
@@ -810,6 +812,18 @@ def process_en_dataset(
         skipped_parse,
         skipped_speaker,
     )
+
+    # Fail-fast: 対象があるのに音素化成功率が閾値未満なら環境起因の全滅
+    # (例: NLTK data 未 DL で g2p-en が全発話 LookupError) であり、
+    # EN 0 件の bilingual dataset を「成功」として出力してはならない
+    # (2026-08-02 v8 再構築の実障害。半分以下は個別テキスト起因ではあり得ない)
+    if tasks and len(phonemized) < len(tasks) * 0.5:
+        raise RuntimeError(
+            f"EN phonemization succeeded for only {len(phonemized)}/{len(tasks)} "
+            "utterances (<50%); this indicates an environment problem "
+            "(e.g. missing NLTK data for g2p-en) rather than bad input. "
+            "See 'Failed to phonemize' warnings above for the root cause."
+        )
 
     # Phase 2: Audio normalization (slow, parallel)
     # Build a set of already-cached spec files for O(1) lookup instead of
