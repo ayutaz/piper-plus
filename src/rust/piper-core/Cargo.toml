@@ -20,10 +20,23 @@ playback = ["dep:rodio"]
 download = ["dep:reqwest"]
 dict-download = ["download", "dep:sha2", "dep:flate2", "dep:tar"]
 resample = ["dep:rubato"]
-cuda = []
-coreml = []
-directml = []
-tensorrt = []
+# EP (Execution Provider) feature は ort 側の同名 feature へ forward する。
+# ort 2.0.0-rc.13 から EP struct 自体が `#[cfg(feature = "...")]` で
+# compile-time gate されるようになったため (rc.12 までは無条件 `pub use`)、
+# forward しないと `--all-features` 時に gpu.rs が `ort::ep::CUDA` 等を
+# 解決できず E0432/E0433 になる。weak dep 記法 (`ort?/`) により
+# ``onnx`` 無効時 (= ort 自体が dep に入らない) は従来どおり no-op のまま。
+#
+# 注意: `--all-features` は cuda+coreml+directml+tensorrt を同時に要求するが、
+# その 4 つを全て含む prebuilt dist はどの target にも存在しない。
+# CI の `cargo check` / `cargo clippy` は link しないため green だが、
+# ローカルで `cargo build --all-features` を叩くと ort-sys が link error を
+# 出す (これは意図的な upstream の挙動)。単一 EP (例 `--features onnx,cuda`)
+# なら prebuilt dist が解決されるため通常利用に影響はない。
+cuda = ["ort?/cuda"]
+coreml = ["ort?/coreml"]
+directml = ["ort?/directml"]
+tensorrt = ["ort?/tensorrt"]
 
 [dependencies]
 piper-plus-g2p = { path = "../piper-plus-g2p", version = "0.5.0", features = ["all-languages"] }

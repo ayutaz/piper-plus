@@ -38,7 +38,7 @@ Out of scope:
 |----------|-------------|--------------------|------------------|
 | Python (training) | `>=1.20.0` | `>=1.20.0` ✓ | `src/python/pyproject.toml` extras (train / inference / inference-gpu) |
 | Python (runtime) | `>=1.20.0` | `>=1.20.0` ✓ | `src/python_run/requirements.txt` + `requirements_gpu.txt` + `setup.py` |
-| Rust     | 2.0.0-rc.12 (`ort` crate, wraps ORT 1.20 series) | exempt (no stable upstream) | `ort` (crates.io) |
+| Rust     | 2.0.0-rc.13 (`ort` crate, wraps ORT 1.28.0) | exempt (no stable upstream) | `ort` (crates.io) |
 | C#       | 1.24.3      | `>=1.20.0` ✓ | `Microsoft.ML.OnnxRuntime{,.Managed}` (NuGet) — 5 csproj files |
 | Go       | 1.27.0      | `>=1.20.0` ✓ | `github.com/yalue/onnxruntime_go` |
 | C++ (canonical) | **1.20.0** | — | `cmake/OnnxRuntime.cmake` (source of truth) |
@@ -90,15 +90,48 @@ When bumping the C++ canonical ORT version (e.g. 1.20.0 → 1.22.0):
 ## Rust `ort` exemption (Issue #372 follow-up)
 
 The Rust ecosystem currently relies on the `ort` crate at
-`2.0.0-rc.12` (RC). Reasons it is exempt from the floor check:
+`2.0.0-rc.13` (RC). Reasons it is exempt from the floor check:
 
 * `ort`'s 2.x line redesigns the API and has not shipped a stable
-  release as of 2026-05. The pre-release (`2.0.0-rc.12`) wraps ORT
-  1.20 series internally, but exposing this in the gate would couple
-  CI to upstream `ort` cadence.
+  release as of 2026-08. The pre-release (`2.0.0-rc.13`) wraps ORT
+  1.28.0 internally (`ort-sys` の `build/download/dist.tsv`), but
+  exposing this in the gate would couple CI to upstream `ort` cadence.
 * `ort 1.x` stable exists but uses a different API; downgrading would
   require rewriting `piper-core` / `piper-cli` / `piper-python` /
   `piper-wasm` for negligible compatibility gain.
+
+Because Rust is exempt, the bundled ORT (1.28.0) is intentionally
+allowed to run ahead of the C++ canonical (1.20.0). This is a
+divergence the gate does not police — it is a documented consequence
+of the exemption, not a drift to be "fixed" by bumping C++.
+
+### EP feature gating (`ort` >= 2.0.0-rc.13)
+
+From `2.0.0-rc.13` the EP structs (`ort::ep::{CUDA, CoreML, DirectML,
+TensorRT}`) are gated behind `ort`'s own Cargo features; until
+`rc.12` they were unconditionally `pub use`d. `piper-core` therefore
+forwards its EP features to `ort` using weak-dependency syntax:
+
+```toml
+cuda     = ["ort?/cuda"]
+coreml   = ["ort?/coreml"]
+directml = ["ort?/directml"]
+tensorrt = ["ort?/tensorrt"]
+```
+
+The `ort?/` form keeps these a no-op when the `onnx` feature is off
+(i.e. when `ort` is not in the dependency graph at all).
+
+Two consequences worth knowing:
+
+* **CUDA 13 only.** `ort-sys` `rc.13` ships prebuilt distributions
+  tagged `cuda13` — there is no `cuda12` entry. Consumers enabling the
+  `cuda` feature need a CUDA 13 runtime.
+* **`--all-features` does not link.** No prebuilt distribution carries
+  `cuda` + `coreml` + `directml` + `tensorrt` at once, so a local
+  `cargo build --all-features` fails in `ort-sys` at link time. CI's
+  `cargo check` / `cargo clippy --all-features` are unaffected because
+  neither links. Build with a single EP (e.g. `--features onnx,cuda`).
 
 Action items tracked separately:
 
