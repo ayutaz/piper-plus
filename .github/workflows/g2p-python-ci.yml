@@ -142,12 +142,22 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.3
       - uses: astral-sh/setup-uv@v6.8.0
-      - run: uv venv .venv-extras
-      - run: uv pip install --python .venv-extras "./src/python/g2p[${{ matrix.extra }}]"
+      # venv は workspace (= cwd) の外に作る。 この job は uv.lock を経由せず
+      # PyPI から fresh resolve するため nltk 3.10.x を引くが、 3.10 で追加された
+      # nltk/inisec.py の NLTKSafeImportFinder は「解決先ファイルが cwd 配下に
+      # 物理的に存在する」モジュールを一律 ImportError でブロックする。
+      # workspace 内に venv を置くと site-packages 全体が cwd 配下となり、
+      # regex 等の正規依存まで誤検知される。
+      # エラーメッセージが案内する `-P` / PYTHONSAFEPATH=1 は判定が sys.path では
+      # なくファイルの物理位置なので回避にならない (実測で確認済み)。
+      - run: uv venv "${RUNNER_TEMP}/venv-extras"
+      - run: uv pip install --python "${RUNNER_TEMP}/venv-extras" "./src/python/g2p[${{ matrix.extra }}]"
       - name: Download NLTK data (EN only)
         if: matrix.extra == 'en'
-        run: .venv-extras/bin/python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
-      - run: .venv-extras/bin/python -c "from piper_plus_g2p import get_phonemizer; p = get_phonemizer('${{ matrix.extra }}'); print(p.phonemize('test'))"
+        run: |
+          "${RUNNER_TEMP}/venv-extras/bin/python" -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
+      - run: |
+          "${RUNNER_TEMP}/venv-extras/bin/python" -c "from piper_plus_g2p import get_phonemizer; p = get_phonemizer('${{ matrix.extra }}'); print(p.phonemize('test'))"
 
   publish:
     name: publish
