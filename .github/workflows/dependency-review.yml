@@ -40,12 +40,21 @@ jobs:
           # 後者は Google Protocol Buffers のオリジナル license (BSD-3-Clause
           # 系) で copyleft なし。 SPDX 標準名でないため allow-licenses では
           # 通せず、 package 単位で carve-out する。
+          #
+          # pkg:pypi/typing-extensions: 4.15+ で scancode が
+          # `Python-2.0 AND GPL-1.0-or-later AND ... AND 0BSD` という合成式を
+          # 検出する。 PyPI の license_expression は 4.14 / 4.16 とも PSF-2.0 で
+          # copyleft なし (LICENSE 本文の GPL 互換性言及と同梱テストヘルパを
+          # 誤検出したもの)。 AND 合成式は全構成要素が allow-licenses に必要で、
+          # 通すには GPL-1.0-or-later を許可せざるを得ないため package 単位で
+          # carve-out する。
           allow-dependencies-licenses: >-
             pkg:pypi/astroid,
             pkg:pypi/matplotlib,
             pkg:pypi/mypy,
             pkg:pypi/pylint,
             pkg:pypi/sphinx-rtd-theme,
+            pkg:pypi/typing-extensions,
             pkg:npm/protobufjs
           # 自動 fail にせず、PR comment で報告
           warn-only: false
