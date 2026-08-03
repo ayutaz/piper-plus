@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783996072533,
+  "lastUpdate": 1785764990518,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -691,6 +691,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Cold Start (en)",
             "value": 1454.8,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 206.5,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d2140faaa86ca3042a8c12c3dc4d2275ed4c5a23",
+          "message": "chore(deps): bump the gh-actions group across 1 directory with 9 updates (#615)\n\nBumps the gh-actions group with 9 updates in the / directory:\n\n| Package | From | To |\n| --- | --- | --- |\n| [actions/checkout](https://github.com/actions/checkout) | `6.0.3` | `6.1.0` |\n| [actions/setup-java](https://github.com/actions/setup-java) | `4.8.0` | `4.9.0` |\n| [actions/setup-node](https://github.com/actions/setup-node) | `6.4.0` | `6.5.0` |\n| [actions/setup-dotnet](https://github.com/actions/setup-dotnet) | `5.3.0` | `5.4.0` |\n| [github/codeql-action](https://github.com/github/codeql-action) | `3.36.2` | `3.37.4` |\n| [docker/login-action](https://github.com/docker/login-action) | `4.2.0` | `4.6.0` |\n| [docker/metadata-action](https://github.com/docker/metadata-action) | `6.1.0` | `6.2.0` |\n| [taiki-e/install-action](https://github.com/taiki-e/install-action) | `2.82.2` | `2.85.5` |\n| [ossf/scorecard-action](https://github.com/ossf/scorecard-action) | `2.4.3` | `2.4.4` |\n\n\n\nUpdates `actions/checkout` from 6.0.3 to 6.1.0\n- [Release notes](https://github.com/actions/checkout/releases)\n- [Changelog](https://github.com/actions/checkout/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/actions/checkout/compare/v6.0.3...v6.1.0)\n\nUpdates `actions/setup-java` from 4.8.0 to 4.9.0\n- [Release notes](https://github.com/actions/setup-java/releases)\n- [Commits](https://github.com/actions/setup-java/compare/v4.8.0...v4.9.0)\n\nUpdates `actions/setup-node` from 6.4.0 to 6.5.0\n- [Release notes](https://github.com/actions/setup-node/releases)\n- [Commits](https://github.com/actions/setup-node/compare/v6.4.0...v6.5.0)\n\nUpdates `actions/setup-dotnet` from 5.3.0 to 5.4.0\n- [Release notes](https://github.com/actions/setup-dotnet/releases)\n- [Commits](https://github.com/actions/setup-dotnet/compare/v5.3.0...v5.4.0)\n\nUpdates `github/codeql-action` from 3.36.2 to 3.37.4\n- [Release notes](https://github.com/github/codeql-action/releases)\n- [Changelog](https://github.com/github/codeql-action/blob/v3.37.4/CHANGELOG.md)\n- [Commits](https://github.com/github/codeql-action/compare/v3.36.2...v3.37.4)\n\nUpdates `docker/login-action` from 4.2.0 to 4.6.0\n- [Release notes](https://github.com/docker/login-action/releases)\n- [Commits](https://github.com/docker/login-action/compare/v4.2.0...v4.6.0)\n\nUpdates `docker/metadata-action` from 6.1.0 to 6.2.0\n- [Release notes](https://github.com/docker/metadata-action/releases)\n- [Commits](https://github.com/docker/metadata-action/compare/v6.1.0...v6.2.0)\n\nUpdates `taiki-e/install-action` from 2.82.2 to 2.85.5\n- [Release notes](https://github.com/taiki-e/install-action/releases)\n- [Changelog](https://github.com/taiki-e/install-action/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/taiki-e/install-action/compare/v2.82.2...v2.85.5)\n\nUpdates `ossf/scorecard-action` from 2.4.3 to 2.4.4\n- [Release notes](https://github.com/ossf/scorecard-action/releases)\n- [Changelog](https://github.com/ossf/scorecard-action/blob/main/RELEASE.md)\n- [Commits](https://github.com/ossf/scorecard-action/compare/v2.4.3...v2.4.4)\n\n---\nupdated-dependencies:\n- dependency-name: actions/checkout\n  dependency-version: 6.1.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: actions/setup-java\n  dependency-version: 4.9.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: actions/setup-node\n  dependency-version: 6.5.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: actions/setup-dotnet\n  dependency-version: 5.4.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: github/codeql-action\n  dependency-version: 3.37.4\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: docker/login-action\n  dependency-version: 4.6.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: docker/metadata-action\n  dependency-version: 6.2.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: taiki-e/install-action\n  dependency-version: 2.85.5\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: ossf/scorecard-action\n  dependency-version: 2.4.4\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n  dependency-group: gh-actions\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-08-03T22:36:56+09:00",
+          "tree_id": "31995aa377b586da61eb7805d8c0d7b7919eeead",
+          "url": "https://github.com/ayutaz/piper-plus/commit/d2140faaa86ca3042a8c12c3dc4d2275ed4c5a23"
+        },
+        "date": 1785764990089,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.1298,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 28.7,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 53.8,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1362.1,
             "unit": "ms"
           },
           {
