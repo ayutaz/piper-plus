@@ -52,7 +52,7 @@ jobs:
     timeout-minutes: 20
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
       - uses: actions/setup-python@v6.2.0
         with:
           python-version: "3.13"
@@ -90,7 +90,7 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -126,7 +126,7 @@ jobs:
     timeout-minutes: 20
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
       - uses: actions/setup-go@v5.6.0
         with:
           # Mirror go-ci.yml's pinned go-version so the Go runtime dlopens
@@ -185,8 +185,8 @@ jobs:
     timeout-minutes: 25
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v6.0.3
-      - uses: actions/setup-dotnet@v5.3.0
+      - uses: actions/checkout@v6.1.0
+      - uses: actions/setup-dotnet@v5.4.0
         with:
           dotnet-version: 10.0.x
 
@@ -215,7 +215,7 @@ jobs:
     timeout-minutes: 30
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       - name: Install system dependencies
         run: |
@@ -253,8 +253,8 @@ jobs:
       run:
         working-directory: src/wasm/openjtalk-web
     steps:
-      - uses: actions/checkout@v6.0.3
-      - uses: actions/setup-node@v6.4.0
+      - uses: actions/checkout@v6.1.0
+      - uses: actions/setup-node@v6.5.0
         with:
           node-version: "24"
 
@@ -289,7 +289,7 @@ jobs:
     timeout-minutes: 10
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
       - uses: actions/setup-python@v6.2.0
         with:
           # Match dump-python (3.13). Both producer and compare side run on

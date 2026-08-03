@@ -54,7 +54,7 @@ jobs:
             echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       # cosign-installer は upstream sigstore/cosign-installer @ vX.Y.Z で pin。
       # SHA pin 移行は別 PR (CLAUDE.md feedback_pin_actions_sha)。

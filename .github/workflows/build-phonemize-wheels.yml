@@ -36,7 +36,7 @@ jobs:
         python: ["3.11", "3.12"]  # Start with 3.11 and 3.12
 
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
         with:
           submodules: recursive
           fetch-depth: 0
@@ -119,7 +119,7 @@ jobs:
         python-version: ['3.11', '3.12']
 
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       - name: Set up Python
         uses: actions/setup-python@v6.2.0
@@ -188,7 +188,7 @@ jobs:
         python-version: ['3.11']  # piper-phonemize の既存 PyPI 配布 (1.0.0/1.1.0) は cp311 wheel のみ。 3.12/3.13 は wheel 不在で install 不可のため existing-package test から除外 (Issue #527)
 
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       - name: Set up Python
         uses: actions/setup-python@v6.2.0

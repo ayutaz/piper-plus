@@ -23,7 +23,7 @@ jobs:
   markdownlint:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       - uses: DavidAnson/markdownlint-cli2-action@v17
         with:
