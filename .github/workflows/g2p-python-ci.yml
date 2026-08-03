@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       - uses: astral-sh/setup-uv@v6.8.0
         with:
@@ -58,7 +58,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ['3.11', '3.12', '3.13']
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       - uses: astral-sh/setup-uv@v6.8.0
         with:
@@ -89,7 +89,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -107,7 +107,7 @@ jobs:
     needs: [lint, test, rust-check]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       - uses: astral-sh/setup-uv@v6.8.0
         with:
@@ -140,7 +140,7 @@ jobs:
       matrix:
         extra: [ja, en, zh]
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
       - uses: astral-sh/setup-uv@v6.8.0
       # venv は workspace (= cwd) の外に作る。 この job は uv.lock を経由せず
       # PyPI から fresh resolve するため nltk 3.10.x を引くが、 3.10 で追加された
@@ -170,7 +170,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       - uses: astral-sh/setup-uv@v6.8.0
 

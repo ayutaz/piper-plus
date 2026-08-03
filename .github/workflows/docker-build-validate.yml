@@ -37,7 +37,7 @@ jobs:
     name: Resolve docker-build.yml actions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       # 以下の uses: は docker-build.yml と必ず同期させること。
       # 不一致が起きた場合は CI が落ちて気付ける。

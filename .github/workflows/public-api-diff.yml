@@ -23,7 +23,7 @@ jobs:
   rust-public-api:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
         with:
           fetch-depth: 0  # need full history for diff
 
@@ -70,7 +70,7 @@ jobs:
   go-public-api:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
         with:
           fetch-depth: 0
 
@@ -97,9 +97,9 @@ jobs:
   csharp-public-api:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
-      - uses: actions/setup-dotnet@v5.3.0
+      - uses: actions/setup-dotnet@v5.4.0
         with:
           dotnet-version: 10.0.x
 

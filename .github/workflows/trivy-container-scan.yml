@@ -81,7 +81,7 @@ jobs:
             build_target: ''
 
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       # PR / push event でも runner の disk 圧迫を回避するため軽量 cleanup。
       # python-inference (CUDA base) + cpp-dev (ubuntu builder + apt deps)
@@ -130,7 +130,7 @@ jobs:
 
       - name: Upload SARIF to GitHub Security tab
         if: always()
-        uses: github/codeql-action/upload-sarif@v3.36.2
+        uses: github/codeql-action/upload-sarif@v3.37.4
         with:
           sarif_file: trivy-${{ matrix.target.name }}.sarif
           category: trivy-${{ matrix.target.name }}
@@ -199,7 +199,7 @@ jobs:
             build_target: builder
 
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       # 重 image (CUDA / ML stack / apt full) を build できるよう
       # ~14-15GB の空き容量を確保。 jlumbroso/free-disk-space は
@@ -245,7 +245,7 @@ jobs:
 
       - name: Upload heavy SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@v3.36.2
+        uses: github/codeql-action/upload-sarif@v3.37.4
         with:
           sarif_file: trivy-heavy-${{ matrix.target.name }}.sarif
           category: trivy-heavy-${{ matrix.target.name }}

@@ -43,7 +43,7 @@ jobs:
         build-type: ${{ fromJson(inputs.build-type-matrix) }}
 
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
         with:
           submodules: recursive
 
