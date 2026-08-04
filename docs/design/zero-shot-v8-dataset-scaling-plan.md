@@ -913,7 +913,7 @@ storage) で dataset 再構築 → smoke 実走を実施。**dataset は完成�
 | holdout | ja 10 話者 1,200 発話 (`holdout/`)。ko holdout は speaker prefix 正規化 (`ko_zeroth-*`) の関係で post-filter が 0 件 → **復元後に要再実行** |
 | config | num_symbols=185 / **num_languages=8** (ko=7、sv=6 欠番のため max+1) / num_speakers=3,692 |
 | CAM++ embedding | 342,855 個 (100%、GPU 抽出) |
-| 退避先 | **essential のみ** (373MB tar.gz = dataset.jsonl + config + CAM++ emb + holdout、sha256 `932b9c87…`): HF private `dataset-7lang-v8/evac_v8_essential.tar.gz` + ローカル `piper-v8-dataset-backup/`。フル cache (193GB) は **HF private ストレージ上限超過で退避不可** → 破棄 (生データから決定的に再生成可、~5h/$20) |
+| 退避先 | **HF public + gated-manual に全量保存 (2026-08-04 方針確定: private ストレージ上限回避)**: dataset フル (5×40GB split tar.gz + sha256 + essential 373MB) は dataset repo `ayousanz/piper-plus-multilingual-7lang-v8-dataset`、学習 ckpt (2ep ごと自動退避) は model repo `ayousanz/piper-plus-zero-shot-multi-7lang-v8`。ローカル控え `piper-v8-dataset-backup/` (essential のみ)。旧 private `…multi-6lang-v8` も public gated 化済み |
 
 **再構築中に発見・修正した 7 バグ** (全て feature branch に push 済み、
 「静かな成功」系は fail-fast gate + 契約テストで再発防止):
