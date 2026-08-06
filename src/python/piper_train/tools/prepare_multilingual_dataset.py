@@ -1028,9 +1028,15 @@ def _compute_specs_gpu_batch(
         for j, valid_j in enumerate(valid_indices):
             _norm_p, spec_p = batch[valid_j]
             orig_len = lengths[j]
-            # Correct frame count for this audio
+            # Correct frame count for this audio。spectrogram_torch は
+            # center=False でも内部で (n_fft - hop)/2 ずつ両側 reflect pad
+            # するため、STFT フレーム数 = (T + (n_fft - hop) - win) // hop + 1。
+            # 旧式 ((T + n_fft - hop) // hop) は +3 frames 過剰で、バッチ 0 埋め
+            # 由来の無音フレームが spec 末尾に混入し、spec/wav 長の不整合で
+            # MAS/KL が発散する (2026-08-05 v8 本走の実障害 — CPU 単体経路の
+            # 出力と一致することを test_gpu_spec_frames で pin)
             padded_len = orig_len + filter_length - hop_length
-            correct_frames = padded_len // hop_length
+            correct_frames = (padded_len - window_length) // hop_length + 1
             trimmed_spec = specs_cpu[j, :, :correct_frames]
             try:
                 _atomic_torch_save(trimmed_spec.half(), spec_p)
