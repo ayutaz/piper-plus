@@ -215,6 +215,148 @@ class TestPublicMaximumPathDispatch:
         assert out.shape == neg_cent.shape
 
 
+class TestRuntimeParityValidation:
+    """Runtime parity self-check of Super-MAS output against Cython.
+
+    2026-08 v8 incident: a specific py3.12 + triton environment made the
+    Super-MAS kernel return corrupt alignments *without any error*, silently
+    ruining an entire 80-epoch run. Unit tests on a healthy environment can
+    never catch that class of breakage, so the first ``_PARITY_CHECK_CALLS``
+    real dispatches are validated at runtime and a mismatch permanently
+    disables Super-MAS for the process. These tests pin that contract with a
+    mocked kernel (healthy / corrupt) on CPU.
+    """
+
+    def _inputs(self, batch=2, t_t=12, t_s=18):
+        torch.manual_seed(0)
+        neg_cent = torch.randn(batch, t_t, t_s)
+        mask = torch.ones(batch, t_t, t_s)
+        return neg_cent, mask
+
+    def test_corrupt_kernel_disables_super_mas_and_returns_cython(self):
+        """Garbage path => permanent fallback + trusted Cython path returned.
+
+        The failing batch itself must NOT train on the corrupt alignment.
+        """
+        neg_cent, mask = self._inputs()
+        expected = monotonic_align._maximum_path_cython(neg_cent, mask)
+
+        def corrupt_kernel(value, attn_mask, dtype=torch.float32):
+            # Worst observed corruption class: structurally invalid output.
+            return torch.zeros(value.shape, dtype=dtype)
+
+        with (
+            mock.patch.object(monotonic_align, "_use_super_mas", return_value=True),
+            mock.patch.object(monotonic_align, "_super_mas_fn", corrupt_kernel),
+            mock.patch.object(monotonic_align, "_parity_checks_done", 0),
+        ):
+            out = monotonic_align.maximum_path(neg_cent, mask)
+            assert torch.equal(out, expected), (
+                "On parity failure the Cython reference must be returned"
+            )
+            assert monotonic_align._super_mas_fn is None, (
+                "Corrupt kernel must be permanently disabled for the process"
+            )
+
+    def test_all_ones_garbage_is_caught(self):
+        """All-ones output must fail the check (IoU rationale pin).
+
+        A reference-coverage-only metric would score all-ones as a perfect
+        match (the true path is a subset of all-ones). IoU penalises the
+        spurious cells, so this corruption class is caught too.
+        """
+        neg_cent, mask = self._inputs()
+        expected = monotonic_align._maximum_path_cython(neg_cent, mask)
+
+        def all_ones_kernel(value, attn_mask, dtype=torch.float32):
+            return torch.ones(value.shape, dtype=dtype)
+
+        with (
+            mock.patch.object(monotonic_align, "_use_super_mas", return_value=True),
+            mock.patch.object(monotonic_align, "_super_mas_fn", all_ones_kernel),
+            mock.patch.object(monotonic_align, "_parity_checks_done", 0),
+        ):
+            out = monotonic_align.maximum_path(neg_cent, mask)
+            assert torch.equal(out, expected)
+            assert monotonic_align._super_mas_fn is None
+
+    def test_faithful_kernel_passes_and_stays_enabled(self):
+        """Cython-identical output => validation passes, kernel stays active."""
+        neg_cent, mask = self._inputs()
+
+        def faithful_kernel(value, attn_mask, dtype=torch.float32):
+            return monotonic_align._maximum_path_cython(
+                value, attn_mask.to(torch.float32)
+            ).to(dtype)
+
+        with (
+            mock.patch.object(monotonic_align, "_use_super_mas", return_value=True),
+            mock.patch.object(monotonic_align, "_super_mas_fn", faithful_kernel),
+            mock.patch.object(monotonic_align, "_parity_checks_done", 0),
+        ):
+            out = monotonic_align.maximum_path(neg_cent, mask)
+            assert monotonic_align._super_mas_fn is faithful_kernel, (
+                "A kernel that matches the reference must stay enabled"
+            )
+            assert monotonic_align._parity_checks_done == 1
+            expected = monotonic_align._maximum_path_cython(neg_cent, mask)
+            assert torch.equal(out, expected)
+
+    def test_validation_stops_after_n_calls(self):
+        """After N passed checks, the Cython reference is no longer computed."""
+        neg_cent, mask = self._inputs()
+        kernel_calls = []
+
+        def faithful_kernel(value, attn_mask, dtype=torch.float32):
+            kernel_calls.append(1)
+            return monotonic_align._maximum_path_cython(
+                value, attn_mask.to(torch.float32)
+            ).to(dtype)
+
+        with (
+            mock.patch.object(monotonic_align, "_use_super_mas", return_value=True),
+            mock.patch.object(monotonic_align, "_super_mas_fn", faithful_kernel),
+            mock.patch.object(
+                monotonic_align,
+                "_parity_checks_done",
+                monotonic_align._PARITY_CHECK_CALLS,
+            ),
+            mock.patch.object(
+                monotonic_align,
+                "_validate_super_mas_parity",
+                side_effect=AssertionError(
+                    "validation must not run after N passed checks"
+                ),
+            ),
+        ):
+            _ = monotonic_align.maximum_path(neg_cent, mask)
+
+        assert len(kernel_calls) == 1, "Super-MAS kernel itself must still run"
+
+    def test_subsequent_calls_use_cython_after_disable(self):
+        """Once disabled, later calls take the Cython branch entirely."""
+        neg_cent, mask = self._inputs()
+
+        def corrupt_kernel(value, attn_mask, dtype=torch.float32):
+            return torch.zeros(value.shape, dtype=dtype)
+
+        with (
+            mock.patch.object(monotonic_align, "_super_mas_fn", corrupt_kernel),
+            mock.patch.object(monotonic_align, "_parity_checks_done", 0),
+        ):
+            # First call: dispatched (predicate mocked True), fails parity.
+            with mock.patch.object(
+                monotonic_align, "_use_super_mas", return_value=True
+            ):
+                monotonic_align.maximum_path(neg_cent, mask)
+            assert monotonic_align._super_mas_fn is None
+            # Second call: real predicate sees _super_mas_fn=None => Cython.
+            assert monotonic_align._use_super_mas(neg_cent) is False
+            out = monotonic_align.maximum_path(neg_cent, mask)
+            expected = monotonic_align._maximum_path_cython(neg_cent, mask)
+            assert torch.equal(out, expected)
+
+
 class TestEnvDisableImportTime:
     """Verify PIPER_PLUS_DISABLE_SUPER_MAS=1 is honoured at import time.
 
