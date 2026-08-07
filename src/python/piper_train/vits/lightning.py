@@ -1,6 +1,7 @@
 import contextlib
 import copy
 import logging
+import os
 from pathlib import Path
 
 import numpy as np
@@ -49,6 +50,33 @@ _LOGGER = logging.getLogger("vits.lightning")
 
 # Memory cleanup frequency (iterations)
 MEMORY_CLEANUP_FREQUENCY = 500
+
+# Raw KL safety cap (see training_step_g). Shared with the KL-cap sticking
+# guard so the clamp value and the detector can never drift apart.
+_KL_CAP = 1e4
+# Abort after this many *consecutive* steps with raw KL pinned at the cap.
+# The cap is expected to be active only in the first ~100 batches of scratch
+# training; hundreds of consecutive capped steps mean the KL term carries no
+# gradient signal and the run is unrecoverable (2026-08 v8 incident: corrupt
+# MAS alignments kept raw KL at the cap from step ~30 to the end of an
+# 80-epoch run while non_finite_skip=0% looked healthy).
+_KL_CAP_ABORT_DEFAULT = 300
+
+
+def _kl_cap_abort_steps_from_env() -> int:
+    """Parse PIPER_PLUS_KL_CAP_ABORT_STEPS (default 300, 0 disables abort)."""
+    raw = os.environ.get("PIPER_PLUS_KL_CAP_ABORT_STEPS", "")
+    if not raw:
+        return _KL_CAP_ABORT_DEFAULT
+    try:
+        return int(raw)
+    except ValueError:
+        _LOGGER.warning(
+            "Invalid PIPER_PLUS_KL_CAP_ABORT_STEPS=%r — using default %d",
+            raw,
+            _KL_CAP_ABORT_DEFAULT,
+        )
+        return _KL_CAP_ABORT_DEFAULT
 
 
 def normalize_id_tensor(
@@ -382,6 +410,10 @@ class VitsModel(pl.LightningModule):
         # State kept between training optimizers
         self._y = None
         self._y_hat = None
+
+        # KL-cap sticking guard state (see _update_kl_cap_guard)
+        self._kl_cap_consecutive = 0
+        self._kl_cap_abort_steps = _kl_cap_abort_steps_from_env()
 
     def _load_test_dataset(self, test_utterances_path: Path):
         """Load fixed test dataset for WandB audio logging.
@@ -808,6 +840,56 @@ class VitsModel(pl.LightningModule):
             torch.distributed.all_reduce(is_finite, op=torch.distributed.ReduceOp.MIN)
         return is_finite.item() == 1
 
+    def _update_kl_cap_guard(self, kl_raw: float) -> None:
+        """Detect raw KL pinned at the ``_KL_CAP`` safety cap and abort.
+
+        2026-08 v8 incident: a silently broken Super-MAS kernel corrupted the
+        MAS alignments, keeping raw KL at the cap for a *whole 80-epoch run*
+        while every other health signal (non_finite_skip=0%, decreasing mel)
+        looked normal. The cap masks divergence from the non-finite skip
+        machinery by design, so the guard watches the *raw* (pre-clamp,
+        pre-weight) value: hundreds of consecutive capped steps mean the KL
+        term carries no gradient signal and continuing the run only burns GPU
+        hours on garbage. Aborting loudly is strictly cheaper.
+
+        DDP note: the divergence lives in the replicated weights, so all
+        ranks cross the threshold within a few steps of each other; the first
+        rank to raise takes the whole job down via NCCL error propagation.
+        This crash-style stop is intentional for an unrecoverable state.
+
+        NaN raw KL does not count as capped (``nan >= cap`` is False) — that
+        case is handled by the non-finite skip machinery instead.
+
+        Env override: ``PIPER_PLUS_KL_CAP_ABORT_STEPS`` (default 300,
+        0 disables the abort; the error logs still fire).
+        """
+        if not kl_raw >= _KL_CAP:
+            self._kl_cap_consecutive = 0
+            return
+
+        self._kl_cap_consecutive += 1
+        if self._kl_cap_consecutive % 50 == 0:
+            _LOGGER.error(
+                "Raw KL has been pinned at the %.0e cap for %d consecutive "
+                "steps (step=%s) — the KL term carries no gradient signal. "
+                "Training has likely diverged (check MAS alignments and "
+                "loss_dur; see PIPER_PLUS_DISABLE_SUPER_MAS).",
+                _KL_CAP,
+                self._kl_cap_consecutive,
+                self.global_step,
+            )
+        if 0 < self._kl_cap_abort_steps <= self._kl_cap_consecutive:
+            raise RuntimeError(
+                f"Raw KL pinned at the {_KL_CAP:.0e} cap for "
+                f"{self._kl_cap_consecutive} consecutive steps "
+                f"(step={self.global_step}). Training has diverged and cannot "
+                f"recover — aborting instead of completing a garbage run. "
+                f"Check MAS alignment integrity (PIPER_PLUS_DISABLE_SUPER_MAS "
+                f"=1 forces the Cython reference) and loss_dur before "
+                f"resuming. Set PIPER_PLUS_KL_CAP_ABORT_STEPS=0 to disable "
+                f"this guard."
+            )
+
     def training_step(self, batch: Batch, batch_idx: int):
         # Manual optimization for multiple optimizers
         opt_g, opt_d = self.optimizers()
@@ -1085,9 +1167,12 @@ class VitsModel(pl.LightningModule):
             # becomes a no-op. Observed on v8 A100 SXM4 real-config smoke:
             # without this cap, batch 31 onwards diverges 100% (262/300 skip)
             # despite the source clamps.
-            loss_kl = (
-                kl_loss(z_p, logs_q, m_p, logs_p, z_mask).clamp(max=1e4) * kl_weight
-            )
+            loss_kl_raw = kl_loss(z_p, logs_q, m_p, logs_p, z_mask)
+            loss_kl = loss_kl_raw.clamp(max=_KL_CAP) * kl_weight
+            # The cap hides divergence from the non-finite skip machinery, so
+            # watch the raw value for cap sticking (aborts an unrecoverable
+            # run — see _update_kl_cap_guard).
+            self._update_kl_cap_guard(float(loss_kl_raw.detach()))
 
             loss_fm = feature_loss(fmap_r, fmap_g)
             loss_gen, _losses_gen = generator_loss(y_d_hat_g)

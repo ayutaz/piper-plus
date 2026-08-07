@@ -18,12 +18,20 @@ Opt-in install (training-only, GPU-only):
 Disable at runtime via env (forces Cython for debugging / reproducibility):
 
     PIPER_PLUS_DISABLE_SUPER_MAS=1
+
+Runtime parity validation: the first few Super-MAS dispatches are checked
+against the Cython reference; on mismatch the process permanently falls back
+to Cython (see ``_validate_super_mas_parity``).
 """
 
+import logging
 import os
 
 import numpy as np
 import torch
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 try:
@@ -53,6 +61,24 @@ if not _SUPER_MAS_DISABLED:
     except ImportError:
         _super_mas_fn = None
 
+# --- Super-MAS runtime parity validation -----------------------------------
+# 2026-08 v8 incident: on py3.12 + a specific triton build the Super-MAS
+# kernel ran without any error yet returned corrupt alignments, silently
+# collapsing duration supervision (loss_dur ≈ 0.006) and pinning KL at its
+# safety cap for an entire 80-epoch run. Environment-dependent silent
+# breakage cannot be caught by unit tests on a healthy environment, so the
+# first few *real* dispatches are validated at runtime against the Cython
+# reference; on mismatch the process permanently falls back to Cython.
+#
+# The comparison metric is IoU over the alignment's '1' cells. Exact cell
+# equality is too strict (equal-score ties may legally break differently
+# between implementations), while reference-coverage alone would let an
+# all-ones garbage path pass. IoU catches both all-ones and near-random
+# corruption while tolerating benign tie differences.
+_PARITY_CHECK_CALLS = 3
+_PARITY_MIN_IOU = 0.90
+_parity_checks_done = 0
+
 
 def _use_super_mas(neg_cent: torch.Tensor) -> bool:
     """Decide whether to dispatch to Super-MAS for this batch."""
@@ -79,8 +105,16 @@ def maximum_path(neg_cent, mask):
         ``neg_cent``.
     """
     if _use_super_mas(neg_cent):
-        return _maximum_path_super_mas(neg_cent, mask)
+        path = _maximum_path_super_mas(neg_cent, mask)
+        if _parity_checks_done < _PARITY_CHECK_CALLS:
+            path = _validate_super_mas_parity(path, neg_cent, mask)
+        return path
 
+    return _maximum_path_cython(neg_cent, mask)
+
+
+def _maximum_path_cython(neg_cent, mask):
+    """Cython reference path with adaptive chunked processing (Issue #197)."""
     device = neg_cent.device
     dtype = neg_cent.dtype
     batch_size, t_t, t_s = neg_cent.shape
@@ -104,6 +138,51 @@ def maximum_path(neg_cent, mask):
         return torch.cat(results, dim=0)
 
     return _maximum_path_core(neg_cent, mask, device, dtype)
+
+
+def _validate_super_mas_parity(path, neg_cent, mask):
+    """Validate a Super-MAS path against the Cython reference at runtime.
+
+    Called for the first ``_PARITY_CHECK_CALLS`` dispatches only (counter is
+    module-global, i.e. per-process / per-DDP-rank). On IoU below
+    ``_PARITY_MIN_IOU`` the Super-MAS kernel is treated as silently broken in
+    this environment: it is permanently disabled for the rest of the process
+    and the trusted Cython path is returned instead, so not even the failing
+    batch trains on a corrupt alignment.
+    """
+    global _parity_checks_done, _super_mas_fn
+    _parity_checks_done += 1
+
+    reference = _maximum_path_cython(neg_cent, mask)
+    # bf16 cannot represent integer counts > 256 exactly — compute in fp32.
+    path_f = path.detach().to(torch.float32)
+    ref_f = reference.detach().to(torch.float32)
+    intersection = float((path_f * ref_f).sum())
+    union = float(path_f.sum()) + float(ref_f.sum()) - intersection
+    iou = intersection / union if union > 0 else 1.0
+
+    if iou < _PARITY_MIN_IOU:
+        _LOGGER.error(
+            "Super-MAS parity check FAILED (IoU=%.4f < %.2f) on call %d/%d — "
+            "the Triton kernel is returning corrupt alignments in this "
+            "environment (known failure mode: silent breakage that collapses "
+            "duration loss and diverges KL). Permanently falling back to the "
+            "Cython implementation for this process.",
+            iou,
+            _PARITY_MIN_IOU,
+            _parity_checks_done,
+            _PARITY_CHECK_CALLS,
+        )
+        _super_mas_fn = None
+        return reference
+
+    _LOGGER.info(
+        "Super-MAS parity check %d/%d passed (IoU=%.4f)",
+        _parity_checks_done,
+        _PARITY_CHECK_CALLS,
+        iou,
+    )
+    return path
 
 
 def _maximum_path_super_mas(neg_cent, mask):
