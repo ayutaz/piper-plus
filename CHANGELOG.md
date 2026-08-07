@@ -48,6 +48,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - CI: `g2p-python-ci.yml` の `test extras` job で venv を workspace 内 (`.venv-extras/`) ではなく `${RUNNER_TEMP}/venv-extras` に作るよう変更。 当 job は `uv.lock` を経由せず PyPI から fresh resolve するため nltk 3.10.x を引くが、 3.10 で追加された `nltk/inisec.py` の `NLTKSafeImportFinder` が「解決先ファイルが cwd 配下に物理的に存在する」モジュールを一律ブロックするため、 workspace 内 venv だと site-packages 全体が誤検知され `import nltk` 自体が `ImportError: Blocked import of regex from current working directory` で失敗していた。 エラーメッセージが案内する `-P` / `PYTHONSAFEPATH=1` は判定基準が sys.path ではなくファイルの物理位置のため回避にならないことを実測で確認済み
 
+### Added
+
+- **Training divergence guards (zero-shot v8 incident hardening)**: the first
+  3 Super-MAS Triton dispatches are now parity-validated at runtime against
+  the Cython MAS reference — on mismatch (IoU < 0.90) the process permanently
+  falls back to Cython and the failing batch trains on the trusted reference
+  path ([`monotonic_align/__init__.py`](src/python/piper_train/vits/monotonic_align/__init__.py)).
+  Additionally, the raw KL loss is watched for sticking at its 1e4 safety
+  cap: 300 consecutive capped steps abort training with `RuntimeError`
+  (override via `PIPER_PLUS_KL_CAP_ABORT_STEPS`, `0` disables the abort)
+  ([`lightning.py`](src/python/piper_train/vits/lightning.py)). Both guards
+  target a 2026-08 failure mode where an environment-dependent, silently
+  broken Super-MAS kernel corrupted MAS alignments, collapsed duration
+  supervision and pinned KL at the cap for an entire 80-epoch run while
+  `non_finite_skip` stayed at 0%. Tests:
+  `tests/test_super_mas_dispatch.py::TestRuntimeParityValidation`,
+  `tests/test_kl_cap_guard.py`.
+
 ## [2.0.0] - 2026-05-25
 
 Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13 + CUDA 12.8 + Ubuntu 24.04** で完全統一する fully-aligned 戦略 migration。 新 GPU (T4 / RTX 6000 Ada / RTX 5090) サポート + TF32 / bf16-mixed default 化。
