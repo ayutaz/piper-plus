@@ -968,6 +968,56 @@ ko holdout の post-filter 再実行 (Zeroth 5-10 spk、speaker 名は
 `/root/v8_train.sh` 相当 (scratchpad `v8_train.sh`、自動 resume +
 ckpt uploader 込み) を使用。
 
+### 3.13 本走 v1 全損事故 — Super-MAS silent 破損の root cause と再発防止 (2026-08-05/07)
+
+NVLink ありホスト (contract 46659524、4x A100 SXM4 40GB、$2.94/hr) で
+2026-08-03 に launch した 80ep 本走 v1 は **「完走」したが SECS ≈ 0 のモデル全損**。
+症状は学習開始直後からの KL 発散 (cap 1e4 貼り付き × kl_weight 0.1 = 表示値 1000) +
+duration 教師崩壊 (loss_dur ≈ 0.006)。mel だけは減少し `non_finite_skip` も 0% の
+ため、当時の監視 (skip 率 + 進行のみ) では健全に見えた。
+
+**bisect (A〜E) による root cause 確定**:
+
+| 実験 | 変更 | 結果 |
+|---|---|---|
+| A/B | T3/T6・GPU spec 経路の除去 | 発散継続 (シロ) |
+| C | ja/en subset (多言語・データ量を除去) | 発散継続 (シロ) |
+| D | C から `--language-balanced-sampling` / `--channels-last` を除去 | 発散継続 (シロ) |
+| E | D + **`PIPER_PLUS_DISABLE_SUPER_MAS=1`** | **kl=1.088→0.942 / dur=1.726→1.820 と即正常化 — 犯人確定** |
+
+**根因: Super-MAS Triton kernel の環境依存 silent 破損**。py3.12 + 当該 triton
+環境で kernel はエラーなく実行されるが、壊れた MAS アラインメントを返す
+(2026-07 の py3.13 環境では正常だった)。壊れたアラインメント → duration 教師が
+無意味化 (loss_dur ≈ 0) + flow prior の整合が取れず KL 発散、という全症状を説明する。
+
+**副産物として発見した実バグ**: GPU batch spec のフレーム切り出しが CPU 経路と
+3 フレームずれていた (`42b2994c` で修正、`test_gpu_spec_frames` で pin)。
+
+**rerun**: HF 上の不良 run 成果物 41 ファイルを削除 (自動レジュームが不良 ckpt を
+拾い「max_epochs 到達済み」で即終了する事故を 1 回踏んだため) → from scratch で
+2026-08-07 00:14 UTC に再 launch (Cython MAS 固定)。kl 1-2 台 / dur ~1.9 で健全。
+
+**再発防止 (コード化済み、本 branch)**:
+
+1. **Super-MAS 実行時 parity 自己検証** (`vits/monotonic_align/__init__.py`):
+   最初の 3 dispatch で Cython 参照と IoU 比較 (閾値 0.90)。不一致なら ERROR log +
+   プロセス内で永続 Cython fallback、当該 batch も参照 path で学習。健全環境の
+   unit test では捕捉できない「環境依存 silent 破損」クラスを実行時に遮断する。
+   coverage メトリクスでなく IoU なのは all-ones 汚染も検出するため。
+   テスト: `test_super_mas_dispatch.py::TestRuntimeParityValidation`
+2. **KL cap 貼り付き検知 + abort** (`vits/lightning.py:_update_kl_cap_guard`):
+   raw KL (clamp 前) が cap 1e4 に **連続 300 step** 貼り付いたら RuntimeError で
+   学習を落とす (50 step ごとに ERROR log)。cap は scratch 初期 ~100 batch のみ
+   活性が正常で、連続貼り付き = KL 勾配ゼロの回復不能状態。
+   `PIPER_PLUS_KL_CAP_ABORT_STEPS` で閾値変更 (0 で abort 無効化)。
+   テスト: `test_kl_cap_guard.py`
+3. **運用**: 学習健全性は「Non-finite skip 率」でなく **wandb の loss_kl / loss_dur
+   実値**で判定する (正常: kl 1〜2 桁で推移、dur ~1.5-2、mel 減少)。Super-MAS を
+   再有効化する場合は実データ 100 batch で loss_kl < 10 を確認すること
+
+**コスト**: 全損 run ~$280 + bisect ~$30。rerun は ~$250-350 見込
+(2026-08-09 UTC 完走予定)。
+
 ## 5. 成功基準と評価
 
 | 指標 | v7 baseline | v8 目標 |
