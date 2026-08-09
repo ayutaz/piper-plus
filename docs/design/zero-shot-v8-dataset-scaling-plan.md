@@ -1018,6 +1018,40 @@ duration 教師崩壊 (loss_dur ≈ 0.006)。mel だけは減少し `non_finite_
 **コスト**: 全損 run ~$280 + bisect ~$30。rerun は ~$250-350 見込
 (2026-08-09 UTC 完走予定)。
 
+### 3.14 rerun 完走 + SECS 評価結果 (2026-08-09)
+
+**rerun は 2026-08-09 06:10 UTC に 80 epoch 完走** (`max_epochs=80 reached`)。全期間
+kl 1-2 台 / dur ~1.8-1.9 で発散なし、loss_mel 38 → 21.6。途中 2026-08-08 04:22 UTC に
+vast.ai ホストの予告なき再起動で epoch 40 途中に中断したが、last.ckpt (epoch 39) から
+自動レジュームで復旧 (損失 ~30 分)。以後の reboot は `/root/onstart.sh` の自動レジューム
+追記で無人復旧する。実測ペース 35-44 min/epoch。rerun 実費 ~$160。
+
+**SECS 評価 (`/root/v8_eval.py`、CAM++ cosine、参照 1 発話 → 合成 3 発話/話者)**:
+
+| 区分 | ep59 | ep69 | **ep79 (final)** | GT 天井* | 達成率 (ep79) |
+|---|---|---|---|---|---|
+| zs_ja (holdout 10 spk) | 0.6535 | 0.6515 | **0.6493** | 0.7183 | **90%** |
+| zs_ko (holdout 7 spk) | 0.4559 | 0.5055 | **0.4895** | 0.8514 | 57% |
+| known (7 lang × 2 spk 中央値) | 0.4471 | 0.4440 | **0.4410** | 0.7911 | 56% |
+
+*GT 天井 = 同一話者の原音同士の SECS (`/root/v8_gt_control.py`)。ja 天井が 0.72 と
+低いのは moe-speech の演技幅による話者内変動。
+
+**所見**:
+
+- **SECS は ep59 で既にプラトー** (3 点の差は誤差範囲、上昇トレンドなし) —
+  追加 epoch での改善余地はない。cosine LR も min 1e-5 到達済み
+- zs_ja は GT 天井比 90% で実質良好。raw では目標 0.72 / v7 baseline 0.6879 に
+  未達だが、v7 の数字は別データセット・別プロトコル測定で厳密比較不可
+- zs_ko (57%) は ko データ量 (~25k utts / ~120 spk) の制約が素直に出た形。
+  改善は v9 でのデータ拡充マター
+- 全損 run (SECS ≈ 0.005) からの回復は完全で、Super-MAS 事故の影響は残っていない
+
+**成果物 (HF `ayousanz/piper-plus-zero-shot-multi-7lang-v8`)**: 全 epoch ckpt
+(2ep ごと) + `onnx/v8-zs-ep79.onnx` (40.6MB FP16) + `eval/eval_results_ep{59,69,79}.json`。
+聴感確認用サンプル (zs_ja ×2 spk + zs_ko ×1 spk、synth 3 + 参照原音) はローカル
+`piper-v8-dataset-backup/v8_listen_samples/`。
+
 ## 5. 成功基準と評価
 
 | 指標 | v7 baseline | v8 目標 |
