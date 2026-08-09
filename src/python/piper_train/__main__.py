@@ -214,6 +214,16 @@ def create_parser():
         "Automatically enables --freeze-dp.",
     )
     parser.add_argument(
+        "--resume-weights-only",
+        help="Warm-restart: load model weights from a checkpoint with strict=False "
+        "and start a FRESH training run (epoch 0, new optimizer / LR schedule). "
+        "Use when the continuation config is incompatible with strict Trainer "
+        "resume — e.g. enabling the WavLM discriminator (adds parameters that "
+        "are fresh-initialized) or replacing an exhausted LR schedule. "
+        "Mutually exclusive with --resume_from_checkpoint and "
+        "--resume-from-multispeaker-checkpoint.",
+    )
+    parser.add_argument(
         "--save-top-k",
         type=int,
         default=-1,
@@ -572,6 +582,74 @@ def create_parser():
     return parser
 
 
+def check_resume_flags_exclusive(args) -> None:
+    """--resume-weights-only と他の resume 系フラグの併用を拒否する。
+
+    weights-only warm restart は optimizer / LR / epoch を意図的に捨てる。
+    strict resume 系と併用されると「どちらの意味か」が曖昧になり、
+    どちらに転んでも事故 (LR schedule の再開 or 二重ロード) になるため
+    起動時に fail-fast する。
+    """
+    if not getattr(args, "resume_weights_only", None):
+        return
+    conflicts = [
+        name
+        for name, flag in [
+            ("--resume_from_checkpoint", getattr(args, "resume_from_checkpoint", None)),
+            (
+                "--resume-from-multispeaker-checkpoint",
+                getattr(args, "resume_from_multispeaker_checkpoint", None),
+            ),
+            (
+                "--resume_from_single_speaker_checkpoint",
+                getattr(args, "resume_from_single_speaker_checkpoint", None),
+            ),
+        ]
+        if flag
+    ]
+    if conflicts:
+        raise SystemExit(
+            f"--resume-weights-only は {', '.join(conflicts)} と併用できません。"
+            "warm restart (weights のみ、epoch 0 から) か strict resume かの"
+            "どちらか一方を指定してください。"
+        )
+
+
+def load_weights_only_checkpoint(checkpoint_path: str, model) -> tuple[list, list]:
+    """checkpoint から model weights のみを strict=False でロードする (warm restart)。
+
+    optimizer / LR scheduler / epoch カウンタは一切復元しない。呼び出し後は
+    通常の ``trainer.fit(model)`` で epoch 0 から新しい schedule で学習を開始する。
+
+    典型的な用途: 学習済み ckpt に対して WavLM discriminator を後から有効化する
+    継続学習 (v8.1)。ckpt に存在しないキー (model_d_wavlm.* 等) は fresh-init の
+    まま残り、ckpt にしか無いキーは捨てられる。
+
+    Returns:
+        (missing_keys, unexpected_keys) — ログ済みだが呼び出し側の検証用に返す。
+    """
+    _LOGGER.info("Warm-restart (weights only) from: %s", checkpoint_path)
+    # NOTE: weights_only=False is required to handle PosixPath objects in checkpoints
+    # This poses a security risk - only load trusted checkpoints
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    state_dict = checkpoint["state_dict"]
+    if _is_legacy_hifigan_checkpoint(state_dict):
+        raise RuntimeError(_LEGACY_HIFIGAN_MESSAGE.format(path=str(checkpoint_path)))
+    remapped_sd = remap_weight_norm_keys(state_dict, model.state_dict())
+    missing, unexpected = model.load_state_dict(remapped_sd, strict=False)
+    _LOGGER.info(
+        "Warm-restart weights loaded (strict=False): missing=%d (fresh-init kept), "
+        "unexpected=%d (dropped)",
+        len(missing),
+        len(unexpected),
+    )
+    if missing:
+        _LOGGER.info("Fresh-initialized keys (not in checkpoint): %s", missing)
+    if unexpected:
+        _LOGGER.info("Dropped checkpoint keys (not in model): %s", unexpected)
+    return missing, unexpected
+
+
 def load_multispeaker_checkpoint(checkpoint_path: str, model: VitsModel) -> None:
     """Load a multispeaker checkpoint for single-speaker fine-tuning.
 
@@ -686,6 +764,8 @@ def main():
     parser = create_parser()
     args = parser.parse_args()
     _LOGGER.debug(args)
+
+    check_resume_flags_exclusive(args)
 
     args.dataset_dir = Path(args.dataset_dir)
 
@@ -990,6 +1070,13 @@ def main():
         # drifted apart (only the function rejected HiFi-GAN checkpoints, only
         # the inline copy remapped weight_norm keys). One implementation now.
         load_multispeaker_checkpoint(args.resume_from_multispeaker_checkpoint, model)
+
+    if getattr(args, "resume_weights_only", None):
+        load_weights_only_checkpoint(args.resume_weights_only, model)
+        _LOGGER.info(
+            "Warm restart: starting fresh training run (epoch 0, new optimizer / "
+            "LR schedule) from loaded weights."
+        )
 
     # チェックポイントからの再開処理を修正
     if args.resume_from_checkpoint:
