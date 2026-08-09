@@ -27,6 +27,7 @@ from .losses import (
     kl_loss,
     mel_speaker_consistency_loss,
     speaker_consistency_loss,
+    speaker_infonce_loss,
 )
 from .mb_istft import PQMF
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
@@ -251,6 +252,12 @@ class VitsModel(pl.LightningModule):
         c_spk: float = 1.0,
         c_dino: float = 0.5,
         speaker_encoder_path: str | None = None,
+        # Differentiable SCL (v8.1): torch 版 CAM++ の重み (campplus_cn_common.bin)。
+        # 指定時は SCL がこの frozen encoder を通して y_hat まで backprop する。
+        # 未指定時は従来の ONNX no_grad 経路 (= 勾配ゼロ、monitoring のみ)。
+        speaker_encoder_torch_path: str | None = None,
+        # SCL の損失形式: "cosine" (従来) | "infonce" (in-batch 対比、話者判別を要求)
+        spk_loss_type: str = "cosine",
         # Speaker embedding dropout for dual-mode training (DEPRECATED: no longer used,
         # spk_proj is now the sole speaker conditioning path)
         spk_emb_dropout: float = 0.0,
@@ -364,6 +371,32 @@ class VitsModel(pl.LightningModule):
         if use_zero_shot and hasattr(self.model_g, "spk_proj"):
             self.spk_proj_teacher = copy.deepcopy(self.model_g.spk_proj)
             self.spk_proj_teacher.requires_grad_(False)
+
+        # Differentiable CAM++ for SCL (v8.1) — 指定時は SCL が y_hat まで backprop。
+        # ONNX 経路 (下) は torch.no_grad + ORT で勾配ゼロ = monitoring にしか
+        # ならない (v7/v8 で loss_spk が動かなかった根因、design doc §3.15)。
+        self.scl_encoder = None
+        if use_zero_shot and self.hparams.speaker_encoder_torch_path is not None:
+            torch_encoder_path = Path(self.hparams.speaker_encoder_torch_path)
+            if torch_encoder_path.exists():
+                from ..speaker_encoder.campplus_torch import (
+                    DifferentiableCamPPEncoder,
+                )
+
+                self.scl_encoder = DifferentiableCamPPEncoder(
+                    str(torch_encoder_path),
+                    source_sr=self.hparams.sample_rate,
+                )
+                _LOGGER.info(
+                    "Differentiable SCL enabled (torch CAM++, spk_loss_type=%s)",
+                    self.hparams.spk_loss_type,
+                )
+            else:
+                _LOGGER.warning(
+                    "speaker_encoder_torch_path not found, differentiable SCL "
+                    "disabled: %s",
+                    torch_encoder_path,
+                )
 
         # CAM++ Speaker Encoder for SCL (optional, CPU-only ONNX, not an nn.Module)
         self.speaker_encoder = None
@@ -1191,8 +1224,37 @@ class VitsModel(pl.LightningModule):
             # enabled=False) so a future refactor cannot silently hoist SCL out
             # of the outer fp32 block and expose it to bf16 numerics.
             with self._scl_autocast_ctx():
-                # CAM++ ONNX encoder path (primary, when speaker_encoder is loaded)
+                # Differentiable torch CAM++ path (v8.1, primary when loaded):
+                # gradient flows y_hat → decoder。ONNX 経路より優先。
                 if (
+                    self.hparams.c_spk > 0
+                    and speaker_embeddings is not None
+                    and self.scl_encoder is not None
+                ):
+                    gen_embedding = self.scl_encoder(y_hat.squeeze(1).float())
+                    ref_embedding = speaker_embeddings.float()
+                    if self.hparams.spk_loss_type == "infonce":
+                        loss_spk = (
+                            speaker_infonce_loss(
+                                gen_embedding,
+                                ref_embedding,
+                                speaker_ids=batch.speaker_ids,
+                            )
+                            * self.hparams.c_spk
+                        )
+                    else:
+                        loss_spk = (
+                            speaker_consistency_loss(gen_embedding, ref_embedding)
+                            * self.hparams.c_spk
+                        )
+                    loss_gen_all = loss_gen_all + loss_spk
+                    self._log_with_batch_info("loss_spk", loss_spk, batch)
+                # CAM++ ONNX encoder path (fallback)。ORT session は backprop
+                # 不能なため torch.no_grad — この経路の loss_spk は勾配ゼロで
+                # **monitoring にしかならない** (v7/v8 で loss_spk が動かなかった
+                # 根因、design doc §3.15)。学習で効かせるには
+                # --speaker-encoder-torch-path を使うこと。
+                elif (
                     self.hparams.c_spk > 0
                     and speaker_embeddings is not None
                     and self.speaker_encoder is not None
@@ -1212,6 +1274,7 @@ class VitsModel(pl.LightningModule):
                     self.hparams.num_speakers > 1
                     and self.hparams.c_spk > 0
                     and self.speaker_encoder is None
+                    and self.scl_encoder is None
                 ):
                     loss_spk = mel_speaker_consistency_loss(
                         y_hat,
