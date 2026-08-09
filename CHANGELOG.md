@@ -48,6 +48,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - CI: `g2p-python-ci.yml` の `test extras` job で venv を workspace 内 (`.venv-extras/`) ではなく `${RUNNER_TEMP}/venv-extras` に作るよう変更。 当 job は `uv.lock` を経由せず PyPI から fresh resolve するため nltk 3.10.x を引くが、 3.10 で追加された `nltk/inisec.py` の `NLTKSafeImportFinder` が「解決先ファイルが cwd 配下に物理的に存在する」モジュールを一律ブロックするため、 workspace 内 venv だと site-packages 全体が誤検知され `import nltk` 自体が `ImportError: Blocked import of regex from current working directory` で失敗していた。 エラーメッセージが案内する `-P` / `PYTHONSAFEPATH=1` は判定基準が sys.path ではなくファイルの物理位置のため回避にならないことを実測で確認済み
 
+### Fixed
+
+- **`--reference-audio` / `--speaker-encoder-model` being silently ignored in
+  `piper_train.infer_onnx`**: the documented voice-cloning flags had separate
+  argparse dests from the canonical fields consumed by the speaker-embedding
+  resolver, so zero-shot models fell back to a zero embedding (with only a
+  warning) even when a reference audio was explicitly given. The aliases are
+  now merged into the canonical fields before resolution; explicit
+  `--speaker-audio` / `--speaker-encoder` win on conflict. Found during v8
+  local verification. Tests:
+  `tests/test_infer_onnx_cli.py::TestSpeakerSourceAliasMerge`.
+
 ### Added
 
 - **Training divergence guards (zero-shot v8 incident hardening)**: the first
