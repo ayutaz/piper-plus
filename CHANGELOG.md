@@ -62,6 +62,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`--resume-weights-only` (warm restart)** in `piper_train`: loads model
+  weights from a checkpoint with `strict=False` and starts a fresh training
+  run (epoch 0, new optimizer / LR schedule). Enables continuation runs whose
+  config is incompatible with strict Trainer resume — e.g. enabling the WavLM
+  discriminator on a checkpoint trained without it (new parameters are
+  fresh-initialized), or replacing an exhausted cosine LR schedule. Mutually
+  exclusive with the strict resume flags (fail-fast at startup). Tests:
+  `tests/test_resume_weights_only.py`.
 - **Training divergence guards (zero-shot v8 incident hardening)**: the first
   3 Super-MAS Triton dispatches are now parity-validated at runtime against
   the Cython MAS reference — on mismatch (IoU < 0.90) the process permanently
