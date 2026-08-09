@@ -94,3 +94,56 @@ class TestInferOnnxCli:
     def test_invalid_device_choice_fails(self) -> None:
         result = _run(["--device", "tpu", "--text", "hello", "--model", "x"])
         assert result.returncode != 0
+
+
+@pytest.mark.unit
+class TestSpeakerSourceAliasMerge:
+    """--reference-audio / --speaker-encoder-model must reach the resolver.
+
+    The documented voice-cloning pair has separate argparse dests from the
+    canonical fields consumed by _resolve_speaker_embedding. Before the merge
+    helper existed the documented flags were silently ignored and zero-shot
+    models fell back to a zero embedding (v8 local verification, 2026-08-09).
+    """
+
+    @staticmethod
+    def _ns(**kw):
+        import argparse
+
+        base = {
+            "speaker_audio": None,
+            "speaker_encoder": None,
+            "reference_audio": None,
+            "speaker_encoder_model": None,
+        }
+        base.update(kw)
+        return argparse.Namespace(**base)
+
+    def test_reference_audio_merges_into_speaker_audio(self) -> None:
+        from piper_train.infer_onnx import _merge_speaker_source_aliases
+
+        ns = self._ns(reference_audio="ref.wav", speaker_encoder_model="enc.onnx")
+        _merge_speaker_source_aliases(ns)
+        assert ns.speaker_audio == "ref.wav"
+        assert ns.speaker_encoder == "enc.onnx"
+
+    def test_canonical_flags_win_on_conflict(self) -> None:
+        from piper_train.infer_onnx import _merge_speaker_source_aliases
+
+        ns = self._ns(
+            speaker_audio="canonical.wav",
+            speaker_encoder="canonical.onnx",
+            reference_audio="alias.wav",
+            speaker_encoder_model="alias.onnx",
+        )
+        _merge_speaker_source_aliases(ns)
+        assert ns.speaker_audio == "canonical.wav"
+        assert ns.speaker_encoder == "canonical.onnx"
+
+    def test_noop_when_nothing_given(self) -> None:
+        from piper_train.infer_onnx import _merge_speaker_source_aliases
+
+        ns = self._ns()
+        _merge_speaker_source_aliases(ns)
+        assert ns.speaker_audio is None
+        assert ns.speaker_encoder is None
