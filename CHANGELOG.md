@@ -62,6 +62,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Differentiable Speaker Consistency Loss (SCL)** in `piper_train`: a
+  PyTorch port of the CAM++ speaker encoder
+  (`piper_train/speaker_encoder/campplus_torch.py`, ported from 3D-Speaker,
+  Apache-2.0; loads the official ModelScope weights via
+  `--speaker-encoder-torch-path campplus_cn_common.bin`, HF mirror
+  `funasr/campplus`, torch/ONNX embedding parity cos=0.993). The previous
+  ONNX-based SCL path computed embeddings under `torch.no_grad()` through an
+  ORT session, so `loss_spk` carried **zero gradient** and never trained
+  speaker similarity (v7/v8 postmortem). With the torch encoder the loss
+  backpropagates through the generated waveform into the decoder. Also adds
+  `--spk-loss-type infonce` (in-batch contrastive SCL with same-speaker
+  false-negative masking via speaker ids) and a `--segment-size` CLI flag
+  (longer decoder slices give the speaker encoder a usable window). Tests:
+  `tests/test_scl_differentiable.py`.
 - **`--resume-weights-only` (warm restart)** in `piper_train`: loads model
   weights from a checkpoint with `strict=False` and starts a fresh training
   run (epoch 0, new optimizer / LR schedule). Enables continuation runs whose
