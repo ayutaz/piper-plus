@@ -444,6 +444,37 @@ def create_parser():
         help="(deprecated, ignored) Speaker embedding dropout rate. "
         "This argument is kept for backward compatibility but has no effect.",
     )
+    parser.add_argument(
+        "--speaker-encoder-torch-path",
+        type=str,
+        default=None,
+        help="Path to torch CAM++ weights (campplus_cn_common.bin, HF mirror: "
+        "funasr/campplus). Enables DIFFERENTIABLE SCL: the frozen torch "
+        "encoder backpropagates through the generated waveform, so loss_spk "
+        "actually trains speaker similarity. Without this, the ONNX encoder "
+        "path computes loss_spk under no_grad (monitoring only, zero "
+        "gradient).",
+    )
+    parser.add_argument(
+        "--spk-loss-type",
+        type=str,
+        choices=["cosine", "infonce"],
+        default="cosine",
+        help="SCL loss form (used with --speaker-encoder-torch-path): "
+        "'cosine' pulls the generated embedding toward its own reference; "
+        "'infonce' additionally requires discriminating the reference from "
+        "other speakers in the batch (same-speaker false negatives are "
+        "masked via speaker ids).",
+    )
+    parser.add_argument(
+        "--segment-size",
+        type=int,
+        default=8192,
+        help="Decoder training slice length in samples (default 8192 = ~0.37s "
+        "@22.05kHz). Longer slices give the SCL speaker encoder a usable "
+        "window (0.37s is too short for stable speaker embeddings) at the "
+        "cost of decoder/discriminator VRAM and step time.",
+    )
     # Speaker encoder path
     parser.add_argument(
         "--speaker-encoder-path",

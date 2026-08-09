@@ -86,6 +86,60 @@ def speaker_consistency_loss(gen_embedding, ref_embedding):
     return 1.0 - F.cosine_similarity(gen_embedding, ref_embedding, dim=-1).mean()
 
 
+def speaker_infonce_loss(
+    gen_embedding,
+    ref_embedding,
+    speaker_ids=None,
+    temperature: float = 0.07,
+):
+    """In-batch InfoNCE 版 SCL — 話者「判別」を要求する対比損失。
+
+    plain cosine (speaker_consistency_loss) は「自分の参照に近づく」ことしか
+    要求せず、batch 内の他話者から離れる圧力がない。InfoNCE は生成音声の
+    embedding が batch 内の全参照 embedding の中から自話者を識別することを
+    要求するため、話者の作り分け (v7/v8 の既知課題「区別性不十分」) に
+    直接の勾配を与える。
+
+    ``samples_per_speaker > 1`` の batch では同一話者の他発話参照が
+    false negative になるため、``speaker_ids`` を渡すと同一話者の
+    非対角成分を分母から除外する (SupCon 方式のマスク)。
+
+    Parameters
+    ----------
+    gen_embedding : torch.Tensor
+        生成音声から抽出した話者埋め込み [B, D] (微分可能であること)
+    ref_embedding : torch.Tensor
+        参照 (conditioning に使った) 話者埋め込み [B, D]
+    speaker_ids : torch.LongTensor | None
+        [B] 話者 ID。None ならマスクなし (全非対角を negative 扱い)
+    temperature : float
+        softmax 温度。小さいほど hard negative を強調 (default 0.07)
+
+    Returns
+    -------
+    torch.Tensor
+        スカラー損失値 (cross entropy、0 が完全識別)
+    """
+    if torch.isnan(gen_embedding).any() or torch.isnan(ref_embedding).any():
+        return torch.tensor(0.0, device=gen_embedding.device)
+
+    gen = F.normalize(gen_embedding, p=2, dim=-1)
+    ref = F.normalize(ref_embedding, p=2, dim=-1)
+    b = gen.shape[0]
+    if b < 2:
+        # 対比相手がいない — cosine にフォールバック
+        return 1.0 - F.cosine_similarity(gen, ref, dim=-1).mean()
+
+    logits = gen @ ref.t() / temperature  # [B, B]
+    labels = torch.arange(b, device=logits.device)
+    if speaker_ids is not None:
+        same = speaker_ids.view(1, -1) == speaker_ids.view(-1, 1)
+        eye = torch.eye(b, dtype=torch.bool, device=logits.device)
+        # 同一話者の他発話参照は negative にしない (false negative 除外)
+        logits = logits.masked_fill(same & ~eye, float("-inf"))
+    return F.cross_entropy(logits, labels)
+
+
 def dino_loss(student_emb, teacher_emb, center, tau_s=0.1, tau_t=0.07):
     """DINO自己蒸留損失 — 話者埋め込み空間の正則化
 
