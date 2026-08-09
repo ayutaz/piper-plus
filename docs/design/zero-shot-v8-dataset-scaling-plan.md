@@ -1052,6 +1052,48 @@ vast.ai ホストの予告なき再起動で epoch 40 途中に中断したが�
 聴感確認用サンプル (zs_ja ×2 spk + zs_ko ×1 spk、synth 3 + 参照原音) はローカル
 `piper-v8-dataset-backup/v8_listen_samples/`。
 
+### 3.15 zero-shot 音質 (がびがび) / 類似度の原因調査 (2026-08-09、ローカル実測)
+
+ユーザー聴感報告「zero-shot はがびがび + 参照に似ていない。FT モデルでは出ない」を受けた
+切り分け調査。全て同一テキスト × 同一 holdout ja 参照 (`361eb7a2`) で UTMOS
+(utmos22_strong) + SECS (CAM++) を実測。
+
+**実測サマリ**:
+
+| 対象 | UTMOS | SECS vs ref |
+|---|---|---|
+| 参照原音 (moe-speech) | 2.60 | — |
+| v8 ep21 (FP16) | 1.27 | 0.65-0.70 |
+| v8 ep41 (FP16) | 1.36 | 0.78-0.81 |
+| v8 ep79 (FP16) | 1.43 | 0.77-0.78 |
+| **v8 ep79 (FP32 export)** | **1.53** | 0.76-0.81 |
+| v7 ep32 (FP16、同条件) | 1.80 | 0.778 |
+
+**確定した事実**:
+
+1. **がびがびは v8 固有でなく v7 でも存在** (v7 UTMOS 1.80 ≪ 参照 2.60、良好 TTS は 3.5+)
+2. **参照 embedding の質はシロ**: 学習使用話者の embedding (単発話 / 50 発話 centroid)
+   でも UTMOS 1.31-1.39 と改善せず → OOD 説を棄却。ノイズは decoder 側に焼き付き
+3. **noise_scale もシロ** (0.2/0.4/0.667 で 1.36-1.44 フラット)
+4. **UTMOS は epoch とともに単調上昇中** (1.27→1.36→1.43、プラトーなし) →
+   decoder は学習不足で、学習を続ければ音質はまだ伸びる。一方 **SECS は ep41 で飽和**
+5. **FP16 export が UTMOS を ~0.1-0.2 押し下げる** (ep79: FP32 1.53 vs FP16 1.43)
+6. 類似度が伸びない機序: SCL は 8192 sample (0.37 秒) 切片への CAM++ cosine で
+   学習時 cosine ~0.21 と勾配が実質無意味 (loss_spk v7 -19% / v8 横ばいで一致)。
+   conditioning は `g = spk_proj + emb_lang` の単一グローバルベクトルで韻律転写機構なし
+7. FT でがびがびが消えるのは decoder が単一話者に特化再学習されるため。
+   multi-speaker base は 3,692 話者に容量が分散し 1 話者あたりの decoder 成熟が遅い
+   (571 話者の v7 は ep32 で UTMOS 1.80 に到達 = 話者数と成熟速度のトレードオフ)
+
+**解決策の選択肢** (§7 / quality-improvement-plan Tier 2-3 と接続):
+
+- 即効: FP32 export 採用 (+0.1-0.2 UTMOS、75MB) / FT 運用 (実証済み: がびがび解消 + SECS 0.77)
+- 学習追い焚き (v8.1): ep79 から WavLM discriminator ON + disc fp32 で +20-40ep resume
+  (UTMOS 上昇トレンド継続中のため効果見込み、~$150-400)
+- v9 根本策: SCL segment 延長 or full-utterance SCL / InfoNCE / 韻律転写 /
+  話者数を quality-first に削減 (話者スケーリングは SECS を改善しなかった:
+  v7 571spk 0.688 → v8 3,692spk 0.649)
+
 ## 5. 成功基準と評価
 
 | 指標 | v7 baseline | v8 目標 |
