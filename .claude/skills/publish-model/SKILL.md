@@ -70,6 +70,23 @@ ls -la /tmp/sanity/*.wav
 
 無音 / クリップ / 形状不一致を catch。
 
+## フェーズ 3.5: 帯域スペクトル検査 + 聴感確認 (multi-speaker / zero-shot モデルは必須)
+
+> **Why (2026-08 教訓):** UTMOS / HNR 等の既製指標は PQMF 帯域境界のエイリアスノイズ
+> (5-9kHz「がびがび」) に**全盲**だった。zero-shot v8/v8.1 はこの検査なしで
+> SECS/UTMOS 合格 → ユーザー聴感で初めて発覚。詳細:
+> `docs/design/zero-shot-noise-root-cause-pqmf.md` (§1 症状 7 / §4 経緯)。
+
+1. 実テキスト 2-3 文で合成 (zero-shot なら holdout 参照音声で `--reference-audio`)
+2. **平均スペクトル比較**: 合成音の active-frame 平均スペクトルを参照原音 (と、あれば
+   単一話者 FT モデルの合成) と重ね描き。**PQMF 帯域境界 2756/5512/8268 Hz 近傍
+   (@22.05kHz) に +5dB 以上の非構造エネルギー超過があれば要調査** — エイリアス
+   ノイズの疑い
+3. スペクトログラム目視: 有声部の倍音間がノイズで埋まっていないか
+4. **ユーザーに聴感確認を依頼** (自動指標のみで publish 判断しない)
+
+判定に迷う場合は `--skip` せず停止してユーザー判断を仰ぐ。
+
 ## フェーズ 4: RTF benchmark (optional)
 
 ```bash
