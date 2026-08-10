@@ -307,6 +307,28 @@ def create_parser():
         "bins). Complements --use-mrd (regression vs adversarial).",
     )
     parser.add_argument(
+        "--reinit-pqmf",
+        action="store_true",
+        default=False,
+        help="After loading checkpoint weights, re-initialize the PQMF filter "
+        "bank with freshly-constructed (canonical) coefficients instead of "
+        "the ones stored in the checkpoint. Required when re-adapting a "
+        "checkpoint trained against the pre-v9 buggy bank to the fixed bank "
+        "(docs/design/zero-shot-noise-root-cause-pqmf.md). Only supported "
+        "with --resume-weights-only (strict Trainer resume restores buffers "
+        "after fit starts and would silently undo the re-init).",
+    )
+    parser.add_argument(
+        "--train-decoder-only",
+        action="store_true",
+        default=False,
+        help="Freeze all generator parameters except the decoder (dec.*). "
+        "Used with --reinit-pqmf for v9 decoder re-adaptation fine-tuning: "
+        "the PQMF-target contamination only ever back-propagated through "
+        "the decoder, so re-adapting it alone against the fixed bank may "
+        "avoid a full retrain.",
+    )
+    parser.add_argument(
         "--freeze-dp",
         action="store_true",
         default=False,
@@ -670,6 +692,28 @@ def check_resume_flags_exclusive(args) -> None:
             "warm restart (weights のみ、epoch 0 から) か strict resume かの"
             "どちらか一方を指定してください。"
         )
+
+
+def reinit_pqmf_bank(model) -> None:
+    """PQMF buffer を新規構築 (canonical) の係数で上書きする (v9 再適応 FT 用)。
+
+    checkpoint の state_dict は PQMF buffer (persistent) を含むため、旧 ckpt を
+    ロードすると壊れた旧バンク係数が復元される — これは通常は望ましい後方互換
+    (旧モデルは旧バンクで学習済み) だが、v9 の decoder 再適応 FT では
+    「旧 decoder 重み + 修正済みバンク」から学習を始めたい。VitsModel.pqmf と
+    model_g.dec.pqmf は同一インスタンス (PR #320 A1) なので片方の上書きで両方に
+    効くが、将来の分離に備えて両方に適用する。
+    """
+    from .vits.mb_istft import PQMF
+
+    fresh = PQMF(subbands=model.pqmf.subbands).state_dict()
+    model.pqmf.load_state_dict(fresh)
+    if model.model_g.dec.pqmf is not model.pqmf:
+        model.model_g.dec.pqmf.load_state_dict(fresh)
+    _LOGGER.info(
+        "PQMF bank re-initialized with canonical coefficients (--reinit-pqmf); "
+        "checkpoint-stored bank discarded."
+    )
 
 
 def load_weights_only_checkpoint(checkpoint_path: str, model) -> tuple[list, list]:
@@ -1134,6 +1178,16 @@ def main():
             "Warm restart: starting fresh training run (epoch 0, new optimizer / "
             "LR schedule) from loaded weights."
         )
+
+    if getattr(args, "reinit_pqmf", False):
+        if not getattr(args, "resume_weights_only", None):
+            raise SystemExit(
+                "--reinit-pqmf は --resume-weights-only と併用してください。"
+                "strict resume (--resume_from_checkpoint) は fit 開始後に "
+                "checkpoint の buffer を復元するため、再初期化が黙って旧バンクに"
+                "巻き戻されます。"
+            )
+        reinit_pqmf_bank(model)
 
     # チェックポイントからの再開処理を修正
     if args.resume_from_checkpoint:

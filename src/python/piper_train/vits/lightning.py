@@ -275,6 +275,8 @@ class VitsModel(pl.LightningModule):
         # (zero-shot がびがびの副次要因 1、root-cause doc §3)
         use_mrd: bool = False,
         c_mrd: float = 1.0,
+        # v9 decoder 再適応 FT: decoder 以外の generator パラメータを凍結
+        train_decoder_only: bool = False,
         # MB-iSTFT options
         c_sub_stft: float = 1.0,
         sub_stft_fft_sizes: tuple[int, ...] = (171, 384, 683),
@@ -1704,7 +1706,25 @@ class VitsModel(pl.LightningModule):
                     param.requires_grad = False
             _LOGGER.info("Froze Duration Predictor parameters (--freeze-dp)")
 
-        # Collect generator parameters (exclude frozen DP params when freeze_dp)
+        # Decoder-only re-adaptation (v9): freeze everything except the
+        # decoder. Used to re-adapt a checkpoint trained against the buggy
+        # PQMF bank to the fixed bank (--reinit-pqmf) without disturbing the
+        # text encoder / posterior / flow / DP / speaker projection — the
+        # sub-band-loss target contamination only ever back-propagated
+        # through dec.* (docs/design/zero-shot-noise-root-cause-pqmf.md).
+        if getattr(self.hparams, "train_decoder_only", False):
+            frozen = 0
+            for name, param in self.model_g.named_parameters():
+                if not name.startswith("dec."):
+                    param.requires_grad = False
+                    frozen += 1
+            _LOGGER.info(
+                "Decoder-only training: froze %d non-decoder generator params "
+                "(--train-decoder-only)",
+                frozen,
+            )
+
+        # Collect generator parameters (exclude frozen params)
         g_params = [p for p in self.model_g.parameters() if p.requires_grad]
 
         # Collect discriminator parameters (including WavLM / MRD if enabled)
