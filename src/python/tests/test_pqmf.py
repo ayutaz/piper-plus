@@ -112,6 +112,40 @@ def test_pqmf_legacy_checkpoint_coefficients_restore():
 
 
 @pytest.mark.unit
+@pytest.mark.xfail(
+    strict=True,
+    reason="Known PQMF aliasing bug: missing (-1)^k*pi/4 modulation phase term "
+    "(docs/design/zero-shot-noise-root-cause-pqmf.md). A canonical "
+    "cosine-modulated PQMF reaches ~60 dB round-trip SNR with this prototype. "
+    "strict=True: when the bank is fixed this test XPASSes as FAILURE, forcing "
+    "removal of the xfail marker and promotion to the real gate.",
+)
+def test_pqmf_reconstruction_matches_canonical():
+    """Near-perfect reconstruction: round-trip SNR must be >= 55 dB.
+
+    This is the criterion the original requirements specified (residual
+    aliasing at -90 dB, later relaxed — see root-cause doc §4). Band-edge
+    tones are the sharpest probe: harmonics crossing 2756/5512/8268 Hz are
+    exactly where the missing phase term leaks mirror images.
+    """
+    import math
+
+    from piper_train.vits.mb_istft import PQMF
+
+    pqmf = PQMF(subbands=4)
+    sr = 22050
+    t = torch.arange(8192, dtype=torch.float32) / sr
+
+    x = torch.randn(1, 1, 8192)
+    assert _roundtrip_snr_db(pqmf, x) >= 55, "white-noise round-trip below 55 dB"
+
+    for freq in (2756.25, 5512.5, 8268.75):  # PQMF band edges @ 22.05 kHz
+        tone = torch.sin(2 * math.pi * freq * t).reshape(1, 1, -1)
+        snr = _roundtrip_snr_db(pqmf, tone)
+        assert snr >= 50, f"band-edge tone {freq:.0f} Hz round-trip {snr:.1f} dB < 50 dB"
+
+
+@pytest.mark.unit
 def test_pqmf_analysis_output_shape():
     """analysis output shape is [B, subbands, T // subbands]."""
     from piper_train.vits.mb_istft import PQMF
