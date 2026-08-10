@@ -1094,6 +1094,48 @@ vast.ai ホストの予告なき再起動で epoch 40 途中に中断したが�
   話者数を quality-first に削減 (話者スケーリングは SECS を改善しなかった:
   v7 571spk 0.688 → v8 3,692spk 0.649)
 
+### 3.16 v8.1 継続学習 — 微分可能 SCL (InfoNCE) + WavLM で両問題を大幅改善 (2026-08-10)
+
+§3.15 の解決策を実装し、v8 ep79 から warm restart で 40 epoch の継続学習 (v8.1) を
+完走 (2026-08-10 05:30 UTC、instance 47257713 = NVLink 実証済ホスト再レンタル、
+実測 ~14.5 min/epoch、学習実費 ~$45)。
+
+**v8.1 の構成変更 (v8 との差分)**:
+
+| 変更 | 実装 |
+|---|---|
+| 微分可能 SCL | torch 版 CAM++ (`--speaker-encoder-torch-path`、3D-Speaker port、ONNX と parity cos=0.993)。**ONNX+no_grad で勾配ゼロだった SCL に初めて勾配が流れる** |
+| InfoNCE 対比損失 | `--spk-loss-type infonce` (in-batch 話者判別、同一話者 false negative はマスク) |
+| SCL 窓の延長 | `--segment-size 16384` (0.37s → 0.74s、CAM++ が安定する窓長) |
+| 知覚品質 discriminator | WavLM ON (`--c-wavlm 0.5 --wavlm-every-n-steps 2`) + `--disc-precision 32-true` |
+| warm restart | `--resume-weights-only` (epoch 0 / 新 optimizer / cosine 1e-4→1e-5、KL annealing なし) |
+
+**結果 (v8 と同一プロトコル: holdout ja 10 + ko 7 spk、known 7 lang × 2 spk)**:
+
+| 指標 | v8 ep79 | **v8.1 ep39** | 変化 | GT 天井 | 達成率 |
+|---|---|---|---|---|---|
+| **zs_ja SECS** | 0.6493 | **0.7117** | **+0.062** | 0.7183 | **99%** (実質天井到達) |
+| **zs_ko SECS** | 0.4895 | **0.6461** | **+0.157** | 0.8514 | 76% |
+| **known SECS** | 0.4410 | **0.6135** | **+0.173** | 0.7911 | 78% |
+| **UTMOS (zs_ja 合成 30 wav)** | 1.43 | **2.014** | **+0.58** | 参照原音 2.60 | v7 (1.80) 超え |
+
+- 学習中の loss_spk (InfoNCE): 1.23 → 0.60 と一貫下降 — **SCL が初めて学習された**
+  (v7/v8 の cosine+no_grad 版は全期間ほぼ横ばいだった)。SECS の +0.06〜+0.17 は
+  この効果が直接現れたもの
+- UTMOS +0.58 は WavLM discriminator + disc fp32 の効果。v8 目標の「がびがび改善」
+  に対する定量的裏付け
+- kl/dur は全期間安定 (2.5-2.8 / 1.8)、発散なし、non-finite skip なし
+
+**成果物 (HF 同 repo)**: `checkpoints-v8.1/` (2ep ごと 20 個) +
+`onnx/v8.1-zs-ep39.onnx` (FP16 40.6MB) + `eval/eval_results_v8.1_ep39.json` +
+`eval/utmos_v8.1_ep39_zsja.tsv` + `logs/v8_1_train_final.log`。
+聴感サンプル: ローカル `piper-v8-dataset-backup/v81_listen_samples/`
+(v8 と同一 3 話者、v8 版 `v8_listen_samples/` と直接聴き比べ可能)。
+
+**セットアップで踏んだ罠 5 件** (hub 1.x pin / `--include` 複数指定 /
+essential tar 展開順 / .env CRLF → NCCL timeout 偽装 / smoke 前提 DL 漏れ) は
+メモリ `v8_zero_shot_scaling.md` に記録済み。
+
 ## 5. 成功基準と評価
 
 | 指標 | v7 baseline | v8 目標 |
