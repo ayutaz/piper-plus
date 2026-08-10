@@ -124,3 +124,54 @@ def test_stft_loss_3d_input():
     loss = loss_fn(x, y)
     assert loss.dim() == 0
     assert loss.item() > 0
+
+
+@pytest.mark.unit
+class TestFullBandSTFTLoss:
+    """v9: full-band 線形周波数 MR-STFT loss の配線 (--c-full-stft)。
+
+    mel L1 の高域粗さ (数百 Hz 幅 bin) を補う fullband 監督
+    (docs/design/zero-shot-noise-root-cause-pqmf.md §3 副次要因 1)。
+    """
+
+    def test_fullband_config_finite_and_positive(self):
+        """v9 デフォルト解像度 (512/1024/2048) で fullband [B,1,T] が通る。"""
+        from piper_train.vits.stft_loss import MultiResolutionSTFTLoss
+
+        loss_fn = MultiResolutionSTFTLoss(
+            fft_sizes=(512, 1024, 2048),
+            hop_sizes=(128, 256, 512),
+            win_sizes=(512, 1024, 2048),
+        )
+        x = torch.randn(2, 1, 16384)
+        y = torch.randn(2, 1, 16384)
+        loss = loss_fn(x, y)
+        assert torch.isfinite(loss)
+        assert loss.item() > 0
+
+    def test_identical_inputs_near_zero(self):
+        from piper_train.vits.stft_loss import MultiResolutionSTFTLoss
+
+        loss_fn = MultiResolutionSTFTLoss(
+            fft_sizes=(512, 1024, 2048),
+            hop_sizes=(128, 256, 512),
+            win_sizes=(512, 1024, 2048),
+        )
+        x = torch.randn(1, 1, 16384)
+        assert loss_fn(x, x).item() < 1e-5
+
+    def test_cli_advertises_c_full_stft(self):
+        from piper_train.__main__ import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(
+            ["--dataset-dir", "/tmp/x", "--batch-size", "1", "--c-full-stft", "0.5"]
+        )
+        assert args.c_full_stft == 0.5
+
+    def test_c_full_stft_default_off(self):
+        from piper_train.__main__ import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--dataset-dir", "/tmp/x", "--batch-size", "1"])
+        assert args.c_full_stft == 0.0

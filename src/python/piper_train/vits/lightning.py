@@ -33,6 +33,7 @@ from .mb_istft import PQMF
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from .models import (
     MultiPeriodDiscriminator,
+    MultiResolutionSpectrogramDiscriminator,
     SynthesizerTrn,
     WavLMDiscriminator,
 )
@@ -268,11 +269,25 @@ class VitsModel(pl.LightningModule):
         wavlm_model_name: str = "microsoft/wavlm-base-plus",
         c_wavlm: float = 0.5,
         wavlm_every_n_steps: int = 1,
+        # MRD: UnivNet 型 multi-resolution spectrogram discriminator (v9)。
+        # 22.05kHz ネイティブの線形周波数 magnitude STFT を判別 — mel loss の
+        # 高域粗さと WavLM の 16kHz 盲点が残す 5-11kHz の敵対的監督を埋める
+        # (zero-shot がびがびの副次要因 1、root-cause doc §3)
+        use_mrd: bool = False,
+        c_mrd: float = 1.0,
         # MB-iSTFT options
         c_sub_stft: float = 1.0,
         sub_stft_fft_sizes: tuple[int, ...] = (171, 384, 683),
         sub_stft_hop_sizes: tuple[int, ...] = (10, 30, 60),
         sub_stft_win_sizes: tuple[int, ...] = (60, 150, 300),
+        # Full-band linear-frequency MR-STFT loss (v9)。mel L1 は高域で bin が
+        # 数百 Hz 幅と粗く、multi-speaker 学習の高域平均化を許す。線形周波数の
+        # spectral convergence + log-mag L1 を fullband o vs y に直接かける
+        # (root-cause doc §3 副次要因 1 の regression 側対策。MRD が敵対的側)
+        c_full_stft: float = 0.0,
+        full_stft_fft_sizes: tuple[int, ...] = (512, 1024, 2048),
+        full_stft_hop_sizes: tuple[int, ...] = (128, 256, 512),
+        full_stft_win_sizes: tuple[int, ...] = (512, 1024, 2048),
         # Training loop optimization
         # D:G update ratio (D updates every step, G updates every d_update_interval steps)
         d_update_interval: int = 2,
@@ -424,6 +439,16 @@ class VitsModel(pl.LightningModule):
                 source_sample_rate=self.hparams.sample_rate,
             )
 
+        # MRD: multi-resolution spectrogram discriminator (optional, v9)
+        self.model_d_mrd = None
+        if self.hparams.use_mrd:
+            _LOGGER.info(
+                "Initializing MRD (multi-resolution spectrogram discriminator), "
+                "c_mrd=%s",
+                self.hparams.c_mrd,
+            )
+            self.model_d_mrd = MultiResolutionSpectrogramDiscriminator()
+
         # MB-iSTFT: PQMF for GT analysis + sub-band STFT loss
         self.pqmf = PQMF(subbands=4)
         # Share PQMF instance with the decoder to avoid duplicate buffers
@@ -432,6 +457,12 @@ class VitsModel(pl.LightningModule):
             fft_sizes=self.hparams.sub_stft_fft_sizes,
             hop_sizes=self.hparams.sub_stft_hop_sizes,
             win_sizes=self.hparams.sub_stft_win_sizes,
+        )
+        # Full-band MR-STFT loss (v9, active when c_full_stft > 0)
+        self.full_stft_loss = MultiResolutionSTFTLoss(
+            fft_sizes=self.hparams.full_stft_fft_sizes,
+            hop_sizes=self.hparams.full_stft_hop_sizes,
+            win_sizes=self.hparams.full_stft_win_sizes,
         )
 
         # Dataset splits
@@ -1007,6 +1038,8 @@ class VitsModel(pl.LightningModule):
             d_params = list(self.model_d.parameters())
             if self.model_d_wavlm is not None:
                 d_params = d_params + list(self.model_d_wavlm.parameters())
+            if self.model_d_mrd is not None:
+                d_params = d_params + list(self.model_d_mrd.parameters())
             torch.nn.utils.clip_grad_norm_(d_params, grad_clip)
         opt_d.step()
 
@@ -1219,6 +1252,14 @@ class VitsModel(pl.LightningModule):
                 loss_gen_all = loss_gen_all + loss_sub_stft
                 self._log_with_batch_info("loss_sub_stft", loss_sub_stft, batch)
 
+            # Full-band linear-frequency MR-STFT loss (v9, opt-in)
+            if self.hparams.c_full_stft > 0:
+                loss_full_stft = (
+                    self.full_stft_loss(y_hat, y) * self.hparams.c_full_stft
+                )
+                loss_gen_all = loss_gen_all + loss_full_stft
+                self._log_with_batch_info("loss_full_stft", loss_full_stft, batch)
+
             # --- Speaker Consistency Loss (SCL) ---
             # T6: SCL is explicitly wrapped in _scl_autocast_ctx (= autocast
             # enabled=False) so a future refactor cannot silently hoist SCL out
@@ -1377,6 +1418,19 @@ class VitsModel(pl.LightningModule):
                 self._log_with_batch_info("loss_gen_wavlm", loss_gen_wavlm, batch)
                 self._log_with_batch_info("loss_fm_wavlm", loss_fm_wavlm, batch)
 
+            # MRD generator loss (optional, v9 — full-band spectral supervision)
+            if self.model_d_mrd is not None:
+                with self._disc_autocast_ctx():
+                    _y_d_r_mrd, y_d_g_mrd, fmap_r_mrd, fmap_g_mrd = self.model_d_mrd(
+                        y, y_hat
+                    )
+                loss_fm_mrd = feature_loss(fmap_r_mrd, fmap_g_mrd)
+                loss_gen_mrd, _ = generator_loss(y_d_g_mrd)
+                loss_mrd = (loss_gen_mrd + loss_fm_mrd) * self.hparams.c_mrd
+                loss_gen_all = loss_gen_all + loss_mrd
+                self._log_with_batch_info("loss_gen_mrd", loss_gen_mrd, batch)
+                self._log_with_batch_info("loss_fm_mrd", loss_fm_mrd, batch)
+
             self._log_with_batch_info("loss_gen_all", loss_gen_all, batch)
             self._log_with_batch_info("loss_mel", loss_mel, batch)
             self._log_with_batch_info("loss_kl", loss_kl, batch)
@@ -1424,6 +1478,14 @@ class VitsModel(pl.LightningModule):
 
                 # Log WavLM discriminator loss
                 self._log_with_batch_info("loss_disc_wavlm", loss_disc_wavlm, batch)
+
+            # MRD discriminator loss (optional, v9)
+            if self.model_d_mrd is not None:
+                with self._disc_autocast_ctx():
+                    y_d_r_mrd, y_d_g_mrd, _, _ = self.model_d_mrd(y, y_hat_detached)
+                loss_disc_mrd, _, _ = discriminator_loss(y_d_r_mrd, y_d_g_mrd)
+                loss_disc_all = loss_disc_all + loss_disc_mrd * self.hparams.c_mrd
+                self._log_with_batch_info("loss_disc_mrd", loss_disc_mrd, batch)
 
             self._log_with_batch_info("loss_disc_all", loss_disc_all, batch)
 
@@ -1645,10 +1707,12 @@ class VitsModel(pl.LightningModule):
         # Collect generator parameters (exclude frozen DP params when freeze_dp)
         g_params = [p for p in self.model_g.parameters() if p.requires_grad]
 
-        # Collect discriminator parameters (including WavLM if enabled)
+        # Collect discriminator parameters (including WavLM / MRD if enabled)
         d_params = list(self.model_d.parameters())
         if self.model_d_wavlm is not None:
             d_params = d_params + list(self.model_d_wavlm.parameters())
+        if self.model_d_mrd is not None:
+            d_params = d_params + list(self.model_d_mrd.parameters())
 
         optimizers = [
             torch.optim.AdamW(
