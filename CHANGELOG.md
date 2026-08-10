@@ -62,6 +62,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Pre-commit gate `test-threshold-relaxation`**
+  ([`scripts/check_test_threshold_relaxation.py`](scripts/check_test_threshold_relaxation.py)):
+  blocks commits that weaken a numeric test threshold (lower `assert x > N`
+  floor, higher `< N` ceiling, wider `approx`/`atol` tolerances, fewer
+  `assertAlmostEqual` places) unless the assertion carries a non-empty
+  `# threshold-relaxed: <evidence>` justification. Born from the PQMF
+  incident where the acceptance criterion was relaxed from -90 dB to
+  ">5 dB", mislabeled "theoretical limit", and the aliasing bug shipped in
+  every MB-iSTFT model for 15 months (see
+  [docs/design/zero-shot-noise-root-cause-pqmf.md](docs/design/zero-shot-noise-root-cause-pqmf.md)).
+  `test_pqmf.py` now documents the buggy 5 dB floor honestly and pins the
+  canonical >=55 dB criterion as `xfail(strict=True)` so fixing the filter
+  bank forces promotion of the real gate. Tests:
+  `tests/scripts/test_check_test_threshold_relaxation.py`.
 - **Differentiable Speaker Consistency Loss (SCL)** in `piper_train`: a
   PyTorch port of the CAM++ speaker encoder
   (`piper_train/speaker_encoder/campplus_torch.py`, ported from 3D-Speaker,

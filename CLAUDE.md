@@ -276,6 +276,15 @@ CHANGELOG unreleased) を full-repo で実行 (~20-30 秒)。`SKIP=...` で comm
 > `.github/workflows/pre-commit.yml` で同じ hook を gate 化済み (install 忘れ
 > しても PR 時に検出)。
 
+> **テスト閾値を緩める時のルール (2026-08 PQMF 事故より):** テストの数値基準
+> (SNR / 許容誤差等) を実測に合わせて緩める前に、**参照実装または第一原理との
+> 比較を必須**とする。緩和には assert 行 (または直上) に
+> `# threshold-relaxed: <根拠>` を書くこと — pre-commit gate
+> `test-threshold-relaxation` (`scripts/check_test_threshold_relaxation.py`)
+> が根拠なしの緩和 diff を block する。「理論限界」「NN が補償する」という
+> 合理化で受け入れ基準 -90dB → 5dB に緩め、バグを 15 ヶ月制度化した事例:
+> [docs/design/zero-shot-noise-root-cause-pqmf.md §4](docs/design/zero-shot-noise-root-cause-pqmf.md)。
+
 > **ruff version pin:** `.pre-commit-config.yaml` の `rev: vX` と
 > `.github/workflows/python-lint.yml` / `.github/workflows/ci.yml` の
 > `(uv) pip install ruff==X`、加えて `pyproject.toml` の 3 dependency
@@ -553,6 +562,8 @@ cat test.jsonl | uv run python -m piper_train.infer_onnx --model <model.onnx> --
 | ゾンビ GPU プロセス | `nvidia-smi --query-compute-apps=pid,used_memory --format=csv` で残存 PID 確認、 `kill` で解放 |
 | ONNX 変換エラー | `CUDA_VISIBLE_DEVICES=""` で CPU モード |
 | HiFi-GAN ckpt resume 失敗 | v1.12.0 で `Generator` 削除。MB-iSTFT base から再 FT (`piper-plus-base/model.ckpt`)。詳細: マイグレーションガイド |
+| DDP で NCCL collective timeout (30 分) | **まず「1 rank だけ死んでいないか」を疑う** — rank の例外死は ALLREDUCE timeout に偽装される。単一 GPU + 同一 config で走らせ素の例外を出す。過去例: .env の CRLF 混入で rank0 の wandb login が例外死 (2026-08) |
+| zero-shot 合成が「がびがび」(5-9kHz ノイズ) | **既知の PQMF エイリアスバグ** (`mb_istft.py` の変調位相項欠落、v9 で修正予定)。single-speaker FT では decoder 補償により無症状。UTMOS/HNR はこのノイズに全盲 — 帯域スペクトル検査 (`/publish-model` フェーズ 3.5) で確認。詳細: [docs/design/zero-shot-noise-root-cause-pqmf.md](docs/design/zero-shot-noise-root-cause-pqmf.md) |
 
 ---
 

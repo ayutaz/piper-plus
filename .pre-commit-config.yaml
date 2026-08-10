@@ -869,6 +869,21 @@ repos:
         files: ^src/(python|python_run)/.*tests?/.*\.py$|^scripts/check_test_skip_reason\.py$
         pass_filenames: true
 
+      # Goalpost-moving guard: block commits that WEAKEN a numeric test
+      # threshold (assert x > N with smaller N, wider approx tolerances,
+      # fewer assertAlmostEqual places) unless the changed assertion carries
+      # a non-empty `# threshold-relaxed: <evidence>` justification. Born
+      # from the PQMF incident (PR #320): acceptance -90dB was relaxed to
+      # >5dB, mislabeled "theoretical limit", and the aliasing bug shipped
+      # in every MB-iSTFT model for 15 months. See
+      # docs/design/zero-shot-noise-root-cause-pqmf.md §4.
+      - id: test-threshold-relaxation
+        name: test threshold relaxation requires evidence
+        entry: uv run --no-sync python scripts/check_test_threshold_relaxation.py
+        language: system
+        files: (^|/)tests?/.*\.py$|(^|/)test_[^/]*\.py$|^scripts/check_test_threshold_relaxation\.py$
+        pass_filenames: false
+
       # gofmt drift catch. Go's tooling already enforces this in CI, but
       # catching it at commit time prevents the cycle-of-shame
       # local-clean / CI-fail pattern (PR #401 ruff parallel). `gofmt -l`
