@@ -1136,6 +1136,22 @@ vast.ai ホストの予告なき再起動で epoch 40 途中に中断したが�
 essential tar 展開順 / .env CRLF → NCCL timeout 偽装 / smoke 前提 DL 漏れ) は
 メモリ `v8_zero_shot_scaling.md` に記録済み。
 
+### 3.17 がびがびの根本原因特定 — PQMF 実装バグ (2026-08-10)
+
+v8.1 でも聴感の「がびがび」が残ったため、信号分析 + 6 方向 deep research +
+git 履歴調査で根本原因を特定した。**結論: `mb_istft.py` の PQMF がコサイン変調の
+位相項 `(-1)^k·π/4` を欠いておりエイリアスキャンセルが機能していない**
+(実測 roundtrip SNR: 帯域境界トーンで -1.6〜12dB、canonical 実装は 59-64dB)。
+帯域境界 5512/8268Hz が症状の 5-9kHz を正確にブラケットし、症状 7 件すべてと整合。
+single-speaker FT では decoder が話者専用のエイリアス事前補償を学習できるため
+ノイズが消え、zero-shot では補償が汎化せず残留する — 「課題が残り続けた」機序。
+
+プロセス上の原因: PR #320 (2026-05) で要求定義の受け入れ基準「PQMF 残存 -90dB」を、
+バグ実装の実測値 (7-8dB) を「理論限界」と誤認して「SNR > 5dB」に緩和した
+(goalpost moving)。詳細・検証実験・対策 (P0: PQMF canonical 修正 — ただし既存
+ckpt と非互換のため v9 再学習 or decoder 再適応 FT が必要) は
+[`zero-shot-noise-root-cause-pqmf.md`](zero-shot-noise-root-cause-pqmf.md) を参照。
+
 ## 5. 成功基準と評価
 
 | 指標 | v7 baseline | v8 目標 |
