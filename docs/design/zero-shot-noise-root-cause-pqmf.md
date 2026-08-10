@@ -144,6 +144,49 @@ moving)。git 履歴 (PR #320、commit `29415b9e`、2026-05-03) に全経緯が�
 4. noise_scale 0.0 / 1.0 の追加測定 (確率成分の完全排除)
 5. 合成音の無音区間フロア + 学習 corpus 別 5-9kHz 分布 (データ説の分離)
 
+## 5.5 検証実験の結果 (2026-08-10 実施) — 因果経路の確定
+
+§5 の実験 1 (subband ダンプ + バンク差し替え) と実音声 roundtrip を実施した。
+結果は PQMF バグの「効き方」を修正する:
+
+**実験 B (実音声 roundtrip、decoder 不介在):**
+
+| 入力 | piper PQMF roundtrip | canonical PQMF roundtrip |
+|---|---|---|
+| 参照原音 (実音声) | **9.6 dB SNR** | 62.8 dB |
+| FT 合成音 | **8.3 dB SNR** | 60.0 dB |
+
+壊れたバンクは実音声に対して単独で可聴レベル (SNR 8-10dB、帯域境界近傍 +5dB) の
+エイリアス歪みを注入する。聴感確認用 wav: scratchpad `pqmf_roundtrip/`。
+
+**実験 A (v8.1 ep39 の decoder subband ダンプ + synthesis バンク差し替え):**
+
+- decoder が出力した 4 subband を **canonical バンクで合成し直しても、合成音は
+  ほぼ不変** (帯域平均差 -2.2〜-0.2dB、5-9kHz 帯で -0.17dB)
+- → **合成音のノイズは synthesis 段のエイリアスキャンセル不全「そのもの」ではなく、
+  decoder の subband 信号自体に焼き付いている**
+- subband の spectral flatness は GT 実音声とほぼ同水準 (上位帯域は本物でも
+  0.91-0.96 とノイズ的) — flatness 単独では異常を判別できない
+
+**確定した因果経路 (§2 の機序の精密化):**
+
+1. 学習の sub-band STFT loss は `pqmf.analysis(y)` (壊れた analysis で分解した GT)
+   をターゲットにする (lightning.py の sub-band loss 配線)。壊れたバンクでは
+   `synthesis(analysis(y)) ≠ y` (SNR 8-10dB) なので、**decoder は「sub-band
+   ターゲットを完全再現しても fullband (mel/GAN) 目標と 8-10dB 分矛盾する」
+   という非整合な多目的最適化を課されている**
+2. single-speaker FT はこの矛盾の「その話者専用の妥協解」に到達できる (クリーン)。
+   multi-speaker zero-shot では妥協解が全話者平均となり、特に敵対的監督の無い
+   5.5kHz 以上でノイズ床として現れる (副次要因 1 と結合)
+3. よって **PQMF バグは「合成段のエイリアス」としてではなく「学習ターゲットの
+   汚染源 + 損失間矛盾の発生源」として効いている**
+
+**対策への含意 (重要):** 推論側でバンクだけ canonical に差し替えても無効
+(実験 A で実証)。修正は学習とセットでのみ意味を持つ — v9 では
+(a) PQMF canonical 修正 (損失間矛盾の解消) と (b) 高域の敵対的監督
+(MRD / full-band loss) の**両方**が必要。どちらか一方では不十分である
+可能性が高い (v8.1 の WavLM 追加だけでは 5-9kHz が不変だった事実とも整合)。
+
 ## 6. 対策
 
 ### 検証確定前でも安全に入れられるもの (no-regret)
