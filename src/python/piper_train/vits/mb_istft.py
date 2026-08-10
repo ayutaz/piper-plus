@@ -23,10 +23,27 @@ LRELU_SLOPE = 0.1
 
 
 class PQMF(nn.Module):
-    """Pseudo Quadrature Mirror Filterbank.
+    """Pseudo Quadrature Mirror Filterbank (canonical near-perfect design).
 
     Decomposes a fullband signal into *subbands* equal-width sub-band signals
     (analysis) and reconstructs the fullband signal from sub-bands (synthesis).
+
+    Coefficients follow the canonical cosine-modulated design (Nguyen 1994,
+    "Near-perfect-reconstruction pseudo-QMF banks"; reference implementation:
+    kan-bayashi/ParallelWaveGAN ``pqmf.py``). Round-trip reconstruction SNR is
+    ~60 dB with the default Kaiser prototype — alias components of adjacent
+    bands cancel in synthesis thanks to the ``±(-1)^k·π/4`` modulation phase.
+
+    HISTORY (2026-08, docs/design/zero-shot-noise-root-cause-pqmf.md): the
+    original implementation omitted the phase term, centred the modulation at
+    ``subbands/2`` instead of ``taps/2``, and decimated band *k* at offset *k*
+    (grouped-eye updown filter). Alias cancellation was broken (round-trip
+    SNR 7-8 dB; band-edge tones down to -1.6 dB) and the resulting
+    sub-band-loss target contamination is the root cause of the audible
+    zero-shot "gabi-gabi" noise. All buffer SHAPES are unchanged, so legacy
+    checkpoints restore their original (buggy) coefficients via state_dict
+    and keep their trained behaviour; only newly-constructed banks get the
+    canonical coefficients.
 
     All filter tensors are registered as buffers so that they follow the
     module's device automatically (no ``.cuda()`` hard-coding).
@@ -36,7 +53,7 @@ class PQMF(nn.Module):
         self,
         subbands: int = 4,
         taps: int = 62,
-        cutoff_ratio: float = 0.15,
+        cutoff_ratio: float = 0.142,
         beta: float = 9.0,
     ):
         super().__init__()
@@ -54,20 +71,19 @@ class PQMF(nn.Module):
         window = np.kaiser(filter_length, beta)
         prototype = sinc * window
 
-        # --- Cosine-modulated analysis filter bank ---
-        # h_k[n] = 2 * prototype[n] * cos((2k+1)*pi/(2M) * (n - M/2))
-        # where M = subbands, n in [0, filter_length-1]
+        # --- Cosine-modulated analysis / synthesis filter banks ---
+        # h_k[n] = 2h[n]·cos((2k+1)·π/(2M)·(n − taps/2) + (−1)^k·π/4)
+        # g_k[n] = 2h[n]·cos((2k+1)·π/(2M)·(n − taps/2) − (−1)^k·π/4)
+        # The ±(−1)^k·π/4 phase pair is what makes adjacent-band aliases
+        # cancel on reconstruction — do NOT remove it.
+        n = np.arange(filter_length, dtype=np.float64)
         analysis_filter = np.zeros((subbands, 1, filter_length), dtype=np.float64)
+        synthesis_filter = np.zeros((subbands, 1, filter_length), dtype=np.float64)
         for k in range(subbands):
-            for n in range(filter_length):
-                analysis_filter[k, 0, n] = (
-                    2.0
-                    * prototype[n]
-                    * np.cos((2 * k + 1) * np.pi / (2 * subbands) * (n - subbands / 2))
-                )
-
-        # Synthesis filter: time-reversed analysis filter
-        synthesis_filter = analysis_filter[:, :, ::-1].copy()
+            arg = (2 * k + 1) * np.pi / (2 * subbands) * (n - taps / 2)
+            phase = (-1) ** k * np.pi / 4
+            analysis_filter[k, 0] = 2.0 * prototype * np.cos(arg + phase)
+            synthesis_filter[k, 0] = 2.0 * prototype * np.cos(arg - phase)
 
         # Register as buffers (float32)
         self.register_buffer(
@@ -77,8 +93,12 @@ class PQMF(nn.Module):
             "synthesis_filter", torch.from_numpy(synthesis_filter).float()
         )
 
-        # Up/down-sampling identity filter: eye(subbands) reshaped for conv1d
-        updown = np.eye(subbands, dtype=np.float32).reshape(subbands, 1, subbands)
+        # Up/down-sampling filter: every band decimates/interpolates at the
+        # SAME polyphase offset (j=0). The previous grouped-eye construction
+        # (band k sampled at offset k) skewed the bands against each other
+        # and was part of the alias-cancellation breakage.
+        updown = np.zeros((subbands, 1, subbands), dtype=np.float32)
+        updown[:, 0, 0] = 1.0
         self.register_buffer("updown_filter", torch.from_numpy(updown))
 
         # Padding

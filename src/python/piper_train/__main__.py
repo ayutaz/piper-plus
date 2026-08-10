@@ -281,6 +281,32 @@ def create_parser():
         help="Disable WavLM discriminator (faster training, slightly lower quality)",
     )
     parser.add_argument(
+        "--use-mrd",
+        action="store_true",
+        default=False,
+        help="Enable MRD (UnivNet-style multi-resolution spectrogram "
+        "discriminator) at native sample rate. Adds adversarial supervision "
+        "of 5-11 kHz spectral fine structure that mel loss (coarse "
+        "high-frequency bins) and the 16 kHz WavLM discriminator cannot "
+        "see — the band where multi-speaker zero-shot noise lives "
+        "(docs/design/zero-shot-noise-root-cause-pqmf.md).",
+    )
+    parser.add_argument(
+        "--c-mrd",
+        type=float,
+        default=1.0,
+        help="MRD loss weight (default: 1.0, used with --use-mrd)",
+    )
+    parser.add_argument(
+        "--c-full-stft",
+        type=float,
+        default=0.0,
+        help="Full-band linear-frequency multi-resolution STFT loss weight "
+        "(default: 0 = disabled). Supervises high-frequency spectral "
+        "structure that mel L1 cannot resolve (coarse high-frequency mel "
+        "bins). Complements --use-mrd (regression vs adversarial).",
+    )
+    parser.add_argument(
         "--freeze-dp",
         action="store_true",
         default=False,
