@@ -60,8 +60,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   local verification. Tests:
   `tests/test_infer_onnx_cli.py::TestSpeakerSourceAliasMerge`.
 
+### Fixed
+
+- **PQMF alias cancellation (zero-shot v9)**: the PQMF in
+  [`mb_istft.py`](src/python/piper_train/vits/mb_istft.py) was missing the
+  canonical `±(-1)^k·π/4` modulation phase term, centred the modulation at
+  `subbands/2` instead of `taps/2`, and decimated band *k* at polyphase
+  offset *k* — alias cancellation was broken (round-trip SNR 7-8 dB;
+  band-edge tones down to -1.6 dB vs ~60 dB for the canonical design).
+  The contaminated sub-band-loss target this produced is the root cause of
+  the audible zero-shot "gabi-gabi" noise (full analysis:
+  [docs/design/zero-shot-noise-root-cause-pqmf.md](docs/design/zero-shot-noise-root-cause-pqmf.md)).
+  Coefficients now follow the canonical design (round-trip 64 dB, band-edge
+  59 dB). **Buffer shapes are unchanged**, so legacy checkpoints restore
+  their original coefficients via state_dict and keep their trained
+  behaviour; only newly-constructed banks are fixed. `test_pqmf.py` gates
+  the canonical criterion (>=55 dB) and pins legacy-checkpoint
+  compatibility.
+
 ### Added
 
+- **MRD (multi-resolution spectrogram discriminator)** for zero-shot v9
+  (`--use-mrd` / `--c-mrd`): UnivNet-style discriminator over 3 STFT
+  resolutions at native sample rate. Existing discriminators left 5-11 kHz
+  spectral fine structure without adversarial gradient (MPD/MSD are
+  waveform-domain, WavLM resamples to 16 kHz) — the band where
+  multi-speaker zero-shot noise lives. STFT computed in fp32 under any
+  autocast (bf16 cuFFT incident hardening). Tests:
+  `tests/test_mrd_discriminator.py`.
+- **Full-band linear-frequency MR-STFT loss** (`--c-full-stft`, default 0):
+  spectral convergence + log-magnitude L1 over fft 512/1024/2048 on the
+  full-band output, complementing mel L1 whose high-frequency bins are too
+  coarse to constrain 5-11 kHz structure.
+- **`piper_train.tools.measure_band_noise`** (voiced high-band excess, dB):
+  purpose-built metric for the zero-shot high-band noise that UTMOS / HNR /
+  CPPS et al. cannot detect. Validated on real A/B data: single-speaker FT
+  -15.5 dB vs garbled zero-shot -9 dB (6 dB separation). For same-text /
+  same-speaker A/B comparison in v9 smoke/eval. Tests:
+  `tests/test_measure_band_noise.py`.
 - **Pre-commit gate `test-threshold-relaxation`**
   ([`scripts/check_test_threshold_relaxation.py`](scripts/check_test_threshold_relaxation.py)):
   blocks commits that weaken a numeric test threshold (lower `assert x > N`

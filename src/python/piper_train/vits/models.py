@@ -2,7 +2,7 @@ import math
 from typing import NamedTuple
 
 import torch
-from torch import nn
+from torch import autocast, nn
 from torch.nn import Conv1d, Conv2d, functional as F
 from torch.nn.utils import spectral_norm, weight_norm
 
@@ -506,6 +506,108 @@ class MultiPeriodDiscriminator(torch.nn.Module):
             fmap_rs.append([f[:b] for f in fmap])
             fmap_gs.append([f[b:] for f in fmap])
 
+        return y_d_rs, y_d_gs, fmap_rs, fmap_gs
+
+
+class DiscriminatorR(torch.nn.Module):
+    """Single-resolution linear-frequency spectrogram discriminator.
+
+    One branch of the UnivNet-style MRD. Operates on the magnitude STFT
+    ([B, 1, F, T]) at native sample rate, so it supervises the FULL band
+    up to Nyquist — unlike mel-based losses (coarse high-frequency bins)
+    and the 16 kHz WavLM discriminator (blind above 8 kHz). See
+    docs/design/zero-shot-noise-root-cause-pqmf.md §3 (副次要因 1).
+    """
+
+    def __init__(self, resolution: tuple, use_spectral_norm: bool = False):
+        super().__init__()
+        self.resolution = resolution  # (n_fft, hop_length, win_length)
+        # 旧 weight_norm API に合わせる (DiscriminatorP/S と同じ流儀 —
+        # remap_weight_norm_keys が旧形式キーを前提とするため混在させない)
+        norm_f = weight_norm if not use_spectral_norm else spectral_norm
+        self.convs = nn.ModuleList(
+            [
+                norm_f(nn.Conv2d(1, 32, (3, 9), padding=(1, 4))),
+                norm_f(nn.Conv2d(32, 32, (3, 9), stride=(1, 2), padding=(1, 4))),
+                norm_f(nn.Conv2d(32, 32, (3, 9), stride=(1, 2), padding=(1, 4))),
+                norm_f(nn.Conv2d(32, 32, (3, 9), stride=(1, 2), padding=(1, 4))),
+                norm_f(nn.Conv2d(32, 32, (3, 3), padding=(1, 1))),
+            ]
+        )
+        self.conv_post = norm_f(nn.Conv2d(32, 1, (3, 3), padding=(1, 1)))
+        self.register_buffer("window", torch.hann_window(resolution[2]))
+        self.LRELU_SLOPE = 0.1
+
+    def spectrogram(self, x: torch.Tensor) -> torch.Tensor:
+        """Waveform [B, 1, T] -> magnitude STFT [B, F, frames].
+
+        Computed in fp32 regardless of autocast: bf16 cuFFT is both
+        numerically poor and was implicated in a real training incident
+        (bf16 cuFFT bug, commit 3dcabd57). The conv stack that follows
+        still honours the ambient autocast context.
+        """
+        n_fft, hop, win = self.resolution
+        with autocast(x.device.type, enabled=False):
+            x = x.float().squeeze(1)
+            pad = (n_fft - hop) // 2
+            x = F.pad(x.unsqueeze(1), (pad, pad), mode="reflect").squeeze(1)
+            spec = torch.stft(
+                x,
+                n_fft=n_fft,
+                hop_length=hop,
+                win_length=win,
+                window=self.window.float(),
+                center=False,
+                return_complex=True,
+            )
+            return spec.abs()
+
+    def forward(self, x: torch.Tensor):
+        fmap = []
+        x = self.spectrogram(x).unsqueeze(1)  # [B, 1, F, T]
+        for conv in self.convs:
+            x = F.leaky_relu(conv(x), self.LRELU_SLOPE)
+            fmap.append(x)
+        x = self.conv_post(x)
+        fmap.append(x)
+        return torch.flatten(x, 1, -1), fmap
+
+
+class MultiResolutionSpectrogramDiscriminator(torch.nn.Module):
+    """UnivNet-style multi-resolution spectrogram discriminator (MRD).
+
+    Adversarial supervision of the full linear-frequency band at native
+    sample rate. Added for zero-shot v9: MPD/MSD operate on raw waveforms
+    and the WavLM discriminator resamples to 16 kHz, leaving 5-11 kHz
+    spectral fine structure without any adversarial gradient — the band
+    where multi-speaker over-smoothing noise (がびがび) lives.
+
+    Interface matches MultiPeriodDiscriminator:
+    ``forward(y, y_hat) -> (y_d_rs, y_d_gs, fmap_rs, fmap_gs)``.
+    """
+
+    def __init__(
+        self,
+        resolutions: tuple = ((1024, 120, 600), (2048, 240, 1200), (512, 50, 240)),
+        use_spectral_norm: bool = False,
+    ):
+        super().__init__()
+        self.discriminators = nn.ModuleList(
+            [DiscriminatorR(r, use_spectral_norm) for r in resolutions]
+        )
+
+    def forward(self, y, y_hat):
+        y_d_rs, y_d_gs, fmap_rs, fmap_gs = [], [], [], []
+        # Batch-concat: same equivalence argument as MultiPeriodDiscriminator
+        # (stft/conv/leaky_relu/pad are all batch-independent).
+        b = y.shape[0]
+        x = torch.cat([y, y_hat], dim=0)
+        for d in self.discriminators:
+            y_d, fmap = d(x)
+            y_d_rs.append(y_d[:b])
+            y_d_gs.append(y_d[b:])
+            fmap_rs.append([f[:b] for f in fmap])
+            fmap_gs.append([f[b:] for f in fmap])
         return y_d_rs, y_d_gs, fmap_rs, fmap_gs
 
 

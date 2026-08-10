@@ -19,50 +19,50 @@ def _roundtrip_snr_db(pqmf, x: "torch.Tensor") -> float:
     return float(snr)
 
 
-@pytest.mark.unit
-def test_pqmf_roundtrip_reconstruction():
-    """PQMF round-trip SNR floor — CURRENTLY PINNED TO A KNOWN-BUGGY VALUE.
+def _legacy_buggy_coefficients(subbands=4, taps=62, cutoff_ratio=0.15, beta=9.0):
+    """Reproduce the pre-2026-08 (buggy) PQMF coefficients.
 
-    HISTORICAL WARNING (do not repeat): this test originally claimed that
-    "~7-8 dB is the theoretical limit of a near-perfect-reconstruction
-    filter bank and the neural network compensates the residual aliasing".
-    Both claims were false. The implementation is missing the ``(-1)^k·π/4``
-    phase term of the canonical cosine modulation, so alias cancellation
-    does not work; a correct PQMF with the same Kaiser prototype measures
-    ~60 dB (band-edge tones ~59 dB vs -1.6 dB here). The learned "NN
-    compensation" only generalises for single-speaker fine-tunes and is the
-    root cause of the audible zero-shot aliasing noise. Full analysis:
-    docs/design/zero-shot-noise-root-cause-pqmf.md.
-
-    The 5 dB floor is kept ONLY because every shipped MB-iSTFT checkpoint
-    is trained against the buggy bank (fixing the bank breaks them). When
-    the bank is fixed (v9), delete this test and promote
-    ``test_pqmf_reconstruction_matches_canonical`` below to the gate.
+    Kept as a test fixture ONLY: every MB-iSTFT checkpoint shipped before the
+    v9 fix was trained against this bank and restores these values via
+    state_dict. The bugs (missing ``(-1)^k·π/4`` phase, modulation centred at
+    ``subbands/2``, grouped-eye updown skew) are documented in
+    docs/design/zero-shot-noise-root-cause-pqmf.md. Do NOT use for new banks.
     """
-    from piper_train.vits.mb_istft import PQMF
+    import numpy as np
 
-    pqmf = PQMF(subbands=4)
-    x = torch.randn(1, 1, 8192)
-    snr_db = _roundtrip_snr_db(pqmf, x)
-    assert snr_db > 5, f"Reconstruction SNR {snr_db:.1f} dB < 5 dB"
+    filter_length = taps + 1
+    omega_c = np.pi * cutoff_ratio
+    t = np.arange(-(taps // 2), taps // 2 + 1, dtype=np.float64)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        sinc = np.where(t == 0, omega_c / np.pi, np.sin(omega_c * t) / (np.pi * t))
+    prototype = sinc * np.kaiser(filter_length, beta)
+    analysis = np.zeros((subbands, 1, filter_length))
+    for k in range(subbands):
+        for n in range(filter_length):
+            analysis[k, 0, n] = (
+                2.0 * prototype[n]
+                * np.cos((2 * k + 1) * np.pi / (2 * subbands) * (n - subbands / 2))
+            )
+    synthesis = analysis[:, :, ::-1].copy()
+    updown = np.eye(subbands, dtype=np.float32).reshape(subbands, 1, subbands)
+    return (
+        torch.from_numpy(analysis).float(),
+        torch.from_numpy(synthesis).float(),
+        torch.from_numpy(updown),
+    )
 
 
 @pytest.mark.unit
-@pytest.mark.xfail(
-    strict=True,
-    reason="Known PQMF aliasing bug: missing (-1)^k*pi/4 modulation phase term "
-    "(docs/design/zero-shot-noise-root-cause-pqmf.md). A canonical "
-    "cosine-modulated PQMF reaches ~60 dB round-trip SNR with this prototype. "
-    "strict=True: when the bank is fixed this test XPASSes as FAILURE, forcing "
-    "removal of the xfail marker and promotion to the real gate.",
-)
 def test_pqmf_reconstruction_matches_canonical():
     """Near-perfect reconstruction: round-trip SNR must be >= 55 dB.
 
     This is the criterion the original requirements specified (residual
-    aliasing at -90 dB, later relaxed — see root-cause doc §4). Band-edge
-    tones are the sharpest probe: harmonics crossing 2756/5512/8268 Hz are
-    exactly where the missing phase term leaks mirror images.
+    aliasing at -90 dB — later wrongly relaxed to 5 dB by mistaking the buggy
+    implementation's 7-8 dB for a "theoretical limit"; see root-cause doc §4
+    and the ``test-threshold-relaxation`` pre-commit gate born from it).
+    Band-edge tones are the sharpest probe: harmonics crossing
+    2756/5512/8268 Hz are exactly where a broken phase term leaks mirror
+    images.
     """
     import math
 
@@ -79,6 +79,35 @@ def test_pqmf_reconstruction_matches_canonical():
         tone = torch.sin(2 * math.pi * freq * t).reshape(1, 1, -1)
         snr = _roundtrip_snr_db(pqmf, tone)
         assert snr >= 50, f"band-edge tone {freq:.0f} Hz round-trip {snr:.1f} dB < 50 dB"
+
+
+@pytest.mark.unit
+def test_pqmf_legacy_checkpoint_coefficients_restore():
+    """Legacy (pre-fix) checkpoints must keep their trained bank behaviour.
+
+    Buffer shapes are intentionally unchanged by the v9 fix, so loading an
+    old checkpoint's state_dict restores the old (buggy) coefficients and the
+    model behaves exactly as trained. This pins that compatibility contract:
+    (1) legacy buffers load without shape errors, (2) the restored bank
+    reproduces the legacy round-trip characteristic (~7-8 dB — NOT the
+    canonical ~60 dB), proving the coefficients came from the checkpoint
+    rather than the new constructor.
+    """
+    from piper_train.vits.mb_istft import PQMF
+
+    pqmf = PQMF(subbands=4)
+    ana, syn, ud = _legacy_buggy_coefficients()
+    pqmf.load_state_dict(
+        {"analysis_filter": ana, "synthesis_filter": syn, "updown_filter": ud}
+    )
+
+    torch.manual_seed(0)
+    x = torch.randn(1, 1, 8192)
+    snr = _roundtrip_snr_db(pqmf, x)
+    assert 4 < snr < 20, (
+        f"legacy coefficients should reproduce the legacy ~7-8 dB round-trip, "
+        f"got {snr:.1f} dB (restore from checkpoint is broken if this is ~60 dB)"
+    )
 
 
 @pytest.mark.unit
