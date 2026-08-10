@@ -94,7 +94,7 @@ def test_pqmf_legacy_checkpoint_coefficients_restore():
     canonical ~60 dB), proving the coefficients came from the checkpoint
     rather than the new constructor.
     """
-    from piper_train.vits.mb_istft import PQMF
+    import numpy as np
 
     pqmf = PQMF(subbands=4)
     ana, syn, ud = _legacy_buggy_coefficients()
@@ -112,21 +112,16 @@ def test_pqmf_legacy_checkpoint_coefficients_restore():
 
 
 @pytest.mark.unit
-@pytest.mark.xfail(
-    strict=True,
-    reason="Known PQMF aliasing bug: missing (-1)^k*pi/4 modulation phase term "
-    "(docs/design/zero-shot-noise-root-cause-pqmf.md). A canonical "
-    "cosine-modulated PQMF reaches ~60 dB round-trip SNR with this prototype. "
-    "strict=True: when the bank is fixed this test XPASSes as FAILURE, forcing "
-    "removal of the xfail marker and promotion to the real gate.",
-)
 def test_pqmf_reconstruction_matches_canonical():
     """Near-perfect reconstruction: round-trip SNR must be >= 55 dB.
 
     This is the criterion the original requirements specified (residual
-    aliasing at -90 dB, later relaxed — see root-cause doc §4). Band-edge
-    tones are the sharpest probe: harmonics crossing 2756/5512/8268 Hz are
-    exactly where the missing phase term leaks mirror images.
+    aliasing at -90 dB — later wrongly relaxed to 5 dB by mistaking the buggy
+    implementation's 7-8 dB for a "theoretical limit"; see root-cause doc §4
+    and the ``test-threshold-relaxation`` pre-commit gate born from it).
+    Band-edge tones are the sharpest probe: harmonics crossing
+    2756/5512/8268 Hz are exactly where a broken phase term leaks mirror
+    images.
     """
     import math
 
@@ -143,6 +138,35 @@ def test_pqmf_reconstruction_matches_canonical():
         tone = torch.sin(2 * math.pi * freq * t).reshape(1, 1, -1)
         snr = _roundtrip_snr_db(pqmf, tone)
         assert snr >= 50, f"band-edge tone {freq:.0f} Hz round-trip {snr:.1f} dB < 50 dB"
+
+
+@pytest.mark.unit
+def test_pqmf_legacy_checkpoint_coefficients_restore():
+    """Legacy (pre-fix) checkpoints must keep their trained bank behaviour.
+
+    Buffer shapes are intentionally unchanged by the v9 fix, so loading an
+    old checkpoint's state_dict restores the old (buggy) coefficients and the
+    model behaves exactly as trained. This pins that compatibility contract:
+    (1) legacy buffers load without shape errors, (2) the restored bank
+    reproduces the legacy round-trip characteristic (~7-8 dB — NOT the
+    canonical ~60 dB), proving the coefficients came from the checkpoint
+    rather than the new constructor.
+    """
+    from piper_train.vits.mb_istft import PQMF
+
+    pqmf = PQMF(subbands=4)
+    ana, syn, ud = _legacy_buggy_coefficients()
+    pqmf.load_state_dict(
+        {"analysis_filter": ana, "synthesis_filter": syn, "updown_filter": ud}
+    )
+
+    torch.manual_seed(0)
+    x = torch.randn(1, 1, 8192)
+    snr = _roundtrip_snr_db(pqmf, x)
+    assert 4 < snr < 20, (
+        f"legacy coefficients should reproduce the legacy ~7-8 dB round-trip, "
+        f"got {snr:.1f} dB (restore from checkpoint is broken if this is ~60 dB)"
+    )
 
 
 @pytest.mark.unit

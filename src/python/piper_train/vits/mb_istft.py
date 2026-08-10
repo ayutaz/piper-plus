@@ -34,9 +34,7 @@ class PQMF(nn.Module):
     ~60 dB with the default Kaiser prototype — alias components of adjacent
     bands cancel in synthesis thanks to the ``±(-1)^k·π/4`` modulation phase.
 
-    HISTORY (2026-08; root-cause analysis in docs/design/
-    zero-shot-noise-root-cause-pqmf.md on the feat/zero-shot-v8-dataset-scaling
-    research branch): the
+    HISTORY (2026-08, docs/design/zero-shot-noise-root-cause-pqmf.md): the
     original implementation omitted the phase term, centred the modulation at
     ``subbands/2`` instead of ``taps/2``, and decimated band *k* at offset *k*
     (grouped-eye updown filter). Alias cancellation was broken (round-trip
