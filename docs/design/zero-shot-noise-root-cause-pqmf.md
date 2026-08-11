@@ -187,6 +187,37 @@ moving)。git 履歴 (PR #320、commit `29415b9e`、2026-05-03) に全経緯が�
 (MRD / full-band loss) の**両方**が必要。どちらか一方では不十分である
 可能性が高い (v8.1 の WavLM 追加だけでは 5-9kHz が不変だった事実とも整合)。
 
+## 5.6 P1 検証結果と v9 構成の確定 (2026-08-11)
+
+**再適応 FT (分岐 A) は不成立と実証**: v8.1 ep39 から修正バンク (--reinit-pqmf) +
+MRD + full-band loss で、decoder-only 2ep → がびがび指標 -10.63→-10.52 dB (不変)、
+全パラメータ 8ep → -10.39 dB (不変)。120ep 分の「壊れたバンク + 汚染ターゲット +
+データノイズ床」の平衡は FT では覆らない。→ **from scratch (分岐 B) 確定**。
+
+**データ側の問題も実測で確定** (353,521 発話の全量帯域調査):
+
+| corpus | fmax99 中央値 | 所見 |
+|---|---|---|
+| moe-plus (ja) | 7,666 Hz | スタジオ品質 |
+| libritts/cml/aishell | 4,119〜6,117 Hz | 普通 |
+| **zeroth (ko)** | **3,043 Hz** | 強ローパス録音 — discriminator の「本物」定義を汚す最大源 |
+
+MRD が生成ノイズを本物と区別できなかった (loss_gen_mrd 0.76) のは、訓練データの
+高域自体がノイジー/欠損しているため。GAN はデータ品質の天井を超えられない。
+
+**データゲート (案 Z、2026-08-11 ユーザー承認)**: Zeroth 全除外 + 全 corpus で
+`hi_ratio (5.5-9kHz エネルギー比) >= 0.0005 かつ fmax999 >= 6000Hz`。
+結果: 353,521 → **300,799 utts (85%) / 3,743 話者**。ja はほぼ無傷 (99%)、
+ko は 356 utts に縮小 (v10 で高品質データ調達後に復活、lid=7 枠は温存)。
+cache は再生成不要 (jsonl の行除外のみ)。ゲート済み jsonl + 全量 metrics は
+HF `v9-data/` に退避。
+
+**v9 本走構成 (launch 済み)**: from scratch 50ep、canonical PQMF + MRD (c=1.0) +
+full-band MR-STFT (c=0.5) + InfoNCE SCL + segment 16384 + WavLM (every 2) +
+disc fp32 + KL annealing 10ep。見込み ~42h / ~$170。
+合格ライン: がびがび指標 -13dB 以下 (FT -15.5 に接近) + SECS が v8.1 (0.712) から
+大幅劣化しない。10ep 時点で中間測定し、傾き無しなら早期見直し。
+
 ## 6. 対策
 
 ### 検証確定前でも安全に入れられるもの (no-regret)
