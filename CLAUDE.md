@@ -191,7 +191,7 @@ echo "PID: $!"
 > - **がびがびの根本原因** (PQMF 変調位相項欠落 → 学習ターゲット汚染 + データ高域ノイズ床): [`docs/design/zero-shot-noise-root-cause-pqmf.md`](docs/design/zero-shot-noise-root-cause-pqmf.md) が canonical (プロセス考古学 §4: 受け入れ基準 -90dB→5dB の goalpost moving が 15 ヶ月バグを制度化 → pre-commit gate `test-threshold-relaxation` で再発防止)
 > - **v9 データ**: 案 Z ゲート (Zeroth 全除外 + hi_ratio/fmax999) で 6 言語 300,443 utts / ~3.7k spk。**ko は除外** (Zeroth が fmax 中央値 3.0kHz の強ローパス + language-balanced sampling は最小言語が epoch サイズを決めるため 356 utts では学習不能) — v10 で高品質 ko データ調達後に復活予定
 > - **残課題**: zs_ja SECS 0.652 (v8.1 0.712 から -0.06) / 韻律 (強弱) の平板さ (v8 系から持ち越し、noise_scale 引き上げ検証中 + v10 で本格対応)
-> - **OOD 参照 zero-shot の実力 (2026-08-12 実測、plan doc §3.19)**: つくよみ参照で cross-utt SECS 0.73 (ceiling 0.888 / ja 女性 floor ~0.7 すれすれ) = 聴感「似ない」。EMA/FP16/ONNX export は 4-way A/B で無罪確定。**SECS は cross-utterance でしか測らない** (same-utt は SCL Goodhart で膨張、0.775 と誤報した事例あり)。epoch 軌跡は ep35 で飽和 (0.672→0.735→0.725) — **素の追加学習では回収見込み薄、継続するなら c_spk/c_dino リバランス込み**。特定話者を確実に似せる用途は FT が正道
+> - **OOD 参照 zero-shot の実力 (2026-08-12 実測)**: つくよみ参照で cross-utt SECS 0.73 (ceiling 0.888 / ja 女性 floor ~0.7 すれすれ) = 聴感「似ない」。EMA/FP16/ONNX export は 4-way A/B で無罪確定。**SECS は cross-utterance でしか測らない** (same-utt は SCL Goodhart で膨張、0.775 と誤報した事例あり)。epoch 軌跡は ep35 で飽和 (0.672→0.735→0.725) — **素の追加学習では回収見込み薄、継続するなら c_spk/c_dino リバランス込み**。特定話者を確実に似せる用途は FT が正道。canonical: [docs/design/zero-shot-speaker-similarity-root-cause.md](docs/design/zero-shot-speaker-similarity-root-cause.md)
 > - 成果物 (HF `ayousanz/piper-plus-zero-shot-multi-7lang-v8`): `checkpoints-v9/` + `onnx/v9-zs-ep49.onnx` + `v9-data/` (ゲート済み jsonl + 帯域 metrics) + 各評価 JSON。聴感サンプル: ローカル `piper-v8-dataset-backup/v9_listen_samples/`
 
 ### (履歴) v8 準備時点の記録 (2026-08-02)
