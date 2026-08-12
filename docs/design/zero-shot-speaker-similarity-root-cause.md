@@ -1,7 +1,8 @@
 # Zero-Shot 話者類似度の根本原因調査 (v9、2026-08-12/13)
 
-> **Status**: 調査完了 (層の特定 + 機構の絞り込みまで)。対策は未着手 — deep research
-> の結果を踏まえて v10 / 継続学習で対応する。
+> **Status**: 調査完了 (層の特定 + 機構の絞り込みまで)。deep research 完了 —
+> 機構の結論・介入候補・ロードマップは
+> [`zero-shot-v10-similarity-research.md`](zero-shot-v10-similarity-research.md) 参照。
 > がびがび (ノイズ) 側の canonical は
 > [`zero-shot-noise-root-cause-pqmf.md`](zero-shot-noise-root-cause-pqmf.md)、
 > 時系列の文脈は
@@ -99,6 +100,10 @@ raw ckpt、同一条件でのつくよみ cross-utt SECS:
 
 ep23→35 で +0.06 伸びた後、**最後の 15 epoch は横ばい〜微減**。v8.1 の 0.777 に
 届かないまま飽和 → 同一 config で epoch を積んでも回収の見込みは薄い。
+
+> **交絡の注記 (deep research C2 の指摘)**: この飽和は cosine LR が終盤 1e-5 に
+> 枯渇する時期と一致しており、「学習不足説の棄却」は LR 一定条件下でしか成立
+> しない。fresh LR での warm restart (3-arm 診断の control arm) で決着させる。
 
 ### 機構仮説 (deep research で検証予定)
 
