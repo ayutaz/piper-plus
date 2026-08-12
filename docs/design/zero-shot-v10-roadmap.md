@@ -22,20 +22,23 @@
 
 ### A-1. 診断・評価基盤
 
-- [ ] **a. 第 2 speaker encoder**: SpeechBrain `spkrec-ecapa-voxceleb` (Apache-2.0)
+- [x] **a. 第 2 speaker encoder**: SpeechBrain `spkrec-ecapa-voxceleb` (Apache-2.0)
       を ONNX 化して SECS 並走 (Goodhart 検知器)。CAM++ と cosine スケール非互換の
       ため per-encoder ceiling/floor 正規化転写率で比較。repo 同梱 ECAPA は学習済み
       重みが存在しない (manifest pending) ため使わない
-- [ ] **b. ckpt 診断スクリプト** (`piper_train.tools.diagnose_zs_ckpt`):
+      — exporter 実装済み (`piper_train.tools.export_ecapa_onnx`、前処理差を
+      graph 内吸収 + cosine >0.999 自己検証)。instance での実 export は実行時
+- [x] **b. ckpt 診断スクリプト** (`piper_train.tools.diagnose_zs_ckpt`):
       spk_proj 出力ノルム vs emb_lang ノルム (lang 支配の実測)、FiLM 層の
       identity からの乖離 (「FiLM がどれだけ起きたか」)、2 つの embedding 間の
-      FiLM 変調差 (話者に対する感度)
-- [ ] **c. per-loss 勾配ノルム probe** (`--grad-probe-every N`、opt-in):
+      FiLM 変調差 (話者に対する感度) — 実装済み (テスト 9 件)
+- [x] **c. per-loss 勾配ノルム probe** (`--grad-probe-every N`、opt-in):
       SCL / MRD / full-band STFT / mel 等の勾配ノルムを共有 probe パラメータ上で
-      比較 — 「希釈」仮説の直接測定
-- [ ] **d. OOD holdout 常設**: つくよみ 5 発話 (取得済み、instance
+      比較 — 「希釈」仮説の直接測定。`grad_probe/ratio_spk_to_spectral` を含む
+      (実装済み、テスト 10 件、default off でオーバーヘッドゼロ)
+- [x] **d. OOD holdout 常設**: つくよみ 5 発話 (取得済み、instance
       `/data/piper/tsukuyomi_ref/`)。JVS はライセンス実確認 (Phase 2 冒頭) まで保留
-- [ ] **e. cross-utt SECS 評価ハーネス** (`piper_train.tools.eval_zs_secs`):
+- [x] **e. cross-utt SECS 評価ハーネス** (`piper_train.tools.eval_zs_secs`):
       dual-encoder + ceiling/floor + 正規化転写率を 1 コマンドで出す標準ツール。
       **arm 比較の前に v9 ep49 baseline を同一ハーネスで再測定する**
       (既存 eval_results.json の 0.652 は測定方法が異なる可能性)
