@@ -1179,6 +1179,9 @@ ckpt と非互換のため v9 再学習 or decoder 再適応 FT が必要) は
 
 ### 3.19 OOD 参照 (つくよみちゃん) zero-shot の実力測定 — SECS 測定方法の訂正 (2026-08-12)
 
+> **canonical**: [`zero-shot-speaker-similarity-root-cause.md`](zero-shot-speaker-similarity-root-cause.md)
+> (本節は要約。A/B 詳細・epoch 軌跡・機構仮説・再現方法は canonical 参照)
+
 つくよみちゃんコーパス VOICEACTRESS100_094 (96kHz studio 録音、学習コーパス外)
 を参照にした v9 zero-shot をユーザーが聴感評価 →「まだがびがび + 全然似ていない
 (多少女性っぽい程度)」。当初報告した SECS 0.775 と矛盾したため分離調査を実施。
