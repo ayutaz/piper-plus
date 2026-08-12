@@ -1152,6 +1152,29 @@ single-speaker FT では decoder が話者専用のエイリアス事前補償�
 ckpt と非互換のため v9 再学習 or decoder 再適応 FT が必要) は
 [`zero-shot-noise-root-cause-pqmf.md`](zero-shot-noise-root-cause-pqmf.md) を参照。
 
+### 3.18 v9: がびがび根治学習 — 完走・聴感で解消確認 (2026-08-10〜12)
+
+§3.15-3.17 の根本原因調査を受けた対策学習。全記録は
+[`zero-shot-noise-root-cause-pqmf.md`](zero-shot-noise-root-cause-pqmf.md)
+(§5.5 検証実験 / §5.6 P1+データゲート / §5.7 本走結果) を canonical とする。要約:
+
+- **P0 (コード)**: PQMF canonical 修正 (roundtrip 7.5→64dB、旧 ckpt は buffer
+  復元で後方互換) / MRD (`--use-mrd`) / full-band MR-STFT (`--c-full-stft`) /
+  がびがび専用指標 `measure_band_noise` / `--reinit-pqmf` + `--train-decoder-only`
+- **P1 (検証)**: v8.1 からの再適応 FT は decoder-only 2ep も全パラメータ 8ep も
+  指標不変 → **from scratch 確定**。訓練データの高域ノイズ床 (Zeroth fmax 中央値
+  3.0kHz) も実測で確定
+- **P1.5 (データゲート、案 Z)**: Zeroth 全除外 + hi_ratio/fmax999 ゲート →
+  300,443 utts / 6 言語 (ko は sampler 崩壊回避のため完全除外、v10 で復活予定。
+  **教訓: language-balanced sampling は最小言語の utts 数が epoch サイズを決める**)
+- **P2 (本走)**: 50ep 完走 (~$140)。スペクトルで 4-9kHz 非構造ノイズ v8.1 比
+  **-5〜-10dB + 倍音構造獲得**。**聴感でがびがび解消をユーザー確認 (2026-08-12)**
+- **トレードオフ**: zs_ja SECS 0.712 → 0.652 (-0.06)。追加学習で回収予定
+- **新課題**: 韻律 (強弱) の平板さ — v8 系からの持ち越し。noise_scale 掃引で
+  即時緩和を検証中、本格対応は v10
+- 成果物: HF `checkpoints-v9/` + `onnx/v9-zs-ep49.onnx` + `v9-data/` (ゲート済み
+  jsonl + 全量帯域 metrics) + `eval/eval_results_v9_ep49.json`
+
 ## 5. 成功基準と評価
 
 | 指標 | v7 baseline | v8 目標 |

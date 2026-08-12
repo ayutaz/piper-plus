@@ -183,9 +183,19 @@ echo "PID: $!"
 
 ---
 
-## 📦 アーカイブ: v8 + ko (7-lang) zero-shot 学習準備完了 (`feat/zero-shot-v8-dataset-scaling`)
+## 📦 v8 → v8.1 → v9 zero-shot 学習 (`feat/zero-shot-v8-dataset-scaling`)
 
-> ⚠️ v8 作業は `feat/zero-shot-v8-dataset-scaling` 上で進行中 (2026-08-02 に `origin/dev` v2.0 (piper→piper_plus 改名込) へリベース済)。 **KsponSpeech (AI-Hub research-only) は除外確定**し、 v8 は **public + 商用利用可の open-model として公開する方針** (過去の piper-plus 事前学習モデル同様)。 現在の 7-lang 規模: **~3,790 speakers / ~346k utts** (6-lang 3,578 spk / 321,391 utts + ko ~210 spk / ~25k utts)。 詳細は下記「2026-08-02 更新」。
+> **最新状態 (2026-08-12): v9 (がびがび根治版) が完走し、聴感でノイズ解消を確認済み。**
+> 系譜: v8 (7-lang スケール、SECS 0.649 / がびがび有り) → v8.1 (微分可能 SCL InfoNCE + WavLM で SECS 0.712 / UTMOS 改善、がびがび残存) → **v9 (PQMF canonical 修正 + MRD + full-band STFT + データゲートで from scratch 50ep、4-9kHz 非構造ノイズ -5〜-10dB + 倍音構造獲得、がびがび解消)**。
+>
+> - **がびがびの根本原因** (PQMF 変調位相項欠落 → 学習ターゲット汚染 + データ高域ノイズ床): [`docs/design/zero-shot-noise-root-cause-pqmf.md`](docs/design/zero-shot-noise-root-cause-pqmf.md) が canonical (プロセス考古学 §4: 受け入れ基準 -90dB→5dB の goalpost moving が 15 ヶ月バグを制度化 → pre-commit gate `test-threshold-relaxation` で再発防止)
+> - **v9 データ**: 案 Z ゲート (Zeroth 全除外 + hi_ratio/fmax999) で 6 言語 300,443 utts / ~3.7k spk。**ko は除外** (Zeroth が fmax 中央値 3.0kHz の強ローパス + language-balanced sampling は最小言語が epoch サイズを決めるため 356 utts では学習不能) — v10 で高品質 ko データ調達後に復活予定
+> - **残課題**: zs_ja SECS 0.652 (v8.1 0.712 から -0.06、追加学習で回収予定) / 韻律 (強弱) の平板さ (v8 系から持ち越し、noise_scale 引き上げ検証中 + v10 で本格対応)
+> - 成果物 (HF `ayousanz/piper-plus-zero-shot-multi-7lang-v8`): `checkpoints-v9/` + `onnx/v9-zs-ep49.onnx` + `v9-data/` (ゲート済み jsonl + 帯域 metrics) + 各評価 JSON。聴感サンプル: ローカル `piper-v8-dataset-backup/v9_listen_samples/`
+
+### (履歴) v8 準備時点の記録 (2026-08-02)
+
+> KsponSpeech (AI-Hub research-only) は除外確定し、 v8 は public + 商用利用可の open-model として公開する方針 (過去の piper-plus 事前学習モデル同様)。 7-lang 規模: ~3,790 speakers / ~346k utts。 詳細は下記「2026-08-02 更新」。
 
 **進捗 (2026-07-09 セッション終了時点)**:
 - ✅ **v8 dataset 完成 (6-lang スナップショット)**: 321,391 utts / 3,578 speakers / 6 lang (`/data/piper/dataset-multilingual-6lang-v8/`)
