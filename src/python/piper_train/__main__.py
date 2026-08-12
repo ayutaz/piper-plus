@@ -461,6 +461,17 @@ def create_parser():
         help="Discriminator update interval relative to generator (D:G ratio). "
         "Default: 1 (update D every G step, i.e. 1:1 ratio).",
     )
+    parser.add_argument(
+        "--grad-probe-every",
+        type=int,
+        default=0,
+        help="Diagnostic (zero-shot v10 roadmap A-1c): every N steps, measure "
+        "per-loss gradient L2 norms (mel/kl/spk/dino/sub_stft/full_stft/mrd/"
+        "mpd_msd/wavlm) on shared probe parameters (spk_proj / dec.conv_pre / "
+        "enc_p.proj / flow.flows[0].pre) and log them as grad_probe/* plus a "
+        "spk-vs-spectral ratio (SCL gradient-dilution measurement). "
+        "0 disables entirely with zero overhead (default: 0).",
+    )
     # LR scheduler arguments
     parser.add_argument(
         "--lr-scheduler",

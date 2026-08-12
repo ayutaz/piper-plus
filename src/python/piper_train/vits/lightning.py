@@ -477,6 +477,12 @@ class VitsModel(pl.LightningModule):
         self._y = None
         self._y_hat = None
 
+        # T1 (roadmap A-1c): per-loss grad-norm probe state。probe が due の
+        # step でのみ training_step_g が loss 成分 dict をここに置き、
+        # training_step が combined backward の前に消費する。無効時
+        # (--grad-probe-every 0, default) は常に None のままで追加コストなし。
+        self._grad_probe_losses: dict[str, torch.Tensor] | None = None
+
         # KL-cap sticking guard state (see _update_kl_cap_guard)
         self._kl_cap_consecutive = 0
         self._kl_cap_abort_steps = _kl_cap_abort_steps_from_env()
@@ -956,6 +962,59 @@ class VitsModel(pl.LightningModule):
                 f"this guard."
             )
 
+    def _grad_probe_due(self) -> bool:
+        """この step が per-loss grad-norm probe の対象かを判定する (A-1c)。
+
+        判定は ``global_step`` と hparams のみに依存するため DDP 全 rank で
+        同一の結果になる (rank 分岐で autograd を呼ばないための前提条件)。
+        無効時 (default: grad_probe_every=0) は int 比較 1 回で即 False を
+        返し、テンソル操作は一切発生しない。
+        """
+        every = int(self.hparams.get("grad_probe_every", 0) or 0)
+        if every <= 0 or not self.training or not torch.is_grad_enabled():
+            return False
+        return self.global_step % every == 0
+
+    def _run_grad_probe(self, batch: Batch) -> None:
+        """収集済み loss 成分の勾配ノルムを probe して logger に記録する。
+
+        combined backward (``manual_backward(loss_g)``) の**前**に呼ぶこと。
+        probe 内の ``torch.autograd.grad`` は全て ``retain_graph=True`` かつ
+        ``.grad`` 非蓄積のため本 backward を壊さない。また AccumulateGrad を
+        経由しないので DDP reducer の hook も発火しない (all_reduce mismatch
+        を起こさない)。DDP 安全性のため probe 自体は全 rank で同一に実行し、
+        log のみ rank 0 に限定する (``rank_zero_only=True`` + sync なし)。
+        """
+        from .grad_probe import collect_probe_params, compute_grad_probe
+
+        losses = self._grad_probe_losses
+        # 消費と同時に必ず参照を手放す (graph を step を跨いで保持しない)
+        self._grad_probe_losses = None
+        if not losses:
+            return
+        try:
+            probe_params = collect_probe_params(self.model_g)
+            if not probe_params:
+                return
+            metrics = compute_grad_probe(losses, probe_params)
+        except RuntimeError:
+            # 診断機能で学習本体を落とさない。graph は retain_graph=True で
+            # 保持されたままなので後続の manual_backward は影響を受けない。
+            _LOGGER.exception(
+                "grad probe failed at step=%d (training continues)",
+                self.global_step,
+            )
+            return
+        batch_size = batch.phoneme_ids.size(0)
+        for key, value in metrics.items():
+            self.log(
+                key,
+                value,
+                batch_size=batch_size,
+                rank_zero_only=True,
+                sync_dist=False,
+            )
+
     def training_step(self, batch: Batch, batch_idx: int):
         # Manual optimization for multiple optimizers
         opt_g, opt_d = self.optimizers()
@@ -1003,7 +1062,15 @@ class VitsModel(pl.LightningModule):
             opt_d.zero_grad(set_to_none=True)
             self._y = None
             self._y_hat = None
+            # T1 (A-1c): skip 時も probe 用の loss 参照を解放 (graph を保持しない)
+            self._grad_probe_losses = None
             return
+
+        # T1 (roadmap A-1c): per-loss grad-norm probe。combined backward の前に
+        # retain_graph=True で各 loss 成分の勾配ノルムを測る (probe due の step
+        # のみ dict が置かれる。DDP 全 rank で同一に実行、log は rank 0 のみ)。
+        if self._grad_probe_losses is not None:
+            self._run_grad_probe(batch)
 
         if update_generator:
             # Train generator: backward + optimizer step
@@ -1126,6 +1193,14 @@ class VitsModel(pl.LightningModule):
         )
         speaker_embeddings = getattr(batch, "speaker_embeddings", None)
 
+        # T1 (roadmap A-1c): probe due の step でのみ loss 成分収集 dict を
+        # 用意する。無効時は None のままで、以降の収集は全て None チェック
+        # 1 回に潰れる (テンソル演算・graph 保持なし = 既存動作に影響ゼロ)。
+        probe_losses: dict[str, torch.Tensor] | None = (
+            {} if self._grad_probe_due() else None
+        )
+        self._grad_probe_losses = probe_losses
+
         # Speaker embedding perturbation for zero-shot generalization
         # (sigma=0.05 improves robustness to unseen speaker embeddings at inference)
         # NOTE: noise 加算後に L2 再正規化を行う。CAM++ 出力 (norm=1.0) に対し、
@@ -1247,12 +1322,20 @@ class VitsModel(pl.LightningModule):
 
             loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl
 
+            # T1 (A-1c): grad probe 用に loss 成分を収集 (probe due の step のみ)
+            if probe_losses is not None:
+                probe_losses["mel"] = loss_mel
+                probe_losses["kl"] = loss_kl
+                probe_losses["mpd_msd"] = loss_gen + loss_fm
+
             # MB-iSTFT: sub-band STFT loss
             if o_mb is not None:
                 y_mb = self.pqmf.analysis(y)  # GT subbands [B, 4, T//4]
                 loss_sub_stft = self.sub_stft_loss(o_mb, y_mb) * self.hparams.c_sub_stft
                 loss_gen_all = loss_gen_all + loss_sub_stft
                 self._log_with_batch_info("loss_sub_stft", loss_sub_stft, batch)
+                if probe_losses is not None:
+                    probe_losses["sub_stft"] = loss_sub_stft
 
             # Full-band linear-frequency MR-STFT loss (v9, opt-in)
             if self.hparams.c_full_stft > 0:
@@ -1261,6 +1344,8 @@ class VitsModel(pl.LightningModule):
                 )
                 loss_gen_all = loss_gen_all + loss_full_stft
                 self._log_with_batch_info("loss_full_stft", loss_full_stft, batch)
+                if probe_losses is not None:
+                    probe_losses["full_stft"] = loss_full_stft
 
             # --- Speaker Consistency Loss (SCL) ---
             # T6: SCL is explicitly wrapped in _scl_autocast_ctx (= autocast
@@ -1292,6 +1377,8 @@ class VitsModel(pl.LightningModule):
                         )
                     loss_gen_all = loss_gen_all + loss_spk
                     self._log_with_batch_info("loss_spk", loss_spk, batch)
+                    if probe_losses is not None:
+                        probe_losses["spk"] = loss_spk
                 # CAM++ ONNX encoder path (fallback)。ORT session は backprop
                 # 不能なため torch.no_grad — この経路の loss_spk は勾配ゼロで
                 # **monitoring にしかならない** (v7/v8 で loss_spk が動かなかった
@@ -1312,6 +1399,10 @@ class VitsModel(pl.LightningModule):
                     )
                     loss_gen_all = loss_gen_all + loss_spk
                     self._log_with_batch_info("loss_spk", loss_spk, batch)
+                    # ONNX no-grad 経路の loss_spk は勾配ゼロだが、probe 側は
+                    # requires_grad=False をゼロノルムとして記録できる
+                    if probe_losses is not None:
+                        probe_losses["spk"] = loss_spk
                 # Mel-domain SCL fallback (differentiable, no external encoder needed)
                 elif (
                     self.hparams.num_speakers > 1
@@ -1332,6 +1423,9 @@ class VitsModel(pl.LightningModule):
                     )
                     loss_gen_all = loss_gen_all + loss_spk * self.hparams.c_spk
                     self._log_with_batch_info("loss_spk", loss_spk, batch)
+                    # probe は loss_gen_all への寄与 (重み付き) を記録する
+                    if probe_losses is not None:
+                        probe_losses["spk"] = loss_spk * self.hparams.c_spk
 
             # --- DINO Self-Distillation Loss ---
             if (
@@ -1348,6 +1442,8 @@ class VitsModel(pl.LightningModule):
                 )
                 loss_gen_all = loss_gen_all + loss_dino
                 self._log_with_batch_info("loss_dino", loss_dino, batch)
+                if probe_losses is not None:
+                    probe_losses["dino"] = loss_dino
 
                 # EMA update for teacher
                 if self.training:
@@ -1419,6 +1515,8 @@ class VitsModel(pl.LightningModule):
                 # Log WavLM losses
                 self._log_with_batch_info("loss_gen_wavlm", loss_gen_wavlm, batch)
                 self._log_with_batch_info("loss_fm_wavlm", loss_fm_wavlm, batch)
+                if probe_losses is not None:
+                    probe_losses["wavlm"] = loss_wavlm
 
             # MRD generator loss (optional, v9 — full-band spectral supervision)
             if self.model_d_mrd is not None:
@@ -1432,6 +1530,8 @@ class VitsModel(pl.LightningModule):
                 loss_gen_all = loss_gen_all + loss_mrd
                 self._log_with_batch_info("loss_gen_mrd", loss_gen_mrd, batch)
                 self._log_with_batch_info("loss_fm_mrd", loss_fm_mrd, batch)
+                if probe_losses is not None:
+                    probe_losses["mrd"] = loss_mrd
 
             self._log_with_batch_info("loss_gen_all", loss_gen_all, batch)
             self._log_with_batch_info("loss_mel", loss_mel, batch)
