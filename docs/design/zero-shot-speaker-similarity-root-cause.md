@@ -3,6 +3,10 @@
 > **Status**: 調査完了 (層の特定 + 機構の絞り込みまで)。deep research 完了 —
 > 機構の結論・介入候補・ロードマップは
 > [`zero-shot-v10-similarity-research.md`](zero-shot-v10-similarity-research.md) 参照。
+> **2026-08-14 追記**: 機構仮説は Phase 0/1 warm restart 診断で決着 —
+> same-utt SCL Goodhart を実験的に実証、係数リバランス系は全滅、
+> warm restart 回収不能を確定。結果:
+> [`zero-shot-warm-restart-diagnostics-phase0-1.md`](zero-shot-warm-restart-diagnostics-phase0-1.md)。
 > がびがび (ノイズ) 側の canonical は
 > [`zero-shot-noise-root-cause-pqmf.md`](zero-shot-noise-root-cause-pqmf.md)、
 > 時系列の文脈は
