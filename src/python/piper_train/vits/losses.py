@@ -91,6 +91,7 @@ def speaker_infonce_loss(
     ref_embedding,
     speaker_ids=None,
     temperature: float = 0.07,
+    positive_mode: str = "same_utt",
 ):
     """In-batch InfoNCE 版 SCL — 話者「判別」を要求する対比損失。
 
@@ -100,9 +101,21 @@ def speaker_infonce_loss(
     要求するため、話者の作り分け (v7/v8 の既知課題「区別性不十分」) に
     直接の勾配を与える。
 
-    ``samples_per_speaker > 1`` の batch では同一話者の他発話参照が
-    false negative になるため、``speaker_ids`` を渡すと同一話者の
-    非対角成分を分母から除外する (SupCon 方式のマスク)。
+    ``positive_mode`` (Phase 1 B-1、v10 roadmap):
+
+    - ``"same_utt"`` (従来): 正例 = 条件付けに使った同一発話の参照 embedding
+      (対角)。``samples_per_speaker > 1`` の batch では同一話者の他発話参照が
+      false negative になるため、``speaker_ids`` を渡すと同一話者の
+      非対角成分を分母から除外する (SupCon 方式のマスク)。
+      **既知の欠陥**: 「同一発話の embedding への一致」を直接最適化するため、
+      話者としての類似 (cross-utterance) が伸びなくても loss が下がる
+      (Phase 0 Arm B で実証された Goodhart 経路)。
+    - ``"cross_utt"``: 正例 = **同一話者の別発話**の参照 embedding (SupCon 形式)。
+      対角 (same-utt) は正例にも負例にもせず分母から除外する (neutral)。
+      発話固有の特徴では正例に近づけないため、話者としての転写に直接の
+      勾配を与える。``speaker_ids`` 必須。batch 内に同一話者の別発話を持たない
+      行は損失から除外し、全行が該当しない場合 (samples_per_speaker=1 相当)
+      は same_utt 挙動にフォールバックする。
 
     Parameters
     ----------
@@ -111,15 +124,25 @@ def speaker_infonce_loss(
     ref_embedding : torch.Tensor
         参照 (conditioning に使った) 話者埋め込み [B, D]
     speaker_ids : torch.LongTensor | None
-        [B] 話者 ID。None ならマスクなし (全非対角を negative 扱い)
+        [B] 話者 ID。None ならマスクなし (全非対角を negative 扱い)。
+        ``positive_mode="cross_utt"`` では必須 (None は ValueError)
     temperature : float
         softmax 温度。小さいほど hard negative を強調 (default 0.07)
+    positive_mode : str
+        "same_utt" (従来、対角正例) | "cross_utt" (同一話者別発話正例)
 
     Returns
     -------
     torch.Tensor
         スカラー損失値 (cross entropy、0 が完全識別)
     """
+    if positive_mode not in ("same_utt", "cross_utt"):
+        raise ValueError(f"unknown positive_mode: {positive_mode!r}")
+    if positive_mode == "cross_utt" and speaker_ids is None:
+        raise ValueError(
+            "positive_mode='cross_utt' requires speaker_ids "
+            "(same-speaker other-utterance positives cannot be built without them)"
+        )
     if torch.isnan(gen_embedding).any() or torch.isnan(ref_embedding).any():
         return torch.tensor(0.0, device=gen_embedding.device)
 
@@ -131,10 +154,29 @@ def speaker_infonce_loss(
         return 1.0 - F.cosine_similarity(gen, ref, dim=-1).mean()
 
     logits = gen @ ref.t() / temperature  # [B, B]
+    eye = torch.eye(b, dtype=torch.bool, device=logits.device)
+
+    if positive_mode == "cross_utt":
+        same = speaker_ids.view(1, -1) == speaker_ids.view(-1, 1)
+        pos_mask = same & ~eye  # 同一話者・別発話 = 正例
+        has_pos = pos_mask.any(dim=1)
+        if has_pos.any():
+            # SupCon: L_i = -mean_{p∈P(i)} [logits_ip - logsumexp_{a∈A(i)} logits_ia]
+            # A(i) = 対角 (same-utt) を除く全列。対角は負例化ではなく
+            # 分母から完全除外 (neutral) — same-utt 一致への勾配を残さない
+            # (v10 roadmap B-1 の footgun 指定、回帰テストで固定)。
+            logits_no_diag = logits.masked_fill(eye, float("-inf"))
+            log_denom = torch.logsumexp(logits_no_diag, dim=1)  # [B]
+            pos_sum = (logits * pos_mask).sum(dim=1)
+            n_pos = pos_mask.sum(dim=1).clamp(min=1)
+            loss_per_row = log_denom - pos_sum / n_pos
+            return loss_per_row[has_pos].mean()
+        # batch 内に cross-utt 正例が 1 行もない (samples_per_speaker=1 相当)
+        # — 学習信号を失わないよう same_utt 挙動にフォールバック
+
     labels = torch.arange(b, device=logits.device)
     if speaker_ids is not None:
         same = speaker_ids.view(1, -1) == speaker_ids.view(-1, 1)
-        eye = torch.eye(b, dtype=torch.bool, device=logits.device)
         # 同一話者の他発話参照は negative にしない (false negative 除外)
         logits = logits.masked_fill(same & ~eye, float("-inf"))
     return F.cross_entropy(logits, labels)

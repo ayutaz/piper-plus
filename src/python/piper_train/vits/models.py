@@ -1179,6 +1179,39 @@ class SynthesizerTrn(nn.Module):
             decoder_subbands=o_mb,
         )
 
+    def scl_waveform_detached_z(
+        self, z, ids_slice, speaker_embeddings=None, sid=None, lid=None
+    ):
+        """SCL 専用の decoder re-forward (v10 roadmap B-3)。
+
+        posterior z を detach してから decoder を通すため、この波形で計算した
+        SCL の勾配は g (spk_proj / emb_lang) と decoder のみに流れ、enc_q
+        (posterior) には流れない — 「decoder が GT 由来の z から音色を読んで
+        SCL を満たす」posterior leak 経路を遮断する。forward と同じ ids_slice
+        を渡すことで主経路の y_hat と同一区間の波形を返す。
+
+        Parameters
+        ----------
+        z : torch.Tensor
+            posterior latent [B, inter_channels, T_frames]
+            (``forward`` の ``latents[0]``)
+        ids_slice : torch.Tensor
+            ``forward`` が返した slice 開始 index (frame 単位)
+        speaker_embeddings / sid / lid
+            ``forward`` に渡したものと同じ条件付け入力
+
+        Returns
+        -------
+        torch.Tensor
+            waveform [B, 1, segment_samples] (``forward`` の waveform と同形状)
+        """
+        z_slice = commons.slice_segments(z, ids_slice, self.segment_size).detach()
+        g = self._get_global_conditioning(
+            sid, lid, speaker_embeddings=speaker_embeddings
+        )
+        o, _ = self.dec(z_slice, g=g)
+        return o
+
     def infer(
         self,
         x,
