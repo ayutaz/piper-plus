@@ -131,6 +131,33 @@ Phase 1 で cross-utt SCL 化と同時に行う (単一変数原則のため Pha
 
 ## Phase 1: v9.1 短期回収 (~$100-150、Phase 0 の結果を受けて)
 
+### Phase 1 A/B 結果 (2026-08-13 完走、判定: 両 arm 平坦)
+
+v9 ep49 から 8ep warm restart、対照 = Phase 0 Arm A。全数値: HF
+`diag-phase1/` (JSON + matrix.txt + ep8 ckpt)。
+
+| Arm (ep8) | zs_ja Δctrl (CAM++) | ECAPA | gap (same-cross) | つくよみ (CAM++/ECAPA) | 判定 |
+|---|---|---|---|---|---|
+| E: B-1 単独 | +0.003 | -0.008 | **0.046 (縮小)** | +0.017 / -0.008 | **効果なし** |
+| F: B-1+B-3 | -0.008 (ep4→ep8 減少) | -0.001 | **0.040 (縮小)** | **+0.023 / +0.011 (両 encoder 同調)** | **主指標は効果なし** |
+
+- **事前登録の主指標 (zs_ja holdout cross-utt) は両 arm とも +0.02 未満で平坦**
+  (matrix.txt 末尾の「判定保留」は集計スクリプトの verdict 分岐バグ — 正しくは
+  「両 arm 平坦」)
+- 機構面は設計どおり動いた: same/cross gap は control 0.058 → E 0.046 → F 0.040
+  と単調に縮小 (= same-utt Goodhart 経路の遮断は効いている)。帯域も非悪化
+  (F ep4 -9.8dB)
+- F はつくよみ (OOD 1 話者) で唯一、CAM++ +0.023 / ECAPA +0.011 の**両 encoder
+  同調の改善**を示した — ただし n=1 のため判定には使わない
+- **解釈**: Phase 0 (係数 4 arm) + Phase 1 (信号修正 2 arm) の計 6 介入が
+  8ep warm restart で全て平坦 → 「収束済み v9 からの 8ep warm restart」という
+  枠組み自体が転写能力を動かせない可能性が高い。50ep かけて焼き付いた
+  posterior leak 依存の decoder 挙動を、8ep で g 依存に再学習させるのは
+  dose 不足の疑いが残る (F の OOD 兆候と gap 縮小がその傍証)
+- **次の分岐** (事前登録の「即断せず dose 増」に従う場合): Arm F を 24ep へ延長
+  (~$30-35) → なお平坦なら「warm restart では回収不能」を確定し、Phase 2
+  (構造介入 C-2 + B-1/B-3 を from-scratch レシピに組込) へ
+
 - [ ] **B-1. SCL InfoNCE の cross-utterance 正例化** (最有力): losses.py の
       labels/mask を同一話者・別発話 index に再配線 (SupCon 形式 ~20 行 + unit test)。
       **footgun**: 対角 (same-utt) は負例化ではなく分母から除外 (neutral) —
@@ -139,7 +166,7 @@ Phase 1 で cross-utt SCL 化と同時に行う (単一変数原則のため Pha
       — **実装済み** (2026-08-13): `--spk-loss-positives cross_utt`。
       brute-force SupCon 参照実装との一致 + 対角 neutral 固定 + 正例なし行の
       除外 + 全行正例なし時の same_utt フォールバックを回帰テスト化
-      (`test_scl_differentiable.py`)。GPU A/B run は未実施
+      (`test_scl_differentiable.py`)。A/B run 済 (上記結果表、8ep では平坦)
 - [x] **B-2. σ 縮小の本採用判断**: **不採用確定** (Phase 0 Arm D: control 比
       +0.0007 で効果なし、かつ same/cross gap +0.013 拡大 = utterance-level
       overfit の兆候。σ=0.05 を維持)
