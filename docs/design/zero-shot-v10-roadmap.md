@@ -91,15 +91,37 @@
 - [x] Arm C 完走 + 評価 — **効果なし** (ep8: zs_ja 0.6114 = control 比 +0.005
       < +0.02 閾値、つくよみも ep4→ep8 で非単調)。スペクトル側からの
       勾配希釈説は単独では不成立
-- [ ] Arm D 完走 + 評価 (実行中 2026-08-13 04:08 UTC〜)
-- [ ] 判定マトリクス適用 → Phase 1 構成決定
+- [x] Arm D 完走 + 評価 — **効果なし** (ep8: zs_ja 0.6070 = control 比 +0.0007
+      < +0.02 閾値、ep4→ep8 減少)。same/cross gap が control 比 +0.013 拡大
+      (事前登録の utterance-level overfit 監視が発火) → **σ 縮小 (B-2) は不採用**
+- [x] 判定マトリクス適用 → Phase 1 構成決定 (2026-08-13、下記「Phase 0 最終判定」)
 
-> **中間所見 (Arm A-C 完了時点)**: A 横ばい + B Goodhart + C 効果なし —
-> 係数リバランス単独では回収できない可能性が高まっており、判定は「全 arm 平坦」
-> 行に向かっている。その場合の次の一手は事前登録どおり勝ち arm 16ep 延長ではなく、
-> B が Goodhart / C が無効である以上 **Phase 1 の学習信号修正 (B-1 cross-utt SCL 化
-> + B-3 z_slice.detach) を主戦線に昇格**させるのが素直 (deep research の構造欠陥
-> ①same-utt 正例 ②posterior leak と整合)。最終判断は Arm D を待って行う。
+### Phase 0 最終判定 (2026-08-13)
+
+全数値: HF `ayousanz/piper-plus-zero-shot-multi-7lang-v8` の `diag-phase0/`
+(評価 JSON 9 本 + matrix.txt + 各 arm ep8 ckpt + 合成 wav tar)。
+
+| Arm | zs_ja Δcontrol (CAM++) | ECAPA | 判定 |
+|---|---|---|---|
+| A (fresh LR) | baseline 比 -0.004 | → | スケジュール説 **棄却** |
+| B (c_spk 2.0) | **+0.023** | **+0.002 (→)** | **Goodhart 棄却** (事前登録基準どおり CAM++/ECAPA 乖離 + same/cross gap 0.048→0.068 拡大 + ep4→ep8 非単調) |
+| C (MRD 半減) | +0.005 | → | 希釈 (スペクトル側) **棄却** |
+| D (σ 0.01) | +0.001 | → | σ blur 天井 **棄却** + gap 拡大で不採用 |
+
+- スクリプトの自動 VERDICT (CAM++ 単独) は「B のみ↑ = 希釈の部分確証」だが、
+  事前登録の ECAPA 基準適用後は **係数リバランス系 4 arm 全滅** = 実効的に
+  「全 arm 平坦」行
+- 事前登録の「勝ち arm 16ep 延長」は**適用対象なし** (B は Goodhart で勝ち arm
+  ではない)。dose 不足説も否定的 — B が 8ep で CAM++ を +0.023 動かせた以上、
+  勾配は十分届いており、**最適化している目的関数が間違っている**
+- **Arm B の挙動 (CAM++↑ / ECAPA→ / gap 拡大) は deep research の構造欠陥①
+  (SCL 正例が same-utterance) の直接的な実験的証拠**: c_spk を盛ると「条件に
+  使った発話の CAM++ embedding への一致」だけが最適化され、話者としての
+  類似 (ECAPA / cross-utt) は動かない
+- **結論: Phase 1 は学習信号修正 (B-1 cross-utt SCL 化 + B-3 z_slice.detach)
+  を主戦線とする**。B-2 (σ 縮小) は不採用確定。構造介入 (Phase 2 C-2) は
+  B-1/B-3 の A/B が平坦だった場合の次段
+- Phase 0 実コスト: ~19h GPU ≈ $65 + 評価・基盤 (見積 $150-230 内)
 
 ### A-3. DINO の扱い
 
@@ -114,8 +136,9 @@ Phase 1 で cross-utt SCL 化と同時に行う (単一変数原則のため Pha
       **footgun**: 対角 (same-utt) は負例化ではなく分母から除外 (neutral) —
       回帰テストで固定。初回は loss 再配線のみの単一変数 A/B (対照 arm 必須、
       SECS は ±0.01/ep 揺れるため対照なしの +0.03 は判定不能)
-- [ ] **B-2. σ 縮小の本採用判断**: Arm D が control +0.015 以上なら採用。
-      gap 拡大時は B-1 と同時投入に切替
+- [x] **B-2. σ 縮小の本採用判断**: **不採用確定** (Phase 0 Arm D: control 比
+      +0.0007 で効果なし、かつ same/cross gap +0.013 拡大 = utterance-level
+      overfit の兆候。σ=0.05 を維持)
 - [ ] **B-3. z_slice.detach()**: SCL 計算時に posterior z を detach し「decoder が
       z から音色を読む」逃げ道を遮断 (数行)。B-1 の第 2 段 arm に同乗
 - [ ] Phase 0 勝ち構成 + B-1/B-2/B-3 の統合 run
