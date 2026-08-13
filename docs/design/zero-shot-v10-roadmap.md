@@ -136,11 +136,20 @@ Phase 1 で cross-utt SCL 化と同時に行う (単一変数原則のため Pha
       **footgun**: 対角 (same-utt) は負例化ではなく分母から除外 (neutral) —
       回帰テストで固定。初回は loss 再配線のみの単一変数 A/B (対照 arm 必須、
       SECS は ±0.01/ep 揺れるため対照なしの +0.03 は判定不能)
+      — **実装済み** (2026-08-13): `--spk-loss-positives cross_utt`。
+      brute-force SupCon 参照実装との一致 + 対角 neutral 固定 + 正例なし行の
+      除外 + 全行正例なし時の same_utt フォールバックを回帰テスト化
+      (`test_scl_differentiable.py`)。GPU A/B run は未実施
 - [x] **B-2. σ 縮小の本採用判断**: **不採用確定** (Phase 0 Arm D: control 比
       +0.0007 で効果なし、かつ same/cross gap +0.013 拡大 = utterance-level
       overfit の兆候。σ=0.05 を維持)
 - [ ] **B-3. z_slice.detach()**: SCL 計算時に posterior z を detach し「decoder が
       z から音色を読む」逃げ道を遮断 (数行)。B-1 の第 2 段 arm に同乗
+      — **実装済み** (2026-08-13): `--scl-detach-z`。SCL 専用の decoder
+      re-forward (`SynthesizerTrn.scl_waveform_detached_z`) として実装 —
+      主経路 y_hat の mel/GAN loss は従来どおり enc_q を学習し、SCL 勾配
+      のみ spk_proj + decoder に制限される。勾配隔離 (enc_q grad = 0) を
+      実モデルで回帰テスト化。decoder forward +1 回/step のコスト増に注意
 - [ ] Phase 0 勝ち構成 + B-1/B-2/B-3 の統合 run
 - [ ] **v9.1 go 基準** (事前登録): zs_ja ≥ 0.70 かつ つくよみ cross-utt ≥ 0.75
       (正規化転写率併記) + 帯域スペクトル非悪化 + ECAPA 乖離なし
