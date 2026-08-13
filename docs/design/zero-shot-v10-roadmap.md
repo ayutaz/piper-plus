@@ -81,12 +81,25 @@
 | D↑ | σ blur 天井 | Phase 1 で σ 縮小本採用 (gap 監視付き) |
 | 全 arm 平坦 | dose 不足 or 構造 | **即断せず**勝ち arm 16ep 延長 (+$25) → なお平坦なら構造介入 (Phase 2 C-2) へ |
 
-- [ ] baseline 再測定 (ep49、新ハーネス)
-- [ ] Arm A 完走 + 評価
-- [ ] Arm B 完走 + 評価
-- [ ] Arm C 完走 + 評価
-- [ ] Arm D 完走 + 評価
+- [x] baseline 再測定 (ep49、新ハーネス) — zs_ja CAM++ 0.6098 / ECAPA 0.5156、
+      つくよみ CAM++ 0.7245 / ECAPA 0.6005、帯域 -7.58dB
+- [x] Arm A 完走 + 評価 — **横ばい** (ep8: zs_ja 0.6063 / つくよみ 0.7211)
+      → スケジュール (LR 枯渇) 単独説を棄却
+- [x] Arm B 完走 + 評価 — **Goodhart 棄却パターン検出** (ep8: zs_ja CAM++
+      +0.023↑ / ECAPA +0.002→、つくよみ CAM++ +0.041↑ / ECAPA +0.010→)。
+      第 2 encoder が事前登録どおり機能。same/cross gap も拡大 (0.048→0.068)
+- [x] Arm C 完走 + 評価 — **効果なし** (ep8: zs_ja 0.6114 = control 比 +0.005
+      < +0.02 閾値、つくよみも ep4→ep8 で非単調)。スペクトル側からの
+      勾配希釈説は単独では不成立
+- [ ] Arm D 完走 + 評価 (実行中 2026-08-13 04:08 UTC〜)
 - [ ] 判定マトリクス適用 → Phase 1 構成決定
+
+> **中間所見 (Arm A-C 完了時点)**: A 横ばい + B Goodhart + C 効果なし —
+> 係数リバランス単独では回収できない可能性が高まっており、判定は「全 arm 平坦」
+> 行に向かっている。その場合の次の一手は事前登録どおり勝ち arm 16ep 延長ではなく、
+> B が Goodhart / C が無効である以上 **Phase 1 の学習信号修正 (B-1 cross-utt SCL 化
+> + B-3 z_slice.detach) を主戦線に昇格**させるのが素直 (deep research の構造欠陥
+> ①same-utt 正例 ②posterior leak と整合)。最終判断は Arm D を待って行う。
 
 ### A-3. DINO の扱い
 
