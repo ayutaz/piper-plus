@@ -1,6 +1,8 @@
 # Zero-Shot 話者類似度改善ロードマップ (Phase 0-2)
 
-> **Status**: Phase 0 実装中 (2026-08-13 開始)。
+> **Status**: **Phase 0/1 完了 (2026-08-14)** — warm restart 回収不能を確定、
+> Phase 2 (v10) ゲート開放。結果の統合レポート:
+> [`zero-shot-warm-restart-diagnostics-phase0-1.md`](zero-shot-warm-restart-diagnostics-phase0-1.md)。
 > 根拠: [`zero-shot-v10-similarity-research.md`](zero-shot-v10-similarity-research.md)
 > (deep research 最終レポート) /
 > [`zero-shot-speaker-similarity-root-cause.md`](zero-shot-speaker-similarity-root-cause.md)
