@@ -526,6 +526,30 @@ def create_parser():
         "masked via speaker ids).",
     )
     parser.add_argument(
+        "--spk-loss-positives",
+        type=str,
+        choices=["same_utt", "cross_utt"],
+        default="same_utt",
+        help="Positive definition for --spk-loss-type infonce (v10 roadmap "
+        "B-1): 'same_utt' (legacy) uses the conditioning utterance's own "
+        "embedding as the positive — known Goodhart path (Phase 0 Arm B): "
+        "the loss can be satisfied by matching the utterance embedding "
+        "without transferring speaker identity. 'cross_utt' uses same-"
+        "speaker OTHER-utterance embeddings as positives (SupCon form; the "
+        "same-utt diagonal is excluded from the denominator, not treated "
+        "as a negative). Requires samples-per-speaker > 1.",
+    )
+    parser.add_argument(
+        "--scl-detach-z",
+        action="store_true",
+        help="v10 roadmap B-3: compute SCL on an extra decoder forward with "
+        "the posterior z detached, so SCL gradients flow only into the "
+        "speaker conditioning (spk_proj) and decoder — never into the "
+        "posterior encoder. Blocks the 'decoder reads timbre from the "
+        "ground-truth-derived z' leak. Costs one extra decoder forward "
+        "per generator step.",
+    )
+    parser.add_argument(
         "--segment-size",
         type=int,
         default=8192,

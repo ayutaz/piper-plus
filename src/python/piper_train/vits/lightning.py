@@ -259,6 +259,16 @@ class VitsModel(pl.LightningModule):
         speaker_encoder_torch_path: str | None = None,
         # SCL の損失形式: "cosine" (従来) | "infonce" (in-batch 対比、話者判別を要求)
         spk_loss_type: str = "cosine",
+        # SCL InfoNCE の正例定義 (Phase 1 B-1、v10 roadmap):
+        # "same_utt" (従来、対角正例) | "cross_utt" (同一話者・別発話正例、
+        # SupCon 形式。same-utt 一致の Goodhart 経路を遮断し話者転写に直接の
+        # 勾配を与える。samples_per_speaker > 1 が前提)
+        spk_loss_positives: str = "same_utt",
+        # B-3 (v10 roadmap): SCL 専用に posterior z を detach した decoder
+        # forward を追加 (opt-in)。SCL 勾配を g (spk_proj) + decoder のみに
+        # 制限し、「decoder が GT 由来の z から音色を読む」posterior leak を
+        # 遮断する。decoder forward が 1 回増えるため step 時間が増加する
+        scl_detach_z: bool = False,
         # Speaker embedding dropout for dual-mode training (DEPRECATED: no longer used,
         # spk_proj is now the sole speaker conditioning path)
         spk_emb_dropout: float = 0.0,
@@ -405,8 +415,11 @@ class VitsModel(pl.LightningModule):
                     source_sr=self.hparams.sample_rate,
                 )
                 _LOGGER.info(
-                    "Differentiable SCL enabled (torch CAM++, spk_loss_type=%s)",
+                    "Differentiable SCL enabled (torch CAM++, spk_loss_type=%s, "
+                    "spk_loss_positives=%s, scl_detach_z=%s)",
                     self.hparams.spk_loss_type,
+                    getattr(self.hparams, "spk_loss_positives", "same_utt"),
+                    getattr(self.hparams, "scl_detach_z", False),
                 )
             else:
                 _LOGGER.warning(
@@ -414,6 +427,8 @@ class VitsModel(pl.LightningModule):
                     "disabled: %s",
                     torch_encoder_path,
                 )
+        # cross_utt 正例モードで speaker_ids 欠落時の警告は一度だけ出す
+        self._warned_cross_utt_no_sid = False
 
         # CAM++ Speaker Encoder for SCL (optional, CPU-only ONNX, not an nn.Module)
         self.speaker_encoder = None
@@ -1348,6 +1363,27 @@ class VitsModel(pl.LightningModule):
                     probe_losses["full_stft"] = loss_full_stft
 
             # --- Speaker Consistency Loss (SCL) ---
+            # B-3 (v10 roadmap、opt-in): SCL 専用に posterior z を detach した
+            # decoder forward を追加する。SCL 勾配は g (spk_proj / emb_lang) と
+            # decoder のみに流れ、enc_q (posterior) には流れない — 「decoder が
+            # GT 由来の z から音色を読んで SCL を満たす」posterior leak 経路を
+            # 遮断する。主経路の y_hat は従来どおり mel/GAN loss で enc_q を
+            # 学習するため、この re-forward は autocast 文脈 (bf16 可) で行い、
+            # 数値精度は下の fp32 ctx 内の .float() cast で従来と揃える。
+            scl_wave = y_hat
+            if (
+                getattr(self.hparams, "scl_detach_z", False)
+                and self.hparams.c_spk > 0
+                and speaker_embeddings is not None
+                and self.scl_encoder is not None
+            ):
+                scl_wave = self.model_g.scl_waveform_detached_z(
+                    g_output.latents[0],
+                    ids_slice,
+                    speaker_embeddings=speaker_embeddings,
+                    lid=language_ids,
+                )
+
             # T6: SCL is explicitly wrapped in _scl_autocast_ctx (= autocast
             # enabled=False) so a future refactor cannot silently hoist SCL out
             # of the outer fp32 block and expose it to bf16 numerics.
@@ -1359,14 +1395,32 @@ class VitsModel(pl.LightningModule):
                     and speaker_embeddings is not None
                     and self.scl_encoder is not None
                 ):
-                    gen_embedding = self.scl_encoder(y_hat.squeeze(1).float())
+                    gen_embedding = self.scl_encoder(scl_wave.squeeze(1).float())
                     ref_embedding = speaker_embeddings.float()
                     if self.hparams.spk_loss_type == "infonce":
+                        positive_mode = getattr(
+                            self.hparams, "spk_loss_positives", "same_utt"
+                        )
+                        if (
+                            positive_mode == "cross_utt"
+                            and batch.speaker_ids is None
+                        ):
+                            # cross_utt は speaker_ids 必須 — 欠落時は従来挙動で
+                            # 継続 (single-speaker FT 等)。黙って劣化しないよう警告
+                            if not self._warned_cross_utt_no_sid:
+                                _LOGGER.warning(
+                                    "spk_loss_positives='cross_utt' requires "
+                                    "speaker_ids but batch has none — falling "
+                                    "back to 'same_utt' positives"
+                                )
+                                self._warned_cross_utt_no_sid = True
+                            positive_mode = "same_utt"
                         loss_spk = (
                             speaker_infonce_loss(
                                 gen_embedding,
                                 ref_embedding,
                                 speaker_ids=batch.speaker_ids,
+                                positive_mode=positive_mode,
                             )
                             * self.hparams.c_spk
                         )
