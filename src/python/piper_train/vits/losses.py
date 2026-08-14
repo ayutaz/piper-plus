@@ -1,4 +1,5 @@
 import logging
+import math
 
 import torch
 from librosa.filters import mel as librosa_mel_fn
@@ -47,10 +48,15 @@ def generator_loss(disc_outputs):
     return loss, gen_losses
 
 
-def kl_loss(z_p, logs_q, m_p, logs_p, z_mask):
+def kl_loss(z_p, logs_q, m_p, logs_p, z_mask, logdet=None):
     """
     z_p, logs_q: [b, h, t_t]
     m_p, logs_p: [b, h, t_t]
+    logdet: [b] or None — flow forward の per-sample 対数行列式 (v10 M1 SNAC
+        flow)。None (default) は従来と厳密一致。
+        log p(z) = log N(flow(z); m_p, logs_p) + logdet なので KL では負号で
+        効く: loss_kl = kl_loss(...) - Σ logdet / Σ z_mask。符号を逆にすると
+        flow が発散方向に報酬を受け KL が静かに壊れる (v10 design §4 M1)。
     """
     z_p = z_p.float()
     logs_q = logs_q.float()
@@ -61,6 +67,8 @@ def kl_loss(z_p, logs_q, m_p, logs_p, z_mask):
     kl = logs_p - logs_q - 0.5
     kl += 0.5 * ((z_p - m_p) ** 2) * torch.exp(-2.0 * logs_p)
     kl = torch.sum(kl * z_mask)
+    if logdet is not None:
+        kl = kl - torch.sum(logdet.float())
     l_kl = kl / torch.sum(z_mask)
     return l_kl
 
@@ -180,6 +188,267 @@ def speaker_infonce_loss(
         # 同一話者の他発話参照は negative にしない (false negative 除外)
         logits = logits.masked_fill(same & ~eye, float("-inf"))
     return F.cross_entropy(logits, labels)
+
+
+def build_same_language_permutation(
+    batch_size, language_ids=None, speaker_ids=None, generator=None
+):
+    """同一言語グループ内 roll で swap ペア permutation を作る純関数 (v10 S1)。
+
+    swap-SCL (design doc §3.1) / Latent Filling (§3.3) の「同一言語 2 話者
+    ペア」構築に共用する。cross-lingual swap は VC として高難度なため、
+    言語グループを跨ぐペアは作らない (§3.1 ガード (a))。
+
+    Parameters
+    ----------
+    batch_size : int
+        バッチ行数 B (``language_ids=None`` のとき B を推定する材料が
+        他にないため第一引数に取る)
+    language_ids : torch.LongTensor | None
+        [B] 言語 ID。None なら全体を 1 グループ扱い (monolingual 学習)
+    speaker_ids : torch.LongTensor | None
+        [B] 話者 ID。指定すると同一言語グループ内でも **同一話者** の
+        ペアは valid=False にする (異話者 derangement)。language-balanced
+        sampling + samples_per_speaker>1 の batch では言語グループが
+        1 話者の複数発話だけで埋まり得るため、これがないと swap-SCL の
+        swap 相手が目標話者 = z_p の中身の話者となり通常 SCL に退化する
+        (design doc §3.1 の Goodhart 耐性が崩れる)。LF 補間も同一話者
+        補間 (≒恒等) に希釈される。None は従来挙動 (別の行なら valid) と
+        bit 互換。
+    generator : torch.Generator | None
+        CPU generator。指定で決定論 (DDP で rank ごとに揃えたい場合は
+        global_step 由来 seed を渡す)
+
+    Returns
+    -------
+    (perm, valid_mask) : (torch.LongTensor [B], torch.BoolTensor [B])
+        perm は全体として ``arange(B)`` の permutation。各グループ内は
+        cyclic shift (shift ∈ [1, n-1]) で ``perm[i] != i`` かつ
+        ``language_ids[perm[i]] == language_ids[i]``。言語内 1 行のみ
+        (singleton) の行は ``perm[i] == i`` / ``valid_mask[i] = False``
+        (損失から除外するための mask)。
+
+        speaker_ids 指定時: グループ内を話者 sort した順序への rotation で
+        shift を「最大話者ブロック幅 m ≤ shift ≤ n - m」に取り、異話者
+        ペアを構造的に保証する (m > n/2 のときは shift = m が同一話者
+        ペア数の理論最小 2m - n を達成し、当たった行のみ valid=False)。
+        言語グループ内が 1 話者のみの場合は全行 ``perm[i] == i`` /
+        valid=False。language_ids / speaker_ids が GPU tensor の場合は
+        同 device で返す。
+    """
+    if language_ids is None:
+        lang = torch.zeros(batch_size, dtype=torch.long)
+        out_device = speaker_ids.device if speaker_ids is not None else None
+    else:
+        lang = language_ids.detach().reshape(-1).to("cpu", torch.long)
+        out_device = language_ids.device
+    spk = None
+    if speaker_ids is not None:
+        spk = speaker_ids.detach().reshape(-1).to("cpu", torch.long)
+    perm = torch.arange(batch_size)
+    valid = torch.zeros(batch_size, dtype=torch.bool)
+    # torch.unique は sorted を返すため group の走査順は決定論
+    for lang_value in torch.unique(lang):
+        idx = (lang == lang_value).nonzero(as_tuple=True)[0]
+        n = int(idx.numel())
+        if n < 2:
+            # singleton: perm[i] == i のまま valid=False (swap 相手がいない)
+            continue
+        if spk is None:
+            shift = int(torch.randint(1, n, (1,), generator=generator).item())
+            # roll(-shift): perm[idx[k]] = idx[(k + shift) % n] — グループ内
+            # cyclic shift。shift >= 1 なので自己写像は生じない
+            perm[idx] = idx.roll(-shift)
+            valid[idx] = True
+            continue
+        spk_grp = spk[idx]
+        counts = torch.unique(spk_grp, return_counts=True)[1]
+        if int(counts.numel()) < 2:
+            # 言語グループ内が 1 話者のみ: 異話者ペアが作れない。
+            # perm identity のまま全行 valid=False (同一話者 swap を損失に
+            # 入れると swap-SCL が通常 SCL に退化するため black-out が正)
+            continue
+        # 話者ブロック sort 済み順序への rotation。shift k を最大ブロック
+        # サイズ m 以上 (かつ n - m 以下) に取ると rotation は必ず話者
+        # ブロックを跨ぐ (2m <= n なら全行異話者)。ブロック内の順序は
+        # generator で shuffle し、step ごとにペアの組合せを変える。
+        m = int(counts.max())
+        shuffle = torch.randperm(n, generator=generator)
+        spk_sh = spk_grp[shuffle]
+        order = torch.argsort(spk_sh, stable=True)
+        sorted_idx = idx[shuffle][order]
+        spk_sorted = spk_sh[order]
+        if 2 * m <= n:
+            k = int(torch.randint(m, n - m + 1, (1,), generator=generator).item())
+        else:
+            # m > n/2: 同一話者ペアを完全には避けられない。k = m が理論
+            # 最小 (2m - n 行) — 当たった行は下の話者比較で valid=False
+            k = m
+        # 1 <= k <= n-1 なので自己写像は生じない (perm は依然 permutation)
+        perm[sorted_idx] = sorted_idx.roll(-k)
+        valid[sorted_idx] = spk_sorted != spk_sorted.roll(-k)
+    if out_device is not None and out_device.type != "cpu":
+        perm = perm.to(out_device)
+        valid = valid.to(out_device)
+    return perm, valid
+
+
+def swap_spk_ramp_weight(current_epoch, start_epoch, ramp_epochs):
+    """swap-SCL の ramp 重み (v10 §3.4: KL annealing 完了後に 0→1 線形)。
+
+    ``weight = c_swap_spk * swap_spk_ramp_weight(...)`` として使う。
+    epoch < start → 0.0 / ramp 中 → (epoch - start) / ramp_epochs /
+    start + ramp 以降 → 1.0。``ramp_epochs=0`` は step 関数 (start 以降 1.0)。
+    """
+    if current_epoch < start_epoch:
+        return 0.0
+    if ramp_epochs <= 0:
+        return 1.0
+    return min(1.0, (current_epoch - start_epoch) / float(ramp_epochs))
+
+
+def gather_speaker_loss_inputs(gen_embedding, ref_embedding, speaker_ids=None):
+    """DDP 全 rank の SCL 入力を結合する (v10 §3.2、--spk-loss-gather)。
+
+    InfoNCE/SupCon の負例数を batch 28 → 4 GPU で 124 に増やす。
+    embedding 側は **勾配が通る** ``torch.distributed.nn.all_gather`` を使う
+    (素の ``torch.distributed.all_gather`` は勾配を切る既知の footgun)。
+    speaker_ids は勾配不要なので素の all_gather で結合する。
+
+    dist 未初期化 / world_size == 1 なら no-op (入力をそのまま返す)。
+
+    NOTE: ``all_gather`` は全 rank で同一 shape を要求する。DDP 学習では
+    epoch 末端の端数 batch で shape が揃わない可能性があるため、本関数は
+    固定 batch サイズの sampler (SpeakerBalancedBatchSampler 等) との
+    併用を前提とする。
+    """
+    if not torch.distributed.is_available() or not torch.distributed.is_initialized():
+        return gen_embedding, ref_embedding, speaker_ids
+    world_size = torch.distributed.get_world_size()
+    if world_size <= 1:
+        return gen_embedding, ref_embedding, speaker_ids
+
+    # 遅延 import: torch.distributed.nn は distributed 非対応ビルドで import
+    # 不能な場合があり、dist 初期化済みの分岐に入るまで触らない
+    import torch.distributed.nn as dist_nn  # noqa: PLC0415
+
+    gen_all = torch.cat(list(dist_nn.all_gather(gen_embedding)), dim=0)
+    ref_all = torch.cat(list(dist_nn.all_gather(ref_embedding)), dim=0)
+    sids_all = None
+    if speaker_ids is not None:
+        sid_list = [torch.zeros_like(speaker_ids) for _ in range(world_size)]
+        torch.distributed.all_gather(sid_list, speaker_ids.contiguous())
+        sids_all = torch.cat(sid_list, dim=0)
+    return gen_all, ref_all, sids_all
+
+
+def is_latent_filling_step(global_step, tau):
+    """Latent Filling step の決定論的判定 (v10 §3.3、arXiv:2310.03538)。
+
+    ``global_step`` を seed にした CPU ``torch.Generator`` で確率 τ の
+    ベルヌーイ判定を行う。同 step 同結果 = DDP 全 rank 一致が保証される
+    (rank ごとに判定がずれると LF step の D-skip / 損失置換で all_reduce
+    mismatch → NCCL timeout になるため、ここでの決定論は生命線)。
+
+    tau <= 0 で常に False (default = 既存挙動と bit 互換)。
+    """
+    if tau <= 0.0:
+        return False
+    if tau >= 1.0:
+        return True
+    g = torch.Generator()
+    # 連番 seed の相関を避けるための multiplicative hash (Knuth)。
+    # Python の hash() は PYTHONHASHSEED でプロセスごとに変わるため使わない
+    # (rank 間不一致の源になる)。
+    g.manual_seed((int(global_step) * 2654435761 + 0x5F3759DF) % (2**63))
+    return bool(torch.rand((), generator=g).item() < tau)
+
+
+def should_run_latent_filling_step(global_step, tau, d_update_interval=1):
+    """LF step の最終判定 — G 更新が走る step に限定する (ラッチ防止)。
+
+    ``d_update_interval >= 2`` では ``global_step % d_update_interval != 0``
+    の step は G 更新を skip する (D-only step)。そこで LF step が発動すると
+    G 更新なし (かつ LF は D 更新も skip) → ``optimizer.step()`` が 1 回も
+    走らず PL manual optimization の ``global_step`` (= optimizer.step()
+    回数) が凍結する。G-update 判定と LF 判定は両方とも凍結した
+    ``global_step`` の純関数なので、以降の全 batch が同一分岐 (forward のみ
+    更新ゼロ) を永久に取る **決定論的ラッチ**になる (silent、自己回復不能)。
+    LF を G 更新 step に限定することでラッチを構造的に排除する。
+
+    ``d_update_interval=1`` (CLI default) では :func:`is_latent_filling_step`
+    と同一判定。決定論性 (同 step 同結果 = DDP 全 rank 一致) は維持される。
+    """
+    if int(global_step) % max(int(d_update_interval), 1) != 0:
+        return False
+    return is_latent_filling_step(global_step, tau)
+
+
+def sample_latent_filling_lambda(n, generator=None):
+    """λ ~ Beta(0.5, 0.5) (arcsine 分布) を n 個サンプルする (v10 §3.3)。
+
+    ``torch.distributions.Beta`` は generator を受けないため、逆関数法で
+    実装する: U ~ Uniform(0,1) に対し X = sin²(πU/2) ~ Beta(0.5, 0.5)
+    (arcsine 分布の CDF は (2/π)·arcsin(√x))。mean 0.5 / var 0.125 /
+    U 字型 (両端に質量) — 補間で端点付近 (≈ 片方の話者) を多めに踏む。
+    """
+    u = torch.rand(n, generator=generator)
+    return torch.sin(math.pi * u / 2.0) ** 2
+
+
+def build_latent_filling_embeddings(
+    speaker_embeddings, language_ids=None, speaker_ids=None, generator=None
+):
+    """Latent Filling の摂動済み条件 embedding s̃ を作る (v10 §3.3)。
+
+    行ごとに確率 0.5 で「同一言語の別話者と λ~Beta(0.5,0.5) 補間」、
+    確率 0.5 で「s + N(0, σ=1e-4) noise」(arXiv:2310.03538 の 2 branch)。
+    補間ペアは :func:`build_same_language_permutation` を流用し言語グループを
+    跨がない。``speaker_ids`` を渡すと同一話者ペア (補間が ≒恒等に希釈)
+    も除外される。同一言語 (異話者) ペアが作れない行は noise branch に
+    フォールバックする。乱数は全て CPU generator から引く (決定論 +
+    グローバル RNG stream を汚さない)。
+
+    Returns
+    -------
+    torch.Tensor [B, D]
+        s̃ (入力と同 device / dtype)。補間 branch の行は L2 再正規化済み
+        (unit-norm 不変条件、下の NOTE 参照)
+    """
+    b = speaker_embeddings.size(0)
+    device = speaker_embeddings.device
+    dtype = speaker_embeddings.dtype
+
+    perm, valid = build_same_language_permutation(
+        b, language_ids=language_ids, speaker_ids=speaker_ids, generator=generator
+    )
+    perm = perm.to(device)
+    valid = valid.to(device)
+
+    lam = sample_latent_filling_lambda(b, generator=generator).to(device, dtype)
+    use_interp = (torch.rand(b, generator=generator) < 0.5).to(device)
+    noise = (
+        torch.randn(speaker_embeddings.shape, generator=generator).to(device, dtype)
+        * 1e-4
+    )
+
+    partner = speaker_embeddings[perm]
+    interp = (
+        lam.unsqueeze(-1) * speaker_embeddings + (1.0 - lam.unsqueeze(-1)) * partner
+    )
+    # NOTE: unit-norm 不変条件の維持。パイプライン全体 (dataset の CAM++
+    # emb / σ-noise 経路の加算後 renormalize / 推論時) は「spk_proj 入力は
+    # L2 unit-norm」を保つ。単位ベクトル 2 本の λ 補間は norm < 1 (直交
+    # ペアの λ=0.5 で 1/√2) になるため、再正規化せず条件付けに渡すと
+    # magnitude 不一致 → 学習進行と共に spk_proj が発散する既知事故
+    # (lightning.py の σ-noise renormalize コメント、v7 実測) と同型の
+    # 経路になる。LFCL の cosine 目標は norm 不変なので損失定義は不変。
+    interp = F.normalize(interp, p=2, dim=-1)
+    noised = speaker_embeddings + noise
+    # 補間 branch は同一言語 (異話者) ペアが存在する行のみ
+    # (singleton / 1 話者グループは noise branch)
+    use_interp = use_interp & valid
+    return torch.where(use_interp.unsqueeze(-1), interp, noised)
 
 
 def dino_loss(student_emb, teacher_emb, center, tau_s=0.1, tau_t=0.07):

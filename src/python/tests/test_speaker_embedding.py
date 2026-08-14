@@ -235,8 +235,11 @@ class TestForwardSpeakerEmbedding:
                 speaker_embeddings=spk_emb,
             )
 
-        # forward returns 8 elements (including decoder_subbands)
-        assert len(result) == 8
+        # forward returns 9 elements (including decoder_subbands and the
+        # v10 M1 tail field flow_logdet — default None, appended at the end
+        # so 8-arg positional construction stays compatible)
+        assert len(result) == 9
+        assert result.flow_logdet is None
 
 
 # ---------------------------------------------------------------------------

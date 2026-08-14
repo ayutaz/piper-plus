@@ -191,6 +191,9 @@ def _make_fake_model(
     fake.global_step = 0
     fake._y = None
     fake._y_hat = None
+    # v10 §3.3: Latent Filling step flag (MagicMock の auto-attr は truthy に
+    # なり LF の D-skip 分岐を誤発火させるため、__init__ 同様 False で初期化)
+    fake._lf_step_active = False
 
     opt_g = _FakeOpt()
     opt_d = _FakeOpt()
@@ -290,8 +293,7 @@ class TestDUpdateIntervalNaNSkip:
             skip_counts[interval] = skip_count
 
         assert skip_counts[1] == skip_counts[2], (
-            f"NaN-skip 回数は d_update_interval に依存しないはず: "
-            f"{skip_counts}"
+            f"NaN-skip 回数は d_update_interval に依存しないはず: {skip_counts}"
         )
         assert skip_counts[1] == 1, (
             "step=2 の planted NaN がちょうど 1 回 skip として記録される"

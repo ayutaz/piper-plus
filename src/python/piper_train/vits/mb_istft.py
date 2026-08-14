@@ -183,6 +183,11 @@ class MBiSTFTGenerator(nn.Module):
         # future-proofing plumbing、 の 2 目的で通す。 crash-safe: 対象 tensor
         # がゼロでも torch は例外を出さない。
         use_channels_last: bool = False,
+        # v10 E1 (--film-init-std): Multi-scale FiLM (cond_layers) の
+        # zero-init を N(0, std) small-Gaussian に置換する opt-in
+        # (AdaLN-Zero 分析: 同等品質に ~46% 少ない学習時間)。0.0 (default)
+        # は従来どおり zero-init (v9 bit 互換)。bias は常に 0。
+        film_init_std: float = 0.0,
     ):
         super().__init__()
         self.num_kernels = len(resblock_kernel_sizes)
@@ -257,10 +262,16 @@ class MBiSTFTGenerator(nn.Module):
             for i in range(self.num_upsamples):
                 ch_stage = upsample_initial_channel // (2 ** (i + 1))
                 layer = nn.Conv1d(gin_channels, ch_stage * 2, 1)
-                # Zero-init: scale_raw=0 → sigmoid(0)+0.5=1.0, shift=0
-                # → 学習開始時 FiLM は identity、徐々に speaker 条件付けを獲得
-                nn.init.zeros_(layer.weight)
-                nn.init.zeros_(layer.bias)
+                if film_init_std > 0:
+                    # v10 E1: zero-init を small-Gaussian に置換 (opt-in)。
+                    # 対称性破りにより FiLM の条件付け獲得を早める。
+                    nn.init.normal_(layer.weight, 0.0, film_init_std)
+                    nn.init.zeros_(layer.bias)
+                else:
+                    # Zero-init: scale_raw=0 → sigmoid(0)+0.5=1.0, shift=0
+                    # → 学習開始時 FiLM は identity、徐々に speaker 条件付けを獲得
+                    nn.init.zeros_(layer.weight)
+                    nn.init.zeros_(layer.bias)
                 self.cond_layers.append(layer)
 
         # T1 拡張: channels_last をモジュール全体に伝播。 現状 Generator は

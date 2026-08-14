@@ -34,6 +34,9 @@ class StochasticDurationPredictor(nn.Module):
         p_dropout: float,
         n_flows: int = 4,
         gin_channels: int = 0,
+        # v10 M3: False で duration NLL の勾配を g へ通す (--dp-spk-head)。
+        # default True は従来の detach 維持 (v9 bit 互換)。
+        detach_g: bool = True,
     ):
         super().__init__()
         filter_channels = in_channels  # it needs to be removed from future version.
@@ -43,6 +46,7 @@ class StochasticDurationPredictor(nn.Module):
         self.p_dropout = p_dropout
         self.n_flows = n_flows
         self.gin_channels = gin_channels
+        self.detach_g = detach_g
 
         self.log_flow = modules.Log()
         self.flows = nn.ModuleList()
@@ -78,7 +82,11 @@ class StochasticDurationPredictor(nn.Module):
         x = torch.detach(x)
         x = self.pre(x)
         if g is not None:
-            g = torch.detach(g)
+            # v10 M3: detach_g=False で duration NLL の勾配を g へ通す。
+            # 呼び出し側 (_get_dp_conditioning) は g_dp = g.detach() +
+            # spk_proj_dp(g.detach()) を渡すため、勾配は残差ヘッドのみに届く。
+            if self.detach_g:
+                g = torch.detach(g)
             x = x + self.cond(g)
         x = self.convs(x, x_mask)
         x = self.proj(x) * x_mask
@@ -143,6 +151,8 @@ class DurationPredictor(nn.Module):
         kernel_size: int,
         p_dropout: float,
         gin_channels: int = 0,
+        # v10 M3: False で duration loss の勾配を g へ通す (--dp-spk-head)。
+        detach_g: bool = True,
     ):
         super().__init__()
 
@@ -151,6 +161,7 @@ class DurationPredictor(nn.Module):
         self.kernel_size = kernel_size
         self.p_dropout = p_dropout
         self.gin_channels = gin_channels
+        self.detach_g = detach_g
 
         self.drop = nn.Dropout(p_dropout)
         self.conv_1 = nn.Conv1d(
@@ -169,7 +180,10 @@ class DurationPredictor(nn.Module):
     def forward(self, x, x_mask, g=None):
         x = torch.detach(x)
         if g is not None:
-            g = torch.detach(g)
+            # v10 M3: detach_g=False で duration loss の勾配を g へ通す
+            # (x = torch.detach(x) は常に維持)。
+            if self.detach_g:
+                g = torch.detach(g)
             x = x + self.cond(g)
         x = self.conv_1(x * x_mask)
         x = torch.relu(x)
@@ -199,6 +213,11 @@ class TextEncoder(nn.Module):
         # Default False preserves the manual path (bit-parity with prior
         # checkpoints). See attentions.MultiHeadAttention for the full contract.
         attn_drop_rel_v: bool = False,
+        # v10 M2 (--speaker-cond-layer): 話者条件 cond_layer(g) の注入位置。
+        # 0 (default) は従来どおり transformer 全層通過後の一括加算 (v9 bit
+        # 互換)。N>=1 で加算を attentions.Encoder の第 N 層入口に移動する
+        # (後段加算は行わない)。v10 推奨値 3 (VITS2 同構成、F3)。
+        speaker_cond_layer: int = 0,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -210,6 +229,12 @@ class TextEncoder(nn.Module):
         self.kernel_size = kernel_size
         self.p_dropout = p_dropout
         self.gin_channels = gin_channels
+        if speaker_cond_layer < 0 or speaker_cond_layer > n_layers:
+            raise ValueError(
+                f"speaker_cond_layer must be in [0, n_layers={n_layers}], "
+                f"got {speaker_cond_layer}"
+            )
+        self.speaker_cond_layer = speaker_cond_layer
 
         self.emb = nn.Embedding(n_vocab, hidden_channels)
         nn.init.normal_(self.emb.weight, 0.0, hidden_channels**-0.5)
@@ -235,9 +260,23 @@ class TextEncoder(nn.Module):
             commons.sequence_mask(x_lengths, x.size(2)), 1
         ).type_as(x)
 
-        x = self.encoder(x * x_mask, x_mask)
+        cond = None
         if g is not None and hasattr(self, "cond_layer"):
-            x = (x + self.cond_layer(g)) * x_mask
+            cond = self.cond_layer(g)
+
+        if cond is not None and self.speaker_cond_layer >= 1:
+            # v10 M2: 第 N 層入口注入 (後段加算は行わない) — self-attention が
+            # 話者情報を見られるようになる (F3 の修正)
+            x = self.encoder(
+                x * x_mask,
+                x_mask,
+                cond=cond,
+                cond_layer_idx=self.speaker_cond_layer,
+            )
+        else:
+            x = self.encoder(x * x_mask, x_mask)
+            if cond is not None:
+                x = (x + cond) * x_mask
         stats = self.proj(x) * x_mask
 
         m, logs = torch.split(stats, self.out_channels, dim=1)
@@ -254,6 +293,9 @@ class ResidualCouplingBlock(nn.Module):
         n_layers: int,
         n_flows: int = 4,
         gin_channels: int = 0,
+        # v10 M1 (--use-snac-flow): coupling を SNAC 化し、forward で
+        # (x, logdet) を返す。default False は従来 API / 従来経路と bit 互換。
+        use_snac: bool = False,
     ):
         super().__init__()
         self.channels = channels
@@ -263,6 +305,7 @@ class ResidualCouplingBlock(nn.Module):
         self.n_layers = n_layers
         self.n_flows = n_flows
         self.gin_channels = gin_channels
+        self.use_snac = use_snac
 
         self.flows = nn.ModuleList()
         for _i in range(n_flows):
@@ -275,18 +318,29 @@ class ResidualCouplingBlock(nn.Module):
                     n_layers,
                     gin_channels=gin_channels,
                     mean_only=True,
+                    use_snac=use_snac,
                 )
             )
             self.flows.append(modules.Flip())
 
-    def forward(self, x, x_mask, g=None, reverse=False):
+    def forward(self, x, x_mask, g=None, reverse=False, g_spk=None):
         if not reverse:
+            if self.use_snac:
+                # v10 M1: coupling ごとの logdet を累積して返す (捨てると
+                # KL が静かに壊れる — design doc §4 M1 リスク)。snac 時のみ
+                # (x, logdet) を返し、off 時は従来 API (x のみ) を維持する。
+                logdet_tot = torch.zeros(x.size(0), dtype=x.dtype, device=x.device)
+                for flow in self.flows:
+                    x, logdet = flow(x, x_mask, g=g, reverse=reverse, g_spk=g_spk)
+                    logdet_tot = logdet_tot + logdet
+                return x, logdet_tot
             for flow in self.flows:
                 x, _ = flow(x, x_mask, g=g, reverse=reverse)
+            return x
         else:
             for flow in reversed(self.flows):
-                x = flow(x, x_mask, g=g, reverse=reverse)
-        return x
+                x = flow(x, x_mask, g=g, reverse=reverse, g_spk=g_spk)
+            return x
 
 
 class PosteriorEncoder(nn.Module):
@@ -816,6 +870,10 @@ class SynthesizerOutput(NamedTuple):
     y_mask: torch.Tensor
     latents: tuple
     decoder_subbands: "torch.Tensor | None"
+    # v10 M1 (SNAC flow): flow forward の per-sample logdet [b]。
+    # snac off の forward では None。末尾 default None なので既存の
+    # positional 構築 (8 引数) を壊さない。
+    flow_logdet: "torch.Tensor | None" = None
 
 
 class SynthesizerTrn(nn.Module):
@@ -866,6 +924,17 @@ class SynthesizerTrn(nn.Module):
         # (a) VitsModel の同一 hparam を D と G の両方に propagate する対称性、
         # (b) 将来 Conv2d を Generator に導入した時の future-proofing、 の 2 目的。
         use_channels_last: bool = False,
+        # --- v10 構造介入 (default は全て v9 と bit 互換。design doc §4) ---
+        # M2: enc_p の話者注入位置 (0 = 後段一括加算、N>=1 = 第 N 層入口)
+        speaker_cond_layer: int = 0,
+        # M3: DP へ spk_proj_dp 残差ヘッド経由で duration 勾配を通す
+        dp_spk_head: bool = False,
+        # M1+E2: flow coupling の SNAC 化 (SN/SDN は話者成分のみ、
+        # WN の gin 条件付けは lang 成分のみ)
+        use_snac_flow: bool = False,
+        # E1: dec FiLM (cond_layers) の zero-init を N(0, std) に置換
+        # (0.0 = 従来の zero-init)
+        film_init_std: float = 0.0,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -896,6 +965,7 @@ class SynthesizerTrn(nn.Module):
 
         self.use_sdp = use_sdp
         self.onnx_export_mode = False
+        self.use_snac_flow = use_snac_flow
 
         self.enc_p = TextEncoder(
             n_vocab,
@@ -908,6 +978,7 @@ class SynthesizerTrn(nn.Module):
             p_dropout,
             gin_channels=gin_channels,
             attn_drop_rel_v=attn_drop_rel_v,
+            speaker_cond_layer=speaker_cond_layer,
         )
         self.dec = MBiSTFTGenerator(
             initial_channel=inter_channels,
@@ -919,6 +990,7 @@ class SynthesizerTrn(nn.Module):
             upsample_kernel_sizes=upsample_kernel_sizes,
             gin_channels=gin_channels,
             use_channels_last=use_channels_last,
+            film_init_std=film_init_std,
         )
         self.enc_q = PosteriorEncoder(
             spec_channels,
@@ -930,7 +1002,13 @@ class SynthesizerTrn(nn.Module):
             gin_channels=gin_channels,
         )
         self.flow = ResidualCouplingBlock(
-            inter_channels, hidden_channels, 5, 2, 4, gin_channels=gin_channels
+            inter_channels,
+            hidden_channels,
+            5,
+            2,
+            4,
+            gin_channels=gin_channels,
+            use_snac=use_snac_flow,
         )
 
         # Prosody feature projection (A1/A2/A3 → prosody_dim)
@@ -943,12 +1021,42 @@ class SynthesizerTrn(nn.Module):
 
         if use_sdp:
             self.dp = StochasticDurationPredictor(
-                dp_in_channels, 192, 3, 0.5, 4, gin_channels=gin_channels
+                dp_in_channels,
+                192,
+                3,
+                0.5,
+                4,
+                gin_channels=gin_channels,
+                detach_g=not dp_spk_head,
             )
         else:
             self.dp = DurationPredictor(
-                dp_in_channels, 256, 3, 0.5, gin_channels=gin_channels
+                dp_in_channels,
+                256,
+                3,
+                0.5,
+                gin_channels=gin_channels,
+                detach_g=not dp_spk_head,
             )
+
+        # v10 M3 (--dp-spk-head): duration 勾配の受け皿となる軽量残差ヘッド。
+        # DP へは g_dp = g.detach() + spk_proj_dp(g.detach()) を渡す
+        # (_get_dp_conditioning) — spk_proj 本体 / enc_p は duration 勾配から
+        # 保護され、圧力は本ヘッドに集約される (F4 + StyleTTS 2)。
+        # default off では作らない (v9 ckpt strict load 互換)。
+        if dp_spk_head:
+            if gin_channels == 0:
+                raise ValueError("dp_spk_head=True requires gin_channels > 0")
+            self.spk_proj_dp = nn.Sequential(
+                nn.Linear(gin_channels, gin_channels // 4),
+                nn.GELU(),
+                nn.Linear(gin_channels // 4, gin_channels),
+            )
+            for module in self.spk_proj_dp:
+                if isinstance(module, nn.Linear):
+                    # 新設ヘッドは --film-init-std と無関係に無条件 N(0, 1e-3)
+                    nn.init.normal_(module.weight, 0.0, 1e-3)
+                    nn.init.zeros_(module.bias)
 
         # Speaker projection MLP for zero-shot speaker conditioning.
         # Replaces emb_g (nn.Embedding) -- all speaker conditioning now goes
@@ -986,7 +1094,9 @@ class SynthesizerTrn(nn.Module):
         g = self.spk_proj(speaker_embeddings)  # [b, gin_channels]
         return g.unsqueeze(-1)  # [b, gin_channels, 1]
 
-    def _get_global_conditioning(self, sid=None, lid=None, speaker_embeddings=None):
+    def _get_global_conditioning(
+        self, sid=None, lid=None, speaker_embeddings=None, return_components=False
+    ):
         """Compute global conditioning vector from speaker and language embeddings.
 
         For multi-speaker models, speaker conditioning is always provided via
@@ -1004,13 +1114,22 @@ class SynthesizerTrn(nn.Module):
         speaker_embeddings : torch.Tensor or None
             Raw speaker embeddings from CAM++ [batch, 192].
             Required for multi-speaker models.
+        return_components : bool
+            v10 E2: True で ``(g_combined, g_spk, g_lang)`` の 3-tuple を返す。
+            g_spk は話者成分のみ (spk_proj 由来、lid 不感応)、g_lang は言語
+            成分のみ (emb_lang 由来、emb 不感応。``n_languages == 1`` または
+            lid 未指定なら None)。SNAC flow の SN/SDN 統計 (話者のみ) と WN
+            条件付け (lang のみ) の分離に使う。default False は従来どおり
+            単一 tensor (既存呼び出しの互換維持)。
 
         Returns
         -------
         torch.Tensor or None
             Global conditioning [batch, gin_channels, 1]
+            (return_components=True 時は上記 3-tuple)
         """
-        g = self._get_speaker_condition(speaker_embeddings)
+        g_spk = self._get_speaker_condition(speaker_embeddings)
+        g_lang = None
         if self.n_languages > 1 and lid is not None:
             # Defend against the lid=-1 mixed-language sentinel used in
             # lightning.py:358-401. Direct model.forward() callers that
@@ -1019,9 +1138,29 @@ class SynthesizerTrn(nn.Module):
             # the embedding lookup succeeds; downstream callers that need
             # true "no language" conditioning should pass lid=None.
             safe_lid = torch.where(lid < 0, torch.zeros_like(lid), lid)
-            lang_emb = self.emb_lang(safe_lid).unsqueeze(-1)  # [b, h, 1]
-            g = (g + lang_emb) if g is not None else lang_emb
+            g_lang = self.emb_lang(safe_lid).unsqueeze(-1)  # [b, h, 1]
+        if g_lang is not None:
+            g = (g_spk + g_lang) if g_spk is not None else g_lang
+        else:
+            g = g_spk
+        if return_components:
+            return g, g_spk, g_lang
         return g
+
+    def _get_dp_conditioning(self, g):
+        """v10 M3: DP へ渡す条件付けを作る。
+
+        dp_spk_head 無効時は g をそのまま返す (DP 側の detach_g=True が従来
+        どおり勾配を遮断 = v9 bit 互換)。有効時は g を detach した上で
+        spk_proj_dp 残差を加算する — duration loss の勾配は spk_proj_dp のみ
+        に流れ、spk_proj 本体 / enc_p は保護される。
+        """
+        if g is None or not hasattr(self, "spk_proj_dp"):
+            return g
+        g_det = g.detach()  # spk_proj 本体を duration 勾配から保護
+        # [b, gin, 1] -> [b, 1, gin] -> MLP -> [b, 1, gin] -> [b, gin, 1]
+        delta = self.spk_proj_dp(g_det.transpose(1, 2)).transpose(1, 2)
+        return g_det + delta
 
     def _prepare_prosody_input(self, x, x_mask, prosody_features, lid=None):
         """Prepare encoder output with prosody features for duration predictor.
@@ -1090,8 +1229,8 @@ class SynthesizerTrn(nn.Module):
         prosody_features=None,
         speaker_embeddings=None,
     ):
-        g = self._get_global_conditioning(
-            sid, lid, speaker_embeddings=speaker_embeddings
+        g, g_spk, g_lang = self._get_global_conditioning(
+            sid, lid, speaker_embeddings=speaker_embeddings, return_components=True
         )
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
         # Safety clamp on log-variance to prevent exp() overflow.
@@ -1109,7 +1248,13 @@ class SynthesizerTrn(nn.Module):
 
         z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g)
         logs_q = logs_q.clamp(min=-8.0, max=8.0)
-        z_p = self.flow(z, y_mask, g=g)
+        if self.use_snac_flow:
+            # v10 M1+E2: SN/SDN 統計は話者成分のみ、WN 条件付けは lang 成分
+            # のみ (n_languages == 1 なら None)。logdet は KL 配線用に返す。
+            z_p, flow_logdet = self.flow(z, y_mask, g=g_lang, g_spk=g_spk)
+        else:
+            z_p = self.flow(z, y_mask, g=g)
+            flow_logdet = None
 
         with torch.no_grad():
             # negative cross-entropy
@@ -1139,12 +1284,15 @@ class SynthesizerTrn(nn.Module):
         x_dp = self._prepare_prosody_input(x, x_mask, prosody_features, lid=lid)
 
         w = attn.sum(2)
+        # v10 M3: dp_spk_head 有効時のみ g_dp = g.detach() + spk_proj_dp(...)
+        # (無効時は g のまま = v9 bit 互換)
+        g_dp = self._get_dp_conditioning(g)
         if self.use_sdp:
-            l_length = self.dp(x_dp, x_mask, w, g=g)
+            l_length = self.dp(x_dp, x_mask, w, g=g_dp)
             l_length = l_length / torch.sum(x_mask)
         else:
             logw_ = torch.log(w + 1e-6) * x_mask
-            logw = self.dp(x_dp, x_mask, g=g)
+            logw = self.dp(x_dp, x_mask, g=g_dp)
             l_length = torch.sum((logw - logw_) ** 2, [1, 2]) / torch.sum(
                 x_mask
             )  # for averaging
@@ -1177,6 +1325,7 @@ class SynthesizerTrn(nn.Module):
             y_mask=y_mask,
             latents=(z, z_p, m_p, logs_p, m_q, logs_q),
             decoder_subbands=o_mb,
+            flow_logdet=flow_logdet,
         )
 
     def scl_waveform_detached_z(
@@ -1209,6 +1358,55 @@ class SynthesizerTrn(nn.Module):
         g = self._get_global_conditioning(
             sid, lid, speaker_embeddings=speaker_embeddings
         )
+        o, _ = self.dec(z_slice, g=g)
+        return o
+
+    def swap_scl_waveform(
+        self, z_p, y_mask, ids_slice, speaker_embeddings=None, sid=None, lid=None
+    ):
+        """swap-SCL 用の flow 逆走 + decoder forward (v10 S1、ASCL 型)。
+
+        forward が返した z_p (話者 s の統計で非依存化済み latent) を別話者 q の
+        条件付け g_q で flow⁻¹ に通し、decoder で波形化する::
+
+            z_swap = flow⁻¹(z_p.detach(), g_q)
+            y_swap = dec(slice(z_swap), g_q)
+
+        z_p は **method 内部で detach** する (ASCL の stop-gradient 契約 —
+        呼び出し側の detach に依存させない)。勾配は flow (reverse 経路の
+        パラメータ) / decoder FiLM / spk_proj (g_q) に届き、enc_q (posterior) /
+        enc_p には届かない。z の中身は話者 s 由来なので decoder は z から
+        目標話者 q の音色を読めず、same-utt Goodhart が経路的に不可能
+        (design doc §3.1 / F2)。
+
+        Parameters
+        ----------
+        z_p : torch.Tensor
+            flow forward 出力 [B, inter_channels, T_frames]
+            (``forward`` の ``latents[1]``)
+        y_mask : torch.Tensor
+            frame mask [B, 1, T_frames] (``forward`` の ``y_mask``)
+        ids_slice : torch.Tensor
+            ``forward`` が返した slice 開始 index (frame 単位)
+        speaker_embeddings / sid / lid
+            swap 先話者 q の条件付け入力 (lid はテキストの言語のまま —
+            変えるのは話者のみ)
+
+        Returns
+        -------
+        torch.Tensor
+            waveform [B, 1, segment_samples] (``forward`` の waveform と同形状)
+        """
+        z_p = z_p.detach()  # ASCL stop-gradient: enc_q / enc_p / 順方向 flow を遮断
+        g, g_spk, g_lang = self._get_global_conditioning(
+            sid, lid, speaker_embeddings=speaker_embeddings, return_components=True
+        )
+        if self.use_snac_flow:
+            # v10 M1+E2: reverse でも SN/SDN 統計は話者成分のみ、WN は lang のみ
+            z_swap = self.flow(z_p, y_mask, g=g_lang, g_spk=g_spk, reverse=True)
+        else:
+            z_swap = self.flow(z_p, y_mask, g=g, reverse=True)
+        z_slice = commons.slice_segments(z_swap * y_mask, ids_slice, self.segment_size)
         o, _ = self.dec(z_slice, g=g)
         return o
 
@@ -1247,8 +1445,8 @@ class SynthesizerTrn(nn.Module):
             raise ValueError(
                 f"speaker_embeddings dim must be 192, got {speaker_embeddings.shape[-1]}"
             )
-        g = self._get_global_conditioning(
-            sid, lid, speaker_embeddings=speaker_embeddings
+        g, g_spk, g_lang = self._get_global_conditioning(
+            sid, lid, speaker_embeddings=speaker_embeddings, return_components=True
         )
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
         # Match the training-time clamp for consistency between train and
@@ -1258,10 +1456,14 @@ class SynthesizerTrn(nn.Module):
         # Prepare input for duration predictor with prosody features
         x_dp = self._prepare_prosody_input(x, x_mask, prosody_features, lid=lid)
 
+        # v10 M3: 学習と同じ DP 条件付け (dp_spk_head 有効時のみ残差ヘッド加算)
+        g_dp = self._get_dp_conditioning(g)
         if self.use_sdp:
-            logw = self.dp(x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w)
+            logw = self.dp(
+                x_dp, x_mask, g=g_dp, reverse=True, noise_scale=noise_scale_w
+            )
         else:
-            logw = self.dp(x_dp, x_mask, g=g)
+            logw = self.dp(x_dp, x_mask, g=g_dp)
         w = torch.exp(logw) * x_mask * length_scale
         durations = w.squeeze(1)
 
@@ -1291,7 +1493,11 @@ class SynthesizerTrn(nn.Module):
             z_p = m_p
         else:
             z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
-        z = self.flow(z_p, y_mask, g=g, reverse=True)
+        if self.use_snac_flow:
+            # v10 M1+E2: reverse でも学習と同じ分離 (SDN=話者、WN=lang)
+            z = self.flow(z_p, y_mask, g=g_lang, g_spk=g_spk, reverse=True)
+        else:
+            z = self.flow(z_p, y_mask, g=g, reverse=True)
         dec_out = self.dec((z * y_mask)[:, :, :max_len], g=g)
         # Decoder returns (fullband, subbands) in training mode but only
         # fullband in onnx_export_mode. Extract fullband in both cases.
@@ -1310,14 +1516,25 @@ class SynthesizerTrn(nn.Module):
         speaker_embeddings_tgt=None,
     ):
         assert self.n_speakers > 1, "n_speakers have to be larger than 1."
-        g_src = self._get_global_conditioning(
-            sid_src, lid, speaker_embeddings=speaker_embeddings_src
+        g_src, g_spk_src, g_lang = self._get_global_conditioning(
+            sid_src,
+            lid,
+            speaker_embeddings=speaker_embeddings_src,
+            return_components=True,
         )
-        g_tgt = self._get_global_conditioning(
-            sid_tgt, lid, speaker_embeddings=speaker_embeddings_tgt
+        g_tgt, g_spk_tgt, _ = self._get_global_conditioning(
+            sid_tgt,
+            lid,
+            speaker_embeddings=speaker_embeddings_tgt,
+            return_components=True,
         )
         z, _m_q, _logs_q, y_mask = self.enc_q(y, y_lengths, g=g_src)
-        z_p = self.flow(z, y_mask, g=g_src)
-        z_hat = self.flow(z_p, y_mask, g=g_tgt, reverse=True)
+        if self.use_snac_flow:
+            # v10 M1+E2: SN で src 話者統計を除去 → SDN で tgt 話者統計を注入
+            z_p, _logdet = self.flow(z, y_mask, g=g_lang, g_spk=g_spk_src)
+            z_hat = self.flow(z_p, y_mask, g=g_lang, g_spk=g_spk_tgt, reverse=True)
+        else:
+            z_p = self.flow(z, y_mask, g=g_src)
+            z_hat = self.flow(z_p, y_mask, g=g_tgt, reverse=True)
         o_hat, _ = self.dec(z_hat * y_mask, g=g_tgt)
         return o_hat, y_mask, (z, z_p, z_hat)
