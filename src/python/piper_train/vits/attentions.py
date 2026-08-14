@@ -66,16 +66,33 @@ class Encoder(nn.Module):
             )
             self.norm_layers_2.append(LayerNorm(hidden_channels))
 
-    def forward(self, x, x_mask):
+    def forward(self, x, x_mask, cond=None, cond_layer_idx=None):
+        """x を n_layers 段の self-attention + FFN に通す。
+
+        cond / cond_layer_idx (v10 M2, ``--speaker-cond-layer``):
+        ``cond_layer_idx`` (1-based) を指定すると ``cond`` ([b, h, 1] を
+        時間軸 broadcast) を第 N 層の入口で加算する — self-attention が
+        話者情報を見られるようにする VITS2 同構成の注入位置。
+        default (両方 None) は従来経路と bit 互換。
+        """
         attn_mask = x_mask.unsqueeze(2) * x_mask.unsqueeze(-1)
         x = x * x_mask
-        for attn_layer, norm_layer_1, ffn_layer, norm_layer_2 in zip(
-            self.attn_layers,
-            self.norm_layers_1,
-            self.ffn_layers,
-            self.norm_layers_2,
-            strict=False,
+        for i, (attn_layer, norm_layer_1, ffn_layer, norm_layer_2) in enumerate(
+            zip(
+                self.attn_layers,
+                self.norm_layers_1,
+                self.ffn_layers,
+                self.norm_layers_2,
+                strict=False,
+            )
         ):
+            if (
+                cond is not None
+                and cond_layer_idx is not None
+                and i == cond_layer_idx - 1
+            ):
+                # v10 M2: 話者条件を第 cond_layer_idx 層の入口に注入
+                x = (x + cond) * x_mask
             y = attn_layer(x, x, attn_mask)
             y = self.drop(y)
             x = norm_layer_1(x + y)
@@ -275,9 +292,7 @@ class MultiHeadAttention(nn.Module):
                 # additive biases are combined post-scale (matches manual math).
                 attn_bias = self._relative_position_to_absolute_position(rel_logits)
             if self.proximal_bias:
-                assert t_s == t_t, (
-                    "Proximal bias is only available for self-attention."
-                )
+                assert t_s == t_t, "Proximal bias is only available for self-attention."
                 proximal = self._attention_bias_proximal(t_s).type_as(query)
                 attn_bias = proximal if attn_bias is None else attn_bias + proximal
             if mask is not None:

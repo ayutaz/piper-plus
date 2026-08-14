@@ -10,6 +10,7 @@ compute_secs_report の数学 (手計算一致) と CLI 契約 (JSON 構造 / ex
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -331,3 +332,243 @@ class TestCollectWavs:
     def test_missing_dir_fails(self, tmp_path):
         with pytest.raises(SystemExit, match="not a directory"):
             collect_wavs(tmp_path / "missing")
+
+
+# ---------------------------------------------------------------------------
+# zs-eval-v2: gap_same_minus_cross / baseline 比較 (goodhart_flag) /
+# --require-encoder2 (docs/spec/zs-eval-contract.md の制度化)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestGapSameMinusCross:
+    """gap = same_utt − cross_utt。SCL Goodhart で膨らむ成分の直接観測。"""
+
+    def test_gap_is_same_minus_cross(self):
+        synth = np.array([[1, 0, 0], [0, 1, 0]], dtype=np.float64)
+        refs = np.array([[0, 0, 1], [1, 1, 0]], dtype=np.float64)
+        ref_emb = np.array([1, 0, 0], dtype=np.float64)
+        r = compute_secs_report(synth, refs, ref_emb=ref_emb)
+        # same = 0.5, cross = 1/(2*sqrt2)
+        assert r["gap_same_minus_cross"] == pytest.approx(0.5 - SQRT2_INV / 2, abs=1e-9)
+
+    def test_gap_null_without_ref(self):
+        synth = np.array([[1, 0, 0]], dtype=np.float64)
+        refs = np.array([[0, 0, 1], [1, 1, 0]], dtype=np.float64)
+        r = compute_secs_report(synth, refs)
+        assert "gap_same_minus_cross" in r  # null 明示 (キー欠落ではない)
+        assert r["gap_same_minus_cross"] is None
+
+
+def _mk_report(campplus: dict | None = None, encoder2: dict | None = None) -> dict:
+    encoders = {}
+    if campplus is not None:
+        encoders["campplus"] = campplus
+    if encoder2 is not None:
+        encoders["encoder2"] = encoder2
+    return {"encoders": encoders}
+
+
+@pytest.mark.unit
+class TestCompareWithBaseline:
+    """Goodhart 判定: primary Δ >= +0.02 かつ encoder2 Δ < +0.01 で flag。
+
+    Phase 0 Arm B (CAM++ +0.023 / ECAPA +0.002 = Goodhart 棄却) の判定基準を
+    そのまま制度化する (zero-shot-warm-restart-diagnostics-phase0-1.md §3)。
+    """
+
+    def test_goodhart_true_when_only_primary_moves(self):
+        # Arm B 実測値の再現: CAM++ +0.023 / ECAPA +0.002
+        cur = _mk_report({"cross_utt_secs": 0.653}, {"cross_utt_secs": 0.502})
+        base = _mk_report({"cross_utt_secs": 0.630}, {"cross_utt_secs": 0.500})
+        c = eval_zs_secs.compare_with_baseline(cur, base)
+        assert c["goodhart_flag"] is True
+        assert c["deltas"]["campplus"]["cross_utt_secs"] == pytest.approx(0.023)
+        assert c["deltas"]["encoder2"]["cross_utt_secs"] == pytest.approx(0.002)
+
+    def test_goodhart_false_when_encoder2_follows(self):
+        cur = _mk_report({"cross_utt_secs": 0.660}, {"cross_utt_secs": 0.520})
+        base = _mk_report({"cross_utt_secs": 0.630}, {"cross_utt_secs": 0.500})
+        c = eval_zs_secs.compare_with_baseline(cur, base)
+        assert c["goodhart_flag"] is False
+
+    def test_goodhart_false_when_primary_below_threshold(self):
+        cur = _mk_report({"cross_utt_secs": 0.645}, {"cross_utt_secs": 0.500})
+        base = _mk_report({"cross_utt_secs": 0.630}, {"cross_utt_secs": 0.500})
+        c = eval_zs_secs.compare_with_baseline(cur, base)
+        assert c["goodhart_flag"] is False
+
+    def test_goodhart_null_without_encoder2(self):
+        cur = _mk_report({"cross_utt_secs": 0.653})
+        base = _mk_report({"cross_utt_secs": 0.630})
+        c = eval_zs_secs.compare_with_baseline(cur, base)
+        assert c["goodhart_flag"] is None
+
+    def test_gap_widening_detected(self):
+        cur = _mk_report({"cross_utt_secs": 0.65, "gap_same_minus_cross": 0.06})
+        base = _mk_report({"cross_utt_secs": 0.64, "gap_same_minus_cross": 0.04})
+        c = eval_zs_secs.compare_with_baseline(cur, base)
+        assert c["gap_widened_encoders"] == ["campplus"]
+        assert c["deltas"]["campplus"]["gap_same_minus_cross"] == pytest.approx(0.02)
+
+    def test_gap_from_v1_baseline_without_gap_field(self):
+        """v1 schema (gap field なし) でも same/cross から gap を復元して比較。"""
+        cur = _mk_report({"cross_utt_secs": 0.65, "gap_same_minus_cross": 0.06})
+        base = _mk_report({"cross_utt_secs": 0.64, "same_utt_secs": 0.68})  # gap 0.04
+        c = eval_zs_secs.compare_with_baseline(cur, base)
+        assert c["deltas"]["campplus"]["gap_same_minus_cross"] == pytest.approx(0.02)
+        assert c["gap_widened_encoders"] == ["campplus"]
+
+    def test_gap_delta_null_when_unmeasured(self):
+        cur = _mk_report({"cross_utt_secs": 0.65})
+        base = _mk_report({"cross_utt_secs": 0.64})
+        c = eval_zs_secs.compare_with_baseline(cur, base)
+        assert c["deltas"]["campplus"]["gap_same_minus_cross"] is None
+        assert c["gap_widened_encoders"] == []
+
+
+@pytest.mark.unit
+class TestCliEvalV2:
+    """CLI 契約: schema v2 / --require-encoder2 / --baseline-json。"""
+
+    def _run(self, wav_dirs, tmp_path, extra):
+        json_out = tmp_path / "report.json"
+        rc = eval_zs_secs.main(
+            [
+                "--synth-dir",
+                str(wav_dirs["synth"]),
+                "--speaker-utts",
+                str(wav_dirs["spk"]),
+                "--exclude-ref",
+                str(wav_dirs["spk"] / "r1.wav"),
+                "--encoder",
+                "campplus_model.onnx",
+                "--json-out",
+                str(json_out),
+                *extra,
+            ]
+        )
+        return rc, json_out
+
+    def _write_baseline(self, tmp_path, campplus, encoder2=None):
+        base = {"encoders": {"campplus": campplus}}
+        if encoder2 is not None:
+            base["encoders"]["encoder2"] = encoder2
+        p = tmp_path / "baseline.json"
+        p.write_text(json.dumps(base), encoding="utf-8")
+        return p
+
+    def test_schema_v2_fields_always_present(self, wav_dirs, patched_cli, tmp_path):
+        rc, json_out = self._run(wav_dirs, tmp_path, ["--encoder2", "ecapa_model.onnx"])
+        assert rc == 0
+        report = json.loads(json_out.read_text(encoding="utf-8"))
+        assert report["schema"] == "zs-eval-v2"
+        assert report["goodhart_flag"] is None  # baseline なしでは判定不能
+        cam = report["encoders"]["campplus"]
+        assert cam["gap_same_minus_cross"] == pytest.approx(
+            0.5 - SQRT2_INV / 2, abs=1e-6
+        )
+
+    def test_gap_null_explicit_without_ref(self, wav_dirs, patched_cli, tmp_path):
+        json_out = tmp_path / "report.json"
+        rc = eval_zs_secs.main(
+            [
+                "--synth-dir",
+                str(wav_dirs["synth"]),
+                "--speaker-utts",
+                str(wav_dirs["spk"]),
+                "--encoder",
+                "campplus_model.onnx",
+                "--json-out",
+                str(json_out),
+            ]
+        )
+        assert rc == 0
+        report = json.loads(json_out.read_text(encoding="utf-8"))
+        cam = report["encoders"]["campplus"]
+        assert cam["same_utt_secs"] is None
+        assert "gap_same_minus_cross" in cam  # 未計測でも null 明示
+        assert cam["gap_same_minus_cross"] is None
+
+    def test_require_encoder2_exits_2(self, wav_dirs, patched_cli, tmp_path):
+        rc, _ = self._run(wav_dirs, tmp_path, ["--require-encoder2"])
+        assert rc == 2
+
+    def test_require_encoder2_passes_with_encoder2(
+        self, wav_dirs, patched_cli, tmp_path
+    ):
+        rc, _ = self._run(
+            wav_dirs, tmp_path, ["--require-encoder2", "--encoder2", "ecapa_model.onnx"]
+        )
+        assert rc == 0
+
+    def test_no_encoder2_warns_goodhart_blind(
+        self, wav_dirs, patched_cli, tmp_path, caplog
+    ):
+        with caplog.at_level(logging.WARNING):
+            rc, _ = self._run(wav_dirs, tmp_path, [])
+        assert rc == 0
+        assert "Goodhart 検知不能" in caplog.text
+
+    def test_baseline_goodhart_flag_true(self, wav_dirs, patched_cli, tmp_path, caplog):
+        # 現在値 (fake embs): campplus cross=0.3536 / encoder2 cross=1.0
+        # baseline を campplus Δ=+0.0236 (>= +0.02) / encoder2 Δ=+0.005 (< +0.01)
+        # になるよう設定 → Goodhart flag
+        baseline = self._write_baseline(
+            tmp_path,
+            {"cross_utt_secs": 0.33, "gap_same_minus_cross": 0.15},
+            {"cross_utt_secs": 0.995, "gap_same_minus_cross": 0.0},
+        )
+        with caplog.at_level(logging.WARNING):
+            rc, json_out = self._run(
+                wav_dirs,
+                tmp_path,
+                ["--encoder2", "ecapa_model.onnx", "--baseline-json", str(baseline)],
+            )
+        assert rc == 0
+        report = json.loads(json_out.read_text(encoding="utf-8"))
+        assert report["goodhart_flag"] is True
+        comp = report["baseline_comparison"]
+        assert comp["goodhart_flag"] is True
+        assert comp["deltas"]["campplus"]["cross_utt_secs"] == pytest.approx(
+            SQRT2_INV / 2 - 0.33, abs=1e-6
+        )
+        assert "Goodhart" in caplog.text
+
+    def test_baseline_both_encoders_up_no_flag(self, wav_dirs, patched_cli, tmp_path):
+        # encoder2 Δ=+0.02 >= +0.01 → 両 encoder 同調 = Goodhart ではない
+        baseline = self._write_baseline(
+            tmp_path,
+            {"cross_utt_secs": 0.33, "gap_same_minus_cross": 0.15},
+            {"cross_utt_secs": 0.98, "gap_same_minus_cross": 0.0},
+        )
+        rc, json_out = self._run(
+            wav_dirs,
+            tmp_path,
+            ["--encoder2", "ecapa_model.onnx", "--baseline-json", str(baseline)],
+        )
+        assert rc == 0
+        report = json.loads(json_out.read_text(encoding="utf-8"))
+        assert report["goodhart_flag"] is False
+
+    def test_baseline_gap_widening_warns(self, wav_dirs, patched_cli, tmp_path, caplog):
+        # 現在の campplus gap = 0.5 - 0.3536 = 0.1464。baseline gap 0.10 →
+        # Δgap = +0.046 >= +0.01 で警告 (Δcross = +0.0036 < +0.02 なので
+        # goodhart 条件とは独立に発火することも確認)
+        baseline = self._write_baseline(
+            tmp_path, {"cross_utt_secs": 0.35, "gap_same_minus_cross": 0.10}
+        )
+        with caplog.at_level(logging.WARNING):
+            rc, json_out = self._run(
+                wav_dirs, tmp_path, ["--baseline-json", str(baseline)]
+            )
+        assert rc == 0
+        report = json.loads(json_out.read_text(encoding="utf-8"))
+        assert report["baseline_comparison"]["gap_widened_encoders"] == ["campplus"]
+        assert "拡大" in caplog.text
+
+    def test_baseline_json_missing_fails(self, wav_dirs, patched_cli, tmp_path):
+        with pytest.raises(SystemExit, match="baseline-json not found"):
+            self._run(
+                wav_dirs, tmp_path, ["--baseline-json", str(tmp_path / "nope.json")]
+            )
