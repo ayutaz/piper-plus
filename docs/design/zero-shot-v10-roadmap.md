@@ -208,6 +208,15 @@ v9 ep49 から 8ep warm restart、対照 = Phase 0 Arm A。全数値: HF
 
 ## Phase 2: v10 本格 (~$300-600、2 ヶ月目〜)
 
+> **2026-08-14 更新**: 追加文献調査 4 系統 (推論経路 SCL / 構造介入 / レシピ /
+> 成功例解剖) を完了し、**v10 の確定設計は
+> [`zero-shot-v10-design.md`](zero-shot-v10-design.md) に集約**した (故障機構→
+> 対策マッピング、swap-SCL、M1-M3 配線修正、80ep レシピ、受け入れ基準、
+> ~$300-500 / ~1 ヶ月)。以下の C-0〜C-4 は設計 doc に統合済みで、tracking は
+> 設計 doc §6 の実行計画 (2a-2d) に従う。主な設計変更: enc_p 注入位置 + DP
+> detach の配線欠陥を新発見 (実コード監査)、DINO 廃止、σ noise → Latent
+> Filling 置換、C-2 は SNAC 化 (AdaLN flow 化は CPU コスト制約で見送り)。
+
 - [ ] **C-0. ライセンス実確認を最初のタスクに置く**: JVS (findings 間で商用可否が
       矛盾 — 規約原文確認、NC 確定なら学習除外・ローカル評価のみ) /
       Emilia-YODAS ja (Amphion card と KRAFTON README で表記矛盾 — LICENSE 現物確認)
