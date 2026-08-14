@@ -106,6 +106,22 @@ case "$CMD" in
     deny "npm publish は手動で行わず、release ワークフロー経由で実行してください。" ;;
 esac
 
+# --- zero-shot SECS 評価は第 2 encoder 必須 (Goodhart 検知) ----------------
+# 2026-08 事故: SCL と同型の CAM++ 単独で測ると「似ていない」モデルでも
+# SECS が高く出る (same-utt 0.775 誤報 / Phase 0 Arm B の偽改善)。
+# eval_zs_secs の実行には --encoder2 (held-out encoder) を必須とする。
+# 契約: docs/spec/zs-eval-contract.md / skill: /eval-zs
+# pytest (テスト実行) と --help は対象外。
+case "$CMD" in
+  *pytest*|*"--help"*) : ;;
+  *"piper_train.tools.eval_zs_secs"*|*"eval_zs_secs.py"*)
+    case "$CMD" in
+      *"--encoder2"*) : ;;
+      *)
+        deny "eval_zs_secs の --encoder2 なし実行は禁止です。第 2 encoder (ECAPA 等) なしでは Goodhart (訓練指標と同型の偽改善) を検知できません。--encoder2 <onnx> を付けて実行してください (契約: docs/spec/zs-eval-contract.md、手順: /eval-zs skill)。" ;;
+    esac ;;
+esac
+
 # --- PR 作成は /create-pr skill 経由を強制 -------------------------------
 # `gh pr create` を直接実行すると /create-pr skill のフェーズ 6.2 で発動する
 # `/watch-pr` auto-chain が走らず、 CI 監視が起動しない (PR #498 で発覚)。
