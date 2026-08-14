@@ -608,6 +608,7 @@ cat test.jsonl | uv run python -m piper_train.infer_onnx --model <model.onnx> --
 | `/add-language <code>` / `/review-language <code>` | 新言語追加と 10 エージェント並列レビュー |
 | `/release-prep` / `/prepare-release` | リリース確認 (read-mostly) と bump 適用案 |
 | `/publish-model` | 学習 ckpt → export + sanity + bench + HF upload chain |
+| `/eval-zs` | zero-shot SECS 評価の標準手順 (cross-utt + dual-encoder + Goodhart 検知 + 4 点判定)。SECS 評価・モデル比較は本 skill 経由必須 |
 | `/bump-deps` | ORT/openjtalk/ruff の cross-runtime canonical sync 更新 |
 | `/skill-health` | skill / hook 自身の health check (frontmatter / script 参照 / trigger 衝突) |
 

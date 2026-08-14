@@ -884,6 +884,19 @@ repos:
         files: (^|/)tests?/.*\.py$|(^|/)test_[^/]*\.py$|^scripts/check_test_threshold_relaxation\.py$
         pass_filenames: false
 
+      # zero-shot 再発防止テスト / 評価 Goodhart ガードの削除・改名検出。
+      # 2026-08 の話者類似度事故 (same-utt SECS Goodhart / posterior leak) の
+      # 再発防止面 (命名済み防止テスト + eval_zs_secs の goodhart_flag /
+      # --require-encoder2 + guard-bash の encoder2 必須 gate) が黙って
+      # 消えるのを block する。意図的な廃止は EXPECTED を同一 commit で更新。
+      # 背景: docs/design/zero-shot-warm-restart-diagnostics-phase0-1.md
+      - id: zs-prevention-gate
+        name: zero-shot prevention tests / eval guards intact
+        entry: uv run --no-sync python scripts/check_zs_prevention_tests.py
+        language: system
+        files: ^src/python/tests/test_(scl_differentiable|v10_structure|v10_speaker_signal|eval_zs_secs)\.py$|^src/python/piper_train/tools/eval_zs_secs\.py$|^docs/spec/zs-eval-contract\.md$|^\.claude/hooks/guard-bash\.sh$|^scripts/check_zs_prevention_tests\.py$
+        pass_filenames: false
+
       # gofmt drift catch. Go's tooling already enforces this in CI, but
       # catching it at commit time prevents the cycle-of-shame
       # local-clean / CI-fail pattern (PR #401 ruff parallel). `gofmt -l`
