@@ -418,6 +418,13 @@ class ResidualCouplingLayer(nn.Module):
         p_dropout: float = 0,
         gin_channels: int = 0,
         mean_only: bool = False,
+        # v10 M1 (SNAC, arXiv:2211.16866): 話者正規化 affine coupling。
+        # forward 入口で SN(x1; g_spk) = (x1 - m) * exp(-v)、reverse 出口で
+        # SDN(x1; g_spk) = x1 * exp(v) + m を適用する。m, v は
+        # sn_linear(g_spk) を chunk (m が先)。E2: 統計は話者成分 g_spk のみ
+        # から予測し、WN の g 条件付け (lang 成分) とは分離する。
+        # default False は既存経路と bit 互換 (新規パラメータなし = v9 ckpt 互換)。
+        use_snac: bool = False,
     ):
         assert channels % 2 == 0, "channels should be divisible by 2"
         super().__init__()
@@ -428,6 +435,7 @@ class ResidualCouplingLayer(nn.Module):
         self.n_layers = n_layers
         self.half_channels = channels // 2
         self.mean_only = mean_only
+        self.use_snac = use_snac
 
         self.pre = nn.Conv1d(self.half_channels, hidden_channels, 1)
         self.enc = WN(
@@ -442,8 +450,27 @@ class ResidualCouplingLayer(nn.Module):
         self.post.weight.data.zero_()
         self.post.bias.data.zero_()
 
-    def forward(self, x, x_mask, g=None, reverse=False):
+        if use_snac:
+            if gin_channels == 0:
+                raise ValueError("use_snac=True requires gin_channels > 0")
+            self.sn_linear = nn.Conv1d(gin_channels, 2 * self.half_channels, 1)
+            # 新設ヘッドは --film-init-std と無関係に無条件で small-Gaussian
+            # N(0, 1e-3) init (AdaLN-Zero 分析、v10 design §4 E1)。bias=0 で
+            # 学習開始時の SN はほぼ identity。
+            nn.init.normal_(self.sn_linear.weight, 0.0, 1e-3)
+            nn.init.zeros_(self.sn_linear.bias)
+
+    def forward(self, x, x_mask, g=None, reverse=False, g_spk=None):
         x0, x1 = torch.split(x, [self.half_channels] * 2, 1)
+        sn_m = sn_v = None
+        if self.use_snac and g_spk is not None:
+            # chunk 順は m が先 (tests/test_v10_structure.py で固定)。
+            # v は bf16 の exp overflow 対策で clamp [-4, 4] (v10 design §4 M1)。
+            sn_m, sn_v = torch.chunk(self.sn_linear(g_spk), 2, dim=1)
+            sn_v = sn_v.clamp(min=-4.0, max=4.0)
+        if not reverse and sn_m is not None:
+            # SN: 入口で話者統計を除去 (x1 のみ — x0 は coupling の条件側)
+            x1 = (x1 - sn_m) * torch.exp(-sn_v) * x_mask
         h = self.pre(x0) * x_mask
         h = self.enc(h, x_mask, g=g)
         stats = self.post(h) * x_mask
@@ -457,9 +484,15 @@ class ResidualCouplingLayer(nn.Module):
             x1 = m + x1 * torch.exp(logs) * x_mask
             x = torch.cat([x0, x1], 1)
             logdet = torch.sum(logs, [1, 2])
+            if sn_v is not None:
+                # SN の対数行列式: dx1'/dx1 = exp(-v) → logdet -= Σ v (mask 内)
+                logdet = logdet - torch.sum(sn_v * x_mask, [1, 2])
             return x, logdet
         else:
             x1 = (x1 - m) * torch.exp(-logs) * x_mask
+            if sn_m is not None:
+                # SDN: reverse 出口で話者統計を再注入
+                x1 = (x1 * torch.exp(sn_v) + sn_m) * x_mask
             x = torch.cat([x0, x1], 1)
             return x
 

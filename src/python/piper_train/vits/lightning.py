@@ -20,14 +20,19 @@ from .commons import (
 )
 from .dataset import Batch, PiperDataset, SpeakerBalancedBatchSampler, UtteranceCollate
 from .losses import (
+    build_latent_filling_embeddings,
+    build_same_language_permutation,
     dino_loss,
     discriminator_loss,
     feature_loss,
+    gather_speaker_loss_inputs,
     generator_loss,
     kl_loss,
     mel_speaker_consistency_loss,
+    should_run_latent_filling_step,
     speaker_consistency_loss,
     speaker_infonce_loss,
+    swap_spk_ramp_weight,
 )
 from .mb_istft import PQMF
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
@@ -49,6 +54,10 @@ except ImportError:
     WANDB_AVAILABLE = False
 
 _LOGGER = logging.getLogger("vits.lightning")
+# パッケージ名前空間の logger。本モジュールの _LOGGER は歴史的経緯で
+# "vits.lightning" 名のため、ユーザ向け警告 (F8 DINO 退化警告等) は
+# piper_train.* 名前空間で出す (logging config / テストの補足対象)。
+_PKG_LOGGER = logging.getLogger("piper_train.vits.lightning")
 
 # Memory cleanup frequency (iterations)
 MEMORY_CLEANUP_FREQUENCY = 500
@@ -269,6 +278,22 @@ class VitsModel(pl.LightningModule):
         # 制限し、「decoder が GT 由来の z から音色を読む」posterior leak を
         # 遮断する。decoder forward が 1 回増えるため step 時間が増加する
         scl_detach_z: bool = False,
+        # v10 S1 (swap-SCL、design doc §3.1): flow を同一言語の別話者
+        # embedding で逆走させた波形に speaker loss を当てる (ASCL 型)。
+        # z_p の中身は元話者由来なので same-utt Goodhart が経路的に不可能。
+        # scl_encoder (--speaker-encoder-torch-path) 必須。default 0.0 = off
+        c_swap_spk: float = 0.0,
+        swap_spk_start_epoch: int = 10,
+        swap_spk_ramp_epochs: int = 5,
+        # v10 §3.2 (SupCon 改良): DDP 全 rank の SCL embedding を勾配が通る
+        # all_gather で結合してから InfoNCE へ (負例プール x world_size)
+        spk_loss_gather: bool = False,
+        # InfoNCE/SupCon の softmax 温度 (v10 recipe は 0.1 を指定)
+        spk_loss_temperature: float = 0.07,
+        # v10 §3.3 (Latent Filling、arXiv:2310.03538): 確率 τ の step で
+        # 条件 embedding を同一言語補間 or 微小 noise に置換し、LFCL のみで
+        # G を更新 (D 更新 skip)。σ noise (F7 で廃止) の置換。0.0 = off
+        latent_filling_tau: float = 0.0,
         # Speaker embedding dropout for dual-mode training (DEPRECATED: no longer used,
         # spk_proj is now the sole speaker conditioning path)
         spk_emb_dropout: float = 0.0,
@@ -337,6 +362,16 @@ class VitsModel(pl.LightningModule):
         # correction is dropped (SDPA does not surface p_attn). Expected win:
         # +2-5% throughput, activation memory -60MB/batch on v8 real config.
         attn_drop_rel_v: bool = False,
+        # v10 構造介入 (M1/M2/M3/E1、default は全て off / 0 = v9 bit 互換。
+        # docs/design/zero-shot-v10-design.md §4):
+        # M2: enc_p の話者注入を transformer 第 N 層入口へ (0 = 従来の後段加算)
+        speaker_cond_layer: int = 0,
+        # M3: duration 勾配を spk_proj_dp 残差ヘッドへ通す (spk_proj 本体は保護)
+        dp_spk_head: bool = False,
+        # M1+E2: flow coupling の SNAC 化 + flow logdet の KL 配線
+        use_snac_flow: bool = False,
+        # E1: dec FiLM (cond_layers) の zero-init を N(0, std) に置換
+        film_init_std: float = 0.0,
         **kwargs,
     ):
         super().__init__()
@@ -376,6 +411,10 @@ class VitsModel(pl.LightningModule):
             prosody_dim=self.hparams.prosody_dim,
             attn_drop_rel_v=self.hparams.attn_drop_rel_v,
             use_channels_last=self.hparams.use_channels_last,
+            speaker_cond_layer=self.hparams.speaker_cond_layer,
+            dp_spk_head=self.hparams.dp_spk_head,
+            use_snac_flow=self.hparams.use_snac_flow,
+            film_init_std=self.hparams.film_init_std,
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm,
@@ -429,6 +468,44 @@ class VitsModel(pl.LightningModule):
                 )
         # cross_utt 正例モードで speaker_ids 欠落時の警告は一度だけ出す
         self._warned_cross_utt_no_sid = False
+
+        # v10 F8: DINO は本実装の構成 (frozen CAM++ / 同一入力 / view 拡張なし)
+        # では慣性項に退化していることが確定している (design doc F8 —
+        # DINO-VITS の効果の本体は「ノイズ拡張 view + speaker encoder joint FT
+        # の正則化」で、我々の版にはどちらもない)。c_dino > 0 のまま学習を
+        # 始めるユーザに構築時 1 回だけ警告する。
+        if self.hparams.c_dino > 0 and self.spk_proj_teacher is not None:
+            _PKG_LOGGER.warning(
+                "c_dino=%s > 0 but the DINO loss is known to degenerate into "
+                "an inertia term in this implementation (frozen CAM++, "
+                "identical student/teacher inputs, no view augmentation — "
+                "v10 design doc F8). The v10 recipe recommends c_dino=0 "
+                "(cross-utt SupCon is the functional superset).",
+                self.hparams.c_dino,
+            )
+
+        # v10 S1 / §3.3: swap-SCL と Latent Filling は微分可能 CAM++
+        # (scl_encoder) が学習信号の実体。encoder 無しでは勾配ゼロなので
+        # 黙って劣化させず、構築時に警告して無効化する。
+        if getattr(self.hparams, "c_swap_spk", 0.0) > 0 and self.scl_encoder is None:
+            _PKG_LOGGER.warning(
+                "c_swap_spk=%s > 0 but no differentiable speaker encoder is "
+                "loaded (--speaker-encoder-torch-path) — swap-SCL disabled.",
+                self.hparams.c_swap_spk,
+            )
+        if (
+            getattr(self.hparams, "latent_filling_tau", 0.0) > 0
+            and self.scl_encoder is None
+        ):
+            _PKG_LOGGER.warning(
+                "latent_filling_tau=%s > 0 but no differentiable speaker "
+                "encoder is loaded (--speaker-encoder-torch-path) — Latent "
+                "Filling disabled.",
+                self.hparams.latent_filling_tau,
+            )
+        # Latent Filling step flag: training_step_g が set し、training_step が
+        # D 更新 skip の判断に使う (LF step は LFCL のみで G を更新する契約)
+        self._lf_step_active = False
 
         # CAM++ Speaker Encoder for SCL (optional, CPU-only ONNX, not an nn.Module)
         self.speaker_encoder = None
@@ -1098,6 +1175,21 @@ class VitsModel(pl.LightningModule):
             # Skip G update on this step (D-only step)
             self._log_with_batch_info("g_step_skipped", 1.0, batch)
 
+        # v10 §3.3 (Latent Filling): LF step は LFCL のみで G を更新し、D 更新
+        # は skip する (論文準拠 — s̃ に対応する実波形が存在しないため D の
+        # real/fake ペアが定義できない)。should_run_latent_filling_step が
+        # global_step の決定論的関数なので全 rank が同時に skip し DDP 整合が
+        # 保たれる。LF は G 更新 step に限定される (d_update_interval 配線)
+        # ため、ここに来た時点で opt_g.step() は必ず実行済み = global_step は
+        # 前進しており、update_generator=False との重なりで optimizer.step()
+        # ゼロのまま return する決定論的ラッチは構造的に起きない。
+        if self._lf_step_active:
+            self._lf_step_active = False
+            self._log_with_batch_info("lf_step", 1.0, batch)
+            self._y = None
+            self._y_hat = None
+            return
+
         # Train discriminator (every step)
         opt_d.zero_grad()
         loss_d = self.training_step_d(batch)
@@ -1184,6 +1276,75 @@ class VitsModel(pl.LightningModule):
 
         return None
 
+    def _latent_filling_step_g(
+        self,
+        batch: Batch,
+        x,
+        x_lengths,
+        spec,
+        spec_lengths,
+        language_ids,
+        prosody_features,
+        speaker_embeddings,
+    ):
+        """Latent Filling step の G 損失 (v10 §3.3、arXiv:2310.03538 準拠)。
+
+        条件 embedding を s̃ (同一言語 2 話者の λ~Beta(0.5,0.5) 補間 or
+        s + N(0, 1e-4)) に置換して通常 forward し、generator 損失を
+        LFCL = 1 - cos(CAM++(y_hat), s̃) **のみ**に置換する。s̃ は実在参照を
+        持たないため recon/mel/KL/GAN は定義できず skip する (論文準拠)。
+        D 更新 skip は training_step が ``_lf_step_active`` flag で行う。
+
+        NaN ガードについて: LFCL が G 損失の全体なので、既存 SCL のような
+        「0 を返す」ガードは graph を失い ``manual_backward`` が失敗する。
+        non-finite はそのまま返し、training_step の DDP-synced non-finite
+        skip (全 rank 一致) に処理を委ねる。
+        """
+        self._lf_step_active = True
+        # LF step は mel/kl 等の probe 対象成分を持たない — probe は見送る
+        # (graph を跨いで保持しないよう参照も解放)
+        self._grad_probe_losses = None
+
+        # 乱数は global_step 由来 seed の CPU generator から引く: 再現性 +
+        # グローバル RNG stream (rand_slice_segments 等) を汚さない
+        g_lf = torch.Generator()
+        g_lf.manual_seed((int(self.global_step) * 2654435761 + 0x9E3779B9) % (2**63))
+        # speaker_ids を渡し同一話者ペアの補間 (≒恒等) を除外する。
+        # language-balanced sampling + samples_per_speaker>1 では言語グループ
+        # が 1 話者の複数発話だけになる batch が典型的にあり、これがないと
+        # 補間 branch が同一話者補間に希釈される
+        s_tilde = build_latent_filling_embeddings(
+            speaker_embeddings,
+            language_ids=language_ids,
+            speaker_ids=batch.speaker_ids,
+            generator=g_lf,
+        )
+
+        g_output = self.model_g(
+            x,
+            x_lengths,
+            spec,
+            spec_lengths,
+            None,  # sid=None: spk_proj is the sole speaker conditioning path
+            lid=language_ids,
+            prosody_features=prosody_features,
+            speaker_embeddings=s_tilde,
+        )
+        y_hat = g_output.waveform
+        # D は skip されるが、non-finite skip 経路が self._y/_y_hat を触るため
+        # 参照を一貫させておく
+        self._y_hat = y_hat.contiguous()
+        self._y = None
+
+        with autocast(self.device.type, enabled=False):
+            with self._scl_autocast_ctx():
+                emb_gen = self.scl_encoder(y_hat.squeeze(1).float())
+                loss_lf = (
+                    1.0 - F.cosine_similarity(emb_gen, s_tilde.float(), dim=-1)
+                ).mean()
+            self._log_with_batch_info("loss_lf", loss_lf, batch)
+        return loss_lf
+
     def training_step_g(self, batch: Batch):
         (
             x,
@@ -1216,8 +1377,10 @@ class VitsModel(pl.LightningModule):
         )
         self._grad_probe_losses = probe_losses
 
-        # Speaker embedding perturbation for zero-shot generalization
-        # (sigma=0.05 improves robustness to unseen speaker embeddings at inference)
+        # Speaker embedding perturbation for zero-shot generalization.
+        # v10 F7: default は 0.0 (無効)。σ=0.05 は Latent Filling の文献値
+        # σ=1e-4 の 500 倍で破壊的と判明 (design doc F7、Phase 0 Arm D)。
+        # v9 以前の再現は --spk-emb-noise-sigma 0.05 の明示指定で可能。
         # NOTE: noise 加算後に L2 再正規化を行う。CAM++ 出力 (norm=1.0) に対し、
         # ``+ N(0, σ² I)`` を加えると期待 norm が ``√(1 + σ²·dim)`` (sigma=0.05,
         # dim=192 で約 1.22) に増加する。再正規化しないと spk_proj の入力分布が
@@ -1226,13 +1389,46 @@ class VitsModel(pl.LightningModule):
         # ``loss_dino`` が NaN マスクで 0 に貼り付く現象が発生する
         # (multi-6lang スクラッチで step ~1249 から実測)。
         if self.training and speaker_embeddings is not None:
-            sigma = getattr(self.hparams, "spk_emb_noise_sigma", 0.05)
+            sigma = getattr(self.hparams, "spk_emb_noise_sigma", 0.0)
             speaker_embeddings = (
                 speaker_embeddings + torch.randn_like(speaker_embeddings) * sigma
             )
             speaker_embeddings = torch.nn.functional.normalize(
                 speaker_embeddings, p=2, dim=-1
             )
+
+        # --- Latent Filling step (v10 §3.3、arXiv:2310.03538 準拠) ---
+        # 確率 τ の step で条件 embedding を s̃ (同一言語補間 or 微小 noise) に
+        # 置換し、G の損失を LFCL のみに置換する (recon/mel/KL/GAN skip。
+        # D 更新 skip は training_step 側が _lf_step_active flag で行う)。
+        # should_run_latent_filling_step は global_step の決定論的関数なので
+        # 全 rank が同時に LF step になり DDP の all_reduce 整合が保たれる。
+        # d_update_interval を配線するのはラッチ防止 (G 更新なしの D-only
+        # step で LF が発動すると optimizer.step() ゼロ → global_step 凍結 →
+        # 全 batch が永久に同一分岐の no-op になる)。詳細は
+        # should_run_latent_filling_step の docstring 参照。
+        self._lf_step_active = False
+        if self.training and speaker_embeddings is not None:
+            lf_tau = float(getattr(self.hparams, "latent_filling_tau", 0.0) or 0.0)
+            if (
+                lf_tau > 0
+                and self.scl_encoder is not None
+                and should_run_latent_filling_step(
+                    self.global_step,
+                    lf_tau,
+                    d_update_interval=self.hparams.d_update_interval,
+                )
+            ):
+                return self._latent_filling_step_g(
+                    batch,
+                    x,
+                    x_lengths,
+                    spec,
+                    spec_lengths,
+                    language_ids,
+                    prosody_features,
+                    speaker_embeddings,
+                )
 
         g_output = self.model_g(
             x,
@@ -1325,7 +1521,13 @@ class VitsModel(pl.LightningModule):
             # becomes a no-op. Observed on v8 A100 SXM4 real-config smoke:
             # without this cap, batch 31 onwards diverges 100% (262/300 skip)
             # despite the source clamps.
-            loss_kl_raw = kl_loss(z_p, logs_q, m_p, logs_p, z_mask)
+            # v10 M1 (SNAC flow): flow forward の logdet を KL に配線する。
+            # log p(z) = log N(flow(z); m_p, logs_p) + logdet なので負号で
+            # 効く (kl_loss 内部で - Σ logdet / Σ z_mask)。snac off では
+            # flow_logdet=None で従来と厳密一致。
+            loss_kl_raw = kl_loss(
+                z_p, logs_q, m_p, logs_p, z_mask, logdet=g_output.flow_logdet
+            )
             loss_kl = loss_kl_raw.clamp(max=_KL_CAP) * kl_weight
             # The cap hides divergence from the non-finite skip machinery, so
             # watch the raw value for cap sticking (aborts an unrecoverable
@@ -1401,10 +1603,7 @@ class VitsModel(pl.LightningModule):
                         positive_mode = getattr(
                             self.hparams, "spk_loss_positives", "same_utt"
                         )
-                        if (
-                            positive_mode == "cross_utt"
-                            and batch.speaker_ids is None
-                        ):
+                        if positive_mode == "cross_utt" and batch.speaker_ids is None:
                             # cross_utt は speaker_ids 必須 — 欠落時は従来挙動で
                             # 継続 (single-speaker FT 等)。黙って劣化しないよう警告
                             if not self._warned_cross_utt_no_sid:
@@ -1415,11 +1614,26 @@ class VitsModel(pl.LightningModule):
                                 )
                                 self._warned_cross_utt_no_sid = True
                             positive_mode = "same_utt"
+                        # v10 §3.2: --spk-loss-gather で DDP 全 rank の embedding
+                        # を結合 (勾配が通る torch.distributed.nn.all_gather —
+                        # 素の all_gather は勾配を切る)。負例 28 → world_size 倍
+                        gen_for_loss = gen_embedding
+                        ref_for_loss = ref_embedding
+                        sids_for_loss = batch.speaker_ids
+                        if getattr(self.hparams, "spk_loss_gather", False):
+                            gen_for_loss, ref_for_loss, sids_for_loss = (
+                                gather_speaker_loss_inputs(
+                                    gen_for_loss, ref_for_loss, sids_for_loss
+                                )
+                            )
                         loss_spk = (
                             speaker_infonce_loss(
-                                gen_embedding,
-                                ref_embedding,
-                                speaker_ids=batch.speaker_ids,
+                                gen_for_loss,
+                                ref_for_loss,
+                                speaker_ids=sids_for_loss,
+                                temperature=getattr(
+                                    self.hparams, "spk_loss_temperature", 0.07
+                                ),
                                 positive_mode=positive_mode,
                             )
                             * self.hparams.c_spk
@@ -1480,6 +1694,76 @@ class VitsModel(pl.LightningModule):
                     # probe は loss_gen_all への寄与 (重み付き) を記録する
                     if probe_losses is not None:
                         probe_losses["spk"] = loss_spk * self.hparams.c_spk
+
+            # --- S1 swap-SCL (v10 §3.1、ASCL 型) ---
+            # batch 内の同一言語別話者 embedding g_q で flow を逆走させた波形に
+            # speaker loss を当てる。z_p の中身は元話者由来なので decoder は
+            # z から目標話者 q の音色を読めず、same-utt Goodhart が経路的に
+            # 不可能 (F2)。flow reverse + decoder FiLM に初めて話者勾配が届く。
+            # weight は KL annealing 完了後 (start_epoch) から ramp (§3.4)。
+            c_swap = float(getattr(self.hparams, "c_swap_spk", 0.0) or 0.0)
+            if (
+                self.training
+                and c_swap > 0
+                and speaker_embeddings is not None
+                and self.scl_encoder is not None
+            ):
+                ramp = swap_spk_ramp_weight(
+                    self.current_epoch,
+                    getattr(self.hparams, "swap_spk_start_epoch", 10),
+                    getattr(self.hparams, "swap_spk_ramp_epochs", 5),
+                )
+                if ramp > 0:
+                    # perm は global_step 由来 seed で決定論 (グローバル RNG
+                    # stream を消費しない — default-off 経路の再現性を守る)。
+                    # speaker_ids を渡し同一話者ペアを valid=False にする:
+                    # swap 相手が同一話者だと z_p の中身の話者 = 目標話者と
+                    # なり「decoder が z から目標話者の音色を読めない」という
+                    # Goodhart 耐性 (design doc §3.1 / F2) が崩れ、swap-SCL が
+                    # 通常 SCL に退化するため
+                    g_swap = torch.Generator()
+                    g_swap.manual_seed(
+                        (int(self.global_step) * 2654435761 + 0x517CC1B7) % (2**63)
+                    )
+                    perm, valid_mask = build_same_language_permutation(
+                        speaker_embeddings.size(0),
+                        language_ids=language_ids,
+                        speaker_ids=batch.speaker_ids,
+                        generator=g_swap,
+                    )
+                    if bool(valid_mask.any()):
+                        # noise 加算後の embedding を流用 (σ default 0.0)
+                        emb_q = speaker_embeddings[perm]
+                        y_swap = self.model_g.swap_scl_waveform(
+                            z_p,
+                            z_mask,
+                            ids_slice,
+                            speaker_embeddings=emb_q,
+                            lid=language_ids,  # lid は自分の行のまま (テキストの言語は不変)
+                        )
+                        with self._scl_autocast_ctx():
+                            emb_gen_swap = self.scl_encoder(y_swap.squeeze(1).float())
+                            emb_q_ref = emb_q.float()
+                            # NaN ガード: 既存 SCL と同じく 0 を返す (additive
+                            # なので loss_gen_all の graph は保たれる)
+                            if (
+                                torch.isnan(emb_gen_swap).any()
+                                or torch.isnan(emb_q_ref).any()
+                            ):
+                                loss_swap = torch.tensor(
+                                    0.0, device=emb_gen_swap.device
+                                )
+                            else:
+                                cos_swap = F.cosine_similarity(
+                                    emb_gen_swap, emb_q_ref, dim=-1
+                                )
+                                valid_mask = valid_mask.to(cos_swap.device)
+                                loss_swap = (1.0 - cos_swap)[valid_mask].mean()
+                        loss_swap_spk = loss_swap * (c_swap * ramp)
+                        loss_gen_all = loss_gen_all + loss_swap_spk
+                        self._log_with_batch_info("loss_swap_spk", loss_swap_spk, batch)
+                        if probe_losses is not None:
+                            probe_losses["swap_spk"] = loss_swap_spk
 
             # --- DINO Self-Distillation Loss ---
             if (
