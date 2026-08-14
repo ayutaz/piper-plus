@@ -1,6 +1,8 @@
 # Zero-Shot v10 設計 — 故障機構への対策と実行計画 (2026-08-14)
 
-> **Status**: 設計確定 (実装前)。Phase 0/1 診断
+> **Status**: **2a 実装完了 (2026-08-14、commit `7b176d7a`、TDD)** — M1-M3/E1/E2 +
+> S1 swap-SCL + SupCon 改良 + LF + 評価 Goodhart ガードをランディング済み。
+> 残: 2b データ → 2c smoke → 2d 本走。Phase 0/1 診断
 > ([`zero-shot-warm-restart-diagnostics-phase0-1.md`](zero-shot-warm-restart-diagnostics-phase0-1.md))
 > で確定した故障機構に対し、追加文献調査 4 系統 (①推論経路 SCL / leak 対策
 > ②構造介入の実装詳細 ③from-scratch レシピ ④軽量成功例の解剖) の結果を統合した
