@@ -25,6 +25,7 @@
 │   ├── release-prep/SKILL.md       # /release-prep — リリース前 version 状況確認 (read-mostly)
 │   ├── prepare-release/SKILL.md    # /prepare-release — 9 manifest bump 案 + Swift checksum + tag 順序
 │   ├── publish-model/SKILL.md      # /publish-model — 学習 ckpt → export + sanity + bench + HF upload
+│   ├── eval-zs/SKILL.md            # /eval-zs — zero-shot SECS 評価の標準手順 (cross-utt + dual-encoder + Goodhart 検知)
 │   ├── bump-deps/SKILL.md          # /bump-deps — ORT/openjtalk/ruff の canonical sync 更新
 │   ├── watch-ci-patterns/SKILL.md  # /watch-ci-patterns — CI failure を flake/drift/env/test bug 分類
 │   ├── skill-health/SKILL.md       # /skill-health — skill / hook の health check (meta)
@@ -57,6 +58,11 @@
 - `rm -rf /data/piper/output-*` / `rm -rf /data/piper/dataset-*` (学習データ保護)
 - `epoch=*.ckpt` / `checkpoints/` の削除 (チェックポイント保護)
 - `npm publish` (リリースワークフロー経由を強制)
+- `eval_zs_secs` の `--encoder2` なし実行 (単一 encoder では Goodhart を検知
+  できない — 2026-08 の same-utt 0.775 誤報 / Arm B 偽改善事故の再発防止。
+  pytest / `--help` は対象外。手順: `/eval-zs` skill、契約:
+  `docs/spec/zs-eval-contract.md`、pre-commit 側は `zs-prevention-gate` が
+  防止テスト群の削除・改名を検出)
 
 `echo`/`printf`/`cat`/`tee` で始まるコマンドは false-positive 防止のためチェックをスキップします (例: `echo 'git push --force main'` のようなデモ・テスト)。
 

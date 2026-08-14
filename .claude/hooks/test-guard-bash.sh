@@ -122,6 +122,33 @@ run "git push --force main (拒否維持)" \
   0 "force push"
 
 echo ""
+echo "== eval_zs_secs の第 2 encoder 必須 gate =="
+run "eval_zs_secs --encoder2 なし (拒否)" \
+  '' \
+  "$(input_no_tx 'uv run python -m piper_train.tools.eval_zs_secs --synth-dir out --json-out r.json')" \
+  0 "permissionDecision.*deny"
+
+run "eval_zs_secs --encoder2 あり (許可)" \
+  '' \
+  "$(input_no_tx 'uv run python -m piper_train.tools.eval_zs_secs --synth-dir out --encoder2 ecapa.onnx --json-out r.json')" \
+  0 ""
+
+run "eval_zs_secs --help (許可)" \
+  '' \
+  "$(input_no_tx 'python -m piper_train.tools.eval_zs_secs --help')" \
+  0 ""
+
+run "pytest の test_eval_zs_secs (許可、テスト実行は対象外)" \
+  '' \
+  "$(input_no_tx 'uv run --no-sync pytest tests/test_eval_zs_secs.py --no-cov -q')" \
+  0 ""
+
+run "eval_zs_secs.py 直接実行 --encoder2 なし (拒否)" \
+  '' \
+  "$(input_no_tx 'python src/python/piper_train/tools/eval_zs_secs.py --synth-dir out')" \
+  0 "permissionDecision.*deny"
+
+echo ""
 if [ "$FAIL" -eq 0 ]; then
   echo "all green"
   exit 0
