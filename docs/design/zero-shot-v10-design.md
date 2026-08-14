@@ -1,8 +1,9 @@
 # Zero-Shot v10 設計 — 故障機構への対策と実行計画 (2026-08-14)
 
-> **Status**: **2a 実装完了 (2026-08-14、commit `7b176d7a`、TDD)** — M1-M3/E1/E2 +
-> S1 swap-SCL + SupCon 改良 + LF + 評価 Goodhart ガードをランディング済み。
-> 残: 2b データ → 2c smoke → 2d 本走。Phase 0/1 診断
+> **Status**: **v10a 本走実行中 (2026-08-14 14:56 UTC launch、80ep from-scratch)**。
+> v10a = v9 と同一データ (300,443 utts) で学習信号・構造修正の効果のみを検証する
+> 単一変数 run (データ拡充は v10b に分離、本 doc 末尾の「v10a 実行記録」参照)。
+> 2a 実装は commit `7b176d7a` (TDD)。Phase 0/1 診断
 > ([`zero-shot-warm-restart-diagnostics-phase0-1.md`](zero-shot-warm-restart-diagnostics-phase0-1.md))
 > で確定した故障機構に対し、追加文献調査 4 系統 (①推論経路 SCL / leak 対策
 > ②構造介入の実装詳細 ③from-scratch レシピ ④軽量成功例の解剖) の結果を統合した
@@ -186,3 +187,31 @@ Coqui TTS #2348) / AdaLN-Zero 分析 2608.09438 / DMOSpeech 2410.11097 /
 MulliVC 2408.04708 / NANSY 2110.14513 / OpenVoice 2312.01479。
 追跡課題: LNACont (EUSIPCO 2024) 本文入手 (E2 設計の裏付け) / SNAC Table I
 baseline 確定値。
+
+## 9. v10a 実行記録 (2026-08-14)
+
+- **構成**: v9 CLI + v10 差分 (M1+E2 SNAC / M2 layer-3 注入 / M3 DP head / E1
+  1e-3 init / cross_utt SupCon + gather + τ0.1 / detach-z / swap-SCL start10
+  ramp5 / DINO off / σ=0 / LF off) / 80ep 単一 cosine / batch 32×4 GPU。
+  instance: vast.ai 47698156 (4x A100 SXM4 40GB、NVLink NV12、$3.73/hr)
+- **係数較正 (smoke 400 step の grad-probe 実測)**: mel ノルム中央値 23.24 /
+  SupCon 18.28 (c=1 で mel の 79%!) / swap 2.69 → 設計目標 (speaker 系 = mel の
+  10%、spk:swap = 1:2) から **c_spk=0.0424 / c_swap_spk=0.577**。
+  副産物: v9 の c_spk=1.0 は「希釈」どころか mel 級の勾配だった (Phase 0 の
+  希釈説棄却と整合する事後証拠)
+- **smoke 実測**: sec/step 10.48 (序盤 I/O 込) / non-finite 0% / loss_kl 2.96
+  (**SNAC logdet→KL 配線の実地検証 pass**) / VRAM 定常 32-35GB
+- **事前登録 gate からの逸脱 2 件 (記録)**: ①VRAM peak 40.3GB > 38GB は起動時
+  一過性スパイク (定常 32-35GB、OOM なし、本走起動時は swap 無効でさらに軽い)
+  として override。②c_spk=0.042 が事前範囲 [0.1,4.0] 外 — 範囲が当てずっぽう
+  だっただけで較正の正しい出力として採用
+- **データ復旧 2 件 (バックアップ欠落、教訓)**: HF の v8ds tar は 7lang dir のみ
+  で、①ja/en の audio cache 150,379 utts 分 (dataset-bilingual-ja-en-v8) と
+  ②speaker_embeddings 10,652 件が欠落していた。cache 名 = sha256(audio_path)
+  の決定論性を利用し、raw 再取得 (moe-speech-plus + LibriTTS-R、export は
+  default パラメータで 100% カバレッジ再現) → cache_norm_audio_no_vad で再生成
+  → 全 300,443 行 × 全パス種別の存在 + 実 load 検証で完全復旧。
+  **再発防止 TODO: dataset.jsonl のパス相対化 + バックアップの復元検証**
+- **判断点**: ep19/39/59/79 で CPU 中間評価 (v9 ep49 baseline 比、goodhart 判定
+  付き)。**ep39 で平坦なら打ち切り** (支出 ~$120-170)。完走時 ~$280-400。
+  成果物: HF `checkpoints-v10a/` に自動退避
