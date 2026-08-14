@@ -149,6 +149,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `non_finite_skip` stayed at 0%. Tests:
   `tests/test_super_mas_dispatch.py::TestRuntimeParityValidation`,
   `tests/test_kl_cap_guard.py`.
+- **Zero-shot v10 speaker-signal and wiring interventions** in `piper_train`
+  ([design doc](docs/design/zero-shot-v10-design.md)). All new behaviour is
+  opt-in; with the flags at their defaults the training graph, checkpoints
+  and ONNX export are bit-compatible with v9:
+  - **swap-SCL** (`--c-swap-spk`, with `--swap-spk-start-epoch` /
+    `--swap-spk-ramp-epochs` weight ramp): ASCL-style speaker supervision
+    through the *inference* path — the posterior `z_p` is re-injected via
+    `flow⁻¹` with a same-language swapped speaker embedding and the decoder
+    output is scored against the swapped target by the differentiable
+    CAM++ encoder. Because the latent content belongs to the source
+    speaker, the same-utterance Goodhart shortcut is structurally
+    impossible, and speaker gradients reach flow reverse / decoder FiLM
+    for the first time. Requires `--speaker-encoder-torch-path`.
+  - **Gradient-carrying DDP `all_gather` for the contrastive speaker loss**
+    (`--spk-loss-gather`) plus `--spk-loss-temperature` (SupCon
+    temperature): multiplies InfoNCE negatives by world size without
+    silently cutting gradients (plain `dist.all_gather` footgun pinned by
+    test).
+  - **Latent Filling** (`--latent-filling-tau`, arXiv:2310.03538):
+    with probability τ a step trains on interpolated (λ~Beta(0.5,0.5),
+    same-language pair) or slightly noised speaker embeddings with the LF
+    consistency loss only; replaces the removed σ-noise regularizer.
+  - **M2 `--speaker-cond-layer N`**: inject speaker conditioning at the
+    input of the Nth `enc_p` transformer layer (VITS2-style) instead of
+    after all layers, so self-attention actually sees the speaker.
+  - **M3 `--dp-spk-head`**: routes duration-loss gradients into a
+    lightweight residual speaker head for the duration predictor
+    (`_get_dp_conditioning`) instead of detaching `g`; the same head is
+    applied in ONNX export.
+  - **M1+E2 `--use-snac-flow`**: SNAC-style speaker-normalized affine
+    coupling in every flow step (SN at the forward entry, SDN at the
+    reverse exit), with normalization statistics predicted from the
+    speaker component only (language embedding stays on the WN additive
+    path). The SN log-scale is clamped to [-4, 4] for bf16 and its logdet
+    is wired into the KL loss (`kl_loss(..., logdet=...)`); invertibility
+    is unit-tested. Streaming export rejects SNAC models explicitly (its
+    single-`g` encoder/decoder boundary cannot express the split).
+  - **E1 `--film-init-std`**: small-Gaussian init (e.g. 1e-3) for the
+    zero-init decoder FiLM stage layers (AdaLN-Zero analysis).
+
+  Tests: `tests/test_v10_structure.py`, `tests/test_v10_speaker_signal.py`.
+- **`piper_train.tools.eval_zs_secs` zs-eval-v2**: the report JSON now
+  carries `schema: "zs-eval-v2"` (additive fields only, v1 readers keep
+  working) with the new `gap_same_minus_cross` metric (direct observation
+  of the SCL-Goodhart component), `--baseline-json` for per-encoder deltas
+  against a previous eval JSON with a machine-readable `goodhart_flag`
+  (primary CAM++ improves while the held-out second encoder does not
+  follow — the Phase 0 Arm B pattern), and `--require-encoder2` (exit 2
+  when no second encoder is given, for publish/CI gates). Contract:
+  [docs/spec/zs-eval-contract.md](docs/spec/zs-eval-contract.md). Tests:
+  `tests/test_eval_zs_secs.py`.
+
+### Changed
+
+- **`--spk-emb-noise-sigma` default changed from `0.05` to `0.0`**
+  (training-CLI behaviour change): σ=0.05 is ~500x the Latent Filling
+  literature value and was measured to be destructive without a similarity
+  benefit (v10 design F7 / Phase 0 Arm D), so speaker-embedding noise is no
+  longer applied by default. Recorded v7/v8/v9 training commands pass the
+  flag explicitly, so their reproducibility is unaffected; pass
+  `--spk-emb-noise-sigma 0.05` to restore the previous default. The
+  Latent Filling path (`--latent-filling-tau`) is the intended
+  replacement regularizer.
 
 ## [2.0.0] - 2026-05-25
 

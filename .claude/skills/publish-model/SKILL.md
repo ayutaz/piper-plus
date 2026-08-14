@@ -91,6 +91,9 @@ ls -la /tmp/sanity/*.wav
    別話者 floor (近い声質の別話者) も測って相対位置を示す。2026-08-12 事例:
    same-utt 0.775 (見かけ好成績) → cross-utt 0.73 で別話者 floor すれすれ =
    聴感「似ていない」と一致 (`zero-shot-v8-dataset-scaling-plan.md` §3.19)。
+   測定は `piper_train.tools.eval_zs_secs` を **`--require-encoder2`** (第 2 encoder
+   必須 gate、未指定 exit 2) + **`--baseline-json <前回 eval JSON>`** (encoder Δ から
+   goodhart_flag 自動判定) 付きで実行する (契約: `docs/spec/zs-eval-contract.md`)。
 5. **ユーザーに聴感確認を依頼** (自動指標のみで publish 判断しない)
 
 判定に迷う場合は `--skip` せず停止してユーザー判断を仰ぐ。

@@ -17,8 +17,15 @@ floor (近い声質の別話者) で正規化した転写率
   cosine」を synth 全体で平均
 - same_utt_secs: synth 各ファイルと exclude-ref (条件付けに使った発話) の平均
   cosine。**判定使用禁止 (参考値)**
+- gap_same_minus_cross: same_utt_secs − cross_utt_secs。SCL Goodhart で膨らむ
+  成分の直接観測 (baseline 比 +0.01 以上の拡大は警告)
 - ceiling: speaker-utts (exclude-ref 除外後) 同士の全ペア平均 cosine
 - floor: speaker-utts (exclude-ref 除外後) と floor-refs の全ペア平均 cosine
+
+JSON schema は "zs-eval-v2" (v1 からは field 追加のみの後方互換)。
+``--baseline-json`` で過去の eval JSON と比較し、「primary (CAM++) だけ上がり
+第 2 encoder が追随しない」パターン (Phase 0 Arm B で実証された Goodhart) を
+``goodhart_flag`` として機械判定する。契約: ``docs/spec/zs-eval-contract.md``。
 
 Usage:
     python -m piper_train.tools.eval_zs_secs \\
@@ -28,6 +35,8 @@ Usage:
         --floor-refs floor_wavs/ \\
         --encoder models/campplus.onnx \\
         --encoder2 models/ecapa.onnx \\
+        --require-encoder2 \\
+        --baseline-json prev_report.json \\
         --json-out report.json
 
 備考: 両 encoder とも入力は ``extract_speaker_embedding.preprocess_audio`` の
@@ -49,6 +58,17 @@ from piper_train.extract_speaker_embedding import extract_embedding, preprocess_
 
 
 _LOGGER = logging.getLogger(__name__)
+
+# JSON schema バージョン (v1 → v2 は field 追加のみの後方互換)
+SCHEMA_VERSION = "zs-eval-v2"
+
+# Goodhart 判定閾値。Phase 0/1 の事前登録閾値 (CAM++ +0.02 未満 = 効果なし /
+# ECAPA +0.01 未満 = 不同調 → Goodhart 棄却) をそのまま制度化する
+# (docs/design/zero-shot-warm-restart-diagnostics-phase0-1.md §2)。
+GOODHART_PRIMARY_DELTA = 0.02
+GOODHART_ENCODER2_DELTA = 0.01
+# same/cross gap (Goodhart 成分) の拡大警告閾値
+GAP_WIDENING_DELTA = 0.01
 
 
 def collect_wavs(directory: str | Path) -> list[Path]:
@@ -80,8 +100,9 @@ def compute_secs_report(
         floor_embs: [K, D] 近い声質の別話者 embedding (floor 用)。
 
     Returns:
-        dict: cross_utt_secs / same_utt_secs / ceiling / floor /
-        normalized_transfer / n_synth / n_refs。該当データが無い指標は None。
+        dict: cross_utt_secs / same_utt_secs / gap_same_minus_cross / ceiling /
+        floor / normalized_transfer / n_synth / n_refs。該当データが無い指標は
+        None (キー欠落ではなく null 明示 — zs-eval-v2 契約)。
         ceiling は speaker_embs が 2 発話未満だと計算不能で None になる
         (CLI 側は 2 発話以上を要求する)。
     """
@@ -122,14 +143,92 @@ def compute_secs_report(
                 floor,
             )
 
+    # SCL Goodhart で膨らむ成分の直接観測 (same-utt 過適合の指標)
+    gap: float | None = None
+    if same is not None:
+        gap = float(same - cross)
+
     return {
         "cross_utt_secs": cross,
         "same_utt_secs": same,
+        "gap_same_minus_cross": gap,
         "ceiling": ceiling,
         "floor": floor,
         "normalized_transfer": normalized_transfer,
         "n_synth": int(synth.shape[0]),
         "n_refs": int(refs.shape[0]),
+    }
+
+
+def _encoder_gap(block: dict) -> float | None:
+    """encoder ブロックから same/cross gap を取り出す。
+
+    zs-eval-v1 の JSON には gap_same_minus_cross field が無いため、
+    same_utt_secs / cross_utt_secs から復元する (後方互換)。
+    """
+    gap = block.get("gap_same_minus_cross")
+    if gap is not None:
+        return float(gap)
+    same = block.get("same_utt_secs")
+    cross = block.get("cross_utt_secs")
+    if same is not None and cross is not None:
+        return float(same) - float(cross)
+    return None
+
+
+def compare_with_baseline(
+    report: dict,
+    baseline: dict,
+    primary: str = "campplus",
+    secondary: str = "encoder2",
+) -> dict:
+    """現レポートを過去の eval JSON と比較し、Δ と Goodhart 判定を返す純関数。
+
+    Goodhart 判定 (docs/spec/zs-eval-contract.md、Phase 0 Arm B の制度化):
+    primary の Δcross >= +0.02 かつ secondary の Δcross < +0.01 のとき True。
+    SCL と同型の encoder (CAM++) だけが動く = 「参照 embedding への一致」の
+    再現であって話者類似の改善ではない、と機械判定する。どちらかの Δ が
+    計算不能 (encoder 欠落など) なら None (判定不能)。
+
+    Returns:
+        dict: goodhart_flag (bool | None) / gap_widened_encoders
+        (gap が +0.01 以上拡大した encoder 名リスト) / deltas
+        (encoder ごとの cross_utt_secs / gap_same_minus_cross の Δ)。
+    """
+    base_encoders = baseline.get("encoders", {})
+    deltas: dict = {}
+    gap_widened: list[str] = []
+    for name, cur in report["encoders"].items():
+        base = base_encoders.get(name)
+        if base is None:
+            continue
+        d_cross: float | None = None
+        if (
+            cur.get("cross_utt_secs") is not None
+            and base.get("cross_utt_secs") is not None
+        ):
+            d_cross = float(cur["cross_utt_secs"]) - float(base["cross_utt_secs"])
+        cur_gap = _encoder_gap(cur)
+        base_gap = _encoder_gap(base)
+        d_gap: float | None = None
+        if cur_gap is not None and base_gap is not None:
+            d_gap = cur_gap - base_gap
+            if d_gap >= GAP_WIDENING_DELTA:
+                gap_widened.append(name)
+        deltas[name] = {"cross_utt_secs": d_cross, "gap_same_minus_cross": d_gap}
+
+    d_primary = deltas.get(primary, {}).get("cross_utt_secs")
+    d_secondary = deltas.get(secondary, {}).get("cross_utt_secs")
+    goodhart: bool | None = None
+    if d_primary is not None and d_secondary is not None:
+        goodhart = bool(
+            d_primary >= GOODHART_PRIMARY_DELTA
+            and d_secondary < GOODHART_ENCODER2_DELTA
+        )
+    return {
+        "goodhart_flag": goodhart,
+        "gap_widened_encoders": gap_widened,
+        "deltas": deltas,
     }
 
 
@@ -185,6 +284,28 @@ def _print_report(report: dict, synth_dir: str, speaker_dir: str) -> None:
     )
 
 
+def _fmt_delta(value: float | None) -> str:
+    return f"{value:+.4f}" if value is not None else "n/a"
+
+
+def _print_baseline_comparison(comparison: dict) -> None:
+    print()
+    print(f"=== baseline comparison (vs {comparison['baseline_path']}) ===")
+    for name, d in comparison["deltas"].items():
+        print(
+            f"{name:<10} Δcross_utt: {_fmt_delta(d['cross_utt_secs']):>8}  "
+            f"Δgap(same-cross): {_fmt_delta(d['gap_same_minus_cross']):>8}"
+        )
+    flag = comparison["goodhart_flag"]
+    if flag is True:
+        label = "TRUE — primary だけ上昇 (Goodhart 疑い、改善と判定しないこと)"
+    elif flag is False:
+        label = "false"
+    else:
+        label = "n/a (encoder2 の Δ が計算不能 — 判定不能)"
+    print(f"goodhart_flag: {label}")
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     parser = argparse.ArgumentParser(
@@ -211,8 +332,42 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--encoder2", help="第 2 encoder ONNX パス (ECAPA、optional、Goodhart 検知用)"
     )
+    parser.add_argument(
+        "--require-encoder2",
+        action="store_true",
+        help="--encoder2 未指定なら exit 2 (publish/CI ゲート用)",
+    )
+    parser.add_argument(
+        "--baseline-json",
+        help=(
+            "過去の eval JSON (zs-eval-v1/v2)。encoder ごとの Δ を表示し、"
+            "Goodhart 判定 (goodhart_flag) を行う"
+        ),
+    )
     parser.add_argument("--json-out", help="レポート JSON の出力先パス")
     args = parser.parse_args(argv)
+
+    if args.require_encoder2 and not args.encoder2:
+        _LOGGER.error(
+            "--require-encoder2: --encoder2 (held-out 第 2 encoder) が未指定。"
+            "CAM++ 単独では Goodhart 検知不能のため gate fail (exit 2)。"
+            "契約: docs/spec/zs-eval-contract.md"
+        )
+        return 2
+    if not args.encoder2:
+        _LOGGER.warning(
+            "--encoder2 未指定: 第 2 encoder なしでは Goodhart 検知不能 "
+            "(CAM++ 単独での go/no-go 判定は禁止 — docs/spec/zs-eval-contract.md)。"
+            "publish/CI ゲートでは --require-encoder2 を付けること"
+        )
+
+    baseline: dict | None = None
+    baseline_path: Path | None = None
+    if args.baseline_json:
+        baseline_path = Path(args.baseline_json)
+        if not baseline_path.is_file():
+            raise SystemExit(f"--baseline-json not found: {baseline_path}")
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
 
     synth_files = collect_wavs(args.synth_dir)
     if not synth_files:
@@ -242,7 +397,7 @@ def main(argv: list[str] | None = None) -> int:
         encoders.append(("encoder2", args.encoder2))
 
     fbank_cache: dict[Path, np.ndarray] = {}
-    report: dict = {"encoders": {}}
+    report: dict = {"schema": SCHEMA_VERSION, "encoders": {}, "goodhart_flag": None}
     for name, encoder_path in encoders:
         _LOGGER.info("extracting embeddings with %s (%s)", name, encoder_path)
         session = _create_session(encoder_path)
@@ -260,7 +415,35 @@ def main(argv: list[str] | None = None) -> int:
             synth_embs, speaker_embs, ref_emb=ref_emb, floor_embs=floor_embs
         )
 
+    comparison: dict | None = None
+    if baseline is not None:
+        comparison = compare_with_baseline(report, baseline)
+        comparison = {"baseline_path": str(baseline_path), **comparison}
+        report["baseline_comparison"] = comparison
+        report["goodhart_flag"] = comparison["goodhart_flag"]
+        if comparison["goodhart_flag"]:
+            d = comparison["deltas"]
+            _LOGGER.warning(
+                "Goodhart 疑い: primary (campplus) Δcross %+.4f >= +%.2f に対し "
+                "encoder2 Δcross %+.4f < +%.2f — SCL と同型の encoder だけが動いて"
+                "おり話者類似の改善とは認めない (SECS 単独判定禁止、"
+                "docs/spec/zs-eval-contract.md)",
+                d["campplus"]["cross_utt_secs"],
+                GOODHART_PRIMARY_DELTA,
+                d["encoder2"]["cross_utt_secs"],
+                GOODHART_ENCODER2_DELTA,
+            )
+        if comparison["gap_widened_encoders"]:
+            _LOGGER.warning(
+                "same/cross gap が baseline 比 +%.2f 以上拡大: %s — same-utt "
+                "Goodhart 成分の膨張を示唆 (docs/spec/zs-eval-contract.md)",
+                GAP_WIDENING_DELTA,
+                ", ".join(comparison["gap_widened_encoders"]),
+            )
+
     _print_report(report, args.synth_dir, args.speaker_utts)
+    if comparison is not None:
+        _print_baseline_comparison(comparison)
 
     if args.json_out:
         json_path = Path(args.json_out)
