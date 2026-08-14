@@ -599,22 +599,29 @@ def main() -> None:
 
         # 1. Global conditioning (must be computed before enc_p)
         # spk_proj-only: pass speaker_embedding through _get_global_conditioning
-        # which uses spk_proj MLP instead of emb_g
-        g = model_g._get_global_conditioning(
-            sid=None, lid=lid, speaker_embeddings=speaker_embedding
+        # which uses spk_proj MLP instead of emb_g. return_components: v10 E2
+        # (SNAC flow) 用に話者/言語成分も取得 (combined g は従来と同一値)。
+        g, g_spk, g_lang = model_g._get_global_conditioning(
+            sid=None,
+            lid=lid,
+            speaker_embeddings=speaker_embedding,
+            return_components=True,
         )
 
         # 2. Encoder (with global conditioning for cond_layer)
         x, m_p, logs_p, x_mask = model_g.enc_p(text, text_lengths, g=g)
 
         # 3. Duration Predictor (called only once)
+        # v10 M3: dp_spk_head 有効モデルでは学習と同じ残差ヘッド加算
+        # (無効時は g のまま = 従来 graph と同一)
         x_dp = model_g._prepare_prosody_input(x, x_mask, prosody_features, lid=lid)
+        g_dp = model_g._get_dp_conditioning(g)
         if model_g.use_sdp:
             logw = model_g.dp(
-                x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
+                x_dp, x_mask, g=g_dp, reverse=True, noise_scale=noise_scale_w
             )
         else:
-            logw = model_g.dp(x_dp, x_mask, g=g)
+            logw = model_g.dp(x_dp, x_mask, g=g_dp)
 
         w = torch.exp(logw) * x_mask * length_scale
         durations = w.squeeze(1)  # [batch, phoneme_length]
@@ -640,7 +647,12 @@ def main() -> None:
             z_p = m_p
 
         # 7. Flow + Decoder
-        z = model_g.flow(z_p, y_mask, g=g, reverse=True)
+        # v10 M1+E2: SNAC flow モデルでは学習と同じ分離 (SDN=話者成分のみ、
+        # WN=lang 成分のみ)。off では従来 graph と同一。
+        if getattr(model_g, "use_snac_flow", False):
+            z = model_g.flow(z_p, y_mask, g=g_lang, g_spk=g_spk, reverse=True)
+        else:
+            z = model_g.flow(z_p, y_mask, g=g, reverse=True)
         o = model_g.dec((z * y_mask), g=g)
 
         return o, durations

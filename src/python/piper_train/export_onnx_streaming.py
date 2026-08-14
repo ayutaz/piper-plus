@@ -68,6 +68,32 @@ class VitsDecoder(nn.Module):
         return output
 
 
+def check_streaming_export_supported(model_g) -> None:
+    """v10 opt-in 構造を streaming export が silent に劣化させないためのガード。
+
+    streaming export は encoder/decoder 境界を単一の g で渡し、encoder graph は
+    DP へ素の g を渡す設計のため、以下のモデルでは学習と挙動の異なる graph を
+    黙って出力してしまう。明示エラーで防ぐ (v10 design §4 / silent 退行防止)。
+    """
+    if getattr(model_g, "use_snac_flow", False):
+        # v10 M1+E2: SNAC flow の話者/言語成分分離 (g_spk / g_lang) を
+        # streaming 境界では表現できない。
+        raise NotImplementedError(
+            "Streaming export does not support use_snac_flow models "
+            "(the encoder/decoder boundary carries a single combined g; "
+            "SNAC needs separate speaker/language components). "
+            "Use piper_train.export_onnx instead."
+        )
+    if getattr(model_g, "spk_proj_dp", None) is not None:
+        # v10 M3: spk_proj_dp 残差を落とした DP conditioning になる。
+        raise NotImplementedError(
+            "Streaming export does not support dp_spk_head models "
+            "(the spk_proj_dp residual head would be silently dropped from "
+            "the duration predictor conditioning). "
+            "Use piper_train.export_onnx instead."
+        )
+
+
 def main() -> None:
     """Main entry point"""
     torch.manual_seed(1234)
@@ -101,6 +127,8 @@ def main() -> None:
 
     model = VitsModel.load_from_checkpoint(args.checkpoint, dataset=None)
     model_g = model.model_g
+
+    check_streaming_export_supported(model_g)
 
     with torch.no_grad():
         model_g.dec.remove_weight_norm()
