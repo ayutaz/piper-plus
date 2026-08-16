@@ -143,6 +143,11 @@ run "pytest の test_eval_zs_secs (許可、テスト実行は対象外)" \
   "$(input_no_tx 'uv run --no-sync pytest tests/test_eval_zs_secs.py --no-cov -q')" \
   0 ""
 
+run "pre-commit のファイル引数に eval_zs_secs.py (許可、偽陽性防止)" \
+  '' \
+  "$(input_no_tx 'uvx pre-commit run --files src/python/piper_train/tools/eval_zs_secs.py src/python/tests/test_eval_zs_secs.py')" \
+  0 ""
+
 run "eval_zs_secs.py 直接実行 --encoder2 なし (拒否)" \
   '' \
   "$(input_no_tx 'python src/python/piper_train/tools/eval_zs_secs.py --synth-dir out')" \

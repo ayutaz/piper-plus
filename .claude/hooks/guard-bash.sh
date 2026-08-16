@@ -111,9 +111,10 @@ esac
 # SECS が高く出る (same-utt 0.775 誤報 / Phase 0 Arm B の偽改善)。
 # eval_zs_secs の実行には --encoder2 (held-out encoder) を必須とする。
 # 契約: docs/spec/zs-eval-contract.md / skill: /eval-zs
-# pytest (テスト実行) と --help は対象外。
+# pytest (テスト実行) / --help / pre-commit・lint 系 (ファイルパス引数として
+# eval_zs_secs.py が現れるだけで評価実行ではない) は対象外。
 case "$CMD" in
-  *pytest*|*"--help"*) : ;;
+  *pytest*|*"--help"*|*"pre-commit run"*|*"ruff "*|*"git add"*|*"git diff"*) : ;;
   *"piper_train.tools.eval_zs_secs"*|*"eval_zs_secs.py"*)
     case "$CMD" in
       *"--encoder2"*) : ;;
