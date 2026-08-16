@@ -366,6 +366,12 @@ inline-quotes = "double"
 "src/python/piper_train/export_onnx.py" = ["E402"]
 # lightning.py: メソッド内の遅延import（循環import回避、オプショナル依存）
 "src/python/piper_train/vits/lightning.py" = ["PLC0415"]
+# zero-shot 評価メトリクス (Phase A): torch import 禁止 (docs/spec/zs-eval-contract.md §2)
+# のため librosa/scipy/soundfile は関数内 lazy import (import コスト削減も兼ねる)
+"src/python/piper_train/tools/acoustic_frames.py" = ["PLC0415"]
+"src/python/piper_train/tools/measure_band_noise.py" = ["PLC0415"]
+"src/python/piper_train/tools/measure_comb_artifacts.py" = ["PLC0415"]
+"src/python/piper_train/tools/measure_prosody.py" = ["PLC0415"]
 
 [tool.setuptools.packages.find]
 where = ["src/python"]

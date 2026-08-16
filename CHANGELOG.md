@@ -48,6 +48,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - CI: `g2p-python-ci.yml` の `test extras` job で venv を workspace 内 (`.venv-extras/`) ではなく `${RUNNER_TEMP}/venv-extras` に作るよう変更。 当 job は `uv.lock` を経由せず PyPI から fresh resolve するため nltk 3.10.x を引くが、 3.10 で追加された `nltk/inisec.py` の `NLTKSafeImportFinder` が「解決先ファイルが cwd 配下に物理的に存在する」モジュールを一律ブロックするため、 workspace 内 venv だと site-packages 全体が誤検知され `import nltk` 自体が `ImportError: Blocked import of regex from current working directory` で失敗していた。 エラーメッセージが案内する `-P` / `PYTHONSAFEPATH=1` は判定基準が sys.path ではなくファイルの物理位置のため回避にならないことを実測で確認済み
 
+### Added
+
+- **zero-shot 評価の音響メトリクス群 (v10b Phase A)**: `eval_zs_secs` を schema
+  `zs-eval-v3` に拡張 — SR/128 格子コム超過 + >4kHz 残差 autocorr
+  (`piper_train.tools.measure_comb_artifacts`、ざらつきのゲーム不能量) /
+  1kHz 帯域ベクトル + 5.5-8.5kHz 照準値 (`measure_band_noise.band_profile`) /
+  韻律統計 delta (`measure_prosody`、F0 std・レンジ・話速 proxy) を JSON に内蔵
+  (default ON、`--skip-acoustics` で省略)。入力 manifest (sha256) / exclude-ref の
+  内容ハッシュ除外 / `above_ceiling_flag` / normalized_transfer の HEADLINE 化を
+  追加。全メトリクスは評価専用 (学習 loss 流用は `docs/spec/zs-eval-contract.md`
+  §2 で禁止、pre-commit `zs-metric-isolation-gate` が機械的に強制)。
+  `measure_band_noise` の CLI default 帯域を harness と同一の 4-9kHz に統一
+
 ### Fixed
 
 - **`--reference-audio` / `--speaker-encoder-model` being silently ignored in
