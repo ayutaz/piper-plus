@@ -62,10 +62,45 @@ EXPECTED: dict[str, dict[str, str]] = {
         "require-encoder2": "第 2 encoder 必須 gate (CAM++ 単独判定の禁止)",
         "gap_same_minus_cross": "same/cross gap の常時出力 (Goodhart 成分の観測)",
         "cross_utt_secs": "cross-utterance SECS (same-utt 単独判定の禁止)",
+        "above_ceiling": "録音特性複製シグナルの独立 flag (E-7(iii))",
+        "manifest": "eval 入力の sha256 pin (E-5(i)、事前登録判定の固定)",
     },
     "docs/spec/zs-eval-contract.md": {
         "goodhart_flag": "評価契約に Goodhart 判定の定義があること",
         "same-utt": "same-utt 単独判定の禁止条項",
+        "恒久禁止": "評価メトリクスの学習流用の恒久禁止 (§2 禁止事項 4)",
+        "above_ceiling_flag": "録音特性複製 flag の契約定義 (§3)",
+    },
+    # --- Phase A (v10b plan §2 E-1〜E-8): 音響メトリクスの三重固定 ---
+    "src/python/piper_train/tools/measure_comb_artifacts.py": {
+        "def comb_metrics": (
+            "SR/128 格子コム超過 + >4kHz autocorr (がびがびコムのゲーム不能量)"
+        ),
+        "EVAL-ONLY": "評価専用マーカー (学習 loss 流用禁止の 1 層目)",
+    },
+    "src/python/piper_train/tools/measure_prosody.py": {
+        "def prosody_stats": "韻律平板さの数値化 (F0 std/レンジ/話速)",
+        "def prosody_delta": "参照 vs 合成の記述統計差 (類似スコア化の禁止と対)",
+        "EVAL-ONLY": "評価専用マーカー",
+    },
+    "src/python/piper_train/tools/measure_band_noise.py": {
+        "def voiced_high_band_excess": "v9 がびがび指標の互換維持 (歴史的 TSV との A/B)",
+        "def band_profile": "1kHz 帯域ベクトル + 5.5-8.5kHz 照準値 (希釈の防止)",
+        "EVAL-ONLY": "評価専用マーカー",
+    },
+    "scripts/check_zs_metric_isolation.py": {
+        "piper_train.vits": "学習コードからのメトリクス import 隔離 gate 本体",
+    },
+    "src/python/tests/test_measure_comb_artifacts.py": {
+        "def test_off_grid_tones_do_not_trip": "格子選択性 (F0 倍音での偽陽性防止)",
+        "def test_white_noise_excess_near_zero": "ゼロ点校正 (dB スケールの絶対保証)",
+        "def test_frame_tiled_noise_high_autocorr": (
+            "フレーム格子アーティファクトの検出能力"
+        ),
+    },
+    "src/python/tests/test_measure_prosody.py": {
+        "def test_vibrato_f0_std_matches_first_principles": "F0 std の第一原理一致",
+        "def test_flat_f0_near_zero_std": "平板韻律の検出 (ゼロ点)",
     },
     ".claude/hooks/guard-bash.sh": {
         "eval_zs_secs": (
