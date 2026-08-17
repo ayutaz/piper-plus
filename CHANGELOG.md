@@ -50,6 +50,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **v10b Phase B デコーダ系 (opt-in、default は v10a 互換)**: `--upsample-mode
+  resize` (H-1: transposed conv を nearest-resize + lowpass 初期化 Conv1d に置換、
+  フレーム格子トーンコムの発生源除去 — 初期化直後の実測でコム超過 8.4→2.1dB。
+  kernel 縮小 k∝1/stride で MACs 中立、FP16 サイズは -1.0MB) / `--pqmf-taps 126`
+  (H-2b: 帯域境界の遷移帯域を狭める) / `--trainable-pqmf-synthesis` (H-2b:
+  合成フィルタを canonical 初期化で学習可能化)。合成チェーン単体テスト (H-2a) と
+  白色雑音帯域応答テスト (H-5) を新設。`scripts/bench_decoder_cpu.py` で
+  decoder 単体 CPU ベンチ (推論コスト gate は Phase D の ONNX ベンチで最終判定)
 - **zero-shot 評価の音響メトリクス群 (v10b Phase A)**: `eval_zs_secs` を schema
   `zs-eval-v3` に拡張 — SR/128 格子コム超過 + >4kHz 残差 autocorr
   (`piper_train.tools.measure_comb_artifacts`、ざらつきのゲーム不能量) /

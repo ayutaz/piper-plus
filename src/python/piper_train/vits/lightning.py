@@ -372,6 +372,14 @@ class VitsModel(pl.LightningModule):
         use_snac_flow: bool = False,
         # E1: dec FiLM (cond_layers) の zero-init を N(0, std) に置換
         film_init_std: float = 0.0,
+        # v10b Phase B デコーダ系 (default は v10a-r2 bit 互換。
+        # docs/design/zero-shot-v10b-quality-plan.md §3.1):
+        # H-1: upsampler の resize+conv 化 ("transposed" | "resize")
+        upsample_mode: str = "transposed",
+        # H-2b: PQMF taps (PQMF_DESIGN の preset) / 合成フィルタの学習可能化。
+        # 両者は decoder と GT analysis が共有する PQMF に適用される。
+        pqmf_taps: int = 62,
+        trainable_pqmf_synthesis: bool = False,
         **kwargs,
     ):
         super().__init__()
@@ -415,6 +423,9 @@ class VitsModel(pl.LightningModule):
             dp_spk_head=self.hparams.dp_spk_head,
             use_snac_flow=self.hparams.use_snac_flow,
             film_init_std=self.hparams.film_init_std,
+            upsample_mode=self.hparams.upsample_mode,
+            pqmf_taps=self.hparams.pqmf_taps,
+            trainable_pqmf_synthesis=self.hparams.trainable_pqmf_synthesis,
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm,
@@ -543,9 +554,20 @@ class VitsModel(pl.LightningModule):
             )
             self.model_d_mrd = MultiResolutionSpectrogramDiscriminator()
 
-        # MB-iSTFT: PQMF for GT analysis + sub-band STFT loss
-        self.pqmf = PQMF(subbands=4)
-        # Share PQMF instance with the decoder to avoid duplicate buffers
+        # MB-iSTFT: PQMF for GT analysis + sub-band STFT loss.
+        # NOTE: this bank REPLACES the one the decoder built for itself, so the
+        # v10b H-2b options must be repeated here — forgetting them would
+        # silently discard --pqmf-taps / --trainable-pqmf-synthesis for every
+        # run that goes through VitsModel (default behaviour stays correct,
+        # which is exactly what makes the omission hard to notice).
+        # tests/test_v10b_decoder_cli.py pins this integration point.
+        self.pqmf = PQMF(
+            subbands=4,
+            taps=self.hparams.pqmf_taps,
+            trainable_synthesis=self.hparams.trainable_pqmf_synthesis,
+        )
+        # Share PQMF instance with the decoder to avoid duplicate buffers and to
+        # keep the sub-band loss target and the decoder synthesis on one bank.
         self.model_g.dec.pqmf = self.pqmf
         self.sub_stft_loss = MultiResolutionSTFTLoss(
             fft_sizes=self.hparams.sub_stft_fft_sizes,

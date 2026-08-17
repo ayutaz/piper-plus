@@ -18,7 +18,7 @@ from .vits.commons import (
 )
 from .vits.ema import EMACallback
 from .vits.lightning import VitsModel
-from .vits.mb_istft import PQMF
+from .vits.mb_istft import PQMF, PQMF_DESIGN
 
 
 # NOTE: the pathlib safe-globals registration and the Windows PosixPath
@@ -799,6 +799,49 @@ def create_parser():
         "TextEncoder self-attention (Encoder / TextEncoder in vits.models); "
         "PosteriorEncoder / Flow / MBiSTFTGenerator unaffected.",
     )
+    # --- v10b Phase B: デコーダ系 (default は v10a-r2 と bit 互換) ---
+    # docs/design/zero-shot-v10b-quality-plan.md §3.1 H-1 / H-2b。
+    # v10b 帯域解剖で残存「ざらつき」の主犯と特定された定常トーンコム
+    # (SR/64 = 344.5Hz 系列、4-8.5kHz で +4.1〜4.7dB) への構造的対策。
+    # レベル系 loss (MRD / MR-STFT) の増強では消えないことが v9→v10a で実測済み。
+    parser.add_argument(
+        "--upsample-mode",
+        default="transposed",
+        choices=("transposed", "resize"),
+        help="Decoder upsampler structure (v10b H-1). 'transposed' (default) "
+        "keeps the ConvTranspose1d stages = bit-compatible with v10a-r2 "
+        "checkpoints. 'resize' replaces them with nearest resize + a stride-1 "
+        "Conv1d whose kernel is shrunk by the upsample factor (16 -> 4), which "
+        "removes the transposed-conv checkerboard comb while staying "
+        "MACs-neutral (Pons et al. arXiv:2010.14356; the observed SR/64 comb "
+        "series coincides with the ups[0] output grid). Measured comb excess at "
+        "random init: 8.37 dB (transposed) vs 2.08 dB (resize). NOTE: 'resize' "
+        "changes ups.* weight shapes, so it is for from-scratch runs only.",
+    )
+    parser.add_argument(
+        "--pqmf-taps",
+        type=int,
+        default=62,
+        choices=sorted(PQMF_DESIGN),
+        help="PQMF prototype filter length (v10b H-2b). 62 (default) is the "
+        "canonical near-perfect-reconstruction design; 126 improves stopband "
+        "attenuation by ~7.9 dB (-99.2 -> -107.1 dB) with round-trip SNR kept "
+        "at 65 dB. Only co-designed presets are accepted: bumping taps without "
+        "re-tuning (cutoff_ratio, beta) improves the stopband while collapsing "
+        "reconstruction to 16 dB (see PQMF_DESIGN in vits/mb_istft.py).",
+    )
+    parser.add_argument(
+        "--trainable-pqmf-synthesis",
+        action="store_true",
+        default=False,
+        help="Make the PQMF *synthesis* filter bank trainable (v10b H-2b, "
+        "MS-iSTFT-VITS style). The analysis bank stays fixed because it "
+        "produces the sub-band training target. Initialised to the canonical "
+        "coefficients, so step 0 is bit-identical to the fixed bank; the "
+        "trade-off is that perfect reconstruction can drift during training "
+        "(re-run tests/test_pqmf_taps_trainable.py against the trained "
+        "checkpoint to measure the deviation).",
+    )
     parser.add_argument("--seed", type=int, default=1234)
     return parser
 
@@ -845,14 +888,18 @@ def reinit_pqmf_bank(model) -> None:
     「旧 decoder 重み + 修正済みバンク」から学習を始めたい。VitsModel.pqmf と
     model_g.dec.pqmf は同一インスタンス (PR #320 A1) なので片方の上書きで両方に
     効くが、将来の分離に備えて両方に適用する。
+
+    taps は現行バンクから引き継ぐ (v10b H-2b で 62 以外の preset を使う場合に
+    canonical 62 で作り直すと形状不一致で落ちるため)。
     """
-    fresh = PQMF(subbands=model.pqmf.subbands).state_dict()
+    fresh = PQMF(subbands=model.pqmf.subbands, taps=model.pqmf.taps).state_dict()
     model.pqmf.load_state_dict(fresh)
     if model.model_g.dec.pqmf is not model.pqmf:
         model.model_g.dec.pqmf.load_state_dict(fresh)
     _LOGGER.info(
-        "PQMF bank re-initialized with canonical coefficients (--reinit-pqmf); "
-        "checkpoint-stored bank discarded."
+        "PQMF bank re-initialized with canonical coefficients (--reinit-pqmf, "
+        "taps=%d); checkpoint-stored bank discarded.",
+        model.pqmf.taps,
     )
 
 
@@ -1204,6 +1251,29 @@ def main():
         _LOGGER.info(
             "v10 E1 enabled (--film-init-std=%s): decoder FiLM init N(0, std)",
             args.film_init_std,
+        )
+
+    # v10b Phase B デコーダ系 flags (default off = v10a-r2 bit 互換)
+    if getattr(args, "upsample_mode", "transposed") != "transposed":
+        _LOGGER.info(
+            "v10b H-1 enabled (--upsample-mode=%s): decoder upsamplers are "
+            "nearest resize + shrunk-kernel Conv1d (checkerboard comb removed, "
+            "MACs-neutral). ups.* weight shapes differ from transposed "
+            "checkpoints — from-scratch runs only.",
+            args.upsample_mode,
+        )
+    if getattr(args, "pqmf_taps", 62) != 62:
+        _LOGGER.info(
+            "v10b H-2b enabled (--pqmf-taps=%d): co-designed PQMF prototype "
+            "%s applied to the shared analysis/synthesis bank",
+            args.pqmf_taps,
+            PQMF_DESIGN[args.pqmf_taps],
+        )
+    if getattr(args, "trainable_pqmf_synthesis", False):
+        _LOGGER.info(
+            "v10b H-2b enabled (--trainable-pqmf-synthesis): PQMF synthesis "
+            "bank is trainable (analysis bank stays fixed); perfect "
+            "reconstruction may drift during training"
         )
 
     # Warn about deprecated --spk-emb-dropout
