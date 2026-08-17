@@ -22,6 +22,29 @@ from .stft_onnx import OnnxISTFT
 LRELU_SLOPE = 0.1
 
 
+# Co-designed PQMF prototype parameters per filter length (v10b H-2b).
+#
+# ``taps`` alone is NOT a free knob: the Kaiser-windowed-sinc prototype must be
+# re-tuned whenever the filter length changes, because a longer filter has a
+# narrower transition band and the near-perfect-reconstruction property depends
+# on adjacent bands overlapping by exactly the right amount. Keeping the
+# taps=62 values while bumping to 126 *improves* the stopband (-99 -> -110 dB)
+# yet collapses round-trip reconstruction (64.0 -> 16.1 dB) and breaks power
+# complementarity (sum|G_k|^2 ripple 0.01 -> 1.80 dB) — i.e. the naive bump is
+# exactly the kind of change a stopband-only acceptance criterion would wave
+# through. See tests/test_pqmf_taps_trainable.py for the measured evidence and
+# docs/design/zero-shot-noise-root-cause-pqmf.md §4 for why we no longer accept
+# single-metric criteria here.
+#
+#   taps  (cutoff_ratio, beta)   round-trip   stopband   ripple
+#     62  (0.1420, 9.00)          64.05 dB    -99.2 dB   0.010 dB   canonical
+#    126  (0.1336, 9.50)          65.17 dB   -107.1 dB   0.015 dB   H-2b
+PQMF_DESIGN: dict[int, tuple[float, float]] = {
+    62: (0.142, 9.0),
+    126: (0.1336, 9.5),
+}
+
+
 class PQMF(nn.Module):
     """Pseudo Quadrature Mirror Filterbank (canonical near-perfect design).
 
@@ -53,12 +76,28 @@ class PQMF(nn.Module):
         self,
         subbands: int = 4,
         taps: int = 62,
-        cutoff_ratio: float = 0.142,
-        beta: float = 9.0,
+        cutoff_ratio: float | None = None,
+        beta: float | None = None,
+        trainable_synthesis: bool = False,
     ):
         super().__init__()
+        if cutoff_ratio is None or beta is None:
+            if taps not in PQMF_DESIGN:
+                raise ValueError(
+                    f"no co-designed prototype for taps={taps}; supported: "
+                    f"{sorted(PQMF_DESIGN)}. Pass cutoff_ratio and beta "
+                    f"explicitly to explore a new length, and verify round-trip "
+                    f"SNR >= 55 dB plus power complementarity before using it "
+                    f"for training (see tests/test_pqmf_taps_trainable.py)."
+                )
+            default_cutoff, default_beta = PQMF_DESIGN[taps]
+            cutoff_ratio = default_cutoff if cutoff_ratio is None else cutoff_ratio
+            beta = default_beta if beta is None else beta
         self.subbands = subbands
         self.taps = taps
+        self.cutoff_ratio = cutoff_ratio
+        self.beta = beta
+        self.trainable_synthesis = trainable_synthesis
 
         # --- Prototype lowpass filter: Kaiser-windowed sinc ---
         filter_length = taps + 1  # 63
@@ -85,13 +124,21 @@ class PQMF(nn.Module):
             analysis_filter[k, 0] = 2.0 * prototype * np.cos(arg + phase)
             synthesis_filter[k, 0] = 2.0 * prototype * np.cos(arg - phase)
 
-        # Register as buffers (float32)
+        # Register as buffers (float32). The analysis bank is ALWAYS fixed: it
+        # produces the sub-band training target from ground-truth audio, so
+        # making it learnable would let the model move the target it is scored
+        # against. Only the synthesis bank may be trainable (v10b H-2b,
+        # MS-iSTFT-VITS style) — and because the coefficients are identical to
+        # the canonical ones at construction, ``state_dict`` keys and shapes are
+        # unchanged either way, so checkpoints interoperate in both directions.
         self.register_buffer(
             "analysis_filter", torch.from_numpy(analysis_filter).float()
         )
-        self.register_buffer(
-            "synthesis_filter", torch.from_numpy(synthesis_filter).float()
-        )
+        synthesis_tensor = torch.from_numpy(synthesis_filter).float()
+        if trainable_synthesis:
+            self.synthesis_filter = nn.Parameter(synthesis_tensor)
+        else:
+            self.register_buffer("synthesis_filter", synthesis_tensor)
 
         # Up/down-sampling filter: every band decimates/interpolates at the
         # SAME polyphase offset (j=0). The previous grouped-eye construction
@@ -150,13 +197,98 @@ class PQMF(nn.Module):
         return x
 
 
+class NearestResizeUpsample(nn.Module):
+    """Nearest-neighbour resize followed by a stride-1 Conv1d (v10b H-1).
+
+    Drop-in replacement for ``ConvTranspose1d(C_in, C_out, k, stride=u)`` that
+    removes the transposed-convolution *checkerboard* / tonal artifact: with a
+    strided transposed conv each output phase ``p in [0, u)`` is produced by a
+    different weight subset, so any non-zero activation mean is modulated with
+    the stage grid period and shows up as a stationary comb in the spectrum
+    (Pons et al., arXiv:2010.14356 — present from initialisation, surviving
+    training). Resizing first and convolving with stride 1 makes every output
+    sample share one filter, so the modulation has no mechanism to appear.
+
+    Motivation for piper-plus specifically: the observed comb series
+    (SR/64 = 344.5 Hz strongest) coincides exactly with the ``ups[0]`` output
+    grid — see docs/design/zero-shot-v10b-quality-plan.md §1.3 (suspect #1).
+
+    MACs (docstring requirement of plan §3.1 H-1【算術】/ §4.3 cost gate)::
+
+        ConvTranspose1d(C_in, C_out, k, stride=u)   MACs = L_in · k · C_in · C_out
+        resize(xu) + Conv1d(C_in, C_out, k')        MACs = u · L_in · k' · C_in · C_out
+
+    Keeping the same kernel would therefore cost ``u`` times more MACs per
+    stage (4x for our ``upsample_rates=(4, 4)``), which would put the CPU
+    real-time budget of MB-iSTFT at risk. We shrink the kernel proportionally,
+    ``k' = k // u`` (16 // 4 = 4), making the replacement **MACs-neutral**.
+
+    The Conv1d is initialised as an interpolation (lowpass) filter: the weight
+    is the outer product of a random channel-mixing matrix and a Hann-windowed
+    sinc of cutoff ``pi/u``, plus a small perturbation that breaks the exact
+    rank-1 degeneracy along the tap axis. Combined with the nearest resize
+    (itself a length-``u`` box filter) the stage starts life as a proper
+    ``xu`` interpolator with strongly suppressed images.
+
+    Both ops are ONNX standard operators (Resize / Pad / Conv), so the export
+    contract is unchanged.
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int,
+        upsample: int,
+        perturb_ratio: float = 0.1,
+    ):
+        super().__init__()
+        self.upsample = upsample
+        # k' = k / u keeps MACs identical to the transposed conv it replaces.
+        k = max(1, kernel_size // upsample)
+        self.kernel_size = k
+        # Even kernels cannot be centred symmetrically by ``Conv1d(padding=)``,
+        # so pad explicitly to keep the output length exactly L_in * u.
+        self.pad = nn.ConstantPad1d((k // 2, k - 1 - k // 2), 0.0)
+
+        conv = Conv1d(in_channels, out_channels, k)
+        with torch.no_grad():
+            h = torch.from_numpy(self._interpolation_kernel(k, upsample)).float()
+            # Match the output variance of PyTorch's default Conv init
+            # (kaiming_uniform with a=sqrt(5) => Var(out) = Var(x)/3):
+            #   Var(out) = C_in * Var(A) * ||h||^2 * Var(x)
+            var_a = 1.0 / (3.0 * in_channels * float((h**2).sum()))
+            a = torch.randn(out_channels, in_channels, 1) * math.sqrt(var_a)
+            weight = a * h.reshape(1, 1, k)
+            weight = weight + torch.randn_like(weight) * (perturb_ratio * weight.std())
+            conv.weight.copy_(weight)
+            conv.bias.zero_()
+        self.conv = weight_norm(conv)
+
+    @staticmethod
+    def _interpolation_kernel(k: int, upsample: int) -> np.ndarray:
+        """Hann-windowed sinc lowpass of cutoff ``pi/upsample``, unity DC gain."""
+        n = np.arange(k, dtype=np.float64) - (k - 1) / 2.0
+        window = 0.5 - 0.5 * np.cos(2 * np.pi * (np.arange(k) + 0.5) / k)
+        h = np.sinc(n / upsample) * window
+        return h / h.sum()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = F.interpolate(x, scale_factor=float(self.upsample), mode="nearest")
+        return self.conv(self.pad(x))
+
+
 class MBiSTFTGenerator(nn.Module):
     """Multi-Band inverse STFT Generator.
 
     The sole VITS decoder. Generates fullband audio from latents via two
-    transposed-convolution upsample stages followed by sub-band iSTFT and
-    PQMF synthesis. Total upsample factor is
+    upsample stages followed by sub-band iSTFT and PQMF synthesis. Total
+    upsample factor is
     ``upsample_rates(16x) * iSTFT_hop(4x) * PQMF_subbands(4x) = 256x``.
+
+    The upsample stages are ``ConvTranspose1d`` by default; ``upsample_mode
+    ="resize"`` (v10b H-1) swaps them for :class:`NearestResizeUpsample` to
+    remove the transposed-conv tonal comb.
     """
 
     def __init__(
@@ -188,8 +320,19 @@ class MBiSTFTGenerator(nn.Module):
         # (AdaLN-Zero 分析: 同等品質に ~46% 少ない学習時間)。0.0 (default)
         # は従来どおり zero-init (v9 bit 互換)。bias は常に 0。
         film_init_std: float = 0.0,
+        # v10b H-1 (--upsample-mode): "transposed" (default、v10a bit 互換) か
+        # "resize" (nearest resize + kernel 縮小 Conv1d、checkerboard 除去)。
+        upsample_mode: str = "transposed",
+        # v10b H-2b: PQMF を自前構築する場合の taps / 学習可能合成フィルタ。
+        # ``pqmf`` を渡した場合は無視される (共有インスタンス側の設定が勝つ)。
+        pqmf_taps: int = 62,
+        trainable_pqmf_synthesis: bool = False,
     ):
         super().__init__()
+        if upsample_mode not in ("transposed", "resize"):
+            raise ValueError(
+                f"upsample_mode must be 'transposed' or 'resize', got {upsample_mode!r}"
+            )
         self.num_kernels = len(resblock_kernel_sizes)
         self.num_upsamples = len(upsample_rates)
         self.subbands = subbands
@@ -197,6 +340,7 @@ class MBiSTFTGenerator(nn.Module):
         self.hop_length = hop_length
         self.onnx_export_mode = False
         self.use_channels_last = use_channels_last
+        self.upsample_mode = upsample_mode
 
         # --- conv_pre ---
         self.conv_pre = weight_norm(
@@ -211,17 +355,22 @@ class MBiSTFTGenerator(nn.Module):
         for i, (u, k) in enumerate(
             zip(upsample_rates, upsample_kernel_sizes, strict=False)
         ):
-            self.ups.append(
-                weight_norm(
-                    ConvTranspose1d(
-                        upsample_initial_channel // (2**i),
-                        upsample_initial_channel // (2 ** (i + 1)),
-                        k,
-                        u,
-                        padding=(k - u) // 2,
+            ch_in = upsample_initial_channel // (2**i)
+            ch_out = upsample_initial_channel // (2 ** (i + 1))
+            if upsample_mode == "resize":
+                self.ups.append(NearestResizeUpsample(ch_in, ch_out, k, u))
+            else:
+                self.ups.append(
+                    weight_norm(
+                        ConvTranspose1d(
+                            ch_in,
+                            ch_out,
+                            k,
+                            u,
+                            padding=(k - u) // 2,
+                        )
                     )
                 )
-            )
 
         # --- ResBlocks after each upsampling stage ---
         self.resblocks = nn.ModuleList()
@@ -242,10 +391,23 @@ class MBiSTFTGenerator(nn.Module):
         self.istft = OnnxISTFT(n_fft=n_fft, hop_length=hop_length)
 
         # --- PQMF (shared instance or create new) ---
-        self.pqmf = pqmf if pqmf is not None else PQMF(subbands=subbands)
+        self.pqmf = (
+            pqmf
+            if pqmf is not None
+            else PQMF(
+                subbands=subbands,
+                taps=pqmf_taps,
+                trainable_synthesis=trainable_pqmf_synthesis,
+            )
+        )
 
         # --- Weight initialisation (ups only) ---
-        self.ups.apply(init_weights)
+        # resize モードは NearestResizeUpsample が interpolation-filter init を
+        # 済ませているため適用しない (init_weights は weight_norm 済み module の
+        # ``weight`` 属性を書くだけで forward pre-hook に上書きされる = 実質
+        # no-op だが、意図を明示するため mode で分ける)。
+        if upsample_mode == "transposed":
+            self.ups.apply(init_weights)
 
         # --- Speaker conditioning (Multi-scale FiLM) ---
         # ``conv_pre`` 直後の Input-stage FiLM と各 upsample 段ごとの FiLM 層を
@@ -376,6 +538,7 @@ class MBiSTFTGenerator(nn.Module):
         print("Removing weight norm...")
         remove_weight_norm(self.conv_pre)
         for l in self.ups:  # noqa: E741
-            remove_weight_norm(l)
+            # resize モード (NearestResizeUpsample) は内側の Conv1d が持つ
+            remove_weight_norm(l.conv if isinstance(l, NearestResizeUpsample) else l)
         for l in self.resblocks:  # noqa: E741
             l.remove_weight_norm()
