@@ -935,6 +935,13 @@ class SynthesizerTrn(nn.Module):
         # E1: dec FiLM (cond_layers) の zero-init を N(0, std) に置換
         # (0.0 = 従来の zero-init)
         film_init_std: float = 0.0,
+        # --- v10b Phase B デコーダ系 (default は全て v10a-r2 と bit 互換。
+        # docs/design/zero-shot-v10b-quality-plan.md §3.1) ---
+        # H-1: upsampler を nearest resize + kernel 縮小 Conv1d に置換
+        upsample_mode: str = "transposed",
+        # H-2b: PQMF の taps (co-design 済み preset のみ) / 合成側の学習可能化
+        pqmf_taps: int = 62,
+        trainable_pqmf_synthesis: bool = False,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -991,6 +998,9 @@ class SynthesizerTrn(nn.Module):
             gin_channels=gin_channels,
             use_channels_last=use_channels_last,
             film_init_std=film_init_std,
+            upsample_mode=upsample_mode,
+            pqmf_taps=pqmf_taps,
+            trainable_pqmf_synthesis=trainable_pqmf_synthesis,
         )
         self.enc_q = PosteriorEncoder(
             spec_channels,
