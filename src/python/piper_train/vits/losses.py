@@ -307,6 +307,112 @@ def swap_spk_ramp_weight(current_epoch, start_epoch, ramp_epochs):
     return min(1.0, (current_epoch - start_epoch) / float(ramp_epochs))
 
 
+def jcu_split(outputs, n_resolutions):
+    """JCU MRD の出力リストを (無条件, 条件) に分ける純関数 (v10b S-1a)。
+
+    ``MultiResolutionSpectrogramDiscriminator`` は 4-tuple 契約を保つため、
+    条件項を同じリストの**後半**に追加する。前半 ``n_resolutions`` 個が
+    無条件項、残りが条件項 (JCU off なら空リスト)。
+
+    呼び出し側は 2 つの LSGAN 項を 1/2 ずつ平均して使う — 条件項を単に
+    リストに足すだけだと MRD の敵対項が 2 倍になり、既存の ``c_mrd`` 較正値
+    (grad-probe で mel の 5-15% に合わせた値) が黙って崩れる。
+    """
+    return list(outputs[:n_resolutions]), list(outputs[n_resolutions:])
+
+
+def _check_speaker_id_range(speaker_ids, num_classes):
+    """speaker_id が [0, num_classes) に収まっているか検証する。
+
+    範囲外の id を CE に渡すと CUDA 側で assert 死する (device-side error は
+    発生位置が追いにくい)。学習途中で落ちるとしても、「話者ラベルがずれた
+    分類器で最後まで学習する」より早期に落とす方が良い。
+
+    GPU 同期は 1 回だけ (bool 1 個の取り出し)。実際の min/max はエラー時に
+    しか計算しない — 毎 step の余計な device→host 同期を作らないため。
+    """
+    if speaker_ids.numel() == 0:
+        return
+    out_of_range = (speaker_ids < 0) | (speaker_ids >= num_classes)
+    if bool(out_of_range.any()):
+        raise ValueError(
+            f"speaker_id out of range for the adversarial speaker classifier: "
+            f"got [{int(speaker_ids.min())}, {int(speaker_ids.max())}], "
+            f"expected [0, {num_classes - 1}]"
+        )
+
+
+def adv_speaker_classifier_loss_d(
+    real_logits, fake_logits, speaker_ids, fake_class_index
+):
+    """分類器 C 側の損失 (v10b S-1b): 実音声 = 真の話者 / 生成音声 = クラス K。
+
+    **fake 項は仕様の核心**: C の決定境界を生成分布上で更新し続けることで、
+    frozen encoder 型の静的な gaming 面 (v10a §10 で prior 経路を崩壊させた
+    機構) が構造的に成立しなくなる。実音声のみで C を学習する形式は
+    plan §2.2 で禁止 — この関数から fake 項を外す変更は
+    tests/test_adv_spk_classifier.py::TestClassifierIsUpdatedOnFakes が
+    検出する。
+
+    Parameters
+    ----------
+    real_logits, fake_logits : torch.Tensor
+        ``[B, num_speakers + 1]``。fake 側は呼び出し側で detach 済みの波形から
+        求める (D 更新が G に勾配を返さないため)
+    speaker_ids : torch.LongTensor
+        ``[B]`` 実音声 = 条件話者の ID
+    fake_class_index : int
+        「生成音声」クラスの index (= num_speakers)
+    """
+    _check_speaker_id_range(speaker_ids, fake_class_index)
+    loss_real = F.cross_entropy(real_logits.float(), speaker_ids)
+    fake_target = torch.full(
+        (fake_logits.shape[0],),
+        fake_class_index,
+        dtype=torch.long,
+        device=fake_logits.device,
+    )
+    loss_fake = F.cross_entropy(fake_logits.float(), fake_target)
+    return loss_real + loss_fake
+
+
+def adv_speaker_classifier_loss_g(fake_logits, speaker_ids):
+    """G 側の損失 (v10b S-1b): 生成音声が条件話者に分類されるよう CE 最小化。
+
+    目標ラベルは常に条件話者 (< K)。「生成音声」クラス K を目標にすると符号が
+    反転して G が自分を fake だと主張しに行くため、ラベルは speaker_ids のみ
+    受け付ける (範囲検証で K 以上を弾く)。
+    """
+    _check_speaker_id_range(speaker_ids, fake_logits.shape[-1] - 1)
+    return F.cross_entropy(fake_logits.float(), speaker_ids)
+
+
+def adv_speaker_classifier_stats(
+    real_logits, fake_logits, speaker_ids, fake_class_index
+):
+    """C の判別状況の監視統計 (v10b Phase D 検証項目 ③ / 本走 R3 監視対象)。
+
+    plan §4.2 D-③ が要求する「fake に対する C の話者分類精度の推移」を
+    数値で出す。学習信号ではないので勾配を切って返す。値は 0-dim tensor の
+    まま返す — ``float()`` に落とすと毎 step 3 回の device→host 同期が入り、
+    ロガー側で遅延評価できなくなるため。
+
+    - ``acc_real``: 実音声を正しい話者に分類できた割合 (C の素の能力)
+    - ``acc_fake_as_generated``: 生成音声を「生成」クラスに分類した割合
+      (**0 に落ちたら C が G に負けている**。逆に 1.0 に貼り付いたまま
+      ``acc_fake_as_conditioned`` が 0 のままなら G 側の敵対項が効いていない)
+    - ``acc_fake_as_conditioned``: 生成音声を条件話者に分類した割合 (G の勝率)
+    """
+    with torch.no_grad():
+        real_pred = real_logits.argmax(dim=-1)
+        fake_pred = fake_logits.argmax(dim=-1)
+        return {
+            "acc_real": (real_pred == speaker_ids).float().mean(),
+            "acc_fake_as_generated": (fake_pred == fake_class_index).float().mean(),
+            "acc_fake_as_conditioned": (fake_pred == speaker_ids).float().mean(),
+        }
+
+
 def gather_speaker_loss_inputs(gen_embedding, ref_embedding, speaker_ids=None):
     """DDP 全 rank の SCL 入力を結合する (v10 §3.2、--spk-loss-gather)。
 
