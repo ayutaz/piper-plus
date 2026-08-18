@@ -425,3 +425,62 @@ class TestAdvSpkCli:
         assert args.c_adv_spk == 0.3
         assert args.adv_spk_start_epoch == 8
         assert args.adv_spk_ramp_epochs == 3
+
+
+class TestSparseSpeakerIdSizing:
+    """v10b smoke 実測事故の再発防止: データゲートで speaker_id が疎な dataset
+    (config num_speakers=個数 < max_id+1) では classifier を max_id+1 で
+    サイズしないと学習が即死する。"""
+
+    def test_adv_spk_num_classes_overrides_num_speakers(self):
+        from piper_train.vits.lightning import VitsModel
+
+        model = VitsModel(
+            num_symbols=50,
+            num_speakers=10,
+            sample_rate=22050,
+            dataset=None,
+            batch_size=1,
+            use_adv_spk_classifier=True,
+            c_adv_spk=1.0,
+            adv_spk_num_classes=17,
+            no_wavlm=True,
+            use_wavlm_discriminator=False,
+        )
+        # 頭数 = adv_spk_num_classes (+1 generated class は内部)
+        assert model.model_c_spk is not None
+        assert model.model_c_spk.num_speakers == 17
+
+    def test_zero_means_num_speakers(self):
+        from piper_train.vits.lightning import VitsModel
+
+        model = VitsModel(
+            num_symbols=50,
+            num_speakers=10,
+            sample_rate=22050,
+            dataset=None,
+            batch_size=1,
+            use_adv_spk_classifier=True,
+            c_adv_spk=1.0,
+            adv_spk_num_classes=0,
+            no_wavlm=True,
+            use_wavlm_discriminator=False,
+        )
+        assert model.model_c_spk.num_speakers == 10
+
+    def test_smaller_than_num_speakers_rejected(self):
+        from piper_train.vits.lightning import VitsModel
+
+        with pytest.raises(ValueError, match="adv_spk_num_classes"):
+            VitsModel(
+                num_symbols=50,
+                num_speakers=10,
+                sample_rate=22050,
+                dataset=None,
+                batch_size=1,
+                use_adv_spk_classifier=True,
+                c_adv_spk=1.0,
+                adv_spk_num_classes=5,
+                no_wavlm=True,
+                use_wavlm_discriminator=False,
+            )

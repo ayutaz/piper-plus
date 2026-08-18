@@ -336,6 +336,12 @@ class VitsModel(pl.LightningModule):
         c_adv_spk: float = 1.0,
         adv_spk_start_epoch: int = 10,
         adv_spk_ramp_epochs: int = 5,
+        # S-1b classifier の出力クラス数。0 = num_speakers を使う (後方互換)。
+        # 案 Z ゲート等で speaker_id が疎 (欠番あり) な dataset では
+        # num_speakers (個数) < max_id+1 となり out-of-range で即死するため、
+        # __main__ が jsonl から max_id+1 を自動算出して渡す (v10b smoke で実測
+        # した事故: num_speakers=3692 に対し max id 3763)
+        adv_spk_num_classes: int = 0,
         # v9 decoder 再適応 FT: decoder 以外の generator パラメータを凍結
         train_decoder_only: bool = False,
         # MB-iSTFT options
@@ -655,15 +661,25 @@ class VitsModel(pl.LightningModule):
                         "--c-adv-spk > 0 (grad-probe calibrated) to enable it.",
                         getattr(self.hparams, "c_adv_spk", 0.0),
                     )
+                n_classes = int(getattr(self.hparams, "adv_spk_num_classes", 0) or 0)
+                if n_classes <= 0:
+                    n_classes = self.hparams.num_speakers
+                elif n_classes < self.hparams.num_speakers:
+                    raise ValueError(
+                        f"adv_spk_num_classes={n_classes} < "
+                        f"num_speakers={self.hparams.num_speakers} — the "
+                        "classifier head cannot be smaller than the distinct "
+                        "speaker count"
+                    )
                 self.model_c_spk = AdversarialSpeakerClassifier(
-                    num_speakers=self.hparams.num_speakers,
+                    num_speakers=n_classes,
                 )
                 _LOGGER.info(
                     "Adversarial speaker classifier enabled (v10b S-1b): "
-                    "%d speakers + 1 generated class, c_adv_spk=%s, ramp "
+                    "%d speaker classes + 1 generated class, c_adv_spk=%s, ramp "
                     "start=%s over %s epochs (classifier itself trains from "
                     "step 0; only the generator term ramps)",
-                    self.hparams.num_speakers,
+                    n_classes,
                     self.hparams.c_adv_spk,
                     self.hparams.adv_spk_start_epoch,
                     self.hparams.adv_spk_ramp_epochs,

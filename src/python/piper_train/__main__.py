@@ -1407,6 +1407,32 @@ def main():
 
     dict_args = vars(args)
 
+    # v10b S-1b: adversarial speaker classifier のクラス数を jsonl から自動算出。
+    # config.json の num_speakers は「話者の個数」であり、データゲート (案 Z 等)
+    # で話者を除外した dataset では speaker_id が疎 (欠番あり) になる —
+    # 個数でヘッドを作ると max_id が範囲外になり学習が即死する (v10b smoke で
+    # 実測: num_speakers=3692 に対し max id 3763)。閉集合 CE の未使用クラスは
+    # 無害なので max_id+1 でサイズする。
+    if getattr(args, "use_adv_spk_classifier", False):
+        max_sid = -1
+        with open(dataset_path, encoding="utf-8") as ds_file:
+            for line in ds_file:
+                if not line.strip():
+                    continue
+                sid = json.loads(line).get("speaker_id")
+                if sid is not None and int(sid) > max_sid:
+                    max_sid = int(sid)
+        if max_sid >= 0:
+            dict_args["adv_spk_num_classes"] = max(max_sid + 1, num_speakers)
+            if max_sid + 1 != num_speakers:
+                _LOGGER.info(
+                    "Adversarial speaker classifier sized by dataset max "
+                    "speaker_id: %d classes (config num_speakers=%d — sparse "
+                    "ids from data gating)",
+                    max_sid + 1,
+                    num_speakers,
+                )
+
     # CLI --gradient-clip-val (Trainer 用の名前) → VitsModel(grad_clip=...) にマップ
     dict_args["grad_clip"] = _resolve_grad_clip(getattr(args, "gradient_clip_val", 1.0))
     if dict_args["grad_clip"] is not None:
