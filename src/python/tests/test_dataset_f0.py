@@ -101,10 +101,31 @@ def test_nonexistent_f0_dir_is_tolerated(tmp_path):
     assert ds[0].f0 is None
 
 
-def test_frame_count_mismatch_raises(tmp_path):
-    """F0 と spectrogram のフレーム数がずれたキャッシュは即エラー。"""
+def test_frame_count_small_mismatch_is_padded(tmp_path):
+    """±4 frame 以内の差は丸め差として端 pad/trim で吸収する。
+
+    pyworld の frame_period (ms 単位 double) と STFT フレーム規約の丸め差は
+    実データで最大 ±3 frame (v10b smoke arm S2 実測: 180 vs 183)。
+    """
     records = [_write_utterance(tmp_path, "a", 40, with_f0=True)]
-    np.save(str(tmp_path / "a.f0.npy"), np.zeros(37, dtype=np.float16))
+    np.save(str(tmp_path / "a.f0.npy"), np.full(37, 200.0, dtype=np.float16))
+    ds = PiperDataset([_dataset_jsonl(tmp_path, records)], f0_dir=tmp_path)
+    utt = ds[0]
+    assert utt.f0 is not None
+    assert utt.f0.shape[0] == utt.spectrogram.size(1) == 40
+    # edge-pad: 末尾は最後の値の複製
+    assert float(utt.f0[-1]) == pytest.approx(200.0)
+
+    # 長すぎる側 (+3) は trim
+    np.save(str(tmp_path / "a.f0.npy"), np.full(43, 200.0, dtype=np.float16))
+    utt = ds[0]
+    assert utt.f0.shape[0] == 40
+
+
+def test_frame_count_large_mismatch_raises(tmp_path):
+    """許容幅 (±4) を超える差は別 hop の無効キャッシュとして即エラー。"""
+    records = [_write_utterance(tmp_path, "a", 40, with_f0=True)]
+    np.save(str(tmp_path / "a.f0.npy"), np.zeros(30, dtype=np.float16))
     ds = PiperDataset([_dataset_jsonl(tmp_path, records)], f0_dir=tmp_path)
     with pytest.raises(ValueError, match="does not match spectrogram frames"):
         _ = ds[0]
