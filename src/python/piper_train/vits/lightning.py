@@ -20,6 +20,9 @@ from .commons import (
 )
 from .dataset import Batch, PiperDataset, SpeakerBalancedBatchSampler, UtteranceCollate
 from .losses import (
+    adv_speaker_classifier_loss_d,
+    adv_speaker_classifier_loss_g,
+    adv_speaker_classifier_stats,
     build_latent_filling_embeddings,
     build_same_language_permutation,
     dino_loss,
@@ -27,6 +30,7 @@ from .losses import (
     feature_loss,
     gather_speaker_loss_inputs,
     generator_loss,
+    jcu_split,
     kl_loss,
     mel_speaker_consistency_loss,
     should_run_latent_filling_step,
@@ -37,6 +41,8 @@ from .losses import (
 from .mb_istft import PQMF
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from .models import (
+    MRD_HIRES_RESOLUTIONS,
+    AdversarialSpeakerClassifier,
     MultiPeriodDiscriminator,
     MultiResolutionSpectrogramDiscriminator,
     SynthesizerTrn,
@@ -310,6 +316,24 @@ class VitsModel(pl.LightningModule):
         # (zero-shot がびがびの副次要因 1、root-cause doc §3)
         use_mrd: bool = False,
         c_mrd: float = 1.0,
+        # --- v10b 識別器系 (default は全て v10a-r2 と bit 互換。
+        # docs/design/zero-shot-v10b-quality-plan.md §3.1 H-3 / §3.2 S-1) ---
+        # S-1a: MRD の各 resolution に GANSpeech 型 JCU 条件分岐を足す
+        # (speaker embedding を FC → 時間展開 → 共有 body に concat)。
+        # 話者監督が共進化する識別器経由になるため、frozen encoder cosine を
+        # 目的化した v10a §10 の崩壊機構が構造的に成立しない
+        use_jcu_mrd: bool = False,
+        # H-3: MRD に高分解能 resolution を 1 本 **追加** (置換ではない)。
+        # "off" / MRD_HIRES_RESOLUTIONS のキー ("2048" / "4096")
+        mrd_hires_resolution: str = "off",
+        # S-1b: 共進化 adversarial speaker classifier。C は実音声を真の話者、
+        # 生成音声を「生成」クラスに分類するよう学習し (= 生成分布上でも
+        # 更新される)、G は生成音声が条件話者に分類されるよう CE 最小化する。
+        # 実音声のみで学習する静的 classifier は plan §2.2 で禁止
+        use_adv_spk_classifier: bool = False,
+        c_adv_spk: float = 1.0,
+        adv_spk_start_epoch: int = 10,
+        adv_spk_ramp_epochs: int = 5,
         # v9 decoder 再適応 FT: decoder 以外の generator パラメータを凍結
         train_decoder_only: bool = False,
         # MB-iSTFT options
@@ -545,14 +569,69 @@ class VitsModel(pl.LightningModule):
             )
 
         # MRD: multi-resolution spectrogram discriminator (optional, v9)
+        # v10b: S-1a JCU 条件分岐 + H-3 高分解能 resolution 追加 (両方 opt-in)
         self.model_d_mrd = None
+        use_jcu = bool(getattr(self.hparams, "use_jcu_mrd", False))
+        hires_name = getattr(self.hparams, "mrd_hires_resolution", "off") or "off"
         if self.hparams.use_mrd:
+            hires = (
+                MRD_HIRES_RESOLUTIONS.get(hires_name) if hires_name != "off" else None
+            )
+            if hires_name != "off" and hires is None:
+                raise ValueError(
+                    f"unknown mrd_hires_resolution: {hires_name!r} "
+                    f"(expected 'off' or one of {sorted(MRD_HIRES_RESOLUTIONS)})"
+                )
             _LOGGER.info(
                 "Initializing MRD (multi-resolution spectrogram discriminator), "
-                "c_mrd=%s",
+                "c_mrd=%s jcu=%s hires=%s",
                 self.hparams.c_mrd,
+                use_jcu,
+                hires or "off",
             )
-            self.model_d_mrd = MultiResolutionSpectrogramDiscriminator()
+            self.model_d_mrd = MultiResolutionSpectrogramDiscriminator(
+                spk_cond_dim=192 if use_jcu else 0,
+                hires_resolution=hires,
+            )
+        elif use_jcu or hires_name != "off":
+            # 黙って無視しない: JCU / hires は MRD 本体の分岐なので、MRD 無しで
+            # 指定されたら効かないことを明示する (CLI 側でも fail-fast する)
+            _PKG_LOGGER.warning(
+                "--use-jcu-mrd / --mrd-hires-resolution require --use-mrd; "
+                "MRD is disabled so both options have no effect."
+            )
+
+        # v10b S-1b: 共進化 adversarial speaker classifier (学習時のみ、
+        # zero-shot 推論 / ONNX 契約には影響しない閉集合分類器)
+        self.model_c_spk = None
+        if getattr(self.hparams, "use_adv_spk_classifier", False):
+            if self.hparams.num_speakers < 2:
+                _PKG_LOGGER.warning(
+                    "--use-adv-spk-classifier requires a multi-speaker dataset "
+                    "(num_speakers=%d) — the classifier is disabled.",
+                    self.hparams.num_speakers,
+                )
+            else:
+                if float(getattr(self.hparams, "c_adv_spk", 0.0) or 0.0) <= 0:
+                    _PKG_LOGGER.warning(
+                        "--use-adv-spk-classifier is set but c_adv_spk=%s, so the "
+                        "adversarial speaker classifier contributes nothing. Pass "
+                        "--c-adv-spk > 0 (grad-probe calibrated) to enable it.",
+                        getattr(self.hparams, "c_adv_spk", 0.0),
+                    )
+                self.model_c_spk = AdversarialSpeakerClassifier(
+                    num_speakers=self.hparams.num_speakers,
+                )
+                _LOGGER.info(
+                    "Adversarial speaker classifier enabled (v10b S-1b): "
+                    "%d speakers + 1 generated class, c_adv_spk=%s, ramp "
+                    "start=%s over %s epochs (classifier itself trains from "
+                    "step 0; only the generator term ramps)",
+                    self.hparams.num_speakers,
+                    self.hparams.c_adv_spk,
+                    self.hparams.adv_spk_start_epoch,
+                    self.hparams.adv_spk_ramp_epochs,
+                )
 
         # MB-iSTFT: PQMF for GT analysis + sub-band STFT loss.
         # NOTE: this bank REPLACES the one the decoder built for itself, so the
@@ -590,6 +669,8 @@ class VitsModel(pl.LightningModule):
         # State kept between training optimizers
         self._y = None
         self._y_hat = None
+        # v10b S-1a: JCU MRD が D 更新でも使う条件 embedding (noise 加算後)
+        self._spk_cond = None
 
         # T1 (roadmap A-1c): per-loss grad-norm probe state。probe が due の
         # step でのみ training_step_g が loss 成分 dict をここに置き、
@@ -1010,6 +1091,117 @@ class VitsModel(pl.LightningModule):
         """
         return torch.autocast(device_type=self.device.type, enabled=False)
 
+    # ------------------------------------------------------------------
+    # v10b S-1a: JCU MRD の loss (無条件項 + 条件項を 1/2 ずつ)
+    # ------------------------------------------------------------------
+
+    def _mrd_generator_losses(self, y, y_hat, spk_cond):
+        """MRD の G 側 loss を返す ``(adv, fm, adv_cond)``。
+
+        JCU 有効時は無条件項と条件項を **1/2 ずつ平均**する。条件項を単純に
+        足すと MRD の敵対項が 2 倍になり、grad-probe で mel の 5-15% に
+        合わせた ``c_mrd`` の較正値が黙って崩れるため。``adv_cond`` は
+        監視ログ用 (None = JCU 非適用)。
+        """
+        with self._disc_autocast_ctx():
+            _y_d_r, y_d_g, fmap_r, fmap_g = self.model_d_mrd(
+                y, y_hat, speaker_embeddings=spk_cond
+            )
+        n = self.model_d_mrd.n_resolutions
+        uncond_g, cond_g = jcu_split(y_d_g, n)
+        loss_adv, _ = generator_loss(uncond_g)
+        loss_adv_cond = None
+        if cond_g:
+            loss_adv_cond, _ = generator_loss(cond_g)
+            loss_adv = 0.5 * (loss_adv + loss_adv_cond)
+        # FM loss は共有 body の fmap のみ (条件ヘッドは fmap を出さない)
+        loss_fm = feature_loss(fmap_r, fmap_g)
+        return loss_adv, loss_fm, loss_adv_cond
+
+    def _mrd_discriminator_loss(self, y, y_hat_detached, spk_cond):
+        """MRD の D 側 loss を返す ``(loss, loss_cond)`` (JCU は 1/2 ずつ平均)。"""
+        with self._disc_autocast_ctx():
+            y_d_r, y_d_g, _, _ = self.model_d_mrd(
+                y, y_hat_detached, speaker_embeddings=spk_cond
+            )
+        n = self.model_d_mrd.n_resolutions
+        uncond_r, cond_r = jcu_split(y_d_r, n)
+        uncond_g, cond_g = jcu_split(y_d_g, n)
+        loss, _, _ = discriminator_loss(uncond_r, uncond_g)
+        loss_cond = None
+        if cond_r:
+            loss_cond, _, _ = discriminator_loss(cond_r, cond_g)
+            loss = 0.5 * (loss + loss_cond)
+        return loss, loss_cond
+
+    # ------------------------------------------------------------------
+    # v10b S-1b: 共進化 adversarial speaker classifier
+    # ------------------------------------------------------------------
+
+    def _adv_spk_ramp(self, epoch: int | None = None) -> float:
+        """G 側敵対項の ramp 重み (0.0-1.0)。epoch のみの純関数 = DDP 整合。"""
+        if epoch is None:
+            epoch = self.current_epoch
+        return swap_spk_ramp_weight(
+            epoch,
+            getattr(self.hparams, "adv_spk_start_epoch", 10),
+            getattr(self.hparams, "adv_spk_ramp_epochs", 5),
+        )
+
+    def _adv_spk_classifier_active(
+        self, epoch: int | None = None, has_speaker_ids: bool = True
+    ) -> bool:
+        """C 自身を更新するか。**step 0 から有効** (ramp に従わない)。
+
+        C が未学習のまま G に「C を騙せ」と要求するとゴミ勾配を与えるため、
+        分類器側は最初から学習させ、G 側の敵対項だけを ramp する
+        (``_adv_spk_generator_active``)。この非対称性は意図的。
+
+        判定は epoch / hparams / speaker_ids の有無のみに依存する — batch 内容
+        や RNG に依存すると rank 間で分岐が食い違い、NCCL all_reduce mismatch
+        (30 分 timeout、「CUDA illegal access」の偽装症状) になる。
+        """
+        del epoch  # C 側は epoch に依存しない (署名の対称性のために受ける)
+        return (
+            self.model_c_spk is not None
+            and float(getattr(self.hparams, "c_adv_spk", 0.0) or 0.0) > 0
+            and has_speaker_ids
+        )
+
+    def _adv_spk_generator_active(
+        self, epoch: int | None = None, has_speaker_ids: bool = True
+    ) -> bool:
+        """G 側の敵対項 (生成音声 → 条件話者 CE) を足すか。ramp 後のみ。"""
+        return (
+            self._adv_spk_classifier_active(has_speaker_ids=has_speaker_ids)
+            and self._adv_spk_ramp(epoch) > 0
+        )
+
+    def _adv_spk_classifier_loss_d(self, y, y_hat_detached, speaker_ids):
+        """C 側の損失と監視統計を返す ``(loss, stats)``。
+
+        **fake 入力に対する更新が仕様の核心** (plan §2.2): C の決定境界を
+        生成分布上でも更新し続けることで、frozen encoder 型の静的な gaming 面
+        (v10a §10 の崩壊機構) が構造的に成立しなくなる。
+        """
+        with self._disc_autocast_ctx():
+            real_logits = self.model_c_spk(y)
+            fake_logits = self.model_c_spk(y_hat_detached)
+        fake_index = self.model_c_spk.fake_class_index
+        loss = adv_speaker_classifier_loss_d(
+            real_logits, fake_logits, speaker_ids, fake_index
+        )
+        stats = adv_speaker_classifier_stats(
+            real_logits.detach(), fake_logits.detach(), speaker_ids, fake_index
+        )
+        return loss, stats
+
+    def _adv_spk_classifier_loss_g(self, y_hat, speaker_ids):
+        """G 側の損失: 生成音声が条件話者に分類されるよう CE 最小化。"""
+        with self._disc_autocast_ctx():
+            fake_logits = self.model_c_spk(y_hat)
+        return adv_speaker_classifier_loss_g(fake_logits, speaker_ids)
+
     @staticmethod
     def _ddp_synced_is_finite(loss: torch.Tensor) -> bool:
         """全 rank 同期で loss が有限かを判定する (skip-batch 決定用)。
@@ -1176,6 +1368,7 @@ class VitsModel(pl.LightningModule):
             opt_d.zero_grad(set_to_none=True)
             self._y = None
             self._y_hat = None
+            self._spk_cond = None
             # T1 (A-1c): skip 時も probe 用の loss 参照を解放 (graph を保持しない)
             self._grad_probe_losses = None
             return
@@ -1210,6 +1403,7 @@ class VitsModel(pl.LightningModule):
             self._log_with_batch_info("lf_step", 1.0, batch)
             self._y = None
             self._y_hat = None
+            self._spk_cond = None
             return
 
         # Train discriminator (every step)
@@ -1229,6 +1423,7 @@ class VitsModel(pl.LightningModule):
             opt_d.zero_grad(set_to_none=True)
             self._y = None
             self._y_hat = None
+            self._spk_cond = None
             return
 
         self.manual_backward(loss_d)
@@ -1238,12 +1433,15 @@ class VitsModel(pl.LightningModule):
                 d_params = d_params + list(self.model_d_wavlm.parameters())
             if self.model_d_mrd is not None:
                 d_params = d_params + list(self.model_d_mrd.parameters())
+            if self.model_c_spk is not None:
+                d_params = d_params + list(self.model_c_spk.parameters())
             torch.nn.utils.clip_grad_norm_(d_params, grad_clip)
         opt_d.step()
 
         # Clear instance variables to release references
         self._y = None
         self._y_hat = None
+        self._spk_cond = None
 
         # NOTE (perf, 2026-07-09): 500-batch 周期の
         # ``torch.cuda.synchronize() + torch.cuda.empty_cache()`` flush を撤去。
@@ -1357,6 +1555,7 @@ class VitsModel(pl.LightningModule):
         # 参照を一貫させておく
         self._y_hat = y_hat.contiguous()
         self._y = None
+        self._spk_cond = None
 
         with autocast(self.device.type, enabled=False):
             with self._scl_autocast_ctx():
@@ -1508,6 +1707,9 @@ class VitsModel(pl.LightningModule):
 
         # Save for training_step_d
         self._y = y
+        # v10b S-1a: JCU MRD の条件は **noise 加算後** の embedding
+        # (conditioning に使ったものと同一) を D 更新でも使う
+        self._spk_cond = speaker_embeddings
 
         # T6: Discriminator forward runs under _disc_autocast_ctx (nullcontext by
         # default; bf16 or fp32 override when disc_precision != "inherit").
@@ -1879,19 +2081,38 @@ class VitsModel(pl.LightningModule):
                     probe_losses["wavlm"] = loss_wavlm
 
             # MRD generator loss (optional, v9 — full-band spectral supervision)
+            # v10b S-1a: JCU 有効時は無条件項 + 条件項を 1/2 ずつ (spk_cond は
+            # noise 加算後の embedding。conditioning に使ったものと同一)
             if self.model_d_mrd is not None:
-                with self._disc_autocast_ctx():
-                    _y_d_r_mrd, y_d_g_mrd, fmap_r_mrd, fmap_g_mrd = self.model_d_mrd(
-                        y, y_hat
-                    )
-                loss_fm_mrd = feature_loss(fmap_r_mrd, fmap_g_mrd)
-                loss_gen_mrd, _ = generator_loss(y_d_g_mrd)
+                loss_gen_mrd, loss_fm_mrd, loss_gen_mrd_cond = (
+                    self._mrd_generator_losses(y, y_hat, speaker_embeddings)
+                )
                 loss_mrd = (loss_gen_mrd + loss_fm_mrd) * self.hparams.c_mrd
                 loss_gen_all = loss_gen_all + loss_mrd
                 self._log_with_batch_info("loss_gen_mrd", loss_gen_mrd, batch)
                 self._log_with_batch_info("loss_fm_mrd", loss_fm_mrd, batch)
+                if loss_gen_mrd_cond is not None:
+                    self._log_with_batch_info(
+                        "loss_gen_mrd_cond", loss_gen_mrd_cond, batch
+                    )
                 if probe_losses is not None:
                     probe_losses["mrd"] = loss_mrd
+
+            # v10b S-1b: adversarial speaker classifier の G 側敵対項。
+            # 生成音声が条件話者に分類されるよう CE 最小化する (frozen encoder
+            # cosine ではなく共進化する分類器が相手なので静的に game できない)
+            if self.model_c_spk is not None and self._adv_spk_generator_active(
+                has_speaker_ids=batch.speaker_ids is not None
+            ):
+                ramp = self._adv_spk_ramp()
+                loss_adv_spk = self._adv_spk_classifier_loss_g(
+                    y_hat, batch.speaker_ids
+                ) * (self.hparams.c_adv_spk * ramp)
+                loss_gen_all = loss_gen_all + loss_adv_spk
+                self._log_with_batch_info("loss_adv_spk", loss_adv_spk, batch)
+                self._log_with_batch_info("adv_spk_ramp", ramp, batch)
+                if probe_losses is not None:
+                    probe_losses["adv_spk"] = loss_adv_spk
 
             self._log_with_batch_info("loss_gen_all", loss_gen_all, batch)
             self._log_with_batch_info("loss_mel", loss_mel, batch)
@@ -1941,13 +2162,35 @@ class VitsModel(pl.LightningModule):
                 # Log WavLM discriminator loss
                 self._log_with_batch_info("loss_disc_wavlm", loss_disc_wavlm, batch)
 
-            # MRD discriminator loss (optional, v9)
+            # MRD discriminator loss (optional, v9; v10b S-1a で JCU 条件項)
             if self.model_d_mrd is not None:
-                with self._disc_autocast_ctx():
-                    y_d_r_mrd, y_d_g_mrd, _, _ = self.model_d_mrd(y, y_hat_detached)
-                loss_disc_mrd, _, _ = discriminator_loss(y_d_r_mrd, y_d_g_mrd)
+                loss_disc_mrd, loss_disc_mrd_cond = self._mrd_discriminator_loss(
+                    y, y_hat_detached, getattr(self, "_spk_cond", None)
+                )
                 loss_disc_all = loss_disc_all + loss_disc_mrd * self.hparams.c_mrd
                 self._log_with_batch_info("loss_disc_mrd", loss_disc_mrd, batch)
+                if loss_disc_mrd_cond is not None:
+                    self._log_with_batch_info(
+                        "loss_disc_mrd_cond", loss_disc_mrd_cond, batch
+                    )
+
+            # v10b S-1b: 分類器 C 自身の更新 (実音声 = 真の話者 / 生成音声 =
+            # 「生成」クラス)。**ramp に従わず step 0 から学習する** — C が
+            # 未学習のまま G に敵対項を課すとゴミ勾配になるため。
+            # fake 側は detach 済み波形なので G に勾配は戻らない。
+            if self.model_c_spk is not None and self._adv_spk_classifier_active(
+                has_speaker_ids=batch.speaker_ids is not None
+            ):
+                loss_c_spk, c_stats = self._adv_spk_classifier_loss_d(
+                    y, y_hat_detached, batch.speaker_ids
+                )
+                loss_disc_all = loss_disc_all + loss_c_spk * self.hparams.c_adv_spk
+                self._log_with_batch_info("loss_c_spk", loss_c_spk, batch)
+                # Phase D 検証項目 ③ / 本走 R3 監視: fake に対する C の判別推移。
+                # acc_fake_as_generated が 1.0 に貼り付いたら C の生成分布上の
+                # 更新が仕事をしていない (= S-1b の前提が崩れている) 兆候
+                for key, value in c_stats.items():
+                    self._log_with_batch_info(f"c_spk_{key}", value, batch)
 
             self._log_with_batch_info("loss_disc_all", loss_disc_all, batch)
 
@@ -2187,12 +2430,18 @@ class VitsModel(pl.LightningModule):
         # Collect generator parameters (exclude frozen params)
         g_params = [p for p in self.model_g.parameters() if p.requires_grad]
 
-        # Collect discriminator parameters (including WavLM / MRD if enabled)
+        # Collect discriminator parameters (including WavLM / MRD / adversarial
+        # speaker classifier if enabled). The classifier belongs to the D
+        # optimizer: it is updated adversarially against the generator, and any
+        # gradient it picks up during the G backward is cleared by the
+        # ``opt_d.zero_grad()`` that precedes ``training_step_d``.
         d_params = list(self.model_d.parameters())
         if self.model_d_wavlm is not None:
             d_params = d_params + list(self.model_d_wavlm.parameters())
         if self.model_d_mrd is not None:
             d_params = d_params + list(self.model_d_mrd.parameters())
+        if self.model_c_spk is not None:
+            d_params = d_params + list(self.model_c_spk.parameters())
 
         optimizers = [
             torch.optim.AdamW(

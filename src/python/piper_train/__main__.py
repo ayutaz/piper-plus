@@ -16,9 +16,10 @@ from .vits.commons import (
     normalize_checkpoint_state_dict,
     remap_weight_norm_keys,
 )
-from .vits.ema import EMACallback
+from .vits.ema import EMA_SCOPES, EXTENDED_EMA_MODULES, EMACallback
 from .vits.lightning import VitsModel
 from .vits.mb_istft import PQMF, PQMF_DESIGN
+from .vits.models import MRD_HIRES_RESOLUTIONS
 
 
 # NOTE: the pathlib safe-globals registration and the Windows PosixPath
@@ -142,8 +143,9 @@ def _build_trainer(args, loggers, num_gpus, num_speakers):
 
     # EMA is enabled by default
     if not args.no_ema:
-        callbacks.append(EMACallback(decay=args.ema_decay))
-        _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
+        scope = getattr(args, "ema_scope", "legacy")
+        callbacks.append(EMACallback(decay=args.ema_decay, scope=scope))
+        _LOGGER.info("Using EMA with decay rate %s (scope=%s)", args.ema_decay, scope)
     else:
         _LOGGER.info("EMA disabled by user request")
 
@@ -179,6 +181,29 @@ def _build_trainer(args, loggers, num_gpus, num_speakers):
         _LOGGER.info("Disabled distributed sampler for SpeakerBalancedBatchSampler")
 
     return Trainer(**trainer_kwargs)
+
+
+def check_discriminator_arg_consistency(args) -> str | None:
+    """v10b 識別器系フラグの依存関係を検証する (違反メッセージ or None)。
+
+    ``--use-jcu-mrd`` (S-1a) と ``--mrd-hires-resolution`` (H-3) はどちらも
+    MRD 本体の分岐なので、``--use-mrd`` なしで指定されても効かない。
+    「指定したのに何も起きない」を黙って通さず fail-fast させる
+    (呼び出し側が ``parser.error`` に渡す)。純関数なのでテストから直接叩ける。
+    """
+    if getattr(args, "use_mrd", False):
+        return None
+    offenders = []
+    if getattr(args, "use_jcu_mrd", False):
+        offenders.append("--use-jcu-mrd")
+    if getattr(args, "mrd_hires_resolution", "off") not in ("off", None):
+        offenders.append("--mrd-hires-resolution")
+    if not offenders:
+        return None
+    return (
+        f"{' and '.join(offenders)} modify the MRD, which is disabled: "
+        "pass --use-mrd as well (or drop these options)."
+    )
 
 
 def create_parser():
@@ -242,6 +267,19 @@ def create_parser():
         help="EMA decay rate (default: 0.9995)",
     )
     parser.add_argument(
+        "--ema-scope",
+        choices=EMA_SCOPES,
+        default="legacy",
+        help="v10b S-5: which generator submodules the EMA tracks. 'legacy' "
+        "(default) = dec + spk_proj, bit-compatible with every earlier run. "
+        "'extended' additionally tracks "
+        f"{' / '.join(EXTENDED_EMA_MODULES)} — required maintenance once the "
+        "SNAC flow (--use-snac-flow) is in play, since the path that collapsed "
+        "in v10a (flow scale growth) was outside the EMA. The scope is recorded "
+        "in the checkpoint so export_onnx applies the extra shadows to the "
+        "right submodules automatically.",
+    )
+    parser.add_argument(
         "--auto_lr_scaling",
         action="store_true",
         default=True,
@@ -297,6 +335,74 @@ def create_parser():
         type=float,
         default=1.0,
         help="MRD loss weight (default: 1.0, used with --use-mrd)",
+    )
+    # v10b 識別器系 (S-1a / H-3、docs/design/zero-shot-v10b-quality-plan.md §3)。
+    # どちらも MRD 本体の分岐なので --use-mrd が前提 (無指定なら fail-fast)。
+    parser.add_argument(
+        "--use-jcu-mrd",
+        action="store_true",
+        default=False,
+        help="v10b S-1a: give every MRD resolution a GANSpeech-style JCU "
+        "(joint conditional & unconditional) branch — the speaker embedding "
+        "goes through an FC, is broadcast over time/frequency and concatenated "
+        "onto the SHARED conv trunk, feeding a conditional output head. The "
+        "unconditional and conditional LSGAN terms are averaged 1/2 each so "
+        "the calibrated --c-mrd keeps its meaning. This routes speaker "
+        "supervision through a CO-EVOLVING discriminator instead of a frozen "
+        "encoder cosine, which is what collapsed the prior path in v10a "
+        "(design doc §10). MPD/MSD stay unconditional. Requires --use-mrd.",
+    )
+    parser.add_argument(
+        "--mrd-hires-resolution",
+        choices=("off", *sorted(MRD_HIRES_RESOLUTIONS)),
+        default="off",
+        help="v10b H-3: ADD one high-frequency-resolution branch to the MRD "
+        "(never replaces the existing three). The effective resolution of an "
+        "STFT is SR/win_length, so these presets use win = n_fft: '4096' gives "
+        "5.4 Hz vs 18.4 Hz for the current best branch, which is what it takes "
+        "to see the ~10.8 Hz-wide SR/128 frame-grid comb (quality plan §1.1 "
+        "A1). Costs about the same activation memory as the existing 2048 "
+        "branch because the longer window yields proportionally fewer frames. "
+        "Requires --use-mrd. Default: off.",
+    )
+    parser.add_argument(
+        "--use-adv-spk-classifier",
+        action="store_true",
+        default=False,
+        help="v10b S-1b: enable the co-evolving adversarial speaker classifier "
+        "C (StarGANv2-VC arXiv:2107.10394, adapted). C has num_speakers + 1 "
+        "outputs and is trained on real audio toward the true speaker AND on "
+        "GENERATED audio toward the extra 'generated' class, while the "
+        "generator minimises cross-entropy toward the conditioning speaker. "
+        "Training C on the generated distribution is the point: a classifier "
+        "fit on real audio only leaves a static decision boundary off-manifold "
+        "— the same gameable surface as a frozen encoder (quality plan §2.2). "
+        "Closed-set and training-only: no effect on zero-shot inference or the "
+        "ONNX [1,192] contract. Requires a multi-speaker dataset.",
+    )
+    parser.add_argument(
+        "--c-adv-spk",
+        type=float,
+        default=1.0,
+        help="Weight of the adversarial speaker classifier terms (default: "
+        "1.0, active only with --use-adv-spk-classifier; calibrate with "
+        "--grad-probe-every so the speaker signal sits at 5-15%% of mel).",
+    )
+    parser.add_argument(
+        "--adv-spk-start-epoch",
+        type=int,
+        default=10,
+        help="Epoch at which the GENERATOR-side adversarial speaker term starts "
+        "ramping (after KL annealing). The classifier itself trains from step 0 "
+        "so it is competent by the time the generator is asked to fool it. "
+        "Default: 10.",
+    )
+    parser.add_argument(
+        "--adv-spk-ramp-epochs",
+        type=int,
+        default=5,
+        help="Epochs over which the generator-side adversarial speaker weight "
+        "ramps 0 → --c-adv-spk (0 = step function). Default: 5.",
     )
     parser.add_argument(
         "--c-full-stft",
@@ -1055,6 +1161,12 @@ def main():
 
     check_resume_flags_exclusive(args)
 
+    # v10b: --use-jcu-mrd / --mrd-hires-resolution は MRD 本体が前提。
+    # 効かない組み合わせは黙って通さない
+    inconsistency = check_discriminator_arg_consistency(args)
+    if inconsistency:
+        parser.error(inconsistency)
+
     args.dataset_dir = Path(args.dataset_dir)
 
     # Set default values for Trainer arguments
@@ -1274,6 +1386,39 @@ def main():
             "v10b H-2b enabled (--trainable-pqmf-synthesis): PQMF synthesis "
             "bank is trainable (analysis bank stays fixed); perfect "
             "reconstruction may drift during training"
+        )
+
+    # v10b 識別器系 flags (default off = v10a-r2 bit 互換)
+    if getattr(args, "use_jcu_mrd", False):
+        _LOGGER.info(
+            "v10b S-1a enabled (--use-jcu-mrd): MRD gains a conditional branch "
+            "on the speaker embedding (shared trunk); unconditional + "
+            "conditional LSGAN terms averaged 1/2 each"
+        )
+    if getattr(args, "mrd_hires_resolution", "off") != "off":
+        _LOGGER.info(
+            "v10b H-3 enabled (--mrd-hires-resolution=%s): MRD gains the extra "
+            "resolution %s (effective Δf = %.1f Hz vs 18.4 Hz for the existing "
+            "best branch)",
+            args.mrd_hires_resolution,
+            MRD_HIRES_RESOLUTIONS[args.mrd_hires_resolution],
+            22050 / MRD_HIRES_RESOLUTIONS[args.mrd_hires_resolution][2],
+        )
+    if getattr(args, "use_adv_spk_classifier", False):
+        _LOGGER.info(
+            "v10b S-1b enabled (--use-adv-spk-classifier): co-evolving speaker "
+            "classifier, c_adv_spk=%s, generator term ramps from epoch %s over "
+            "%s epochs (the classifier itself trains from step 0, and it is "
+            "updated on GENERATED audio as well — quality plan §2.2)",
+            args.c_adv_spk,
+            args.adv_spk_start_epoch,
+            args.adv_spk_ramp_epochs,
+        )
+    if getattr(args, "ema_scope", "legacy") != "legacy":
+        _LOGGER.info(
+            "v10b S-5 enabled (--ema-scope=%s): EMA also tracks %s",
+            args.ema_scope,
+            ", ".join(EXTENDED_EMA_MODULES),
         )
 
     # Warn about deprecated --spk-emb-dropout
