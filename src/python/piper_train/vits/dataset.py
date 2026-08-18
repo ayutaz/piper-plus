@@ -15,6 +15,12 @@ from torch.utils.data import Dataset
 
 _LOGGER = logging.getLogger("vits.dataset")
 
+# v10b S-2: F0 キャッシュと spectrogram のフレーム数差の許容幅。pyworld の
+# frame_period (ms 単位 double) と STFT フレーム規約の丸め差は実データで
+# 最大 ±3 frame (v10b smoke arm S2 実測)。それを端 trim/edge-pad で吸収する
+# 上限で、これを超える差は「別 hop で抽出した無効キャッシュ」として拒否する。
+_F0_FRAME_TOLERANCE = 4
+
 
 def _load_tensor(path: Path) -> torch.Tensor:
     """Load a tensor from either numpy (.npy) or torch format."""
@@ -257,9 +263,15 @@ class PiperDataset(Dataset):
                 )
             speaker_embedding_tensor = torch.from_numpy(spk_emb)
 
-        # v10b S-2: GT F0 (fp16 cache → fp32)。spectrogram とフレーム数が
-        # ずれているキャッシュは学習ターゲットとして無効なので、黙って
-        # ずらさず ValueError にする (F0 と mel の位置ずれは聴感で気づけない)。
+        # v10b S-2: GT F0 (fp16 cache → fp32)。spectrogram とのフレーム数差は
+        # 2 段階で扱う:
+        # - |差| <= _F0_FRAME_TOLERANCE: pyworld の frame_period (ms 単位 double)
+        #   と STFT フレーム規約の丸め差 (実データで最大 ±3 を実測、v10b smoke
+        #   arm S2) — 端の trim / edge-pad で吸収する。F0 は 11.6ms/frame の
+        #   region-level 特徴で、端 ±4 frame (~46ms) の複製は voiced 境界の
+        #   誤差以下
+        # - それ以上: 別 hop で抽出した無効キャッシュなので黙ってずらさず
+        #   ValueError (F0 と mel の位置ずれは聴感で気づけない)
         f0_tensor = None
         if utt.f0_path is not None:
             f0_np = np.load(utt.f0_path, allow_pickle=False).astype(np.float32)
@@ -267,13 +279,19 @@ class PiperDataset(Dataset):
                 raise ValueError(
                     f"f0 cache must be 1-D, got shape {f0_np.shape} from {utt.f0_path}"
                 )
-            if f0_np.shape[0] != spectrogram.size(1):
+            n_spec = spectrogram.size(1)
+            diff = f0_np.shape[0] - n_spec
+            if abs(diff) > _F0_FRAME_TOLERANCE:
                 raise ValueError(
                     f"f0 cache length {f0_np.shape[0]} does not match "
-                    f"spectrogram frames {spectrogram.size(1)} "
+                    f"spectrogram frames {n_spec} "
                     f"({utt.f0_path}); re-run piper_train.tools.extract_f0 "
                     f"with the same --hop-length as training."
                 )
+            if diff > 0:
+                f0_np = f0_np[:n_spec]
+            elif diff < 0:
+                f0_np = np.pad(f0_np, (0, -diff), mode="edge")
             f0_tensor = torch.from_numpy(f0_np)
 
         return UtteranceTensors(
