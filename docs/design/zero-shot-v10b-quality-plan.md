@@ -1,8 +1,10 @@
 # Zero-Shot v10b 品質改善計画 — 高域アーティファクト根治 + 話者類似の次段 (2026-08-16)
 
 > **Status**: **Phase A 完了 (`76d42c57`) + Phase B 完了 (`f99316a9` デコーダ系 /
-> `c7518499` 識別器系、2026-08-18)**。残: S-2 設計スパイク (F0 経路) → Phase C
-> (データ + F0 前処理) → Phase D (smoke) → Phase E (本走)。
+> `c7518499` 識別器系) + S-2 実装完了 (`2aa5ecbf`、設計 `5fcc9eb8`) + C-0
+> ライセンス確定 (`245f8f49`、§7)、2026-08-18**。
+> **実装は全て完了 — 残: Phase C (データ前処理: Emilia-YODAS ja/ko + CV ja +
+> F0 抽出、instance 再レンタル) → Phase D (smoke + go/no-go) → Phase E (本走 80ep)**。
 > v10a-r2 完走 (2026-08-16、
 > [`zero-shot-v10-design.md`](zero-shot-v10-design.md) §11) を受け、4 系統の調査
 > レポート — ①帯域解剖 (実測)、②評価ハーネス監査、③類似系文献調査、④高域ノイズ系
