@@ -894,7 +894,7 @@ repos:
         name: zero-shot prevention tests / eval guards intact
         entry: uv run --no-sync python scripts/check_zs_prevention_tests.py
         language: system
-        files: ^src/python/tests/test_(scl_differentiable|v10_structure|v10_speaker_signal|eval_zs_secs|measure_comb_artifacts|measure_prosody|measure_band_noise)\.py$|^src/python/piper_train/tools/(eval_zs_secs|measure_band_noise|measure_comb_artifacts|measure_prosody|acoustic_frames)\.py$|^docs/spec/zs-eval-contract\.md$|^\.claude/hooks/guard-bash\.sh$|^scripts/check_zs_(prevention_tests|metric_isolation)\.py$
+        files: ^src/python/tests/test_(scl_differentiable|v10_structure|v10_speaker_signal|eval_zs_secs|measure_comb_artifacts|measure_prosody|measure_band_noise|adv_spk_classifier|jcu_mrd)\.py$|^src/python/piper_train/tools/(eval_zs_secs|measure_band_noise|measure_comb_artifacts|measure_prosody|acoustic_frames)\.py$|^src/python/piper_train/vits/losses\.py$|^docs/spec/zs-eval-contract\.md$|^\.claude/hooks/guard-bash\.sh$|^scripts/check_zs_(prevention_tests|metric_isolation)\.py$
         pass_filenames: false
 
       # 教訓① (評価器の目的化 = 検出器の喪失) の機械的強制。学習コード

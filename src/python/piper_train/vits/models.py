@@ -571,9 +571,23 @@ class DiscriminatorR(torch.nn.Module):
     up to Nyquist — unlike mel-based losses (coarse high-frequency bins)
     and the 16 kHz WavLM discriminator (blind above 8 kHz). See
     docs/design/zero-shot-noise-root-cause-pqmf.md §3 (副次要因 1).
+
+    v10b S-1a (``spk_cond_dim > 0``): GANSpeech 型 JCU (Joint Conditional &
+    Unconditional) 分岐を追加する (arXiv:2106.15153)。speaker embedding を
+    FC で ``cond_channels`` に落とし、時間・周波数軸に展開して**共有 body の
+    出力**に concat、条件専用の出力ヘッドに通す。無条件分岐と条件分岐は body
+    (``convs``) を共有するため、増分は ``cond_proj`` + ``conv_post_cond`` の
+    2 モジュールのみ。話者監督が「共進化する識別器」経由になるので、frozen
+    encoder の cosine を目的化した v10a §10 の崩壊機構が構造的に成立しない。
     """
 
-    def __init__(self, resolution: tuple, use_spectral_norm: bool = False):
+    def __init__(
+        self,
+        resolution: tuple,
+        use_spectral_norm: bool = False,
+        spk_cond_dim: int = 0,
+        cond_channels: int = 32,
+    ):
         super().__init__()
         self.resolution = resolution  # (n_fft, hop_length, win_length)
         # 旧 weight_norm API に合わせる (DiscriminatorP/S と同じ流儀 —
@@ -591,6 +605,14 @@ class DiscriminatorR(torch.nn.Module):
         self.conv_post = norm_f(nn.Conv2d(32, 1, (3, 3), padding=(1, 1)))
         self.register_buffer("window", torch.hann_window(resolution[2]))
         self.LRELU_SLOPE = 0.1
+        # S-1a: JCU 条件分岐 (spk_cond_dim=0 = 従来と bit 互換、モジュールを
+        # 一切作らないので state_dict キーも RNG 消費も変わらない)
+        self.spk_cond_dim = spk_cond_dim
+        if spk_cond_dim > 0:
+            self.cond_proj = nn.Linear(spk_cond_dim, cond_channels)
+            self.conv_post_cond = norm_f(
+                nn.Conv2d(32 + cond_channels, 1, (3, 3), padding=(1, 1))
+            )
 
     def spectrogram(self, x: torch.Tensor) -> torch.Tensor:
         """Waveform [B, 1, T] -> magnitude STFT [B, F, frames].
@@ -616,15 +638,53 @@ class DiscriminatorR(torch.nn.Module):
             )
             return spec.abs()
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, spk_cond: torch.Tensor | None = None):
+        """Returns ``(unconditional, fmap, conditional)``.
+
+        ``conditional`` is ``None`` unless the JCU branch exists
+        (``spk_cond_dim > 0``) *and* ``spk_cond`` is supplied. The arity is
+        always 3 so callers never have to count tuple elements.
+
+        ``fmap`` covers the shared body + the unconditional head only: the
+        feature-matching loss stays on the shared trunk, so enabling JCU does
+        not silently double ``loss_fm_mrd``.
+        """
         fmap = []
         x = self.spectrogram(x).unsqueeze(1)  # [B, 1, F, T]
         for conv in self.convs:
             x = F.leaky_relu(conv(x), self.LRELU_SLOPE)
             fmap.append(x)
-        x = self.conv_post(x)
+        body = x
+        x = self.conv_post(body)
         fmap.append(x)
-        return torch.flatten(x, 1, -1), fmap
+        uncond = torch.flatten(x, 1, -1)
+
+        if self.spk_cond_dim <= 0 or spk_cond is None:
+            return uncond, fmap, None
+
+        # FC → 時間 (T) / 周波数 (F) 軸へ展開 → 共有 body に concat (GANSpeech)
+        cond = self.cond_proj(spk_cond.to(body.dtype))
+        cond = cond[:, :, None, None].expand(-1, -1, body.shape[2], body.shape[3])
+        cond_out = self.conv_post_cond(torch.cat([body, cond], dim=1))
+        return uncond, fmap, torch.flatten(cond_out, 1, -1)
+
+
+# v10b H-3: 高分解能 resolution の preset (n_fft, hop_length, win_length)。
+# 実効周波数分解能は Δf = SR / win_length で決まる (n_fft の zero-pad は
+# スペクトルを補間するだけで分解能を上げない) ため、**win = n_fft** とする。
+# 対象は SR/128 = 172.27Hz 間隔・歯幅 ~10.8Hz の定常トーンコム
+# (v10b-quality-plan §1.1 A1): 22050/4096 = 5.4Hz で歯 ~2 bin / 歯間 32 bin。
+# 既存最良の (2048, 240, 1200) は Δf = 18.4Hz で歯が 1 bin 未満に潰れる。
+# hop は「窓長 / 8」相当に取り、活性化フットプリント (F × frames) を既存
+# 2048 分岐と同級に保つ (長窓でフレーム数が減る分が bin 増を相殺する)。
+#
+# 制約: ``DiscriminatorR.spectrogram`` は reflect pad を使うため、入力長
+# (= segment_size) が pad 幅 ``(n_fft - hop) // 2`` を上回る必要がある。
+# 学習の segment_size=8192 では 4096 preset の pad 1792 に十分な余裕がある。
+MRD_HIRES_RESOLUTIONS: dict[str, tuple[int, int, int]] = {
+    "2048": (2048, 256, 2048),
+    "4096": (4096, 512, 4096),
+}
 
 
 class MultiResolutionSpectrogramDiscriminator(torch.nn.Module):
@@ -638,31 +698,150 @@ class MultiResolutionSpectrogramDiscriminator(torch.nn.Module):
 
     Interface matches MultiPeriodDiscriminator:
     ``forward(y, y_hat) -> (y_d_rs, y_d_gs, fmap_rs, fmap_gs)``.
+
+    v10b additions (both default-off):
+
+    - **S-1a** ``spk_cond_dim > 0``: every resolution grows a JCU conditional
+      branch. The score lists then hold ``2 * n_resolutions`` entries —
+      unconditional first, conditional second (split with
+      ``losses.jcu_split``). The 4-tuple shape itself is unchanged so
+      ``feature_loss`` / ``generator_loss`` / ``discriminator_loss`` keep
+      working untouched.
+    - **H-3** ``hires_resolution``: appends one high-frequency-resolution
+      branch (see ``MRD_HIRES_RESOLUTIONS``). Appending — never replacing —
+      keeps the existing branches' time resolution.
     """
 
     def __init__(
         self,
         resolutions: tuple = ((1024, 120, 600), (2048, 240, 1200), (512, 50, 240)),
         use_spectral_norm: bool = False,
+        spk_cond_dim: int = 0,
+        hires_resolution: tuple | None = None,
     ):
         super().__init__()
+        all_resolutions = tuple(tuple(r) for r in resolutions)
+        if hires_resolution is not None:
+            all_resolutions = all_resolutions + (tuple(hires_resolution),)
+        self.resolutions = all_resolutions
+        self.n_resolutions = len(all_resolutions)
+        self.use_jcu = spk_cond_dim > 0
         self.discriminators = nn.ModuleList(
-            [DiscriminatorR(r, use_spectral_norm) for r in resolutions]
+            [
+                DiscriminatorR(r, use_spectral_norm, spk_cond_dim=spk_cond_dim)
+                for r in all_resolutions
+            ]
         )
 
-    def forward(self, y, y_hat):
+    def forward(self, y, y_hat, speaker_embeddings=None):
         y_d_rs, y_d_gs, fmap_rs, fmap_gs = [], [], [], []
+        cond_rs, cond_gs = [], []
         # Batch-concat: same equivalence argument as MultiPeriodDiscriminator
         # (stft/conv/leaky_relu/pad are all batch-independent).
         b = y.shape[0]
         x = torch.cat([y, y_hat], dim=0)
+        spk_cond = None
+        if self.use_jcu and speaker_embeddings is not None:
+            # real には正しいペア、fake には条件付けに使った embedding を渡す
+            # (どちらも同じ行の embedding なので単純に 2 回並べる)
+            spk_cond = torch.cat([speaker_embeddings, speaker_embeddings], dim=0)
         for d in self.discriminators:
-            y_d, fmap = d(x)
+            y_d, fmap, y_c = d(x, spk_cond)
             y_d_rs.append(y_d[:b])
             y_d_gs.append(y_d[b:])
             fmap_rs.append([f[:b] for f in fmap])
             fmap_gs.append([f[b:] for f in fmap])
-        return y_d_rs, y_d_gs, fmap_rs, fmap_gs
+            if y_c is not None:
+                cond_rs.append(y_c[:b])
+                cond_gs.append(y_c[b:])
+        return y_d_rs + cond_rs, y_d_gs + cond_gs, fmap_rs, fmap_gs
+
+
+class AdversarialSpeakerClassifier(torch.nn.Module):
+    """共進化する話者分類器 (v10b S-1b、StarGANv2-VC arXiv:2107.10394 の翻案)。
+
+    出力は ``num_speakers + 1`` クラスで、最後のクラス
+    (``fake_class_index``) が「生成音声」を表す:
+
+    - C は実音声を真の話者に、**生成音声をクラス K に**分類するよう学習する
+    - G は生成音声が条件話者 (< K) に分類されるよう CE を最小化する
+
+    原典の adversarial source classifier は変換後サンプルを source ドメインへ
+    分類させるが、TTS の recon 経路には source 話者が存在しない (条件話者 =
+    元話者) ため、「生成音声」クラスで置き換えた (Salimans らの K+1 GAN 形式)。
+    plan §2.2 が要求する本質 — **C の決定境界が生成分布上でも更新される** —
+    は保たれる。実音声のみで学習する静的 classifier は frozen encoder と同型の
+    gaming 面を持つため禁止 (v10a §10 の崩壊機構)。
+
+    閉集合分類器なので**学習時のみ**の構造で、zero-shot 推論・ONNX 契約
+    ([1, 192] speaker_embedding) には一切影響しない。
+    """
+
+    def __init__(
+        self,
+        num_speakers: int,
+        resolution: tuple = (1024, 256, 1024),
+        embed_dim: int = 256,
+        use_spectral_norm: bool = False,
+    ):
+        super().__init__()
+        if num_speakers < 2:
+            raise ValueError(
+                f"AdversarialSpeakerClassifier requires num_speakers >= 2, "
+                f"got {num_speakers}"
+            )
+        self.num_speakers = num_speakers
+        self.resolution = resolution
+        norm_f = weight_norm if not use_spectral_norm else spectral_norm
+        self.convs = nn.ModuleList(
+            [
+                norm_f(nn.Conv2d(1, 32, (3, 9), stride=(2, 2), padding=(1, 4))),
+                norm_f(nn.Conv2d(32, 64, (3, 9), stride=(2, 2), padding=(1, 4))),
+                norm_f(nn.Conv2d(64, 128, (3, 9), stride=(2, 2), padding=(1, 4))),
+                norm_f(nn.Conv2d(128, 128, (3, 3), stride=(2, 1), padding=(1, 1))),
+            ]
+        )
+        self.proj = nn.Linear(128, embed_dim)
+        self.head = nn.Linear(embed_dim, num_speakers + 1)
+        self.register_buffer("window", torch.hann_window(resolution[2]))
+        self.LRELU_SLOPE = 0.1
+
+    @property
+    def fake_class_index(self) -> int:
+        """Index of the "generated audio" class (= ``num_speakers``)."""
+        return self.num_speakers
+
+    def spectrogram(self, x: torch.Tensor) -> torch.Tensor:
+        """Waveform [B, 1, T] -> log-magnitude STFT [B, F, frames].
+
+        fp32 forced regardless of autocast, for the same reason as
+        ``DiscriminatorR.spectrogram`` (bf16 cuFFT incident, commit 3dcabd57).
+        """
+        n_fft, hop, win = self.resolution
+        with autocast(x.device.type, enabled=False):
+            x = x.float().squeeze(1)
+            pad = (n_fft - hop) // 2
+            x = F.pad(x.unsqueeze(1), (pad, pad), mode="reflect").squeeze(1)
+            spec = torch.stft(
+                x,
+                n_fft=n_fft,
+                hop_length=hop,
+                win_length=win,
+                window=self.window.float(),
+                center=False,
+                return_complex=True,
+            )
+            return torch.log(spec.abs().clamp(min=1e-5))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Waveform [B, 1, T] -> speaker logits [B, num_speakers + 1]."""
+        h = self.spectrogram(x).unsqueeze(1)
+        for conv in self.convs:
+            h = F.leaky_relu(conv(h), self.LRELU_SLOPE)
+        # 時間・周波数を平均プーリング (可変長入力に対して形状が安定する)
+        h = h.mean(dim=(2, 3))
+        h = F.leaky_relu(self.proj(h), self.LRELU_SLOPE)
+        return self.head(h)
 
 
 class WavLMDiscriminator(torch.nn.Module):

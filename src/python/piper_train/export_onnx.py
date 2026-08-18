@@ -116,6 +116,7 @@ def build_infer_forward(
 def apply_ema_shadow_params(
     decoder: torch.nn.Module,
     shadow_params: dict,
+    module_name: str = "decoder",
 ) -> tuple[int, int]:
     """Apply pre-loaded EMA shadow parameters to the decoder module.
 
@@ -135,6 +136,9 @@ def apply_ema_shadow_params(
     shadow_params : dict
         Mapping of parameter name → shadow tensor, typically from
         ``checkpoint["ema_generator_state"]["shadow_params"]``.
+    module_name : str
+        Name used in log messages only (``"decoder"`` by default; the S-5
+        scope-aware caller passes ``flow`` / ``enc_p`` / ``spk_proj_dp``).
 
     Returns
     -------
@@ -163,14 +167,82 @@ def apply_ema_shadow_params(
 
     if applied > 0:
         _LOGGER.info(
-            "Applied EMA weights to decoder: %d parameters (skipped %d)",
+            "Applied EMA weights to %s: %d parameters (skipped %d)",
+            module_name,
             applied,
             skipped,
         )
     else:
-        _LOGGER.warning("EMA state found but no matching decoder parameters")
+        _LOGGER.warning("EMA state found but no matching %s parameters", module_name)
 
     return applied, skipped
+
+
+def apply_ema_scope_from_checkpoint(
+    model_g: torch.nn.Module,
+    ckpt: dict,
+) -> dict[str, tuple[int, int]]:
+    """Apply every EMA shadow present in *ckpt* to its own submodule of *model_g*.
+
+    v10b S-5. Legacy checkpoints carry ``ema_generator_state`` (decoder) and
+    ``ema_spk_proj_state``; ``--ema-scope extended`` runs add
+    ``ema_extended_state`` = ``{submodule_name: ema_state}`` for flow / enc_p /
+    spk_proj_dp plus an ``ema_scope`` marker. Dispatch is driven by which keys
+    exist, so old checkpoints behave exactly as before and a future scope that
+    adds another submodule needs no change here.
+
+    Must be called BEFORE ``remove_weight_norm()`` — shadow params are keyed
+    on ``weight_g``/``weight_v`` (see :func:`apply_ema_shadow_params`).
+
+    Returns
+    -------
+    dict[str, tuple[int, int]]
+        ``{submodule_name: (applied, skipped)}`` for every EMA payload found.
+        Submodules missing from the model report ``(0, n_shadow_params)``.
+    """
+    report: dict[str, tuple[int, int]] = {}
+
+    payloads: list[tuple[str, dict]] = []
+    legacy = (("dec", "ema_generator_state"), ("spk_proj", "ema_spk_proj_state"))
+    for module_name, ckpt_key in legacy:
+        state = ckpt.get(ckpt_key)
+        if state and "shadow_params" in state:
+            payloads.append((module_name, state["shadow_params"]))
+    for module_name, state in (ckpt.get("ema_extended_state") or {}).items():
+        if state and "shadow_params" in state:
+            payloads.append((module_name, state["shadow_params"]))
+
+    if not payloads:
+        _LOGGER.info("No EMA state found in checkpoint, skipping EMA")
+        return report
+
+    scope = ckpt.get("ema_scope", "legacy")
+    for module_name, shadow_params in payloads:
+        module = getattr(model_g, module_name, None)
+        if module is None:
+            _LOGGER.warning(
+                "Checkpoint carries EMA shadows for model_g.%s but this model "
+                "has no such submodule — skipping %d parameters",
+                module_name,
+                len(shadow_params),
+            )
+            report[module_name] = (0, len(shadow_params))
+            continue
+        # Remap shadow param keys for weight_norm format compatibility
+        # (parametrized ↔ legacy weight_g/weight_v).
+        target_params = dict(module.named_parameters())
+        shadow = remap_weight_norm_keys(shadow_params, target_params)
+        applied, skipped = apply_ema_shadow_params(
+            module, shadow, module_name=module_name
+        )
+        report[module_name] = (applied, skipped)
+
+    _LOGGER.info(
+        "Applied EMA (scope=%s) to: %s",
+        scope,
+        ", ".join(f"{name}={a}/{a + s}" for name, (a, s) in report.items()),
+    )
+    return report
 
 
 def apply_ema_weights(
@@ -507,46 +579,15 @@ def main() -> None:
             num_languages,
         )
 
-    # Apply EMA weights to decoder and spk_proj if available (always applied when present)
+    # Apply EMA weights to every submodule the checkpoint carries shadows for
+    # (always applied when present). dec + spk_proj come from the legacy keys;
+    # flow / enc_p / spk_proj_dp appear when the run used --ema-scope extended
+    # (v10b S-5) and are dispatched automatically from ``ema_extended_state``.
+    #
     # IMPORTANT: EMA must be applied BEFORE remove_weight_norm(), because EMA shadow
     # params use weight_g/weight_v keys. remove_weight_norm() fuses them into a single
     # "weight" tensor, making EMA keys unmatchable.
-
-    # --- EMA decoder ---
-    ema_state = ckpt.get("ema_generator_state")
-    if ema_state and "shadow_params" in ema_state:
-        # Delegate to the shared helper rather than re-implementing the copy
-        # loop: it owns the key remapping and the pre-FiLM migration, and a
-        # second copy of that logic here is exactly how the two drifted apart.
-        apply_ema_shadow_params(model_g.dec, ema_state["shadow_params"])
-    else:
-        _LOGGER.info("No EMA state found in checkpoint, skipping EMA")
-
-    # --- EMA spk_proj ---
-    ema_spk_proj_state = ckpt.get("ema_spk_proj_state")
-    if ema_spk_proj_state and "shadow_params" in ema_spk_proj_state and has_spk_proj:
-        applied = 0
-        skipped = 0
-        spk_proj_params = dict(model_g.spk_proj.named_parameters())
-        shadow = remap_weight_norm_keys(
-            ema_spk_proj_state["shadow_params"], spk_proj_params
-        )
-        for name, shadow_param in shadow.items():
-            if name in spk_proj_params:
-                spk_proj_params[name].data.copy_(shadow_param)
-                applied += 1
-            else:
-                skipped += 1
-        if applied > 0:
-            _LOGGER.info(
-                "Applied EMA weights to spk_proj: %d parameters (skipped %d)",
-                applied,
-                skipped,
-            )
-        else:
-            _LOGGER.warning("EMA spk_proj state found but no matching parameters")
-    elif has_spk_proj:
-        _LOGGER.info("No EMA spk_proj state found in checkpoint, skipping")
+    apply_ema_scope_from_checkpoint(model_g, ckpt)
 
     del ckpt
 

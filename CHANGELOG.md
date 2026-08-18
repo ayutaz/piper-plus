@@ -50,6 +50,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **v10b Phase B 識別器系 (opt-in、default は v10a 互換)**: `--use-jcu-mrd`
+  (S-1a: MRD の各 resolution に GANSpeech 型 JCU 条件分岐を追加 — speaker
+  embedding を FC → 時間・周波数展開 → 共有 body に concat し、無条件項と条件項を
+  1/2 ずつ平均。話者監督が frozen encoder cosine ではなく共進化する識別器を
+  経由する) / `--use-adv-spk-classifier` + `--c-adv-spk` +
+  `--adv-spk-start-epoch` + `--adv-spk-ramp-epochs` (S-1b: 共進化 adversarial
+  speaker classifier。実音声は真の話者、**生成音声は「生成」クラス**に分類する
+  よう C を更新し、G は生成音声が条件話者に分類されるよう CE 最小化。
+  StarGANv2-VC の adversarial source classifier を TTS 向けに翻案。生成分布上で
+  C を更新しない real-only 形式は禁止で、pre-commit `zs-prevention-gate` が
+  退行を block。学習時のみ / ONNX 契約 `[1,192]` 不変) /
+  `--mrd-hires-resolution {2048,4096}` (H-3: 高分解能 resolution を 1 本**追加** —
+  実効分解能 Δf = SR/win を 18.4 → 5.4Hz にして 10.8Hz 幅のフレーム格子コムに
+  勾配を当てる。長窓でフレーム数が減るため活性化コストは既存 2048 分岐の 0.94x) /
+  `--ema-scope extended` (S-5: EMA 対象を flow / enc_p / spk_proj_dp に拡張。
+  scope を ckpt に記録し `export_onnx` が適用先を自動判別)
 - **v10b Phase B デコーダ系 (opt-in、default は v10a 互換)**: `--upsample-mode
   resize` (H-1: transposed conv を nearest-resize + lowpass 初期化 Conv1d に置換、
   フレーム格子トーンコムの発生源除去 — 初期化直後の実測でコム超過 8.4→2.1dB。

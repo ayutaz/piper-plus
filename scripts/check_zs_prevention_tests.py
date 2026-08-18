@@ -16,6 +16,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+
 REPO = Path(__file__).resolve().parent.parent
 
 # ファイル → 存在必須のシンボル (防止テスト名 / ガード面) と、その防止対象
@@ -102,10 +103,40 @@ EXPECTED: dict[str, dict[str, str]] = {
         "def test_vibrato_f0_std_matches_first_principles": "F0 std の第一原理一致",
         "def test_flat_f0_near_zero_std": "平板韻律の検出 (ゼロ点)",
     },
-    ".claude/hooks/guard-bash.sh": {
-        "eval_zs_secs": (
-            "SECS 評価の --encoder2 なし実行を block する hook guard"
+    # --- Phase B S-1b (v10b plan §2.2 / §3.2): 話者監督の共進化条件 ---
+    # 「識別器/分類器が生成分布上でも更新される場合のみ可」は恒久制約であり、
+    # 実音声のみで学習する形式 (frozen encoder と同型の gaming 面) への退行を
+    # 機械的に block する。v10a §10 の崩壊機構の再発防止面。
+    "src/python/piper_train/vits/losses.py": {
+        "def adv_speaker_classifier_loss_d": (
+            "adversarial speaker classifier の D 側 loss (real + **fake** 両項)"
         ),
+        "fake_target": (
+            "fake 入力に「生成」クラスを与える敵対項 — これを外すと "
+            "real-only 形式 (plan §2.2 の禁止形) に退行する"
+        ),
+    },
+    "src/python/tests/test_adv_spk_classifier.py": {
+        "def test_fake_term_produces_nonzero_gradient_on_classifier": (
+            "fake 入力に対する C の勾配が非ゼロ (共進化条件の本体)"
+        ),
+        "def test_loss_d_includes_the_fake_term": (
+            "D 側 loss ≠ real のみ CE (real-only 退行の mutation 検出)"
+        ),
+        "def test_classifier_trains_before_the_generator_term_ramps_in": (
+            "C は step 0 から学習 / G 側のみ ramp (未学習 C を騙させない)"
+        ),
+    },
+    "src/python/tests/test_jcu_mrd.py": {
+        "def test_shuffled_condition_raises_conditional_loss_after_training": (
+            "JCU 条件分岐が話者ペアの整合性を実際に判別する構造検証"
+        ),
+        "def test_body_is_shared_not_duplicated": (
+            "無条件/条件分岐の body 共有 (GANSpeech 形式) のパラメータ検算"
+        ),
+    },
+    ".claude/hooks/guard-bash.sh": {
+        "eval_zs_secs": ("SECS 評価の --encoder2 なし実行を block する hook guard"),
     },
 }
 
