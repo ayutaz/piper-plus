@@ -680,6 +680,16 @@ def main() -> None:
         m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
         logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
 
+        # 5b. v10b S-2: F0 予測 → (opt-in) prior 残差 → decoder 注入。
+        # 推論時は GT F0 が存在しないため常に予測 F0 で走り、graph 入力は
+        # ``speaker_embedding [1, 192]`` のまま増えない (契約不変)。学習の
+        # ``SynthesizerTrn.forward`` / ``infer`` と同じ順序を保つこと。
+        f0_decoder = None
+        if getattr(model_g, "use_f0_path", False):
+            log_f0, vuv_logit = model_g._predict_f0(x, attn, y_mask, g)
+            m_p = model_g._apply_f0_prior_residual(m_p, log_f0, vuv_logit, y_mask)
+            f0_decoder = model_g._predicted_f0_hz(log_f0, vuv_logit)
+
         # 6. Sample z_p
         if stochastic:
             noise_scale = scales[0]
@@ -694,7 +704,7 @@ def main() -> None:
             z = model_g.flow(z_p, y_mask, g=g_lang, g_spk=g_spk, reverse=True)
         else:
             z = model_g.flow(z_p, y_mask, g=g, reverse=True)
-        o = model_g.dec((z * y_mask), g=g)
+        o = model_g.dec((z * y_mask), g=g, f0=f0_decoder)
 
         return o, durations
 
