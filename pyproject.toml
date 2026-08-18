@@ -104,6 +104,11 @@ train = [
     "seaborn>=0.13",
     "pyyaml>=6.0.3",
     "onnxsim-prebuilt",
+    # v10b S-2: GT frame-level F0 抽出 (tools/extract_f0.py)。前処理専用で
+    # 配布物 (ONNX / ランタイム) には含まれない。pyworld ラッパは MIT、
+    # 内部の WORLD vocoder は modified BSD (3-clause) — いずれも許諾型で
+    # v8 以降の public / 商用利用可 open-model 方針と両立する。
+    "pyworld>=0.3.5",
 ]
 
 dev = [

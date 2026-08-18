@@ -50,6 +50,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **v10b S-2 F0 明示経路 (opt-in、default は現行 bit 互換)**: `--use-f0-path` で
+  frame prior からの F0+V/UV 予測 (GT frame-level F0 回帰 — 評価契約 §2 の明示
+  例外形) + decoder への 2 点注入 (frame 格子 F0/VUV concat + **head 格子
+  harmonic 位相テンプレート** [cos/sin(2πmΦ)]、Chebyshev + float64 位相累積、
+  zero-init) を追加。`--f0-prior-residual` (prior 側 F0 残差、zero-init) /
+  `--f0-teacher-forcing-epochs` (GT→予測のアニール) / grad-probe 連携。
+  前処理 `piper_train.tools.extract_f0` (pyworld DIO+StoneMask、オクターブ
+  エラー検出付き — 評価側 measure_prosody の librosa.pyin と推定器を意図的に
+  分離) と Phase D go/no-go 用 `tools/f0_shift_ablation` (±semitone シフト
+  追従率) を新設。設計: docs/design/zero-shot-v10b-s2-f0-design.md
 - **v10b Phase B 識別器系 (opt-in、default は v10a 互換)**: `--use-jcu-mrd`
   (S-1a: MRD の各 resolution に GANSpeech 型 JCU 条件分岐を追加 — speaker
   embedding を FC → 時間・周波数展開 → 共有 body に concat し、無条件項と条件項を

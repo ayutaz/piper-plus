@@ -45,6 +45,10 @@ class Utterance:
     # cache (no pickle deserialisation). Backward-compatible: when ``None``
     # the loader falls back to ``audio_spec_path``.
     precomputed_mel_path: Path | None = None
+    # v10b S-2: GT frame-level F0 cache (.f0.npy, fp16, [T_frames], 無声 0.0)。
+    # ``tools/extract_f0.py`` が書き、``f0_dir`` 指定時か jsonl の ``f0_path``
+    # から解決される。``None`` のときは S-2 が無効 (後方互換)。
+    f0_path: Path | None = None
 
 
 @dataclass
@@ -57,6 +61,8 @@ class UtteranceTensors:
     text: str | None = None
     prosody_features: LongTensor | None = None  # Shape: (num_phonemes, 3) for A1/A2/A3
     speaker_embedding: FloatTensor | None = None
+    # v10b S-2: GT F0 (Hz, 無声 0.0) — spectrogram と同一フレーム格子の 1-D
+    f0: FloatTensor | None = None
 
     @property
     def spec_length(self) -> int:
@@ -75,6 +81,11 @@ class Batch:
     language_ids: LongTensor | None = None
     prosody_features: LongTensor | None = None  # Shape: (batch, max_phonemes, 3)
     speaker_embeddings: FloatTensor | None = None
+    # v10b S-2: GT F0 と有声フラグ。どちらも ``[batch, 1, max_spec_length]``
+    # (audios と同じ [B, 1, T] レイアウト)。F0 キャッシュを 1 つも持たない
+    # dataset では両方 None のままで、S-2 は自動的に無効になる (後方互換)。
+    f0: FloatTensor | None = None
+    vuv: FloatTensor | None = None
 
     def pin_memory(self) -> "Batch":
         """Pin all tensor fields into page-locked memory.
@@ -110,6 +121,8 @@ class Batch:
             language_ids=_pin(self.language_ids),
             prosody_features=_pin(self.prosody_features),
             speaker_embeddings=_pin(self.speaker_embeddings),
+            f0=_pin(self.f0),
+            vuv=_pin(self.vuv),
         )
 
 
@@ -133,6 +146,7 @@ class PiperDataset(Dataset):
         filter_length: int = 1024,
         validate_cache: bool = False,
         precomputed_mel_dir: Path | str | None = None,
+        f0_dir: Path | str | None = None,
     ):
         self.utterances: list[Utterance] = []
 
@@ -154,6 +168,22 @@ class PiperDataset(Dataset):
                     resolved,
                 )
 
+        # v10b S-2: GT F0 キャッシュ (``tools/extract_f0.py`` の出力)。存在
+        # しないディレクトリを渡された場合は「F0 なし」として扱い、学習は
+        # S-2 無効で継続できる (--use-f0-path を付けた場合だけ lightning が
+        # fail-fast する)。
+        self.f0_dir: Path | None = None
+        if f0_dir is not None:
+            resolved_f0 = Path(f0_dir)
+            if resolved_f0.is_dir():
+                self.f0_dir = resolved_f0
+            else:
+                _LOGGER.warning(
+                    "f0_dir=%s does not exist; F0 targets will be unavailable "
+                    "(S-2 disabled).",
+                    resolved_f0,
+                )
+
         for dataset_path in dataset_paths:
             dataset_path = Path(dataset_path)
             _LOGGER.debug("Loading dataset: %s", dataset_path)
@@ -164,6 +194,7 @@ class PiperDataset(Dataset):
                     max_spec_length=max_spec_length,
                     filter_length=filter_length,
                     precomputed_mel_dir=self.precomputed_mel_dir,
+                    f0_dir=self.f0_dir,
                 )
             )
 
@@ -226,6 +257,25 @@ class PiperDataset(Dataset):
                 )
             speaker_embedding_tensor = torch.from_numpy(spk_emb)
 
+        # v10b S-2: GT F0 (fp16 cache → fp32)。spectrogram とフレーム数が
+        # ずれているキャッシュは学習ターゲットとして無効なので、黙って
+        # ずらさず ValueError にする (F0 と mel の位置ずれは聴感で気づけない)。
+        f0_tensor = None
+        if utt.f0_path is not None:
+            f0_np = np.load(utt.f0_path, allow_pickle=False).astype(np.float32)
+            if f0_np.ndim != 1:
+                raise ValueError(
+                    f"f0 cache must be 1-D, got shape {f0_np.shape} from {utt.f0_path}"
+                )
+            if f0_np.shape[0] != spectrogram.size(1):
+                raise ValueError(
+                    f"f0 cache length {f0_np.shape[0]} does not match "
+                    f"spectrogram frames {spectrogram.size(1)} "
+                    f"({utt.f0_path}); re-run piper_train.tools.extract_f0 "
+                    f"with the same --hop-length as training."
+                )
+            f0_tensor = torch.from_numpy(f0_np)
+
         return UtteranceTensors(
             phoneme_ids=LongTensor(utt.phoneme_ids),
             audio_norm=audio_norm,
@@ -239,6 +289,7 @@ class PiperDataset(Dataset):
             text=utt.text,
             prosody_features=prosody_tensor,
             speaker_embedding=speaker_embedding_tensor,
+            f0=f0_tensor,
         )
 
     @staticmethod
@@ -284,6 +335,7 @@ class PiperDataset(Dataset):
         max_spec_length: int | None = None,
         filter_length: int = 1024,
         precomputed_mel_dir: Path | None = None,
+        f0_dir: Path | None = None,
     ) -> Iterable[Utterance]:
         num_skipped_phoneme = 0
         num_skipped_spec = 0
@@ -321,6 +373,16 @@ class PiperDataset(Dataset):
                         )
                         if candidate.exists():
                             utt.precomputed_mel_path = candidate
+
+                    # v10b S-2: jsonl に f0_path が無ければ f0_dir から
+                    # sibling を解決する (存在するときだけ記録 = 欠落は
+                    # 「F0 なし」で後方互換)。
+                    if utt.f0_path is None and f0_dir is not None:
+                        candidate = PiperDataset._f0_path_for(
+                            f0_dir, utt.audio_spec_path
+                        )
+                        if candidate.exists():
+                            utt.f0_path = candidate
 
                     if (max_phoneme_ids is not None) and (
                         len(utt.phoneme_ids) > max_phoneme_ids
@@ -397,6 +459,24 @@ class PiperDataset(Dataset):
         return precomputed_mel_dir / f"{cache_id}.mel.npy"
 
     @staticmethod
+    def _f0_path_for(f0_dir: Path, audio_spec_path: Path) -> Path:
+        """Compose ``{f0_dir}/{cache_id}.f0.npy`` from an ``audio_spec_path``.
+
+        Mirrors ``tools.extract_f0.f0_path_for`` (writer side). Changing one
+        side only makes the cache silently invisible, which disables S-2
+        without any error — keep both in sync.
+        """
+        name = audio_spec_path.name
+        cache_id: str | None = None
+        for suffix in PiperDataset._MEL_STRIP_SUFFIXES:
+            if name.endswith(suffix):
+                cache_id = name[: -len(suffix)]
+                break
+        if cache_id is None:
+            cache_id = audio_spec_path.stem
+        return f0_dir / f"{cache_id}.f0.npy"
+
+    @staticmethod
     def load_utterance(line: str, dataset_dir: Path | None = None) -> Utterance:
         utt_dict = json.loads(line)
 
@@ -408,6 +488,7 @@ class PiperDataset(Dataset):
             return path
 
         spk_emb_path = utt_dict.get("speaker_embedding_path")
+        f0_path = utt_dict.get("f0_path")
         return Utterance(
             phoneme_ids=utt_dict["phoneme_ids"],
             audio_norm_path=_resolve(utt_dict["audio_norm_path"]),
@@ -417,6 +498,7 @@ class PiperDataset(Dataset):
             text=utt_dict.get("text"),
             prosody_features=utt_dict.get("prosody_features"),
             speaker_embedding_path=_resolve(spk_emb_path) if spk_emb_path else None,
+            f0_path=_resolve(f0_path) if f0_path else None,
         )
 
 
@@ -439,6 +521,7 @@ class UtteranceCollate:
         num_mels = 0
         has_prosody = False
         has_speaker_embedding = False
+        has_f0 = False
 
         # Determine lengths
         for _utt_idx, utt in enumerate(utterances):
@@ -462,6 +545,9 @@ class UtteranceCollate:
 
             if utt.speaker_embedding is not None:
                 has_speaker_embedding = True
+
+            if utt.f0 is not None:
+                has_f0 = True
 
         # Audio cannot be smaller than segment size (8192)
         max_audio_length = max(max_audio_length, self.segment_size)
@@ -493,6 +579,15 @@ class UtteranceCollate:
             prosody_padded = LongTensor(num_utterances, max_phonemes_length, 3)
             prosody_padded.zero_()
 
+        # v10b S-2: F0 / V-UV は spectrogram と同じフレーム格子で 0 padding。
+        # padding フレームは f0=0 → vuv=0 になり、loss 側の frame mask と
+        # 二重に無効化される (どちらか一方が抜けても事故らない)。
+        f0_padded: FloatTensor | None = None
+        vuv_padded: FloatTensor | None = None
+        if has_f0:
+            f0_padded = FloatTensor(num_utterances, 1, max_spec_length)
+            f0_padded.zero_()
+
         # Sort by decreasing spectrogram length
         sorted_utterances = sorted(
             utterances, key=lambda u: u.spectrogram.size(1), reverse=True
@@ -517,6 +612,10 @@ class UtteranceCollate:
 
             if utt.language_id is not None and language_ids is not None:
                 language_ids[utt_idx] = utt.language_id
+
+            if f0_padded is not None and utt.f0 is not None:
+                f0_length = min(utt.f0.size(0), spec_length)
+                f0_padded[utt_idx, 0, :f0_length] = utt.f0[:f0_length]
 
             if prosody_padded is not None and utt.prosody_features is not None:
                 # prosody_features の長さが phoneme_length と異なる場合に対応
@@ -543,6 +642,9 @@ class UtteranceCollate:
                     emb_list.append(torch.zeros(emb_dim))
             speaker_embeddings = torch.stack(emb_list)
 
+        if f0_padded is not None:
+            vuv_padded = (f0_padded > 0).to(f0_padded.dtype)
+
         return Batch(
             phoneme_ids=phonemes_padded,
             phoneme_lengths=phoneme_lengths,
@@ -554,6 +656,8 @@ class UtteranceCollate:
             language_ids=language_ids,
             prosody_features=prosody_padded,
             speaker_embeddings=speaker_embeddings,
+            f0=f0_padded,
+            vuv=vuv_padded,
         )
 
 
@@ -914,9 +1018,9 @@ class SpeakerBalancedBatchSampler:
                 binned[bin_of(maxlen)][lang].append((spk, bucket))
 
         # bin 内でランダムシャッフル (どの話者が先に消費されるかを epoch 毎に変える)
-        for bin_id in binned:
-            for lang_id in binned[bin_id]:
-                rng.shuffle(binned[bin_id][lang_id])
+        for lang_pools in binned.values():
+            for pool in lang_pools.values():
+                rng.shuffle(pool)
 
         # Step 4: 各バッチを 1 つの bin から抽出
         all_batches: list[list[int]] = []

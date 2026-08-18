@@ -3295,6 +3295,7 @@ train = [
     { name = "onnxsim-prebuilt" },
     { name = "pyopenjtalk-plus" },
     { name = "pytorch-lightning" },
+    { name = "pyworld" },
     { name = "pyyaml" },
     { name = "scipy" },
     { name = "seaborn" },
@@ -3378,6 +3379,7 @@ requires-dist = [
     { name = "pytest-xdist", marker = "extra == 'test'", specifier = "==3.8.0" },
     { name = "pytorch-lightning", specifier = ">=2.6.5" },
     { name = "pytorch-lightning", marker = "extra == 'train'", specifier = ">=2.6.5" },
+    { name = "pyworld", marker = "extra == 'train'", specifier = ">=0.3.5" },
     { name = "pyyaml", marker = "extra == 'train'", specifier = ">=6.0.3" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.15.15" },
     { name = "ruff", marker = "extra == 'test'", specifier = "==0.15.15" },
@@ -3480,6 +3482,7 @@ train = [
     { name = "piper-plus-g2p", extra = ["all"] },
     { name = "pyopenjtalk-plus" },
     { name = "pytorch-lightning" },
+    { name = "pyworld" },
     { name = "pyyaml" },
     { name = "scipy" },
     { name = "seaborn" },
@@ -3525,6 +3528,7 @@ requires-dist = [
     { name = "pytest-timeout", marker = "extra == 'test'", specifier = ">=2.2" },
     { name = "pytest-xdist", marker = "extra == 'test'", specifier = ">=3.5" },
     { name = "pytorch-lightning", marker = "extra == 'train'", specifier = ">=2.4.0" },
+    { name = "pyworld", marker = "extra == 'train'", specifier = ">=0.3.5" },
     { name = "pyyaml", marker = "extra == 'train'", specifier = ">=6.0" },
     { name = "ruff", marker = "extra == 'test'", specifier = ">=0.12" },
     { name = "scipy", marker = "extra == 'train'", specifier = ">=1.17.1" },
@@ -4135,6 +4139,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/56/db/b8721d71d945e6a8ac63c0fc900b2067181dbb50805958d4d4661cf7d277/pytz-2026.1.post1.tar.gz", hash = "sha256:3378dde6a0c3d26719182142c56e60c7f9af7e968076f31aae569d72a0358ee1", size = 321088, upload-time = "2026-03-03T07:47:50.683Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/10/99/781fe0c827be2742bcc775efefccb3b048a3a9c6ce9aec0cbf4a101677e5/pytz-2026.1.post1-py2.py3-none-any.whl", hash = "sha256:f2fd16142fda348286a75e1a524be810bb05d444e5a081f37f7affc635035f7a", size = 510489, upload-time = "2026-03-03T07:47:49.167Z" },
+]
+
+[[package]]
+name = "pyworld"
+version = "0.3.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a5/0f/c78d631ffbb4c1aaebf80ff2bf9e791213b381dbe404f9ce1a3eb3672931/pyworld-0.3.5.tar.gz", hash = "sha256:1b93e53cddb67a0e4faa34d6cf919ac6c662feb1c8c0ed901d71b595ab396aa3", size = 261021, upload-time = "2025-01-20T16:07:51.261Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0a/fd/de13003de61ae39ce0952158aab502443e822d149d4d35be93e3b466fa12/pyworld-0.3.5-cp311-cp311-win_amd64.whl", hash = "sha256:538a359862f4bcfa7a58c019644f78941c94dc66a654be8567054ee9c1fc8f1b", size = 225230, upload-time = "2025-01-21T15:53:35.005Z" },
+    { url = "https://files.pythonhosted.org/packages/b6/29/9c9c0dad7575faea3dbc3cbc8b69e0365b35912332068afd79a2b93d822d/pyworld-0.3.5-cp312-cp312-win_amd64.whl", hash = "sha256:59b48961c2ac34fb01efeb1a77d3eda69c41b676858cbc3a82dfb7602c0c762b", size = 222700, upload-time = "2025-01-21T15:58:47.959Z" },
+    { url = "https://files.pythonhosted.org/packages/6f/5c/7e8fb5417ef96cbeca125b5ee507ec5568ce4bde7b576d20db2d2d4a80fc/pyworld-0.3.5-cp313-cp313-win_amd64.whl", hash = "sha256:860c5c3528f1dbc5c68fa71a16e3bb6990244619e5b9baf62952f3a6bfc6131c", size = 222371, upload-time = "2025-01-21T15:59:08.319Z" },
 ]
 
 [[package]]

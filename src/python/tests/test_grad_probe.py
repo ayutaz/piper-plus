@@ -148,7 +148,7 @@ def test_bf16_loss_norm_recorded_as_float32():
     assert math.isfinite(val)
 
 
-def _tiny_synthesizer(n_speakers=4):
+def _tiny_synthesizer(n_speakers=4, **overrides):
     """probe 対象構造 (spk_proj / dec / enc_p / flow) を持つ最小モデル。"""
     try:
         from piper_train.vits.models import SynthesizerTrn
@@ -176,6 +176,7 @@ def _tiny_synthesizer(n_speakers=4):
         gin_channels=64,
         use_sdp=True,
         prosody_dim=16,
+        **overrides,
     )
 
 
@@ -223,3 +224,20 @@ def test_collect_probe_params_single_speaker_no_spk_proj():
     params = collect_probe_params(model)
     assert "spk_proj_out" not in params
     assert {"dec_pre", "enc_p_proj", "flow0_pre"} <= set(params.keys())
+
+
+@pytest.mark.unit
+def test_collect_probe_params_adds_the_f0_predictor_point():
+    """v10b S-2 有効時のみ ``f0_pred_out`` が増える (無効時は従来 4 点)。
+
+    c_f0 の較正はこの点の勾配ノルムを見て行う — 他 4 点と違い F0 loss しか
+    届かない点なので、他 4 点が非ゼロなら意図しない勾配経路が開いている
+    (``--f0-spk-grad`` / ``--f0-attach-predictor-input``) というシグナルになる。
+    """
+    off = collect_probe_params(_tiny_synthesizer())
+    assert "f0_pred_out" not in off
+
+    on = collect_probe_params(_tiny_synthesizer(use_f0_path=True))
+    assert "f0_pred_out" in on
+    assert on["f0_pred_out"].is_leaf
+    assert on["f0_pred_out"].requires_grad

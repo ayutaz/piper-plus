@@ -278,6 +278,104 @@ class NearestResizeUpsample(nn.Module):
         return self.conv(self.pad(x))
 
 
+class HarmonicPhaseTemplate(nn.Module):
+    """frame 格子 F0 → head 格子の調波位相テンプレート (v10b S-2c)。
+
+    ``f0 [B, 1, T_frames]`` (Hz、無声 = 0) を受け取り、iSTFT head が消費する
+    格子 (``SR / (frame_hop / upsample)`` = 1378.125 Hz) で
+
+        Φ_t = Σ_{i≤t} f0_i / frame_rate            (cycles)
+        template = [cos(2πmΦ)]_{m=1..M} ⊕ [sin(2πmΦ)]_{m=1..M} ⊕ log f0 ⊕ V/UV
+
+    を返す (``[B, 2M+2, T_frames * upsample]``)。学習パラメータは持たない。
+
+    **なぜ head 格子なのか** (docs/design/zero-shot-v10b-s2-f0-design.md §1):
+    この decoder で「周期性」が実際に存在するのは head が出す per-frame 位相の
+    frame 間整合だけで、subband iSTFT の bin 幅は 344.5Hz と F0 の倍音間隔を
+    分解できない。従って位相参照を置いて意味がある格子は head 格子しかなく、
+    frame 格子 (86Hz) への注入は「値」情報にしかならない (それは S-2a の担当)。
+
+    実装上の要点 2 つ:
+
+    * **Chebyshev 漸化式**: ``cos(mθ) = 2cos(θ)cos((m−1)θ) − cos((m−2)θ)``
+      で m ≥ 2 を Mul/Sub だけで展開する。超越関数の評価が head 格子で
+      2 個/サンプル (M=8 なら 16 → 2) に減る。精度は M=8 で 2.9e-06 と
+      直接評価と実用上同一 (設計 doc §3.1【実測】)。
+    * **float64 位相累積**: fp32 の ``cumsum`` は torch と ORT で加算順序が
+      異なり、誤差が長さとともに増幅する (T=2000 で相対 1.7e-01)。位相の
+      累積のみ float64 にすると長さ非依存で 3e-05 に収まり、レイテンシ
+      コストは測定誤差以下だった (設計 doc §3.4【実測】)。ONNX parity を
+      長尺で書けるようにするための必須条件。
+
+    学習時は一様乱数の初期位相 ``U(0, 1)`` cycles をサンプルごとに加算する
+    (§4.4)。学習は ``segment_size // hop`` フレームのスライスで行うため、
+    これがないと「slice 先頭の位相は常に 0」を模型が学習しうる。``eval()``
+    では常に 0 — ONNX graph に乱数 op を出さないための構造的保証も兼ねる。
+    """
+
+    def __init__(
+        self,
+        n_harmonics: int = 8,
+        upsample: int = 16,
+        sample_rate: int = 22050,
+        frame_hop: int = 256,
+        f0_log_scale: float = 6.0,
+    ):
+        super().__init__()
+        if n_harmonics < 1:
+            raise ValueError(f"n_harmonics must be >= 1, got {n_harmonics}")
+        self.n_harmonics = n_harmonics
+        self.upsample = upsample
+        # head 格子 = frame 格子 (sample_rate / frame_hop) の upsample 倍。
+        self.frame_rate = sample_rate * upsample / frame_hop
+        self.f0_log_scale = f0_log_scale
+
+    @property
+    def out_channels(self) -> int:
+        return 2 * self.n_harmonics + 2
+
+    def forward(self, f0: torch.Tensor) -> torch.Tensor:
+        """``f0 [B, 1, T]`` (Hz、無声 0) → ``[B, 2M+2, T * upsample]``."""
+        uv = (f0 > 1.0).to(f0.dtype)
+        f0_up = F.interpolate(
+            f0, scale_factor=float(self.upsample), mode="linear", align_corners=False
+        )
+        uv_up = F.interpolate(uv, scale_factor=float(self.upsample), mode="nearest")
+
+        # --- 位相累積 (float64) ---
+        # 除算も float64 で行う: fp32 で割ってから cast すると 1 frame あたりの
+        # 位相ステップが fp32 に量子化され、その丸め **バイアス** が長さに比例して
+        # 蓄積する (T=1024 で 5e-06 cycles → 8 次調波の振幅誤差 2.4e-04、
+        # T=13,760 で 3.8e-03)。cast 位置を 1 つ手前に置くだけで長さ非依存になる。
+        phase = torch.cumsum(f0_up.double() / self.frame_rate, dim=-1)
+        if self.training:
+            # サンプルごとに独立な初期位相 (位相オフセット不変性の獲得)
+            phase = phase + torch.rand(
+                phase.size(0), 1, 1, dtype=phase.dtype, device=phase.device
+            )
+        # 倍音を掛ける **前** に小数部を取る = 位相精度の保護
+        frac = phase - torch.floor(phase)
+        # **必ず float32 で三角関数と漸化式を回す** (入力 dtype に従わない)。
+        # autocast(bf16) 下では f0 が bf16 で来るが、bf16 の cos/sin は絶対誤差
+        # ~4e-3 で、Chebyshev 漸化式はその誤差を ~m² 倍に増幅する — M=8 では
+        # 0.25 に達し、高次調波のテンプレートが壊れる。テンプレートは head 格子で
+        # 超越関数 2 個 + Mul/Sub だけなので、fp32 固定のコストは無視できる。
+        arg = (2.0 * math.pi * frac).float()
+
+        c1 = torch.cos(arg)  # 超越関数の評価はこの 2 個だけ
+        s1 = torch.sin(arg)
+        two_c1 = 2.0 * c1
+        cos_terms = [torch.ones_like(c1), c1]
+        sin_terms = [torch.zeros_like(s1), s1]
+        for _ in range(2, self.n_harmonics + 1):
+            cos_terms.append(two_c1 * cos_terms[-1] - cos_terms[-2])
+            sin_terms.append(two_c1 * sin_terms[-1] - sin_terms[-2])
+
+        harmonics = torch.cat(cos_terms[1:] + sin_terms[1:], dim=1) * uv_up.float()
+        log_f0 = torch.log(f0_up.float().clamp(min=1.0)) / self.f0_log_scale
+        return torch.cat([harmonics, log_f0, uv_up.float()], dim=1)
+
+
 class MBiSTFTGenerator(nn.Module):
     """Multi-Band inverse STFT Generator.
 
@@ -327,6 +425,18 @@ class MBiSTFTGenerator(nn.Module):
         # ``pqmf`` を渡した場合は無視される (共有インスタンス側の設定が勝つ)。
         pqmf_taps: int = 62,
         trainable_pqmf_synthesis: bool = False,
+        # --- v10b S-2 (F0 明示経路、default off = v10a-r2 bit 互換。
+        # docs/design/zero-shot-v10b-s2-f0-design.md §6.1) ---
+        # S-2a + S-2c を一括で有効化する。有効時は forward に ``f0`` が必須。
+        use_f0_path: bool = False,
+        # S-2a: frame 格子 (SR/256) で [log f0, V/UV] を射影して conv_pre 入力へ
+        f0_feat_channels: int = 8,
+        # S-2c: head 格子 (SR/16) の位相テンプレートを射影して head 入力へ
+        f0_head_channels: int = 8,
+        f0_harmonics: int = 8,
+        # 位相の格子計算に必要な音響パラメータ (mel hop = frame 格子の周期)
+        sample_rate: int = 22050,
+        f0_frame_hop: int = 256,
     ):
         super().__init__()
         if upsample_mode not in ("transposed", "resize"):
@@ -341,10 +451,23 @@ class MBiSTFTGenerator(nn.Module):
         self.onnx_export_mode = False
         self.use_channels_last = use_channels_last
         self.upsample_mode = upsample_mode
+        self.use_f0_path = use_f0_path
+
+        # --- v10b S-2a: frame 格子の F0 特徴 (conv_pre 入力へ concat) ---
+        # zero-init: 学習開始時は F0 の値に依存しない出力になり、smoke 失敗時に
+        # 経路を切る退避が bit レベルで安全になる (設計 doc §6.2)。出力が 0 でも
+        # 入力側重みの勾配は非ゼロなので学習は普通に進む
+        # (test_zero_init_projections_still_receive_gradient が固定)。
+        conv_pre_in = initial_channel
+        if use_f0_path:
+            self.f0_feat = Conv1d(2, f0_feat_channels, 1)
+            nn.init.zeros_(self.f0_feat.weight)
+            nn.init.zeros_(self.f0_feat.bias)
+            conv_pre_in += f0_feat_channels
 
         # --- conv_pre ---
         self.conv_pre = weight_norm(
-            Conv1d(initial_channel, upsample_initial_channel, 7, 1, padding=3)
+            Conv1d(conv_pre_in, upsample_initial_channel, 7, 1, padding=3)
         )
 
         # --- ResBlock selection ---
@@ -381,8 +504,28 @@ class MBiSTFTGenerator(nn.Module):
             ):
                 self.resblocks.append(resblock_module(ch, k, d))
 
-        # --- Sub-band convolution (no weight_norm) ---
+        # --- v10b S-2c: head 格子の harmonic 位相テンプレート ---
+        # 位相が実際に消費される唯一の格子 (head) に位相参照を置く。head_proj も
+        # zero-init (S-2a と同じ理由)。
         post_in_channels = upsample_initial_channel // (2 ** len(upsample_rates))
+        if use_f0_path:
+            head_upsample = 1
+            for u in upsample_rates:
+                head_upsample *= u
+            self.phase_template = HarmonicPhaseTemplate(
+                n_harmonics=f0_harmonics,
+                upsample=head_upsample,
+                sample_rate=sample_rate,
+                frame_hop=f0_frame_hop,
+            )
+            self.head_proj = Conv1d(
+                self.phase_template.out_channels, f0_head_channels, 1
+            )
+            nn.init.zeros_(self.head_proj.weight)
+            nn.init.zeros_(self.head_proj.bias)
+            post_in_channels += f0_head_channels
+
+        # --- Sub-band convolution (no weight_norm) ---
         self.subband_conv_post = Conv1d(
             post_in_channels, subbands * (n_fft + 2), 7, padding=3
         )
@@ -459,13 +602,19 @@ class MBiSTFTGenerator(nn.Module):
         return x * scale + shift
 
     def forward(
-        self, x: torch.Tensor, g: torch.Tensor | None = None
+        self,
+        x: torch.Tensor,
+        g: torch.Tensor | None = None,
+        f0: torch.Tensor | None = None,
     ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """Generate waveform from latent representation.
 
         Args:
             x: Latent ``[B, initial_channel, T_frames]``.
             g: Speaker embedding ``[B, gin_channels, 1]`` (optional).
+            f0: Frame-level F0 in Hz ``[B, 1, T_frames]`` (unvoiced = 0).
+                Required when ``use_f0_path`` is enabled; ignored otherwise
+                (so existing callers can pass it unconditionally).
 
         Returns:
             If ``onnx_export_mode`` is False (training):
@@ -474,6 +623,19 @@ class MBiSTFTGenerator(nn.Module):
             If ``onnx_export_mode`` is True (ONNX inference):
                 ``fullband`` only ``[B, 1, T]``.
         """
+        if self.use_f0_path:
+            if f0 is None:
+                raise ValueError(
+                    "use_f0_path is enabled but f0 was not provided to "
+                    "MBiSTFTGenerator.forward(). Pass frame-level f0 "
+                    "[B, 1, T_frames] (Hz, unvoiced = 0)."
+                )
+            # S-2a: frame 格子で F0 の「値」情報 (音域・帯域包絡の F0 依存) を渡す
+            f0_frame = f0.to(x.dtype)
+            uv = (f0_frame > 1.0).to(x.dtype)
+            log_f0 = torch.log(f0_frame.clamp(min=1.0)) / 6.0
+            x = torch.cat([x, self.f0_feat(torch.cat([log_f0, uv], dim=1))], dim=1)
+
         x = self.conv_pre(x)
         if g is not None and self.gin_channels != 0:
             # Input-stage FiLM (scale + shift) — 旧加算のみから FiLM へ強化
@@ -495,6 +657,12 @@ class MBiSTFTGenerator(nn.Module):
                 x = self._apply_film(x, self.cond_layers[i](g))
 
         x = F.leaky_relu(x, LRELU_SLOPE)
+        if self.use_f0_path:
+            # S-2c: head 格子で位相参照を渡す。head は各 (band, bin) の位相を
+            # この参照からの差分として出せばよく、自力で積分せずに済む。
+            x = torch.cat(
+                [x, self.head_proj(self.phase_template(f0).to(x.dtype))], dim=1
+            )
         x = self.subband_conv_post(x)  # [B, subbands * (n_fft + 2), T_frames]
 
         B = x.size(0)

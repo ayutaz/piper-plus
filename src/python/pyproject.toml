@@ -50,6 +50,7 @@ train = [
     # 有効化は環境変数 HF_HUB_ENABLE_HF_TRANSFER=1 (Dockerfile / handoff で設定)。
     # 元となる HF Hub URL / 認可フローは既存 huggingface_hub 側と互換 (backend swap のみ)。
     "hf_transfer>=0.1.6",
+    "pyworld>=0.3.5",
 ]
 
 inference = [
