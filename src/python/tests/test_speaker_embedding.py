@@ -235,11 +235,18 @@ class TestForwardSpeakerEmbedding:
                 speaker_embeddings=spk_emb,
             )
 
-        # forward returns 9 elements (including decoder_subbands and the
-        # v10 M1 tail field flow_logdet — default None, appended at the end
-        # so 8-arg positional construction stays compatible)
-        assert len(result) == 9
+        # ``SynthesizerOutput`` grows a tail field whenever an opt-in feature
+        # lands (v10 M1 flow_logdet, v10b S-2 f0_pred / f0_decoder). New
+        # fields default to None and are appended at the end, so positional
+        # construction stays compatible — that contract is what this test
+        # pins, not the current field count (asserting the count only
+        # produced churn on every feature).
+        assert result.waveform is not None
+        assert result.decoder_subbands is not None
+        # Opt-in tail fields are inert unless their feature is enabled.
         assert result.flow_logdet is None
+        assert result.f0_pred is None
+        assert result.f0_decoder is None
 
 
 # ---------------------------------------------------------------------------

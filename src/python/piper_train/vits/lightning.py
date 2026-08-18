@@ -27,6 +27,8 @@ from .losses import (
     build_same_language_permutation,
     dino_loss,
     discriminator_loss,
+    f0_prediction_loss,
+    f0_teacher_forcing_prob,
     feature_loss,
     gather_speaker_loss_inputs,
     generator_loss,
@@ -404,6 +406,30 @@ class VitsModel(pl.LightningModule):
         # 両者は decoder と GT analysis が共有する PQMF に適用される。
         pqmf_taps: int = 62,
         trainable_pqmf_synthesis: bool = False,
+        # --- v10b S-2 (F0 明示経路。default off = v10a-r2 bit 互換。
+        # docs/design/zero-shot-v10b-s2-f0-design.md) ---
+        # S-2a + S-2c + S-2p を一括で有効化する。GT F0 キャッシュが必須
+        # (``tools/extract_f0.py`` で作る)。
+        use_f0_path: bool = False,
+        # GT F0 キャッシュのディレクトリ (未指定なら {dataset_dir}/f0)
+        f0_dir: str | None = None,
+        # 予測器 (S-2p) の loss 係数。§4.3 の λ は grad-probe で較正する
+        c_f0: float = 1.0,
+        c_vuv: float = 1.0,
+        f0_predictor_hidden: int = 96,
+        f0_feat_channels: int = 8,
+        f0_head_channels: int = 8,
+        f0_harmonics: int = 8,
+        # S-2r: prior 側 F0 残差 (zero-init、B1 を動かす主経路と見る)
+        f0_prior_residual: bool = False,
+        # F0 loss の勾配を spk_proj 本体 / enc_p へ通すか (default は保護側)
+        f0_spk_grad: bool = False,
+        f0_detach_input: bool = True,
+        # teacher forcing アニール (§4.4): epoch K 以降 R epoch かけて
+        # GT F0 → 予測 F0 へ確率 p_max まで寄せる
+        f0_teacher_forcing_epochs: int = 10,
+        f0_teacher_forcing_ramp: int = 10,
+        f0_pred_prob_max: float = 0.5,
         **kwargs,
     ):
         super().__init__()
@@ -450,6 +476,16 @@ class VitsModel(pl.LightningModule):
             upsample_mode=self.hparams.upsample_mode,
             pqmf_taps=self.hparams.pqmf_taps,
             trainable_pqmf_synthesis=self.hparams.trainable_pqmf_synthesis,
+            use_f0_path=self.hparams.use_f0_path,
+            f0_predictor_hidden=self.hparams.f0_predictor_hidden,
+            f0_feat_channels=self.hparams.f0_feat_channels,
+            f0_head_channels=self.hparams.f0_head_channels,
+            f0_harmonics=self.hparams.f0_harmonics,
+            f0_prior_residual=self.hparams.f0_prior_residual,
+            f0_spk_grad=self.hparams.f0_spk_grad,
+            f0_detach_input=self.hparams.f0_detach_input,
+            sample_rate=self.hparams.sample_rate,
+            hop_length=self.hparams.hop_length,
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm,
@@ -783,6 +819,16 @@ class VitsModel(pl.LightningModule):
             precomputed_mel_dir = Path(self.hparams.dataset_dir) / "mel"
             _LOGGER.info("Precomputed mel cache enabled: %s", precomputed_mel_dir)
 
+        # v10b S-2: GT F0 cache (``tools/extract_f0.py`` の出力)。既定は
+        # ``{dataset_dir}/f0``。ディレクトリが無ければ PiperDataset 側が警告して
+        # 「F0 なし」に倒す (--use-f0-path 有効時は training_step が fail-fast)。
+        f0_dir: Path | None = None
+        if self.hparams.get("use_f0_path", False):
+            f0_dir = Path(
+                self.hparams.get("f0_dir") or (Path(self.hparams.dataset_dir) / "f0")
+            )
+            _LOGGER.info("v10b S-2: F0 target cache = %s", f0_dir)
+
         # Try to load fixed test dataset first
         test_utterances_path = self.hparams.dataset_dir / "test_utterances.jsonl"
         if test_utterances_path.exists():
@@ -793,6 +839,7 @@ class VitsModel(pl.LightningModule):
                 max_phoneme_ids=max_phoneme_ids,
                 validate_cache=validate_cache,
                 precomputed_mel_dir=precomputed_mel_dir,
+                f0_dir=f0_dir,
             )
             valid_set_size = int(len(full_dataset) * validation_split)
             train_set_size = len(full_dataset) - valid_set_size
@@ -812,6 +859,7 @@ class VitsModel(pl.LightningModule):
                 max_phoneme_ids=max_phoneme_ids,
                 validate_cache=validate_cache,
                 precomputed_mel_dir=precomputed_mel_dir,
+                f0_dir=f0_dir,
             )
             valid_set_size = int(len(full_dataset) * validation_split)
             train_set_size = len(full_dataset) - valid_set_size - num_test_examples
@@ -1549,6 +1597,11 @@ class VitsModel(pl.LightningModule):
             lid=language_ids,
             prosody_features=prosody_features,
             speaker_embeddings=s_tilde,
+            # v10b S-2: LF step も decoder を通るので F0 が要る。s̃ は実在参照を
+            # 持たない架空話者なので GT F0 は使わず、常に予測 F0 で走らせる
+            # (この step の損失は LFCL のみで、F0 回帰は課さない)。
+            f0=getattr(batch, "f0", None),
+            f0_pred_prob=1.0,
         )
         y_hat = g_output.waveform
         # D は skip されるが、non-finite skip 経路が self._y/_y_hat を触るため
@@ -1651,6 +1704,27 @@ class VitsModel(pl.LightningModule):
                     speaker_embeddings,
                 )
 
+        # --- v10b S-2: GT F0 と teacher forcing 確率 ---
+        # 有効化したのに F0 キャッシュが無い構成は黙って劣化させず即エラーに
+        # する (無言で S-2 なしの学習が 1 週間走るほうが遥かに高くつく)。
+        f0_gt = None
+        f0_pred_prob = 0.0
+        if self.hparams.use_f0_path:
+            f0_gt = getattr(batch, "f0", None)
+            if f0_gt is None:
+                raise RuntimeError(
+                    "use_f0_path is enabled but the batch carries no GT F0. "
+                    "Run `python -m piper_train.tools.extract_f0 --dataset "
+                    "<dataset.jsonl> --output-dir <dataset_dir>/f0` first, or "
+                    "point --f0-dir at an existing cache."
+                )
+            f0_pred_prob = f0_teacher_forcing_prob(
+                self.current_epoch,
+                self.hparams.f0_teacher_forcing_epochs,
+                self.hparams.f0_teacher_forcing_ramp,
+                self.hparams.f0_pred_prob_max,
+            )
+
         g_output = self.model_g(
             x,
             x_lengths,
@@ -1660,6 +1734,8 @@ class VitsModel(pl.LightningModule):
             lid=language_ids,
             prosody_features=prosody_features,
             speaker_embeddings=speaker_embeddings,
+            f0=f0_gt,
+            f0_pred_prob=f0_pred_prob,
         )
         y_hat = g_output.waveform
         l_length = g_output.duration_loss
@@ -1778,6 +1854,28 @@ class VitsModel(pl.LightningModule):
                 if probe_losses is not None:
                     probe_losses["sub_stft"] = loss_sub_stft
 
+            # --- v10b S-2p: F0 / V-UV predictor の GT 回帰 loss ---
+            # GT frame-level F0 を教師とする per-frame 回帰であり、生成音声の
+            # F0 統計は一切参照しない (zs-eval-contract §2 禁止事項 4 の
+            # 例外条項に正面から乗る形。構造ガードは
+            # tests/test_f0_contract_guard.py)。
+            if g_output.f0_pred is not None and batch.f0 is not None:
+                loss_f0_raw, loss_vuv_raw = f0_prediction_loss(
+                    g_output.f0_pred[0],
+                    g_output.f0_pred[1],
+                    batch.f0,
+                    batch.vuv,
+                    z_mask,
+                )
+                loss_f0 = loss_f0_raw * self.hparams.c_f0
+                loss_vuv = loss_vuv_raw * self.hparams.c_vuv
+                loss_gen_all = loss_gen_all + loss_f0 + loss_vuv
+                self._log_with_batch_info("loss_f0", loss_f0, batch)
+                self._log_with_batch_info("loss_vuv", loss_vuv, batch)
+                self._log_with_batch_info("f0_pred_prob", f0_pred_prob, batch)
+                if probe_losses is not None:
+                    probe_losses["f0"] = loss_f0 + loss_vuv
+
             # Full-band linear-frequency MR-STFT loss (v9, opt-in)
             if self.hparams.c_full_stft > 0:
                 loss_full_stft = (
@@ -1808,6 +1906,7 @@ class VitsModel(pl.LightningModule):
                     ids_slice,
                     speaker_embeddings=speaker_embeddings,
                     lid=language_ids,
+                    f0=g_output.f0_decoder,
                 )
 
             # T6: SCL is explicitly wrapped in _scl_autocast_ctx (= autocast
@@ -1964,6 +2063,9 @@ class VitsModel(pl.LightningModule):
                             ids_slice,
                             speaker_embeddings=emb_q,
                             lid=language_ids,  # lid は自分の行のまま (テキストの言語は不変)
+                            # S-2: 主経路と同一の F0 スライス。話者だけを
+                            # 入れ替える ASCL の趣旨どおり、位相参照は動かさない
+                            f0=g_output.f0_decoder,
                         )
                         with self._scl_autocast_ctx():
                             emb_gen_swap = self.scl_encoder(y_swap.squeeze(1).float())

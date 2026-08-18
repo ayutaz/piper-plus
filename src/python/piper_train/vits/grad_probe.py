@@ -87,6 +87,17 @@ def collect_probe_params(model_g: torch.nn.Module) -> dict[str, torch.Tensor]:
     if flows is not None and len(flows) > 0:
         candidates["flow0_pre"] = _resolve_weight(getattr(flows[0], "pre", None))
 
+    # v10b S-2: F0 予測器の出力射影。``--use-f0-path`` 有効時のみ存在する。
+    #
+    # 他の 4 点と違い、これは **F0 loss しか届かない** 点である
+    # (default の ``f0_detach_input=True`` が予測器の入力を切っているため、
+    # mel / GAN の勾配はここに来ない)。従って「mel の 5-15%」型の比率較正は
+    # 使えず、c_f0 の較正は「F0 loss の勾配がこの点で有意な大きさを持つか /
+    # 他 4 点を汚していないか」で見る。後者がゼロでないなら、意図せず
+    # ``--f0-spk-grad`` か ``--f0-attach-predictor-input`` が効いている。
+    f0_predictor = getattr(model_g, "f0_predictor", None)
+    candidates["f0_pred_out"] = _resolve_weight(getattr(f0_predictor, "proj_f0", None))
+
     return {
         name: param
         for name, param in candidates.items()
