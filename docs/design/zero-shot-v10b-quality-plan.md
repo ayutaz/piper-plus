@@ -460,3 +460,30 @@ from-scratch のコスト上、複数レバーを束ねざるを得ない。以�
   (係数較正 / swap-SCL インシデント / r2 最終スコア)、HF
   `ayousanz/piper-plus-zero-shot-multi-7lang-v8` の `v10a-results/` +
   `checkpoints-v10a-r2/`
+
+## 7. Phase C-0: ライセンス実確認の結果 (2026-08-18、原文ベース)
+
+| 候補 | 判定 | 根拠 (原文要旨) | 規模 |
+|---|---|---|---|
+| JVS | **不採用** (学習除外。評価もローカル参照のみ、合成サンプル公開不可) | 公開版は「非商用目的の研究に限り使用可能」+ 再配布不可。過去調査の「商用可」は**東大 TLO 経由の有償ライセンス営業案内の誤読**と決着 | 100 spk / 30h |
+| **Emilia-YODAS (ja/ko)** | **採用可** (CC BY 4.0、attribution + 品質ゲート必須) | 権利者 Amphion が 3 文書 + HF タグで一貫して YODAS split = CC BY 4.0。KRAFTON README の逆表記は**行の取り違え** (上流 espnet/yodas2 が cc-by-3.0 の系譜とも整合)。残余リスク: YouTube 自己申告 CC 依存 (espnet が削除受付明記) / モデルカードでのデータセット単位帰属が義務 | ja ~0.8k h / ko ~7.2k h / 24kHz |
+| Emilia 本体 (非 YODAS) | 不採用 | CC BY-NC 4.0 明記 | — |
+| Common Voice ja | **採用可** | CC0 (HF メタデータ + 明文) | validated 380h / 7,859 voices |
+| Zeroth-Korean | 不採用 (品質) | ライセンスは CC BY 4.0 で可だが fmax99 中央値 3.0kHz で案 Z ゲート不通過 (v9 事故の再現になる) | — |
+| Pansori-TEDxKR | 不採用 | CC BY-NC-ND | — |
+| CV ko | 補助のみ | CC0 だが validated 2.2h | — |
+| KSS/MSSS 系 | 未確認 (調査打ち切り — ko は Emilia-YODAS で充足見込) | — | — |
+
+**v10b データ構成案**: 現行 300,443 utts / 6 lang + **Emilia-YODAS ja (話者多様性)
++ Emilia-YODAS ko (7 lang 復活、pt と同オーダーの ≥30k utts を必須条件に cap 設計)
++ CV ja (CC0 属性補完)**。投入時の必須ゲート 3 点:
+
+1. **案 Z ゲートを新データへ同一適用** (YODAS は低ビットレート AAC の 11-12kHz
+   遮断が 22.05kHz Nyquist と接する — fmax999/hi_ratio を投入前に必ず測定)
+2. **DNSMOS ≥ 3.0 で切る** (Emilia-Large 拡張分は 2.4 閾値で低品質が混入)
+3. **擬似話者ラベルの post-filter** (Emilia の speaker はダイアライゼーション由来で
+   誤マージあり — cross-utt SCL の正例定義を直撃するため、話者あたり発話数下限 +
+   embedding クラスタ内分散でフィルタ)
+
+設計原則: in-the-wild (YODAS) は**話者多様性用**、スタジオ品質 (moe-speech-plus)
+は**音質の教師**として役割を分け、discriminator の real 定義を汚さない。
