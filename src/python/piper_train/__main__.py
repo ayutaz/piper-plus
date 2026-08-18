@@ -948,6 +948,119 @@ def create_parser():
         "(re-run tests/test_pqmf_taps_trainable.py against the trained "
         "checkpoint to measure the deviation).",
     )
+    # --- v10b S-2: F0 明示経路 (default off = v10a-r2 bit 互換) ---
+    # docs/design/zero-shot-v10b-s2-f0-design.md。B1 (F0 std が GT の 55-65%)
+    # と A3 (1-3kHz の調波間ノイズ充填) への構造的対策。head 格子で位相参照を
+    # 与えることで、head が位相を自力で積分せずに済むようにする。
+    parser.add_argument(
+        "--use-f0-path",
+        action="store_true",
+        default=False,
+        help="Enable the explicit F0 path (v10b S-2): a frame-level F0/V-UV "
+        "predictor (S-2p), frame-grid F0 features into conv_pre (S-2a) and a "
+        "harmonic phase template on the iSTFT head grid (S-2c). Requires a GT "
+        "F0 cache built by `python -m piper_train.tools.extract_f0`; training "
+        "fails fast if the cache is missing. Changes conv_pre / "
+        "subband_conv_post input channels, so it is for from-scratch runs only.",
+    )
+    parser.add_argument(
+        "--f0-dir",
+        default=None,
+        help="Directory holding the GT F0 cache ({cache_id}.f0.npy). "
+        "Defaults to {dataset_dir}/f0.",
+    )
+    parser.add_argument(
+        "--c-f0",
+        type=float,
+        default=1.0,
+        help="Weight of the voiced-frame L1(log f0) regression loss (v10b S-2p). "
+        "Calibrate with the grad-probe procedure (speaker-family losses were "
+        "tuned to 5-15%% of mel).",
+    )
+    parser.add_argument(
+        "--c-vuv",
+        type=float,
+        default=1.0,
+        help="Weight of the V/UV BCE loss (v10b S-2p).",
+    )
+    parser.add_argument(
+        "--f0-predictor-hidden",
+        type=int,
+        default=96,
+        help="Hidden width of the F0 predictor (v10b S-2p). The predictor is "
+        "the largest CPU cost item of S-2, so it is trim step 2 of the "
+        "pre-registered order in design doc §6.6 (96 -> 64).",
+    )
+    parser.add_argument(
+        "--f0-feat-channels",
+        type=int,
+        default=8,
+        help="Channels of the frame-grid F0 feature concatenated into conv_pre "
+        "(v10b S-2a). Trim step 3 (8 -> 4).",
+    )
+    parser.add_argument(
+        "--f0-head-channels",
+        type=int,
+        default=8,
+        help="Channels of the phase-template projection concatenated into "
+        "subband_conv_post (v10b S-2c). Trim step 1 (8 -> 4).",
+    )
+    parser.add_argument(
+        "--f0-harmonics",
+        type=int,
+        default=8,
+        help="Number of harmonics M in the phase template (v10b S-2c). Trim "
+        "step 4 (8 -> 4); band0 linear reachability is 0.837 vs 0.825, i.e. "
+        "nearly unchanged.",
+    )
+    parser.add_argument(
+        "--f0-prior-residual",
+        action="store_true",
+        default=False,
+        help="Add a zero-init residual of the predicted F0 to the expanded "
+        "prior mean m_p (v10b S-2r). Design doc §4.5 argues this is the path "
+        "that actually moves F0 dynamics (B1), because KL gives the model a "
+        "reason to use F0 — unlike decoder injection, which it may ignore.",
+    )
+    parser.add_argument(
+        "--f0-spk-grad",
+        action="store_true",
+        default=False,
+        help="Let the F0 loss gradient reach spk_proj itself instead of only "
+        "the dedicated spk_proj_f0 head (v10b S-2, design doc §4.2). Speaker "
+        "pitch range is part of speaker identity so this may help similarity, "
+        "but v10a showed extra gradient pressure on spk_proj can break the "
+        "prior path — hence opt-in.",
+    )
+    parser.add_argument(
+        "--f0-attach-predictor-input",
+        action="store_true",
+        default=False,
+        help="Do NOT detach the F0 predictor's input (expanded enc_p hidden), "
+        "letting the F0 loss also train the text encoder (FastPitch style). "
+        "Default detaches it, mirroring VITS' DurationPredictor, so the F0 "
+        "loss cannot reach spk_proj through enc_p's speaker conditioning.",
+    )
+    parser.add_argument(
+        "--f0-teacher-forcing-epochs",
+        type=int,
+        default=10,
+        help="Epoch K after which the decoder starts seeing predicted F0 "
+        "instead of GT F0 (v10b S-2, design doc §4.4).",
+    )
+    parser.add_argument(
+        "--f0-teacher-forcing-ramp",
+        type=int,
+        default=10,
+        help="Ramp length R (epochs) of the teacher-forcing anneal.",
+    )
+    parser.add_argument(
+        "--f0-pred-prob-max",
+        type=float,
+        default=0.5,
+        help="Maximum probability of feeding predicted (rather than GT) F0 to "
+        "the decoder during training.",
+    )
     parser.add_argument("--seed", type=int, default=1234)
     return parser
 
@@ -1386,6 +1499,26 @@ def main():
             "v10b H-2b enabled (--trainable-pqmf-synthesis): PQMF synthesis "
             "bank is trainable (analysis bank stays fixed); perfect "
             "reconstruction may drift during training"
+        )
+
+    # v10b S-2 (F0 明示経路)。argparse は肯定形 --f0-attach-predictor-input を
+    # 受けるが、モデル側の hparam は保護側 default を素直に読める
+    # ``f0_detach_input`` なので、ここで反転して渡す。
+    dict_args["f0_detach_input"] = not getattr(args, "f0_attach_predictor_input", False)
+    if getattr(args, "use_f0_path", False):
+        _LOGGER.info(
+            "v10b S-2 enabled (--use-f0-path): frame F0/V-UV predictor "
+            "(hidden=%d) + frame-grid concat (%d ch) + head-grid harmonic "
+            "phase template (M=%d -> %d ch); prior residual=%s, "
+            "spk_proj grad=%s, predictor input detached=%s. GT F0 cache is "
+            "required (piper_train.tools.extract_f0).",
+            args.f0_predictor_hidden,
+            args.f0_feat_channels,
+            args.f0_harmonics,
+            args.f0_head_channels,
+            args.f0_prior_residual,
+            args.f0_spk_grad,
+            dict_args["f0_detach_input"],
         )
 
     # v10b 識別器系 flags (default off = v10a-r2 bit 互換)

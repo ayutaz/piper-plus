@@ -307,6 +307,74 @@ def swap_spk_ramp_weight(current_epoch, start_epoch, ramp_epochs):
     return min(1.0, (current_epoch - start_epoch) / float(ramp_epochs))
 
 
+def f0_prediction_loss(logf0_pred, vuv_logit, f0_gt, vuv_gt, frame_mask):
+    """S-2p の pitch predictor 回帰 loss (v10b、GT frame-level F0 が教師)。
+
+    docs/design/zero-shot-v10b-s2-f0-design.md §4.3::
+
+        L_f0  = L1( log f0_pred , log f0_gt )   over voiced frames
+        L_vuv = BCE( vuv_logit , vuv_gt )       over valid frames
+
+    **契約上の位置づけ** (zs-eval-contract §2 禁止事項 4 の例外条項):
+    本 loss は「GT を教師とする per-frame 回帰」であり、評価器 (frozen
+    encoder / 契約の統計量) を一切消費しない。逆に、以下は**実装してはいけない**
+    — 追加した瞬間に §4.3 の F0 gate が検出器として死ぬ:
+
+    * 生成波形から F0 を推定して GT と比べる項 (推定器が微分可能かに関わらず)
+    * F0 の std / p5-95 レンジ / skew / kurt など **分布モーメント**を目的化する項
+
+    構造ガードは ``tests/test_f0_contract_guard.py`` が固定する。
+
+    Args:
+        logf0_pred: 予測 log F0 ``[B, 1, T]``
+        vuv_logit: 予測 V/UV logit ``[B, 1, T]`` (sigmoid 前)
+        f0_gt: GT F0 (Hz、無声 = 0) ``[B, 1, T]``
+        vuv_gt: GT 有声フラグ (0/1) ``[B, 1, T]``
+        frame_mask: 有効フレーム mask ``[B, 1, T]`` (padding = 0)
+
+    Returns:
+        ``(loss_f0, loss_vuv)`` — いずれも係数を掛けていないスカラー。
+        有声フレームが 1 つも無いバッチでは ``loss_f0`` は 0 (0/0 の NaN を
+        出して non-finite skip を誘発しないため)。
+    """
+    # fp32 に上げてから集計する (``kl_loss`` と同じ流儀)。autocast(bf16) 下では
+    # 予測が bf16 で来るが、bf16 は仮数 8 bit しかないため (i) 有効フレーム数の
+    # 総和が数百を超えた時点で正規化分母が丸まり (1000 → 1008)、(ii) 数千
+    # フレームの誤差総和が累積丸めで潰れる。
+    logf0_pred = logf0_pred.float()
+    vuv_logit = vuv_logit.float()
+    frame_mask = frame_mask.float()
+    vuv_gt = vuv_gt.float()
+
+    voiced_mask = frame_mask * vuv_gt
+    n_voiced = voiced_mask.sum()
+    log_f0_gt = torch.log(f0_gt.float().clamp(min=1.0))
+    abs_err = (logf0_pred - log_f0_gt).abs() * voiced_mask
+    loss_f0 = abs_err.sum() / n_voiced.clamp(min=1.0)
+
+    bce = F.binary_cross_entropy_with_logits(vuv_logit, vuv_gt, reduction="none")
+    loss_vuv = (bce * frame_mask).sum() / frame_mask.sum().clamp(min=1.0)
+    return loss_f0, loss_vuv
+
+
+def f0_teacher_forcing_prob(current_epoch, start_epoch, ramp_epochs, p_max):
+    """decoder へ渡す F0 を「予測 F0」にする確率 (v10b S-2、§4.4)。
+
+    ``p_pred = clamp((epoch − K) / R, 0, p_max)``。学習初期は GT F0 で
+    クリーンな位相参照を head に与え、epoch K 以降ゆっくり予測 F0 へ寄せる
+    ことで train/infer の齟齬と GT leak を同時に減らす。
+
+    ``ramp_epochs <= 0`` は step 関数 (start 以降ずっと p_max)。
+    p_max は [0, 1] にクランプされる。
+    """
+    p_max = min(1.0, max(0.0, float(p_max)))
+    if current_epoch < start_epoch:
+        return 0.0
+    if ramp_epochs <= 0:
+        return p_max
+    return min(p_max, p_max * (current_epoch - start_epoch) / float(ramp_epochs))
+
+
 def jcu_split(outputs, n_resolutions):
     """JCU MRD の出力リストを (無条件, 条件) に分ける純関数 (v10b S-1a)。
 

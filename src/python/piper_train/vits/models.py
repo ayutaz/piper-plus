@@ -11,6 +11,13 @@ from .commons import get_padding
 from .mb_istft import MBiSTFTGenerator
 
 
+# v10b S-2: 予測 log F0 を Hz に戻す前のクランプ域。学習初期の外れ値が
+# head 格子の位相 cumsum を暴走させるのを防ぐだけの安全弁で、通常発話の
+# F0 レンジ (おおよそ 60-600Hz) を十分に含む。
+_F0_LOG_MIN = math.log(50.0)
+_F0_LOG_MAX = math.log(1100.0)
+
+
 class InferOutput(NamedTuple):
     """Return type of :meth:`SynthesizerTrn.infer`.
 
@@ -195,6 +202,84 @@ class DurationPredictor(nn.Module):
         x = self.drop(x)
         x = self.proj(x * x_mask)
         return x * x_mask
+
+
+class F0Predictor(nn.Module):
+    """frame 格子の log F0 / V-UV 予測器 (v10b S-2p)。
+
+    docs/design/zero-shot-v10b-s2-f0-design.md §4。MAS 展開後の enc_p hidden
+    ``x_frame [B, in_channels, T_frames]`` から per-frame の ``log F0`` と
+    V/UV logit を出す (Period VITS の frame prior network 相当)。
+
+    **入力を posterior ``z`` ではなく ``x_frame`` にする理由** (§4.1):
+
+    1. 学習と推論で同じ情報源になる (``z`` は推論時 prior 由来なので、学習で
+       posterior ``z`` を使うと GT 音高の leak になる)。
+    2. prosody_features (A1/A2/A3、日本語アクセント) が enc_p を経由して既に
+       入っており、JA の音高アクセントを予測する材料が揃っている。
+
+    **正規化に LayerNorm (channel 方向) を使う**: 設計 doc は GroupNorm と
+    書いているが、GroupNorm は (C, T) 全体で統計を取るため **padding された
+    フレームが有効フレームの正規化統計に混入**する。バッチ構成が変わるだけで
+    予測が動く = 学習 (バッチ) と推論 (単発) で別の値が出るため、VITS の
+    ``DurationPredictor`` と同じ ``modules.LayerNorm`` (channel 方向のみ) を
+    使う。不変条件は ``test_predictor_is_padding_safe`` が固定する。
+
+    出力は ``(log_f0 [B, 1, T], vuv_logit [B, 1, T])``。log F0 ヘッドの bias は
+    ``log(200Hz)`` 初期化 — 学習開始直後に ``exp`` が爆発しないため。
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        hidden_channels: int = 96,
+        gin_channels: int = 0,
+        kernel_size: int = 5,
+        n_layers: int = 2,
+        p_dropout: float = 0.0,
+        f0_init_hz: float = 200.0,
+    ):
+        super().__init__()
+        self.in_channels = in_channels
+        self.hidden_channels = hidden_channels
+        self.gin_channels = gin_channels
+
+        self.convs = nn.ModuleList()
+        self.norms = nn.ModuleList()
+        for i in range(n_layers):
+            self.convs.append(
+                nn.Conv1d(
+                    in_channels if i == 0 else hidden_channels,
+                    hidden_channels,
+                    kernel_size,
+                    padding=kernel_size // 2,
+                )
+            )
+            self.norms.append(modules.LayerNorm(hidden_channels))
+        self.drop = nn.Dropout(p_dropout)
+
+        # 話者条件は 1x1 conv の加算 (予測器が小さいので FiLM との差は小さい)。
+        if gin_channels != 0:
+            self.cond = nn.Conv1d(gin_channels, hidden_channels, 1)
+
+        self.proj_f0 = nn.Conv1d(hidden_channels, 1, 1)
+        self.proj_vuv = nn.Conv1d(hidden_channels, 1, 1)
+        # 重みは既定の init のまま (zero-init にすると初期出力が全フレーム
+        # 同一値になり、最初の数百 step が定数回帰の学習に費やされる)。
+        # bias だけ log(200Hz) に置き、``exp(log f0)`` の初期爆発を避ける。
+        nn.init.constant_(self.proj_f0.bias, math.log(f0_init_hz))
+        nn.init.zeros_(self.proj_vuv.bias)
+
+    def forward(self, x, x_mask, g=None):
+        for i, (conv, norm) in enumerate(zip(self.convs, self.norms, strict=True)):
+            x = conv(x * x_mask)
+            if i == 0 and g is not None and self.gin_channels != 0:
+                x = x + self.cond(g)
+            x = torch.relu(x)
+            x = norm(x)
+            x = self.drop(x)
+        x = x * x_mask
+        return self.proj_f0(x) * x_mask, self.proj_vuv(x) * x_mask
 
 
 class TextEncoder(nn.Module):
@@ -1053,6 +1138,13 @@ class SynthesizerOutput(NamedTuple):
     # snac off の forward では None。末尾 default None なので既存の
     # positional 構築 (8 引数) を壊さない。
     flow_logdet: "torch.Tensor | None" = None
+    # v10b S-2p: F0 predictor の生出力 ``(log_f0 [b,1,T], vuv_logit [b,1,T])``。
+    # use_f0_path off では None。GT 回帰 loss (losses.f0_prediction_loss) の入力。
+    f0_pred: "tuple[torch.Tensor, torch.Tensor] | None" = None
+    # v10b S-2: decoder に実際に渡した F0 スライス ``[b, 1, segment_frames]``。
+    # teacher forcing の結果 (GT / 予測の混合) がそのまま入る。SCL 用の
+    # decoder re-forward (B-3 / swap-SCL) に同一 F0 を渡すために公開する。
+    f0_decoder: "torch.Tensor | None" = None
 
 
 class SynthesizerTrn(nn.Module):
@@ -1121,6 +1213,24 @@ class SynthesizerTrn(nn.Module):
         # H-2b: PQMF の taps (co-design 済み preset のみ) / 合成側の学習可能化
         pqmf_taps: int = 62,
         trainable_pqmf_synthesis: bool = False,
+        # --- v10b S-2 (F0 明示経路。default off = v10a-r2 bit 互換。
+        # docs/design/zero-shot-v10b-s2-f0-design.md §6.1) ---
+        use_f0_path: bool = False,
+        f0_predictor_hidden: int = 96,
+        f0_feat_channels: int = 8,
+        f0_head_channels: int = 8,
+        f0_harmonics: int = 8,
+        # S-2r: prior (m_p) に予測 F0 の zero-init 残差を足す (B1 を動かす主経路)
+        f0_prior_residual: bool = False,
+        # F0 loss の勾配を spk_proj 本体へ通すか (default False = 専用ヘッドのみ)
+        f0_spk_grad: bool = False,
+        # 予測器の入力 (展開済み enc_p hidden) を detach するか。
+        # default True = F0 loss は predictor だけを学習させる (VITS の
+        # DurationPredictor と同じ流儀)。詳細は ``_predict_f0`` の docstring。
+        f0_detach_input: bool = True,
+        # 位相格子の計算に必要な音響パラメータ
+        sample_rate: int = 22050,
+        hop_length: int = 256,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -1152,6 +1262,9 @@ class SynthesizerTrn(nn.Module):
         self.use_sdp = use_sdp
         self.onnx_export_mode = False
         self.use_snac_flow = use_snac_flow
+        self.use_f0_path = use_f0_path
+        self.f0_spk_grad = f0_spk_grad
+        self.f0_detach_input = f0_detach_input
 
         self.enc_p = TextEncoder(
             n_vocab,
@@ -1180,6 +1293,12 @@ class SynthesizerTrn(nn.Module):
             upsample_mode=upsample_mode,
             pqmf_taps=pqmf_taps,
             trainable_pqmf_synthesis=trainable_pqmf_synthesis,
+            use_f0_path=use_f0_path,
+            f0_feat_channels=f0_feat_channels,
+            f0_head_channels=f0_head_channels,
+            f0_harmonics=f0_harmonics,
+            sample_rate=sample_rate,
+            f0_frame_hop=hop_length,
         )
         self.enc_q = PosteriorEncoder(
             spec_channels,
@@ -1246,6 +1365,33 @@ class SynthesizerTrn(nn.Module):
                     # 新設ヘッドは --film-init-std と無関係に無条件 N(0, 1e-3)
                     nn.init.normal_(module.weight, 0.0, 1e-3)
                     nn.init.zeros_(module.bias)
+
+        # v10b S-2p: frame prior F0/V-UV predictor と、その話者条件用の軽量
+        # 残差ヘッド。spk_proj_dp (v10 M3) と同じ流儀で、F0 loss の勾配は
+        # default では spk_proj 本体に届かない (--f0-spk-grad で opt-in)。
+        if use_f0_path:
+            self.f0_predictor = F0Predictor(
+                in_channels=hidden_channels,
+                hidden_channels=f0_predictor_hidden,
+                gin_channels=gin_channels,
+            )
+            if gin_channels != 0:
+                self.spk_proj_f0 = nn.Sequential(
+                    nn.Linear(gin_channels, gin_channels // 4),
+                    nn.GELU(),
+                    nn.Linear(gin_channels // 4, gin_channels),
+                )
+                for module in self.spk_proj_f0:
+                    if isinstance(module, nn.Linear):
+                        nn.init.normal_(module.weight, 0.0, 1e-3)
+                        nn.init.zeros_(module.bias)
+            # S-2r: prior 側 F0 残差 (zero-init)。KL が「F0 を使ったほうが z_p を
+            # よく説明できる」勾配圧力を与えるので、decoder 注入と違って
+            # 「使われる理由」がある経路 (設計 doc §4.5)。
+            if f0_prior_residual:
+                self.f0_prior_res = nn.Conv1d(2, inter_channels, 1)
+                nn.init.zeros_(self.f0_prior_res.weight)
+                nn.init.zeros_(self.f0_prior_res.bias)
 
         # Speaker projection MLP for zero-shot speaker conditioning.
         # Replaces emb_g (nn.Embedding) -- all speaker conditioning now goes
@@ -1351,6 +1497,85 @@ class SynthesizerTrn(nn.Module):
         delta = self.spk_proj_dp(g_det.transpose(1, 2)).transpose(1, 2)
         return g_det + delta
 
+    def _get_f0_conditioning(self, g):
+        """v10b S-2: F0 predictor へ渡す話者条件を作る (M3 と同じ流儀)。
+
+        default (``f0_spk_grad=False``) は ``g.detach() + spk_proj_f0(g.detach())``
+        — F0 loss の勾配は ``spk_proj_f0`` にだけ流れ、``spk_proj`` 本体 / enc_p は
+        保護される。話者の音域は話者性そのものなので本体へ流すほうが類似度に
+        効く可能性はあるが、v10a の教訓 (spk_proj への余計な勾配圧力が prior
+        経路を壊しうる) を踏まえ、default は保護側に倒し ``--f0-spk-grad`` で
+        A/B できるようにする (設計 doc §4.2)。
+        """
+        if g is None or not hasattr(self, "spk_proj_f0"):
+            return g
+        base = g if self.f0_spk_grad else g.detach()
+        delta = self.spk_proj_f0(base.transpose(1, 2)).transpose(1, 2)
+        return base + delta
+
+    def _predict_f0(self, x, attn, y_mask, g):
+        """MAS/generate_path の attn で enc_p hidden を展開して F0 を予測する。
+
+        **入力を detach する理由** (default ``f0_detach_input=True``): 設計 doc
+        §4.2 は「F0 loss の勾配を spk_proj 本体に通さない」を default に置くが、
+        予測器の入力 ``x_frame`` は enc_p 出力であり、enc_p は ``g`` で条件付け
+        されている。従って入力を繋いだままだと勾配は
+        ``F0 loss → predictor → x_frame → enc_p → g → spk_proj`` という**裏口**
+        から本体に届き、保護の意図が成立しない (専用ヘッドを作った意味が消える)。
+        VITS の ``DurationPredictor`` が ``x = torch.detach(x)`` を無条件で行う
+        のと同じ理由で、default では入力側も切る。
+
+        F0 予測性能のために enc_p 側も学習させたい場合は
+        ``--f0-attach-predictor-input`` (=``f0_detach_input=False``) で opt-in
+        し、Phase D の optional arm で A/B する (FastPitch / FastSpeech 2 は
+        繋いだままなので、そちらが有利な可能性は残る)。
+
+        Returns ``(log_f0 [b,1,T_frames], vuv_logit [b,1,T_frames])``。
+        """
+        if self.f0_detach_input:
+            x = x.detach()
+        x_frame = torch.matmul(attn.squeeze(1), x.transpose(1, 2)).transpose(1, 2)
+        return self.f0_predictor(x_frame, y_mask, g=self._get_f0_conditioning(g))
+
+    def _apply_f0_prior_residual(self, m_p, log_f0, vuv_logit, y_mask):
+        """S-2r: 予測 F0 の zero-init 残差を展開済み ``m_p`` に足す。"""
+        if not hasattr(self, "f0_prior_res"):
+            return m_p
+        f0_cond = torch.cat([log_f0.detach(), torch.sigmoid(vuv_logit).detach()], dim=1)
+        return m_p + self.f0_prior_res(f0_cond) * y_mask
+
+    def _predicted_f0_hz(self, log_f0, vuv_logit, f0_scale: float = 1.0):
+        """予測 log F0 / V-UV を decoder が食う Hz 表現 (無声 = 0) に変換する。
+
+        ``log_f0`` は無拘束なので ``exp`` の前に [F0_MIN, F0_MAX] にクランプする
+        — 学習初期の外れ値が位相 cumsum を暴走させるのを防ぐ。``f0_scale`` は
+        Phase D の F0 シフト追従 ablation 用 (推論時のみ、default 1.0 = 恒等)。
+        """
+        f0 = torch.exp(log_f0.clamp(min=_F0_LOG_MIN, max=_F0_LOG_MAX))
+        if f0_scale != 1.0:
+            f0 = f0 * f0_scale
+        voiced = (torch.sigmoid(vuv_logit) > 0.5).to(f0.dtype)
+        return f0 * voiced
+
+    def _f0_for_decoder(self, f0_gt, log_f0, vuv_logit, f0_pred_prob):
+        """teacher forcing: GT F0 と予測 F0 をサンプル単位で混ぜる (§4.4)。
+
+        予測 F0 は **detach してから** decoder に渡す (FastPitch / FastSpeech 2
+        の標準) — mel/GAN の勾配が予測器を汚さず、予測器は純粋に GT 回帰で
+        学習する。混合はサンプル単位の Bernoulli で、注入値が graph を持たない
+        ため DDP の rank 間で選択がばらついても all-reduce は整合する。
+        """
+        f0_hat = self._predicted_f0_hz(log_f0, vuv_logit).detach()
+        if f0_gt is None:
+            return f0_hat
+        f0_gt = f0_gt.to(f0_hat.dtype)
+        if f0_pred_prob <= 0.0:
+            return f0_gt
+        if f0_pred_prob >= 1.0:
+            return f0_hat
+        use_pred = torch.rand(f0_hat.size(0), 1, 1, device=f0_hat.device) < f0_pred_prob
+        return torch.where(use_pred, f0_hat, f0_gt)
+
     def _prepare_prosody_input(self, x, x_mask, prosody_features, lid=None):
         """Prepare encoder output with prosody features for duration predictor.
 
@@ -1417,6 +1642,8 @@ class SynthesizerTrn(nn.Module):
         lid=None,
         prosody_features=None,
         speaker_embeddings=None,
+        f0=None,
+        f0_pred_prob: float = 0.0,
     ):
         g, g_spk, g_lang = self._get_global_conditioning(
             sid, lid, speaker_embeddings=speaker_embeddings, return_components=True
@@ -1489,6 +1716,15 @@ class SynthesizerTrn(nn.Module):
         # expand prior
         m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
         logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
+
+        # v10b S-2p/S-2r: frame 格子の F0 予測 → (opt-in) prior 残差。
+        # 残差は clamp の **前** に足す (下の clamp が最終 m_p を必ず縛る)。
+        f0_pred = None
+        if self.use_f0_path:
+            log_f0, vuv_logit = self._predict_f0(x, attn, y_mask, g)
+            f0_pred = (log_f0, vuv_logit)
+            m_p = self._apply_f0_prior_residual(m_p, log_f0, vuv_logit, y_mask)
+
         # Re-clamp after MAS expansion: at scratch init the random-init neg_cent
         # fed to `monotonic_align.maximum_path` can produce an attn whose rows
         # are effectively soft (multi-hot after Super-MAS dispatch or when
@@ -1504,7 +1740,13 @@ class SynthesizerTrn(nn.Module):
         z_slice, ids_slice = commons.rand_slice_segments(
             z, y_lengths, self.segment_size
         )
-        o, o_mb = self.dec(z_slice, g=g)
+
+        # v10b S-2a/S-2c: decoder に渡す F0 を z と同一区間にスライスする。
+        f0_decoder = None
+        if self.use_f0_path:
+            f0_full = self._f0_for_decoder(f0, f0_pred[0], f0_pred[1], f0_pred_prob)
+            f0_decoder = commons.slice_segments(f0_full, ids_slice, self.segment_size)
+        o, o_mb = self.dec(z_slice, g=g, f0=f0_decoder)
         return SynthesizerOutput(
             waveform=o,
             duration_loss=l_length,
@@ -1515,10 +1757,12 @@ class SynthesizerTrn(nn.Module):
             latents=(z, z_p, m_p, logs_p, m_q, logs_q),
             decoder_subbands=o_mb,
             flow_logdet=flow_logdet,
+            f0_pred=f0_pred,
+            f0_decoder=f0_decoder,
         )
 
     def scl_waveform_detached_z(
-        self, z, ids_slice, speaker_embeddings=None, sid=None, lid=None
+        self, z, ids_slice, speaker_embeddings=None, sid=None, lid=None, f0=None
     ):
         """SCL 専用の decoder re-forward (v10 roadmap B-3)。
 
@@ -1537,6 +1781,9 @@ class SynthesizerTrn(nn.Module):
             ``forward`` が返した slice 開始 index (frame 単位)
         speaker_embeddings / sid / lid
             ``forward`` に渡したものと同じ条件付け入力
+        f0 : torch.Tensor or None
+            v10b S-2: ``forward`` が decoder に渡した F0 スライス
+            (``SynthesizerOutput.f0_decoder``)。主経路と同一の位相参照を使う。
 
         Returns
         -------
@@ -1547,11 +1794,18 @@ class SynthesizerTrn(nn.Module):
         g = self._get_global_conditioning(
             sid, lid, speaker_embeddings=speaker_embeddings
         )
-        o, _ = self.dec(z_slice, g=g)
+        o, _ = self.dec(z_slice, g=g, f0=f0)
         return o
 
     def swap_scl_waveform(
-        self, z_p, y_mask, ids_slice, speaker_embeddings=None, sid=None, lid=None
+        self,
+        z_p,
+        y_mask,
+        ids_slice,
+        speaker_embeddings=None,
+        sid=None,
+        lid=None,
+        f0=None,
     ):
         """swap-SCL 用の flow 逆走 + decoder forward (v10 S1、ASCL 型)。
 
@@ -1596,7 +1850,7 @@ class SynthesizerTrn(nn.Module):
         else:
             z_swap = self.flow(z_p, y_mask, g=g, reverse=True)
         z_slice = commons.slice_segments(z_swap * y_mask, ids_slice, self.segment_size)
-        o, _ = self.dec(z_slice, g=g)
+        o, _ = self.dec(z_slice, g=g, f0=f0)
         return o
 
     def infer(
@@ -1611,6 +1865,7 @@ class SynthesizerTrn(nn.Module):
         max_len=None,
         prosody_features=None,
         speaker_embeddings=None,
+        f0_scale: float = 1.0,
     ) -> "InferOutput":
         """Run inference to synthesize audio from phoneme IDs.
 
@@ -1670,6 +1925,15 @@ class SynthesizerTrn(nn.Module):
         logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(
             1, 2
         )  # [b, t', t], [b, t, d] -> [b, d, t']
+
+        # v10b S-2: 推論時は常に予測 F0 (GT は存在しない)。学習の
+        # ``forward`` と同じ順序 — 予測 → prior 残差 → clamp。
+        f0_decoder = None
+        if self.use_f0_path:
+            log_f0, vuv_logit = self._predict_f0(x, attn, y_mask, g)
+            m_p = self._apply_f0_prior_residual(m_p, log_f0, vuv_logit, y_mask)
+            f0_decoder = self._predicted_f0_hz(log_f0, vuv_logit, f0_scale=f0_scale)
+
         # Match the training-time post-MAS clamp (see forward()) so ONNX
         # inference produces the same numerical range as training. In
         # inference w_ceil is always integer and attn is truly one-hot so
@@ -1687,7 +1951,11 @@ class SynthesizerTrn(nn.Module):
             z = self.flow(z_p, y_mask, g=g_lang, g_spk=g_spk, reverse=True)
         else:
             z = self.flow(z_p, y_mask, g=g, reverse=True)
-        dec_out = self.dec((z * y_mask)[:, :, :max_len], g=g)
+        dec_out = self.dec(
+            (z * y_mask)[:, :, :max_len],
+            g=g,
+            f0=None if f0_decoder is None else f0_decoder[:, :, :max_len],
+        )
         # Decoder returns (fullband, subbands) in training mode but only
         # fullband in onnx_export_mode. Extract fullband in both cases.
         o = dec_out[0] if isinstance(dec_out, tuple) else dec_out
@@ -1705,6 +1973,14 @@ class SynthesizerTrn(nn.Module):
         speaker_embeddings_tgt=None,
     ):
         assert self.n_speakers > 1, "n_speakers have to be larger than 1."
+        if self.use_f0_path:
+            # VC は enc_p を通らないため F0 predictor の入力 (展開済み text
+            # hidden) が存在しない。S-2 モデルでの VC は未対応 (v10c 以降)。
+            raise NotImplementedError(
+                "voice_conversion is not supported with use_f0_path=True: the "
+                "S-2 F0 predictor consumes expanded enc_p hidden states, which "
+                "the VC path never computes."
+            )
         g_src, g_spk_src, g_lang = self._get_global_conditioning(
             sid_src,
             lid,
