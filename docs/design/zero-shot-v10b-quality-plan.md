@@ -582,3 +582,46 @@ H-3/S-1a/S-1b/S-5 + cross-utt SupCon + detach-z (S-2 は smoke go/no-go 不合�
 (40 ckpt) + v10b-results/ (per-epoch 評価 JSON 23 + baseline) +
 onnx/v10b-zs-ep79.onnx (EMA 適用 FP16 38.8MB)。聴感サンプル: ローカル
 piper-v8-dataset-backup/v10b_listen_samples/ (つくよみ 3 + zs_ja 2)。
+
+## 10. 完走後の残存ノイズ診断 (2026-08-20、ローカル実測)
+
+聴感 (ユーザー): 「似ている度合いは上がったが、ざらつきはまだ残る (つくよみ /
+未知話者とも)」。EMA export 版でも同様。実測診断の結果:
+
+### 残存ざらつきの正体 = decoder 生成の高域ノイズ床 (6-11kHz)
+
+1kHz 刻み帯域プロファイル (voiced、GT 比):
+
+| 帯域 | 4-5k | 5-6k | 6-7k | 7-8k | 8-9k | 9-10k | **10-11k** |
+|---|---|---|---|---|---|---|---|
+| EMA 版 Δ vs GT | +0.5 | +2.4 | +4.5 | +9.8 | +10.4 | +8.5 | **+17.3dB** |
+
+- コム (金属的リンギング) は 1.09dB (GT 0.81) まで根治済み — 聴こえている
+  ざらつきは**旧 4-9kHz 指標の死角だった Nyquist 直下を含む広帯域ノイズ床**
+- noise_scale 0.4/0.2 でも不変 (推論ノブでは直らない = 学習構造の問題)
+
+### 主犯: --trainable-pqmf-synthesis のドリフト (新たな教訓)
+
+ep79 の合成フィルタは canonical から **rel-norm 42% ドリフト**し、周波数応答は
+**band3 (8.3-11kHz) を +6.9dB 増幅** (peak 1.0→2.22)、阻止帯域も -110dB →
+-39〜-66dB に劣化。**GAN が「制約のない学習可能フィルタ」を高域を盛る方向に
+使った** — frozen encoder / swap-SCL に続き、「制約のない自由度は損失の抜け道に
+使われる」系の 4 例目。canonical 初期化は保証にならず、PR (完全再構成)
+正則化なしの trainable filter は footgun と確定。
+
+外科的検証 (フィルタのみ canonical に戻して再 export): 10-11k +17.3→+11.8dB に
+部分改善するが 9-10k が +8.5→+17.2dB に悪化 = **decoder が band3 にノイズを
+生成しており、ドリフトしたフィルタと共適応済み**。post-hoc 修理は不可。
+
+### v10c (短期修理) の処方
+
+1. **--trainable-pqmf-synthesis を外す** (または PR 正則化を実装するまで封印)
+2. **高域 GT 参照ペナルティ**: 6-11kHz を重み付けした band-weighted MR-STFT 項
+   (GT 教師の回帰 loss なので契約 §2 例外に適合)。特に 9-11kHz の重みを厚く
+   (mel/既存 STFT loss はこの帯域に実質盲目)
+3. ckpt 資産: ep79 から decoder 系のみ再適応 (freeze 大半 + 数 epoch) で
+   足りるかは要検証 — decoder 本体が band3 ノイズ源のため from-scratch の
+   可能性も。smoke で A/B
+4. 聴感切り分けサンプル: `v10b_listen_samples/tsukuyomi_ema_lowpass_diag/`
+   (8.5kHz LPF、診断専用 — 後処理は製品解ではない)。これでざらつきが消えれば
+   高域ノイズ床が聴感の主犯と確定、残るなら A3 (調波間充填) も並走対策
