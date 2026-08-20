@@ -44,6 +44,11 @@ v3 (Phase A、docs/design/zero-shot-v10b-quality-plan.md §2) の追加:
   測定は素の出力 wav に対して行うこと (後処理禁止 — 契約 §2 禁止事項 5)。
   事前登録閾値 (plan §4.3) の pass/fail 判定はツールでは行わない (参考表示のみ
   — 判定は /eval-zs skill と /publish-model の責務)
+- **comb_hnr ブロック** (v10b 残存ノイズ診断 §1 の A3 直接測定、v3 への field
+  追加のみ・default ON): 1-3kHz の調波 bin vs 中間 bin パワー比 median
+  (measure_comb_hnr)。**出力自身の F0 トラックで測る** (GT/予測格子は
+  ±20 cent で崩壊 — v11 head 設計 §5.3)。アンカー: GT 13.2 / v10b ns0.667
+  4.6 / ns0.0 12.3 dB。--skip-acoustics で他ブロックと共に skip
 
 ``--baseline-json`` で過去の eval JSON と比較し、「primary (CAM++) だけ上がり
 第 2 encoder が追随しない」パターン (Phase 0 Arm B で実証された Goodhart) を
@@ -82,6 +87,7 @@ from piper_train.extract_speaker_embedding import extract_embedding, preprocess_
 from piper_train.tools import (
     measure_band_noise,
     measure_comb_artifacts,
+    measure_comb_hnr,
     measure_prosody,
 )
 from piper_train.tools.acoustic_frames import (
@@ -115,6 +121,7 @@ _ACOUSTIC_DELTA_KEYS = (
     ("comb", "synth", "hf_autocorr_lag256_median"),
     ("band", "synth", "voiced_hi_excess_db_median"),
     ("band", "delta", "shelf_voiced_max_delta_db"),
+    ("comb_hnr", "synth", "comb_hnr_db_median"),
 )
 
 
@@ -382,6 +389,16 @@ _PROSODY_PARAMS = {
     "hop": _AC_HOP,
 }
 
+_COMB_HNR_PARAMS = {
+    "band_hz": list(measure_comb_hnr.DEFAULT_BAND_HZ),
+    "n_fft": measure_comb_hnr.N_FFT,
+    "hop": measure_comb_hnr.HOP,
+    "pyin_fmin": measure_comb_hnr.PYIN_FMIN,
+    "pyin_fmax": measure_comb_hnr.PYIN_FMAX,
+    # 測定プロトコル pin: 出力自身の F0 トラック (GT/予測格子は ±20cent で崩壊)
+    "f0_track": "self",
+}
+
 
 def _median_or_none(values: list[float]) -> float | None:
     return float(np.median(values)) if values else None
@@ -393,6 +410,7 @@ def _analyze_clip_group(paths: list[Path]) -> dict:
     combs: list[dict] = []
     prosody: list[dict] = []
     hi_excess: list[float] = []
+    comb_hnrs: list[dict] = []
     for p in paths:
         try:
             wav = load_wav(p)
@@ -401,6 +419,9 @@ def _analyze_clip_group(paths: list[Path]) -> dict:
             prof = measure_band_noise.band_profile(fa) if fa is not None else None
             stats = measure_prosody.prosody_stats(fa) if fa is not None else None
             hi = measure_band_noise.voiced_high_band_excess(wav, _AC_SR)
+            # 診断 doc §1/§8 のアンカーと同一数値系を保つため FrameAnalysis は
+            # 再利用せず canonical 実装で測る (voiced 判定が energy gate 分違う)
+            hnr = measure_comb_hnr.comb_hnr(wav, _AC_SR)
         except Exception as exc:  # noqa: BLE001 — per-file 縮退 (§4.7【決定 D14】)
             _LOGGER.warning("acoustics analysis failed for %s: %s", p.name, exc)
             continue
@@ -412,11 +433,14 @@ def _analyze_clip_group(paths: list[Path]) -> dict:
             prosody.append(stats)
         if hi is not None:
             hi_excess.append(float(hi))
+        if hnr is not None:
+            comb_hnrs.append({"file": p.name, "comb_hnr_db": float(hnr)})
     return {
         "profiles": profiles,
         "combs": combs,
         "prosody": prosody,
         "hi_excess": hi_excess,
+        "comb_hnrs": comb_hnrs,
     }
 
 
@@ -437,8 +461,8 @@ def _comb_group_medians(entries: list[dict]) -> dict:
 
 def compute_acoustics_blocks(
     synth_files: list[Path], real_files: list[Path]
-) -> tuple[dict | None, dict | None, dict | None]:
-    """band / comb / prosody ブロック (synth vs real anchor) を計算する。
+) -> tuple[dict | None, dict | None, dict | None, dict | None]:
+    """band / comb / prosody / comb_hnr ブロック (synth vs real anchor) を計算する。
 
     real anchor = speaker-utts の cross set (exclude-ref 除外後)【決定 D11】。
     どちらかの群が全滅 (解析不能) したブロックは None (null 明示)。gate 適用は
@@ -484,7 +508,24 @@ def compute_acoustics_blocks(
             "delta": measure_prosody.prosody_delta(synth_pros, real_pros),
         }
 
-    return band, comb, prosody
+    comb_hnr: dict | None = None
+    if synth["comb_hnrs"] and real["comb_hnrs"]:
+        comb_hnr = {
+            "params": dict(_COMB_HNR_PARAMS),
+            "per_file": synth["comb_hnrs"],
+            "synth": {
+                "comb_hnr_db_median": _median_or_none(
+                    [e["comb_hnr_db"] for e in synth["comb_hnrs"]]
+                )
+            },
+            "real": {
+                "comb_hnr_db_median": _median_or_none(
+                    [e["comb_hnr_db"] for e in real["comb_hnrs"]]
+                )
+            },
+        }
+
+    return band, comb, prosody, comb_hnr
 
 
 # ---------------------------------------------------------------------------
@@ -576,7 +617,8 @@ def _print_acoustics(report: dict) -> None:
     """acoustics サマリ (§4.4)。事前登録値は参考表示のみで PASS/FAIL は出さない。"""
     print("--- acoustics (synth vs real anchor = speaker-utts) ---")
     band, comb, prosody = report.get("band"), report.get("comb"), report.get("prosody")
-    if band is None and comb is None and prosody is None:
+    comb_hnr = report.get("comb_hnr")
+    if band is None and comb is None and prosody is None and comb_hnr is None:
         print("n/a (--skip-acoustics or 解析不能)")
         return
     if comb is not None:
@@ -597,6 +639,15 @@ def _print_acoustics(report: dict) -> None:
         )
     else:
         print("comb_excess_db: n/a")
+    if comb_hnr is not None:
+        print(
+            "comb_hnr 1-3kHz median: "
+            f"synth {_fmt_plain(comb_hnr['synth']['comb_hnr_db_median'])} / "
+            f"real {_fmt_plain(comb_hnr['real']['comb_hnr_db_median'])} dB"
+            "   [アンカー: GT 13.2 / v10b ns0.667 4.6 / ns0.0 12.3。自 F0 トラック]"
+        )
+    else:
+        print("comb_hnr: n/a")
     if band is not None:
         shelf_v = band["delta"]["shelf_voiced_max_delta_db"]
         shelf_u = band["delta"]["shelf_unvoiced_max_delta_db"]
@@ -826,6 +877,7 @@ def main(argv: list[str] | None = None) -> int:
         "band": None,
         "comb": None,
         "prosody": None,
+        "comb_hnr": None,
         "manifest": None,
     }
     for name, encoder_path in encoders:
@@ -856,12 +908,16 @@ def main(argv: list[str] | None = None) -> int:
             "改善と報告しないこと (docs/spec/zs-eval-contract.md §3)"
         )
 
-    # E-1〜E-4: band / comb / prosody (default ON、real anchor = 除外後 cross set)
+    # E-1〜E-4 + comb_hnr: band / comb / prosody / comb_hnr (default ON、
+    # real anchor = 除外後 cross set)
     if not args.skip_acoustics:
-        band, comb, prosody = compute_acoustics_blocks(synth_files, cross_files)
+        band, comb, prosody, comb_hnr = compute_acoustics_blocks(
+            synth_files, cross_files
+        )
         report["band"] = band
         report["comb"] = comb
         report["prosody"] = prosody
+        report["comb_hnr"] = comb_hnr
 
     # E-5(i): manifest (ファイル名 + sha256 pin)
     report["manifest"] = {

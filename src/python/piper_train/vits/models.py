@@ -1228,6 +1228,12 @@ class SynthesizerTrn(nn.Module):
         # default True = F0 loss は predictor だけを学習させる (VITS の
         # DurationPredictor と同じ流儀)。詳細は ``_predict_f0`` の docstring。
         f0_detach_input: bool = True,
+        # --- v11 A′ (担体化 harmonic-plus-noise head。default off = v10b
+        # bit 互換。docs/design/zero-shot-v11-harmonic-head-design.md) ---
+        # use_f0_path=True が前提 (decoder 側で fail-fast)。有効時は S-2c
+        # (head 位相テンプレート concat) が担体で置換される。
+        use_carrier_head: bool = False,
+        carrier_harmonics: int = 32,
         # 位相格子の計算に必要な音響パラメータ
         sample_rate: int = 22050,
         hop_length: int = 256,
@@ -1263,6 +1269,7 @@ class SynthesizerTrn(nn.Module):
         self.onnx_export_mode = False
         self.use_snac_flow = use_snac_flow
         self.use_f0_path = use_f0_path
+        self.use_carrier_head = use_carrier_head
         self.f0_spk_grad = f0_spk_grad
         self.f0_detach_input = f0_detach_input
 
@@ -1297,6 +1304,8 @@ class SynthesizerTrn(nn.Module):
             f0_feat_channels=f0_feat_channels,
             f0_head_channels=f0_head_channels,
             f0_harmonics=f0_harmonics,
+            use_carrier_head=use_carrier_head,
+            carrier_harmonics=carrier_harmonics,
             sample_rate=sample_rate,
             f0_frame_hop=hop_length,
         )

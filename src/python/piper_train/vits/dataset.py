@@ -15,8 +15,8 @@ from torch.utils.data import Dataset
 
 _LOGGER = logging.getLogger("vits.dataset")
 
-# v10b S-2: F0 キャッシュと spectrogram のフレーム数差の許容幅。pyworld の
-# frame_period (ms 単位 double) と STFT フレーム規約の丸め差は実データで
+# v10b S-2: F0 キャッシュと spectrogram のフレーム数差の許容幅。F0 抽出器
+# (tools/extract_f0.py) の frame_period (ms 単位 double) と STFT フレーム規約の丸め差は実データで
 # 最大 ±3 frame (v10b smoke arm S2 実測)。それを端 trim/edge-pad で吸収する
 # 上限で、これを超える差は「別 hop で抽出した無効キャッシュ」として拒否する。
 _F0_FRAME_TOLERANCE = 4
@@ -265,7 +265,7 @@ class PiperDataset(Dataset):
 
         # v10b S-2: GT F0 (fp16 cache → fp32)。spectrogram とのフレーム数差は
         # 2 段階で扱う:
-        # - |差| <= _F0_FRAME_TOLERANCE: pyworld の frame_period (ms 単位 double)
+        # - |差| <= _F0_FRAME_TOLERANCE: F0 抽出器の frame_period (ms 単位 double)
         #   と STFT フレーム規約の丸め差 (実データで最大 ±3 を実測、v10b smoke
         #   arm S2) — 端の trim / edge-pad で吸収する。F0 は 11.6ms/frame の
         #   region-level 特徴で、端 ±4 frame (~46ms) の複製は voiced 境界の

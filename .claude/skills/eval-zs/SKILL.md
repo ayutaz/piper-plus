@@ -78,11 +78,47 @@ uv run python -m piper_train.tools.eval_zs_secs \
 | `band.synth.voiced_hi_excess_db_median` | 4-9kHz 旧指標 (互換維持) | ep69 baseline 比**非悪化** |
 | `prosody.synth.f0_std_hz` / `f0_range_p5_p95_hz` | 韻律の平板さ (絶対値) | **≥ 45Hz / ≥ 150Hz** (GT: 47-74 / 153-215Hz) |
 | `prosody.delta.*` | synth − real の記述統計差 (類似スコアではない) | 診断用 (負の f0_std delta = synth が平板) |
+| `comb_hnr.synth.comb_hnr_db_median` | 1-3kHz 調波 bin vs 中間 bin パワー比 (A3 = がびがびの主犯の直接測定) | v11 Phase D smoke: **≥ 10dB** (下のアンカー表で読む) |
 
 - gate は **synth 側のみ** (real/GT は文脈表示 — GT の per-file autocorr は 0.13
   まで出る)。測定は**素の出力 wav** (後処理禁止 — 契約 §2 禁止事項 5)
 - **教訓①**: これらのメトリクスを学習 loss に流用することは恒久禁止
   (契約 §2 禁止事項 4、pre-commit `zs-metric-isolation-gate` が機械 block)
+
+### 3.6 comb-HNR の読み方 (アンカー値表)
+
+`measure_comb_hnr` (eval JSON の `comb_hnr` ブロック)。1-3kHz の voiced フレームで
+調波 bin (k·F0) と中間 bin ((k+0.5)·F0) の平均パワー比 median [dB]。
+背景: [docs/design/zero-shot-v10b-residual-noise-diagnosis.md](../../../docs/design/zero-shot-v10b-residual-noise-diagnosis.md) §1/§8。
+
+| アンカー (22.05kHz / 1-3kHz / クリップ median、実測) | comb-HNR |
+|---|---|
+| GT (moe-speech 実音声) | **13.2 dB** |
+| v10b ns=0.0 (deterministic 骨格 — 構造は無罪の証拠) | 12.3 dB |
+| single-speaker FT (v7 系, n=3) | 11.6 dB |
+| teacher-forced recon (学習時に損失が見ていた波形) | 6.7 dB |
+| v10b ep79 EMA ns=0.667 (がびがび A3 残存) | **4.6 dB** |
+
+読み方:
+
+- **≥ 10dB ≈ 調波ロック獲得 (GT 級)** / **~5dB = A3 残存 (がびがび)**。
+  v11 Phase D smoke の事前登録 gate は「≥ 10dB を 400 batch までに」
+  (harmonic head 設計 §7 #2)
+- **必ず出力自身の F0 トラック (pyin) で測る** — GT/予測 F0 格子で測ると
+  ±20 cent の系統誤差で 18.7 → 0.7dB に崩壊する罠 (head 設計 §5.3)。
+  `eval_zs_secs` / `measure_comb_hnr` は自トラック固定 (`params.f0_track:
+  "self"`)。外部格子 (`comb_hnr_at_reference`) は oct↓ (サブハーモニック
+  挿入) 診断専用で gate 使用禁止
+- ns 掃引で単調に動く (0.667→0.0 で 4.8→12.3dB) ため、**比較は同一
+  noise_scale (meta-json pin) でのみ有効**
+
+### 3.7 seen 話者識別 (診断専用、go/no-go 不使用)
+
+`piper_train.tools.eval_seen_speaker_id` (v11 conditioning 設計 §6): seen 話者
+N 択識別 top-1 を raw / centered (両クラウド平均除去) で分離し、「条件付け
+経路が話者情報を運べているか」をアーキ診断する。参考: 実音声 raw 98.5% /
+v10a-r2 ep69 raw 43%・centered 73%。**go/no-go には使わない** (判定は上の
+4 点セット)。学習 loss への流用は恒久禁止。
 
 ### 4. 報告フォーマット
 

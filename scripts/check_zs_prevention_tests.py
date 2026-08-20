@@ -65,6 +65,7 @@ EXPECTED: dict[str, dict[str, str]] = {
         "cross_utt_secs": "cross-utterance SECS (same-utt 単独判定の禁止)",
         "above_ceiling": "録音特性複製シグナルの独立 flag (E-7(iii))",
         "manifest": "eval 入力の sha256 pin (E-5(i)、事前登録判定の固定)",
+        "comb_hnr": "A3 (1-3kHz 調波間ノイズ) 直接測定ブロックの v3 統合",
     },
     "docs/spec/zs-eval-contract.md": {
         "goodhart_flag": "評価契約に Goodhart 判定の定義があること",
@@ -88,6 +89,41 @@ EXPECTED: dict[str, dict[str, str]] = {
         "def voiced_high_band_excess": "v9 がびがび指標の互換維持 (歴史的 TSV との A/B)",
         "def band_profile": "1kHz 帯域ベクトル + 5.5-8.5kHz 照準値 (希釈の防止)",
         "EVAL-ONLY": "評価専用マーカー",
+    },
+    # --- v11 評価系 (Phase A レーン 2): comb-HNR (A3 直接測定) + seen-ID 診断 ---
+    "src/python/piper_train/tools/measure_comb_hnr.py": {
+        "def comb_hnr": (
+            "comb-HNR@1-3kHz — A3 調波間ノイズの直接測定 "
+            "(v10b 残存ノイズ診断 §1/§8 のアンカーと同一数値系)"
+        ),
+        "出力自身の F0": (
+            "測定プロトコル: 出力自身の F0 トラックで測る "
+            "(GT/予測格子は ±20cent で崩壊 — v11 head 設計 §5.3 deviation 4)"
+        ),
+        "def detect_octave_down": (
+            "サブハーモニック挿入 (oct↓ エラー) の検出 (f0 比主根拠)"
+        ),
+        "EVAL-ONLY": "評価専用マーカー (学習 loss 流用禁止の 1 層目)",
+    },
+    "src/python/piper_train/tools/eval_seen_speaker_id.py": {
+        "def identification_report": (
+            "raw + centered top-1 の分離 (ドメイン差 vs 話者同一性の切り分け、"
+            "v11 conditioning 設計 §6 の oracle プロトコル製品化)"
+        ),
+        "診断専用": (
+            "go/no-go 不使用の明記 — 本指標の gate 化は Goodhart 面 "
+            "(学習 loss 流用は frozen encoder gaming 事例 4 件により恒久禁止)"
+        ),
+        "EVAL-ONLY": "評価専用マーカー",
+    },
+    "src/python/tests/test_measure_comb_hnr.py": {
+        "def test_self_track_invariant_under_f0_cent_error": (
+            "±20cent 罠の再発防止 (自 F0 トラック測定プロトコルの機械 pin)"
+        ),
+        "def test_white_noise_near_zero_db": "ゼロ点校正 (dB スケールの絶対保証)",
+        "def test_harmonic_signal_first_principles": (
+            "ノイズパワー ×10 → -10dB の第一原理一致"
+        ),
     },
     "scripts/check_zs_metric_isolation.py": {
         "piper_train.vits": "学習コードからのメトリクス import 隔離 gate 本体",
@@ -125,6 +161,23 @@ EXPECTED: dict[str, dict[str, str]] = {
         ),
         "def test_classifier_trains_before_the_generator_term_ramps_in": (
             "C は step 0 から学習 / G 側のみ ramp (未学習 C を騙させない)"
+        ),
+    },
+    # --- v11 柱 2 (A2'): trainable PQMF synthesis の CLI 封印 ---
+    # v10b ep79 で GAN が制約なし合成フィルタを canonical から 42% ドリフト
+    # させ band3 +6.9dB の高域ノイズ床を作った (gaming 4 例目、残存ノイズ診断
+    # doc §3)。PR 正則化の実装まで CLI で封印 — 封印の解除は本 EXPECTED の
+    # 更新 + commit message での根拠明記を要する。
+    "src/python/piper_train/__main__.py": {
+        "_TRAINABLE_PQMF_SEAL_MSG": (
+            "--trainable-pqmf-synthesis の封印メッセージ本体 (argparse 段階の "
+            "fail-fast。黙った封印解除の検出)"
+        ),
+    },
+    "src/python/tests/test_v10b_decoder_cli.py": {
+        "def test_trainable_pqmf_synthesis_cli_is_sealed": (
+            "trainable PQMF synthesis の CLI 拒否テスト (gaming 4 例目の再発"
+            "防止 — 残存ノイズ診断 doc §3、PR 正則化実装までの封印)"
         ),
     },
     "src/python/tests/test_jcu_mrd.py": {
