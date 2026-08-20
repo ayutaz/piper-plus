@@ -4,7 +4,16 @@
 
     --upsample-mode {transposed,resize}   (H-1)
     --pqmf-taps INT                       (H-2b)
-    --trainable-pqmf-synthesis            (H-2b)
+    --trainable-pqmf-synthesis            (H-2b → v11 で CLI 封印)
+
+**v11 封印 (柱 2)**: ``--trainable-pqmf-synthesis`` は CLI で明示エラーになる。
+v10b ep79 で GAN が制約のない合成フィルタを canonical から rel-norm 42%
+ドリフトさせ band3 (8.3-11kHz) passband +6.9dB の高域ノイズ床を作った
+(制約なき自由度の gaming 4 例目、docs/design/zero-shot-v10b-residual-noise-
+diagnosis.md §3)。PR (perfect-reconstruction) 正則化を実装するまで封印。
+**PQMF クラスの trainable_synthesis 機能自体は維持**する (研究/オフライン
+検証用 — tests/test_pqmf_taps_trainable.py)。本ファイルは
+「クラス機能は維持 + CLI は拒否」の両面を pin する。
 
 **最重要の配線点**: ``lightning.py`` は GT analysis 用に自前で ``PQMF`` を作り
 ``self.model_g.dec.pqmf = self.pqmf`` で decoder のバンクを **上書きする**
@@ -40,12 +49,31 @@ class TestV10bDecoderCli:
         assert args.trainable_pqmf_synthesis is False
 
     def test_opt_in_flags_parse(self):
-        args = _parse_train_args(
-            ("--upsample-mode", "resize", "--pqmf-taps", "126", "--trainable-pqmf-synthesis")
-        )
+        args = _parse_train_args(("--upsample-mode", "resize", "--pqmf-taps", "126"))
         assert args.upsample_mode == "resize"
         assert args.pqmf_taps == 126
-        assert args.trainable_pqmf_synthesis is True
+
+    def test_trainable_pqmf_synthesis_cli_is_sealed(self, capsys):
+        """v11 柱 2: --trainable-pqmf-synthesis は CLI で明示エラー (封印)。
+
+        「unrecognized arguments」ではなく、gaming 4 例目の実測 (診断 doc §3)
+        と封印解除条件 (PR 正則化の実装) を引用した専用メッセージで拒否する。
+        argparse action レベルで落とすため、main() の後段 validation に
+        依存せず ``create_parser().parse_args`` 単体で再現できる。
+        """
+        with pytest.raises(SystemExit):
+            _parse_train_args(("--trainable-pqmf-synthesis",))
+        err = capsys.readouterr().err
+        assert "sealed" in err
+        assert "zero-shot-v10b-residual-noise-diagnosis" in err, (
+            "封印メッセージが診断 doc §3 (gaming 4 例目) を引用していない"
+        )
+        assert "regulariz" in err, "封印解除条件 (PR 正則化の実装) の明記がない"
+
+    def test_sealed_flag_default_stays_false_for_downstream(self):
+        """封印後も dest は default False で残る (dict_args → VitsModel の
+        ``trainable_pqmf_synthesis=False`` 経路が壊れない)。"""
+        assert _parse_train_args().trainable_pqmf_synthesis is False
 
     def test_invalid_upsample_mode_rejected_by_argparse(self):
         with pytest.raises(SystemExit):
