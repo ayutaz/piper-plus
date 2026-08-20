@@ -19,6 +19,15 @@ class Encoder(nn.Module):
         p_dropout: float = 0.0,
         window_size: int = 4,
         drop_rel_v: bool = False,
+        # v11 P2 (--use-adaln-encp): 各層の LayerNorm 出力を話者条件で変調する
+        # AdaLN-Zero。0 (default) は無効 = 従来経路と bit 互換 / 新規パラメータ
+        # なし。> 0 で共有低ランク trunk (adaln_gin_channels → adaln_rank) +
+        # per-norm zero-init head (adaln_rank → 2·hidden) を構築し、forward の
+        # ``g_adaln`` から γ̂/β̂ を発話あたり 1 回計算して
+        # ``x = LN(x)·(1+γ̂) + β̂`` を各 norm 直後に適用する。zero-init head に
+        # より on 直後は素の LN と bit 一致 (conditioning 設計 doc §5.1 a-1)。
+        adaln_gin_channels: int = 0,
+        adaln_rank: int = 128,
         **kwargs,
     ):
         super().__init__()
@@ -66,7 +75,29 @@ class Encoder(nn.Module):
             )
             self.norm_layers_2.append(LayerNorm(hidden_channels))
 
-    def forward(self, x, x_mask, cond=None, cond_layer_idx=None):
+        # v11 P2: AdaLN trunk + heads (2 norm/層 × n_layers 本)。head は
+        # zero-init (γ̂=β̂=0 → 恒等)、trunk は通常 init (head のゼロが恒等を
+        # 保証するため対称性破りは trunk 側に残してよい)。
+        self.adaln_heads = None
+        if adaln_gin_channels > 0:
+            self.adaln_trunk = nn.Sequential(
+                nn.Conv1d(adaln_gin_channels, adaln_rank, 1),
+                nn.GELU(),
+            )
+            self.adaln_heads = nn.ModuleList()
+            for _i in range(2 * self.n_layers):
+                head = nn.Conv1d(adaln_rank, hidden_channels * 2, 1)
+                nn.init.zeros_(head.weight)
+                nn.init.zeros_(head.bias)
+                self.adaln_heads.append(head)
+
+    @staticmethod
+    def _apply_adaln(x, mod):
+        """AdaLN-Zero 変調: ``x·(1+γ̂) + β̂`` (mod = [b, 2h, 1]、γ̂ が先)。"""
+        gamma, beta = mod.split(mod.size(1) // 2, dim=1)
+        return x * (1.0 + gamma) + beta
+
+    def forward(self, x, x_mask, cond=None, cond_layer_idx=None, g_adaln=None):
         """x を n_layers 段の self-attention + FFN に通す。
 
         cond / cond_layer_idx (v10 M2, ``--speaker-cond-layer``):
@@ -74,7 +105,18 @@ class Encoder(nn.Module):
         時間軸 broadcast) を第 N 層の入口で加算する — self-attention が
         話者情報を見られるようにする VITS2 同構成の注入位置。
         default (両方 None) は従来経路と bit 互換。
+
+        g_adaln (v11 P2, ``--use-adaln-encp``): AdaLN 条件 [b, gin, 1]。
+        構築時に ``adaln_gin_channels > 0`` の場合のみ有効で、各 LayerNorm
+        直後に ``x·(1+γ̂(g)) + β̂(g)`` を適用する。None (default) または
+        AdaLN 未構築なら素の LN のまま (bit 互換)。M2 (cond) とは独立に共存
+        する (重複の要否は smoke A/B — conditioning 設計 doc §10.5)。
         """
+        adaln_mods = None
+        if g_adaln is not None and self.adaln_heads is not None:
+            # 発話あたり 1 回 (時間軸 broadcast) — RTF への影響 ≈ 0
+            trunk = self.adaln_trunk(g_adaln)
+            adaln_mods = [head(trunk) for head in self.adaln_heads]
         attn_mask = x_mask.unsqueeze(2) * x_mask.unsqueeze(-1)
         x = x * x_mask
         for i, (attn_layer, norm_layer_1, ffn_layer, norm_layer_2) in enumerate(
@@ -96,10 +138,14 @@ class Encoder(nn.Module):
             y = attn_layer(x, x, attn_mask)
             y = self.drop(y)
             x = norm_layer_1(x + y)
+            if adaln_mods is not None:
+                x = self._apply_adaln(x, adaln_mods[2 * i])
 
             y = ffn_layer(x, x_mask)
             y = self.drop(y)
             x = norm_layer_2(x + y)
+            if adaln_mods is not None:
+                x = self._apply_adaln(x, adaln_mods[2 * i + 1])
         x = x * x_mask
         return x
 
