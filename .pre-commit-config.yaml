@@ -894,7 +894,7 @@ repos:
         name: zero-shot prevention tests / eval guards intact
         entry: uv run --no-sync python scripts/check_zs_prevention_tests.py
         language: system
-        files: ^src/python/tests/test_(scl_differentiable|v10_structure|v10_speaker_signal|eval_zs_secs|measure_comb_artifacts|measure_prosody|measure_band_noise|adv_spk_classifier|jcu_mrd)\.py$|^src/python/piper_train/tools/(eval_zs_secs|measure_band_noise|measure_comb_artifacts|measure_prosody|acoustic_frames)\.py$|^src/python/piper_train/vits/losses\.py$|^docs/spec/zs-eval-contract\.md$|^\.claude/hooks/guard-bash\.sh$|^scripts/check_zs_(prevention_tests|metric_isolation)\.py$
+        files: ^src/python/tests/test_(scl_differentiable|v10_structure|v10_speaker_signal|eval_zs_secs|measure_comb_artifacts|measure_prosody|measure_band_noise|adv_spk_classifier|jcu_mrd)\.py$|^src/python/piper_train/tools/(eval_zs_secs|measure_band_noise|measure_comb_artifacts|measure_comb_hnr|measure_prosody|acoustic_frames|eval_seen_speaker_id)\.py$|^src/python/piper_train/vits/losses\.py$|^docs/spec/zs-eval-contract\.md$|^\.claude/hooks/guard-bash\.sh$|^scripts/check_zs_(prevention_tests|metric_isolation)\.py$
         pass_filenames: false
 
       # 教訓① (評価器の目的化 = 検出器の喪失) の機械的強制。学習コード
@@ -907,7 +907,7 @@ repos:
         name: zero-shot eval metrics isolated from training code
         entry: uv run --no-sync python scripts/check_zs_metric_isolation.py
         language: system
-        files: ^src/python/piper_train/(vits/.*\.py|__main__\.py|tools/(measure_band_noise|measure_comb_artifacts|measure_prosody|acoustic_frames|eval_zs_secs)\.py)$|^scripts/check_zs_metric_isolation\.py$
+        files: ^src/python/piper_train/(vits/.*\.py|__main__\.py|tools/(measure_band_noise|measure_comb_artifacts|measure_comb_hnr|measure_prosody|acoustic_frames|eval_zs_secs|eval_seen_speaker_id)\.py)$|^scripts/check_zs_metric_isolation\.py$
         pass_filenames: false
 
       # gofmt drift catch. Go's tooling already enforces this in CI, but

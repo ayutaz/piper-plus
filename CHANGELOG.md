@@ -50,6 +50,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **v11 Phase A (opt-in、default は v10b 互換)**: `--use-carrier-head` (A′
+  担体化 harmonic-plus-noise head — band0/1 の voiced 調波を F0 位相テンプレート
+  担体からのみ描画、noise 枝は log σ 9ch。がびがび (A3) の構造保証、敵対的
+  ゲインでも comb-HNR 42dB を初期化直後に達成) / `--c-hiband-stft` (6-11kHz
+  band-weighted GT 参照 MR-STFT — 高域ノイズ床 A2' 対策) / `--film-free-scale`
+  (P0: FiLM scale の sigmoid [0.5,1.5] 制限を 1+γ̂ に開放 — 飽和貼り付きの実測
+  に基づく) / `--c-src-reg`+`--src-reg-tau` (L_src hinge、事前登録の緩和策)。
+  評価系: `tools/measure_comb_hnr` (調波間ノイズのゲーム不能量、出力自身の
+  F0 トラックで測定) + `tools/eval_seen_speaker_id` (seen 話者 N 択識別、
+  診断専用) + eval_zs_secs への comb_hnr ブロック統合
 - **v10b S-2 F0 明示経路 (opt-in、default は現行 bit 互換)**: `--use-f0-path` で
   frame prior からの F0+V/UV 予測 (GT frame-level F0 回帰 — 評価契約 §2 の明示
   例外形) + decoder への 2 点注入 (frame 格子 F0/VUV concat + **head 格子
@@ -249,6 +259,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_eval_zs_secs.py`.
 
 ### Changed
+
+- **`--trainable-pqmf-synthesis` を封印 (CLI で明示エラー)**: v10b 本走で GAN が
+  合成フィルタを band3 +6.9dB 増幅へドリフトさせた実測 (残存ノイズ診断 doc §3、
+  「制約なき自由度の gaming」4 例目) に基づく。PR 正則化の実装まで解除しない。
+  PQMF クラスの機能自体は維持 (テスト互換)
 
 - **`--spk-emb-noise-sigma` default changed from `0.05` to `0.0`**
   (training-CLI behaviour change): σ=0.05 is ~500x the Latent Filling

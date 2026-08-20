@@ -66,9 +66,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 METRIC_MODULES: tuple[str, ...] = (
     "measure_band_noise",
     "measure_comb_artifacts",
+    "measure_comb_hnr",
     "measure_prosody",
     "acoustic_frames",
     "eval_zs_secs",
+    "eval_seen_speaker_id",
 )
 
 _METRIC_ALT = "|".join(METRIC_MODULES)
