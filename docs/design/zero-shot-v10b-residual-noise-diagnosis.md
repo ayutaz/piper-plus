@@ -1,7 +1,8 @@
 # v10b 残存ノイズ (がびがび) 診断レポート — 3 層構造の確定 (2026-08-20)
 
-> **Status**: 診断確定 (聴感 × 測定の突き合わせ完了)。deep-research による追加
-> 検証が本 doc の §6 (未検証仮説) を対象に進行中。
+> **Status**: **診断完了 (deep-research 検証済み、2026-08-20)**。§6 の仮説
+> 5 点は 6 エージェント (判別実験 3 + 文献 2 + 敵対的統合 1) で全て判定済み —
+> **A3 の機序は「推論時 prior ノイズ ε の非調波ロック描画 + 経路盲目」と確定**。
 > 関連: [`zero-shot-v10b-quality-plan.md`](zero-shot-v10b-quality-plan.md) §9-10
 > (v10b 本走結果) / [`zero-shot-noise-root-cause-pqmf.md`](zero-shot-noise-root-cause-pqmf.md)
 > (v9 コム根治の canonical) / [`zero-shot-v10b-s2-f0-design.md`](zero-shot-v10b-s2-f0-design.md)
@@ -81,35 +82,50 @@ v10b 完走モデル (ep79 EMA) の聴感「まだざらつき・がびがびが
   表現できず、調波は「frame 間位相の整合」としてのみ存在する。head の位相
   整合誤差がそのまま調波間ノイズになる【実測 (コード) + 推測】
 
-## 5. 対策の帰結 — v11 で 3 本柱が 1 本の線につながった
+## 5. 対策の帰結 — v11 で 3 本柱が 1 本の線につながった (2026-08-20 deep-research 反映)
 
-1. **A3 の本修理 = F0 明示経路の「無視できない配線」** (S-2 の本来の狙い)。
-   v10b smoke で「decoder が F0 を無視する」(シフト追従率 0.0) 失敗を確認済み
-   のため、オプション特徴の追加ではなく**励振を担体として飲み込ませる
-   source-filter 型** (または prior 残差の強制) で再設計する【推測、v11 設計対象】
-2. A2' の修理 = trainable filter 除去 + 高域重み付き GT 参照 loss
-3. 話者類似の壁 (0.60 plateau) = 条件付け経路の容量改修 (oracle 診断 §8 の帰結)
+1. **A3 の本修理 = 担体化 harmonic-plus-noise head** (S-2c の拡張)。§6 の検証で
+   A3 の機序が「推論時 prior ノイズ ε の非調波ロック描画 + 全損失が recon 経路
+   のみ監督 (経路盲目) で ε に圧力ゼロ」と確定したため、損失ベースの対策は
+   原理的に届かず、**構造保証**が唯一の直撃手段: head の voiced 帯域出力を
+   「S-2c 位相テンプレートへの複素ゲイン + VUV ゲート付き noise 枝」に制限する
+   (NSF/uSFGAN/SiFi-GAN の担体化系譜。concat 注入は SiFi-GAN baseline で崩壊が
+   実証済み = v10b smoke シフト追従率 0.0 と同型)【実測+文献】。
+   **noise 枝バイパス対策 (VUV ゲート + uSFGAN 型 source 正則化) は同梱必須** —
+   band0 テンプレート被覆 83% の残り 17% が新たな gaming 自由度になり得る
+   (trainable PQMF と同型のリスク)【実測+推測】。
+   次点: posterior F0 分離 (SiFiSinger 型、z から音高を奪う) — E2E VITS での
+   励振無視根治の公刊実績はこちらが上だが全再学習が必要、§5-3 と一括なら候補。
+   暫定緩和: ns default 引き下げ (0.2 で A3 差 -2.2dB) は A1 悪化 (1.09→2.83dB)
+   + 韻律平板化とのトレードオフのため聴感 A/B 通過が条件【実測】。
+2. A2' の修理 = trainable filter 除去 + 高域重み付き GT 参照 loss (変更なし)
+3. 話者類似の壁 (0.60 plateau) = 条件付け経路の容量改修 (変更なし)。
+   H-E 再定式化 (§6) により A3 とも接続: multi-spk zero-shot で ε の調波ロック
+   描画が獲得されない問題は条件付けの弱さと同根の可能性【推測】
 
-3 つとも decoder / アーキテクチャの改修であり、v11 として一括設計する。
+## 6. 仮説検証結果 (deep-research 完了、2026-08-20)
 
-## 6. 未検証仮説 (deep-research の対象)
+5 系統 (M1: FT モデル判別 / M2: noise_scale 判別 / M3: 損失分解能 /
+R1: iSTFT 位相文献 / R2: source-filter 配線文献) + 敵対的統合の判定:
 
-A3 の機序について、以下は**まだ検証されていない**:
+| 仮説 | 判定 | 根拠 |
+|---|---|---|
+| **H-A: head 構造限界説** | **棄却** (強形) | v10b 本体が ns=0.0 で comb-HNR 12.28dB = GT 級 (GT 13.29)【実測】。同型 head の single-speaker FT (v7 系 zs-FT で代替、n=3) も 11.61dB【実測】。弱形「保証機構なし → 条件付けが弱い zero-shot で最初に破綻する自由度」は存続 (iSTFTNet C8C8I 同 regime、Vocos periodicity 最悪値、CARGAN)【文献】 |
+| **H-B: z ノイズ説** | **確定** (エネルギー源として) | ns 用量反応 0.667/0.4/0.2/0.0 → 4.77/6.13/11.07/12.28dB (単調、-8.6dB 差のほぼ全量)【実測】。限定: 同じ ε でも FT は 11.6dB を出す (ns=0.4 マッチド比較) → 病理は「ε の非調波ロック描画」であり ε の存在自体ではない【実測】 |
+| **H-C: 損失盲目説** | **原形棄却 → 「経路盲目」に再定式化して確定** | 周波数分解能は十分 (F0~300 の谷 150Hz を mel/full-STFT/MRD が分解可能)【算術】。真の盲目 = 学習時 decoder は posterior z のみ decode (`models.py` L1740-1749、コード検証済)、推論時 prior ε は全損失の監督外。A3 が ε にのみ存在 (H-B) + 配線事実 → どの損失も A3 を罰し得なかったと演繹確定。**H-3 hires MRD 無効の説明もこれ** (D の入力 = 綺麗な recon → 勾配ゼロ)。副次: c_mel は F0≲175Hz 話者の 2-3kHz に盲目 (圧力希釈)【算術】 |
+| **H-D: 位相損失欠如説** | **棄却** (A3 の原因として) | deterministic 経路は位相損失なしで GT 級の位相整合を達成済み (ns=0.0)【実測】。文献の anti-wrapping loss は bin 幅 < F0 の full-resolution head 専用 (APNet/APNet2/NSPP) で n_fft=16 subband head に適用対象なし【文献】。head 全面改修 (Vocos/APNet2 型) 時の設計指針としてのみ有効 |
+| **H-E: multi-speaker 希釈説** | **原形棄却 → 再定式化して部分確定、機序は未決** | 「調波構造がぼやける」は ns=0.0 GT 級で棄却【実測】。FT/multi-spk 差はマッチド ns で実在 (11.61 vs 6.13dB) → 「multi-spk zero-shot は ε の調波ロック描画を獲得しない (FT は獲得する)」に再定式化【実測】。希釈 (平均化) vs 条件付け容量の切り分けは未実施 — v11 条件付け改修 (§5-3) の検証項目に接続 |
 
-- **H-A: head 構造限界説** — bin 幅 344.5Hz の iSTFT head では位相整合の学習が
-  原理的に困難。反証可能: 同一 head 構造の single-speaker FT モデル
-  (tsukuyomi MB-iSTFT FT) が GT 級の comb-HNR を出すなら、構造ではなく
-  学習信号/条件付けの問題
-- **H-B: z ノイズ説** — posterior/prior の stochastic z が調波間ノイズとして
-  透過する。noise_scale 掃引で帯域プロファイルは不変だったが comb-HNR は
-  未測定 (掃引サンプルはローカルにあり測定可能)
-- **H-C: 損失盲目説** — mel (80 bins) の 1-3kHz でのフィルタ幅と調波間隔の
-  関係で、mel loss が調波間ノイズを分解できない。MRD hires が効かなかった
-  事実との整合の説明が必要
-- **H-D: 位相損失欠如説** — magnitude 系 loss のみで位相整合への直接圧力が
-  無い (anti-wrapping phase loss 等の文献対策の適用可能性)
-- **H-E: multi-speaker 希釈説** — 3.7k 話者の平均化で調波構造がぼやける
-  (FT で消える A1 の前例と同型)
+**確定した A3 の因果連鎖**: 推論時 prior ノイズ ε (ns·N(0,1) → flow 逆変換) を
+decoder が調波非ロックの広帯域ノイズとして 1-3kHz 調波間に描画する。
+deterministic 骨格は無罪。ε 描画は経路盲目により学習圧力ゼロ。single-speaker
+FT は decoder 補償でロックを獲得、zero-shot multi-spk では獲得されない。
+
+残タスク (安価、結論を左右しない確認): (i) teacher-forced recon 波形の
+comb-HNR 測定 (GT 級の予測 — v10c 着手前に演繹の残穴を塞ぐ)、(ii) v11 評価
+セットに低 F0 話者を 1 名追加 (全測定が F0~300Hz 素材のため、c_mel 盲目域の
+A3 実態が未測定)、(iii)「v10b からの FT でも ε ロックを獲得するか」は担体化
+head の Phase D smoke が事実上兼ねる。
 
 ## 7. 資産
 
@@ -121,3 +137,12 @@ A3 の機序について、以下は**まだ検証されていない**:
   `piper_train.tools` 未収載 — v10c で E 系に追加予定)
 - モデル: HF `ayousanz/piper-plus-zero-shot-multi-7lang-v8`
   (`checkpoints-v10b/` + `onnx/v10b-zs-ep79.onnx`)
+- deep-research 測定 (2026-08-20): comb-HNR スクリプト + FT/ns 掃引合成 wav は
+  session scratchpad (`noise_dr/` 等) — **セッション限定のため、v10c で
+  comb-HNR を `piper_train.tools` に E 系メトリクスとして収載する際に移植**
+- 代替 FT モデル: HF `ayousanz/piper-plus-zero-shot-tsukuyomi`
+  (`tsukuyomi-ft-epoch499-zs.onnx`、v7 系 = pre-v9 PQMF + FiLM の交絡あり)
+- 文献アンカー: iSTFTNet 2203.02395 / MB-iSTFT-VITS 2210.15975 / Vocos
+  2306.00814 / APNet2 2311.11545 / CARGAN 2110.10139 / NSF 1904.12088 /
+  uSFGAN 2104.04668 / SiFi-GAN 2210.15533 / HiFTNet 2309.09493 /
+  VISinger2 2211.02903 / SiFiSinger 2410.12536
