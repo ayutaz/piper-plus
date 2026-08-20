@@ -50,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **v11 条件付け改修 (Phase 0 診断準拠、opt-in、default は v10b 互換)**:
+  `--use-adain-decoder` (P3: decoder resblock への zero-init AdaIN、s1 重心
+  s1×3+s2×1 — 律速の主座 [SECS 損失の 78%] への直撃) / `--use-adaln-encp`
+  (P2: enc_p LayerNorm 12 本の AdaLN-Zero 化、trunk 入力は g_spk のみで
+  g_lang 干渉を分離 [P0-4]) / `--no-snac-stats` (P5: SNAC 統計注入の除去
+  -394k param、LOO で無害と実測) / `--telemetry-every` (D-2 変調テレメトリ
+  常設 — 話者依存分散比で SNAC 型死荷重を検知可能に)
 - **v11 Phase A (opt-in、default は v10b 互換)**: `--use-carrier-head` (A′
   担体化 harmonic-plus-noise head — band0/1 の voiced 調波を F0 位相テンプレート
   担体からのみ描画、noise 枝は log σ 9ch。がびがび (A3) の構造保証、敵対的

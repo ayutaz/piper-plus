@@ -303,6 +303,12 @@ class TextEncoder(nn.Module):
         # 互換)。N>=1 で加算を attentions.Encoder の第 N 層入口に移動する
         # (後段加算は行わない)。v10 推奨値 3 (VITS2 同構成、F3)。
         speaker_cond_layer: int = 0,
+        # v11 P2 (--use-adaln-encp): transformer 全層の LayerNorm (2 本/層) を
+        # AdaLN-Zero 化する (共有低ランク trunk + per-norm zero-init head、
+        # conditioning 設計 doc §5.1 a-1 / §10.5)。zero-init で on 直後は素の
+        # LN と bit 一致。M2 (speaker_cond_layer の加算 bias) とは独立 flag で
+        # 共存する。default off = v10b bit 互換 / 新規パラメータなし。
+        use_adaln: bool = False,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -320,6 +326,12 @@ class TextEncoder(nn.Module):
                 f"got {speaker_cond_layer}"
             )
         self.speaker_cond_layer = speaker_cond_layer
+        if use_adaln and gin_channels == 0:
+            raise ValueError(
+                "use_adaln=True requires gin_channels > 0: the AdaLN "
+                "trunk consumes the projected speaker condition g_spk."
+            )
+        self.use_adaln = use_adaln
 
         self.emb = nn.Embedding(n_vocab, hidden_channels)
         nn.init.normal_(self.emb.weight, 0.0, hidden_channels**-0.5)
@@ -332,13 +344,14 @@ class TextEncoder(nn.Module):
             kernel_size,
             p_dropout,
             drop_rel_v=attn_drop_rel_v,
+            adaln_gin_channels=gin_channels if use_adaln else 0,
         )
         self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
 
         if gin_channels != 0:
             self.cond_layer = nn.Conv1d(gin_channels, hidden_channels, 1)
 
-    def forward(self, x, x_lengths, g=None):
+    def forward(self, x, x_lengths, g=None, g_spk=None):
         x = self.emb(x) * math.sqrt(self.hidden_channels)  # [b, t, h]
         x = torch.transpose(x, 1, -1)  # [b, h, t]
         x_mask = torch.unsqueeze(
@@ -349,6 +362,14 @@ class TextEncoder(nn.Module):
         if g is not None and hasattr(self, "cond_layer"):
             cond = self.cond_layer(g)
 
+        # v11 P2 + P0-4: AdaLN trunk への入力は **g_spk (話者成分) のみ** —
+        # g (= g_spk + g_lang) を渡さない。Phase 0 D-2 で cos(g_spk, g_lang)
+        # = −0.56 (spk_proj が lang 打ち消しに容量を消費) が実測されており、
+        # lang を含めると AdaLN が言語変調に容量を割いて lang/spk 干渉を
+        # 再生産する。lang 条件は従来どおり cond (加算) 経路が運ぶ
+        # (conditioning 設計 doc §10.5 P0-4: 干渉分離の第一歩)。
+        g_adaln = g_spk if self.use_adaln else None
+
         if cond is not None and self.speaker_cond_layer >= 1:
             # v10 M2: 第 N 層入口注入 (後段加算は行わない) — self-attention が
             # 話者情報を見られるようになる (F3 の修正)
@@ -357,9 +378,10 @@ class TextEncoder(nn.Module):
                 x_mask,
                 cond=cond,
                 cond_layer_idx=self.speaker_cond_layer,
+                g_adaln=g_adaln,
             )
         else:
-            x = self.encoder(x * x_mask, x_mask)
+            x = self.encoder(x * x_mask, x_mask, g_adaln=g_adaln)
             if cond is not None:
                 x = (x + cond) * x_mask
         stats = self.proj(x) * x_mask
@@ -381,6 +403,9 @@ class ResidualCouplingBlock(nn.Module):
         # v10 M1 (--use-snac-flow): coupling を SNAC 化し、forward で
         # (x, logdet) を返す。default False は従来 API / 従来経路と bit 互換。
         use_snac: bool = False,
+        # v11 P5 (--no-snac-stats → snac_stats=False): SN/SDN 統計注入のみを
+        # 除去 (sn_linear 非構築、−394k param)。flow 構造・logdet API は不変。
+        snac_stats: bool = True,
     ):
         super().__init__()
         self.channels = channels
@@ -391,6 +416,7 @@ class ResidualCouplingBlock(nn.Module):
         self.n_flows = n_flows
         self.gin_channels = gin_channels
         self.use_snac = use_snac
+        self.snac_stats = snac_stats
 
         self.flows = nn.ModuleList()
         for _i in range(n_flows):
@@ -404,6 +430,7 @@ class ResidualCouplingBlock(nn.Module):
                     gin_channels=gin_channels,
                     mean_only=True,
                     use_snac=use_snac,
+                    snac_stats=snac_stats,
                 )
             )
             self.flows.append(modules.Flip())
@@ -1203,6 +1230,14 @@ class SynthesizerTrn(nn.Module):
         # M1+E2: flow coupling の SNAC 化 (SN/SDN は話者成分のみ、
         # WN の gin 条件付けは lang 成分のみ)
         use_snac_flow: bool = False,
+        # v11 P2 (--use-adaln-encp): enc_p transformer の LayerNorm 12 本を
+        # AdaLN-Zero 化 (trunk 入力は g_spk のみ — P0-4 の lang 干渉分離)。
+        # default off = v10b bit 互換
+        use_adaln_encp: bool = False,
+        # v11 P5 (--no-snac-stats → snac_stats=False): SNAC の SN/SDN 統計
+        # 注入のみを恒等化 (sn_linear 非構築、−394k param)。use_snac_flow=True
+        # の時のみ意味を持つ。default True = v10b 互換
+        snac_stats: bool = True,
         # E1: dec FiLM (cond_layers) の zero-init を N(0, std) に置換
         # (0.0 = 従来の zero-init)
         film_init_std: float = 0.0,
@@ -1234,6 +1269,10 @@ class SynthesizerTrn(nn.Module):
         # (head 位相テンプレート concat) が担体で置換される。
         use_carrier_head: bool = False,
         carrier_harmonics: int = 32,
+        # --- v11 P3 (--use-adain-decoder。default off = v10b bit 互換。
+        # conditioning 設計 doc §5.1 a-2 / §10.5) ---
+        # decoder resblock 単位の zero-init 残差 AdaIN (s1 重心レイアウト)。
+        use_adain_decoder: bool = False,
         # 位相格子の計算に必要な音響パラメータ
         sample_rate: int = 22050,
         hop_length: int = 256,
@@ -1268,8 +1307,10 @@ class SynthesizerTrn(nn.Module):
         self.use_sdp = use_sdp
         self.onnx_export_mode = False
         self.use_snac_flow = use_snac_flow
+        self.use_adaln_encp = use_adaln_encp
         self.use_f0_path = use_f0_path
         self.use_carrier_head = use_carrier_head
+        self.use_adain_decoder = use_adain_decoder
         self.f0_spk_grad = f0_spk_grad
         self.f0_detach_input = f0_detach_input
 
@@ -1285,6 +1326,7 @@ class SynthesizerTrn(nn.Module):
             gin_channels=gin_channels,
             attn_drop_rel_v=attn_drop_rel_v,
             speaker_cond_layer=speaker_cond_layer,
+            use_adaln=use_adaln_encp,
         )
         self.dec = MBiSTFTGenerator(
             initial_channel=inter_channels,
@@ -1306,6 +1348,7 @@ class SynthesizerTrn(nn.Module):
             f0_harmonics=f0_harmonics,
             use_carrier_head=use_carrier_head,
             carrier_harmonics=carrier_harmonics,
+            use_adain_decoder=use_adain_decoder,
             sample_rate=sample_rate,
             f0_frame_hop=hop_length,
         )
@@ -1326,6 +1369,7 @@ class SynthesizerTrn(nn.Module):
             4,
             gin_channels=gin_channels,
             use_snac=use_snac_flow,
+            snac_stats=snac_stats,
         )
 
         # Prosody feature projection (A1/A2/A3 → prosody_dim)
@@ -1657,7 +1701,8 @@ class SynthesizerTrn(nn.Module):
         g, g_spk, g_lang = self._get_global_conditioning(
             sid, lid, speaker_embeddings=speaker_embeddings, return_components=True
         )
-        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
+        # v11 P2: g_spk は AdaLN 用 (use_adaln_encp off なら enc_p 側で無視)
+        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g, g_spk=g_spk)
         # Safety clamp on log-variance to prevent exp() overflow.
         # logs_p is fed into `exp(-2 * logs_p)` for both MAS (below) and the
         # KL loss (losses.kl_loss). At scratch init the TextEncoder projection
@@ -1901,7 +1946,8 @@ class SynthesizerTrn(nn.Module):
         g, g_spk, g_lang = self._get_global_conditioning(
             sid, lid, speaker_embeddings=speaker_embeddings, return_components=True
         )
-        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
+        # v11 P2: g_spk は AdaLN 用 (use_adaln_encp off なら enc_p 側で無視)
+        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g, g_spk=g_spk)
         # Match the training-time clamp for consistency between train and
         # inference. See models.py training forward for the rationale.
         logs_p = logs_p.clamp(min=-8.0, max=8.0)

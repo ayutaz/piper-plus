@@ -417,12 +417,32 @@ class VitsModel(pl.LightningModule):
         dp_spk_head: bool = False,
         # M1+E2: flow coupling の SNAC 化 + flow logdet の KL 配線
         use_snac_flow: bool = False,
+        # v11 P2 (--use-adaln-encp): enc_p transformer の LayerNorm 12 本を
+        # AdaLN-Zero 化 (共有低ランク trunk、入力は g_spk のみ = P0-4 の
+        # lang 干渉分離)。zero-init で on 直後は素の LN と一致。M2
+        # (speaker_cond_layer) とは独立 flag で共存 (重複の要否は smoke A/B、
+        # conditioning 設計 doc §10.5)。default off = v10b bit 互換
+        use_adaln_encp: bool = False,
+        # v11 P5 (--no-snac-stats): SNAC の SN/SDN 統計注入のみを恒等化
+        # (sn_linear 非構築、−394k param。Phase 0 D-3/D-4 で LOO −0.017 =
+        # 無害な死荷重と実測)。SNAC flow 構造 (可逆性・logdet の KL 配線) は
+        # 不変。use_snac_flow=True が前提。default off = 従来どおり統計注入
+        no_snac_stats: bool = False,
+        # v11 D-2: 変調統計テレメトリ常設 — 各注入点の話者依存分散比
+        # (話者間分散/総分散) 等を N step ごとに log する。0 で無効。
+        # 「総量だけでは SNAC 型死荷重を検知できない」教訓の制度化
+        # (conditioning 設計 doc §10.6-4 / §10.3-1)
+        telemetry_every: int = 500,
         # E1: dec FiLM (cond_layers) の zero-init を N(0, std) に置換
         film_init_std: float = 0.0,
         # v11 P0 (--film-free-scale): dec FiLM scale を sigmoid+0.5 の
         # [0.5, 1.5] 制限から 1+γ̂ (無界、zero-init 層では on 直後 = off) に
         # 開放 (conditioning 設計 doc §5.2 b-1)。default off = v10b bit 互換
         film_free_scale: bool = False,
+        # v11 P3 (--use-adain-decoder): decoder resblock 単位の zero-init
+        # 残差 AdaIN (s1 重心レイアウト、conditioning 設計 doc §5.1 a-2 /
+        # §10.5)。既存 FiLM と独立に共存。default off = v10b bit 互換
+        use_adain_decoder: bool = False,
         # v10b Phase B デコーダ系 (default は v10a-r2 bit 互換。
         # docs/design/zero-shot-v10b-quality-plan.md §3.1):
         # H-1: upsampler の resize+conv 化 ("transposed" | "resize")
@@ -467,6 +487,16 @@ class VitsModel(pl.LightningModule):
         if (num_speakers > 1 or num_languages > 1) and (gin_channels <= 0):
             gin_channels = 512
 
+        # v11 P5: --no-snac-stats は SNAC の修飾 flag なので、SNAC flow なしで
+        # 指定された構成は黙って no-op にせず即エラーにする (意図の取り違えを
+        # 1 週間の学習で払わせない)
+        if no_snac_stats and not use_snac_flow:
+            raise ValueError(
+                "--no-snac-stats requires --use-snac-flow: it removes only the "
+                "SN/SDN statistics injection from the SNAC coupling layers, "
+                "which do not exist without the SNAC flow."
+            )
+
         self.save_hyperparameters()
 
         # Set up models
@@ -497,6 +527,8 @@ class VitsModel(pl.LightningModule):
             speaker_cond_layer=self.hparams.speaker_cond_layer,
             dp_spk_head=self.hparams.dp_spk_head,
             use_snac_flow=self.hparams.use_snac_flow,
+            use_adaln_encp=self.hparams.use_adaln_encp,
+            snac_stats=not self.hparams.no_snac_stats,
             film_init_std=self.hparams.film_init_std,
             upsample_mode=self.hparams.upsample_mode,
             pqmf_taps=self.hparams.pqmf_taps,
@@ -511,6 +543,7 @@ class VitsModel(pl.LightningModule):
             f0_detach_input=self.hparams.f0_detach_input,
             use_carrier_head=self.hparams.use_carrier_head,
             carrier_harmonics=self.hparams.carrier_harmonics,
+            use_adain_decoder=self.hparams.use_adain_decoder,
             sample_rate=self.hparams.sample_rate,
             hop_length=self.hparams.hop_length,
         )
@@ -1418,6 +1451,53 @@ class VitsModel(pl.LightningModule):
                 sync_dist=False,
             )
 
+    def _telemetry_due(self) -> bool:
+        """この step が変調統計テレメトリ (v11 D-2) の対象かを判定する。
+
+        ``global_step`` と hparams のみに依存するため DDP 全 rank で同一
+        (rank 分岐で計算量が変わっても collective を含まないので安全側だが、
+        due 判定自体も決定論に揃えておく)。無効時 (telemetry_every=0) は
+        int 比較 1 回で即 False。
+        """
+        every = int(self.hparams.get("telemetry_every", 0) or 0)
+        if every <= 0 or not self.training:
+            return False
+        return self.global_step % every == 0
+
+    def _log_modulation_telemetry(
+        self, batch: Batch, speaker_embeddings, language_ids
+    ) -> None:
+        """各注入点の変調統計 (話者依存分散比ほか) を logger に記録する。
+
+        全て ``torch.no_grad`` の発話単位 1x1 conv/MLP なので計算コストは
+        無視できる。DDP 安全性のため log は rank 0 のみ (sync なし) —
+        ``_run_grad_probe`` と同じ流儀。診断機能で学習本体は落とさない。
+        """
+        from .telemetry import collect_modulation_telemetry
+
+        try:
+            metrics = collect_modulation_telemetry(
+                self.model_g,
+                speaker_embeddings,
+                lid=language_ids,
+                speaker_ids=batch.speaker_ids,
+            )
+        except RuntimeError:
+            _LOGGER.exception(
+                "modulation telemetry failed at step=%d (training continues)",
+                self.global_step,
+            )
+            return
+        batch_size = batch.phoneme_ids.size(0)
+        for key, value in metrics.items():
+            self.log(
+                key,
+                value,
+                batch_size=batch_size,
+                rank_zero_only=True,
+                sync_dist=False,
+            )
+
     def training_step(self, batch: Batch, batch_idx: int):
         # Manual optimization for multiple optimizers
         opt_g, opt_d = self.optimizers()
@@ -1719,6 +1799,13 @@ class VitsModel(pl.LightningModule):
             speaker_embeddings = torch.nn.functional.normalize(
                 speaker_embeddings, p=2, dim=-1
             )
+
+        # v11 D-2: 変調統計テレメトリ (--telemetry-every、default 500 step 毎)。
+        # forward に依存しない (g からの発話単位 1x1 conv のみ) ので LF 分岐の
+        # 前に置き、due step では必ず記録する。noise 加算「後」の embedding =
+        # 実際に conditioning に使う値で測る。
+        if speaker_embeddings is not None and self._telemetry_due():
+            self._log_modulation_telemetry(batch, speaker_embeddings, language_ids)
 
         # --- Latent Filling step (v10 §3.3、arXiv:2310.03538 準拠) ---
         # 確率 τ の step で条件 embedding を s̃ (同一言語補間 or 微小 noise) に
