@@ -487,3 +487,126 @@ ablation)。0.70 必達は約束できず、**D 診断で主ボトルネック�
 - 多粒度 (v12 隔離枠): Mega-TTS 2: arXiv:2307.07218 / Attentron:
   arXiv:2005.08484 / SEF-VC: arXiv:2312.08676 / XTTS: arXiv:2406.04904 /
   PFluxTTS: arXiv:2602.04160
+
+## 10. Phase 0 診断結果 — 律速点の一意化 (2026-08-20、D-1〜D-9 完了)
+
+> **Status**: §3 の診断 9 本を完了、§3 末尾の判定マトリクス (事前登録) を適用して
+> 律速点を確定した。対象 ckpt: **v10b ep79** (`checkpoints-v10b/epoch=79-step=106880.ckpt`、
+> state_dict 704/704 検証、EMA 非適用 = oracle §8 と同条件)。4 独立ハーネス全てが
+> v10a-r2 ep69 の既知アンカー (raw top-1 43% / synth-real cos 0.814) を数値一致で
+> 再現してから測定【実測】。D-3 の infer() 再実装は `gen.infer` と bit 一致を確認済。
+
+### 10.1 チェーン会計 — 話者情報はどこで死ぬか【実測】
+
+20 択 seen 話者識別 (raw top-1) の段別追跡:
+
+```
+CAM++ emb 98.5% → (spk_proj) → g_spk 98.5%     [D-1: 落ち 0]
+  → (enc_p / MAS) → m_p 99% → z_p 97%           [D-8: 落ち 0、ただし振幅は微小 (sep 0.034)]
+  → (flow⁻¹ SNAC) → z 78% (centered 93%)        [D-8: 情報破壊なし]
+  → (decoder 描画 → wav → CAM++) → 39-40%       [−60pt がここに全集中]
+       うち合成音共通ドメインオフセット: ~41pt   (centered で 80-83% まで回復)
+       うち per-speaker 描画歪み:        ~19pt   (98.5 → 80)
+```
+
+SECS 会計 (D-5 lite、つくよみ OOD、cross-utt 中央値):
+
+```
+GT 実音声 0.859 → teacher-forced recon (enc_q z + 現行 decoder) 0.714   [decoder 段 −0.145 = 78%]
+  → TTS フルパス 0.673                                                   [prior/flow/duration 上流 −0.041 = 22%]
+```
+
+**recon bound (本診断の最重要数値)**: 実音声由来の posterior z (= flow/prior を
+完璧にした場合の上界) を現行 decoder に入れても cross-utt SECS 0.714 /
+NTR 0.135 (ja 女性 floor 0.689 すれすれ) にしか届かない【実測】。
+= **decoder を直さない限り、上流 (P2/P4) の完璧化による利得は +0.04 が上限**。
+一方 D-9 のオフセット除去上限は +0.13 (0.607→0.737、ceiling 0.797)。
+なお合成音を enc_q→dec に往復させるとほぼ無損失 (roundtrip cos 0.969、top-1 不変)
+— enc_q→dec の往復自体は壊れておらず、**実音声由来の z を decoder が自分の
+「合成ドメイン」へ写像する時に話者性が潰れる**【実測+解釈】。
+
+### 10.2 各診断の要点
+
+| 診断 | 結果 | 判定 |
+|---|---|---|
+| D-1 spk_proj | g_spk raw top-1 98.5%、Fisher 比 1.35→1.98 (増加)、rank collapse なし | **シロ**。(b-2) 棄却 |
+| D-2 テレメトリ | FiLM scale が sigmoid 上限に飽和 (max 0.4998)、変調の 8-9 割は話者共通の固定変換 (話者依存分 10-16%)。sn_v 話者間 std ~4% (死亡)。cos(g_spk, g_lang) = **−0.56** (spk_proj が lang 打ち消しに容量消費)。lang/spk ノルム比 1.56 | P0-1 の直接傍証 + lang 干渉という新規論点 |
+| D-3 LOO | Δtop-1: **dec FiLM −0.233 ≧ enc_p −0.217** ≫ DP −0.033 > SNAC −0.017。dec 内は s1 (128ch) 0.150 ≫ s2 0.067 > 入口 0.033 | 実効キャリアは dec+enc_p の 2 点のみ。入口 FiLM は最弱 |
+| D-4 isolation | pair_dec_encp = base の 92% (cross gain 95%) を回収。iso_flow / iso_dp = chance。ISO 和 (0.20) ≪ pair (0.317) = **dec と enc_p は相補・超加法的** | SNAC 中和 実在 (推論時分解として)。P2+P3 同時投入を支持 |
+| D-5 lite | recon NTR 0.135 / recon−TTS 差 +0.04 のみ / autoencode (合成入力) は無損失 0.969 | **decoder 描画不足が律速に含まれる** (proxy 測定、10.4 の限定参照) |
+| D-6 VC oracle | VC raw **17%** ≪ TTS 42.5% (同 ckpt)。identity-VC 0.755 vs cross-target leak 0.729 → **g 差し替えの実効注入振幅 0.026 ≈ 0**。予測は source 近傍 6 話者に崩壊 | **flow⁻¹ は音色を注入できていない** (現状の均衡で寄与ゼロ) |
+| D-7 gain 外挿 | 入力マージン +44% に対し出力 separation +2% (平坦)、SECS は単調悪化 (7/10 話者)。α は応急ノブに**ならない** | **ゲイン不足を棄却** — 形式・容量問題 |
+| D-8 probe | m_p 99% (sep 0.034 = 存在するが薄い) / z 78% (centered 93%) | 情報破壊なし。ただし「存在 ≠ 使用」(10.3-1) |
+| D-9 offset | v10b raw 39% / centered 80% / translated 56%。SECS 0.607 → translated 0.737 (ceiling 0.797)。offset は剛体平行移動 1 本ではなく per-speaker 歪み残存 | オフセット除去 = +0.13 SECS の頭金 (H 系の射程)。**Δ 検出は centered 指標を主指標に** |
+
+### 10.3 敵対的検証で解消した見かけの矛盾
+
+1. **D-8「z まで生きている」vs D-4「iso_flow = chance」**: 矛盾ではない。SNAC sn_m
+   の時不変シフトは z 上の probe には見える (separation ×10) が、decoder はそれを
+   音色として描画しない。D-2 の「SNAC が最も話者差を運搬」も入力側分散の話であり
+   出力効果とは別物。**教訓: 変調テレメトリの分散量を効果と読み替えない**
+   (Phase E テレメトリは LOO 型 probe と対で解釈する)。
+2. **D-7 α=3.0 の top-1 +0.10**: n=20 で ±2 サンプル内のノイズ。separation 平坦 +
+   SECS 単調悪化が実体で、「飽和」判定が正しい。
+3. **baseline 群 (43/39/40/42.5/30%)**: プロトコル差 (話者数×文数×conditioning) で
+   全て整合。TTS-A 30% の低さは単発 emb conditioning 由来 → 10.6-1 の所見に転化。
+4. **「dec FiLM は最大キャリア」と「decoder が律速」の両立**: dec は話者性が
+   入る場所でも死ぬ場所でもある — 通り抜けた僅かな情報の最大搬送者が dec FiLM で、
+   かつ描画段が最大損失点。P3 はこの同一段を狙う。
+
+### 10.4 判定マトリクスの適用 (§3 事前登録)
+
+- **D-6 = 低 (17% ≤ 55%) 確定**。行 2 (P4 主軸) の前提「D-5 高」は不成立。
+- **D-5 = 低い側** — ただし proxy (OOD 1 話者 SECS ベース、seen recon top-1 は
+  GT wav 不在で未測定)。独立 3 系統 (D-5 lite recon / D-6 identity-VC /
+  D-9 offset) が全て decoder 段を指すため判定は頑健と評価するが、
+  **seen recon top-1 の本測定を実装フェーズ冒頭 (GT wav のある instance 上) で
+  追試して確認する** (~30 分、判定を覆す場合は本節を改訂)。
+- **D-7 陰性** → 行 4 の「ゲイン問題」枝を棄却。
+
+**確定判定: 行 3 (decoder 描画不足 → P3 繰上げ) を主、行 4 の複合処方
+(P0+P2+P3 同時、P4 は Phase D A/B) を併用。**
+律速比率: decoder 段 ~78% (SECS 会計) — うちドメインオフセット分は H 系の射程、
+per-speaker 描画分が P3 の射程。prior 彫刻 ~22% (P2、dec と超加法)。
+flow の推論時寄与 0% (P4 は「強化」ではなく Phase D A/B)。ゲイン不足 0% (棄却)。
+
+### 10.5 P アーム採否 (確定) と §7 優先順位の改訂
+
+| アーム | 採否 | Phase 0 根拠 | §7 からの変更 |
+|---|---|---|---|
+| P0-1 FiLM scale 開放 | **採用** | D-2 飽和貼り付き (直接傍証) | 変更なし |
+| P0-4 (新規) lang/spk 干渉の設計検討 | 検討 | cos(g_spk,g_lang) −0.56、lang/spk 1.56 | 新規: g_lang の注入分離 or 直交化を P2 実装時に併せて検討 |
+| P2 enc_p AdaLN | **採用** | LOO −0.217 / dec と相補。単独上限 +0.04 (recon bound) | P3 と同時投入が条件 |
+| P3 dec per-resblock AdaIN | **採用・最優先** | 律速の主座 (78%)。**s1 (中解像度) 重心**で設計 (LOO: s1 ≫ s2 > 入口) | P2 より繰上げ (マトリクス行 3)。帯域 gate 必須 |
+| P4 flow 強化 | **Phase D A/B に降格** | 現状寄与 0 だが recon bound により P3 前の投資は無効。実施時は **c-1 T-Flow lite + SNAC 除去のセット arm**。c-2 は fallback に降格 | 「D-6 分岐で主軸」→「P3/P2 後の A/B」へ |
+| P5 注入再配分 | **採用 (再定義)** | SNAC 除去 = 無害軽量化 (LOO −0.017、−394k param)。**当初案「dec 1 点 + flow 重心」は廃案** (入口 FiLM 最弱の実測が反証)。DP head 残置 (centered −0.133 の実寄与) | A/B から「SNAC 除去 flag」へ縮退 |
+| (b-2) spk_proj 増強 | **不採用確定** | D-1 シロ | 事前登録どおり |
+
+**期待効果の改訂【推測】**: conditioning 改修 (P0+P2+P3) の射程は per-speaker
+描画分 (~19pt top-1 / SECS +0.04〜) + 形式改善による均衡シフト。
+ドメインオフセット分 (+0.13 SECS 上限) は H 系 (decoder 実音声化) の射程で
+本 doc のスコープ外 — **§7 の「0.60→0.65-0.70」のうち 0.70 到達には H 系の
+並走が必要**という条件を明示する。
+
+### 10.6 副次所見 (学習不要の改善・評価プロトコル改訂)
+
+1. **参照 centroid conditioning**: 単発 emb → 話者 centroid で raw 30→42.5% /
+   centered 67.5→82.5%【実測】。学習不要の推論時レシピとして採用し、評価
+   manifest にも pin する (§6 ハーネスは centroid 条件で統一)。
+2. **α 外挿はノブにならない** (D-7: 単調悪化) — §3 D-7 の「応急改善ノブ」候補は棄却。
+3. **Δ 検出の主指標は centered top-1 / centered separation** (D-9: raw は共通
+   オフセット変動に埋もれる)。v10b ep79 の pin 値: 20spk×3文 protocol で
+   raw 0.400 / centered 0.833 / separation 0.1147 / cross-SECS mean 0.588。
+4. Phase E テレメトリには変調の**話者依存分散比** (D-2 定義) を含める — 総量
+   だけでは死荷重 (SNAC 型) を検知できない (10.3-1)。
+
+### 10.7 成果物 (ローカル scratchpad、要アーカイブ)
+
+`.../scratchpad/v11_phase0/` 配下: `d_probes/` (D-1/2/8/9 + 合成 100 wav) /
+`d3_d4_injection/` (18 arm 1,080 wav + bit-parity 検証) / `d6_vc_oracle/` (185 wav) /
+`d7_gain/` + `d5_lite/`。スクリプト・JSON 生値・wav 全数を含む。session temp のため
+**HF `diag-phase0-v11/` への退避を実装フェーズ開始前に実施** (v10 の diag 慣行踏襲)。
+
+**限定事項**: CAM++ 単独判定 (診断用途、学習未使用のため指標汚染なし) / ja のみ /
+seen 20 話者 (D-5 lite・D-6 anchor は OOD つくよみ) / 推論時分解であり再学習後の
+各点容量とは別物 (SNAC「FLOW のみで学習すれば強いか」は未解決のまま P4 A/B に持越)。
