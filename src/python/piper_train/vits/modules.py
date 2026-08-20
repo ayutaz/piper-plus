@@ -425,6 +425,14 @@ class ResidualCouplingLayer(nn.Module):
         # から予測し、WN の g 条件付け (lang 成分) とは分離する。
         # default False は既存経路と bit 互換 (新規パラメータなし = v9 ckpt 互換)。
         use_snac: bool = False,
+        # v11 P5 (--no-snac-stats → snac_stats=False): SN/SDN の統計注入のみを
+        # 恒等化する。Phase 0 D-3/D-4 で SNAC 統計は LOO −0.017 (無害) かつ
+        # isolation で chance = 死荷重と実測されたため、除去で −394k param
+        # (conditioning 設計 doc §10.5 P5)。sn_linear を構築しない (= use_snac
+        # かつ snac_stats=False のパラメータ集合は plain coupling と同一で v9
+        # ckpt が strict load 可能)。flow 構造 (可逆性・logdet の KL 配線) は
+        # 不変 — logdet は Σ logs のまま返り続ける。default True = v10b 互換。
+        snac_stats: bool = True,
     ):
         assert channels % 2 == 0, "channels should be divisible by 2"
         super().__init__()
@@ -436,6 +444,7 @@ class ResidualCouplingLayer(nn.Module):
         self.half_channels = channels // 2
         self.mean_only = mean_only
         self.use_snac = use_snac
+        self.snac_stats = snac_stats
 
         self.pre = nn.Conv1d(self.half_channels, hidden_channels, 1)
         self.enc = WN(
@@ -450,7 +459,7 @@ class ResidualCouplingLayer(nn.Module):
         self.post.weight.data.zero_()
         self.post.bias.data.zero_()
 
-        if use_snac:
+        if use_snac and snac_stats:
             if gin_channels == 0:
                 raise ValueError("use_snac=True requires gin_channels > 0")
             self.sn_linear = nn.Conv1d(gin_channels, 2 * self.half_channels, 1)
@@ -463,7 +472,9 @@ class ResidualCouplingLayer(nn.Module):
     def forward(self, x, x_mask, g=None, reverse=False, g_spk=None):
         x0, x1 = torch.split(x, [self.half_channels] * 2, 1)
         sn_m = sn_v = None
-        if self.use_snac and g_spk is not None:
+        # v11 P5: snac_stats=False では sn_linear が存在しない → sn_m/sn_v は
+        # None のままで SN/SDN・logdet 補正の全てが自動的に恒等になる
+        if self.use_snac and self.snac_stats and g_spk is not None:
             # chunk 順は m が先 (tests/test_v10_structure.py で固定)。
             # v は bf16 の exp overflow 対策で clamp [-4, 4] (v10 design §4 M1)。
             sn_m, sn_v = torch.chunk(self.sn_linear(g_spk), 2, dim=1)

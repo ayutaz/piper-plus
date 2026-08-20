@@ -822,6 +822,59 @@ def create_parser():
         "— from-scratch runs only.",
     )
     parser.add_argument(
+        "--use-adain-decoder",
+        action="store_true",
+        default=False,
+        help="v11 P3 (conditioning design doc §5.1 a-2 / §10.5): per-resblock "
+        "zero-init residual AdaIN in the decoder — y = x + gamma(g)*IN(x) + "
+        "beta(g), StyleTTS 2 lineage. Injection is centred on the s1 stage "
+        "(after ups[0], mid resolution; LOO showed s1 >> s2 > entrance): all "
+        "resblocks of s1, floor(half) of each later stage, entrance omitted. "
+        "Coexists with (does not replace) the existing FiLM layers so the two "
+        "can be ablated independently. Zero-init makes step-0 output "
+        "bit-identical to off. Off (default) = v10b bit-compatible; enabling "
+        "adds adain_layers.* parameters, so from-scratch runs only.",
+    )
+    parser.add_argument(
+        "--use-adaln-encp",
+        action="store_true",
+        default=False,
+        help="v11 P2 (conditioning design doc §5.1 a-1 / §10.5): make all 12 "
+        "LayerNorms of the text-encoder transformer conditional (AdaLN-Zero): "
+        "gamma/beta are produced from the speaker condition g_spk through a "
+        "shared low-rank trunk with zero-init per-norm heads, so enabling is "
+        "bit-identical to plain LN at step 0. The trunk input is the speaker "
+        "component only (g_lang excluded — P0-4 lang/speaker interference "
+        "separation, measured cos(g_spk, g_lang) = -0.56). Coexists with "
+        "--speaker-cond-layer (M2, additive bias) as an independent flag. "
+        "Off (default) = v10b bit-compatible; enabling adds adaln_* "
+        "parameters, so from-scratch runs only.",
+    )
+    parser.add_argument(
+        "--no-snac-stats",
+        action="store_true",
+        default=False,
+        help="v11 P5 (conditioning design doc §10.5): remove only the SN/SDN "
+        "statistics injection (sn_linear) from the SNAC coupling layers "
+        "(-394k params). Phase 0 measured the statistics as harmless dead "
+        "weight (LOO -0.017, isolation = chance). The SNAC flow structure "
+        "itself (invertibility, logdet wired into KL) is unchanged. Requires "
+        "--use-snac-flow (fails fast otherwise). Default: off (statistics "
+        "injected as before = v10b behaviour).",
+    )
+    parser.add_argument(
+        "--telemetry-every",
+        type=int,
+        default=500,
+        help="v11 D-2: log modulation-statistics telemetry for every "
+        "conditioning injection point (dec FiLM / dec AdaIN / enc_p cond / "
+        "enc_p AdaLN / SNAC / DP head) every N steps — notably the "
+        "speaker-dependent variance ratio (between-speaker variance / total "
+        "variance within the batch), which detects dead-weight injections "
+        "that raw magnitudes cannot (SNAC lesson, doc §10.3-1). 0 disables. "
+        "Default: 500.",
+    )
+    parser.add_argument(
         "--segment-size",
         type=int,
         default=8192,
@@ -1631,6 +1684,27 @@ def main():
             "v11 P0 enabled (--film-free-scale): decoder FiLM scale = 1 + raw "
             "(unbounded) instead of sigmoid(raw)+0.5 clamped to [0.5, 1.5]. "
             "From-scratch runs only (not resumable from clamped-form ckpts)."
+        )
+    if getattr(args, "use_adain_decoder", False):
+        _LOGGER.info(
+            "v11 P3 enabled (--use-adain-decoder): per-resblock zero-init "
+            "residual AdaIN (y = x + gamma(g)*IN(x) + beta(g)), s1-centred "
+            "layout (all s1 resblocks, half of each later stage, entrance "
+            "omitted). Coexists with FiLM. Adds adain_layers.* parameters — "
+            "from-scratch runs only."
+        )
+    if getattr(args, "use_adaln_encp", False):
+        _LOGGER.info(
+            "v11 P2 enabled (--use-adaln-encp): text-encoder LayerNorms are "
+            "AdaLN-Zero conditioned on g_spk only (g_lang excluded, P0-4). "
+            "Zero-init heads = plain LN at step 0. Adds adaln_* parameters — "
+            "from-scratch runs only."
+        )
+    if getattr(args, "no_snac_stats", False):
+        _LOGGER.info(
+            "v11 P5 enabled (--no-snac-stats): SNAC SN/SDN statistics "
+            "injection removed (sn_linear not built, -394k params); flow "
+            "structure and logdet->KL wiring unchanged."
         )
     if getattr(args, "c_hiband_stft", 0.0) > 0:
         _LOGGER.info(

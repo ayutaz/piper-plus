@@ -610,6 +610,39 @@ def carrier_source_regularization(
     return (hinge * voiced).sum() / denom
 
 
+class AdaIN1d(nn.Module):
+    """v11 P3: resblock 単位の zero-init 残差 AdaIN (StyleTTS 2 系譜)。
+
+    conditioning 設計 doc §5.1 (a-2) / §10.5。StyleTTS 2 のテンプレートは
+    ``(1+γ)·IN(x)+β`` だが、そのままでは γ̂=0 でも ``IN(x) ≠ x`` となり
+    「zero-init = off と bit 一致」の退避保証 (v11 の全 opt-in flag に共通の
+    契約) を満たせない。そこで AdaLN-Zero (DiT) と同じ残差ゲート形に置く:
+
+        y = x + γ̂(g) ⊙ IN(x) + β(g)
+
+    - ``IN`` は affine なし InstanceNorm1d (発話内の per-channel 統計を除去) —
+      話者アフィンが source 統計に汚染されず支配できる、という AdaIN の機構は
+      維持される (変調枝は正規化座標で書かれる)。
+    - ``γ̂ = β = 0`` (zero-init) で恒等 = flag off と bit 一致。
+    - γ̂/β は ``g [B, gin_channels, 1]`` から発話あたり 1 回の 1x1 Conv で
+      計算して時間軸へ broadcast — 時間格子に同期した変調機構を持たないため
+      コム (がびがび) を構造的に作れない (帯域 gate は
+      tests/test_adain_decoder.py が pin)。
+    """
+
+    def __init__(self, gin_channels: int, channels: int):
+        super().__init__()
+        self.channels = channels
+        self.norm = nn.InstanceNorm1d(channels, affine=False)
+        self.fc = Conv1d(gin_channels, channels * 2, 1)
+        nn.init.zeros_(self.fc.weight)
+        nn.init.zeros_(self.fc.bias)
+
+    def forward(self, x: torch.Tensor, g: torch.Tensor) -> torch.Tensor:
+        gamma, beta = self.fc(g).split(self.channels, dim=1)
+        return x + gamma * self.norm(x) + beta
+
+
 class MBiSTFTGenerator(nn.Module):
     """Multi-Band inverse STFT Generator.
 
@@ -685,6 +718,14 @@ class MBiSTFTGenerator(nn.Module):
         # concat) は担体で置換される (S-2a / S-2p / S-2r は共存)。
         use_carrier_head: bool = False,
         carrier_harmonics: int = 32,
+        # --- v11 P3 (--use-adain-decoder、default off = v10b bit 互換。
+        # conditioning 設計 doc §5.1 a-2 / §10.5) ---
+        # resblock 単位の zero-init 残差 AdaIN。注入重心は s1 (ups[0] 後の
+        # 中解像度段、LOO 実測 s1 ≫ s2 > 入口): s1 は全 resblock、以降の段は
+        # 半分 (floor)、入口 (conv_pre 段) は省略。既存 FiLM (cond /
+        # cond_layers) とは独立に共存する (置換ではなく追加 — 単変量で
+        # 切り分けられるように)。
+        use_adain_decoder: bool = False,
     ):
         super().__init__()
         if upsample_mode not in ("transposed", "resize"):
@@ -707,6 +748,14 @@ class MBiSTFTGenerator(nn.Module):
         self.use_f0_path = use_f0_path
         self.use_carrier_head = use_carrier_head
         self.film_free_scale = film_free_scale
+        self.use_adain_decoder = use_adain_decoder
+        if use_adain_decoder and gin_channels == 0:
+            raise ValueError(
+                "use_adain_decoder requires gin_channels > 0: the AdaIN "
+                "affine (gamma, beta) is computed from the speaker "
+                "conditioning g. Single-speaker models have no g to condition "
+                "on."
+            )
 
         # --- v10b S-2a: frame 格子の F0 特徴 (conv_pre 入力へ concat) ---
         # zero-init: 学習開始時は F0 の値に依存しない出力になり、smoke 失敗時に
@@ -865,6 +914,23 @@ class MBiSTFTGenerator(nn.Module):
                     nn.init.zeros_(layer.bias)
                 self.cond_layers.append(layer)
 
+        # --- v11 P3: resblock 単位 AdaIN (s1 重心レイアウト) ---
+        # key = self.resblocks のグローバル index (str)。s1 (stage 0、128ch 相当)
+        # は全 num_kernels resblock、以降の段は floor(num_kernels/2) 個のみ
+        # (LOO: s1 0.150 ≫ s2 0.067、conditioning doc §10.5)。medium 実構成
+        # (gin=512, 256→128/64ch, num_kernels=3) で +0.46M params ≈ +0.92MB
+        # fp16 — doc §5.1 (a-2) の +0.45M/+0.9MB 見積と一致し、FP16 40MB gate
+        # (残り ~1.2MB) 内に収まる。
+        if use_adain_decoder:
+            self.adain_layers = nn.ModuleDict()
+            for i in range(self.num_upsamples):
+                ch_stage = upsample_initial_channel // (2 ** (i + 1))
+                n_sites = self.num_kernels if i == 0 else self.num_kernels // 2
+                for j in range(n_sites):
+                    self.adain_layers[str(i * self.num_kernels + j)] = AdaIN1d(
+                        gin_channels, ch_stage
+                    )
+
         # T1 拡張: channels_last をモジュール全体に伝播。 現状 Generator は
         # Conv1d のみのため PyTorch は 3D weight に対し memory_format 変換を
         # skip する (torch/nn/modules/module.py::_apply → convert: t.dim() in
@@ -983,10 +1049,22 @@ class MBiSTFTGenerator(nn.Module):
             xs = None
             for j, resblock in enumerate(self.resblocks):
                 index = j - (i * self.num_kernels)
+                if index < 0 or index >= self.num_kernels:
+                    continue
+                h = x
+                # v11 P3: resblock 入口に AdaIN。resblock は leaky_relu → conv
+                # で始まるため、これで StyleTTS 2 テンプレート
+                # (AdaIN → 活性 → Conv) の順序になる。
+                if (
+                    self.use_adain_decoder
+                    and g is not None
+                    and str(j) in self.adain_layers
+                ):
+                    h = self.adain_layers[str(j)](h, g)
                 if index == 0:
-                    xs = resblock(x)
-                elif (index > 0) and (index < self.num_kernels):
-                    xs = xs + resblock(x)
+                    xs = resblock(h)
+                else:
+                    xs = xs + resblock(h)
             x = xs / self.num_kernels
             # Multi-scale FiLM: 各 upsample 段の出力に speaker 条件付けを注入
             if g is not None and self.gin_channels != 0:
