@@ -40,7 +40,7 @@ from .losses import (
     speaker_infonce_loss,
     swap_spk_ramp_weight,
 )
-from .mb_istft import PQMF
+from .mb_istft import PQMF, carrier_source_regularization
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from .models import (
     MRD_HIRES_RESOLUTIONS,
@@ -50,7 +50,7 @@ from .models import (
     SynthesizerTrn,
     WavLMDiscriminator,
 )
-from .stft_loss import MultiResolutionSTFTLoss
+from .stft_loss import HighBandSTFTLoss, MultiResolutionSTFTLoss
 
 
 # Optional wandb import with graceful fallback
@@ -357,6 +357,21 @@ class VitsModel(pl.LightningModule):
         full_stft_fft_sizes: tuple[int, ...] = (512, 1024, 2048),
         full_stft_hop_sizes: tuple[int, ...] = (128, 256, 512),
         full_stft_win_sizes: tuple[int, ...] = (512, 1024, 2048),
+        # v11 柱2 (A2'): 6-11kHz (9-11kHz は 2 倍の厚み) band-weighted GT 参照
+        # MR-STFT magnitude 回帰。mel L1 / 既存 STFT loss が実質盲目な帯域を
+        # GT waveform を教師として直接監督する (残存ノイズ診断 doc §3 対策 ii)。
+        # GT 教師回帰 = zs-eval-contract §2 の例外形 (評価メトリクスの loss 化
+        # ではない)。default 0 = off (v10b bit 互換)。
+        c_hiband_stft: float = 0.0,
+        # v11 A′ (--use-carrier-head): 担体化 harmonic-plus-noise head
+        # (docs/design/zero-shot-v11-harmonic-head-design.md)。use_f0_path 必須。
+        # default off = v10b bit 互換。
+        use_carrier_head: bool = False,
+        carrier_harmonics: int = 32,
+        # A′ の L_src hinge (σ 氾濫の事前登録緩和策、設計 doc §4.3)。
+        # default 0 = off — Phase D 監視 #6 発火時のみ arm する。
+        c_src_reg: float = 0.0,
+        src_reg_tau: float = 0.0,
         # Training loop optimization
         # D:G update ratio (D updates every step, G updates every d_update_interval steps)
         d_update_interval: int = 2,
@@ -404,6 +419,10 @@ class VitsModel(pl.LightningModule):
         use_snac_flow: bool = False,
         # E1: dec FiLM (cond_layers) の zero-init を N(0, std) に置換
         film_init_std: float = 0.0,
+        # v11 P0 (--film-free-scale): dec FiLM scale を sigmoid+0.5 の
+        # [0.5, 1.5] 制限から 1+γ̂ (無界、zero-init 層では on 直後 = off) に
+        # 開放 (conditioning 設計 doc §5.2 b-1)。default off = v10b bit 互換
+        film_free_scale: bool = False,
         # v10b Phase B デコーダ系 (default は v10a-r2 bit 互換。
         # docs/design/zero-shot-v10b-quality-plan.md §3.1):
         # H-1: upsampler の resize+conv 化 ("transposed" | "resize")
@@ -490,9 +509,19 @@ class VitsModel(pl.LightningModule):
             f0_prior_residual=self.hparams.f0_prior_residual,
             f0_spk_grad=self.hparams.f0_spk_grad,
             f0_detach_input=self.hparams.f0_detach_input,
+            use_carrier_head=self.hparams.use_carrier_head,
+            carrier_harmonics=self.hparams.carrier_harmonics,
             sample_rate=self.hparams.sample_rate,
             hop_length=self.hparams.hop_length,
         )
+        # v11 P0 (--film-free-scale): forward 時の scale 式だけを切り替える
+        # 挙動 flag (パラメータ・初期化・state_dict は不変) なので、
+        # SynthesizerTrn の signature を経由せず decoder 属性へ直接設定する。
+        # hparams には save_hyperparameters() で保存済み → resume / ONNX
+        # export (load_from_checkpoint → 本 __init__) でも再現される。
+        # tests/test_film_free_scale.py がこの統合点を pin する。
+        if self.hparams.film_free_scale:
+            self.model_g.dec.film_free_scale = True
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm,
             use_channels_last=self.hparams.use_channels_last,
@@ -711,6 +740,10 @@ class VitsModel(pl.LightningModule):
             hop_sizes=self.hparams.full_stft_hop_sizes,
             win_sizes=self.hparams.full_stft_win_sizes,
         )
+        # v11 柱2: 高域 band-weighted GT 参照 MR-STFT (active when
+        # c_hiband_stft > 0)。帯域重みは固定 buffer (学習不能 — gaming 面を
+        # 増やさない)。
+        self.hiband_stft_loss = HighBandSTFTLoss(sample_rate=self.hparams.sample_rate)
 
         # Dataset splits
         self._train_dataset: Dataset | None = None
@@ -1901,6 +1934,42 @@ class VitsModel(pl.LightningModule):
                 self._log_with_batch_info("loss_full_stft", loss_full_stft, batch)
                 if probe_losses is not None:
                     probe_losses["full_stft"] = loss_full_stft
+
+            # --- v11 柱2 (A2'): 6-11kHz band-weighted GT 参照 MR-STFT (opt-in) ---
+            # GT waveform y を教師とする magnitude 回帰 (zs-eval-contract §2 の
+            # 例外形 = mel / sub-band STFT / MRD と同族)。E-4 コム指標や帯域
+            # 評価メトリクスの loss 化ではない (import 隔離は
+            # scripts/check_zs_metric_isolation.py が強制)。mel L1 が実質盲目な
+            # 帯域に GAN がノイズを置く経路 (trainable PQMF ドリフト事故、
+            # 残存ノイズ診断 doc §3) への regression 側の防壁。
+            if self.hparams.c_hiband_stft > 0:
+                loss_hiband_stft = (
+                    self.hiband_stft_loss(y_hat, y) * self.hparams.c_hiband_stft
+                )
+                loss_gen_all = loss_gen_all + loss_hiband_stft
+                self._log_with_batch_info("loss_hiband_stft", loss_hiband_stft, batch)
+                if probe_losses is not None:
+                    probe_losses["hiband_stft"] = loss_hiband_stft
+
+            # --- v11 A′ L_src hinge (opt-in、σ 氾濫の事前登録緩和策) ---
+            # carrier head の枝エネルギー比のみを参照 (評価器を消費しない、
+            # harmonic-head 設計 doc §4.3)。default 0 = off。
+            if (
+                self.hparams.c_src_reg > 0
+                and getattr(self.model_g.dec, "last_carrier_energies", None) is not None
+                and g_output.f0_decoder is not None
+            ):
+                e_h, e_n = self.model_g.dec.last_carrier_energies
+                loss_src_reg = (
+                    carrier_source_regularization(
+                        e_h, e_n, f0=g_output.f0_decoder, tau=self.hparams.src_reg_tau
+                    )
+                    * self.hparams.c_src_reg
+                )
+                loss_gen_all = loss_gen_all + loss_src_reg
+                self._log_with_batch_info("loss_src_reg", loss_src_reg, batch)
+                if probe_losses is not None:
+                    probe_losses["src_reg"] = loss_src_reg
 
             # --- Speaker Consistency Loss (SCL) ---
             # B-3 (v10 roadmap、opt-in): SCL 専用に posterior z を detach した

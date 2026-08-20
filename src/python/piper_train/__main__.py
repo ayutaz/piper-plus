@@ -206,6 +206,39 @@ def check_discriminator_arg_consistency(args) -> str | None:
     )
 
 
+# v11 柱2: --trainable-pqmf-synthesis の封印メッセージ (残存ノイズ診断 doc §3)。
+_TRAINABLE_PQMF_SEAL_MSG = (
+    "--trainable-pqmf-synthesis is sealed (v11 pillar 2): on the v10b ep79 run "
+    "the GAN drove the unconstrained synthesis filter 42% (rel-norm) away from "
+    "the canonical design — band3 (8.3-11kHz) passband gain +6.9dB — the 4th "
+    "observed case of gaming an unconstrained degree of freedom (after "
+    "same-utt SCL, the c_spk increase, and swap-SCL cosine), and the decoder "
+    "co-adapts with the drifted filter so post-hoc filter restoration cannot "
+    "repair the run (docs/design/zero-shot-v10b-residual-noise-diagnosis.md "
+    "§3). The flag stays sealed until a perfect-reconstruction (PR) "
+    "regularizer is implemented; the PQMF class itself keeps "
+    "trainable_synthesis for offline research "
+    "(tests/test_pqmf_taps_trainable.py)."
+)
+
+
+class _SealedFlagAction(argparse.Action):
+    """指定された瞬間に parser.error で拒否する封印 flag 用 action。
+
+    「unrecognized arguments」ではなく封印理由 (実測事故 + 解除条件) を
+    表示するために、引数自体は登録したまま使用のみを禁止する。dest は
+    default (False) のまま残るので、下流 (dict_args → VitsModel) の
+    ``trainable_pqmf_synthesis=False`` 経路は従来どおり動く。
+    """
+
+    def __init__(self, option_strings, dest, default=False, help=None, message=""):
+        self.message = message
+        super().__init__(option_strings, dest, nargs=0, default=default, help=help)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        parser.error(self.message or f"{option_string} is sealed")
+
+
 def create_parser():
     """Create the argument parser for piper_train.
 
@@ -412,6 +445,20 @@ def create_parser():
         "(default: 0 = disabled). Supervises high-frequency spectral "
         "structure that mel L1 cannot resolve (coarse high-frequency mel "
         "bins). Complements --use-mrd (regression vs adversarial).",
+    )
+    parser.add_argument(
+        "--c-hiband-stft",
+        type=float,
+        default=0.0,
+        help="v11 pillar 2 (A2'): high-band band-weighted GT-reference "
+        "MR-STFT magnitude loss weight (default: 0 = disabled). Weights "
+        "6-9kHz at 1.0 and 9-11kHz at 2.0 (zero below 6kHz) against the "
+        "ground-truth waveform — the band where mel L1 and the default STFT "
+        "losses are effectively blind, which let the GAN park a +6.9dB noise "
+        "floor in band3 via the then-trainable PQMF synthesis filter "
+        "(docs/design/zero-shot-v10b-residual-noise-diagnosis.md §3). "
+        "GT-teacher regression (zs-eval-contract §2 exception form), not a "
+        "loss-ification of the E-4 comb/band evaluation metrics.",
     )
     parser.add_argument(
         "--reinit-pqmf",
@@ -763,6 +810,18 @@ def create_parser():
         "regardless of this flag.",
     )
     parser.add_argument(
+        "--film-free-scale",
+        action="store_true",
+        default=False,
+        help="v11 P0 (conditioning design doc §5.2 b-1): open up the decoder "
+        "FiLM scale from sigmoid(raw)+0.5 (clamped to [0.5, 1.5]) to 1+gamma "
+        "(unbounded). The FiLM paper shows that sigmoid/tanh-limiting gamma "
+        "hurts; with the zero-initialised FiLM layers the two forms coincide "
+        "at step 0. Off (default) = v10b bit-compatible. Not resumable from "
+        "clamped-form checkpoints (the meaning of the scale weights changes) "
+        "— from-scratch runs only.",
+    )
+    parser.add_argument(
         "--segment-size",
         type=int,
         default=8192,
@@ -938,15 +997,17 @@ def create_parser():
     )
     parser.add_argument(
         "--trainable-pqmf-synthesis",
-        action="store_true",
+        action=_SealedFlagAction,
         default=False,
-        help="Make the PQMF *synthesis* filter bank trainable (v10b H-2b, "
-        "MS-iSTFT-VITS style). The analysis bank stays fixed because it "
-        "produces the sub-band training target. Initialised to the canonical "
-        "coefficients, so step 0 is bit-identical to the fixed bank; the "
-        "trade-off is that perfect reconstruction can drift during training "
-        "(re-run tests/test_pqmf_taps_trainable.py against the trained "
-        "checkpoint to measure the deviation).",
+        message=_TRAINABLE_PQMF_SEAL_MSG,
+        help="[SEALED in v11 — passing this flag is an error] Formerly v10b "
+        "H-2b: make the PQMF synthesis filter bank trainable. On the v10b "
+        "ep79 run the GAN abused this unconstrained freedom to build a "
+        "high-band noise floor (band3 +6.9dB) and the decoder co-adapted "
+        "with the drifted filter (residual-noise diagnosis doc §3, 4th "
+        "gaming case). Sealed until a perfect-reconstruction regularizer "
+        "is implemented; the PQMF class keeps trainable_synthesis for "
+        "offline research: tests/test_pqmf_taps_trainable.py.",
     )
     # --- v10b S-2: F0 明示経路 (default off = v10a-r2 bit 互換) ---
     # docs/design/zero-shot-v10b-s2-f0-design.md。B1 (F0 std が GT の 55-65%)
@@ -1060,6 +1121,52 @@ def create_parser():
         default=0.5,
         help="Maximum probability of feeding predicted (rather than GT) F0 to "
         "the decoder during training.",
+    )
+    # --- v11 A′: 担体化 harmonic-plus-noise head (default off = v10b bit 互換) ---
+    # docs/design/zero-shot-v11-harmonic-head-design.md。A3 (1-3kHz 調波間ノイズ
+    # 充填 = がびがび) への構造根治: voiced 帯域の調波エネルギーを「F0 位相への
+    # 複素ゲイン」経由でしか出せなくする (損失の追加では原理的に届かない経路盲目
+    # への直撃手段)。
+    parser.add_argument(
+        "--use-carrier-head",
+        action="store_true",
+        default=False,
+        help="Enable the v11 A' carrier head: band0's iSTFT head output is "
+        "reduced to a log-sigma noise branch (random per-frame phase = tones "
+        "are structurally impossible), and voiced-band (<=3kHz) harmonics can "
+        "only be drawn by an analysis-weighted 2-band oscillator bank driven "
+        "by the predicted F0 (conj(H_k) weights cancel band-edge aliases to "
+        "<= -98dB). Replaces S-2c (head phase template); S-2a/S-2p/S-2r are "
+        "kept. Requires --use-f0-path; incompatible with "
+        "--trainable-pqmf-synthesis (the alias cancellation assumes the "
+        "canonical bank). Changes subband_conv_post shape, so from-scratch "
+        "runs only.",
+    )
+    parser.add_argument(
+        "--carrier-harmonics",
+        type=int,
+        default=32,
+        help="Number of harmonics M of the carrier head (v11 A'). 32 covers "
+        "the 3kHz hard cap for F0 >= 94Hz; pre-registered trim order is "
+        "40 -> 32 -> 24 (design doc S7 #5).",
+    )
+    parser.add_argument(
+        "--c-src-reg",
+        type=float,
+        default=0.0,
+        help="Weight of the uSFGAN-style hinge source regularization L_src "
+        "(v11 A', design doc S4.3). Default 0.0 = OFF; pre-registered "
+        "mitigation to arm ONLY if the Phase D branch-energy monitor (#6, "
+        "noise flooding) fires. Penalizes voiced frames where the band0 noise "
+        "branch energy exceeds the carrier energy by more than tau.",
+    )
+    parser.add_argument(
+        "--src-reg-tau",
+        type=float,
+        default=0.0,
+        help="Slack tau (log energy ratio) for --c-src-reg. Calibrate from the "
+        "GT band0 noise/harmonic ratio p95 in Phase C (design doc S4.3); 0.0 "
+        "is the strictest setting.",
     )
     parser.add_argument("--seed", type=int, default=1234)
     return parser
@@ -1279,6 +1386,22 @@ def main():
     inconsistency = check_discriminator_arg_consistency(args)
     if inconsistency:
         parser.error(inconsistency)
+
+    # v11 A′: 担体は F0 predictor (S-2p) が供給する f0 を前提とし、alias 相殺は
+    # canonical PQMF synthesis を前提とする — 成立しない組み合わせは fail-fast。
+    if getattr(args, "use_carrier_head", False):
+        if not getattr(args, "use_f0_path", False):
+            parser.error(
+                "--use-carrier-head requires --use-f0-path: the carrier head "
+                "consumes the frame-level F0 that the S-2 predictor provides."
+            )
+        if getattr(args, "trainable_pqmf_synthesis", False):
+            parser.error(
+                "--use-carrier-head is incompatible with "
+                "--trainable-pqmf-synthesis: the carrier's 2-band alias "
+                "cancellation assumes the canonical (fixed) PQMF synthesis "
+                "bank (design doc §4.1 #6 / §8 R5)."
+            )
 
     args.dataset_dir = Path(args.dataset_dir)
 
@@ -1503,6 +1626,19 @@ def main():
             "v10 E1 enabled (--film-init-std=%s): decoder FiLM init N(0, std)",
             args.film_init_std,
         )
+    if getattr(args, "film_free_scale", False):
+        _LOGGER.info(
+            "v11 P0 enabled (--film-free-scale): decoder FiLM scale = 1 + raw "
+            "(unbounded) instead of sigmoid(raw)+0.5 clamped to [0.5, 1.5]. "
+            "From-scratch runs only (not resumable from clamped-form ckpts)."
+        )
+    if getattr(args, "c_hiband_stft", 0.0) > 0:
+        _LOGGER.info(
+            "v11 pillar-2 enabled (--c-hiband-stft=%s): band-weighted GT "
+            "MR-STFT loss on 6-9kHz (w=1) / 9-11kHz (w=2) against the "
+            "ground-truth waveform (A2' regression-side guard)",
+            args.c_hiband_stft,
+        )
 
     # v10b Phase B デコーダ系 flags (default off = v10a-r2 bit 互換)
     if getattr(args, "upsample_mode", "transposed") != "transposed":
@@ -1520,12 +1656,9 @@ def main():
             args.pqmf_taps,
             PQMF_DESIGN[args.pqmf_taps],
         )
-    if getattr(args, "trainable_pqmf_synthesis", False):
-        _LOGGER.info(
-            "v10b H-2b enabled (--trainable-pqmf-synthesis): PQMF synthesis "
-            "bank is trainable (analysis bank stays fixed); perfect "
-            "reconstruction may drift during training"
-        )
+    # v11 柱2: --trainable-pqmf-synthesis は _SealedFlagAction が argparse 段階で
+    # 拒否するため、ここに到達する時点で常に False (dict_args にも False が流れる)。
+    # 封印理由と解除条件は _TRAINABLE_PQMF_SEAL_MSG を参照。
 
     # v10b S-2 (F0 明示経路)。argparse は肯定形 --f0-attach-predictor-input を
     # 受けるが、モデル側の hparam は保護側 default を素直に読める
@@ -1545,6 +1678,18 @@ def main():
             args.f0_prior_residual,
             args.f0_spk_grad,
             dict_args["f0_detach_input"],
+        )
+    if getattr(args, "use_carrier_head", False):
+        _LOGGER.info(
+            "v11 A' enabled (--use-carrier-head): band0/1 voiced harmonics are "
+            "restricted to the analysis-weighted 2-band carrier (M=%d, hard "
+            "cap 3000Hz, fixed Hann k=5 gain smoothing on the frame grid) + a "
+            "random-phase band0 noise branch (log sigma 9ch). S-2c head phase "
+            "template is replaced by the carrier. c_src_reg=%s (hinge source "
+            "regularization; 0 = off, arm only if the branch-energy monitor "
+            "fires).",
+            args.carrier_harmonics,
+            args.c_src_reg,
         )
 
     # v10b 識別器系 flags (default off = v10a-r2 bit 互換)
