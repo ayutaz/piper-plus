@@ -1,8 +1,9 @@
 # v10b 残存ノイズ (がびがび) 診断レポート — 3 層構造の確定 (2026-08-20)
 
-> **Status**: **診断完了 (deep-research 検証済み、2026-08-20)**。§6 の仮説
-> 5 点は 6 エージェント (判別実験 3 + 文献 2 + 敵対的統合 1) で全て判定済み —
-> **A3 の機序は「推論時 prior ノイズ ε の非調波ロック描画 + 経路盲目」と確定**。
+> **Status**: **診断完了 (deep-research + 残タスク実測、2026-08-20)**。§6 の
+> 仮説 5 点は判定済み。§8 の recon 実測で §6 の「経路盲目」前提は修正され、
+> **最終機序は「decoder が z の微細内容 (posterior/ε を問わず) を調波非ロックに
+> 波形化し、損失は ~6.7dB で平衡」— 対策は構造保証 (担体化 head、§5-1) で不変・強化**。
 > 関連: [`zero-shot-v10b-quality-plan.md`](zero-shot-v10b-quality-plan.md) §9-10
 > (v10b 本走結果) / [`zero-shot-noise-root-cause-pqmf.md`](zero-shot-noise-root-cause-pqmf.md)
 > (v9 コム根治の canonical) / [`zero-shot-v10b-s2-f0-design.md`](zero-shot-v10b-s2-f0-design.md)
