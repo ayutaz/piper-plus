@@ -17,6 +17,13 @@ from .mb_istft import MBiSTFTGenerator
 _F0_LOG_MIN = math.log(50.0)
 _F0_LOG_MAX = math.log(1100.0)
 
+# v11 A′: 予測 F0 安定化 (box 平滑 + V/UV 多数決) の窓幅 [frame]。
+# 5 frame = 58ms — 自然な F0 遷移 (アクセント ~100ms) は通し、predictor の
+# symbol-rate ノイズ (~50Hz) だけを落とす。固定値 (学習・CLI 不可変) なのは
+# ゲイン側の「frame 格子 + 固定 Hann 平滑」(mb_istft 設計 doc §3.2) と同じ
+# 理由 — 構造保証はモデルが外せない要素で構成する。
+_F0_SMOOTH_FRAMES = 5
+
 
 class InferOutput(NamedTuple):
     """Return type of :meth:`SynthesizerTrn.infer`.
@@ -1603,12 +1610,57 @@ class SynthesizerTrn(nn.Module):
         ``log_f0`` は無拘束なので ``exp`` の前に [F0_MIN, F0_MAX] にクランプする
         — 学習初期の外れ値が位相 cumsum を暴走させるのを防ぐ。``f0_scale`` は
         Phase D の F0 シフト追従 ablation 用 (推論時のみ、default 1.0 = 恒等)。
+
+        ``use_carrier_head`` 時は :meth:`_stabilize_predicted_f0` を通す —
+        担体は F0 を忠実に FM するため、predictor ノイズをここで構造的に
+        遮断しないと調波が潰れる (v11 smoke arm H の失敗機序)。v10b
+        (carrier なし) は従来どおり bit 不変。
         """
         f0 = torch.exp(log_f0.clamp(min=_F0_LOG_MIN, max=_F0_LOG_MAX))
         if f0_scale != 1.0:
             f0 = f0 * f0_scale
         voiced = (torch.sigmoid(vuv_logit) > 0.5).to(f0.dtype)
-        return f0 * voiced
+        f0 = f0 * voiced
+        if self.use_carrier_head:
+            f0 = self._stabilize_predicted_f0(f0)
+        return f0
+
+    @staticmethod
+    def _stabilize_predicted_f0(f0):
+        """v11 A′: 予測 F0 の frame-rate ノイズを担体に渡る前に構造的に遮断する。
+
+        F0 predictor の入力は attn 展開した enc_p hidden = symbol 格子 (JA 実測
+        ~1.6 frame/symbol) なので、予測誤差は自然韻律 (≲10Hz 変調) ではなく
+        **frame-rate のジッタ + V/UV 明滅**として現れる (smoke arm H 実測:
+        voiced 内 |diff| median 26Hz/frame、孤立 1-frame unvoiced が数 frame
+        おき)。担体 (CarrierHead) は F0 を忠実に FM/AM 描画するため、この
+        ノイズは倍音 m で m 倍に拡大され 1-3kHz の調波構造を潰す (comb-HNR
+        5.2dB。設計 doc §5.3 E2 は静的 cent シフトのみ検証しており、動的
+        ジッタ + 明滅が盲点だった。instance 実測: 58ms box 平滑のみで
+        13.2dB、V/UV 明滅も除いた一定 F0 で 46dB に回復)。
+
+        処方はゲイン側 (§3.2「frame 格子 + 固定 Hann 平滑」) と同じ流儀の
+        固定 (学習不能・CLI 不可変) 演算 2 つ:
+
+        1. **V/UV 多数決 (k=5)**: 窓内 voiced 過半で voiced。孤立 1-2 frame の
+           明滅 (担体のぶつ切り = AM 側波帯、実測 ~30dB 損) を除去し、真の
+           障害音 (≥3 frame の閉鎖) は保存する。
+        2. **58ms box 平滑 (voiced マスク付き平均)**: unvoiced の 0 を統計に
+           混ぜずに F0 だけ平滑。i.i.d. ジッタの frame 間 |diff| を ~1/5 に
+           落とし、アクセント遷移 (~100ms) は保存する。
+
+        GT F0 (teacher forcing) は自然韻律そのものなので通さない (呼び出し側
+        ``_predicted_f0_hz`` でのみ適用)。ONNX: Pad(edge)/Conv/Greater のみで
+        opset 15 に収まり、決定的 (parity テスト対象)。
+        """
+        voiced = (f0 > 1.0).to(f0.dtype)
+        k = _F0_SMOOTH_FRAMES
+        pad = k // 2
+        w = torch.ones(1, 1, k, dtype=f0.dtype, device=f0.device)
+        num = F.conv1d(F.pad(f0 * voiced, (pad, pad), mode="replicate"), w)
+        den = F.conv1d(F.pad(voiced, (pad, pad), mode="replicate"), w)
+        keep = (den * 2.0 > float(k)).to(f0.dtype)  # 多数決 (> k/2)
+        return keep * num / den.clamp(min=1.0)
 
     def _f0_for_decoder(self, f0_gt, log_f0, vuv_logit, f0_pred_prob):
         """teacher forcing: GT F0 と予測 F0 をサンプル単位で混ぜる (§4.4)。

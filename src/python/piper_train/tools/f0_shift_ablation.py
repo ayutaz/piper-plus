@@ -84,14 +84,28 @@ def follow_ratio(
 
 
 def summarize(ratios: dict[float, float]) -> dict:
-    """追従率の集計と go/no-go 判定 (判定は表示のみ、副作用なし)。"""
+    """追従率の集計と go/no-go 判定 (判定は表示のみ、副作用なし)。
+
+    追従率が 1 点も計算できない欠測 (出力がノイジーで pyin の voiced 検出が
+    全滅した場合や基準 shift=0 の実測欠落) は ``median_follow_ratio=None`` +
+    ``insufficient_data=True`` で報告する — 0.0 を捏造すると「decoder が F0 を
+    無視」という別の失敗機序に見え、診断を誤誘導する (v11 smoke arm H で実害:
+    実際は平滑 F0 でほぼ完全追従だった)。verdict は保守側の no-go を維持
+    (欠測を gate 通過にしない)。
+    """
     values = [v for v in ratios.values() if np.isfinite(v)]
-    median_ratio = float(np.median(values)) if values else 0.0
+    insufficient = not values
+    median_ratio = None if insufficient else float(np.median(values))
+    if insufficient:
+        verdict = "no-go"
+    else:
+        verdict = "go" if median_ratio >= GO_THRESHOLD else "no-go"
     return {
         "per_shift": ratios,
         "median_follow_ratio": median_ratio,
+        "insufficient_data": insufficient,
         "go_threshold": GO_THRESHOLD,
-        "verdict": "go" if median_ratio >= GO_THRESHOLD else "no-go",
+        "verdict": verdict,
     }
 
 
@@ -266,18 +280,29 @@ def main(argv: list[str] | None = None) -> int:
 
     report = summarize(follow_ratio(measured))
     report["measured_median_hz"] = measured
+    report["missing_shifts"] = [s for s in args.shifts if s not in measured]
     report["checkpoint"] = args.checkpoint
     out_path = out_root / "f0_shift_ablation.json"
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
 
-    _LOGGER.info(
-        "median follow ratio = %.3f (threshold %.2f) -> %s | wrote %s",
-        report["median_follow_ratio"],
-        GO_THRESHOLD,
-        report["verdict"].upper(),
-        out_path,
-    )
+    if report["insufficient_data"]:
+        _LOGGER.warning(
+            "no follow ratio could be computed (missing shifts: %s) -> "
+            "%s is a MISSING-DATA verdict, not a measured tracking failure "
+            "| wrote %s",
+            report["missing_shifts"],
+            report["verdict"].upper(),
+            out_path,
+        )
+    else:
+        _LOGGER.info(
+            "median follow ratio = %.3f (threshold %.2f) -> %s | wrote %s",
+            report["median_follow_ratio"],
+            GO_THRESHOLD,
+            report["verdict"].upper(),
+            out_path,
+        )
     return 0
 
 
