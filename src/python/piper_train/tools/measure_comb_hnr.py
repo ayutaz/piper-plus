@@ -16,6 +16,16 @@ canonical: v10b 残存ノイズ診断 (docs/design/zero-shot-v10b-residual-noise
 (:func:`comb_hnr_at_reference`) はサブハーモニック / オクターブ下エラー診断
 (:func:`detect_octave_down`) 専用で、gate への使用は禁止。
 
+**exact-track fallback (carrier head 専用、2026-08-21)**: carrier head モデル
+の f0_decoder track は oscillator がそのまま消費するため cent 誤差ゼロ
+(±20 cent 罠は「推定」格子の話で適用外)。pyin が voicing を全滅判定した
+クリップ (実例: v11 smoke arm H ns=0.0 — band0 carrier/noise ~-2dB で pyin
+voiced 0、実際は decoder 格子 comb 5.9-6.1dB) では self-track が null になり
+「完全非周期」と誤読される。:func:`comb_hnr_at_exact_track` は pyin 非依存
+(voiced = track > 1Hz) の測定で、この誤判定を防ぐ。事前登録 gate (#2
+ns=0.667 ≥10dB) は self-track のまま、ns 掃引 (#3) の測定不能点の補完に使い、
+どちらの track かを必ず出力に明記する。
+
 既知アンカー (22.05kHz / band 1-3kHz / クリップ median、診断 doc §1/§6 実測):
 
     GT (moe-speech 実音声)        : 13.2 dB
@@ -204,6 +214,41 @@ def comb_hnr_at_reference(
     return float(np.median(ratios))
 
 
+def comb_hnr_at_exact_track(
+    y: np.ndarray,
+    sr: int,
+    f0_track_hz: np.ndarray,
+    band: tuple[float, float] = DEFAULT_BAND_HZ,
+) -> float | None:
+    """decoder 消費 F0 track (cent 誤差ゼロ) での comb-HNR [dB] median。
+
+    **carrier head モデル専用の pyin 非依存 fallback** (module docstring の
+    exact-track fallback 節参照)。voiced 判定も track 自身 (f0 > 1Hz) から
+    取るため、pyin の voicing 全滅 (band0 carrier/noise 悪化時) に影響され
+    ない。track は frame 格子 (hop 256) の Hz 値、無声 = 0。[1, 1, T] 等の
+    tensor dump 形状も受理する。
+
+    :func:`comb_hnr_at_reference` (pyin voiced 依存、oct↓ 診断用) とは別物。
+    非 carrier モデルの GT / 予測「推定」格子に使うと ±20 cent 罠で崩壊する
+    ため、その用途は引き続き禁止。
+    """
+    y = _validate_input(y, sr)
+    if y is None:
+        return None
+    import librosa  # noqa: PLC0415 — lazy import (import 時コストの回避、house style)
+
+    power = np.abs(librosa.stft(y, n_fft=N_FFT, hop_length=HOP)) ** 2
+    f0 = np.asarray(f0_track_hz, dtype=np.float64).reshape(-1)
+    n = min(power.shape[1], len(f0))
+    f0 = f0[:n]
+    power = power[:, :n]
+    voiced = f0 > 1.0
+    ratios = comb_hnr_frames(power, f0, voiced, sr, band=band)
+    if not ratios:
+        return None
+    return float(np.median(ratios))
+
+
 def detect_octave_down(
     y: np.ndarray,
     sr: int,
@@ -271,6 +316,19 @@ def score_file(path: Path, band: tuple[float, float] = DEFAULT_BAND_HZ) -> float
     return comb_hnr(load_wav(path, sr=SR_ANALYSIS), SR_ANALYSIS, band=band)
 
 
+def score_file_exact(
+    path: Path, track_path: Path, band: tuple[float, float] = DEFAULT_BAND_HZ
+) -> float | None:
+    """wav + `<stem>.f0.npy` (frame 格子 Hz、無声=0) で exact-track comb を返す。"""
+    from piper_train.tools.acoustic_frames import load_wav  # noqa: PLC0415
+
+    if not track_path.is_file():
+        return None
+    return comb_hnr_at_exact_track(
+        load_wav(path, sr=SR_ANALYSIS), SR_ANALYSIS, np.load(track_path), band=band
+    )
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -286,15 +344,33 @@ def main() -> int:
         help="測定帯域 Hz (default: 1000 3000 = A3 帯域。アンカー値は default 専用)",
     )
     ap.add_argument("--json-out", help="per-file + median/mean の JSON 出力先")
+    ap.add_argument(
+        "--f0-track-dir",
+        help="decoder 消費 F0 track (`<stem>.f0.npy`, frame 格子 Hz, 無声=0) の"
+        "ディレクトリ。carrier head モデル専用 — pyin voicing 全滅で self-track"
+        " が null になるクリップの exact-track 補完 (per_file_exact /"
+        " median_exact を追加、既存 self-track フィールドは不変)",
+    )
     args = ap.parse_args()
 
     band = (float(args.band[0]), float(args.band[1]))
     paths = [Path(args.wav)] if args.wav else sorted(Path(args.clips_dir).glob("*.wav"))
     per_file: dict[str, float | None] = {}
+    per_file_exact: dict[str, float | None] = {}
     for p in paths:
         v = score_file(p, band=band)
         per_file[p.name] = None if v is None else round(v, 3)
         _LOGGER.info("%s: comb_hnr=%s dB", p.name, "n/a" if v is None else f"{v:.3f}")
+        if args.f0_track_dir:
+            ve = score_file_exact(
+                p, Path(args.f0_track_dir) / f"{p.stem}.f0.npy", band=band
+            )
+            per_file_exact[p.name] = None if ve is None else round(ve, 3)
+            _LOGGER.info(
+                "%s: comb_hnr_exact=%s dB",
+                p.name,
+                "n/a" if ve is None else f"{ve:.3f}",
+            )
 
     vals = [v for v in per_file.values() if v is not None]
     summary = {
@@ -304,6 +380,12 @@ def main() -> int:
         "median": round(float(np.median(vals)), 3) if vals else None,
         "mean": round(float(np.mean(vals)), 3) if vals else None,
     }
+    if args.f0_track_dir:
+        vals_e = [v for v in per_file_exact.values() if v is not None]
+        summary["f0_track_exact"] = "decoder-consumed (carrier head)"
+        summary["per_file_exact"] = per_file_exact
+        summary["median_exact"] = round(float(np.median(vals_e)), 3) if vals_e else None
+        summary["mean_exact"] = round(float(np.mean(vals_e)), 3) if vals_e else None
     # ASCII-only (Windows cp932 console でも化けない)
     print(
         f"comb_hnr median: {summary['median']} dB "

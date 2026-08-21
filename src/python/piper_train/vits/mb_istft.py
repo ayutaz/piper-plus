@@ -841,6 +841,15 @@ class MBiSTFTGenerator(nn.Module):
         self.subband_conv_post = Conv1d(
             post_in_channels, post_out_channels, 7, padding=3
         )
+        if use_carrier_head:
+            # v11 A′: noise 枝 (band0 log σ) の default-off 化。ゼロ特徴の
+            # 動作点で σ = exp(0) = 1 (default-on) だと、学習初期から noise 床
+            # が担体を覆い ns 用量反応も逆転する (smoke 実測: σ_med が 668 iter
+            # で 0.74 までしか下がらず comb 床 ~8dB)。log σ チャネルの bias を
+            # -2 (σ ≈ 0.135) に初期化して「鳴らすには学習で上げる」向きに
+            # 揃える。carrier mode 専用チャネルのため v10b 互換に影響なし。
+            with torch.no_grad():
+                self.subband_conv_post.bias[: n_fft // 2 + 1].fill_(-2.0)
 
         # --- iSTFT ---
         self.istft = OnnxISTFT(n_fft=n_fft, hop_length=hop_length)

@@ -582,3 +582,34 @@ class TestLightningWiring:
         src = Path("piper_train/vits/lightning.py").read_text(encoding="utf-8")
         assert "carrier_source_regularization(" in src
         assert "c_src_reg > 0" in src.replace("self.hparams.", "")
+
+
+class TestNoiseBranchDefaultOff:
+    """v11 A′ noise 枝の default-off 初期化 (smoke 2 実測に基づく)。
+
+    ゼロ特徴の動作点で σ=1 (default-on) だと学習初期から noise 床が担体を
+    覆い、ns 用量反応が v10b と逆転する (σ_med 668 iter で 0.74 止まり、
+    comb 床 ~8dB)。log σ bias を -2 に初期化し「鳴らすには学習で上げる」
+    向きに揃える。
+    """
+
+    def test_log_sigma_bias_initialized_negative(self):
+        import torch
+
+        gen = _gen(use_carrier_head=True)
+        n_half = gen.n_fft // 2 + 1
+        bias = gen.subband_conv_post.bias.detach()
+        assert torch.allclose(bias[:n_half], torch.full((n_half,), -2.0))
+        # band1-3 (自由 head) の bias は通常初期化のまま (全 -2 ではない)
+        assert not torch.allclose(
+            bias[n_half:], torch.full_like(bias[n_half:], -2.0)
+        )
+
+    def test_non_carrier_mode_bias_untouched(self):
+        import torch
+
+        gen = _gen(use_carrier_head=False)
+        # v10b 互換: carrier off では -2 埋めをしない
+        assert not torch.allclose(
+            gen.subband_conv_post.bias.detach()[:9], torch.full((9,), -2.0)
+        )
