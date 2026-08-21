@@ -17,6 +17,7 @@ from piper_train.tools import measure_comb_hnr
 from piper_train.tools.measure_comb_hnr import (
     DEFAULT_BAND_HZ,
     comb_hnr,
+    comb_hnr_at_exact_track,
     comb_hnr_at_reference,
     comb_hnr_frames,
     detect_octave_down,
@@ -169,6 +170,118 @@ class TestOctaveDownDetection:
         y = _harmonic_signal(220.0 * 2 ** (20.0 / 1200.0), noise_rms=3e-4, seed=6)
         out = detect_octave_down(y, SR, f0_ref_hz=220.0)
         assert out["octave_down_flag"] is False
+
+
+@pytest.mark.unit
+class TestExactTrackFallback:
+    """pyin voicing 全滅時の測定不能穴 (v11 smoke arm H 2 回目の誤 die の再発防止)。
+
+    実事例 (2026-08-21): carrier head ckpt の ns=0.0 合成は band0 の
+    carrier/noise 比 ~-2dB で pyin が全フレーム unvoiced を返し、self-track
+    comb-HNR が null → smoke が「完全非周期」と誤判定して die した。実際は
+    decoder 自身の F0 格子で測ると comb 5.9-6.1dB (調波構造あり)。
+
+    carrier head モデルでは f0_decoder track は oscillator がそのまま消費する
+    ため cent 誤差ゼロ (±20 cent 罠 = GT/予測「推定」格子の話 — は適用外)。
+    pyin 非依存の exact-track 測定はこの場合に限り有効、という契約を pin する。
+    """
+
+    def _pyin_all_unvoiced(self, y, **kwargs):
+        """run-2 ns=0.0 の実挙動 (pyin が voicing を全滅判定) の決定的再現。"""
+        n = 1 + len(y) // measure_comb_hnr.HOP
+        return (
+            np.full(n, np.nan),
+            np.zeros(n, dtype=bool),
+            np.zeros(n),
+        )
+
+    def test_exact_track_measures_when_pyin_voicing_fails(self, monkeypatch):
+        """pyin 全滅 → self-track は null (穴)、exact-track は測れる (修正)。"""
+        import librosa
+
+        y = _harmonic_signal(220.0, noise_rms=3e-4, seed=8)
+        n_frames = 1 + len(y) // measure_comb_hnr.HOP
+        track = np.full(n_frames, 220.0)
+
+        baseline = comb_hnr(y, SR)
+        assert baseline is not None  # pyin が正常なら self-track で測れる信号
+
+        monkeypatch.setattr(librosa, "pyin", self._pyin_all_unvoiced)
+        assert comb_hnr(y, SR) is None  # 穴: pyin 全滅で self-track は null
+        exact = comb_hnr_at_exact_track(y, SR, track)
+        assert exact is not None
+        assert exact == pytest.approx(baseline, abs=1.5)
+
+    def test_exact_track_does_not_call_pyin(self, monkeypatch):
+        """exact-track は pyin を一切呼ばない (依存の構造的排除)。"""
+        import librosa
+
+        def _boom(*args, **kwargs):
+            raise AssertionError("exact-track must not call pyin")
+
+        monkeypatch.setattr(librosa, "pyin", _boom)
+        y = _harmonic_signal(220.0, noise_rms=3e-4, seed=9)
+        n_frames = 1 + len(y) // measure_comb_hnr.HOP
+        assert comb_hnr_at_exact_track(y, SR, np.full(n_frames, 220.0)) is not None
+
+    def test_exact_track_voiced_mask_from_track(self):
+        """voiced 判定は track 自身 (f0 > 1) — f0=0 フレームは格子から除外、
+        全フレーム f0=0 なら None。"""
+        y = _harmonic_signal(220.0, noise_rms=3e-4, seed=10)
+        n_frames = 1 + len(y) // measure_comb_hnr.HOP
+        track = np.full(n_frames, 220.0)
+        track[: n_frames // 2] = 0.0
+        assert comb_hnr_at_exact_track(y, SR, track) is not None
+        assert comb_hnr_at_exact_track(y, SR, np.zeros(n_frames)) is None
+
+    def test_exact_track_accepts_tensor_shaped_input(self):
+        """decoder dump の [1, 1, T] 形状 ndarray も受理する (reshape(-1))。"""
+        y = _harmonic_signal(220.0, noise_rms=3e-4, seed=11)
+        n_frames = 1 + len(y) // measure_comb_hnr.HOP
+        track = np.full((1, 1, n_frames), 220.0)
+        assert comb_hnr_at_exact_track(y, SR, track) is not None
+
+    def test_cli_f0_track_dir_adds_exact_fields(self, tmp_path, monkeypatch):
+        """--f0-track-dir で per_file_exact / median_exact が追加され、既存
+        schema (per_file / median = self-track) は不変 (後方互換)。"""
+        import json
+        import sys
+
+        import soundfile as sf
+
+        y = _harmonic_signal(220.0, noise_rms=3e-4, seed=12)
+        clips = tmp_path / "clips"
+        tracks = tmp_path / "tracks"
+        clips.mkdir()
+        tracks.mkdir()
+        sf.write(clips / "t0.wav", y.astype(np.float32), SR)
+        n_frames = 1 + len(y) // measure_comb_hnr.HOP
+        np.save(tracks / "t0.f0.npy", np.full(n_frames, 220.0))
+        out_json = tmp_path / "out.json"
+
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "measure_comb_hnr",
+                "--clips-dir",
+                str(clips),
+                "--f0-track-dir",
+                str(tracks),
+                "--json-out",
+                str(out_json),
+            ],
+        )
+        assert measure_comb_hnr.main() == 0
+        summary = json.loads(out_json.read_text(encoding="utf-8"))
+        assert summary["f0_track"] == "self"  # 既存 gate 契約は self-track のまま
+        assert "t0.wav" in summary["per_file"]
+        assert summary["per_file_exact"]["t0.wav"] is not None
+        assert summary["median_exact"] is not None
+        # self と exact は F0 誤差ゼロの合成信号ではほぼ一致
+        assert summary["per_file_exact"]["t0.wav"] == pytest.approx(
+            summary["per_file"]["t0.wav"], abs=1.5
+        )
 
 
 @pytest.mark.unit
