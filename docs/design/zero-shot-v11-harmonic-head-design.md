@@ -611,3 +611,23 @@ v10b plan §4.3 の流儀 (測ってから基準をいじらない) に従い先
   frame-rate 包絡 × oscillator bank の系譜) / Period VITS (arXiv:2210.15964) /
   Nguyen 1994 (near-perfect-reconstruction pseudo-QMF、解析重みの根拠) /
   FastPitch (arXiv:2006.06873、predictor detach の流儀)
+
+## 10. Phase B smoke で発見した盲点と修正 (2026-08-21)
+
+arm H 初回 smoke が担体 gate で不合格 (comb-HNR 2.27dB / 追従率 0.0)。統合配線は
+シロ (一定 F0 なら full forward で 51dB、ピークは正確に m·F0)【実測】。真因は
+本 doc §5.3 E2 の盲点:
+
+- **E2 は静的 cent シフトのみ検証**していたが、実際の予測 F0 は undertrained
+  段階で frame 単位ジッタ (|ΔF0| median 12-26Hz/frame) + 孤立 1-frame V/UV
+  明滅を持ち、担体がそれを**忠実に FM/AM 描画**して倍音 m で m 倍に拡大 →
+  調波が潰れる (carrier 単独 5.2dB)【実測】
+- 修正: `_stabilize_predicted_f0` — **固定 58ms box 平滑 (voiced マスク付き) +
+  V/UV 多数決 k=5** を推論時の予測 F0 にのみ適用 (GT teacher forcing 不適用 /
+  carrier off は bit 不変 / 固定・学習不能 = §3.2 ゲイン平滑と同じ構造保証)。
+  実測 2.67→14.17dB (E2E、predictor 級ノイズ較正)【実測】
+- 副発見: 追従率 0.0 は **f0_shift_ablation が pyin 欠測時に 0.0 を捏造**して
+  いた測定バグ (実際は平滑後 ±2st に対し出力 197.99/249.45Hz = 追従 ~1.0)。
+  欠測は `insufficient_data` として顕在化するよう修正 (verdict は保守側維持)
+- 教訓: 構造保証の検証には**入力の動的な汚さ (時間微分)** も敵対条件に含める。
+  新テスト `test_carrier_f0_stability.py` が predictor 級ノイズの E2E を恒久 pin

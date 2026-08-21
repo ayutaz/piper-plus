@@ -79,6 +79,27 @@ def test_go_threshold_matches_the_design_document():
     assert abl.GO_THRESHOLD == 0.8
 
 
+def test_summarize_does_not_fabricate_a_zero_ratio_from_missing_data():
+    """欠測 (追従率が 1 点も計算できない) を「追従率 0.0」と偽装しない。
+
+    v11 smoke arm H (2026-08-20) の実害: 出力がノイジーで pyin の voiced 検出が
+    全滅 → prosody 全 null → follow_ratio 空 → median 0.0 が「担体が F0 を
+    無視」と誤読され、デバッグが統合バグ方向に誘導された (実際は平滑 F0 で
+    追従率ほぼ 1.0)。欠測は median_follow_ratio=None + insufficient_data=True
+    で報告し、verdict は保守側 (no-go) を維持する — gate は緩めない。
+    """
+    out = abl.summarize({})
+    assert out["verdict"] == "no-go"
+    assert out["median_follow_ratio"] is None
+    assert out["insufficient_data"] is True
+
+
+def test_summarize_with_measurements_is_not_flagged_insufficient():
+    out = abl.summarize({2.0: 0.9, -2.0: 0.85})
+    assert out["insufficient_data"] is False
+    assert out["median_follow_ratio"] == pytest.approx(0.875)
+
+
 def test_measurement_runs_measure_prosody_in_a_subprocess():
     """評価器は subprocess 越し (torch を積んだプロセスに引き込まない)。"""
     source = inspect.getsource(abl.measure_group_f0_median)
