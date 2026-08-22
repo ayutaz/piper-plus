@@ -32,7 +32,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import pathlib
 import sys
 from pathlib import Path
 
@@ -41,9 +40,16 @@ import torch
 
 # Windows で Linux 由来の ckpt をロードするための互換パッチ。
 # (Lightning は hyper_parameters に PosixPath を直接ピクルする)
-if sys.platform == "win32":
-    pathlib.PosixPath = pathlib.WindowsPath  # type: ignore[misc,assignment]
-torch.serialization.add_safe_globals([pathlib.PosixPath, pathlib.WindowsPath])
+#
+# 実装は piper_train._compat が canonical。 ここに写経すると、 CPython 3.13 の
+# pathlib 分割のような変更が起きたときに片方だけ直って drift する
+# (実際 piper_train/__main__.py の複製がそうなっていた)。
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src" / "python"))
+
+from piper_train._compat import apply_windows_pathlib_aliases  # noqa: E402
+
+
+apply_windows_pathlib_aliases()
 
 
 TOP_LEVEL_KEYS_TO_DROP = (

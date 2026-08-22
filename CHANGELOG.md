@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- 学習: CPython 3.13 で `torch.load` が既存 ckpt を `UnpicklingError: GLOBAL pathlib.PosixPath was not an allowed global` で拒否する問題を修正。 `torch.serialization.add_safe_globals([cls])` (bare 形式) は登録キーを **読み手側の** `cls.__module__` から導出するが、 unpickler は **書き手側が記録した文字列**を引く。 CPython 3.13 が具象 path クラスを `pathlib._local` へ移した (3.14 で `pathlib` に復帰) ため両者が一致せず、 3.12 以前で保存した ckpt が 3.13 で読めなくなっていた (逆方向も同様)。 `piper_train._compat` が `pathlib` / `pathlib._local` の両綴りを `(callable, name)` タプル形式で明示登録するようにし、 `weights_only=False` 経路用の Windows alias も両モジュールへ適用する。 併せて `piper_train/__main__.py` と `scripts/convert_multi_to_single_speaker.py` にあった同ロジックの複製 (drift 元) を canonical 実装への委譲に置き換え、 CI で 1 度も実行されていなかった `tests/test_compat.py` に `unit` マーカーを付与
+
 - CI: `g2p-python-ci.yml` の `test extras` job で venv を workspace 内 (`.venv-extras/`) ではなく `${RUNNER_TEMP}/venv-extras` に作るよう変更。 当 job は `uv.lock` を経由せず PyPI から fresh resolve するため nltk 3.10.x を引くが、 3.10 で追加された `nltk/inisec.py` の `NLTKSafeImportFinder` が「解決先ファイルが cwd 配下に物理的に存在する」モジュールを一律ブロックするため、 workspace 内 venv だと site-packages 全体が誤検知され `import nltk` 自体が `ImportError: Blocked import of regex from current working directory` で失敗していた。 エラーメッセージが案内する `-P` / `PYTHONSAFEPATH=1` は判定基準が sys.path ではなくファイルの物理位置のため回避にならないことを実測で確認済み
 
 ## [2.0.0] - 2026-05-25
