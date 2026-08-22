@@ -5,7 +5,7 @@ a v1.11.x HiFi-GAN checkpoint is no longer possible — the loader must
 detect such checkpoints and emit a clear migration error.
 
 These tests pin the detection logic in
-``piper_train.__main__._is_legacy_hifigan_checkpoint`` so we don't:
+``piper_train.vits.commons.is_legacy_hifigan_checkpoint`` so we don't:
   - accidentally accept a HiFi-GAN ckpt (silent corruption), or
   - reject a valid MB-iSTFT ckpt (false positive).
 """
@@ -14,9 +14,9 @@ import pytest
 
 pytest.importorskip("torch")
 
-from piper_train.__main__ import (  # noqa: E402
+from piper_train.vits.commons import (  # noqa: E402
     _LEGACY_HIFIGAN_MESSAGE,
-    _is_legacy_hifigan_checkpoint,
+    is_legacy_hifigan_checkpoint as _is_legacy_hifigan_checkpoint,
 )
 
 

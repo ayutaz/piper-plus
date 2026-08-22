@@ -13,8 +13,6 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.strategies import DDPStrategy
 
 from .vits.commons import (
-    _LEGACY_HIFIGAN_MESSAGE,  # noqa: F401  (re-exported for callers/tests)
-    is_legacy_hifigan_checkpoint,
     normalize_checkpoint_state_dict,
     remap_weight_norm_keys,
 )
@@ -41,10 +39,10 @@ except ImportError:
 _LOGGER = logging.getLogger(__package__)
 
 
-# Checkpoint compatibility lives in `vits.commons` so the training entry point,
-# the ONNX exporter and the Lightning hook all share one implementation. These
-# aliases keep the historical `piper_train.__main__` import path working.
-_is_legacy_hifigan_checkpoint = is_legacy_hifigan_checkpoint
+# NOTE: HiFi-GAN checkpoint detection and its migration message now live in
+# `vits.commons`, applied via `normalize_checkpoint_state_dict`, so the
+# training entry point, the ONNX exporter and the Lightning hook all share
+# one implementation. Import them from there, not from this module.
 
 
 def calculate_effective_batch_size(batch_size, num_gpus=1):

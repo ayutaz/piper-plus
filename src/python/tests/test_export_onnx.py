@@ -1141,9 +1141,9 @@ class TestExportAfterLegacyHifiganResume:
           Act     — call the detection helper.
           Assert  — returns True; message mentions MB-iSTFT/migration.
         """
-        from piper_train.__main__ import (
+        from piper_train.vits.commons import (
             _LEGACY_HIFIGAN_MESSAGE,
-            _is_legacy_hifigan_checkpoint,
+            is_legacy_hifigan_checkpoint as _is_legacy_hifigan_checkpoint,
         )
 
         # Arrange: realistic HiFi-GAN-shaped state_dict (no MB-iSTFT marker).

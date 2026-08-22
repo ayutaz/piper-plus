@@ -25,9 +25,9 @@ pytest.importorskip("torch")
 
 import torch  # noqa: E402
 
-from piper_train.__main__ import (  # noqa: E402
-    _is_legacy_hifigan_checkpoint,
-    create_parser,
+from piper_train.__main__ import create_parser  # noqa: E402
+from piper_train.vits.commons import (  # noqa: E402
+    is_legacy_hifigan_checkpoint as _is_legacy_hifigan_checkpoint,
 )
 
 
@@ -86,7 +86,7 @@ def test_old_hifigan_ckpt_raises_dr006_error(tmp_path):
     ``_is_legacy_hifigan_checkpoint(state_dict)`` then raise
     ``RuntimeError(_LEGACY_HIFIGAN_MESSAGE.format(path=...))``.
     """
-    from piper_train.__main__ import _LEGACY_HIFIGAN_MESSAGE
+    from piper_train.vits.commons import _LEGACY_HIFIGAN_MESSAGE
 
     fake_state_dict = {
         "model_g.enc_p.emb.weight": torch.zeros(50, 192),
