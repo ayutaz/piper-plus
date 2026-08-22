@@ -272,6 +272,10 @@ android/piper-plus-g2p/.cxx/
 android/piper-plus-g2p/build/
 android/.gradle/
 
+# Android SDK path — Gradle auto-generates this per machine on first build.
+# Machine-local absolute path, must never be committed.
+android/local.properties
+
 # Swift Package Manager: Package.resolved is auto-generated when SPM
 # resolves dependencies. piper-plus ships libraries (PiperPlus /
 # PiperPlusG2P), not an app, so we don't pin transitive dependency
