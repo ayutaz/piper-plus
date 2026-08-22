@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- 開発ツール: `.claude/hooks/guard-bash.sh` の `is_in_skill` が、 同一セッションで skill を再呼び出しした際に harness が挿入する `(Re-invocation of /<name> — ...)` メタ行 (`"isMeta":true`) を「新しいユーザー入力」と誤判定し、 **2 回目以降の `/create-pr` を常に deny** していた問題を修正 (1 セッションで複数 PR を出す流れが丸ごと塞がる)。 併せて `.claude/hooks/test-guard-bash.sh` の「許可」ケースが exit code しか見ておらず (hook は deny 時も exit 0 で JSON を stdout に出すため) **全て空振りしていた**のを、 出力が空であることまで検査するよう強化。 この振る舞いテストを pre-commit gate (`guard-bash-behaviour`) として登録し、 shellcheck では原理的に検出できない判定ロジックの回帰を commit 時点で捕まえるようにした
+
 - CI: `g2p-python-ci.yml` の `test extras` job で venv を workspace 内 (`.venv-extras/`) ではなく `${RUNNER_TEMP}/venv-extras` に作るよう変更。 当 job は `uv.lock` を経由せず PyPI から fresh resolve するため nltk 3.10.x を引くが、 3.10 で追加された `nltk/inisec.py` の `NLTKSafeImportFinder` が「解決先ファイルが cwd 配下に物理的に存在する」モジュールを一律ブロックするため、 workspace 内 venv だと site-packages 全体が誤検知され `import nltk` 自体が `ImportError: Blocked import of regex from current working directory` で失敗していた。 エラーメッセージが案内する `-P` / `PYTHONSAFEPATH=1` は判定基準が sys.path ではなくファイルの物理位置のため回避にならないことを実測で確認済み
 
 ## [2.0.0] - 2026-05-25
