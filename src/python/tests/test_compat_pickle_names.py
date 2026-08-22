@@ -101,7 +101,7 @@ def _write_checkpoint(tmp_path, spelling: str):
             {
                 "epoch": 74,
                 "global_step": 500034,
-                "hyper_parameters": {"dataset": [proxy("/data/piper/dataset.jsonl")]},
+                "hyper_parameters": {"dataset": [proxy("/var/example/dataset.jsonl")]},
                 "state_dict": {"weight": torch.zeros(2, 2)},
             },
             target,
