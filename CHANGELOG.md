@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- ドキュメント: `docs/guides/development/pretrained-models.md` の 6lang base model 記述を実態に合わせて修正。 HF `ayousanz/piper-plus-base` の `model.ckpt` は 2026-05-03 に HiFi-GAN 版から **MB-iSTFT-VITS2 版** (75 epoch scratch、 `epoch=74-step=500034`) へ差し替え済みだが、 表が「6-Language Base (HiFi-GAN)」、 注記が「MB-iSTFT 版は未アップロード」のまま残っていた。 併せて `dev` (v2.0) では `model_g.dec.cond` の size mismatch で読み込めないこと ([Issue #616](https://github.com/ayutaz/piper-plus/issues/616)) と、 互換タグ `v1.13.0` を使う回避策を明記
+- `notebooks/finetune.ipynb`: HF に存在しないファイル名 `epoch=74-step=504712.ckpt` を DL しようとして 404 で失敗していたのを `model.ckpt` に修正。 併せて (1) 公開中の ckpt と互換なリリースタグ `v1.13.0` を固定 clone するよう変更 (`dev` は Multi-scale FiLM 導入で decoder 形状が変わり ckpt を読めない)、 (2) `phoneme_id_map` / `num_symbols` を `get_phoneme_id_map()` (KO/SV を含む 8 言語統合マップ、 185 symbol) ではなく HF `config.json` (173 symbol) から取得するよう変更し、 `model_g.enc_p.emb.weight` の 173 vs 185 size mismatch を解消
+- CI: `_build-test-cpp.yml` のテストモデル取得 step を削除。 `https://huggingface.co/ayousanz/piper-plus-base/resolve/main/multilingual-test-medium.onnx` は 404 を返すようになっていたが `curl ... || true` で握り潰されており、 integration test がモデル無しで黙って劣化しうる状態だった。 実際には `test/models/multilingual-test-medium.onnx` は LFS ではない通常の blob として commit 済みで checkout 時点から存在するため、 cache + download をまとめて削除し、 存在確認して欠けていたら fail-fast する step に置き換え
 - CI: `g2p-python-ci.yml` の `test extras` job で venv を workspace 内 (`.venv-extras/`) ではなく `${RUNNER_TEMP}/venv-extras` に作るよう変更。 当 job は `uv.lock` を経由せず PyPI から fresh resolve するため nltk 3.10.x を引くが、 3.10 で追加された `nltk/inisec.py` の `NLTKSafeImportFinder` が「解決先ファイルが cwd 配下に物理的に存在する」モジュールを一律ブロックするため、 workspace 内 venv だと site-packages 全体が誤検知され `import nltk` 自体が `ImportError: Blocked import of regex from current working directory` で失敗していた。 エラーメッセージが案内する `-P` / `PYTHONSAFEPATH=1` は判定基準が sys.path ではなくファイルの物理位置のため回避にならないことを実測で確認済み
 
 ## [2.0.0] - 2026-05-25
