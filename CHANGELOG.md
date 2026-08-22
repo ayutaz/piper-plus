@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- 契約: `docs/spec/phoneme-set-version.toml` が `num_symbols = 173` を「IMMUTABLE」と宣言する一方、 実コードの `get_phoneme_id_map("multilingual")` は #300 (Swedish 追加) 以降ずっと 185 を返しており、 仕様と実装が乖離していた問題を修正。 原因は gate (`scripts/check_phoneme_set_version.py`) が toml の自己整合と `pua.json` の entry 数しか見ておらず、 **インベントリを実際に構築する関数を一度も呼んでいなかった**こと (契約自体も `pua.json` + 公開モデル config を書き写して作られており、 当初からコードを参照していなかった)。 加えて pre-commit の `files` regex に `id_maps.py` が含まれておらず、 **インベントリ本体を編集しても発火する hook が 1 つも存在しなかった**
+- 契約: 単一 pin をやめ、 live inventory (185 / `symbol_set_version = "1.1"`) と出荷済み snapshot (173 / `"1.0"`) を分けて表現するようにした。 両者は append-only な関係であることを実測で確認済み (`sha256(live[:173])` が HF 公開モデルの `phoneme_id_map` と完全一致)。 gate は (1) live の長さ、 (2) live 全体の digest (並べ替え検出)、 (3) 各 snapshot が live の厳密な prefix であること、 を検査する。 長さのみの検査では v1.12.0 が実際に出荷した「185 のまま id 94/149/153 が公開モデルと食い違う」ケースを検出できない
+- テスト: `tests/test_swedish_phonemizer.py` の `assert len(id_map) > 180` / `>= 173` という緩い assert (Swedish 12 記号の追加を通した張本人) を、 契約の厳密値 + digest 照合に置換。 `src/python/g2p/tests/test_phoneme_inventory.py` を新規追加し、 id の連続性・snapshot prefix 不変・合成言語コード間の一致を pin
+
 - CI: `g2p-python-ci.yml` の `test extras` job で venv を workspace 内 (`.venv-extras/`) ではなく `${RUNNER_TEMP}/venv-extras` に作るよう変更。 当 job は `uv.lock` を経由せず PyPI から fresh resolve するため nltk 3.10.x を引くが、 3.10 で追加された `nltk/inisec.py` の `NLTKSafeImportFinder` が「解決先ファイルが cwd 配下に物理的に存在する」モジュールを一律ブロックするため、 workspace 内 venv だと site-packages 全体が誤検知され `import nltk` 自体が `ImportError: Blocked import of regex from current working directory` で失敗していた。 エラーメッセージが案内する `-P` / `PYTHONSAFEPATH=1` は判定基準が sys.path ではなくファイルの物理位置のため回避にならないことを実測で確認済み
 
 ## [2.0.0] - 2026-05-25
