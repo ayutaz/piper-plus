@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- 学習 / エクスポート: 公開ベースモデル (`ayousanz/piper-plus-base`) を含む Multi-scale FiLM 導入前 (PR #579 以前) の MB-iSTFT ckpt が `RuntimeError: size mismatch for model_g.dec.cond.weight` で読み込めない問題を修正 ([Issue #616](https://github.com/ayutaz/piper-plus/issues/616))。 PR #579 が `MBiSTFTGenerator.cond` の出力チャネルを 2 倍 (FiLM の scale + shift) に拡幅したため、 ONNX エクスポート / FT (`--resume-from-multispeaker-checkpoint`) / 学習再開 (`--resume_from_checkpoint`) の全経路が落ちていた (`strict=False` は size mismatch を緩めない)。 `piper_train.vits.commons.migrate_prefilm_decoder_cond` が旧 `cond` 重みを FiLM の shift 側に載せ scale 側をゼロ埋めする。 `_apply_film` は `scale = sigmoid(scale_raw) + 0.5` なので `scale_raw = 0` で gain が厳密に 1.0 となり、 旧 `x + cond(g)` と **ビット単位で同一**の出力になる (公開 ckpt 実機で max abs diff = 0.0 を確認)。 `cond_layers` は model 側と同じくゼロで backfill。 適用は `VitsModel.on_load_checkpoint` に置いたため `load_from_checkpoint` / `trainer.fit(ckpt_path=)` の両方が透過的に救われる
+- 学習: 上記 ckpt からの学習再開で optimizer state が黙って失われる問題を修正。 `optimizer.load_state_dict` は shape を検証しないため、 pre-FiLM の Adam moment が拡幅後の param にそのままロードされ、 最初の `step()` で `RuntimeError` になり、 それを resume の fallback が飲み込んで **epoch 0 から再学習**していた。 パラメータ順序を検証できる場合は moment を同じ規則で拡幅し、 検証できない場合は optimizer state を破棄したうえで警告を出す (黙って epoch 0 に戻る経路を塞ぐ)。 fallback 自体も `UnpicklingError` を捕捉対象に加え、 「重みのみロードし epoch 0 から開始する」ことを warning で明示するようにした
+
+### Changed
+
+- 学習: `--resume-from-multispeaker-checkpoint` の実処理がインライン複製から `load_multispeaker_checkpoint()` に一本化された。 同関数はどこからも呼ばれない dead code で、 インライン側と挙動が食い違っていた (関数側のみ HiFi-GAN ckpt を明示エラーにし、 インライン側のみ weight_norm キーを remap していた)。 統合の結果、 **FT 経路でも v1.11 以前の HiFi-GAN ckpt が明示エラーになる** (従来は無言で大量の missing keys を出して継続していた)。 同様に `export_onnx` の EMA 適用も 2 箇所の複製を `apply_ema_shadow_params()` に集約した
+
 - CI: `g2p-python-ci.yml` の `test extras` job で venv を workspace 内 (`.venv-extras/`) ではなく `${RUNNER_TEMP}/venv-extras` に作るよう変更。 当 job は `uv.lock` を経由せず PyPI から fresh resolve するため nltk 3.10.x を引くが、 3.10 で追加された `nltk/inisec.py` の `NLTKSafeImportFinder` が「解決先ファイルが cwd 配下に物理的に存在する」モジュールを一律ブロックするため、 workspace 内 venv だと site-packages 全体が誤検知され `import nltk` 自体が `ImportError: Blocked import of regex from current working directory` で失敗していた。 エラーメッセージが案内する `-P` / `PYTHONSAFEPATH=1` は判定基準が sys.path ではなくファイルの物理位置のため回避にならないことを実測で確認済み
 
 ## [2.0.0] - 2026-05-25

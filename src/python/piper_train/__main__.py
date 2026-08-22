@@ -4,6 +4,7 @@ import logging
 import pathlib
 import platform
 from pathlib import Path
+from pickle import UnpicklingError
 
 import torch
 from pytorch_lightning import Trainer
@@ -11,7 +12,12 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.strategies import DDPStrategy
 
-from .vits.commons import remap_weight_norm_keys
+from .vits.commons import (
+    _LEGACY_HIFIGAN_MESSAGE,  # noqa: F401  (re-exported for callers/tests)
+    is_legacy_hifigan_checkpoint,
+    normalize_checkpoint_state_dict,
+    remap_weight_norm_keys,
+)
 from .vits.ema import EMACallback
 from .vits.lightning import VitsModel
 
@@ -35,30 +41,10 @@ except ImportError:
 _LOGGER = logging.getLogger(__package__)
 
 
-def _is_legacy_hifigan_checkpoint(state_dict: dict) -> bool:
-    """v1.11.0 以前の HiFi-GAN ベース ckpt を検出する。
-
-    v1.12.0 で Decoder は MB-iSTFT-VITS2 に統一された。MB-iSTFT decoder は
-    ``model_g.dec.subband_conv_post.*`` または ``model_g.dec.pqmf.*`` を持つが、
-    HiFi-GAN decoder にはこれらが存在しない。decoder 系キーがあるのに
-    MB-iSTFT のマーカーが無い場合、HiFi-GAN ckpt とみなす。
-    """
-    has_decoder_keys = any(k.startswith("model_g.dec.") for k in state_dict)
-    has_mbistft_marker = any(
-        k.startswith("model_g.dec.subband_conv_post")
-        or k.startswith("model_g.dec.pqmf")
-        for k in state_dict
-    )
-    return has_decoder_keys and not has_mbistft_marker
-
-
-_LEGACY_HIFIGAN_MESSAGE = (
-    "Checkpoint {path!r} appears to be from v1.11.0 or earlier (HiFi-GAN Generator). "
-    "v1.12.0 unified the decoder to MB-iSTFT-VITS2, so HiFi-GAN ckpt files cannot be "
-    "resumed for training. Fine-tune from the new MB-iSTFT base model instead:\n"
-    "    https://huggingface.co/ayousanz/piper-plus-base/resolve/main/model.ckpt\n"
-    "See docs/migration/v1.11-to-v1.12.md for the full migration guide."
-)
+# Checkpoint compatibility lives in `vits.commons` so the training entry point,
+# the ONNX exporter and the Lightning hook all share one implementation. These
+# aliases keep the historical `piper_train.__main__` import path working.
+_is_legacy_hifigan_checkpoint = is_legacy_hifigan_checkpoint
 
 
 def calculate_effective_batch_size(batch_size, num_gpus=1):
@@ -476,9 +462,11 @@ def load_multispeaker_checkpoint(checkpoint_path: str, model: VitsModel) -> None
         map_location="cpu",
         weights_only=False,
     )
-    if _is_legacy_hifigan_checkpoint(checkpoint["state_dict"]):
-        raise RuntimeError(_LEGACY_HIFIGAN_MESSAGE.format(path=str(checkpoint_path)))
-    missing, unexpected = model.load_state_dict(checkpoint["state_dict"], strict=False)
+    # Rejects HiFi-GAN checkpoints and migrates pre-FiLM decoders (issue #616).
+    normalized_sd, _ = normalize_checkpoint_state_dict(
+        checkpoint["state_dict"], model.state_dict(), checkpoint_path=checkpoint_path
+    )
+    missing, unexpected = model.load_state_dict(normalized_sd, strict=False)
     _LOGGER.info(
         "Weights loaded (strict=False). Missing keys: %s. Unexpected keys: %s.",
         missing,
@@ -779,58 +767,11 @@ def main():
             args.resume_from_multispeaker_checkpoint,
         )
 
-        # 1. strict=False でロード（emb_g は自動スキップ）
-        # NOTE: weights_only=False is required to handle PosixPath objects in checkpoints
-        # This poses a security risk - only load trusted checkpoints
-        checkpoint = torch.load(
-            args.resume_from_multispeaker_checkpoint,
-            map_location="cpu",
-            weights_only=False,
-        )
-        remapped_sd = remap_weight_norm_keys(
-            checkpoint["state_dict"], model.state_dict()
-        )
-        missing, unexpected = model.load_state_dict(remapped_sd, strict=False)
-        _LOGGER.info(
-            "Weights loaded (strict=False). Missing keys: %s. Unexpected keys: %s.",
-            missing,
-            unexpected,
-        )
-
-        # 2. emb_g 平均を emb_lang に加算（conditioning 分布補正）
-        #    emb_g は平均ノルム ~0.68 でほぼゼロ中心のため影響は軽微だが、
-        #    conceptual correctness のため実施する。
-        raw_sd = checkpoint["state_dict"]
-        emb_g_weight = raw_sd.get("model_g.emb_g.weight")
-        if emb_g_weight is not None and hasattr(model.model_g, "emb_lang"):
-            emb_g_mean = emb_g_weight.mean(dim=0)  # [gin_channels]
-            _LOGGER.info(
-                "emb_g mean norm: %.4f → adding to all emb_lang rows for conditioning correction",
-                emb_g_mean.norm().item(),
-            )
-            with torch.no_grad():
-                model.model_g.emb_lang.weight.add_(emb_g_mean.unsqueeze(0))
-            _LOGGER.info("emb_g_mean added to emb_lang.")
-        else:
-            _LOGGER.info(
-                "emb_g not found in checkpoint or model has no emb_lang; skipping conditioning correction."
-            )
-
-        # 3. All emb_lang rows are preserved with emb_g_mean correction.
-        #    Previously emb_lang[0] (JA) was copied to emb_lang[1] (EN), but this
-        #    caused the frozen Duration Predictor to lose EN conditioning, breaking
-        #    English duration prediction. Keeping original embeddings + correction
-        #    lets the DP predict correct duration patterns for all languages.
-        if hasattr(model.model_g, "emb_lang") and model.model_g.n_languages > 1:
-            _LOGGER.info(
-                "All emb_lang rows preserved with emb_g_mean correction "
-                "for correct duration prediction across languages."
-            )
-
-        _LOGGER.info(
-            "Multispeaker → single-speaker transfer complete. "
-            "Starting training from epoch 0 (optimizer state reset)."
-        )
+        # This used to be an inline copy of `load_multispeaker_checkpoint`,
+        # which left the function itself unreachable — and the two had already
+        # drifted apart (only the function rejected HiFi-GAN checkpoints, only
+        # the inline copy remapped weight_norm keys). One implementation now.
+        load_multispeaker_checkpoint(args.resume_from_multispeaker_checkpoint, model)
 
     # チェックポイントからの再開処理を修正
     if args.resume_from_checkpoint:
@@ -840,7 +781,7 @@ def main():
         try:
             # まずは通常のResumeを試みる
             trainer.fit(model, ckpt_path=args.resume_from_checkpoint)
-        except (RuntimeError, KeyError, NotImplementedError) as e:
+        except (RuntimeError, KeyError, NotImplementedError, UnpicklingError) as e:
             # RuntimeError (size mismatchなど) や KeyError (optimizer stateなし) が発生した場合
             _LOGGER.warning("Graceful resume failed with error: %s", e)
             _LOGGER.info("Attempting to load weights only (strict=False)...")
@@ -851,19 +792,18 @@ def main():
             checkpoint = torch.load(
                 args.resume_from_checkpoint, map_location="cpu", weights_only=False
             )
-            if _is_legacy_hifigan_checkpoint(checkpoint["state_dict"]):
-                raise RuntimeError(
-                    _LEGACY_HIFIGAN_MESSAGE.format(
-                        path=str(args.resume_from_checkpoint)
-                    )
-                ) from None
-            remapped_sd = remap_weight_norm_keys(
-                checkpoint["state_dict"], model.state_dict()
+            normalized_sd, _ = normalize_checkpoint_state_dict(
+                checkpoint["state_dict"],
+                model.state_dict(),
+                checkpoint_path=args.resume_from_checkpoint,
             )
-            model.load_state_dict(remapped_sd, strict=False)
+            model.load_state_dict(normalized_sd, strict=False)
 
-            _LOGGER.info(
-                "Weights loaded successfully with strict=False. Starting training without resuming optimizer state."  # noqa: E501
+            _LOGGER.warning(
+                "Weights were loaded with strict=False, but optimizer state and "
+                "epoch counter are NOT restored: training restarts from epoch 0. "
+                "If this checkpoint was meant to continue a run, stop here and "
+                "investigate the error above instead of letting it retrain."
             )
 
             # argsからresume_from_checkpointを削除
