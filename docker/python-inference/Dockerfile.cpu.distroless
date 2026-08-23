@@ -90,9 +90,7 @@ COPY src/python_run/requirements_webui.txt /build/requirements_webui.txt
 # /usr/local/lib/python3.13/site-packages is self-contained and copy-able
 # into the final stage.
 RUN uv pip install --system "/build/src/python/g2p[all]"
-# TEMPORARY bisect: does ORT 1.28.0 (the version in the last green run,
-# 2026-08-03) import in the final stage while 1.29.0 segfaults?
-RUN uv pip install --system "/build/src/python[inference]" "onnxruntime==1.28.0"
+RUN uv pip install --system "/build/src/python[inference]"
 RUN uv pip install --system -r /build/requirements_webui.txt
 
 # Pre-download NLTK data for g2p-en. The download dir is shared so the
@@ -167,9 +165,38 @@ COPY --from=builder /opt/runtime-libs/ /usr/lib/
 COPY --from=builder /usr/local/lib/python3.13 /usr/local/lib/python3.13
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data
 
-# distroless/python3-debian13's default python3 is /usr/bin/python3.13
-# (debian layout). PYTHONPATH points at the site-packages we copied;
-# the interpreter itself comes from the base image.
+# Bring the builder's interpreter along, and run *that* one.
+#
+# Previously the final stage ran the base image's /usr/bin/python3 against
+# site-packages installed by the builder's interpreter. Both are CPython
+# 3.13, so the wheels' `cp313` tag matches and imports mostly worked — but
+# the two are different builds at different patch levels (builder 3.13.15
+# vs distroless 3.13.5), and prebuilt extension wheels are only validated
+# against the interpreter that installed them.
+#
+# onnxruntime 1.29.0 turned that latent mismatch into a hard failure:
+# `import onnxruntime` segfaulted (exit 139) inside the extension's module
+# init under the base image's 3.13.5, while importing cleanly under the
+# builder's 3.13.15. It is not a missing symbol — dlopen with RTLD_NOW
+# resolves every symbol in `onnxruntime_pybind11_state...so`, and
+# `libstdc++` / `libgomp` / `libgcc_s` are all present. ORT 1.28.0 imports
+# fine in the same image, which is what pinned the trigger.
+#
+# Pinning onnxruntime would only postpone the next occurrence, and it would
+# hold back the canonical Dockerfile.cpu (unaffected, because it never mixes
+# interpreters). Copying the interpreter removes the whole class of bug:
+# site-packages and the interpreter now always come from the same build.
+#
+# The official python images configure CPython with `--enable-shared`, so
+# libpython lives beside the binary in /usr/local/lib and must come too.
+# Every other shared library CPython needs (libexpat, libz, libssl, libffi,
+# libsqlite3, ...) is already in the base image, which is Debian 13 just
+# like the builder.
+COPY --from=builder /usr/local/bin/python3.13 /usr/local/bin/python3.13
+COPY --from=builder /usr/local/lib/libpython3.13.so* /usr/local/lib/
+
+# `--enable-shared` builds need the loader to find libpython3.13.so.1.0.
+ENV LD_LIBRARY_PATH=/usr/local/lib
 ENV PYTHONPATH=/usr/local/lib/python3.13/site-packages
 ENV NLTK_DATA=/usr/share/nltk_data
 ENV PYTHONUNBUFFERED=1
@@ -189,15 +216,16 @@ EXPOSE 8000 7860
 # No `USER` directive needed; documenting the assumption for reviewers.
 
 # distroless has no shell — HEALTHCHECK must be exec-form, and inline
-# python. distroless/python3-debian13 ships /usr/bin/python3 (Debian
-# layout); there is no /usr/bin/python alias. Always use the absolute
-# path so `python` resolution via PATH never enters the picture.
+# python. Use the absolute path to the interpreter copied from the builder
+# (see the COPY above for why the base image's /usr/bin/python3 is not
+# used) so `python` resolution via PATH never enters the picture.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD ["/usr/bin/python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+    CMD ["/usr/local/bin/python3.13", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
 
 # Default entrypoint matches Dockerfile.cpu — OpenAI-compat FastAPI
 # server bound to 8000. Override at `docker run` for CLI / WebUI modes.
-# `/usr/bin/python3` (absolute) because distroless does not provide a
-# bare `python` alias.
-ENTRYPOINT ["/usr/bin/python3", "/app/inference.py"]
+# Absolute path to the builder's interpreter: distroless provides no bare
+# `python` alias, and its own /usr/bin/python3 must not be used against
+# these site-packages (see the COPY above).
+ENTRYPOINT ["/usr/local/bin/python3.13", "/app/inference.py"]
 CMD ["--server", "--model", "/app/models/model.onnx", "--port", "8000"]

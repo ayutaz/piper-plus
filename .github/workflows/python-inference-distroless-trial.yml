@@ -82,10 +82,11 @@ jobs:
           # does not include).
           #
           # All imports MUST pass — that is the trial's primary success
-          # criterion. builder (python:3.11-slim-trixie) and final
-          # (gcr.io/distroless/python3-debian12) share Debian-glibc ABI,
-          # so onnxruntime's pre-built C extension resolves cleanly.
-          docker run --rm --entrypoint /usr/bin/python3 \
+          # criterion. The final stage runs the interpreter copied from the
+          # builder (/usr/local/bin/python3.13), not the base image's
+          # /usr/bin/python3, so the wheels always run on the interpreter
+          # that installed them. See Dockerfile.cpu.distroless for why.
+          docker run --rm --entrypoint /usr/local/bin/python3.13 \
             piper-plus-inference:cpu-distroless-trial \
             -c "import platform, sys; \
                 print(f'final arch: {platform.machine()}'); \
@@ -107,7 +108,7 @@ jobs:
       - name: Diagnose final-stage import (temporary)
         if: always()
         run: |
-          docker run --rm -i --entrypoint /usr/bin/python3 \
+          docker run --rm -i --entrypoint /usr/local/bin/python3.13 \
             piper-plus-inference:cpu-distroless-trial - \
             < docker/python-inference/_probe_distroless.py || true
 
