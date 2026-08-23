@@ -52,13 +52,31 @@ sos = sorted(
 for so in dict.fromkeys(sos):
     print("  so:", so, os.path.getsize(so), flush=True)
 
-print("=== dlopen native modules directly ===", flush=True)
+print("=== dlopen with RTLD_NOW (forces eager symbol resolution) ===", flush=True)
+# The default lazy binding lets dlopen succeed even when a symbol is missing:
+# the PLT entry stays unresolved and the first call jumps to NULL -> SIGSEGV,
+# which is exactly the signature we see. RTLD_NOW resolves everything up front
+# and names the offending symbol instead of crashing.
 for so in dict.fromkeys(sos):
     try:
-        ctypes.CDLL(so, mode=ctypes.RTLD_GLOBAL)
-        print("  CDLL OK  ", so, flush=True)
+        ctypes.CDLL(so, mode=os.RTLD_NOW | os.RTLD_GLOBAL)
+        print("  RTLD_NOW OK  ", so, flush=True)
     except OSError as exc:
-        print("  CDLL FAIL", so, "->", exc, flush=True)
+        print("  RTLD_NOW FAIL", so, "->", exc, flush=True)
+
+print("=== libpython symbols the extension may need ===", flush=True)
+try:
+    libpy = ctypes.CDLL(None)
+    for sym in (
+        "PyUnicode_New", "Py_Version", "PyObject_Vectorcall",
+        "PyType_GetModuleByDef", "PyLong_AsInt", "PyDict_GetItemRef",
+        "PyList_GetItemRef", "PyUnicode_Export", "PyLong_GetSign",
+        "PyType_GetFullyQualifiedName", "PyUnstable_Object_EnableDeferredRefcount",
+        "PyLong_AsNativeBytes", "PyBytes_Join", "PyIter_NextItem",
+    ):
+        print(f"  {sym}:", "present" if hasattr(libpy, sym) else "MISSING", flush=True)
+except Exception as exc:
+    print("  libpython probe failed:", exc, flush=True)
 
 print("=== import onnxruntime (may crash) ===", flush=True)
 import onnxruntime as ort  # noqa: E402
