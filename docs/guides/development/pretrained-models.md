@@ -19,9 +19,13 @@ Pre-trained models for multilingual TTS and fine-tuning are available on Hugging
 
 | Model | Languages | Speakers | Description | Download |
 |---|---|---|---|---|
-| 6-Language Base (HiFi-GAN) | JA/EN/ZH/ES/FR/PT | 571 | Multilingual pre-trained (508,187 utterances, VITS + Prosody). **75 epochs / ~282K gradient steps (2026-03-16)**, language-balanced sampling, WavLM-disabled (V100 friendly). Actual HF file: `model.ckpt` (training checkpoint for FT). | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
+| 6-Language Base (MB-iSTFT-VITS2) | JA/EN/ZH/ES/FR/PT | 571 | Multilingual pre-trained (508,187 utterances, VITS + Prosody). **75 epochs scratch / `epoch=74-step=500034`**, MB-iSTFT + PQMF decoder (`upsample_rates=(4, 4)` × iSTFT(4) × PQMF(4) = 256x), language-balanced sampling, WavLM-disabled (V100 friendly). `num_symbols=173` / `num_languages=6` / `prosody_dim=16` / `gin_channels=512`. Actual HF files: `model.ckpt` (302 MB, training checkpoint for FT) + `config.json`. | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
 
-> **6-lang MB-iSTFT Base (upcoming)**: `multilingual-6lang-mb-istft-scratch-75epoch.onnx` / `*.ckpt` (75 epoch scratch、 2.21x faster CPU inference、 Issue #268) は学習完了済みですが、 HF への upload はまだ実施されていません。 v2.0 では canonical FT base として `piper-plus-base` の `model.ckpt` (HiFi-GAN 系) を使用してください。 MB-iSTFT variant の upload は [Issue #590](https://github.com/ayutaz/piper-plus/issues/590) follow-up にて予定。
+> **Decoder 世代**: HF 上の `model.ckpt` は 2026-05-03 に HiFi-GAN 版から **MB-iSTFT-VITS2 版** (75 epoch scratch、 2.21x faster CPU inference、 [Issue #268](https://github.com/ayutaz/piper-plus/issues/268) / [PR #320](https://github.com/ayutaz/piper-plus/pull/320)) に差し替え済みです。 旧 HiFi-GAN 版の ckpt は配布されていません。 同じ学習 run の推論用 ONNX (`multilingual-6lang-mb-istft-scratch-75epoch.onnx`) の upload は [Issue #590](https://github.com/ayutaz/piper-plus/issues/590) follow-up にて予定。
+
+> ⚠️ **v2.0 (`dev`) では読み込めません**: Zero-Shot TTS ([PR #579](https://github.com/ayutaz/piper-plus/pull/579)) が `MBiSTFTGenerator.cond` を Multi-scale FiLM 化して出力チャネルを 2 倍にしたため、 この ckpt は `model_g.dec.cond` で size mismatch (256 vs 512) になります ([Issue #616](https://github.com/ayutaz/piper-plus/issues/616))。 現時点で FT / ONNX エクスポートに使う場合は互換タグ **`v1.13.0`** を checkout してください (`git clone --branch v1.13.0 https://github.com/ayutaz/piper-plus.git`)。 v2.0 対応の新しい base ckpt は次回リリースで公開予定です。
+
+> **音素表の世代差**: 本 ckpt は `num_symbols=173` (6 言語時代の inventory) で学習されています。 現行の `get_phoneme_id_map("ja-en-zh-es-fr-pt")` は KO/SV を含む 8 言語統合マップ (185 symbol) を 返すので、 これを使って FT すると `model_g.enc_p.emb.weight` が 173 vs 185 で size mismatch に なります。 FT 時は `get_phoneme_id_map()` ではなく HF `config.json` の `phoneme_id_map` / `num_symbols` をそのまま使ってください (`get_phoneme_id_map` の docstring が案内している経路。 `notebooks/finetune.ipynb` は対応済み)。
 
 **Zero-Shot TTS Models (PR #222, v7 multi-6lang scratch + Tsukuyomi FT):**
 

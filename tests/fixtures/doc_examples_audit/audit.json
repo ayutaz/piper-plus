@@ -2127,8 +2127,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 40,
-      "line_end": 44,
+      "line_start": 44,
+      "line_end": 48,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2142,8 +2142,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 48,
-      "line_end": 52,
+      "line_start": 52,
+      "line_end": 56,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
