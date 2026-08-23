@@ -90,7 +90,9 @@ COPY src/python_run/requirements_webui.txt /build/requirements_webui.txt
 # /usr/local/lib/python3.13/site-packages is self-contained and copy-able
 # into the final stage.
 RUN uv pip install --system "/build/src/python/g2p[all]"
-RUN uv pip install --system "/build/src/python[inference]"
+# TEMPORARY bisect: does ORT 1.28.0 (the version in the last green run,
+# 2026-08-03) import in the final stage while 1.29.0 segfaults?
+RUN uv pip install --system "/build/src/python[inference]" "onnxruntime==1.28.0"
 RUN uv pip install --system -r /build/requirements_webui.txt
 
 # Pre-download NLTK data for g2p-en. The download dir is shared so the
