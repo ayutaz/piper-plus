@@ -4,8 +4,8 @@
   "totals": {
     "executable": 223,
     "needs_placeholder": 6,
-    "skip_warranted": 238,
-    "total": 467
+    "skip_warranted": 239,
+    "total": 468
   },
   "by_language": {
     "bash": {
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 193
+      "skip_warranted": 194
     },
     "wasm": {
       "executable": 10,
@@ -4916,8 +4916,23 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 334,
-      "line_end": 338,
+      "line_start": 305,
+      "line_end": 310,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "c54e9c70976b7444b38152ab7cdbb86b23f28d59"
+    },
+    {
+      "file": "docs/migration/v1.12-to-v2.0.md",
+      "line_start": 365,
+      "line_end": 369,
       "language_raw": "sh",
       "language": "bash",
       "category": "needs_placeholder",
@@ -4931,8 +4946,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 344,
-      "line_end": 351,
+      "line_start": 375,
+      "line_end": 382,
       "language_raw": "sh",
       "language": "bash",
       "category": "needs_placeholder",
@@ -4946,8 +4961,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 373,
-      "line_end": 379,
+      "line_start": 404,
+      "line_end": 410,
       "language_raw": "dockerfile",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4961,8 +4976,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 389,
-      "line_end": 394,
+      "line_start": 420,
+      "line_end": 425,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4974,8 +4989,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 406,
-      "line_end": 409,
+      "line_start": 437,
+      "line_end": 440,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4987,8 +5002,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 424,
-      "line_end": 429,
+      "line_start": 455,
+      "line_end": 460,
       "language_raw": "diff",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5002,8 +5017,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 437,
-      "line_end": 442,
+      "line_start": 468,
+      "line_end": 473,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -5015,8 +5030,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 448,
-      "line_end": 452,
+      "line_start": 479,
+      "line_end": 483,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -5028,8 +5043,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 458,
-      "line_end": 461,
+      "line_start": 489,
+      "line_end": 492,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",

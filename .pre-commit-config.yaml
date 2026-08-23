@@ -842,6 +842,20 @@ repos:
         files: ^\.claude/hooks/(guard-bash|test-guard-bash)\.sh$
         pass_filenames: false
 
+      # Published-checkpoint compatibility. Every other test builds its
+      # checkpoints from the current model definition, so an architecture
+      # change stays self-consistent and CI notices nothing while the
+      # checkpoints users already downloaded stop loading (issue #616).
+      # This gate replays the recorded key->shape map of each published
+      # checkpoint through the migration path and requires a strict load.
+      # Shapes only — no download, no GPU.
+      - id: checkpoint-compat-contract
+        name: published checkpoint compatibility (issue #616 ratchet)
+        entry: uv run --no-sync python scripts/check_checkpoint_compat.py
+        language: system
+        files: ^(src/python/piper_train/vits/.*\.py|docs/spec/checkpoint-compat-contract\.toml|scripts/check_checkpoint_compat\.py)$
+        pass_filenames: false
+
       # Pytest skip-reason discipline. Skips without `reason=` accumulate as
       # silent technical debt — reviewers can't tell whether they're
       # permanent (missing optional dep), temporary (waiting on a fix), or

@@ -9,7 +9,13 @@ from torch import autocast
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset, random_split
 
-from .commons import slice_segments
+from .commons import (
+    migrate_prefilm_decoder_cond,
+    migrate_prefilm_optimizer_states,
+    normalize_checkpoint_state_dict,
+    optimizer_states_need_migration,
+    slice_segments,
+)
 from .dataset import Batch, PiperDataset, SpeakerBalancedBatchSampler, UtteranceCollate
 from .losses import (
     dino_loss,
@@ -483,6 +489,80 @@ class VitsModel(pl.LightningModule):
         )
 
         return audio
+
+    def on_load_checkpoint(self, checkpoint: dict) -> None:
+        """Normalise older checkpoints in place before Lightning loads them.
+
+        Lightning calls this hook *before* ``load_state_dict``, which is the
+        only place a fix can land for ``VitsModel.load_from_checkpoint`` and
+        ``trainer.fit(ckpt_path=...)`` alike — both raise on a size mismatch
+        before any caller-side code gets a chance to intervene, and
+        ``strict=False`` does not help (it tolerates missing/unexpected keys,
+        never mismatched shapes).
+
+        Handles checkpoints predating the Multi-scale FiLM decoder (issue
+        #616), plus the ``torch.compile`` and DDP weight-norm key formats.
+        """
+        model_sd = self.state_dict()
+
+        state_dict = checkpoint.get("state_dict")
+        if state_dict:
+            checkpoint["state_dict"], stats = normalize_checkpoint_state_dict(
+                state_dict, model_sd
+            )
+            if stats["cond_migrated"]:
+                _LOGGER.info(
+                    "Loaded a pre-FiLM checkpoint; decoder conditioning was "
+                    "migrated to the Multi-scale FiLM layout (issue #616)."
+                )
+
+        # EMA shadow params live in the decoder's own namespace and are applied
+        # by EMACallback later in the restore sequence. Migrating them here as
+        # well keeps the two halves of the checkpoint consistent; the migration
+        # is idempotent, so EMACallback re-running it is harmless.
+        ema_state = checkpoint.get("ema_generator_state")
+        if isinstance(ema_state, dict) and ema_state.get("shadow_params"):
+            ema_state["shadow_params"], _ = migrate_prefilm_decoder_cond(
+                ema_state["shadow_params"], self.model_g.dec.state_dict()
+            )
+
+        # Adam moments are shaped like the parameters they track, so the
+        # decoder migration invalidates them too. `optimizer.load_state_dict`
+        # does not check shapes, so leaving them alone means the resume dies at
+        # the first `step()` — and the caller's fallback then silently restarts
+        # from epoch 0. Widen them when the parameter ordering can be
+        # validated; otherwise drop them loudly.
+        if optimizer_states_need_migration(checkpoint, model_sd):
+            if (
+                migrate_prefilm_optimizer_states(
+                    checkpoint, self._generator_named_params()
+                )
+                == 0
+            ):
+                checkpoint.pop("optimizer_states", None)
+                checkpoint.pop("lr_schedulers", None)
+                _LOGGER.warning(
+                    "Optimizer state is in the pre-FiLM layout and its parameter "
+                    "ordering could not be validated, so it was discarded. "
+                    "Training resumes from epoch %s with the checkpoint's weights "
+                    "but freshly initialised optimizer moments.",
+                    checkpoint.get("epoch", "?"),
+                )
+
+    def _generator_named_params(self) -> list:
+        """``(name, tensor)`` in the order the generator optimizer receives them.
+
+        Mirrors ``configure_optimizers``: the generator optimizer is built from
+        ``model_g.parameters()`` filtered by ``requires_grad``. ``freeze_dp`` is
+        applied there, i.e. *after* this hook runs, so the filter is replayed
+        from hparams instead of read off the live flags.
+        """
+        freeze_dp = bool(getattr(self.hparams, "freeze_dp", False))
+        return [
+            (f"model_g.{name}", param)
+            for name, param in self.model_g.named_parameters()
+            if param.requires_grad and not (freeze_dp and name.startswith("dp."))
+        ]
 
     def on_train_epoch_end(self):
         """Step LR schedulers at the end of each epoch.
