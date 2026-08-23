@@ -123,6 +123,17 @@ case "$CMD" in
     esac ;;
 esac
 
+# --- リモート運用: kill と起動の同一コマンド禁止 (自己マッチ事故防止) ------
+# pkill -f と nohup 起動を 1 つの (ssh) コマンドに連結すると、pkill のパターン
+# が同一コマンドライン内の起動対象パス (例: nohup bash /root/v11_smoke.sh) に
+# マッチして自分ごと死ぬ (v10a/v10b/v11 で計 3 回実測、exit 255/143 で無言死)。
+# [x] エスケープでは防げない — kill と起動は別々の ssh/Bash 呼び出しに分ける。
+case "$CMD" in
+  *"<<"*|*test-guard-bash*) : ;;  # heredoc (文字列としての言及) と hook 自身のテストは除外
+  *pkill*nohup*|*nohup*pkill*)
+    deny "pkill と nohup 起動を同一コマンドに連結しています。pkill -f のパターンが同一コマンドライン内の起動対象 (nohup bash <script> 等) に自己マッチして ssh ごと死ぬ既知事故 (3 回実測) の型です。kill と起動を別々の Bash/ssh 呼び出しに分けてください。" ;;
+esac
+
 # --- PR 作成は /create-pr skill 経由を強制 -------------------------------
 # `gh pr create` を直接実行すると /create-pr skill のフェーズ 6.2 で発動する
 # `/watch-pr` auto-chain が走らず、 CI 監視が起動しない (PR #498 で発覚)。

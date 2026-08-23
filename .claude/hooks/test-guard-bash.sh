@@ -153,6 +153,21 @@ run "eval_zs_secs.py 直接実行 --encoder2 なし (拒否)" \
   "$(input_no_tx 'python src/python/piper_train/tools/eval_zs_secs.py --synth-dir out')" \
   0 "permissionDecision.*deny"
 
+run "pkill + nohup の同一コマンド連結 (拒否、自己マッチ事故)" \
+  '' \
+  "$(input_no_tx "ssh host 'pkill -9 -f piper_train; sleep 3; nohup bash /root/v11_smoke.sh &'")" \
+  0 "permissionDecision.*deny"
+
+run "pkill 単独 (許可)" \
+  '' \
+  "$(input_no_tx 'ssh host pkill -9 -f piper_train')" \
+  0 ""
+
+run "nohup 単独 (許可)" \
+  '' \
+  "$(input_no_tx 'ssh host nohup bash /root/v11_train.sh')" \
+  0 ""
+
 echo ""
 if [ "$FAIL" -eq 0 ]; then
   echo "all green"
