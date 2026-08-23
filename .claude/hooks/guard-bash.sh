@@ -129,8 +129,8 @@ esac
 # マッチして自分ごと死ぬ (v10a/v10b/v11 で計 3 回実測、exit 255/143 で無言死)。
 # [x] エスケープでは防げない — kill と起動は別々の ssh/Bash 呼び出しに分ける。
 case "$CMD" in
-  *"<<"*|*test-guard-bash*) : ;;  # heredoc (文字列としての言及) と hook 自身のテストは除外
-  *pkill*nohup*|*nohup*pkill*)
+  *"<<"*|*test-guard-bash*|*"git commit"*|*"git add"*) : ;;  # heredoc/コミットメッセージ内の言及と hook テストは除外
+  *pkill*nohup*|*nohup*pkill*|*"pkill"*"piper_train --dataset-dir"*|*"piper_train --dataset-dir"*"pkill"*)
     deny "pkill と nohup 起動を同一コマンドに連結しています。pkill -f のパターンが同一コマンドライン内の起動対象 (nohup bash <script> 等) に自己マッチして ssh ごと死ぬ既知事故 (3 回実測) の型です。kill と起動を別々の Bash/ssh 呼び出しに分けてください。" ;;
 esac
 
