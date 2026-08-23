@@ -23,7 +23,10 @@
 > **Security**: `torch.load(weights_only=False)` を使用。Lightning ckpt は
 > `hyper_parameters` に `pathlib.Path` をピクルするので weights_only=True では
 > 読めない。**信頼できる ckpt にのみ使用すること**。Windows では Linux 由来の
-> ckpt をロードするため `pathlib.PosixPath` の互換パッチを自動適用。
+> ckpt をロードするため `pathlib.PosixPath` の互換パッチを自動適用する
+> (実装は `piper_train._compat.apply_windows_pathlib_aliases()` が canonical。
+> CPython 3.13 の `pathlib._local` 分割に対応するため、 このスクリプトは
+> 自前で写経せず同関数を import して呼ぶ)。
 
 ## 使い方
 

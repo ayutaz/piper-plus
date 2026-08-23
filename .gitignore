@@ -116,73 +116,20 @@ test_phoneme*.py
 verify_*.py
 analyze_*.py
 check_*.py
-!scripts/check_pua_consistency.py
-!scripts/check_onnx_inputs.py
-!scripts/check_loanword_consistency.py
-!scripts/check_ort_versions.py
-!scripts/check_short_text_contract.py
-!scripts/check_ort_session_contract.py
-!scripts/check_text_splitter_contract.py
-!scripts/check_language_id_map_contract.py
-!scripts/check_ssml_contract.py
-!scripts/check_onnx_export_contract.py
-!scripts/check_ort_version_drift.py
-!scripts/check_dictionary_versions.py
-!scripts/check_phoneme_set_version.py
-!scripts/check_loanword_forward_compat.py
-!scripts/check_audio_format_contract.py
-!scripts/check_ort_provider_contract.py
-!scripts/check_streaming_api_contract.py
-!scripts/check_swift_g2p_contract.py
-!scripts/check_pt_dialect_contract.py
-!scripts/check_speaker_encoder_contract.py
-!scripts/check_dictionary_consistency.py
-!scripts/check_voice_catalog_parity.py
-!scripts/check_ruff_version_sync.py
-!scripts/check_inference_input_contract.py
-!scripts/check_cli_flag_parity.py
-!scripts/check_action_pins.py
+# `scripts/` holds the repo's contract gates, not ad-hoc debug scripts,
+# so un-ignore the whole directory rather than maintaining a per-file
+# allowlist. That list had grown to 72 entries and silently swallowed
+# every newly added gate: `git add -A` skipped the file, the commit
+# looked fine locally, and CI failed with 'No such file or directory'.
+!scripts/check_*.py
 !scripts/action_pins_baseline.txt
-!scripts/check_action_sha_drift.py
 !scripts/action_sha_baseline.json
 !scripts/verify_model_checksums.py
 !scripts/verify_rekor_releases.py
-!scripts/check_phoneme_timing_contract.py
-!scripts/check_cli_help_drift.py
-!scripts/check_bundle_size.py
-!scripts/check_migration_changelog_parity.py
-!scripts/check_language_parity.py
-!scripts/check_changelog_unreleased.py
-!scripts/check_secret_path_reference.py
-!scripts/check_openjtalk_version_sync.py
-!scripts/check_test_skip_reason.py
 # Workflow-automation wave2 で追加した check スクリプト群
-!scripts/check_precommit_file_regex.py
-!scripts/check_readme_code_examples.py
-!scripts/check_japanese_n_variant_contract.py
-!scripts/check_chinese_tone_contract.py
-!scripts/check_skill_health.py
-!scripts/check_readme_breaking_sync.py
-!scripts/check_deprecated_api_lingering.py
-!scripts/check_lockfile_consistency.py
-!scripts/check_benchmark_json.py
-!scripts/check_readme_h2_parity.py
-!scripts/check_spec_meta.py
-!scripts/check_version_manifest_sync.py
 # Wave 5 — workflow automation 第 3 波 で追加した check スクリプト群
-!scripts/check_test_parametrize.py
-!scripts/check_cargo_lock_duplicates.py
-!scripts/check_lockfile_size.py
-!scripts/check_readme_latency_freshness.py
-!scripts/check_asymmetric_latency.py
-!scripts/check_unwrap_density.py
-!scripts/check_todo_age.py
-!scripts/check_workspace_python_parity.py
-!scripts/check_training_defaults.py
 # M1.1 — cancelled / skipped baseline alarm gateway
-!scripts/check_required_gate.py
 # M1.2 — migration guide cross-ref lint
-!scripts/check_migration_xref.py
 # M1.3 — first-PR fast lane (gate neutralizer + weekly health)
 !scripts/first_pr_fast_lane.py
 !scripts/first_pr_health.py
@@ -195,32 +142,19 @@ check_*.py
 # Model card / license attribution generator (data-sources.yml driven)
 !scripts/generate_model_card.py
 # Typosquatting watch (registry Levenshtein + homograph scan)
-!scripts/check_typosquatting.py
 # Forward-compat fuzz for loanword / PUA JSON schema
 !scripts/fuzz_forward_compat.py
 # Phoneme timing monotonicity property test
-!scripts/check_timing_monotonicity.py
 # CHANGELOG keep-a-changelog format validator (proposals §3.7 Tier S #1)
-!scripts/check_changelog_format.py
 # README heading tree parity (proposals §3.7 Tier S #2, informational)
-!scripts/check_readme_heading_tree.py
 # M2 spec sync gates (T-005 / T-006 / T-008)
-!scripts/check_model_sha256_manifest.py
-!scripts/check_artifact_retention.py
-!scripts/check_test_flake_retry.py
 # Doc examples audit (T-009)
-!scripts/check_doc_examples.py
 # Swedish per-word LID sync gate (Issue #539)
-!scripts/check_swedish_lid_consistency.py
 # HF Space deploy gates (sdk_version drift / frontmatter / post-deploy runtime)
-!scripts/check_hf_space_gradio_sync.py
-!scripts/check_hf_space_frontmatter.py
 !scripts/verify_hf_space_runtime.py
 # GitHub Pages post-deploy 404 detection gate
 !scripts/verify_pages_assets.py
 # Post-rename hardening gates (Issue #590 / follow-up to PR #598)
-!scripts/check_no_legacy_piper_imports.py
-!scripts/check_wheel_data_bundling.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py
@@ -271,6 +205,10 @@ android/piper-plus-g2p/src/main/jniLibs/
 android/piper-plus-g2p/.cxx/
 android/piper-plus-g2p/build/
 android/.gradle/
+
+# Android SDK path — Gradle auto-generates this per machine on first build.
+# Machine-local absolute path, must never be committed.
+android/local.properties
 
 # Swift Package Manager: Package.resolved is auto-generated when SPM
 # resolves dependencies. piper-plus ships libraries (PiperPlus /

@@ -11,7 +11,11 @@ import torch
 
 from .tools.convert_fp16 import convert_fp16
 from .vits import commons
-from .vits.commons import remap_weight_norm_keys
+from .vits.commons import (
+    migrate_prefilm_decoder_cond,
+    normalize_checkpoint_state_dict,
+    remap_weight_norm_keys,
+)
 from .vits.lightning import VitsModel
 
 
@@ -140,6 +144,15 @@ def apply_ema_shadow_params(
     applied = 0
     skipped = 0
     dec_params = dict(decoder.named_parameters())
+    decoder_sd = decoder.state_dict()
+    # Shadow params carry the checkpoint's own key format and shapes, so they
+    # need the same fixups as the state_dict: weight_norm key remapping
+    # (DDP parametrized <-> legacy), then the pre-FiLM widening. Without the
+    # latter, `Tensor.copy_` cannot broadcast (256, 512, 1) onto
+    # (512, 512, 1) and raises (issue #616). Both are no-ops for checkpoints
+    # that are already in the current format.
+    shadow_params = remap_weight_norm_keys(shadow_params, decoder_sd)
+    shadow_params, _ = migrate_prefilm_decoder_cond(shadow_params, decoder_sd)
     with torch.no_grad():
         for name, shadow_param in shadow_params.items():
             if name in dec_params:
@@ -444,11 +457,14 @@ def main() -> None:
 
     raw_sd = ckpt.get("state_dict", {})
 
-    # Fix torch.compile artifact: strip _orig_mod prefix from state_dict keys.
-    cleaned_sd, n_stripped = _strip_orig_mod(raw_sd)
-
-    # Fix DDP weight_norm format mismatch (parametrized ↔ legacy).
-    cleaned_sd = remap_weight_norm_keys(cleaned_sd, model.state_dict())
+    # Apply every checkpoint compatibility fixup in the one order that works
+    # (HiFi-GAN rejection, _orig_mod strip, weight_norm remap, pre-FiLM
+    # decoder migration). See `normalize_checkpoint_state_dict` for why the
+    # order matters.
+    cleaned_sd, fixup_stats = normalize_checkpoint_state_dict(
+        raw_sd, model.state_dict(), checkpoint_path=args.checkpoint
+    )
+    n_stripped = fixup_stats["stripped"]
 
     if n_stripped > 0 or cleaned_sd != raw_sd:
         missing, unexpected = model.load_state_dict(cleaned_sd, strict=False)
@@ -499,25 +515,10 @@ def main() -> None:
     # --- EMA decoder ---
     ema_state = ckpt.get("ema_generator_state")
     if ema_state and "shadow_params" in ema_state:
-        applied = 0
-        skipped = 0
-        dec_params = dict(model_g.dec.named_parameters())
-        # Remap shadow param keys for weight_norm format compatibility
-        shadow = remap_weight_norm_keys(ema_state["shadow_params"], dec_params)
-        for name, shadow_param in shadow.items():
-            if name in dec_params:
-                dec_params[name].data.copy_(shadow_param)
-                applied += 1
-            else:
-                skipped += 1
-        if applied > 0:
-            _LOGGER.info(
-                "Applied EMA weights to decoder: %d parameters (skipped %d)",
-                applied,
-                skipped,
-            )
-        else:
-            _LOGGER.warning("EMA state found but no matching decoder parameters")
+        # Delegate to the shared helper rather than re-implementing the copy
+        # loop: it owns the key remapping and the pre-FiLM migration, and a
+        # second copy of that logic here is exactly how the two drifted apart.
+        apply_ema_shadow_params(model_g.dec, ema_state["shadow_params"])
     else:
         _LOGGER.info("No EMA state found in checkpoint, skipping EMA")
 

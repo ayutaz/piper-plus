@@ -628,14 +628,19 @@ repos:
         files: ^(\.github/workflows/.*\.ya?ml|\.github/actions/.*action\.ya?ml|scripts/check_action_pins\.py|scripts/action_pins_baseline\.txt)$
         pass_filenames: false
 
-      # Pinned canonical phoneme-set size (num_symbols=173, embedding_dim=192).
-      # Drift here is a model-breaking change for every released ckpt — gate
-      # at commit time so the toml + pua.json review is forced before push.
+      # Phoneme inventory contract. The gate compares the spec against the
+      # *live* inventory returned by `get_phoneme_id_map("multilingual")` and
+      # against the frozen snapshots that released models were trained on.
+      #
+      # `id_maps.py` is in `files` for a reason: it is the file that actually
+      # defines the inventory, and until now no hook fired on it at all. That
+      # is how the spec came to claim 173 symbols while the code returned 185
+      # for months (Swedish, #300) without any gate objecting.
       - id: phoneme-set-version
-        name: phoneme set version contract (num_symbols=173 strict)
+        name: phoneme set version contract (live inventory vs pinned snapshots)
         entry: uv run --no-sync python scripts/check_phoneme_set_version.py
         language: system
-        files: ^(docs/spec/phoneme-set-version\.toml|src/python/g2p/piper_plus_g2p/data/pua\.json|scripts/check_phoneme_set_version\.py)$
+        files: ^(docs/spec/phoneme-set-version\.toml|src/python/g2p/piper_plus_g2p/encode/(id_maps|pua)\.py|src/python/g2p/piper_plus_g2p/data/pua\.json|scripts/check_phoneme_set_version\.py)$
         pass_filenames: false
 
       # Cross-runtime phoneme-timing formula anchor check. Guards the
@@ -822,6 +827,33 @@ repos:
         # `[project.dependencies]` array, so a pin change there must
         # re-fire the gate.
         files: ^(cmake/ExternalDeps\.cmake|.*pyproject\.toml|.*requirements.*\.txt|scripts/check_openjtalk_version_sync\.py)$
+        pass_filenames: false
+
+      # guard-bash.sh の振る舞いテスト。 既に shellcheck で syntax / lint は
+      # 見ているが、 hook の判定ロジックのバグ (「許可すべきものを deny する」)
+      # は shellcheck では原理的に検出できない。 実際 /create-pr の再呼び出しが
+      # 常に deny される回帰が素通りし、 セッション内で 2 本目以降の PR が
+      # 作れなくなっていた。 mock transcript を食わせる自己完結テストなので
+      # 依存なし・0.1 秒未満で回る。
+      - id: guard-bash-behaviour
+        name: guard-bash.sh 判定ロジックの振る舞いテスト
+        entry: bash .claude/hooks/test-guard-bash.sh
+        language: system
+        files: ^\.claude/hooks/(guard-bash|test-guard-bash)\.sh$
+        pass_filenames: false
+
+      # Published-checkpoint compatibility. Every other test builds its
+      # checkpoints from the current model definition, so an architecture
+      # change stays self-consistent and CI notices nothing while the
+      # checkpoints users already downloaded stop loading (issue #616).
+      # This gate replays the recorded key->shape map of each published
+      # checkpoint through the migration path and requires a strict load.
+      # Shapes only — no download, no GPU.
+      - id: checkpoint-compat-contract
+        name: published checkpoint compatibility (issue #616 ratchet)
+        entry: uv run --no-sync python scripts/check_checkpoint_compat.py
+        language: system
+        files: ^(src/python/piper_train/vits/.*\.py|docs/spec/checkpoint-compat-contract\.toml|scripts/check_checkpoint_compat\.py)$
         pass_filenames: false
 
       # Pytest skip-reason discipline. Skips without `reason=` accumulate as

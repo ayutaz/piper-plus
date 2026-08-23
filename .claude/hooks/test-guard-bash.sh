@@ -28,6 +28,13 @@ run() {
     if ! printf '%s' "$out" | grep -q "$want_output_grep"; then
       ok=0
     fi
+  # want_output_grep が空 = 「許可」 を期待するケース。 hook は deny する時だけ
+  # JSON を stdout に書き、 許可時は何も出力せずに exit 0 する。 exit code は
+  # deny でも 0 なので、 出力が空であることまで検査しないと許可ケースの
+  # assertion が全て空振りする (実際そうなっており、 /create-pr 再呼び出しの
+  # deny バグをこのハーネスが検出できなかった)。
+  elif [ -n "$out" ]; then
+    ok=0
   fi
   if [ "$ok" = 1 ]; then
     printf '  PASS  %s\n' "$label"
@@ -83,6 +90,22 @@ run "marker 後に user new prompt (拒否、 historical match 防止)" \
 
 run "marker 後に tool_result + user prompt 両方 (拒否)" \
   $'<command-name>/create-pr</command-name>\n{"type":"user","content":[{"tool_use_id":"toolu_01","type":"tool_result"}]}\n{"type":"user","content":"another task"}' \
+  "$(input_for 'gh pr create --base dev')" \
+  0 "permissionDecision.*deny"
+
+# 同一セッションで skill を再呼び出しすると harness が
+#   {"type":"user","message":{...},"isMeta":true}
+#   content = "(Re-invocation of /create-pr — ...)"
+# という合成行を挿入する。 これを user の new prompt と誤判定すると
+# 2 回目以降の /create-pr が常に deny される (セッション内で複数 PR を
+# 出すケースを丸ごと塞ぐ)。
+run "marker 後に skill 再呼び出しの isMeta 行 (許可)" \
+  $'{"name":"Skill","input":{"skill":"create-pr","args":""}}\n{"type":"user","message":{"role":"user","content":"(Re-invocation of /create-pr — the skill instructions were previously loaded; the arguments or dynamic output below are new.)"},"isMeta":true,"turnCompanion":true}' \
+  "$(input_for 'gh pr create --base dev')" \
+  0 ""
+
+run "marker 後に isMeta 行 + 実 user prompt (拒否は維持)" \
+  $'{"name":"Skill","input":{"skill":"create-pr","args":""}}\n{"type":"user","message":{"role":"user","content":"(Re-invocation of /create-pr — ...)"},"isMeta":true}\n{"type":"user","content":"another task"}' \
   "$(input_for 'gh pr create --base dev')" \
   0 "permissionDecision.*deny"
 

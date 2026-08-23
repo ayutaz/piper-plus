@@ -72,59 +72,67 @@ forward_compat_policy = "strict"
 # old models continue to load successfully.
 
 [inventory]
-# num_symbols=173 is pinned by scripts/check_phoneme_set_version.py
-# (PINNED_NUM_SYMBOLS constant). Future changes require updating
-# both this toml and the script's constant in lockstep; the CI gate
-# will fail otherwise. Treat this field as IMMUTABLE without an
-# explicit symbol_set_version major bump (1.x → 2.x).
-_strict = true
-num_symbols = 173
-symbol_set_version = "1.0"
-embedding_dim = 192    # vits.text_encoder.emb.weight.shape = [173, 192]
-
-# Per-language breakdown. The numbers below sum to 173 minus shared
-# symbols (PAD, BOS, EOS, UNK, sentence-break, prosody markers, etc.).
-# Counts are approximate by language because some phonemes are shared
-# (e.g., /a/ between ja-en-zh) — the canonical source is pua.json's
-# inventory section.
+# `num_symbols` is the size of the *live* inventory produced by
+# `piper_plus_g2p.encode.id_maps.get_phoneme_id_map("multilingual")` — the
+# map every newly generated dataset and newly trained model uses. It is
+# verified against the code by `scripts/check_phoneme_set_version.py`, not
+# transcribed by hand.
 #
-# Counts derived from `src/python/g2p/piper_plus_g2p/data/pua.json`
-# at contract authoring time (2026-05-09).
+# History: this field used to read 173 and was described as IMMUTABLE, while
+# the code had produced 185 since #300 (2026-04-03) added Swedish. Nothing
+# caught the divergence because the gate only ever compared this file against
+# `pua.json` and against itself — it never called the function that actually
+# builds the map. The contract was written by transcribing `pua.json` plus a
+# published model's config (its own comment said so), so it described a
+# snapshot rather than the code from the day it was authored.
+#
+# The relationship between 173 and 185 is append-only: the live inventory's
+# first 173 symbols are byte-identical to the published 6-language model's
+# map (verified by digest below), so no id was reordered or removed. That is
+# what makes this a minor bump (1.0 -> 1.1) rather than a breaking change.
+_strict = true
+num_symbols = 185
+symbol_set_version = "1.1"
+embedding_dim = 192    # vits.text_encoder.emb.weight.shape = [num_symbols, 192]
 
-[[inventory.languages]]
-language = "shared"
-count = 9
-description = "PAD, BOS, EOS, UNK, sentence-break, prosody markers (?, ., !, ~)"
+# sha256 of the symbols joined by a single space, ordered by id. Pins the
+# *ordering*, which a length check cannot: v1.12.0 shipped 185 symbols whose
+# ids 94/149/153 disagreed with the published models, and a count-only gate
+# saw nothing wrong.
+inventory_sha256 = "66dd9d23fee924faefe93e033499fdbc2c6d4a601ae19a2393590dbb565d0ff0"
 
-[[inventory.languages]]
-language = "ja"
-count = 55
-description = "Japanese phonemes (vowels 5 + voiced/unvoiced consonants + 4 N variants + special katakana)"
-notes = "Canonical OpenJTalk + NAIST-jdic phoneme set. Includes /N_m/, /N_n/, /N_ng/, /N_uvular/."
+# ---------------------------------------------------------------------------
+# Released snapshots
+# ---------------------------------------------------------------------------
+# Inventories that shipped inside a released model. A model's embedding table
+# is fixed at training time, so each of these must remain reachable from the
+# live inventory as an exact prefix — that is what lets an older checkpoint
+# keep loading. The gate recomputes `sha256(live[:num_symbols])` and compares.
+#
+# Add an entry here only when a model is actually published with that
+# inventory: doing so freezes those ids, and any later reordering below that
+# boundary becomes a breaking change.
 
-[[inventory.languages]]
-language = "en"
-count = 42
-description = "English phonemes (CMU dict ARPAbet, including stress markers)"
-notes = "Sourced via g2p-en. Some symbols overlap with ja (/a/, /i/, /u/, /e/, /o/)."
+[[snapshots]]
+symbol_set_version = "1.0"
+num_symbols = 173
+inventory_sha256 = "9a5803319f73cd9e93fa258f98561a7bde6fb4fb4c2f316ef81fcdb6de2aa8de"
+description = "6-language inventory shipped in the published models"
+models = [
+    "ayousanz/piper-plus-base",
+    "ayousanz/piper-plus-tsukuyomi-chan",
+    "ayousanz/piper-plus-css10-ja-6lang",
+]
 
-[[inventory.languages]]
-language = "zh"
-count = 40
-description = "Mandarin pinyin initials + finals + tones"
-notes = "Sourced via pypinyin. Tones encoded as separate symbols (1-5)."
-
-[[inventory.languages]]
-language = "ko"
-count = 27
-description = "Korean Jamo phonemes (initial/medial/final consonants + vowels)"
-notes = "Sourced via g2pk2. Optional dependency."
-
-[[inventory.languages]]
-language = "es-pt-fr-sv"
-count = 0
-description = "European languages reuse en/zh inventory plus IPA extensions"
-notes = "5 IPA-only codepoints (ã/õ/ɐ̃/ɔ̃/œ̃) + 2 EU-PT specific (ɨ/ɫ) added in pua.json without expanding num_symbols."
+# ---------------------------------------------------------------------------
+# Symbols added after 1.0
+# ---------------------------------------------------------------------------
+# ids 173-184, all Swedish (#300). Listed so a reviewer can see exactly what
+# the minor bump covers. These ids did not exist in any released model, so no
+# published checkpoint is affected.
+#
+#   173 U+0267 ɧ   174 U+0275 ɵ   175 U+028F ʏ
+#   176-184 U+E059..U+E061 (PUA-encoded multi-codepoint Swedish vowels)
 
 # ---------------------------------------------------------------------------
 # Forward Compatibility Strategy
@@ -144,14 +152,17 @@ notes = "5 IPA-only codepoints (ã/õ/ɐ̃/ɔ̃/œ̃) + 2 EU-PT specific (ɨ/ɫ)
 #       checkpoint. Reserved for cases where (A) is exhausted.
 
 [forward_compat]
-free_slots = [168, 169, 170, 171, 172]
-free_slots_count = 5
+# `free_slots = [168..172]` used to be listed here as reserved. They are not:
+# 168 is `ɰ` (Korean) and 169-172 are `ɖ ʈ ɳ ɭ` (Swedish), all allocated. The
+# next genuinely unused id is simply `num_symbols`.
+next_free_id = 185
 extension_policy = "prefer-A"  # see "Forward Compatibility Strategy" above
 backward_compat_window = "indefinite"  # never break released models silently
 required_change_set_for_minor_bump = [
+    "src/python/g2p/piper_plus_g2p/encode/id_maps.py",  # the live inventory itself
     "src/python/g2p/piper_plus_g2p/data/pua.json",
     "tests/fixtures/g2p/phoneme_test_cases.json",
-    "docs/spec/phoneme-set-version.toml",  # this file (bump symbol_set_version)
+    "docs/spec/phoneme-set-version.toml",  # num_symbols + inventory_sha256
     "docs/spec/pua-contract.toml",         # if invariants change
 ]
 
