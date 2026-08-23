@@ -746,9 +746,36 @@ class TestMultilingualIntegration:
 
     @pytest.mark.unit
     def test_7lang_id_map(self):
+        """The composite code must return the exact pinned inventory.
+
+        This used to assert `len(id_map) > 180`, which is how Swedish grew the
+        inventory from 173 to 185 without anything objecting — the spec still
+        claimed 173, and no gate compared it against the code. The exact count
+        and digest now live in `docs/spec/phoneme-set-version.toml` and are
+        enforced by `scripts/check_phoneme_set_version.py`; this test pins that
+        the composite language code resolves to that same inventory.
+        """
+        import hashlib
+        import tomllib
+        from pathlib import Path
+
         from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
+
+        spec_path = (
+            Path(__file__).resolve().parents[3]
+            / "docs"
+            / "spec"
+            / "phoneme-set-version.toml"
+        )
+        with spec_path.open("rb") as handle:
+            inventory = tomllib.load(handle)["inventory"]
+
         id_map = get_phoneme_id_map("ja-en-zh-es-fr-pt-sv")
-        assert len(id_map) > 180  # 6lang was 173, +sv ~189
+        symbols = sorted(id_map, key=lambda symbol: id_map[symbol][0])
+
+        assert len(symbols) == inventory["num_symbols"]
+        digest = hashlib.sha256(" ".join(symbols).encode("utf-8")).hexdigest()
+        assert digest == inventory["inventory_sha256"]
 
 
 # =========================================================================
@@ -782,10 +809,33 @@ class TestRegressionExistingLanguages:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
             id_map = get_phoneme_id_map("ja-en-zh-es-fr-pt")
-        # piper_plus_g2p uses fixed PUA (no dynamic register), so multi-char tokens
-        # without PUA mappings keep multi-char keys. Count differs from
-        # piper_train's 173 (which used dynamic PUA for ZH compound finals).
-        assert len(id_map) >= 173  # at least as many symbols
+        # The first 173 ids must stay byte-identical to the inventory the
+        # published models were trained on: their embedding rows are frozen, so
+        # an id that changes meaning silently mis-maps every one of them.
+        # `len(id_map) >= 173` — the previous assertion — cannot see that, and
+        # would pass just as happily if two symbols swapped places.
+        import hashlib
+        import tomllib
+        from pathlib import Path
+
+        spec_path = (
+            Path(__file__).resolve().parents[3]
+            / "docs"
+            / "spec"
+            / "phoneme-set-version.toml"
+        )
+        with spec_path.open("rb") as handle:
+            released = tomllib.load(handle)["snapshots"][0]
+
+        symbols = sorted(id_map, key=lambda symbol: id_map[symbol][0])
+        prefix = symbols[: released["num_symbols"]]
+        digest = hashlib.sha256(" ".join(prefix).encode("utf-8")).hexdigest()
+
+        assert digest == released["inventory_sha256"], (
+            "the first "
+            f"{released['num_symbols']} phoneme ids no longer match the "
+            f"inventory released models were trained on"
+        )
 
     @pytest.mark.unit
     def test_ja_pua_unchanged(self):

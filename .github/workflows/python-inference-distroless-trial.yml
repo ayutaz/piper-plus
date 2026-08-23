@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v6.1.0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3.12.0
@@ -85,8 +85,13 @@ jobs:
           # criterion. builder (python:3.11-slim-trixie) and final
           # (gcr.io/distroless/python3-debian12) share Debian-glibc ABI,
           # so onnxruntime's pre-built C extension resolves cleanly.
+          # -X faulthandler so a native crash prints the Python traceback that
+          # pinpoints it. Without it this step reports a bare `exit 139` and
+          # the next person has to rebuild the whole image to learn anything
+          # (which is exactly what happened with the ORT 1.29 segfault).
           docker run --rm --entrypoint /usr/bin/python3 \
             piper-plus-inference:cpu-distroless-trial \
+            -X faulthandler \
             -c "import platform, sys; \
                 print(f'final arch: {platform.machine()}'); \
                 print(f'final python: {sys.version}'); \

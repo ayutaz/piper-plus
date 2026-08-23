@@ -2,6 +2,8 @@ import torch
 from pytorch_lightning.callbacks import Callback
 from torch import nn
 
+from .commons import migrate_prefilm_decoder_cond
+
 
 class ExponentialMovingAverage:
     """Exponential Moving Average for model parameters.
@@ -193,7 +195,17 @@ class EMACallback(Callback):
                 self.ema_generator = ExponentialMovingAverage(
                     model.model_g.dec, decay=self.decay
                 )
-            self.ema_generator.load_state_dict(checkpoint["ema_generator_state"])
+            # `VitsModel.on_load_checkpoint` normally migrates pre-FiLM shadow
+            # params before this runs (Lightning restores the module before its
+            # callbacks). Repeating it here keeps that ordering from being a
+            # single point of failure — the migration is idempotent, so a
+            # second pass is a no-op (issue #616).
+            ema_state = checkpoint["ema_generator_state"]
+            if isinstance(ema_state, dict) and ema_state.get("shadow_params"):
+                ema_state["shadow_params"], _ = migrate_prefilm_decoder_cond(
+                    ema_state["shadow_params"], model.model_g.dec.state_dict()
+                )
+            self.ema_generator.load_state_dict(ema_state)
 
         if checkpoint.get("ema_spk_proj_state"):
             if self.ema_spk_proj is None and hasattr(model.model_g, "spk_proj"):

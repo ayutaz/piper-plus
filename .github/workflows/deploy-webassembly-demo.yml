@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6.0.3
+        uses: actions/checkout@v6.1.0
         with:
           submodules: recursive
 
@@ -392,7 +392,7 @@ jobs:
         uses: actions/deploy-pages@v4.0.5
 
       - name: Checkout (for verify script)
-        uses: actions/checkout@v6.0.3
+        uses: actions/checkout@v6.1.0
         with:
           # We only need scripts/verify_pages_assets.py; a shallow clone is
           # cheaper than the deploy job's default treeless fetch.
