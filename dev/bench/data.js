@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785764990518,
+  "lastUpdate": 1787470592240,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -750,6 +750,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 206.5,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4475d45d0d18b052e8f9621138a3395c69dc84f9",
+          "message": "fix(train): Python 3.13 で pathlib 綴りがずれ ckpt が読めない問題を修正 (#619)\n\n* fix(train): Python 3.13 で pathlib 綴りがずれ ckpt が読めない問題を修正\n\n`torch.serialization.add_safe_globals([cls])` (bare 形式) は registry の\nキーを **読み手側** の `cls.__module__` から lookup 時に導出する。 一方\nunpickler は **書き手側が記録した文字列** をそのまま引く。\n\nCPython 3.13 は具象 path クラスを `pathlib._local` へ移した (3.14 で\n`pathlib` に復帰) ため、 3.12 以前で保存した ckpt (GLOBAL =\n`pathlib PosixPath`) を 3.13 で読むと、 shim が「動いている」のに\nキーが一致せず torch 2.6+ の既定 `weights_only=True` で拒否される:\n\n    _pickle.UnpicklingError: Weights only load failed.\n      WeightsUnpickler error: Unsupported global:\n      GLOBAL pathlib.PosixPath was not an allowed global by default.\n\n逆方向 (3.13 製 ckpt を 3.12 で読む) も同型に壊れる。\n\n修正:\n- `_compat` が `pathlib` / `pathlib._local` の両綴りを `(callable, name)`\n  タプル形式で明示登録する (torch 2.6+。 それ未満は feature detection で\n  bare 形式にフォールバック — `src/python/pyproject.toml` は torch を pin\n  しておらず古い torch が解決されうるため)\n- `weights_only=False` 経路用の Windows alias も `pathlib._local` へ適用。\n  3.13 製 ckpt は unpickler が `sys.modules[\"pathlib._local\"]` を直接\n  getattr するため、 公開モジュール側の alias だけでは迂回される\n- `SAFE_GLOBAL_TARGETS` を純粋関数 `build_safe_global_targets(is_windows)`\n  から構築し、 Windows のマッピングを POSIX 上からも検証可能にした\n- `__main__.py` と `scripts/convert_multi_to_single_speaker.py` にあった\n  同ロジックの複製 (今回の drift 元) を canonical 実装への委譲に置換\n\nテスト:\n- `tests/test_compat_pickle_names.py` を新規追加。 両綴りの pickle を\n  合成して `torch.load` (weights_only 既定) と Lightning の\n  `cloud_io._load` の双方を検証。 綴りは parametrize しているので\n  CI matrix の 3.11/3.12 leg が逆方向を、 3.13 leg が順方向を固定する\n- `tests/test_compat.py` は CI で 1 度も走っていなかった\n  (`-m unit` で 4 deselected)。 `unit` マーカーを付与し、 完全修飾名を\n  検査するよう assert を強化 (旧 assert はクラス名だけを見ていたため\n  綴り違いを素通しし、 本バグを検出できなかった)\n\nRefs #616\n\nClaude-Session: https://claude.ai/code/session_01FXPP4Zv3gvHLRJsobaH8ga\n\n* fix(docs): doc examples audit snapshot を再生成\n\nhandoff ドキュメントに python コードブロックを 1 つ追加し、 migration\nガイドに注記を足したことで、 block 数 (466 -> 467) と既存ブロックの行番号が\n変化し \"Syntax-validate executable docs blocks\" が\n`audit drifted from snapshot` で fail していた。\n\nClaude-Session: https://claude.ai/code/session_01FXPP4Zv3gvHLRJsobaH8ga\n\n* fix(test): fixture の path を host 固有パスから中立な例に差し替え\n\n`secret-path-reference` gate が `src/python/tests/test_compat_pickle_names.py`\nの `/data/piper/dataset.jsonl` を「メンテナの学習マシン固有パス」として\n検出していた。 fixture は path 文字列の中身に依存しないため\n`/var/example/dataset.jsonl` に変更する。\n\nローカルで検出できなかったのは、 pre-commit が untracked file を\n`--all-files` の対象に含めないため (当該ファイルは新規追加で未 add だった)。\n\nClaude-Session: https://claude.ai/code/session_01FXPP4Zv3gvHLRJsobaH8ga",
+          "timestamp": "2026-08-23T16:35:03+09:00",
+          "tree_id": "5a93d015100f7ea97fc8d6fef4b52416013a72bc",
+          "url": "https://github.com/ayutaz/piper-plus/commit/4475d45d0d18b052e8f9621138a3395c69dc84f9"
+        },
+        "date": 1787470590226,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0988,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 25.2,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 25.4,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1496,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 206.7,
             "unit": "MB"
           },
           {
