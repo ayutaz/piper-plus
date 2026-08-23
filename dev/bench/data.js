@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1787470592240,
+  "lastUpdate": 1787479921047,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -804,6 +804,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 206.7,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f14b8f76c9e4603f7d5b5f3f11807b0005b4e3a2",
+          "message": "fix(train): Multi-scale FiLM 導入前の ckpt を自動移行する (#616) (#621)\n\n* fix(train): Multi-scale FiLM 導入前の ckpt を自動移行する (#616)\n\nPR #579 (Zero-Shot TTS) が `MBiSTFTGenerator.cond` の出力チャネルを\n`upsample_initial_channel` から `* 2` (FiLM の scale + shift) に拡幅した\n結果、 それ以前に学習された MB-iSTFT ckpt — HF 公開の\n`ayousanz/piper-plus-base` の `model.ckpt` を含む — が全ロード経路で\n落ちるようになっていた。 `strict=False` は size mismatch を緩めないため\n回避もできない。\n\n    RuntimeError: size mismatch for model_g.dec.cond.weight:\n      copying a param with shape torch.Size([256, 512, 1]) ...\n      the shape in current model is torch.Size([512, 512, 1])\n\n移行はロスレスである。 `_apply_film` は入力を scale_raw / shift に二分し\n`x * (sigmoid(scale_raw) + 0.5) + shift` を計算するので、 旧重みの上に\nゼロを積めば gain は厳密に 1.0 となり、 旧来の `x + cond(g)` と\n**ビット単位で同一**の出力になる。 `cond_layers` は model 側と同じく\nゼロで backfill する (これも FiLM を恒等にする値であって、 単なる穴埋めではない)。\n公開 ckpt 実機で max abs diff = 0.0 / strict=True load 成功を確認済み。\n\n主な変更:\n\n- `vits/commons.py` に checkpoint 正規化ファミリを集約\n  (`normalize_checkpoint_state_dict` = HiFi-GAN 判定 → _orig_mod 除去 →\n   weight_norm remap → pre-FiLM 移行)。 順序には理由があり docstring に明記\n- `VitsModel.on_load_checkpoint` に適用。 Lightning は load_state_dict の\n  直前にこの hook を呼ぶため、 `load_from_checkpoint` と\n  `trainer.fit(ckpt_path=)` の両方が 1 箇所で救われる\n- `export_onnx` の state_dict / EMA shadow params、\n  `--resume-from-multispeaker-checkpoint`、 resume fallback にも適用\n- optimizer state: `optimizer.load_state_dict` は shape を検証しないため、\n  重みだけ移行すると最初の `step()` で落ち、 それを resume fallback が\n  飲み込んで **epoch 0 から再学習**していた。 パラメータ順序を検証できる\n  場合のみ Adam moment を拡幅し、 できない場合は破棄して警告する\n- 重複実装の解消: FT 経路のインライン複製を `load_multispeaker_checkpoint`\n  に、 export_onnx の EMA 複製を `apply_ema_shadow_params` に一本化\n  (いずれも複製同士が既に drift していた)\n\n回帰防止 (CI):\n\n- `docs/spec/checkpoint-compat-contract.toml` に公開 ckpt の key→shape\n  (799 tensor) を記録し、 `scripts/check_checkpoint_compat.py` が\n  「公開済み ckpt が現行モデルに strict load できること」を強制する。\n  DL 不要・GPU 不要 (shape からゼロ tensor を起こすだけ、 約 1 秒)\n- pre-commit gate `checkpoint-compat-contract` + pytest からも実行\n- `tests/test_checkpoint_film_migration.py` (14 件)。 shape だけでなく\n  「移行後 decoder 出力が加算 conditioning と bit-identical」を pin する。\n  実際にこのテスト群が実装中の順序バグ (HiFi-GAN 判定を _orig_mod 除去より\n  先に置くと torch.compile 製 ckpt を誤って HiFi-GAN と判定する) を検出した\n\nCloses #616\n\nClaude-Session: https://claude.ai/code/session_01FXPP4Zv3gvHLRJsobaH8ga\n\n* fix(ci): .gitignore の check_*.py 除外で新規 gate が commit されない問題を修正\n\n`scripts/check_checkpoint_compat.py` が `git add -A` で無言でスキップされ、\nローカルでは動くのに CI で\n\n    can't open file '.../scripts/check_checkpoint_compat.py':\n    [Errno 2] No such file or directory\n\nになっていた。 `.gitignore` の `check_*.py` (repo ルートのアドホックな\nデバッグスクリプト向け) が `scripts/` 配下にも効いており、 個別の\n`!scripts/check_xxx.py` を 1 行ずつ足して回る運用になっていたため。\n\nこの否定リストは 72 行まで膨らんでおり、 **新しい contract gate を追加する\nたびに必ず踏む罠**になっていた (追跡済み 73 件に対し否定 72 件、 1 件は\nignore ルール導入前に add されていたため生き残っていただけ)。\n\n`scripts/` は contract gate を置く場所でアドホックなデバッグ置き場では\nないので、 72 行の個別否定を `!scripts/check_*.py` 1 行に置き換える。\n既存 73 件すべてが引き続き追跡対象であること、 意図的に ignore されている\n`scripts/check_*.py` が 1 つも無いことを確認済み。\n\nClaude-Session: https://claude.ai/code/session_01FXPP4Zv3gvHLRJsobaH8ga\n\n* fix(ci): 新規 gate スクリプトに実行ビットを付与\n\n`scripts/check_checkpoint_compat.py` は shebang を持つが mode 644 で\ncommit されており、 `check-shebang-scripts-are-executable` hook が\n落ちていた (既存の `scripts/check_*.py` はいずれも 755)。\n\nローカルで検出できなかったのは、 直前まで .gitignore の\n`check_*.py` に飲まれて untracked だったため — pre-commit は\nuntracked file を `--all-files` の対象に含めない。\n\nClaude-Session: https://claude.ai/code/session_01FXPP4Zv3gvHLRJsobaH8ga\n\n* refactor(train): __main__ の死んだ re-export を削除 (CodeQL)\n\n`_LEGACY_HIFIGAN_MESSAGE` の import と `_is_legacy_hifigan_checkpoint`\nのエイリアスは、 HiFi-GAN 判定を `vits.commons` へ移した際に後方互換の\nつもりで残したものだが、 `__main__.py` 内では 1 度も使われておらず\nCodeQL の \"Unused import\" / \"Unused global variable\" を踏んでいた。\n\n参照していたのはテスト 3 ファイルのみで、 いずれも underscore 付きの\nprivate 名。 外部 API の互換義務は無いので、 テスト側を canonical な\n`piper_train.vits.commons` からの import に切り替え、 vestigial な\nエイリアスを削除する。 これで「実装は commons、 参照だけ __main__」と\nいう紛らわしい二重経路も無くなる。\n\nClaude-Session: https://claude.ai/code/session_01FXPP4Zv3gvHLRJsobaH8ga\n\n* fix: rebase 時の .pre-commit-config.yaml 競合を解消 (両 hook を保持)\n\ndev 側の guard-bash-behaviour と本ブランチの checkpoint-compat-contract が\n同じアンカーに hook を追加していたため競合していた。 両方を残し、\nmarker の外側にあった pass_filenames: false を各ブロックに配る。\n\nClaude-Session: https://claude.ai/code/session_01FXPP4Zv3gvHLRJsobaH8ga",
+          "timestamp": "2026-08-23T19:11:00+09:00",
+          "tree_id": "837f4e7e71950823d640365241cb55d515d406f0",
+          "url": "https://github.com/ayutaz/piper-plus/commit/f14b8f76c9e4603f7d5b5f3f11807b0005b4e3a2"
+        },
+        "date": 1787479919132,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.1238,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 25,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 55.8,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1392.6,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 208.3,
             "unit": "MB"
           },
           {
