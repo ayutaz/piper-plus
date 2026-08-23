@@ -112,6 +112,25 @@ jobs:
             piper-plus-inference:cpu-distroless-trial - \
             < docker/python-inference/_probe_distroless.py || true
 
+      # TEMPORARY: LD_DEBUG shows exactly which shared object the loader is
+      # resolving when the process dies, which the Python-level traceback
+      # cannot. Two libgomp copies exist in this image (one from the builder
+      # under /usr/lib, one from the base under /usr/lib/x86_64-linux-gnu);
+      # this tells us which is actually bound.
+      - name: LD_DEBUG trace of the crashing import (temporary)
+        if: always()
+        run: |
+          docker run --rm -e LD_DEBUG=libs \
+            --entrypoint /usr/local/bin/python3.13 \
+            piper-plus-inference:cpu-distroless-trial \
+            -c "import onnxruntime" > /tmp/lddebug.log 2>&1 || true
+          echo "---- total lines ----"
+          wc -l /tmp/lddebug.log
+          echo "---- libgomp / libstdc++ / libcurl / provider bindings ----"
+          grep -iE "libgomp|libstdc\+\+|libcurl|providers_shared|onnxruntime" /tmp/lddebug.log | tail -40 || true
+          echo "---- last 60 lines before death ----"
+          tail -60 /tmp/lddebug.log
+
       - name: Compose report.md
         id: report
         env:
