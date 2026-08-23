@@ -131,6 +131,31 @@ jobs:
           echo "---- last 60 lines before death ----"
           tail -60 /tmp/lddebug.log
 
+      # TEMPORARY: the interpreter and site-packages are now identical to the
+      # builder's, yet the import crashes only in the final image. What is
+      # still different is the base filesystem and the runtime user
+      # (distroless defaults to nonroot 65532; the builder runs as root).
+      # Try the obvious environmental suspects one at a time.
+      - name: Bisect the runtime environment (temporary)
+        if: always()
+        run: |
+          try() {
+            printf '%-42s' "$1"; shift
+            if docker run --rm "$@" --entrypoint /usr/local/bin/python3.13 \
+                 piper-plus-inference:cpu-distroless-trial \
+                 -c "import onnxruntime as o; print('OK', o.__version__)" 2>&1 | tail -1; then :; fi
+          }
+          try "default (nonroot)"
+          try "--user 0:0 (root)"                 --user 0:0
+          try "HOME=/tmp"                         -e HOME=/tmp
+          try "OMP_NUM_THREADS=1"                 -e OMP_NUM_THREADS=1
+          try "ORT_DISABLE_AZURE=1"               -e ORT_DISABLE_AZURE=1
+          try "root + HOME=/tmp"                  --user 0:0 -e HOME=/tmp
+          echo "---- env seen inside the container ----"
+          docker run --rm --entrypoint /usr/local/bin/python3.13 \
+            piper-plus-inference:cpu-distroless-trial \
+            -c "import os; print({k: os.environ.get(k) for k in ('HOME','USER','TMPDIR','LD_LIBRARY_PATH')}); print('uid', os.getuid())" || true
+
       - name: Compose report.md
         id: report
         env:
