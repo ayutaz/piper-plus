@@ -215,6 +215,17 @@ Windows PC で HF からモデルを取得して `torch.load` で sanity check �
    ckpt = torch.load("epoch=32-step=216326.ckpt", map_location="cpu", weights_only=False)
    ```
 
+   ただし **CPython 3.13 で保存された ckpt にはこの 1 行では足りない**。 3.13 は具象 path
+   クラスを `pathlib._local` へ移したため pickle の GLOBAL が `pathlib._local PosixPath`
+   と綴られ、 unpickler が公開モジュール側の alias を迂回する。 `piper_train` を import
+   すれば `piper_train._compat` が両モジュールに alias を張るので、 手で書くならこちらを
+   使うほうが安全:
+
+   ```python
+   from piper_train._compat import apply_windows_pathlib_aliases
+   apply_windows_pathlib_aliases()
+   ```
+
 詳細: [`docs/migration/v1.12-to-v2.0.md` の "Windows local dev" セクション](../migration/v1.12-to-v2.0.md#windows-local-dev-cross-platform-notes)。 学習自体は Linux 環境で実行する前提のため、 上記 patch は Windows ローカル inspect 専用。
 
 ### 4.3 各 ckpt / ファイルの役割

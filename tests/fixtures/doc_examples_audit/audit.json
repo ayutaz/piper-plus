@@ -2,10 +2,10 @@
   "schema_version": 1,
   "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
-    "executable": 222,
+    "executable": 223,
     "needs_placeholder": 6,
     "skip_warranted": 238,
-    "total": 466
+    "total": 467
   },
   "by_language": {
     "bash": {
@@ -24,7 +24,7 @@
       "skip_warranted": 0
     },
     "python": {
-      "executable": 29,
+      "executable": 30,
       "needs_placeholder": 0,
       "skip_warranted": 1
     },
@@ -4437,8 +4437,21 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 281,
-      "line_end": 308,
+      "line_start": 224,
+      "line_end": 227,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "d3bbbeb2cd18d8fe507b30d42afb101101fdef88"
+    },
+    {
+      "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
+      "line_start": 292,
+      "line_end": 319,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4452,8 +4465,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 315,
-      "line_end": 338,
+      "line_start": 326,
+      "line_end": 349,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4467,8 +4480,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 342,
-      "line_end": 347,
+      "line_start": 353,
+      "line_end": 358,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4482,8 +4495,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 353,
-      "line_end": 378,
+      "line_start": 364,
+      "line_end": 389,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4498,8 +4511,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 385,
-      "line_end": 403,
+      "line_start": 396,
+      "line_end": 414,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4513,8 +4526,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 411,
-      "line_end": 443,
+      "line_start": 422,
+      "line_end": 454,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4528,8 +4541,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 471,
-      "line_end": 495,
+      "line_start": 482,
+      "line_end": 506,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4543,8 +4556,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 511,
-      "line_end": 516,
+      "line_start": 522,
+      "line_end": 527,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4559,8 +4572,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 520,
-      "line_end": 525,
+      "line_start": 531,
+      "line_end": 536,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4575,8 +4588,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 545,
-      "line_end": 561,
+      "line_start": 556,
+      "line_end": 572,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4590,8 +4603,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 569,
-      "line_end": 594,
+      "line_start": 580,
+      "line_end": 605,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4606,8 +4619,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 598,
-      "line_end": 604,
+      "line_start": 609,
+      "line_end": 615,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4621,8 +4634,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 641,
-      "line_end": 646,
+      "line_start": 652,
+      "line_end": 657,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4636,8 +4649,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 652,
-      "line_end": 660,
+      "line_start": 663,
+      "line_end": 671,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4649,8 +4662,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 759,
-      "line_end": 842,
+      "line_start": 770,
+      "line_end": 853,
       "language_raw": "python",
       "language": "python",
       "category": "skip_warranted",
@@ -4890,8 +4903,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 283,
-      "line_end": 288,
+      "line_start": 285,
+      "line_end": 290,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4903,8 +4916,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 330,
-      "line_end": 334,
+      "line_start": 334,
+      "line_end": 338,
       "language_raw": "sh",
       "language": "bash",
       "category": "needs_placeholder",
@@ -4918,8 +4931,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 340,
-      "line_end": 347,
+      "line_start": 344,
+      "line_end": 351,
       "language_raw": "sh",
       "language": "bash",
       "category": "needs_placeholder",
@@ -4933,8 +4946,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 369,
-      "line_end": 375,
+      "line_start": 373,
+      "line_end": 379,
       "language_raw": "dockerfile",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4948,8 +4961,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 385,
-      "line_end": 390,
+      "line_start": 389,
+      "line_end": 394,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4961,8 +4974,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 402,
-      "line_end": 405,
+      "line_start": 406,
+      "line_end": 409,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4974,8 +4987,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 420,
-      "line_end": 425,
+      "line_start": 424,
+      "line_end": 429,
       "language_raw": "diff",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4989,8 +5002,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 433,
-      "line_end": 438,
+      "line_start": 437,
+      "line_end": 442,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -5002,8 +5015,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 444,
-      "line_end": 448,
+      "line_start": 448,
+      "line_end": 452,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -5015,8 +5028,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 454,
-      "line_end": 457,
+      "line_start": 458,
+      "line_end": 461,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
