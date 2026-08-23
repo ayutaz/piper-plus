@@ -153,8 +153,14 @@ pub fn mono_to_stereo(samples: &[i16]) -> Vec<i16> {
 
 /// Convert stereo to mono (average channels)
 pub fn stereo_to_mono(samples: &[i16]) -> Vec<i16> {
+    // `as_chunks::<2>()` over `chunks_exact(2)`: clippy 1.98 で新設された
+    // `chunks_exact_to_as_chunks` が定数 chunk size を lint するため。
+    // `.0` は完全な chunk のみを含み、余り (奇数長の末尾 1 sample) は `.1`
+    // に入って捨てられる = `chunks_exact` と同一の挙動。
     samples
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| {
             // Use i32 to avoid overflow when averaging
             ((pair[0] as i32 + pair[1] as i32) / 2) as i16
