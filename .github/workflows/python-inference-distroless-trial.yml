@@ -100,6 +100,17 @@ jobs:
                 print(f'FastAPI: {fastapi.__version__}, uvicorn: {uvicorn.__version__}'); \
                 import soundfile; print(f'soundfile: {soundfile.__version__}')"
 
+      # TEMPORARY: diagnose the `import onnxruntime` SIGSEGV (exit 139) that
+      # reproduces on plain `dev`. distroless has no shell, so the probe is fed
+      # to the interpreter on stdin. Non-gating — this step only collects
+      # evidence. Remove once the root cause is fixed.
+      - name: Diagnose final-stage import (temporary)
+        if: always()
+        run: |
+          docker run --rm -i --entrypoint /usr/bin/python3 \
+            piper-plus-inference:cpu-distroless-trial - \
+            < docker/python-inference/_probe_distroless.py || true
+
       - name: Compose report.md
         id: report
         env:
