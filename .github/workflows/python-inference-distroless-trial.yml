@@ -131,30 +131,32 @@ jobs:
           echo "---- last 60 lines before death ----"
           tail -60 /tmp/lddebug.log
 
-      # TEMPORARY: the interpreter and site-packages are now identical to the
-      # builder's, yet the import crashes only in the final image. What is
-      # still different is the base filesystem and the runtime user
-      # (distroless defaults to nonroot 65532; the builder runs as root).
-      # Try the obvious environmental suspects one at a time.
+      # TEMPORARY: interpreter, site-packages and numpy are now identical to
+      # the builder's, all libraries resolve, and there are no missing symbols
+      # — yet the import crashes only in the final image. Bisect what is left:
+      # the runtime user, HOME, threading env, and the container sandbox
+      # (Docker's default seccomp profile blocks syscalls a newer ORT may use).
       - name: Bisect the runtime environment (temporary)
         if: always()
         run: |
-          try() {
-            printf '%-42s' "$1"; shift
-            if docker run --rm "$@" --entrypoint /usr/local/bin/python3.13 \
-                 piper-plus-inference:cpu-distroless-trial \
-                 -c "import onnxruntime as o; print('OK', o.__version__)" 2>&1 | tail -1; then :; fi
+          IMG=piper-plus-inference:cpu-distroless-trial
+          run_variant() {
+            label="$1"; shift
+            out=$(docker run --rm "$@" --entrypoint /usr/local/bin/python3.13 \
+                    "$IMG" -c "import onnxruntime as o; print('OK', o.__version__)" 2>&1)
+            rc=$?
+            printf '%-34s rc=%-4s %s\n' "$label" "$rc" "$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-110)"
           }
-          try "default (nonroot)"
-          try "--user 0:0 (root)"                 --user 0:0
-          try "HOME=/tmp"                         -e HOME=/tmp
-          try "OMP_NUM_THREADS=1"                 -e OMP_NUM_THREADS=1
-          try "ORT_DISABLE_AZURE=1"               -e ORT_DISABLE_AZURE=1
-          try "root + HOME=/tmp"                  --user 0:0 -e HOME=/tmp
-          echo "---- env seen inside the container ----"
-          docker run --rm --entrypoint /usr/local/bin/python3.13 \
-            piper-plus-inference:cpu-distroless-trial \
-            -c "import os; print({k: os.environ.get(k) for k in ('HOME','USER','TMPDIR','LD_LIBRARY_PATH')}); print('uid', os.getuid())" || true
+          run_variant "default"
+          run_variant "root"                 --user 0:0
+          run_variant "nonroot-65532"        --user 65532:65532
+          run_variant "HOME=/tmp"            -e HOME=/tmp
+          run_variant "OMP_NUM_THREADS=1"    -e OMP_NUM_THREADS=1
+          run_variant "seccomp=unconfined"   --security-opt seccomp=unconfined
+          run_variant "privileged"           --privileged
+          echo "---- baseline: does numpy alone import? ----"
+          docker run --rm --entrypoint /usr/local/bin/python3.13 "$IMG" \
+            -c "import numpy; print('numpy', numpy.__version__)" 2>&1 | tail -2 || true
 
       - name: Compose report.md
         id: report
