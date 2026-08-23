@@ -62,7 +62,7 @@ curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyo
 - Languages: Japanese (20 speakers), English (310 speakers), Mandarin Chinese (142 speakers), Spanish (63 speakers), French (28 speakers), Portuguese (8 speakers)
 - Language codes: ja=0, en=1, zh=2, es=3, fr=4, pt=5
 - Sample rate: 22,050 Hz
-- Phonemes: 173 symbols (unified multilingual phoneme inventory)
+- Phonemes: 173 symbols (`symbol_set_version` 1.0 — the inventory the published models were trained on). 現行コードの live inventory は 185 symbol (`1.1`、 KO/SV 追加分を含む) で、 先頭 173 は 1.0 と byte 一致する append-only 拡張。 契約と検証: [`docs/spec/phoneme-set-version.toml`](../../spec/phoneme-set-version.toml)
 - Prosody Features: A1/A2/A3 prosody information (Japanese)
 - Extended phonemes: Question markers, context-dependent "N" variants
 

@@ -11,7 +11,7 @@ piper-plus の **ランタイム横断 byte-for-byte 整合契約** の目次。
 | 仕様 | パス | 適用範囲 |
 |------|------|--------|
 | PUA マッピング | [`pua-contract.toml`](pua-contract.toml) | Python/Rust/Go/C++/C#/WASM/Swift/Kotlin |
-| Phoneme Set バージョン | [`phoneme-set-version.toml`](phoneme-set-version.toml) | 173 シンボル / PUA v2 |
+| Phoneme Set バージョン | [`phoneme-set-version.toml`](phoneme-set-version.toml) | live 185 シンボル (`1.1`) + 出荷済み snapshot 173 (`1.0`) / PUA v2 |
 | 音素タイミング | [`phoneme-timing-contract.toml`](phoneme-timing-contract.toml) | 全ランタイム JSON/TSV/SRT 出力 |
 | Audio Format | [`audio-format-contract.toml`](audio-format-contract.toml) | WAV 出力 |
 | Audio Parity | [`audio-parity-contract.toml`](audio-parity-contract.toml) | 全ランタイム WAV 階層化等価性 (peak RMS / chromaprint / mel-spec) |
