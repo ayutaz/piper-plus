@@ -23,6 +23,20 @@ $10-50 の実害** — 手順の省略は費用に直結する。
 | 5 | **遅い box の見逃し** | PCIe box が 6.4x 遅く $60 浪費 | §1: レンタル直後・データ DL **前**に 25-batch 速度サニティ。予算導出の sec/step 上限で gate |
 | 6 | **幽霊起動** (queued start の遅延発火) | v10b instance が勝手に再起動し ~$50 浪費 | §5: `vastai start` がキューされたら**必ず台帳に記録**し、不要になったら `vastai stop` を明示発行。stop/destroy 後は `vastai show instances` で全台の actual_status を確認 |
 
+## 0. 速度測定の鉄則 (cudnn.benchmark 過渡、2026-08-23 の教訓)
+
+**可変長入力 + `cudnn.benchmark=True` の学習は、最初の 1-2 epoch が定常の 5-8 倍
+遅い** (新形状のたびに cudnn がカーネル探索 — profile 実測: Conv1d 1 call 25ms
+× 4,768/10batch = 120s が探索コスト)。形状キャッシュが埋まると加速する
+(v10b 実測: 1h/epoch → 30min → 15min)。
+
+- **起動直後の 25-400 batch の sec/step を「box が遅い」と誤読しない** — この
+  誤読で box を 3 台乗り換え ~$100 を浪費した実例あり
+- box 比較・速度 gate は **同一プロセスの 300+ batch 経過後 (warm) の窓**で測る
+- 短い bench (25 batch) は cold 窓しか見えない — bench 同士の比較は可、
+  定常の絶対値の見積もりには使えない
+- 再起動 (resume 含む) のたびにキャッシュは消える — resume 直後の遅さは正常
+
 ## 1. レンタル
 
 ```bash
