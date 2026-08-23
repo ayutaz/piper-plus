@@ -131,32 +131,45 @@ jobs:
           echo "---- last 60 lines before death ----"
           tail -60 /tmp/lddebug.log
 
-      # TEMPORARY: interpreter, site-packages and numpy are now identical to
-      # the builder's, all libraries resolve, and there are no missing symbols
-      # — yet the import crashes only in the final image. Bisect what is left:
-      # the runtime user, HOME, threading env, and the container sandbox
+      # TEMPORARY: interpreter, site-packages and numpy are identical to the
+      # builder's, every library resolves, and RTLD_NOW finds no missing
+      # symbol — yet the import crashes only in the final image. Bisect what
+      # is left: runtime user, HOME, threading env, and the container sandbox
       # (Docker's default seccomp profile blocks syscalls a newer ORT may use).
+      #
+      # `set +e` is essential: the step runs under `bash -e`, so a failing
+      # docker run inside a command substitution would abort the whole step
+      # before printing anything.
       - name: Bisect the runtime environment (temporary)
         if: always()
         run: |
+          set +e
           IMG=piper-plus-inference:cpu-distroless-trial
           run_variant() {
             label="$1"; shift
             out=$(docker run --rm "$@" --entrypoint /usr/local/bin/python3.13 \
                     "$IMG" -c "import onnxruntime as o; print('OK', o.__version__)" 2>&1)
             rc=$?
-            printf '%-34s rc=%-4s %s\n' "$label" "$rc" "$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-110)"
+            printf '%-24s rc=%-4s %s\n' "$label" "$rc" "$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-100)"
           }
           run_variant "default"
-          run_variant "root"                 --user 0:0
-          run_variant "nonroot-65532"        --user 65532:65532
-          run_variant "HOME=/tmp"            -e HOME=/tmp
-          run_variant "OMP_NUM_THREADS=1"    -e OMP_NUM_THREADS=1
-          run_variant "seccomp=unconfined"   --security-opt seccomp=unconfined
-          run_variant "privileged"           --privileged
-          echo "---- baseline: does numpy alone import? ----"
-          docker run --rm --entrypoint /usr/local/bin/python3.13 "$IMG" \
-            -c "import numpy; print('numpy', numpy.__version__)" 2>&1 | tail -2 || true
+          run_variant "root"              --user 0:0
+          run_variant "nonroot-65532"     --user 65532:65532
+          run_variant "HOME=/tmp"         -e HOME=/tmp
+          run_variant "OMP_NUM_THREADS=1" -e OMP_NUM_THREADS=1
+          run_variant "seccomp=unconfined" --security-opt seccomp=unconfined
+          run_variant "privileged"        --privileged
+
+          echo "---- controls ----"
+          out=$(docker run --rm --entrypoint /usr/local/bin/python3.13 "$IMG" \
+                  -c "import numpy; print('numpy', numpy.__version__)" 2>&1); \
+            printf '%-24s rc=%-4s %s\n' "numpy only" "$?" "$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-100)"
+          # Canonical (non-distroless) image: does ORT 1.29 import there? This
+          # decides whether a pin belongs repo-wide or only in this trial image.
+          out=$(docker run --rm --entrypoint python piper-plus-inference:cpu-canonical \
+                  -c "import onnxruntime as o; print('OK', o.__version__)" 2>&1); \
+            printf '%-24s rc=%-4s %s\n' "canonical Dockerfile.cpu" "$?" "$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-100)"
+          exit 0
 
       - name: Compose report.md
         id: report
