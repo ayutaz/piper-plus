@@ -90,7 +90,36 @@ COPY src/python_run/requirements_webui.txt /build/requirements_webui.txt
 # /usr/local/lib/python3.13/site-packages is self-contained and copy-able
 # into the final stage.
 RUN uv pip install --system "/build/src/python/g2p[all]"
-RUN uv pip install --system "/build/src/python[inference]"
+# onnxruntime is capped below 1.29 *for this image only*.
+#
+# ORT 1.29 runs a device-discovery pass at import time (`device_discovery.cc`,
+# new in 1.29) that walks /sys/devices to read PCI bus IDs. On this distroless
+# base that pass segfaults: `import onnxruntime` dies with SIGSEGV (exit 139)
+# inside the extension's module init, before any Python-level error surfaces.
+#
+# Measured, not guessed — every one of these was ruled out:
+#   * missing symbol      — dlopen with RTLD_NOW resolves every symbol in
+#                           onnxruntime_pybind11_state...so
+#   * missing library     — libstdc++ / libgcc_s resolve; libgomp is never
+#                           even loaded (LD_DEBUG=libs)
+#   * interpreter skew    — copying the builder's own CPython 3.13.15 into the
+#                           final stage (instead of the base image's 3.13.5)
+#                           changes nothing; it still crashes
+#   * runtime user / env  — root, nonroot 65532, HOME=/tmp, OMP_NUM_THREADS=1
+#                           all crash identically
+#   * container sandbox   — seccomp=unconfined and --privileged crash too
+# while numpy imports fine in the same image, ORT 1.28.0 imports fine in the
+# same image, and ORT 1.29.0 imports fine in the canonical Dockerfile.cpu —
+# where the very same discovery pass logs
+#   "Skipping pci_bus_id for PCI path ... did not match expected pattern"
+# and carries on. The crash is specific to 1.29 + this minimal filesystem.
+#
+# The cap deliberately lives here and not in pyproject.toml: the canonical
+# image and every non-distroless install are unaffected and should keep
+# getting ORT updates. Lift it once upstream stops crashing on a minimal /sys
+# (or once the discovery pass can be disabled), and re-run this workflow to
+# confirm before doing so.
+RUN uv pip install --system "/build/src/python[inference]" "onnxruntime<1.29"
 RUN uv pip install --system -r /build/requirements_webui.txt
 
 # Pre-download NLTK data for g2p-en. The download dir is shared so the
@@ -183,8 +212,12 @@ WORKDIR /app
 
 EXPOSE 8000 7860
 
-# distroless/python3-debian13 defaults to UID 65532 (nonroot user).
-# No `USER` directive needed; documenting the assumption for reviewers.
+# NOTE: this image runs as **root** (uid 0), not the nonroot 65532 this
+# comment used to claim — measured with `docker run ... python3 -c
+# "import os; print(os.getuid())"`. gcr.io/distroless/python3-debian13 has a
+# nonroot variant, but the default tag used here does not switch users. If
+# nonroot is wanted, add an explicit `USER 65532:65532` rather than relying
+# on the base image's default.
 
 # distroless has no shell — HEALTHCHECK must be exec-form, and inline
 # python. distroless/python3-debian13 ships /usr/bin/python3 (Debian
