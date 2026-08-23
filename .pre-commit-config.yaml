@@ -824,6 +824,19 @@ repos:
         files: ^(cmake/ExternalDeps\.cmake|.*pyproject\.toml|.*requirements.*\.txt|scripts/check_openjtalk_version_sync\.py)$
         pass_filenames: false
 
+      # guard-bash.sh の振る舞いテスト。 既に shellcheck で syntax / lint は
+      # 見ているが、 hook の判定ロジックのバグ (「許可すべきものを deny する」)
+      # は shellcheck では原理的に検出できない。 実際 /create-pr の再呼び出しが
+      # 常に deny される回帰が素通りし、 セッション内で 2 本目以降の PR が
+      # 作れなくなっていた。 mock transcript を食わせる自己完結テストなので
+      # 依存なし・0.1 秒未満で回る。
+      - id: guard-bash-behaviour
+        name: guard-bash.sh 判定ロジックの振る舞いテスト
+        entry: bash .claude/hooks/test-guard-bash.sh
+        language: system
+        files: ^\.claude/hooks/(guard-bash|test-guard-bash)\.sh$
+        pass_filenames: false
+
       # Pytest skip-reason discipline. Skips without `reason=` accumulate as
       # silent technical debt — reviewers can't tell whether they're
       # permanent (missing optional dep), temporary (waiting on a fix), or
