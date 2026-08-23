@@ -1,8 +1,6 @@
 import argparse
 import json
 import logging
-import pathlib
-import platform
 from pathlib import Path
 from pickle import UnpicklingError
 
@@ -20,12 +18,12 @@ from .vits.ema import EMACallback
 from .vits.lightning import VitsModel
 
 
-# Allow Path objects in checkpoints (PyTorch 2.6+ weights_only=True)
-torch.serialization.add_safe_globals([pathlib.PosixPath, pathlib.WindowsPath])
-
-# Fix PosixPath instantiation error when loading Linux checkpoints on Windows
-if platform.system() == "Windows":
-    pathlib.PosixPath = pathlib.WindowsPath
+# NOTE: the pathlib safe-globals registration and the Windows PosixPath
+# alias live in `piper_train._compat`, which `piper_train/__init__.py`
+# imports eagerly — so they are already applied by the time this module
+# runs. Do not re-add a copy here: the duplicate that used to sit at this
+# spot drifted out of sync and registered the wrong keys under CPython
+# 3.13 (see `_compat.py` for why the module spelling matters).
 
 # Optional wandb integration
 try:

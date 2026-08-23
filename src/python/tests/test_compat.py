@@ -21,11 +21,13 @@ import platform
 import pytest
 
 
+@pytest.mark.unit
 def test_compat_module_imports_without_error() -> None:
     """`piper_train._compat` must import cleanly on every platform."""
     from piper_train import _compat  # noqa: F401
 
 
+@pytest.mark.unit
 def test_piper_train_import_triggers_compat() -> None:
     """`import piper_train` must eagerly load the compat shim.
 
@@ -66,25 +68,44 @@ def test_piper_train_import_triggers_compat() -> None:
         entries = list(raw)
 
     def _entry_name(entry: object) -> str:
-        # tuple form: (callable, name_str) — prefer the explicit name
+        """Return the *fully qualified* name torch registered the entry under.
+
+        Deliberately does NOT fall back to `__name__`. The bare class name
+        ("PosixPath") is what the previous version of this test compared
+        against, and it matches regardless of which module spelling was
+        registered — which is precisely the bug that shipped: on CPython
+        3.13 only `pathlib._local.*` was registered, so checkpoints
+        written under <= 3.12 (spelling `pathlib.PosixPath`) failed to
+        load while this assertion stayed green.
+        """
+        # tuple form: (callable, name_str) — the explicit registration name
         if isinstance(entry, tuple) and len(entry) >= 2 and isinstance(entry[1], str):
             return entry[1]
         if isinstance(entry, tuple) and entry:
             entry = entry[0]
         if isinstance(entry, str):
             return entry
-        return getattr(entry, "__name__", repr(entry))
+        cls = entry
+        return f"{getattr(cls, '__module__', '?')}.{getattr(cls, '__qualname__', cls)}"
 
     safe_names = {_entry_name(e) for e in entries}
-    assert "PosixPath" in safe_names, (
-        "pathlib.PosixPath must be in torch safe globals after `import piper_train`. "
-        "Did piper_train/__init__.py stop importing _compat?"
-    )
-    assert "WindowsPath" in safe_names, (
-        "pathlib.WindowsPath must be in torch safe globals after `import piper_train`."
+    required = {
+        f"{module}.{name}"
+        for module in ("pathlib", "pathlib._local")
+        for name in ("PosixPath", "WindowsPath")
+    }
+    missing = sorted(required - safe_names)
+    assert not missing, (
+        f"missing pathlib safe globals after `import piper_train`: {missing}. "
+        "Every module spelling must be registered explicitly — the registry "
+        "key is matched against the string recorded by the interpreter that "
+        "WROTE the checkpoint, not the one reading it. "
+        "See piper_train/_compat.py. "
+        "(Did piper_train/__init__.py stop importing _compat?)"
     )
 
 
+@pytest.mark.unit
 @pytest.mark.skipif(
     platform.system() != "Windows",
     reason="PosixPath → WindowsPath patch only applies on Windows",
@@ -104,6 +125,7 @@ def test_posixpath_routed_to_windowspath_on_windows() -> None:
     )
 
 
+@pytest.mark.unit
 @pytest.mark.skipif(
     platform.system() == "Windows",
     reason="non-Windows must keep PosixPath untouched",

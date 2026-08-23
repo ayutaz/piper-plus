@@ -47,9 +47,10 @@ def test_tf32_enabled_after_main_initialization():
     code = textwrap.dedent(
         """
         import torch
-        # Reproduce the DR-007 init block from piper_train.__main__ main() (L576-577).
-        # Importing the module also exercises the module-level Windows / safe_globals
-        # patches (L19-24), so we exercise both surfaces in one subprocess.
+        # Reproduce the DR-007 TF32 init block from piper_train.__main__ main().
+        # Importing the module also pulls in piper_train/__init__.py, which
+        # eagerly loads the `_compat` shim (Windows aliases + pathlib safe
+        # globals), so we exercise both surfaces in one subprocess.
         import piper_train.__main__  # noqa: F401
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
@@ -119,7 +120,7 @@ def test_old_hifigan_ckpt_raises_dr006_error(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Windows PosixPath patch (L19-24)
+# Windows PosixPath patch (piper_train._compat)
 # ---------------------------------------------------------------------------
 
 
@@ -127,8 +128,12 @@ def test_old_hifigan_ckpt_raises_dr006_error(tmp_path):
 def test_windows_posix_path_patch_applied():
     """On Windows, importing ``piper_train.__main__`` aliases PosixPath -> WindowsPath.
 
-    On POSIX systems the patch is a no-op (the ``if platform.system() == 'Windows'``
-    guard at L23 ensures PosixPath stays the original class).
+    The aliasing itself lives in ``piper_train._compat`` (imported eagerly by
+    ``piper_train/__init__.py``); this test pins that importing the CLI entry
+    point is enough to trigger it. On POSIX the shim is a no-op —
+    ``apply_windows_pathlib_aliases()`` returns early and PosixPath stays the
+    original class. The alias *table* itself is covered by
+    ``test_compat_pickle_names.py``.
 
     Uses a fresh subprocess to avoid relying on whatever order the parent test
     process imported things in.
@@ -137,7 +142,7 @@ def test_windows_posix_path_patch_applied():
         """
         import platform, pathlib, sys
         original_posix = pathlib.PosixPath
-        import piper_train.__main__  # triggers L19-24 patch
+        import piper_train.__main__  # triggers piper_train._compat
         if platform.system() == "Windows":
             # Patch must have aliased PosixPath to WindowsPath.
             assert pathlib.PosixPath is pathlib.WindowsPath, (
