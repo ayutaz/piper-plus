@@ -237,3 +237,5 @@ mutants.out/
 mutants.out.old/
 # Stryker.NET reports (any depth)
 **/StrykerOutput/
+# v11 local eval artifacts (HF ckpt DL / ONNX export / listen samples)
+piper-v11-local/
