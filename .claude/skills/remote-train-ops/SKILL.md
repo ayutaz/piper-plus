@@ -22,6 +22,7 @@ $10-50 の実害** — 手順の省略は費用に直結する。
 | 4 | **pkill 自己マッチ** | 3 回 (ssh ごと死んで無言) | kill と起動は**別々の Bash/ssh 呼び出し**に分ける ([x] エスケープでは不十分)。guard-bash hook が同一コマンド連結を block する |
 | 5 | **遅い box の見逃し** | PCIe box が 6.4x 遅く $60 浪費 | §1: レンタル直後・データ DL **前**に 25-batch 速度サニティ。予算導出の sec/step 上限で gate |
 | 6 | **幽霊起動** (queued start の遅延発火) | v10b instance が勝手に再起動し ~$50 浪費 | §5: `vastai start` がキューされたら**必ず台帳に記録**し、不要になったら `vastai stop` を明示発行。stop/destroy 後は `vastai show instances` で全台の actual_status を確認 |
+| 8 | **安全装置 abort の外因死誤診 → blind resume** | v11 で R3 (ECAPA 急落) の kill を外部 SIGTERM と誤診し resume、4h 後に再発動 ($14) | §7: 学習死の resume 前に**全ログ横断 grep** (train/monitor/runner/eval/uploader)。kill 系 watchdog のマーカーは呼び出し元のログに出る。abort の発動数値を見て正当性を判断してから resume |
 
 ## 0. 速度測定の鉄則 (cudnn.benchmark 過渡、2026-08-23 の教訓)
 
@@ -106,3 +107,18 @@ vastai create instance <id> --image nvidia/cuda:12.8.1-devel-ubuntu24.04 --disk 
 - 新 box での resume は: bootstrap → ckpt を `checkpoints/last.ckpt` に配置 →
   **較正 JSON (`*_calibration.json`) も HF から復元** (無いと hparams 検査が
   default 値と比較して誤 ABORT する — 実測) → 同一 env override で launch
+
+## 7. 学習死の resume 前チェック (安全装置 abort の見落とし防止)
+
+学習プロセスが「消滅」した時、resume の前に必ず:
+
+1. **全ログを横断 grep**: `grep -a "ABORT\|training kill\|FAILED" /data/logs/*.log`
+   — kill 系 watchdog (ECAPA 急落 R3 / hparams 検査 / flag 検査) のマーカーは
+   **呼び出し元プロセスのログ** に出る (eval chain 内の watchdog → eval log)。
+   monitor ログだけ見て「watchdog 非発動」と結論しない (v11 で誤診 → $14)
+2. 「[rank N] Received SIGTERM」は外因とは限らない — kill_train の署名でもある
+   (直前に裸の PID 列挙が近くのログに出る)
+3. abort マーカーが見つかったら、**発動理由の数値** (評価 JSON) を確認して
+   abort の正当性を判断する。安全装置が正しく止めた run の resume は上書き行為
+4. resume する場合、`last.ckpt` が最新か mtime/size で確認 (Lightning は既存
+   last.ckpt があると `last-v1.ckpt` に書く — stale last.ckpt での resume 事故防止)
