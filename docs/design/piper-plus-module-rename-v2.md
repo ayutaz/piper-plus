@@ -1,6 +1,6 @@
 # piper → piper_plus モジュール改名 (v2.0 / Issue #590)
 
-**ステータス**: Design (レビュー待ち)
+**ステータス**: 実装完了 (v2.0 / `dev` に出荷済み。移行手順は [docs/migration/v1.12-to-v2.0.md](../migration/v1.12-to-v2.0.md))
 **対象バージョン**: v2.0.0 (未リリース。VERSION=2.0.0、git tag は v1.13.0 が最新)
 **関連 Issue**: [#590](https://github.com/ayutaz/piper-plus/issues/590) — Allow to install piper and piper-plus to the same environment
 **ブランチ**: `feat/piper-plus-module-rename`

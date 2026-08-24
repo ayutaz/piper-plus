@@ -19,7 +19,7 @@
 
 > **🔑 唯一の MIT ライセンス Piper フォーク** — オリジナルの [rhasspy/piper](https://github.com/rhasspy/piper) は 2025年10月にアーカイブ済み。[OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) は GPL-3.0 に移行。piper-plus は espeak-ng に依存しない唯一の MIT 互換フォークです。独自実装の G2P で8言語 (JA/EN/ZH/KO/ES/FR/PT/SV) に対応し、商用利用・組込み利用に適しています。
 
-> **📢 v2.0.0 Breaking changes (2026-05):** Docker 既定イメージが CUDA 12.8 + Ubuntu 24.04 + Python 3.13 に統一 (host NVIDIA driver **R570+** 必須、 旧 driver では新イメージが起動不可) / 学習 torch 2.11+cu128 へ更新 (torch 2.2 製 checkpoint の resume 非対応) / TF32 + bf16-mixed が学習デフォルト。詳細: [docs/migration/v1.12-to-v2.0.md](docs/migration/v1.12-to-v2.0.md)
+> **📢 v2.0.0 Breaking changes (2026-05、`dev` で準備中・最新リリースタグは v1.13.0):** Docker 既定イメージが CUDA 12.8 + Ubuntu 24.04 + Python 3.13 に統一 (host NVIDIA driver **R570+** 必須、 旧 driver では新イメージが起動不可) / 学習 torch 2.11+cu128 へ更新 (torch 2.2 製 checkpoint の resume 非対応) / TF32 + bf16-mixed が学習デフォルト。詳細: [docs/migration/v1.12-to-v2.0.md](docs/migration/v1.12-to-v2.0.md)
 
 高速・高品質なニューラルテキスト音声合成 (TTS) システム。[VITS](https://github.com/jaywalnut310/vits/) アーキテクチャを採用し、日本語・英語・中国語・韓国語・スペイン語・フランス語・ポルトガル語・スウェーデン語の8言語マルチスピーカー音声合成に対応。[Piper](https://github.com/rhasspy/piper) のフォークで、日本語対応・音質向上・学習機能を大幅に強化しています。
 
@@ -79,18 +79,18 @@ Python / Rust / Go / C# / C++ / WASM の 6 ランタイムを `multilingual-test
 
 ### 音声合成
 
-- **8言語対応** — 日本語・英語・中国語・スペイン語・フランス語・ポルトガル語・スウェーデン語・韓国語 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) ※学習済みモデルは6言語 (JA/EN/ZH/ES/FR/PT)
+- **8言語対応** — 日本語・英語・中国語・スペイン語・フランス語・ポルトガル語 (BR/EU dialect 切替: `pt`/`pt-BR`/`pt-PT`)・スウェーデン語・韓国語 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) ※学習済みモデルは6言語 (JA/EN/ZH/ES/FR/PT)
 - **日本語 TTS** — OpenJTalk統合、韻律情報 (A1/A2/A3)、疑問詞マーカー (#204)、文脈依存「ん」バリアント (#207)
 - **英語 TTS** — GPL-free G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0)、espeak-ng 不要
 - **マルチスピーカー** — 571話者対応 (学習用ベースモデル)、SpeakerBalancedBatchSampler、言語グループ均等サンプリング
-- **カスタム辞書** — 200+技術用語の発音辞書内蔵
+- **カスタム辞書** — JSON (v1/v2) / TSV によるユーザー発音辞書の追加に対応
 - **音素入力** — `[[ phonemes ]]` 記法による直接指定 — [ガイド](docs/features/phoneme-input.md)
 
 ### 学習
 
 - **WavLM Discriminator** — MOS +0.15-0.25 向上 (デフォルト有効、学習時のみ使用)
 - **MB-iSTFT-VITS2 Decoder** — Decoder を MB-iSTFT + PQMF に統一、CPU 推論 2.21x 高速化。ONNX 形式不変で既存ランタイム互換
-- **FP16 Mixed Precision** — 学習速度2-3倍、メモリ約50%削減 (デフォルト有効)
+- **BF16 Mixed Precision** — `--precision bf16-mixed` (デフォルト) + TF32 で学習を高速化、メモリ約50%削減
 - **EMA** — Exponential Moving Average による学習安定性向上 (デフォルト有効)
 - **マルチGPU** — DDP対応、自動学習率スケーリング
 - **Prosody Features** — Duration Predictorへの韻律情報注入 (`--prosody-dim 16`)
@@ -104,7 +104,7 @@ Python / Rust / Go / C# / C++ / WASM の 6 ランタイムを `multilingual-test
 - **[iOS xcframework + SPM](docs/guides/platform/ios-integration.md)** — `PiperPlus` (Swift Package)、合成エンジン本体を iOS arm64 device + simulator universal で配信
 - **[iOS Swift G2P (SPM)](docs/guides/platform/swift-g2p-integration.md)** — `PiperPlusG2P` 単独ライブラリ、8言語の G2P を ONNX Runtime 非依存で iOS 上で利用可能 (Issue #387)
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — ブラウザ内で完全動作、**音素タイミング出力 (JSON/TSV/SRT)**、サーバー不要
-- **[Docker](docker/README.md)** — 推論・学習・WebUI・C++の5イメージ提供
+- **[Docker](docker/README.md)** — 推論・学習・WebUI・C++・Wyoming (Home Assistant) など 7 系統のイメージ提供
 - **PyPI** — `pip install piper-plus` で簡単インストール、8言語マルチリンガル、**音素タイミング出力 (JSON/TSV/SRT)**、ストリーミング、HTTP API
 - **C# CLI** — .NET 10 クロスプラットフォーム、8言語マルチリンガル、ONNX推論、**音素タイミング出力 (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応、**音素タイミング出力 (JSON/TSV/SRT)**、辞書自動ダウンロード
@@ -261,9 +261,8 @@ docker pull ghcr.io/ayutaz/piper-plus/python-train:dev
 docker pull ghcr.io/ayutaz/piper-plus/webui:dev
 docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:dev
 docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
+docker pull ghcr.io/ayutaz/piper-plus/wyoming:dev
 ```
-
-> **Note:** webui イメージは CI で自動ビルドされません。`docker build -t piper-webui -f docker/webui/Dockerfile .` で手動ビルドしてください。
 
 詳細は [docker/README.md](docker/README.md) を参照。
 
@@ -331,7 +330,7 @@ dotnet add package PiperPlus.Core
 
 ```toml
 [dependencies]
-piper-plus = "0.4"
+piper-plus = "0.5"
 ```
 
 ### ソースからビルド
@@ -364,7 +363,7 @@ C++ CLI の詳細なコマンドラインオプション、JSON 入力フォー�
 
 公開されている piper-plus モデルの一覧、ダウンロード方法、6 言語ベースモデルの特徴、日本語 TTS の詳細は **[モデルガイド](docs/guides/development/pretrained-models.md)** を参照してください。
 
-主要モデル: `tsukuyomi` (日本語), `multilingual-6lang` (8 言語ベース), `bilingual-ja-en-v4` (日英 2 言語) — 詳細は HuggingFace の [ayousanz/piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) や [ayousanz/piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) を参照。
+主要モデル: `tsukuyomi` (日本語) と `css10-6lang` (`--download-model` で取得可能)、および 6 言語ベース ckpt (学習・FT 用) — 詳細は HuggingFace の [ayousanz/piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) や [ayousanz/piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) を参照。
 
 ---
 
@@ -382,9 +381,9 @@ C++ CLI の詳細なコマンドラインオプション、JSON 入力フォー�
 
 Piper を Unity で使用するプラグイン: [github.com/ayutaz/uPiper](https://github.com/ayutaz/uPiper)
 
-- Unity 6000.0.35f1+、Unity.InferenceEngine
-- Windows / macOS (Apple Silicon) / Linux / Android 対応
-- 日本語・英語対応、非同期API、ストリーミング
+- Unity 6000.3.11f1+、Unity.InferenceEngine
+- Windows / macOS (Apple Silicon) / Linux / Android / iOS / WebGL (WebGPU/WebGL2) 対応
+- 7言語対応 (ja/en/zh/es/fr/pt/ko)、非同期API、ストリーミング
 
 ### 音声モデル (Voices)
 
@@ -407,6 +406,7 @@ piper-plus 専用モデル: [piper-plus-base](https://huggingface.co/ayousanz/pi
 - **Go**: `go get github.com/ayutaz/piper-plus/src/go/phonemize` — [ソースコード](src/go/phonemize/)
 - **JavaScript/WASM**: `npm install @piper-plus/g2p` — [ソースコード](src/wasm/g2p/)
 - **Kotlin/Android**: `implementation("io.github.ayutaz:piper-plus-g2p-android:1.0.0")` — [ソースコード](android/piper-plus-g2p/) · [辞書配布ガイド](docs/guides/platform/android-g2p-dictionary.md)
+- **Swift (iOS/macOS)**: SPM product `PiperPlusG2P` — [統合ガイド](docs/guides/platform/swift-g2p-integration.md) · [ソースコード](Sources/PiperPlusG2P/)
 
 ### People using Piper
 
@@ -418,11 +418,10 @@ piper-plus 専用モデル: [piper-plus-base](https://huggingface.co/ayousanz/pi
 
 | カテゴリ | リンク |
 |---|---|
-| 日本語TTS | 日本語音声合成ガイド |
-| 学習 | [学習ガイド](docs/guides/training/training-guide.md) · マルチGPU |
+| 学習 | [学習ガイド](docs/guides/training/training-guide.md) (マルチGPU 含む) |
 | API | [音素マッピング](docs/api-reference/phoneme-mapping.md) · [環境変数](docs/getting-started/environment-variables.md) |
-| 機能 | [WebUI](docs/features/webui.md) · CLI強化 · ストリーミング |
-| セットアップ | クイックスタート (日本語) · [Windows](docs/getting-started/windows-setup.md) · [トラブルシューティング](docs/getting-started/troubleshooting.md) |
+| 機能 | [WebUI](docs/features/webui.md) · [音素タイミング](docs/features/phoneme-timing.md) · [CLI](docs/guides/development/cli-usage.md) |
+| セットアップ | [Windows](docs/getting-started/windows-setup.md) · [トラブルシューティング](docs/getting-started/troubleshooting.md) |
 | Docker | [Docker環境](docker/README.md) |
 | WebAssembly | [技術詳細](src/wasm/openjtalk-web/README.npm.md) |
 

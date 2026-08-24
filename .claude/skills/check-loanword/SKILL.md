@@ -1,32 +1,36 @@
 ---
 name: check-loanword
-description: ZH-EN code-switching loanword の同期と forward-compat を 1 コマンドで検査。zh_en_loanword.json を編集したり 5 ランタイムのいずれかに新規エントリを追加する前後に呼ぶ。Python source を canonical とし、Rust×2 / Go / C# / WASM / C++ の 6 mirror + Python runtime mirror = 計 7 copy + 6 fixture mirror が byte-for-byte 一致しているかを確認。
+description: ZH-EN code-switching loanword の同期と forward-compat を 1 コマンドで検査。zh_en_loanword.json を編集したり 5 ランタイムのいずれかに新規エントリを追加する前後に呼ぶ。Python source を canonical とし、Python runtime / Rust×2 / Go / C# / WASM / C++ / Kotlin-Android / Swift の 9 runtime mirror (計 10 copy) + 8 fixture mirror が byte-for-byte 一致しているかを確認 (一覧の canonical は docs/spec/loanword-mirrors.toml)。
 disable-model-invocation: false
 allowed-tools: Bash(python *) Bash(uv run *) Bash(cargo test *) Bash(go test *) Bash(node *) Bash(dotnet test *) Bash(git diff *) Bash(git status *)
 ---
 
 # ZH-EN Loanword Consistency Check
 
-ZH-EN code-switching (Issue #384) で使う loanword 辞書 (`zh_en_loanword.json`) を 5 ランタイムに展開する際の同期チェック。`pua-contract.toml` の PUA 同期と同じ哲学で、Python source を **唯一の真実** とし、CI で 7 copy + 6 fixture mirror が byte-for-byte 一致することを保証する。
+ZH-EN code-switching (Issue #384) で使う loanword 辞書 (`zh_en_loanword.json`) を 5 ランタイムに展開する際の同期チェック。`pua-contract.toml` の PUA 同期と同じ哲学で、Python source を **唯一の真実** とし、CI で 10 copy (canonical + 9 runtime mirror) + 8 fixture mirror が byte-for-byte 一致することを保証する (一覧: docs/spec/loanword-mirrors.toml)。
 
 ## 何をチェックするか
 
 `docs/reference/zh-en-loanword/README.md` の不変条件:
 
-1. **7 mirror byte-for-byte sync** — Python source と以下の 6 mirror が SHA256 一致:
+1. **runtime mirror byte-for-byte sync** — Python source と以下の 9 mirror が SHA256 一致:
    - Python runtime (`src/python_run/piper_plus/phonemize/data/zh_en_loanword.json`)
    - Rust 2 crate (`src/rust/piper-plus-g2p/data/`, `src/rust/piper-core/data/`)
    - Go (`src/go/phonemize/data/zh_en_loanword.json`)
    - C# (`src/csharp/PiperPlus.Core/Phonemize/Data/zh_en_loanword.json`)
    - WASM (`src/wasm/g2p/data/zh_en_loanword.json`)
    - C++ (`src/cpp/data/zh_en_loanword.json`)
+   - Kotlin Android (`android/piper-plus-g2p/src/main/assets/zh_en_loanword.json`)
+   - Swift G2P (`Sources/PiperPlusG2P/Resources/zh_en_loanword.json`)
 2. **Schema validation** — Python の `_load_loanword_data` と同じ書式 (`'<section>.<key>' must be list[str]`) でエラーを出すこと
-3. **6 fixture mirror sync** — `tests/fixtures/g2p/zh_en_loanword_matrix.json` と以下の mirror が一致:
+3. **8 fixture mirror sync** — `tests/fixtures/g2p/zh_en_loanword_matrix.json` と以下の mirror が一致:
    - `src/go/phonemize/testdata/`
    - `src/csharp/PiperPlus.Core.Tests/Phonemize/TestData/`
    - `src/cpp/tests/fixtures/`
    - `src/wasm/g2p/test/fixtures/`
    - `src/rust/piper-plus-g2p/tests/fixtures/`, `src/rust/piper-core/tests/fixtures/`
+   - `android/piper-plus-g2p/src/androidTest/assets/g2p_fixtures/`
+   - `tests/PiperPlusG2PTests/Fixtures/`
 4. **Forward-compat (YELLOW-5)** — 各ランタイムの loader が `schema_version: 2` 未来の追加フィールドを silent ignore すること
 
 ## 実行ステップ
@@ -37,7 +41,7 @@ ZH-EN code-switching (Issue #384) で使う loanword 辞書 (`zh_en_loanword.jso
 python scripts/check_loanword_consistency.py
 ```
 
-期待: `OK All 7 copies + 6 fixture mirrors in sync` で終了 (exit 0)。
+期待: `OK All 17 mirror(s) in sync across 2 group(s)` で終了 (exit 0)。
 
 ### 2. drift 発見時は自動修復
 
@@ -45,7 +49,7 @@ Python source を canonical とした **一方向コピー** で復元:
 
 ```bash
 python scripts/check_loanword_consistency.py --diff   # 差分確認 (dry-run)
-python scripts/check_loanword_consistency.py --fix    # 6 mirror + 6 fixture を Python source に揃える
+python scripts/check_loanword_consistency.py --fix    # 9 runtime mirror + 8 fixture を Python source に揃える
 ```
 
 > **注意**: Mirror を直接編集しても `--fix` で上書きされる。JSON 変更を提案する場合は **必ず Python source (`src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json`) を編集** すること。
@@ -84,12 +88,12 @@ gh workflow view "ZH-EN Loanword Sync Gate" --branch <branch>
 
 ## 確認すべき事項
 
-- [ ] `python scripts/check_loanword_consistency.py` が `OK All 7 copies + 6 fixture mirrors in sync` を返す
+- [ ] `python scripts/check_loanword_consistency.py` が `OK All 17 mirror(s) in sync across 2 group(s)` を返す
 - [ ] schema validation でエラーなし
 - [ ] 5 ランタイムの forward-compat loader test が PASS
 - [ ] CI workflow `ZH-EN Loanword Sync Gate / json-sync` が green
 - [ ] `git diff src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json` が意図した変更のみ
-- [ ] PR description に "loanword JSON updated, 6 mirrors auto-synced via `--fix`" を明記
+- [ ] PR description に "loanword JSON updated, 9 mirrors auto-synced via `--fix`" を明記
 
 ## トラブルシューティング
 
@@ -98,7 +102,7 @@ gh workflow view "ZH-EN Loanword Sync Gate" --branch <branch>
 | `MISMATCH src/.../zh_en_loanword.json` | `--fix` で復元、または Python source の意図しない変更を revert |
 | `MISSING src/.../zh_en_loanword.json` | `--fix` で作成、または該当ランタイム実装が未着手 (Phase 6a 想定なら `--allow-missing` を一時利用) |
 | `'acronyms.GPS' must be list[str]` | Python source で値型が間違っている。`["ji4", "pi4", "ai1", "si4"]` の形式に修正 |
-| `FIXTURE OUT OF SYNC` | `tests/fixtures/g2p/zh_en_loanword_matrix.json` を更新後 `--fix` で 6 mirror に展開 |
+| `FIXTURE OUT OF SYNC` | `tests/fixtures/g2p/zh_en_loanword_matrix.json` を更新後 `--fix` で 8 mirror に展開 |
 | Windows で `sha256` 不一致が常時出る | `.gitattributes` の `*.json text eol=lf` で CRLF 強制 LF。再正規化: `git rm --cached <file> && git add <file>` |
 
 ## 関連ドキュメント

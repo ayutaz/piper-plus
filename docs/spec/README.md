@@ -3,6 +3,7 @@
 piper-plus の **ランタイム横断 byte-for-byte 整合契約** の目次。`.toml` 形式 (機械可読 + CI gate 対応)。
 
 設計書 / 運用 SOP / テストマトリクスなどの `.md` 文書は [`../reference/`](../reference/README.md) を参照。
+例外として zero-shot 評価契約 [`zs-eval-contract.md`](zs-eval-contract.md) (cross-utt SECS / dual-encoder / Goodhart 検知 / 音響ブロック / CER §7) は本ディレクトリ直下の `.md` 契約。
 
 ## Core Contracts
 

@@ -120,10 +120,5 @@ reason = "Voice cloning not yet wired into C++ CLI"
 
 [[skips]]
 runtime = "cpp"
-flag = "speaker-embedding"
-reason = "Voice cloning not yet wired into C++ CLI"
-
-[[skips]]
-runtime = "cpp"
 flag = "speaker-encoder-model"
 reason = "Voice cloning not yet wired into C++ CLI"

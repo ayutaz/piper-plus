@@ -3,8 +3,9 @@
 > **Status**: **Phase A 完了 (`76d42c57`) + Phase B 完了 (`f99316a9` デコーダ系 /
 > `c7518499` 識別器系) + S-2 実装完了 (`2aa5ecbf`、設計 `5fcc9eb8`) + C-0
 > ライセンス確定 (`245f8f49`、§7)、2026-08-18**。
-> **実装は全て完了 — 残: Phase C (データ前処理: Emilia-YODAS ja/ko + CV ja +
-> F0 抽出、instance 再レンタル) → Phase D (smoke + go/no-go) → Phase E (本走 80ep)**。
+> **Phase E 完走 (v10b-lite 80ep、2026-08-20) — 最終結果は §9、完走後の
+> 残存ノイズ診断は §10**。後継は v11
+> ([`zero-shot-v11-roadmap.md`](zero-shot-v11-roadmap.md) §5 が現在の canonical)。
 > v10a-r2 完走 (2026-08-16、
 > [`zero-shot-v10-design.md`](zero-shot-v10-design.md) §11) を受け、4 系統の調査
 > レポート — ①帯域解剖 (実測)、②評価ハーネス監査、③類似系文献調査、④高域ノイズ系
@@ -441,7 +442,8 @@ from-scratch のコスト上、複数レバーを束ねざるを得ない。以�
 
 - **①帯域解剖 (実測)**: r2_ep79 / v9 / GT 計 17 ファイルの voiced 限定分析。
   スクリプト: scratchpad `quality_anatomy/{anatomy.py,verify_comb.py}`
-  (Phase A の E-4 で `piper_train.tools` へ移植予定)。聴感サンプル: ローカル
+  (Phase A の E-4 で `piper_train.tools.measure_band_noise` /
+  `measure_comb_artifacts` へ移植済み)。聴感サンプル: ローカル
   `piper-v8-dataset-backup/v10a_listen_samples/r2_ep79_tsukuyomi/`
 - **②評価ハーネス監査**: `src/python/piper_train/tools/eval_zs_secs.py` /
   `measure_band_noise.py` / HF `diag-phase0/scripts/phase0_eval_arm.py` /

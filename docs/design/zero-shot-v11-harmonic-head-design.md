@@ -1,6 +1,9 @@
 # v11 設計スパイク — 担体化 harmonic-plus-noise head (A3 がびがび根治) (2026-08-20)
 
-> **Status**: 設計スパイク完了 (プロトタイプ検証まで。本実装は未着手)。
+> **Status**: 実装・本走検証済み — v11 本走 (ep29 で R3 正規停止) で carrier head の
+> 調波構造保証を実証 (comb-HNR 14.6dB = GT 超え)。技術検証成功、実用は学習量不足
+> ([`zero-shot-v11-roadmap.md`](zero-shot-v11-roadmap.md) §5 が canonical)。
+> Phase B smoke での盲点と修正は §11。
 > [`zero-shot-v10b-residual-noise-diagnosis.md`](zero-shot-v10b-residual-noise-diagnosis.md)
 > §5-1 が要求した「担体化 harmonic-plus-noise head」の具体設計と構造検証の成果物。
 > S-2 (F0 明示経路) の設計スパイク
@@ -612,7 +615,7 @@ v10b plan §4.3 の流儀 (測ってから基準をいじらない) に従い先
   Nguyen 1994 (near-perfect-reconstruction pseudo-QMF、解析重みの根拠) /
   FastPitch (arXiv:2006.06873、predictor detach の流儀)
 
-## 10. Phase B smoke で発見した盲点と修正 (2026-08-21)
+## 11. Phase B smoke で発見した盲点と修正 (2026-08-21)
 
 arm H 初回 smoke が担体 gate で不合格 (comb-HNR 2.27dB / 追従率 0.0)。統合配線は
 シロ (一定 F0 なら full forward で 51dB、ピークは正確に m·F0)【実測】。真因は

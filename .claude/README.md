@@ -14,11 +14,15 @@
 │   ├── guard-bash.sh               # PreToolUse: 危険コマンドブロック
 │   ├── prompt-guard.sh             # UserPromptSubmit: キーワード検出 → リマインダー
 │   ├── stop-warn-uncommitted.sh    # Stop: 未コミット変更を警告
-│   └── session-env.sh              # SessionStart: env 変数 + ブランチ情報注入
-├── skills/                         # ユーザー起動 skills (`/<name>` で実行)
+│   ├── session-env.sh              # SessionStart: env 変数 + ブランチ情報注入
+│   └── test-guard-bash.sh          # guard-bash.sh の振る舞いテスト (pre-commit gate `guard-bash-behaviour` から実行)
+├── skills/                         # ユーザー起動 skills (`/<name>` で実行、全 23 個)
 │   ├── precheck/SKILL.md           # /precheck — lint + format + test 一括
 │   ├── check-pr-ready/SKILL.md     # /check-pr-ready — PR 作成前の最終チェック
 │   ├── commit/SKILL.md             # /commit — CLAUDE.md 準拠コミット
+│   ├── create-pr/SKILL.md          # /create-pr — push → 構造化 PR 本文 → CI 監視 → review 返信 (gh pr create 直接実行は guard-bash が block)
+│   ├── watch-pr/SKILL.md           # /watch-pr — PR push 後の CI 監視 auto chain
+│   ├── check-review-backlog/SKILL.md # /check-review-backlog — open PR の未解決 review 集計
 │   ├── run-tests/SKILL.md          # /run-tests — 各言語ランタイムテスト
 │   ├── sync-docs/SKILL.md          # /sync-docs — エージェントチームによる全ドキュメント監査・更新
 │   ├── reply-review/SKILL.md       # /reply-review — レビューコメントに返信 + thread resolve
@@ -26,10 +30,16 @@
 │   ├── prepare-release/SKILL.md    # /prepare-release — 9 manifest bump 案 + Swift checksum + tag 順序
 │   ├── publish-model/SKILL.md      # /publish-model — 学習 ckpt → export + sanity + bench + HF upload
 │   ├── eval-zs/SKILL.md            # /eval-zs — zero-shot SECS 評価の標準手順 (cross-utt + dual-encoder + Goodhart 検知)
+│   ├── remote-train-ops/SKILL.md   # /remote-train-ops — リモート GPU instance の学習運用 (事故クラス 8 種の再発防止)
+│   ├── check-preprocess-env/SKILL.md # /check-preprocess-env — 学習前処理環境の事前検証
 │   ├── bump-deps/SKILL.md          # /bump-deps — ORT/openjtalk/ruff の canonical sync 更新
 │   ├── watch-ci-patterns/SKILL.md  # /watch-ci-patterns — CI failure を flake/drift/env/test bug 分類
 │   ├── skill-health/SKILL.md       # /skill-health — skill / hook の health check (meta)
-│   └── ... (他 cross-runtime gate skill)
+│   ├── check-cross-runtime/SKILL.md   # /check-cross-runtime — 7 ランタイム実装同期検査
+│   ├── check-loanword/SKILL.md        # /check-loanword — ZH-EN loanword mirror 同期検査
+│   ├── check-pua/SKILL.md             # /check-pua — PUA テーブル / fixture 整合性検査
+│   ├── check-runtime-parity/SKILL.md  # /check-runtime-parity — 推論パスの canonical 同期検査
+│   └── check-new-runtime-asset/SKILL.md # /check-new-runtime-asset — 新規データアセットのミラー配置検査
 └── commands/                       # 既存の slash commands (skills と併存可)
     ├── add-language.md             # 新言語追加ガイド
     └── review-language.md          # 10 エージェント並列レビュー
@@ -51,20 +61,52 @@
 
 ### 主な保護対象 (guard-bash.sh)
 
-- `git push --force` to main/master
-- `git commit --no-verify` (CLAUDE.md 禁止)
+- `git push --force` / `--force-with-lease` to main/master
+- `git push --no-verify` / `git commit --no-verify` (CLAUDE.md 禁止)
 - `git commit --no-gpg-sign` (CLAUDE.md 禁止)
 - `git reset --hard origin/main|master`
 - `rm -rf /data/piper/output-*` / `rm -rf /data/piper/dataset-*` (学習データ保護)
 - `epoch=*.ckpt` / `checkpoints/` の削除 (チェックポイント保護)
 - `npm publish` (リリースワークフロー経由を強制)
+- `pkill` + `nohup` 起動の同一コマンド連結 (pkill 自己マッチで ssh ごと死ぬ
+  無言死 — v10a/v10b/v11 で実測。kill と起動は別々の呼び出しに分ける)
+- `pkill -f <pattern>` のパターンが同一コマンド内に再出現する形 (自己マッチの
+  一般形。PID 指定 kill へ誘導 — 2026-08 までに通算 6 回実測)
+- `~/.ssh/id_*` 秘密鍵への上書き (`cp`/`mv`/リダイレクト。`cp -n` / 事前 `.bak` /
+  `.pub` は除外 — 2026-08 の復元不能上書き事故の再発防止)
+- `gh pr create` 直接実行 (`/create-pr` skill 経由のみ許可 — 構造化 PR 本文 +
+  CI 監視 auto chain を強制)
 - `eval_zs_secs` の `--encoder2` なし実行 (単一 encoder では Goodhart を検知
   できない — 2026-08 の same-utt 0.775 誤報 / Arm B 偽改善事故の再発防止。
-  pytest / `--help` は対象外。手順: `/eval-zs` skill、契約:
+  pytest / `--help` / `pre-commit run` / `ruff` / `git add` / `git diff` は
+  対象外。手順: `/eval-zs` skill、契約:
   `docs/spec/zs-eval-contract.md`、pre-commit 側は `zs-prevention-gate` が
   防止テスト群の削除・改名を検出)
 
 `echo`/`printf`/`cat`/`tee` で始まるコマンドは false-positive 防止のためチェックをスキップします (例: `echo 'git push --force main'` のようなデモ・テスト)。
+
+## Pre-commit / pre-push gates
+
+canonical 定義は [.pre-commit-config.yaml](../.pre-commit-config.yaml) (約 100 hook エントリ /
+16 repo ブロック、うち 10 hook は `stages: [pre-push]`)。導入は clone 後 1 回:
+
+```bash
+pre-commit install                          # commit 時 gate
+pre-commit install --hook-type pre-push     # push 時 gate (opt-in、推奨)
+```
+
+構成の内訳: cross-language formatter (ruff / gofmt / rustfmt / dotnet format /
+clang-format / prettier)、contract gate 群 (`scripts/check_*.py`、PUA / loanword /
+Swedish LID / phoneme-set / CHANGELOG / ORT バージョン等の同期検査)、および
+zero-shot 学習事故由来の再発防止 gate。後者の主なもの:
+
+| gate | trigger | 何を防ぐか |
+|------|---------|-----------|
+| `guard-bash-behaviour` | `.claude/hooks/(guard|test-guard)-bash.sh` | guard-bash 判定ロジックの回帰 (`test-guard-bash.sh` を実行。shellcheck では検出不能な振る舞いを pin) |
+| `test-threshold-relaxation` | テストの数値閾値の緩和 diff | 根拠 (`# threshold-relaxed: <根拠>`) なしの受け入れ基準緩和 (PQMF -90dB→5dB goalpost moving の再発防止) |
+| `zs-prevention-gate` | 評価ガード面 + guard-bash.sh | zero-shot 防止テスト群・評価ガードの削除・改名 |
+| `zs-metric-isolation-gate` | 学習コード / メトリクスモジュール | 学習コードからの評価メトリクス import (メトリクスの loss 流用は恒久禁止) |
+| `export-path-unification` | `export_onnx.py` | main() への infer 経路手書き複製の再導入 (v11 の ONNX 話者条件断線事故の再発防止、`build_infer_forward` 一本化を強制) |
 
 ## Skills (手動起動)
 
@@ -203,7 +245,7 @@ Hooks は **自動実行で予防**、Skills は **明示的に呼び出して�
 
 `.claude/commands/` にある `add-language.md` / `review-language.md` は **slash commands** として引き続き動作します。これらは `/add-language <lang>` / `/review-language <lang>` で起動できます。
 
-新規追加した skills (`/precheck`, `/check-pr-ready`, `/commit`, `/run-tests`) は **frontmatter 付き** で同じく slash command として動作します。
+`.claude/skills/` の全 23 skill は **frontmatter 付き** で同じく slash command として動作します。
 
 ## 関連ドキュメント
 
