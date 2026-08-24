@@ -61,10 +61,14 @@ def build_infer_forward(
         A forward function with signature::
 
             infer_forward(text, text_lengths, scales,
-                sid=None, lid=None, prosody_features=None,
-                speaker_embedding=None,
-                speaker_embedding_mask=None)
+                speaker_embedding=None, lid=None, prosody_features=None)
             -> (audio: Tensor, durations: Tensor)
+
+        Positional order matches the ONNX export input order
+        (``input, input_lengths, scales, speaker_embedding, lid,
+        prosody_features``) so that ``torch.onnx.export`` の args tuple が
+        そのまま束縛できる。``sid`` は受けない (zero-shot export は
+        speaker_embedding 経路のみ。v1.12 以降の契約)。
     """
     # Configure stochastic/deterministic mode ONCE at build time
     # (not inside forward, to avoid "state_dict changed during tracing" errors).
@@ -79,10 +83,9 @@ def build_infer_forward(
         text,
         text_lengths,
         scales,
-        sid=None,
+        speaker_embedding=None,
         lid=None,
         prosody_features=None,
-        speaker_embedding=None,
     ):
         noise_scale = scales[0]
         length_scale = scales[1]
@@ -99,7 +102,7 @@ def build_infer_forward(
         audio, _attn, _y_mask, _latents, durations = model.infer(
             text,
             text_lengths,
-            sid=sid,
+            sid=None,
             lid=lid,
             noise_scale=noise_scale,
             length_scale=length_scale,
@@ -641,98 +644,13 @@ def main() -> None:
             "Zero-shot mode: model will accept speaker_embedding [batch, 192] input"
         )
 
-    stochastic = args.stochastic
-
-    def infer_forward(
-        text,
-        text_lengths,
-        scales,
-        speaker_embedding=None,
-        lid=None,
-        prosody_features=None,
-    ):
-        """
-        Efficient forward function that returns both audio and duration information.
-        The duration predictor is called once to compute both durations and audio output.
-
-        For multi-speaker models, speaker_embedding (float32 [batch, 192]) is used
-        with spk_proj MLP to compute global conditioning.
-        """
-        # noise_scale = scales[0]  # unused in ONNX export (deterministic mode)
-        length_scale = scales[1]
-        noise_scale_w = scales[2]
-
-        # 1. Global conditioning (must be computed before enc_p)
-        # spk_proj-only: pass speaker_embedding through _get_global_conditioning
-        # which uses spk_proj MLP instead of emb_g. return_components: v10 E2
-        # (SNAC flow) 用に話者/言語成分も取得 (combined g は従来と同一値)。
-        g, g_spk, g_lang = model_g._get_global_conditioning(
-            sid=None,
-            lid=lid,
-            speaker_embeddings=speaker_embedding,
-            return_components=True,
-        )
-
-        # 2. Encoder (with global conditioning for cond_layer)
-        x, m_p, logs_p, x_mask = model_g.enc_p(text, text_lengths, g=g)
-
-        # 3. Duration Predictor (called only once)
-        # v10 M3: dp_spk_head 有効モデルでは学習と同じ残差ヘッド加算
-        # (無効時は g のまま = 従来 graph と同一)
-        x_dp = model_g._prepare_prosody_input(x, x_mask, prosody_features, lid=lid)
-        g_dp = model_g._get_dp_conditioning(g)
-        if model_g.use_sdp:
-            logw = model_g.dp(
-                x_dp, x_mask, g=g_dp, reverse=True, noise_scale=noise_scale_w
-            )
-        else:
-            logw = model_g.dp(x_dp, x_mask, g=g_dp)
-
-        w = torch.exp(logw) * x_mask * length_scale
-        durations = w.squeeze(1)  # [batch, phoneme_length]
-
-        # 4. Attention/Alignment
-        w_ceil = torch.ceil(w)
-        y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
-        y_mask = torch.unsqueeze(
-            commons.sequence_mask(y_lengths, y_lengths.max()), 1
-        ).type_as(x_mask)
-        attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
-        attn = commons.generate_path(w_ceil, attn_mask)
-
-        # 5. Expand prior
-        m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
-        logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
-
-        # 5b. v10b S-2: F0 予測 → (opt-in) prior 残差 → decoder 注入。
-        # 推論時は GT F0 が存在しないため常に予測 F0 で走り、graph 入力は
-        # ``speaker_embedding [1, 192]`` のまま増えない (契約不変)。学習の
-        # ``SynthesizerTrn.forward`` / ``infer`` と同じ順序を保つこと。
-        f0_decoder = None
-        if getattr(model_g, "use_f0_path", False):
-            log_f0, vuv_logit = model_g._predict_f0(x, attn, y_mask, g)
-            m_p = model_g._apply_f0_prior_residual(m_p, log_f0, vuv_logit, y_mask)
-            f0_decoder = model_g._predicted_f0_hz(log_f0, vuv_logit)
-
-        # 6. Sample z_p
-        if stochastic:
-            noise_scale = scales[0]
-            z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
-        else:
-            z_p = m_p
-
-        # 7. Flow + Decoder
-        # v10 M1+E2: SNAC flow モデルでは学習と同じ分離 (SDN=話者成分のみ、
-        # WN=lang 成分のみ)。off では従来 graph と同一。
-        if getattr(model_g, "use_snac_flow", False):
-            z = model_g.flow(z_p, y_mask, g=g_lang, g_spk=g_spk, reverse=True)
-        else:
-            z = model_g.flow(z_p, y_mask, g=g, reverse=True)
-        o = model_g.dec((z * y_mask), g=g, f0=f0_decoder)
-
-        return o, durations
-
-    model_g.forward = infer_forward
+    # export 経路は build_infer_forward (models.infer の薄い wrapper) に一本化。
+    # 過去はここに infer の手書き複製を置いていたが、v11 P2 (enc_p の
+    # g_spk/AdaLN 条件付け) の変更に追従できず、ONNX だけ話者条件が断線して
+    # 担体の調波が崩壊した (2026-08 実測)。models.infer への一本化で学習側の
+    # 変更が自動的に export に反映される。位置引数順の契約は
+    # tests/test_build_infer_forward.py::test_export_positional_order_zero_shot_adaln_carrier が pin。
+    model_g.forward = build_infer_forward(model_g, stochastic=args.stochastic)
 
     dummy_input_length = 50
     sequences = torch.randint(
