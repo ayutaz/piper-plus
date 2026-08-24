@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- ライセンス方針: `train` extra 限定の copyleft 依存を「明文化された例外」として受理する規定を `CONTRIBUTING.md` に追加。 `soxr` (LGPL-2.1-or-later) は `librosa` 0.11 の必須依存で `train` extra にのみ入り、 PyPI に publish される wheel (`src/python_run` 由来、 依存は `src/python_run/requirements.txt` が宣言) には含まれないため再頒布が発生せず LGPL の義務も生じない。 これまで CI の `allow-dependencies-licenses` には carve-out が入る一方で `CONTRIBUTING.md` は「LGPL はバージョンを問わず禁止」のままだったため、 設定と明文の方針が食い違っていた。 併せて、 scanner の parser bug 回避のための carve-out (`typing-extensions` / `llvmlite`、 実際には copyleft ではない) は方針例外ではなく、 例外表に載せてはならないことを明記
+
 - 学習: `--resume-from-multispeaker-checkpoint` の実処理がインライン複製から `load_multispeaker_checkpoint()` に一本化された。 同関数はどこからも呼ばれない dead code で、 インライン側と挙動が食い違っていた (関数側のみ HiFi-GAN ckpt を明示エラーにし、 インライン側のみ weight_norm キーを remap していた)。 統合の結果、 **FT 経路でも v1.11 以前の HiFi-GAN ckpt が明示エラーになる** (従来は無言で大量の missing keys を出して継続していた)。 同様に `export_onnx` の EMA 適用も 2 箇所の複製を `apply_ema_shadow_params()` に集約した
 
 - CI: `g2p-python-ci.yml` の `test extras` job で venv を workspace 内 (`.venv-extras/`) ではなく `${RUNNER_TEMP}/venv-extras` に作るよう変更。 当 job は `uv.lock` を経由せず PyPI から fresh resolve するため nltk 3.10.x を引くが、 3.10 で追加された `nltk/inisec.py` の `NLTKSafeImportFinder` が「解決先ファイルが cwd 配下に物理的に存在する」モジュールを一律ブロックするため、 workspace 内 venv だと site-packages 全体が誤検知され `import nltk` 自体が `ImportError: Blocked import of regex from current working directory` で失敗していた。 エラーメッセージが案内する `-P` / `PYTHONSAFEPATH=1` は判定基準が sys.path ではなくファイルの物理位置のため回避にならないことを実測で確認済み
