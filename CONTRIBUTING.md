@@ -157,6 +157,28 @@ The following licenses are **not allowed**:
 - GPL, LGPL, AGPL (any version)
 - SSPL, BSL, Commons Clause
 
+### Exception: Training-Only Dependencies
+
+The prohibition above governs everything piper-plus **distributes**. The published
+runtime wheel (built from `src/python_run`, dependencies declared in
+`src/python_run/requirements.txt`) and every other shipped artifact must stay free
+of copyleft dependencies — no exceptions.
+
+The `train` extra is never packaged or uploaded; it is installed from source by
+people who train their own models. A copyleft package that is unavoidable *there*
+may therefore be accepted as an explicitly documented exception:
+
+| Package | License | Why it is accepted |
+|---------|---------|--------------------|
+| `soxr` | LGPL-2.1-or-later | Mandatory dependency of `librosa` 0.11, and `train` extra only. Absent from `src/python_run/requirements.txt`, so piper-plus never redistributes it and no LGPL obligation attaches. |
+
+Adding a row requires PR review plus a matching `allow-dependencies-licenses`
+entry in both `.github/workflows/dependency-review.yml` and
+`.github/workflows/security-audit.yml`. Packages carved out in those workflows to
+work around scanner parser bugs (a permissive license misreported as a composite
+SPDX expression, e.g. `typing-extensions`, `llvmlite`) are **not** exceptions to
+this policy and must not be listed here.
+
 ### espeak-ng Policy
 
 piper-plus does **NOT** depend on espeak-ng. This is a deliberate design decision to avoid GPL contamination. **Do not introduce espeak-ng as a dependency in any form** (direct, transitive, or optional).
