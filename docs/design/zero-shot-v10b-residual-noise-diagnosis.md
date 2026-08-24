@@ -134,13 +134,13 @@ head の Phase D smoke が事実上兼ねる。
   (`tsukuyomi_ema*` / `lpf_ladder_{4000,5500,7000}` / `tsukuyomi_pqmfcanon` /
   `tsukuyomi_ema_lowpass_diag`)
 - パッチ ckpt (フィルタ canonical 復元): 同 dir `ep79_pqmf_canon.ckpt`
-- 測定コード: 本セッションのインライン (comb-HNR は
-  `piper_train.tools` 未収載 — v10c で E 系に追加予定)
+- 測定コード: `piper_train.tools.measure_comb_hnr` に収載済み (v11 Phase A で
+  移植。`eval_zs_secs` の `comb_hnr` ブロックにも統合)
 - モデル: HF `ayousanz/piper-plus-zero-shot-multi-7lang-v8`
   (`checkpoints-v10b/` + `onnx/v10b-zs-ep79.onnx`)
-- deep-research 測定 (2026-08-20): comb-HNR スクリプト + FT/ns 掃引合成 wav は
-  session scratchpad (`noise_dr/` 等) — **セッション限定のため、v10c で
-  comb-HNR を `piper_train.tools` に E 系メトリクスとして収載する際に移植**
+- deep-research 測定 (2026-08-20): comb-HNR スクリプトは
+  `piper_train.tools.measure_comb_hnr` として収載済み (v11 Phase A)。FT/ns
+  掃引合成 wav は session scratchpad (`noise_dr/` 等) 限定で残していない
 - 代替 FT モデル: HF `ayousanz/piper-plus-zero-shot-tsukuyomi`
   (`tsukuyomi-ft-epoch499-zs.onnx`、v7 系 = pre-v9 PQMF + FiLM の交絡あり)
 - 文献アンカー: iSTFTNet 2203.02395 / MB-iSTFT-VITS 2210.15975 / Vocos

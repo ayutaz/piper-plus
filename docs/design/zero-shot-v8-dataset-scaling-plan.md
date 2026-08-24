@@ -1,6 +1,8 @@
 # Zero-Shot TTS v8 — 話者数スケーリング学習計画
 
-> 作成日: 2026-07-07 / 最終更新: 2026-08-02 / **状態: 再開 — smoke test 待ち (開始ブロッカーなし、§4.5)**
+> 作成日: 2026-07-07 / 最終更新: 2026-08-25 / **状態: v8/v8.1 完走済み (§3.16 / §5)。
+> 後継系譜は v9 → v10 → v11 — 現在の canonical は
+> [`zero-shot-v11-roadmap.md`](zero-shot-v11-roadmap.md) §5**
 > 2026-08-02: origin/dev (`2412e370`、v2.0 piper→piper_plus 改名込) へのリベース完了。
 > **KsponSpeech は v8 から除外確定** (public + 商用利用可の open-model 方針、§6.5 冒頭) —
 > ko は Zeroth-Korean + Common Voice ko のみ (7-lang 計 話者 ~3,790 / 発話 ~346k、§2)。
@@ -1165,7 +1167,8 @@ ckpt と非互換のため v9 再学習 or decoder 再適応 FT が必要) は
   指標不変 → **from scratch 確定**。訓練データの高域ノイズ床 (Zeroth fmax 中央値
   3.0kHz) も実測で確定
 - **P1.5 (データゲート、案 Z)**: Zeroth 全除外 + hi_ratio/fmax999 ゲート →
-  300,443 utts / 6 言語 (ko は sampler 崩壊回避のため完全除外、v10 で復活予定。
+  300,443 utts / 6 言語 (ko は sampler 崩壊回避のため完全除外。v10/v11 でも
+  未投入のまま — 復活は Emilia 投入判断と併せ v11b 以降で判断。
   **教訓: language-balanced sampling は最小言語の utts 数が epoch サイズを決める**)
 - **P2 (本走)**: 50ep 完走 (~$140)。スペクトルで 4-9kHz 非構造ノイズ v8.1 比
   **-5〜-10dB + 倍音構造獲得**。聴感で「v8.1 より減った」をユーザー確認

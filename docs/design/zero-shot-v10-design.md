@@ -1,6 +1,8 @@
 # Zero-Shot v10 設計 — 故障機構への対策と実行計画 (2026-08-14)
 
-> **Status**: **v10a 本走実行中 (2026-08-14 14:56 UTC launch、80ep from-scratch)**。
+> **Status**: **v10a / v10a-r2 完走 (2026-08-16、最終結果は §11)**。後継は
+> v10b ([`zero-shot-v10b-quality-plan.md`](zero-shot-v10b-quality-plan.md)) →
+> v11 ([`zero-shot-v11-roadmap.md`](zero-shot-v11-roadmap.md) §5 が現在の canonical)。
 > v10a = v9 と同一データ (300,443 utts) で学習信号・構造修正の効果のみを検証する
 > 単一変数 run (データ拡充は v10b に分離、本 doc 末尾の「v10a 実行記録」参照)。
 > 2a 実装は commit `7b176d7a` (TDD)。Phase 0/1 診断
