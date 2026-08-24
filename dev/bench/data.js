@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1787479921047,
+  "lastUpdate": 1787578736370,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -853,6 +853,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Cold Start (en)",
             "value": 1392.6,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 208.3,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0f3b1a62fa3b9a323c92ad709288fd80b42ff18f",
+          "message": "fix(train): batch_spectrograms の一時ファイル作成失敗が UnboundLocalError で握り潰される問題を修正 (#626)\n\n`_save_spec` は `tempfile.mkstemp` を、 その戻り値 `tmp_path` を参照する\ncleanup ハンドラと同じ `try` に置いていた。 mkstemp 自体が失敗すると\n(ENOSPC / EACCES / 親ディレクトリ不在) except 側で未束縛の `tmp_path` に触れ、\n`UnboundLocalError` が本来の OSError を覆い隠していた。\n\n併せて 2 点:\n\n- 例外を無言で握り潰していた箇所に、 同 file の `_load_pt` と同じ粒度の\n  warning ログを追加\n- `_save_spec` の戻り値を成否 bool にし、 `run()` が失敗を `skipped` に計上\n  するようにした。 従来は全書き込みが失敗した batch でも\n  `processed=N skipped=0` と報告され、 1 件も書けていないことが表に出な\n  かった\n\n`_save_spec` は module-private で呼び出し元は同 file の `run()` のみ\n(repo 全体に他の importer は無し) のため、 戻り値型の変更の影響は閉じている。",
+          "timestamp": "2026-08-24T22:36:42+09:00",
+          "tree_id": "6a07a0e8d0ecab762de1073d6cdf99f2a2252fd4",
+          "url": "https://github.com/ayutaz/piper-plus/commit/0f3b1a62fa3b9a323c92ad709288fd80b42ff18f"
+        },
+        "date": 1787578735189,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0582,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 14.6,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 16.7,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1079.9,
             "unit": "ms"
           },
           {
