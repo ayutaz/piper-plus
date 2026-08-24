@@ -77,14 +77,14 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 - **Japanese TTS** — OpenJTalk integration, prosody features (A1/A2/A3), question markers (#204), context-dependent "N" variants (#207)
 - **English TTS** — v2.0.2 bundles G2P based on [g2p-en](https://github.com/Kyubyong/g2p), with Apache-2.0 inference code and the Tacotron MIT notice. No external `g2p-en`/`Distance` or espeak-ng is needed. Older PyPI 2.0.1 metadata is unchanged; see the [migration guide](docs/migration/python-g2p-license.md)
 - **Multi-speaker** — 571 speakers in 6-language base model (code supports 8 languages including Swedish and Korean), SpeakerBalancedBatchSampler with language-balanced sampling
-- **Custom Dictionary** — 200+ built-in technical term pronunciations
+- **Custom Dictionary** — user-supplied pronunciation dictionaries via JSON (v1/v2) / TSV
 - **Phoneme Input** — Direct phoneme specification with `[[ phonemes ]]` notation — [Guide](docs/features/phoneme-input.md)
 
 ### Training
 
 - **WavLM Discriminator** — MOS +0.15-0.25 improvement (enabled by default, training only)
 - **MB-iSTFT-VITS2 Decoder** — VITS decoder uses MB-iSTFT + PQMF, delivering ~2.21x faster CPU inference. ONNX-compatible with existing runtimes
-- **FP16 Mixed Precision** — 2-3x faster training, ~50% memory reduction (enabled by default)
+- **BF16 Mixed Precision** — `--precision bf16-mixed` (default) + TF32 for faster training, ~50% memory reduction
 - **EMA** — Exponential Moving Average for training stability (enabled by default)
 - **Multi-GPU** — DDP support, automatic learning rate scaling
 - **Prosody Features** — Prosody injection into Duration Predictor (`--prosody-dim 16`)
@@ -98,7 +98,7 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 - **[iOS xcframework + SPM](docs/guides/platform/ios-integration.md)** — `PiperPlus` Swift Package, synthesis engine shipped as iOS arm64 device + simulator universal xcframework
 - **[iOS Swift G2P (SPM)](docs/guides/platform/swift-g2p-integration.md)** — `PiperPlusG2P` standalone Swift Package: 8-language G2P on iOS without ONNX Runtime (Issue #387)
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Fully runs in browser, **phoneme timing output (JSON/TSV/SRT)**, no server
-- **[Docker](docker/README.md)** — 5 images for inference, training, WebUI, and C++
+- **[Docker](docker/README.md)** — 7 image families: inference, training, WebUI, C++, Wyoming (Home Assistant), and more
 - **PyPI (`pip install piper-plus`)** — Easy install, multilingual, **phoneme timing output (JSON/TSV/SRT)**, streaming, HTTP API
 - **C# CLI** — .NET 10 cross-platform, 8-language G2P/phonemization (current trained models cover 6 languages), ONNX inference, **phoneme timing output (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML support, **phoneme timing output (JSON/TSV/SRT)**, auto dictionary download
@@ -252,9 +252,8 @@ docker pull ghcr.io/ayutaz/piper-plus/python-train:dev
 docker pull ghcr.io/ayutaz/piper-plus/webui:dev
 docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:dev
 docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
+docker pull ghcr.io/ayutaz/piper-plus/wyoming:dev
 ```
-
-> **Note:** The webui image is not automatically built by CI. Build manually with: `docker build -t piper-webui -f docker/webui/Dockerfile .`
 
 See [docker/README.md](docker/README.md) for details.
 
@@ -377,9 +376,9 @@ Main models: `tsukuyomi` (Japanese), `zs-v1` (experimental 6-language Zero-Shot/
 
 Unity plugin for Piper: [github.com/ayutaz/uPiper](https://github.com/ayutaz/uPiper)
 
-- Unity 6000.0.35f1+, Unity.InferenceEngine
-- Windows / macOS (Apple Silicon) / Linux / Android
-- Japanese & English, async API, streaming
+- Unity 6000.3.11f1+, Unity.InferenceEngine
+- Windows / macOS (Apple Silicon) / Linux / Android / iOS / WebGL (WebGPU/WebGL2)
+- 7 languages (ja/en/zh/es/fr/pt/ko), async API, streaming
 
 ### piper-plus-g2p (Standalone G2P Package)
 
