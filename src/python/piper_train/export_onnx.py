@@ -245,6 +245,23 @@ def apply_ema_scope_from_checkpoint(
     return report
 
 
+def maybe_apply_ema(
+    model_g: torch.nn.Module,
+    ckpt: dict,
+    no_ema: bool,
+) -> dict[str, tuple[int, int]]:
+    """EMA 適用のゲート。``no_ema=True`` なら何も適用せず空 report を返す。
+
+    v11 実測: 早期打ち切り (未収束) ckpt では EMA shadow が raw weights より
+    大幅に劣化する (decay lag + 崩壊汚染。torch A/B: raw 14.9dB vs EMA 6.2dB)。
+    収束済み run では従来どおり EMA が既定。
+    """
+    if no_ema:
+        _LOGGER.info("EMA application disabled by --no-ema (using raw weights)")
+        return {}
+    return apply_ema_scope_from_checkpoint(model_g, ckpt)
+
+
 def apply_ema_weights(
     decoder: torch.nn.Module,
     checkpoint_path: str | Path,
@@ -462,6 +479,13 @@ def main() -> None:
         help="Disable FP16 conversion (default: FP16 enabled)",
     )
     parser.add_argument(
+        "--no-ema",
+        action="store_true",
+        help="Disable EMA shadow application (default: EMA applied when the "
+        "checkpoint carries EMA state). Use for early-stopped / unconverged "
+        "checkpoints where the EMA shadow lags behind raw weights (v11).",
+    )
+    parser.add_argument(
         "--unify-emb-lang",
         action=argparse.BooleanOptionalAction,
         default=None,
@@ -587,7 +611,7 @@ def main() -> None:
     # IMPORTANT: EMA must be applied BEFORE remove_weight_norm(), because EMA shadow
     # params use weight_g/weight_v keys. remove_weight_norm() fuses them into a single
     # "weight" tensor, making EMA keys unmatchable.
-    apply_ema_scope_from_checkpoint(model_g, ckpt)
+    maybe_apply_ema(model_g, ckpt, no_ema=args.no_ema)
 
     del ckpt
 
