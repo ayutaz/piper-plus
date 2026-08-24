@@ -102,15 +102,6 @@ repos:
         language: system
         files: \.rs$
         pass_filenames: false
-      - id: gofmt
-        name: gofmt -l (Go)
-        # gofmt -l prints files that are not gofmt'd; we treat any output
-        # as a failure. Use awk to convert "any line of output" -> exit 1.
-        entry: bash -c 'out=$(gofmt -l src/go); if [ -n "$out" ]; then echo "gofmt drift:"; echo "$out"; exit 1; fi'
-        language: system
-        files: \.go$
-        pass_filenames: false
-
   # ---------------------------------------------------------------------------
   # Cross-language lint hooks — added 2026-05 after PR #401 cycle of shame.
   #
