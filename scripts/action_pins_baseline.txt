@@ -2,3 +2,33 @@
 # DO NOT add new entries to this file — pin new actions by SemVer or SHA.
 # Removing a line here: action is migrated to SemVer/SHA pin (good).
 # Adding a line here: undermines the gate (bad). Discuss in PR review first.
+#
+# The 5 entries below are NOT new adoptions. They were already in the tree
+# but invisible to the gate: USES_RE only matched the plain `uses:` form, so
+# the list form `- uses:` (52% of all uses: lines — 418 of 806) went
+# unchecked, hiding 38 sliding-major references across 17 workflows. Fixing
+# the regex made them visible all at once.
+#
+# They are baselined rather than pinned in the same change because pinning
+# them touches 38 lines in 17 workflow files, and each pin freezes a version
+# resolution that CI currently follows — too much behaviour change to bundle
+# into a gate-correctness fix. Follow-up PR migrates them; verified target
+# versions (same major, so no upgrade is implied):
+#
+#   Swatinem/rust-cache@v2              -> v2.9.2   (23 lines, 13 files)
+#   docker/setup-qemu-action@v3         -> v3.7.0   (9 lines, 2 files)
+#   actions/download-artifact@v5        -> v5.0.0   (4 lines, 1 file)
+#   lycheeverse/lychee-action@v2        -> v2.9.0   (1 line)
+#   DavidAnson/markdownlint-cli2-action@v17 -> v17.0.0 (1 line)
+#
+# Not listed here (classified 'other' => WARN only, never a hard failure):
+#   dtolnay/rust-toolchain@stable  (37 lines) — upstream publishes exactly one
+#     tag (`v1`, 2022) and documents branch refs only, so SHA pinning is the
+#     only real option. Tracked with the migration above.
+#   pypa/gh-action-pypi-publish@release/v1 (3 lines) — opaque release branch,
+#     the documented upstream usage.
+DavidAnson/markdownlint-cli2-action@v17
+Swatinem/rust-cache@v2
+actions/download-artifact@v5
+docker/setup-qemu-action@v3
+lycheeverse/lychee-action@v2
