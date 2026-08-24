@@ -136,11 +136,16 @@ v10b と同じ 2-arm 方式 + 事前登録 gate (harmonic-head §7):
 
 1. **評価系に明瞭度指標が無い**: SECS / comb-HNR / seen-ID はどれも
   「読めているか」を測らない → v11b は **ASR ベース CER を gate に追加**
-2. **ONNX export が v11 carrier head を壊す (2 問題、未修理)**:
-   (a) EMA 自動適用が有害 — 早期打ち切り ckpt では EMA が劣化重み
-   (torch A/B: raw 14.9dB vs EMA 6.2dB)。export_onnx に --no-ema が必要。
-   (b) EMA を剥がしても trace 後の ONNX は調波構造が崩壊 (原因未特定)。
-   **修理まで v11 系の ONNX 配布不可** (torch 推論は正常)
+2. **ONNX export が v11 carrier head を壊す (2 問題) — 2026-08-25 修理完了**:
+   (a) EMA 自動適用が有害 (早期打ち切り ckpt では EMA が劣化重み、torch A/B:
+   raw 14.9dB vs EMA 6.2dB) → `--no-ema` フラグ追加 (commit 67adc5f7)。
+   (b) trace 後の ONNX の調波崩壊 — 真因は **main() 内の infer 手書き複製が
+   v11 P2 の `enc_p(g_spk)` (AdaLN) に追従せず、ONNX だけ話者条件が断線**
+   していたこと (carrier 単体は legacy trace でも parity 完全一致 = 無罪を
+   probe で確定)。複製を `build_infer_forward` (models.infer の wrapper) に
+   一本化し、位置束縛 parity テスト + 複製再導入禁止の構造テストで pin
+   (commit 84e5fe4e)。**修理後の FP16+no-EMA export で 14.38dB を実測回復**
+   — v11 系の ONNX 配布は可能になった (早期打ち切り ckpt は --no-ema 必須)
 3. 敵対 ramp スケジュール: ep15 の谷 → ep19 回復 → ep19 以降崩壊の経過から、
   ramp 進行が崩壊の駆動因の第一容疑。v11b では ramp 凍結/減速 + R3 継続
 

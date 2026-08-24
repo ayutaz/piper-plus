@@ -187,7 +187,7 @@ echo "PID: $!"
 
 > **最新状態 (2026-08-25): v11 (carrier head 構造保証) は R3 安全装置により ep29/80 で正規停止 — 調波構造の技術検証成功 (comb-HNR 14.6dB = GT 超え、v10b 4.6)、実用は学習量不足で不成立。次は v11b (ramp 修正 + CER gate + export 修理)。**
 >
-> - **v11 最終結論 (2026-08-25)**: [zero-shot-v11-roadmap.md §5](docs/design/zero-shot-v11-roadmap.md) が canonical。要点: ①carrier head で がびがび残存成分 (A3) の構造保証を実証、②ep19→25 で敵対 ramp による dual-encoder 乖離崩壊 (encoder 騙し 6 例目) → R3 が正規停止、③**ONNX export が carrier head を壊す 2 バグ未修理 (EMA 有害 + trace 崩壊) — v11 系 ONNX 配布不可**、④評価系に明瞭度 (CER) が無い盲点 → v11b gate に追加。成果物: HF `checkpoints-v11/` + `v11-results/`、ログ/TB はローカル `piper-v11-local/box-evac/`
+> - **v11 最終結論 (2026-08-25)**: [zero-shot-v11-roadmap.md §5](docs/design/zero-shot-v11-roadmap.md) が canonical。要点: ①carrier head で がびがび残存成分 (A3) の構造保証を実証、②ep19→25 で敵対 ramp による dual-encoder 乖離崩壊 (encoder 騙し 6 例目) → R3 が正規停止、③ONNX export の 2 バグは**修理完了 (2026-08-25)**: `--no-ema` フラグ (67adc5f7) + main() の infer 手書き複製を build_infer_forward に一本化 (84e5fe4e、AdaLN g_spk 断線の根治、FP16 export で 14.4dB 回復実測)、④評価系に明瞭度 (CER) が無い盲点 → v11b gate に追加。成果物: HF `checkpoints-v11/` + `v11-results/`、ログ/TB はローカル `piper-v11-local/box-evac/`
 > - v9 (がびがび根治版) 完走・聴感確認済み (2026-08-12) — ただし v10b ep79 でも A3 (調波間ノイズ) は聴感残存 (2026-08-25 ユーザー確認)、根治は v11 系の完走待ち
 > 系譜: v8 (7-lang スケール、SECS 0.649 / がびがび有り) → v8.1 (微分可能 SCL InfoNCE + WavLM で SECS 0.712 / UTMOS 改善、がびがび残存) → **v9 (PQMF canonical 修正 + MRD + full-band STFT + データゲートで from scratch 50ep、4-9kHz 非構造ノイズ -5〜-10dB + 倍音構造獲得、がびがび解消)**。
 >
