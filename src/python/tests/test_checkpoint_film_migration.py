@@ -203,7 +203,9 @@ class TestMigratePrefilmDecoderCond:
             migrated_out = migrated_gen(x, g)
 
         original_film = MBiSTFTGenerator.__dict__["_apply_film"]
-        MBiSTFTGenerator._apply_film = staticmethod(lambda t, cond: t + cond)
+        MBiSTFTGenerator._apply_film = staticmethod(
+            lambda t, cond, free_scale=False: t + cond
+        )
         try:
             with torch.no_grad():
                 legacy_out = legacy_gen(x, g)
