@@ -218,6 +218,56 @@ class TestEMAWeightApplication:
         assert skipped == 0
 
 
+@pytest.mark.unit
+class TestNoEmaGate:
+    """--no-ema ゲート (maybe_apply_ema)
+
+    v11 実測: 早期打ち切り ckpt では EMA shadow が raw weights より大幅に劣化
+    (torch A/B: raw 14.9dB vs EMA 6.2dB) — export 時に EMA を無効化できる
+    経路が必要。
+    """
+
+    def _model_and_ckpt(self):
+        model_g = torch.nn.Module()
+        model_g.dec = torch.nn.Linear(10, 5)
+        shadow = {
+            name: param.data.clone() + 0.1
+            for name, param in model_g.dec.named_parameters()
+        }
+        ckpt = {"ema_generator_state": {"shadow_params": shadow}}
+        return model_g, ckpt
+
+    def test_no_ema_skips_application(self):
+        """no_ema=True では EMA state があっても重みが変わらない"""
+        from piper_train.export_onnx import maybe_apply_ema
+
+        model_g, ckpt = self._model_and_ckpt()
+        before = {n: p.data.clone() for n, p in model_g.dec.named_parameters()}
+
+        report = maybe_apply_ema(model_g, ckpt, no_ema=True)
+
+        assert report == {}
+        for name, param in model_g.dec.named_parameters():
+            assert torch.equal(param.data, before[name]), (
+                f"--no-ema なのに {name} が変更された"
+            )
+
+    def test_default_applies_ema(self):
+        """no_ema=False (default) では従来どおり EMA が適用される"""
+        from piper_train.export_onnx import maybe_apply_ema
+
+        model_g, ckpt = self._model_and_ckpt()
+        before = {n: p.data.clone() for n, p in model_g.dec.named_parameters()}
+
+        report = maybe_apply_ema(model_g, ckpt, no_ema=False)
+
+        assert report.get("dec", (0, 0))[0] > 0
+        assert any(
+            not torch.equal(p.data, before[n])
+            for n, p in model_g.dec.named_parameters()
+        ), "EMA が適用されていない"
+
+
 def _make_mock_model_g(n_speakers, n_languages, gin_channels=512):
     """emb_lang テスト用の簡易モックモデルを作成"""
 
