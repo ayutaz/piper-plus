@@ -160,8 +160,24 @@ v10b と同じ 2-arm 方式 + 事前登録 gate (harmonic-head §7):
 
 ### v11b への引き継ぎ (次の一手)
 
-1. export 修理 (--no-ema flag + carrier trace バグ、TDD) — v11b 完走前まで
-2. v11b 設計判断: ep19 warm 継続 (60ep ≈ ~$73) vs from-scratch (~$108+)。
-  warm は ep19 が健全である前提 (聴感未成熟だが指標上は崩壊前)。
-  残高 $76.80 では warm がぎりぎり、from-scratch は来月
-3. gate 追加: CER (明瞭度) + R3 継続 + ramp 凍結条件の事前登録
+1. ~~export 修理~~ ✅ 完了 (2026-08-25): `--no-ema` (67adc5f7) + infer 複製の
+  一本化 (84e5fe4e)。FP16 export 14.4dB 回復実測
+2. ~~CER gate 実装~~ ✅ 完了 (2026-08-25): `piper_train.tools.eval_cer`
+  (610b46a6、TDD、transformers whisper で追加依存ゼロ)。較正実測
+  (whisper-small、つくよみ 3 文、median):
+  **v10b ep79 (明瞭) 0.095 / v11 ep9 1.429 / v11 ep19 1.261** — 聴感判定と
+  完全一致、桁違い分離。whisper は不明瞭音声で幻覚繰り返しを起こし mean が
+  膨張するため **median を頑健統計として使う** (comb-HNR と同じ理由)
+3. **v11b 実行計画 (来月頭、$ 追加後)**: from-scratch 80ep (~$108+、
+  22min/epoch 実測ベース)。ep19 warm 継続 (~$73) は v9 Phase 0/1 の
+  「warm restart は転写能力を回収できない」前例があり非推奨。レシピ =
+  v11 と同一 + 次の 3 変更を事前登録:
+  - **敵対 ramp 凍結**: c_adv_spk の ramp を ep15 相当で頭打ち (ep15 谷 →
+    ep19 回復 → ep19 以降崩壊の経過から ramp 進行が崩壊駆動の第一容疑)
+  - **CER gate**: ep 節目評価に eval_cer を追加、**CER median ≤ 0.30**
+    (whisper-small、つくよみ参照合成 ≥3 文) を実用判定 gate に。
+    早期 ep は未成熟で当然 fail するため、abort 条件ではなく
+    **ep40 以降の昇格 gate** として扱う
+  - **R3 継続** (held-out ECAPA 急落 abort、v11 で 2 回正しく発動) +
+    export は完走 ckpt でも EMA/raw 両方を眺めて良い方を採る
+    (早期打ち切り時は --no-ema 必須)
