@@ -31,6 +31,12 @@ forward_compat_policy = "strict"
 "r-efi" = 2
 "rand" = 2
 "rand_core" = 2
+# syn 2.0.117 / 3.0.3 の並存。 proc-macro 側エコシステムの syn 2 -> 3 移行が
+# 段階的に進んでいるため。 3.0.3 は clap_derive 4.6.4 / serde_derive 1.0.229 が
+# 引き、 2.0.117 は async-trait / displaydoc など未移行の proc-macro が保持する。
+# いずれも proc-macro (build 時のみ) なので実行バイナリには入らず、 ABI mismatch
+# の risk もない。 移行完了後に 1 に戻す。
+"syn" = 2
 "thiserror" = 2
 "thiserror-impl" = 2
 "ureq" = 2

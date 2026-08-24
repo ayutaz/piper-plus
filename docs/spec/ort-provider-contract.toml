@@ -77,7 +77,7 @@ all session-level settings from ort-session-contract.toml verbatim.
 name = "CUDAExecutionProvider"
 short_name = "cuda"
 platforms = ["linux-x86_64", "windows-x86_64"]
-required_runtime = "CUDA 12.x + cuDNN 9.x"
+required_runtime = "CUDA 12.x + cuDNN 9.x; Rust runtime requires CUDA 13.x (see notes)"
 default_on = "none"  # opt-in via CLI / config
 deterministic = "best-effort"
 fp16_support = "native (model can be FP16 at weights and compute)"
@@ -87,6 +87,14 @@ with identical seeds, producing tiny output drift. The CUDA EP does not
 honour `enable_memory_pattern` (CUDA uses its own allocator). Per-device
 selection uses cuda{device_id} format from ort-session-contract.toml's
 [cache] table for cache labelling.
+
+The required CUDA major version is not uniform across runtimes. Python /
+C# / Go / C++ link an ONNX Runtime built against CUDA 12.x. The Rust
+runtime is the exception: from `ort` 2.0.0-rc.13 the prebuilt `ort-sys`
+distributions are tagged `cuda13` only, so enabling piper-core's `cuda`
+feature requires a CUDA 13 runtime. This follows from the Rust `ort`
+floor-check exemption (docs/reference/ort-versions.md) and is expected to
+converge once `ort` 2.x ships stable.
 """
 
 # ---------------------------------------------------------------------------

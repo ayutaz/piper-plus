@@ -4,8 +4,8 @@
   "totals": {
     "executable": 223,
     "needs_placeholder": 6,
-    "skip_warranted": 239,
-    "total": 468
+    "skip_warranted": 240,
+    "total": 469
   },
   "by_language": {
     "bash": {
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 194
+      "skip_warranted": 195
     },
     "wasm": {
       "executable": 10,
@@ -5450,6 +5450,21 @@
       "directives_detected": [],
       "env_dependencies": [],
       "hash_sha1": "e1bff66231daccc9b32eee3752f6271b0313dbb5"
+    },
+    {
+      "file": "docs/reference/ort-versions.md",
+      "line_start": 115,
+      "line_end": 120,
+      "language_raw": "toml",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "38b2ecf8a49c574a70b1193414e308bd078bd2fd"
     },
     {
       "file": "docs/reference/pua-test-matrix.md",
