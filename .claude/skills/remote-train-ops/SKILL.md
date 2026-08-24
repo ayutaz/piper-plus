@@ -72,6 +72,14 @@ vastai create instance <id> --image nvidia/cuda:12.8.1-devel-ubuntu24.04 --disk 
   無言死**し、監視が「まだ走っている」と誤認する
 - 失敗 marker (`*_FAILED`) は必ず log の**新しい行**として出す (監視の grep 対象)
 - 起動後 30 秒でログ末尾を必ず確認 (「launched」だけでなく次の STEP が出るまで)
+- **kill 系 watchdog の規約** (v11 の SIGTERM 誤診事故の設計側対策):
+  - kill する**前に**発動理由 (指標名と数値) を必ず mark する
+  - mark は 1 行に正規化 — PID 列挙は `tr '\n' ' '` してから埋め込む
+    (複数行のまま渡すと 2 行目以降が裸の数字になり grep で発見不能)
+  - 全 watchdog の mark は自 subprocess のログに加えて**中央 marker ログ
+    (例: /data/logs/markers.log) にも tee** する — マーカーが呼び出し元ごとの
+    ログに分散していると死因調査で見落とす (v11 実測: R3 の ABORT が eval log
+    のみに出て monitor log の grep で「非発動」と誤結論)
 
 ## 4. 監視 (通知が確実に届く形)
 
@@ -87,6 +95,10 @@ vastai create instance <id> --image nvidia/cuda:12.8.1-devel-ubuntu24.04 --disk 
 - 判定条件は「アンカー行 (最新 launch マーカー) 以降のみ」を対象にする —
   ログ累積で過去の FAILED に誤マッチする事故も実測済み
 - ssh 内の grep には `</dev/null` を付ける (stdin 吸い込みハング防止)
+- **監視・自動停止 watcher を張ったら、マーカー経路を必ずテスト**する:
+  監視対象ログにテスト行を echo して検知されるか確認してから本番任せにする。
+  v11 実測: 自己停止 watcher が誤ったログファイル (runner.log — マーカーの
+  実出力先は monitor.log) を監視しており、保険が最初から無効だった
 
 ## 5. 停止・destroy (課金の確実な停止)
 
@@ -122,3 +134,8 @@ vastai create instance <id> --image nvidia/cuda:12.8.1-devel-ubuntu24.04 --disk 
    abort の正当性を判断する。安全装置が正しく止めた run の resume は上書き行為
 4. resume する場合、`last.ckpt` が最新か mtime/size で確認 (Lightning は既存
    last.ckpt があると `last-v1.ckpt` に書く — stale last.ckpt での resume 事故防止)
+5. train log 末尾に startup banner (「GPU available: True」等) が複数ある場合、
+   誰かの再 launch とは限らない — piper_train は SIGTERM 後に内部で
+   weights-only 再起動を試みる (「Graceful resume failed → strict=False reload」)
+   ため、**死にかけの run 自身が新しい banner を書く**。banner 数で launch 回数を
+   推定しない (v11 で「謎の第三者 launch」と誤推理した実測)
