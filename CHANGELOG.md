@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enforces this automatically.
 -->
 
+### Security
+
+- CI: `Required Status Check Gate` (`.github/workflows/required_status_check_gate.yml`) に script injection があったのを修正。 `workflow_run` イベント経路で fork 側の branch 名 (`github.event.workflow_run.head_branch`) を `run:` ブロックへ直接展開しており、 git の ref 名は `$( )` や backtick を含められるため任意コマンドが実行可能だった。 `workflow_run` は fork PR 由来でも base repo の write context で発火し、 当 job は `pull-requests: write` を持つ。 さらに直前の `actions/checkout` が `persist-credentials: false` を指定していなかったため、 注入されたコマンドから `.git/config` 経由で `GITHUB_TOKEN` を回収できる状態だった (pwn-request パターン)。 同 repo 内の `pr-title-check.yml` / `pr-body-validate.yml` が既に採っている `env:` 経由で shell 変数として参照する形に統一し、 併せて checkout に `persist-credentials: false` を追加して多層防御とした (`check_required_gate.py` は stdlib `urllib` のみで `GITHUB_TOKEN` env から認証しており git credential helper を使わないことを確認済み)。 `.github/workflows/*.yml` の `run:` ブロック全件を走査し、 外部から制御可能な `github.event.*` フィールドを展開している箇所が他に無いことを確認済み
+
 ### Fixed
 
 - CI: distroless trial イメージ (`Dockerfile.cpu.distroless`) で `import onnxruntime` が SIGSEGV (exit 139) し、 `src/python/**` を触る全 PR がブロックされていた問題を修正。 ORT 1.29 が import 時に新設した device discovery (`device_discovery.cc`、 `/sys/devices` を走査して PCI bus ID を読む) が distroless の最小ファイルシステム上でクラッシュする。 本イメージ限定で `onnxruntime<1.29` に上限を設ける (canonical `Dockerfile.cpu` では ORT 1.29 が正常動作することを実測で確認済みのため、 そちらと通常のインストールは巻き込まない)。 シンボル欠落 / ライブラリ欠落 / インタプリタのパッチレベル差 / 実行ユーザー / seccomp はいずれも実測で棄却済み (根拠は Dockerfile のコメントに記録)。 併せて smoke test に `-X faulthandler` を追加し、 次に native crash が起きた際に `exit 139` だけでなく Python トレースバックが出るようにした。 「nonroot 65532 で動く」という誤ったコメントも実測値 (uid 0) に訂正
