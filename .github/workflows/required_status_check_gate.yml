@@ -51,6 +51,12 @@ jobs:
         Multi-Runtime RTF Benchmark,Memory regression (per-language),CodeQL,Parity Hub,PUA Consistency Gate
     steps:
       - uses: actions/checkout@v6.1.0
+        with:
+          # gate は workspace の scripts/ しか読まない。 check_required_gate.py は
+          # GITHUB_TOKEN env 経由で REST API を叩く (stdlib urllib のみ、 git は
+          # 呼ばない) ため credential helper は不要。 workflow_run は fork PR でも
+          # write context で走るので .git/config に token を残さない。
+          persist-credentials: false
 
       - uses: actions/setup-python@v6.2.0
         with:
@@ -58,17 +64,28 @@ jobs:
 
       - name: Resolve head_sha and PR number
         id: ctx
+        # workflow_run.head_branch は fork 側の branch 名 = 外部 contributor が
+        # 自由に決められる文字列で `$( )` / backtick を含められる。 run: に
+        # ${{ }} を直接展開すると script injection になるため、 pr-title-check /
+        # pr-body-validate と同じく env 経由で shell 変数として参照する。
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
-            echo "pr=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
-            echo "base_branch=${{ github.event.pull_request.base.ref }}" >> "$GITHUB_OUTPUT"
+          if [ "${EVENT_NAME}" = "pull_request" ]; then
+            echo "sha=${PR_HEAD_SHA}" >> "$GITHUB_OUTPUT"
+            echo "pr=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+            echo "base_branch=${PR_BASE_REF}" >> "$GITHUB_OUTPUT"
           else
-            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+            echo "sha=${RUN_HEAD_SHA}" >> "$GITHUB_OUTPUT"
             # `workflow_run` doesn't carry the PR number directly; surface the
             # head branch so the next step can look it up if needed.
             echo "pr=" >> "$GITHUB_OUTPUT"
-            echo "base_branch=${{ github.event.workflow_run.head_branch }}" >> "$GITHUB_OUTPUT"
+            echo "base_branch=${RUN_HEAD_BRANCH}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Aggregate spoke conclusions
