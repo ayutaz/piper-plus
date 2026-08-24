@@ -836,7 +836,7 @@ cp /path/to/training_dir/config.json \
 | `--unify-emb-lang-source N` | 0 | Source language index for emb_lang unification. |
 | `--simplify` | off | Apply ONNX model simplification after export. |
 | `--debug` | off | Print DEBUG messages to the console. |
-| EMA | always on | EMA weights are automatically applied when available (not a CLI flag). |
+| `--no-ema` | EMA ON | Disable EMA shadow-weight application. Default: EMA weights are applied when the checkpoint carries them. **Use `--no-ema` for early-stopped / mid-training checkpoints** — EMA shadows lag behind and can be much worse than the raw weights there (v11 measured: raw 14.9dB vs EMA 6.2dB comb-HNR). When unsure, export both and compare (see `/publish-model` phase 2). |
 
 Example (default stochastic + FP16 export, recommended):
 

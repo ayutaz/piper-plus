@@ -7,7 +7,7 @@ allowed-tools: Bash(uv run *) Bash(ls *) Bash(test *) Bash(file *) Bash(stat *) 
 
 # Skill / Hook Health Check
 
-このプロジェクトの自動化資産 (16 skill + 5 hook + 49 pre-commit hook) を meta-level で健全性検証する。
+このプロジェクトの自動化資産 (23 skill + 6 hook script + 約 100 pre-commit hook) を meta-level で健全性検証する。
 
 memory `feedback_conservative_changes.md` に従い、 read-only、 検査結果を report として返すのみ。 修正は別 skill / 手動で。
 
@@ -32,8 +32,7 @@ uv run python scripts/check_skill_health.py --verbose
 期待出力例:
 
 ```text
-inspected 16 skills, 5 hooks
-OK skill-health: 16 skill(s), 5 hook(s) inspected
+OK skill-health: 23 skill(s), 6 hook(s) inspected
 ```
 
 ### 2. 失敗時の対応

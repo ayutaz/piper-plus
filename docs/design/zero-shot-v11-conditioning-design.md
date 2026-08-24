@@ -1,6 +1,8 @@
 # Zero-Shot v11 — 条件付け経路の容量改修 設計調査 (2026-08-20)
 
-> **Status**: 設計調査完了 (実装なし)。v10b oracle 診断
+> **Status**: 診断完了 (§10、2026-08-20) + P0 (`--film-free-scale`) / P2 (enc_p AdaLN)
+> 実装済み・v11 本走で稼働 (v11 の ONNX export バグの真因は P2 の AdaLN 断線だった)。
+> v10b oracle 診断
 > ([`zero-shot-v10b-quality-plan.md`](zero-shot-v10b-quality-plan.md) §8) で確定した
 > 「アーキ (条件付け経路) 律速」— seen 話者ですら合成音の 20 択話者識別 top-1 43%
 > (実音声 98.5%) — に対する v11 改修の設計調査。§9 で S-1 識別器圧力でも 0.60

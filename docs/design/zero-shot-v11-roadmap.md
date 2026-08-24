@@ -1,6 +1,8 @@
 # Zero-Shot v11 ロードマップ — 構造保証による品質改修 (2026-08-20)
 
-> **Status**: 設計完了 (設計スパイク 2 本 + 診断 3 本の統合)。実装未着手。
+> **Status**: 本走完了 — R3 安全装置により ep29/80 で正規停止 (2026-08-25)。
+> 最終結論と v11b 実行計画は **§5 が canonical** (調波構造の技術検証成功、
+> 実用は学習量不足で不成立。次は v11b from-scratch)。
 >
 > 子 doc (詳細はそちらが正):
 > - [`zero-shot-v10b-residual-noise-diagnosis.md`](zero-shot-v10b-residual-noise-diagnosis.md)
@@ -138,13 +140,13 @@ v10b と同じ 2-arm 方式 + 事前登録 gate (harmonic-head §7):
   「読めているか」を測らない → v11b は **ASR ベース CER を gate に追加**
 2. **ONNX export が v11 carrier head を壊す (2 問題) — 2026-08-25 修理完了**:
    (a) EMA 自動適用が有害 (早期打ち切り ckpt では EMA が劣化重み、torch A/B:
-   raw 14.9dB vs EMA 6.2dB) → `--no-ema` フラグ追加 (commit 67adc5f7)。
+   raw 14.9dB vs EMA 6.2dB) → `--no-ema` フラグ追加 (commit a12609b1)。
    (b) trace 後の ONNX の調波崩壊 — 真因は **main() 内の infer 手書き複製が
    v11 P2 の `enc_p(g_spk)` (AdaLN) に追従せず、ONNX だけ話者条件が断線**
    していたこと (carrier 単体は legacy trace でも parity 完全一致 = 無罪を
    probe で確定)。複製を `build_infer_forward` (models.infer の wrapper) に
    一本化し、位置束縛 parity テスト + 複製再導入禁止の構造テストで pin
-   (commit 84e5fe4e)。**修理後の FP16+no-EMA export で 14.38dB を実測回復**
+   (commit ca76d6ea)。**修理後の FP16+no-EMA export で 14.38dB を実測回復**
    — v11 系の ONNX 配布は可能になった (早期打ち切り ckpt は --no-ema 必須)
 3. 敵対 ramp スケジュール: ep15 の谷 → ep19 回復 → ep19 以降崩壊の経過から、
   ramp 進行が崩壊の駆動因の第一容疑。v11b では ramp 凍結/減速 + R3 継続
@@ -160,10 +162,10 @@ v10b と同じ 2-arm 方式 + 事前登録 gate (harmonic-head §7):
 
 ### v11b への引き継ぎ (次の一手)
 
-1. ~~export 修理~~ ✅ 完了 (2026-08-25): `--no-ema` (67adc5f7) + infer 複製の
-  一本化 (84e5fe4e)。FP16 export 14.4dB 回復実測
+1. ~~export 修理~~ ✅ 完了 (2026-08-25): `--no-ema` (a12609b1) + infer 複製の
+  一本化 (ca76d6ea)。FP16 export 14.4dB 回復実測
 2. ~~CER gate 実装~~ ✅ 完了 (2026-08-25): `piper_train.tools.eval_cer`
-  (610b46a6、TDD、transformers whisper で追加依存ゼロ)。較正実測
+  (ca12027e、TDD、transformers whisper で追加依存ゼロ)。較正実測
   (whisper-small、つくよみ 3 文、median):
   **v10b ep79 (明瞭) 0.095 / v11 ep9 1.429 / v11 ep19 1.261** — 聴感判定と
   完全一致、桁違い分離。whisper は不明瞭音声で幻覚繰り返しを起こし mean が

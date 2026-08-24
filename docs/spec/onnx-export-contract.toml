@@ -25,7 +25,7 @@
 
 [meta]
 spec_version = "1.0"
-last_updated = "2026-05-09"
+last_updated = "2026-08-25"
 applies_to = ["python-export", "all-runtime-loaders"]
 canonical_source = "src/python/piper_train/export_onnx.py"
 forward_compat_policy = "strict"
@@ -43,7 +43,13 @@ forward_compat_policy = "strict"
 order = 1
 name = "torch.onnx.export"
 description = """
-Export the EMA-applied torch.nn.Module to ONNX bytes via torch.onnx.export().
+Export the torch.nn.Module to ONNX bytes via torch.onnx.export(). EMA shadow
+weights are applied first via maybe_apply_ema() unless --no-ema is given
+(early-stopped checkpoints: EMA shadows can be worse than raw weights —
+v11 measured raw 14.9dB vs EMA 6.2dB comb-HNR). The inference graph MUST be
+installed via build_infer_forward() — a hand-written copy of the infer path
+inside main() is forbidden (pre-commit gate `export-path-unification`; a
+drifted copy silently severed the AdaLN speaker conditioning in v11).
 opset_version is read from this contract's [opset] table — different export
 paths may legitimately use different opsets (see [opset] table for the
 mismatch justification).

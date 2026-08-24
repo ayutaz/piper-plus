@@ -97,7 +97,9 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 
 ## Design Documents
 
-- [Zero-Shot Quality Improvement Plan](design/zero-shot-quality-improvement-plan.md) - Improvement roadmap for zero-shot speaker similarity (Phase 1 ✅ shipped via v7 multi-6lang)
+- [Zero-Shot v11 Roadmap](design/zero-shot-v11-roadmap.md) - **Canonical for the zero-shot lineage (v8 → v9 → v10 → v10b → v11)**: final v11 conclusion + v11b execution plan (§5)
+- [Zero-Shot Noise Root Cause (PQMF)](design/zero-shot-noise-root-cause-pqmf.md) - PQMF alias bug root-cause analysis, fixed in v9
+- [Zero-Shot Quality Improvement Plan](design/zero-shot-quality-improvement-plan.md) - Improvement roadmap for zero-shot speaker similarity (Phase 1 ✅ shipped via v7 multi-6lang; Tier 2/3 shipped via v10/v11)
 - [Multi-6lang Zero-Shot v7 Training Results](design/multi-6lang-zero-shot-v7-training-results.md) - Canonical v7 training results + 5 fix commit history
 
 ## Development

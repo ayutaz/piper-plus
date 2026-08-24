@@ -3,7 +3,7 @@
 > **ステータス更新 (2026-06-26)**:
 >
 > - **Tier 1 (未実装機能の修正): ✅ 完了** — v7 multi-6lang スクラッチ学習 (32 epoch 完走) で全 5 修正実装済 (5cdfafb / 34ad257 / 5e700d4 / ba71e16 / 95e74cb)。 SECS (zero-shot) 0.6622 → 0.6879 達成。 Tsukuyomi FT で SECS 0.7749 を確認。 詳細: [`multi-6lang-zero-shot-v7-training-results.md`](multi-6lang-zero-shot-v7-training-results.md)
-> - **Tier 2/3 (学習改善 / アーキ微調整): 🟡 active future work** — InfoNCE / R1 regularizer / データ拡充は引き続き計画段階。 CLAUDE.md L139 + [`docs/handoff/zero-shot-tts-handoff-2026-06-20.md`](../handoff/zero-shot-tts-handoff-2026-06-20.md) から参照中
+> - **Tier 2/3 (学習改善 / アーキ微調整): ✅ 主要項目は v10/v11 で実装済み** (2026-08-25 追記) — InfoNCE は SupCon 形式で出荷 (v10 B-1、DDP all_gather 込)、TextEncoder 条件付けは v10 M1、FiLM 活性化範囲拡張は v11 P0 `--film-free-scale`、データ拡充は v8 で 300k utts へ実行済み。現在の canonical は [`zero-shot-v11-roadmap.md`](zero-shot-v11-roadmap.md) §5
 > - 「1. 重大発見: 未実装/不完全な機能」 セクションの記述は **当初調査時 (2026-03-31) の snapshot** で、 現在は v7 で fix 済の項目を含みます。 historical context として残しています
 
 > 調査日: 2026-03-31 (復元完了: 2026-04-01)
