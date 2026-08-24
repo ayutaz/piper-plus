@@ -23,10 +23,13 @@ on:
     paths:
       - 'docker/**/Dockerfile*'
       - '.github/workflows/trivy-container-scan.yml'
+      - 'scripts/check_trivy_sarif.py'
+      - 'tests/scripts/test_check_trivy_sarif.py'
   push:
     branches: [dev, main]
     paths:
       - 'docker/**/Dockerfile*'
+      - 'scripts/check_trivy_sarif.py'
   workflow_dispatch:
   schedule:
     # 週 1 で base image の新規 CVE を catch する。
@@ -42,6 +45,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # gate script 自身の unit test。 `tests/scripts/` は pytest.ini の
+  # `testpaths` に含まれず、 既存 workflow のどれも実行していないため
+  # (changelog-format.yml / readme-heading-tree-parity.yml は path trigger に
+  # 挙げるだけで pytest は走らせていない)、 本 workflow 内で明示的に回す。
+  # `--override-ini="addopts="` は pytest.ini の `--cov` 系を無効化する
+  # (ort-version-sync.yml と同じ手法)。
+  gate-script-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.1.0
+
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.13"
+
+      - name: Install pytest
+        run: python -m pip install --disable-pip-version-check "pytest>=9.0.3,<10"
+
+      - name: Unit test the Trivy SARIF severity gate
+        run: |
+          python -m pytest tests/scripts/test_check_trivy_sarif.py \
+            -v --override-ini="addopts="
+
   scan:
     runs-on: ubuntu-24.04
     strategy:
@@ -138,31 +165,14 @@ jobs:
       - name: Fail on CRITICAL findings only
         # SARIF を parse して CRITICAL があれば fail。 trivy-action を再度
         # 呼ばないことで DB download + scan の重複コストを回避。
-        run: |
-          python3 - <<'PY'
-          import json, sys
-          path = "trivy-${{ matrix.target.name }}.sarif"
-          try:
-              data = json.load(open(path))
-          except (OSError, json.JSONDecodeError) as exc:
-              print(f"SARIF parse failed: {exc}; treating as no findings.")
-              sys.exit(0)
-          runs = data.get("runs", [])
-          critical = 0
-          for run in runs:
-              for r in run.get("results", []):
-                  level = r.get("level") or r.get("properties", {}).get("security-severity")
-                  # Trivy SARIF: level="error" maps to CRITICAL/HIGH; tags
-                  # carry the actual severity name.
-                  for tag in r.get("properties", {}).get("tags", []):
-                      if isinstance(tag, str) and tag.upper() == "CRITICAL":
-                          critical += 1
-                          break
-          if critical:
-              print(f"CRITICAL findings: {critical} — failing.")
-              sys.exit(1)
-          print("No CRITICAL findings — pass.")
-          PY
+        #
+        # 解析 logic は scripts/check_trivy_sarif.py に集約 (F2)。 旧 inline
+        # heredoc は severity を `results[].properties.tags` から読んでいたが、
+        # Trivy は severity tag を `tool.driver.rules[].properties.tags` 側に
+        # 置くため CRITICAL が構造的に常に 0 = gate が no-op だった。
+        # severity 別 breakdown を必ず print するため、 CRITICAL=0 の run も
+        # 「gate が実際に数えた」 ことがログで監査できる。
+        run: python3 scripts/check_trivy_sarif.py trivy-${{ matrix.target.name }}.sarif
 
   # ---------------------------------------------------------------------------
   # Scheduled heavy scan (Wave 3, T12).
@@ -251,25 +261,5 @@ jobs:
           category: trivy-heavy-${{ matrix.target.name }}
 
       - name: Fail on CRITICAL findings only (heavy)
-        run: |
-          python3 - <<'PY'
-          import json, sys
-          path = "trivy-heavy-${{ matrix.target.name }}.sarif"
-          try:
-              data = json.load(open(path))
-          except (OSError, json.JSONDecodeError) as exc:
-              print(f"SARIF parse failed: {exc}; treating as no findings.")
-              sys.exit(0)
-          runs = data.get("runs", [])
-          critical = 0
-          for run in runs:
-              for r in run.get("results", []):
-                  for tag in r.get("properties", {}).get("tags", []):
-                      if isinstance(tag, str) and tag.upper() == "CRITICAL":
-                          critical += 1
-                          break
-          if critical:
-              print(f"CRITICAL findings: {critical} — failing.")
-              sys.exit(1)
-          print("No CRITICAL findings — pass.")
-          PY
+        # light matrix と同一 script を共有 (旧 inline heredoc の重複を解消)。
+        run: python3 scripts/check_trivy_sarif.py trivy-heavy-${{ matrix.target.name }}.sarif
