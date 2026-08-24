@@ -1300,10 +1300,11 @@ def load_weights_only_checkpoint(checkpoint_path: str, model) -> tuple[list, lis
     # This poses a security risk - only load trusted checkpoints
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     state_dict = checkpoint["state_dict"]
-    if _is_legacy_hifigan_checkpoint(state_dict):
-        raise RuntimeError(_LEGACY_HIFIGAN_MESSAGE.format(path=str(checkpoint_path)))
-    remapped_sd = remap_weight_norm_keys(state_dict, model.state_dict())
-    missing, unexpected = model.load_state_dict(remapped_sd, strict=False)
+    # Rejects HiFi-GAN checkpoints and migrates pre-FiLM decoders (issue #616).
+    normalized_sd, _ = normalize_checkpoint_state_dict(
+        state_dict, model.state_dict(), checkpoint_path=checkpoint_path
+    )
+    missing, unexpected = model.load_state_dict(normalized_sd, strict=False)
     _LOGGER.info(
         "Warm-restart weights loaded (strict=False): missing=%d (fresh-init kept), "
         "unexpected=%d (dropped)",
