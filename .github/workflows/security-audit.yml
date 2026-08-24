@@ -173,6 +173,13 @@ jobs:
             --strict --vulnerability-service osv \
             --ignore-vuln GHSA-p4gq-832x-fm9v
       - name: Audit src/python_run
+        # 直前の `Audit root requirements` が失敗しても必ず実行する。 GitHub
+        # Actions は step 失敗時に後続 step を既定で skip するため、 これが無いと
+        # root 側が 1 件でも advisory を報告した瞬間、 **配布 wheel を監査する
+        # 本 step が丸ごと実行されなくなる** (dev push / schedule では
+        # `continue-on-error` が false になるので実際に skip される)。 監査対象の
+        # 独立性を保つため、 cancel 以外では両 step を常に評価する。
+        if: ${{ !cancelled() }}
         # 引数なし `pip-audit --strict` は working-directory に依存せず runner の
         # グローバル Python 環境を audit してしまい、プリインストール pip 自体の
         # CVE で fail する (PR #447 後の push run で CVE-2026-3219 / CVE-2026-6357
