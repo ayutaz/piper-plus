@@ -238,3 +238,21 @@ python -m piper_train.tools.eval_zs_secs \
 - 比較の定義変更 (帯域・正規化基準・格子定義) は事前登録を無効化する — 変更する
   場合は新指標として別名で登録し直すこと (goalpost moving の禁止、
   pre-commit `test-threshold-relaxation` gate と同思想)。
+
+## 7. 明瞭度 (CER) — v11b で追加 (2026-08-25 事前登録)
+
+**背景 (v11 の盲点)**: SECS / comb-HNR / seen-ID は「発話として読めているか」
+を測らない。v11 ep9/19 は指標上は良好 (comb-HNR 14.6dB = GT 超え) だが
+日本語として聞き取れなかった (ユーザー聴感確認、学習量不足)。
+
+- **ツール**: `piper_train.tools.eval_cer` (ASR = transformers
+  `openai/whisper-small`、追加依存なし)。CER = NFKC 正規化 +
+  句読点/空白除去後の文字編集距離 / 参照長
+- **統計は median** — whisper は不明瞭音声で幻覚繰り返しを起こし
+  mean が桁で膨張する (較正実測: v11 ep9 の mean 7.3 vs median 1.4)
+- **較正 anchor (whisper-small、つくよみ参照合成 3 文、median)**:
+  明瞭 (v10b ep79) **0.095** / 不明瞭 (v11 ep9/ep19) **1.43 / 1.26**
+- **gate (v11b)**: **CER median ≤ 0.30** (参照合成 ≥3 文、文セットは
+  manifest に pin)。早期 epoch は未成熟で当然 fail するため abort 条件では
+  なく **ep40 以降の昇格 gate**。ASR モデル・文セット・正規化規則の変更は
+  事前登録を無効化する (§6 と同じ goalpost moving 禁止)
