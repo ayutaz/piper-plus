@@ -120,11 +120,29 @@ N 択識別 top-1 を raw / centered (両クラウド平均除去) で分離し�
 v10a-r2 ep69 raw 43%・centered 73%。**go/no-go には使わない** (判定は上の
 4 点セット)。学習 loss への流用は恒久禁止。
 
+### 3.8 明瞭度 CER (v11b 以降は必須、契約 §7)
+
+`piper_train.tools.eval_cer` (ASR = transformers whisper-small、追加依存なし)。
+**v11 の盲点**: SECS / comb-HNR / seen-ID はどれも「発話として読めているか」
+を測らず、日本語として聞き取れないモデル (v11 ep9/19) が指標上は良好に見えた。
+
+```bash
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.tools.eval_cer \
+  --clips-dir <synth_dir> --texts <texts.tsv> --json-out <out.json>
+```
+
+- **統計は median** (whisper は不明瞭音声で幻覚繰り返しを起こし mean が桁で
+  膨張する — 実測: v11 ep9 mean 7.3 vs median 1.4)
+- 較正 anchor: 明瞭 (v10b ep79) **0.095** / 不明瞭 (v11 ep9/19) **1.26-1.43**
+- gate: **median ≤ 0.30** (ep40 以降の昇格判定。早期 ep は未成熟で当然 fail
+  するため abort 条件にしない)。ASR モデル・文セット・正規化の変更は
+  事前登録を無効化する
+
 ### 4. 報告フォーマット
 
 結果は必ず「**normalized_transfer (headline)** / cross-utt SECS / encoder2 /
-gap / 帯域・コム / 聴感」を併記し、baseline 比較なら goodhart_flag と
-above_ceiling_flag の値を明記する。
+gap / 帯域・コム / **CER (明瞭度)** / 聴感」を併記し、baseline 比較なら
+goodhart_flag と above_ceiling_flag の値を明記する。
 
 ## 再発防止の多層ガード (本 skill 以外)
 
