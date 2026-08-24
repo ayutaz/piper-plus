@@ -463,7 +463,7 @@ class TestOnnxExport:
         text, lengths, scales, emb = _onnx_inputs()
         torch.onnx.export(
             model=model,
-            args=(text, lengths, scales, None, None, None, emb),
+            args=(text, lengths, scales, emb),
             f=str(path),
             opset_version=15,
             input_names=["input", "input_lengths", "scales", "speaker_embedding"],
@@ -509,7 +509,7 @@ class TestOnnxExport:
         model, path = exported
         text, lengths, scales, emb = _onnx_inputs()
         with torch.no_grad():
-            torch_out, _ = model(text, lengths, scales, None, None, None, emb)
+            torch_out, _ = model(text, lengths, scales, emb)
         sess = onnxruntime.InferenceSession(
             str(path), providers=["CPUExecutionProvider"]
         )
