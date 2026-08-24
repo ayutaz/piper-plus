@@ -185,7 +185,10 @@ echo "PID: $!"
 
 ## 📦 v8 → v8.1 → v9 zero-shot 学習 (`feat/zero-shot-v8-dataset-scaling`)
 
-> **最新状態 (2026-08-12): v9 (がびがび根治版) が完走し、聴感でノイズ解消を確認済み。**
+> **最新状態 (2026-08-25): v11 (carrier head 構造保証) は R3 安全装置により ep29/80 で正規停止 — 調波構造の技術検証成功 (comb-HNR 14.6dB = GT 超え、v10b 4.6)、実用は学習量不足で不成立。次は v11b (ramp 修正 + CER gate + export 修理)。**
+>
+> - **v11 最終結論 (2026-08-25)**: [zero-shot-v11-roadmap.md §5](docs/design/zero-shot-v11-roadmap.md) が canonical。要点: ①carrier head で がびがび残存成分 (A3) の構造保証を実証、②ep19→25 で敵対 ramp による dual-encoder 乖離崩壊 (encoder 騙し 6 例目) → R3 が正規停止、③**ONNX export が carrier head を壊す 2 バグ未修理 (EMA 有害 + trace 崩壊) — v11 系 ONNX 配布不可**、④評価系に明瞭度 (CER) が無い盲点 → v11b gate に追加。成果物: HF `checkpoints-v11/` + `v11-results/`、ログ/TB はローカル `piper-v11-local/box-evac/`
+> - v9 (がびがび根治版) 完走・聴感確認済み (2026-08-12) — ただし v10b ep79 でも A3 (調波間ノイズ) は聴感残存 (2026-08-25 ユーザー確認)、根治は v11 系の完走待ち
 > 系譜: v8 (7-lang スケール、SECS 0.649 / がびがび有り) → v8.1 (微分可能 SCL InfoNCE + WavLM で SECS 0.712 / UTMOS 改善、がびがび残存) → **v9 (PQMF canonical 修正 + MRD + full-band STFT + データゲートで from scratch 50ep、4-9kHz 非構造ノイズ -5〜-10dB + 倍音構造獲得、がびがび解消)**。
 >
 > - **がびがびの根本原因** (PQMF 変調位相項欠落 → 学習ターゲット汚染 + データ高域ノイズ床): [`docs/design/zero-shot-noise-root-cause-pqmf.md`](docs/design/zero-shot-noise-root-cause-pqmf.md) が canonical (プロセス考古学 §4: 受け入れ基準 -90dB→5dB の goalpost moving が 15 ヶ月バグを制度化 → pre-commit gate `test-threshold-relaxation` で再発防止)
