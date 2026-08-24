@@ -127,6 +127,13 @@ jobs:
       - uses: actions/setup-python@v6.2.0
         with:
           python-version: "3.13"
+      # `Audit root requirements` の `uv pip compile` に必須。 ubuntu-24.04 の
+      # runner image に uv は同梱されておらず、 この step が無いと
+      # command-not-found → 空の requirements → pip-audit が 0 件を audit して
+      # 緑になる (silent false-negative)。 pin は他 workflow と同じ v6.8.0。
+      # `with: python-version:` は付けない (uv が独自に interpreter を用意して
+      # 上の setup-python と二重化するため。 PATH 上の 3.13 を拾わせる)。
+      - uses: astral-sh/setup-uv@v6.8.0
       - name: Install pip-audit
         run: pip install pip-audit
       - name: Audit root requirements
@@ -144,9 +151,26 @@ jobs:
         #     tracking: #588
         continue-on-error: ${{ github.event_name == 'pull_request' }}
         run: |
-          pip-audit --requirement <(uv pip compile pyproject.toml 2>/dev/null) --strict --vulnerability-service osv \
-            --ignore-vuln GHSA-p4gq-832x-fm9v || \
-          pip-audit --strict --vulnerability-service osv \
+          # workspace member (piper-train / piper-plus / piper-plus-g2p) は
+          # `-e file:///...` として emit され pip-audit が版を決定できないため、
+          # `--no-emit-package` で除外し外部依存だけを audit 対象にする。
+          # process substitution ではなく実ファイルに落とすのは、 `<(...)` だと
+          # uv の失敗が空入力に化けて「0 件 audit で緑」になるため
+          # (default shell は `bash -e` なので実ファイル経路なら step が止まる)。
+          uv pip compile pyproject.toml \
+            --no-emit-package piper-train \
+            --no-emit-package piper-plus \
+            --no-emit-package piper-plus-g2p \
+            -o "${RUNNER_TEMP}/root-requirements.txt"
+          # `--disable-pip --no-deps` は必須 (省略可能な最適化ではない)。
+          # compile 出力は `torch==2.11.0+cu128` のような local version を含む
+          # 一方、 per-package index (`[tool.uv.sources]` の pytorch-cu128) は
+          # requirements.txt 形式で表現できず emit されない。 pip resolve 経路に
+          # 落とすと PyPI からこの版を解決できず hard fail する。 出力は全て
+          # `==` の完全解決済みクロージャなので再解決自体が不要。
+          pip-audit --requirement "${RUNNER_TEMP}/root-requirements.txt" \
+            --disable-pip --no-deps \
+            --strict --vulnerability-service osv \
             --ignore-vuln GHSA-p4gq-832x-fm9v
       - name: Audit src/python_run
         # 引数なし `pip-audit --strict` は working-directory に依存せず runner の
@@ -158,8 +182,12 @@ jobs:
         # `--ignore-vuln` 一覧は root 側 step のコメントブロックが single source。
         continue-on-error: ${{ github.event_name == 'pull_request' }}
         working-directory: src/python_run
-        run: pip-audit --strict --vulnerability-service osv --requirement requirements.txt \
-          --ignore-vuln GHSA-p4gq-832x-fm9v
+        # NOTE: requirements.txt は floor (`>=`) 指定なので root 側 step の
+        # `--disable-pip --no-deps` は使えない (pip-audit が "not pinned to an
+        # exact version" で fail する)。 pip resolve 経路のままにすること。
+        run: |
+          pip-audit --strict --vulnerability-service osv --requirement requirements.txt \
+            --ignore-vuln GHSA-p4gq-832x-fm9v
 
   # Rust: cargo-audit
   # fail-on-severity 統一 (High 以上): cargo-audit はデフォルトで vulnerability
