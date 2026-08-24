@@ -37,6 +37,10 @@ $10-50 の実害** — 手順の省略は費用に直結する。
 - 短い bench (25 batch) は cold 窓しか見えない — bench 同士の比較は可、
   定常の絶対値の見積もりには使えない
 - 再起動 (resume 含む) のたびにキャッシュは消える — resume 直後の遅さは正常
+- **epoch 時間は ckpt の mtime 差で測る** (`ls --time-style` で 2 epoch ごとの
+  保存間隔を見る)。step ログの部分窓から外挿すると warmup/eval 並走が混ざって
+  誤る — v11 で「15min/epoch」と誤測し (実際 22min)、完走見積が 40% ずれて
+  ユーザーへの予算報告を 2 度訂正した実測あり
 
 ## 1. レンタル
 
@@ -108,8 +112,18 @@ vastai create instance <id> --image nvidia/cuda:12.8.1-devel-ubuntu24.04 --disk 
    遅延発火して勝手に課金が再開する** (実測 ~$50)。不要になったら明示的に
    stop/destroy して台帳確認
 3. destroy は不可逆 — 先に **退避チェックリスト**: ckpt (HF) / 評価 JSON (HF) /
-   較正・smoke レポート (HF) / 実行スクリプト (HF) / 聴感 wav (ローカル)。
-   destroy は `echo y | vastai destroy instance <id>` (確認プロンプトあり)
+   較正・smoke レポート (HF) / 実行スクリプト (HF) / 聴感 wav (ローカル) /
+   **全運用ログ + TensorBoard events (`tar czf` で 1 ファイルに)** — ログ/TB は
+   run の事後解析 (崩壊の損失曲線等) に必要で、HF 自動退避の対象外
+4. **退避は instance が running のうちに済ませてから stop する** (2026-08-25
+   実測): stopped box からの `vastai copy` はホスト側 rsync モジュール未公開で
+   不成立、再 start は GPU 枠が埋まっていると queued のまま数十分〜不定に
+   待たされる。stop してから「あれも要る」に気づくと高くつく
+5. queued start を待つ場合は「発火 → 退避 → destroy」を自動化した watcher を
+   ローカル背景 Bash で仕込む (退避失敗時は destroy せず stop に戻す分岐必須)。
+   放置された queued start は幽霊起動 (#6) と同じ課金リスク
+6. destroy は `echo y | vastai destroy instance <id>` (確認プロンプトあり)。
+   実行後に `vastai show instances` で一覧から消えたことを確認
 4. 作業の節目 (フェーズ完了・失敗で停止した時) には**全 instance の一覧**を
    確認する — 自分のセッション外の instance には触らない
 

@@ -46,6 +46,13 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
     "$CKPT_PATH" "$OUTPUT_ONNX"
 ```
 
+> **EMA の適用判断 (v11 実測、2026-08-25)**: EMA は**収束済み run でのみ**
+> default 適用する。早期打ち切り・未収束 ckpt では EMA shadow が raw weights
+> より大幅に劣化する (v11 ep9 torch A/B: raw 14.9dB vs EMA 6.2dB — decay lag
+> + 崩壊汚染)。打ち切り ckpt や途中 epoch を export する場合は **`--no-ema`
+> を付け、迷ったら EMA 有無の両方を export して フェーズ 3.5 の帯域検査 +
+> comb-HNR で良い方を採る**。
+
 出力後の verification:
 
 ```bash
@@ -91,6 +98,11 @@ ls -la /tmp/sanity/*.wav
    別話者 floor (近い声質の別話者) も測って相対位置を示す。2026-08-12 事例:
    same-utt 0.775 (見かけ好成績) → cross-utt 0.73 で別話者 floor すれすれ =
    聴感「似ていない」と一致 (`zero-shot-v8-dataset-scaling-plan.md` §3.19)。
+5. **明瞭度 CER** (v11 教訓、2026-08-25): SECS / comb-HNR / seen-ID は
+   「発話として読めているか」に全盲 — 聞き取れないモデルが指標上良好に
+   見えた実測あり。合成 wav に `piper_train.tools.eval_cer` を掛け、
+   **CER median ≤ 0.30** (whisper-small、契約 `zs-eval-contract.md` §7) を
+   確認する。統計は median (whisper は不明瞭音声で幻覚繰り返し → mean 膨張)。
    測定は `piper_train.tools.eval_zs_secs` を **`--require-encoder2`** (第 2 encoder
    必須 gate、未指定 exit 2) + **`--baseline-json <前回 eval JSON>`** (encoder Δ から
    goodhart_flag 自動判定) 付きで実行する (契約: `docs/spec/zs-eval-contract.md`)。
