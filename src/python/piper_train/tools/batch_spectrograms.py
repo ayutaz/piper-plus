@@ -45,20 +45,36 @@ def _load_pt(path_str: str) -> tuple[str, torch.Tensor | None]:
         return (path_str, None)
 
 
-def _save_spec(args: tuple[str, torch.Tensor]) -> None:
-    """Atomically save a spectrogram tensor as .spec.pt in FP16."""
+def _save_spec(args: tuple[str, torch.Tensor]) -> bool:
+    """Atomically save a spectrogram tensor as .spec.pt in FP16.
+
+    Returns True on success, False on failure. Failures are logged as warnings
+    (同じ file 内の ``_load_pt`` と同じ粒度) so that a partially failed run is
+    visible instead of being silently counted as processed.
+    """
     pt_path_str, spec = args
     spec_path = Path(pt_path_str).with_suffix(".spec.pt")
+
+    # mkstemp 自体が失敗する (ENOSPC / EACCES / 親ディレクトリ不在) 場合、
+    # tmp_path は未束縛なので cleanup ブロックの外で処理する。
     try:
         tmp_fd, tmp_path = tempfile.mkstemp(dir=spec_path.parent, suffix=".tmp")
+    except Exception as exc:
+        logger.warning("Failed to create temp file for %s: %s", spec_path, exc)
+        return False
+
+    try:
         os.close(tmp_fd)
         torch.save(spec.half(), tmp_path)
         Path(tmp_path).replace(spec_path)
-    except Exception:
+        return True
+    except Exception as exc:
+        logger.warning("Failed to save %s: %s", spec_path, exc)
         try:
             Path(tmp_path).unlink()
         except OSError:
             pass
+        return False
 
 
 def _scan_pending(cache_dir: str) -> list[str]:
@@ -189,9 +205,13 @@ def run(
         # Save spectrograms in parallel
         save_args = list(zip(paths, specs, strict=False))
         with ThreadPoolExecutor(max_workers=io_workers) as io_pool:
-            list(io_pool.map(_save_spec, save_args))
+            saved = list(io_pool.map(_save_spec, save_args))
 
-        processed += len(valid)
+        # 保存に失敗したファイルは processed ではなく skipped に計上する
+        # (書けていないのに processed=N と報告する overcount を防ぐ)。
+        saved_ok = sum(saved)
+        processed += saved_ok
+        skipped += len(valid) - saved_ok
 
     pbar.close()
     logger.info("Done. processed=%d  skipped=%d", processed, skipped)
