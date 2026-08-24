@@ -134,6 +134,41 @@ case "$CMD" in
     deny "pkill と nohup 起動を同一コマンドに連結しています。pkill -f のパターンが同一コマンドライン内の起動対象 (nohup bash <script> 等) に自己マッチして ssh ごと死ぬ既知事故 (3 回実測) の型です。kill と起動を別々の Bash/ssh 呼び出しに分けてください。" ;;
 esac
 
+# --- pkill -f 自己マッチの一般形検知 (2026-08-25、計 6 回目の実測で拡大) ----
+# `pkill -f <pattern>` の <pattern> がコマンド文字列の他の場所にも現れる場合、
+# bash -c / ssh のリモートシェル自身のコマンドラインにマッチして自分ごと死ぬ
+# (例: `pkill -f self_stop_watcher; pgrep self_stop_watcher` /
+#  `pkill -f 'rsync --server'` を含む検証コマンド)。対策: pgrep で PID を
+# 取って kill する (`for p in $(pgrep -f X); do ...` は pgrep 自身を含まない)
+# か、パターンをコマンド内で 1 回しか書かない。
+case "$CMD" in
+  *"<<"*|*test-guard-bash*|*"git commit"*|*"git add"*) : ;;
+  *pkill*)
+    PKILL_PAT=$(printf '%s' "$CMD" | sed -nE "s/.*pkill[[:space:]]+(-[a-zA-Z]+[[:space:]]+)*-f[[:space:]]+'([^']+)'.*/\2/p; s/.*pkill[[:space:]]+(-[a-zA-Z]+[[:space:]]+)*-f[[:space:]]+\"([^\"]+)\".*/\2/p; s/.*pkill[[:space:]]+(-[a-zA-Z]+[[:space:]]+)*-f[[:space:]]+([^;|&[:space:]]+).*/\2/p" | head -1)
+    if [ -n "$PKILL_PAT" ]; then
+      # pkill 呼び出し自身を除いた残りの文字列にパターンが再出現するか
+      REST=$(printf '%s' "$CMD" | sed "s/pkill[^;|&]*//")
+      case "$REST" in
+        *"$PKILL_PAT"*)
+          deny "pkill -f のパターン '$PKILL_PAT' が同一コマンド内の別の場所にも出現しています。リモート/ローカルシェル自身のコマンドラインに自己マッチして無言死する既知事故 (6 回実測) の型です。PID 指定 kill (for p in \$(pgrep -f X); do kill \$p; done) に変えるか、パターンの再出現を無くしてください。" ;;
+      esac
+    fi ;;
+esac
+
+# --- ~/.ssh 秘密鍵の無バックアップ上書き防止 (2026-08-24 実測事故) ----------
+# WSL の既存 ~/.ssh/id_ed25519 (別用途の鍵) を cp で上書きし、鍵ペアを復元
+# 不能にした。秘密鍵ファイル (.pub 以外の id_*) への cp/mv/リダイレクトは、
+# no-clobber (-n) か事前バックアップなしでは行わない。
+case "$CMD" in
+  *"cp -n"*|*"mv -n"*|*".bak"*|*test-guard-bash*|*"<<"*) : ;;
+  *"cp "*".ssh/id_"*|*"mv "*".ssh/id_"*|*"> "*".ssh/id_"*)
+    case "$CMD" in
+      *".ssh/id_"*".pub"*) : ;;  # 公開鍵は再生成可能なので対象外
+      *)
+        deny "~/.ssh の秘密鍵 (id_*) への上書きコピーです。既存の別用途鍵を破壊した実測事故 (2026-08-24、復元不能) があります。cp -n (no-clobber) を使うか、先に 'cp <鍵> <鍵>.bak' でバックアップしてから実行してください。" ;;
+    esac ;;
+esac
+
 # --- PR 作成は /create-pr skill 経由を強制 -------------------------------
 # `gh pr create` を直接実行すると /create-pr skill のフェーズ 6.2 で発動する
 # `/watch-pr` auto-chain が走らず、 CI 監視が起動しない (PR #498 で発覚)。

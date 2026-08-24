@@ -897,6 +897,20 @@ repos:
         files: ^src/python/tests/test_(scl_differentiable|v10_structure|v10_speaker_signal|eval_zs_secs|measure_comb_artifacts|measure_prosody|measure_band_noise|adv_spk_classifier|jcu_mrd)\.py$|^src/python/piper_train/tools/(eval_zs_secs|measure_band_noise|measure_comb_artifacts|measure_comb_hnr|measure_prosody|acoustic_frames|eval_seen_speaker_id)\.py$|^src/python/piper_train/vits/losses\.py$|^docs/spec/zs-eval-contract\.md$|^\.claude/hooks/guard-bash\.sh$|^scripts/check_zs_(prevention_tests|metric_isolation)\.py$
         pass_filenames: false
 
+      # export 経路一本化 gate (2026-08-25 v11 事故): export_onnx.main() の
+      # infer 手書き複製が v11 P2 (enc_p の g_spk/AdaLN) に追従できず、ONNX
+      # だけ話者条件が断線して担体の調波が崩壊した。main() は
+      # build_infer_forward (models.infer の wrapper) 一本に固定し、複製の
+      # 再導入 (infer 内部ヘルパーの直呼び) を text-only で block する。
+      # 同型の pytest (torch 必須) は
+      # tests/test_f0_export_onnx.py::test_production_export_path_uses_build_infer_forward
+      - id: export-path-unification
+        name: export_onnx.main() uses build_infer_forward (no infer copy)
+        entry: python scripts/check_export_path_unification.py
+        language: system
+        files: ^src/python/piper_train/export_onnx\.py$|^scripts/check_export_path_unification\.py$
+        pass_filenames: false
+
       # 教訓① (評価器の目的化 = 検出器の喪失) の機械的強制。学習コード
       # (piper_train/vits/ + __main__.py) から評価メトリクスモジュール
       # (measure_band_noise / measure_comb_artifacts / measure_prosody /
