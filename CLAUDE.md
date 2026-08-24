@@ -8,7 +8,7 @@ VITS ベースの高品質ニューラル TTS。**6言語マルチリンガル�
 
 ## Research / archive and publication pointers
 
-研究用の v7 zero-shot 学習結果と手順は、重複した agent context ではなく次の文書を正本とします。
+現在の研究ブランチは `feat/zero-shot-v8-dataset-scaling` です。研究用の v7 zero-shot 学習結果と手順は、次の文書を正本とします。
 
 - [v7 学習結果・根本原因](docs/design/multi-6lang-zero-shot-v7-training-results.md) — epoch 32、6言語、571話者、研究上の修正と評価。
 - [zero-shot handoff](docs/handoff/zero-shot-tts-handoff-2026-06-20.md) — private/gated 研究保存先、旧 `/data/piper` パス、再現・再開手順。
@@ -25,20 +25,23 @@ VITS ベースの高品質ニューラル TTS。**6言語マルチリンガル�
 
 > **最新状態 (2026-08-25): v11 (carrier head 構造保証) は R3 安全装置により ep29/80 で正規停止 — 調波構造の技術検証成功 (comb-HNR 14.6dB = GT 超え、v10b 4.6)、実用は学習量不足で不成立。次は v11b (ramp 修正 + CER gate + export 修理)。**
 >
-> - **v11 最終結論 (2026-08-25)**: [zero-shot-v11-roadmap.md §5](docs/design/zero-shot-v11-roadmap.md) が canonical。要点: ①carrier head で がびがび残存成分 (A3) の構造保証を実証、②ep19→25 で敵対 ramp による dual-encoder 乖離崩壊 (encoder 騙し 6 例目) → R3 が正規停止、③ONNX export の 2 バグは**修理完了 (2026-08-25)**: `--no-ema` フラグ (67adc5f7) + main() の infer 手書き複製を build_infer_forward に一本化 (84e5fe4e、AdaLN g_spk 断線の根治、FP16 export で 14.4dB 回復実測)、④評価系に明瞭度 (CER) が無い盲点 → v11b gate に追加。成果物: HF `checkpoints-v11/` + `v11-results/`、ログ/TB はローカル `piper-v11-local/box-evac/`
+> - **v11 最終結論 (2026-08-25)**: [zero-shot-v11-roadmap.md §5](docs/design/zero-shot-v11-roadmap.md) が canonical。要点: ①carrier head で がびがび残存成分 (A3) の構造保証を実証、②ep19→25 で敵対 ramp による dual-encoder 乖離崩壊 (encoder 騙し 6 例目) → R3 が正規停止、③ONNX export の 2 バグは**修理完了 (2026-08-25)**: `--no-ema` フラグ (a12609b1) + main() の infer 手書き複製を build_infer_forward に一本化 (ca76d6ea、AdaLN g_spk 断線の根治、FP16 export で 14.4dB 回復実測)、④評価系の明瞭度盲点は**解消済み** — `piper_train.tools.eval_cer` 実装 (ca12027e) + gate 事前登録 (契約 §7、median ≤ 0.30 / ep40+ 昇格判定。較正: 明瞭 v10b ep79 = 0.095 vs 不明瞭 v11 ep9 = 1.43)。成果物: HF `checkpoints-v11/` + `v11-results/`、ログ/TB はローカル `piper-v11-local/box-evac/`
+> - **dev リベース (2026-08-25)**: `origin/dev` を取り込み。#616 (Multi-scale FiLM 導入前 ckpt の自動移行) + #619 (py3.13 pathlib ckpt 読み込み) が入り、ckpt state_dict 正規化は `normalize_checkpoint_state_dict` に一本化 (073062b1 で `--resume-weights-only` 経路も追従)。v7 時代に本ブランチ独自だった FiLM 復活パッチは upstream 化された。**リベースにより本 doc 内の pre-rebase コミットハッシュは非到達** (ローカル `backup/pre-rebase-dev-20260825` に退避済み)
 > - v9 (がびがび根治版) 完走・聴感確認済み (2026-08-12) — ただし v10b ep79 でも A3 (調波間ノイズ) は聴感残存 (2026-08-25 ユーザー確認)、根治は v11 系の完走待ち
 > 系譜: v8 (7-lang スケール、SECS 0.649 / がびがび有り) → v8.1 (微分可能 SCL InfoNCE + WavLM で SECS 0.712 / UTMOS 改善、がびがび残存) → **v9 (PQMF canonical 修正 + MRD + full-band STFT + データゲートで from scratch 50ep、4-9kHz 非構造ノイズ -5〜-10dB + 倍音構造獲得、がびがび解消)**。
 >
 > - **がびがびの根本原因** (PQMF 変調位相項欠落 → 学習ターゲット汚染 + データ高域ノイズ床): [`docs/design/zero-shot-noise-root-cause-pqmf.md`](docs/design/zero-shot-noise-root-cause-pqmf.md) が canonical (プロセス考古学 §4: 受け入れ基準 -90dB→5dB の goalpost moving が 15 ヶ月バグを制度化 → pre-commit gate `test-threshold-relaxation` で再発防止)
-> - **v9 データ**: 案 Z ゲート (Zeroth 全除外 + hi_ratio/fmax999) で 6 言語 300,443 utts / ~3.7k spk。**ko は除外** (Zeroth が fmax 中央値 3.0kHz の強ローパス + language-balanced sampling は最小言語が epoch サイズを決めるため 356 utts では学習不能) — v10 で高品質 ko データ調達後に復活予定
+> - **v9 データ**: 案 Z ゲート (Zeroth 全除外 + hi_ratio/fmax999) で 6 言語 300,443 utts / ~3.7k spk。**ko は除外** (Zeroth が fmax 中央値 3.0kHz の強ローパス + language-balanced sampling は最小言語が epoch サイズを決めるため 356 utts では学習不能) — v10/v11 でも未投入のまま、復活は Emilia 投入判断と併せ v11b 以降で判断
 > - **残課題**: zs_ja SECS 0.652 (v8.1 0.712 から -0.06) / 韻律 (強弱) の平板さ (v8 系から持ち越し、noise_scale 引き上げ検証中 + v10 で本格対応)
 > - **OOD 参照 zero-shot の実力 (2026-08-12 実測)**: つくよみ参照で cross-utt SECS 0.73 (ceiling 0.888 / ja 女性 floor ~0.7 すれすれ) = 聴感「似ない」。EMA/FP16/ONNX export は 4-way A/B で無罪確定。**SECS は cross-utterance でしか測らない** (same-utt は SCL Goodhart で膨張、0.775 と誤報した事例あり)。特定話者を確実に似せる用途は FT が正道。canonical: [docs/design/zero-shot-speaker-similarity-root-cause.md](docs/design/zero-shot-speaker-similarity-root-cause.md)
-> - **Phase 0/1 診断完了 (2026-08-14)**: v9 ep49 からの warm restart 計 7 介入 (LR/c_spk/c_mrd/σ の係数 4 arm + SCL cross-utt 正例化 B-1 + posterior z detach B-3 + dose 増 24ep) が**全て事前登録閾値未達 → warm restart では転写能力を回収できないことを確定**。Arm B (c_spk 2.0) の CAM++↑/ECAPA→ が「SCL same-utt 正例 = Goodhart」の直接証拠。B-1/B-3 は実装済み (`--spk-loss-positives cross_utt` / `--scl-detach-z`、default off) で機構として動作確認済み (gap 縮小 + OOD つくよみ両 encoder 同調 +0.03) — **v10 from-scratch レシピに組込予定**。実行計画・全数値: [docs/design/zero-shot-v10-roadmap.md](docs/design/zero-shot-v10-roadmap.md)、生データ: HF `diag-phase0/` + `diag-phase1/`
+> - **Phase 0/1 診断完了 (2026-08-14)**: v9 ep49 からの warm restart 計 7 介入 (LR/c_spk/c_mrd/σ の係数 4 arm + SCL cross-utt 正例化 B-1 + posterior z detach B-3 + dose 増 24ep) が**全て事前登録閾値未達 → warm restart では転写能力を回収できないことを確定**。Arm B (c_spk 2.0) の CAM++↑/ECAPA→ が「SCL same-utt 正例 = Goodhart」の直接証拠。B-1/B-3 は実装済み (`--spk-loss-positives cross_utt` / `--scl-detach-z`、default off) で機構として動作確認済み (gap 縮小 + OOD つくよみ両 encoder 同調 +0.03) — **v10 from-scratch レシピに組込済み (v10a は cross-utt SupCon で完走)**。実行計画・全数値: [docs/design/zero-shot-v10-roadmap.md](docs/design/zero-shot-v10-roadmap.md)、生データ: HF `diag-phase0/` + `diag-phase1/`
 > - **v10a 完走 (2026-08-16)**: v9 同一データ + 配線修正 (M1-M3) + cross-utt SupCon で 80ep。**OOD (つくよみ) 0.753/0.634 = v9 比 +0.03 両 encoder 同調 + 帯域 -2.9dB 改善、in-domain は v9 同等 (0.60 plateau、0.70 未達)**。swap-SCL (cosine 版) は ep28-33 で prior 経路を崩壊させ切除 — **固定 encoder のスコアを学習目標にすると、モデルは実際に似せるのではなく encoder を騙す方向に逸れる (グッドハートの法則)。今回で 3 例目** (識別器形式 R2 で v10b 再挑戦)。推奨 ckpt: HF `checkpoints-v10a-r2/epoch=69` (dual-encoder 最良)。全記録: [design doc §9-11](docs/design/zero-shot-v10-design.md)
 > - **v10 実装ランディング (2026-08-14、TDD)**: 設計 doc [docs/design/zero-shot-v10-design.md](docs/design/zero-shot-v10-design.md) の 2a を実装。学習系 (全て opt-in、default は v9 挙動維持): `--speaker-cond-layer` (M2 enc_p 層内注入) / `--dp-spk-head` (M3 DP 話者勾配 + spk_proj_dp) / `--use-snac-flow` (M1+E2 SNAC flow、logdet→KL 配線 + 可逆性テスト付) / `--film-init-std` (E1) / `--c-swap-spk` 系 (S1 swap-SCL、同一言語・異話者 derangement) / `--spk-loss-gather` (勾配が通る DDP all_gather) / `--spk-loss-temperature` / `--latent-filling-tau` (LF)。**breaking: `--spk-emb-noise-sigma` default 0.05→0.0** (F7 破壊的 noise の default 除去、v9 スクリプトは明示指定のため再現性維持)。評価系: `eval_zs_secs` に goodhart_flag 自動判定 (`--baseline-json`) + `--require-encoder2`、契約は [docs/spec/zs-eval-contract.md](docs/spec/zs-eval-contract.md)。DINO は c_dino>0 で退化警告 (v10 は 0 推奨)
 > - 成果物 (HF `ayousanz/piper-plus-zero-shot-multi-7lang-v8`): `checkpoints-v9/` + `onnx/v9-zs-ep49.onnx` + `v9-data/` (ゲート済み jsonl + 帯域 metrics) + 各評価 JSON。聴感サンプル: ローカル `piper-v8-dataset-backup/v9_listen_samples/`
 
 ### (履歴) v8 準備時点の記録 (2026-08-02)
+
+> ✅ 本節は当時の計画のスナップショット。v8 本走以降 v11 まで実走済みで、節内の「本走待ち」「残 TODO」等は全て過去形。commit ハッシュは 2026-08-25 の dev リベースにより非到達 (`backup/pre-rebase-dev-20260825` に退避)。
 
 > KsponSpeech (AI-Hub research-only) は除外確定し、 v8 は public + 商用利用可の open-model として公開する方針 (過去の piper-plus 事前学習モデル同様)。 7-lang 規模: ~3,790 speakers / ~346k utts。 詳細は下記「2026-08-02 更新」。
 
@@ -277,7 +280,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 
 ### G2P 詳細機能 (中国語)
 
-- **ZH-EN 混在ピンイン化** (`chinese.py:phonemize_embedded_english`) — 中国語に隣接する英単語 (acronym/loanword) を米国英語ではなく Mandarin pinyin で発音。`MultilingualPhonemizer` が `[zh,en,zh]`/`[zh,en]`/`[en,zh]` パターンを自動検出してディスパッチ。辞書 (canonical source): `src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json` (acronyms 66 / loanwords 40 / letter_fallback 26 (A-Z))。カスタム上書きは `ChinesePhonemizer(zh_en_loanword_dict_paths=...)`。**全 10 mirror 同期** (Python canonical + Rust 2 crate / Go / C# / WASM / C++ / Kotlin Android / Swift G2P)。CI gate `ZH-EN Loanword Sync Gate / json-sync` が mirror + fixture の byte-for-byte 一致を強制 (`scripts/check_loanword_consistency.py`、`/check-loanword` skill)。Forward-compat loader: 全ランタイムで `schema_version: 2` の未来フィールド受理を pinning。Issue #384, [docs/reference/zh-en-loanword/README.md](docs/reference/zh-en-loanword/README.md)。
+- **ZH-EN 混在ピンイン化** (`chinese.py:phonemize_embedded_english`) — 中国語に隣接する英単語 (acronym/loanword) を米国英語ではなく Mandarin pinyin で発音。`MultilingualPhonemizer` が `[zh,en,zh]`/`[zh,en]`/`[en,zh]` パターンを自動検出してディスパッチ。辞書 (canonical source): `src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json` (acronyms 66 / loanwords 40 / letter_fallback 26 (A-Z))。カスタム上書きは `ChinesePhonemizer(zh_en_loanword_dict_paths=...)`。**全 10 mirror 同期** (Python canonical + Python runtime / Rust 2 crate / Go / C# / WASM / C++ / Kotlin Android / Swift G2P)。CI gate `ZH-EN Loanword Sync Gate / json-sync` が mirror + fixture の byte-for-byte 一致を強制 (`scripts/check_loanword_consistency.py`、`/check-loanword` skill)。Forward-compat loader: 全ランタイムで `schema_version: 2` の未来フィールド受理を pinning。Issue #384, [docs/reference/zh-en-loanword/README.md](docs/reference/zh-en-loanword/README.md)。
 
 ### G2P 詳細機能 (スウェーデン語)
 
@@ -423,7 +426,7 @@ cat test.jsonl | uv run python -m piper_train.infer_onnx --model <model.onnx> --
 | ONNX 変換エラー | `CUDA_VISIBLE_DEVICES=""` で CPU モード |
 | HiFi-GAN ckpt resume 失敗 | v1.12.0 で `Generator` 削除。旧 v1.12/v1.13 系は legacy root の `piper-plus-base/model.ckpt` から再 FT。v2.0 系は、実験用 Zero-Shot/FT base `releases/zs-v1/base.ckpt` (revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1`) を使う。詳細: マイグレーションガイド |
 | DDP で NCCL collective timeout (30 分) | **まず「1 rank だけ死んでいないか」を疑う** — rank の例外死は ALLREDUCE timeout に偽装される。単一 GPU + 同一 config で走らせ素の例外を出す。過去例: .env の CRLF 混入で rank0 の wandb login が例外死 (2026-08) |
-| zero-shot 合成が「がびがび」(5-9kHz ノイズ) | **既知の PQMF エイリアスバグ** (`mb_istft.py` の変調位相項欠落、v9 で修正予定)。single-speaker FT では decoder 補償により無症状。UTMOS/HNR はこのノイズに全盲 — 帯域スペクトル検査 (`/publish-model` フェーズ 3.5) で確認。詳細: [docs/design/zero-shot-noise-root-cause-pqmf.md](docs/design/zero-shot-noise-root-cause-pqmf.md) |
+| zero-shot 合成が「がびがび」(5-9kHz ノイズ) | **v9 で修正済み** (PQMF 変調位相項 `±(-1)^k·π/4` を `mb_istft.py` に実装)。v9 以前の ckpt には残存。**別層の A3 (1-3kHz 調波間ノイズ) は未根治** — v11 carrier head で構造保証を実証済み、実用は v11b 完走待ち。UTMOS/HNR はこのノイズに全盲 — 帯域スペクトル検査 (`/publish-model` フェーズ 3.5) + `piper_train.tools.measure_comb_hnr` で確認。詳細: [PQMF 根本原因](docs/design/zero-shot-noise-root-cause-pqmf.md) / [v10b 残存ノイズ診断](docs/design/zero-shot-v10b-residual-noise-diagnosis.md) |
 
 ---
 
@@ -454,7 +457,8 @@ cat test.jsonl | uv run python -m piper_train.infer_onnx --model <model.onnx> --
 | `/precheck` / `/check-pr-ready` / `/run-tests` | scope 自動判定で local CI equivalent を実行 |
 | `/commit` / `/sync-docs` | コミット前 ドキュメント整合性 + 構造化メッセージ |
 | `/check-loanword` / `/check-pua` / `/check-runtime-parity` / `/check-cross-runtime` / `/check-new-runtime-asset` | cross-runtime 同期検査 |
-| `/add-language <code>` / `/review-language <code>` | 新言語追加と 10 エージェント並列レビュー |
+| `/check-preprocess-env` | 学習前処理 (dataset 構築) 環境の事前検証 (g2p inventory / NLTK data / audio_norm cache 形式 / parquet 依存) |
+| `/add-language <code>` / `/review-language <code>` | 新言語追加と 10 エージェント並列レビュー (skill ではなく `.claude/commands/` の slash command) |
 | `/release-prep` / `/prepare-release` | リリース確認 (read-mostly) と bump 適用案 |
 | `/publish-model` | 学習 ckpt → export + sanity + bench + HF upload chain |
 | `/remote-train-ops` | vast.ai 等リモート GPU instance の学習運用標準手順 (レンタル/デプロイ/監視/停止)。実測 6 事故クラス (無言死/監視不達/pin 不整合/pkill 自己マッチ/遅い box/幽霊起動) の再発防止 |

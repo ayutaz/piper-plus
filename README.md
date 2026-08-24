@@ -83,7 +83,7 @@ Python / Rust / Go / C# / C++ / WASM の 6 ランタイムを `multilingual-test
 - **日本語 TTS** — OpenJTalk統合、韻律情報 (A1/A2/A3)、疑問詞マーカー (#204)、文脈依存「ん」バリアント (#207)
 - **英語 TTS** — v2.0.2 では [g2p-en](https://github.com/Kyubyong/g2p) 由来の G2P を Apache-2.0 の推論コードと Tacotron の MIT 許諾表示付きで同梱しています。外部の `g2p-en` / `Distance` や espeak-ng は不要です。旧 PyPI 2.0.1 の依存定義は変更されません。[移行ガイド](docs/migration/python-g2p-license.md)を参照してください
 - **マルチスピーカー** — 571話者対応 (学習用ベースモデル)、SpeakerBalancedBatchSampler、言語グループ均等サンプリング
-- **カスタム辞書** — 200+技術用語の発音辞書内蔵
+- **カスタム辞書** — JSON (v1/v2) / TSV によるユーザー発音辞書の追加に対応
 - **音素入力** — `[[ phonemes ]]` 記法による直接指定 — [ガイド](docs/features/phoneme-input.md)
 
 ### 学習
@@ -397,9 +397,9 @@ C++ CLI の詳細なコマンドラインオプション、JSON 入力フォー�
 
 Piper を Unity で使用するプラグイン: [github.com/ayutaz/uPiper](https://github.com/ayutaz/uPiper)
 
-- Unity 6000.0.35f1+、Unity.InferenceEngine
-- Windows / macOS (Apple Silicon) / Linux / Android 対応
-- 日本語・英語対応、非同期API、ストリーミング
+- Unity 6000.3.11f1+、Unity.InferenceEngine
+- Windows / macOS (Apple Silicon) / Linux / Android / iOS / WebGL (WebGPU/WebGL2) 対応
+- 7言語対応 (ja/en/zh/es/fr/pt/ko)、非同期API、ストリーミング
 
 ### 音声モデル (Voices)
 
@@ -433,11 +433,10 @@ piper-plus 専用モデル: [zs-v1 Zero-Shot/FT ベース](https://huggingface.c
 
 | カテゴリ | リンク |
 |---|---|
-| 日本語TTS | 日本語音声合成ガイド |
-| 学習 | [学習ガイド](docs/guides/training/training-guide.md) · マルチGPU |
+| 学習 | [学習ガイド](docs/guides/training/training-guide.md) (マルチGPU 含む) |
 | API | [音素マッピング](docs/api-reference/phoneme-mapping.md) · [環境変数](docs/getting-started/environment-variables.md) |
-| 機能 | [WebUI](docs/features/webui.md) · CLI強化 · ストリーミング |
-| セットアップ | クイックスタート (日本語) · [Windows](docs/getting-started/windows-setup.md) · [トラブルシューティング](docs/getting-started/troubleshooting.md) |
+| 機能 | [WebUI](docs/features/webui.md) · [音素タイミング](docs/features/phoneme-timing.md) · [CLI](docs/guides/development/cli-usage.md) |
+| セットアップ | [Windows](docs/getting-started/windows-setup.md) · [トラブルシューティング](docs/getting-started/troubleshooting.md) |
 | Docker | [Docker環境](docker/README.md) |
 | WebAssembly | [技術詳細](src/wasm/openjtalk-web/README.npm.md) |
 

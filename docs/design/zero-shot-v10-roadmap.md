@@ -7,7 +7,9 @@
 > (deep research 最終レポート) /
 > [`zero-shot-speaker-similarity-root-cause.md`](zero-shot-speaker-similarity-root-cause.md)
 > (実測の canonical)。
-> 本書は実行計画と進捗の tracking を担う。各項目のチェックボックスを更新すること。
+> 本書は実行計画と進捗の tracking を担っていた (v10 系は完了 — v10a/v10a-r2/v10b
+> 完走済み)。以後の tracking は [`zero-shot-v11-roadmap.md`](zero-shot-v11-roadmap.md)
+> §5 へ移管。
 
 ## 運用原則 (全フェーズ共通、違反した評価は無効)
 
