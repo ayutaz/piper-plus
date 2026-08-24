@@ -106,3 +106,57 @@ v10b と同じ 2-arm 方式 + 事前登録 gate (harmonic-head §7):
 - 参照系列入力 (契約改定必須、SIM +0.08-0.11【文献】) — v12 枠
 - gol-game (同ドメイン話者スケール) — oracle 診断により優先度低のまま
 - FT ladder (embedding 最適化 / LoRA) — 「確実に似せる」用途の正道、別トラック
+
+## 5. 最終結論 (2026-08-25 確定)
+
+**v11 本走は R3 安全装置 (held-out ECAPA 急落検知) により ep29/80 で正規停止。
+調波構造の技術検証は成功、実用モデルとしては学習量不足で不成立。**
+
+### 実測サマリ
+
+| 指標 | ep9 | ep19 | ep25 | ep29 | gate |
+|---|---|---|---|---|---|
+| comb-HNR (A3) | **14.6** | 12.9 | 7.8 | 3.8 | ≥10 (GT 13.2、v10b 4.6) |
+| つくよみ CAM++/ECAPA | 0.672/**0.458** | **0.697**/0.389 | 0.607/0.148 | 0.605/0.231 | 0.740 |
+| zs_ja CAM++ | 0.484 | 0.498 | 0.561 | 0.531 | 0.662 |
+| seen-ID raw/cent | 8/30% | 30/33% | 22/40% | 17/35% | 追跡 |
+
+- **成功**: carrier head (A′) は合成音の調波性を GT 超え (14.6 vs 13.2dB、
+  v10b 比 +10dB) に到達 — A3 (がびがび残存成分) の構造保証は実証
+- **崩壊**: ep19→25 で ECAPA 急落 (0.389→0.148) + comb-HNR 崩壊 (12.9→7.8)。
+  CAM++ は高いままの dual-encoder 乖離 = 敵対 ramp / SCL 圧による
+  「encoder を騙す」逸脱の 6 例目。R3 が 2 度発動し正しく停止
+  (1 度目を外因死と誤診して blind resume した — remote-train-ops skill §7 参照)
+- **聴感 (2026-08-24/25 ローカル torch 合成、ユーザー確認)**: ep9/ep19 は
+  日本語として聞き取れない (12k-27k step は VITS の明瞭発話獲得 ~100k step の
+  はるか手前)。同一経路で v10b ep79 は「明瞭だが がびがび残存」— つまり
+  明瞭さ (学習量) × ノイズ根治 (carrier head) の両立は v11 系の完走が必要
+
+### 露呈した盲点・バグ (v11b 前に対処)
+
+1. **評価系に明瞭度指標が無い**: SECS / comb-HNR / seen-ID はどれも
+  「読めているか」を測らない → v11b は **ASR ベース CER を gate に追加**
+2. **ONNX export が v11 carrier head を壊す (2 問題、未修理)**:
+   (a) EMA 自動適用が有害 — 早期打ち切り ckpt では EMA が劣化重み
+   (torch A/B: raw 14.9dB vs EMA 6.2dB)。export_onnx に --no-ema が必要。
+   (b) EMA を剥がしても trace 後の ONNX は調波構造が崩壊 (原因未特定)。
+   **修理まで v11 系の ONNX 配布不可** (torch 推論は正常)
+3. 敵対 ramp スケジュール: ep15 の谷 → ep19 回復 → ep19 以降崩壊の経過から、
+  ramp 進行が崩壊の駆動因の第一容疑。v11b では ramp 凍結/減速 + R3 継続
+
+### 成果物の所在
+
+- ckpt (ep1-29 奇数 + last): HF `checkpoints-v11/` / 評価 JSON: `v11-results/`
+- 学習ログ + TensorBoard events (崩壊解析用): ローカル
+  `piper-v11-local/box-evac/box-final-evac.tar.gz` (rotated ep0-25 train log 含む)
+- 聴感 wav: `piper-v11-local/listen_torch/` (torch 直合成のみ有効 —
+  `listen_onnx_BROKEN/` は export バグの証拠品)
+- instance 48459366 は 2026-08-24 14:49 UTC destroy 済み (残高 $76.80)
+
+### v11b への引き継ぎ (次の一手)
+
+1. export 修理 (--no-ema flag + carrier trace バグ、TDD) — v11b 完走前まで
+2. v11b 設計判断: ep19 warm 継続 (60ep ≈ ~$73) vs from-scratch (~$108+)。
+  warm は ep19 が健全である前提 (聴感未成熟だが指標上は崩壊前)。
+  残高 $76.80 では warm がぎりぎり、from-scratch は来月
+3. gate 追加: CER (明瞭度) + R3 継続 + ramp 凍結条件の事前登録
