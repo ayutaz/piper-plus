@@ -93,7 +93,7 @@ def _export(model, path: Path, n_phonemes: int = 12):
     text, lengths, scales, emb = _inputs(n_phonemes)
     torch.onnx.export(
         model=model,
-        args=(text, lengths, scales, None, None, None, emb),
+        args=(text, lengths, scales, emb),
         f=str(path),
         opset_version=OPSET,
         input_names=["input", "input_lengths", "scales", "speaker_embedding"],
@@ -193,7 +193,7 @@ def test_onnx_matches_torch_for_short_and_long_inputs(exported, n_phonemes):
     model, path = exported
     text, lengths, scales, emb = _inputs(n_phonemes)
     with torch.no_grad():
-        torch_out, _ = model(text, lengths, scales, None, None, None, emb)
+        torch_out, _ = model(text, lengths, scales, emb)
     ort_out = _run_ort(path, n_phonemes)
 
     assert ort_out.shape == tuple(torch_out.shape)
@@ -210,45 +210,46 @@ def test_prior_residual_variant_also_exports_and_matches(tmp_path):
 
     text, lengths, scales, emb = _inputs(12)
     with torch.no_grad():
-        torch_out, _ = model(text, lengths, scales, None, None, None, emb)
+        torch_out, _ = model(text, lengths, scales, emb)
     np.testing.assert_allclose(
         _run_ort(path, 12), torch_out.numpy(), atol=2e-4, rtol=0
     )
 
 
-def test_production_export_path_mirrors_the_inference_path():
-    """``export_onnx.main()`` の手書き infer_forward が S-2 を同じ順序で通す。
+def test_production_export_path_uses_build_infer_forward():
+    """``export_onnx.main()`` が ``build_infer_forward`` (models.infer の wrapper) を使う。
 
-    production の export は ``model.infer`` を呼ばず、``main()`` 内に手書きした
-    ``infer_forward`` で graph を組む (歴史的経緯)。従って上の parity テスト
-    (``build_infer_forward`` = ``model.infer`` 経由) だけでは、**実際に配布
-    される graph** に S-2 が入っている保証にならない。2 経路が乖離すると
-    「学習では F0 を使うのに ONNX では使わない」モデルが黙って出荷される。
-
-    ここは構造 (同じ 3 ヘルパーを同じ順序で呼び、``dec`` に f0 を渡す) を
-    固定する。数値 parity は ``model.infer`` 側のテストが担保する。
+    かつて main() は ``model.infer`` を呼ばず手書きの infer_forward 複製で
+    graph を組んでおり、本テストの旧版はその複製が S-2 (F0 経路) を落とさない
+    ことを source 検査で守っていた。しかし v11 P2 (enc_p の g_spk/AdaLN) は
+    検査対象外で複製から漏れ、ONNX だけ話者条件が断線して担体の調波が崩壊
+    した (2026-08 実測)。個別 marker の検査では「守り漏れ」が構造的に残る
+    ため、複製自体を廃止して models.infer へ一本化した。ここではその一本化
+    (= 複製の再導入禁止) を pin する。数値 parity は
+    ``test_build_infer_forward`` の parity テスト群が担保する。
     """
     import inspect
 
     from piper_train import export_onnx as ex
 
     source = inspect.getsource(ex.main)
-    for marker in (
-        'getattr(model_g, "use_f0_path", False)',
+    assert "build_infer_forward(model_g" in source, (
+        "main() が build_infer_forward を使っていない — export graph が "
+        "models.infer と乖離する経路は禁止"
+    )
+    # 複製の再導入を構造的に検出: main() 内での infer 内部ヘルパー直呼びは
+    # 「手書き複製が戻ってきた」シグナル
+    for forbidden in (
         "model_g._predict_f0(",
         "model_g._apply_f0_prior_residual(",
-        "model_g._predicted_f0_hz(",
-        "f0=f0_decoder",
+        "model_g.enc_p(",
+        "model_g.flow(",
+        "model_g.dec(",
     ):
-        assert marker in source, f"export_onnx.main() lost the S-2 step: {marker}"
-
-    # 順序: 予測 → prior 残差 → decoder 注入 (infer と同じ)
-    assert source.index("model_g._predict_f0(") < source.index(
-        "model_g._apply_f0_prior_residual("
-    )
-    assert source.index("model_g._apply_f0_prior_residual(") < source.index(
-        "f0=f0_decoder"
-    )
+        assert forbidden not in source, (
+            f"main() に infer の手書き複製が再導入されている: {forbidden} — "
+            "export 経路は build_infer_forward (models.infer) 一本に固定する"
+        )
 
 
 def _relative_magnitude_spectrum_error(a: np.ndarray, b: np.ndarray) -> float:

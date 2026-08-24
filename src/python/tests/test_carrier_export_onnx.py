@@ -92,7 +92,7 @@ def _export(model, path: Path, n_phonemes: int = 12):
     text, lengths, scales, emb = _inputs(n_phonemes)
     torch.onnx.export(
         model=model,
-        args=(text, lengths, scales, None, None, None, emb),
+        args=(text, lengths, scales, emb),
         f=str(path),
         opset_version=OPSET,
         input_names=["input", "input_lengths", "scales", "speaker_embedding"],
@@ -169,7 +169,7 @@ def test_ort_runs_and_matches_torch_shapes(exported):
     model, path = exported
     text, lengths, scales, emb = _inputs(12)
     with torch.no_grad():
-        torch_out, _ = model(text, lengths, scales, None, None, None, emb)
+        torch_out, _ = model(text, lengths, scales, emb)
     sess = onnxruntime.InferenceSession(str(path), providers=["CPUExecutionProvider"])
     ort_out = sess.run(
         None,

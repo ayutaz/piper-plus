@@ -110,8 +110,8 @@ class TestBuildInferForward:
             f"Expected durations shape (1, {phoneme_length}), got {durations.shape}"
         )
 
-    def test_single_speaker_sid_none(self, mock_vits_model):
-        """Single-speaker model works with sid=None, lid=None."""
+    def test_single_speaker_no_embedding(self, mock_vits_model):
+        """Single-speaker model works with speaker_embedding=None, lid=None."""
         from piper_train.export_onnx import build_infer_forward
 
         fn = build_infer_forward(mock_vits_model, stochastic=False)
@@ -126,7 +126,7 @@ class TestBuildInferForward:
                 text,
                 text_lengths,
                 scales,
-                sid=None,
+                speaker_embedding=None,
                 lid=None,
                 prosody_features=prosody,
             )
@@ -134,8 +134,8 @@ class TestBuildInferForward:
         assert audio.shape[0] == 1
         assert durations.shape[0] == 1
 
-    def test_multi_speaker_with_sid_lid(self, mock_vits_model_multilingual):
-        """Multi-speaker/multilingual model works with explicit sid and lid."""
+    def test_multilingual_with_lid(self, mock_vits_model_multilingual):
+        """Multilingual model works with explicit lid (sid は v1.12 契約で廃止)。"""
         from piper_train.export_onnx import build_infer_forward
 
         model = mock_vits_model_multilingual
@@ -144,7 +144,6 @@ class TestBuildInferForward:
         text = torch.randint(0, 50, (1, 10), dtype=torch.long)
         text_lengths = torch.LongTensor([10])
         scales = torch.FloatTensor([0.4, 1.0, 0.5])
-        sid = torch.LongTensor([0])
         lid = torch.LongTensor([0])
         prosody = torch.zeros(1, 10, 3, dtype=torch.long)
 
@@ -153,7 +152,6 @@ class TestBuildInferForward:
                 text,
                 text_lengths,
                 scales,
-                sid=sid,
                 lid=lid,
                 prosody_features=prosody,
             )
@@ -251,3 +249,84 @@ def test_parity_with_model_infer():
         "Audio output diverged between model.infer() and build_infer_forward(). "
         f"Max diff: {(audio_infer - audio_export).abs().max().item():.6e}"
     )
+
+
+@pytest.mark.unit
+@pytest.mark.training
+def test_export_positional_order_zero_shot_adaln_carrier():
+    """export の位置引数順で build_infer_forward が models.infer と一致する。
+
+    ONNX export の入力順は (text, lengths, scales, speaker_embedding, lid,
+    prosody_features) — speaker_embedding が第 4 位置。v11 実測バグ (2026-08):
+    main() 内の手書き infer_forward 複製が enc_p の g_spk (P2 AdaLN) を
+    落とし、ONNX だけ話者条件が断線して担体の調波が崩壊した。export 経路を
+    build_infer_forward 一本に固定し、export と同じ位置順 + v11 構成
+    (use_adaln_encp + use_f0_path + use_carrier_head) の parity をここで pin する。
+    """
+    from piper_train.export_onnx import build_infer_forward, set_export_mode
+    from piper_train.vits.models import SynthesizerTrn
+
+    torch.manual_seed(1234)
+    model = SynthesizerTrn(
+        n_vocab=60,
+        spec_channels=513,
+        segment_size=32,
+        inter_channels=192,
+        hidden_channels=192,
+        filter_channels=256,
+        n_heads=2,
+        n_layers=2,
+        kernel_size=3,
+        p_dropout=0.0,
+        resblock="2",
+        resblock_kernel_sizes=(3, 5, 7),
+        resblock_dilation_sizes=((1, 2), (2, 6), (3, 12)),
+        upsample_rates=(4, 4),
+        upsample_initial_channel=256,
+        upsample_kernel_sizes=(16, 16),
+        n_speakers=4,
+        n_languages=2,
+        gin_channels=512,
+        use_sdp=True,
+        prosody_dim=0,
+        use_f0_path=True,
+        use_carrier_head=True,
+        use_adaln_encp=True,
+    )
+    model.eval()
+    with torch.no_grad():
+        model.dec.remove_weight_norm()
+    set_export_mode(model, True)
+    # SDP は onnx_export_mode 属性を宣言していないため set_export_mode の
+    # hasattr ガードを素通りする — 参照経路の決定論化はここで明示する
+    # (build_infer_forward(stochastic=False) は fn 側で同じ値を設定する)
+    model.onnx_export_mode = True
+    model.dp.onnx_export_mode = True
+
+    text = torch.randint(1, 60, (1, 12), dtype=torch.long)
+    lengths = torch.LongTensor([12])
+    scales = torch.FloatTensor([0.4, 1.0, 0.5])
+    emb = torch.nn.functional.normalize(torch.randn(1, 192), dim=-1)
+    lid = torch.LongTensor([0])
+
+    # carrier のノイズ枝 (randn_like) が RNG を消費するため、両経路の直前で
+    # 同一 seed を張る (z_p/SDP は export mode で決定論)
+    torch.manual_seed(7)
+    with torch.no_grad():
+        ref_audio, _attn, _y_mask, _latents, ref_dur = model.infer(
+            text,
+            lengths,
+            lid=lid,
+            noise_scale=0.4,
+            length_scale=1.0,
+            noise_scale_w=0.5,
+            speaker_embeddings=emb,
+        )
+
+    fn = build_infer_forward(model, stochastic=False)
+    torch.manual_seed(7)
+    with torch.no_grad():
+        audio, dur = fn(text, lengths, scales, emb, lid)
+
+    torch.testing.assert_close(audio, ref_audio)
+    torch.testing.assert_close(dur, ref_dur)
