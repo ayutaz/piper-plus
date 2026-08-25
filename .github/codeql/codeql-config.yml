@@ -151,6 +151,38 @@ query-filters:
   # taint flow は設計上の意図と一致しない。
   - exclude:
       id: py/command-line-injection
+  # py/log-injection + go/log-injection: 全 11 件を実コードで確認した結果、
+  # いずれも untrusted 入力がログに素通りする経路ではない。
+  #
+  #   src/python_run/piper_plus/voice.py (5 件: 304/312/323/338/340)
+  #     — ログ対象は `cache_path` / `sentinel_path` で、 `--model` 由来の
+  #       起動時ローカルパス。 リクエストデータではない。 py/path-injection を
+  #       除外しているのと同じ「CLI tool only」の理屈 (上記参照)。
+  #   src/python/g2p/.../multilingual.py:294-295 と
+  #   src/python_run/piper_plus/phonemize/multilingual.py:263 (計 3 件)
+  #     — `_LOGGER.debug("... %r ...", text, ...)` で **repr 経由**。 repr は
+  #       改行を `\n` にエスケープするため、 log injection の主要ベクタ
+  #       (偽のログ行を差し込む) が成立しない。 かつ DEBUG レベル。
+  #   src/python_run/piper_plus/training_manager.py:138, 286 (2 件)
+  #     — CLI subprocess ラッパー。 ユーザーは同じ CLI を直接起動できる立場
+  #       (信頼境界の内側)。 py/command-line-injection を同ファイルに対して
+  #       除外しているのと同じ前提。
+  #   src/go/piperplus/server.go:147 (1 件)
+  #     — 唯一の HTTP 経路だが、 既に `req.Text` ではなく `len(req.Text)` を
+  #       記録している。 `fmt.Errorf` を全数確認したが入力テキストを埋める
+  #       ものは無く、 `slog` の structured logging は値を quote する。
+  #
+  # 個別 dismiss ではなくルール除外にするのは、 下の cpp/loop-variable-changed
+  # と同じ理由 (bulk dismiss → 同型パターンで再発 → ルール suppress へ切替)。
+  #
+  # ⚠ トレードオフ: 将来 `http_server.py` (FastAPI) や `server.go` に
+  # **本物の** log injection が入っても検出しない。 リクエスト由来の値を
+  # ログへ出す変更を入れる際は、 値を `%r` に通すか長さ・ID のみを記録する
+  # 方針を code review で担保すること。
+  - exclude:
+      id: py/log-injection
+  - exclude:
+      id: go/log-injection
   # cpp/loop-variable-changed: note-level の style query で、 C/C++ argv parser
   # の `argv[++i]` イディオムや phonemizer の grapheme state machine など
   # 意図的なイテレータ前進で大量に false-positive を出す。 PR #434 で 87 件
