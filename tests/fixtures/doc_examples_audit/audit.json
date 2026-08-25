@@ -5453,8 +5453,8 @@
     },
     {
       "file": "docs/reference/ort-versions.md",
-      "line_start": 115,
-      "line_end": 120,
+      "line_start": 122,
+      "line_end": 127,
       "language_raw": "toml",
       "language": "unknown",
       "category": "skip_warranted",
