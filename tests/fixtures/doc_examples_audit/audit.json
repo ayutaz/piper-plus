@@ -1280,8 +1280,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 379,
-      "line_end": 382,
+      "line_start": 386,
+      "line_end": 389,
       "language_raw": "bash",
       "language": "bash",
       "category": "needs_placeholder",
@@ -1295,8 +1295,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 388,
-      "line_end": 390,
+      "line_start": 395,
+      "line_end": 397,
       "language_raw": "bash",
       "language": "bash",
       "category": "needs_placeholder",
@@ -1310,8 +1310,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 413,
-      "line_end": 415,
+      "line_start": 420,
+      "line_end": 422,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1323,8 +1323,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 419,
-      "line_end": 421,
+      "line_start": 426,
+      "line_end": 428,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1336,8 +1336,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 425,
-      "line_end": 427,
+      "line_start": 432,
+      "line_end": 434,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1349,8 +1349,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 437,
-      "line_end": 441,
+      "line_start": 444,
+      "line_end": 448,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1362,8 +1362,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 445,
-      "line_end": 447,
+      "line_start": 452,
+      "line_end": 454,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1372,21 +1372,6 @@
       "directives_detected": [],
       "env_dependencies": [],
       "hash_sha1": "25a304af975c0d412b9984c085eeefe3e35f0f14"
-    },
-    {
-      "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 459,
-      "line_end": 462,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "skip_warranted",
-      "suggested_action": "sandbox_cannot_satisfy_env_dep",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [
-        "CUDA_VISIBLE_DEVICES"
-      ],
-      "hash_sha1": "4271d26d01dae800051421914736bd4be645ee1d"
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
@@ -1401,12 +1386,27 @@
       "env_dependencies": [
         "CUDA_VISIBLE_DEVICES"
       ],
+      "hash_sha1": "4271d26d01dae800051421914736bd4be645ee1d"
+    },
+    {
+      "file": "docs/getting-started/troubleshooting.md",
+      "line_start": 473,
+      "line_end": 476,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "skip_warranted",
+      "suggested_action": "sandbox_cannot_satisfy_env_dep",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [
+        "CUDA_VISIBLE_DEVICES"
+      ],
       "hash_sha1": "f08fffc2a27748b7b9753ed7b7e20d55078d32eb"
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 487,
-      "line_end": 489,
+      "line_start": 494,
+      "line_end": 496,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
