@@ -22,6 +22,13 @@ ENV DEBIAN_FRONTEND=noninteractive
 # TimeoutError で unreachable になる flake 対策 (2026-07-10 PR #598 observed)。
 # apt-get 自体は retry 機能を持たないため shell で明示的に wrap する。
 #
+# `add-apt-repository` も同じ retry で包む。 従来は 2 つの apt-get ループの
+# 「間」に裸で置かれており、 Launchpad 側の一過性障害を拾えなかった。
+# 2026-08-25 に実際に 3 連続で CI が落ちている:
+#   lazr.restfulclient.errors.ServerError: HTTP Error 500
+#   b'GPGKeyTemporarilyNotFoundError'
+# エラー名のとおり一時的なもので、 リトライで回復する種類のもの。
+#
 # install 後に `apt-get upgrade` を実行する。 base image
 # (nvidia/cuda:12.8.1-...-ubuntu24.04) は Ubuntu noble のパッケージを
 # 固定時点のまま含むため、 これが無いと util-linux / openssl / glibc 等の
@@ -35,7 +42,10 @@ RUN for i in 1 2 3; do \
             software-properties-common \
         && break || { echo "apt retry $i/3"; sleep 15; }; \
     done && \
-    add-apt-repository -y ppa:deadsnakes/ppa && \
+    for i in 1 2 3; do \
+        add-apt-repository -y ppa:deadsnakes/ppa \
+        && break || { echo "add-apt-repository retry $i/3"; sleep 20; }; \
+    done && \
     for i in 1 2 3; do \
         apt-get update && apt-get install -y --no-install-recommends \
             python3.13 \
