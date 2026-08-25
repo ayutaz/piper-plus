@@ -21,6 +21,23 @@
 # Adding new test/demo paths still gets analyzed unless explicitly excluded
 # below. New PRs introducing genuine production XSS / race conditions will
 # still fail CI.
+#
+# # ⚠ paths-ignore が効く範囲 (重要)
+# GitHub Docs: paths / paths-ignore が使えるのは interpreted language
+# (python / javascript-typescript) と、 **コードを build しない** compiled
+# language のみ。 build する場合は "you must specify appropriate build steps
+# in the workflow" と明記されている。
+# 本 repo の matrix (codeql.yml) では cpp / csharp / kotlin が
+# build-mode: manual なので、 これら 3 言語に対して以下の paths-ignore は
+# **一切効かない**。 生成物の除外は codeql.yml の build step 側で行い、
+# 2 段の assert step で守っている。
+#
+# # 逆方向の false-negative (この設計が検知しないもの)
+# build tree 側に first-party のコードが移動した場合 —
+# cmake/PiperCommon.cmake の条件分岐でソースの配置が変わる、 first-party の
+# Roslyn source generator を追加する等 — 解析カバレッジが無警告で消える。
+# SARIF guard は「生成物のパスが報告に出たか」を見るだけなので、
+# この方向は検知しない。 build step を触るときは意識すること。
 
 paths-ignore:
   # Test files — race conditions and unused variables in test fixtures
@@ -55,10 +72,21 @@ paths-ignore:
   - 'src/wasm/openjtalk-web/test_unicode_debug.html'
   - 'src/wasm/openjtalk-web/test_mecab_detail.html'
 
-  # Build output / generated files. CodeQL's autobuild step compiles into
-  # `build/`, so the C/C++ extractor can re-pick up vendored headers from
-  # there even when the path is listed; the redundant `build/**` (without
-  # leading `**/`) makes sure root-level CMake build dirs match.
+  # Build output / generated files.
+  #
+  # ⚠ paths-ignore が効くのは interpreted language と build-mode: none の
+  # compiled language だけ。 GitHub Docs は built な compiled language に
+  # ついて "you must specify appropriate build steps in the workflow" と
+  # 明記している。 本 repo の cpp / csharp / kotlin は 3 つとも
+  # build-mode: manual なので、 **以下の build/dist 除外はこれらに効かない**。
+  # 生成物は codeql.yml の build step で $RUNNER_TEMP に出して除外している
+  # (CodeQL は source root 外の結果を drop する)。 C# の obj/** がここに
+  # 無いのも同じ理由で、 ArtifactsPath で source root の外へ出している。
+  #
+  # 実効性の内訳 (build-mode: none の js/python に対して):
+  #   - `**/dist/**`  : tracked 7 件 (openjtalk-web/dist/*.js 等) に有効
+  #   - `build/**` / `**/build/**` : tracked は build-*.sh の 3 件のみで
+  #     CodeQL の解析対象言語に該当せず、 現時点では実質 inert
   - '**/dist/**'
   - 'build/**'
   - '**/build/**'
@@ -68,14 +96,14 @@ paths-ignore:
 
   # Vendored / third-party code (we don't audit upstream).
   - 'src/piper_phonemize_bundled/**'
-  - 'src/cpp/openjtalk/**'
   # nlohmann/json single-header (v3.11.2, MIT) at src/cpp/json.hpp。
   # Code Scanning alert の上位を占める (cpp/commented-out-code 108 件 /
   # cpp/unused-local-variable 7 件 / cpp/long-switch 7 件 等)。
-  # 我々は upstream を audit しない。 cpp の compilation DB 経由 include で
-  # paths-ignore がどこまで効くかは extractor 側の都合に依存するが、 新規
-  # PR が `#include "json.hpp"` を増やしたときに analysis 入り口で除外
-  # 候補と見なせるよう、 ここで明示的に列挙しておく。
+  # ⚠ cpp は build-mode: manual なので **この除外は効かない**。 さらに
+  # in-source の vendored header なので、 build tree を source root の外へ
+  # 出す対処でも救済されない (該当 137 件は dismiss 済み)。 恒久対策
+  # (build 時に source root 外へ複製する等) は別途。 ここに残すのは、
+  # cpp が build-mode: none に変わった場合に効かせるため。
   - 'src/cpp/json.hpp'
 
   # Generated/large fixtures.
