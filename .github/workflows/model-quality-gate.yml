@@ -11,6 +11,17 @@ on:
       - 'src/python_run/pyproject.toml'
       - 'src/rust/piper-core/Cargo.toml'
       - 'src/rust/piper-plus-g2p/Cargo.toml'
+      # check_ort_version_drift.py が doc 表と突き合わせる実 pin サイト。
+      # 特に `src/go/go.mod` は必須: dependabot.yml の gomod ecosystem が
+      # `onnxruntime_go` を bump する PR は、 ここに無いと本 gate を起動せずに
+      # merge され、 その push で初めて dev が赤くなる。
+      - 'src/python/pyproject.toml'
+      - 'src/python_run/requirements.txt'
+      - 'src/python_run/requirements_gpu.txt'
+      - 'src/go/go.mod'
+      - 'src/csharp/PiperPlus.Core/PiperPlus.Core.csproj'
+      - 'src/wasm/openjtalk-web/package.json'
+      - 'tests/scripts/test_check_ort_version_drift.py'
       - 'docs/spec/onnx-export-contract.toml'
       - 'docs/spec/model-sha256-manifest.toml'
       - 'docs/spec/dictionary-versions.toml'
@@ -46,6 +57,11 @@ jobs:
       - name: Install tomli (Python 3.10 fallback only)
         run: pip install tomli  # Python 3.11+ has tomllib built-in but harmless
 
+      # `tests/scripts` は pytest.ini の testpaths 外なので、 self-test step は
+      # パス明示 + `--override-ini` が要る (ort-version-sync.yml と同じ形)。
+      - name: Install pytest (gate self-test)
+        run: pip install pytest
+
       - name: Check ONNX export contract
         run: python scripts/check_onnx_export_contract.py
 
@@ -56,9 +72,15 @@ jobs:
         run: python scripts/check_dictionary_versions.py
         continue-on-error: true  # spec text scan は false negative あり
 
+      # `continue-on-error` は付けない。 この step は #401 (`692cb3f6`) で
+      # workflow が生まれた時点から `continue-on-error: true` を持っており、
+      # 一度も job を落としたことがなかった。 その裏で doc の Python 2 行が
+      # `>=1.20.0` のまま実 pin `>=1.26.0` と乖離していた。
+      - name: Gate self-test (check_ort_version_drift)
+        run: pytest tests/scripts/test_check_ort_version_drift.py -q --override-ini="addopts="
+
       - name: Check ORT version drift
-        run: python scripts/check_ort_version_drift.py
-        continue-on-error: true
+        run: python scripts/check_ort_version_drift.py --verbose
 
       - name: Verify model checksums (manifest print)
         run: python scripts/verify_model_checksums.py --print-manifest

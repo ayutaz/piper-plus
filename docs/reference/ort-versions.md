@@ -32,12 +32,19 @@ Out of scope:
   separately so the gate is not coupled to upstream `ort` cadence.
 * `docs/` (history-bearing; reviewed by humans, not by the gate).
 
+`scripts/check_ort_version_drift.py` (workflow `Model Quality Gate`) keeps
+the `## Current versions` table below honest by comparing each row against
+the real pin, per row. It covers only the rows this file does **not**
+exempt: the `Rust` row is out of scope per the bullet above, and the C++ /
+iOS / Android / Kotlin G2P rows belong to `check_ort_versions.py`'s
+exact-match group.
+
 ## Current versions
 
 | Runtime  | ORT Version  | Floor (Issue #372) | Package / Source |
 |----------|-------------|--------------------|------------------|
-| Python (training) | `>=1.20.0` | `>=1.20.0` ✓ | `src/python/pyproject.toml` extras (train / inference / inference-gpu) |
-| Python (runtime) | `>=1.20.0` | `>=1.20.0` ✓ | `src/python_run/requirements.txt` + `requirements_gpu.txt` + `setup.py` |
+| Python (training) | `>=1.26.0` (gpu extra: `onnxruntime-gpu>=1.20.1,<1.26`) | `>=1.20.0` ✓ | `src/python/pyproject.toml` extras (train / inference / inference-gpu) |
+| Python (runtime) | `>=1.26.0` (gpu: `onnxruntime-gpu>=1.20.1,<1.26`) | `>=1.20.0` ✓ | `src/python_run/requirements.txt` + `requirements_gpu.txt` |
 | Rust     | 2.0.0-rc.13 (`ort` crate, wraps ORT 1.28.0) | exempt (no stable upstream) | `ort` (crates.io) |
 | C#       | 1.24.3      | `>=1.20.0` ✓ | `Microsoft.ML.OnnxRuntime{,.Managed}` (NuGet) — 5 csproj files |
 | Go       | 1.27.0      | `>=1.20.0` ✓ | `github.com/yalue/onnxruntime_go` |

@@ -41,7 +41,7 @@ Issue #383 follow-up で ORT 1.17.0 → 1.20.0 に上げた際、6 ファイル 
 * Rust ``src/rust/piper-core/Cargo.toml`` の ``ort`` Rust package
     — ``ort`` のバージョンは upstream ORT と 1:1 対応せず (RC 系列の
     ``2.0.0-rc.X`` は ORT 1.20 系をラップ)、また stable 版が未公開
-    (2026-05 時点)。``docs/spec/ort-versions.md`` で別途トラッキング。
+    (2026-05 時点)。``docs/reference/ort-versions.md`` で別途トラッキング。
 * ``docs/`` (history を含むため自動検査せず、人間がレビューする)
 
 Usage:
