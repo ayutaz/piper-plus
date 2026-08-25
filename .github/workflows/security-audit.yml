@@ -124,6 +124,10 @@ jobs:
   # コメントで、 いずれも規制/監査のスコープを **piper-plus が頒布するもの** に
   # 限ると明記している。 findings はログに全件出るため、 抑止 (`--ignore-vuln`)
   # と違って何も隠さない。
+  # なお `Audit root requirements` は `uv.lock` を読まず `uv pip compile` で
+  # 実行時に PyPI から再解決する。 したがって findings はリポジトリを変更
+  # しなくても上流 advisory の公開・更新だけで増減する。 件数が動いたときに
+  # まず疑うのはコード変更ではなく上流側。
   # なお `--strict` は依存の収集失敗 (skip) のみを制御するフラグで、 脆弱性検出に
   # よる exit 1 は `--strict` の有無と無関係に常時発生する。
   pip-audit:
@@ -144,7 +148,10 @@ jobs:
       - name: Install pip-audit
         run: pip install pip-audit
       - name: Audit root requirements
-        # PR は warning、schedule/push は fail。
+        # tier は informational (下の `continue-on-error: true` が無条件)。
+        # 「PR は warning、schedule/push は fail」は `Audit src/python_run` 側の
+        # 挙動で、 本 step には当てはまらない (#628 で root を informational へ
+        # 移した際、 #401 由来のこの 1 行が取り残され 26 行下の実装と矛盾していた)。
         # IGNORE 一覧 (`--ignore-vuln`) は本コメントブロックが single source。
         # 一 advisory = 一行 + justification + 解除条件 + tracking issue 番号 を
         # 明記する。 解除手順 (latest 確認 + 削除) の詳細は各 tracking issue 側。
@@ -160,16 +167,31 @@ jobs:
         # informational tier (job レベルコメント参照)。 root は
         # `[tool.uv] package = false` の workspace meta で publish されず、 この
         # クロージャ (torch / tensorboard / transformers 等) は頒布されない。
-        # 現在 setuptools PYSEC-2026-3447 と transformers PYSEC-2026-2288 /
-        # 2289 / 2290 / PYSEC-2025-217 を報告するが、 前者は torch 2.11 が
-        # `setuptools<82` を課す一方 fix が 83.0.0 で構造的に解けず (cu128 index
-        # の torch 上限も 2.11.0)、 後者は fix の `transformers>=5.3.0` が
-        # `huggingface-hub>=1.3.0` を要求するため hf-hub の major 移行を伴う。
-        # torch PYSEC-2025-194 は `last_affected: 2.6.0-NA` (PEP 440 不正) の
-        # 上流データ不整合で、 解決版 2.11.0 は本来この範囲外
-        # (docs/getting-started/troubleshooting.md の該当節に診断手順あり)。
-        # 解除条件: transformers / hf-hub 移行が完了し findings が解消した時点で
-        # blocking (`${{ github.event_name == 'pull_request' }}`) へ戻す。
+        # 2026-08-25 実測 (CI と同条件 = linux / py3.13):
+        #   Found 77 known vulnerabilities, ignored 2 in 8 packages
+        #   aiohttp 28 / pillow 26 / nltk 10 / transformers 7 / setuptools 2 /
+        #   msgpack 2 / torch 1 / click 1
+        # 構造的に解けないものの内訳:
+        #   - setuptools PYSEC-2026-3447 — torch 2.11 が `setuptools<82` を課す
+        #     一方 fix は 83.0.0 (cu128 index の torch 上限も 2.11.0)。
+        #   - transformers PYSEC-2026-2288 / 2289 / 2290 / PYSEC-2025-217 —
+        #     fix の `transformers>=5.3.0` が `huggingface-hub>=1.3.0` を要求し
+        #     hf-hub の major 移行を伴う。
+        #   - torch PYSEC-2025-194 — PYSEC 側は `last_affected: 2.6.0-NA` で
+        #     2.11.0 を範囲外とするが、 alias の GHSA-rrmf-rvhw-rf47 が
+        #     2026-07-17 に `fixed: 2.13.0` へ更新され、 OSV 経由ではこちらが
+        #     採られるため現在は**報告される** (fix 2.13.0 は未リリース)。
+        #     (docs/getting-started/troubleshooting.md の該当節に診断手順あり)
+        # blocking へ戻す条件 (旧コメントの「transformers / hf-hub 移行が完了し
+        # findings が解消した時点」は達成不能なので撤回):
+        #   (a) 監査対象を `uv pip compile` の再解決から `uv export --locked`
+        #       (= `uv sync` が実際に入れるもの) へ変える。 現状この step は
+        #       uv.lock を読まず実行時に PyPI から再解決するため、 リポジトリを
+        #       1 行も変えなくても上流 advisory の公開だけで findings が動く
+        #       (#628 執筆時 5 advisory → 本コメント執筆時 77 findings)。
+        #   (b) 上記 8 パッケージの実 finding を bump で解消する。 これは学習
+        #       環境の依存 (torch / transformers 等) に波及するため、 学習の
+        #       区切りを待って別途実施する。
         continue-on-error: true
         run: |
           # workspace member (piper-train / piper-plus / piper-plus-g2p) は

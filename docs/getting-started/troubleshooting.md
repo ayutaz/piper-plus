@@ -350,11 +350,18 @@ If issues persist:
 
 ### `Security Audit / pip-audit` fails on a transitive dependency CVE
 
-**Symptoms**: The `Security Audit / pip-audit (Python)` job fails on a `push` to
-`dev` / `main` (it is `continue-on-error` on pull requests, so PRs only warn),
-reporting a CVE / PYSEC advisory against a package that is **not** listed
-directly in `requirements.txt` — e.g. a `g2p-en` → `nltk` → `joblib` transitive
-dependency. The *same commit* may pass in a later `schedule` run.
+**Symptoms**: The `Audit src/python_run` step of the
+`Security Audit / pip-audit (Python)` job fails on a `push` to `dev` / `main`
+(it is `continue-on-error` on pull requests, so PRs only warn), reporting a
+CVE / PYSEC advisory against a package that is **not** listed directly in
+`requirements.txt` — e.g. a `g2p-en` → `nltk` → `joblib` transitive dependency.
+The *same commit* may pass in a later `schedule` run.
+
+> The sibling `Audit root requirements` step never fails the job on any event —
+> it is unconditionally `continue-on-error: true` because it audits the
+> workspace-meta dev/train closure, which piper-plus does not distribute. Its
+> findings are reported in the log for information only. See the tier rationale
+> in `.github/workflows/security-audit.yml`.
 
 **Most common root cause**: a transient **upstream advisory-data defect**, not a
 real regression in this repo. OSV / PyPA advisories are sometimes auto-generated
