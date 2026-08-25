@@ -21,20 +21,48 @@ ENV DEBIAN_FRONTEND=noninteractive
 # apt-get retry loop (max 3): CI で稀に Ubuntu package server が
 # TimeoutError で unreachable になる flake 対策 (2026-07-10 PR #598 observed)。
 # apt-get 自体は retry 機能を持たないため shell で明示的に wrap する。
-RUN for i in 1 2 3; do \
-        apt-get update && apt-get install -y --no-install-recommends \
-            software-properties-common \
-        && break || { echo "apt retry $i/3"; sleep 15; }; \
-    done && \
-    add-apt-repository -y ppa:deadsnakes/ppa && \
-    for i in 1 2 3; do \
-        apt-get update && apt-get install -y --no-install-recommends \
+#
+# `add-apt-repository` も同じ retry で包む。 従来は 2 つの apt-get ループの
+# 「間」に裸で置かれており、 Launchpad 側の一過性障害を拾えなかった。
+# 2026-08-25 に実際に CI が落ちている:
+#   lazr.restfulclient.errors.ServerError: HTTP Error 500
+#   b'GPGKeyTemporarilyNotFoundError'
+#
+# ★ retry は `ok` フラグで結果を持ち回り、 3 回とも失敗したら明示的に
+#   `exit 1` する。 素朴な `cmd && break || { sleep; }` 形式の for ループは
+#   **全滅しても終了ステータス 0 を返す** (最後に実行されるのが `sleep` の
+#   ため)。 実測: `for i in 1 2 3; do false && break || { echo retry; }; done`
+#   → `$?` は 0。 従来の apt-get ループはこの形だったため、 パッケージ取得に
+#   失敗しても後続へ進み、 `update-alternatives: alternative path
+#   /usr/bin/python3.13 doesn't exist` という無関係なエラーとして表面化して
+#   いた (2026-08-25 の CI で観測)。
+#
+# install 後に `apt-get upgrade` を実行する。 base image
+# (nvidia/cuda:12.8.1-...-ubuntu24.04) は Ubuntu noble のパッケージを
+# 固定時点のまま含むため、 これが無いと util-linux / openssl / glibc 等の
+# **fix が公開済みの** CVE をそのまま出荷することになる。
+# trivy-container-scan.yml は `ignore-unfixed: true` を指定しており、
+# 報告される CVE は「upstream に fix があるのに当たっていない」ものだけ。
+# retry ループの中ではなく後段に置くのは、 ループが `break` で抜ける構造
+# のため中に入れると成功時に実行されないケースが生じるから。
+RUN ok=0; for i in 1 2 3; do \
+        if apt-get update && apt-get install -y --no-install-recommends \
+            software-properties-common; then ok=1; break; fi; \
+        echo "apt retry $i/3"; sleep 15; \
+    done; [ "$ok" = 1 ] || { echo "apt-get install software-properties-common failed after 3 attempts"; exit 1; }; \
+    ok=0; for i in 1 2 3; do \
+        if add-apt-repository -y ppa:deadsnakes/ppa; then ok=1; break; fi; \
+        echo "add-apt-repository retry $i/3"; sleep 20; \
+    done; [ "$ok" = 1 ] || { echo "add-apt-repository ppa:deadsnakes/ppa failed after 3 attempts"; exit 1; }; \
+    ok=0; for i in 1 2 3; do \
+        if apt-get update && apt-get install -y --no-install-recommends \
             python3.13 \
             python3.13-venv \
             python3-pip \
-            libsndfile1 \
-        && break || { echo "apt retry $i/3"; sleep 15; }; \
-    done && \
+            libsndfile1; then ok=1; break; fi; \
+        echo "apt retry $i/3"; sleep 15; \
+    done; [ "$ok" = 1 ] || { echo "apt-get install python3.13 failed after 3 attempts"; exit 1; }; \
+    apt-get upgrade -y --no-install-recommends && \
     update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 && \
     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1 && \
     rm -rf /var/lib/apt/lists/*

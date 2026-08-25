@@ -14,8 +14,12 @@ FROM python:3.13.14-slim-trixie AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Build dependencies for pyopenjtalk (cmake, g++) and audio libs
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Build dependencies for pyopenjtalk (cmake, g++) and audio libs.
+# `apt-get upgrade` については runtime stage 側のコメント参照 (同じ理由)。
+# trivy-container-scan.yml の heavy scan は本 builder stage を対象にする。
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     g++ \
@@ -81,8 +85,16 @@ FROM python:3.13.14-slim-trixie
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Runtime-only system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Runtime-only system dependencies.
+#
+# `apt-get upgrade` を併せて実行する。 base image は Debian trixie の
+# パッケージを固定時点のまま含むため、 これが無いと util-linux / openssl /
+# glibc 等の **fix が公開済みの** CVE をそのまま出荷することになる。
+# trivy-container-scan.yml は `ignore-unfixed: true` を指定しており、
+# 報告される CVE は「upstream に fix があるのに当たっていない」ものだけ。
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
     libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 

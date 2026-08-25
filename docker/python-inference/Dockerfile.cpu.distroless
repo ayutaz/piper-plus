@@ -56,7 +56,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 # (a transitive dep of piper-plus-g2p via the [all] extra) builds C
 # extensions from source on arm64. libsndfile1-dev provides the .so /
 # headers that soundfile needs at install AND runtime.
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# builder stage で `apt-get upgrade` も実行する。 最終段は distroless
+# (apt 不在) だが、 builder の共有ライブラリを COPY して出荷するため、
+# ここで更新しないと fix 済み CVE がそのまま最終イメージに入る。
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     g++ \
