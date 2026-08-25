@@ -23,10 +23,18 @@
 
 /**
  * Default dictionary archive URL (GitHub Releases).
- * Shared across Rust, C#, C++, and npm implementations.
+ * Shared across Rust, C#, C++, and npm implementations — keep this byte-identical
+ * to `dictionary_manager.rs`, `DictionaryManager.cs`, and
+ * `openjtalk_dictionary_manager.c`.
+ *
+ * This previously pointed at `ayutaz/piper-plus` tag `dict-v1.0.0`, which does
+ * not exist (the tag returns 404, as does the asset), so the default download
+ * path of `@piper-plus/g2p` could never succeed. The other three runtimes all
+ * used the r9y9 canonical URL below, and `DICT_SHA256` already matched it —
+ * only this one line was left behind.
  */
 const DICT_TAR_GZ_URL =
-  "https://github.com/ayutaz/piper-plus/releases/download/dict-v1.0.0/open_jtalk_dic_utf_8-1.11.tar.gz";
+  "https://github.com/r9y9/open_jtalk/releases/download/v1.11.1/open_jtalk_dic_utf_8-1.11.tar.gz";
 
 /** SHA-256 of the default tar.gz archive. */
 const DICT_SHA256 = "fe6ba0e43542cef98339abdffd903e062008ea170b04e7e2a35da805902f382a";
