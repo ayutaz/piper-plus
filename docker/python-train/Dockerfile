@@ -39,10 +39,11 @@ ENV UV_NO_CACHE=1
 # (CPython core dev maintained) 経由で取得 (Issue #527 / DR-001)。
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
-    && for i in 1 2 3; do \
-        add-apt-repository -y ppa:deadsnakes/ppa \
-        && break || { echo "add-apt-repository retry $i/3"; sleep 20; }; \
+    && ok=0 && for i in 1 2 3; do \
+        if add-apt-repository -y ppa:deadsnakes/ppa; then ok=1; break; fi; \
+        echo "add-apt-repository retry $i/3"; sleep 20; \
     done \
+    && { [ "$ok" = 1 ] || { echo "add-apt-repository ppa:deadsnakes/ppa failed after 3 attempts"; exit 1; }; } \
     && apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
@@ -109,10 +110,11 @@ ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 # Install runtime dependencies + Python 3.13 via deadsnakes PPA
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
-    && for i in 1 2 3; do \
-        add-apt-repository -y ppa:deadsnakes/ppa \
-        && break || { echo "add-apt-repository retry $i/3"; sleep 20; }; \
+    && ok=0 && for i in 1 2 3; do \
+        if add-apt-repository -y ppa:deadsnakes/ppa; then ok=1; break; fi; \
+        echo "add-apt-repository retry $i/3"; sleep 20; \
     done \
+    && { [ "$ok" = 1 ] || { echo "add-apt-repository ppa:deadsnakes/ppa failed after 3 attempts"; exit 1; }; } \
     && apt-get update && apt-get install -y --no-install-recommends \
     python3.13 \
     python3.13-venv \
