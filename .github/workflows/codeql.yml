@@ -210,15 +210,34 @@ jobs:
         if: steps.should-skip.outputs.skip != 'true' && matrix.build-mode == 'autobuild'
         uses: github/codeql-action/autobuild@v3.37.4
 
+      # `paths-ignore` は build-mode: manual の compiled language には効かない
+      # (GitHub Docs: paths/paths-ignore が使えるのは interpreted language と
+      # 「コードを build しない」compiled language のみ。 build する場合は
+      # "you must specify appropriate build steps in the workflow" と明記)。
+      # したがって生成物の除外は build step 側で行う。 CodeQL は source root
+      # (= $GITHUB_WORKSPACE) の外にある結果を drop するので、 生成物を
+      # $RUNNER_TEMP へ逃がすのが唯一の手段。
       - name: Manual build (C#)
         if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'csharp'
-        run: dotnet build src/csharp/PiperPlus.sln -c Release
+        # CodeQL の C# tracer は `-p:EmitCompilerGeneratedFiles=true` を強制
+        # 注入する (無効化不可) ため、 obj/**/generated/*.g.cs が source root に
+        # 落ちて解析対象化する。 ArtifactsPath で obj/bin ごと外へ出す。
+        # ★ このプロパティは **本コマンドラインでのみ** 渡すこと。
+        #   src/csharp/Directory.Build.props に置くと bin/ も移動し、
+        #   cli-help-extract.yml:116,180 と multi-runtime-rtf.yml:200 が
+        #   hard-code する bin/Release/net10.0/PiperPlus.Cli.dll が壊れる。
+        run: >-
+          dotnet build src/csharp/PiperPlus.sln -c Release
+          -p:ArtifactsPath="${{ runner.temp }}/codeql-csharp-artifacts"
 
       - name: Manual build (C++)
         if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'cpp'
+        # in-tree の `-B build` だと vendored 依存が source root 内に展開される
+        # (cmake/ExternalDeps.cmake:43 の `PREFIX "${CMAKE_CURRENT_BINARY_DIR}/f"`
+        # で fmt が build/f 配下に入る)。 build tree ごと $RUNNER_TEMP へ移す。
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
-          cmake --build build --parallel 2
+          cmake -S . -B "${RUNNER_TEMP}/codeql-cpp-build" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build "${RUNNER_TEMP}/codeql-cpp-build" --parallel 2
 
       - name: Manual build (Kotlin)
         if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'kotlin'
@@ -240,8 +259,69 @@ jobs:
             :piper-plus:compileReleaseKotlin \
             --no-daemon --stacktrace
 
+      # 除外が壊れたら気付けるようにする。 filesystem 側は proxy なので、
+      # 「実際に CodeQL が何を報告したか」を見る SARIF 側 (下の step) が本命。
+      - name: Assert build output stayed outside the source root
+        if: >-
+          steps.should-skip.outputs.skip != 'true' &&
+          contains(fromJSON('["cpp","csharp","kotlin"]'), matrix.language)
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail=0
+          case "${{ matrix.language }}" in
+            cpp)
+              # positive: 期待した場所に実際に build されたか
+              # (「ビルドが走らなかった」を「漏れがない」と取り違えない)
+              test -f "${RUNNER_TEMP}/codeql-cpp-build/CMakeCache.txt" \
+                || { echo "::error::out-of-tree build tree not found — the build did not run"; fail=1; }
+              # negative: ディレクトリ名に依存しない (`-B out` 等に変えても検知)
+              leaked=$(find "${GITHUB_WORKSPACE}" -name CMakeCache.txt -not -path '*/node_modules/*' -print -quit)
+              [ -z "$leaked" ] || { echo "::error::CMake build tree inside source root: $leaked"; fail=1; }
+              ;;
+            csharp)
+              test -d "${RUNNER_TEMP}/codeql-csharp-artifacts/obj" \
+                || { echo "::error::ArtifactsPath obj/ not found — the build did not run"; fail=1; }
+              leaked=$(find "${GITHUB_WORKSPACE}/src/csharp" \( -name obj -o -name bin \) -print -quit)
+              [ -z "$leaked" ] || { echo "::error::obj/bin inside source root: $leaked"; fail=1; }
+              ;;
+            kotlin)
+              # gradle は android/*/build/generated/ に生成ソースを吐く。 現状
+              # alert は出ていないが同型の潜在欠陥なので一緒に見張る。
+              leaked=$(find "${GITHUB_WORKSPACE}/android" -path '*/build/generated/*' \
+                         \( -name '*.java' -o -name '*.kt' \) -print -quit)
+              [ -z "$leaked" ] || { echo "::error::gradle generated sources inside source root: $leaked"; fail=1; }
+              ;;
+          esac
+          exit $fail
+
       - name: Perform CodeQL Analysis
         if: steps.should-skip.outputs.skip != 'true'
         uses: github/codeql-action/analyze@v3.37.4
         with:
           category: "/language:${{ matrix.language == 'kotlin' && 'java-kotlin' || matrix.language }}"
+          output: ${{ runner.temp }}/codeql-sarif
+          upload: always
+
+      # outcome ベースの guard。 tracer が新たな injection を増やしても、
+      # 新しい source generator が入っても、 Kotlin 経路が変わっても、
+      # 「生成物のパスが報告に出た」時点で赤くなる。
+      - name: Assert no build-artifact paths in SARIF
+        if: steps.should-skip.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=("${RUNNER_TEMP}"/codeql-sarif/*.sarif)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no SARIF produced at ${RUNNER_TEMP}/codeql-sarif — cannot verify"
+            exit 1
+          fi
+          hit=$(jq -r '.runs[].results[]?.locations[]?.physicalLocation.artifactLocation.uri' \
+                  "${files[@]}" | grep -E '^build/|/obj/|^android/.*/build/' || true)
+          if [ -n "$hit" ]; then
+            echo "::error::CodeQL reported build artifacts:"
+            echo "$hit"
+            exit 1
+          fi
+          echo "OK no build-artifact paths in ${#files[@]} SARIF file(s)"
