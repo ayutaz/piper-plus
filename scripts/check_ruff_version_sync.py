@@ -3,12 +3,18 @@
 """Ruff version pin synchronization gate.
 
 CLAUDE.md says "ruff version is pinned in 3 places" but the actual count
-is **6 pin sites** across 3 files:
+is **5 pin sites** across 3 files:
 
   1. .pre-commit-config.yaml      `rev: v<VER>`            (ruff-pre-commit)
   2. .github/workflows/python-lint.yml `pip install ruff==<VER>`
-  3. .github/workflows/ci.yml          `uv pip install ... ruff==<VER>`
-  4. pyproject.toml                    `"ruff==<VER>"` × 3 (dev / test / quality groups)
+  3. pyproject.toml                    `"ruff==<VER>"` × 3 (dev / test / quality groups)
+
+`.github/workflows/ci.yml` used to be a sixth site, but PR #462
+(`36e40904`) deleted its Ruff lint job as a duplicate of python-lint.yml.
+This script kept listing it afterwards; because a missing match in
+`single` mode was silently ignored, the gate reported "Found 5 pin sites"
+and passed while believing it had checked 6. A site that yields no match
+is now a hard failure — see `EXPECT_ONE_MATCH` below.
 
 Drift between any of these = local-clean / CI-fail mismatch (PR #401 cause).
 Dependabot's uv-workspace ecosystem PR (#442) bumped pyproject.toml only,
@@ -72,8 +78,23 @@ def grep_all(path: Path, pattern: str) -> list[tuple[str, int]]:
     return out
 
 
+# Every site declares how many pins it must yield. A site that yields a
+# different number is a hard error rather than a silent skip: before this
+# was enforced, `.github/workflows/ci.yml` stayed in the site list for
+# three months after PR #462 deleted its ruff job, and the gate reported
+# success while checking one site fewer than it claimed. The same silence
+# would hide python-lint.yml losing its `pip install ruff==` line — i.e.
+# the gate would go green precisely when the pin it guards disappeared.
+EXPECTED_PIN_COUNT = {
+    ".pre-commit-config.yaml": 1,
+    ".github/workflows/python-lint.yml": 1,
+    "pyproject.toml": 3,  # dev / test / quality dependency groups
+}
+TOTAL_EXPECTED_PINS = sum(EXPECTED_PIN_COUNT.values())
+
+
 def main(argv: list[str] | None = None) -> int:
-    # Site → (path, pattern, "single" or "all")
+    # Site → (path, pattern, "next" | "single" | "all")
     # Pattern must capture the version in group 1.
     sites: list[tuple[str, Path, str, str]] = [
         (
@@ -86,12 +107,6 @@ def main(argv: list[str] | None = None) -> int:
             ".github/workflows/python-lint.yml",
             REPO_ROOT / ".github/workflows/python-lint.yml",
             r"pip install\s+ruff==([0-9][0-9.]*)",
-            "single",
-        ),
-        (
-            ".github/workflows/ci.yml",
-            REPO_ROOT / ".github/workflows/ci.yml",
-            r"ruff==([0-9][0-9.]*)",
             "single",
         ),
         (
@@ -110,6 +125,7 @@ def main(argv: list[str] | None = None) -> int:
             missing.append(f"{label} ({path})")
             continue
 
+        before = len(findings)
         if mode == "next":
             # Special case for pre-commit-config: find ruff-pre-commit then
             # parse the next `rev: v<VER>` line.
@@ -130,8 +146,24 @@ def main(argv: list[str] | None = None) -> int:
             for ver, lineno in grep_all(path, pattern):
                 findings.append((label, ver, lineno))
 
+        found = len(findings) - before
+        expected = EXPECTED_PIN_COUNT[label]
+        if found != expected:
+            missing.append(
+                f"{label}: expected {expected} ruff pin(s), found {found} "
+                f"(pattern {pattern!r}, mode {mode})"
+            )
+
     if missing:
-        print(f"ERROR: pin sites missing: {missing}", file=sys.stderr)
+        print("ERROR: pin site inventory mismatch:", file=sys.stderr)
+        for item in missing:
+            print(f"  - {item}", file=sys.stderr)
+        print(
+            "\nEither the pin was removed (restore it) or the site genuinely "
+            "went away (drop it from `sites` AND from EXPECTED_PIN_COUNT, and "
+            "update the paths filter in .github/workflows/ruff-version-sync.yml).",
+            file=sys.stderr,
+        )
         return 1
 
     if not findings:
@@ -149,8 +181,9 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         print(
-            "All 6 sites (1 pre-commit rev + 2 workflow installs + 3 pyproject "
-            "dependency-group entries) must use the same version.\n"
+            f"All {TOTAL_EXPECTED_PINS} sites (1 pre-commit rev + 1 workflow "
+            "install + 3 pyproject dependency-group entries) must use the same "
+            "version.\n"
             "Update them together; CLAUDE.md has the rationale (PR #401 / #442 "
             "drift events).",
             file=sys.stderr,

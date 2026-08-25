@@ -15,6 +15,11 @@
 #
 # Source-of-truth contract: docs/spec/<name>-contract.{toml,md}
 # Check script:             scripts/check_<name>_contract.py
+#
+# `label-refs` is the one entry whose source-of-truth is not under docs/spec:
+# it verifies that every GitHub label named by dependabot.yml / a workflow /
+# first_pr_fast_lane.py is declared in `.github/labels.yml`. Same shape as the
+# others (offline, stdlib-only, 3 OSes), different catalogue location.
 
 name: Extended contract gates
 
@@ -44,6 +49,10 @@ on:
       - 'scripts/check_model_sha256_manifest.py'
       - 'scripts/check_artifact_retention.py'
       - 'scripts/check_test_flake_retry.py'
+      - 'scripts/check_label_references.py'
+      - '.github/labels.yml'  # label-refs: label カタログ (source-of-truth)
+      - '.github/dependabot.yml'  # label-refs: 11 ecosystem の labels:
+      - 'scripts/first_pr_fast_lane.py'  # label-refs: PROMOTE_LABEL
       - '.github/workflows/*.yml'  # artifact-retention scans every workflow
       - 'src/python_run/pyproject.toml'  # test-flake-retry: pytest-rerunfailures dep
       - '.github/workflows/python-tests.yml'  # test-flake-retry: --reruns flag
@@ -81,6 +90,7 @@ jobs:
           - model-sha256-manifest
           - artifact-retention
           - test-flake-retry
+          - label-refs
     steps:
       - uses: actions/checkout@v6.1.0
 
@@ -106,6 +116,7 @@ jobs:
             model-sha256-manifest)   script=check_model_sha256_manifest.py ;;
             artifact-retention)      script=check_artifact_retention.py ;;
             test-flake-retry)        script=check_test_flake_retry.py ;;
+            label-refs)              script=check_label_references.py ;;
             *) echo "::error::unknown contract id ${{ matrix.contract }}"; exit 1 ;;
           esac
           python "scripts/$script"

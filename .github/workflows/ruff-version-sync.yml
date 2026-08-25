@@ -1,10 +1,14 @@
 name: "Ruff Version Sync Gate"
 
-# Verifies that the ruff version is pinned identically across all 6 sites:
+# Verifies that the ruff version is pinned identically across all 5 sites:
 #   - .pre-commit-config.yaml  (rev:)
 #   - .github/workflows/python-lint.yml  (pip install ruff==)
-#   - .github/workflows/ci.yml  (uv pip install ruff==)
 #   - pyproject.toml  (3 dependency-group entries)
+#
+# ci.yml was a 6th site until PR #462 (`36e40904`) removed its ruff job as a
+# duplicate of python-lint.yml. The check script kept listing it and silently
+# skipped the missing match, so the gate advertised 6 sites while checking 5.
+# A site that yields no match is now a hard failure (EXPECTED_PIN_COUNT).
 #
 # Drift = local-clean / CI-fail mismatch (PR #401 was the original incident;
 # Dependabot's uv-workspace PR #442 was the most recent — it bumped pyproject
@@ -17,7 +21,6 @@ on:
     paths:
       - '.pre-commit-config.yaml'
       - '.github/workflows/python-lint.yml'
-      - '.github/workflows/ci.yml'
       - 'pyproject.toml'
       - 'scripts/check_ruff_version_sync.py'
       - '.github/workflows/ruff-version-sync.yml'
@@ -25,7 +28,6 @@ on:
     paths:
       - '.pre-commit-config.yaml'
       - '.github/workflows/python-lint.yml'
-      - '.github/workflows/ci.yml'
       - 'pyproject.toml'
       - 'scripts/check_ruff_version_sync.py'
       - '.github/workflows/ruff-version-sync.yml'
@@ -40,7 +42,7 @@ permissions:
 
 jobs:
   ruff-pin-sync:
-    name: 6 ruff pin sites agree
+    name: 5 ruff pin sites agree
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

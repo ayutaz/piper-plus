@@ -210,10 +210,10 @@ repos:
         pass_filenames: false
 
       - id: ruff-version-sync
-        name: ruff version pin synchronization (6 sites across pre-commit/workflows/pyproject)
+        name: ruff version pin synchronization (5 sites across pre-commit/workflows/pyproject)
         entry: uv run --no-sync python scripts/check_ruff_version_sync.py
         language: system
-        files: ^(\.pre-commit-config\.yaml|\.github/workflows/(python-lint|ci)\.yml|pyproject\.toml|scripts/check_ruff_version_sync\.py)$
+        files: ^(\.pre-commit-config\.yaml|\.github/workflows/python-lint\.yml|pyproject\.toml|scripts/check_ruff_version_sync\.py)$
         pass_filenames: false
 
       # PR #496 (file-path regex over-matching) で再発したパターンを抑止する
@@ -301,6 +301,19 @@ repos:
         entry: uv run python scripts/check_test_flake_retry.py
         language: system
         files: ^(docs/spec/test-flake-retry-contract\.toml|src/python_run/pyproject\.toml|\.github/workflows/python-tests\.yml|scripts/check_test_flake_retry\.py)$
+        pass_filenames: false
+
+      # CI 設定が名指しする GitHub label が `.github/labels.yml` に宣言済みか
+      # 検査する。 label 参照は文字列でしか書けず、 存在しない label を指しても
+      # GitHub は分かりやすいエラーを出さない (dependabot は PR に注記して素通り、
+      # `gh issue edit --add-label` は step ごと落ちる、 actions/stale は黙って
+      # exempt しなくなる)。 実際 dependabot の `dependencies` / `automated` は
+      # 11 ecosystem 全てで参照されながら 1 度も存在しなかった。
+      - id: label-references
+        name: CI が参照する GitHub label が labels.yml に宣言済みか
+        entry: uv run --no-sync python scripts/check_label_references.py
+        language: system
+        files: ^(\.github/(labels|dependabot)\.yml|\.github/workflows/.*\.ya?ml|scripts/(check_label_references|first_pr_fast_lane)\.py)$
         pass_filenames: false
 
       # Release 時に CHANGELOG.md の `### Breaking changes` と
@@ -977,7 +990,11 @@ repos:
   # tomllib in stdlib (<3.11).
   # ---------------------------------------------------------------------------
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.3.0
+    # `.github/workflows/codespell.yml` の `pip install 'codespell==X'` と
+    # 同一版にすること。 drift すると「ローカル pre-push は緑 / CI は赤」
+    # (辞書エントリが版で増えるため) が起きる。 2.3.0 のまま CI だけ 2.4.2 に
+    # 上がっていた状態を解消。
+    rev: v2.4.2
     hooks:
       - id: codespell
         stages: [pre-push]

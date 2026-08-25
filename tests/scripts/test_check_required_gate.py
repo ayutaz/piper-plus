@@ -257,3 +257,44 @@ def test_unfiltered_missing_workflow_still_fails(gate, tmp_path, capsys):
     assert rc == 1
     assert "Missing spokes" in captured.out
     assert "CodeQL" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# Spoke still running == deferred, not failed.
+#
+# The gate is triggered by `workflow_run: completed` on each monitored spoke,
+# so every firing but the last one observes a spoke that has not finished.
+# Failing on that made 38 of the 60 runs preceding this fix red while the
+# final (authoritative) firing was green — noise that hides real failures.
+# ---------------------------------------------------------------------------
+
+
+def test_pending_spoke_defers_instead_of_failing(gate, capsys):
+    rc, _ = _run(gate, "gh_runs_pending.json")
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert "deferred — spokes still running" in captured.out
+    assert "Spokes still running" in captured.out
+    assert "Multi-Runtime RTF Benchmark" in captured.out
+    # The unqualified success line must not appear — not every spoke is done.
+    assert "All monitored spokes succeeded" not in captured.out
+
+
+def test_pending_does_not_mask_a_real_failure(gate, capsys):
+    rc, _ = _run(gate, "gh_runs_pending_with_failure.json")
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert "deferred" not in captured.out
+    assert "Non-success spokes" in captured.out
+    assert "CodeQL" in captured.out
+    # The still-running spoke is still reported, just not as a failure.
+    assert "Spokes still running" in captured.out
+
+
+def test_classify_returns_pending_separately(gate):
+    runs = json.loads((FIXTURES / "gh_runs_pending.json").read_text())["workflow_runs"]
+    monitored = gate.parse_monitored(MONITORED)
+    spokes, _missing = gate.pick_latest_per_workflow(runs, monitored, HEAD_SHA)
+    bad, pending = gate.classify(spokes, on_cancelled="fail", on_skipped="fail")
+    assert bad == []
+    assert [name for name, _ in pending] == ["Multi-Runtime RTF Benchmark"]
