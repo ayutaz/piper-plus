@@ -21,6 +21,15 @@ ENV DEBIAN_FRONTEND=noninteractive
 # apt-get retry loop (max 3): CI で稀に Ubuntu package server が
 # TimeoutError で unreachable になる flake 対策 (2026-07-10 PR #598 observed)。
 # apt-get 自体は retry 機能を持たないため shell で明示的に wrap する。
+#
+# install 後に `apt-get upgrade` を実行する。 base image
+# (nvidia/cuda:12.8.1-...-ubuntu24.04) は Ubuntu noble のパッケージを
+# 固定時点のまま含むため、 これが無いと util-linux / openssl / glibc 等の
+# **fix が公開済みの** CVE をそのまま出荷することになる。
+# trivy-container-scan.yml は `ignore-unfixed: true` を指定しており、
+# 報告される CVE は「upstream に fix があるのに当たっていない」ものだけ。
+# retry ループの中ではなく後段に置くのは、 ループが `break` で抜ける構造
+# のため中に入れると成功時に実行されないケースが生じるから。
 RUN for i in 1 2 3; do \
         apt-get update && apt-get install -y --no-install-recommends \
             software-properties-common \
@@ -35,6 +44,7 @@ RUN for i in 1 2 3; do \
             libsndfile1 \
         && break || { echo "apt retry $i/3"; sleep 15; }; \
     done && \
+    apt-get upgrade -y --no-install-recommends && \
     update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 && \
     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1 && \
     rm -rf /var/lib/apt/lists/*

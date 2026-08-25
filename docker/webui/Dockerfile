@@ -1,8 +1,17 @@
 # WebUI Docker image for piper-plus
 FROM python:3.13.13-slim-trixie
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install system dependencies.
+#
+# `apt-get upgrade` を併せて実行する。 base image (python:3.13.13-slim-trixie)
+# は Debian trixie のパッケージを固定時点のまま含むため、 これが無いと
+# util-linux / openssl / glibc 等の **fix が公開済みの** CVE をそのまま
+# 出荷することになる。 trivy-container-scan.yml は `ignore-unfixed: true` を
+# 指定しており、 報告される CVE は「upstream に fix があるのに当たっていない」
+# ものだけである (2026-08 時点で 3 イメージ合計 341 件)。
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
     libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
