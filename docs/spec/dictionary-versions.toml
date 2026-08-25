@@ -37,7 +37,7 @@
 
 [meta]
 spec_version = "1.0"
-last_updated = "2026-05-09"
+last_updated = "2026-08-26"
 contract_version = 1
 status = "stable"
 applies_to = ["python", "rust", "go", "csharp", "cpp", "wasm-js", "kotlin", "swift"]
@@ -74,10 +74,10 @@ forward_compat_policy = "strict"
 # Distributed as a PyPI sdist that contains both the C source for
 # libopenjtalk and the binary NAIST-JDIC dictionary files.
 package = "pyopenjtalk-plus"
-version = "0.4.1.post7"
+version = "0.4.1.post8"
 pypi_constraint = ">=0.4"   # constraint pinned in pyproject.toml
-sdist_url = "https://files.pythonhosted.org/packages/82/4e/1e2c165b04dd250dbcb1c270df8517681eed5c20b755c72bec2b42853851/pyopenjtalk_plus-0.4.1.post7.tar.gz"
-sdist_sha256 = "555fdf86310d6d72f4a37e92beb251cdc2114aafc133d4c77b136a07a4b17119"
+sdist_url = "https://files.pythonhosted.org/packages/8f/de/004b053d6e5a319dd5072a74aa2bd68e71a8ba5f3acdf6e78381aed94898/pyopenjtalk_plus-0.4.1.post8.tar.gz"
+sdist_sha256 = "f4dfbfbe9021d33c708f04ca5a27008c4f72a9fed097718ca3234d318a7a45e1"
 includes = [
     "libopenjtalk source (lib/open_jtalk/src)",
     "NAIST-JDIC binary dictionary (pyopenjtalk/dictionary/{sys.dic,unk.dic,matrix.bin,*-id.def,char.bin,rewrite.def,COPYING})",
@@ -96,7 +96,7 @@ license = "MIT (jpreprocess), BSD-3-Clause (NAIST-JDIC bundled)"
 canonical_for = ["rust", "wasm-rust", "swift", "kotlin"]
 note = """
 jpreprocess-naist-jdic 0.9.1 bundles the same NAIST-JDIC corpus as the
-pyopenjtalk-plus 0.4.1.post7 distribution (both ultimately derive from
+pyopenjtalk-plus 0.4.1.post8 distribution (both ultimately derive from
 the upstream NAIST-JDIC project). Cross-runtime phoneme parity has been
 verified empirically against piper_train's Python output via the
 fullcontext-label fixtures in test/fixtures/.
@@ -116,7 +116,7 @@ python_train = "via pyopenjtalk-plus PyPI install"
 python_runtime = "via pyopenjtalk-plus PyPI install"
 rust_g2p = "src/rust/piper-plus-g2p/Cargo.toml feature [naist-jdic] (jpreprocess crate)"
 csharp_g2p = "DotNetG2P NuGet package (user-installed; not bundled with PiperPlus.Core)"
-cpp = "cmake/ExternalDeps.cmake openjtalk_external + openjtalk_dic_download (downloads pyopenjtalk-plus 0.4.1.post7)"
+cpp = "cmake/ExternalDeps.cmake openjtalk_external + openjtalk_dic_download (downloads pyopenjtalk-plus 0.4.1.post8)"
 wasm_cpp = "src/wasm/openjtalk-web (Emscripten build of libopenjtalk; same source)"
 wasm_g2p_npm = "src/wasm/g2p (compiled from piper-plus-g2p Rust → WASM via piper-wasm; embeds jpreprocess + naist-jdic)"
 android = "android/piper-plus-g2p/ (Kotlin AAR; loads the Rust shared lib via JNI; embeds jpreprocess + naist-jdic)"

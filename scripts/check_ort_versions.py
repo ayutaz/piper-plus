@@ -31,7 +31,6 @@ Issue #383 follow-up で ORT 1.17.0 → 1.20.0 に上げた際、6 ファイル 
     * ``src/python/pyproject.toml`` (train / inference / inference-gpu extras)
     * ``src/python_run/requirements.txt`` (runtime CPU)
     * ``src/python_run/requirements_gpu.txt`` (runtime GPU)
-    * ``src/python_run/setup.py`` (runtime extras_require)
     * ``src/csharp/PiperPlus.{Core,Cli,Cli.Tests,Core.Tests,Bench}.csproj``
     * ``src/go/go.mod``
     * ``src/wasm/openjtalk-web/package.json`` (peerDependencies)
@@ -187,7 +186,11 @@ FLOOR_TARGETS: list[tuple[Path, str]] = [
     (Path("src/python/pyproject.toml"), "python"),
     (Path("src/python_run/requirements.txt"), "python"),
     (Path("src/python_run/requirements_gpu.txt"), "python"),
-    (Path("src/python_run/setup.py"), "python"),
+    # NOTE: `src/python_run/setup.py` is deliberately absent. It stopped
+    # declaring dependencies in Issue #418 — it now reads requirements.txt
+    # into `install_requires` — so it carried no ORT pin to check and the
+    # gate printed `(no matches)` on every run while still passing. The
+    # floor loop below now treats an empty target as a hard failure.
     # C# (Core + CLI + tests + bench)
     (Path("src/csharp/PiperPlus.Core/PiperPlus.Core.csproj"), "csharp"),
     (Path("src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj"), "csharp"),
@@ -333,10 +336,25 @@ def main() -> int:
             continue
         text = target.read_text(encoding="utf-8")
 
+        found = find_floor_versions(text, ecosystem)
         if args.verbose:
-            found = find_floor_versions(text, ecosystem)
             pretty = ", ".join(f"{p}={v}" for p, v in found) or "(no matches)"
             print(f"[info] {target} ({ecosystem}): {pretty}")
+
+        # An empty target is a HARD failure, symmetrically with the missing-file
+        # case above. Previously the file only had to *exist*: a target whose
+        # pin had been deleted printed `(no matches)` and passed, so the gate
+        # went green precisely when it stopped guarding anything.
+        # `src/python_run/setup.py` sat in this state from Issue #418 until
+        # 2026-08-26.
+        if not found:
+            floor_failures.append(
+                f"{target} ({ecosystem}): no ORT pin found — gate cannot "
+                "verify floor. Either the pin was removed (restore it) or this "
+                "manifest no longer declares ORT (drop it from FLOOR_TARGETS in "
+                "scripts/check_ort_versions.py)."
+            )
+            continue
 
         violations = find_floor_violations(text, ecosystem, canonical)
         if violations:
