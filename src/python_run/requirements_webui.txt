@@ -1,4 +1,9 @@
 # Gradio WebUI requirements
 # Requires Python 3.11+
-gradio==6.14.0
+#
+# 6.15.0 未満は CVE-2026-48545 (Cookie Injection via Shared Proxy Client) の
+# 影響を受ける。 6.21.0 は huggingface-space/requirements.txt が既に採用済みで、
+# WebUI が使う Gradio API (Blocks / Audio / Slider 等のコアコンポーネントのみ)
+# に破壊的変更はない。
+gradio==6.21.0
 numpy>=1.26.4,<2.3
