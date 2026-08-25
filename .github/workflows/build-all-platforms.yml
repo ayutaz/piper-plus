@@ -16,6 +16,12 @@ jobs:
   build-matrix:
     name: Build Matrix
     strategy:
+      # build-piper.yml の Unix step は `bash -eo pipefail`、 Windows step は
+      # pwsh の throw と、 失敗の出方が OS で異なる。 既定 (fail-fast: true) の
+      # ままだと 1 プラットフォームの一過性ネットワーク失敗が残り 2 job を
+      # キャンセルし、 「どの OS で何が起きたか」を切り分けられなくなる。
+      # dev-build-all.yml:213 も同じ理由で false にしている。
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest

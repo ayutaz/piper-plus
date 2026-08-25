@@ -260,6 +260,12 @@ jobs:
       # Create distribution package
       - name: Create distribution package (Unix)
         if: runner.os != 'Windows'
+        # `shell: bash` は `bash --noprofile --norc -eo pipefail {0}` を意味する。
+        # 既定 (shell 未指定) は `bash -e` で **pipefail が無い** ため、 下の
+        # `echo "<sha>  <file>" | sha256sum -c -` のようなパイプは右端の終了
+        # 状態しか見ず、 検証失敗を取りこぼしうる。 同 step 内の他のパイプ
+        # (otool | grep | awk 等) も併せて硬化する。
+        shell: bash
         run: |
           mkdir -p dist/piper-plus/bin
           mkdir -p dist/piper-plus/lib
@@ -359,19 +365,39 @@ jobs:
             fi
           done
 
-          # Download and install OpenJTalk dictionary
+          # Download and install OpenJTalk dictionary.
+          #
+          # `if curl ...; then` で包んではいけない。 curl が非 0 で終わると
+          # (DNS 失敗 / TLS / 接続リセット / タイムアウト) install ブロックごと
+          # skip され、 step は緑のまま下の `tar -czf` に到達して **辞書欠落
+          # パッケージがそのまま出荷される**。 `--fail` を足しただけで `if` を
+          # 残すのはむしろ逆効果で、 404 でも同じ経路に落ちる。
+          #
+          # 取得元は他 4 ランタイム (openjtalk_dictionary_manager.c:29 /
+          # dictionary_manager.rs:36 / DictionaryManager.cs:32 /
+          # dict-loader.js) と同じ canonical ミラーに揃え、 同じ sha256 を
+          # 検証する。 SourceForge はリクエストごとにランダムミラーへ 302 する
+          # ため chronic flake 源で、 かつ HTTP 200 + 空ボディを返した場合
+          # bsdtar が 0 バイト .tar.gz を exit 0 で受理してしまう
+          # (= checksum が無いと素通りする)。
+          #
+          # `--retry-all-errors` は付けない。 `-f` と併用すると 404 のような
+          # 恒久エラーまで 3 回リトライして「一過性 flake」に偽装する。
           echo "Downloading OpenJTalk dictionary..."
-          if curl -L -o naist-jdic.tar.gz "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download"; then
-            tar -xzf naist-jdic.tar.gz
-            if [ -d "open_jtalk_dic_utf_8-1.11" ]; then
-              echo "Installing OpenJTalk dictionary..."
-              mkdir -p dist/piper-plus/share/open_jtalk/dic
-              cp -r open_jtalk_dic_utf_8-1.11/* dist/piper-plus/share/open_jtalk/dic/
-            fi
-            # Clean up
-            rm -f naist-jdic.tar.gz
-            rm -rf open_jtalk_dic_utf_8-1.11
+          DICT_URL="https://github.com/r9y9/open_jtalk/releases/download/v1.11.1/open_jtalk_dic_utf_8-1.11.tar.gz"
+          DICT_SHA256="fe6ba0e43542cef98339abdffd903e062008ea170b04e7e2a35da805902f382a"
+          curl -fsSL --retry 3 --retry-delay 5 -o naist-jdic.tar.gz "$DICT_URL"
+          if command -v sha256sum >/dev/null 2>&1; then
+            echo "${DICT_SHA256}  naist-jdic.tar.gz" | sha256sum -c -
+          else
+            echo "${DICT_SHA256}  naist-jdic.tar.gz" | shasum -a 256 -c -
           fi
+          tar -xzf naist-jdic.tar.gz
+          echo "Installing OpenJTalk dictionary..."
+          mkdir -p dist/piper-plus/share/open_jtalk/dic
+          cp -r open_jtalk_dic_utf_8-1.11/* dist/piper-plus/share/open_jtalk/dic/
+          rm -f naist-jdic.tar.gz
+          rm -rf open_jtalk_dic_utf_8-1.11
 
           # Copy phonemizer dictionaries
           # Source of truth: src/rust/piper-plus-g2p/data/ (Issue #387)
@@ -379,6 +405,50 @@ jobs:
           cp src/rust/piper-plus-g2p/data/cmudict_data.json dist/piper-plus/share/piper/dicts/ 2>/dev/null || true
           cp src/rust/piper-plus-g2p/data/pinyin_single.json dist/piper-plus/share/piper/dicts/ 2>/dev/null || true
           cp src/rust/piper-plus-g2p/data/pinyin_phrases.json dist/piper-plus/share/piper/dicts/ 2>/dev/null || true
+
+          # --- packaged artifact manifest (欠けたら出荷しない) ---
+          #
+          # 同 step には `|| true` / `2>/dev/null` / else なしの if が 13 箇所
+          # あり、 コピー失敗はすべて緑のまま通る。 個別に潰すと壊れやすいので、
+          # アーカイブ直前に「入っているべきものが入っているか」を一度だけ
+          # 検査する。 判定基準は tools/build-openjtalk-dict-archive.sh:39-43 の
+          # 既存慣行 (sys.dic / unk.dic が無ければ stripped とみなして exit) を
+          # 踏襲する。
+          #
+          # espeak-ng-data は **意図的に必須リストへ入れない**。 上の
+          # `Copy espeak-ng data` は else なしの if/elif で silent skip するが、
+          # C++ CLI は自前の 8 言語 G2P を使っており espeak にリンクしていない
+          # (src/cpp の espeak 参照はコメントのみ、 v1.13.0 の実配布バイナリ内の
+          # espeak 文字列は 0 件、 同アセットに espeak-ng-data は同梱されて
+          # いないが日本語以外も動作している)。 必須にすると実態と乖離して
+          # 即座に赤くなる。
+          echo "Verifying packaged artifact..."
+          missing=0
+          for f in \
+            bin/piper-plus \
+            share/open_jtalk/dic/sys.dic \
+            share/open_jtalk/dic/unk.dic \
+            share/open_jtalk/dic/char.bin \
+            share/open_jtalk/dic/matrix.bin \
+            share/piper/dicts/cmudict_data.json \
+            share/piper/dicts/pinyin_single.json \
+            share/piper/dicts/pinyin_phrases.json
+          do
+            if [ ! -s "dist/piper-plus/$f" ]; then
+              echo "::error::packaged artifact is missing or empty: $f"
+              missing=1
+            fi
+          done
+          if ! ls dist/piper-plus/lib/libonnxruntime* >/dev/null 2>&1; then
+            echo "::error::packaged artifact has no libonnxruntime in lib/"
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            echo "Contents of dist/piper-plus:"
+            find dist/piper-plus -type f | sort
+            exit 1
+          fi
+          echo "OK all required files present"
 
           # Create archive
           tar -czf piper-plus-cpp-${{ runner.os }}.tar.gz -C dist piper-plus
@@ -450,22 +520,32 @@ jobs:
             }
           }
 
-          # Download and install OpenJTalk dictionary
+          # Download and install OpenJTalk dictionary.
+          # Unix 側と同じ canonical ミラー + sha256。 旧実装は curl の終了
+          # 状態を見ず、 展開に失敗しても `Write-Host "Warning: ..."` で続行
+          # していたため、 辞書欠落パッケージがそのまま .zip 化されていた。
+          # `curl.exe` / `tar.exe` と明示するのは、 PowerShell では `curl` が
+          # `Invoke-WebRequest` の alias になりうるため (5.1 fallback 時)。
           Write-Host "Downloading OpenJTalk dictionary..."
-          # Use curl for better redirect handling on SourceForge
-          & curl -L -o naist-jdic.tar.gz "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download"
+          $DictUrl = "https://github.com/r9y9/open_jtalk/releases/download/v1.11.1/open_jtalk_dic_utf_8-1.11.tar.gz"
+          $DictSha256 = "fe6ba0e43542cef98339abdffd903e062008ea170b04e7e2a35da805902f382a"
+          & curl.exe -fsSL --retry 3 --retry-delay 5 -o naist-jdic.tar.gz "$DictUrl"
+          if ($LASTEXITCODE -ne 0) { throw "OpenJTalk dictionary download failed (curl exit $LASTEXITCODE)" }
 
-          # Extract using tar (available in Windows 10+)
-          tar -xzf naist-jdic.tar.gz
-
-          # Move dictionary files to the correct location
-          if (Test-Path "open_jtalk_dic_utf_8-1.11") {
-            Write-Host "Installing OpenJTalk dictionary..."
-            New-Item -ItemType Directory -Force -Path dist/piper-plus/share/open_jtalk/dic
-            Copy-Item -Path "open_jtalk_dic_utf_8-1.11\*" -Destination "dist/piper-plus/share/open_jtalk/dic/" -Recurse -Force
-          } else {
-            Write-Host "Warning: Failed to extract OpenJTalk dictionary"
+          $actual = (Get-FileHash -Algorithm SHA256 naist-jdic.tar.gz).Hash.ToLower()
+          if ($actual -ne $DictSha256) {
+            throw "OpenJTalk dictionary checksum mismatch: expected $DictSha256, got $actual"
           }
+
+          & tar.exe -xzf naist-jdic.tar.gz
+          if ($LASTEXITCODE -ne 0) { throw "OpenJTalk dictionary extraction failed (tar exit $LASTEXITCODE)" }
+          if (-not (Test-Path "open_jtalk_dic_utf_8-1.11")) {
+            throw "OpenJTalk dictionary extracted but open_jtalk_dic_utf_8-1.11/ is absent"
+          }
+
+          Write-Host "Installing OpenJTalk dictionary..."
+          New-Item -ItemType Directory -Force -Path dist/piper-plus/share/open_jtalk/dic
+          Copy-Item -Path "open_jtalk_dic_utf_8-1.11\*" -Destination "dist/piper-plus/share/open_jtalk/dic/" -Recurse -Force
 
           # Clean up
           Remove-Item -Force naist-jdic.tar.gz -ErrorAction SilentlyContinue
@@ -477,6 +557,40 @@ jobs:
           Copy-Item src/rust/piper-plus-g2p/data/cmudict_data.json -Destination dist/piper-plus/share/piper/dicts/ -ErrorAction SilentlyContinue
           Copy-Item src/rust/piper-plus-g2p/data/pinyin_single.json -Destination dist/piper-plus/share/piper/dicts/ -ErrorAction SilentlyContinue
           Copy-Item src/rust/piper-plus-g2p/data/pinyin_phrases.json -Destination dist/piper-plus/share/piper/dicts/ -ErrorAction SilentlyContinue
+
+          # --- packaged artifact manifest (欠けたら出荷しない) ---
+          # Unix 側と同じ趣旨。 Windows は ORT を lib/ ではなく bin/ に置く
+          # (v1.13.0 の piper-windows-x64.zip で確認: bin/onnxruntime.dll)。
+          # espeak-ng-data は Unix 側と同じ理由で必須リストに入れない。
+          Write-Host "Verifying packaged artifact..."
+          $missing = $false
+          $required = @(
+            "bin/piper-plus.exe",
+            "share/open_jtalk/dic/sys.dic",
+            "share/open_jtalk/dic/unk.dic",
+            "share/open_jtalk/dic/char.bin",
+            "share/open_jtalk/dic/matrix.bin",
+            "share/piper/dicts/cmudict_data.json",
+            "share/piper/dicts/pinyin_single.json",
+            "share/piper/dicts/pinyin_phrases.json"
+          )
+          foreach ($f in $required) {
+            $p = Join-Path "dist/piper-plus" $f
+            if (-not (Test-Path $p) -or ((Get-Item $p).Length -eq 0)) {
+              Write-Host "::error::packaged artifact is missing or empty: $f"
+              $missing = $true
+            }
+          }
+          if (-not (Get-ChildItem "dist/piper-plus/bin/onnxruntime*.dll" -ErrorAction SilentlyContinue)) {
+            Write-Host "::error::packaged artifact has no onnxruntime DLL in bin/"
+            $missing = $true
+          }
+          if ($missing) {
+            Write-Host "Contents of dist/piper-plus:"
+            Get-ChildItem -Path dist/piper-plus -Recurse -File | Select-Object -ExpandProperty FullName | Sort-Object
+            throw "packaged artifact is incomplete"
+          }
+          Write-Host "OK all required files present"
 
           # Create archive
           Compress-Archive -Path dist/piper-plus -DestinationPath piper-plus-cpp-${{ runner.os }}.zip
