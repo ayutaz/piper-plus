@@ -33,8 +33,11 @@ jobs:
           python-version: '3.13'
 
       - name: Install codespell
-        # Pin version so CI matches the pre-commit hook
-        # (.pre-commit-config.yaml currently uses codespell 2.4.x via codespell-cli).
+        # Pin version so CI matches the pre-commit hook. `.pre-commit-config.yaml`
+        # must carry the same version as `rev: v<VER>` on the
+        # codespell-project/codespell repo entry — it said v2.3.0 while this
+        # line said 2.4.2, so the local pre-push hook and CI ran different
+        # dictionaries.
         run: pip install 'codespell==2.4.2'
 
       - name: Run codespell

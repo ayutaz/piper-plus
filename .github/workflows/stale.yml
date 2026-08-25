@@ -41,7 +41,10 @@ jobs:
           close-issue-label: auto-closed
           stale-pr-label: stale
           close-pr-label: auto-closed
-          exempt-issue-labels: 'pinned,blocked,wip,security,roadmap,help-wanted'
+          # `help wanted` はスペース区切りが正 (GitHub 既定 label)。
+          # `help-wanted` と書いていた間、 この exemption は 1 度も
+          # マッチしていなかった (label 名は大小文字・空白を区別する)。
+          exempt-issue-labels: 'pinned,blocked,wip,security,roadmap,help wanted'
           exempt-pr-labels: 'pinned,blocked,wip,security,dependencies'
           stale-issue-message: |
             この Issue は 90 日間 activity がないため `stale` label を付与しました。

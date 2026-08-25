@@ -1,9 +1,27 @@
 # Repository label catalogue (Issue / PR triage).
 #
-# Apply with: `gh label sync -f .github/labels.yml`
-# or with the `actions/labeler` family. We do **not** auto-sync from CI to
-# avoid clobbering labels that maintainers set manually; this file is the
-# source-of-truth that humans update when adding a label.
+# This file is the source-of-truth for every label that CI configuration
+# names. `scripts/check_label_references.py` fails the build when
+# `.github/dependabot.yml`, a workflow, or `scripts/first_pr_fast_lane.py`
+# references a label that is not declared below. Labels created ad hoc for
+# human triage do not have to appear here; labels that automation depends on
+# do, because a reference to a label nobody created is not an error GitHub
+# reports anywhere useful — Dependabot just comments and moves on, `gh issue
+# edit --add-label` fails the step, and `actions/stale` silently stops
+# exempting.
+#
+# Applying the catalogue
+# ----------------------
+# There is no `gh label sync` subcommand (this file used to claim there was,
+# which is why the catalogue was never applied). `gh label` offers only
+# list / create / edit / delete / clone. Emit the commands instead:
+#
+#     python scripts/check_label_references.py --emit-create-commands
+#
+# and run the ones for labels the repository does not have yet. `gh label
+# create --force` updates an existing label in place rather than failing, so
+# the emitted commands are safe to re-run. Nothing here ever deletes a label:
+# the repository legitimately carries labels this file does not list.
 
 - name: run-full-gate
   color: "B60205"
@@ -16,3 +34,71 @@
   description: >-
     PR introduces a user-visible breaking change. Triggers Migration Guide Lint
     enforcement on top of paths-based detection.
+
+# --- Dependabot (.github/dependabot.yml, all 11 ecosystems) -----------------
+
+- name: dependencies
+  color: "0366D6"
+  description: >-
+    Dependency update. Applied by Dependabot to every ecosystem PR, and used by
+    actions/stale as a PR staleness exemption.
+
+- name: automated
+  color: "EDEDED"
+  description: >-
+    Opened by automation rather than a human. Applied by Dependabot alongside
+    `dependencies`.
+
+# --- actions/stale (.github/workflows/stale.yml) ----------------------------
+
+- name: stale
+  color: "EDEDED"
+  description: >-
+    No activity for 90 days. Auto-closed 7 days later unless the issue or PR
+    sees a comment, a push, or an exemption label.
+
+- name: auto-closed
+  color: "EDEDED"
+  description: >-
+    Closed automatically after 90+7 days without activity. Reopen freely.
+
+- name: pinned
+  color: "FBCA04"
+  description: Exempt from stale auto-close. Keep open indefinitely.
+
+- name: blocked
+  color: "D93F0B"
+  description: >-
+    Waiting on something outside this repository (upstream fix, external
+    review, hardware). Exempt from stale auto-close.
+
+- name: wip
+  color: "FEF2C0"
+  description: >-
+    Work in progress. Exempt from stale auto-close.
+
+- name: security
+  color: "B60205"
+  description: >-
+    Security-relevant issue or PR. Exempt from stale auto-close and routed by
+    security-issue-routing.yml.
+
+- name: roadmap
+  color: "0E8A16"
+  description: >-
+    Tracked on the project roadmap. Exempt from stale auto-close.
+
+- name: help wanted
+  color: "008672"
+  description: >-
+    Extra attention is needed. Exempt from stale auto-close.
+    Note the space — GitHub label names are space- and case-sensitive, and
+    `help-wanted` is a different (nonexistent) label.
+
+# --- security-issue-routing.yml --------------------------------------------
+
+- name: needs-triage
+  color: "D876E3"
+  description: >-
+    Awaiting maintainer triage. Applied automatically to incoming security
+    issues.

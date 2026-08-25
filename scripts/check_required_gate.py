@@ -8,6 +8,11 @@ hub of a hub-and-spoke gateway: it asks the REST API for the latest run of
 every monitored spoke workflow at ``head_sha`` and exits non-zero if any
 spoke is missing, cancelled, skipped, failed, or timed out.
 
+A spoke that is still running is reported but does NOT fail the gate — see
+``classify`` for why deferring is both necessary (the gate fires while other
+spokes run) and safe (the last spoke to complete triggers an authoritative
+final firing).
+
 The script is deliberately stdlib-only (``urllib`` + ``json``) so the gate
 workflow has no install step. ``GITHUB_TOKEN`` (read-only ``actions:read``
 + ``pull-requests:write`` is enough) is read from the environment.
@@ -148,12 +153,30 @@ def classify(
     *,
     on_cancelled: str,
     on_skipped: str,
-) -> list[tuple[str, str]]:
-    """Return [(workflow_name, reason)] of spokes that must fail the gate."""
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """Return ``(bad, pending)`` spoke lists.
+
+    ``bad`` are spokes that must fail the gate. ``pending`` are spokes that
+    have not reached ``status == "completed"`` yet.
+
+    Pending is deliberately NOT a failure. The gate is triggered by
+    ``workflow_run: completed`` on each monitored spoke, so by construction
+    it fires while the *other* spokes are still running: every firing but
+    the last one would see a pending spoke. Treating that as a failure made
+    2-7 of the ~3-8 firings per push red (38 failure / 22 success over the
+    60 runs preceding this fix) and buried genuine gate failures in noise.
+
+    Deferring is safe because the last monitored spoke to complete always
+    triggers a final firing, and at that point every other monitored spoke
+    has completed — so the authoritative evaluation always happens. This is
+    the same reasoning as the ``--branch-for-supersede`` escape hatch, which
+    already covered the "head_sha is stale" case but not this one.
+    """
     bad: list[tuple[str, str]] = []
+    pending: list[tuple[str, str]] = []
     for name, run in spokes.items():
         if run.status != "completed":
-            bad.append((name, f"still {run.status}"))
+            pending.append((name, f"still {run.status}"))
             continue
         conclusion = run.conclusion or "missing"
         if conclusion == "success":
@@ -171,7 +194,7 @@ def classify(
             bad.append((name, conclusion))
         elif conclusion != "success":
             bad.append((name, conclusion))
-    return bad
+    return bad, pending
 
 
 def format_diagnostic(
@@ -180,10 +203,17 @@ def format_diagnostic(
     bad: list[tuple[str, str]],
     spokes: dict[str, SpokeRun],
     exempt_missing: list[str] | None = None,
+    pending: list[tuple[str, str]] | None = None,
 ) -> str:
+    deferred = bool(pending) and not missing and not bad
+    heading = (
+        "## Required status-check gate (deferred — spokes still running)"
+        if deferred
+        else "## Required status-check gate"
+    )
     lines = [
         STICKY_MARKER,
-        "## Required status-check gate",
+        heading,
         "",
         f"Head SHA: `{head_sha[:7]}`",
         "",
@@ -200,12 +230,28 @@ def format_diagnostic(
             suffix = f" — [run]({url})" if url else ""
             lines.append(f"- `{name}` → `{reason}`{suffix}")
         lines.append("")
+    if pending:
+        lines.append(
+            "**Spokes still running** (not a failure — the gate re-fires when "
+            "each one completes):"
+        )
+        for name, reason in pending:
+            url = spokes[name].html_url if name in spokes else ""
+            suffix = f" — [run]({url})" if url else ""
+            lines.append(f"- `{name}` → `{reason}`{suffix}")
+        lines.append("")
     if exempt_missing:
         lines.append("**Paths-filtered spokes (intentionally not run on this push)**:")
         for name in exempt_missing:
             lines.append(f"- `{name}`")
         lines.append("")
-    if not missing and not bad:
+    if deferred:
+        lines.append(
+            "Deferring: no spoke has failed so far. The final firing "
+            "(triggered by the last monitored spoke to complete) is the "
+            "authoritative evaluation."
+        )
+    elif not missing and not bad:
         if exempt_missing:
             # Don't emit the unqualified success line — it contradicts the
             # Paths-filtered section above (Copilot review on PR #587).
@@ -335,11 +381,17 @@ def run(args: argparse.Namespace) -> int:
     paths_filtered = parse_monitored(args.paths_filtered) if args.paths_filtered else []
     exempt_missing = [m for m in missing if m in paths_filtered]
     missing = [m for m in missing if m not in paths_filtered]
-    bad = classify(spokes, on_cancelled=args.on_cancelled, on_skipped=args.on_skipped)
-    body = format_diagnostic(args.head_sha, missing, bad, spokes, exempt_missing)
+    bad, pending = classify(
+        spokes, on_cancelled=args.on_cancelled, on_skipped=args.on_skipped
+    )
+    body = format_diagnostic(
+        args.head_sha, missing, bad, spokes, exempt_missing, pending
+    )
     print(body)
     if args.post_pr_comment and token and args.repo and args.runs_json is None:
         upsert_sticky_comment(args.repo, args.post_pr_comment, body, token)
+    # `pending` alone defers (exit 0); a real failure still fails the gate
+    # immediately even while other spokes run, so the signal is not delayed.
     return 1 if (missing or bad) else 0
 
 

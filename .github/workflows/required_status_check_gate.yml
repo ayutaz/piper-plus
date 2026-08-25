@@ -7,6 +7,16 @@
 # every monitored spoke at `head_sha` and fails if any spoke is missing,
 # cancelled, skipped, failed, or timed out.
 #
+# A spoke that is still *running* is reported but does not fail the gate.
+# This workflow fires on each monitored spoke's `workflow_run: completed`,
+# so it necessarily runs while the other spokes are still going: treating
+# that as a failure turned every firing but the last one red (38 failure /
+# 22 success across the 60 runs before this was fixed) and buried genuine
+# gate failures. The last monitored spoke to complete always triggers a
+# final firing, and every other spoke has completed by then, so the
+# authoritative evaluation still happens. A spoke that actually failed
+# still fails the gate immediately, pending siblings or not.
+#
 # Why a separate workflow rather than touching the spokes:
 #   - The 18+ contract gates have well-isolated responsibilities; we don't
 #     want to add fail-open guards into each of them.
