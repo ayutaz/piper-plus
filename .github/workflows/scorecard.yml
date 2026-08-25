@@ -11,6 +11,13 @@
 #   - 既存 cosign / SBOM / Trivy / dependency-review / action-pin gate と
 #     重複しないため net flat policy 違反なし (Scorecard は外部公開メタ)
 #
+# 唯一の例外が pinned-deps の GitHubAction 部分で、 ここだけは action-pin
+# gate と重複する上に基準が食い違う (Scorecard=SHA 必須 / 本リポジトリ=
+# SemVer 可)。 code scanning に上げる SARIF からはこの部分のみ除外する
+# (scripts/filter_scorecard_sarif.py)。 scorecard.dev に publish される
+# 公開スコアは action 内部で算出されるため、 このフィルタの影響を受けない
+# (= 外部から見た Scorecard スコアは従来どおり)。
+#
 # 関連: docs/proposals/ci-expansion-2026-05.md §3.6 (Supply-chain
 # hardening recommended roadmap)、 親調査 Top 10 外の §3 横断テーマ。
 # 本 workflow は PR を block せず、 trend 監視と OpenSSF Score badge の
@@ -58,6 +65,8 @@ jobs:
           # (https://scorecard.dev/viewer/?uri=github.com/ayutaz/piper-plus)。
           publish_results: true
 
+      # artifact は未フィルタのまま残す。 code scanning に上げるのは次の
+      # step でフィルタしたものなので、 何が落ちたかはここから監査できる。
       - name: Upload artifact
         uses: actions/upload-artifact@v4.6.2
         with:
@@ -65,7 +74,20 @@ jobs:
           path: results.sarif
           retention-days: 7
 
+      # Scorecard の Pinned-Dependencies は SHA pin でないと score 0 とするが、
+      # 本リポジトリは scripts/check_action_pins.py でフル SemVer pin を
+      # 「許可」と定義している (sliding major のみ hard fail)。 両者は矛盾する
+      # 基準であり、 前者を code scanning に上げ続けると 937 件中 789 件 (84%)
+      # が「決着済みの方針差分」で埋まる。 dismiss では解決しない
+      # (partialFingerprints が行内容ハッシュなので Dependabot の bump ごとに
+      # 新 alert が起票される — 2026-05 に 679 件 dismiss したが 2026-08 時点で
+      # 321 箇所が同一 path:line で再 open していた)。
+      # 落とすのは GitHubAction 系のみ。 pip/container/npm 等は本リポジトリに
+      # 方針がなく Scorecard が唯一の追跡手段なので残す。
+      - name: Drop GitHub Action pin findings from SARIF
+        run: python3 scripts/filter_scorecard_sarif.py results.sarif -o results.filtered.sarif
+
       - name: Upload to code scanning
         uses: github/codeql-action/upload-sarif@v3.37.4
         with:
-          sarif_file: results.sarif
+          sarif_file: results.filtered.sarif
