@@ -22,6 +22,7 @@ on:
       - 'src/csharp/PiperPlus.Core/PiperPlus.Core.csproj'
       - 'src/wasm/openjtalk-web/package.json'
       - 'tests/scripts/test_check_ort_version_drift.py'
+      - 'tests/scripts/test_check_dictionary_versions.py'
       - 'docs/spec/onnx-export-contract.toml'
       - 'docs/spec/model-sha256-manifest.toml'
       - 'docs/spec/dictionary-versions.toml'
@@ -68,9 +69,17 @@ jobs:
       - name: Check phoneme set version contract
         run: python scripts/check_phoneme_set_version.py
 
+      # `continue-on-error` は外した。 元のコメント (「spec text scan は false
+      # negative あり」) は当時の実装 — spec 全文への substring 一致 — を指した
+      # ものだが、 その実装は 4 target 全てがマッチせず `[OK]` を出して exit 0
+      # する状態になっていた (setup.py が Issue #418 で pin を失い、 Rust の
+      # pattern も実際の `{ version = "..." }` 形式に一致しなかった)。
+      # 現在は spec を TOML として読み、 各 pin を自分の宣言値と比較する。
+      - name: Gate self-test (check_dictionary_versions)
+        run: pytest tests/scripts/test_check_dictionary_versions.py -q --override-ini="addopts="
+
       - name: Check dictionary versions
-        run: python scripts/check_dictionary_versions.py
-        continue-on-error: true  # spec text scan は false negative あり
+        run: python scripts/check_dictionary_versions.py --verbose
 
       # `continue-on-error` は付けない。 この step は #401 (`692cb3f6`) で
       # workflow が生まれた時点から `continue-on-error: true` を持っており、
