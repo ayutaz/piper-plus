@@ -10,6 +10,7 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import { readFileSync, existsSync, statSync, readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -451,6 +452,91 @@ describe("exports↔files 整合バリデーション", () => {
       [],
       "Every exports target must be covered by a files entry; otherwise the subpath " +
         "is declared but never published (#301: ./wasm/ja shipped 0 files)."
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 8. scripts フィールドバリデーション
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract repo-local shell scripts invoked by an npm script.
+ *
+ * Matches `./foo.sh` and `foo/bar.sh`, resolved relative to an optional
+ * leading `cd <dir> &&`.
+ *
+ * @param {string} command
+ * @returns {string[]} paths relative to the package root
+ */
+function localShellScripts(command) {
+  const cdMatch = command.match(/^cd\s+([^\s&|;]+)\s*&&\s*/);
+  const base = cdMatch ? cdMatch[1] : "";
+  const body = cdMatch ? command.slice(cdMatch[0].length) : command;
+
+  const found = [];
+  for (const m of body.matchAll(/(?:^|[\s&|;])(\.\/)?([\w./-]+\.sh)\b/g)) {
+    found.push(base ? `${base}/${m[2]}` : m[2]);
+  }
+  return found;
+}
+
+describe("scripts フィールドバリデーション", () => {
+  it("npm script が参照するローカルシェルスクリプトが実在する", () => {
+    const broken = [];
+    for (const [name, command] of Object.entries(pkg.scripts ?? {})) {
+      for (const rel of localShellScripts(command)) {
+        if (!existsSync(join(PROJECT_ROOT, rel))) {
+          broken.push(`${name}: ${rel}`);
+        }
+      }
+    }
+
+    assert.deepEqual(
+      broken,
+      [],
+      "An npm script pointing at a missing shell script fails only when someone " +
+        "runs it, so it can rot indefinitely."
+    );
+  });
+
+  it("clean スクリプトが git 追跡下のパスを削除しない", () => {
+    const clean = pkg.scripts?.clean;
+    assert.ok(typeof clean === "string", "a clean script should exist");
+
+    // Expand each `rm -rf` target as a shell glob and check the results
+    // against the index. `rm -rf dist build/build-*` used to match three
+    // tracked build scripts, so `npm run clean` deleted source files.
+    const tracked = new Set(
+      execFileSync("git", ["ls-files"], { cwd: PROJECT_ROOT, encoding: "utf-8" })
+        .split("\n")
+        .filter(Boolean)
+    );
+
+    const targets = clean
+      .replace(/^rm\s+(-\w+\s+)*/, "")
+      .split(/\s+/)
+      .filter(Boolean);
+
+    const destroyed = [];
+    for (const target of targets) {
+      const dir = target.includes("/") ? target.slice(0, target.lastIndexOf("/")) : ".";
+      const pattern = target.includes("/") ? target.slice(target.lastIndexOf("/") + 1) : target;
+      const absDir = join(PROJECT_ROOT, dir);
+      if (!existsSync(absDir)) continue;
+
+      const rx = new RegExp("^" + pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$");
+      for (const name of readdirSync(absDir)) {
+        if (!rx.test(name)) continue;
+        const rel = dir === "." ? name : `${dir}/${name}`;
+        if (tracked.has(rel)) destroyed.push(rel);
+      }
+    }
+
+    assert.deepEqual(
+      destroyed,
+      [],
+      `\`npm run clean\` would delete git-tracked files: ${destroyed.join(", ")}`
     );
   });
 });
