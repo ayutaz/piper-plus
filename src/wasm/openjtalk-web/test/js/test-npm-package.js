@@ -525,7 +525,9 @@ describe("scripts フィールドバリデーション", () => {
       const absDir = join(PROJECT_ROOT, dir);
       if (!existsSync(absDir)) continue;
 
-      const rx = new RegExp("^" + pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$");
+      const rx = new RegExp(
+        "^" + pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$"
+      );
       for (const name of readdirSync(absDir)) {
         if (!rx.test(name)) continue;
         const rel = dir === "." ? name : `${dir}/${name}`;

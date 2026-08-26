@@ -34,7 +34,7 @@ const CONFIG_JSON = JSON.stringify({
  * @param {{ chinese?: boolean, japanese?: boolean, languages?: string[] }} opts
  */
 function createMockWasmModule({ chinese = false, japanese = false, languages } = {}) {
-    const calls = { chinese: [], japanese: [] };
+  const calls = { chinese: [], japanese: [] };
 
   class WasmPhonemizer {
     constructor(configJson) {
@@ -178,5 +178,121 @@ describe("RustWasmAdapter.create() — JA 辞書は自発的に発火しない (
       .filter((url) => /jdic|naist|japanese|\bja\b/i.test(url));
 
     assert.deepEqual(japaneseish, [], "no Japanese dictionary should be fetched");
+  });
+});
+
+describe("RustWasmAdapter.create() — JA 外部辞書の opt-in 投入", () => {
+  const JA_URL = "https://example.test/dict/naist-jdic.bin";
+  const JA_BYTES = new Uint8Array([9, 8, 7, 6]);
+
+  /** SHA-256 of JA_BYTES, computed at test time so the fixture cannot drift. */
+  async function jaSha256() {
+    const digest = await crypto.subtle.digest("SHA-256", JA_BYTES);
+    return Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  function jaRoutes() {
+    return { [JA_URL]: { ok: true, arrayBuffer: () => JA_BYTES.buffer } };
+  }
+
+  it("jaDict.url を渡すと setJapaneseDictionary が 1 回だけ呼ばれる", async () => {
+    activeFetch = installSafeFetch(jaRoutes());
+    const { module, calls } = createMockWasmModule({ japanese: true });
+
+    const adapter = await RustWasmAdapter.create(CONFIG_JSON, {
+      wasmLoader: async () => module,
+      jaDict: { url: JA_URL },
+    });
+
+    assert.equal(calls.japanese.length, 1);
+    assert.ok(calls.japanese[0] instanceof Uint8Array);
+    assert.equal(adapter.japaneseDictionaryStatus, "loaded");
+  });
+
+  it("sha256 が一致しなければ setJapaneseDictionary を呼ばない", async () => {
+    activeFetch = installSafeFetch(jaRoutes());
+    const { module, calls } = createMockWasmModule({ japanese: true });
+
+    const adapter = await RustWasmAdapter.create(CONFIG_JSON, {
+      wasmLoader: async () => module,
+      jaDict: { url: JA_URL, sha256: "0".repeat(64) },
+    });
+
+    assert.equal(calls.japanese.length, 0, "unverified bytes must never reach the setter");
+    assert.equal(adapter.japaneseDictionaryStatus, "failed");
+  });
+
+  it("sha256 が一致すれば投入される", async () => {
+    activeFetch = installSafeFetch(jaRoutes());
+    const { module, calls } = createMockWasmModule({ japanese: true });
+
+    const adapter = await RustWasmAdapter.create(CONFIG_JSON, {
+      wasmLoader: async () => module,
+      jaDict: { url: JA_URL, sha256: await jaSha256() },
+    });
+
+    assert.equal(calls.japanese.length, 1);
+    assert.equal(adapter.japaneseDictionaryStatus, "loaded");
+  });
+
+  it("取得に失敗しても create() は reject せず、言語リストも変わらない", async () => {
+    activeFetch = installSafeFetch({});
+    const { module, calls } = createMockWasmModule({ japanese: true });
+
+    const adapter = await RustWasmAdapter.create(CONFIG_JSON, {
+      wasmLoader: async () => module,
+      jaDict: { url: JA_URL },
+    });
+
+    // Rejecting here would be caught by index.js and drop *both* ja and zh
+    // from the WASM path, taking working Chinese down with failed Japanese.
+    assert.ok(adapter);
+    assert.equal(calls.japanese.length, 0);
+    assert.equal(adapter.japaneseDictionaryStatus, "failed");
+    assert.deepEqual(adapter.supportedLanguages, ["ja", "en", "zh"]);
+  });
+
+  it("setJapaneseDictionary が throw しても create() は解決する", async () => {
+    activeFetch = installSafeFetch(jaRoutes());
+    const { module } = createMockWasmModule({ japanese: true });
+    module.WasmPhonemizer.prototype.setJapaneseDictionary = function () {
+      throw new Error("CONFIG_PARSE_ERROR: version mismatch");
+    };
+
+    const adapter = await RustWasmAdapter.create(CONFIG_JSON, {
+      wasmLoader: async () => module,
+      jaDict: { url: JA_URL },
+    });
+
+    assert.ok(adapter);
+    assert.equal(adapter.japaneseDictionaryStatus, "failed");
+  });
+
+  it("setter を持たないビルドでは fetch せず unsupported を返す", async () => {
+    activeFetch = installSafeFetch(jaRoutes());
+    const { module } = createMockWasmModule({ japanese: false });
+
+    const adapter = await RustWasmAdapter.create(CONFIG_JSON, {
+      wasmLoader: async () => module,
+      jaDict: { url: JA_URL },
+    });
+
+    // The bundled-dictionary build has no setter. Silently ignoring the
+    // option left callers unable to tell their dictionary never applied.
+    assert.equal(activeFetch.calls.length, 0, "must not download 55 MB it cannot use");
+    assert.equal(adapter.japaneseDictionaryStatus, "unsupported");
+  });
+
+  it("jaDict を渡さなければ status は not-requested", async () => {
+    activeFetch = installSafeFetch({});
+    const { module } = createMockWasmModule({ japanese: true });
+
+    const adapter = await RustWasmAdapter.create(CONFIG_JSON, {
+      wasmLoader: async () => module,
+    });
+
+    assert.equal(adapter.japaneseDictionaryStatus, "not-requested");
   });
 });
