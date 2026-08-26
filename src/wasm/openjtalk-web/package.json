@@ -27,12 +27,6 @@
     },
     "./wasm/multilingual": {
       "import": "./dist/rust-wasm/piper_plus_wasm.js"
-    },
-    "./wasm/ja": {
-      "import": "./dist/rust-wasm-ja/piper_plus_wasm.js"
-    },
-    "./wasm/ja-lite": {
-      "import": "./dist/rust-wasm-ja-lite/piper_plus_wasm.js"
     }
   },
   "files": [

@@ -77,11 +77,23 @@ jobs:
         working-directory: src/rust/piper-wasm
         run: |
           wasm-pack build --target web --release ${{ matrix.features }}
+          # wasm-pack writes a `.gitignore` containing `*` into pkg/. Moving it
+          # into dist/ silently nullifies the `dist/rust-wasm/**` entry in
+          # package.json `files` -- npm packs 0 files from the directory and
+          # prints no warning. Releases only work today because
+          # actions/upload-artifact drops hidden files by default, which is an
+          # undocumented accident. Delete it here so the tarball never depends
+          # on that behaviour (scripts/check_npm_exports_shipped.py guards it).
+          rm -f pkg/.gitignore
           rm -rf ../../wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}
           mv pkg ../../wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}
 
       - name: Verify output
-        run: test -f src/wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}/piper_plus_wasm_bg.wasm
+        run: |
+          # Check the file `exports` actually resolves to, not just the binary.
+          test -f src/wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}/piper_plus_wasm.js
+          test -f src/wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}/piper_plus_wasm_bg.wasm
+          test ! -e src/wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}/.gitignore
 
       - name: Report size
         run: |

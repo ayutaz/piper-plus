@@ -216,6 +216,17 @@ repos:
         files: ^(\.pre-commit-config\.yaml|\.github/workflows/python-lint\.yml|pyproject\.toml|scripts/check_ruff_version_sync\.py)$
         pass_filenames: false
 
+      # `exports["./wasm/*"]` は 3 箇所が揃って初めて出荷される — package.json の
+      # 宣言、 build matrix のビルド、 npm-publish の artifact download。 #301 で
+      # 追加された ./wasm/ja と ./wasm/ja-lite は 3 番目を欠いたまま 4 リリース
+      # 出荷され続け、 どこも赤くならなかった (実体 0 ファイル)。
+      - id: wasm-variant-shipping
+        name: WASM variant shipping chain (exports → build matrix → publish download)
+        entry: uv run --no-sync python scripts/check_wasm_variant_shipping.py
+        language: system
+        files: ^(src/wasm/openjtalk-web/package\.json|\.github/workflows/(build-wasm-reusable|npm-publish)\.yml|scripts/check_wasm_variant_shipping\.py)$
+        pass_filenames: false
+
       # PR #496 (file-path regex over-matching) で再発したパターンを抑止する
       # メタ gate。 `.pre-commit-config.yaml` 自身の `files:` regex を全 hook
       # スキャンし、 (1) `^(name1|name2)$` 形式で root-only に anchor された
