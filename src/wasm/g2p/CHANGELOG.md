@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-08-28
+
+### Fixed
+
+- **Default Japanese dictionary download returned HTTP 404 (Issue #634)**: `DICT_TAR_GZ_URL` in `src/dict-loader.js` pointed at `ayutaz/piper-plus` release tag `dict-v1.0.0`, which does not exist. Any consumer that did not pass an explicit `dictUrl` therefore hit a 404 and Japanese G2P failed every time. The URL now matches the canonical source the Rust / C# / C++ runtimes already use (`r9y9/open_jtalk` v1.11.1); `DICT_SHA256` was already the checksum for that archive, so only the one line was wrong.
+- **Package declared MIT but shipped no license text (Issue #640)**: `package.json` set `"license": "MIT"` while the published tarball contained no `LICENSE` file of any kind, which the MIT terms do not permit — the copyright and permission notice must accompany every copy. `LICENSE.md` is now included in `files`. The same change drops `dist/openjtalk.js` and `dist/openjtalk.wasm` from `files`: the Emscripten OpenJTalk build was retired in #301 and nothing has produced those artifacts since, so npm was silently discarding both entries and the tarball never contained a `dist/` directory at all.
+
 ## [0.4.1] - 2026-06-07
 
 ### Added
