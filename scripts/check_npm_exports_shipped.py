@@ -62,9 +62,27 @@ def packed_paths(pkg_dir: Path) -> set[str]:
         print("ERROR: `npm pack --dry-run --json` failed:")
         print(proc.stderr.strip() or proc.stdout.strip())
         raise SystemExit(1)
-    # npm prints the JSON array on stdout; notices go to stderr.
+
+    # npm prints the JSON on stdout; notices go to stderr. The top-level shape
+    # changed between majors and both are in play here: the publish workflow
+    # upgrades to npm@latest for OIDC trusted publishing, while a developer's
+    # local npm is whatever their Node ships.
+    #
+    #   npm 11.x -> [ { name, files: [...], ... } ]
+    #   npm 12.x -> { "<pkg-name>": { name, files: [...], ... } }
+    #
+    # Only the envelope differs; each entry keeps the same keys.
     payload = json.loads(proc.stdout)
-    return {entry["path"] for entry in payload[0]["files"]}
+    if isinstance(payload, dict):
+        entries = list(payload.values())
+    else:
+        entries = list(payload)
+
+    if not entries:
+        print("ERROR: `npm pack --dry-run --json` reported no package.")
+        raise SystemExit(1)
+
+    return {entry["path"] for entry in entries[0]["files"]}
 
 
 def main() -> int:
