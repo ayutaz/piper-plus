@@ -69,7 +69,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@piper-plus/g2p": "^0.4.1"
+    "@piper-plus/g2p": "^0.4.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.10.0",
