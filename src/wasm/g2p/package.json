@@ -1,6 +1,6 @@
 {
   "name": "@piper-plus/g2p",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Multilingual G2P (Grapheme-to-Phoneme) for TTS — eSpeak-ng free, MIT licensed",
   "type": "module",
   "main": "src/index.js",
