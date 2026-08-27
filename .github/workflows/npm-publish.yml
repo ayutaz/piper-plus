@@ -94,6 +94,11 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: https://registry.npmjs.org
 
+      - name: Upgrade npm for OIDC trusted publishing (>= 11.5.1)
+        # setup-node が入れる npm は OIDC trusted publishing に対応した
+        # 11.5.1 より古いことがある。g2p-wasm-ci.yml と同じ手当て。
+        run: npm install -g npm@latest
+
       - name: Download WASM artifact
         uses: actions/download-artifact@v8.0.1
         with:
@@ -129,6 +134,10 @@ jobs:
         # Publishes the already-packed tarball with both SLSA-provenance
         # (GitHub artifact attestation, attached above) and npm-provenance
         # (sigstore via --provenance, attached by the registry).
+        #
+        # OIDC trusted publishing: NODE_AUTH_TOKEN は設定しない。npm は
+        # トークンが存在するとそちらを優先し、org の 2FA 強制下では OTP を
+        # 要求して EOTP で失敗する (npm-v0.7.0 の初回 publish が実際にこれで
+        # 落ちた)。permissions.id-token: write の OIDC token で npm 側の
+        # Trusted Publisher 設定に対して認証する。g2p-wasm-ci.yml と同じ構成。
         run: npm publish *.tgz --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
