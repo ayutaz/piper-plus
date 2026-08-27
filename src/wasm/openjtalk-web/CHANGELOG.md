@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-28
+
 ### Added
 
 #### SSML 合成統合 (synthesize 側)
@@ -22,6 +24,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **仕様:** `docs/spec/ssml-contract.toml` (`applies_to` に `"wasm"` を追加、status table を ✓ に更新)。`tests/fixtures/ssml/contract.json` と byte-for-byte 互換。
 
 **テスト:** `test/js/test-piper-plus-ssml.js` (23 件): re-export 確認 / `synthesize()` 自動 dispatch / segment iteration / `length_scale` 適用 / silence 挿入 / fixture parity。
+#### Speaker Encoder synthesize 統合 (#478)
+
+参照音声から話者埋め込みを作り、そのまま合成に流せる高位 API をブラウザ側に追加。CLI の `--reference-audio` + `--speaker-encoder-model` に相当する経路が JS だけで完結する。
+
+**新規 API:**
+
+- `PiperPlus.synthesizeFromReferenceAudio({ text, referenceWav, encoder })` — 参照 WAV をエンコードし、得られた埋め込みを `synthesize()` に `speakerEmbedding` として渡す
+- `synthesize(text, { speakerEmbedding })` — `SynthesizeOptions` に `speakerEmbedding` を追加
+- 型: `SynthesizeFromReferenceAudioParams`
+
+#### CLI エントリポイント
+
+- `package.json` に `bin` を追加 (`piper-plus` → `bin/piper-cli.js`)。インストールすると `node_modules/.bin/piper-plus` が生え、グローバルインストールでは `piper-plus` コマンドが作られる
+- **注意:** PyPI 版 `piper-plus` の console script と同名。両方をグローバルに入れている場合は PATH 上で衝突しうる
+
+#### その他の公開 API 追加
+
+- `trimEosRegion` — EOS 領域トリムを Rust / Go / C# / C++ とそろえた (#507)
+- ORT ウォームアップ定数 8 種 (`WARMUP_BOS_TOKEN` / `WARMUP_EOS_TOKEN` / `WARMUP_DEFAULT_RUNS` / `WARMUP_DUMMY_PHONEME` / `WARMUP_LENGTH_SCALE` / `WARMUP_NOISE_SCALE` / `WARMUP_NOISE_W` / `WARMUP_PHONEME_LENGTH`) — `docs/spec/ort-session-contract.toml` の値をコードから参照可能に
+- `RustWasmAdapter.create()` の `options.jaDict` — `ja-external` / `multilingual-external` variant 向けに外部 JA 辞書を opt-in で投入する (#640)。取得 → SHA-256 検証 → 投入の順で適用し、既定 URL は持たない
+- `RustWasmAdapter#japaneseDictionaryStatus` — 上記の結果を `"not-requested"` / `"unsupported"` / `"loaded"` / `"failed"` で公開 (#640)
+
+### Deprecated
+
+- `PiperPlus.synthesizeWithVoiceCloning(text, speakerEmbedding, options)` — `synthesize(text, { speakerEmbedding })` に置き換え。後方互換のため残しており、削除は将来のメジャーリリースで行う (#478)
+
+### Removed
+
+- `exports` から `./wasm/ja` と `./wasm/ja-lite` を削除 (#640)。この 2 つは #301 で宣言されて以来どの公開版でも実体 0 ファイルで、0.6.0 の tarball でも `require.resolve` が `MODULE_NOT_FOUND` になる状態だった。依存できた利用者は存在しないため実質的な破壊的変更ではない
+
+### Fixed
+
+- `files` に `bin/**/*.js` を追加。これがないと `bin` で宣言した CLI が tarball に入らない (#640)
+
+## [0.6.0] - 2026-05-04
+
+### Added
 
 #### Phoneme Timing 機能 (新規モジュール)
 
@@ -73,10 +112,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Phoneme Timing for Lip-Sync & Subtitles" セクション追加
 - Viseme マッピング例
 - Output format リファレンス
-
-### Tests
-
-- 全テスト: 376 passed, 1 skipped, 0 failed (リグレッション 0 件)
 
 ## [0.4.0] - 2026-04-12
 
