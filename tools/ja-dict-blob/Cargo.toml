@@ -1,0 +1,29 @@
+# Standalone crate: deliberately NOT a member of the src/rust workspace.
+#
+# Building it enables `jpreprocess/naist-jdic`, whose build script downloads
+# ~19 MB and builds the dictionary. Pulling that into the workspace would put
+# it on the critical path of every `cargo build --workspace` and CI lane, for
+# a tool that runs once per dictionary version bump.
+[workspace]
+
+[package]
+name = "ja-dict-blob"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "MIT"
+description = "Generate the bincode-serialized NAIST-JDIC blob consumed by setJapaneseDictionary()"
+
+[dependencies]
+# These versions MUST match what piper-plus-g2p resolves, because the blob is
+# a raw bincode dump of `lindera_core::dictionary::Dictionary` with no magic
+# bytes, no version field, and no length check (see japanese.rs
+# `new_from_serialized_dict`). A blob produced by a different jpreprocess or
+# lindera version deserialises into garbage or an opaque bincode error.
+jpreprocess = { version = "0.9.1", features = ["naist-jdic"] }
+bincode = "1"
+sha2 = "0.10"
+
+[profile.release]
+# The tool is I/O bound; heavy optimisation only slows the build down.
+opt-level = 1

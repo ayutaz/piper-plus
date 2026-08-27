@@ -6,6 +6,9 @@
 # - deploy-webassembly-demo.yml: builds before GitHub Pages deploy
 # Do NOT track in git; each CI workflow builds it from src/rust/piper-wasm.
 dist/rust-wasm/
+dist/rust-wasm-ja/
+dist/rust-wasm-ja-lite/
+dist/rust-wasm-multilingual-external/
 build/build-*/
 build/CMakeFiles/
 build/CMakeCache.txt

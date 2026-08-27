@@ -1200,4 +1200,104 @@ mod tests {
         let result = JapanesePhonemizer::new_from_serialized_dict(&[]);
         assert!(result.is_err(), "empty data should return error");
     }
+
+    // ===== External dictionary end-to-end (requires the real NAIST-JDIC) =====
+
+    /// Serialising the bundled dictionary and reloading it must not change a
+    /// single phoneme.
+    ///
+    /// This is the only test that exercises `new_from_serialized_dict` with a
+    /// **real** dictionary; every other test feeds it deliberately invalid
+    /// bytes. The external-dictionary WASM variants
+    /// (`ja-external` / `multilingual-external`) depend entirely on this
+    /// equivalence: they ship no dictionary and fall back to
+    /// `PassthroughPhonemizer`, which emits character-level tokens **without
+    /// raising an error**. If a serialised blob ever decoded into something
+    /// subtly different, the only symptom would be worse Japanese.
+    #[cfg(feature = "naist-jdic")]
+    #[test]
+    fn test_serialized_dictionary_reproduces_bundled_phonemes_exactly() {
+        let dictionary = jpreprocess::SystemDictionaryConfig::Bundled(
+            jpreprocess::kind::JPreprocessDictionaryKind::NaistJdic,
+        )
+        .load()
+        .expect("bundled NAIST-JDIC should load");
+
+        let bytes = bincode::serialize(&dictionary).expect("Dictionary should serialise");
+        assert!(
+            bytes.len() > 1_000_000,
+            "a real dictionary blob should be megabytes, got {} bytes",
+            bytes.len()
+        );
+
+        let bundled = JapanesePhonemizer::new_bundled().expect("bundled phonemizer");
+        let external =
+            JapanesePhonemizer::new_from_serialized_dict(&bytes).expect("external phonemizer");
+
+        // Kanji readings, numerals, mixed scripts, and homographs -- the
+        // places where a degraded dictionary shows up first.
+        let cases = [
+            "こんにちは",
+            "今日はいい天気ですね",
+            "私は東京都に住んでいます",
+            "音声合成の精度を検証します",
+            "一二三四五六七八九十",
+            "AIが日本語を話す",
+            "彼は１２３円の本を買った",
+            "西暦2026年8月27日",
+            "難しい漢字の読み分け",
+            "ピーマンとパプリカ",
+        ];
+
+        for text in cases {
+            let (want, want_prosody) = bundled
+                .phonemize_with_prosody(text)
+                .unwrap_or_else(|e| panic!("bundled failed on {text:?}: {e}"));
+            let (got, got_prosody) = external
+                .phonemize_with_prosody(text)
+                .unwrap_or_else(|e| panic!("external failed on {text:?}: {e}"));
+
+            assert_eq!(got, want, "phoneme mismatch for {text:?}");
+            assert_eq!(
+                got_prosody.len(),
+                want_prosody.len(),
+                "prosody length for {text:?}"
+            );
+        }
+    }
+
+    /// A restored dictionary must actually analyse Japanese, not merely agree
+    /// with the bundled one.
+    ///
+    /// Guards against the degenerate pass where both sides fall back to
+    /// character-level output: identical-but-wrong would satisfy the parity
+    /// test above on its own.
+    #[cfg(feature = "naist-jdic")]
+    #[test]
+    fn test_serialized_dictionary_is_not_passthrough() {
+        let dictionary = jpreprocess::SystemDictionaryConfig::Bundled(
+            jpreprocess::kind::JPreprocessDictionaryKind::NaistJdic,
+        )
+        .load()
+        .expect("bundled NAIST-JDIC should load");
+        let bytes = bincode::serialize(&dictionary).expect("Dictionary should serialise");
+        let external =
+            JapanesePhonemizer::new_from_serialized_dict(&bytes).expect("external phonemizer");
+
+        // 東京 is read トウキョウ; a passthrough fallback would hand back the
+        // two kanji unchanged.
+        let text = "東京";
+        let (tokens, _) = external
+            .phonemize_with_prosody(text)
+            .expect("phonemization should succeed");
+
+        assert!(!tokens.is_empty(), "phonemization produced no tokens");
+        for ch in text.chars() {
+            assert!(
+                !tokens.iter().any(|t| t == &ch.to_string()),
+                "token list still contains the raw character {ch:?}, so the \
+                 dictionary was not applied: {tokens:?}"
+            );
+        }
+    }
 }

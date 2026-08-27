@@ -101,7 +101,17 @@ jobs:
           path: src/wasm/openjtalk-web/dist/rust-wasm/
 
       - name: Verify WASM output
-        run: test -f dist/rust-wasm/piper_plus_wasm_bg.wasm
+        run: |
+          # Check the file `exports` actually resolves to, not just the binary.
+          test -f dist/rust-wasm/piper_plus_wasm.js
+          test -f dist/rust-wasm/piper_plus_wasm_bg.wasm
+
+      - name: Verify every exports target is in the tarball
+        # Guards the failure mode that shipped `./wasm/ja` with 0 files for
+        # four releases: a declaration can be present everywhere while the
+        # tarball is empty. This is the only check that opens the tarball.
+        working-directory: ${{ github.workspace }}
+        run: python3 scripts/check_npm_exports_shipped.py
 
       - name: Pack tarball for attestation
         # Pack first so attestation covers the exact bytes that get uploaded.

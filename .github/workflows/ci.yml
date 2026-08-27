@@ -412,6 +412,9 @@ jobs:
         working-directory: src/rust/piper-wasm
         run: |
           wasm-pack build --target web --release --features multilingual
+          # See build-wasm-reusable.yml: wasm-pack's pkg/.gitignore silently
+          # nullifies the `dist/rust-wasm/**` files entry when moved into dist/.
+          rm -f pkg/.gitignore
           rm -rf ../../wasm/openjtalk-web/dist/rust-wasm
           mv pkg ../../wasm/openjtalk-web/dist/rust-wasm
 
@@ -424,6 +427,14 @@ jobs:
 
       - name: Run npm package tests
         run: npm run test:npm-package:all
+
+      - name: Verify shipping chain and tarball contents
+        # This is the only lane where real wasm-pack output sits in dist/, so
+        # it is the only place the tarball check can run outside publishing.
+        working-directory: ${{ github.workspace }}
+        run: |
+          python3 scripts/check_wasm_variant_shipping.py
+          python3 scripts/check_npm_exports_shipped.py
 
   # ---------- required status check (single gate) ----------
   # This job always runs so GitHub branch-protection can use "ci-required"

@@ -494,7 +494,7 @@ impl WasmPhonemizer {
     /// # Errors
     ///
     /// Returns `CONFIG_PARSE_ERROR` if the dictionary bytes are invalid.
-    #[cfg(feature = "ja-external")]
+    #[cfg(all(not(feature = "ja"), feature = "ja-external"))]
     #[wasm_bindgen(js_name = setJapaneseDictionary)]
     pub fn set_japanese_dictionary(&mut self, dict_data: &[u8]) -> Result<(), JsValue> {
         let ja_phonemizer =
@@ -1163,7 +1163,51 @@ mod tests {
     // External dictionary tests (ja-external feature)
     // -------------------------------------------------------------------
 
-    #[cfg(feature = "ja-external")]
+    /// Source of this file, read at compile time for the cfg-contract test.
+    const LIB_RS_SOURCE: &str = include_str!("lib.rs");
+
+    /// `setJapaneseDictionary` must not exist on a build that already bundles
+    /// the NAIST-JDIC dictionary.
+    ///
+    /// Cargo features are additive, so a downstream crate can select
+    /// `--features "multilingual,ja-external"`. `create_phonemizer` prefers the
+    /// bundled dictionary in that union, but a permissively gated setter would
+    /// still be exported -- and calling it swaps the bundled Japanese
+    /// phonemizer out via `replace_phonemizer`, silently changing Japanese
+    /// output on a build that was supposed to be self-contained.
+    ///
+    /// This test is deliberately **feature-independent**: an absence contract
+    /// ("must not exist in configuration X") cannot be expressed with
+    /// `#[cfg]`, and no CI lane enables `ja` and `ja-external` together, so a
+    /// feature-gated test would never run. Reading the source text means the
+    /// contract is checked by the cheapest lane (`cargo test -p
+    /// piper-plus-wasm`, no 19 MB dictionary download).
+    #[test]
+    fn test_ja_setter_is_gated_exclusively_against_bundled_ja() {
+        // `concat!` keeps these needles from matching this test's own source.
+        let anchor = concat!("pub fn set_japanese_", "dictionary(");
+        let exclusive_gate = r#"all(not(feature = "ja"), feature = "ja-external")"#;
+        let permissive_gate = r#"#[cfg(feature = "ja-external")]"#;
+
+        let idx = LIB_RS_SOURCE
+            .find(anchor)
+            .expect("set_japanese_dictionary should exist in lib.rs");
+        let window = &LIB_RS_SOURCE[idx.saturating_sub(400)..idx];
+
+        assert!(
+            window.contains(exclusive_gate),
+            "set_japanese_dictionary must be gated with {exclusive_gate} so it \
+             cannot coexist with the bundled `ja` dictionary"
+        );
+        assert!(
+            !window.contains(permissive_gate),
+            "set_japanese_dictionary is still gated with the permissive \
+             {permissive_gate}; a `ja` + `ja-external` union would export a \
+             setter that replaces the bundled Japanese phonemizer"
+        );
+    }
+
+    #[cfg(all(not(feature = "ja"), feature = "ja-external"))]
     #[test]
     fn test_ja_external_starts_with_passthrough() {
         // With ja-external (not ja), JA starts as PassthroughPhonemizer.
@@ -1177,7 +1221,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "ja-external")]
+    #[cfg(all(not(feature = "ja"), feature = "ja-external"))]
     #[test]
     fn test_set_japanese_dictionary_invalid_data() {
         // set_japanese_dictionary with invalid data should return Err.
@@ -1517,7 +1561,7 @@ mod wasm_tests {
     // External dictionary tests (ja-external feature)
     // -------------------------------------------------------------------
 
-    #[cfg(feature = "ja-external")]
+    #[cfg(all(not(feature = "ja"), feature = "ja-external"))]
     #[wasm_bindgen_test]
     fn test_wasm_set_japanese_dictionary_invalid_data() {
         let config = make_test_config();
@@ -1530,7 +1574,7 @@ mod wasm_tests {
         assert_eq!(code.as_string().unwrap(), "CONFIG_PARSE_ERROR");
     }
 
-    #[cfg(feature = "ja-external")]
+    #[cfg(all(not(feature = "ja"), feature = "ja-external"))]
     #[wasm_bindgen_test]
     fn test_wasm_set_japanese_dictionary_empty_data() {
         let config = make_test_config();

@@ -44,6 +44,20 @@ jobs:
             features: '-- --no-default-features --features ja-external'
             dist_subdir: rust-wasm-ja-lite
             artifact: piper-plus-wasm-ja-lite
+          # 辞書を同梱せず 8 言語すべてを有効にする variant。 辞書が要るのは
+          # ja と zh だけで、 ko/es/fr/pt/sv は規則ベースのため辞書不要
+          # (piper-wasm/Cargo.toml の feature 定義)。 rust-tests.yml では
+          # wasm-pack test で既に検証しているが、 配布 artifact としては
+          # 一度もビルドされていなかった。
+          #
+          # npm の exports にはまだ追加しない。 ja の外部辞書 blob が未公開の
+          # ため、 今 subpath を生やすと「宣言はあるが日本語が passthrough に
+          # 落ちる」という、 この PR が ./wasm/ja で直した欠陥を再生産する。
+          # まず artifact とサイズ実測を得て、 辞書配布が整ってから出荷する。
+          - name: multilingual-external
+            features: '-- --no-default-features --features multilingual-external'
+            dist_subdir: rust-wasm-multilingual-external
+            artifact: piper-plus-wasm-multilingual-external
     steps:
       - uses: actions/checkout@v6.1.0
 
@@ -77,11 +91,23 @@ jobs:
         working-directory: src/rust/piper-wasm
         run: |
           wasm-pack build --target web --release ${{ matrix.features }}
+          # wasm-pack writes a `.gitignore` containing `*` into pkg/. Moving it
+          # into dist/ silently nullifies the `dist/rust-wasm/**` entry in
+          # package.json `files` -- npm packs 0 files from the directory and
+          # prints no warning. Releases only work today because
+          # actions/upload-artifact drops hidden files by default, which is an
+          # undocumented accident. Delete it here so the tarball never depends
+          # on that behaviour (scripts/check_npm_exports_shipped.py guards it).
+          rm -f pkg/.gitignore
           rm -rf ../../wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}
           mv pkg ../../wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}
 
       - name: Verify output
-        run: test -f src/wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}/piper_plus_wasm_bg.wasm
+        run: |
+          # Check the file `exports` actually resolves to, not just the binary.
+          test -f src/wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}/piper_plus_wasm.js
+          test -f src/wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}/piper_plus_wasm_bg.wasm
+          test ! -e src/wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}/.gitignore
 
       - name: Report size
         run: |

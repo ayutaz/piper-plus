@@ -10,6 +10,7 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import { readFileSync, existsSync, statSync, readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -334,6 +335,210 @@ describe("パッケージサイズ見積もり", () => {
     assert.ok(
       totalBytes <= MAX_SIZE_BYTES,
       `Package is too large (${totalMB} MB > 100 MB).\n${detail}`
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. exports↔files 整合バリデーション
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalise a `files` entry or an exports target to a comparable path.
+ * Strips a leading "./" and any trailing slashes.
+ *
+ * @param {string} p
+ * @returns {string}
+ */
+function normPath(p) {
+  return p.replace(/^\.\//, "").replace(/\/+$/, "");
+}
+
+/**
+ * Decide whether a single `files` entry covers a concrete path.
+ *
+ * npm treats a bare directory entry as "include the whole directory" and `**`
+ * as a recursive wildcard.  The property that matters here is that matching
+ * happens on *path segment* boundaries: `dist/rust-wasm/**` must not cover
+ * `dist/rust-wasm-ja/...`.  That distinction is exactly how `./wasm/ja` came
+ * to be declared in `exports` while never being published (#301).
+ *
+ * @param {string} entry - one element of package.json `files`
+ * @param {string} target - a concrete path relative to the package root
+ * @returns {boolean}
+ */
+function filesEntryCovers(entry, target) {
+  const e = normPath(entry);
+  const t = normPath(target);
+
+  const star = e.indexOf("**");
+  if (star === -1) {
+    return t === e || t.startsWith(e + "/");
+  }
+
+  const base = normPath(e.slice(0, star));
+  const tail = e.slice(star + 2).replace(/^\//, "");
+
+  if (base !== "" && !(t === base || t.startsWith(base + "/"))) {
+    return false;
+  }
+  if (tail === "" || tail === "*") {
+    return true;
+  }
+  if (tail.startsWith("*.")) {
+    return t.endsWith(tail.slice(1));
+  }
+  return t === tail || t.endsWith("/" + tail);
+}
+
+/**
+ * Flatten package.json `exports` into `{subpath, condition, target}` records.
+ *
+ * @param {object} exportsField
+ * @returns {Array<{subpath: string, condition: string, target: string}>}
+ */
+function collectExportTargets(exportsField) {
+  const out = [];
+  for (const [subpath, value] of Object.entries(exportsField ?? {})) {
+    if (typeof value === "string") {
+      out.push({ subpath, condition: "default", target: value });
+      continue;
+    }
+    for (const [condition, target] of Object.entries(value ?? {})) {
+      if (typeof target === "string") {
+        out.push({ subpath, condition, target });
+      }
+    }
+  }
+  return out;
+}
+
+describe("exports↔files 整合バリデーション", () => {
+  it("files glob matcher が path segment 境界を守る", () => {
+    const cases = [
+      ["dist/rust-wasm/**", "dist/rust-wasm/piper_plus_wasm.js", true],
+      ["dist/rust-wasm/**", "dist/rust-wasm", true],
+      // 兄弟ディレクトリを飲み込まないこと。素朴な startsWith で書くとここが true になり、
+      // 下の整合テストが緑のまま ./wasm/ja 相当の欠陥を見逃す。
+      ["dist/rust-wasm/**", "dist/rust-wasm-ja/piper_plus_wasm.js", false],
+      ["dist/rust-wasm/**", "dist/rust-wasm-ja-lite/piper_plus_wasm.js", false],
+      ["src/**/*.js", "src/index.js", true],
+      ["src/**/*.js", "src/phonemizer/rust-wasm-adapter.js", true],
+      ["src/**/*.js", "src/index.mjs", false],
+      ["types/", "types/index.d.ts", true],
+      ["types/", "typesX/index.d.ts", false],
+      ["LICENSE.md", "LICENSE.md", true],
+    ];
+
+    for (const [entry, target, expected] of cases) {
+      assert.equal(
+        filesEntryCovers(entry, target),
+        expected,
+        `filesEntryCovers(${JSON.stringify(entry)}, ${JSON.stringify(target)}) should be ${expected}`
+      );
+    }
+  });
+
+  it("全 exports target が files のいずれかにカバーされる", () => {
+    const targets = collectExportTargets(pkg.exports);
+    assert.ok(targets.length > 0, "exports should declare at least one target");
+
+    const uncovered = targets
+      .filter(({ target }) => !pkg.files.some((entry) => filesEntryCovers(entry, target)))
+      .map(({ subpath, condition, target }) => `exports["${subpath}"].${condition} -> ${target}`);
+
+    assert.deepEqual(
+      uncovered,
+      [],
+      "Every exports target must be covered by a files entry; otherwise the subpath " +
+        "is declared but never published (#301: ./wasm/ja shipped 0 files)."
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 8. scripts フィールドバリデーション
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract repo-local shell scripts invoked by an npm script.
+ *
+ * Matches `./foo.sh` and `foo/bar.sh`, resolved relative to an optional
+ * leading `cd <dir> &&`.
+ *
+ * @param {string} command
+ * @returns {string[]} paths relative to the package root
+ */
+function localShellScripts(command) {
+  const cdMatch = command.match(/^cd\s+([^\s&|;]+)\s*&&\s*/);
+  const base = cdMatch ? cdMatch[1] : "";
+  const body = cdMatch ? command.slice(cdMatch[0].length) : command;
+
+  const found = [];
+  for (const m of body.matchAll(/(?:^|[\s&|;])(\.\/)?([\w./-]+\.sh)\b/g)) {
+    found.push(base ? `${base}/${m[2]}` : m[2]);
+  }
+  return found;
+}
+
+describe("scripts フィールドバリデーション", () => {
+  it("npm script が参照するローカルシェルスクリプトが実在する", () => {
+    const broken = [];
+    for (const [name, command] of Object.entries(pkg.scripts ?? {})) {
+      for (const rel of localShellScripts(command)) {
+        if (!existsSync(join(PROJECT_ROOT, rel))) {
+          broken.push(`${name}: ${rel}`);
+        }
+      }
+    }
+
+    assert.deepEqual(
+      broken,
+      [],
+      "An npm script pointing at a missing shell script fails only when someone " +
+        "runs it, so it can rot indefinitely."
+    );
+  });
+
+  it("clean スクリプトが git 追跡下のパスを削除しない", () => {
+    const clean = pkg.scripts?.clean;
+    assert.ok(typeof clean === "string", "a clean script should exist");
+
+    // Expand each `rm -rf` target as a shell glob and check the results
+    // against the index. `rm -rf dist build/build-*` used to match three
+    // tracked build scripts, so `npm run clean` deleted source files.
+    const tracked = new Set(
+      execFileSync("git", ["ls-files"], { cwd: PROJECT_ROOT, encoding: "utf-8" })
+        .split("\n")
+        .filter(Boolean)
+    );
+
+    const targets = clean
+      .replace(/^rm\s+(-\w+\s+)*/, "")
+      .split(/\s+/)
+      .filter(Boolean);
+
+    const destroyed = [];
+    for (const target of targets) {
+      const dir = target.includes("/") ? target.slice(0, target.lastIndexOf("/")) : ".";
+      const pattern = target.includes("/") ? target.slice(target.lastIndexOf("/") + 1) : target;
+      const absDir = join(PROJECT_ROOT, dir);
+      if (!existsSync(absDir)) continue;
+
+      const rx = new RegExp(
+        "^" + pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$"
+      );
+      for (const name of readdirSync(absDir)) {
+        if (!rx.test(name)) continue;
+        const rel = dir === "." ? name : `${dir}/${name}`;
+        if (tracked.has(rel)) destroyed.push(rel);
+      }
+    }
+
+    assert.deepEqual(
+      destroyed,
+      [],
+      `\`npm run clean\` would delete git-tracked files: ${destroyed.join(", ")}`
     );
   });
 });
