@@ -157,7 +157,7 @@ jobs:
 
       - name: Upload SARIF to GitHub Security tab
         if: always()
-        uses: github/codeql-action/upload-sarif@v3.37.4
+        uses: github/codeql-action/upload-sarif@v3.37.9
         with:
           sarif_file: trivy-${{ matrix.target.name }}.sarif
           category: trivy-${{ matrix.target.name }}
@@ -255,7 +255,7 @@ jobs:
 
       - name: Upload heavy SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@v3.37.4
+        uses: github/codeql-action/upload-sarif@v3.37.9
         with:
           sarif_file: trivy-heavy-${{ matrix.target.name }}.sarif
           category: trivy-heavy-${{ matrix.target.name }}

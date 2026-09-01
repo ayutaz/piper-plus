@@ -59,7 +59,7 @@ jobs:
       - id: changes
         # On schedule we run all languages; on PR we filter via paths.
         if: github.event_name == 'pull_request' || github.event_name == 'push'
-        uses: dorny/paths-filter@v3.0.3
+        uses: dorny/paths-filter@v3.0.4
         with:
           filters: |
             python:
@@ -181,7 +181,7 @@ jobs:
 
       - name: Setup JDK (Kotlin)
         if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'kotlin'
-        uses: actions/setup-java@v4.9.0
+        uses: actions/setup-java@v4.9.1
         with:
           distribution: temurin
           java-version: '17'
@@ -194,7 +194,7 @@ jobs:
 
       - name: Initialize CodeQL
         if: steps.should-skip.outputs.skip != 'true'
-        uses: github/codeql-action/init@v3.37.4
+        uses: github/codeql-action/init@v3.37.9
         with:
           # CodeQL は Kotlin を `java-kotlin` 言語として識別する。matrix の
           # 表示用 `kotlin` を init 渡し用にここでマップする。
@@ -208,7 +208,7 @@ jobs:
 
       - name: Build (autobuild for Go)
         if: steps.should-skip.outputs.skip != 'true' && matrix.build-mode == 'autobuild'
-        uses: github/codeql-action/autobuild@v3.37.4
+        uses: github/codeql-action/autobuild@v3.37.9
 
       # `paths-ignore` は build-mode: manual の compiled language には効かない
       # (GitHub Docs: paths/paths-ignore が使えるのは interpreted language と
@@ -297,7 +297,7 @@ jobs:
 
       - name: Perform CodeQL Analysis
         if: steps.should-skip.outputs.skip != 'true'
-        uses: github/codeql-action/analyze@v3.37.4
+        uses: github/codeql-action/analyze@v3.37.9
         with:
           category: "/language:${{ matrix.language == 'kotlin' && 'java-kotlin' || matrix.language }}"
           output: ${{ runner.temp }}/codeql-sarif
