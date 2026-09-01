@@ -23,7 +23,7 @@ dependencies = [
     "pytorch-lightning>=2.6.5",
     "librosa>=0.11.0",
     "cython>=3.2.9",
-    "pyopenjtalk-plus>=0.4",
+    "pyopenjtalk-plus*",
     "wandb>=0.28.1",
     "transformers>=4.50.0",
     # workspace member refs: `uv sync` でこれらが自動 install される (root は
