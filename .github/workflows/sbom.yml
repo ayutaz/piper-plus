@@ -40,7 +40,7 @@ jobs:
           fetch-depth: 0
 
       - name: Generate SBOM (SPDX JSON)
-        uses: anchore/sbom-action@v0.24.0
+        uses: anchore/sbom-action@v0.24.2
         with:
           path: .
           format: spdx-json
@@ -48,7 +48,7 @@ jobs:
           artifact-name: sbom-repo-spdx
 
       - name: Generate SBOM (CycloneDX JSON)
-        uses: anchore/sbom-action@v0.24.0
+        uses: anchore/sbom-action@v0.24.2
         with:
           path: .
           format: cyclonedx-json

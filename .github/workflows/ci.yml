@@ -44,7 +44,7 @@ jobs:
       docs: ${{ steps.filter.outputs.docs }}
     steps:
       - uses: actions/checkout@v6.1.0
-      - uses: dorny/paths-filter@v3.0.3
+      - uses: dorny/paths-filter@v3.0.4
         id: filter
         with:
           filters: |

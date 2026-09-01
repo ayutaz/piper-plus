@@ -48,7 +48,7 @@ jobs:
       - uses: actions/checkout@v6.1.0
         with: { submodules: true }
       - name: Set up JDK 17
-        uses: actions/setup-java@v4.9.0
+        uses: actions/setup-java@v4.9.1
         with: { distribution: temurin, java-version: 17 }
       - name: Setup Android NDK
         uses: android-actions/setup-android@v3.2.2
@@ -117,7 +117,7 @@ jobs:
       - uses: actions/checkout@v6.1.0
         with: { submodules: true }
       - name: Set up JDK 17
-        uses: actions/setup-java@v4.9.0
+        uses: actions/setup-java@v4.9.1
         with: { distribution: temurin, java-version: 17 }
 
       # AGP triggers externalNativeBuild during configure; the publish job

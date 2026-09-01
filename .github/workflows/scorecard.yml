@@ -88,6 +88,6 @@ jobs:
         run: python3 scripts/filter_scorecard_sarif.py results.sarif -o results.filtered.sarif
 
       - name: Upload to code scanning
-        uses: github/codeql-action/upload-sarif@v3.37.4
+        uses: github/codeql-action/upload-sarif@v3.37.9
         with:
           sarif_file: results.filtered.sarif
