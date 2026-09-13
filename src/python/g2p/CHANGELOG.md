@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Hindi / Hinglish G2P (Phase 1)**: rule-based `HindiPhonemizer` (`hi`)
+  for Devanagari and Latin Hinglish. Word-level LID splits ASCII runs into
+  `[hi][en][hi]…` (lexicon wins, then CMU, else Hindi). No espeak-ng.
 - **ZH-EN code-switching (Issue #384)**: English acronyms and loanwords
   inside a Chinese context are now phonemised as Mandarin pinyin instead
   of US English. `ChinesePhonemizer.phonemize_embedded_english()` and

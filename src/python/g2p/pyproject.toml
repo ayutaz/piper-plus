@@ -36,6 +36,7 @@ es = []
 fr = []
 pt = []
 sv = []
+hi = []
 all = [
     "pyopenjtalk-plus>=0.3,<1",
     "g2p-en>=2.1.0,<3",

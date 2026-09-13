@@ -85,6 +85,99 @@ def _load_sv_function_words() -> tuple[frozenset[str], frozenset[str]]:
 
 _SV_FUNCTION_WORDS, _SV_STRONG_CHARS = _load_sv_function_words()
 
+# ---------------------------------------------------------------------------
+# Hinglish per-word LID (Phase 1)
+# ---------------------------------------------------------------------------
+# Latin script is shared with English. After Unicode segmentation, default-Latin
+# runs are split word-by-word: Hindi lexicon wins, else CMU English, else Hindi.
+# Canonical copy: src/python/g2p/piper_plus_g2p/data/hi_hinglish_words.json
+_HI_HINGLISH_WORDS_PATH = Path(__file__).parent / "data" / "hi_hinglish_words.json"
+_RE_LATIN_SPLIT = re.compile(r"([A-Za-z]+)|([^A-Za-z]+)")
+_HI_STRIP_MARKS = ".,;:!?"
+
+
+@functools.cache
+def _load_hinglish_words() -> frozenset[str]:
+    try:
+        with open(_HI_HINGLISH_WORDS_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        _LOGGER.warning(
+            "Hinglish lexicon unavailable at %s (%s); "
+            "per-word Hindi LID will default unknown Latin to Hindi.",
+            _HI_HINGLISH_WORDS_PATH,
+            exc,
+        )
+        return frozenset()
+    words_raw = data.get("words", []) if isinstance(data, dict) else []
+    return frozenset(
+        w.lower().strip() for w in words_raw if isinstance(w, str) and w.strip()
+    )
+
+
+def _word_in_cmu(word: str) -> bool:
+    from .english import _get_g2p  # noqa: PLC0415
+
+    g2p = _get_g2p()
+    if g2p is None:
+        return False
+    cmu = getattr(g2p, "cmu", None)
+    if not isinstance(cmu, dict):
+        return False
+    return word.lower() in cmu
+
+
+def _classify_latin_hinglish_word(word: str) -> str:
+    w = word.strip(_HI_STRIP_MARKS).lower()
+    if not w:
+        return "hi"
+    if w in _load_hinglish_words():
+        return "hi"
+    if _word_in_cmu(w):
+        return "en"
+    return "hi"
+
+
+def _split_latin_hinglish_runs(text: str) -> list[tuple[str, str]]:
+    pieces = [p for p in _RE_LATIN_SPLIT.split(text) if p]
+    if not pieces:
+        return []
+
+    tagged: list[tuple[str | None, str]] = []
+    for part in pieces:
+        if part.isalpha():
+            tagged.append((_classify_latin_hinglish_word(part), part))
+        else:
+            tagged.append((None, part))
+
+    merged: list[tuple[str, str]] = []
+    pending = ""
+    current_lang: str | None = None
+    buf = ""
+    for lang, part in tagged:
+        if lang is None:
+            if current_lang is None:
+                pending += part
+            else:
+                buf += part
+            continue
+        if current_lang is None:
+            current_lang = lang
+            buf = pending + part
+            pending = ""
+            continue
+        if lang == current_lang:
+            buf += part
+            continue
+        merged.append((current_lang, buf))
+        current_lang = lang
+        buf = part
+    if current_lang is not None:
+        merged.append((current_lang, buf + pending))
+    elif pending:
+        merged.append(("hi", pending))
+    return merged
+
 
 class UnicodeLanguageDetector:
     """Detect language from Unicode character ranges.
@@ -139,13 +232,15 @@ class UnicodeLanguageDetector:
 
         # Latin-script languages available (for disambiguation if needed)
         self._has_sv = "sv" in self.languages
+        self._has_hi = "hi" in self.languages
         self._latin_languages = {
-            lang for lang in languages if lang in ("en", "es", "pt", "fr", "sv")
+            lang for lang in languages if lang in ("en", "es", "pt", "fr", "sv", "hi")
         }
         # Conservative gate for the Swedish per-word post-pass (Issue #539):
         # only when Swedish is requested alongside >=2 Latin-script languages
         # (i.e. genuine code-switching context, not a Swedish-only model).
         self._detect_swedish = self._has_sv and len(self._latin_languages) >= 2
+        self._detect_hinglish = self._has_hi and "en" in self.languages
 
     def detect_char(self, ch: str, context_has_kana: bool = False) -> str | None:  # noqa: PLR0911
         """Detect language for a single character.
@@ -199,6 +294,10 @@ class UnicodeLanguageDetector:
             if self.default_latin_language in self.languages:
                 return self.default_latin_language
             return None
+
+        # Devanagari: U+0900-097F
+        if "\u0900" <= ch <= "\u097f":
+            return "hi" if self._has_hi else None
 
         # Neutral: whitespace, digits, punctuation
         return None
@@ -270,6 +369,9 @@ def _segment_text_multilingual(
     if detector._detect_swedish:
         segments = _refine_latin_segments_for_swedish(segments, detector)
 
+    if detector._detect_hinglish:
+        segments = _refine_latin_segments_for_hinglish(segments, detector)
+
     return segments
 
 
@@ -313,6 +415,28 @@ def _refine_latin_segments_for_swedish(
     return result
 
 
+def _refine_latin_segments_for_hinglish(
+    segments: list[tuple[str, str]],
+    detector: "UnicodeLanguageDetector",
+) -> list[tuple[str, str]]:
+    """Split default-Latin runs into word-level ``hi`` / ``en``."""
+    default = detector.default_latin_language
+    result: list[tuple[str, str]] = []
+    for lang, text in segments:
+        if lang != default:
+            result.append((lang, text))
+            continue
+        result.extend(_split_latin_hinglish_runs(text))
+
+    merged: list[tuple[str, str]] = []
+    for lang, text in result:
+        if merged and merged[-1][0] == lang:
+            merged[-1] = (lang, merged[-1][1] + text)
+        else:
+            merged.append((lang, text))
+    return merged
+
+
 # ---------------------------------------------------------------------------
 # Per-language phonemizer dispatch
 # ---------------------------------------------------------------------------
@@ -353,6 +477,10 @@ def _get_phonemize_func(lang: str):
         from .portuguese import phonemize_european_portuguese  # noqa: PLC0415
 
         func = phonemize_european_portuguese
+    elif lang == "hi":
+        from .hindi import phonemize_hindi  # noqa: PLC0415
+
+        func = phonemize_hindi
     else:
         raise ValueError(f"Unsupported language: {lang}")
 

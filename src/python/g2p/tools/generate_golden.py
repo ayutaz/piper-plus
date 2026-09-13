@@ -17,13 +17,14 @@ from pathlib import Path
 def main():
     from piper_plus_g2p import available_languages, get_phonemizer
 
-    DETERMINISTIC_LANGUAGES = ["es", "fr", "pt", "sv"]
+    DETERMINISTIC_LANGUAGES = ["es", "fr", "pt", "sv", "hi"]
 
     test_texts = {
         "es": ["Hola, ¿cómo estás?", "Buenos días"],
         "fr": ["Bonjour, comment allez-vous?", "Merci beaucoup"],
         "pt": ["Olá, como você está?", "Bom dia"],
         "sv": ["Hej, hur mår du?", "God morgon"],
+        "hi": ["आपका", "नमस्ते"],
     }
 
     golden = {

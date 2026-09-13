@@ -49,3 +49,9 @@ class TestLanguageCode:
 
         p = get_phonemizer("pt")
         assert p.language_code == "pt"
+
+    def test_hindi_language_code(self):
+        from piper_plus_g2p import get_phonemizer
+
+        p = get_phonemizer("hi")
+        assert p.language_code == "hi"

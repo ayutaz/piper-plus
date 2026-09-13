@@ -104,6 +104,7 @@ piper_plus = [
     "voices.json",
     "phonemize/data/zh_en_loanword.json",
     "phonemize/data/sv_function_words.json",
+    "phonemize/data/hi_hinglish_words.json",
 ]
 
 [tool.mypy]

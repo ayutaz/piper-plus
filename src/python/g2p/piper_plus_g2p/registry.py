@@ -28,7 +28,7 @@ from .base import Phonemizer
 _LOGGER = logging.getLogger(__name__)
 
 # Latin-script language priority for default_latin_language detection
-_LATIN_PRIORITY = ("en", "es", "pt", "fr")
+_LATIN_PRIORITY = ("en", "es", "pt", "fr", "hi")
 
 # BCP-47 dialect aliases. Resolved transparently by `PhonemizerRegistry.get`.
 # Keep entries case-insensitive by registering both upper- and lower-case
@@ -55,6 +55,7 @@ _LANGUAGE_TABLE = [
     ("pt", ".portuguese", "PortuguesePhonemizer"),
     ("pt-PT", ".portuguese", "EuropeanPortuguesePhonemizer"),
     ("sv", ".swedish", "SwedishPhonemizer"),
+    ("hi", ".hindi", "HindiPhonemizer"),
 ]
 
 # Human-readable skip reasons for languages with optional dependencies

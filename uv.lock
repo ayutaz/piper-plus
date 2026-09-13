@@ -3166,7 +3166,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
 ]
-provides-extras = ["ja", "en", "zh", "ko", "es", "fr", "pt", "sv", "all", "dev"]
+provides-extras = ["ja", "en", "zh", "ko", "es", "fr", "pt", "sv", "hi", "all", "dev"]
 
 [[package]]
 name = "piper-plus-workspace"

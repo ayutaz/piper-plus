@@ -112,13 +112,17 @@ class UnicodeLanguageDetector:
 
         # Latin-script languages available (for disambiguation if needed)
         self._has_sv = "sv" in self.languages
+        self._has_hi = "hi" in self.languages
         self._latin_languages = {
-            lang for lang in languages if lang in ("en", "es", "pt", "fr", "sv")
+            lang for lang in languages if lang in ("en", "es", "pt", "fr", "sv", "hi")
         }
         # Conservative gate for the Swedish per-word post-pass (Issue #539):
         # only when Swedish is requested alongside >=2 Latin-script languages
         # (i.e. genuine code-switching context, not a Swedish-only model).
         self._detect_swedish = self._has_sv and len(self._latin_languages) >= 2
+        # Hinglish word-level split: Latin is shared with English, so one ASCII
+        # run must become [hi][en][hi]… when both languages are requested.
+        self._detect_hinglish = self._has_hi and "en" in self.languages
 
     def detect_char(self, ch: str, context_has_kana: bool = False) -> str | None:  # noqa: PLR0911
         """Detect language for a single character.
@@ -217,6 +221,11 @@ class UnicodeLanguageDetector:
         ):
             return self._default_latin
 
+        # Devanagari: U+0900-097F (Hindi and related). Danda / digits in this
+        # block are treated as Hindi so they attach to the surrounding run.
+        if 0x0900 <= code <= 0x097F:
+            return "hi" if self._has_hi else None
+
         # Neutral: whitespace, digits, ASCII punctuation, etc.
         return None
 
@@ -301,6 +310,9 @@ def _segment_text_multilingual(
     if detector._detect_swedish:
         segments = _refine_latin_segments_for_swedish(segments, detector)
 
+    if detector._detect_hinglish:
+        segments = _refine_latin_segments_for_hinglish(segments, detector)
+
     return segments
 
 
@@ -342,6 +354,34 @@ def _refine_latin_segments_for_swedish(
                 break
         result.append(("sv", text) if strong else (default, text))
     return result
+
+
+def _refine_latin_segments_for_hinglish(
+    segments: list[tuple[str, str]],
+    detector: "UnicodeLanguageDetector",
+) -> list[tuple[str, str]]:
+    """Split default-Latin (English) runs into word-level ``hi`` / ``en``.
+
+    Devanagari ``hi`` segments and non-default languages are left untouched.
+    Adjacent runs of the same language are merged after the split.
+    """
+    from .hindi import split_latin_hinglish_runs  # noqa: PLC0415
+
+    default = detector.default_latin_language
+    result: list[tuple[str, str]] = []
+    for lang, text in segments:
+        if lang != default:
+            result.append((lang, text))
+            continue
+        result.extend(split_latin_hinglish_runs(text))
+
+    merged: list[tuple[str, str]] = []
+    for lang, text in result:
+        if merged and merged[-1][0] == lang:
+            merged[-1] = (lang, merged[-1][1] + text)
+        else:
+            merged.append((lang, text))
+    return merged
 
 
 class MultilingualPhonemizer(Phonemizer):
