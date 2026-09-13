@@ -163,7 +163,7 @@ func parseHexCodepoint(s string) (int64, error) {
 }
 
 // ===========================================================================
-// PUA full map consistency — verify all 99 fixedPUA entries round-trip (PUA v2)
+// PUA full map consistency — verify all 113 fixedPUA entries round-trip
 // ===========================================================================
 
 func TestGolden_PUAFullMapRoundTrip(t *testing.T) {

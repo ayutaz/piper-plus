@@ -10,7 +10,7 @@
 // fallible initializer when constructing `tokenToPuaTable`.
 //
 // These XCTest assertions provide a fast in-process check that:
-//   - the 99-entry count matches Rust and Python G2P
+//   - the 113-entry count matches Rust and Python G2P
 //   - `compatVersion` matches the canonical `PUA_COMPAT_VERSION`
 //   - every codepoint is inside the PUA range (E000–F8FF)
 //   - no two tokens share a codepoint (would corrupt round-trip)
@@ -26,9 +26,9 @@ import XCTest
 final class PUAMapTests: XCTestCase {
     func testFixedMapEntryCount() {
         XCTAssertEqual(
-            PUAMap.fixedMap.count, 99,
+            PUAMap.fixedMap.count, 113,
             """
-            PUAMap.fixedMap must have exactly 99 entries to match
+            PUAMap.fixedMap must have exactly 113 entries to match
             src/rust/piper-plus-g2p/src/token_map.rs::FIXED_PUA_MAP and
             src/python/g2p/piper_plus_g2p/data/pua.json. If pua.json
             was bumped to v3, update PUAMap.swift and PUAMap.compatVersion.

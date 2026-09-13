@@ -48,9 +48,7 @@ class TestM12PhonemeInventory:
             ch = map_token(lv)
             assert len(ch) == 1, f"{lv!r} should map to single PUA char"
             cp = ord(ch)
-            assert 0xE059 <= cp <= 0xE061, (
-                f"{lv!r} PUA 0x{cp:04X} outside SV range"
-            )
+            assert 0xE059 <= cp <= 0xE061, f"{lv!r} PUA 0x{cp:04X} outside SV range"
 
     @pytest.mark.unit
     def test_pua_assignments_are_unique(self):
@@ -64,10 +62,8 @@ class TestM12PhonemeInventory:
 
     @pytest.mark.unit
     def test_pua_max_codepoint(self):
-        # PUA v2 (2026-05): added en/fr/pt multi-CP entries at 0xE062-0xE064.
-        # Allocation map lives in docs/spec/pua-contract.toml.
         max_cp = max(FIXED_PUA_MAPPING.values())
-        assert max_cp <= 0xE064, f"Max PUA codepoint 0x{max_cp:04X} exceeds PUA v2 range"
+        assert max_cp <= 0xE072, f"Max PUA codepoint 0x{max_cp:04X} exceeds Hindi range"
 
     @pytest.mark.unit
     def test_sv_pua_range(self):
@@ -99,9 +95,7 @@ class TestM12PhonemeInventory:
         long_vowels = ["iː", "yː", "eː", "ɛː", "øː", "ɑː", "oː", "uː", "ʉː"]
         for token in long_vowels:
             ch = TOKEN2CHAR[token]
-            assert CHAR2TOKEN[ch] == token, (
-                f"Bidirectional mismatch for {token!r}"
-            )
+            assert CHAR2TOKEN[ch] == token, f"Bidirectional mismatch for {token!r}"
 
     @pytest.mark.unit
     def test_map_token_idempotent(self):
@@ -112,8 +106,12 @@ class TestM12PhonemeInventory:
     @pytest.mark.unit
     def test_existing_ja_pua_unchanged(self):
         ja_mappings = {
-            "a:": 0xE000, "i:": 0xE001, "u:": 0xE002,
-            "e:": 0xE003, "o:": 0xE004, "cl": 0xE005,
+            "a:": 0xE000,
+            "i:": 0xE001,
+            "u:": 0xE002,
+            "e:": 0xE003,
+            "o:": 0xE004,
+            "cl": 0xE005,
         }
         for token, cp in ja_mappings.items():
             assert FIXED_PUA_MAPPING[token] == cp
@@ -179,7 +177,7 @@ class TestM11SampaToIpa:
 
     @pytest.mark.unit
     def test_sampa_to_ipa_tj_sound(self):
-        assert convert_sampa_to_ipa('"s\' I n d') == "ˈɕɪnd"
+        assert convert_sampa_to_ipa("\"s' I n d") == "ˈɕɪnd"
 
     @pytest.mark.unit
     def test_sampa_to_ipa_retroflex(self):
@@ -195,7 +193,7 @@ class TestM11SampaToIpa:
 
     @pytest.mark.unit
     def test_sampa_to_ipa_secondary_stress(self):
-        assert convert_sampa_to_ipa('%h }: s') == "ˌhʉːs"
+        assert convert_sampa_to_ipa("%h }: s") == "ˌhʉːs"
 
     @pytest.mark.unit
     def test_sampa_to_ipa_g_to_ipa_g(self):
@@ -269,7 +267,7 @@ class TestM11Parsing:
 
     @pytest.mark.unit
     def test_parse_valid_line(self):
-        result = parse_nst_line("BARN\t\"b A: n`")
+        result = parse_nst_line('BARN\t"b A: n`')
         assert result is not None
         word, sampa = result
         assert word == "barn"
@@ -278,7 +276,7 @@ class TestM11Parsing:
     @pytest.mark.unit
     def test_nfc_normalization(self):
         # NFD å (a + combining ring above) should normalize to NFC å
-        nfd_line = "A\u030aR\t\"O: r"
+        nfd_line = 'A\u030aR\t"O: r'
         result = parse_nst_line(nfd_line)
         assert result is not None
         word, _ = result
@@ -312,10 +310,21 @@ class TestM11CLI:
     @pytest.mark.unit
     def test_cli_input_not_found(self):
         import subprocess
+
         result = subprocess.run(
-            ["uv", "run", "python", "-m", "piper_train.tools.convert_nst_dictionary",
-             "-i", "nonexistent.txt", "-o", "out.json"],
-            capture_output=True, text=True,
+            [
+                "uv",
+                "run",
+                "python",
+                "-m",
+                "piper_train.tools.convert_nst_dictionary",
+                "-i",
+                "nonexistent.txt",
+                "-o",
+                "out.json",
+            ],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 1
 
@@ -325,17 +334,32 @@ class TestM11CLI:
             inp = Path(tmpdir) / "lexicon.txt"
             out = Path(tmpdir) / "out.json"
 
-            self._make_lexicon([
-                ("BARN", '"b A: n`'),
-                ("FEST", '"f E s t'),
-                ("HUS", '"h }: s'),
-            ], inp)
+            self._make_lexicon(
+                [
+                    ("BARN", '"b A: n`'),
+                    ("FEST", '"f E s t'),
+                    ("HUS", '"h }: s'),
+                ],
+                inp,
+            )
 
             import subprocess
+
             result = subprocess.run(
-                ["uv", "run", "python", "-m", "piper_train.tools.convert_nst_dictionary",
-                 "-i", str(inp), "-o", str(out), "-q"],
-                capture_output=True, text=True,
+                [
+                    "uv",
+                    "run",
+                    "python",
+                    "-m",
+                    "piper_train.tools.convert_nst_dictionary",
+                    "-i",
+                    str(inp),
+                    "-o",
+                    str(out),
+                    "-q",
+                ],
+                capture_output=True,
+                text=True,
                 env={**__import__("os").environ, "PYTHONUTF8": "1"},
             )
             assert result.returncode == 0
@@ -353,10 +377,23 @@ class TestM11CLI:
             self._make_lexicon([("SOL", '"s u: l')], inp)
 
             import subprocess
+
             result = subprocess.run(
-                ["uv", "run", "python", "-m", "piper_train.tools.convert_nst_dictionary",
-                 "-i", str(inp), "-o", str(out), "--gzip", "-q"],
-                capture_output=True, text=True,
+                [
+                    "uv",
+                    "run",
+                    "python",
+                    "-m",
+                    "piper_train.tools.convert_nst_dictionary",
+                    "-i",
+                    str(inp),
+                    "-o",
+                    str(out),
+                    "--gzip",
+                    "-q",
+                ],
+                capture_output=True,
+                text=True,
                 env={**__import__("os").environ, "PYTHONUTF8": "1"},
             )
             assert result.returncode == 0
@@ -375,10 +412,23 @@ class TestM11CLI:
             self._make_lexicon(entries, inp)
 
             import subprocess
+
             result = subprocess.run(
-                ["uv", "run", "python", "-m", "piper_train.tools.convert_nst_dictionary",
-                 "-i", str(inp), "-o", str(out), "--validate", "-q"],
-                capture_output=True, text=True,
+                [
+                    "uv",
+                    "run",
+                    "python",
+                    "-m",
+                    "piper_train.tools.convert_nst_dictionary",
+                    "-i",
+                    str(inp),
+                    "-o",
+                    str(out),
+                    "--validate",
+                    "-q",
+                ],
+                capture_output=True,
+                text=True,
                 env={**__import__("os").environ, "PYTHONUTF8": "1"},
             )
             assert result.returncode == 0
@@ -396,10 +446,23 @@ class TestM11CLI:
             self._make_lexicon(entries, inp)
 
             import subprocess
+
             result = subprocess.run(
-                ["uv", "run", "python", "-m", "piper_train.tools.convert_nst_dictionary",
-                 "-i", str(inp), "-o", str(out), "--validate", "-q"],
-                capture_output=True, text=True,
+                [
+                    "uv",
+                    "run",
+                    "python",
+                    "-m",
+                    "piper_train.tools.convert_nst_dictionary",
+                    "-i",
+                    str(inp),
+                    "-o",
+                    str(out),
+                    "--validate",
+                    "-q",
+                ],
+                capture_output=True,
+                text=True,
                 env={**__import__("os").environ, "PYTHONUTF8": "1"},
             )
             assert result.returncode == 4
@@ -410,17 +473,32 @@ class TestM11CLI:
             inp = Path(tmpdir) / "lexicon.txt"
             out = Path(tmpdir) / "out.json"
 
-            self._make_lexicon([
-                ("ZOO", '"s u: l'),
-                ("ALFA", '"a l f a'),
-                ("BARN", '"b A: n`'),
-            ], inp)
+            self._make_lexicon(
+                [
+                    ("ZOO", '"s u: l'),
+                    ("ALFA", '"a l f a'),
+                    ("BARN", '"b A: n`'),
+                ],
+                inp,
+            )
 
             import subprocess
+
             subprocess.run(
-                ["uv", "run", "python", "-m", "piper_train.tools.convert_nst_dictionary",
-                 "-i", str(inp), "-o", str(out), "-q"],
-                capture_output=True, text=True,
+                [
+                    "uv",
+                    "run",
+                    "python",
+                    "-m",
+                    "piper_train.tools.convert_nst_dictionary",
+                    "-i",
+                    str(inp),
+                    "-o",
+                    str(out),
+                    "-q",
+                ],
+                capture_output=True,
+                text=True,
                 env={**__import__("os").environ, "PYTHONUTF8": "1"},
             )
             raw = out.read_text(encoding="utf-8")

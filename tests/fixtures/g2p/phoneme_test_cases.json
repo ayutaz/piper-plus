@@ -2745,7 +2745,7 @@
       "expected_token_count_min": 2
     }
   ],
-  "pua_map_count": 99,
+  "pua_map_count": 113,
   "pua_spot_checks": [
     {
       "token": "a:",
@@ -2992,7 +2992,21 @@
     "\u0289\u02d0": "0xE061",
     "\u0254\u026a": "0xE062",
     "\u0153\u0303": "0xE063",
-    "\u0250\u0303": "0xE064"
+    "\u0250\u0303": "0xE064",
+    "t\u032a": "0xE065",
+    "d\u032a": "0xE066",
+    "t\u032a\u02b0": "0xE067",
+    "d\u032a\u02b1": "0xE068",
+    "\u0288\u02b0": "0xE069",
+    "\u0256\u02b1": "0xE06A",
+    "b\u02b1": "0xE06B",
+    "d\u02b1": "0xE06C",
+    "g\u02b1": "0xE06D",
+    "t\u0283\u02b0": "0xE06E",
+    "d\u0292\u02b1": "0xE06F",
+    "\u027d\u02b1": "0xE070",
+    "\u0259\u0303": "0xE071",
+    "q_uvular": "0xE072"
   },
   "detect_test_cases": [
     {

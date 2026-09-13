@@ -1,7 +1,7 @@
 // PUAMap.swift — Private Use Area codepoint mapping.
 //
 // Mirrors `src/rust/piper-plus-g2p/src/token_map.rs::FIXED_PUA_MAP` exactly
-// (99 entries). The Rust phonemizer encodes every multi-character token as
+// (113 entries). The Rust phonemizer encodes every multi-character token as
 // a single PUA codepoint before returning it through the FFI, so callers
 // (including Swift tests using the cross-runtime fixture) need this map to
 // translate human-readable token names like "rr" or "cl" back to the PUA
@@ -16,7 +16,7 @@ public enum PUAMap {
     /// Compatibility version (matches Rust `PUA_COMPAT_VERSION`).
     public static let compatVersion: UInt32 = 2
 
-    /// All 99 (token, codepoint) pairs in canonical order.
+    /// All 113 (token, codepoint) pairs in canonical order.
     public static let fixedMap: [(String, UInt32)] = [
         // === Japanese (U+E000-E01C) ===
         // Long vowels
@@ -146,6 +146,21 @@ public enum PUAMap {
         ("\u{0254}\u{026A}", 0xE062),
         ("\u{0153}\u{0303}", 0xE063),
         ("\u{0250}\u{0303}", 0xE064),
+        // === Hindi (U+E065-E072) ===
+        ("t\u{032a}", 0xE065),
+        ("d\u{032a}", 0xE066),
+        ("t\u{032a}\u{02b0}", 0xE067),
+        ("d\u{032a}\u{02b1}", 0xE068),
+        ("\u{0288}\u{02b0}", 0xE069),
+        ("\u{0256}\u{02b1}", 0xE06A),
+        ("b\u{02b1}", 0xE06B),
+        ("d\u{02b1}", 0xE06C),
+        ("g\u{02b1}", 0xE06D),
+        ("t\u{0283}\u{02b0}", 0xE06E),
+        ("d\u{0292}\u{02b1}", 0xE06F),
+        ("\u{027d}\u{02b1}", 0xE070),
+        ("\u{0259}\u{0303}", 0xE071),
+        ("q_uvular", 0xE072),
     ]
 
     private static let tokenToPuaTable: [String: Character] = {

@@ -13,7 +13,7 @@
 
 [meta]
 spec_version = "2.0"
-last_updated = "2026-05-05"
+last_updated = "2026-09-14"
 applies_to = ["python", "rust", "go", "cpp", "csharp", "wasm-js", "swift"]
 # kotlin-android is delegated via JNI to the Rust PUA map (no separate constants)
 canonical_source = "src/python/g2p/piper_plus_g2p/data/pua.json"
@@ -69,6 +69,7 @@ inventory_lists = [
     "_PORTUGUESE_PHONEMES",
     "_KOREAN_PHONEMES",
     "_SWEDISH_PHONEMES",
+    "_HINDI_PHONEMES",
 ]
 rule = "Any multi-codepoint token in any inventory list must appear as a token in pua.json"
 
@@ -115,7 +116,8 @@ rule = "All listed values must equal pua.json's version field"
 "U+E056-E058" = "French nasal vowels (ɛ̃, ɑ̃, ɔ̃)"
 "U+E059-E061" = "Swedish long vowels (9 entries)"
 "U+E062-E064" = "Multi-codepoint additions v2 (ɔɪ, œ̃, ɐ̃)"
-"U+E065-"     = "(future allocations)"
+"U+E065-E072" = "Hindi (14 entries: dentals, breathy/aspirated, ə̃, q_uvular)"
+"U+E073-"     = "(future allocations / dynamic PUA)"
 
 # ============================================================================
 # CI enforcement

@@ -154,6 +154,23 @@ FIXED_PUA_MAPPING = {
     "ɔɪ": 0xE062,  # OY  English diphthong
     "œ̃": 0xE063,  # oe-tilde  French nasal open-mid front rounded
     "ɐ̃": 0xE064,  # a-tilde  Portuguese nasal near-open central
+    # =======================================================================
+    # Hindi (HI) — U+E065–U+E072
+    # =======================================================================
+    "t̪": 0xE065,  # dental त
+    "d̪": 0xE066,  # dental द
+    "t̪ʰ": 0xE067,  # थ
+    "d̪ʱ": 0xE068,  # ध
+    "ʈʰ": 0xE069,  # ठ
+    "ɖʱ": 0xE06A,  # ढ
+    "bʱ": 0xE06B,  # भ
+    "dʱ": 0xE06C,  # breathy alveolar
+    "gʱ": 0xE06D,  # घ
+    "tʃʰ": 0xE06E,  # छ
+    "dʒʱ": 0xE06F,  # झ
+    "ɽʱ": 0xE070,  # ढ़
+    "ə̃": 0xE071,  # nasal schwa
+    "q_uvular": 0xE072,  # nukta क़ (not JA geminate q)
 }
 
 # Build bidirectional mappings
@@ -167,8 +184,8 @@ for token, codepoint in FIXED_PUA_MAPPING.items():
     CHAR2TOKEN[ch] = token
 
 # Private Use Area for dynamic allocation (starting after the last FIXED codepoint)
-# 0xE064 is the last used fixed codepoint (PT ɐ̃), so dynamic starts at 0xE065.
-_PUA_START = 0xE065
+# 0xE072 is the last used fixed codepoint (HI q_uvular), so dynamic starts at 0xE073.
+_PUA_START = 0xE073
 _next = _PUA_START
 
 

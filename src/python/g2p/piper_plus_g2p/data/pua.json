@@ -100,6 +100,20 @@
     {"token": "\u0289\u02d0", "codepoint": "0xE061", "language": "sv", "description": "close central rounded long"},
     {"token": "\u0254\u026a", "codepoint": "0xE062", "language": "en", "description": "Diphthong \u0254\u026a (English OY)"},
     {"token": "\u0153\u0303", "codepoint": "0xE063", "language": "fr", "description": "Nasal open-mid front rounded vowel \u0153\u0303"},
-    {"token": "\u0250\u0303", "codepoint": "0xE064", "language": "pt", "description": "Nasal near-open central vowel \u0250\u0303"}
+    {"token": "\u0250\u0303", "codepoint": "0xE064", "language": "pt", "description": "Nasal near-open central vowel \u0250\u0303"},
+    {"token": "t\u032a", "codepoint": "0xE065", "language": "hi", "description": "Dental voiceless stop t\u032a (\u0924)"},
+    {"token": "d\u032a", "codepoint": "0xE066", "language": "hi", "description": "Dental voiced stop d\u032a (\u0926)"},
+    {"token": "t\u032a\u02b0", "codepoint": "0xE067", "language": "hi", "description": "Dental aspirated stop t\u032a\u02b0 (\u0925)"},
+    {"token": "d\u032a\u02b1", "codepoint": "0xE068", "language": "hi", "description": "Dental breathy stop d\u032a\u02b1 (\u0927)"},
+    {"token": "\u0288\u02b0", "codepoint": "0xE069", "language": "hi", "description": "Retroflex aspirated stop \u0288\u02b0 (\u0920)"},
+    {"token": "\u0256\u02b1", "codepoint": "0xE06A", "language": "hi", "description": "Retroflex breathy stop \u0256\u02b1 (\u0922)"},
+    {"token": "b\u02b1", "codepoint": "0xE06B", "language": "hi", "description": "Breathy voiced bilabial b\u02b1 (\u092d)"},
+    {"token": "d\u02b1", "codepoint": "0xE06C", "language": "hi", "description": "Breathy voiced alveolar d\u02b1"},
+    {"token": "g\u02b1", "codepoint": "0xE06D", "language": "hi", "description": "Breathy voiced velar g\u02b1 (\u0918)"},
+    {"token": "t\u0283\u02b0", "codepoint": "0xE06E", "language": "hi", "description": "Aspirated postalveolar affricate t\u0283\u02b0 (\u091b)"},
+    {"token": "d\u0292\u02b1", "codepoint": "0xE06F", "language": "hi", "description": "Breathy postalveolar affricate d\u0292\u02b1 (\u091d)"},
+    {"token": "\u027d\u02b1", "codepoint": "0xE070", "language": "hi", "description": "Breathy retroflex flap \u027d\u02b1 (\u0922\u093c)"},
+    {"token": "\u0259\u0303", "codepoint": "0xE071", "language": "hi", "description": "Nasal schwa \u0259\u0303 (anusv\u0101ra)"},
+    {"token": "q_uvular", "codepoint": "0xE072", "language": "hi", "description": "Uvular stop /q/ (nukta \u0915\u093c); not JA geminate q"}
   ]
 }

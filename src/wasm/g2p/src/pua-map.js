@@ -1,10 +1,10 @@
 /**
  * PUA (Private Use Area) mapping table.
  *
- * Canonical source: src/python/g2p/piper_plus_g2p/data/pua.json (99 entries)
+ * Canonical source: src/python/g2p/piper_plus_g2p/data/pua.json (113 entries)
  *
  * Multi-character phoneme tokens are mapped to single Unicode PUA codepoints
- * (U+E000..U+E064) so that the model's phoneme_id_map can look them up as
+ * (U+E000..U+E072) so that the model's phoneme_id_map can look them up as
  * single characters.
  *
  * @module pua-map
@@ -38,7 +38,7 @@ export function checkPuaCompat(modelVersion) {
 }
 
 /**
- * Forward mapping: multi-char token -> PUA character (99 entries).
+ * Forward mapping: multi-char token -> PUA character (113 entries).
  * @type {Record<string, string>}
  */
 export const PUA_MAP = {
@@ -156,6 +156,22 @@ export const PUA_MAP = {
   "\u0254\u026A": "\uE062", // ɔɪ  English diphthong (OY)
   "\u0153\u0303": "\uE063", // œ̃ French nasal open-mid front rounded vowel
   "\u0250\u0303": "\uE064", // ɐ̃ Portuguese nasal near-open central vowel
+
+  // --- Hindi (hi) --- 14 entries (U+E065-E072)
+  "t\u032A": "\uE065", // t̪ dental त
+  "d\u032A": "\uE066", // d̪ dental द
+  "t\u032A\u02B0": "\uE067", // t̪ʰ थ
+  "d\u032A\u02B1": "\uE068", // d̪ʱ ध
+  "\u0288\u02B0": "\uE069", // ʈʰ ठ
+  "\u0256\u02B1": "\uE06A", // ɖʱ ढ
+  "b\u02B1": "\uE06B", // bʱ भ
+  "d\u02B1": "\uE06C", // dʱ breathy alveolar
+  "g\u02B1": "\uE06D", // gʱ घ
+  "t\u0283\u02B0": "\uE06E", // tʃʰ छ
+  "d\u0292\u02B1": "\uE06F", // dʒʱ झ
+  "\u027D\u02B1": "\uE070", // ɽʱ ढ़
+  "\u0259\u0303": "\uE071", // ə̃ nasal schwa
+  q_uvular: "\uE072", // uvular /q/ (nukta क़)
 };
 
 /**

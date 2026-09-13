@@ -1,10 +1,10 @@
 """Language-specific phoneme-to-ID maps for Piper TTS.
 
-Built-in ID maps for Japanese (single-language) and the 8-language
-multilingual map (JA/EN/ZH/ES/FR/PT/KO/SV).  The multilingual map is
-returned for composite language codes (e.g. ``"ja-en-zh-ko-es-fr-pt-sv"``),
-``"multilingual"``, or single codes ``"ko"`` / ``"sv"`` that require the
-combined symbol set.
+Built-in ID maps for Japanese (single-language) and the multilingual
+map (JA/EN/ZH/ES/FR/PT/KO/SV/HI).  The multilingual map is returned for
+composite language codes (e.g. ``"ja-en-zh-ko-es-fr-pt-sv"``),
+``"multilingual"``, or single codes ``"ko"`` / ``"sv"`` / ``"hi"`` that
+require the combined symbol set.
 """
 
 from __future__ import annotations
@@ -336,11 +336,33 @@ _SWEDISH_PHONEMES: list[str] = [
     "ʉː",
 ]
 
+_HINDI_PHONEMES: list[str] = [
+    # Single-codepoint (no PUA). Appended after SV so ids 0-184 stay frozen.
+    "ɽ",  # retroflex flap (ड़)
+    "ʋ",  # labiodental approximant (व)
+    "ɦ",  # voiced glottal fricative (ह)
+    # Multi-codepoint -> PUA U+E065-E072
+    "t̪",  # dental त
+    "d̪",  # dental द
+    "t̪ʰ",  # थ
+    "d̪ʱ",  # ध
+    "ʈʰ",  # ठ
+    "ɖʱ",  # ढ
+    "bʱ",  # भ
+    "dʱ",  # breathy alveolar (inventory completeness)
+    "gʱ",  # घ
+    "tʃʰ",  # छ
+    "dʒʱ",  # झ
+    "ɽʱ",  # ढ़
+    "ə̃",  # nasal schwa / anusvāra
+    "q_uvular",  # nukta क़; distinct from JA geminate "q"
+]
+
 
 def _build_multilingual_id_map() -> dict[str, list[int]]:
     """Build the combined multilingual phoneme_id_map.
 
-    Symbol ordering: special tokens -> JA -> EN -> ZH -> ES -> FR -> PT -> KO -> SV.
+    Symbol ordering: special tokens -> JA -> EN -> ZH -> ES -> FR -> PT -> KO -> SV -> HI.
     Shared symbols deduplicated (first occurrence wins).
     """
     all_inventories = [
@@ -352,6 +374,7 @@ def _build_multilingual_id_map() -> dict[str, list[int]]:
         _PORTUGUESE_PHONEMES,
         _KOREAN_PHONEMES,
         _SWEDISH_PHONEMES,
+        _HINDI_PHONEMES,
     ]
     symbols: list[str] = []
     seen: set[str] = set()
@@ -395,7 +418,7 @@ def get_phoneme_id_map(language: str) -> dict[str, list[int]]:
     ------
     ValueError
         If *language* is not a recognized code.  Supported single-language
-        codes: ``"ja"``, ``"ko"``, ``"sv"``.  Composite codes (e.g.
+        codes: ``"ja"``, ``"ko"``, ``"sv"``, ``"hi"``.  Composite codes (e.g.
         ``"ja-en-zh-ko-es-fr-pt-sv"``) and ``"multilingual"`` also work.
     """
     if language == "ja":
@@ -403,7 +426,7 @@ def get_phoneme_id_map(language: str) -> dict[str, list[int]]:
 
     # Single-language codes that use the multilingual map
     # (ko and sv share symbols with other languages via the unified map)
-    if language in ("ko", "sv"):
+    if language in ("ko", "sv", "hi"):
         return _build_multilingual_id_map()
 
     # Multilingual composite code (e.g. "ja-en-zh-es-fr-pt",

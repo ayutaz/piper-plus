@@ -6,21 +6,21 @@ namespace PiperPlus.Core.Mapping;
 /// Provides bidirectional mapping between multi-character phoneme tokens
 /// and single PUA (Private Use Area) codepoints used by the Piper TTS pipeline.
 /// <para>
-/// The 96 fixed entries mirror <c>FIXED_PUA_MAPPING</c> in the Python
+/// The 113 fixed entries mirror <c>FIXED_PUA_MAPPING</c> in the Python
 /// <c>token_mapper.py</c> and the C++ phonemizer implementations.
 /// </para>
 /// </summary>
 public static class OpenJTalkToPiperMapping
 {
     // ----------------------------------------------------------------
-    // Fixed PUA mapping table (U+E000 .. U+E064) -- 99 entries
+    // Fixed PUA mapping table (U+E000 .. U+E072) -- 113 entries
     // ----------------------------------------------------------------
 
     /// <summary>
     /// Multi-character token to single PUA character.
     /// </summary>
     public static IReadOnlyDictionary<string, char> TokenToChar { get; } =
-        new Dictionary<string, char>(99)
+        new Dictionary<string, char>(113)
         {
             // =============================================================
             // Japanese (JA) — U+E000–U+E01C (29 entries)
@@ -192,6 +192,24 @@ public static class OpenJTalkToPiperMapping
             ["ɔɪ"] = '',     // ɔɪ  English diphthong (OY)
             ["œ̃"] = '',     // œ̃   French nasal open-mid front rounded vowel
             ["ɐ̃"] = '',     // ɐ̃   Portuguese nasal near-open central vowel
+
+            // =============================================================
+            // Hindi (HI) — U+E065–U+E072 (14 entries)
+            // =============================================================
+            ["t\u032A"] = '\uE065',          // t̪  dental त
+            ["d\u032A"] = '\uE066',          // d̪  dental द
+            ["t\u032A\u02B0"] = '\uE067',    // t̪ʰ थ
+            ["d\u032A\u02B1"] = '\uE068',    // d̪ʱ ध
+            ["\u0288\u02B0"] = '\uE069',     // ʈʰ ठ
+            ["\u0256\u02B1"] = '\uE06A',     // ɖʱ ढ
+            ["b\u02B1"] = '\uE06B',          // bʱ भ
+            ["d\u02B1"] = '\uE06C',          // dʱ breathy alveolar
+            ["g\u02B1"] = '\uE06D',          // gʱ घ
+            ["t\u0283\u02B0"] = '\uE06E',    // tʃʰ छ
+            ["d\u0292\u02B1"] = '\uE06F',    // dʒʱ झ
+            ["\u027D\u02B1"] = '\uE070',     // ɽʱ ढ़
+            ["\u0259\u0303"] = '\uE071',     // ə̃  nasal schwa
+            ["q_uvular"] = '\uE072',         // uvular /q/ (nukta क़)
         }.AsReadOnly();
 
     /// <summary>

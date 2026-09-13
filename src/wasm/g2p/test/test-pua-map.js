@@ -47,13 +47,13 @@ describe('PUA_MAP table', () => {
             'Duplicate PUA codepoints detected');
     });
 
-    it('should map all values to PUA range U+E000..U+E064', () => {
+    it('should map all values to PUA range U+E000..U+E072', () => {
         for (const [token, puaChar] of Object.entries(PUA_MAP)) {
             const code = puaChar.codePointAt(0);
             assert.ok(
-                code >= 0xE000 && code <= 0xE064,
+                code >= 0xE000 && code <= 0xE072,
                 `Token "${token}" maps to U+${code.toString(16).toUpperCase()}, ` +
-                `outside expected range U+E000..U+E064`
+                `outside expected range U+E000..U+E072`
             );
         }
     });
@@ -169,7 +169,7 @@ describe('unmapToken', () => {
 // ---------------------------------------------------------------------------
 
 describe('PUA round-trip', () => {
-    it('should round-trip all 99 entries correctly', () => {
+    it('should round-trip all PUA_MAP entries correctly', () => {
         for (const [token, puaChar] of Object.entries(PUA_MAP)) {
             const mapped = mapToken(token);
             assert.equal(mapped, puaChar,
@@ -262,8 +262,8 @@ describe('PUA full individual verification', () => {
             // Codepoint range check
             const code = puaChar.codePointAt(0);
             assert.ok(
-                code >= 0xE000 && code <= 0xE064,
-                `Codepoint U+${code.toString(16).toUpperCase()} outside range U+E000..U+E064`
+                code >= 0xE000 && code <= 0xE072,
+                `Codepoint U+${code.toString(16).toUpperCase()} outside range U+E000..U+E072`
             );
         });
     }

@@ -41,7 +41,7 @@ def _load_pua_mapping() -> dict[str, int]:
 
 
 # -------------------------------------------------------------------------
-# Fixed PUA mapping table (99 entries — PUA v2)
+# Fixed PUA mapping table (113 entries — PUA v2 + Hindi U+E065-E072)
 # CRITICAL: Every codepoint here is baked into trained models.
 # Do NOT change assigned codepoints.
 # Loaded from data/pua.json — the single source of truth.

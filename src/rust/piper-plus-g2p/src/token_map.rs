@@ -21,7 +21,7 @@ pub fn check_pua_compat(model_version: Option<u32>) -> Result<(), String> {
     }
 }
 
-/// 固定 PUA マッピング (99 エントリ)
+/// 固定 PUA マッピング (113 エントリ)
 /// 多文字音素トークン → Unicode Private Use Area コードポイント
 pub static FIXED_PUA_MAP: LazyLock<Vec<(&'static str, u32)>> = LazyLock::new(|| {
     vec![
@@ -155,6 +155,21 @@ pub static FIXED_PUA_MAP: LazyLock<Vec<(&'static str, u32)>> = LazyLock::new(|| 
         ("\u{0254}\u{026A}", 0xE062), // ɔɪ  English diphthong (OY)
         ("\u{0153}\u{0303}", 0xE063), // œ̃   French nasal open-mid front rounded vowel
         ("\u{0250}\u{0303}", 0xE064), // ɐ̃   Portuguese nasal near-open central vowel
+        // === Hindi (U+E065-E072) ===
+        ("t\u{032a}", 0xE065),           // t̪  dental त
+        ("d\u{032a}", 0xE066),           // d̪  dental द
+        ("t\u{032a}\u{02b0}", 0xE067),   // t̪ʰ थ
+        ("d\u{032a}\u{02b1}", 0xE068),   // d̪ʱ ध
+        ("\u{0288}\u{02b0}", 0xE069),    // ʈʰ ठ
+        ("\u{0256}\u{02b1}", 0xE06A),    // ɖʱ ढ
+        ("b\u{02b1}", 0xE06B),           // bʱ भ
+        ("d\u{02b1}", 0xE06C),           // dʱ breathy alveolar
+        ("g\u{02b1}", 0xE06D),           // gʱ घ
+        ("t\u{0283}\u{02b0}", 0xE06E),   // tʃʰ छ
+        ("d\u{0292}\u{02b1}", 0xE06F),   // dʒʱ झ
+        ("\u{027d}\u{02b1}", 0xE070),    // ɽʱ ढ़
+        ("\u{0259}\u{0303}", 0xE071),    // ə̃  nasal schwa
+        ("q_uvular", 0xE072),           // uvular /q/ (nukta क़)
     ]
 });
 

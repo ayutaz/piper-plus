@@ -25,6 +25,7 @@ from piper_plus_g2p.encode.id_maps import (
     _CHINESE_PHONEMES,
     _ENGLISH_PHONEMES,
     _FRENCH_PHONEMES,
+    _HINDI_PHONEMES,
     _JAPANESE_PHONEMES,
     _KOREAN_PHONEMES,
     _PORTUGUESE_PHONEMES,
@@ -121,6 +122,7 @@ class TestInventoryCoverage:
             ("_PORTUGUESE_PHONEMES", _PORTUGUESE_PHONEMES),
             ("_KOREAN_PHONEMES", _KOREAN_PHONEMES),
             ("_SWEDISH_PHONEMES", _SWEDISH_PHONEMES),
+            ("_HINDI_PHONEMES", _HINDI_PHONEMES),
         ],
     )
     def test_inventory_multi_codepoint_tokens_have_pua_mapping(
