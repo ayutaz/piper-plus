@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789746651384,
+  "lastUpdate": 1789769972041,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1020,6 +1020,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 211,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "69054a2db6a3012ebf6f9e7f3005fb7013106da2",
+          "message": "fix(timing): C++ CLI に srt を露出し SRT の ms 丸めを 6 ランタイムで統一する (#682)\n\n* fix(timing): C++ CLI に srt を露出し SRT の ms 丸めを 6 ランタイムで統一する\n\n#657: spec の [implementations.cpp].formats は 6 ランタイム全てと同じく srt を\n含むと宣言し、README 5 言語版も JSON/TSV/SRT と記載し、実装\npiper::outputTimingsAsSRT とその単体テストも存在していたが、CLI からの露出だけ\nが欠けていた。--timing-format srt は exit 1 していた。\n\n#681 (本対応中に発見): [output_formats.srt] は書式を規定していたが丸め規則を\n規定しておらず、言語既定がそのまま出ていた。Python の round() と .NET の\nMath.Round(double) は half-to-even、Rust / Go / JS / C++ は half-away-from-zero\nのため、Python (canonical) と C# だけが .5 境界で 1ms 早い値を出力していた。\n逸脱している 2 実装を含む 3 ソースが「Rust に合わせる」と明記しており、両言語の\n既定が ToEven であることを踏まえずに round を呼んでいたのが原因。Python の\ndoctest が誤った期待値を固定してもいた。\n\n検出されなかった理由は srt の parity fixture が無く、6 ランタイムいずれの既存\nテストも小数部が .5 にならない値しか使っていなかったこと。spec に丸め規則と\n.5 境界ケースを追加し、6 ランタイムにテストを入れ、言語既定へ逆行しないことを\n検査する gate を新設した。\n\n* fix(timing): レビュー指摘に対応 — SRT cue index の locale 固定と負値 clamp\n\n複数エージェントによるレビューで 3 件の実害を検出したため対応する。\n\n#684: outputTimingsAsSRT の cue index が呼び出し元の locale を継承し、1000\n以降が `1,000` になる。CLI が global に en_US.UTF-8 を設定し ofstream が\ngrouping numpunct を継承するため。同ファイルの outputTimingsAsTSV はまさに\nこの理由で classic locale を imbue しているが SRT 側は漏れていた。timestamp は\nsnprintf 製なので影響は index のみ。1000 エントリでの回帰テストを追加し、修正前\nに `1,000` で fail することを確認した。--timing-format srt の露出により初めて\nCLI から到達可能になる経路なので本 PR で直す。\n\n#681 の追加分: SRT の負値 clamp を contract に明記し、唯一 clamp していなかった\nJS を修正した。JS は -1500ms に対し `-1:-1:-2,-500` という符号が全フィールドに\n漏れた文字列を返していた (実測)。併せて rounding の説明が「Rust/Go/JS/C++ は\nいずれも half-away-from-zero」と書いていた点を訂正した — 正確には Rust/Go/C# が\nhalf-away-from-zero、Python/JS/C++ が half-up で、clamp により定義域が ms >= 0\nに限定されるため一致する。この不正確な記述が、唯一 clamp を欠いていた JS を\nちょうど覆っていた。\n\ngate に clamp_idiom 検査を追加し、clamp 除去も検出することを確認した。\n\nWindows の CRLF (C# の StreamWriter.NewLine 未設定 / C++ CLI の text mode) は\njson/tsv にも影響する既存問題のため #683 として分離した。\n\n* fix(timing): floor(ms+0.5) の丸め誤差を排し gate のすり抜け 3 種を塞ぐ\n\n複数エージェントのレビューで、直前のコミットが canonical ではなく C++ の欠陥\nイディオムに合わせていたことが実証された。\n\n#681 の訂正: math.floor(ms + 0.5) と (long long)(ms + 0.5) は round の等価物\nではない。0.5 の加算が binary64 で丸め上がるため ms = 0.49999999999999994 で\n和がちょうど 1.0 になり、イディオムは 1、Rust/Go/JS の round は 0 を返す\n(ECMA-262 が Math.round の注記で挙げる反例)。6 実装すべてを実測で確認した。\nPython を小数部比較に、C++ を std::llround に変更し、非負入力で 6 ランタイムが\n厳密一致するようにした。contract に本ケースを追加し、float64 formatter を持つ\n4 ランタイムのテストに入れた (C# は float 引数、C++ は秒が float で当該値が\n0.5 に潰れるため requires_float64 として免除)。\n\ngate のすり抜け 3 種を塞いだ (いずれもレビューが mutation で実証):\n- イディオムをコメントに残してコードだけ変更 → コメントと Python docstring を\n  除去してから検索\n- round(ms, 0) が round(ms) の部分文字列でないため forbidden をすり抜ける →\n  正規表現化し floor(ms+0.5) 系 / nearbyint / RoundToEven も追加\n- テスト表を非判別値に「整理」すると 5 ランタイムが黙って判別力を失う →\n  test_file を宣言させ判別ケースの入力リテラルの存在を検査\n\npre-commit.yml の paths に .rs/.go/.cs/.js/.cpp 等を追加した。同 workflow は\n「any source change で全 hook を走らせる」と書いているが実際は .py/.json/.toml\nのみで、cargo fmt / gofmt / go vet / ktlint / swiftformat と本 gate は対象言語\nのファイルだけが変わった PR で一度も実行されていなかった。\n\n書式化出力の cross-runtime 値比較が CI に無い点は #685 として起票した。\n\n* style: codespell の指摘に対応 (retuned -> re-tuned)",
+          "timestamp": "2026-09-19T07:13:47+09:00",
+          "tree_id": "173290ba795f05b555702e16ba2b9c8fa7fb2fab",
+          "url": "https://github.com/ayutaz/piper-plus/commit/69054a2db6a3012ebf6f9e7f3005fb7013106da2"
+        },
+        "date": 1789769970100,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0987,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 25.1,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 25.5,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1191.5,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 210.8,
             "unit": "MB"
           },
           {
