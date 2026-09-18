@@ -99,6 +99,32 @@ updates:
       # ruff version は check_ruff_version_sync.py が検査する pin site を
       # /bump-deps で一括手動更新する (CLAUDE.md「ruff version pin」節 参照)。
       - dependency-name: "ruff"
+      # gradio は dependabot で更新しない (ruff と同型の cross-site pin sync)。
+      # HF Spaces は huggingface-space/README.md frontmatter の sdk_version から
+      # `gradio[oauth,mcp]==<sdk_version>` を requirements.txt と並べて pip install に
+      # 注入するため、両者が一致しないと resolve が 1 pass で解けず BUILD_ERROR になる。
+      # dependabot は requirements.txt だけを bump し README frontmatter を更新できない
+      # ため Layer 0 gate (scripts/check_hf_space_gradio_sync.py) が必ず fail する。
+      # 事例: #649 (6.21.0 → 6.26.0 で test-hf-space fail、close)。
+      # 更新時は README sdk_version と requirements.txt を同時に手動 bump する。
+      - dependency-name: "gradio"
+      # onnxruntime-gpu は dependabot で更新しない (意図的な cap を破るため)。
+      # `>=1.20.1,<1.26` の上限は 1.26+ が libcudart.so.13 (CUDA 13) を要求する一方
+      # DR-001 base image が CUDA 12.8.1 であることに由来する (Issue #527 follow-up)。
+      # dependabot はこの cap を `<1.30` に緩める。check_ort_versions.py /
+      # check_ort_version_drift.py は floor のみを検査するため cap 緩和は gate を
+      # すり抜ける (CI が緑でもマージしてはいけない)。事例: #649。
+      # cap の引き上げは CUDA 13 base image bump とセットで専用 PR で行う。
+      - dependency-name: "onnxruntime-gpu"
+      # pyopenjtalk-plus は dependabot で更新しない (PEP 440 post-release 書き換えバグ)。
+      # post-release への bump 時に root pyproject.toml の `pyopenjtalk-plus>=0.4` を
+      # `pyopenjtalk-plus*` という PEP 508 として不正な requirement に書き換えるため、
+      # `uv sync` が "`project.dependencies[N]` must be pep508" で失敗し
+      # ruff (RUF200) / pre-commit / python-tests が落ちる。
+      # 事例: #650 (0.4.1.post8 → post9 で 4 job fail、close)。
+      # 宣言は既に `>=0.4` で post リリースを許容するため、更新が必要な場合は
+      # `uv lock --upgrade-package pyopenjtalk-plus` で lock のみ手動更新する。
+      - dependency-name: "pyopenjtalk-plus"
 
   # Rust: src/rust (Cargo workspace)
   - package-ecosystem: "cargo"
