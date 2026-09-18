@@ -30,6 +30,19 @@
  * That makes the test deterministic despite the stochastic decoder: it asserts
  * sample COUNTS and the integrity of a known prefix, never waveform content.
  *
+ * One case (GrowthIsIndependentOfPriorBufferContents) additionally compares
+ * lengths across TWO separate inferences, which assumes the duration predictor
+ * is deterministic run-to-run. That holds for this fixture -- its four
+ * RandomNormalLike nodes feed the decoder's z noise, not the DP -- and was
+ * checked over six consecutive runs. If a future fixture makes the DP
+ * stochastic, that one case becomes flaky while the others stay valid, since
+ * only it needs cross-run length equality.
+ *
+ * Detection power, measured by rebuilding against a reverted piper.cpp:
+ * AudioSecondsDescribesOnlyThisCall and PaddedUnitDoesNotTrimTheCallersAudio
+ * fail on the int16 path, the two FloatPath cases fail on the float path, and
+ * the remaining three are pins that stay green (they are labelled as such).
+ *
  * Requires the test model at test/models/multilingual-test-medium.onnx.
  * Auto-skips if it is absent.
  */
@@ -170,8 +183,11 @@ TEST_F(SynthesizeAppendScopeTest, AudioSecondsDescribesOnlyThisCall) {
         << "quadratically in the phrase count (issue #654)";
 }
 
-// #654, second half: realTimeFactor is derived from audioSeconds, so it must
-// follow the same per-call definition.
+// Derived-field consistency pin. NOT a #654 detector: realTimeFactor is
+// computed as inferSeconds / audioSeconds right where audioSeconds is assigned,
+// so this equality holds for the buggy value too -- verified GREEN against a
+// fully reverted piper.cpp. What it pins is that a future change cannot start
+// deriving realTimeFactor from a different length than the one it reports.
 TEST_F(SynthesizeAppendScopeTest, RealTimeFactorMatchesReportedAudioSeconds) {
     const auto phonemes = phonemesOf("Hola, esta es una prueba de audio.");
     ASSERT_FALSE(phonemes.empty());

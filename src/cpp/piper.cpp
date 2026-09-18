@@ -1238,7 +1238,7 @@ static void trimSilenceFloat(std::vector<float> &audioBuffer,
   }
 
   if (startSample > 0 || endSample < totalSamples) {
-    spdlog::debug("Trimming silence: [{}, {}) from {} samples",
+    spdlog::debug("Trimming silence (float): [{}, {}) from {} samples",
                   startSample, endSample, totalSamples);
     if (endSample < totalSamples) {
       audioBuffer.erase(audioBuffer.begin() + base + endSample,
