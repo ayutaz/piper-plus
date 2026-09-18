@@ -195,7 +195,7 @@ jobs:
 
       - name: Initialize CodeQL
         if: steps.should-skip.outputs.skip != 'true'
-        uses: github/codeql-action/init@v3.37.9
+        uses: github/codeql-action/init@v3.38.0
         with:
           # CodeQL は Kotlin を `java-kotlin` 言語として識別する。matrix の
           # 表示用 `kotlin` を init 渡し用にここでマップする。
@@ -209,7 +209,7 @@ jobs:
 
       - name: Build (autobuild for Go)
         if: steps.should-skip.outputs.skip != 'true' && matrix.build-mode == 'autobuild'
-        uses: github/codeql-action/autobuild@v3.37.9
+        uses: github/codeql-action/autobuild@v3.38.0
 
       # `paths-ignore` は build-mode: manual の compiled language には効かない
       # (GitHub Docs: paths/paths-ignore が使えるのは interpreted language と
@@ -298,7 +298,7 @@ jobs:
 
       - name: Perform CodeQL Analysis
         if: steps.should-skip.outputs.skip != 'true'
-        uses: github/codeql-action/analyze@v3.37.9
+        uses: github/codeql-action/analyze@v3.38.0
         with:
           category: "/language:${{ matrix.language == 'kotlin' && 'java-kotlin' || matrix.language }}"
           output: ${{ runner.temp }}/codeql-sarif
