@@ -861,12 +861,21 @@ static bool padPhonemeIds(std::vector<PhonemeId> &phonemeIds,
 // (truncation toward zero), matching int() in the Python implementation.
 //
 // Falls through unchanged when arguments are inconsistent.
+// `baseOffset` is the size the caller's buffer had before this inference
+// appended to it. Everything below [0, baseOffset) belongs to previously
+// emitted units and MUST NOT be touched: synthesize() appends, so
+// audioBuffer.begin() is the start of the whole utterance, not of this unit
+// (issue #655). Trimming from index 0 deleted the head of the utterance
+// whenever a later phrase was padded -- and since `frontSum` always includes
+// durations[0] (BOS), that happened for every padded phrase, even at
+// frontPad == 0.
 static void trimPaddingByDurations(std::vector<int16_t> &audioBuffer,
                                    const std::vector<float> &durations,
                                    int frontPad,
                                    int backPad,
                                    int hopSize,
-                                   int eosMaxFrames = TRIM_EOS_MAX_FRAMES) {
+                                   int eosMaxFrames = TRIM_EOS_MAX_FRAMES,
+                                   std::size_t baseOffset = 0) {
   if (frontPad <= 0 && backPad <= 0) return;
   if (durations.empty() || hopSize <= 0) return;
   const int expectedLen = 1 + frontPad + backPad + 1; // BOS + pads + EOS
@@ -897,16 +906,23 @@ static void trimPaddingByDurations(std::vector<int16_t> &audioBuffer,
       backPadSamples +
       static_cast<int>(eosExcess * static_cast<float>(hopSize));
 
-  const int totalSamples = static_cast<int>(audioBuffer.size());
+  // Operate on [baseOffset, size) only. `erase` keeps the caller's prefix in
+  // place instead of rebuilding the buffer from an absolute slice.
+  const std::size_t bufferSize = audioBuffer.size();
+  if (baseOffset > bufferSize) return;
+  const int unitSamples = static_cast<int>(bufferSize - baseOffset);
   int start = frontSamples < 0 ? 0 : frontSamples;
-  int end = totalSamples - backSamples;
+  int end = unitSamples - backSamples;
   if (end < start) end = start;
-  if (start >= totalSamples || end <= 0 || start >= end) return;
+  if (start >= unitSamples || end <= 0 || start >= end) return;
 
-  if (start > 0 || end < totalSamples) {
-    std::vector<int16_t> trimmed(audioBuffer.begin() + start,
-                                 audioBuffer.begin() + end);
-    audioBuffer = std::move(trimmed);
+  if (end < unitSamples) {
+    audioBuffer.erase(audioBuffer.begin() + baseOffset + end,
+                      audioBuffer.end());
+  }
+  if (start > 0) {
+    audioBuffer.erase(audioBuffer.begin() + baseOffset,
+                      audioBuffer.begin() + baseOffset + start);
   }
 }
 
@@ -917,7 +933,8 @@ static void trimPaddingByDurationsFloat(std::vector<float> &audioBuffer,
                                         int frontPad,
                                         int backPad,
                                         int hopSize,
-                                        int eosMaxFrames = TRIM_EOS_MAX_FRAMES) {
+                                        int eosMaxFrames = TRIM_EOS_MAX_FRAMES,
+                                        std::size_t baseOffset = 0) {
   if (frontPad <= 0 && backPad <= 0) return;
   if (durations.empty() || hopSize <= 0) return;
   const int expectedLen = 1 + frontPad + backPad + 1;
@@ -945,16 +962,23 @@ static void trimPaddingByDurationsFloat(std::vector<float> &audioBuffer,
       backPadSamples +
       static_cast<int>(eosExcess * static_cast<float>(hopSize));
 
-  const int totalSamples = static_cast<int>(audioBuffer.size());
+  // Operate on [baseOffset, size) only. `erase` keeps the caller's prefix in
+  // place instead of rebuilding the buffer from an absolute slice.
+  const std::size_t bufferSize = audioBuffer.size();
+  if (baseOffset > bufferSize) return;
+  const int unitSamples = static_cast<int>(bufferSize - baseOffset);
   int start = frontSamples < 0 ? 0 : frontSamples;
-  int end = totalSamples - backSamples;
+  int end = unitSamples - backSamples;
   if (end < start) end = start;
-  if (start >= totalSamples || end <= 0 || start >= end) return;
+  if (start >= unitSamples || end <= 0 || start >= end) return;
 
-  if (start > 0 || end < totalSamples) {
-    std::vector<float> trimmed(audioBuffer.begin() + start,
-                               audioBuffer.begin() + end);
-    audioBuffer = std::move(trimmed);
+  if (end < unitSamples) {
+    audioBuffer.erase(audioBuffer.begin() + baseOffset + end,
+                      audioBuffer.end());
+  }
+  if (start > 0) {
+    audioBuffer.erase(audioBuffer.begin() + baseOffset,
+                      audioBuffer.begin() + baseOffset + start);
   }
 }
 
@@ -979,16 +1003,23 @@ static void trimPaddingByDurationsFloat(std::vector<float> &audioBuffer,
 static void trimEosRegion(std::vector<int16_t> &audioBuffer,
                           const std::vector<float> &durations,
                           int hopSize,
-                          int eosMaxFrames = TRIM_EOS_MAX_FRAMES) {
+                          int eosMaxFrames = TRIM_EOS_MAX_FRAMES,
+                          std::size_t baseOffset = 0) {
   if (hopSize <= 0 || durations.empty()) return;
   const float eosFrames = durations.back();
   const int eosCeil = static_cast<int>(std::ceil(eosFrames));
   const int eosExcess = std::max(0, eosCeil - eosMaxFrames);
   if (eosExcess <= 0) return;
   const int trimSamples = eosExcess * hopSize;
-  const int totalSamples = static_cast<int>(audioBuffer.size());
-  if (trimSamples >= totalSamples) return;
-  audioBuffer.resize(totalSamples - trimSamples);
+  const std::size_t bufferSize = audioBuffer.size();
+  if (baseOffset > bufferSize) return;
+  // Measure against THIS call's samples. `resize` only removes from the tail,
+  // so the caller's prefix was never rewritten -- but the guard used the whole
+  // buffer's length, so a trim larger than the unit would have eaten into the
+  // preceding unit instead of being skipped (issue #655).
+  const int unitSamples = static_cast<int>(bufferSize - baseOffset);
+  if (trimSamples >= unitSamples) return;
+  audioBuffer.resize(bufferSize - static_cast<std::size_t>(trimSamples));
 }
 
 // Float32 variant of trimEosRegion. Identical sample-count logic; only the
@@ -996,22 +1027,40 @@ static void trimEosRegion(std::vector<int16_t> &audioBuffer,
 static void trimEosRegionFloat(std::vector<float> &audioBuffer,
                                const std::vector<float> &durations,
                                int hopSize,
-                               int eosMaxFrames = TRIM_EOS_MAX_FRAMES) {
+                               int eosMaxFrames = TRIM_EOS_MAX_FRAMES,
+                               std::size_t baseOffset = 0) {
   if (hopSize <= 0 || durations.empty()) return;
   const float eosFrames = durations.back();
   const int eosCeil = static_cast<int>(std::ceil(eosFrames));
   const int eosExcess = std::max(0, eosCeil - eosMaxFrames);
   if (eosExcess <= 0) return;
   const int trimSamples = eosExcess * hopSize;
-  const int totalSamples = static_cast<int>(audioBuffer.size());
-  if (trimSamples >= totalSamples) return;
-  audioBuffer.resize(totalSamples - trimSamples);
+  const std::size_t bufferSize = audioBuffer.size();
+  if (baseOffset > bufferSize) return;
+  // Measure against THIS call's samples. `resize` only removes from the tail,
+  // so the caller's prefix was never rewritten -- but the guard used the whole
+  // buffer's length, so a trim larger than the unit would have eaten into the
+  // preceding unit instead of being skipped (issue #655).
+  const int unitSamples = static_cast<int>(bufferSize - baseOffset);
+  if (trimSamples >= unitSamples) return;
+  audioBuffer.resize(bufferSize - static_cast<std::size_t>(trimSamples));
 }
 
 // Trim leading/trailing silence from int16 audio using windowed RMS.
 // Preserves at least TRIM_MIN_SAMPLES samples.
-static void trimSilenceInt16(std::vector<int16_t> &audioBuffer) {
-  const auto totalSamples = static_cast<int>(audioBuffer.size());
+static void trimSilenceInt16(std::vector<int16_t> &audioBuffer,
+                             std::size_t baseOffset = 0) {
+  // Scoped to [baseOffset, size): synthesize() appends, so scanning from index
+  // 0 would measure RMS over -- and slice away -- audio belonging to units the
+  // caller already received (issue #655). This is the fallback path for models
+  // without a durations output; the durations-based trim above has the same
+  // constraint.
+  const std::size_t bufferSize = audioBuffer.size();
+  if (baseOffset > bufferSize) {
+    return;
+  }
+  const std::size_t base = baseOffset;
+  const auto totalSamples = static_cast<int>(bufferSize - base);
   if (totalSamples <= TRIM_MIN_SAMPLES) {
     return;
   }
@@ -1029,7 +1078,7 @@ static void trimSilenceInt16(std::vector<int16_t> &audioBuffer) {
     float sumSq = 0.0f;
     const int offset = w * TRIM_WINDOW_SIZE;
     for (int s = 0; s < TRIM_WINDOW_SIZE; s++) {
-      float sample = static_cast<float>(audioBuffer[offset + s]) / 32767.0f;
+      float sample = static_cast<float>(audioBuffer[base + offset + s]) / 32767.0f;
       sumSq += sample * sample;
     }
     float rms = std::sqrt(sumSq / static_cast<float>(TRIM_WINDOW_SIZE));
@@ -1047,7 +1096,7 @@ static void trimSilenceInt16(std::vector<int16_t> &audioBuffer) {
     float sumSq = 0.0f;
     const int offset = nWindows * TRIM_WINDOW_SIZE;
     for (int s = 0; s < remainder; s++) {
-      float sample = static_cast<float>(audioBuffer[offset + s]) / 32767.0f;
+      float sample = static_cast<float>(audioBuffer[base + offset + s]) / 32767.0f;
       sumSq += sample * sample;
     }
     float rms = std::sqrt(sumSq / static_cast<float>(remainder));
@@ -1061,7 +1110,8 @@ static void trimSilenceInt16(std::vector<int16_t> &audioBuffer) {
 
   if (firstAbove < 0) {
     // All silence -- keep minimum
-    audioBuffer.resize(std::min(totalSamples, TRIM_MIN_SAMPLES));
+    audioBuffer.resize(base + static_cast<std::size_t>(
+                                  std::min(totalSamples, TRIM_MIN_SAMPLES)));
     return;
   }
 
@@ -1080,17 +1130,33 @@ static void trimSilenceInt16(std::vector<int16_t> &audioBuffer) {
   if (startSample > 0 || endSample < totalSamples) {
     spdlog::debug("Trimming silence: [{}, {}) from {} samples",
                   startSample, endSample, totalSamples);
-    std::vector<int16_t> trimmed(audioBuffer.begin() + startSample,
-                                 audioBuffer.begin() + endSample);
-    audioBuffer = std::move(trimmed);
+    if (endSample < totalSamples) {
+      audioBuffer.erase(audioBuffer.begin() + base + endSample,
+                        audioBuffer.end());
+    }
+    if (startSample > 0) {
+      audioBuffer.erase(audioBuffer.begin() + base,
+                        audioBuffer.begin() + base + startSample);
+    }
   }
 }
 
 // Trim leading/trailing silence from float32 audio using windowed RMS.
 // Audio is assumed normalized to [-1.0, 1.0].
 // Preserves at least TRIM_MIN_SAMPLES samples.
-static void trimSilenceFloat(std::vector<float> &audioBuffer) {
-  const auto totalSamples = static_cast<int>(audioBuffer.size());
+static void trimSilenceFloat(std::vector<float> &audioBuffer,
+                             std::size_t baseOffset = 0) {
+  // Scoped to [baseOffset, size): synthesize() appends, so scanning from index
+  // 0 would measure RMS over -- and slice away -- audio belonging to units the
+  // caller already received (issue #655). This is the fallback path for models
+  // without a durations output; the durations-based trim above has the same
+  // constraint.
+  const std::size_t bufferSize = audioBuffer.size();
+  if (baseOffset > bufferSize) {
+    return;
+  }
+  const std::size_t base = baseOffset;
+  const auto totalSamples = static_cast<int>(bufferSize - base);
   if (totalSamples <= TRIM_MIN_SAMPLES) {
     return;
   }
@@ -1100,6 +1166,7 @@ static void trimSilenceFloat(std::vector<float> &audioBuffer) {
     return;
   }
 
+  // Find first and last window above RMS threshold
   int firstAbove = -1;
   int lastAbove = -1;
 
@@ -1107,7 +1174,7 @@ static void trimSilenceFloat(std::vector<float> &audioBuffer) {
     float sumSq = 0.0f;
     const int offset = w * TRIM_WINDOW_SIZE;
     for (int s = 0; s < TRIM_WINDOW_SIZE; s++) {
-      float sample = audioBuffer[offset + s];
+      float sample = audioBuffer[base + offset + s];
       sumSq += sample * sample;
     }
     float rms = std::sqrt(sumSq / static_cast<float>(TRIM_WINDOW_SIZE));
@@ -1125,26 +1192,29 @@ static void trimSilenceFloat(std::vector<float> &audioBuffer) {
     float sumSq = 0.0f;
     const int offset = nWindows * TRIM_WINDOW_SIZE;
     for (int s = 0; s < remainder; s++) {
-      float sample = audioBuffer[offset + s];
+      float sample = audioBuffer[base + offset + s];
       sumSq += sample * sample;
     }
     float rms = std::sqrt(sumSq / static_cast<float>(remainder));
     if (rms > TRIM_THRESHOLD_RMS) {
       if (firstAbove < 0) {
-        firstAbove = nWindows;
+        firstAbove = nWindows;  // virtual window index for the partial
       }
       lastAbove = nWindows;
     }
   }
 
   if (firstAbove < 0) {
-    audioBuffer.resize(std::min(totalSamples, TRIM_MIN_SAMPLES));
+    // All silence -- keep minimum
+    audioBuffer.resize(base + static_cast<std::size_t>(
+                                  std::min(totalSamples, TRIM_MIN_SAMPLES)));
     return;
   }
 
   int startSample = firstAbove * TRIM_WINDOW_SIZE;
   int endSample = std::min((lastAbove + 1) * TRIM_WINDOW_SIZE, totalSamples);
 
+  // Ensure minimum length
   int length = endSample - startSample;
   if (length < TRIM_MIN_SAMPLES) {
     int center = (startSample + endSample) / 2;
@@ -1154,11 +1224,16 @@ static void trimSilenceFloat(std::vector<float> &audioBuffer) {
   }
 
   if (startSample > 0 || endSample < totalSamples) {
-    spdlog::debug("Trimming silence (float): [{}, {}) from {} samples",
+    spdlog::debug("Trimming silence: [{}, {}) from {} samples",
                   startSample, endSample, totalSamples);
-    std::vector<float> trimmed(audioBuffer.begin() + startSample,
-                               audioBuffer.begin() + endSample);
-    audioBuffer = std::move(trimmed);
+    if (endSample < totalSamples) {
+      audioBuffer.erase(audioBuffer.begin() + base + endSample,
+                        audioBuffer.end());
+    }
+    if (startSample > 0) {
+      audioBuffer.erase(audioBuffer.begin() + base,
+                        audioBuffer.begin() + base + startSample);
+    }
   }
 }
 
@@ -1483,12 +1558,14 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
   if (wasPadded) {
     if (haveDurations) {
       trimPaddingByDurations(audioBuffer, paddedDurations, frontPad, backPad,
-                             hopSize, TRIM_EOS_MAX_FRAMES);
+                             hopSize, TRIM_EOS_MAX_FRAMES, audioBase);
     } else {
-      trimSilenceInt16(audioBuffer);
+      trimSilenceInt16(audioBuffer, audioBase);
     }
+    // Measure what THIS call left behind, not the whole accumulated buffer:
+    // callers add these values up per phrase (issue #654).
     result.audioSeconds =
-        static_cast<double>(audioBuffer.size()) /
+        static_cast<double>(audioBuffer.size() - audioBase) /
         static_cast<double>(synthesisConfig.sampleRate);
     if (result.audioSeconds > 0) {
       result.realTimeFactor = result.inferSeconds / result.audioSeconds;
@@ -1499,9 +1576,10 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
     // syllable was repeated. Strategy A above already handles this for
     // padded inputs; this branch applies the same EOS-region drop to
     // long-text outputs.
-    trimEosRegion(audioBuffer, paddedDurations, hopSize, TRIM_EOS_MAX_FRAMES);
+    trimEosRegion(audioBuffer, paddedDurations, hopSize, TRIM_EOS_MAX_FRAMES,
+                  audioBase);
     result.audioSeconds =
-        static_cast<double>(audioBuffer.size()) /
+        static_cast<double>(audioBuffer.size() - audioBase) /
         static_cast<double>(synthesisConfig.sampleRate);
     if (result.audioSeconds > 0) {
       result.realTimeFactor = result.inferSeconds / result.audioSeconds;
@@ -1653,8 +1731,11 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
   }
 #endif
 
-  // We know the size up front
-  audioBuffer.reserve(audioBuffer.size() + audioCount);
+  // We know the size up front. This is an APPENDING api, so record where this
+  // call's samples start: the post-trim and the audioSeconds report below must
+  // both be scoped to [audioBase, size) (issues #654 / #655).
+  const std::size_t audioBase = audioBuffer.size();
+  audioBuffer.reserve(audioBase + static_cast<std::size_t>(audioCount));
 
   // Normalize audio to [-1.0, 1.0] and copy directly as float
   float invMax = 1.0f / std::max(0.01f, maxAudioValue);
@@ -1684,12 +1765,13 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
   if (wasPadded) {
     if (haveDurations) {
       trimPaddingByDurationsFloat(audioBuffer, paddedDurations, frontPad,
-                                  backPad, hopSize, TRIM_EOS_MAX_FRAMES);
+                                  backPad, hopSize, TRIM_EOS_MAX_FRAMES,
+                                  audioBase);
     } else {
-      trimSilenceFloat(audioBuffer);
+      trimSilenceFloat(audioBuffer, audioBase);
     }
     result.audioSeconds =
-        static_cast<double>(audioBuffer.size()) /
+        static_cast<double>(audioBuffer.size() - audioBase) /
         static_cast<double>(synthesisConfig.sampleRate);
     if (result.audioSeconds > 0) {
       result.realTimeFactor = result.inferSeconds / result.audioSeconds;
@@ -1697,9 +1779,9 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
   } else if (haveDurations) {
     // Tier 1 workaround for Issue #499 — see int16 path above.
     trimEosRegionFloat(audioBuffer, paddedDurations, hopSize,
-                       TRIM_EOS_MAX_FRAMES);
+                       TRIM_EOS_MAX_FRAMES, audioBase);
     result.audioSeconds =
-        static_cast<double>(audioBuffer.size()) /
+        static_cast<double>(audioBuffer.size() - audioBase) /
         static_cast<double>(synthesisConfig.sampleRate);
     if (result.audioSeconds > 0) {
       result.realTimeFactor = result.inferSeconds / result.audioSeconds;

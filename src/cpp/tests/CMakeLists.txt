@@ -49,6 +49,7 @@ set(TEST_SOURCES
     test_phoneme_parser.cpp
     test_streaming.cpp
     test_phoneme_timing_text_path.cpp
+    test_synthesize_append_scope.cpp
     test_ssml_synth.cpp
     test_streaming_simple.cpp
     test_streaming_raw_phonemes.cpp
@@ -331,6 +332,7 @@ foreach(test_source ${TEST_SOURCES})
     if(${test_name} STREQUAL "test_speaker_embedding_inference" OR
         ${test_name} STREQUAL "test_phonemize_config" OR
         ${test_name} STREQUAL "test_phoneme_timing_text_path" OR
+        ${test_name} STREQUAL "test_synthesize_append_scope" OR
         ${test_name} STREQUAL "test_ssml_synth" OR
         ${test_name} STREQUAL "test_streaming")
         target_sources(${test_name} PRIVATE
@@ -792,6 +794,7 @@ endforeach()
 # `ctest --timeout 120`. This target loads the fixture model, so it gets the
 # same explicit 300 s budget as the other model-backed tests below.
 set_tests_properties(test_phoneme_timing_text_path PROPERTIES TIMEOUT 300)
+set_tests_properties(test_synthesize_append_scope PROPERTIES TIMEOUT 300)
 set_tests_properties(test_ssml_synth PROPERTIES TIMEOUT 300)
 
 # Direct unit tests for piper_proc_exec.c (argv-based process spawn helpers).
