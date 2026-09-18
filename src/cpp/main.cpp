@@ -39,6 +39,7 @@
 #include "model_manager.hpp"
 #include "safe_path.hpp"
 #include "ssml.hpp"
+#include "ssml_synth.hpp"
 
 using namespace std;
 using json = nlohmann::json;
@@ -641,53 +642,6 @@ void rawOutputProc(vector<int16_t> &sharedAudioBuffer, mutex &mutAudio,
 // non-empty text segment with per-segment length_scale, and inserts silence
 // for `<break>` segments. The original length_scale is restored before
 // returning. Used by `--ssml` mode for the standard WAV output paths.
-static void synthesizeSsmlToBuffer(const string &ssmlText,
-                                   piper::PiperConfig &piperConfig,
-                                   piper::Voice &voice,
-                                   piper::SynthesisResult &result,
-                                   vector<int16_t> &audioBuffer) {
-  auto segments = piper::ssml::parse(ssmlText);
-  spdlog::info("SSML: parsed {} segment(s)", segments.size());
-
-  const float originalLengthScale = voice.synthesisConfig.lengthScale;
-  const int sampleRate = voice.synthesisConfig.sampleRate;
-
-  for (size_t segIdx = 0; segIdx < segments.size(); ++segIdx) {
-    const auto &seg = segments[segIdx];
-
-    if (!seg.text.empty()) {
-      voice.synthesisConfig.lengthScale = originalLengthScale * seg.rate;
-      vector<int16_t> segAudio;
-      piper::SynthesisResult segResult;
-      try {
-        piper::textToAudio(piperConfig, voice, seg.text, segAudio, segResult,
-                           []() {}, nullptr);
-      } catch (const exception &e) {
-        spdlog::warn("SSML segment {} synthesis failed: {}", segIdx, e.what());
-        voice.synthesisConfig.lengthScale = originalLengthScale;
-        continue;
-      }
-      audioBuffer.insert(audioBuffer.end(), segAudio.begin(), segAudio.end());
-      result.inferSeconds += segResult.inferSeconds;
-      result.audioSeconds += segResult.audioSeconds;
-    }
-
-    if (seg.breakMs > 0) {
-      const size_t silenceSamples =
-          static_cast<size_t>((static_cast<double>(seg.breakMs) / 1000.0) *
-                              static_cast<double>(sampleRate));
-      audioBuffer.insert(audioBuffer.end(), silenceSamples, int16_t{0});
-      result.audioSeconds +=
-          static_cast<double>(seg.breakMs) / 1000.0;
-    }
-  }
-
-  voice.synthesisConfig.lengthScale = originalLengthScale;
-  result.realTimeFactor = (result.audioSeconds > 0.0)
-                              ? (result.inferSeconds / result.audioSeconds)
-                              : 0.0;
-}
-
 // Write a minimal RIFF/WAVE header followed by 16-bit mono PCM samples.
 // We re-implement this locally rather than #include "wavfile.hpp" because
 // that header defines `writeWavHeader` with external linkage at namespace
@@ -889,7 +843,8 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
       piper::phonemesToWavFile(piperConfig, voice, phonemes, audioFile, result);
     } else if (ssmlActive) {
       vector<int16_t> audioBuffer;
-      synthesizeSsmlToBuffer(line, piperConfig, voice, result, audioBuffer);
+      piper::synthesizeSsmlToBuffer(line, piperConfig, voice, result,
+                                    audioBuffer);
       writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, audioFile);
     } else {
       piper::textToWavFile(piperConfig, voice, line, audioFile, result, externalProsodyPtr);
@@ -927,7 +882,8 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
       piper::phonemesToWavFile(piperConfig, voice, phonemes, audioFile, result);
     } else if (ssmlActive) {
       vector<int16_t> audioBuffer;
-      synthesizeSsmlToBuffer(line, piperConfig, voice, result, audioBuffer);
+      piper::synthesizeSsmlToBuffer(line, piperConfig, voice, result,
+                                    audioBuffer);
       writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, audioFile);
     } else {
       piper::textToWavFile(piperConfig, voice, line, audioFile, result, externalProsodyPtr);
@@ -946,7 +902,8 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
       piper::phonemesToWavFile(piperConfig, voice, phonemes, cout, result);
     } else if (ssmlActive) {
       vector<int16_t> audioBuffer;
-      synthesizeSsmlToBuffer(line, piperConfig, voice, result, audioBuffer);
+      piper::synthesizeSsmlToBuffer(line, piperConfig, voice, result,
+                                    audioBuffer);
       writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, cout);
     } else {
       piper::textToWavFile(piperConfig, voice, line, cout, result, externalProsodyPtr);

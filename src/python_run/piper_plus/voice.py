@@ -36,6 +36,10 @@ _LOGGER = logging.getLogger(__name__)
 # tokens leak as audible artifacts that post-trim cannot fully remove. We
 # pick 15 as a conservative middle ground: roughly 2× the measured stable
 # minimum, still well below typical short utterances like 「こんにちは。」.
+# 16-bit mono PCM: the WAV writer is configured with setsampwidth(2) /
+# setnchannels(1), so one sample is two bytes on every path here.
+_BYTES_PER_SAMPLE = 2
+
 MIN_PHONEME_IDS = 15
 
 # Minimum body length (excluding BOS/EOS) for Strategy A to kick in.
@@ -1239,7 +1243,16 @@ class PiperVoice:
             wf.setnchannels(1)
 
             all_timing_entries: list[PhonemeTimingInfo] = []
-            cumulative_ms = 0.0
+            # Offset for the next unit, counted in the interleaved PCM samples
+            # already written to the caller's stream (unit audio +
+            # inter-sentence silence). Sample-anchored rather than
+            # duration-summed: the ONNX `durations` tensor is exported
+            # pre-`ceil`, so summing it yields 0.55-0.83x of the real unit
+            # length and the offset drifts earlier with every sentence
+            # (issue #660; the pre-`ceil` export itself is issue #653).
+            # Matches the C++ rule in
+            # docs/spec/phoneme-timing-contract.toml [concatenation].
+            emitted_samples = 0
 
             # Build reverse map for phoneme display names
             pua_reverse = {chr(v): k for k, v in FIXED_PUA_MAPPING.items()}
@@ -1252,6 +1265,9 @@ class PiperVoice:
             all_raw_frames: list[bytes] = []
 
             for phonemes in sentence_phonemes:
+                # Captured before this sentence's audio is written, so it is
+                # the position this sentence occupies in the stream.
+                offset_ms = emitted_samples / self.config.sample_rate * 1000.0
                 phoneme_ids = self.phonemes_to_ids(phonemes)
                 audio_bytes, durations, original_ids = self._synthesize_ids_core(
                     phoneme_ids,
@@ -1266,6 +1282,7 @@ class PiperVoice:
 
                 wf.writeframes(audio_bytes)
                 all_raw_frames.append(audio_bytes)
+                emitted_samples += len(audio_bytes) // _BYTES_PER_SAMPLE
 
                 if durations is not None:
                     tokens = [
@@ -1298,19 +1315,17 @@ class PiperVoice:
                         all_timing_entries.append(
                             PhonemeTimingInfo(
                                 phoneme=p.phoneme,
-                                start_ms=p.start_ms + cumulative_ms,
-                                end_ms=p.end_ms + cumulative_ms,
+                                start_ms=p.start_ms + offset_ms,
+                                end_ms=p.end_ms + offset_ms,
                                 duration_ms=p.duration_ms,
                             )
                         )
-                    cumulative_ms += timing.total_duration_ms
 
                 if sentence_silence > 0:
-                    silence_ms = sentence_silence * 1000.0
-                    cumulative_ms += silence_ms
-                    silence_frame = bytes(num_silence_samples * 2)
+                    silence_frame = bytes(num_silence_samples * _BYTES_PER_SAMPLE)
                     wf.writeframes(silence_frame)
                     all_raw_frames.append(silence_frame)
+                    emitted_samples += num_silence_samples
 
         # Also write to caller's wav_file if provided
         if wav_file is not None:
@@ -1324,7 +1339,7 @@ class PiperVoice:
         if all_timing_entries:
             timing_result = TimingResult(
                 phonemes=all_timing_entries,
-                total_duration_ms=cumulative_ms,
+                total_duration_ms=emitted_samples / self.config.sample_rate * 1000.0,
                 sample_rate=self.config.sample_rate,
             )
 
