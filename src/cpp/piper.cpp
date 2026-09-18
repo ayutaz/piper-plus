@@ -1011,6 +1011,13 @@ static void trimEosRegion(std::vector<int16_t> &audioBuffer,
   const int eosExcess = std::max(0, eosCeil - eosMaxFrames);
   if (eosExcess <= 0) return;
   const int trimSamples = eosExcess * hopSize;
+  // Unreachable from a sane model (it needs durations.back() > 8.4M frames at
+  // hop 256) but guarded explicitly: on overflow `trimSamples` goes negative
+  // and `bufferSize - static_cast<std::size_t>(trimSamples)` wraps into a
+  // gigabyte-scale resize. The pre-existing code had the same exposure via
+  // `resize(totalSamples - trimSamples)`; the guard is free, so it is added
+  // while this function is being touched rather than left as a latent trap.
+  if (trimSamples < 0) return;
   const std::size_t bufferSize = audioBuffer.size();
   if (baseOffset > bufferSize) return;
   // Measure against THIS call's samples. `resize` only removes from the tail,
@@ -1035,6 +1042,13 @@ static void trimEosRegionFloat(std::vector<float> &audioBuffer,
   const int eosExcess = std::max(0, eosCeil - eosMaxFrames);
   if (eosExcess <= 0) return;
   const int trimSamples = eosExcess * hopSize;
+  // Unreachable from a sane model (it needs durations.back() > 8.4M frames at
+  // hop 256) but guarded explicitly: on overflow `trimSamples` goes negative
+  // and `bufferSize - static_cast<std::size_t>(trimSamples)` wraps into a
+  // gigabyte-scale resize. The pre-existing code had the same exposure via
+  // `resize(totalSamples - trimSamples)`; the guard is free, so it is added
+  // while this function is being touched rather than left as a latent trap.
+  if (trimSamples < 0) return;
   const std::size_t bufferSize = audioBuffer.size();
   if (baseOffset > bufferSize) return;
   // Measure against THIS call's samples. `resize` only removes from the tail,

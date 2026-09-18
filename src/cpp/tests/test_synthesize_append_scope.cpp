@@ -250,3 +250,72 @@ TEST_F(SynthesizeAppendScopeTest, EmptyBufferCallIsUnaffected) {
     EXPECT_NEAR(result.audioSeconds, expectedSeconds,
                 1.0 / static_cast<double>(sampleRate()));
 }
+
+// ---------------------------------------------------------------------------
+// Float path. synthesizeFloat / trimPaddingByDurationsFloat / trimSilenceFloat
+// / trimEosRegionFloat received the same baseOffset treatment, and the C API
+// iterator (synth_next) runs on it, so it needs its own coverage: the int16
+// cases above would keep passing if only the float variants regressed.
+//
+// phonemesToAudioFloat appends "phrase audio + per-phrase silence + trailing
+// sentenceSilenceSamples", so sentenceSilenceSeconds is zeroed for these cases.
+// Leaving it at its default masked the bug: the trailing silence (0.2 s =
+// 4410 samples at 22050 Hz) is larger than the sentinel prefix (2048), so the
+// buggy `audioSeconds` -- which counts the sentinel -- still fitted under the
+// inflated growth and the assertion passed. Verified by mutation: with the
+// default silence the float audioSeconds case does NOT detect a reverted float
+// path; with the silence zeroed it does.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+constexpr float kSentinelFloat = 0.4242f;
+
+std::vector<float> sentinelBufferFloat() {
+    return std::vector<float>(kSentinelCount, kSentinelFloat);
+}
+
+} // namespace
+
+TEST_F(SynthesizeAppendScopeTest, FloatPathAudioSecondsDescribesOnlyThisCall) {
+    const auto phonemes = phonemesOf("Hola, esta es una prueba de audio.");
+    ASSERT_FALSE(phonemes.empty());
+
+    // Remove the trailing silence so the growth equals exactly what
+    // synthesizeFloat produced; otherwise the padding hides the defect.
+    voice.synthesisConfig.sentenceSilenceSeconds = 0.0f;
+
+    std::vector<float> audio = sentinelBufferFloat();
+    piper::SynthesisResult result;
+    piper::phonemesToAudioFloat(config, voice, phonemes, nullptr, audio, result);
+
+    ASSERT_GT(audio.size(), kSentinelCount) << "no samples were appended";
+    const std::size_t grown = audio.size() - kSentinelCount;
+    const double expectedSeconds =
+        static_cast<double>(grown) / static_cast<double>(sampleRate());
+
+    EXPECT_NEAR(result.audioSeconds, expectedSeconds,
+                1.0 / static_cast<double>(sampleRate()))
+        << "audioSeconds is " << result.audioSeconds << " s but this call "
+        << "appended " << grown << " samples (" << expectedSeconds << " s); "
+        << "the float path is reporting the whole accumulated buffer "
+        << "(issue #654)";
+}
+
+TEST_F(SynthesizeAppendScopeTest, FloatPathPaddedUnitDoesNotTrimCallersAudio) {
+    const auto phonemes = phonemesOf("Sol");
+    ASSERT_FALSE(phonemes.empty());
+
+    std::vector<float> audio = sentinelBufferFloat();
+    piper::SynthesisResult result;
+    piper::phonemesToAudioFloat(config, voice, phonemes, nullptr, audio, result);
+
+    ASSERT_GE(audio.size(), kSentinelCount)
+        << "the buffer shrank below the caller's prefix";
+    for (std::size_t i = 0; i < kSentinelCount; ++i) {
+        ASSERT_FLOAT_EQ(audio[i], kSentinelFloat)
+            << "float sample " << i
+            << " of the caller's existing audio was overwritten or shifted "
+               "(issue #655)";
+    }
+}

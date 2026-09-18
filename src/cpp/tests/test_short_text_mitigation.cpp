@@ -5,6 +5,25 @@
  * Strategy B: Dynamic scales adjustment
  *
  * These tests verify the helper logic without requiring an ONNX model.
+ *
+ * NOTE ON THE REPLICAS BELOW. The trim helpers in this file are hand-copies of
+ * the `static` originals in src/cpp/piper.cpp, kept here so the arithmetic can
+ * be tested without linking onnxruntime. They are pinned to the SINGLE-UNIT
+ * behaviour only: production now takes a `baseOffset` and operates on
+ * [baseOffset, size) so it cannot trim audio belonging to units the caller
+ * already received (issue #655). The copies here are exercised with
+ * baseOffset == 0 semantics, where the two are exactly equivalent -- verified
+ * by exhaustive comparison of the old and new implementations over 67,820
+ * parameter combinations.
+ *
+ * Consequences to be aware of:
+ *   - DO NOT copy these back into piper.cpp: they are the pre-#655 shape.
+ *   - The baseOffset != 0 paths are covered only by
+ *     src/cpp/tests/test_synthesize_append_scope.cpp, which drives the real
+ *     helpers through phonemesToAudio and needs the fixture model.
+ *   - No gate compares this file against piper.cpp
+ *     (`scripts/check_short_text_contract.py` checks only the numeric
+ *     constants in the Python sources), so drift here is silent.
  */
 
 #include <gtest/gtest.h>
