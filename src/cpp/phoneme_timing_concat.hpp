@@ -86,7 +86,15 @@ void appendShifted(
     const float offsetSeconds = static_cast<float>(cursor.seconds());
     const int offsetFrames = static_cast<int>(cursor.frames());
 
-    out.reserve(out.size() + unit.size());
+    // Grow geometrically. `reserve` allocates exactly what is asked for, so
+    // reserving the precise total on every unit reallocates and copy-constructs
+    // all previously accumulated entries each time -- quadratic across many
+    // units. Only ask when the current capacity is short, and then at least
+    // double it so vector's usual amortisation is preserved.
+    const std::size_t needed = out.size() + unit.size();
+    if (out.capacity() < needed) {
+        out.reserve(std::max(needed, out.capacity() * 2));
+    }
     for (const Entry &entry : unit) {
         Entry shifted = entry;
         shifted.start_time += offsetSeconds;
