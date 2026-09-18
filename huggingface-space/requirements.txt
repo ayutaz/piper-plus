@@ -1,5 +1,5 @@
 # piper-plus Demo Requirements
-gradio==6.21.0
+gradio==6.26.0
 numpy>=2.4.6,<2.5
 onnxruntime>=1.28.0
 pyopenjtalk-plus>=0.4  # Japanese Phonemizer (JapanesePhonemizer), Apache-2.0
