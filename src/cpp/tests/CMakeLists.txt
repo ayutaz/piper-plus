@@ -48,6 +48,7 @@ set(TEST_SOURCES
     test_gpu_device_id.cpp
     test_phoneme_parser.cpp
     test_streaming.cpp
+    test_phoneme_timing_text_path.cpp
     test_streaming_simple.cpp
     test_streaming_raw_phonemes.cpp
     test_n_variants.cpp
@@ -328,6 +329,7 @@ foreach(test_source ${TEST_SOURCES})
     # in-tree fixture model.
     if(${test_name} STREQUAL "test_speaker_embedding_inference" OR
         ${test_name} STREQUAL "test_phonemize_config" OR
+        ${test_name} STREQUAL "test_phoneme_timing_text_path" OR
         ${test_name} STREQUAL "test_streaming")
         target_sources(${test_name} PRIVATE
             ../piper.cpp
@@ -775,6 +777,11 @@ foreach(test_source ${TEST_SOURCES})
     )
 endforeach()
 
+# Issue #652: the generic loop above sets no TIMEOUT, and CI invokes
+# `ctest --timeout 120`. This target loads the fixture model, so it gets the
+# same explicit 300 s budget as the other model-backed tests below.
+set_tests_properties(test_phoneme_timing_text_path PROPERTIES TIMEOUT 300)
+
 # Direct unit tests for piper_proc_exec.c (argv-based process spawn helpers).
 # Self-contained: compiles piper_proc_exec.c directly + links gtest. No other
 # piper-library symbols required. PR #401 introduced these helpers to remove
@@ -864,6 +871,24 @@ target_link_libraries(test_phoneme_timing
 )
 
 add_test(NAME test_phoneme_timing COMMAND test_phoneme_timing)
+
+# Add test_phoneme_timing_concat - model-free unit tests for the timing
+# concatenation cursor (issue #652). Header-only subject
+# (src/cpp/phoneme_timing_concat.hpp), so only gtest is needed; it keeps
+# running when the fixture model is absent.
+add_executable(test_phoneme_timing_concat test_phoneme_timing_concat.cpp)
+target_include_directories(test_phoneme_timing_concat PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../
+)
+target_link_libraries(test_phoneme_timing_concat
+    gtest_main
+)
+
+add_test(NAME test_phoneme_timing_concat COMMAND test_phoneme_timing_concat)
+set_tests_properties(test_phoneme_timing_concat PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
 
 # Cross-runtime phoneme timing parity test.
 # Reads tests/fixtures/phoneme_timing/golden_matrix.json (generated from the

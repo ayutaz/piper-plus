@@ -233,7 +233,6 @@ jobs:
       # `|| true` で握り潰されて integration test が黙って劣化する状態だったため削除した。
       # 代わりに存在確認だけを行い、 欠けていたら fail-fast する。
       - name: Verify test model is present
-        if: ${{ inputs.run-integration-tests }}
         shell: bash
         run: |
           missing=0
