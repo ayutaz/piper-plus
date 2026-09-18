@@ -1386,13 +1386,8 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
     outputNamesVec.push_back("durations");
   }
 
-  // Resolve hop_size for durations-based Strategy A trim. Falls back to
-  // DEFAULT_HOP_SIZE when the config is missing or the field is absent.
-  int hopSize = DEFAULT_HOP_SIZE;
-  if (voice && voice->configRoot.contains("audio") &&
-      voice->configRoot["audio"].contains("hop_size")) {
-    hopSize = voice->configRoot["audio"]["hop_size"];
-  }
+  // hop_size for the durations-based Strategy A trim.
+  const int hopSize = resolveHopSize(voice);
 
   // Infer
   auto startTime = std::chrono::steady_clock::now();
@@ -1434,16 +1429,24 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
   }
 #endif
 
-  // We know the size up front
-  audioBuffer.reserve(audioCount);
+  // We know the size up front. This is an APPENDING api -- callers accumulate
+  // several units into one buffer -- so reserve relative to the current size,
+  // matching synthesizeFloat below.
+  const std::size_t audioBase = audioBuffer.size();
+  audioBuffer.reserve(audioBase + static_cast<std::size_t>(audioCount));
 
   // Scale audio to fill range and convert to int16
   float audioScale = (MAX_WAV_VALUE / std::max(0.01f, maxAudioValue));
 
 #ifdef USE_ARM64_NEON
-  // Resize buffer to final size for NEON implementation
-  audioBuffer.resize(audioCount);
-  scaleAndConvertAudioNEON(audio, audioBuffer.data(), audioCount, audioScale);
+  // Grow by audioCount and write past the existing samples. A plain
+  // resize(audioCount) would truncate whatever the caller had already
+  // accumulated and then overwrite it from index 0, which breaks both the
+  // concatenated audio and the emitted-sample offsets the aggregating entry
+  // points measure (issue #652).
+  audioBuffer.resize(audioBase + static_cast<std::size_t>(audioCount));
+  scaleAndConvertAudioNEON(audio, audioBuffer.data() + audioBase, audioCount,
+                           audioScale);
 #else
   for (int64_t i = 0; i < audioCount; i++) {
     int16_t intAudioValue = static_cast<int16_t>(
@@ -1571,12 +1574,8 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
                   ratio, effectiveNoiseScale, effectiveNoiseW);
   }
 
-  // Resolve hop_size for durations-based Strategy A trim.
-  int hopSize = DEFAULT_HOP_SIZE;
-  if (voice && voice->configRoot.contains("audio") &&
-      voice->configRoot["audio"].contains("hop_size")) {
-    hopSize = voice->configRoot["audio"]["hop_size"];
-  }
+  // hop_size for the durations-based Strategy A trim.
+  const int hopSize = resolveHopSize(voice);
 
   // Populate InferenceInputs from the existing parameters
   InferenceInputs inputs;
@@ -1721,12 +1720,9 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
 
       std::vector<float> durationVec(durations, durations + durationCount);
 
-      int hopSize = DEFAULT_HOP_SIZE;
-      if (voice->configRoot.contains("audio") &&
-          voice->configRoot["audio"].contains("hop_size")) {
-        hopSize = voice->configRoot["audio"]["hop_size"];
-      }
-
+      // Reuses the function-scope hopSize resolved above; re-declaring it
+      // here would shadow it (CodeQL cpp/declaration-hides-variable) and
+      // recompute the identical value.
       result.phonemeTimings = extractTimingsFromDurations(
           durationVec, originalPhonemeIds,
           voice->phonemizeConfig.phonemeIdMap,

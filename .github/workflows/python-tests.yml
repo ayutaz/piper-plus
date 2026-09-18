@@ -180,10 +180,14 @@ jobs:
         PYTHONUTF8: '1'
 
     - name: Run runtime full tests (config, training manager, CLI, timing, streaming, short-text, zh-en, g2p-parallel, webui, http_server, text_splitter contract)
+    # NOTE: pytest はディレクトリではなくファイルを明示列挙している。 新規テスト
+    # ファイルを追加したら必ずこの行にも追加すること (追加しないと CI で 1 度も
+    # 実行されない)。 列挙漏れは scripts/check_python_run_test_coverage.py が
+    # pre-commit / CI で検出する。
       run: |
         cd src/python_run
         # Wave 4: --reruns 1 で HTTP server bind race / ONNX warmup / threading-related flake を retry。
-        pytest tests/test_config_fallback.py tests/test_english_phonemization.py tests/test_runtime.py tests/test_util_impl.py tests/test_cli_models.py tests/test_training_manager.py tests/test_training_integration.py tests/test_phoneme_timing.py tests/test_voice_timing.py tests/test_http_timing.py tests/test_http_server_root.py tests/test_voice_streaming.py tests/test_text_splitter.py tests/test_text_splitter_contract.py tests/test_voice_g2p_parallel.py tests/test_short_text_mitigation.py tests/test_zh_en_loanword_runtime.py tests/test_webui.py tests/test_audio_result.py tests/test_model_resolver.py tests/test_piper_plus_api.py tests/test_piper_plus_engine.py -v --tb=short --override-ini="addopts=" --reruns 1 --reruns-delay 1
+        pytest tests/test_config_fallback.py tests/test_english_phonemization.py tests/test_runtime.py tests/test_util_impl.py tests/test_cli_models.py tests/test_training_manager.py tests/test_training_integration.py tests/test_phoneme_timing.py tests/test_voice_timing.py tests/test_http_timing.py tests/test_http_server_root.py tests/test_voice_streaming.py tests/test_text_splitter.py tests/test_text_splitter_contract.py tests/test_voice_g2p_parallel.py tests/test_short_text_mitigation.py tests/test_zh_en_loanword_runtime.py tests/test_webui.py tests/test_audio_result.py tests/test_model_resolver.py tests/test_piper_plus_api.py tests/test_piper_plus_engine.py tests/test_download_resilience.py tests/test_french_phonemization.py tests/test_json_input_cli.py tests/test_pt_dialect_parity.py tests/test_swedish_lid_runtime.py tests/test_voice_speaker_embedding.py tests/test_zero_shot_parity_fixture.py -v --tb=short --override-ini="addopts=" --reruns 1 --reruns-delay 1
       env:
         PYTHONUTF8: '1'
 

@@ -232,6 +232,13 @@ repos:
       # スキャンし、 (1) `^(name1|name2)$` 形式で root-only に anchor された
       # basename alternation、 (2) 0 ファイルしか match しない dead regex、
       # (3) compile error を検出する。 `.pre-commit-config.yaml` 編集時のみ走る。
+      - id: python-run-test-ci-coverage
+        name: "src/python_run test files referenced by a CI workflow (meta gate)"
+        entry: uv run --no-sync python scripts/check_python_run_test_coverage.py
+        language: system
+        files: ^(src/python_run/tests/test_.*\.py|\.github/workflows/.*\.yml|scripts/check_python_run_test_coverage\.py)$
+        pass_filenames: false
+
       - id: precommit-file-regex
         name: "pre-commit files regex coverage (meta gate)"
         entry: uv run --no-sync python scripts/check_precommit_file_regex.py
