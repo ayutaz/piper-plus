@@ -35,10 +35,12 @@ on:
     # 週 1 で base image の新規 CVE を catch する。
     - cron: '17 5 * * 1'
 
-# 最小権限 + SARIF upload に必要な security-events
+# 最小権限: SARIF upload に必要な security-events: write は、 実際に
+# upload-sarif を呼ぶ scan / scan-heavy job だけが jobLevel で持つ
+# (Scorecard Token-Permissions: topLevel の write を避ける)。
+# gate-script-tests は pytest のみで書き込み権限を必要としない。
 permissions:
   contents: read
-  security-events: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
@@ -71,6 +73,9 @@ jobs:
 
   scan:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write  # github/codeql-action/upload-sarif
     strategy:
       fail-fast: false
       matrix:
@@ -194,6 +199,9 @@ jobs:
   scan-heavy:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write  # github/codeql-action/upload-sarif
     strategy:
       fail-fast: false
       matrix:
