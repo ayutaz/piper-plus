@@ -44,6 +44,7 @@ set(PIPER_COMMON_SOURCES
   src/cpp/portuguese_phonemize.cpp
   src/cpp/swedish_phonemize.cpp
   src/cpp/ssml.cpp
+  src/cpp/ssml_synth.cpp
   src/cpp/openjtalk_phonemize.cpp
   src/cpp/openjtalk_phonemize_utils.cpp
   src/cpp/openjtalk_error.c
