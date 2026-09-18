@@ -47,6 +47,7 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <locale>
 #include <map>
 #include <optional>
 #include <sstream>
@@ -761,4 +762,96 @@ TEST_F(TimingTextPathTest, PhonemesToAudioTimingUnchanged) {
     expectMonotonic(result.phonemeTimings);
     expectWithinAudio(result.phonemeTimings, audio.size(), sampleRate(),
                       channels());
+}
+
+// ---------------------------------------------------------------------------
+// Locale independence of the production TSV writer. Model-free: it drives
+// piper::outputTimingsAsTSV over a hand-built timing vector, so it runs even
+// where the fixture model is absent.
+//
+// The CLI installs a global "en_US.UTF-8" locale (main.cpp) before any
+// synthesis happens, so the ofstream behind --output-timing inherits its
+// numpunct, which groups thousands. Every entry past 1 second was written as
+// `1,011.541`: not a number to any TSV consumer, and not the format the spec
+// pins in [output_formats.tsv] (float_precision = 3). It reproduced only on
+// runtimes where that locale is installable -- main.cpp falls back to the
+// classic locale otherwise -- and the writer's own tests never saw it because
+// their fixture data stays under one second.
+//
+// A hand-rolled numpunct is used rather than a named locale so the grouping is
+// reproduced identically on every runner, with no dependency on which locales
+// happen to be installed.
+// ---------------------------------------------------------------------------
+namespace {
+
+class CommaGroupingNumpunct : public std::numpunct<char> {
+protected:
+    char do_thousands_sep() const override { return ','; }
+    std::string do_grouping() const override { return "\3"; }
+};
+
+std::vector<std::string> splitTabs(const std::string &line) {
+    std::vector<std::string> columns;
+    std::string current;
+    for (const char c : line) {
+        if (c == '\t') {
+            columns.push_back(current);
+            current.clear();
+        } else {
+            current.push_back(c);
+        }
+    }
+    columns.push_back(current);
+    return columns;
+}
+
+} // namespace
+
+TEST(TimingTsvWriterLocaleTest, NumericColumnsHaveNoThousandsSeparator) {
+    // Both entries end past the 1000 ms grouping boundary, which is where the
+    // separator appears. A fixture that stays under a second cannot see this.
+    const std::vector<piper::PhonemeInfo> timings = {
+        {"a", 0.900f, 1.011541f, 77, 87},
+        {"b", 1.011541f, 2.103099f, 87, 181},
+    };
+
+    std::ostringstream out;
+    out.imbue(std::locale(std::locale::classic(), new CommaGroupingNumpunct));
+    piper::outputTimingsAsTSV(timings, out);
+
+    const std::string text = out.str();
+    ASSERT_FALSE(text.empty());
+
+    std::istringstream lines(text);
+    std::string header;
+    ASSERT_TRUE(static_cast<bool>(std::getline(lines, header)));
+
+    std::size_t rows = 0;
+    std::string line;
+    while (std::getline(lines, line)) {
+        const std::vector<std::string> columns = splitTabs(line);
+        ASSERT_EQ(columns.size(), 8u) << "row='" << line << "'";
+        // Columns 1..5 are floating point; 6..7 are integers. None of them may
+        // carry a digit-group separator, and each must round-trip through
+        // std::stod consuming the whole field.
+        for (std::size_t i = 1; i < columns.size(); ++i) {
+            EXPECT_EQ(columns[i].find(','), std::string::npos)
+                << "column " << i << " of row '" << line
+                << "' contains a thousands separator, so the TSV is not "
+                   "numerically parseable";
+            std::size_t consumed = 0;
+            const double value = std::stod(columns[i], &consumed);
+            EXPECT_EQ(consumed, columns[i].size())
+                << "column " << i << " ('" << columns[i]
+                << "') did not parse as a single number";
+            EXPECT_GE(value, 0.0);
+        }
+        ++rows;
+    }
+    EXPECT_EQ(rows, timings.size());
+
+    // The caller's locale must be left as it was found.
+    EXPECT_EQ(out.getloc().name(), std::locale(std::locale::classic(),
+                                               new CommaGroupingNumpunct)
+                                       .name());
 }

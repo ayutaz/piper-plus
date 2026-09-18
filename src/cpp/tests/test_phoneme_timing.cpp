@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdio>
 #include <ios>
+#include <locale>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -95,8 +96,12 @@ void outputTimingsAsTSV(const std::vector<PhonemeInfo>& timings,
     output << "phoneme\tstart_ms\tend_ms\tduration_ms\tstart\tend\tstart_frame\tend_frame"
            << std::endl;
 
+    // Mirrors piper.cpp: pin the classic locale so a caller-installed
+    // grouping numpunct cannot write `1,011.541` into a numeric column.
+    const std::locale savedLocale = output.getloc();
     const std::ios_base::fmtflags savedFlags = output.flags();
     const std::streamsize savedPrecision = output.precision();
+    output.imbue(std::locale::classic());
     output.setf(std::ios_base::fixed, std::ios_base::floatfield);
     output.precision(3);
 
@@ -117,6 +122,7 @@ void outputTimingsAsTSV(const std::vector<PhonemeInfo>& timings,
 
     output.flags(savedFlags);
     output.precision(savedPrecision);
+    output.imbue(savedLocale);
 }
 
 void outputTimingsAsSRT(const std::vector<PhonemeInfo>& timings,

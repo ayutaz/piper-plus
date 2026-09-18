@@ -1006,6 +1006,18 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
       spdlog::error("Failed to open timing output file: {}",
                     runConfig.outputTimingPath.value().string());
     }
+  } else if (runConfig.outputTimingPath) {
+    // Say so instead of exiting 0 with nothing written. A silent skip here is
+    // byte-for-byte the observable behaviour of issue #652 (no file, no
+    // message, exit 0), so a user could not tell a broken build from a model
+    // that simply has no `durations` output. Not an error: a model without
+    // duration support is a legitimate input, and failing the run would break
+    // callers that pass --output-timing unconditionally.
+    spdlog::warn("--output-timing was requested but no phoneme timing is "
+                 "available for this input, so {} was not written (the model "
+                 "may not expose a 'durations' output, or the input produced "
+                 "no phonemes)",
+                 runConfig.outputTimingPath.value().string());
   }
 
   // Restore config (--json-input)

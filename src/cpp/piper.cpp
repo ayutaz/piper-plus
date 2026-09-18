@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <fstream>
 #include <limits>
+#include <locale>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -3530,8 +3531,19 @@ void outputTimingsAsTSV(const std::vector<PhonemeInfo> &timings,
 
     // Use fixed precision (3 decimals) for ms columns per spec
     // [output_formats.tsv].float_precision = 3.
+    //
+    // The locale must be pinned, not inherited. The CLI installs a global
+    // "en_US.UTF-8" locale (main.cpp), and every stream constructed after that
+    // -- including the ofstream behind --output-timing -- inherits its
+    // numpunct, which groups thousands. Any entry past 1 second was then
+    // written as `1,011.541`, which no TSV consumer can parse as a number and
+    // which the spec's float_precision = 3 format does not allow. It
+    // reproduced only where that locale exists, since main.cpp falls back to
+    // the classic locale when the runtime lacks it.
+    const std::locale savedLocale = output.getloc();
     const std::ios_base::fmtflags savedFlags = output.flags();
     const std::streamsize savedPrecision = output.precision();
+    output.imbue(std::locale::classic());
     output.setf(std::ios_base::fixed, std::ios_base::floatfield);
     output.precision(3);
 
@@ -3552,6 +3564,7 @@ void outputTimingsAsTSV(const std::vector<PhonemeInfo> &timings,
 
     output.flags(savedFlags);
     output.precision(savedPrecision);
+    output.imbue(savedLocale);
 }
 
 // Output phoneme timing information as SubRip subtitle (SRT) format.
