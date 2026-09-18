@@ -30,7 +30,7 @@ This gate reads `[output_formats.srt].rounding_impl` and, per runtime, asserts:
   4. it contains the declared clamp idiom, where one is declared (Rust relies
      on a saturating cast and is the documented exception),
   5. the runtime's own test file pins every DISCRIMINATING contract case, so a
-     table quietly retuned to values both rounding rules agree on fails here
+     table quietly re-tuned to values both rounding rules agree on fails here
      instead of passing vacuously.
 
 Why not compare values directly: five of the six formatters are private to
