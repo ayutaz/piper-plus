@@ -358,7 +358,7 @@ static int resolveHopSize(const Voice *voice) {
 // unchanged.
 static void appendUnitTimings(SynthesisResult &out, const SynthesisResult &unit,
                               const piper_plus::timing::ConcatCursor &cursor) {
-  if (!unit.hasTimingInfo) {
+  if (!unit.hasTimingInfo || unit.phonemeTimings.empty()) {
     return;
   }
 
