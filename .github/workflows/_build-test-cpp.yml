@@ -314,6 +314,30 @@ jobs:
             exit 1
           fi
 
+      # ── CLI phoneme timing E2E (issue #652) ───────────────────
+      # Runs the built CLI exactly as the #652 reporter did. The gtest suites
+      # drive textToAudio / the C API directly, but main.cpp has no
+      # test-reachable entry point, so before this step nothing in CI ever
+      # executed --output-timing: not the flag parsing, not the
+      # `result.hasTimingInfo` gate that swallowed the bug, and not the
+      # JSON/TSV writers behind it. A grep for "output-timing" across
+      # .github/workflows/ matched a --help allowlist and nothing else.
+      #
+      # Deliberately NOT passed --allow-skip: if the binary or the fixture
+      # model goes missing, this must fail rather than report success, which
+      # is the same degradation that let #652 and #659 ship.
+      #
+      # Scoped to the integration matrix: the asan/ubsan and coverage callers
+      # pass run-integration-tests: false, and asan currently reports
+      # pre-existing leaks that would make this red for unrelated reasons.
+      - name: CLI phoneme timing E2E (#652)
+        if: ${{ runner.os != 'Windows' && inputs.run-integration-tests }}
+        shell: bash
+        run: |
+          export OPENJTALK_DICTIONARY_PATH="${PWD}/build/naist-jdic"
+          export ESPEAK_NG_DATA="${PWD}/build/espeak-ng-data"
+          python3 scripts/test_cpp_cli_timing.py --binary build/piper-plus
+
       # ── Test result summary ──────────────────────────────────
       - name: Test result summary
         if: always()
@@ -402,6 +426,10 @@ jobs:
             piper_plus_phonemize
             piper_plus_available_languages
             piper_plus_get_library_dir
+            # Issue #652 was reported against this entry point. It was absent
+            # from this list, so a rename or a dropped export would not have
+            # been noticed here.
+            piper_plus_get_phoneme_timing
           )
 
           MISSING=0
