@@ -3582,8 +3582,18 @@ void outputTimingsAsSRT(const std::vector<PhonemeInfo> &timings,
         if (ms < 0.0) {
             ms = 0.0;
         }
-        // Round to nearest millisecond before splitting (matches Rust impl).
-        const long long total_ms = static_cast<long long>(ms + 0.5);
+        // Round to nearest millisecond before splitting, half away from zero
+        // per the contract's [output_formats.srt].rounding.
+        //
+        // std::llround, not `static_cast<long long>(ms + 0.5)`: adding 0.5 can
+        // round up in binary64, so the sum idiom disagrees with a true round()
+        // at ms = 0.49999999999999994 (the largest double below 0.5), where
+        // `ms + 0.5` is exactly 1.0. Rust f64::round, Go math.Round and JS
+        // Math.round all yield 0 there. The float-seconds storage of
+        // PhonemeInfo makes that input unreachable through this writer, but
+        // the idiom is what the contract pins across six runtimes, so it must
+        // be the correct one rather than one that happens not to be exercised.
+        const long long total_ms = std::llround(ms);
         const long long millis = total_ms % 1000;
         const long long total_secs = total_ms / 1000;
         const long long secs = total_secs % 60;

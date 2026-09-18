@@ -22,10 +22,28 @@ on:
       - '.github/workflows/pre-commit.yml'
       # Trigger on any source change so all hooks run; pre-commit itself
       # short-circuits hooks that are scoped via `files:` in the config.
+      #
+      # The non-Python extensions are not optional. The config registers hooks
+      # that only ever match them -- `cargo fmt --check`, `gofmt -l`, `go vet`,
+      # `ktlint`, `swiftformat --lint`, and the SRT rounding parity gate, whose
+      # six formatter files are .py/.cs/.rs/.go/.js/.cpp. Without these globs a
+      # PR touching only src/go/piperplus/timing.go or src/cpp/piper.cpp does
+      # not start this workflow at all, so those hooks never run in CI.
       - '**/*.py'
       - '**/*.pyi'
       - '**/*.json'
       - '**/*.toml'
+      - '**/*.rs'
+      - '**/*.go'
+      - '**/*.cs'
+      - '**/*.js'
+      - '**/*.mjs'
+      - '**/*.cpp'
+      - '**/*.hpp'
+      - '**/*.h'
+      - '**/*.kt'
+      - '**/*.kts'
+      - '**/*.swift'
       - 'scripts/**'
   push:
     branches: [ dev ]
@@ -36,6 +54,17 @@ on:
       - '**/*.pyi'
       - '**/*.json'
       - '**/*.toml'
+      - '**/*.rs'
+      - '**/*.go'
+      - '**/*.cs'
+      - '**/*.js'
+      - '**/*.mjs'
+      - '**/*.cpp'
+      - '**/*.hpp'
+      - '**/*.h'
+      - '**/*.kt'
+      - '**/*.kts'
+      - '**/*.swift'
       - 'scripts/**'
 
 concurrency:

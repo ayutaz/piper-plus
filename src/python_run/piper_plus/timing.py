@@ -207,10 +207,20 @@ def _format_srt_timestamp(ms: float) -> str:
 
     Rounding is half-away-from-zero per
     ``docs/spec/phoneme-timing-contract.toml`` ``[output_formats.srt].rounding``.
+
     The builtin ``round`` is deliberately NOT used: it rounds half to even, so
     this function used to emit a timestamp 1 ms earlier than the Rust, Go, C++
     and JS runtimes on every ``.5`` boundary (issue #681), and the example
     below pinned that wrong value as expected output.
+
+    ``math.floor(ms + 0.5)`` is NOT used either, even though it looks like the
+    obvious replacement: adding 0.5 can round up in binary64 and produce a
+    different answer than a true round(). ``ms = 0.49999999999999994`` (the
+    largest double below 0.5) sums to exactly ``1.0``, so ``floor(ms + 0.5)``
+    yields 1 while Rust ``f64::round``, Go ``math.Round`` and JS ``Math.round``
+    all yield 0. This is the counterexample ECMA-262 cites for
+    ``Math.round``. The comparison below is done on the fractional part
+    instead, which has no such error.
 
     Examples
     --------
@@ -225,7 +235,8 @@ def _format_srt_timestamp(ms: float) -> str:
     # from durations_to_timing (it clamps frames to 0) but the helper is
     # reachable with caller-built entries.
     ms = max(ms, 0.0)
-    total_ms = math.floor(ms + 0.5)
+    whole = math.floor(ms)
+    total_ms = whole + (1 if ms - whole >= 0.5 else 0)
     millis = total_ms % 1000
     total_secs = total_ms // 1000
     secs = total_secs % 60

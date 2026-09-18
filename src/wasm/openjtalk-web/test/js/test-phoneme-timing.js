@@ -732,6 +732,9 @@ describe("timingToSrt - rounding parity (issue #681)", () => {
     [1234.5, "00:00:01,235"],
     [2500.5, "00:00:02,501"],
     [0.0, "00:00:00,000"],
+    // Largest double below 0.5: ms + 0.5 is exactly 1.0 in binary64, so the
+    // floor(ms + 0.5) idiom yields 1 here while Math.round yields 0.
+    [0.49999999999999994, "00:00:00,000"],
     [3661500.0, "01:01:01,500"],
   ];
 
