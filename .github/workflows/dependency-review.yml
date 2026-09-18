@@ -77,6 +77,21 @@ jobs:
             pkg:pypi/llvmlite,
             pkg:pypi/soxr,
             pkg:npm/protobufjs
+          # 修正版が存在しない advisory の carve-out。
+          # fail-on-severity: high のため、 upstream が未修正の high advisory は
+          # 「依存を上げても下げても該当する」 のに PR で依存行を触った瞬間だけ
+          # gate が落ちる (既存依存は dependency-review の検査対象外のため)。
+          # 結果として脆弱性を減らす PR がブロックされるので、 patched 版が
+          # 出るまで GHSA 単位で明示 carve-out する。
+          #
+          # GHSA-8mgp-746c-j5xp (CVE-2026-81726, 2026-09-02 公開):
+          # NLTK の model-artifact API が pathsec を回避し許可 root 外の
+          # ファイルに触れる。 range は `<= 3.10.3` で nltk の最新 3.10.3 でも
+          # patched 版が存在しない (first_patched_version: null)。
+          # piper-plus での nltk 利用は g2p-en 経由の cmudict ロードのみで、
+          # model artifact のパスを外部入力から組み立てる経路はない。
+          # nltk 側に修正版が出たら本 carve-out を外して lock を上げる。
+          allow-ghsas: GHSA-8mgp-746c-j5xp
           # 自動 fail にせず、PR comment で報告
           warn-only: false
           # vulnerability scope
