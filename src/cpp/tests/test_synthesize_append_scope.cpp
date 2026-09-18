@@ -53,6 +53,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <vector>
@@ -63,10 +65,20 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// A value the decoder cannot plausibly emit at every index, so its survival is
-// unambiguous evidence that the prefix was left alone.
-constexpr int16_t kSentinel = 12345;
+// The prefix is an index-DEPENDENT pattern, not a constant. A constant prefix
+// proves only that no sample was moved across the boundary: an in-place rewrite,
+// or a reordering inside the prefix, would leave every value equal to the
+// sentinel and pass. Making each sample a function of its index catches those
+// too, at no cost.
 constexpr std::size_t kSentinelCount = 2048;
+
+int16_t sentinelAt(std::size_t index) {
+    return static_cast<int16_t>((index * 37) % 30000 - 15000);
+}
+
+float sentinelFloatAt(std::size_t index) {
+    return static_cast<float>(sentinelAt(index)) / 32768.0f;
+}
 
 std::string g_model_path;
 std::string g_config_path;
@@ -134,7 +146,11 @@ protected:
     }
 
     static std::vector<int16_t> sentinelBuffer() {
-        return std::vector<int16_t>(kSentinelCount, kSentinel);
+        std::vector<int16_t> buffer(kSentinelCount);
+        for (std::size_t i = 0; i < kSentinelCount; ++i) {
+            buffer[i] = sentinelAt(i);
+        }
+        return buffer;
     }
 
     static void expectSentinelIntact(const std::vector<int16_t> &buffer,
@@ -143,18 +159,89 @@ protected:
             << what << ": the buffer shrank below the caller's prefix, so "
                        "previously accumulated audio was destroyed";
         for (std::size_t i = 0; i < kSentinelCount; ++i) {
-            ASSERT_EQ(buffer[i], kSentinel)
+            ASSERT_EQ(buffer[i], sentinelAt(i))
                 << what << ": sample " << i
-                << " of the caller's existing audio was overwritten or shifted "
-                   "(issue #655)";
+                << " of the caller's existing audio was overwritten, shifted "
+                   "or reordered (issue #655)";
         }
+    }
+
+    // Assert that this phoneme sequence really does trigger Strategy A padding,
+    // which is the only way to reach the front-trim branch. Without this the
+    // padded cases degrade into duplicates of the unpadded ones the moment the
+    // fixture's G2P output length changes.
+    void expectPaddingWillTrigger(const std::vector<piper::Phoneme> &phonemes) {
+        ASSERT_TRUE(voice.phonemizeConfig.interspersePad)
+            << "this fixture no longer interleaves pad ids, so the id count is "
+               "no longer 2x the phoneme count and the window below is wrong";
+        // phonemeIds = one pad after every phoneme (interspersePad), so
+        // len == 2 * phonemes. padPhonemeIds pads when
+        // MIN_BODY_FOR_STRATEGY_A (3) <= len - 2 and len < MIN_PHONEME_IDS (15).
+        const std::size_t ids = phonemes.size() * 2;
+        ASSERT_GE(ids, 5u) << "only " << ids << " phoneme ids: body is shorter "
+                              "than MIN_BODY_FOR_STRATEGY_A so Strategy A is "
+                              "skipped and no front trim happens";
+        ASSERT_LT(ids, 15u) << ids << " phoneme ids reaches MIN_PHONEME_IDS, so "
+                               "no padding is applied and this case silently "
+                               "stops exercising the trim";
     }
 };
 
-TEST_F(SynthesizeAppendScopeTest, FixtureModelIsPresent) {
-    EXPECT_TRUE(g_model_found)
-        << "test/models/multilingual-test-medium.onnx must be present for "
-           "these assertions to mean anything";
+// ---------------------------------------------------------------------------
+// Anti-vacuity gates. These are deliberately OUTSIDE the fixture: the fixture's
+// SetUp() calls GTEST_SKIP() when the model is missing, and gtest applies a
+// SetUp skip before the test body runs, so a gate declared as TEST_F can never
+// fail -- with no model the whole suite reports `[ PASSED ] 0 tests` and exit
+// code 0, and ctest calls that a pass. Measured by running the binary from a
+// directory where the relative model path does not resolve.
+//
+// As bare TEST()s they do their own lookup and fail loudly instead.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Mirrors the fixture's search, without the skip.
+std::string findFixtureModel() {
+    const std::vector<std::string> searchPaths = {
+        "test/models/multilingual-test-medium.onnx",
+        "../test/models/multilingual-test-medium.onnx",
+        "../../test/models/multilingual-test-medium.onnx",
+    };
+    for (const auto &path : searchPaths) {
+        if (fs::exists(path) && fs::exists(path + ".json")) {
+            return path;
+        }
+    }
+    return {};
+}
+
+} // namespace
+
+TEST(SynthesizeAppendScopeGate, FixtureModelIsPresent) {
+    EXPECT_FALSE(findFixtureModel().empty())
+        << "test/models/multilingual-test-medium.onnx (+ .json) must be "
+           "present, otherwise every case in this file skips and the suite "
+           "reports success while testing nothing";
+}
+
+// Without a `durations` output the model never takes the padding or EOS trim
+// branches, so `audioSeconds` is only ever assigned by the per-call computation
+// that was already correct -- AudioSecondsDescribesOnlyThisCall would then hold
+// even on the unfixed code. Byte-scan the fixture rather than trust the config.
+TEST(SynthesizeAppendScopeGate, FixtureModelDeclaresDurationsOutput) {
+    const std::string model = findFixtureModel();
+    if (model.empty()) {
+        GTEST_SKIP() << "model absent; FixtureModelIsPresent reports that";
+    }
+
+    std::ifstream file(model, std::ios::binary);
+    ASSERT_TRUE(file.is_open()) << "cannot open " << model;
+    const std::string bytes((std::istreambuf_iterator<char>(file)),
+                            std::istreambuf_iterator<char>());
+    EXPECT_NE(bytes.find("durations"), std::string::npos)
+        << model << " does not declare a 'durations' output, so the trim "
+                    "branches this file exercises are unreachable and its "
+                    "audioSeconds assertions become tautological";
 }
 
 // #654. No padding needed: the EOS-region trim runs for every durations-capable
@@ -209,6 +296,7 @@ TEST_F(SynthesizeAppendScopeTest, PaddedUnitDoesNotTrimTheCallersAudio) {
     // interspersed pads), which is exactly the padded window.
     const auto phonemes = phonemesOf("Sol");
     ASSERT_FALSE(phonemes.empty());
+    expectPaddingWillTrigger(phonemes);
 
     std::vector<int16_t> audio = sentinelBuffer();
     piper::SynthesisResult result;
@@ -285,10 +373,12 @@ TEST_F(SynthesizeAppendScopeTest, EmptyBufferCallIsUnaffected) {
 
 namespace {
 
-constexpr float kSentinelFloat = 0.4242f;
-
 std::vector<float> sentinelBufferFloat() {
-    return std::vector<float>(kSentinelCount, kSentinelFloat);
+    std::vector<float> buffer(kSentinelCount);
+    for (std::size_t i = 0; i < kSentinelCount; ++i) {
+        buffer[i] = sentinelFloatAt(i);
+    }
+    return buffer;
 }
 
 } // namespace
@@ -321,6 +411,7 @@ TEST_F(SynthesizeAppendScopeTest, FloatPathAudioSecondsDescribesOnlyThisCall) {
 TEST_F(SynthesizeAppendScopeTest, FloatPathPaddedUnitDoesNotTrimCallersAudio) {
     const auto phonemes = phonemesOf("Sol");
     ASSERT_FALSE(phonemes.empty());
+    expectPaddingWillTrigger(phonemes);
 
     std::vector<float> audio = sentinelBufferFloat();
     piper::SynthesisResult result;
@@ -329,9 +420,9 @@ TEST_F(SynthesizeAppendScopeTest, FloatPathPaddedUnitDoesNotTrimCallersAudio) {
     ASSERT_GE(audio.size(), kSentinelCount)
         << "the buffer shrank below the caller's prefix";
     for (std::size_t i = 0; i < kSentinelCount; ++i) {
-        ASSERT_FLOAT_EQ(audio[i], kSentinelFloat)
+        ASSERT_FLOAT_EQ(audio[i], sentinelFloatAt(i))
             << "float sample " << i
-            << " of the caller's existing audio was overwritten or shifted "
-               "(issue #655)";
+            << " of the caller's existing audio was overwritten, shifted or "
+               "reordered (issue #655)";
     }
 }

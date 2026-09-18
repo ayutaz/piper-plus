@@ -429,10 +429,28 @@ static bool modelDeclaresDurations(const char* path) {
 // is only meaningful while the fixture model actually emits durations: swapping
 // in a durations-less export would degrade all of them to "model does not
 // support timing", which is precisely how #652 shipped green.
-TEST_F(CApiIntegrationTest, FixtureModelDeclaresDurationsOutput) {
-    EXPECT_TRUE(modelDeclaresDurations(g_model_path))
-        << "test/models/multilingual-test-medium.onnx declares no 'durations' "
-           "graph output; the phoneme timing tests would pass vacuously";
+// Declared OUTSIDE the fixture on purpose. The fixture's SetUp() calls
+// GTEST_SKIP() when the model is missing, and gtest applies a SetUp skip before
+// the test body, so a gate written as TEST_F can never fail: with no model the
+// suite reports `[ PASSED ] 0 tests` and exit code 0, which ctest calls a pass.
+// Measured by running the binary from a directory where the relative model path
+// does not resolve.
+TEST(CApiIntegrationGate, FixtureModelDeclaresDurationsOutput) {
+    std::string model;
+    for (const auto &path : {"test/models/multilingual-test-medium.onnx",
+                             "../test/models/multilingual-test-medium.onnx",
+                             "../../test/models/multilingual-test-medium.onnx"}) {
+        if (fs::exists(path)) {
+            model = path;
+            break;
+        }
+    }
+    ASSERT_FALSE(model.empty())
+        << "test/models/multilingual-test-medium.onnx is missing, so every "
+           "integration case skips and the suite reports success";
+    EXPECT_TRUE(modelDeclaresDurations(model.c_str()))
+        << model << " declares no 'durations' graph output; the phoneme timing "
+                    "tests would pass vacuously";
 }
 
 TEST_F(CApiIntegrationTest, TimingAfterSynthesis) {

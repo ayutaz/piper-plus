@@ -498,14 +498,36 @@ protected:
 // shipped in. Without this gate the whole suite would degrade to "the model
 // does not support timing" and report PASSED. Mirrors
 // test_c_api_integration.cpp::FixtureModelDeclaresDurationsOutput.
-TEST_F(TimingTextPathTest, FixtureModelDeclaresDurationsOutput) {
-    EXPECT_TRUE(modelDeclaresDurations(g_timing_model_path))
-        << g_timing_model_path
+// The static half of the gate lives OUTSIDE the fixture on purpose. The
+// fixture's SetUp() calls GTEST_SKIP() when the model is missing, and gtest
+// applies a SetUp skip before the test body, so a gate written as TEST_F can
+// never fail: with no model the suite reports `[ PASSED ] 0 tests` and exit
+// code 0, which ctest calls a pass. Measured by running the binary from a
+// directory where the relative model path does not resolve.
+TEST(TimingTextPathGate, FixtureModelDeclaresDurationsOutput) {
+    std::string model;
+    for (const auto &path : {"test/models/multilingual-test-medium.onnx",
+                             "../test/models/multilingual-test-medium.onnx",
+                             "../../test/models/multilingual-test-medium.onnx"}) {
+        if (fs::exists(path)) {
+            model = path;
+            break;
+        }
+    }
+    ASSERT_FALSE(model.empty())
+        << "test/models/multilingual-test-medium.onnx is missing, so every "
+           "timing case in this file skips and the suite reports success";
+    EXPECT_TRUE(modelDeclaresDurations(model.c_str()))
+        << model
         << " declares no 'durations' graph output; every timing assertion in "
            "this file would pass vacuously";
-    // The runtime probe loadVoice performs is what actually gates
-    // extractTimingsFromDurations, so pin it too: a model that declares the
-    // output but whose session does not expose it is just as vacuous.
+}
+
+// The runtime half needs a loaded voice, so it stays in the fixture: a model
+// that declares the output but whose session does not expose it is just as
+// vacuous. This one legitimately skips without a model -- the gate above is
+// what reports that.
+TEST_F(TimingTextPathTest, LoadedSessionExposesDurationOutput) {
     EXPECT_TRUE(voice.session.hasDurationOutput)
         << "the loaded session exposes no duration output";
 }
