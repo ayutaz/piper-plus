@@ -52,7 +52,7 @@ jobs:
         with: { distribution: temurin, java-version: 17 }
       - name: Setup Android NDK
         uses: android-actions/setup-android@v3.2.2
-        with: { cmdline-tools-version: 11076708 }
+        with: { cmdline-tools-version: 11076708, packages: platform-tools }
       - name: Install NDK
         run: |
           sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
@@ -124,7 +124,7 @@ jobs:
       # therefore needs the same NDK as build-native.
       - name: Setup Android SDK + NDK
         uses: android-actions/setup-android@v3.2.2
-        with: { cmdline-tools-version: 11076708 }
+        with: { cmdline-tools-version: 11076708, packages: platform-tools }
       - name: Install NDK
         run: |
           sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"

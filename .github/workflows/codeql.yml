@@ -191,6 +191,7 @@ jobs:
         uses: android-actions/setup-android@v3.2.2
         with:
           cmdline-tools-version: 11076708
+          packages: platform-tools
 
       - name: Initialize CodeQL
         if: steps.should-skip.outputs.skip != 'true'

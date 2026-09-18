@@ -61,7 +61,7 @@ jobs:
 
       - name: Setup Android NDK
         uses: android-actions/setup-android@v3.2.2
-        with: { cmdline-tools-version: 11076708 }
+        with: { cmdline-tools-version: 11076708, packages: platform-tools }
 
       - name: Install NDK
         run: |
@@ -156,7 +156,7 @@ jobs:
       # installed at the path declared by `android.ndkVersion`.
       - name: Setup Android SDK + NDK
         uses: android-actions/setup-android@v3.2.2
-        with: { cmdline-tools-version: 11076708 }
+        with: { cmdline-tools-version: 11076708, packages: platform-tools }
       - name: Install NDK
         run: |
           sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
@@ -211,7 +211,7 @@ jobs:
 
       - name: Setup Android SDK + NDK
         uses: android-actions/setup-android@v3.2.2
-        with: { cmdline-tools-version: 11076708 }
+        with: { cmdline-tools-version: 11076708, packages: platform-tools }
       - name: Install NDK
         run: |
           sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
@@ -320,7 +320,7 @@ jobs:
 
       - name: Setup Android SDK + NDK
         uses: android-actions/setup-android@v3.2.2
-        with: { cmdline-tools-version: 11076708 }
+        with: { cmdline-tools-version: 11076708, packages: platform-tools }
       - name: Install NDK
         run: |
           sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
@@ -636,7 +636,7 @@ jobs:
 
       - name: Setup Android SDK + NDK
         uses: android-actions/setup-android@v3.2.2
-        with: { cmdline-tools-version: 11076708 }
+        with: { cmdline-tools-version: 11076708, packages: platform-tools }
       - name: Install NDK
         run: |
           sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
