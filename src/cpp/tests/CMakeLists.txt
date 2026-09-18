@@ -175,6 +175,25 @@ foreach(test_source ${TEST_SOURCES})
         )
     endif()
 
+    # test_short_text_mitigation now includes ../trim_helpers.hpp, i.e. the
+    # PRODUCTION trim helpers rather than hand-written copies, so it needs the
+    # src/cpp include path and spdlog (one debug line per helper). It still
+    # links no piper.cpp: the helpers are header-only inline functions, so the
+    # suite stays model-free and onnxruntime-free.
+    if(${test_name} STREQUAL "test_short_text_mitigation")
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
+        if(WIN32)
+            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib)
+        else()
+            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/si/lib/libspdlog.a)
+        endif()
+        if(TARGET spdlog_external)
+            add_dependencies(${test_name} spdlog_external)
+        endif()
+    endif()
+
     # Link utf8_utils.hpp include path for split sentences test
     if(${test_name} STREQUAL "test_split_sentences")
         target_include_directories(${test_name} PRIVATE
