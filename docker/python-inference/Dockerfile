@@ -72,7 +72,17 @@ RUN ok=0; for i in 1 2 3; do \
 # --ignore-installed は Ubuntu 24.04 の apt-installed pip 24.0 で
 # 「Cannot uninstall pip 24.0, RECORD file not found」 を回避するため必須
 # (debian package が pip metadata を持たないことに起因する既知問題)。
-RUN pip install --no-cache-dir --upgrade --break-system-packages --ignore-installed pip setuptools wheel
+# --ignore-installed は apt 版を uninstall せず残すため、 upgrade した
+# setuptools とは別に dist-packages の古い setuptools (70.3.0 系) が残り、
+# Trivy が CVE-2025-47273 (high) / CVE-2026-59890 (medium) を検出し続ける。
+# apt 版だけを明示削除し、 削除後も import 可能なことをビルド時に検証する。
+# (コメントは RUN の外に置く: `\` 継続行の内側に `#` を書くと Docker が行を
+#  連結した結果それ以降がすべてコメント化され、 後続コマンドが実行されない)
+RUN pip install --no-cache-dir --upgrade --break-system-packages --ignore-installed pip setuptools wheel && \
+    rm -rf /usr/lib/python3/dist-packages/setuptools \
+           /usr/lib/python3/dist-packages/setuptools-*.dist-info \
+           /usr/lib/python3/dist-packages/setuptools-*.egg-info && \
+    python -c "import setuptools; print('setuptools', setuptools.__version__)"
 
 # Install uv. --break-system-packages は Ubuntu 24.04 + Python 3.13 環境で
 # PEP 668 protections を bypass するため。 venv を使わず system Python に
