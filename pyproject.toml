@@ -180,6 +180,12 @@ dev-dependencies = [
     # Issue #527 / DR-002: inference extras の統一 floor (>=0.136.1) と揃える。
     "fastapi>=0.136.1",
     "httpx>=0.28.1",
+    # starlette 1.x の TestClient は httpx ではなく httpx2 を要求する
+    # (starlette/testclient.py が httpx2 未導入時に RuntimeError を投げる)。
+    # 現状は wandb 0.30 の transitive として解決されるが、
+    # test_http_server_root.py / test_http_timing.py / test_openai_api.py が
+    # TestClient を使うため、 無関係な経路への暗黙依存を避けて明示宣言する。
+    "httpx2>=2.13.0",
     # OpenAI SDK for end-to-end tests against /v1/audio/speech via
     # docker/python-inference/test_openai_api.py::TestOpenAISDKEndToEnd. Tests
     # auto-skip when the SDK is not installed; this entry just ensures uv-managed
