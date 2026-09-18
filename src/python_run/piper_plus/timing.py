@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 
@@ -204,16 +205,27 @@ def timing_to_srt(result: TimingResult) -> str:
 def _format_srt_timestamp(ms: float) -> str:
     """Format milliseconds as SRT timestamp: ``HH:MM:SS,mmm``.
 
+    Rounding is half-away-from-zero per
+    ``docs/spec/phoneme-timing-contract.toml`` ``[output_formats.srt].rounding``.
+    The builtin ``round`` is deliberately NOT used: it rounds half to even, so
+    this function used to emit a timestamp 1 ms earlier than the Rust, Go, C++
+    and JS runtimes on every ``.5`` boundary (issue #681), and the example
+    below pinned that wrong value as expected output.
+
     Examples
     --------
     >>> _format_srt_timestamp(0)
     '00:00:00,000'
     >>> _format_srt_timestamp(1234.5)
-    '00:00:01,234'
+    '00:00:01,235'
     >>> _format_srt_timestamp(3_661_500)
     '01:01:01,500'
     """
-    total_ms = round(ms)
+    # Clamp like Go / C# / C++ do before splitting. Negative input cannot come
+    # from durations_to_timing (it clamps frames to 0) but the helper is
+    # reachable with caller-built entries.
+    ms = max(ms, 0.0)
+    total_ms = math.floor(ms + 0.5)
     millis = total_ms % 1000
     total_secs = total_ms // 1000
     secs = total_secs % 60

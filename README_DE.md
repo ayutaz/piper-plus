@@ -489,7 +489,7 @@ Wichtige Optionen:
 | `--output_dir/-d DIR` | Ausgabeverzeichnis | - |
 | `--output-raw` | Raw-PCM-Audio auf stdout ausgeben | aus |
 | `--language/-l CODE` | Sprachcode | - |
-| `--timing-format FORMAT` | Timing-Ausgabeformat (json/tsv) | - |
+| `--timing-format FORMAT` | Timing-Ausgabeformat (json/tsv/srt) | - |
 | `--test-mode` | Testmodus, ONNX-Inferenz überspringen | aus |
 | `--debug` | Debug-Logging aktivieren | aus |
 | `--quiet/-q` | Logging deaktivieren | aus |

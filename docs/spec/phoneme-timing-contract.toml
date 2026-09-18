@@ -236,6 +236,27 @@ start_ms	end_ms	duration_ms	phoneme
 timestamp_format = "HH:MM:SS,mmm"
 cue_format = "{index}\n{start} --> {end}\n{phoneme}\n\n"
 indexing_starts_at = 1
+# Millisecond rounding. This MUST be stated because the language default
+# differs: Python's round() and .NET's Math.Round(double) are round-half-to-EVEN
+# (banker's), while Rust f64::round, Go math.Round, JS Math.round and the C++
+# `(long long)(ms + 0.5)` idiom are all half-away-from-zero. Left unspecified,
+# Python and C# silently emitted a timestamp 1 ms earlier than the other four
+# runtimes on every .5 boundary. Rust is the reference implementation the other
+# five cite in their own source comments, so its behaviour is canonical here.
+# Implementations MUST NOT use a language default that rounds half to even.
+rounding = "half_away_from_zero"
+# Boundary cases every runtime's SRT formatter must reproduce. Each `ms` has an
+# EVEN integer part, which is exactly where half-to-even and half-away-from-zero
+# disagree -- a fixture built from odd integer parts passes under both and
+# proves nothing.
+rounding_cases = [
+  { ms = 0.5, timestamp = "00:00:00,001" },
+  { ms = 1234.5, timestamp = "00:00:01,235" },
+  { ms = 2500.5, timestamp = "00:00:02,501" },
+  { ms = 0.0, timestamp = "00:00:00,000" },
+  { ms = 3661500.0, timestamp = "01:01:01,500" },
+]
+
 example = '''
 1
 00:00:00,000 --> 00:00:00,058
@@ -245,6 +266,33 @@ example = '''
 00:00:00,058 --> 00:00:00,151
 k
 '''
+
+[output_formats.srt.rounding_impl]
+# The rounding idiom each runtime must keep, and where it lives.
+# `scripts/check_srt_rounding_parity.py` asserts the file still contains the
+# idiom and contains none of the forbidden ones, so a "cleanup" back to the
+# language default fails CI instead of silently shifting timestamps by 1 ms.
+#
+# Why an idiom check rather than a value check: five of the six formatters are
+# private to their module, and the C++ one takes seconds as float, where no
+# value multiplies to exactly 1234.5 ms. Value-level pinning lives in each
+# runtime's own test suite (see `rounding_cases`); this gate exists to catch the
+# specific regression that produced #681 -- reaching for the language default.
+python = { file = "src/python_run/piper_plus/timing.py", idiom = "math.floor(ms + 0.5)" }
+csharp = { file = "src/csharp/PiperPlus.Core/Inference/TimingWriter.cs", idiom = "MidpointRounding.AwayFromZero" }
+rust = { file = "src/rust/piper-core/src/timing.rs", idiom = "ms.round()" }
+go = { file = "src/go/piperplus/timing.go", idiom = "math.Round(ms)" }
+js = { file = "src/wasm/openjtalk-web/src/timing.js", idiom = "Math.round(ms)" }
+cpp = { file = "src/cpp/piper.cpp", idiom = "ms + 0.5" }
+
+# Idioms that round half to EVEN in the runtime's language. Present in a
+# formatter file, any of these is the #681 regression.
+forbidden_idioms = { python = [
+  "round(ms)",
+], csharp = [
+  "Math.Round(ms)",
+  "Math.Round(ms, MidpointRounding.ToEven)",
+] }
 
 # ============================================================================
 # Phoneme ID Reverse Mapping

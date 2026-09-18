@@ -300,6 +300,31 @@ func TestFormatSRTTimestamp_VariousMagnitudes(t *testing.T) {
 	}
 }
 
+// SRT millisecond rounding is half-away-from-zero per
+// docs/spec/phoneme-timing-contract.toml [output_formats.srt].rounding. Every
+// case has an EVEN integer part, which is exactly where half-to-even and
+// half-away-from-zero disagree; a case such as 1.5 rounds to 2 under both and
+// proves nothing. Python and C# used their language default (ToEven) and were
+// 1 ms early on every such boundary (issue #681) -- this runtime is the
+// reference the others cite, so these cases lock it in place.
+func TestFormatSRTTimestamp_RoundsHalfAwayFromZero(t *testing.T) {
+	cases := []struct {
+		ms   float64
+		want string
+	}{
+		{0.5, "00:00:00,001"},
+		{1234.5, "00:00:01,235"},
+		{2500.5, "00:00:02,501"},
+		{0.0, "00:00:00,000"},
+		{3661500.0, "01:01:01,500"},
+	}
+	for _, tc := range cases {
+		if got := formatSRTTimestamp(tc.ms); got != tc.want {
+			t.Errorf("formatSRTTimestamp(%v) = %q; want %q (must round half away from zero)", tc.ms, got, tc.want)
+		}
+	}
+}
+
 func TestFormatSRTTimestamp_NegativeClampsToZero(t *testing.T) {
 	got := formatSRTTimestamp(-100)
 	want := "00:00:00,000"

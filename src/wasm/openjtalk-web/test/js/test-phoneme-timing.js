@@ -718,3 +718,35 @@ describe("timingToJson / timingToJsonCompact - roundtrip precision", () => {
 // ---------------------------------------------------------------------------
 // Import via timingToJsonCompact (add to imports if missing)
 // ---------------------------------------------------------------------------
+
+// SRT millisecond rounding is half-away-from-zero per
+// docs/spec/phoneme-timing-contract.toml [output_formats.srt].rounding. Every
+// case has an EVEN integer part, which is exactly where half-to-even and
+// half-away-from-zero disagree; a case such as 1.5 rounds to 2 under both and
+// proves nothing. Python and C# used their language default (ToEven) and were
+// 1 ms early on every such boundary (issue #681) -- this runtime is the
+// reference the others cite, so these cases lock it in place.
+describe("timingToSrt - rounding parity (issue #681)", () => {
+  const roundingCases = [
+    [0.5, "00:00:00,001"],
+    [1234.5, "00:00:01,235"],
+    [2500.5, "00:00:02,501"],
+    [0.0, "00:00:00,000"],
+    [3661500.0, "01:01:01,500"],
+  ];
+
+  for (const [ms, expected] of roundingCases) {
+    it(`formats ${ms} ms as ${expected}`, () => {
+      const result = {
+        phonemes: [{ phoneme: "a", start_ms: ms, end_ms: ms, duration_ms: 0 }],
+        total_duration_ms: ms,
+        sample_rate: 22050,
+      };
+      const srt = timingToSrt(result);
+      assert.ok(
+        srt.includes(`${expected} --> ${expected}`),
+        `expected ${expected} in:\n${srt}`,
+      );
+    });
+  }
+});

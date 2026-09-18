@@ -493,7 +493,12 @@ public static class TimingWriter
             ms = 0f;
         }
 
-        long total_ms = (long)Math.Round(ms);
+        // Half-away-from-zero per docs/spec/phoneme-timing-contract.toml
+        // [output_formats.srt].rounding. Math.Round(double) without an explicit
+        // mode is MidpointRounding.ToEven, which made this writer emit a
+        // timestamp 1 ms earlier than the Rust / Go / C++ / JS runtimes on
+        // every .5 boundary (issue #681).
+        long total_ms = (long)Math.Round(ms, MidpointRounding.AwayFromZero);
         long hours = total_ms / 3_600_000L;
         long remainder = total_ms % 3_600_000L;
         long minutes = remainder / 60_000L;

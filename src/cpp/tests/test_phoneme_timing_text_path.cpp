@@ -855,3 +855,54 @@ TEST(TimingTsvWriterLocaleTest, NumericColumnsHaveNoThousandsSeparator) {
                                                new CommaGroupingNumpunct)
                                        .name());
 }
+
+// ---------------------------------------------------------------------------
+// SRT millisecond rounding (issue #681). Model-free: drives the production
+// piper::outputTimingsAsSRT over a hand-built timing vector.
+//
+// The rule is half-away-from-zero, per
+// docs/spec/phoneme-timing-contract.toml [output_formats.srt].rounding. Python
+// and C# used their language default (round-half-to-EVEN) and emitted a
+// timestamp 1 ms earlier than this runtime on every .5 boundary; these cases
+// pin C++ on the correct side so a future "cleanup" to std::round or
+// std::lround (both half-away-from-zero, but easy to replace with a
+// banker's-rounding helper) cannot drift silently.
+//
+// The contract's rounding_cases are expressed in MILLISECONDS, but PhonemeInfo
+// stores SECONDS as float, and no float multiplied by 1000 lands exactly on
+// 1234.5 ms. The values below are the ms equivalents that ARE exactly
+// representable (k/2000 with k a multiple of 125) and whose integer part is
+// even -- the only combination that both round-trips through float and
+// distinguishes the two rounding rules.
+// ---------------------------------------------------------------------------
+TEST(TimingSrtWriterRoundingTest, RoundsHalfAwayFromZero) {
+    struct Case {
+        float seconds;
+        double expectedMs;  // documentation: what seconds * 1000 must equal
+        const char *timestamp;
+    };
+    // 0.0625 s = 62.5 ms (62 even), 0.3125 s = 312.5 ms (312 even).
+    const Case cases[] = {
+        {0.0625f, 62.5, "00:00:00,063"},
+        {0.3125f, 312.5, "00:00:00,313"},
+        {0.5625f, 562.5, "00:00:00,563"},
+    };
+
+    for (const Case &c : cases) {
+        ASSERT_DOUBLE_EQ(static_cast<double>(c.seconds) * 1000.0, c.expectedMs)
+            << "fixture value " << c.seconds
+            << " does not land exactly on the .5 ms boundary, so this case "
+               "cannot distinguish the two rounding rules";
+
+        const std::vector<piper::PhonemeInfo> timings = {
+            {"a", c.seconds, c.seconds, 0, 0},
+        };
+        std::ostringstream out;
+        piper::outputTimingsAsSRT(timings, out, 22050.0, 256);
+
+        const std::string expectedCue =
+            std::string(c.timestamp) + " --> " + c.timestamp;
+        EXPECT_NE(out.str().find(expectedCue), std::string::npos)
+            << "expected cue '" << expectedCue << "' in:\n" << out.str();
+    }
+}

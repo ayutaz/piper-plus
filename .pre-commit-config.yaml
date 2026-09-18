@@ -239,6 +239,18 @@ repos:
         files: ^(src/python_run/tests/test_.*\.py|\.github/workflows/.*\.yml|scripts/check_python_run_test_coverage\.py)$
         pass_filenames: false
 
+      # SRT の ms 丸めは言語既定が分かれる (Python round() / .NET Math.Round は
+      # half-to-even、 Rust / Go / JS / C++ は half-away-from-zero)。 spec が
+      # 丸めを規定していなかったため Python と C# が .5 境界で 1ms 早い値を
+      # 出力していた (#681)。 6 ランタイムの formatter が canonical な idiom を
+      # 保持し、 言語既定の idiom を含まないことを検査する。
+      - id: srt-rounding-parity
+        name: "SRT ms rounding parity (6 runtimes vs contract toml)"
+        entry: uv run --no-sync python scripts/check_srt_rounding_parity.py
+        language: system
+        files: ^(docs/spec/phoneme-timing-contract\.toml|src/python_run/piper_plus/timing\.py|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/rust/piper-core/src/timing\.rs|src/go/piperplus/timing\.go|src/wasm/openjtalk-web/src/timing\.js|src/cpp/piper\.cpp|scripts/check_srt_rounding_parity\.py)$
+        pass_filenames: false
+
       - id: precommit-file-regex
         name: "pre-commit files regex coverage (meta gate)"
         entry: uv run --no-sync python scripts/check_precommit_file_regex.py

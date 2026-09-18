@@ -318,6 +318,46 @@ public sealed class TimingWriterTests
     }
 
     // ================================================================
+    // 10b. SrtTimestamp rounding parity (issue #681)
+    // ================================================================
+
+    /// <summary>
+    /// SRT millisecond rounding must be half-away-from-zero, per
+    /// docs/spec/phoneme-timing-contract.toml [output_formats.srt].rounding.
+    ///
+    /// Math.Round(double) defaults to MidpointRounding.ToEven, so this writer
+    /// used to emit a timestamp 1 ms earlier than the Rust, Go, C++ and JS
+    /// runtimes on every .5 boundary. Every case below has an EVEN integer
+    /// part, which is exactly where the two rules disagree -- a case such as
+    /// 1.5 rounds to 2 under both and would prove nothing.
+    ///
+    /// The values mirror the contract's `rounding_cases` table;
+    /// scripts/check_srt_rounding_parity.py fails if this file drifts from it.
+    /// </summary>
+    [Theory]
+    [InlineData(0.5f, "00:00:00,001")]
+    [InlineData(1234.5f, "00:00:01,235")]
+    [InlineData(2500.5f, "00:00:02,501")]
+    [InlineData(0f, "00:00:00,000")]
+    [InlineData(3_661_500f, "01:01:01,500")]
+    public void SrtTimestamp_RoundsHalfAwayFromZero(float ms, string expected)
+    {
+        var entries = new List<TimingWriter.PhonemeTimingEntry>
+        {
+            new("a", ms, ms, 0f),
+        };
+
+        using var stream = new MemoryStream();
+        TimingWriter.WriteSrt(stream, entries);
+
+        stream.Position = 0;
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        string srt = reader.ReadToEnd();
+
+        Assert.Contains($"{expected} --> {expected}", srt);
+    }
+
+    // ================================================================
     // Spec-conformance tests for WriteJson
     // (docs/spec/phoneme-timing-contract.toml v1.0)
     // ================================================================
