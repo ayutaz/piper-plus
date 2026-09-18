@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789719669654,
+  "lastUpdate": 1789746651384,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -966,6 +966,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 208.7,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0201b9fa23b4d53e808bd6bdd7760400e1474bff",
+          "message": "chore(deps): bump the gh-actions group with 3 updates (#675)\n\nBumps the gh-actions group with 3 updates: [github/codeql-action](https://github.com/github/codeql-action), [benchmark-action/github-action-benchmark](https://github.com/benchmark-action/github-action-benchmark) and [taiki-e/install-action](https://github.com/taiki-e/install-action).\n\n\nUpdates `github/codeql-action` from 3.37.9 to 3.38.0\n- [Release notes](https://github.com/github/codeql-action/releases)\n- [Changelog](https://github.com/github/codeql-action/blob/v3.38.0/CHANGELOG.md)\n- [Commits](https://github.com/github/codeql-action/compare/v3.37.9...v3.38.0)\n\nUpdates `benchmark-action/github-action-benchmark` from 1.22.1 to 1.22.2\n- [Release notes](https://github.com/benchmark-action/github-action-benchmark/releases)\n- [Changelog](https://github.com/benchmark-action/github-action-benchmark/blob/master/CHANGELOG.md)\n- [Commits](https://github.com/benchmark-action/github-action-benchmark/compare/v1.22.1...v1.22.2)\n\nUpdates `taiki-e/install-action` from 2.87.1 to 2.87.13\n- [Release notes](https://github.com/taiki-e/install-action/releases)\n- [Changelog](https://github.com/taiki-e/install-action/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/taiki-e/install-action/compare/v2.87.1...v2.87.13)\n\n---\nupdated-dependencies:\n- dependency-name: github/codeql-action\n  dependency-version: 3.38.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: benchmark-action/github-action-benchmark\n  dependency-version: 1.22.2\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n  dependency-group: gh-actions\n- dependency-name: taiki-e/install-action\n  dependency-version: 2.87.13\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n  dependency-group: gh-actions\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-09-19T00:49:27+09:00",
+          "tree_id": "d0f50d99933e2e817a2e7f4ef6fb28733d38526e",
+          "url": "https://github.com/ayutaz/piper-plus/commit/0201b9fa23b4d53e808bd6bdd7760400e1474bff"
+        },
+        "date": 1789746649260,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0442,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 11.2,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 12.9,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 632.4,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 211,
             "unit": "MB"
           },
           {
