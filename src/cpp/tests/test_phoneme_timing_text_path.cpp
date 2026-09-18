@@ -906,3 +906,56 @@ TEST(TimingSrtWriterRoundingTest, RoundsHalfAwayFromZero) {
             << "expected cue '" << expectedCue << "' in:\n" << out.str();
     }
 }
+
+// ---------------------------------------------------------------------------
+// The SRT cue index must not inherit a grouping numpunct (issue #684).
+//
+// outputTimingsAsSRT writes the 1-based index with `output << (i + 1)`. The CLI
+// installs a global "en_US.UTF-8" locale (main.cpp), so the ofstream behind
+// --output-timing inherits its numpunct and every index from 1000 on is written
+// as "1,000" -- not an integer to any SRT parser. outputTimingsAsTSV pins the
+// classic locale for exactly this reason; the SRT writer did not, and the bug
+// was unreachable from the CLI until --timing-format srt was exposed (#657).
+//
+// 1000 entries is the smallest count that crosses the grouping boundary.
+// Model-free: it drives the production writer over a synthetic timing vector.
+// ---------------------------------------------------------------------------
+TEST(TimingSrtWriterLocaleTest, CueIndexHasNoThousandsSeparator) {
+    std::vector<piper::PhonemeInfo> timings;
+    timings.reserve(1000);
+    for (int i = 0; i < 1000; ++i) {
+        const float start = static_cast<float>(i) * 0.01f;
+        timings.push_back({"a", start, start + 0.01f, i, i + 1});
+    }
+
+    std::ostringstream out;
+    out.imbue(std::locale(std::locale::classic(), new CommaGroupingNumpunct));
+    piper::outputTimingsAsSRT(timings, out, 22050.0, 256);
+
+    const std::string text = out.str();
+    ASSERT_FALSE(text.empty());
+
+    // Every cue's first line must parse as a bare integer.
+    std::istringstream lines(text);
+    std::string line;
+    std::size_t expectedIndex = 0;
+    while (std::getline(lines, line)) {
+        if (line.empty()) {
+            continue;
+        }
+        // Cue blocks are index / timestamps / phoneme; only the index line is
+        // a bare number, and the timestamp line always contains " --> ".
+        if (line.find(" --> ") != std::string::npos || line == "a") {
+            continue;
+        }
+        ++expectedIndex;
+        EXPECT_EQ(line.find(','), std::string::npos)
+            << "cue index line '" << line
+            << "' contains a thousands separator, so the SRT index is not an "
+               "integer";
+        EXPECT_EQ(line, std::to_string(expectedIndex))
+            << "cue index line '" << line << "' is not the bare integer "
+            << expectedIndex;
+    }
+    EXPECT_EQ(expectedIndex, timings.size());
+}

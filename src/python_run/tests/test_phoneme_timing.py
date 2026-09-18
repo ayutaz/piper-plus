@@ -426,6 +426,37 @@ def test_srt_rounding_cases_would_detect_banker_rounding():
         assert round(ms) != math.floor(ms + 0.5)
 
 
+def _srt_negative_cases() -> list[tuple[float, str]]:
+    """Load `[output_formats.srt].negative_cases` from the contract."""
+    try:
+        import tomllib
+    except ImportError:  # pragma: no cover - Python < 3.11
+        import tomli as tomllib  # type: ignore[no-redef]
+
+    repo_root = Path(__file__).resolve().parents[3]
+    contract = repo_root / "docs" / "spec" / "phoneme-timing-contract.toml"
+    srt = tomllib.loads(contract.read_text(encoding="utf-8"))["output_formats"]["srt"]
+    assert srt["negative_input"] == "clamp_to_zero_before_rounding"
+    cases = [(float(c["ms"]), str(c["timestamp"])) for c in srt["negative_cases"]]
+    assert cases, "the contract's negative_cases table is empty"
+    return cases
+
+
+def test_srt_timestamp_clamps_negative_input():
+    """Negative ms must clamp to 0 before rounding, not leak the sign.
+
+    JS emitted "-1:-1:-2,-500" for -1500 ms until issue #681; the clamp is now
+    a contract rule so every runtime is held to it.
+    """
+    from piper_plus.timing import _format_srt_timestamp
+
+    for ms, expected in _srt_negative_cases():
+        assert _format_srt_timestamp(ms) == expected, (
+            f"_format_srt_timestamp({ms}) produced "
+            f"{_format_srt_timestamp(ms)!r}, contract requires {expected!r}"
+        )
+
+
 def test_srt_output_uses_contract_rounding():
     """The rule must hold through the public writer, not just the helper."""
     from piper_plus.timing import timing_to_srt

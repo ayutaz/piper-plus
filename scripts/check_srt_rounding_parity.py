@@ -92,6 +92,26 @@ def main() -> int:
         )
         return 1
 
+    negative_input = srt.get("negative_input")
+    if negative_input != "clamp_to_zero_before_rounding":
+        print(
+            f"ERROR: [output_formats.srt].negative_input is {negative_input!r}, "
+            "expected 'clamp_to_zero_before_rounding'. Without the clamp the two "
+            "rounding idioms in use (half-up and half-away-from-zero) diverge on "
+            "negative input, and JS leaked the sign into every timestamp field "
+            "(issue #681).",
+            file=sys.stderr,
+        )
+        return 1
+
+    if not srt.get("negative_cases"):
+        print(
+            "ERROR: [output_formats.srt].negative_cases is missing or empty, so "
+            "no runtime's clamp is pinned by the contract",
+            file=sys.stderr,
+        )
+        return 1
+
     impl = srt.get("rounding_impl")
     if not impl:
         print(
@@ -132,6 +152,15 @@ def main() -> int:
                 "that is issue #681 reappearing."
             )
 
+        clamp_idiom = entry.get("clamp_idiom")
+        if clamp_idiom and clamp_idiom not in source:
+            failures.append(
+                f"{runtime}: {entry['file']} no longer contains the clamp "
+                f"{clamp_idiom!r}. Without it a negative millisecond leaks its "
+                "sign into every timestamp field -- JS emitted "
+                '"-1:-1:-2,-500" before #681.'
+            )
+
         for bad in forbidden.get(runtime, []):
             if bad in source:
                 failures.append(
@@ -140,8 +169,11 @@ def main() -> int:
                     "behind the other runtimes on .5 boundaries (issue #681)"
                 )
 
-        if not any(f.startswith(f"{runtime}:") for f in failures):
-            print(f"  OK: {runtime} -- {entry['file']} keeps {idiom!r}")
+        if not any(f.startswith(f"{runtime}: ") for f in failures):
+            detail = f"keeps {idiom!r}"
+            if clamp_idiom:
+                detail += f" + clamp {clamp_idiom!r}"
+            print(f"  OK: {runtime} -- {entry['file']} {detail}")
 
     if failures:
         print(

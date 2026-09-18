@@ -3597,6 +3597,15 @@ void outputTimingsAsSRT(const std::vector<PhonemeInfo> &timings,
         return std::string(buf);
     };
 
+    // Pin the classic locale, as outputTimingsAsTSV does. The cue index is
+    // streamed as an integer, and the CLI installs a global "en_US.UTF-8"
+    // locale (main.cpp) whose numpunct groups thousands -- cue 1000 came out as
+    // "1,000", which is not an integer to any SRT parser. The timestamps are
+    // built with snprintf so they were never affected, which is why only the
+    // index needs this.
+    const std::locale savedLocale = output.getloc();
+    output.imbue(std::locale::classic());
+
     for (size_t i = 0; i < timings.size(); ++i) {
         const auto &info = timings[i];
         const double startMs = static_cast<double>(info.start_time) * 1000.0;
@@ -3608,6 +3617,8 @@ void outputTimingsAsSRT(const std::vector<PhonemeInfo> &timings,
                << formatTimestamp(endMs) << "\n"
                << info.phoneme << "\n\n";
     }
+
+    output.imbue(savedLocale);
 }
 
 void warmupModel(ModelSession &session, int runs) {

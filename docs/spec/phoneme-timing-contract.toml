@@ -239,12 +239,31 @@ indexing_starts_at = 1
 # Millisecond rounding. This MUST be stated because the language default
 # differs: Python's round() and .NET's Math.Round(double) are round-half-to-EVEN
 # (banker's), while Rust f64::round, Go math.Round, JS Math.round and the C++
-# `(long long)(ms + 0.5)` idiom are all half-away-from-zero. Left unspecified,
+# `(long long)(ms + 0.5)` idiom all round a .5 boundary UP. Left unspecified,
 # Python and C# silently emitted a timestamp 1 ms earlier than the other four
 # runtimes on every .5 boundary. Rust is the reference implementation the other
 # five cite in their own source comments, so its behaviour is canonical here.
 # Implementations MUST NOT use a language default that rounds half to even.
+#
+# The name is exact only over the clamped domain: `negative_input` below
+# requires clamping to 0 BEFORE rounding, and for ms >= 0 half-up and
+# half-away-from-zero coincide. Either idiom is therefore acceptable --
+# Rust/Go/C# use half-away-from-zero (f64::round, math.Round,
+# MidpointRounding.AwayFromZero) and Python/JS/C++ use half-up
+# (math.floor(ms + 0.5), Math.round, (long long)(ms + 0.5)). They diverge only
+# on negative input, which the clamp removes from the domain.
 rounding = "half_away_from_zero"
+# Negative milliseconds must be clamped to 0 before rounding, so the timestamp
+# is well-formed rather than sign-leaking into every field. Cursor walks clamp
+# negative frames already ([calculation.negative_handling]), so this is only
+# reachable with caller-built entries -- but JS did not clamp and produced
+# "-1:-1:-2,-500", which no SRT parser accepts.
+negative_input = "clamp_to_zero_before_rounding"
+negative_cases = [
+  { ms = -1500.0, timestamp = "00:00:00,000" },
+  { ms = -1234.5, timestamp = "00:00:00,000" },
+  { ms = -0.4, timestamp = "00:00:00,000" },
+]
 # Boundary cases every runtime's SRT formatter must reproduce. Each `ms` has an
 # EVEN integer part, which is exactly where half-to-even and half-away-from-zero
 # disagree -- a fixture built from odd integer parts passes under both and
@@ -278,12 +297,17 @@ k
 # value multiplies to exactly 1234.5 ms. Value-level pinning lives in each
 # runtime's own test suite (see `rounding_cases`); this gate exists to catch the
 # specific regression that produced #681 -- reaching for the language default.
-python = { file = "src/python_run/piper_plus/timing.py", idiom = "math.floor(ms + 0.5)" }
-csharp = { file = "src/csharp/PiperPlus.Core/Inference/TimingWriter.cs", idiom = "MidpointRounding.AwayFromZero" }
-rust = { file = "src/rust/piper-core/src/timing.rs", idiom = "ms.round()" }
-go = { file = "src/go/piperplus/timing.go", idiom = "math.Round(ms)" }
-js = { file = "src/wasm/openjtalk-web/src/timing.js", idiom = "Math.round(ms)" }
-cpp = { file = "src/cpp/piper.cpp", idiom = "ms + 0.5" }
+# `clamp_idiom` pins `negative_input` in the source as well. Rust has no
+# explicit clamp: `ms.round() as u64` is a saturating cast, so any negative
+# rounds to 0 by the language's own rules -- it is the documented exception and
+# carries no clamp_idiom. JS was the runtime that actually lacked a clamp and
+# leaked the sign into every field, so it is pinned here.
+python = { file = "src/python_run/piper_plus/timing.py", idiom = "math.floor(ms + 0.5)", clamp_idiom = "max(ms, 0.0)" }
+csharp = { file = "src/csharp/PiperPlus.Core/Inference/TimingWriter.cs", idiom = "MidpointRounding.AwayFromZero", clamp_idiom = "if (ms < 0f)" }
+rust = { file = "src/rust/piper-core/src/timing.rs", idiom = "ms.round() as u64" }
+go = { file = "src/go/piperplus/timing.go", idiom = "math.Round(ms)", clamp_idiom = "if ms < 0 {" }
+js = { file = "src/wasm/openjtalk-web/src/timing.js", idiom = "Math.round(Math.max(ms, 0))", clamp_idiom = "Math.max(ms, 0)" }
+cpp = { file = "src/cpp/piper.cpp", idiom = "ms + 0.5", clamp_idiom = "if (ms < 0.0)" }
 
 # Idioms that round half to EVEN in the runtime's language. Present in a
 # formatter file, any of these is the #681 regression.

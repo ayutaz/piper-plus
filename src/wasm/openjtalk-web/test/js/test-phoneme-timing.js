@@ -750,3 +750,39 @@ describe("timingToSrt - rounding parity (issue #681)", () => {
     });
   }
 });
+
+// Negative milliseconds must clamp to zero before rounding, per
+// docs/spec/phoneme-timing-contract.toml [output_formats.srt].negative_input.
+// Every other runtime clamps (Go / C# / C++ explicitly, Rust via a saturating
+// cast, Python since #681); JS did not, and emitted "-1:-1:-2,-500" -- a
+// timestamp no SRT parser accepts, with the sign leaking into every field.
+describe("timingToSrt - negative input clamping", () => {
+  const negativeCases = [
+    [-1500, "00:00:00,000"],
+    [-1234.5, "00:00:00,000"],
+    [-0.4, "00:00:00,000"],
+  ];
+
+  for (const [ms, expected] of negativeCases) {
+    it(`clamps ${ms} ms to ${expected}`, () => {
+      const result = {
+        phonemes: [{ phoneme: "a", start_ms: ms, end_ms: ms, duration_ms: 0 }],
+        total_duration_ms: 0,
+        sample_rate: 22050,
+      };
+      const srt = timingToSrt(result);
+      assert.ok(
+        srt.includes(`${expected} --> ${expected}`),
+        `expected ${expected} in:\n${srt}`,
+      );
+      // The cue's timestamp line must be digits only. A bare `includes("-")`
+      // cannot be used here: the SRT cue separator is itself "-->".
+      const timestampLine = srt.split("\n")[1];
+      assert.match(
+        timestampLine,
+        /^\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}$/,
+        `sign leaked into the timestamp line: ${timestampLine}`,
+      );
+    });
+  }
+});
