@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1787578736370,
+  "lastUpdate": 1789719669654,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -912,6 +912,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 208.3,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7c74a4502d47f2fb2e456f242a286bc9023f6e82",
+          "message": "fix: SSML 経路の無音出力と Python timing オフセットのずれを修正する (#661)\n\n* fix(cpp): SSML 経路が音声を出力しない問題を修正し、合成ループをテスト可能にする\n\n--ssml および SSML 自動検出経路が音声を一切出力せず、<break> の無音だけを\n書き出していた。synthesizeSsmlToBuffer が textToAudio に [](){} を\naudioCallback として渡していたため。textToAudio は callback が入っていると\n「callback 側が既にサンプルをコピーした」という前提で文ごとに出力バッファを\nclear() するので、何もしない lambda では segment ごとのバッファが空のまま返り、\ninsert が 0 サンプルを追加していた。\n\n実測 (dev 0c265d8f):\n  <speak>Hola mundo</speak>                          -> 0 フレーム\n  <speak>Hola<break time=\"200ms\"/>mundo</speak>      -> 4410 フレーム (無音のみ)\n  Hola mundo. (平文、対照)                            -> 15674 フレーム\n\nPR #477 で SSML CLI 経路が追加された時点から一貫して無音で、リグレッションでは\nなく初出からの欠陥。\n\naudioCallback を nullptr にして修正した。あわせて result.audioSeconds を\nsegment が実際に出力したサンプル数から算出するようにした (従来は\nsegResult.audioSeconds を加算しており、音声 0 サンプルなのに audio=0.476 sec と\n報告していた。この値は #654 の影響も受ける)。\n\n回帰テストのために合成ループを src/cpp/ssml_synth.{hpp,cpp} へ切り出した。\n従来は main.cpp 内の static 関数でテストから到達できず、既存の test_ssml.cpp は\nparser だけを検証していたため「parser は正しいが出力が無音」という状態を\n検出できなかった (#652 と同じ「検査対象を含まない gate」の類型)。\n\ntest_ssml_synth.cpp に 7 ケースを追加:\n- SpeakOnlyDocumentProducesAudio (無音でないサンプルの存在を要求)\n- SingleSegmentMatchesDirectTextToAudio (直接呼び出しとサンプル数一致)\n- BreakAddsExactlyItsSilence (break の増分がちょうど 0.2s、末尾が全てゼロ)\n- BothSidesOfABreakAreSynthesized (無音区間の両側に音声があること)\n- ReportedAudioSecondsMatchesEmittedSamples (ログと実出力の一致)\n- LengthScaleIsRestoredAfterSynthesis / FixtureModelIsPresent\n\ndev の欠陥 ([](){} + segResult.audioSeconds) を復元すると 7 本中 5 本が fail\nすることを実測で確認済み (残り 2 本は bug と無関係なため green が正しい)。\ntest_ssml / test_streaming / test_streaming_raw_phonemes も green。\n\nCloses #659\n\n* fix(python): timing 連結オフセットを実出力サンプル基準に移行する\n\nsynthesize_with_timing は複数文の timing を連結する際、オフセットを\n`cumulative_ms += timing.total_duration_ms` で durations の合計だけ進めていた。\nONNX の durations は torch.ceil 適用前の値なので (#653) 合計は実際に書き出した\n音声の 0.55-0.83 倍にしかならず、文が進むごとに timestamp が前へずれていた\n(3 unit の発話で 2 文目 -77 ms / 3 文目 -140 ms)。\n\n書き出した PCM サンプル数 (音声 + 文間無音) を積算してオフセットにするよう\n変更し、PR #658 で移行済みの C++ と規則を一致させた。文間無音も\n`int(sentence_silence * sample_rate)` サンプルとして加算するため、\n従来の float 秒からの ms 換算との丸め不整合も解消される。\n\n挙動変更:\n- 複数文入力の start_ms / end_ms が変わる (実音声上の位置に一致する)\n- 単一文入力の per-phoneme 値は不変 (先頭 unit のオフセットは厳密に 0)\n- TimingResult.total_duration_ms は「出力ストリーム長」の定義に変わるため\n  単一文でも値が変わる。従来は per-unit cursor 走破長の合計で、#653 の分だけ\n  実音声より短かった\n- durations_to_timing() 単体の挙動と parity fixture は不変\n\nspec は [concatenation].divergence を解消し、集約 total の定義を\naggregate_total_duration_ms として明文化した。C++ と Python の両方が\nemitted-sample anchoring になったため、この節に per-runtime の差異は無くなった。\n\nテストは TestSynthesizeWithTimingOffsetAnchoring を追加し、_synthesize_ids_core\nを stub して「実出力 500 ms に対し durations 合計 348.3 ms」と意図的に乖離させた\nうえで両側比較する。既存の test_multi_sentence_cumulative_offset /\ntest_sentence_silence_increases_gap は単調増加と大小関係しか見ておらず、\nどちらの規則でも緑になるため回帰を検出できなかった。前提が崩れたら気付けるよう\ntest_duration_sum_and_emitted_length_differ で乖離自体も pin している。\n\n旧実装 (durations 合計 + total_duration_ms=cumulative_ms) に戻すと 4 テストが\nfail することを実測で確認済み (348.2993 vs 期待 500.0 ± 0.05)。復元後は\ntiming 関連 145 テスト (test_voice_timing / test_phoneme_timing /\ntest_phoneme_timing_parity / test_http_timing) が green。\n\nCloses #660",
+          "timestamp": "2026-09-18T17:19:30+09:00",
+          "tree_id": "c0b208b2c64fa48a778918aba553e57faa927d08",
+          "url": "https://github.com/ayutaz/piper-plus/commit/7c74a4502d47f2fb2e456f242a286bc9023f6e82"
+        },
+        "date": 1789719666768,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0728,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 18.4,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 20,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1105.2,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 208.7,
             "unit": "MB"
           },
           {
