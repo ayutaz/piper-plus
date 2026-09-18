@@ -110,15 +110,13 @@ millisecond_fields_are_canonical_across_units = true
 frame_fields_advisory_across_units = true
 # start_frame/end_frame truncate on division, so they may drift by <= 1 frame
 # per inter-unit silence gap. Compare milliseconds, not frames, across units.
-divergence = """
-Python (src/python_run/piper_plus/voice.py:1300-1311, `cumulative_ms +=
-timing.total_duration_ms` at :1306) advances the offset by the SUM OF THE UNIT'S
-DURATIONS instead of by the emitted sample count. Because the durations tensor
-is exported pre-ceil (#653) that offset is 0.55-0.83x of the real unit length,
-so Python timestamps drift earlier with every unit. C++ deliberately does NOT
-mirror this; migrating Python onto emitted-sample anchoring is tracked
-separately.
-"""
+aggregate_total_duration_ms = "the emitted stream length (offset after the last unit, inter-unit silence included) -- NOT the sum of the per-unit cursor walks, which understates it by the pre-ceil gap of #653"
+# History: Python advanced the offset by the SUM OF THE UNIT'S DURATIONS
+# (`cumulative_ms += timing.total_duration_ms`) until issue #660. Because the
+# durations tensor is exported pre-ceil (#653) that offset was 0.55-0.83x of
+# the real unit length, so timestamps drifted earlier with every unit. Both
+# C++ and Python now anchor to emitted samples, so this section has no
+# per-runtime divergence.
 
 [concatenation.silence]
 # Inter-unit silence is audio the caller receives, so it MUST be part of the
@@ -287,7 +285,7 @@ example = "{ '\\uE019': 'N_m', '\\uE00E': 'ch' }"
 [implementations.python]
 file = "src/python_run/piper_plus/timing.py"
 voice_integration = "src/python_run/piper_plus/voice.py:synthesize_with_timing"
-concatenation = "duration-sum offset (see [concatenation].divergence) -- NOT yet migrated to emitted-sample anchoring"
+concatenation = "emitted-sample anchoring (issue #660); see [concatenation]"
 http_endpoint = "POST /api/phoneme-timing (src/python_run/piper_plus/http_server.py)"
 formats = ["json_pretty", "json_compact", "tsv", "srt"]
 test_files = [

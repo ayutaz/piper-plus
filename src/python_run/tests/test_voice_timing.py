@@ -19,8 +19,14 @@ from unittest.mock import MagicMock
 
 import numpy as np
 
+import pytest
+
 from piper_plus.config import PhonemeType, PiperConfig
-from piper_plus.timing import PhonemeTimingInfo, TimingResult
+from piper_plus.timing import (
+    PhonemeTimingInfo,
+    TimingResult,
+    durations_to_timing,
+)
 from piper_plus.voice import PiperVoice
 
 
@@ -649,3 +655,148 @@ class TestSpeakerEmbeddingDefaults:
         assert feeds["speaker_embedding"].shape == (1, 192)
         assert feeds["speaker_embedding"].dtype == np.float32
         assert feeds["speaker_embedding_mask"].tolist() == [[0]]
+
+
+# ---------------------------------------------------------------------------
+# Offset anchoring (issue #660)
+# ---------------------------------------------------------------------------
+
+
+class TestSynthesizeWithTimingOffsetAnchoring:
+    """Multi-sentence offsets must be anchored to emitted samples.
+
+    ``synthesize_with_timing`` used to advance the offset by
+    ``timing.total_duration_ms``, i.e. the sum of the ``durations`` tensor.
+    That tensor is exported pre-``ceil`` (#653), so the sum is 0.55-0.83x of
+    the audio actually written and every sentence boundary drifted earlier.
+
+    ``_synthesize_ids_core`` is stubbed here so the emitted byte count and the
+    duration sum are deliberately far apart (500 ms of audio against a
+    348.3 ms duration sum). The old rule and the new one therefore cannot both
+    satisfy these assertions: each test below is red on the duration-summed
+    implementation.
+    """
+
+    SAMPLE_RATE = 22050
+    HOP = 256
+    # 11025 samples = 500.0 ms at 22050 Hz.
+    AUDIO_SAMPLES = 11025
+    # 30 frames * (256 / 22050) s = 348.299... ms -- nowhere near 500 ms.
+    DURATIONS = [10.0, 20.0]
+    ORIGINAL_IDS = [10, 12]  # -> tokens "a", "k" via the fixture's id map
+
+    def _voice_with_fixed_units(self, num_sentences: int) -> PiperVoice:
+        voice = _make_mock_voice(has_durations=True, sample_rate=self.SAMPLE_RATE)
+        voice.config.hop_size = self.HOP
+        voice.phonemize = MagicMock(
+            return_value=[["a", "k"] for _ in range(num_sentences)]
+        )
+        audio_bytes = b"\x10\x00" * self.AUDIO_SAMPLES
+        voice._synthesize_ids_core = MagicMock(
+            return_value=(
+                audio_bytes,
+                np.array(self.DURATIONS, dtype=np.float32),
+                list(self.ORIGINAL_IDS),
+            )
+        )
+        return voice
+
+    def _frame_time_ms(self) -> float:
+        return self.HOP / self.SAMPLE_RATE * 1000.0
+
+    def _unit_audio_ms(self) -> float:
+        return self.AUDIO_SAMPLES / self.SAMPLE_RATE * 1000.0
+
+    def test_duration_sum_and_emitted_length_differ(self):
+        """Guard the premise: the two candidate rules must not coincide.
+
+        If a future fixture change made the duration sum equal the emitted
+        length, every test in this class would pass under either rule and
+        would silently stop guarding anything.
+        """
+        duration_sum_ms = sum(self.DURATIONS) * self._frame_time_ms()
+        assert abs(duration_sum_ms - self._unit_audio_ms()) > 100.0
+
+    def test_second_sentence_offset_equals_emitted_samples(self):
+        """Sentence 2 starts at the sample count written for sentence 1."""
+        voice = self._voice_with_fixed_units(2)
+
+        _, timing = voice.synthesize_with_timing("a. b.", sentence_silence=0.0)
+
+        assert timing is not None
+        entries_per_unit = len(self.ORIGINAL_IDS)
+        assert len(timing.phonemes) == entries_per_unit * 2
+
+        first_of_second = timing.phonemes[entries_per_unit]
+        first_of_first = timing.phonemes[0]
+        assert first_of_first.start_ms == pytest.approx(0.0, abs=1e-9)
+        assert first_of_second.start_ms == pytest.approx(
+            self._unit_audio_ms(), abs=0.05
+        )
+
+    def test_sentence_silence_enters_offset_as_samples(self):
+        """The offset grows by int(silence * rate) samples, not by float ms."""
+        silence = 0.25
+        voice = self._voice_with_fixed_units(2)
+
+        _, timing = voice.synthesize_with_timing("a. b.", sentence_silence=silence)
+
+        assert timing is not None
+        silence_samples = int(silence * self.SAMPLE_RATE)
+        expected_ms = (
+            self.AUDIO_SAMPLES + silence_samples
+        ) / self.SAMPLE_RATE * 1000.0
+        first_of_second = timing.phonemes[len(self.ORIGINAL_IDS)]
+        assert first_of_second.start_ms == pytest.approx(expected_ms, abs=0.05)
+
+    def test_offsets_accumulate_linearly_across_three_sentences(self):
+        """Every boundary is one unit apart -- no compounding drift."""
+        voice = self._voice_with_fixed_units(3)
+
+        _, timing = voice.synthesize_with_timing("a. b. c.", sentence_silence=0.0)
+
+        assert timing is not None
+        per_unit = len(self.ORIGINAL_IDS)
+        starts = [timing.phonemes[i * per_unit].start_ms for i in range(3)]
+        for index, start in enumerate(starts):
+            assert start == pytest.approx(index * self._unit_audio_ms(), abs=0.05)
+
+    def test_total_duration_ms_is_emitted_stream_length(self):
+        """The aggregate total describes the stream, not the duration sum."""
+        silence = 0.1
+        voice = self._voice_with_fixed_units(2)
+
+        wav_bytes, timing = voice.synthesize_with_timing(
+            "a. b.", sentence_silence=silence
+        )
+
+        assert timing is not None
+        silence_samples = int(silence * self.SAMPLE_RATE)
+        expected_samples = 2 * (self.AUDIO_SAMPLES + silence_samples)
+        assert timing.total_duration_ms == pytest.approx(
+            expected_samples / self.SAMPLE_RATE * 1000.0, abs=0.05
+        )
+
+        # And it matches the WAV the caller received.
+        with wave.open(BytesIO(wav_bytes), "rb") as wf:
+            assert wf.getnframes() == expected_samples
+
+    def test_single_sentence_entries_are_unshifted(self):
+        """A single unit has offset 0, so its entries are untouched."""
+        voice = self._voice_with_fixed_units(1)
+
+        _, timing = voice.synthesize_with_timing("a.", sentence_silence=0.0)
+
+        assert timing is not None
+        expected = durations_to_timing(
+            self.DURATIONS,
+            ["a", "k"],
+            self.SAMPLE_RATE,
+            hop_length=self.HOP,
+        )
+        assert [p.start_ms for p in timing.phonemes] == [
+            p.start_ms for p in expected.phonemes
+        ]
+        assert [p.end_ms for p in timing.phonemes] == [
+            p.end_ms for p in expected.phonemes
+        ]
