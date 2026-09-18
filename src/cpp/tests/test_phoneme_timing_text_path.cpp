@@ -19,6 +19,16 @@
  * tier is unreachable from the C API, so both need a target that links
  * piper.cpp.
  *
+ * The exact-offset checks are written once (`expectMultiUnitOffsetsExact`,
+ * `expectPhraseSilenceOffsetsExact`) and run against EVERY aggregating entry
+ * point via the `Aggregator` adapters, not just the int16 generator. Covering
+ * only `textToAudio` left the two paths that production actually uses
+ * unguarded: `textToAudioFloat` is what the C API and every FFI binding call,
+ * and `phonemesToAudioFloat` is the Iterator body (`piper_plus_synth_next`).
+ * Deleting the `emittedSamples` advance from either of them, or forwarding
+ * only phrase 0 again, kept an int16-only suite green while every C API
+ * caller received offsets that were 0.2 s per sentence short.
+ *
  * Every timing-vs-audio bound here is ONE-SIDED (`end_time <= audio_length +
  * tol`): the ONNX `durations` tensor is exported pre-`ceil` (issue #653), so
  * the timing total runs short of the real audio by a model-dependent amount.
@@ -35,6 +45,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
+#include <functional>
 #include <map>
 #include <optional>
 #include <sstream>
@@ -62,6 +74,41 @@ int hopSizeOf(const piper::Voice &voice) {
     return 256;
 }
 
+// Does the ONNX file declare a graph output named "durations"?
+//
+// Byte scan of the serialised protobuf, mirroring
+// test_c_api_integration.cpp::modelDeclaresDurations so both suites gate on
+// the same fact in the same way. Deliberately independent of the loaded
+// session: it answers "is the fixture still a timing-capable export?" even if
+// the runtime probe in loadVoice were to change.
+bool modelDeclaresDurations(const std::string &path) {
+    if (path.empty()) {
+        return false;
+    }
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        return false;
+    }
+
+    const std::string needle = "durations";
+    // Keep the trailing needle.size()-1 bytes of each block so a needle that
+    // straddles a block boundary is still found.
+    const std::size_t overlap = needle.size() - 1;
+    std::vector<char> block(64 * 1024);
+    std::string window;
+    while (in.read(block.data(), static_cast<std::streamsize>(block.size())) ||
+           in.gcount() > 0) {
+        window.append(block.data(), static_cast<std::size_t>(in.gcount()));
+        if (window.find(needle) != std::string::npos) {
+            return true;
+        }
+        if (window.size() > overlap) {
+            window.erase(0, window.size() - overlap);
+        }
+    }
+    return false;
+}
+
 // Non-decreasing start_time and end_time >= start_time. Deliberately NOT
 // contiguity: extractTimingsFromDurations drops the PAD/BOS/EOS ids from the
 // entry list while still advancing its cursor, so intra-unit gaps are
@@ -85,6 +132,17 @@ void expectWithinAudio(const std::vector<piper::PhonemeInfo> &timings,
         (static_cast<double>(sampleRate) * static_cast<double>(channels));
     EXPECT_LE(static_cast<double>(timings.back().end_time), audioSeconds + 1e-3);
 }
+
+// One aggregating entry point under test, normalised to "text in ->
+// interleaved PCM sample count + aggregated result out". `samples` is the
+// number of interleaved samples the call emitted into the caller's buffer,
+// which is the base the offset rule is defined against.
+struct Aggregator {
+    std::string name;
+    std::function<void(const std::string &text, std::size_t &samples,
+                       piper::SynthesisResult &result)>
+        run;
+};
 
 } // namespace
 
@@ -148,7 +206,308 @@ protected:
     double oneSample() const {
         return 1.0 / (static_cast<double>(sampleRate()) * channels());
     }
+
+    // ---- Aggregators under test -------------------------------------------
+
+    // int16 generator. Reachable from the CLI and textToWavFile only.
+    Aggregator int16TextAggregator() {
+        Aggregator agg;
+        agg.name = "piper::textToAudio";
+        agg.run = [this](const std::string &text, std::size_t &samples,
+                         piper::SynthesisResult &result) {
+            std::vector<int16_t> audio;
+            piper::textToAudio(config, voice, text, audio, result, nullptr);
+            samples = audio.size();
+        };
+        return agg;
+    }
+
+    // float generator. This is the one the C API (piper_plus_synthesize,
+    // piper_plus_synthesize_streaming) and every FFI binding call.
+    Aggregator floatTextAggregator() {
+        Aggregator agg;
+        agg.name = "piper::textToAudioFloat";
+        agg.run = [this](const std::string &text, std::size_t &samples,
+                         piper::SynthesisResult &result) {
+            std::vector<float> audio;
+            piper::textToAudioFloat(config, voice, text, audio, result,
+                                    nullptr);
+            samples = audio.size();
+        };
+        return agg;
+    }
+
+    // Pre-phonemized float generator. This is the Iterator body: the only
+    // production caller is piper_plus_synth_next, which feeds it the phonemes
+    // synth_start pre-computed. Its multi-unit tier is the
+    // phonemeSilenceSeconds phrase split, so only the phrase-silence check
+    // applies to it.
+    Aggregator floatPhonemeAggregator() {
+        Aggregator agg;
+        agg.name = "piper::phonemesToAudioFloat";
+        agg.run = [this](const std::string &text, std::size_t &samples,
+                         piper::SynthesisResult &result) {
+            piper::PhonemizeResult phonResult;
+            piper::phonemizeText(voice, text, phonResult);
+            ASSERT_FALSE(phonResult.phonemes.empty()) << text;
+            std::vector<float> audio;
+            piper::phonemesToAudioFloat(config, voice,
+                                        phonResult.phonemes.front(), nullptr,
+                                        audio, result);
+            samples = audio.size();
+        };
+        return agg;
+    }
+
+    // ---- Shared exact-offset checks ---------------------------------------
+
+    // The offset rule across SENTENCE units. Inline `[[ ]]` notation is the
+    // only way to force three synthesize() units out of one call: plain
+    // multi-sentence text is flattened into a single unit by the multilingual
+    // phonemizer. The units land in the per-sentence loop, so the gap between
+    // them is the inter-sentence silence -- which is what pins the
+    // `emittedSamples += sentenceSilenceSamples` step. Deleting that step
+    // shifts every unit after the first by -0.2 s.
+    void expectMultiUnitOffsetsExact(const Aggregator &agg) {
+        SCOPED_TRACE(agg.name);
+        const std::string combinedText = "Hola. [[ m u n d o ]] Adios.";
+
+        std::size_t combinedSamples = 0;
+        piper::SynthesisResult combined;
+        ASSERT_NO_FATAL_FAILURE(
+            agg.run(combinedText, combinedSamples, combined));
+
+        ASSERT_TRUE(combined.hasTimingInfo);
+        // Pinned measurement: 5 + 5 + 7 entries across the three units.
+        ASSERT_EQ(combined.phonemeTimings.size(), 17u);
+        expectMonotonic(combined.phonemeTimings);
+
+        // Re-synthesize each unit alone with the trailing sentence silence
+        // turned off, so each run's emitted sample count is exactly that
+        // unit's length. Durations are deterministic for a given id sequence,
+        // so the isolated entries are the combined run's entries minus the
+        // offset.
+        const float sentenceSilenceSeconds =
+            voice.synthesisConfig.sentenceSilenceSeconds;
+        voice.synthesisConfig.sentenceSilenceSeconds = 0.0f;
+
+        const std::vector<std::string> segments = {"Hola.", "[[ m u n d o ]]",
+                                                   "Adios."};
+        std::vector<std::size_t> unitSamples;
+        std::vector<std::vector<piper::PhonemeInfo>> unitTimings;
+        for (const auto &segment : segments) {
+            SCOPED_TRACE(segment);
+            std::size_t segmentSamples = 0;
+            piper::SynthesisResult segmentResult;
+            ASSERT_NO_FATAL_FAILURE(
+                agg.run(segment, segmentSamples, segmentResult));
+            ASSERT_TRUE(segmentResult.hasTimingInfo);
+            ASSERT_FALSE(segmentResult.phonemeTimings.empty());
+            unitSamples.push_back(segmentSamples);
+            unitTimings.push_back(segmentResult.phonemeTimings);
+        }
+
+        voice.synthesisConfig.sentenceSilenceSeconds = sentenceSilenceSeconds;
+
+        // Pinned per-unit entry counts.
+        ASSERT_EQ(unitTimings.size(), 3u);
+        EXPECT_EQ(unitTimings[0].size(), 5u);
+        EXPECT_EQ(unitTimings[1].size(), 5u);
+        EXPECT_EQ(unitTimings[2].size(), 7u);
+        ASSERT_GT(combined.phonemeTimings.size(), unitTimings[0].size())
+            << "the 3-unit run must carry strictly more entries than one unit";
+
+        // Same expression the aggregator uses (piper.cpp), so the sample count
+        // matches bit-for-bit.
+        const std::size_t sentenceSilenceSamples = static_cast<std::size_t>(
+            sentenceSilenceSeconds * sampleRate() * channels());
+        ASSERT_GT(sentenceSilenceSamples, 0u)
+            << "this test needs a non-zero inter-sentence silence";
+
+        std::size_t entryIdx = 0;
+        std::size_t offsetSamples = 0;
+        for (std::size_t unit = 0; unit < unitTimings.size(); ++unit) {
+            const std::string where = "unit " + std::to_string(unit);
+            ASSERT_LE(entryIdx + unitTimings[unit].size(),
+                      combined.phonemeTimings.size())
+                << where;
+
+            const double offsetSeconds =
+                static_cast<double>(offsetSamples) /
+                (static_cast<double>(sampleRate()) * channels());
+            const int offsetFrames = static_cast<int>(
+                offsetSamples /
+                (static_cast<std::size_t>(hopSize()) * channels()));
+
+            for (std::size_t i = 0; i < unitTimings[unit].size(); ++i) {
+                const piper::PhonemeInfo &expected = unitTimings[unit][i];
+                const piper::PhonemeInfo &actual =
+                    combined.phonemeTimings[entryIdx + i];
+                const std::string at = where + " entry " + std::to_string(i);
+
+                EXPECT_EQ(actual.phoneme, expected.phoneme) << at;
+                // Exact inter-unit delta, tolerance one sample. Forwarding
+                // only unit 0 never reaches this loop; concatenating with no
+                // offset, using the per-unit audioSeconds (#654), dropping the
+                // inter-sentence silence from the cursor or a raw duration sum
+                // (#653) are all off by 72-200 ms here.
+                EXPECT_NEAR(static_cast<double>(actual.start_time),
+                            static_cast<double>(expected.start_time) +
+                                offsetSeconds,
+                            oneSample())
+                    << at;
+                EXPECT_NEAR(static_cast<double>(actual.end_time),
+                            static_cast<double>(expected.end_time) +
+                                offsetSeconds,
+                            oneSample())
+                    << at;
+                EXPECT_EQ(actual.start_frame,
+                          expected.start_frame + offsetFrames)
+                    << at;
+                EXPECT_EQ(actual.end_frame, expected.end_frame + offsetFrames)
+                    << at;
+            }
+
+            entryIdx += unitTimings[unit].size();
+            offsetSamples += unitSamples[unit] + sentenceSilenceSamples;
+        }
+
+        EXPECT_EQ(entryIdx, combined.phonemeTimings.size())
+            << "every combined entry must belong to one of the three units";
+        // Sum(unit audio) + Sum(sentence silence) reconstructs the emitted
+        // stream to the sample; this is what makes the offsets positions in
+        // the caller's WAV rather than approximations.
+        EXPECT_EQ(combinedSamples, offsetSamples);
+    }
+
+    // The offset rule across PHRASE units inside one sentence.
+    // `phonemeSilenceSeconds` splits one sentence into several synthesize()
+    // units, which the partial forward this fix replaces dropped silently.
+    // Unreachable from the C API, and the only tier `phonemesToAudioFloat`
+    // has. Re-running with a larger silence isolates the cursor advance: with
+    // it, phrase 2 moves by exactly the extra silence; without it, phrase 2
+    // sits at offset 0 in both runs.
+    void expectPhraseSilenceOffsetsExact(const Aggregator &agg) {
+        SCOPED_TRACE(agg.name);
+        const piper::Phoneme splitPhoneme = U'l';
+        if (voice.phonemizeConfig.phonemeIdMap.count(splitPhoneme) == 0) {
+            GTEST_SKIP() << "phoneme 'l' is absent from this model's "
+                            "phoneme_id_map, so the phrase split cannot happen";
+        }
+
+        const std::string text = "Hola mundo.";
+
+        auto runWithPhraseSilence = [&](float seconds, std::size_t &samples,
+                                        piper::SynthesisResult &result) {
+            voice.synthesisConfig.phonemeSilenceSeconds =
+                std::map<piper::Phoneme, float>{{splitPhoneme, seconds}};
+            agg.run(text, samples, result);
+            voice.synthesisConfig.phonemeSilenceSeconds.reset();
+        };
+
+        std::size_t samplesA = 0;
+        std::size_t samplesB = 0;
+        piper::SynthesisResult resultA;
+        piper::SynthesisResult resultB;
+        ASSERT_NO_FATAL_FAILURE(runWithPhraseSilence(0.3f, samplesA, resultA));
+        ASSERT_NO_FATAL_FAILURE(runWithPhraseSilence(0.6f, samplesB, resultB));
+
+        ASSERT_TRUE(resultA.hasTimingInfo);
+        ASSERT_TRUE(resultB.hasTimingInfo);
+        ASSERT_FALSE(resultA.phonemeTimings.empty());
+        ASSERT_EQ(resultA.phonemeTimings.size(), resultB.phonemeTimings.size());
+        // Pinned measurement: 3 + 9 phonemes across the two phrases.
+        EXPECT_EQ(resultA.phonemeTimings.size(), 12u);
+        expectMonotonic(resultA.phonemeTimings);
+        expectMonotonic(resultB.phonemeTimings);
+
+        // Same expressions the phrase loop uses.
+        const std::size_t silenceA =
+            static_cast<std::size_t>(0.3f * sampleRate() * channels());
+        const std::size_t silenceB =
+            static_cast<std::size_t>(0.6f * sampleRate() * channels());
+        ASSERT_GT(silenceB, silenceA);
+        EXPECT_EQ(samplesB - samplesA, silenceB - silenceA)
+            << "the phrase silence must be the only audio difference";
+
+        // The phrase boundary is the first entry whose start_time moved;
+        // phrase 1 carries offset 0 in both runs, so it must be bit-identical.
+        std::size_t boundary = resultA.phonemeTimings.size();
+        for (std::size_t i = 0; i < resultA.phonemeTimings.size(); ++i) {
+            if (resultA.phonemeTimings[i].start_time !=
+                resultB.phonemeTimings[i].start_time) {
+                boundary = i;
+                break;
+            }
+        }
+        ASSERT_GT(boundary, 0u) << "phrase 1 must keep offset 0 in both runs";
+        ASSERT_LT(boundary, resultA.phonemeTimings.size())
+            << "no phrase split happened, or the phrase cursor never advances; "
+               "the phrase tier is untested";
+        EXPECT_EQ(boundary, 3u);  // Pinned: the split lands after 3 phonemes.
+
+        for (std::size_t i = 0; i < boundary; ++i) {
+            const std::string at = "phrase 1 entry " + std::to_string(i);
+            EXPECT_EQ(resultB.phonemeTimings[i].start_time,
+                      resultA.phonemeTimings[i].start_time)
+                << at;
+            EXPECT_EQ(resultB.phonemeTimings[i].end_time,
+                      resultA.phonemeTimings[i].end_time)
+                << at;
+            EXPECT_EQ(resultB.phonemeTimings[i].start_frame,
+                      resultA.phonemeTimings[i].start_frame)
+                << at;
+            EXPECT_EQ(resultB.phonemeTimings[i].end_frame,
+                      resultA.phonemeTimings[i].end_frame)
+                << at;
+        }
+
+        const double expectedShift =
+            static_cast<double>(silenceB - silenceA) /
+            (static_cast<double>(sampleRate()) * channels());
+        const int expectedFrameShift =
+            static_cast<int>(silenceB /
+                             (static_cast<std::size_t>(hopSize()) * channels())) -
+            static_cast<int>(silenceA /
+                             (static_cast<std::size_t>(hopSize()) * channels()));
+        for (std::size_t i = boundary; i < resultA.phonemeTimings.size(); ++i) {
+            const std::string at = "phrase 2 entry " + std::to_string(i);
+            EXPECT_NEAR(
+                static_cast<double>(resultB.phonemeTimings[i].start_time) -
+                    static_cast<double>(resultA.phonemeTimings[i].start_time),
+                expectedShift, oneSample())
+                << at;
+            EXPECT_NEAR(
+                static_cast<double>(resultB.phonemeTimings[i].end_time) -
+                    static_cast<double>(resultA.phonemeTimings[i].end_time),
+                expectedShift, oneSample())
+                << at;
+            EXPECT_EQ(resultB.phonemeTimings[i].start_frame -
+                          resultA.phonemeTimings[i].start_frame,
+                      expectedFrameShift)
+                << at;
+        }
+    }
 };
+
+// Anti-vacuity gate. GREEN both before and after the #652 fix -- it is not a
+// reproducer. Every exact assertion in this file is only meaningful while the
+// fixture actually emits a `durations` tensor: swap in a durations-less export
+// and `hasTimingInfo` stays false everywhere, which is exactly the state #652
+// shipped in. Without this gate the whole suite would degrade to "the model
+// does not support timing" and report PASSED. Mirrors
+// test_c_api_integration.cpp::FixtureModelDeclaresDurationsOutput.
+TEST_F(TimingTextPathTest, FixtureModelDeclaresDurationsOutput) {
+    EXPECT_TRUE(modelDeclaresDurations(g_timing_model_path))
+        << g_timing_model_path
+        << " declares no 'durations' graph output; every timing assertion in "
+           "this file would pass vacuously";
+    // The runtime probe loadVoice performs is what actually gates
+    // extractTimingsFromDurations, so pin it too: a model that declares the
+    // output but whose session does not expose it is just as vacuous.
+    EXPECT_TRUE(voice.session.hasDurationOutput)
+        << "the loaded session exposes no duration output";
+}
 
 // `hasTimingInfo` is literally the flag the CLI tests before writing
 // --output-timing, so assert it on both generators.
@@ -179,209 +538,36 @@ TEST_F(TimingTextPathTest, TextPathPropagatesTiming) {
         << "the int16 and float generators must report the same entries";
 }
 
-// The offset rule itself. Inline `[[ ]]` notation is the only way to force
-// three synthesize() units out of one call: plain multi-sentence text is
-// flattened into a single unit by the multilingual phonemizer.
+// The sentence-unit offset rule, once per generator. `textToAudio` is the CLI
+// path; `textToAudioFloat` is the one the C API and every FFI binding use, and
+// it was unguarded until this pair existed.
 TEST_F(TimingTextPathTest, MultiUnitOffsetsMatchEmittedSampleCounts) {
-    const std::string combinedText = "Hola. [[ m u n d o ]] Adios.";
-
-    std::vector<int16_t> combinedAudio;
-    piper::SynthesisResult combined;
-    piper::textToAudio(config, voice, combinedText, combinedAudio, combined,
-                       nullptr);
-
-    ASSERT_TRUE(combined.hasTimingInfo);
-    // Pinned measurement: 5 + 5 + 7 entries across the three units.
-    ASSERT_EQ(combined.phonemeTimings.size(), 17u);
-    expectMonotonic(combined.phonemeTimings);
-
-    // Re-synthesize each unit alone with the trailing sentence silence turned
-    // off, so each run's audioBuffer.size() is exactly that unit's length.
-    // Durations are deterministic for a given id sequence, so the isolated
-    // entries are the combined run's entries minus the offset.
-    const float sentenceSilenceSeconds =
-        voice.synthesisConfig.sentenceSilenceSeconds;
-    voice.synthesisConfig.sentenceSilenceSeconds = 0.0f;
-
-    const std::vector<std::string> segments = {"Hola.", "[[ m u n d o ]]",
-                                               "Adios."};
-    std::vector<std::size_t> unitSamples;
-    std::vector<std::vector<piper::PhonemeInfo>> unitTimings;
-    for (const auto &segment : segments) {
-        std::vector<int16_t> segmentAudio;
-        piper::SynthesisResult segmentResult;
-        piper::textToAudio(config, voice, segment, segmentAudio, segmentResult,
-                           nullptr);
-        ASSERT_TRUE(segmentResult.hasTimingInfo) << segment;
-        ASSERT_FALSE(segmentResult.phonemeTimings.empty()) << segment;
-        unitSamples.push_back(segmentAudio.size());
-        unitTimings.push_back(segmentResult.phonemeTimings);
-    }
-
-    voice.synthesisConfig.sentenceSilenceSeconds = sentenceSilenceSeconds;
-
-    // Pinned per-unit entry counts.
-    ASSERT_EQ(unitTimings.size(), 3u);
-    EXPECT_EQ(unitTimings[0].size(), 5u);
-    EXPECT_EQ(unitTimings[1].size(), 5u);
-    EXPECT_EQ(unitTimings[2].size(), 7u);
-    ASSERT_GT(combined.phonemeTimings.size(), unitTimings[0].size())
-        << "the 3-unit run must carry strictly more entries than one unit";
-
-    // Same expression the aggregator uses (piper.cpp), so the sample count
-    // matches bit-for-bit.
-    const std::size_t sentenceSilenceSamples = static_cast<std::size_t>(
-        sentenceSilenceSeconds * sampleRate() * channels());
-    ASSERT_GT(sentenceSilenceSamples, 0u)
-        << "this test needs a non-zero inter-sentence silence";
-
-    std::size_t entryIdx = 0;
-    std::size_t offsetSamples = 0;
-    for (std::size_t unit = 0; unit < unitTimings.size(); ++unit) {
-        const std::string where = "unit " + std::to_string(unit);
-        ASSERT_LE(entryIdx + unitTimings[unit].size(),
-                  combined.phonemeTimings.size())
-            << where;
-
-        const double offsetSeconds = static_cast<double>(offsetSamples) /
-                                     (static_cast<double>(sampleRate()) *
-                                      channels());
-        const int offsetFrames = static_cast<int>(
-            offsetSamples /
-            (static_cast<std::size_t>(hopSize()) * channels()));
-
-        for (std::size_t i = 0; i < unitTimings[unit].size(); ++i) {
-            const piper::PhonemeInfo &expected = unitTimings[unit][i];
-            const piper::PhonemeInfo &actual =
-                combined.phonemeTimings[entryIdx + i];
-            const std::string at = where + " entry " + std::to_string(i);
-
-            EXPECT_EQ(actual.phoneme, expected.phoneme) << at;
-            // Exact inter-unit delta, tolerance one sample. Forwarding only
-            // unit 0 never reaches this loop; concatenating with no offset,
-            // using the per-unit audioSeconds (#654) or a raw duration sum
-            // (#653) are all off by 72-140 ms here.
-            EXPECT_NEAR(static_cast<double>(actual.start_time),
-                        static_cast<double>(expected.start_time) + offsetSeconds,
-                        oneSample())
-                << at;
-            EXPECT_NEAR(static_cast<double>(actual.end_time),
-                        static_cast<double>(expected.end_time) + offsetSeconds,
-                        oneSample())
-                << at;
-            EXPECT_EQ(actual.start_frame, expected.start_frame + offsetFrames)
-                << at;
-            EXPECT_EQ(actual.end_frame, expected.end_frame + offsetFrames) << at;
-        }
-
-        entryIdx += unitTimings[unit].size();
-        offsetSamples += unitSamples[unit] + sentenceSilenceSamples;
-    }
-
-    EXPECT_EQ(entryIdx, combined.phonemeTimings.size())
-        << "every combined entry must belong to one of the three units";
-    // Sum(unit audio) + Sum(sentence silence) reconstructs the emitted stream
-    // to the sample; this is what makes the offsets positions in the caller's
-    // WAV rather than approximations.
-    EXPECT_EQ(combinedAudio.size(), offsetSamples);
+    ASSERT_NO_FATAL_FAILURE(
+        expectMultiUnitOffsetsExact(int16TextAggregator()));
 }
 
-// Intra-sentence phrase tier: `phonemeSilenceSeconds` splits one sentence into
-// several synthesize() units, which the partial forward this fix replaces
-// dropped silently. Unreachable from the C API.
+TEST_F(TimingTextPathTest, MultiUnitOffsetsMatchEmittedSampleCountsFloat) {
+    ASSERT_NO_FATAL_FAILURE(
+        expectMultiUnitOffsetsExact(floatTextAggregator()));
+}
+
+// Intra-sentence phrase tier, once per aggregator that has one. The
+// phonemesToAudioFloat variant is the only exact coverage the Iterator body
+// gets: its cursor advance is unreachable from the C API because
+// phonemeSilenceSeconds is not exposed there.
 TEST_F(TimingTextPathTest, PhraseSilenceSplitOffsetsAreExact) {
-    const piper::Phoneme splitPhoneme = U'l';
-    if (voice.phonemizeConfig.phonemeIdMap.count(splitPhoneme) == 0) {
-        GTEST_SKIP() << "phoneme 'l' is absent from this model's "
-                        "phoneme_id_map, so the phrase split cannot happen";
-    }
+    ASSERT_NO_FATAL_FAILURE(
+        expectPhraseSilenceOffsetsExact(int16TextAggregator()));
+}
 
-    const std::string text = "Hola mundo.";
+TEST_F(TimingTextPathTest, PhraseSilenceSplitOffsetsAreExactFloat) {
+    ASSERT_NO_FATAL_FAILURE(
+        expectPhraseSilenceOffsetsExact(floatTextAggregator()));
+}
 
-    auto runWithPhraseSilence = [&](float seconds, std::vector<int16_t> &audio,
-                                    piper::SynthesisResult &result) {
-        voice.synthesisConfig.phonemeSilenceSeconds =
-            std::map<piper::Phoneme, float>{{splitPhoneme, seconds}};
-        piper::textToAudio(config, voice, text, audio, result, nullptr);
-        voice.synthesisConfig.phonemeSilenceSeconds.reset();
-    };
-
-    std::vector<int16_t> audioA;
-    std::vector<int16_t> audioB;
-    piper::SynthesisResult resultA;
-    piper::SynthesisResult resultB;
-    runWithPhraseSilence(0.3f, audioA, resultA);
-    runWithPhraseSilence(0.6f, audioB, resultB);
-
-    ASSERT_TRUE(resultA.hasTimingInfo);
-    ASSERT_TRUE(resultB.hasTimingInfo);
-    ASSERT_FALSE(resultA.phonemeTimings.empty());
-    ASSERT_EQ(resultA.phonemeTimings.size(), resultB.phonemeTimings.size());
-    // Pinned measurement: 3 + 9 phonemes across the two phrases.
-    EXPECT_EQ(resultA.phonemeTimings.size(), 12u);
-    expectMonotonic(resultA.phonemeTimings);
-    expectMonotonic(resultB.phonemeTimings);
-
-    // Same expressions the phrase loop uses.
-    const std::size_t silenceA =
-        static_cast<std::size_t>(0.3f * sampleRate() * channels());
-    const std::size_t silenceB =
-        static_cast<std::size_t>(0.6f * sampleRate() * channels());
-    ASSERT_GT(silenceB, silenceA);
-    EXPECT_EQ(audioB.size() - audioA.size(), silenceB - silenceA)
-        << "the phrase silence must be the only audio difference";
-
-    // The phrase boundary is the first entry whose start_time moved; phrase 1
-    // carries offset 0 in both runs, so it must be bit-identical.
-    std::size_t boundary = resultA.phonemeTimings.size();
-    for (std::size_t i = 0; i < resultA.phonemeTimings.size(); ++i) {
-        if (resultA.phonemeTimings[i].start_time !=
-            resultB.phonemeTimings[i].start_time) {
-            boundary = i;
-            break;
-        }
-    }
-    ASSERT_GT(boundary, 0u) << "phrase 1 must keep offset 0 in both runs";
-    ASSERT_LT(boundary, resultA.phonemeTimings.size())
-        << "no phrase split happened; the phrase tier is untested";
-    EXPECT_EQ(boundary, 3u);  // Pinned: the split lands after 3 phonemes.
-
-    for (std::size_t i = 0; i < boundary; ++i) {
-        const std::string at = "phrase 1 entry " + std::to_string(i);
-        EXPECT_EQ(resultB.phonemeTimings[i].start_time,
-                  resultA.phonemeTimings[i].start_time)
-            << at;
-        EXPECT_EQ(resultB.phonemeTimings[i].end_time,
-                  resultA.phonemeTimings[i].end_time)
-            << at;
-        EXPECT_EQ(resultB.phonemeTimings[i].start_frame,
-                  resultA.phonemeTimings[i].start_frame)
-            << at;
-        EXPECT_EQ(resultB.phonemeTimings[i].end_frame,
-                  resultA.phonemeTimings[i].end_frame)
-            << at;
-    }
-
-    const double expectedShift = static_cast<double>(silenceB - silenceA) /
-                                 (static_cast<double>(sampleRate()) * channels());
-    const int expectedFrameShift =
-        static_cast<int>(silenceB / (static_cast<std::size_t>(hopSize()) * channels())) -
-        static_cast<int>(silenceA / (static_cast<std::size_t>(hopSize()) * channels()));
-    for (std::size_t i = boundary; i < resultA.phonemeTimings.size(); ++i) {
-        const std::string at = "phrase 2 entry " + std::to_string(i);
-        EXPECT_NEAR(static_cast<double>(resultB.phonemeTimings[i].start_time) -
-                        static_cast<double>(resultA.phonemeTimings[i].start_time),
-                    expectedShift, oneSample())
-            << at;
-        EXPECT_NEAR(static_cast<double>(resultB.phonemeTimings[i].end_time) -
-                        static_cast<double>(resultA.phonemeTimings[i].end_time),
-                    expectedShift, oneSample())
-            << at;
-        EXPECT_EQ(resultB.phonemeTimings[i].start_frame -
-                      resultA.phonemeTimings[i].start_frame,
-                  expectedFrameShift)
-            << at;
-    }
+TEST_F(TimingTextPathTest, PhraseSilenceSplitOffsetsAreExactPhonemesFloat) {
+    ASSERT_NO_FATAL_FAILURE(
+        expectPhraseSilenceOffsetsExact(floatPhonemeAggregator()));
 }
 
 // The gate for the one new bug an append-based fix can introduce: the CLI
