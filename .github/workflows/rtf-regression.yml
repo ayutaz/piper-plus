@@ -159,7 +159,7 @@ jobs:
       - name: Store + compare against baseline
         # PR ではスキップ。push to dev でのみ実行。
         if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
-        uses: benchmark-action/github-action-benchmark@v1.22.1
+        uses: benchmark-action/github-action-benchmark@v1.22.2
         with:
           name: Python inference benchmark
           tool: customSmallerIsBetter
