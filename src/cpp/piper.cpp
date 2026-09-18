@@ -1720,8 +1720,9 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
 
       std::vector<float> durationVec(durations, durations + durationCount);
 
-      const int hopSize = resolveHopSize(voice);
-
+      // Reuses the function-scope hopSize resolved above; re-declaring it
+      // here would shadow it (CodeQL cpp/declaration-hides-variable) and
+      // recompute the identical value.
       result.phonemeTimings = extractTimingsFromDurations(
           durationVec, originalPhonemeIds,
           voice->phonemizeConfig.phonemeIdMap,
