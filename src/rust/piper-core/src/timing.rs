@@ -906,4 +906,33 @@ mod tests {
             msg
         );
     }
+
+    /// SRT millisecond rounding is half-away-from-zero per
+    /// docs/spec/phoneme-timing-contract.toml [output_formats.srt].rounding. Every
+    /// case has an EVEN integer part, which is exactly where half-to-even and
+    /// half-away-from-zero disagree; a case such as 1.5 rounds to 2 under both and
+    /// proves nothing. Python and C# used their language default (ToEven) and were
+    /// 1 ms early on every such boundary (issue #681) -- this runtime is the
+    /// reference the others cite, so these cases lock it in place.
+    #[test]
+    fn format_srt_timestamp_rounds_half_away_from_zero() {
+        let cases: [(f64, &str); 6] = [
+            (0.5_f64, "00:00:00,001"),
+            (1234.5_f64, "00:00:01,235"),
+            (2500.5_f64, "00:00:02,501"),
+            (0.0_f64, "00:00:00,000"),
+            // Largest double below 0.5: `ms + 0.5` is exactly 1.0 in binary64,
+            // so the floor(ms + 0.5) idiom yields 1 here while a true round()
+            // yields 0. This case is what keeps Python and C++ off that idiom.
+            (0.49999999999999994_f64, "00:00:00,000"),
+            (3661500.0_f64, "01:01:01,500"),
+        ];
+        for (ms, want) in cases {
+            assert_eq!(
+                format_srt_timestamp(ms),
+                want,
+                "format_srt_timestamp({ms}) must round half away from zero"
+            );
+        }
+    }
 }

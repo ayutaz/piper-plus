@@ -490,7 +490,7 @@ Opciones principales:
 | `--output_dir/-d DIR` | Directorio de salida | - |
 | `--output-raw` | Salida de audio PCM raw a stdout | desactivado |
 | `--language/-l CODE` | Código de idioma | - |
-| `--timing-format FMT` | Formato de salida de temporización (json/tsv) | - |
+| `--timing-format FMT` | Formato de salida de temporización (json/tsv/srt) | - |
 | `--test-mode` | Modo de prueba, omitir inferencia ONNX | desactivado |
 | `--debug` | Activar registro de depuración | desactivado |
 | `--quiet/-q` | Desactivar registro | desactivado |

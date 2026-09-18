@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 
@@ -204,16 +205,38 @@ def timing_to_srt(result: TimingResult) -> str:
 def _format_srt_timestamp(ms: float) -> str:
     """Format milliseconds as SRT timestamp: ``HH:MM:SS,mmm``.
 
+    Rounding is half-away-from-zero per
+    ``docs/spec/phoneme-timing-contract.toml`` ``[output_formats.srt].rounding``.
+
+    The builtin ``round`` is deliberately NOT used: it rounds half to even, so
+    this function used to emit a timestamp 1 ms earlier than the Rust, Go, C++
+    and JS runtimes on every ``.5`` boundary (issue #681), and the example
+    below pinned that wrong value as expected output.
+
+    ``math.floor(ms + 0.5)`` is NOT used either, even though it looks like the
+    obvious replacement: adding 0.5 can round up in binary64 and produce a
+    different answer than a true round(). ``ms = 0.49999999999999994`` (the
+    largest double below 0.5) sums to exactly ``1.0``, so ``floor(ms + 0.5)``
+    yields 1 while Rust ``f64::round``, Go ``math.Round`` and JS ``Math.round``
+    all yield 0. This is the counterexample ECMA-262 cites for
+    ``Math.round``. The comparison below is done on the fractional part
+    instead, which has no such error.
+
     Examples
     --------
     >>> _format_srt_timestamp(0)
     '00:00:00,000'
     >>> _format_srt_timestamp(1234.5)
-    '00:00:01,234'
+    '00:00:01,235'
     >>> _format_srt_timestamp(3_661_500)
     '01:01:01,500'
     """
-    total_ms = round(ms)
+    # Clamp like Go / C# / C++ do before splitting. Negative input cannot come
+    # from durations_to_timing (it clamps frames to 0) but the helper is
+    # reachable with caller-built entries.
+    ms = max(ms, 0.0)
+    whole = math.floor(ms)
+    total_ms = whole + (1 if ms - whole >= 0.5 else 0)
     millis = total_ms % 1000
     total_secs = total_ms // 1000
     secs = total_secs % 60

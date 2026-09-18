@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 from piper_plus.timing import (
     DEFAULT_HOP_LENGTH,
+    PhonemeTimingInfo,
     TimingResult,
     build_phoneme_id_reverse_map,
     durations_to_timing,
@@ -354,6 +356,127 @@ def test_srt_empty_input():
     result = durations_to_timing([], [], 22050)
     srt = timing_to_srt(result)
     assert srt == ""
+
+
+# --- SRT rounding parity (issue #681) --------------------------------------
+#
+# The .5 boundary is where a language's default rounding leaks into the output
+# format. Python's round() and .NET's Math.Round(double) are round-half-to-EVEN;
+# Rust f64::round, Go math.Round, JS Math.round and the C++ `(long long)(ms +
+# 0.5)` idiom are all half-away-from-zero. Python therefore emitted a timestamp
+# 1 ms earlier than four other runtimes on every such boundary, and its own
+# docstring pinned the wrong value as expected output.
+#
+# The cases are read from the contract rather than duplicated here: the spec is
+# the single source of truth and `scripts/check_srt_rounding_parity.py` holds
+# the other five runtimes to the same table.
+
+
+def _srt_rounding_cases() -> list[tuple[float, str]]:
+    """Load `[output_formats.srt].rounding_cases` from the contract."""
+    try:
+        import tomllib
+    except ImportError:  # pragma: no cover - Python < 3.11
+        import tomli as tomllib  # type: ignore[no-redef]
+
+    repo_root = Path(__file__).resolve().parents[3]
+    contract = repo_root / "docs" / "spec" / "phoneme-timing-contract.toml"
+    data = tomllib.loads(contract.read_text(encoding="utf-8"))
+    srt = data["output_formats"]["srt"]
+    assert srt["rounding"] == "half_away_from_zero", (
+        "the contract no longer specifies half-away-from-zero rounding; "
+        "this test and five other runtimes were written against that rule"
+    )
+    cases = [(float(c["ms"]), str(c["timestamp"])) for c in srt["rounding_cases"]]
+    assert cases, "the contract's rounding_cases table is empty"
+    return cases
+
+
+def test_srt_timestamp_rounding_matches_contract():
+    """Every contract boundary case must format exactly as specified."""
+    from piper_plus.timing import _format_srt_timestamp
+
+    for ms, expected in _srt_rounding_cases():
+        assert _format_srt_timestamp(ms) == expected, (
+            f"_format_srt_timestamp({ms}) produced "
+            f"{_format_srt_timestamp(ms)!r}, contract requires {expected!r}"
+        )
+
+
+def test_srt_rounding_cases_would_detect_banker_rounding():
+    """Anti-vacuity: the contract table must contain a discriminating case.
+
+    A table built only from odd integer parts (e.g. 1.5 -> 2 under both rules)
+    passes whichever rounding is in use and proves nothing. At least one case
+    must be one where half-to-even and half-away-from-zero disagree.
+    """
+    import math
+
+    discriminating = [
+        ms
+        for ms, _ in _srt_rounding_cases()
+        if ms % 1 == 0.5 and int(ms) % 2 == 0
+    ]
+    assert discriminating, (
+        "no case in the contract has a .5 fraction over an even integer, so "
+        "the table cannot distinguish banker's rounding from half-away-from-zero"
+    )
+    # And the two rules really do disagree on them, for the reader's benefit.
+    for ms in discriminating:
+        assert round(ms) != math.floor(ms + 0.5)
+
+
+def _srt_negative_cases() -> list[tuple[float, str]]:
+    """Load `[output_formats.srt].negative_cases` from the contract."""
+    try:
+        import tomllib
+    except ImportError:  # pragma: no cover - Python < 3.11
+        import tomli as tomllib  # type: ignore[no-redef]
+
+    repo_root = Path(__file__).resolve().parents[3]
+    contract = repo_root / "docs" / "spec" / "phoneme-timing-contract.toml"
+    srt = tomllib.loads(contract.read_text(encoding="utf-8"))["output_formats"]["srt"]
+    assert srt["negative_input"] == "clamp_to_zero_before_rounding"
+    cases = [(float(c["ms"]), str(c["timestamp"])) for c in srt["negative_cases"]]
+    assert cases, "the contract's negative_cases table is empty"
+    return cases
+
+
+def test_srt_timestamp_clamps_negative_input():
+    """Negative ms must clamp to 0 before rounding, not leak the sign.
+
+    JS emitted "-1:-1:-2,-500" for -1500 ms until issue #681; the clamp is now
+    a contract rule so every runtime is held to it.
+    """
+    from piper_plus.timing import _format_srt_timestamp
+
+    for ms, expected in _srt_negative_cases():
+        assert _format_srt_timestamp(ms) == expected, (
+            f"_format_srt_timestamp({ms}) produced "
+            f"{_format_srt_timestamp(ms)!r}, contract requires {expected!r}"
+        )
+
+
+def test_srt_output_uses_contract_rounding():
+    """The rule must hold through the public writer, not just the helper."""
+    from piper_plus.timing import timing_to_srt
+
+    # 1234.5 ms start / 2500.5 ms end, expressed as explicit entries so the
+    # test does not depend on frame arithmetic landing on a .5 boundary.
+    result = TimingResult(
+        phonemes=[
+            PhonemeTimingInfo(
+                phoneme="a",
+                start_ms=1234.5,
+                end_ms=2500.5,
+                duration_ms=1266.0,
+            ),
+        ],
+        total_duration_ms=2500.5,
+        sample_rate=22050,
+    )
+    srt = timing_to_srt(result)
+    assert "00:00:01,235 --> 00:00:02,501" in srt, srt
 
 
 # --- Edge case tests ---

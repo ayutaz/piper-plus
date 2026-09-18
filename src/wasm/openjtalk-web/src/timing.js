@@ -200,7 +200,12 @@ export function timingToSrt(result) {
  * @returns {string}
  */
 function formatSrtTimestamp(ms) {
-  const totalMs = Math.round(ms);
+  // Clamp before rounding, per the contract's
+  // [output_formats.srt].negative_input. Without it the sign leaks into every
+  // field -- -1500 ms produced "-1:-1:-2,-500" (issue #681). Every other
+  // runtime clamps: Go / C# / C++ explicitly, Rust via a saturating cast to
+  // u64, Python since the same fix.
+  const totalMs = Math.round(Math.max(ms, 0));
   const millis = totalMs % 1000;
   const totalSecs = Math.floor(totalMs / 1000);
   const secs = totalSecs % 60;

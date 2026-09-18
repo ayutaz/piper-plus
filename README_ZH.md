@@ -497,7 +497,7 @@ echo 'Long text...' | ./bin/piper-plus --model en_model.onnx --output-raw | \
 | `--output_dir PATH` / `-d` | 输出目录 | - |
 | `--output-raw` | 将 raw PCM 音频输出到标准输出 | off |
 | `--language LANG` / `-l` | 语言代码 | - |
-| `--timing-format FMT` | 时间信息输出格式 (json/tsv) | json |
+| `--timing-format FMT` | 时间信息输出格式 (json/tsv/srt) | json |
 | `--test-mode` | 测试模式（跳过 ONNX 推理） | off |
 | `--debug` | 启用调试日志 | off |
 | `--quiet` / `-q` | 禁用日志输出 | off |

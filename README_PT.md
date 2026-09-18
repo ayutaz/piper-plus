@@ -486,7 +486,7 @@ Opções principais:
 | `--output-timing FILE` | Saída de informações de temporização de fonemas para arquivo (JSON/TSV) | - |
 | `--custom-dict FILE` | Dicionário personalizado (múltiplos separados por vírgula) | - |
 | `--language/-l CODE` | Código do idioma | - |
-| `--timing-format FORMAT` | Formato de saída de temporização (json/tsv) | - |
+| `--timing-format FORMAT` | Formato de saída de temporização (json/tsv/srt) | - |
 | `--test-mode` | Modo de teste, pular inferência ONNX | off |
 | `--debug` | Ativar log de depuração | off |
 | `--quiet/-q` | Desativar log | off |

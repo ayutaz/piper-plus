@@ -236,6 +236,59 @@ start_ms	end_ms	duration_ms	phoneme
 timestamp_format = "HH:MM:SS,mmm"
 cue_format = "{index}\n{start} --> {end}\n{phoneme}\n\n"
 indexing_starts_at = 1
+# Millisecond rounding. This MUST be stated because the language default
+# differs: Python's round() and .NET's Math.Round(double) are round-half-to-EVEN
+# (banker's), while Rust f64::round, Go math.Round, JS Math.round and .NET's
+# MidpointRounding.AwayFromZero round a .5 boundary away from zero. Left
+# unspecified, Python and C# silently emitted a timestamp 1 ms earlier than the
+# other four runtimes on every .5 boundary. Rust is the reference implementation
+# the other five cite in their own source comments, so its behaviour is
+# canonical here.
+#
+# Two idioms are FORBIDDEN, for different reasons:
+#
+#   1. A language default that rounds half to EVEN (Python `round`, .NET
+#      `Math.Round(double)` without a mode). This is issue #681.
+#   2. `floor(ms + 0.5)` / `(long long)(ms + 0.5)`. It looks equivalent but is
+#      not: adding 0.5 can round up in binary64. At ms = 0.49999999999999994
+#      (the largest double below 0.5) the sum is exactly 1.0, so the idiom
+#      yields 1 while a true round() yields 0 -- the counterexample ECMA-262
+#      cites for Math.round. Compare the fractional part instead, or call the
+#      language's round/llround.
+#
+# With `negative_input` below clamping to 0 first, all six runtimes then agree
+# bit-for-bit on every input.
+rounding = "half_away_from_zero"
+# Negative milliseconds must be clamped to 0 before rounding, so the timestamp
+# is well-formed rather than sign-leaking into every field. Cursor walks clamp
+# negative frames already ([calculation.negative_handling]), so this is only
+# reachable with caller-built entries -- but JS did not clamp and produced
+# "-1:-1:-2,-500", which no SRT parser accepts.
+negative_input = "clamp_to_zero_before_rounding"
+negative_cases = [
+  { ms = -1500.0, timestamp = "00:00:00,000" },
+  { ms = -1234.5, timestamp = "00:00:00,000" },
+  { ms = -0.4, timestamp = "00:00:00,000" },
+]
+# Boundary cases every runtime's SRT formatter must reproduce. Each `ms` has an
+# EVEN integer part, which is exactly where half-to-even and half-away-from-zero
+# disagree -- a fixture built from odd integer parts passes under both and
+# proves nothing.
+rounding_cases = [
+  # Discriminates half-to-even from half-away-from-zero (even integer part).
+  { ms = 0.5, timestamp = "00:00:00,001" },
+  { ms = 1234.5, timestamp = "00:00:01,235" },
+  { ms = 2500.5, timestamp = "00:00:02,501" },
+  # Discriminates a true round() from floor(ms + 0.5): the largest double
+  # below 0.5, whose sum with 0.5 is exactly 1.0. Rust / Go / JS yield 0.
+  # requires_float64: the value collapses to 0.5 in binary32, so runtimes whose
+  # formatter takes a 32-bit float (C#, C++) cannot express it and are exempt.
+  { ms = 0.49999999999999994, timestamp = "00:00:00,000", requires_float64 = true },
+  # Sanity / carry cases, deliberately NOT discriminating.
+  { ms = 0.0, timestamp = "00:00:00,000" },
+  { ms = 3661500.0, timestamp = "01:01:01,500" },
+]
+
 example = '''
 1
 00:00:00,000 --> 00:00:00,058
@@ -245,6 +298,60 @@ example = '''
 00:00:00,058 --> 00:00:00,151
 k
 '''
+
+[output_formats.srt.rounding_impl]
+# The rounding idiom each runtime must keep, and where it lives.
+# `scripts/check_srt_rounding_parity.py` asserts the file still contains the
+# idiom and contains none of the forbidden ones, so a "cleanup" back to the
+# language default fails CI instead of silently shifting timestamps by 1 ms.
+#
+# Why an idiom check rather than a value check: five of the six formatters are
+# private to their module, and the C++ one takes seconds as float, where no
+# value multiplies to exactly 1234.5 ms. Value-level pinning lives in each
+# runtime's own test suite (see `rounding_cases`); this gate exists to catch the
+# specific regression that produced #681 -- reaching for the language default.
+# `clamp_idiom` pins `negative_input` in the source as well. Rust has no
+# explicit clamp: `ms.round() as u64` is a saturating cast, so any negative
+# rounds to 0 by the language's own rules -- it is the documented exception and
+# carries no clamp_idiom. JS was the runtime that actually lacked a clamp and
+# leaked the sign into every field, so it is pinned here.
+# `test_file` holds the runtime's own value-level pinning. The gate requires
+# every DISCRIMINATING `rounding_cases` timestamp to appear there, so a table
+# quietly "tidied" to non-discriminating values (e.g. 1.5 -> 00:00:00,002,
+# which both rounding rules produce) fails instead of passing vacuously.
+# cpp is the exception: PhonemeInfo stores seconds as float and no float
+# multiplied by 1000 lands exactly on a .5 ms boundary, so its test uses
+# float-exact equivalents (62.5 / 312.5 / 562.5 ms) and carries its own
+# ASSERT_DOUBLE_EQ guard instead.
+python = { file = "src/python_run/piper_plus/timing.py", idiom = "ms - whole >= 0.5", clamp_idiom = "max(ms, 0.0)", test_file = "src/python_run/tests/test_phoneme_timing.py", test_reads_contract = true }
+csharp = { file = "src/csharp/PiperPlus.Core/Inference/TimingWriter.cs", idiom = "MidpointRounding.AwayFromZero", clamp_idiom = "if (ms < 0f)", test_file = "src/csharp/PiperPlus.Core.Tests/TimingWriterTests.cs", formatter_precision = "float32" }
+rust = { file = "src/rust/piper-core/src/timing.rs", idiom = "ms.round() as u64", test_file = "src/rust/piper-core/src/timing.rs" }
+go = { file = "src/go/piperplus/timing.go", idiom = "math.Round(ms)", clamp_idiom = "if ms < 0 {", test_file = "src/go/piperplus/timing_test.go" }
+js = { file = "src/wasm/openjtalk-web/src/timing.js", idiom = "Math.round(Math.max(ms, 0))", clamp_idiom = "Math.max(ms, 0)", test_file = "src/wasm/openjtalk-web/test/js/test-phoneme-timing.js" }
+cpp = { file = "src/cpp/piper.cpp", idiom = "std::llround(ms)", clamp_idiom = "if (ms < 0.0)", test_file = "src/cpp/tests/test_phoneme_timing_text_path.cpp", test_uses_float_seconds = true, formatter_precision = "float32" }
+
+# Idioms that round half to EVEN in the runtime's language. Present in a
+# formatter file, any of these is the #681 regression.
+# Regular expressions, matched against the formatter file with comments
+# stripped. `round(ms, 0)` is ToEven too, so the python pattern must not be a
+# plain substring of `round(ms)`.
+forbidden_patterns = { python = [
+  "(?<![a-z_.])round\\s*\\(\\s*ms\\s*[,)]",
+  "math\\.floor\\s*\\(\\s*ms\\s*\\+\\s*0\\.5\\s*\\)",
+], csharp = [
+  "Math\\.Round\\s*\\(\\s*ms\\s*\\)",
+  "MidpointRounding\\.ToEven",
+], cpp = [
+  "static_cast<long long>\\s*\\(\\s*ms\\s*\\+\\s*0\\.5\\s*\\)",
+  "nearbyint",
+  "RoundToEven",
+], go = [
+  "math\\.RoundToEven",
+], js = [
+  "Math\\.floor\\s*\\(\\s*ms\\s*\\+\\s*0\\.5\\s*\\)",
+], rust = [
+  "round_ties_even",
+] }
 
 # ============================================================================
 # Phoneme ID Reverse Mapping

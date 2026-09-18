@@ -36,6 +36,11 @@ What each case defends, and how it fails if the defence is removed:
     The TSV writer is reached only from ``main.cpp``, so no unit test can see
     a change to its header or column count.
 
+``srt_format``
+    ``--timing-format srt`` (issue #657). The contract declares srt for all six
+    runtimes and ``outputTimingsAsSRT`` existed all along; only the CLI
+    exposure was missing, so the flag exited 1.
+
 ``missing_timing_is_diagnosed``
     When ``--output-timing`` is requested and no timing is available, the CLI
     must say so. Before this gate it wrote nothing and exited 0 -- byte-for-byte
@@ -392,6 +397,81 @@ def case_tsv_format(binary: Path, model: Path, config: Path) -> str:
         return f"{len(lines) - 1} rows, header exact, max start {max_start:.0f} ms"
 
 
+def case_srt_format(binary: Path, model: Path, config: Path) -> str:
+    """`--timing-format srt` must work (issue #657).
+
+    `docs/spec/phoneme-timing-contract.toml` declares srt for all six
+    runtimes and `piper::outputTimingsAsSRT` has existed all along; only the
+    CLI exposure was missing, so the flag exited 1 with
+    "Invalid timing format: srt (must be json or tsv)".
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        workdir = Path(tmp)
+        timing = workdir / "timing.srt"
+        proc = run_cli(
+            binary, model, config, MULTI_SENTENCE_TEXT, workdir,
+            timing_path=timing, timing_format="srt",
+        )
+        log = proc.stdout + proc.stderr
+        _check(
+            proc.returncode == 0,
+            f"CLI rejected --timing-format srt (exit {proc.returncode}); the "
+            f"contract declares srt for every runtime\n{log}",
+        )
+        _check(timing.is_file(), "the SRT timing file was not created")
+
+        text = timing.read_text(encoding="utf-8")
+        _check(text != "", "the SRT file is empty")
+
+        # Cues are separated by a blank line: "N\n<start> --> <end>\n<phoneme>".
+        cues = [block for block in text.split("\n\n") if block.strip()]
+        _check(len(cues) > 0, "no SRT cues were written")
+
+        previous_start = -1.0
+        for position, cue in enumerate(cues, start=1):
+            lines = cue.strip("\n").split("\n")
+            _check(
+                len(lines) == 3,
+                f"cue {position} has {len(lines)} line(s), expected "
+                f"index/timestamps/phoneme: {lines!r}",
+            )
+            _check(
+                lines[0] == str(position),
+                f"cue index is {lines[0]!r}, expected {position} "
+                "(1-based, sequential per the contract)",
+            )
+            match = re.fullmatch(
+                r"(\d{2}):(\d{2}):(\d{2}),(\d{3}) --> "
+                r"(\d{2}):(\d{2}):(\d{2}),(\d{3})",
+                lines[1],
+            )
+            _check(
+                match is not None,
+                f"cue {position} timestamp line does not match "
+                f"HH:MM:SS,mmm --> HH:MM:SS,mmm: {lines[1]!r}",
+            )
+            groups = [int(g) for g in match.groups()]
+            start = (
+                groups[0] * 3_600_000 + groups[1] * 60_000
+                + groups[2] * 1000 + groups[3]
+            )
+            end = (
+                groups[4] * 3_600_000 + groups[5] * 60_000
+                + groups[6] * 1000 + groups[7]
+            )
+            _check(end >= start, f"cue {position} ends before it starts")
+            _check(
+                start >= previous_start,
+                f"cue {position} start {start} ms goes backwards",
+            )
+            previous_start = start
+            _check(
+                not PLACEHOLDER_RE.match(lines[2]),
+                f"cue {position} phoneme is the placeholder {lines[2]!r}",
+            )
+        return f"{len(cues)} cues, 1-based sequential, timestamps well-formed"
+
+
 def case_missing_timing_is_diagnosed(binary: Path, model: Path, config: Path) -> str:
     """--output-timing with nothing to write must not fail silently.
 
@@ -440,6 +520,7 @@ CASES = (
     ("single_sentence_json", case_single_sentence_json),
     ("multi_unit_offsets", case_multi_unit_offsets),
     ("tsv_format", case_tsv_format),
+    ("srt_format", case_srt_format),
     ("missing_timing_is_diagnosed", case_missing_timing_is_diagnosed),
     ("no_flag_writes_nothing", case_no_flag_writes_nothing),
 )

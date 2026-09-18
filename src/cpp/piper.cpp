@@ -3582,8 +3582,18 @@ void outputTimingsAsSRT(const std::vector<PhonemeInfo> &timings,
         if (ms < 0.0) {
             ms = 0.0;
         }
-        // Round to nearest millisecond before splitting (matches Rust impl).
-        const long long total_ms = static_cast<long long>(ms + 0.5);
+        // Round to nearest millisecond before splitting, half away from zero
+        // per the contract's [output_formats.srt].rounding.
+        //
+        // std::llround, not `static_cast<long long>(ms + 0.5)`: adding 0.5 can
+        // round up in binary64, so the sum idiom disagrees with a true round()
+        // at ms = 0.49999999999999994 (the largest double below 0.5), where
+        // `ms + 0.5` is exactly 1.0. Rust f64::round, Go math.Round and JS
+        // Math.round all yield 0 there. The float-seconds storage of
+        // PhonemeInfo makes that input unreachable through this writer, but
+        // the idiom is what the contract pins across six runtimes, so it must
+        // be the correct one rather than one that happens not to be exercised.
+        const long long total_ms = std::llround(ms);
         const long long millis = total_ms % 1000;
         const long long total_secs = total_ms / 1000;
         const long long secs = total_secs % 60;
@@ -3597,6 +3607,15 @@ void outputTimingsAsSRT(const std::vector<PhonemeInfo> &timings,
         return std::string(buf);
     };
 
+    // Pin the classic locale, as outputTimingsAsTSV does. The cue index is
+    // streamed as an integer, and the CLI installs a global "en_US.UTF-8"
+    // locale (main.cpp) whose numpunct groups thousands -- cue 1000 came out as
+    // "1,000", which is not an integer to any SRT parser. The timestamps are
+    // built with snprintf so they were never affected, which is why only the
+    // index needs this.
+    const std::locale savedLocale = output.getloc();
+    output.imbue(std::locale::classic());
+
     for (size_t i = 0; i < timings.size(); ++i) {
         const auto &info = timings[i];
         const double startMs = static_cast<double>(info.start_time) * 1000.0;
@@ -3608,6 +3627,8 @@ void outputTimingsAsSRT(const std::vector<PhonemeInfo> &timings,
                << formatTimestamp(endMs) << "\n"
                << info.phoneme << "\n\n";
     }
+
+    output.imbue(savedLocale);
 }
 
 void warmupModel(ModelSession &session, int runs) {

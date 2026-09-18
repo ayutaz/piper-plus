@@ -128,6 +128,7 @@ struct RunConfig {
   // Format constants
   static const string FORMAT_JSON;
   static const string FORMAT_TSV;
+  static const string FORMAT_SRT;
 
   // Paths to custom dictionary files
   vector<filesystem::path> customDictPaths;
@@ -161,6 +162,7 @@ struct RunConfig {
 // Define static constants
 const string RunConfig::FORMAT_JSON = "json";
 const string RunConfig::FORMAT_TSV = "tsv";
+const string RunConfig::FORMAT_SRT = "srt";
 
 void parseArgs(int argc, char *argv[], RunConfig &runConfig);
 void rawOutputProc(vector<int16_t> &sharedAudioBuffer, mutex &mutAudio,
@@ -999,6 +1001,10 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
                                    voice.synthesisConfig.sampleRate);
       } else if (runConfig.timingFormat == RunConfig::FORMAT_TSV) {
         piper::outputTimingsAsTSV(result.phonemeTimings, timingFile);
+      } else if (runConfig.timingFormat == RunConfig::FORMAT_SRT) {
+        piper::outputTimingsAsSRT(
+            result.phonemeTimings, timingFile,
+            static_cast<double>(voice.synthesisConfig.sampleRate));
       }
       timingFile.close();
       spdlog::info("Wrote phoneme timing to {}", runConfig.outputTimingPath.value().string());
@@ -1098,7 +1104,7 @@ void printUsage(char *argv[]) {
        << endl;
   cerr << "   --output-timing         FILE  output phoneme timing to FILE"
        << endl;
-  cerr << "   --timing-format         FMT   timing output format: json|tsv (default: json)"
+  cerr << "   --timing-format         FMT   timing output format: json|tsv|srt (default: json)"
        << endl;
   cerr << "   --list-models      [LANG]     list available voice models" << endl;
   cerr << "   --download-model   NAME       download a voice model" << endl;
@@ -1251,8 +1257,10 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
     } else if (arg == "--timing-format" || arg == "--timing_format") {
       ensureArg(argc, argv, i);
       runConfig.timingFormat = argv[++i];
-      if (runConfig.timingFormat != RunConfig::FORMAT_JSON && runConfig.timingFormat != RunConfig::FORMAT_TSV) {
-        cerr << "Invalid timing format: " << runConfig.timingFormat << " (must be json or tsv)" << endl;
+      if (runConfig.timingFormat != RunConfig::FORMAT_JSON &&
+          runConfig.timingFormat != RunConfig::FORMAT_TSV &&
+          runConfig.timingFormat != RunConfig::FORMAT_SRT) {
+        cerr << "Invalid timing format: " << runConfig.timingFormat << " (must be json, tsv or srt)" << endl;
         exit(1);
       }
     } else if (arg == "--custom-dict" || arg == "--custom_dict") {

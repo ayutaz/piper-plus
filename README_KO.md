@@ -488,7 +488,7 @@ echo 'Long text...' | ./bin/piper-plus --model en_model.onnx --output-raw | \
 | `--output_dir PATH` / `-d` | 출력 디렉토리 | - |
 | `--output-raw` | raw PCM 오디오를 표준 출력으로 출력 | off |
 | `--language LANG` / `-l` | 언어 코드 | - |
-| `--timing-format FMT` | 타이밍 출력 형식 (json/tsv) | json |
+| `--timing-format FMT` | 타이밍 출력 형식 (json/tsv/srt) | json |
 | `--test-mode` | 테스트 모드 (ONNX 추론 스킵) | off |
 | `--debug` | 디버그 로그 활성화 | off |
 | `--quiet` / `-q` | 로그 비활성화 | off |

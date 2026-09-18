@@ -718,3 +718,74 @@ describe("timingToJson / timingToJsonCompact - roundtrip precision", () => {
 // ---------------------------------------------------------------------------
 // Import via timingToJsonCompact (add to imports if missing)
 // ---------------------------------------------------------------------------
+
+// SRT millisecond rounding is half-away-from-zero per
+// docs/spec/phoneme-timing-contract.toml [output_formats.srt].rounding. Every
+// case has an EVEN integer part, which is exactly where half-to-even and
+// half-away-from-zero disagree; a case such as 1.5 rounds to 2 under both and
+// proves nothing. Python and C# used their language default (ToEven) and were
+// 1 ms early on every such boundary (issue #681) -- this runtime is the
+// reference the others cite, so these cases lock it in place.
+describe("timingToSrt - rounding parity (issue #681)", () => {
+  const roundingCases = [
+    [0.5, "00:00:00,001"],
+    [1234.5, "00:00:01,235"],
+    [2500.5, "00:00:02,501"],
+    [0.0, "00:00:00,000"],
+    // Largest double below 0.5: ms + 0.5 is exactly 1.0 in binary64, so the
+    // floor(ms + 0.5) idiom yields 1 here while Math.round yields 0.
+    [0.49999999999999994, "00:00:00,000"],
+    [3661500.0, "01:01:01,500"],
+  ];
+
+  for (const [ms, expected] of roundingCases) {
+    it(`formats ${ms} ms as ${expected}`, () => {
+      const result = {
+        phonemes: [{ phoneme: "a", start_ms: ms, end_ms: ms, duration_ms: 0 }],
+        total_duration_ms: ms,
+        sample_rate: 22050,
+      };
+      const srt = timingToSrt(result);
+      assert.ok(
+        srt.includes(`${expected} --> ${expected}`),
+        `expected ${expected} in:\n${srt}`,
+      );
+    });
+  }
+});
+
+// Negative milliseconds must clamp to zero before rounding, per
+// docs/spec/phoneme-timing-contract.toml [output_formats.srt].negative_input.
+// Every other runtime clamps (Go / C# / C++ explicitly, Rust via a saturating
+// cast, Python since #681); JS did not, and emitted "-1:-1:-2,-500" -- a
+// timestamp no SRT parser accepts, with the sign leaking into every field.
+describe("timingToSrt - negative input clamping", () => {
+  const negativeCases = [
+    [-1500, "00:00:00,000"],
+    [-1234.5, "00:00:00,000"],
+    [-0.4, "00:00:00,000"],
+  ];
+
+  for (const [ms, expected] of negativeCases) {
+    it(`clamps ${ms} ms to ${expected}`, () => {
+      const result = {
+        phonemes: [{ phoneme: "a", start_ms: ms, end_ms: ms, duration_ms: 0 }],
+        total_duration_ms: 0,
+        sample_rate: 22050,
+      };
+      const srt = timingToSrt(result);
+      assert.ok(
+        srt.includes(`${expected} --> ${expected}`),
+        `expected ${expected} in:\n${srt}`,
+      );
+      // The cue's timestamp line must be digits only. A bare `includes("-")`
+      // cannot be used here: the SRT cue separator is itself "-->".
+      const timestampLine = srt.split("\n")[1];
+      assert.match(
+        timestampLine,
+        /^\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}$/,
+        `sign leaked into the timestamp line: ${timestampLine}`,
+      );
+    });
+  }
+});
