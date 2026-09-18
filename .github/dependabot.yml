@@ -126,6 +126,63 @@ updates:
       # `uv lock --upgrade-package pyopenjtalk-plus` で lock のみ手動更新する。
       - dependency-name: "pyopenjtalk-plus"
 
+  # uv: src/python/g2p (piper-plus-g2p は独立した pyproject.toml / uv.lock を持つ)
+  # root の uv entry (directory: "/") は workspace root の uv.lock だけを見るため、
+  # ここを登録しないと g2p 側の lock が Dependabot の対象外になる
+  # (Dependabot alert が 29 件溜まっていた原因)。
+  - package-ecosystem: "uv"
+    directory: "/src/python/g2p"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automated"
+    groups:
+      python-uv-g2p:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+      # root の uv entry と同じ理由で除外 (詳細は上の uv entry のコメント参照)。
+      # ruff は cross-site pin sync を /bump-deps で一括手動更新する方針。
+      - dependency-name: "ruff"
+      # pyopenjtalk-plus は post-release bump 時に requirement を PEP 508 として
+      # 不正な形へ書き換える (g2p 側の宣言も `>=0.3,<1` で同じ影響を受ける)。
+      - dependency-name: "pyopenjtalk-plus"
+
+  # pip: src/benchmark (TorchScript / ONNX ベンチマークスクリプトの requirements.txt)
+  # uv workspace 外の素の requirements.txt で、 どの ecosystem からも参照されて
+  # いなかったため Dependabot alert が 12 件 (torch の critical 2 件を含む) 溜まっていた。
+  - package-ecosystem: "pip"
+    directory: "/src/benchmark"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automated"
+    groups:
+      python-benchmark:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+
   # Rust: src/rust (Cargo workspace)
   - package-ecosystem: "cargo"
     directory: "/src/rust"
