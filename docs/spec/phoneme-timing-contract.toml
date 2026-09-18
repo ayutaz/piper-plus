@@ -8,8 +8,8 @@
 # adhering to this spec.
 
 [meta]
-spec_version = "1.0"
-last_updated = "2026-05-13"
+spec_version = "1.1"
+last_updated = "2026-09-18"
 applies_to = ["python", "rust", "go", "cpp", "csharp", "wasm-js"]
 forward_compat_policy = "strict"
 
@@ -49,6 +49,107 @@ total_duration_ms = cursor_ms
 clamp_to = 0.0
 log_level = "warning"
 # Negative values must NOT raise an exception (gracefully degrade)
+
+# ============================================================================
+# Concatenation across multiple inferences (spec_version 1.1)
+# ============================================================================
+# [calculation.cursor_walk] specifies ONE inference: its algorithm literally
+# starts at `cursor_ms = 0`. A single text->audio call may however run several
+# inferences (one per sentence, per phrase split by phoneme_silence_seconds, or
+# per inline `[[ ... ]]` segment) and concatenate their audio into one stream.
+# This section specifies how the per-inference timings are joined so that a
+# timestamp refers to the audio stream the caller actually receives. See
+# `exactness_precondition` below for the one case where that correspondence
+# degrades from content-exact to count-exact.
+
+[concatenation]
+applies_when = "one text->audio call performs more than one synthesize() inference"
+unit = """
+UNIT = one synthesize() inference (one sentence, one phrase, or one inline
+phoneme segment). A generator always emits 0-based timings for its own unit;
+no offset is ever applied inside the per-unit cursor walk.
+"""
+algorithm = """
+emitted_samples = 0                      # interleaved PCM samples already handed to the caller
+for each unit u in emission order:
+    before = output_buffer.size()
+    synthesize(u)                         # appends to output_buffer
+    grown  = max(output_buffer.size() - before, 0)
+    if u.has_timing:
+        offset_seconds = emitted_samples / (sample_rate * max(channels, 1))
+        offset_frames  = emitted_samples // (hop_length * max(channels, 1))
+        for each entry in u.timings:
+            emit(entry shifted by offset_seconds / offset_frames)
+    emitted_samples += grown + inter_unit_silence_samples(u)
+"""
+offset_source = "emitted PCM samples (unit audio + inter-unit silence), measured as the growth of the output buffer across one synthesize() call"
+forbidden_offset_sources = [
+  "SynthesisResult.audioSeconds / any per-unit audioSeconds (#654: re-assigned from the whole accumulated buffer inside the trim branches; measured 1.53x over on a 3-unit utterance)",
+  "sum of raw durations (#653: the exported durations tensor is pre-ceil, 0.55-0.83x of real length; -140 ms by the 3rd unit of a 779 ms utterance)",
+  "sum of ceil(durations) * hop_length (the PRE-trim unit length; +72..+121 ms)",
+  "the last entry's end_time (the cursor walk advances over pad/bos/eos ids without emitting entries for them, so the unit tail is invisible)",
+]
+first_unit_offset = 0
+# Single-inference output is therefore bit-identical to spec_version 1.0.
+exactness_precondition = """
+`grown` is measured AFTER the unit's own post-trims have run. A trim that only
+shortens the unit's own tail keeps every published offset content-exact. A trim
+that removes samples from the FRONT of the accumulated buffer, however, deletes
+audio belonging to units that were already published, which shifts their
+content left while their timestamps stay put: an already-published offset then
+reads late by the sum of the front trims of all units synthesized after it.
+In C++ this happens only via #655 (trimPaddingByDurations slices index 0 of the
+cumulative buffer) and therefore only when a non-first unit is short enough to
+be padded (< 15 phoneme ids). Offsets remain count-exact in every case, and
+content-exact for single-unit output, for followers that are not padded, and
+for both streaming paths (which synthesize into a per-unit buffer). Fixing #655
+makes the correspondence content-exact everywhere with no change to this
+algorithm.
+"""
+millisecond_fields_are_canonical_across_units = true
+frame_fields_advisory_across_units = true
+# start_frame/end_frame truncate on division, so they may drift by <= 1 frame
+# per inter-unit silence gap. Compare milliseconds, not frames, across units.
+divergence = """
+Python (src/python_run/piper_plus/voice.py:1300-1311, `cumulative_ms +=
+timing.total_duration_ms` at :1306) advances the offset by the SUM OF THE UNIT'S
+DURATIONS instead of by the emitted sample count. Because the durations tensor
+is exported pre-ceil (#653) that offset is 0.55-0.83x of the real unit length,
+so Python timestamps drift earlier with every unit. C++ deliberately does NOT
+mirror this; migrating Python onto emitted-sample anchoring is tracked
+separately.
+"""
+
+[concatenation.silence]
+# Inter-unit silence is audio the caller receives, so it MUST be part of the
+# offset -- but it is not speech, so it never produces a timing entry.
+silence_produces_entry = false
+after_phrase = "phoneme_silence_seconds[phoneme] * sample_rate * channels samples, inserted after every phrase whose terminating phoneme carries a silence entry -- including the sentence-final phrase when the sentence ends on that phoneme"
+after_sentence = "sentence_silence_seconds * sample_rate * channels samples, inserted after every sentence"
+applied_after_last_unit = true
+# `applied_after_last_unit` refers to the AUDIO: a trailing sentence silence is
+# still emitted after the final unit. It cannot enter any offset because no
+# unit follows it, so it never affects a timestamp.
+channels_in_divisor = true
+# `channels` appears in both the silence sample count and the seconds/frames
+# divisors so the two cancel. It is 1 on every shipped path today.
+
+[concatenation.exemptions]
+# Runtimes that run exactly one inference per text are trivially conformant:
+# the first unit's offset is 0, so their output is unchanged by this section.
+single_inference = ["rust", "go"]
+# csharp ships the formatter only: PiperPlus.Core/Inference/TimingWriter.cs has
+# no production caller, so there is no aggregation site to conform. Whoever
+# wires it into a synthesis path must implement this section.
+no_production_caller = ["csharp"]
+intentionally_timing_less = [
+  "wasm_js synthesizeStreaming (Float32Array only; timing discarded by design)",
+  "wasm_js synthesizeSsml (iterates segments, so it IS multi-inference, but returns AudioResult with timing = null by design; synthesize() dispatches here for SSML input)",
+  "cpp main.cpp SSML branch (synthesizeSsmlToBuffer aggregates per-segment results and publishes no timing; the CLI resets the timing fields per line so a previous line never leaks into an SSML line)",
+]
+# Single-unit C++ paths that DO publish timing without needing this section,
+# because synthesize() assigns straight into the caller's result:
+single_unit_direct = ["cpp phonemesToAudio", "cpp phonemeIdsToWavFile"]
 
 # ============================================================================
 # Validation
@@ -186,6 +287,7 @@ example = "{ '\\uE019': 'N_m', '\\uE00E': 'ch' }"
 [implementations.python]
 file = "src/python_run/piper_plus/timing.py"
 voice_integration = "src/python_run/piper_plus/voice.py:synthesize_with_timing"
+concatenation = "duration-sum offset (see [concatenation].divergence) -- NOT yet migrated to emitted-sample anchoring"
 http_endpoint = "POST /api/phoneme-timing (src/python_run/piper_plus/http_server.py)"
 formats = ["json_pretty", "json_compact", "tsv", "srt"]
 test_files = [
@@ -209,6 +311,14 @@ formats = ["json_pretty", "json_compact", "tsv", "srt"]
 file = "src/cpp/piper.cpp (extractTimingsFromDurations)"
 cli_integration = "src/cpp/main.cpp (--output-timing, --timing-format)"
 formats = ["json_pretty", "json_compact", "tsv", "srt"]
+concatenation = "src/cpp/phoneme_timing_concat.hpp (appendShifted / ConcatCursor), applied by textToAudio, textToAudioFloat, phonemesToAudioFloat, textToAudioStreaming, phonemesToAudioStreaming"
+c_api_integration = "piper_plus_get_phoneme_timing (src/cpp/piper_plus_c_api.cpp)"
+test_files = [
+  "src/cpp/tests/test_phoneme_timing.cpp",
+  "src/cpp/tests/test_phoneme_timing_concat.cpp",
+  "src/cpp/tests/test_phoneme_timing_text_path.cpp",
+  "src/cpp/tests/test_c_api_integration.cpp",
+]
 
 [implementations.csharp]
 file = "src/csharp/PiperPlus.Core/Inference/TimingWriter.cs"

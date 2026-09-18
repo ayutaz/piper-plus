@@ -741,6 +741,16 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
   auto speakerEmbedding = voice.synthesisConfig.speakerEmbedding;
   std::optional<filesystem::path> maybeOutputPath = runConfig.outputPath;
 
+  // One SynthesisResult is shared by every stdin line, and the timing file is
+  // rewritten per line, so the timing fields must start empty for each line.
+  // The library entry points reset them too, but the SSML branch below
+  // synthesizes into per-segment results and never touches `result`, which
+  // would otherwise publish the PREVIOUS line's phonemes as this line's
+  // timing (issue #652). audioSeconds / inferSeconds are deliberately left
+  // alone: their cross-line accumulation is the existing RTF semantics.
+  result.phonemeTimings.clear();
+  result.hasTimingInfo = false;
+
   // External prosody features (from JSON input)
   std::vector<piper::ProsodyFeature> externalProsody;
   const std::vector<piper::ProsodyFeature> *externalProsodyPtr = nullptr;

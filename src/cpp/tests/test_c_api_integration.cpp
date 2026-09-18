@@ -11,6 +11,10 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
+#include <cstdint>
+#include <fstream>
+#include <string>
+#include <utility>
 #include <vector>
 #include "piper_plus.h"
 
@@ -392,7 +396,50 @@ TEST_F(CApiIntegrationTest, AvailableLanguagesNonEmpty) {
 
 // ===== Phase 4: Phoneme timing integration tests =====
 
+// Does the ONNX file declare a graph output named "durations"?
+//
+// ONNX serialises graph output names as plain protobuf strings, so a streaming
+// byte scan answers the question without linking onnxruntime here. This
+// mirrors the runtime probe piper.cpp performs when it decides whether a voice
+// can produce phoneme timing at all.
+static bool modelDeclaresDurations(const char* path) {
+    if (!path) return false;
+    std::ifstream in(path, std::ios::binary);
+    if (!in) return false;
+
+    const std::string needle = "durations";
+    // Keep the trailing needle.size()-1 bytes of each block so a needle that
+    // straddles a block boundary is still found.
+    const std::size_t overlap = needle.size() - 1;
+    std::vector<char> block(64 * 1024);
+    std::string window;
+    while (in.read(block.data(), static_cast<std::streamsize>(block.size())) ||
+           in.gcount() > 0) {
+        window.append(block.data(), static_cast<std::size_t>(in.gcount()));
+        if (window.find(needle) != std::string::npos) return true;
+        if (window.size() > overlap) {
+            window.erase(0, window.size() - overlap);
+        }
+    }
+    return false;
+}
+
+// Anti-vacuity gate. GREEN both before and after the #652 fix -- it is not a
+// reproducer. It exists because every assertion in the two timing tests below
+// is only meaningful while the fixture model actually emits durations: swapping
+// in a durations-less export would degrade all of them to "model does not
+// support timing", which is precisely how #652 shipped green.
+TEST_F(CApiIntegrationTest, FixtureModelDeclaresDurationsOutput) {
+    EXPECT_TRUE(modelDeclaresDurations(g_model_path))
+        << "test/models/multilingual-test-medium.onnx declares no 'durations' "
+           "graph output; the phoneme timing tests would pass vacuously";
+}
+
 TEST_F(CApiIntegrationTest, TimingAfterSynthesis) {
+    // Precondition, not a subject: without it a missing 'durations' output
+    // would be indistinguishable from the #652 propagation bug.
+    ASSERT_TRUE(modelDeclaresDurations(g_model_path));
+
     auto* engine = createEngine();
     ASSERT_NE(engine, nullptr);
 
@@ -402,16 +449,329 @@ TEST_F(CApiIntegrationTest, TimingAfterSynthesis) {
     auto opts = piper_plus_default_options();
     PiperPlusStatus rc = piper_plus_synthesize(engine, "Hello.", &opts,
                                        &samples, &num_samples, &sample_rate);
-    ASSERT_EQ(rc, PIPER_PLUS_OK);
+    ASSERT_EQ(rc, PIPER_PLUS_OK) << piper_plus_get_last_error();
+    ASSERT_GT(num_samples, 0);
+    ASSERT_GT(sample_rate, 0);
     piper_plus_free_audio(samples);
 
-    // Get timing (may or may not be available depending on model)
+    // Unconditional: the aggregating text->audio path must forward the timings
+    // it extracted per synthesize() unit (#652). The previous version of this
+    // test inspected the data only `if (rc == PIPER_PLUS_OK)`, so it reported
+    // PASSED while the feature was entirely broken.
     PiperPlusTimingResult timing = {};
     rc = piper_plus_get_phoneme_timing(engine, &timing);
-    // Either OK with data, or ERR if model doesn't support timing
-    if (rc == PIPER_PLUS_OK) {
-        EXPECT_GT(timing.count, 0);
-        EXPECT_NE(timing.entries, nullptr);
+    ASSERT_EQ(rc, PIPER_PLUS_OK) << piper_plus_get_last_error();
+    ASSERT_GT(timing.count, 0);
+    ASSERT_NE(timing.entries, nullptr);
+
+    // Non-decreasing, never contiguous: extractTimingsFromDurations omits the
+    // pad/bos/eos ids from the entry list while still advancing its cursor, so
+    // gaps between consecutive entries are legitimate.
+    for (int32_t i = 0; i < timing.count; ++i) {
+        EXPECT_GE(timing.entries[i].end_time, timing.entries[i].start_time)
+            << "entry " << i << " ends before it starts";
+        if (i > 0) {
+            EXPECT_GE(timing.entries[i].start_time,
+                      timing.entries[i - 1].start_time)
+                << "start_time regressed at entry " << i;
+        }
+    }
+
+    // One-sided on purpose: the exported durations tensor is pre-ceil (#653),
+    // so the timing total runs short of the emitted audio by design. What must
+    // never happen is a timing running past the audio the caller received.
+    EXPECT_LE(timing.entries[timing.count - 1].end_time,
+              static_cast<float>(num_samples) /
+                      static_cast<float>(sample_rate) +
+                  0.05f);
+
+    piper_plus_free(engine);
+}
+
+// Multi-unit coverage. Inline `[[ ... ]]` notation splits the text into several
+// synthesize() units inside one piper_plus_synthesize() call, which is exactly
+// where #652 dropped timings: only the first unit (or none at all) survived.
+//
+// The offsets are bound on BOTH sides. Inequalities alone ("later entries sit
+// past the first unit") accept an offset that is too large (#654's per-unit
+// audioSeconds re-assignment, measured 1.53x over) just as happily as one that
+// is too small (a raw `durations` sum, 0.55-0.83x under, or a cursor that skips
+// the inter-sentence silence, -0.2 s per unit). So each unit is re-synthesized
+// alone with the trailing sentence silence switched off, and the combined run's
+// entries must equal that unit's entries plus the exact interleaved sample
+// count emitted before it.
+//
+// The only one-sided bound left is timing-total vs audio length: the exported
+// `durations` tensor is pre-`ceil` (#653), so the last end_time legitimately
+// falls short of the audio by a model-dependent amount. What is pinned exactly
+// is the inter-unit DELTA, which #653 cannot influence.
+TEST_F(CApiIntegrationTest, TimingSpansAllInlinePhonemeUnits) {
+    ASSERT_TRUE(modelDeclaresDurations(g_model_path));
+
+    auto* engine = createEngine();
+    ASSERT_NE(engine, nullptr);
+
+    // Pin the Latin-script G2P instead of relying on auto-detect. The phoneme
+    // sequence -- and therefore every duration -- depends on the language id,
+    // and piper_plus_synthesize restores synthesisConfig on the way out, so an
+    // auto-detected id is not even guaranteed to be identical between the
+    // isolated and the combined run.
+    const int32_t esLanguageId = piper_plus_language_id(engine, "es");
+    if (esLanguageId < 0) {
+        piper_plus_free(engine);
+        GTEST_SKIP() << "fixture model declares no 'es' language id; skipping "
+                        "the Spanish-text timing assertions";
+    }
+
+    const int32_t sampleRate = piper_plus_sample_rate(engine);
+    ASSERT_GT(sampleRate, 0);
+
+    struct Unit {
+        std::vector<std::string> phonemes;
+        std::vector<float> starts;
+        std::vector<float> ends;
+        int32_t numSamples = 0;
+    };
+
+    // timing.entries is BORROWED and invalidated by the next call on this
+    // engine, so copy the fields out immediately after each synthesis.
+    auto collect = [&](const char* text, float sentenceSilenceSec, Unit& unit) {
+        auto opts = piper_plus_default_options();
+        opts.language_id = esLanguageId;
+        opts.sentence_silence_sec = sentenceSilenceSec;
+
+        float* samples = nullptr;
+        int32_t num_samples = 0, sample_rate = 0;
+        ASSERT_EQ(piper_plus_synthesize(engine, text, &opts, &samples,
+                                        &num_samples, &sample_rate),
+                  PIPER_PLUS_OK)
+            << piper_plus_get_last_error();
+        piper_plus_free_audio(samples);
+        ASSERT_GT(num_samples, 0);
+        unit.numSamples = num_samples;
+
+        PiperPlusTimingResult timing = {};
+        ASSERT_EQ(piper_plus_get_phoneme_timing(engine, &timing), PIPER_PLUS_OK)
+            << piper_plus_get_last_error();
+        ASSERT_GT(timing.count, 0);
+        ASSERT_NE(timing.entries, nullptr);
+
+        unit.phonemes.clear();
+        unit.starts.clear();
+        unit.ends.clear();
+        for (int32_t i = 0; i < timing.count; ++i) {
+            unit.phonemes.push_back(
+                timing.entries[i].phoneme ? timing.entries[i].phoneme : "");
+            unit.starts.push_back(timing.entries[i].start_time);
+            unit.ends.push_back(timing.entries[i].end_time);
+        }
+    };
+
+    // Each unit alone, sentence silence off, so numSamples is exactly that
+    // unit's audio length.
+    const std::vector<std::string> segments = {"Hola.", "[[ m u n d o ]]",
+                                               "Adios."};
+    std::vector<Unit> units(segments.size());
+    for (std::size_t i = 0; i < segments.size(); ++i) {
+        SCOPED_TRACE(segments[i]);
+        ASSERT_NO_FATAL_FAILURE(collect(segments[i].c_str(), 0.0f, units[i]));
+    }
+
+    const float sentenceSilenceSec = 0.2f;
+    Unit combined;
+    ASSERT_NO_FATAL_FAILURE(
+        collect("Hola. [[ m u n d o ]] Adios.", sentenceSilenceSec, combined));
+
+    // Same expression the aggregator uses (piper.cpp), truncation included.
+    // channels is 1 on every shipped voice and the C API exposes no channel
+    // count, so it drops out of both this product and the divisors below.
+    const int64_t silenceSamples =
+        static_cast<int64_t>(sentenceSilenceSec * sampleRate);
+    ASSERT_GT(silenceSamples, 0);
+
+    std::size_t totalUnitEntries = 0;
+    for (const Unit& unit : units) {
+        totalUnitEntries += unit.starts.size();
+    }
+    EXPECT_GT(combined.starts.size(), units[0].starts.size())
+        << "the multi-unit text yielded no more entries than its first unit "
+           "alone -- later units were dropped";
+    ASSERT_EQ(combined.starts.size(), totalUnitEntries)
+        << "the combined run must carry exactly the three units' entries";
+
+    for (std::size_t i = 1; i < combined.starts.size(); ++i) {
+        EXPECT_GE(combined.starts[i], combined.starts[i - 1])
+            << "start_time regressed at entry " << i
+            << "; a unit boundary reset the cursor instead of shifting it";
+    }
+
+    const double oneSample = 1.0 / static_cast<double>(sampleRate);
+    std::size_t entryIdx = 0;
+    int64_t offsetSamples = 0;
+    for (std::size_t u = 0; u < units.size(); ++u) {
+        SCOPED_TRACE("unit " + std::to_string(u));
+        const double offsetSeconds =
+            static_cast<double>(offsetSamples) / static_cast<double>(sampleRate);
+
+        for (std::size_t i = 0; i < units[u].starts.size(); ++i) {
+            SCOPED_TRACE("entry " + std::to_string(i));
+            EXPECT_EQ(combined.phonemes[entryIdx + i], units[u].phonemes[i]);
+            EXPECT_NEAR(static_cast<double>(combined.starts[entryIdx + i]),
+                        static_cast<double>(units[u].starts[i]) + offsetSeconds,
+                        oneSample);
+            EXPECT_NEAR(static_cast<double>(combined.ends[entryIdx + i]),
+                        static_cast<double>(units[u].ends[i]) + offsetSeconds,
+                        oneSample);
+        }
+
+        entryIdx += units[u].starts.size();
+        offsetSamples += units[u].numSamples + silenceSamples;
+    }
+
+    // Sum(unit audio) + Sum(sentence silence) reconstructs the emitted stream
+    // to the sample, which is what makes the offsets above positions in the
+    // buffer the caller received rather than approximations.
+    EXPECT_EQ(static_cast<int64_t>(combined.numSamples), offsetSamples);
+
+    // One-sided, per #653 (see the header comment above).
+    EXPECT_LE(combined.ends.back(),
+              static_cast<float>(combined.numSamples) /
+                      static_cast<float>(sampleRate) +
+                  0.05f);
+
+    piper_plus_free(engine);
+}
+
+// Iterator coverage. piper_plus_synth_next is the ONLY production caller of
+// piper::phonemesToAudioFloat, and every timing test above inspects the state
+// left behind by the one-shot piper_plus_synthesize, so the Iterator's own
+// timing was entirely unasserted. Each synth_next publishes the timing of the
+// chunk it just returned: entries are per-chunk and 0-based (a chunk is one
+// sentence, so its cursor starts at zero), never a running concatenation and
+// never the previous chunk's leftovers.
+TEST_F(CApiIntegrationTest, IteratorPublishesPerChunkTiming) {
+    ASSERT_TRUE(modelDeclaresDurations(g_model_path));
+
+    auto* engine = createEngine();
+    ASSERT_NE(engine, nullptr);
+
+    const int32_t esLanguageId = piper_plus_language_id(engine, "es");
+    if (esLanguageId < 0) {
+        piper_plus_free(engine);
+        GTEST_SKIP() << "fixture model declares no 'es' language id; skipping "
+                        "the Spanish-text timing assertions";
+    }
+
+    auto opts = piper_plus_default_options();
+    opts.language_id = esLanguageId;
+
+    // Deliberately different sentences: a stale or mixed-in chunk is then
+    // detectable by CONTENT, not just by entry count.
+    const std::vector<std::string> sentences = {"Hola.", "Mundo bonito.",
+                                                "Adios amigo."};
+    const std::string text = sentences[0] + " " + sentences[1] + " " +
+                             sentences[2];
+
+    struct Entry {
+        std::string phoneme;
+        float start = 0.0f;
+        float end = 0.0f;
+    };
+
+    std::vector<std::vector<Entry>> perChunk;
+    ASSERT_EQ(piper_plus_synth_start(engine, text.c_str(), &opts),
+              PIPER_PLUS_OK)
+        << piper_plus_get_last_error();
+    for (;;) {
+        PiperPlusAudioChunk chunk = {};
+        PiperPlusStatus rc = piper_plus_synth_next(engine, &chunk);
+        ASSERT_NE(rc, PIPER_PLUS_ERR) << piper_plus_get_last_error();
+
+        if (chunk.num_samples > 0) {
+            SCOPED_TRACE("chunk " + std::to_string(perChunk.size()));
+            // timing.entries is BORROWED and the next API call on this engine
+            // rebuilds it, so copy before advancing the iterator.
+            PiperPlusTimingResult timing = {};
+            ASSERT_EQ(piper_plus_get_phoneme_timing(engine, &timing),
+                      PIPER_PLUS_OK)
+                << "the Iterator published no timing for this chunk: "
+                << piper_plus_get_last_error();
+            ASSERT_GT(timing.count, 0);
+            ASSERT_NE(timing.entries, nullptr);
+
+            std::vector<Entry> entries;
+            entries.reserve(static_cast<std::size_t>(timing.count));
+            for (int32_t i = 0; i < timing.count; ++i) {
+                Entry entry;
+                entry.phoneme = timing.entries[i].phoneme
+                                    ? timing.entries[i].phoneme
+                                    : "";
+                entry.start = timing.entries[i].start_time;
+                entry.end = timing.entries[i].end_time;
+                entries.push_back(std::move(entry));
+            }
+            perChunk.push_back(std::move(entries));
+        }
+
+        if (rc == PIPER_PLUS_DONE) {
+            break;
+        }
+    }
+
+    ASSERT_EQ(perChunk.size(), sentences.size())
+        << "one chunk per sentence is what the timing snapshots below assume";
+
+    for (std::size_t c = 0; c < perChunk.size(); ++c) {
+        SCOPED_TRACE("chunk " + std::to_string(c));
+        for (std::size_t i = 1; i < perChunk[c].size(); ++i) {
+            EXPECT_GE(perChunk[c][i].start, perChunk[c][i - 1].start)
+                << "start_time regressed at entry " << i;
+        }
+        for (std::size_t i = 0; i < perChunk[c].size(); ++i) {
+            EXPECT_GE(perChunk[c][i].end, perChunk[c][i].start)
+                << "entry " << i << " ends before it starts";
+        }
+    }
+
+    // Each chunk must carry exactly its own sentence, offset 0. Synthesizing
+    // the sentence on its own goes through textToAudioFloat while the Iterator
+    // goes through phonemesToAudioFloat, so this also pins the two aggregators
+    // against each other.
+    for (std::size_t c = 0; c < sentences.size(); ++c) {
+        SCOPED_TRACE("chunk " + std::to_string(c) + " = " + sentences[c]);
+
+        auto soloOpts = piper_plus_default_options();
+        soloOpts.language_id = esLanguageId;
+
+        float* samples = nullptr;
+        int32_t num_samples = 0, sample_rate = 0;
+        ASSERT_EQ(piper_plus_synthesize(engine, sentences[c].c_str(), &soloOpts,
+                                        &samples, &num_samples, &sample_rate),
+                  PIPER_PLUS_OK)
+            << piper_plus_get_last_error();
+        piper_plus_free_audio(samples);
+
+        PiperPlusTimingResult timing = {};
+        ASSERT_EQ(piper_plus_get_phoneme_timing(engine, &timing), PIPER_PLUS_OK)
+            << piper_plus_get_last_error();
+        ASSERT_GT(timing.count, 0);
+
+        ASSERT_EQ(perChunk[c].size(), static_cast<std::size_t>(timing.count))
+            << "the chunk carries a different number of entries than the "
+               "sentence does on its own -- entries leaked across chunks";
+        for (int32_t i = 0; i < timing.count; ++i) {
+            const std::size_t idx = static_cast<std::size_t>(i);
+            EXPECT_EQ(perChunk[c][idx].phoneme,
+                      std::string(timing.entries[i].phoneme
+                                      ? timing.entries[i].phoneme
+                                      : ""))
+                << "entry " << i;
+            EXPECT_FLOAT_EQ(perChunk[c][idx].start,
+                            timing.entries[i].start_time)
+                << "entry " << i;
+            EXPECT_FLOAT_EQ(perChunk[c][idx].end, timing.entries[i].end_time)
+                << "entry " << i;
+        }
     }
 
     piper_plus_free(engine);

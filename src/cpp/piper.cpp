@@ -35,6 +35,7 @@
 #include "wavfile.hpp"
 #include "openjtalk_phonemize.hpp"
 #include "phoneme_parser.hpp"
+#include "phoneme_timing_concat.hpp"
 #include "language_detector.hpp"
 #include "spanish_phonemize.hpp"
 #include "french_phonemize.hpp"
@@ -337,6 +338,34 @@ void parseModelConfig(json &configRoot, ModelConfig &modelConfig) {
 static const std::string UNKNOWN_PHONEME = "?";
 static const float JAPANESE_CL_OVERLAP_RATIO = 0.3f;
 static const int DEFAULT_HOP_SIZE = 256;
+
+// Resolve hop_size from the voice config, falling back to DEFAULT_HOP_SIZE
+// when the config is missing or the field is absent. Used by the aggregating
+// entry points to convert a sample cursor into decoder frames.
+static int resolveHopSize(const Voice *voice) {
+  if (voice && voice->configRoot.contains("audio") &&
+      voice->configRoot["audio"].contains("hop_size")) {
+    return voice->configRoot["audio"]["hop_size"];
+  }
+
+  return DEFAULT_HOP_SIZE;
+}
+
+// Concatenate one inference unit's phoneme timings onto an aggregate result,
+// shifted by how much audio the caller has already emitted (issue #652).
+// The generator keeps emitting 0-based per-unit values; the shift lives
+// entirely here, so a zero cursor is the identity and single-unit output is
+// unchanged.
+static void appendUnitTimings(SynthesisResult &out, const SynthesisResult &unit,
+                              const piper_plus::timing::ConcatCursor &cursor) {
+  if (!unit.hasTimingInfo || unit.phonemeTimings.empty()) {
+    return;
+  }
+
+  piper_plus::timing::appendShifted(out.phonemeTimings, unit.phonemeTimings,
+                                    cursor);
+  out.hasTimingInfo = true;
+}
 
 // Helper function to extract phoneme timings from duration information
 std::vector<PhonemeInfo> extractTimingsFromDurations(
@@ -1938,6 +1967,14 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
                  const std::function<void()> &audioCallback,
                  const std::vector<ProsodyFeature> *externalProsody) {
 
+  // Entry reset of the timing fields only (issue #652). main.cpp reuses one
+  // SynthesisResult for every stdin line and rewrites the timing file per
+  // line, so appending without this would emit line1+line2+... on the last
+  // line. audioSeconds / inferSeconds are deliberately NOT reset: their
+  // cross-call accumulation is the existing per-line RTF semantics.
+  result.phonemeTimings.clear();
+  result.hasTimingInfo = false;
+
   std::size_t sentenceSilenceSamples = 0;
   if (voice.synthesisConfig.sentenceSilenceSeconds > 0) {
     sentenceSilenceSamples = (std::size_t)(
@@ -1957,6 +1994,13 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
       phonResult.detectedLanguageId.has_value()) {
     voice.synthesisConfig.languageId = phonResult.detectedLanguageId;
   }
+
+  // Interleaved PCM samples already emitted into the caller's buffer (unit
+  // audio + inter-phrase silence + inter-sentence silence). Declared at
+  // function scope so it survives the per-sentence audioBuffer.clear() that
+  // runs when an audioCallback is installed.
+  std::size_t emittedSamples = 0;
+  const int hopSize = resolveHopSize(&voice);
 
   // Synthesize each sentence independently.
   std::vector<PhonemeId> phonemeIds;
@@ -2108,8 +2152,19 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
                       numPhonemeIds, sentenceProsody.size());
       }
 
+      // Measure this unit as output-buffer growth. This relies on the
+      // synthesizer APPENDING to audioBuffer, which the scalar conversion
+      // loop does; the latent USE_ARM64_NEON branch instead resizes from
+      // index 0 and would break both the caller's accumulated audio and this
+      // delta.
+      const std::size_t beforeSamples = audioBuffer.size();
+
       synthesize(phonemeIds, voice.synthesisConfig, voice.session, audioBuffer,
                  phraseResults[phraseIdx], &voice, prosodyPtr);
+
+      const std::size_t grownSamples = audioBuffer.size() > beforeSamples
+                                           ? audioBuffer.size() - beforeSamples
+                                           : 0;
 
       // Add end of phrase silence
       for (std::size_t i = 0; i < phraseSilenceSamples[phraseIdx]; i++) {
@@ -2119,6 +2174,13 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
       result.audioSeconds += phraseResults[phraseIdx].audioSeconds;
       result.inferSeconds += phraseResults[phraseIdx].inferSeconds;
 
+      // Concatenate this unit's timings at the position it occupies in the
+      // stream the caller receives (issue #652).
+      appendUnitTimings(result, phraseResults[phraseIdx],
+                        {emittedSamples, voice.synthesisConfig.sampleRate,
+                         voice.synthesisConfig.channels, hopSize});
+      emittedSamples += grownSamples + phraseSilenceSamples[phraseIdx];
+
       phonemeIds.clear();
     }
 
@@ -2127,6 +2189,8 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
       for (std::size_t i = 0; i < sentenceSilenceSamples; i++) {
         audioBuffer.push_back(0);
       }
+
+      emittedSamples += sentenceSilenceSamples;
     }
 
     if (audioCallback) {
@@ -2163,6 +2227,14 @@ void textToAudioFloat(PiperConfig &config, Voice &voice, std::string text,
                       const std::function<void()> &audioCallback,
                       const std::vector<ProsodyFeature> *externalProsody) {
 
+  // Entry reset of the timing fields only (issue #652). main.cpp reuses one
+  // SynthesisResult for every stdin line and rewrites the timing file per
+  // line, so appending without this would emit line1+line2+... on the last
+  // line. audioSeconds / inferSeconds are deliberately NOT reset: their
+  // cross-call accumulation is the existing per-line RTF semantics.
+  result.phonemeTimings.clear();
+  result.hasTimingInfo = false;
+
   std::size_t sentenceSilenceSamples = 0;
   if (voice.synthesisConfig.sentenceSilenceSeconds > 0) {
     sentenceSilenceSamples = (std::size_t)(
@@ -2182,6 +2254,13 @@ void textToAudioFloat(PiperConfig &config, Voice &voice, std::string text,
       phonResult.detectedLanguageId.has_value()) {
     voice.synthesisConfig.languageId = phonResult.detectedLanguageId;
   }
+
+  // Interleaved PCM samples already emitted into the caller's buffer (unit
+  // audio + inter-phrase silence + inter-sentence silence). Declared at
+  // function scope so it survives the per-sentence audioBuffer.clear() that
+  // runs when an audioCallback is installed.
+  std::size_t emittedSamples = 0;
+  const int hopSize = resolveHopSize(&voice);
 
   // Synthesize each sentence independently.
   std::vector<PhonemeId> phonemeIds;
@@ -2309,8 +2388,19 @@ void textToAudioFloat(PiperConfig &config, Voice &voice, std::string text,
                       numPhonemeIds, sentenceProsody.size());
       }
 
+      // Measure this unit as output-buffer growth. This relies on the
+      // synthesizer APPENDING to audioBuffer, which the scalar conversion
+      // loop does; the latent USE_ARM64_NEON branch instead resizes from
+      // index 0 and would break both the caller's accumulated audio and this
+      // delta.
+      const std::size_t beforeSamples = audioBuffer.size();
+
       synthesizeFloat(phonemeIds, voice.synthesisConfig, voice.session, audioBuffer,
                       phraseResults[phraseIdx], &voice, prosodyPtr);
+
+      const std::size_t grownSamples = audioBuffer.size() > beforeSamples
+                                           ? audioBuffer.size() - beforeSamples
+                                           : 0;
 
       // Add end of phrase silence (float 0.0)
       for (std::size_t i = 0; i < phraseSilenceSamples[phraseIdx]; i++) {
@@ -2320,6 +2410,13 @@ void textToAudioFloat(PiperConfig &config, Voice &voice, std::string text,
       result.audioSeconds += phraseResults[phraseIdx].audioSeconds;
       result.inferSeconds += phraseResults[phraseIdx].inferSeconds;
 
+      // Concatenate this unit's timings at the position it occupies in the
+      // stream the caller receives (issue #652).
+      appendUnitTimings(result, phraseResults[phraseIdx],
+                        {emittedSamples, voice.synthesisConfig.sampleRate,
+                         voice.synthesisConfig.channels, hopSize});
+      emittedSamples += grownSamples + phraseSilenceSamples[phraseIdx];
+
       phonemeIds.clear();
     }
 
@@ -2328,6 +2425,8 @@ void textToAudioFloat(PiperConfig &config, Voice &voice, std::string text,
       for (std::size_t i = 0; i < sentenceSilenceSamples; i++) {
         audioBuffer.push_back(0.0f);
       }
+
+      emittedSamples += sentenceSilenceSamples;
     }
 
     if (audioCallback) {
@@ -2458,6 +2557,13 @@ void phonemesToAudioFloat(PiperConfig &config, Voice &voice,
                           std::vector<float> &audioBuffer,
                           SynthesisResult &result,
                           const std::function<void()> &audioCallback) {
+  // Entry reset of the timing fields only (issue #652), above the empty
+  // guard so a reused result never carries a previous sentence's entries.
+  // audioSeconds / inferSeconds are deliberately NOT reset: their cross-call
+  // accumulation is the existing RTF semantics.
+  result.phonemeTimings.clear();
+  result.hasTimingInfo = false;
+
   if (sentencePhonemes.empty()) {
     return;
   }
@@ -2517,6 +2623,12 @@ void phonemesToAudioFloat(PiperConfig &config, Voice &voice,
   std::vector<PhonemeId> phonemeIds;
   std::map<Phoneme, std::size_t> missingPhonemes;
 
+  // Interleaved PCM samples already emitted into the caller's buffer
+  // (phrase audio + inter-phrase silence). The trailing sentence silence is
+  // appended after this loop and therefore enters no offset.
+  std::size_t emittedSamples = 0;
+  const int hopSize = resolveHopSize(&voice);
+
   for (size_t phraseIdx = 0; phraseIdx < phrasePhonemes.size(); phraseIdx++) {
     if (phrasePhonemes[phraseIdx]->size() == 0) {
       continue;
@@ -2551,8 +2663,18 @@ void phonemesToAudioFloat(PiperConfig &config, Voice &voice,
       prosodyPtr = &prosodyFlat;
     }
 
+    // Measure this unit as output-buffer growth. This relies on the
+    // synthesizer APPENDING to audioBuffer, which the scalar conversion loop
+    // does; the latent USE_ARM64_NEON branch instead resizes from index 0 and
+    // would break both the caller's accumulated audio and this delta.
+    const std::size_t beforeSamples = audioBuffer.size();
+
     synthesizeFloat(phonemeIds, voice.synthesisConfig, voice.session,
                     audioBuffer, phraseResults[phraseIdx], &voice, prosodyPtr);
+
+    const std::size_t grownSamples = audioBuffer.size() > beforeSamples
+                                         ? audioBuffer.size() - beforeSamples
+                                         : 0;
 
     for (std::size_t i = 0; i < phraseSilenceSamples[phraseIdx]; i++) {
       audioBuffer.push_back(0.0f);
@@ -2561,13 +2683,14 @@ void phonemesToAudioFloat(PiperConfig &config, Voice &voice,
     result.audioSeconds += phraseResults[phraseIdx].audioSeconds;
     result.inferSeconds += phraseResults[phraseIdx].inferSeconds;
 
-    // Forward timing/durations from the first phrase so callers like
-    // synth_next that consume one phoneme sentence get the timing data
-    // they expect (mirrors the textToAudioFloat path).
-    if (phraseIdx == 0) {
-      result.phonemeTimings = phraseResults[phraseIdx].phonemeTimings;
-      result.hasTimingInfo = phraseResults[phraseIdx].hasTimingInfo;
-    }
+    // Concatenate every phrase's timings at the position it occupies in the
+    // stream the caller receives. Forwarding only phrase 0 silently dropped
+    // phrases 1..N whenever phonemeSilenceSeconds split the sentence
+    // (issue #652).
+    appendUnitTimings(result, phraseResults[phraseIdx],
+                      {emittedSamples, voice.synthesisConfig.sampleRate,
+                       voice.synthesisConfig.channels, hopSize});
+    emittedSamples += grownSamples + phraseSilenceSamples[phraseIdx];
 
     phonemeIds.clear();
   }
@@ -3124,6 +3247,11 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
   result.inferSeconds = 0;
   result.audioSeconds = 0;
   result.realTimeFactor = 0;
+  // Timing entries must be reset too (issue #652): once a unit forwards
+  // timings, a reused caller result would otherwise leak another synthesis's
+  // entries with hasTimingInfo still true.
+  result.phonemeTimings.clear();
+  result.hasTimingInfo = false;
 
   // Clear output buffer
   audioBuffer.clear();
@@ -3138,6 +3266,9 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
                                         chunkSize > 0 ? chunkSize : 0);
 
   spdlog::debug("Split text into {} sentence(s)", sentences.size());
+
+  // Hop size for converting the sample cursor into decoder frames.
+  const int hopSize = resolveHopSize(&voice);
 
   // Synthesize each sentence through the unified textToAudio() path.
   // textToAudio handles all phoneme types (OpenJTalk, MultilingualPhonemes)
@@ -3155,9 +3286,21 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
     textToAudio(config, voice, sentence, sentenceAudio, sentenceResult,
                 nullptr /* audioCallback */);
 
+    // Offset base for this sentence's phoneme timings. audioBuffer is
+    // cleared at entry and thereafter grows only by insert, so its absolute
+    // size is the correct cursor (and is immune to the audioSeconds
+    // re-assignment of issue #654). No sentence silence is added here: the
+    // textToAudio call above ran with a null audioCallback and has already
+    // folded its own trailing silence into sentenceAudio.
+    const std::size_t base = audioBuffer.size();
+
     // Accumulate into the full output buffer
     audioBuffer.insert(audioBuffer.end(),
                        sentenceAudio.begin(), sentenceAudio.end());
+
+    appendUnitTimings(result, sentenceResult,
+                      {base, voice.synthesisConfig.sampleRate,
+                       voice.synthesisConfig.channels, hopSize});
 
     // Update cumulative timing
     result.inferSeconds += sentenceResult.inferSeconds;
@@ -3193,6 +3336,11 @@ void phonemesToAudioStreaming(PiperConfig &config, Voice &voice,
   result.inferSeconds = 0;
   result.audioSeconds = 0;
   result.realTimeFactor = 0;
+  // Timing entries must be reset too (issue #652): once a unit forwards
+  // timings, a reused caller result would otherwise leak another synthesis's
+  // entries with hasTimingInfo still true.
+  result.phonemeTimings.clear();
+  result.hasTimingInfo = false;
 
   // Clear output buffer
   audioBuffer.clear();
@@ -3218,6 +3366,9 @@ void phonemesToAudioStreaming(PiperConfig &config, Voice &voice,
   std::vector<PhonemeId> phonemeIds;
   std::map<Phoneme, std::size_t> missingPhonemes;
   std::vector<int16_t> chunkAudioBuffer;
+
+  // Hop size for converting the sample cursor into decoder frames.
+  const int hopSize = resolveHopSize(&voice);
 
   // Process phonemes in chunks
   size_t processedPhonemes = 0;
@@ -3261,10 +3412,19 @@ void phonemesToAudioStreaming(PiperConfig &config, Voice &voice,
     result.audioSeconds += chunkResult.audioSeconds;
     result.inferSeconds += chunkResult.inferSeconds;
 
+    // Offset base for this chunk's phoneme timings. audioBuffer is cleared
+    // at entry and thereafter grows only by insert, and no silence is
+    // inserted between chunks, so its absolute size is the correct cursor.
+    const std::size_t base = audioBuffer.size();
+
     // Append to main buffer
     audioBuffer.insert(audioBuffer.end(),
                        chunkAudioBuffer.begin(),
                        chunkAudioBuffer.end());
+
+    appendUnitTimings(result, chunkResult,
+                      {base, voice.synthesisConfig.sampleRate,
+                       voice.synthesisConfig.channels, hopSize});
 
     // Call chunk callback
     if (chunkCallback && !chunkAudioBuffer.empty()) {
