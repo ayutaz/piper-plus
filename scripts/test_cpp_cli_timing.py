@@ -474,7 +474,10 @@ def main() -> int:
 
     missing = []
     if binary is None:
-        missing.append(f"CLI binary (looked for {', '.join(BINARY_CANDIDATES)})")
+        # Name what was actually looked for: reporting the default candidates
+        # after an explicit --binary would send the reader to the wrong path.
+        looked_for = args.binary or ", ".join(BINARY_CANDIDATES)
+        missing.append(f"CLI binary (looked for {looked_for})")
     if not model.is_file():
         missing.append(f"model {model}")
     if not config.is_file():
