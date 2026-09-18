@@ -60,7 +60,10 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
-  contents: write  # gh-pages への push に必要
+  # write は gh-pages への push / baseline commit を行う aggregate job だけが
+  # jobLevel で持つ (Scorecard Token-Permissions: topLevel の write を避ける)。
+  # benchmark job は matrix 18 セルすべて読み取りのみで足りる。
+  contents: read
 
 jobs:
   benchmark:

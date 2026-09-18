@@ -33,9 +33,9 @@ on:
         required: true
 
 permissions:
-  contents: write  # release assets を upload するため必要
-  id-token: write  # OIDC token for keyless signing
-  actions: read
+  # write は署名と asset upload を行う sign job だけが jobLevel で持つ
+  # (Scorecard Token-Permissions: topLevel の write を避ける)。
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.release.tag_name || inputs.tag }}
@@ -44,6 +44,10 @@ concurrency:
 jobs:
   sign:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write  # gh release upload で .sig / .pem を添付するため必要
+      id-token: write  # OIDC token for keyless signing (cosign)
+      actions: read
     steps:
       - name: Determine tag
         id: tag

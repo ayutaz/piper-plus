@@ -27,9 +27,10 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  # write は check-run の neutral 化と PR コメント投稿を行う neutralize job
+  # だけが jobLevel で持つ (Scorecard Token-Permissions: topLevel の write を
+  # 避ける)。 evaluate は github context の読み取りのみ、 notify-skip は echo だけ。
   contents: read
-  pull-requests: write
-  checks: write
 
 jobs:
   evaluate:
@@ -57,6 +58,12 @@ jobs:
     if: needs.evaluate.outputs.fast_lane == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      # first_pr_fast_lane.py neutralize が Checks API で contract gate の
+      # check-run を neutral 化し、 --post-pr-comment で PR にコメントする。
+      checks: write
+      pull-requests: write
     env:
       # Contract gate names that count as "warnings" on a first-PR.
       # Adding a gate here is the *only* coupling between a contract spec
