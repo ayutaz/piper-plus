@@ -251,6 +251,15 @@ void phonemesToWavFile(PiperConfig &config, Voice &voice,
 // docs/spec/audio-parity-contract.toml). IDs must already include any
 // BOS / EOS / padding the model expects (callers are responsible for
 // matching the model's `phoneme_id_map`).
+// Synthesize audio from phoneme IDs into a caller-owned buffer. Mirrors the
+// body of phonemeIdsToWavFile minus the WAV write, so the CLI can learn the
+// emitted sample count (needed for the timing aggregate total, issue #662)
+// instead of handing the stream straight to an ostream.
+void phonemeIdsToAudio(PiperConfig &config, Voice &voice,
+                       std::vector<PhonemeId> &phonemeIds,
+                       std::vector<int16_t> &audioBuffer,
+                       SynthesisResult &result);
+
 void phonemeIdsToWavFile(PiperConfig &config, Voice &voice,
                          std::vector<PhonemeId> &phonemeIds,
                          std::ostream &audioFile, SynthesisResult &result);
@@ -281,6 +290,37 @@ void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
                          const std::string &text = "",
                          int sampleRate = 22050,
                          int hopSize = 256);
+
+// Overload that is told the emitted stream length, in samples, so
+// `total_duration_ms` can follow the contract's
+// `[concatenation].aggregate_total_duration_ms`: the offset after the last
+// unit, inter-unit silence included -- explicitly NOT the sum of the per-unit
+// cursor walks. The 5-argument form above cannot compute that (it only sees the
+// entries) and derives the field from max(end_ms), which omits the trailing
+// pad/eos frames and the trailing silence, and understates the rest by the
+// pre-ceil gap of issue #653.
+//
+// Added as an overload rather than a parameter on the existing function because
+// `piper::outputTimingsAsJSON` is exported from libpiper_plus: changing its
+// signature would alter the mangled name and break the ABI. The old symbol
+// stays, with its max(end_ms) fallback, for existing callers.
+//
+// `emittedSamples` is INTERLEAVED samples, i.e. frames * channels -- the same
+// convention as `piper_plus::timing::ConcatCursor`, which the offsets in
+// `phonemeTimings` are already anchored to. Note that `writeWavHeader`
+// (src/cpp/wavfile.hpp) uses the OPPOSITE convention for its own `numSamples`
+// argument: it multiplies by channels, i.e. treats the value as frames. Both
+// are fed `audioBuffer.size()` by the CLI, so exactly one of them is wrong for
+// channels > 1. Nothing sets `channels` away from its default of 1 today (the
+// config parser does not read it), so the disagreement is latent; it is called
+// out here rather than silently inherited.
+void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
+                         std::ostream &output,
+                         const std::string &text,
+                         int sampleRate,
+                         int hopSize,
+                         std::size_t emittedSamples,
+                         int channels = 1);
 
 // Output phoneme timing information as TSV with both spec-canonical
 // millisecond columns and legacy seconds/frame columns.

@@ -111,7 +111,7 @@ frame_fields_advisory_across_units = true
 # start_frame/end_frame truncate on division, so they may drift by <= 1 frame
 # per inter-unit silence gap. Compare milliseconds, not frames, across units.
 aggregate_total_duration_ms = "the emitted stream length (offset after the last unit, inter-unit silence included) -- NOT the sum of the per-unit cursor walks, which understates it by the pre-ceil gap of #653"
-aggregate_total_duration_ms_conformance = "python: conformant (voice.py tracks the emitted sample count). cpp: NOT yet -- outputTimingsAsJSON derives total_duration_ms from max(end_ms) over the entries because the writer is never given the emitted length, so it omits the trailing pad/eos frames and the trailing silence. Unifying needs the emitted count threaded to the writer, which needs either a new exported overload or a trustworthy per-unit audioSeconds (#654)."
+aggregate_total_duration_ms_conformance = "python: conformant (voice.py tracks the emitted sample count). cpp: conformant since #662 -- outputTimingsAsJSON gained an overload that takes the emitted sample count, and the CLI records it in all five sinks (--output_file, --output_dir, `-f -`, --output-raw, --output-raw --streaming), each verified against what that sink actually received. The 5-argument overload is kept, with its max(end_ms) fallback, because the symbol is exported from libpiper_plus and changing the signature would break the ABI; callers that cannot supply the count still get the old, understated value."
 # History: Python advanced the offset by the SUM OF THE UNIT'S DURATIONS
 # (`cumulative_ms += timing.total_duration_ms`) until issue #660. Because the
 # durations tensor is exported pre-ceil (#653) that offset was 0.55-0.83x of

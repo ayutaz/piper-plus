@@ -126,8 +126,16 @@ def run_cli(
     timing_format: str | None = None,
     debug: bool = False,
     extra_args: list[str] | None = None,
+    output_mode: str = "file",
 ) -> subprocess.CompletedProcess[str]:
-    """Invoke the CLI exactly as a user would, feeding `text` on stdin."""
+    """Invoke the CLI exactly as a user would, feeding `text` on stdin.
+
+    `output_mode` selects which of the CLI's four sinks to use. They are
+    separate code paths in `processLine`, and each has to record the emitted
+    sample count for `total_duration_ms` (issue #662) -- the non-streaming
+    `--output-raw` path shipped without it because every case here used
+    `--output_file`.
+    """
     cmd = [
         str(binary),
         "--model",
@@ -136,9 +144,21 @@ def run_cli(
         str(config),
         "--language",
         "es",
-        "--output_file",
-        str(workdir / "out.wav"),
     ]
+    if output_mode == "file":
+        cmd += ["--output_file", str(workdir / "out.wav")]
+    elif output_mode == "dir":
+        cmd += ["--output_dir", str(workdir)]
+    elif output_mode == "stdout":
+        # `-f -` selects OUTPUT_STDOUT; omitting a sink flag would fall through
+        # to OUTPUT_DIRECTORY (cwd), which is a different branch entirely.
+        cmd += ["--output_file", "-"]
+    elif output_mode == "raw":
+        cmd.append("--output-raw")
+    elif output_mode == "raw-streaming":
+        cmd += ["--output-raw", "--streaming"]
+    else:
+        raise AssertionError(f"unknown output_mode {output_mode!r}")
     if timing_path is not None:
         cmd += ["--output-timing", str(timing_path)]
     if timing_format is not None:
@@ -147,6 +167,25 @@ def run_cli(
         cmd.append("--debug")
     if extra_args:
         cmd += extra_args
+
+    if output_mode in {"stdout", "raw", "raw-streaming"}:
+        # Audio goes to stdout, so it must not be decoded as text.
+        raw = subprocess.run(
+            cmd,
+            input=(text + "\n").encode("utf-8"),
+            capture_output=True,
+            cwd=REPO_ROOT,
+            timeout=300,
+        )
+        # Persist the bytes so the caller can measure what the sink received;
+        # returning them as `stdout` would mean decoding audio as text.
+        (workdir / "sink.bin").write_bytes(raw.stdout)
+        return subprocess.CompletedProcess(
+            raw.args,
+            raw.returncode,
+            stdout="",
+            stderr=raw.stderr.decode("utf-8", errors="replace"),
+        )
 
     return subprocess.run(
         cmd,
@@ -216,13 +255,34 @@ def assert_timing_json(payload: dict, wav: Path, *, label: str) -> list[dict]:
         )
 
     max_end = max(entry["end_ms"] for entry in entries)
+    # NOT asserted equal to total_duration_ms: the contract makes the aggregate
+    # total the emitted stream length, which is longer than the last entry's end
+    # by the trailing pad/eos frames, the trailing silence, and the pre-ceil gap
+    # of #653. It must not EXCEED the stream, though.
     _check(
-        abs(payload["total_duration_ms"] - max_end) < 1e-6,
-        f"{label}: total_duration_ms {payload['total_duration_ms']} does not "
-        f"match the largest end_ms {max_end}",
+        max_end <= payload["total_duration_ms"] + 1e-6,
+        f"{label}: the last entry ends at {max_end} ms, past the reported "
+        f"total_duration_ms {payload['total_duration_ms']}",
     )
 
     rate, duration_sec = wav_info(wav)
+
+    # `[concatenation].aggregate_total_duration_ms` defines the aggregate total
+    # as the EMITTED STREAM LENGTH -- the offset after the last unit, inter-unit
+    # silence included -- explicitly "NOT the sum of the per-unit cursor walks".
+    # The writer used to derive it from max(end_ms) over the entries, which
+    # omits the trailing pad/eos frames and the trailing silence, and (because
+    # the durations tensor is pre-ceil, #653) understates the rest as well. The
+    # WAV is written from the same buffer the offsets are anchored to, so the
+    # two must agree to within a sample.
+    wav_ms = duration_sec * 1000.0
+    _check(
+        abs(payload["total_duration_ms"] - wav_ms) <= 1000.0 / rate,
+        f"{label}: total_duration_ms is {payload['total_duration_ms']} ms but "
+        f"the emitted stream is {wav_ms} ms. The contract defines the aggregate "
+        "total as the emitted stream length, not max(end_ms) over the entries "
+        "(issue #662)",
+    )
     _check(
         payload["sample_rate"] == rate,
         f"{label}: timing sample_rate {payload['sample_rate']} does not match "
@@ -472,6 +532,81 @@ def case_srt_format(binary: Path, model: Path, config: Path) -> str:
         return f"{len(cues)} cues, 1-based sequential, timestamps well-formed"
 
 
+def case_total_duration_in_every_output_mode(
+    binary: Path, model: Path, config: Path
+) -> str:
+    """`total_duration_ms` must be the emitted length in ALL four sinks (#662).
+
+    `processLine` has a separate branch per sink, and each has to record the
+    emitted sample count. The non-streaming `--output-raw` path shipped without
+    it and silently fell back to max(end_ms) -- 1715 ms reported for a 2475 ms
+    stream -- because every other case in this file uses `--output_file`. The
+    same input therefore gave different values depending on `--streaming`.
+
+    The emitted length is read back from the sink itself (the WAV, or the raw
+    PCM on stdout), so the assertion compares the JSON against what the user
+    actually received rather than against another copy of the same number.
+    """
+    results: list[str] = []
+    for mode in ("file", "dir", "stdout", "raw", "raw-streaming"):
+        with tempfile.TemporaryDirectory() as tmp:
+            workdir = Path(tmp)
+            timing = workdir / "timing.json"
+            proc = run_cli(
+                binary, model, config, REPORTER_TEXT, workdir,
+                timing_path=timing, output_mode=mode,
+            )
+            log = proc.stdout + proc.stderr
+            _check(
+                proc.returncode == 0,
+                f"{mode}: CLI exited {proc.returncode}\n{log}",
+            )
+            _check(timing.is_file(), f"{mode}: no timing file was written")
+
+            payload = json.loads(timing.read_text(encoding="utf-8"))
+            emitted_ms = _emitted_ms_for_mode(mode, workdir, proc)
+            _check(
+                emitted_ms is not None,
+                f"{mode}: could not determine the emitted stream length, so "
+                "this mode is not actually being checked",
+            )
+            _check(
+                abs(payload["total_duration_ms"] - emitted_ms) <= 1000.0 / 22050,
+                f"{mode}: total_duration_ms is {payload['total_duration_ms']} ms "
+                f"but the sink received {emitted_ms} ms. This mode is not "
+                "recording the emitted sample count (issue #662)",
+            )
+            results.append(f"{mode}={payload['total_duration_ms']:.1f}ms")
+    return ", ".join(results)
+
+
+def _emitted_ms_for_mode(
+    mode: str, workdir: Path, proc: subprocess.CompletedProcess[str]
+) -> float | None:
+    """Length of what the chosen sink actually received, in milliseconds."""
+    if mode == "file":
+        return wav_info(workdir / "out.wav")[1] * 1000.0
+    if mode == "dir":
+        # The CLI names the file itself and prints the path on stdout.
+        wavs = sorted(workdir.glob("*.wav"))
+        if len(wavs) != 1:
+            return None
+        return wav_info(wavs[0])[1] * 1000.0
+    if mode in {"stdout", "raw", "raw-streaming"}:
+        # stdout was captured as bytes and discarded by run_cli, so re-derive
+        # the length from the sink file the caller wrote instead.
+        path = workdir / "sink.bin"
+        if not path.is_file():
+            return None
+        size = path.stat().st_size
+        samples = size // 2 if mode != "stdout" else None
+        if samples is None:
+            # WAV on stdout: 44-byte canonical header written by the CLI.
+            samples = max(0, (size - 44)) // 2
+        return samples / 22050.0 * 1000.0
+    return None
+
+
 def case_missing_timing_is_diagnosed(binary: Path, model: Path, config: Path) -> str:
     """--output-timing with nothing to write must not fail silently.
 
@@ -521,6 +656,8 @@ CASES = (
     ("multi_unit_offsets", case_multi_unit_offsets),
     ("tsv_format", case_tsv_format),
     ("srt_format", case_srt_format),
+    ("total_duration_in_every_output_mode",
+     case_total_duration_in_every_output_mode),
     ("missing_timing_is_diagnosed", case_missing_timing_is_diagnosed),
     ("no_flag_writes_nothing", case_no_flag_writes_nothing),
 )

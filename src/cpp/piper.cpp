@@ -2109,6 +2109,14 @@ void textToWavFile(PiperConfig &config, Voice &voice, std::string text,
 // (docs/spec/audio-parity-contract.toml) relies on this entry point to
 // match Rust / Go / C# / Python which all already accept phoneme_ids
 // JSONL stdin directly.
+void phonemeIdsToAudio(PiperConfig &config, Voice &voice,
+                       std::vector<PhonemeId> &phonemeIds,
+                       std::vector<int16_t> &audioBuffer,
+                       SynthesisResult &result) {
+  synthesize(phonemeIds, voice.synthesisConfig, voice.session, audioBuffer,
+             result, &voice);
+}
+
 void phonemeIdsToWavFile(PiperConfig &config, Voice &voice,
                          std::vector<PhonemeId> &phonemeIds,
                          std::ostream &audioFile,
@@ -3099,11 +3107,16 @@ void phonemesToAudioStreaming(PiperConfig &config, Voice &voice,
 // For backward compatibility we additionally emit the legacy fields
 // (`start`, `end`, `start_frame`, `end_frame`, `total_duration`) so existing
 // consumers keep working. New consumers should use the *_ms fields.
-void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
-                         std::ostream &output,
-                         const std::string &text,
-                         int sampleRate,
-                         int hopSize) {
+namespace {
+
+// Shared body. `totalDurationMs < 0` means "derive it from the entries", which
+// is what the legacy 5-argument overload must keep doing.
+void writeTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
+                        std::ostream &output,
+                        const std::string &text,
+                        int sampleRate,
+                        int hopSize,
+                        double totalDurationMs) {
     // Spec [calculation]: frame_time_ms = (hop_length / sample_rate) * 1000
     const double frameShiftMs =
         sampleRate > 0
@@ -3141,14 +3154,45 @@ void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
     if (!text.empty()) {
         result["text"] = text;
     }
-    // Spec-canonical fields
-    result["total_duration_ms"] = timings.empty() ? 0.0 : maxEndMs;
+    // Spec-canonical fields. `[concatenation].aggregate_total_duration_ms` is
+    // the emitted stream length; maxEndMs is only the fallback for callers of
+    // the legacy overload, which cannot know it.
+    result["total_duration_ms"] =
+        totalDurationMs >= 0.0 ? totalDurationMs
+                               : (timings.empty() ? 0.0 : maxEndMs);
     result["sample_rate"] = sampleRate;
     result["frame_shift_ms"] = frameShiftMs;
     // Legacy field (kept for backward compatibility)
     result["total_duration"] = timings.empty() ? 0.0 : timings.back().end_time;
 
     output << result.dump(2) << std::endl;
+}
+
+} // namespace
+
+void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
+                         std::ostream &output,
+                         const std::string &text,
+                         int sampleRate,
+                         int hopSize) {
+    writeTimingsAsJSON(timings, output, text, sampleRate, hopSize,
+                       /*totalDurationMs=*/-1.0);
+}
+
+void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
+                         std::ostream &output,
+                         const std::string &text,
+                         int sampleRate,
+                         int hopSize,
+                         std::size_t emittedSamples,
+                         int channels) {
+    const int frameRate = sampleRate * std::max(1, channels);
+    const double totalDurationMs =
+        frameRate > 0 ? (static_cast<double>(emittedSamples) /
+                         static_cast<double>(frameRate)) * 1000.0
+                      : 0.0;
+    writeTimingsAsJSON(timings, output, text, sampleRate, hopSize,
+                       totalDurationMs);
 }
 
 // Output phoneme timing information as TSV.

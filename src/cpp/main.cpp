@@ -707,6 +707,15 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
   result.phonemeTimings.clear();
   result.hasTimingInfo = false;
 
+  // Samples this line handed to the output sink. The timing aggregate total is
+  // the emitted stream length per `[concatenation].aggregate_total_duration_ms`
+  // (issue #662), and nothing in SynthesisResult carries it: `audioSeconds`
+  // sums the per-unit decoder output and excludes the inter-unit silence, and
+  // adding a field would change the struct's layout, which the ABI gate
+  // (`ABI diff (libpiper_plus.so head vs base)`) treats as a break. Every
+  // output mode therefore records it here.
+  std::size_t emittedSamples = 0;
+
   // External prosody features (from JSON input)
   std::vector<piper::ProsodyFeature> externalProsody;
   const std::vector<piper::ProsodyFeature> *externalProsodyPtr = nullptr;
@@ -834,22 +843,27 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
 
     // Output audio to automatically-named WAV file in a directory
     ofstream audioFile(outputPath.string(), ios::binary);
-    if (!externalPhonemeIds.empty()) {
-      // Direct phoneme_ids path (JSONL --json-input bypass G2P)
-      piper::phonemeIdsToWavFile(piperConfig, voice, externalPhonemeIds,
-                                 audioFile, result);
-    } else if (runConfig.rawPhonemes) {
-      // Parse raw phonemes from input
-      auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
-      auto phonemes = piper::parsePhonemeString(line, phonemeType);
-      piper::phonemesToWavFile(piperConfig, voice, phonemes, audioFile, result);
-    } else if (ssmlActive) {
+    {
       vector<int16_t> audioBuffer;
-      piper::synthesizeSsmlToBuffer(line, piperConfig, voice, result,
-                                    audioBuffer);
+      if (!externalPhonemeIds.empty()) {
+        // Direct phoneme_ids path (JSONL --json-input bypass G2P)
+        piper::phonemeIdsToAudio(piperConfig, voice, externalPhonemeIds,
+                                 audioBuffer, result);
+      } else if (runConfig.rawPhonemes) {
+        auto phonemeType =
+            static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
+        auto phonemes = piper::parsePhonemeString(line, phonemeType);
+        piper::phonemesToAudio(piperConfig, voice, phonemes, audioBuffer,
+                               result);
+      } else if (ssmlActive) {
+        piper::synthesizeSsmlToBuffer(line, piperConfig, voice, result,
+                                      audioBuffer);
+      } else {
+        piper::textToAudio(piperConfig, voice, line, audioBuffer, result,
+                           nullptr, externalProsodyPtr);
+      }
+      emittedSamples = audioBuffer.size();
       writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, audioFile);
-    } else {
-      piper::textToWavFile(piperConfig, voice, line, audioFile, result, externalProsodyPtr);
     }
     cout << outputPath.string() << endl;
   } else if (outputType == OUTPUT_FILE) {
@@ -873,42 +887,52 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
 
     // Output audio to WAV file
     ofstream audioFile(outputPath.string(), ios::binary);
-    if (!externalPhonemeIds.empty()) {
-      // Direct phoneme_ids path (JSONL --json-input bypass G2P)
-      piper::phonemeIdsToWavFile(piperConfig, voice, externalPhonemeIds,
-                                 audioFile, result);
-    } else if (runConfig.rawPhonemes) {
-      // Parse raw phonemes from input
-      auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
-      auto phonemes = piper::parsePhonemeString(line, phonemeType);
-      piper::phonemesToWavFile(piperConfig, voice, phonemes, audioFile, result);
-    } else if (ssmlActive) {
+    {
       vector<int16_t> audioBuffer;
-      piper::synthesizeSsmlToBuffer(line, piperConfig, voice, result,
-                                    audioBuffer);
+      if (!externalPhonemeIds.empty()) {
+        // Direct phoneme_ids path (JSONL --json-input bypass G2P)
+        piper::phonemeIdsToAudio(piperConfig, voice, externalPhonemeIds,
+                                 audioBuffer, result);
+      } else if (runConfig.rawPhonemes) {
+        auto phonemeType =
+            static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
+        auto phonemes = piper::parsePhonemeString(line, phonemeType);
+        piper::phonemesToAudio(piperConfig, voice, phonemes, audioBuffer,
+                               result);
+      } else if (ssmlActive) {
+        piper::synthesizeSsmlToBuffer(line, piperConfig, voice, result,
+                                      audioBuffer);
+      } else {
+        piper::textToAudio(piperConfig, voice, line, audioBuffer, result,
+                           nullptr, externalProsodyPtr);
+      }
+      emittedSamples = audioBuffer.size();
       writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, audioFile);
-    } else {
-      piper::textToWavFile(piperConfig, voice, line, audioFile, result, externalProsodyPtr);
     }
     cout << outputPath.string() << endl;
   } else if (outputType == OUTPUT_STDOUT) {
     // Output WAV to stdout
-    if (!externalPhonemeIds.empty()) {
-      // Direct phoneme_ids path (JSONL --json-input bypass G2P)
-      piper::phonemeIdsToWavFile(piperConfig, voice, externalPhonemeIds,
-                                 cout, result);
-    } else if (runConfig.rawPhonemes) {
-      // Parse raw phonemes from input
-      auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
-      auto phonemes = piper::parsePhonemeString(line, phonemeType);
-      piper::phonemesToWavFile(piperConfig, voice, phonemes, cout, result);
-    } else if (ssmlActive) {
+    {
       vector<int16_t> audioBuffer;
-      piper::synthesizeSsmlToBuffer(line, piperConfig, voice, result,
-                                    audioBuffer);
+      if (!externalPhonemeIds.empty()) {
+        // Direct phoneme_ids path (JSONL --json-input bypass G2P)
+        piper::phonemeIdsToAudio(piperConfig, voice, externalPhonemeIds,
+                                 audioBuffer, result);
+      } else if (runConfig.rawPhonemes) {
+        auto phonemeType =
+            static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
+        auto phonemes = piper::parsePhonemeString(line, phonemeType);
+        piper::phonemesToAudio(piperConfig, voice, phonemes, audioBuffer,
+                               result);
+      } else if (ssmlActive) {
+        piper::synthesizeSsmlToBuffer(line, piperConfig, voice, result,
+                                      audioBuffer);
+      } else {
+        piper::textToAudio(piperConfig, voice, line, audioBuffer, result,
+                           nullptr, externalProsodyPtr);
+      }
+      emittedSamples = audioBuffer.size();
       writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, cout);
-    } else {
-      piper::textToWavFile(piperConfig, voice, line, cout, result, externalProsodyPtr);
     }
   } else if (outputType == OUTPUT_RAW) {
     // Raw output to stdout
@@ -931,7 +955,10 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
     if (runConfig.streamingMode) {
       // Streaming mode - use chunk callback
       spdlog::info("Using streaming mode for synthesis");
-      auto chunkCallback = [&sharedAudioBuffer, &mutAudio, &cvAudio, &audioReady](const std::vector<int16_t>& chunk) {
+      auto chunkCallback = [&sharedAudioBuffer, &mutAudio, &cvAudio,
+                           &audioReady,
+                           &emittedSamples](const std::vector<int16_t>& chunk) {
+        emittedSamples += chunk.size();
         // Signal thread that audio chunk is ready
         {
           unique_lock lockAudio(mutAudio);
@@ -953,7 +980,13 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
     } else {
       // Regular mode - buffer all audio before output
       auto audioCallback = [&audioBuffer, &sharedAudioBuffer, &mutAudio,
-                            &cvAudio, &audioReady]() {
+                            &cvAudio, &audioReady, &emittedSamples]() {
+        // Count here, not after the synthesis call: textToAudio clears
+        // audioBuffer immediately after invoking this callback (the callback
+        // contract is "you have copied the samples out"), so reading
+        // audioBuffer.size() afterwards yields 0 and total_duration_ms would
+        // silently fall back to max(end_ms) (issue #662).
+        emittedSamples += audioBuffer.size();
         // Signal thread that audio is ready
         {
           unique_lock lockAudio(mutAudio);
@@ -997,8 +1030,26 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
     ofstream timingFile(runConfig.outputTimingPath.value());
     if (timingFile.is_open()) {
       if (runConfig.timingFormat == RunConfig::FORMAT_JSON) {
-        piper::outputTimingsAsJSON(result.phonemeTimings, timingFile, line,
-                                   voice.synthesisConfig.sampleRate);
+        // Pass the emitted sample count so total_duration_ms is the stream
+        // length the caller received, not max(end_ms) over the entries
+        // (issue #662). Falls back to the legacy overload only if no output
+        // mode recorded a count, which would make the derived value wrong in
+        // the other direction.
+        if (emittedSamples > 0) {
+          piper::outputTimingsAsJSON(result.phonemeTimings, timingFile, line,
+                                     voice.synthesisConfig.sampleRate,
+                                     // 256: the same value the 5-argument
+                                     // overload defaults to, so frame_shift_ms
+                                     // is unchanged. Resolving the model's real
+                                     // hop_size here would alter that field and
+                                     // is a separate concern.
+                                     /*hopSize=*/256,
+                                     emittedSamples,
+                                     voice.synthesisConfig.channels);
+        } else {
+          piper::outputTimingsAsJSON(result.phonemeTimings, timingFile, line,
+                                     voice.synthesisConfig.sampleRate);
+        }
       } else if (runConfig.timingFormat == RunConfig::FORMAT_TSV) {
         piper::outputTimingsAsTSV(result.phonemeTimings, timingFile);
       } else if (runConfig.timingFormat == RunConfig::FORMAT_SRT) {
