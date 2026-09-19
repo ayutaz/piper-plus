@@ -216,13 +216,34 @@ def assert_timing_json(payload: dict, wav: Path, *, label: str) -> list[dict]:
         )
 
     max_end = max(entry["end_ms"] for entry in entries)
+    # NOT asserted equal to total_duration_ms: the contract makes the aggregate
+    # total the emitted stream length, which is longer than the last entry's end
+    # by the trailing pad/eos frames, the trailing silence, and the pre-ceil gap
+    # of #653. It must not EXCEED the stream, though.
     _check(
-        abs(payload["total_duration_ms"] - max_end) < 1e-6,
-        f"{label}: total_duration_ms {payload['total_duration_ms']} does not "
-        f"match the largest end_ms {max_end}",
+        max_end <= payload["total_duration_ms"] + 1e-6,
+        f"{label}: the last entry ends at {max_end} ms, past the reported "
+        f"total_duration_ms {payload['total_duration_ms']}",
     )
 
     rate, duration_sec = wav_info(wav)
+
+    # `[concatenation].aggregate_total_duration_ms` defines the aggregate total
+    # as the EMITTED STREAM LENGTH -- the offset after the last unit, inter-unit
+    # silence included -- explicitly "NOT the sum of the per-unit cursor walks".
+    # The writer used to derive it from max(end_ms) over the entries, which
+    # omits the trailing pad/eos frames and the trailing silence, and (because
+    # the durations tensor is pre-ceil, #653) understates the rest as well. The
+    # WAV is written from the same buffer the offsets are anchored to, so the
+    # two must agree to within a sample.
+    wav_ms = duration_sec * 1000.0
+    _check(
+        abs(payload["total_duration_ms"] - wav_ms) <= 1000.0 / rate,
+        f"{label}: total_duration_ms is {payload['total_duration_ms']} ms but "
+        f"the emitted stream is {wav_ms} ms. The contract defines the aggregate "
+        "total as the emitted stream length, not max(end_ms) over the entries "
+        "(issue #662)",
+    )
     _check(
         payload["sample_rate"] == rate,
         f"{label}: timing sample_rate {payload['sample_rate']} does not match "
