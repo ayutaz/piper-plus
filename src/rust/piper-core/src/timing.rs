@@ -5,6 +5,7 @@
 //! This module converts frame counts to millisecond timestamps.
 
 use serde::Serialize;
+use std::collections::HashMap;
 
 use crate::error::PiperError;
 
@@ -94,6 +95,111 @@ fn format_srt_timestamp(ms: f64) -> String {
 ///
 /// # Returns
 /// TimingResult with start/end timestamps for each phoneme
+/// phoneme ID から表示名への逆引きマップを構築する。
+///
+/// `docs/spec/phoneme-timing-contract.toml` の `[reverse_map]` 規定に従う:
+///
+/// - **first-wins**: 複数の phoneme 文字列が同一 ID に割り当たっている場合、
+///   最初に見つかったものを保持する
+/// - **PUA fallback**: 明示マッピングの無い PUA 文字 (U+E000..U+F8FF) は
+///   `U+XXXX` 形式 (大文字 hex, 4 桁ゼロ埋め) で表示する
+/// - **explicit mapping**: `pua_to_multi_char` が与えられていればそれを優先する
+///
+/// canonical 実装は `src/python_run/piper_plus/timing.py`
+/// (`build_phoneme_id_reverse_map`) で、JS 版は
+/// `src/wasm/openjtalk-web/src/timing.js` (`buildPhonemeIdToTokenMap`)。
+///
+/// # 反復順について
+///
+/// Python の dict と JS の object は挿入順を保つため first-wins の「最初」が
+/// 一意に定まるが、Rust の `HashMap` の反復順は非決定的である。そのため
+/// **キーをソートしてから**反復し、決定的な結果を返す。ID が衝突していない
+/// マップでは順序が結果に影響しないため canonical と完全に一致する
+/// (出荷されている全モデルがこれに該当: fixture の 173 キーで衝突 0 件)。
+/// 衝突のあるマップでは canonical と異なる勝者を選び得る。
+pub fn build_phoneme_id_reverse_map(
+    phoneme_id_map: &HashMap<String, Vec<i64>>,
+    pua_to_multi_char: Option<&HashMap<String, String>>,
+) -> HashMap<i64, String> {
+    let mut reverse: HashMap<i64, String> = HashMap::new();
+
+    let mut keys: Vec<&String> = phoneme_id_map.keys().collect();
+    keys.sort();
+
+    for key in keys {
+        let display = if let Some(name) = pua_to_multi_char.and_then(|m| m.get(key)) {
+            name.clone()
+        } else {
+            let mut chars = key.chars();
+            match (chars.next(), chars.next()) {
+                (Some(c), None) if is_private_use_area(c) => {
+                    format!("U+{:04X}", c as u32)
+                }
+                _ => key.clone(),
+            }
+        };
+
+        for id in &phoneme_id_map[key] {
+            reverse.entry(*id).or_insert_with(|| display.clone());
+        }
+    }
+
+    reverse
+}
+
+/// Unicode Private Use Area (U+E000..U+F8FF) の判定。
+fn is_private_use_area(c: char) -> bool {
+    matches!(c as u32, 0xE000..=0xF8FF)
+}
+
+/// phoneme ID 列を表示名列に変換する。逆引きマップに無い ID は
+/// `U+XXXX` でも表現できないため `<id>` 形式のまま残す
+/// (プレースホルダ `ph_0` と違い、どの ID が未知なのかが分かる)。
+pub fn phoneme_ids_to_tokens(
+    phoneme_ids: &[i64],
+    reverse_map: &HashMap<i64, String>,
+) -> Vec<String> {
+    phoneme_ids
+        .iter()
+        .map(|id| {
+            reverse_map
+                .get(id)
+                .cloned()
+                .unwrap_or_else(|| format!("<{}>", id))
+        })
+        .collect()
+}
+
+/// timing 出力に使う表示名列を決める。
+///
+/// `phoneme_ids` が `duration_count` と一致していれば逆引きした実音素名を
+/// 返し、一致しなければ位置プレースホルダ (`ph_0`, `ph_1`, ...) を返す。
+/// フォールバックは意図的なもので、自信をもって間違えた音素名を出すほうが
+/// 明らかに無意味なプレースホルダより有害 (出力だけを見て区別できない)。
+/// 戻り値の `bool` はどちらの経路を通ったかを示し、呼び出し側が warn を
+/// 出せるようにしている。
+///
+/// CLI から切り出してテスト可能にしたもの: alignment 条件とフォールバックは
+/// piper-cli の中にインラインで書かれていて、どのテストも CI step も
+/// どちらの分岐も実行していなかった (issue #656)。
+pub fn resolve_timing_tokens(
+    phoneme_ids: Option<&[i64]>,
+    duration_count: usize,
+    phoneme_id_map: &HashMap<String, Vec<i64>>,
+    pua_to_multi_char: Option<&HashMap<String, String>>,
+) -> (Vec<String>, bool) {
+    match phoneme_ids {
+        Some(ids) if ids.len() == duration_count && duration_count > 0 => {
+            let reverse_map = build_phoneme_id_reverse_map(phoneme_id_map, pua_to_multi_char);
+            (phoneme_ids_to_tokens(ids, &reverse_map), true)
+        }
+        _ => (
+            (0..duration_count).map(|i| format!("ph_{}", i)).collect(),
+            false,
+        ),
+    }
+}
+
 pub fn durations_to_timing(
     durations: &[f32],
     phoneme_tokens: &[String],
@@ -934,5 +1040,185 @@ mod tests {
                 "format_srt_timestamp({ms}) must round half away from zero"
             );
         }
+    }
+
+    // ---- reverse map (issue #656) ----
+    //
+    // spec `[reverse_map]` の 3 規定 (first-wins / PUA fallback /
+    // explicit mapping) と、canonical (Python) / JS との一致を pin する。
+    // 修正前の Rust CLI は `ph_0`, `ph_1`, ... という連番プレースホルダを
+    // 出力しており、timing から音素を識別できなかった。
+
+    fn sample_id_map() -> HashMap<String, Vec<i64>> {
+        let mut m = HashMap::new();
+        m.insert("a".to_string(), vec![5]);
+        m.insert("b".to_string(), vec![6, 7]);
+        m.insert("\u{e019}".to_string(), vec![42]);
+        m.insert("ch".to_string(), vec![50]);
+        m
+    }
+
+    #[test]
+    fn reverse_map_maps_every_id_of_a_key() {
+        let reverse = build_phoneme_id_reverse_map(&sample_id_map(), None);
+        assert_eq!(reverse.get(&5), Some(&"a".to_string()));
+        // Both ids of "b" must resolve; the canonical doctest pins {6: 'b', 7: 'b'}.
+        assert_eq!(reverse.get(&6), Some(&"b".to_string()));
+        assert_eq!(reverse.get(&7), Some(&"b".to_string()));
+    }
+
+    #[test]
+    fn reverse_map_renders_unmapped_pua_as_codepoint() {
+        let reverse = build_phoneme_id_reverse_map(&sample_id_map(), None);
+        // U+E019 has no explicit name, so the contract's
+        // [reverse_map.pua_handling] fallback applies: uppercase, 4 hex digits.
+        assert_eq!(reverse.get(&42), Some(&"U+E019".to_string()));
+    }
+
+    #[test]
+    fn reverse_map_prefers_explicit_pua_name() {
+        let mut pua = HashMap::new();
+        pua.insert("\u{e019}".to_string(), "N_m".to_string());
+        let reverse = build_phoneme_id_reverse_map(&sample_id_map(), Some(&pua));
+        assert_eq!(reverse.get(&42), Some(&"N_m".to_string()));
+    }
+
+    #[test]
+    fn reverse_map_passes_multi_char_keys_through() {
+        let reverse = build_phoneme_id_reverse_map(&sample_id_map(), None);
+        // "ch" is two chars, so the PUA branch must not fire even though its
+        // first char would not be PUA either.
+        assert_eq!(reverse.get(&50), Some(&"ch".to_string()));
+    }
+
+    #[test]
+    fn resolve_timing_tokens_uses_real_phonemes_when_aligned() {
+        let ids = vec![5, 6, 50];
+        let (tokens, resolved) =
+            resolve_timing_tokens(Some(&ids), ids.len(), &sample_id_map(), None);
+        assert!(resolved, "aligned ids must take the reverse-map branch");
+        assert_eq!(tokens, vec!["a", "b", "ch"]);
+    }
+
+    #[test]
+    fn resolve_timing_tokens_applies_pua_names_when_aligned() {
+        let mut pua = HashMap::new();
+        pua.insert("\u{e019}".to_string(), "N_m".to_string());
+        let ids = vec![42, 5];
+        let (tokens, resolved) =
+            resolve_timing_tokens(Some(&ids), ids.len(), &sample_id_map(), Some(&pua));
+        assert!(resolved);
+        assert_eq!(tokens, vec!["N_m", "a"]);
+    }
+
+    #[test]
+    fn resolve_timing_tokens_falls_back_when_counts_differ() {
+        // The pre-#656 bug shape: the caller passed text-derived ids (5) while
+        // the decoder produced 15 durations (Strategy A padding / Strategy C
+        // SSML wrap). Emitting the 5 names against 15 slots would silently
+        // mislabel every entry, so placeholders are required here.
+        let ids = vec![5, 6, 7, 50, 42];
+        let (tokens, resolved) = resolve_timing_tokens(Some(&ids), 15, &sample_id_map(), None);
+        assert!(!resolved, "mismatched counts must NOT claim resolution");
+        assert_eq!(tokens.len(), 15);
+        assert_eq!(tokens[0], "ph_0");
+        assert_eq!(tokens[14], "ph_14");
+        // No real phoneme name may leak into the fallback labels.
+        assert!(
+            tokens.iter().all(|t| t.starts_with("ph_")),
+            "fallback leaked a reverse-mapped name: {:?}",
+            tokens
+        );
+    }
+
+    #[test]
+    fn resolve_timing_tokens_falls_back_when_ids_absent() {
+        let (tokens, resolved) = resolve_timing_tokens(None, 3, &sample_id_map(), None);
+        assert!(!resolved);
+        assert_eq!(tokens, vec!["ph_0", "ph_1", "ph_2"]);
+    }
+
+    #[test]
+    fn resolve_timing_tokens_treats_zero_durations_as_unresolved() {
+        // Zero durations means there is nothing to label; claiming `resolved`
+        // would make the caller skip the warning for an empty-and-broken
+        // result. Empty ids also trivially "match" length 0, so the guard has
+        // to be explicit.
+        let ids: Vec<i64> = Vec::new();
+        let (tokens, resolved) = resolve_timing_tokens(Some(&ids), 0, &sample_id_map(), None);
+        assert!(!resolved);
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn resolve_timing_tokens_keeps_padded_alignment() {
+        // Strategy A pads the id list; engine.rs now returns the PADDED ids so
+        // they line up with the padded durations. This pins that contract: a
+        // 15-long id list against 15 durations resolves, and the pad ids
+        // themselves get real names rather than placeholders.
+        let ids: Vec<i64> = (0..15).map(|i| if i % 2 == 0 { 5 } else { 6 }).collect();
+        let (tokens, resolved) =
+            resolve_timing_tokens(Some(&ids), ids.len(), &sample_id_map(), None);
+        assert!(resolved);
+        assert_eq!(tokens.len(), 15);
+        assert_eq!(tokens[0], "a");
+        assert_eq!(tokens[1], "b");
+    }
+
+    #[test]
+    fn resolve_timing_tokens_marks_unknown_ids_distinctly() {
+        // An id outside the map is a different failure from a count mismatch:
+        // alignment holds, so only that one slot is unknown. It must be
+        // `<id>`, never `ph_N` (which would imply the whole run is unaligned).
+        let ids = vec![5, 9999];
+        let (tokens, resolved) =
+            resolve_timing_tokens(Some(&ids), ids.len(), &sample_id_map(), None);
+        assert!(resolved);
+        assert_eq!(tokens, vec!["a", "<9999>"]);
+    }
+
+    #[test]
+    fn reverse_map_is_first_wins_and_deterministic() {
+        // Two keys claim id 9. HashMap iteration order is not stable, so the
+        // implementation sorts keys: "aa" wins over "zz" on every run.
+        let mut m = HashMap::new();
+        m.insert("zz".to_string(), vec![9]);
+        m.insert("aa".to_string(), vec![9]);
+
+        for _ in 0..16 {
+            let reverse = build_phoneme_id_reverse_map(&m, None);
+            assert_eq!(
+                reverse.get(&9),
+                Some(&"aa".to_string()),
+                "collision winner must not vary between runs"
+            );
+        }
+    }
+
+    #[test]
+    fn reverse_map_pua_boundaries() {
+        let mut m = HashMap::new();
+        // U+DFFF is a surrogate and cannot be a Rust char literal, so the
+        // "just below" probe uses the nearest valid scalar instead.
+        m.insert("\u{d7ff}".to_string(), vec![1]); // just below the surrogate block
+        m.insert("\u{e000}".to_string(), vec![2]); // first PUA
+        m.insert("\u{f8ff}".to_string(), vec![3]); // last PUA
+        m.insert("\u{f900}".to_string(), vec![4]); // just above
+        let reverse = build_phoneme_id_reverse_map(&m, None);
+
+        assert_eq!(reverse.get(&2), Some(&"U+E000".to_string()));
+        assert_eq!(reverse.get(&3), Some(&"U+F8FF".to_string()));
+        // Outside the range the character passes through unchanged.
+        assert_ne!(reverse.get(&4), Some(&"U+F900".to_string()));
+        assert_ne!(reverse.get(&1), Some(&"U+D7FF".to_string()));
+    }
+
+    #[test]
+    fn tokens_mark_unknown_ids_distinguishably() {
+        let reverse = build_phoneme_id_reverse_map(&sample_id_map(), None);
+        let tokens = phoneme_ids_to_tokens(&[5, 999, 42], &reverse);
+        // A missing id must be identifiable, unlike the old `ph_N` placeholder
+        // which said nothing about which id it was.
+        assert_eq!(tokens, vec!["a", "<999>", "U+E019"]);
     }
 }

@@ -385,13 +385,15 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 			copy(paddedDurations, rawDur)
 			durations = make([]float32, len(rawDur))
 			copy(durations, rawDur)
-			// When padding was applied, trim durations back to original length.
-			if wasPadded && len(durations) > originalPhonemeLen {
-				durations = durations[:originalPhonemeLen]
-			}
-			if len(durations) != originalPhonemeLen {
-				e.logger.Warn("duration count does not match phoneme length",
-					"durations", len(durations), "phoneme_len", originalPhonemeLen)
+			// Durations stay at the PADDED length. Truncating to the original
+			// length takes entries from the FRONT, but the padded layout is
+			// [BOS, frontPad.., body.., backPad.., EOS], so the body ends up
+			// shifted by frontPad and index-based phoneme-name lookup assigns
+			// pad durations to spoken phonemes (#656 / #689). The IDs actually
+			// used are returned alongside so callers can line them up.
+			if len(durations) != len(phonemeIDs) {
+				e.logger.Warn("duration count does not match the padded phoneme length",
+					"durations", len(durations), "phoneme_len", len(phonemeIDs))
 			}
 		} else {
 			e.logger.Warn("unexpected tensor type for duration output; durations unavailable")
@@ -444,6 +446,7 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 		Duration:   audioDuration,
 		InferTime:  inferTime,
 		Durations:  durations,
+		PhonemeIDs: phonemeIDs,
 	}, nil
 }
 

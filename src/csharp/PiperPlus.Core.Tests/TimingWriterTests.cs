@@ -318,6 +318,68 @@ public sealed class TimingWriterTests
     }
 
     // ================================================================
+    // 10c. Reverse map conformance (issue #656)
+    // ================================================================
+
+    /// <summary>
+    /// Every ID of a phoneme key must resolve, not just the first. The
+    /// contract's example maps {"b": [6, 7]} to {6: 'b', 7: 'b'}; this writer
+    /// only registered ids[0], so the remaining IDs fell back to "?".
+    /// </summary>
+    [Fact]
+    public void ReverseMap_ResolvesEveryIdOfAKey()
+    {
+        var idMap = new Dictionary<string, int[]>
+        {
+            ["a"] = [5],
+            ["b"] = [6, 7],
+        };
+
+        // One entry per id, each with a 1-frame duration.
+        var entries = TimingWriter.CalculateTiming(
+            [5L, 6L, 7L],
+            [1f, 1f, 1f],
+            idMap,
+            22050);
+
+        Assert.Equal(3, entries.Count);
+        Assert.Equal("a", entries[0].Phoneme);
+        Assert.Equal("b", entries[1].Phoneme);
+        Assert.Equal("b", entries[2].Phoneme);
+    }
+
+    /// <summary>
+    /// A PUA character with no entry in CharToToken must render as U+XXXX per
+    /// [reverse_map.pua_handling], the same as Python / Rust / Go / JS / C++.
+    /// It used to be emitted raw, which is unreadable and disagrees with every
+    /// other runtime.
+    /// </summary>
+    [Fact]
+    public void ReverseMap_RendersUnmappedPuaAsCodepoint()
+    {
+        // U+F8FF is the last PUA codepoint and is not an OpenJTalk token.
+        var idMap = new Dictionary<string, int[]> { ["\uF8FF"] = [11] };
+        var entries = TimingWriter.CalculateTiming([11L], [1f], idMap, 22050);
+
+        Assert.Single(entries);
+        Assert.Equal("U+F8FF", entries[0].Phoneme);
+    }
+
+    /// <summary>
+    /// Characters outside U+E000..U+F8FF must pass through unchanged, so the
+    /// fallback cannot swallow ordinary phonemes.
+    /// </summary>
+    [Fact]
+    public void ReverseMap_LeavesNonPuaCharactersAlone()
+    {
+        var idMap = new Dictionary<string, int[]> { ["\uF900"] = [12], ["k"] = [13] };
+        var entries = TimingWriter.CalculateTiming([12L, 13L], [1f, 1f], idMap, 22050);
+
+        Assert.Equal("\uF900", entries[0].Phoneme);
+        Assert.Equal("k", entries[1].Phoneme);
+    }
+
+    // ================================================================
     // 10b. SrtTimestamp rounding parity (issue #681)
     // ================================================================
 

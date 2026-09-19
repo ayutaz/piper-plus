@@ -377,6 +377,29 @@ range = ["U+E000", "U+F8FF"]
 fallback_format = "U+{HEX:04X}"
 example = "char '\\uE019' → 'U+E019'"
 
+[reverse_map.unaligned_fallback]
+# A CLI that has durations but CANNOT trust the id-to-duration alignment must
+# emit positional placeholders, never reverse-mapped names. Names emitted
+# against the wrong slots are indistinguishable from correct output, so the
+# consumer has no way to detect the error; placeholders are obviously
+# meaningless and therefore safe.
+#
+# Alignment is untrustworthy whenever len(ids) != len(durations). This is a
+# real state, not a theoretical one: Strategy A prepends padding ids and
+# Strategy C wraps short text in SSML, so a caller that re-derives ids from the
+# input text gets a different count from the decoder (measured: 11 ids vs 111
+# durations for "Sol"). The fix is for the engine to return the ids it actually
+# ran, but the guard stays as the backstop.
+label_format = "ph_{index}"       # zero-based, e.g. ph_0, ph_1, ...
+applies_to = ["rust", "go"]       # the runtimes whose CLI owns this decision
+zero_durations_are_unaligned = true  # an empty id list trivially matches len 0
+# Unknown id WITH valid alignment is a different case and keeps the "<id>"
+# form from [reverse_map] -- it marks the one unresolved slot instead of
+# implying the whole run is unaligned.
+unknown_id_format = "<{id}>"
+# Pinned by scripts/check_reverse_map_parity.py (CLI wiring section) plus
+# resolve_timing_tokens / ResolveTimingTokens unit tests in both runtimes.
+
 [reverse_map.explicit_pua_mapping]
 # Implementations may accept an optional pua_to_multi_char dict to translate
 # PUA chars into human-readable multi-char names (e.g. "N_m", "ch", "tʃ").
