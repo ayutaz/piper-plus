@@ -124,10 +124,26 @@ protected:
 // this the whole suite could degrade to a silent pass if the model went
 // missing — the same "the gate goes green when its subject disappears" shape
 // that let #659 ship behind a parser-only test suite.
-TEST_F(SsmlSynthTest, FixtureModelIsPresent) {
-    EXPECT_TRUE(g_ssml_model_found)
-        << "test/models/multilingual-test-medium.onnx must be present for the "
-           "SSML synthesis assertions to mean anything";
+// Declared OUTSIDE the fixture on purpose. The fixture's SetUp() calls
+// GTEST_SKIP() when the model is missing, and gtest applies a SetUp skip before
+// the test body, so a gate written as TEST_F can never fail: with no model the
+// suite reports `[ PASSED ] 0 tests` and exit code 0, which ctest calls a pass.
+// Measured by running the binary from a directory where the relative model path
+// does not resolve.
+TEST(SsmlSynthGate, FixtureModelIsPresent) {
+    bool found = false;
+    for (const auto &path : {"test/models/multilingual-test-medium.onnx",
+                             "../test/models/multilingual-test-medium.onnx",
+                             "../../test/models/multilingual-test-medium.onnx"}) {
+        if (fs::exists(path) && fs::exists(std::string(path) + ".json")) {
+            found = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(found)
+        << "test/models/multilingual-test-medium.onnx (+ .json) must be "
+           "present, otherwise every SSML synthesis case skips and the suite "
+           "reports success while testing nothing";
 }
 
 // The #659 reproducer. RED on dev: audio.size() == 0.

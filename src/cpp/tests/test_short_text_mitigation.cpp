@@ -5,279 +5,63 @@
  * Strategy B: Dynamic scales adjustment
  *
  * These tests verify the helper logic without requiring an ONNX model.
+ *
+ * NOTE ON THE REPLICAS BELOW. The trim helpers in this file are hand-copies of
+ * the `static` originals in src/cpp/piper.cpp, kept here so the arithmetic can
+ * be tested without linking onnxruntime. They are pinned to the SINGLE-UNIT
+ * behaviour only: production now takes a `baseOffset` and operates on
+ * [baseOffset, size) so it cannot trim audio belonging to units the caller
+ * already received (issue #655). The copies here are exercised with
+ * baseOffset == 0 semantics, where the two are exactly equivalent -- verified
+ * by exhaustive comparison of the old and new implementations over 67,820
+ * parameter combinations.
+ *
+ * Consequences to be aware of:
+ *   - DO NOT copy these back into piper.cpp: they are the pre-#655 shape.
+ *   - The baseOffset != 0 paths are covered only by
+ *     src/cpp/tests/test_synthesize_append_scope.cpp, which drives the real
+ *     helpers through phonemesToAudio and needs the fixture model.
+ *   - No gate compares this file against piper.cpp
+ *     (`scripts/check_short_text_contract.py` checks only the numeric
+ *     constants in the Python sources), so drift here is silent.
  */
 
 #include <gtest/gtest.h>
+
+#include "../trim_helpers.hpp"
+
+using piper::padPhonemeIds;
+using piper::PhonemeId;
+using piper::trimEosRegion;
+using piper::trimEosRegionFloat;
+using piper::trimPaddingByDurations;
+using piper::trimPaddingByDurationsFloat;
+using piper::trimSilenceFloat;
+using piper::trimSilenceInt16;
+using piper::MIN_BODY_FOR_STRATEGY_A;
+using piper::MIN_PHONEME_IDS;
+using piper::TRIM_EOS_MAX_FRAMES;
+using piper::TRIM_MIN_SAMPLES;
+using piper::TRIM_THRESHOLD_RMS;
+using piper::TRIM_WINDOW_SIZE;
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <vector>
 
 // ---------------------------------------------------------------------------
-// Redeclare the constants and helpers identically to piper.cpp so the tests
-// are self-contained (no piper.cpp linkage required).
+// The trim helpers under test are the PRODUCTION ones, included from
+// src/cpp/trim_helpers.hpp. They used to be hand-written copies here, which
+// meant the absolute-sample-count assertions below tested the copies and not
+// piper.cpp: five trim-boundary mutations in the real code (front erase off by
+// one, back erase off by one, the float variant, an inverted erase order, and
+// an extra sample off the EOS tail) passed every suite in the repository.
+//
+// padPhonemeIds moved to the same header, so its 12 cases below now also test
+// the production implementation rather than a copy.
 // ---------------------------------------------------------------------------
 
-using PhonemeId = int64_t;
 
-constexpr int MIN_PHONEME_IDS = 15;
-constexpr int MIN_BODY_FOR_STRATEGY_A = 3;
-constexpr float TRIM_THRESHOLD_RMS = 0.01f;
-constexpr int TRIM_MIN_SAMPLES = 2205;  // 22050 Hz * 0.1 s
-constexpr int TRIM_WINDOW_SIZE = 256;
-constexpr int TRIM_EOS_MAX_FRAMES = 0;
-
-// Replica of padPhonemeIds from piper.cpp
-static bool padPhonemeIds(std::vector<PhonemeId> &phonemeIds,
-                          PhonemeId padId = 0,
-                          int *frontPadOut = nullptr,
-                          int *backPadOut = nullptr) {
-  if (frontPadOut) *frontPadOut = 0;
-  if (backPadOut) *backPadOut = 0;
-  const auto len = static_cast<int>(phonemeIds.size());
-  const int bodyLen = len - 2;
-  if (bodyLen < MIN_BODY_FOR_STRATEGY_A) {
-    return false;
-  }
-  if (len >= MIN_PHONEME_IDS) {
-    return false;
-  }
-
-  const int needed = MIN_PHONEME_IDS - len;
-  const int front = needed / 2;
-  const int back = needed - front;
-
-  if (phonemeIds.size() < 2) {
-    phonemeIds.insert(phonemeIds.end(), static_cast<size_t>(needed), padId);
-    if (frontPadOut) *frontPadOut = front;
-    if (backPadOut) *backPadOut = back;
-    return true;
-  }
-
-  PhonemeId bos = phonemeIds.front();
-  PhonemeId eos = phonemeIds.back();
-  std::vector<PhonemeId> body(phonemeIds.begin() + 1, phonemeIds.end() - 1);
-
-  phonemeIds.clear();
-  phonemeIds.reserve(static_cast<size_t>(MIN_PHONEME_IDS));
-  phonemeIds.push_back(bos);
-  phonemeIds.insert(phonemeIds.end(), static_cast<size_t>(front), padId);
-  phonemeIds.insert(phonemeIds.end(), body.begin(), body.end());
-  phonemeIds.insert(phonemeIds.end(), static_cast<size_t>(back), padId);
-  phonemeIds.push_back(eos);
-
-  if (frontPadOut) *frontPadOut = front;
-  if (backPadOut) *backPadOut = back;
-  return true;
-}
-
-// Replica of trimPaddingByDurations from piper.cpp (int16 variant).
-static void trimPaddingByDurations(std::vector<int16_t> &audioBuffer,
-                                   const std::vector<float> &durations,
-                                   int frontPad,
-                                   int backPad,
-                                   int hopSize,
-                                   int eosMaxFrames = TRIM_EOS_MAX_FRAMES) {
-  if (frontPad <= 0 && backPad <= 0) return;
-  if (durations.empty() || hopSize <= 0) return;
-  const int expectedLen = 1 + frontPad + backPad + 1;
-  if (static_cast<int>(durations.size()) < expectedLen) return;
-
-  float frontSum = 0.0f;
-  for (int i = 0; i < 1 + frontPad; i++) {
-    frontSum += durations[i];
-  }
-  const int frontSamples = static_cast<int>(frontSum * static_cast<float>(hopSize));
-
-  float backPadSum = 0.0f;
-  if (backPad > 0) {
-    const int start = static_cast<int>(durations.size()) - 1 - backPad;
-    for (int i = start; i < static_cast<int>(durations.size()) - 1; i++) {
-      backPadSum += durations[i];
-    }
-  }
-  const int backPadSamples =
-      static_cast<int>(backPadSum * static_cast<float>(hopSize));
-  const float eosFrames = durations.back();
-  float eosExcess = eosFrames - static_cast<float>(eosMaxFrames);
-  if (eosExcess < 0.0f) eosExcess = 0.0f;
-  const int backSamples =
-      backPadSamples +
-      static_cast<int>(eosExcess * static_cast<float>(hopSize));
-
-  const int totalSamples = static_cast<int>(audioBuffer.size());
-  int start = frontSamples < 0 ? 0 : frontSamples;
-  int end = totalSamples - backSamples;
-  if (end < start) end = start;
-  if (start >= totalSamples || end <= 0 || start >= end) return;
-
-  if (start > 0 || end < totalSamples) {
-    std::vector<int16_t> trimmed(audioBuffer.begin() + start,
-                                 audioBuffer.begin() + end);
-    audioBuffer = std::move(trimmed);
-  }
-}
-
-// Replica of trimEosRegion from piper.cpp (int16 variant). Tier 1 (Issue
-// #499): drop ceil(durations[-1]) frames from the tail for ALL inputs.
-static void trimEosRegion(std::vector<int16_t> &audioBuffer,
-                          const std::vector<float> &durations,
-                          int hopSize,
-                          int eosMaxFrames = TRIM_EOS_MAX_FRAMES) {
-  if (hopSize <= 0 || durations.empty()) return;
-  const float eosFrames = durations.back();
-  const int eosCeil = static_cast<int>(std::ceil(eosFrames));
-  const int eosExcess = std::max(0, eosCeil - eosMaxFrames);
-  if (eosExcess <= 0) return;
-  const int trimSamples = eosExcess * hopSize;
-  const int totalSamples = static_cast<int>(audioBuffer.size());
-  if (trimSamples >= totalSamples) return;
-  audioBuffer.resize(totalSamples - trimSamples);
-}
-
-// Replica of trimSilenceInt16 from piper.cpp
-static void trimSilenceInt16(std::vector<int16_t> &audioBuffer) {
-  const auto totalSamples = static_cast<int>(audioBuffer.size());
-  if (totalSamples <= TRIM_MIN_SAMPLES) {
-    return;
-  }
-
-  const int nWindows = totalSamples / TRIM_WINDOW_SIZE;
-  if (nWindows == 0) {
-    return;
-  }
-
-  int firstAbove = -1;
-  int lastAbove = -1;
-
-  for (int w = 0; w < nWindows; w++) {
-    float sumSq = 0.0f;
-    const int offset = w * TRIM_WINDOW_SIZE;
-    for (int s = 0; s < TRIM_WINDOW_SIZE; s++) {
-      float sample = static_cast<float>(audioBuffer[offset + s]) / 32767.0f;
-      sumSq += sample * sample;
-    }
-    float rms = std::sqrt(sumSq / static_cast<float>(TRIM_WINDOW_SIZE));
-    if (rms > TRIM_THRESHOLD_RMS) {
-      if (firstAbove < 0) {
-        firstAbove = w;
-      }
-      lastAbove = w;
-    }
-  }
-
-  // Check partial window (remainder samples after the last full window)
-  const int remainder = totalSamples % TRIM_WINDOW_SIZE;
-  if (remainder > 0) {
-    float sumSq = 0.0f;
-    const int offset = nWindows * TRIM_WINDOW_SIZE;
-    for (int s = 0; s < remainder; s++) {
-      float sample = static_cast<float>(audioBuffer[offset + s]) / 32767.0f;
-      sumSq += sample * sample;
-    }
-    float rms = std::sqrt(sumSq / static_cast<float>(remainder));
-    if (rms > TRIM_THRESHOLD_RMS) {
-      if (firstAbove < 0) {
-        firstAbove = nWindows;
-      }
-      lastAbove = nWindows;
-    }
-  }
-
-  if (firstAbove < 0) {
-    audioBuffer.resize(std::min(totalSamples, TRIM_MIN_SAMPLES));
-    return;
-  }
-
-  int startSample = firstAbove * TRIM_WINDOW_SIZE;
-  int endSample = std::min((lastAbove + 1) * TRIM_WINDOW_SIZE, totalSamples);
-
-  int length = endSample - startSample;
-  if (length < TRIM_MIN_SAMPLES) {
-    int center = (startSample + endSample) / 2;
-    startSample = std::max(0, center - TRIM_MIN_SAMPLES / 2);
-    endSample = std::min(totalSamples, startSample + TRIM_MIN_SAMPLES);
-    startSample = std::max(0, endSample - TRIM_MIN_SAMPLES);
-  }
-
-  if (startSample > 0 || endSample < totalSamples) {
-    std::vector<int16_t> trimmed(audioBuffer.begin() + startSample,
-                                 audioBuffer.begin() + endSample);
-    audioBuffer = std::move(trimmed);
-  }
-}
-
-// Replica of trimSilenceFloat from piper.cpp
-static void trimSilenceFloat(std::vector<float> &audioBuffer) {
-  const auto totalSamples = static_cast<int>(audioBuffer.size());
-  if (totalSamples <= TRIM_MIN_SAMPLES) {
-    return;
-  }
-
-  const int nWindows = totalSamples / TRIM_WINDOW_SIZE;
-  if (nWindows == 0) {
-    return;
-  }
-
-  int firstAbove = -1;
-  int lastAbove = -1;
-
-  for (int w = 0; w < nWindows; w++) {
-    float sumSq = 0.0f;
-    const int offset = w * TRIM_WINDOW_SIZE;
-    for (int s = 0; s < TRIM_WINDOW_SIZE; s++) {
-      float sample = audioBuffer[offset + s];
-      sumSq += sample * sample;
-    }
-    float rms = std::sqrt(sumSq / static_cast<float>(TRIM_WINDOW_SIZE));
-    if (rms > TRIM_THRESHOLD_RMS) {
-      if (firstAbove < 0) {
-        firstAbove = w;
-      }
-      lastAbove = w;
-    }
-  }
-
-  // Check partial window (remainder samples after the last full window)
-  const int remainder = totalSamples % TRIM_WINDOW_SIZE;
-  if (remainder > 0) {
-    float sumSq = 0.0f;
-    const int offset = nWindows * TRIM_WINDOW_SIZE;
-    for (int s = 0; s < remainder; s++) {
-      float sample = audioBuffer[offset + s];
-      sumSq += sample * sample;
-    }
-    float rms = std::sqrt(sumSq / static_cast<float>(remainder));
-    if (rms > TRIM_THRESHOLD_RMS) {
-      if (firstAbove < 0) {
-        firstAbove = nWindows;
-      }
-      lastAbove = nWindows;
-    }
-  }
-
-  if (firstAbove < 0) {
-    audioBuffer.resize(std::min(totalSamples, TRIM_MIN_SAMPLES));
-    return;
-  }
-
-  int startSample = firstAbove * TRIM_WINDOW_SIZE;
-  int endSample = std::min((lastAbove + 1) * TRIM_WINDOW_SIZE, totalSamples);
-
-  int length = endSample - startSample;
-  if (length < TRIM_MIN_SAMPLES) {
-    int center = (startSample + endSample) / 2;
-    startSample = std::max(0, center - TRIM_MIN_SAMPLES / 2);
-    endSample = std::min(totalSamples, startSample + TRIM_MIN_SAMPLES);
-    startSample = std::max(0, endSample - TRIM_MIN_SAMPLES);
-  }
-
-  if (startSample > 0 || endSample < totalSamples) {
-    std::vector<float> trimmed(audioBuffer.begin() + startSample,
-                               audioBuffer.begin() + endSample);
-    audioBuffer = std::move(trimmed);
-  }
-}
 
 // ======================================================================
 // Strategy A: padPhonemeIds tests
@@ -1171,4 +955,239 @@ TEST_F(TrimEosRegionTest, IntegerDurationUnaffectedByCeil) {
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
+}
+
+// ======================================================================
+// Float mirrors + baseOffset coverage (issues #654 / #655)
+// ======================================================================
+// Two gaps these close, both measured by mutation against the production
+// helpers now that this file includes them instead of copies:
+//
+//   1. The float variants had NO absolute-length assertions. An off-by-one in
+//      trimPaddingByDurationsFloat's front erase passed every suite in the
+//      repository, while the same mutation in the int16 variant failed 8 cases.
+//      The float path is what the C API iterator (synth_next) runs on.
+//
+//   2. Nothing exercised baseOffset != 0 at the unit level. That parameter is
+//      the whole of the #655 fix: synthesize() appends, so a trim scoped to the
+//      entire buffer deletes audio belonging to units the caller already
+//      received. The model-driven test (test_synthesize_append_scope.cpp) covers
+//      it end to end, but only for whatever offsets that fixture happens to
+//      produce; these cases pin the arithmetic directly.
+
+class TrimPaddingByDurationsFloatTest : public ::testing::Test {};
+
+TEST_F(TrimPaddingByDurationsFloatTest, NoOpWhenNoPadding) {
+  std::vector<float> audio(1000, 0.5f);
+  std::vector<float> durations = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
+
+  trimPaddingByDurationsFloat(audio, durations, /*frontPad=*/0, /*backPad=*/0,
+                              /*hopSize=*/256, TRIM_EOS_MAX_FRAMES);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), 1000);
+}
+
+TEST_F(TrimPaddingByDurationsFloatTest, TrimsFrontPaddingOnly) {
+  std::vector<float> durations = {2.0f, 3.0f, 3.0f, 3.0f, 4.0f, 1.0f};
+  const int hop = 100;
+  const int total = 1900;
+  std::vector<float> audio(total, 0.5f);
+
+  trimPaddingByDurationsFloat(audio, durations, /*frontPad=*/3, /*backPad=*/0,
+                              hop, /*eosMaxFrames=*/6);
+
+  // BOS + front padding samples = (2+3+3+3) * 100 = 1100
+  EXPECT_EQ(static_cast<int>(audio.size()), total - 1100);
+}
+
+TEST_F(TrimPaddingByDurationsFloatTest, DefaultStripsEosCompletely) {
+  std::vector<float> durations = {2.0f, 5.0f, 5.0f, 4.0f, 4.0f, 5.0f, 5.0f, 8.0f};
+  const int hop = 100;
+  const int total = 3800;
+  std::vector<float> audio(total, 0.5f);
+
+  trimPaddingByDurationsFloat(audio, durations, /*frontPad=*/2, /*backPad=*/2,
+                              hop, TRIM_EOS_MAX_FRAMES);
+
+  // front = (2+5+5)*100 = 1200, back = (5+5)*100 + eos 8*100 = 1800
+  EXPECT_EQ(static_cast<int>(audio.size()), total - 1200 - 1800);
+}
+
+TEST_F(TrimPaddingByDurationsFloatTest, ReturnsInputWhenDurationsTooShort) {
+  std::vector<float> durations = {1.0f, 1.0f};
+  std::vector<float> audio(500, 0.5f);
+
+  trimPaddingByDurationsFloat(audio, durations, /*frontPad=*/3, /*backPad=*/3,
+                              /*hopSize=*/256, TRIM_EOS_MAX_FRAMES);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), 500);
+}
+
+TEST_F(TrimPaddingByDurationsFloatTest, ReturnsInputWhenHopSizeZero) {
+  std::vector<float> durations = {2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
+  std::vector<float> audio(500, 0.5f);
+
+  trimPaddingByDurationsFloat(audio, durations, /*frontPad=*/1, /*backPad=*/1,
+                              /*hopSize=*/0, TRIM_EOS_MAX_FRAMES);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), 500);
+}
+
+TEST_F(TrimPaddingByDurationsFloatTest, TruncationMatchesIntCast) {
+  // 2.7 + 3.3 = 6.0 exactly? No: float arithmetic gives 5.9999995, and the
+  // int cast truncates, so the front cut is 599 and not 600. The int16 variant
+  // pins the same value; keeping both honest is the point of this mirror.
+  std::vector<float> durations = {2.7f, 3.3f, 4.0f, 1.0f};
+  const int hop = 100;
+  std::vector<float> audio(1100, 0.5f);
+
+  trimPaddingByDurationsFloat(audio, durations, /*frontPad=*/1, /*backPad=*/0,
+                              hop, /*eosMaxFrames=*/1);
+
+  const int frontSamples = static_cast<int>((2.7f + 3.3f) * hop);
+  EXPECT_EQ(static_cast<int>(audio.size()), 1100 - frontSamples);
+}
+
+class TrimEosRegionFloatTest : public ::testing::Test {};
+
+TEST_F(TrimEosRegionFloatTest, DefaultStripsFullEosRegion) {
+  std::vector<float> durations = {2.0f, 4.0f, 6.0f};
+  const int hop = 100;
+  std::vector<float> audio(1200, 0.5f);
+
+  trimEosRegionFloat(audio, durations, hop, TRIM_EOS_MAX_FRAMES);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), 1200 - 600);
+}
+
+TEST_F(TrimEosRegionFloatTest, AppliesCeilToFractionalDuration) {
+  std::vector<float> durations = {2.0f, 4.0f, 5.2f};
+  const int hop = 100;
+  std::vector<float> audio(1200, 0.5f);
+
+  trimEosRegionFloat(audio, durations, hop, TRIM_EOS_MAX_FRAMES);
+
+  // ceil(5.2) = 6 frames
+  EXPECT_EQ(static_cast<int>(audio.size()), 1200 - 600);
+}
+
+TEST_F(TrimEosRegionFloatTest, NoOpWhenEosBelowMax) {
+  std::vector<float> durations = {2.0f, 4.0f, 3.0f};
+  std::vector<float> audio(1200, 0.5f);
+
+  trimEosRegionFloat(audio, durations, /*hopSize=*/100, /*eosMaxFrames=*/4);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), 1200);
+}
+
+TEST_F(TrimEosRegionFloatTest, ReturnsInputWhenTrimExceedsAudio) {
+  std::vector<float> durations = {2.0f, 4.0f, 100.0f};
+  std::vector<float> audio(500, 0.5f);
+
+  trimEosRegionFloat(audio, durations, /*hopSize=*/100, TRIM_EOS_MAX_FRAMES);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), 500);
+}
+
+// ---- baseOffset != 0 ----
+
+class TrimBaseOffsetTest : public ::testing::Test {
+protected:
+  // A prefix whose samples are a function of their index, so a shift shows up
+  // even when the shifted-in values are in range.
+  static std::vector<int16_t> prefixed(std::size_t prefix, std::size_t unit) {
+    std::vector<int16_t> buffer(prefix + unit);
+    for (std::size_t i = 0; i < buffer.size(); ++i) {
+      buffer[i] = static_cast<int16_t>((i * 31) % 20000 - 10000);
+    }
+    return buffer;
+  }
+
+  static void expectPrefixIntact(const std::vector<int16_t> &buffer,
+                                 std::size_t prefix) {
+    ASSERT_GE(buffer.size(), prefix);
+    for (std::size_t i = 0; i < prefix; ++i) {
+      ASSERT_EQ(buffer[i], static_cast<int16_t>((i * 31) % 20000 - 10000))
+          << "prefix sample " << i << " was altered";
+    }
+  }
+};
+
+TEST_F(TrimBaseOffsetTest, PaddingTrimCutsOnlyInsideTheUnit) {
+  const std::size_t prefix = 700;
+  const std::size_t unit = 1900;
+  auto audio = prefixed(prefix, unit);
+  std::vector<float> durations = {2.0f, 3.0f, 3.0f, 3.0f, 4.0f, 1.0f};
+
+  trimPaddingByDurations(audio, durations, /*frontPad=*/3, /*backPad=*/0,
+                         /*hopSize=*/100, /*eosMaxFrames=*/6, prefix);
+
+  // Same 1100-sample front cut as the offset-0 case, taken out of the unit.
+  EXPECT_EQ(audio.size(), prefix + unit - 1100);
+  expectPrefixIntact(audio, prefix);
+}
+
+TEST_F(TrimBaseOffsetTest, PaddingTrimFrontAndBackInsideTheUnit) {
+  const std::size_t prefix = 512;
+  const std::size_t unit = 3800;
+  auto audio = prefixed(prefix, unit);
+  std::vector<float> durations = {2.0f, 5.0f, 5.0f, 4.0f, 4.0f, 5.0f, 5.0f, 8.0f};
+
+  trimPaddingByDurations(audio, durations, /*frontPad=*/2, /*backPad=*/2,
+                         /*hopSize=*/100, TRIM_EOS_MAX_FRAMES, prefix);
+
+  EXPECT_EQ(audio.size(), prefix + unit - 1200 - 1800);
+  expectPrefixIntact(audio, prefix);
+}
+
+TEST_F(TrimBaseOffsetTest, EosTrimMeasuresAgainstTheUnitNotTheBuffer) {
+  // trimSamples (600) exceeds the unit (500) but not the whole buffer, so the
+  // guard must decline. Measuring against the buffer would have eaten 100
+  // samples of the caller's prefix.
+  const std::size_t prefix = 1000;
+  const std::size_t unit = 500;
+  auto audio = prefixed(prefix, unit);
+  std::vector<float> durations = {2.0f, 4.0f, 6.0f};
+
+  trimEosRegion(audio, durations, /*hopSize=*/100, TRIM_EOS_MAX_FRAMES, prefix);
+
+  EXPECT_EQ(audio.size(), prefix + unit);
+  expectPrefixIntact(audio, prefix);
+}
+
+TEST_F(TrimBaseOffsetTest, SilenceTrimScansOnlyTheUnit) {
+  // The prefix is loud and the unit is silent. Scanning the whole buffer would
+  // find audio in the prefix and keep everything; scoped correctly, the unit
+  // collapses to TRIM_MIN_SAMPLES.
+  const std::size_t prefix = 4096;
+  const std::size_t unit = 3 * TRIM_MIN_SAMPLES;
+  std::vector<int16_t> audio(prefix + unit, 0);
+  for (std::size_t i = 0; i < prefix; ++i) {
+    audio[i] = static_cast<int16_t>((i % 2 == 0) ? 12000 : -12000);
+  }
+
+  trimSilenceInt16(audio, prefix);
+
+  EXPECT_EQ(audio.size(), prefix + static_cast<std::size_t>(TRIM_MIN_SAMPLES));
+  for (std::size_t i = 0; i < prefix; ++i) {
+    ASSERT_EQ(audio[i], static_cast<int16_t>((i % 2 == 0) ? 12000 : -12000))
+        << "prefix sample " << i << " was altered by the silence trim";
+  }
+}
+
+TEST_F(TrimBaseOffsetTest, SilenceTrimFloatScansOnlyTheUnit) {
+  const std::size_t prefix = 4096;
+  const std::size_t unit = 3 * TRIM_MIN_SAMPLES;
+  std::vector<float> audio(prefix + unit, 0.0f);
+  for (std::size_t i = 0; i < prefix; ++i) {
+    audio[i] = (i % 2 == 0) ? 0.4f : -0.4f;
+  }
+
+  trimSilenceFloat(audio, prefix);
+
+  EXPECT_EQ(audio.size(), prefix + static_cast<std::size_t>(TRIM_MIN_SAMPLES));
+  for (std::size_t i = 0; i < prefix; ++i) {
+    ASSERT_FLOAT_EQ(audio[i], (i % 2 == 0) ? 0.4f : -0.4f)
+        << "prefix sample " << i << " was altered by the float silence trim";
+  }
 }

@@ -49,6 +49,7 @@ set(TEST_SOURCES
     test_phoneme_parser.cpp
     test_streaming.cpp
     test_phoneme_timing_text_path.cpp
+    test_synthesize_append_scope.cpp
     test_ssml_synth.cpp
     test_streaming_simple.cpp
     test_streaming_raw_phonemes.cpp
@@ -172,6 +173,39 @@ foreach(test_source ${TEST_SOURCES})
         target_compile_definitions(${test_name} PRIVATE
             OPENJTALK_DIC_PATH="../share/open_jtalk/dic"
         )
+    endif()
+
+    # test_short_text_mitigation now includes ../trim_helpers.hpp, i.e. the
+    # PRODUCTION trim helpers rather than hand-written copies, so it needs the
+    # src/cpp include path and spdlog (one debug line per helper). It still
+    # links no piper.cpp: the helpers are header-only inline functions, so the
+    # suite stays model-free and onnxruntime-free.
+    if(${test_name} STREQUAL "test_short_text_mitigation")
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
+        # Mirror cmake/PiperLink.cmake: MSVC builds spdlog/fmt with a `d`
+        # suffix in Debug, and spdlog is compiled with SPDLOG_FMT_EXTERNAL so it
+        # needs fmt at link time too. Hardcoding spdlog.lib made the Windows
+        # Debug job fail with LNK1104 (the file is spdlogd.lib there).
+        if(WIN32)
+            target_link_libraries(${test_name}
+                optimized ${CMAKE_BINARY_DIR}/fi/lib/fmt.lib
+                debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
+                optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
+                debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
+            )
+        else()
+            # Absolute paths: the ExternalProject install prefixes are not on
+            # this target's link search path (only their include dirs are).
+            target_link_libraries(${test_name}
+                ${CMAKE_BINARY_DIR}/si/lib/libspdlog.a
+                ${CMAKE_BINARY_DIR}/fi/lib/libfmt.a
+            )
+        endif()
+        if(TARGET spdlog_external)
+            add_dependencies(${test_name} spdlog_external)
+        endif()
     endif()
 
     # Link utf8_utils.hpp include path for split sentences test
@@ -331,6 +365,7 @@ foreach(test_source ${TEST_SOURCES})
     if(${test_name} STREQUAL "test_speaker_embedding_inference" OR
         ${test_name} STREQUAL "test_phonemize_config" OR
         ${test_name} STREQUAL "test_phoneme_timing_text_path" OR
+        ${test_name} STREQUAL "test_synthesize_append_scope" OR
         ${test_name} STREQUAL "test_ssml_synth" OR
         ${test_name} STREQUAL "test_streaming")
         target_sources(${test_name} PRIVATE
@@ -792,6 +827,7 @@ endforeach()
 # `ctest --timeout 120`. This target loads the fixture model, so it gets the
 # same explicit 300 s budget as the other model-backed tests below.
 set_tests_properties(test_phoneme_timing_text_path PROPERTIES TIMEOUT 300)
+set_tests_properties(test_synthesize_append_scope PROPERTIES TIMEOUT 300)
 set_tests_properties(test_ssml_synth PROPERTIES TIMEOUT 300)
 
 # Direct unit tests for piper_proc_exec.c (argv-based process spawn helpers).
