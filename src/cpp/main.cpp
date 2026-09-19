@@ -980,7 +980,13 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
     } else {
       // Regular mode - buffer all audio before output
       auto audioCallback = [&audioBuffer, &sharedAudioBuffer, &mutAudio,
-                            &cvAudio, &audioReady]() {
+                            &cvAudio, &audioReady, &emittedSamples]() {
+        // Count here, not after the synthesis call: textToAudio clears
+        // audioBuffer immediately after invoking this callback (the callback
+        // contract is "you have copied the samples out"), so reading
+        // audioBuffer.size() afterwards yields 0 and total_duration_ms would
+        // silently fall back to max(end_ms) (issue #662).
+        emittedSamples += audioBuffer.size();
         // Signal thread that audio is ready
         {
           unique_lock lockAudio(mutAudio);
