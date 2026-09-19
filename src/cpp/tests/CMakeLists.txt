@@ -184,10 +184,24 @@ foreach(test_source ${TEST_SOURCES})
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
         )
+        # Mirror cmake/PiperLink.cmake: MSVC builds spdlog/fmt with a `d`
+        # suffix in Debug, and spdlog is compiled with SPDLOG_FMT_EXTERNAL so it
+        # needs fmt at link time too. Hardcoding spdlog.lib made the Windows
+        # Debug job fail with LNK1104 (the file is spdlogd.lib there).
         if(WIN32)
-            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib)
+            target_link_libraries(${test_name}
+                optimized ${CMAKE_BINARY_DIR}/fi/lib/fmt.lib
+                debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
+                optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
+                debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
+            )
         else()
-            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/si/lib/libspdlog.a)
+            # Absolute paths: the ExternalProject install prefixes are not on
+            # this target's link search path (only their include dirs are).
+            target_link_libraries(${test_name}
+                ${CMAKE_BINARY_DIR}/si/lib/libspdlog.a
+                ${CMAKE_BINARY_DIR}/fi/lib/libfmt.a
+            )
         endif()
         if(TARGET spdlog_external)
             add_dependencies(${test_name} spdlog_external)
