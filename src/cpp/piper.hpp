@@ -304,6 +304,16 @@ void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
 // `piper::outputTimingsAsJSON` is exported from libpiper_plus: changing its
 // signature would alter the mangled name and break the ABI. The old symbol
 // stays, with its max(end_ms) fallback, for existing callers.
+//
+// `emittedSamples` is INTERLEAVED samples, i.e. frames * channels -- the same
+// convention as `piper_plus::timing::ConcatCursor`, which the offsets in
+// `phonemeTimings` are already anchored to. Note that `writeWavHeader`
+// (src/cpp/wavfile.hpp) uses the OPPOSITE convention for its own `numSamples`
+// argument: it multiplies by channels, i.e. treats the value as frames. Both
+// are fed `audioBuffer.size()` by the CLI, so exactly one of them is wrong for
+// channels > 1. Nothing sets `channels` away from its default of 1 today (the
+// config parser does not read it), so the disagreement is latent; it is called
+// out here rather than silently inherited.
 void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
                          std::ostream &output,
                          const std::string &text,

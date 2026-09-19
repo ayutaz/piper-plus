@@ -981,3 +981,82 @@ TEST(TimingSrtWriterLocaleTest, CueIndexHasNoThousandsSeparator) {
     }
     EXPECT_EQ(expectedIndex, timings.size());
 }
+
+// ---------------------------------------------------------------------------
+// The emitted-length overload of outputTimingsAsJSON (issue #662). Model-free.
+//
+// `total_duration_ms` must be the emitted stream length, per the contract's
+// `[concatenation].aggregate_total_duration_ms`, and NOT max(end_ms) over the
+// entries. The CLI supplies the count; nothing pinned the arithmetic itself, so
+// the channels divisor and the legacy fallback were both unverified.
+// ---------------------------------------------------------------------------
+TEST(TimingJsonAggregateTotalTest, UsesEmittedSamplesNotMaxEndMs) {
+    // Entries end at 500 ms; the stream is 22050 samples = 1000 ms at 22050 Hz.
+    const std::vector<piper::PhonemeInfo> timings = {
+        {"a", 0.0f, 0.25f, 0, 21},
+        {"b", 0.25f, 0.5f, 21, 43},
+    };
+
+    std::ostringstream out;
+    piper::outputTimingsAsJSON(timings, out, "text", 22050, 256,
+                               /*emittedSamples=*/22050u, /*channels=*/1);
+    const nlohmann::json parsed = nlohmann::json::parse(out.str());
+
+    EXPECT_NEAR(parsed["total_duration_ms"].get<double>(), 1000.0, 1e-9)
+        << "total_duration_ms must come from the emitted sample count";
+    // The entries are untouched, and the last one still ends well before the
+    // total -- that gap is the trailing pad/eos frames, the trailing silence
+    // and the pre-ceil shortfall of #653.
+    EXPECT_NEAR(parsed["phonemes"].back()["end_ms"].get<double>(), 500.0, 1e-6);
+}
+
+TEST(TimingJsonAggregateTotalTest, LegacyOverloadStillDerivesFromEntries) {
+    const std::vector<piper::PhonemeInfo> timings = {
+        {"a", 0.0f, 0.25f, 0, 21},
+        {"b", 0.25f, 0.5f, 21, 43},
+    };
+
+    std::ostringstream out;
+    piper::outputTimingsAsJSON(timings, out, "text", 22050, 256);
+    const nlohmann::json parsed = nlohmann::json::parse(out.str());
+
+    // The 5-argument symbol is kept for ABI reasons and must keep its old
+    // behaviour: callers that cannot supply a count get max(end_ms).
+    EXPECT_NEAR(parsed["total_duration_ms"].get<double>(), 500.0, 1e-6);
+}
+
+TEST(TimingJsonAggregateTotalTest, ChannelsDivideTheInterleavedCount) {
+    const std::vector<piper::PhonemeInfo> timings = {
+        {"a", 0.0f, 0.25f, 0, 21},
+    };
+
+    // 44100 interleaved samples over 2 channels at 22050 Hz = 1000 ms, the
+    // same wall-clock length as 22050 samples in mono. This pins the divisor's
+    // direction: multiplying instead would report 4000 ms.
+    std::ostringstream stereo;
+    piper::outputTimingsAsJSON(timings, stereo, "", 22050, 256,
+                               /*emittedSamples=*/44100u, /*channels=*/2);
+    EXPECT_NEAR(nlohmann::json::parse(stereo.str())["total_duration_ms"]
+                    .get<double>(),
+                1000.0, 1e-9);
+
+    // channels <= 0 must not divide by zero; it is clamped to 1.
+    std::ostringstream zero;
+    piper::outputTimingsAsJSON(timings, zero, "", 22050, 256,
+                               /*emittedSamples=*/22050u, /*channels=*/0);
+    EXPECT_NEAR(nlohmann::json::parse(zero.str())["total_duration_ms"]
+                    .get<double>(),
+                1000.0, 1e-9);
+}
+
+TEST(TimingJsonAggregateTotalTest, EmptyTimingsStillReportTheStreamLength) {
+    // A stream can exist with no entries (e.g. every id was a special token).
+    // The legacy overload reports 0; the emitted-count one must report what was
+    // actually emitted, otherwise the field contradicts the audio.
+    std::ostringstream out;
+    piper::outputTimingsAsJSON({}, out, "", 22050, 256,
+                               /*emittedSamples=*/11025u, /*channels=*/1);
+    EXPECT_NEAR(nlohmann::json::parse(out.str())["total_duration_ms"]
+                    .get<double>(),
+                500.0, 1e-9);
+}
