@@ -597,18 +597,15 @@ func writeTiming(result *piperplus.SynthesisResult, voice *piperplus.Voice, logg
 	// result.PhonemeIDs is the sequence actually fed to the model, so it lines
 	// up with Durations index-for-index. Re-phonemizing the input text would
 	// not: Strategy A padding inserts pad tokens at the front.
-	tokens := make([]string, len(result.Durations))
-	if ids := result.PhonemeIDs; len(ids) == len(result.Durations) {
-		reverse := piperplus.BuildPhonemeIDReverseMap(voice.Config().PhonemeIDMap, nil)
-		tokens = piperplus.PhonemeIDsToTokens(ids, reverse)
-	} else {
-		// Alignment cannot be established; positional labels are less harmful
-		// than confidently wrong phoneme names.
+	tokens, resolved := piperplus.ResolveTimingTokens(
+		result.PhonemeIDs,
+		len(result.Durations),
+		voice.Config().PhonemeIDMap,
+		nil,
+	)
+	if !resolved {
 		logger.Warn("phoneme id count differs from durations; using positional labels",
-			"ids", len(ids), "durations", len(result.Durations))
-		for i := range tokens {
-			tokens[i] = fmt.Sprintf("p%d", i)
-		}
+			"ids", len(result.PhonemeIDs), "durations", len(result.Durations))
 	}
 
 	hopLength := piperplus.DefaultHopLength

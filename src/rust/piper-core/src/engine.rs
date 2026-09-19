@@ -1226,6 +1226,7 @@ mod tests {
             infer_seconds: 0.5,
             audio_seconds: 1.0,
             durations: None,
+            phoneme_ids: None,
         };
         assert!((result.real_time_factor() - 0.5).abs() < 1e-6);
     }
@@ -1238,6 +1239,7 @@ mod tests {
             infer_seconds: 0.1,
             audio_seconds: 0.0,
             durations: None,
+            phoneme_ids: None,
         };
         assert!((result.real_time_factor()).abs() < 1e-6);
     }
@@ -1321,6 +1323,7 @@ mod tests {
             infer_seconds: 0.3,
             audio_seconds: 1.0,
             durations: Some(vec![1.0, 2.0, 3.0]),
+            phoneme_ids: Some(vec![1, 8, 2]),
         };
         let durations = result.durations.as_ref().unwrap();
         assert_eq!(durations.len(), 3);
@@ -1338,6 +1341,7 @@ mod tests {
             infer_seconds: 1.5,
             audio_seconds: 0.0,
             durations: None,
+            phoneme_ids: None,
         };
         assert!((result.real_time_factor() - 0.0).abs() < 1e-6);
     }

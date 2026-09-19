@@ -26,6 +26,16 @@ runtime's own unit tests (Python doctests, `timing::tests` in Rust,
 gate prevents is a runtime being added -- or reverted -- WITHOUT the map, which
 is the state Rust and Go were in.
 
+A second section checks the Rust/Go CLI WIRING. Having the map is not enough:
+the CLI has to decide whether the id list actually lines up with the durations,
+and fall back to placeholders when it does not. That decision first landed
+inline in each CLI's main(), where no test and no CI step executed either
+branch -- exactly the blind spot that let the original bug ship. So the gate
+requires the decision to live in the shared, unit-tested helper
+(`resolve_timing_tokens` / `ResolveTimingTokens`), requires the CLI to call it,
+forbids the CLI from rebuilding the reverse map itself, and requires the named
+tests for both branches to exist.
+
 Exit codes: 0 = every runtime implements it, 1 = at least one does not.
 """
 
@@ -73,6 +83,121 @@ PUA_UPPER = re.compile(r"(0x)?f8ff", re.IGNORECASE)
 # to a format directive; requiring 04X specifically would reject the JS form.
 PUA_FORMAT = re.compile(r"U\+")
 
+# The token-resolution decision must live in the shared helper, not inline in
+# the CLI. `forbidden_in_cli` is what inlining looks like: if the CLI builds the
+# reverse map itself, it is making the alignment decision again in untested
+# code. `tests` are required by name so deleting them fails the gate rather
+# than silently reducing coverage to zero.
+CLI_WIRING: dict[str, dict[str, object]] = {
+    "rust": {
+        "helper_file": "src/rust/piper-core/src/timing.rs",
+        "helper_decl": "pub fn resolve_timing_tokens(",
+        "guard": "duration_count > 0",
+        "placeholder": 'format!("ph_{}", i)',
+        "cli_file": "src/rust/piper-cli/src/main.rs",
+        "cli_call": "timing::resolve_timing_tokens(",
+        "forbidden_in_cli": ["build_phoneme_id_reverse_map("],
+        "test_file": "src/rust/piper-core/src/timing.rs",
+        "tests": [
+            "resolve_timing_tokens_uses_real_phonemes_when_aligned",
+            "resolve_timing_tokens_falls_back_when_counts_differ",
+            "resolve_timing_tokens_treats_zero_durations_as_unresolved",
+        ],
+    },
+    "go": {
+        "helper_file": "src/go/piperplus/timing.go",
+        "helper_decl": "func ResolveTimingTokens(",
+        "guard": "durationCount > 0",
+        "placeholder": 'fmt.Sprintf("ph_%d", i)',
+        "cli_file": "src/go/cmd/piper-plus/main.go",
+        "cli_call": "piperplus.ResolveTimingTokens(",
+        "forbidden_in_cli": ["BuildPhonemeIDReverseMap("],
+        "test_file": "src/go/piperplus/timing_test.go",
+        "tests": [
+            "TestResolveTimingTokens_UsesRealPhonemesWhenAligned",
+            "TestResolveTimingTokens_FallsBackWhenCountsDiffer",
+            "TestResolveTimingTokens_TreatsZeroDurationsAsUnresolved",
+        ],
+    },
+}
+
+
+def read(rel: str) -> str | None:
+    path = REPO_ROOT / rel
+    if not path.is_file():
+        return None
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
+def check_cli_wiring() -> list[str]:
+    """Rust/Go: the alignment decision must be shared and unit-tested."""
+    failures: list[str] = []
+
+    for runtime, spec in sorted(CLI_WIRING.items()):
+        helper_rel = str(spec["helper_file"])
+        cli_rel = str(spec["cli_file"])
+        test_rel = str(spec["test_file"])
+
+        helper = read(helper_rel)
+        cli = read(cli_rel)
+        tests = read(test_rel)
+        for rel, source in ((helper_rel, helper), (cli_rel, cli), (test_rel, tests)):
+            if source is None:
+                failures.append(f"{runtime}: file not found: {rel}")
+        if helper is None or cli is None or tests is None:
+            continue
+
+        problems: list[str] = []
+
+        decl = str(spec["helper_decl"])
+        if decl not in helper:
+            problems.append(
+                f"{helper_rel}: no shared helper (expected {decl!r}); the "
+                "alignment decision would be inline in the CLI, where no test "
+                "reaches either branch"
+            )
+        guard = str(spec["guard"])
+        if guard not in helper:
+            problems.append(
+                f"{helper_rel}: no zero-duration guard (expected {guard!r}); an "
+                "empty id list trivially matches a duration count of 0, so the "
+                "helper would report a broken result as resolved"
+            )
+        placeholder = str(spec["placeholder"])
+        if placeholder not in helper:
+            problems.append(
+                f"{helper_rel}: no {placeholder!r} fallback label; Rust and Go "
+                "must agree on the placeholder spelling"
+            )
+
+        call = str(spec["cli_call"])
+        if call not in cli:
+            problems.append(
+                f"{cli_rel}: does not call {call!r}; the CLI must delegate the "
+                "decision to the tested helper"
+            )
+        for forbidden in spec["forbidden_in_cli"]:  # type: ignore[union-attr]
+            if str(forbidden) in cli:
+                problems.append(
+                    f"{cli_rel}: contains {forbidden!r}; resolving ids in the "
+                    "CLI re-introduces the untested inline decision"
+                )
+
+        for test_name in spec["tests"]:  # type: ignore[union-attr]
+            if str(test_name) not in tests:
+                problems.append(
+                    f"{test_rel}: missing test {test_name!r}; the branch it "
+                    "covers would go unexercised"
+                )
+
+        if problems:
+            failures.extend(f"{runtime} {problem}" for problem in problems)
+        else:
+            print(f"  OK: {runtime} CLI wiring -- {cli_rel} -> {helper_rel}")
+
+    return failures
+
+
 
 def main() -> int:
     failures: list[str] = []
@@ -108,6 +233,8 @@ def main() -> int:
         else:
             print(f"  OK: {runtime} -- {rel}")
 
+    failures.extend(check_cli_wiring())
+
     if failures:
         print(
             f"\nERROR: reverse map missing or incomplete in {len(failures)} "
@@ -123,7 +250,10 @@ def main() -> int:
         )
         return 1
 
-    print(f"OK: all {len(RUNTIMES)} runtimes implement the phoneme-ID reverse map")
+    print(
+        f"OK: all {len(RUNTIMES)} runtimes implement the phoneme-ID reverse map, "
+        f"and {len(CLI_WIRING)} CLI(s) delegate token resolution to a tested helper"
+    )
     return 0
 
 

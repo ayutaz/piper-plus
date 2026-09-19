@@ -643,27 +643,23 @@ fn main() -> Result<()> {
                     // 音素列がテキスト由来のものと別物になる (実測: "Sol" で
                     // ID 11 個に対し durations 111 個)。Strategy A の padding も
                     // 前方に pad を挿入して index をずらす。
-                    let reverse_map = piper_plus::timing::build_phoneme_id_reverse_map(
+                    let (tokens, resolved) = piper_plus::timing::resolve_timing_tokens(
+                        result.phoneme_ids.as_deref(),
+                        durations.len(),
                         &voice.config().phoneme_id_map,
                         None,
                     );
-                    let tokens: Vec<String> = match result.phoneme_ids.as_deref() {
-                        Some(ids) if ids.len() == durations.len() => {
-                            piper_plus::timing::phoneme_ids_to_tokens(ids, &reverse_map)
-                        }
-                        other => {
-                            // 長さが合わないなら対応が取れない。誤った音素名を
-                            // 出すよりプレースホルダのほうが害が小さい。
-                            tracing::warn!(
-                                "phoneme id count ({:?}) differs from durations ({}); \
-                                 falling back to positional labels because the \
-                                 id-to-duration alignment cannot be trusted",
-                                other.map(<[i64]>::len),
-                                durations.len()
-                            );
-                            (0..durations.len()).map(|i| format!("ph_{}", i)).collect()
-                        }
-                    };
+                    if !resolved {
+                        // 長さが合わないなら対応が取れない。誤った音素名を
+                        // 出すよりプレースホルダのほうが害が小さい。
+                        tracing::warn!(
+                            "phoneme id count ({:?}) differs from durations ({}); \
+                             falling back to positional labels because the \
+                             id-to-duration alignment cannot be trusted",
+                            result.phoneme_ids.as_deref().map(<[i64]>::len),
+                            durations.len()
+                        );
+                    }
                     match piper_plus::timing::durations_to_timing(
                         durations,
                         &tokens,

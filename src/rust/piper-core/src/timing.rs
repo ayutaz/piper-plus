@@ -170,6 +170,36 @@ pub fn phoneme_ids_to_tokens(
         .collect()
 }
 
+/// timing 出力に使う表示名列を決める。
+///
+/// `phoneme_ids` が `duration_count` と一致していれば逆引きした実音素名を
+/// 返し、一致しなければ位置プレースホルダ (`ph_0`, `ph_1`, ...) を返す。
+/// フォールバックは意図的なもので、自信をもって間違えた音素名を出すほうが
+/// 明らかに無意味なプレースホルダより有害 (出力だけを見て区別できない)。
+/// 戻り値の `bool` はどちらの経路を通ったかを示し、呼び出し側が warn を
+/// 出せるようにしている。
+///
+/// CLI から切り出してテスト可能にしたもの: alignment 条件とフォールバックは
+/// piper-cli の中にインラインで書かれていて、どのテストも CI step も
+/// どちらの分岐も実行していなかった (issue #656)。
+pub fn resolve_timing_tokens(
+    phoneme_ids: Option<&[i64]>,
+    duration_count: usize,
+    phoneme_id_map: &HashMap<String, Vec<i64>>,
+    pua_to_multi_char: Option<&HashMap<String, String>>,
+) -> (Vec<String>, bool) {
+    match phoneme_ids {
+        Some(ids) if ids.len() == duration_count && duration_count > 0 => {
+            let reverse_map = build_phoneme_id_reverse_map(phoneme_id_map, pua_to_multi_char);
+            (phoneme_ids_to_tokens(ids, &reverse_map), true)
+        }
+        _ => (
+            (0..duration_count).map(|i| format!("ph_{}", i)).collect(),
+            false,
+        ),
+    }
+}
+
 pub fn durations_to_timing(
     durations: &[f32],
     phoneme_tokens: &[String],
@@ -1059,6 +1089,92 @@ mod tests {
         // "ch" is two chars, so the PUA branch must not fire even though its
         // first char would not be PUA either.
         assert_eq!(reverse.get(&50), Some(&"ch".to_string()));
+    }
+
+    #[test]
+    fn resolve_timing_tokens_uses_real_phonemes_when_aligned() {
+        let ids = vec![5, 6, 50];
+        let (tokens, resolved) =
+            resolve_timing_tokens(Some(&ids), ids.len(), &sample_id_map(), None);
+        assert!(resolved, "aligned ids must take the reverse-map branch");
+        assert_eq!(tokens, vec!["a", "b", "ch"]);
+    }
+
+    #[test]
+    fn resolve_timing_tokens_applies_pua_names_when_aligned() {
+        let mut pua = HashMap::new();
+        pua.insert("\u{e019}".to_string(), "N_m".to_string());
+        let ids = vec![42, 5];
+        let (tokens, resolved) =
+            resolve_timing_tokens(Some(&ids), ids.len(), &sample_id_map(), Some(&pua));
+        assert!(resolved);
+        assert_eq!(tokens, vec!["N_m", "a"]);
+    }
+
+    #[test]
+    fn resolve_timing_tokens_falls_back_when_counts_differ() {
+        // The pre-#656 bug shape: the caller passed text-derived ids (5) while
+        // the decoder produced 15 durations (Strategy A padding / Strategy C
+        // SSML wrap). Emitting the 5 names against 15 slots would silently
+        // mislabel every entry, so placeholders are required here.
+        let ids = vec![5, 6, 7, 50, 42];
+        let (tokens, resolved) = resolve_timing_tokens(Some(&ids), 15, &sample_id_map(), None);
+        assert!(!resolved, "mismatched counts must NOT claim resolution");
+        assert_eq!(tokens.len(), 15);
+        assert_eq!(tokens[0], "ph_0");
+        assert_eq!(tokens[14], "ph_14");
+        // No real phoneme name may leak into the fallback labels.
+        assert!(
+            tokens.iter().all(|t| t.starts_with("ph_")),
+            "fallback leaked a reverse-mapped name: {:?}",
+            tokens
+        );
+    }
+
+    #[test]
+    fn resolve_timing_tokens_falls_back_when_ids_absent() {
+        let (tokens, resolved) = resolve_timing_tokens(None, 3, &sample_id_map(), None);
+        assert!(!resolved);
+        assert_eq!(tokens, vec!["ph_0", "ph_1", "ph_2"]);
+    }
+
+    #[test]
+    fn resolve_timing_tokens_treats_zero_durations_as_unresolved() {
+        // Zero durations means there is nothing to label; claiming `resolved`
+        // would make the caller skip the warning for an empty-and-broken
+        // result. Empty ids also trivially "match" length 0, so the guard has
+        // to be explicit.
+        let ids: Vec<i64> = Vec::new();
+        let (tokens, resolved) = resolve_timing_tokens(Some(&ids), 0, &sample_id_map(), None);
+        assert!(!resolved);
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn resolve_timing_tokens_keeps_padded_alignment() {
+        // Strategy A pads the id list; engine.rs now returns the PADDED ids so
+        // they line up with the padded durations. This pins that contract: a
+        // 15-long id list against 15 durations resolves, and the pad ids
+        // themselves get real names rather than placeholders.
+        let ids: Vec<i64> = (0..15).map(|i| if i % 2 == 0 { 5 } else { 6 }).collect();
+        let (tokens, resolved) =
+            resolve_timing_tokens(Some(&ids), ids.len(), &sample_id_map(), None);
+        assert!(resolved);
+        assert_eq!(tokens.len(), 15);
+        assert_eq!(tokens[0], "a");
+        assert_eq!(tokens[1], "b");
+    }
+
+    #[test]
+    fn resolve_timing_tokens_marks_unknown_ids_distinctly() {
+        // An id outside the map is a different failure from a count mismatch:
+        // alignment holds, so only that one slot is unknown. It must be
+        // `<id>`, never `ph_N` (which would imply the whole run is unaligned).
+        let ids = vec![5, 9999];
+        let (tokens, resolved) =
+            resolve_timing_tokens(Some(&ids), ids.len(), &sample_id_map(), None);
+        assert!(resolved);
+        assert_eq!(tokens, vec!["a", "<9999>"]);
     }
 
     #[test]

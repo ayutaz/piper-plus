@@ -478,3 +478,114 @@ func TestPhonemeIDsToTokens_MarksUnknownIDsDistinguishably(t *testing.T) {
 		}
 	}
 }
+
+// ResolveTimingTokens tests. The alignment decision and its fallback used to
+// live inline in cmd/piper-plus, where no test or CI step executed either
+// branch (issue #656 review finding).
+
+func TestResolveTimingTokens_UsesRealPhonemesWhenAligned(t *testing.T) {
+	ids := []int64{5, 6, 50}
+	tokens, resolved := ResolveTimingTokens(ids, len(ids), sampleIDMap(), nil)
+	if !resolved {
+		t.Error("aligned ids must take the reverse-map branch")
+	}
+	want := []string{"a", "b", "ch"}
+	for i := range want {
+		if tokens[i] != want[i] {
+			t.Errorf("token %d = %q; want %q", i, tokens[i], want[i])
+		}
+	}
+}
+
+func TestResolveTimingTokens_AppliesPUANamesWhenAligned(t *testing.T) {
+	pua := map[string]string{"": "N_m"}
+	ids := []int64{42, 5}
+	tokens, resolved := ResolveTimingTokens(ids, len(ids), sampleIDMap(), pua)
+	if !resolved {
+		t.Fatal("aligned ids must resolve")
+	}
+	if tokens[0] != "N_m" || tokens[1] != "a" {
+		t.Errorf("tokens = %v; want [N_m a]", tokens)
+	}
+}
+
+func TestResolveTimingTokens_FallsBackWhenCountsDiffer(t *testing.T) {
+	// The pre-#656 bug shape: text-derived ids (5) against decoder durations
+	// (15, after Strategy A padding). Emitting the 5 names across 15 slots
+	// would silently mislabel every entry.
+	ids := []int64{5, 6, 7, 50, 42}
+	tokens, resolved := ResolveTimingTokens(ids, 15, sampleIDMap(), nil)
+	if resolved {
+		t.Error("mismatched counts must NOT claim resolution")
+	}
+	if len(tokens) != 15 {
+		t.Fatalf("len(tokens) = %d; want 15 (one per duration)", len(tokens))
+	}
+	if tokens[0] != "ph_0" || tokens[14] != "ph_14" {
+		t.Errorf("tokens[0]=%q tokens[14]=%q; want ph_0 / ph_14", tokens[0], tokens[14])
+	}
+	for i, tok := range tokens {
+		if !strings.HasPrefix(tok, "ph_") {
+			t.Errorf("token %d = %q; fallback leaked a reverse-mapped name", i, tok)
+		}
+	}
+}
+
+func TestResolveTimingTokens_FallsBackWhenIDsAbsent(t *testing.T) {
+	tokens, resolved := ResolveTimingTokens(nil, 3, sampleIDMap(), nil)
+	if resolved {
+		t.Error("nil ids must not claim resolution")
+	}
+	want := []string{"ph_0", "ph_1", "ph_2"}
+	for i := range want {
+		if tokens[i] != want[i] {
+			t.Errorf("token %d = %q; want %q", i, tokens[i], want[i])
+		}
+	}
+}
+
+func TestResolveTimingTokens_TreatsZeroDurationsAsUnresolved(t *testing.T) {
+	// Empty ids trivially "match" a length of 0, so the guard must be
+	// explicit: otherwise an empty-and-broken result would suppress the
+	// caller's warning.
+	tokens, resolved := ResolveTimingTokens([]int64{}, 0, sampleIDMap(), nil)
+	if resolved {
+		t.Error("zero durations must not claim resolution")
+	}
+	if len(tokens) != 0 {
+		t.Errorf("len(tokens) = %d; want 0", len(tokens))
+	}
+}
+
+func TestResolveTimingTokens_KeepsPaddedAlignment(t *testing.T) {
+	// Strategy A pads the id list; engine.go now returns the PADDED ids so
+	// they line up with the padded durations.
+	ids := make([]int64, 15)
+	for i := range ids {
+		if i%2 == 0 {
+			ids[i] = 5
+		} else {
+			ids[i] = 6
+		}
+	}
+	tokens, resolved := ResolveTimingTokens(ids, len(ids), sampleIDMap(), nil)
+	if !resolved {
+		t.Fatal("padded ids matching padded durations must resolve")
+	}
+	if tokens[0] != "a" || tokens[1] != "b" {
+		t.Errorf("tokens[:2] = %v; want [a b]", tokens[:2])
+	}
+}
+
+func TestResolveTimingTokens_MarksUnknownIDsDistinctly(t *testing.T) {
+	// An unknown id is a different failure from a count mismatch: alignment
+	// holds, so only that slot is unknown. It must be "<id>", never "ph_N".
+	ids := []int64{5, 9999}
+	tokens, resolved := ResolveTimingTokens(ids, len(ids), sampleIDMap(), nil)
+	if !resolved {
+		t.Fatal("an unknown id does not break alignment")
+	}
+	if tokens[0] != "a" || tokens[1] != "<9999>" {
+		t.Errorf("tokens = %v; want [a <9999>]", tokens)
+	}
+}

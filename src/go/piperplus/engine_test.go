@@ -91,8 +91,31 @@ func TestOnnxEngine_Synthesize(t *testing.T) {
 	if result.Durations == nil {
 		t.Error("expected non-nil Durations")
 	}
-	if len(result.Durations) != len(req.PhonemeIDs) {
-		t.Errorf("expected Durations length %d, got %d", len(req.PhonemeIDs), len(result.Durations))
+	// Durations is now the PADDED length, and PhonemeIDs reports the sequence
+	// actually fed to the model, so the two must agree index-for-index
+	// (issue #656). This request has 5 IDs, which Strategy A pads to
+	// minPhonemeIDs (15), so asserting against len(req.PhonemeIDs) would be
+	// asserting the old truncating behaviour -- and that truncation took
+	// entries from the FRONT of [BOS, frontPad.., body.., backPad.., EOS],
+	// which shifted the body by frontPad and made index-based phoneme-name
+	// lookup assign pad durations to spoken phonemes.
+	if result.PhonemeIDs == nil {
+		t.Error("expected non-nil PhonemeIDs")
+	}
+	if len(result.Durations) != len(result.PhonemeIDs) {
+		t.Errorf("Durations length %d != PhonemeIDs length %d; the two must line up",
+			len(result.Durations), len(result.PhonemeIDs))
+	}
+	if len(result.PhonemeIDs) < len(req.PhonemeIDs) {
+		t.Errorf("PhonemeIDs (%d) is shorter than the request (%d); padding only adds",
+			len(result.PhonemeIDs), len(req.PhonemeIDs))
+	}
+	// The request is short enough that Strategy A must have padded it; without
+	// this the assertions above would also hold for an unpadded request and
+	// would not exercise the padded path at all.
+	if len(result.PhonemeIDs) != minPhonemeIDs {
+		t.Errorf("expected Strategy A to pad %d IDs up to %d, got %d",
+			len(req.PhonemeIDs), minPhonemeIDs, len(result.PhonemeIDs))
 	}
 }
 

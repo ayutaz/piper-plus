@@ -250,11 +250,20 @@ repos:
       # (#656)。 プレースホルダは別の欠陥も隠していた — 音素名が見えないため
       # Rust が短文で SSML ラッパを読み上げていること (#694) に誰も気付け
       # なかった。
+      #
+      # CLI wiring section も併せて検査する: 「実音素名を出すか placeholder に
+      # 落とすか」の判定は当初 Rust/Go の CLI main() にインラインで書かれ、
+      # どのテストも CI step もどちらの分岐も実行していなかった。 判定を
+      # 共有 helper (resolve_timing_tokens / ResolveTimingTokens) に置き、
+      # CLI がそれを呼ぶことと両分岐のテストが存在することを強制する。
       - id: reverse-map-parity
-        name: "phoneme ID reverse map (6 runtimes vs contract toml)"
+        name: "phoneme ID reverse map + CLI wiring (6 runtimes vs contract toml)"
         entry: uv run --no-sync python scripts/check_reverse_map_parity.py
         language: system
-        files: ^(docs/spec/phoneme-timing-contract\.toml|src/python_run/piper_plus/timing\.py|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/rust/piper-core/src/timing\.rs|src/go/piperplus/timing\.go|src/wasm/openjtalk-web/src/timing\.js|src/cpp/piper\.cpp|scripts/check_reverse_map_parity\.py)$
+        # CLI とテストのパスも trigger に含める: gate の CLI wiring section が
+        # それらを読むため、 含めないと CLI だけを書き換えた変更で gate が
+        # 走らず (= inline 化の再発を検出できず) 素通りする。
+        files: ^(docs/spec/phoneme-timing-contract\.toml|src/python_run/piper_plus/timing\.py|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/rust/piper-core/src/timing\.rs|src/rust/piper-cli/src/main\.rs|src/go/piperplus/timing\.go|src/go/piperplus/timing_test\.go|src/go/cmd/piper-plus/main\.go|src/wasm/openjtalk-web/src/timing\.js|src/cpp/piper\.cpp|scripts/check_reverse_map_parity\.py)$
         pass_filenames: false
 
       - id: srt-rounding-parity

@@ -83,6 +83,37 @@ func BuildPhonemeIDReverseMap(
 	return reverse
 }
 
+// ResolveTimingTokens picks the display names for a timing result.
+//
+// It returns the reverse-mapped phoneme names when phonemeIDs lines up with
+// durationCount, and positional placeholders ("ph_0", "ph_1", ...) otherwise.
+// The
+// fallback is deliberate: a confidently WRONG phoneme name is more misleading
+// than an obviously meaningless placeholder, and the two cannot be told apart
+// from the output alone. The bool reports which branch was taken so callers can
+// log it.
+//
+// Extracted from the CLI so the decision is testable: the alignment condition
+// and its fallback previously lived inline in cmd/piper-plus and no test or CI
+// step executed either branch (issue #656).
+func ResolveTimingTokens(
+	phonemeIDs []int64,
+	durationCount int,
+	phonemeIDMap map[string][]int64,
+	puaToMultiChar map[string]string,
+) (tokens []string, resolved bool) {
+	if len(phonemeIDs) == durationCount && durationCount > 0 {
+		reverse := BuildPhonemeIDReverseMap(phonemeIDMap, puaToMultiChar)
+		return PhonemeIDsToTokens(phonemeIDs, reverse), true
+	}
+
+	tokens = make([]string, durationCount)
+	for i := range tokens {
+		tokens[i] = fmt.Sprintf("ph_%d", i)
+	}
+	return tokens, false
+}
+
 // isPrivateUseArea reports whether r is in the Unicode PUA (U+E000..U+F8FF).
 func isPrivateUseArea(r rune) bool {
 	return r >= 0xE000 && r <= 0xF8FF
