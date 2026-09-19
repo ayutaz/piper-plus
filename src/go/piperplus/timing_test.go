@@ -379,3 +379,102 @@ func TestToSRT_EmptyTimingProducesEmptyString(t *testing.T) {
 		t.Errorf("ToSRT() on empty timing = %q; want empty string", got)
 	}
 }
+
+// ---- reverse map (issue #656) ----
+//
+// Pins the three rules of spec [reverse_map] (first-wins / PUA fallback /
+// explicit mapping) and agreement with the canonical Python and JS mirrors.
+// Before the fix the Go CLI emitted `p0`, `p1`, ... positional placeholders, so
+// the timing output could not identify phonemes at all.
+
+func sampleIDMap() map[string][]int64 {
+	return map[string][]int64{
+		"a":  {5},
+		"b":  {6, 7},
+		"":  {42},
+		"ch": {50},
+	}
+}
+
+func TestBuildPhonemeIDReverseMap_MapsEveryIDOfAKey(t *testing.T) {
+	reverse := BuildPhonemeIDReverseMap(sampleIDMap(), nil)
+	if got := reverse[5]; got != "a" {
+		t.Errorf("id 5 = %q; want %q", got, "a")
+	}
+	// Both ids of "b" must resolve; the canonical doctest pins {6: 'b', 7: 'b'}.
+	if got := reverse[6]; got != "b" {
+		t.Errorf("id 6 = %q; want %q", got, "b")
+	}
+	if got := reverse[7]; got != "b" {
+		t.Errorf("id 7 = %q; want %q", got, "b")
+	}
+}
+
+func TestBuildPhonemeIDReverseMap_RendersUnmappedPUAAsCodepoint(t *testing.T) {
+	reverse := BuildPhonemeIDReverseMap(sampleIDMap(), nil)
+	// [reverse_map.pua_handling]: uppercase, 4 hex digits.
+	if got := reverse[42]; got != "U+E019" {
+		t.Errorf("id 42 = %q; want %q", got, "U+E019")
+	}
+}
+
+func TestBuildPhonemeIDReverseMap_PrefersExplicitPUAName(t *testing.T) {
+	reverse := BuildPhonemeIDReverseMap(sampleIDMap(), map[string]string{"": "N_m"})
+	if got := reverse[42]; got != "N_m" {
+		t.Errorf("id 42 = %q; want %q", got, "N_m")
+	}
+}
+
+func TestBuildPhonemeIDReverseMap_PassesMultiCharKeysThrough(t *testing.T) {
+	reverse := BuildPhonemeIDReverseMap(sampleIDMap(), nil)
+	// "ch" is two runes, so the PUA branch must not fire.
+	if got := reverse[50]; got != "ch" {
+		t.Errorf("id 50 = %q; want %q", got, "ch")
+	}
+}
+
+func TestBuildPhonemeIDReverseMap_FirstWinsIsDeterministic(t *testing.T) {
+	// Two keys claim id 9. Go map iteration is randomised, so the
+	// implementation sorts keys: "aa" must win on every run.
+	m := map[string][]int64{"zz": {9}, "aa": {9}}
+	for i := 0; i < 16; i++ {
+		if got := BuildPhonemeIDReverseMap(m, nil)[9]; got != "aa" {
+			t.Fatalf("run %d: id 9 = %q; want %q (collision winner must be stable)", i, got, "aa")
+		}
+	}
+}
+
+func TestBuildPhonemeIDReverseMap_PUABoundaries(t *testing.T) {
+	m := map[string][]int64{
+		"퟿": {1}, // below the surrogate block
+		"": {2}, // first PUA
+		"": {3}, // last PUA
+		"豈": {4}, // just above
+	}
+	reverse := BuildPhonemeIDReverseMap(m, nil)
+
+	if got := reverse[2]; got != "U+E000" {
+		t.Errorf("id 2 = %q; want %q", got, "U+E000")
+	}
+	if got := reverse[3]; got != "U+F8FF" {
+		t.Errorf("id 3 = %q; want %q", got, "U+F8FF")
+	}
+	// Outside the range the character passes through unchanged.
+	if got := reverse[4]; got == "U+F900" {
+		t.Errorf("id 4 = %q; U+F900 is outside the PUA and must pass through", got)
+	}
+	if got := reverse[1]; got == "U+D7FF" {
+		t.Errorf("id 1 = %q; U+D7FF is outside the PUA and must pass through", got)
+	}
+}
+
+func TestPhonemeIDsToTokens_MarksUnknownIDsDistinguishably(t *testing.T) {
+	reverse := BuildPhonemeIDReverseMap(sampleIDMap(), nil)
+	tokens := PhonemeIDsToTokens([]int64{5, 999, 42}, reverse)
+	want := []string{"a", "<999>", "U+E019"}
+	for i := range want {
+		if tokens[i] != want[i] {
+			t.Errorf("token %d = %q; want %q", i, tokens[i], want[i])
+		}
+	}
+}

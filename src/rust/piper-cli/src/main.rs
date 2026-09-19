@@ -631,9 +631,39 @@ fn main() -> Result<()> {
             // --timing: 音素タイミング出力
             if let Some(ref format) = cli.timing {
                 if let Some(ref durations) = result.durations {
-                    // phoneme_ids からトークン名を推定 (簡易版: ID をそのまま使用)
-                    let tokens: Vec<String> =
-                        (0..durations.len()).map(|i| format!("ph_{}", i)).collect();
+                    // 音素名は config の phoneme_id_map から逆引きする
+                    // (issue #656)。以前は `ph_0`, `ph_1`, ... という連番
+                    // プレースホルダを出していたため、timing 出力から音素を
+                    // 識別できず lip-sync 等の用途で使えなかった。
+                    //
+                    // ID 列は `result.phoneme_ids` (実際に推論へ渡したもの)
+                    // を使う。`phonemize_to_ids(text)` を再実行して対応付ける
+                    // のは誤りで、Strategy C が 10 文字以下のテキストを
+                    // `<break time="300ms"/>` で SSML ラップするため合成に使う
+                    // 音素列がテキスト由来のものと別物になる (実測: "Sol" で
+                    // ID 11 個に対し durations 111 個)。Strategy A の padding も
+                    // 前方に pad を挿入して index をずらす。
+                    let reverse_map = piper_plus::timing::build_phoneme_id_reverse_map(
+                        &voice.config().phoneme_id_map,
+                        None,
+                    );
+                    let tokens: Vec<String> = match result.phoneme_ids.as_deref() {
+                        Some(ids) if ids.len() == durations.len() => {
+                            piper_plus::timing::phoneme_ids_to_tokens(ids, &reverse_map)
+                        }
+                        other => {
+                            // 長さが合わないなら対応が取れない。誤った音素名を
+                            // 出すよりプレースホルダのほうが害が小さい。
+                            tracing::warn!(
+                                "phoneme id count ({:?}) differs from durations ({}); \
+                                 falling back to positional labels because the \
+                                 id-to-duration alignment cannot be trusted",
+                                other.map(<[i64]>::len),
+                                durations.len()
+                            );
+                            (0..durations.len()).map(|i| format!("ph_{}", i)).collect()
+                        }
+                    };
                     match piper_plus::timing::durations_to_timing(
                         durations,
                         &tokens,

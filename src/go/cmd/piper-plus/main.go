@@ -384,7 +384,7 @@ func runTextMode(ctx context.Context, voice *piperplus.Voice, logger *slog.Logge
 		return err
 	}
 
-	return writeTiming(result, logger)
+	return writeTiming(result, voice, logger)
 }
 
 // runBatchMode reads a batch file line by line and synthesizes each (fix #2).
@@ -585,15 +585,30 @@ func cleanupPartial(path string, logger *slog.Logger) {
 }
 
 // writeTiming writes phoneme timing data if --output-timing is set and durations are available.
-func writeTiming(result *piperplus.SynthesisResult, logger *slog.Logger) error {
+func writeTiming(result *piperplus.SynthesisResult, voice *piperplus.Voice, logger *slog.Logger) error {
 	if timingOutput == "" || result.Durations == nil {
 		return nil
 	}
 
-	// Build placeholder phoneme tokens (indices as strings).
+	// Resolve phoneme names from the model's phoneme_id_map (issue #656).
+	// Previously this emitted `p0`, `p1`, ... positional placeholders, so the
+	// timing output could not identify phonemes and was unusable for lip-sync.
+	//
+	// result.PhonemeIDs is the sequence actually fed to the model, so it lines
+	// up with Durations index-for-index. Re-phonemizing the input text would
+	// not: Strategy A padding inserts pad tokens at the front.
 	tokens := make([]string, len(result.Durations))
-	for i := range tokens {
-		tokens[i] = fmt.Sprintf("p%d", i)
+	if ids := result.PhonemeIDs; len(ids) == len(result.Durations) {
+		reverse := piperplus.BuildPhonemeIDReverseMap(voice.Config().PhonemeIDMap, nil)
+		tokens = piperplus.PhonemeIDsToTokens(ids, reverse)
+	} else {
+		// Alignment cannot be established; positional labels are less harmful
+		// than confidently wrong phoneme names.
+		logger.Warn("phoneme id count differs from durations; using positional labels",
+			"ids", len(ids), "durations", len(result.Durations))
+		for i := range tokens {
+			tokens[i] = fmt.Sprintf("p%d", i)
+		}
 	}
 
 	hopLength := piperplus.DefaultHopLength

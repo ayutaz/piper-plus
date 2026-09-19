@@ -285,9 +285,18 @@ public static class TimingWriter
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// Builds a reverse lookup from integer phoneme ID to display string.
-    /// PUA codepoints (U+E000..U+E01C) are decoded to their multi-character
-    /// equivalents using <see cref="Mapping.OpenJTalkToPiperMapping.CharToToken"/>.
+    /// Builds a reverse lookup from integer phoneme ID to display string, per
+    /// docs/spec/phoneme-timing-contract.toml [reverse_map]:
+    /// first-wins on collision, PUA codepoints (U+E000..U+F8FF) resolved to
+    /// their multi-character names via
+    /// <see cref="Mapping.OpenJTalkToPiperMapping.CharToToken"/> when known and
+    /// rendered as <c>U+XXXX</c> otherwise.
+    ///
+    /// Two deviations were fixed here (issue #656): only <c>ids[0]</c> of each
+    /// key was mapped, so a phoneme owning several IDs resolved for one of them
+    /// and fell back to <c>"?"</c> for the rest; and a PUA character absent from
+    /// CharToToken was emitted raw instead of as <c>U+XXXX</c>, which the
+    /// contract requires and which Python, Rust, Go, JS and C++ all produce.
     /// </summary>
     private static Dictionary<long, string> BuildReverseIdMap(
         Dictionary<string, int[]> phonemeIdMap)
@@ -306,9 +315,21 @@ public static class TimingWriter
                     {
                         display = token;
                     }
+                    else if (ch >= '\uE000' && ch <= '\uF8FF')
+                    {
+                        display = string.Format(
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            "U+{0:X4}",
+                            (int)ch);
+                    }
                 }
 
-                reverse.TryAdd(ids[0], display);
+                // EVERY id of this key, not just the first: the contract's
+                // example maps {"b": [6, 7]} to {6: 'b', 7: 'b'}.
+                foreach (int id in ids)
+                {
+                    reverse.TryAdd(id, display);
+                }
             }
         }
 

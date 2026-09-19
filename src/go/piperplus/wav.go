@@ -15,6 +15,12 @@ type SynthesisResult struct {
 	Duration   time.Duration // audio duration
 	InferTime  time.Duration // wall-clock inference time
 	Durations  []float32     // per-phoneme durations in frames (nil if not available)
+	// PhonemeIDs is the ID sequence actually fed to the model (after Strategy A
+	// padding). It has the SAME length and order as Durations, so timing code
+	// can resolve phoneme names index-for-index (issue #656). Re-running
+	// phonemization on the input text is not equivalent: padding inserts pad
+	// tokens at the front, which shifts every later index.
+	PhonemeIDs []int64
 }
 
 // WriteTo writes the synthesis result as a WAV file to w.

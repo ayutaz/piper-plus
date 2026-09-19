@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"sort"
 	"strings"
 )
 
@@ -29,6 +30,79 @@ type TimingResult struct {
 // DurationsToTiming converts per-phoneme duration frames from the ONNX model's
 // duration output to timestamps. durations and phonemeTokens must have the same
 // length. sampleRate and hopLength must both be positive.
+// BuildPhonemeIDReverseMap builds a phoneme ID -> display name map from the
+// model config's phoneme_id_map, per docs/spec/phoneme-timing-contract.toml
+// [reverse_map]:
+//
+//   - first-wins: when several phoneme strings share an ID, the first one seen
+//     is kept.
+//   - PUA fallback: a Private Use Area character (U+E000..U+F8FF) with no
+//     explicit name renders as "U+XXXX" (uppercase, 4 hex digits).
+//   - explicit mapping: puaToMultiChar takes precedence when it has the key.
+//
+// The canonical implementation is src/python_run/piper_plus/timing.py
+// (build_phoneme_id_reverse_map); the JS mirror is
+// src/wasm/openjtalk-web/src/timing.js (buildPhonemeIdToTokenMap).
+//
+// Iteration order: Python dicts and JS objects preserve insertion order, so
+// "first" is well defined there. Go map iteration is randomised, so keys are
+// SORTED before iterating to make the result deterministic. Order cannot affect
+// the outcome for maps without ID collisions, which is every shipped model (the
+// in-tree fixture has 173 keys and zero collisions); a colliding map may pick a
+// different winner than the canonical implementation.
+func BuildPhonemeIDReverseMap(
+	phonemeIDMap map[string][]int64,
+	puaToMultiChar map[string]string,
+) map[int64]string {
+	reverse := make(map[int64]string, len(phonemeIDMap))
+
+	keys := make([]string, 0, len(phonemeIDMap))
+	for k := range phonemeIDMap {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		display := key
+		if name, ok := puaToMultiChar[key]; ok {
+			display = name
+		} else {
+			runes := []rune(key)
+			if len(runes) == 1 && isPrivateUseArea(runes[0]) {
+				display = fmt.Sprintf("U+%04X", runes[0])
+			}
+		}
+
+		for _, id := range phonemeIDMap[key] {
+			if _, exists := reverse[id]; !exists {
+				reverse[id] = display
+			}
+		}
+	}
+
+	return reverse
+}
+
+// isPrivateUseArea reports whether r is in the Unicode PUA (U+E000..U+F8FF).
+func isPrivateUseArea(r rune) bool {
+	return r >= 0xE000 && r <= 0xF8FF
+}
+
+// PhonemeIDsToTokens maps phoneme IDs to display names. An ID missing from the
+// reverse map is rendered as "<id>" rather than a positional placeholder, so
+// the unknown ID stays identifiable.
+func PhonemeIDsToTokens(phonemeIDs []int64, reverseMap map[int64]string) []string {
+	tokens := make([]string, len(phonemeIDs))
+	for i, id := range phonemeIDs {
+		if name, ok := reverseMap[id]; ok {
+			tokens[i] = name
+		} else {
+			tokens[i] = fmt.Sprintf("<%d>", id)
+		}
+	}
+	return tokens
+}
+
 func DurationsToTiming(durations []float32, phonemeTokens []string, sampleRate, hopLength int) (*TimingResult, error) {
 	if len(durations) != len(phonemeTokens) {
 		return nil, fmt.Errorf("length mismatch: durations has %d elements but phonemeTokens has %d", len(durations), len(phonemeTokens))
