@@ -269,6 +269,588 @@
       }
     },
     {
+      "name": "fractional_durations",
+      "description": "Non-integer frame counts — what a real ONNX `durations` output actually looks like. Every other case here is integer-valued, and ceil(int) == int, so an implementation that forgot to apply the frame quantisation the decoder uses would match all of them (issue #653). This case is the one that can tell them apart.",
+      "inputs": {
+        "durations": [
+          2.5,
+          3.25,
+          1.75,
+          4.125
+        ],
+        "phoneme_tokens": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "sample_rate": 22050,
+        "hop_length": 256
+      },
+      "expected": {
+        "phonemes": [
+          {
+            "phoneme": "a",
+            "start_ms": 0.0,
+            "end_ms": 29.024943310657598,
+            "duration_ms": 29.024943310657598
+          },
+          {
+            "phoneme": "b",
+            "start_ms": 29.024943310657598,
+            "end_ms": 66.75736961451247,
+            "duration_ms": 37.73242630385487
+          },
+          {
+            "phoneme": "c",
+            "start_ms": 66.75736961451247,
+            "end_ms": 87.07482993197279,
+            "duration_ms": 20.317460317460316
+          },
+          {
+            "phoneme": "d",
+            "start_ms": 87.07482993197279,
+            "end_ms": 134.96598639455783,
+            "duration_ms": 47.89115646258503
+          }
+        ],
+        "total_duration_ms": 134.96598639455783,
+        "sample_rate": 22050
+      }
+    },
+    {
+      "name": "fractional_just_above_integer",
+      "description": "Durations a hair above an integer. Distinguishes truncation from rounding from ceiling: trunc(3.0001)=3, round(3.0001)=3, ceil(3.0001)=4. A single .5 case cannot separate round from ceil.",
+      "inputs": {
+        "durations": [
+          3.0001,
+          7.0001
+        ],
+        "phoneme_tokens": [
+          "x",
+          "y"
+        ],
+        "sample_rate": 22050,
+        "hop_length": 256
+      },
+      "expected": {
+        "phonemes": [
+          {
+            "phoneme": "x",
+            "start_ms": 0.0,
+            "end_ms": 34.831092970521546,
+            "duration_ms": 34.831092970521546
+          },
+          {
+            "phoneme": "y",
+            "start_ms": 34.831092970521546,
+            "end_ms": 116.10209523809525,
+            "duration_ms": 81.27100226757369
+          }
+        ],
+        "total_duration_ms": 116.10209523809525,
+        "sample_rate": 22050
+      }
+    },
+    {
+      "name": "long_utterance_accumulation",
+      "description": "60 phonemes of fractional duration. The other cases top out at 11 entries / 50 frames, where a float32 cursor drifts only ~5e-5 ms from float64 and slips under every runtime's tolerance. This length makes the accumulator width observable.",
+      "inputs": {
+        "durations": [
+          2.0,
+          2.375,
+          2.75,
+          3.125,
+          3.5,
+          3.875,
+          4.25,
+          2.0,
+          2.375,
+          2.75,
+          3.125,
+          3.5,
+          3.875,
+          4.25,
+          2.0,
+          2.375,
+          2.75,
+          3.125,
+          3.5,
+          3.875,
+          4.25,
+          2.0,
+          2.375,
+          2.75,
+          3.125,
+          3.5,
+          3.875,
+          4.25,
+          2.0,
+          2.375,
+          2.75,
+          3.125,
+          3.5,
+          3.875,
+          4.25,
+          2.0,
+          2.375,
+          2.75,
+          3.125,
+          3.5,
+          3.875,
+          4.25,
+          2.0,
+          2.375,
+          2.75,
+          3.125,
+          3.5,
+          3.875,
+          4.25,
+          2.0,
+          2.375,
+          2.75,
+          3.125,
+          3.5,
+          3.875,
+          4.25,
+          2.0,
+          2.375,
+          2.75,
+          3.125
+        ],
+        "phoneme_tokens": [
+          "p0",
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6",
+          "p7",
+          "p8",
+          "p9",
+          "p0",
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6",
+          "p7",
+          "p8",
+          "p9",
+          "p0",
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6",
+          "p7",
+          "p8",
+          "p9",
+          "p0",
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6",
+          "p7",
+          "p8",
+          "p9",
+          "p0",
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6",
+          "p7",
+          "p8",
+          "p9",
+          "p0",
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6",
+          "p7",
+          "p8",
+          "p9"
+        ],
+        "sample_rate": 22050,
+        "hop_length": 256
+      },
+      "expected": {
+        "phonemes": [
+          {
+            "phoneme": "p0",
+            "start_ms": 0.0,
+            "end_ms": 23.219954648526077,
+            "duration_ms": 23.219954648526077
+          },
+          {
+            "phoneme": "p1",
+            "start_ms": 23.219954648526077,
+            "end_ms": 50.7936507936508,
+            "duration_ms": 27.573696145124718
+          },
+          {
+            "phoneme": "p2",
+            "start_ms": 50.7936507936508,
+            "end_ms": 82.72108843537416,
+            "duration_ms": 31.927437641723355
+          },
+          {
+            "phoneme": "p3",
+            "start_ms": 82.72108843537416,
+            "end_ms": 119.00226757369614,
+            "duration_ms": 36.281179138321995
+          },
+          {
+            "phoneme": "p4",
+            "start_ms": 119.00226757369614,
+            "end_ms": 159.63718820861678,
+            "duration_ms": 40.63492063492063
+          },
+          {
+            "phoneme": "p5",
+            "start_ms": 159.63718820861678,
+            "end_ms": 204.62585034013605,
+            "duration_ms": 44.98866213151928
+          },
+          {
+            "phoneme": "p6",
+            "start_ms": 204.62585034013605,
+            "end_ms": 253.96825396825398,
+            "duration_ms": 49.342403628117914
+          },
+          {
+            "phoneme": "p7",
+            "start_ms": 253.96825396825398,
+            "end_ms": 277.18820861678006,
+            "duration_ms": 23.219954648526077
+          },
+          {
+            "phoneme": "p8",
+            "start_ms": 277.18820861678006,
+            "end_ms": 304.76190476190476,
+            "duration_ms": 27.573696145124718
+          },
+          {
+            "phoneme": "p9",
+            "start_ms": 304.76190476190476,
+            "end_ms": 336.68934240362813,
+            "duration_ms": 31.927437641723355
+          },
+          {
+            "phoneme": "p0",
+            "start_ms": 336.68934240362813,
+            "end_ms": 372.9705215419501,
+            "duration_ms": 36.281179138321995
+          },
+          {
+            "phoneme": "p1",
+            "start_ms": 372.9705215419501,
+            "end_ms": 413.6054421768707,
+            "duration_ms": 40.63492063492063
+          },
+          {
+            "phoneme": "p2",
+            "start_ms": 413.6054421768707,
+            "end_ms": 458.59410430839,
+            "duration_ms": 44.98866213151928
+          },
+          {
+            "phoneme": "p3",
+            "start_ms": 458.59410430839,
+            "end_ms": 507.9365079365079,
+            "duration_ms": 49.342403628117914
+          },
+          {
+            "phoneme": "p4",
+            "start_ms": 507.9365079365079,
+            "end_ms": 531.156462585034,
+            "duration_ms": 23.219954648526077
+          },
+          {
+            "phoneme": "p5",
+            "start_ms": 531.156462585034,
+            "end_ms": 558.7301587301587,
+            "duration_ms": 27.573696145124718
+          },
+          {
+            "phoneme": "p6",
+            "start_ms": 558.7301587301587,
+            "end_ms": 590.657596371882,
+            "duration_ms": 31.927437641723355
+          },
+          {
+            "phoneme": "p7",
+            "start_ms": 590.657596371882,
+            "end_ms": 626.9387755102041,
+            "duration_ms": 36.281179138321995
+          },
+          {
+            "phoneme": "p8",
+            "start_ms": 626.9387755102041,
+            "end_ms": 667.5736961451247,
+            "duration_ms": 40.63492063492063
+          },
+          {
+            "phoneme": "p9",
+            "start_ms": 667.5736961451247,
+            "end_ms": 712.562358276644,
+            "duration_ms": 44.98866213151928
+          },
+          {
+            "phoneme": "p0",
+            "start_ms": 712.562358276644,
+            "end_ms": 761.9047619047619,
+            "duration_ms": 49.342403628117914
+          },
+          {
+            "phoneme": "p1",
+            "start_ms": 761.9047619047619,
+            "end_ms": 785.124716553288,
+            "duration_ms": 23.219954648526077
+          },
+          {
+            "phoneme": "p2",
+            "start_ms": 785.124716553288,
+            "end_ms": 812.6984126984127,
+            "duration_ms": 27.573696145124718
+          },
+          {
+            "phoneme": "p3",
+            "start_ms": 812.6984126984127,
+            "end_ms": 844.625850340136,
+            "duration_ms": 31.927437641723355
+          },
+          {
+            "phoneme": "p4",
+            "start_ms": 844.625850340136,
+            "end_ms": 880.9070294784581,
+            "duration_ms": 36.281179138321995
+          },
+          {
+            "phoneme": "p5",
+            "start_ms": 880.9070294784581,
+            "end_ms": 921.5419501133787,
+            "duration_ms": 40.63492063492063
+          },
+          {
+            "phoneme": "p6",
+            "start_ms": 921.5419501133787,
+            "end_ms": 966.530612244898,
+            "duration_ms": 44.98866213151928
+          },
+          {
+            "phoneme": "p7",
+            "start_ms": 966.530612244898,
+            "end_ms": 1015.8730158730159,
+            "duration_ms": 49.342403628117914
+          },
+          {
+            "phoneme": "p8",
+            "start_ms": 1015.8730158730159,
+            "end_ms": 1039.092970521542,
+            "duration_ms": 23.219954648526077
+          },
+          {
+            "phoneme": "p9",
+            "start_ms": 1039.092970521542,
+            "end_ms": 1066.6666666666667,
+            "duration_ms": 27.573696145124718
+          },
+          {
+            "phoneme": "p0",
+            "start_ms": 1066.6666666666667,
+            "end_ms": 1098.5941043083901,
+            "duration_ms": 31.927437641723355
+          },
+          {
+            "phoneme": "p1",
+            "start_ms": 1098.5941043083901,
+            "end_ms": 1134.875283446712,
+            "duration_ms": 36.281179138321995
+          },
+          {
+            "phoneme": "p2",
+            "start_ms": 1134.875283446712,
+            "end_ms": 1175.5102040816328,
+            "duration_ms": 40.63492063492063
+          },
+          {
+            "phoneme": "p3",
+            "start_ms": 1175.5102040816328,
+            "end_ms": 1220.498866213152,
+            "duration_ms": 44.98866213151928
+          },
+          {
+            "phoneme": "p4",
+            "start_ms": 1220.498866213152,
+            "end_ms": 1269.8412698412699,
+            "duration_ms": 49.342403628117914
+          },
+          {
+            "phoneme": "p5",
+            "start_ms": 1269.8412698412699,
+            "end_ms": 1293.061224489796,
+            "duration_ms": 23.219954648526077
+          },
+          {
+            "phoneme": "p6",
+            "start_ms": 1293.061224489796,
+            "end_ms": 1320.6349206349207,
+            "duration_ms": 27.573696145124718
+          },
+          {
+            "phoneme": "p7",
+            "start_ms": 1320.6349206349207,
+            "end_ms": 1352.562358276644,
+            "duration_ms": 31.927437641723355
+          },
+          {
+            "phoneme": "p8",
+            "start_ms": 1352.562358276644,
+            "end_ms": 1388.843537414966,
+            "duration_ms": 36.281179138321995
+          },
+          {
+            "phoneme": "p9",
+            "start_ms": 1388.843537414966,
+            "end_ms": 1429.4784580498867,
+            "duration_ms": 40.63492063492063
+          },
+          {
+            "phoneme": "p0",
+            "start_ms": 1429.4784580498867,
+            "end_ms": 1474.467120181406,
+            "duration_ms": 44.98866213151928
+          },
+          {
+            "phoneme": "p1",
+            "start_ms": 1474.467120181406,
+            "end_ms": 1523.8095238095239,
+            "duration_ms": 49.342403628117914
+          },
+          {
+            "phoneme": "p2",
+            "start_ms": 1523.8095238095239,
+            "end_ms": 1547.0294784580499,
+            "duration_ms": 23.219954648526077
+          },
+          {
+            "phoneme": "p3",
+            "start_ms": 1547.0294784580499,
+            "end_ms": 1574.6031746031747,
+            "duration_ms": 27.573696145124718
+          },
+          {
+            "phoneme": "p4",
+            "start_ms": 1574.6031746031747,
+            "end_ms": 1606.530612244898,
+            "duration_ms": 31.927437641723355
+          },
+          {
+            "phoneme": "p5",
+            "start_ms": 1606.530612244898,
+            "end_ms": 1642.81179138322,
+            "duration_ms": 36.281179138321995
+          },
+          {
+            "phoneme": "p6",
+            "start_ms": 1642.81179138322,
+            "end_ms": 1683.4467120181407,
+            "duration_ms": 40.63492063492063
+          },
+          {
+            "phoneme": "p7",
+            "start_ms": 1683.4467120181407,
+            "end_ms": 1728.43537414966,
+            "duration_ms": 44.98866213151928
+          },
+          {
+            "phoneme": "p8",
+            "start_ms": 1728.43537414966,
+            "end_ms": 1777.7777777777778,
+            "duration_ms": 49.342403628117914
+          },
+          {
+            "phoneme": "p9",
+            "start_ms": 1777.7777777777778,
+            "end_ms": 1800.9977324263039,
+            "duration_ms": 23.219954648526077
+          },
+          {
+            "phoneme": "p0",
+            "start_ms": 1800.9977324263039,
+            "end_ms": 1828.5714285714287,
+            "duration_ms": 27.573696145124718
+          },
+          {
+            "phoneme": "p1",
+            "start_ms": 1828.5714285714287,
+            "end_ms": 1860.498866213152,
+            "duration_ms": 31.927437641723355
+          },
+          {
+            "phoneme": "p2",
+            "start_ms": 1860.498866213152,
+            "end_ms": 1896.780045351474,
+            "duration_ms": 36.281179138321995
+          },
+          {
+            "phoneme": "p3",
+            "start_ms": 1896.780045351474,
+            "end_ms": 1937.4149659863947,
+            "duration_ms": 40.63492063492063
+          },
+          {
+            "phoneme": "p4",
+            "start_ms": 1937.4149659863947,
+            "end_ms": 1982.403628117914,
+            "duration_ms": 44.98866213151928
+          },
+          {
+            "phoneme": "p5",
+            "start_ms": 1982.403628117914,
+            "end_ms": 2031.7460317460318,
+            "duration_ms": 49.342403628117914
+          },
+          {
+            "phoneme": "p6",
+            "start_ms": 2031.7460317460318,
+            "end_ms": 2054.965986394558,
+            "duration_ms": 23.219954648526077
+          },
+          {
+            "phoneme": "p7",
+            "start_ms": 2054.965986394558,
+            "end_ms": 2082.539682539683,
+            "duration_ms": 27.573696145124718
+          },
+          {
+            "phoneme": "p8",
+            "start_ms": 2082.539682539683,
+            "end_ms": 2114.4671201814062,
+            "duration_ms": 31.927437641723355
+          },
+          {
+            "phoneme": "p9",
+            "start_ms": 2114.4671201814062,
+            "end_ms": 2150.748299319728,
+            "duration_ms": 36.281179138321995
+          }
+        ],
+        "total_duration_ms": 2150.748299319728,
+        "sample_rate": 22050
+      }
+    },
+    {
       "name": "all_zero_durations",
       "description": "All-zero durations → contiguous zero-length boundaries",
       "inputs": {
