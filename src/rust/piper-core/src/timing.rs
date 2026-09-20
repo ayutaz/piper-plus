@@ -170,6 +170,31 @@ pub fn phoneme_ids_to_tokens(
         .collect()
 }
 
+/// G2P の固定 PUA テーブルから「PUA 文字 → 読める名前」の対応表を作る。
+///
+/// `phoneme_id_map` のキーには `a:` / `cl` / `N_m` のような多文字トークンが
+/// PUA コードポイント 1 文字に畳まれて入っている。この表が無いと
+/// `[reverse_map.pua_handling]` のフォールバックが効いて `U+E019` のような
+/// コードポイント表記になり、**Python canonical / C# / C++ と出力が食い違う**
+/// (in-tree の 173 キーのモデルで 79 ID が該当し、日本語の長音・促音・拗音・
+/// N バリアントがほぼ全滅する)。
+///
+/// テーブルは `piper_plus_g2p` が公開する 1 文字単位の逆引き関数しか持たない
+/// ため、PUA レンジ (U+E000..U+F8FF) を走査して引けたものだけを集める。
+/// 6400 回の lookup は CLI の 1 回の合成に対して無視できるコスト。
+pub fn builtin_pua_names() -> HashMap<String, String> {
+    let mut names = HashMap::new();
+    for codepoint in 0xE000u32..=0xF8FF {
+        let Some(ch) = char::from_u32(codepoint) else {
+            continue;
+        };
+        if let Some(token) = piper_plus_g2p::token_map::pua_to_token(ch) {
+            names.insert(ch.to_string(), token.to_string());
+        }
+    }
+    names
+}
+
 /// timing 出力に使う表示名列を決める。
 ///
 /// `phoneme_ids` が `duration_count` と一致していれば逆引きした実音素名を
@@ -182,6 +207,8 @@ pub fn phoneme_ids_to_tokens(
 /// CLI から切り出してテスト可能にしたもの: alignment 条件とフォールバックは
 /// piper-cli の中にインラインで書かれていて、どのテストも CI step も
 /// どちらの分岐も実行していなかった (issue #656)。
+///
+/// `pua_to_multi_char` が `None` のときは [`builtin_pua_names`] を使う。
 pub fn resolve_timing_tokens(
     phoneme_ids: Option<&[i64]>,
     duration_count: usize,
@@ -190,7 +217,19 @@ pub fn resolve_timing_tokens(
 ) -> (Vec<String>, bool) {
     match phoneme_ids {
         Some(ids) if ids.len() == duration_count && duration_count > 0 => {
-            let reverse_map = build_phoneme_id_reverse_map(phoneme_id_map, pua_to_multi_char);
+            // `None` は「PUA 名を解決しない」ではなく「組み込みテーブルを使う」。
+            // 呼び出し側が渡し忘れると 79 ID が `U+E0xx` に化けて canonical と
+            // 食い違うため、忘れようのない既定値にしてある。明示的に空の map
+            // を渡せば従来どおり素の PUA フォールバックになる。
+            let builtin;
+            let pua = match pua_to_multi_char {
+                Some(explicit) => explicit,
+                None => {
+                    builtin = builtin_pua_names();
+                    &builtin
+                }
+            };
+            let reverse_map = build_phoneme_id_reverse_map(phoneme_id_map, Some(pua));
             (phoneme_ids_to_tokens(ids, &reverse_map), true)
         }
         _ => (
@@ -1112,6 +1151,54 @@ mod tests {
     }
 
     #[test]
+    fn builtin_pua_names_cover_the_fixed_table() {
+        let names = builtin_pua_names();
+        // Anti-vacuity: an empty or truncated table would silently reproduce
+        // the `U+E0xx` output this function exists to prevent.
+        assert!(
+            names.len() >= 50,
+            "builtin PUA table looks truncated: {} entries",
+            names.len()
+        );
+        // Spot-check the families that regressed: N variant, long vowel,
+        // geminate, palatalised consonant, question marker.
+        assert_eq!(names.get("\u{e019}").map(String::as_str), Some("N_m"));
+        assert_eq!(names.get("\u{e000}").map(String::as_str), Some("a:"));
+        assert_eq!(names.get("\u{e005}").map(String::as_str), Some("cl"));
+        assert_eq!(names.get("\u{e006}").map(String::as_str), Some("ky"));
+        assert_eq!(names.get("\u{e016}").map(String::as_str), Some("?!"));
+        // A codepoint the table does not claim must be absent, not empty.
+        assert!(!names.contains_key("\u{f8ff}"));
+    }
+
+    #[test]
+    fn resolve_timing_tokens_uses_builtin_pua_names_by_default() {
+        // Passing None must NOT degrade to the `U+XXXX` fallback: that is the
+        // exact shape of the cross-runtime divergence (79 of 173 ids on the
+        // in-tree model) this default exists to prevent.
+        let mut m = HashMap::new();
+        m.insert("\u{e019}".to_string(), vec![26]);
+        m.insert("a".to_string(), vec![5]);
+        let ids = vec![26, 5];
+        let (tokens, resolved) = resolve_timing_tokens(Some(&ids), ids.len(), &m, None);
+        assert!(resolved);
+        assert_eq!(tokens, vec!["N_m", "a"]);
+    }
+
+    #[test]
+    fn resolve_timing_tokens_explicit_empty_map_keeps_codepoint_fallback() {
+        // An explicitly empty map is how a caller opts OUT of the builtin
+        // names; it must not be confused with None.
+        let mut m = HashMap::new();
+        m.insert("\u{e019}".to_string(), vec![26]);
+        let ids = vec![26];
+        let empty = HashMap::new();
+        let (tokens, resolved) = resolve_timing_tokens(Some(&ids), 1, &m, Some(&empty));
+        assert!(resolved);
+        assert_eq!(tokens, vec!["U+E019"]);
+    }
+
+    #[test]
     fn resolve_timing_tokens_falls_back_when_counts_differ() {
         // The pre-#656 bug shape: the caller passed text-derived ids (5) while
         // the decoder produced 15 durations (Strategy A padding / Strategy C
@@ -1178,9 +1265,15 @@ mod tests {
     }
 
     #[test]
-    fn reverse_map_is_first_wins_and_deterministic() {
+    fn reverse_map_is_deterministic_on_collision() {
         // Two keys claim id 9. HashMap iteration order is not stable, so the
         // implementation sorts keys: "aa" wins over "zz" on every run.
+        //
+        // NOTE: this pins DETERMINISM, not cross-runtime parity. Python and JS
+        // resolve first-wins in insertion order and would pick "zz" here. The
+        // contract records the divergence under [reverse_map.collision_
+        // resolution] `key_order`; it is unreachable for every shipped model
+        // because none has a collision (in-tree fixture: 173 keys, 0).
         let mut m = HashMap::new();
         m.insert("zz".to_string(), vec![9]);
         m.insert("aa".to_string(), vec![9]);

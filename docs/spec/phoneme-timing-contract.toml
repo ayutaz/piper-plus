@@ -370,6 +370,25 @@ forbidden_patterns = { python = [
 # JS:     `if (!(id in reverse)) { reverse[id] = display; }`
 strategy = "first-wins"
 
+# "First" is only well defined if the key order is. It currently is NOT the
+# same across runtimes, so first-wins picks the same winner everywhere ONLY for
+# collision-free maps:
+#
+#   python / js / csharp : insertion order (dict / object / Dictionary)
+#   cpp                  : sorted by codepoint (PhonemeIdMap is std::map)
+#   rust / go            : sorted by UTF-8 key bytes (HashMap / map have no
+#                          iteration order at all, so sorting is the only way
+#                          to be deterministic run-to-run)
+#
+# Every shipped model is collision-free -- the in-tree 173-key fixture has 0
+# ids claimed by more than one phoneme -- so the winner is identical in
+# practice and the runtimes agree byte-for-byte. A map WITH a collision would
+# diverge (e.g. {"zz": [9], "aa": [9]} gives 'zz' under insertion order and
+# 'aa' under sorted order). Unifying on one order is tracked separately; it
+# touches the canonical implementation and therefore belongs with the next
+# spec_version bump rather than being slipped in silently.
+key_order = "runtime-dependent (see above); collision-free maps are unaffected"
+
 [reverse_map.pua_handling]
 # PUA characters (U+E000–U+F8FF) without an explicit name mapping should be
 # rendered as "U+XXXX" using uppercase hex.

@@ -7,6 +7,8 @@ import (
 	"math"
 	"sort"
 	"strings"
+
+	"github.com/ayutaz/piper-plus/src/go/phonemize"
 )
 
 // DefaultHopLength is the STFT hop length in samples.
@@ -83,6 +85,29 @@ func BuildPhonemeIDReverseMap(
 	return reverse
 }
 
+// BuiltinPUANames builds the "PUA char -> readable name" table from the G2P
+// fixed table.
+//
+// phoneme_id_map keys fold multi-character tokens like "a:", "cl" and "N_m"
+// into a single PUA codepoint. Without this table the
+// [reverse_map.pua_handling] fallback kicks in and those come out as "U+E019",
+// which DISAGREES with Python canonical, C# and C++ (79 of 173 ids on the
+// in-tree model -- essentially every Japanese long vowel, geminate,
+// palatalised consonant and N variant).
+//
+// The G2P package exposes only a single-codepoint reverse lookup, so the PUA
+// range (U+E000..U+F8FF) is scanned and whatever resolves is collected. 6400
+// lookups are negligible against one synthesis call.
+func BuiltinPUANames() map[string]string {
+	names := make(map[string]string)
+	for codepoint := rune(0xE000); codepoint <= 0xF8FF; codepoint++ {
+		if token, ok := phonemize.PUAToToken(codepoint); ok {
+			names[string(codepoint)] = token
+		}
+	}
+	return names
+}
+
 // ResolveTimingTokens picks the display names for a timing result.
 //
 // It returns the reverse-mapped phoneme names when phonemeIDs lines up with
@@ -96,6 +121,8 @@ func BuildPhonemeIDReverseMap(
 // Extracted from the CLI so the decision is testable: the alignment condition
 // and its fallback previously lived inline in cmd/piper-plus and no test or CI
 // step executed either branch (issue #656).
+//
+// A nil puaToMultiChar uses BuiltinPUANames.
 func ResolveTimingTokens(
 	phonemeIDs []int64,
 	durationCount int,
@@ -103,7 +130,15 @@ func ResolveTimingTokens(
 	puaToMultiChar map[string]string,
 ) (tokens []string, resolved bool) {
 	if len(phonemeIDs) == durationCount && durationCount > 0 {
-		reverse := BuildPhonemeIDReverseMap(phonemeIDMap, puaToMultiChar)
+		// nil does NOT mean "skip PUA names" -- it means "use the builtin
+		// table". A caller that forgets to pass one would otherwise turn 79
+		// ids into "U+E0xx" and disagree with canonical. Pass an empty (but
+		// non-nil) map for the bare PUA fallback.
+		pua := puaToMultiChar
+		if pua == nil {
+			pua = BuiltinPUANames()
+		}
+		reverse := BuildPhonemeIDReverseMap(phonemeIDMap, pua)
 		return PhonemeIDsToTokens(phonemeIDs, reverse), true
 	}
 

@@ -433,7 +433,12 @@ func TestBuildPhonemeIDReverseMap_PassesMultiCharKeysThrough(t *testing.T) {
 	}
 }
 
-func TestBuildPhonemeIDReverseMap_FirstWinsIsDeterministic(t *testing.T) {
+// NOTE: this pins DETERMINISM, not cross-runtime parity. Python and JS resolve
+// first-wins in insertion order and would pick "zz" here. The contract records
+// the divergence under [reverse_map.collision_resolution] key_order; it is
+// unreachable for every shipped model because none has a collision (in-tree
+// fixture: 173 keys, 0).
+func TestBuildPhonemeIDReverseMap_DeterministicOnCollision(t *testing.T) {
 	// Two keys claim id 9. Go map iteration is randomized, so the
 	// implementation sorts keys: "aa" must win on every run.
 	m := map[string][]int64{"zz": {9}, "aa": {9}}
@@ -587,5 +592,58 @@ func TestResolveTimingTokens_MarksUnknownIDsDistinctly(t *testing.T) {
 	}
 	if tokens[0] != "a" || tokens[1] != "<9999>" {
 		t.Errorf("tokens = %v; want [a <9999>]", tokens)
+	}
+}
+
+func TestBuiltinPUANames_CoversTheFixedTable(t *testing.T) {
+	names := BuiltinPUANames()
+	// Anti-vacuity: an empty or truncated table would silently reproduce the
+	// "U+E0xx" output this function exists to prevent.
+	if len(names) < 50 {
+		t.Fatalf("builtin PUA table looks truncated: %d entries", len(names))
+	}
+	// Spot-check the families that regressed: N variant, long vowel,
+	// geminate, palatalised consonant, question marker.
+	for pua, want := range map[string]string{
+		"": "N_m",
+		"": "a:",
+		"": "cl",
+		"": "ky",
+		"": "?!",
+	} {
+		if got := names[pua]; got != want {
+			t.Errorf("names[%q] = %q; want %q", pua, got, want)
+		}
+	}
+	if _, ok := names[""]; ok {
+		t.Error("U+F8FF is not in the fixed table and must be absent")
+	}
+}
+
+func TestResolveTimingTokens_UsesBuiltinPUANamesByDefault(t *testing.T) {
+	// nil must NOT degrade to the "U+XXXX" fallback: that is the exact shape
+	// of the cross-runtime divergence (79 of 173 ids on the in-tree model)
+	// this default exists to prevent.
+	m := map[string][]int64{"": {26}, "a": {5}}
+	ids := []int64{26, 5}
+	tokens, resolved := ResolveTimingTokens(ids, len(ids), m, nil)
+	if !resolved {
+		t.Fatal("aligned ids must resolve")
+	}
+	if tokens[0] != "N_m" || tokens[1] != "a" {
+		t.Errorf("tokens = %v; want [N_m a]", tokens)
+	}
+}
+
+func TestResolveTimingTokens_ExplicitEmptyMapKeepsCodepointFallback(t *testing.T) {
+	// An explicitly empty map is how a caller opts OUT of the builtin names;
+	// it must not be confused with nil.
+	m := map[string][]int64{"": {26}}
+	tokens, resolved := ResolveTimingTokens([]int64{26}, 1, m, map[string]string{})
+	if !resolved {
+		t.Fatal("aligned ids must resolve")
+	}
+	if tokens[0] != "U+E019" {
+		t.Errorf("tokens[0] = %q; want U+E019", tokens[0])
 	}
 }

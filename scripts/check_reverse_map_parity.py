@@ -94,6 +94,10 @@ CLI_WIRING: dict[str, dict[str, object]] = {
         "helper_decl": "pub fn resolve_timing_tokens(",
         "guard": "duration_count > 0",
         "placeholder": 'format!("ph_{}", i)',
+        # The bare name would also match the function DEFINITION, making this
+        # check vacuous (caught by mutation: replacing the call kept the gate
+        # green). Pin the assignment at the call site.
+        "pua_default": "builtin = builtin_pua_names();",
         "cli_file": "src/rust/piper-cli/src/main.rs",
         "cli_call": "timing::resolve_timing_tokens(",
         "forbidden_in_cli": ["build_phoneme_id_reverse_map("],
@@ -102,6 +106,8 @@ CLI_WIRING: dict[str, dict[str, object]] = {
             "resolve_timing_tokens_uses_real_phonemes_when_aligned",
             "resolve_timing_tokens_falls_back_when_counts_differ",
             "resolve_timing_tokens_treats_zero_durations_as_unresolved",
+            "resolve_timing_tokens_uses_builtin_pua_names_by_default",
+            "builtin_pua_names_cover_the_fixed_table",
         ],
     },
     "go": {
@@ -109,6 +115,9 @@ CLI_WIRING: dict[str, dict[str, object]] = {
         "helper_decl": "func ResolveTimingTokens(",
         "guard": "durationCount > 0",
         "placeholder": 'fmt.Sprintf("ph_%d", i)',
+        # Same vacuity trap as Rust: the bare name matches `func
+        # BuiltinPUANames()`. Pin the assignment at the call site.
+        "pua_default": "pua = BuiltinPUANames()",
         "cli_file": "src/go/cmd/piper-plus/main.go",
         "cli_call": "piperplus.ResolveTimingTokens(",
         "forbidden_in_cli": ["BuildPhonemeIDReverseMap("],
@@ -117,6 +126,8 @@ CLI_WIRING: dict[str, dict[str, object]] = {
             "TestResolveTimingTokens_UsesRealPhonemesWhenAligned",
             "TestResolveTimingTokens_FallsBackWhenCountsDiffer",
             "TestResolveTimingTokens_TreatsZeroDurationsAsUnresolved",
+            "TestResolveTimingTokens_UsesBuiltinPUANamesByDefault",
+            "TestBuiltinPUANames_CoversTheFixedTable",
         ],
     },
 }
@@ -168,6 +179,14 @@ def check_cli_wiring() -> list[str]:
             problems.append(
                 f"{helper_rel}: no {placeholder!r} fallback label; Rust and Go "
                 "must agree on the placeholder spelling"
+            )
+        pua_default = str(spec["pua_default"])
+        if pua_default not in helper:
+            problems.append(
+                f"{helper_rel}: does not fall back to {pua_default!r}; without "
+                "the builtin PUA table, multi-char tokens (a:, cl, N_m, ky, ?!) "
+                "come out as U+E0xx and disagree with Python canonical, C# and "
+                "C++ -- 79 of 173 ids on the in-tree model"
             )
 
         call = str(spec["cli_call"])
