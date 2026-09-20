@@ -137,6 +137,15 @@ pub struct SynthesisResult {
     /// Phoneme durations from the model (if available).
     /// Shape: [phoneme_length], each value = number of frames.
     pub durations: Option<Vec<f32>>,
+    /// 実際に推論へ渡した phoneme ID 列 (padding 適用後)。
+    ///
+    /// `durations` と**同じ長さ・同じ並び**なので、index 対応で音素名を
+    /// 引き当てられる (issue #656)。呼び出し元が `phonemize_to_ids(text)` を
+    /// 再実行して対応付けるのは誤りである: Strategy C は 10 文字以下の
+    /// テキストを `<break time="300ms"/>` で SSML ラップするため合成に使う
+    /// 音素列がテキスト由来のものと別物になり (実測で +100 ID)、Strategy A の
+    /// padding も前方に pad を挿入して index をずらす。
+    pub phoneme_ids: Option<Vec<i64>>,
 }
 
 impl SynthesisResult {
@@ -740,6 +749,10 @@ impl OnnxEngine {
         let (phoneme_ids, prosody_features, was_padded, front_pad, back_pad) =
             pad_short_phonemes(&request.phoneme_ids, request.prosody_features.as_ref());
         let phoneme_len = phoneme_ids.len();
+        // Keep a copy before the ids are moved into the inference inputs: the
+        // caller needs them to line up phoneme names with `durations`
+        // index-for-index (#656).
+        let ids_used = phoneme_ids.clone();
 
         if was_padded {
             tracing::debug!(
@@ -1037,14 +1050,14 @@ impl OnnxEngine {
         };
         let audio_seconds = audio_i16.len() as f64 / self.sample_rate as f64;
 
-        // 呼び出し側に返す durations は original 長に切り詰める
-        // (timing 用途では padded extras は not user-visible)。
-        let durations = padded_durations.map(|mut d| {
-            if was_padded && d.len() > original_len {
-                d.truncate(original_len);
-            }
-            d
-        });
+        // durations は padding 後の長さのまま返す。以前は original 長へ
+        // `truncate` していたが、padded layout は
+        // `[BOS, front_pad.., body.., back_pad.., EOS]` なので**先頭から**
+        // 切り詰めると body が front_pad 個ずれ、index 対応で音素名を
+        // 引き当てると発話音素が pad の duration を受け取る (#656 / #689)。
+        // 呼び出し側が index 対応できるよう、実際に推論へ渡した ID 列を
+        // `phoneme_ids` として同じ長さで併せて返す。
+        let durations = padded_durations;
 
         Ok(SynthesisResult {
             audio: audio_i16,
@@ -1052,6 +1065,7 @@ impl OnnxEngine {
             infer_seconds,
             audio_seconds,
             durations,
+            phoneme_ids: Some(ids_used),
         })
     }
 
@@ -1212,6 +1226,7 @@ mod tests {
             infer_seconds: 0.5,
             audio_seconds: 1.0,
             durations: None,
+            phoneme_ids: None,
         };
         assert!((result.real_time_factor() - 0.5).abs() < 1e-6);
     }
@@ -1224,6 +1239,7 @@ mod tests {
             infer_seconds: 0.1,
             audio_seconds: 0.0,
             durations: None,
+            phoneme_ids: None,
         };
         assert!((result.real_time_factor()).abs() < 1e-6);
     }
@@ -1307,6 +1323,7 @@ mod tests {
             infer_seconds: 0.3,
             audio_seconds: 1.0,
             durations: Some(vec![1.0, 2.0, 3.0]),
+            phoneme_ids: Some(vec![1, 8, 2]),
         };
         let durations = result.durations.as_ref().unwrap();
         assert_eq!(durations.len(), 3);
@@ -1324,6 +1341,7 @@ mod tests {
             infer_seconds: 1.5,
             audio_seconds: 0.0,
             durations: None,
+            phoneme_ids: None,
         };
         assert!((result.real_time_factor() - 0.0).abs() < 1e-6);
     }
