@@ -67,8 +67,21 @@ jobs:
           #   3. 1.0.0 から機械可読な license_expression を宣言するようになった
           #      だけで、 0.5.x も classifier では LGPLv2+。 本 carve-out は新規
           #      exposure ではなく既存実態の明文化。
+          #
+          # pkg:pypi/defusedxml: PSF-2.0 (Python Software Foundation License 2.0)。
+          # nltk 3.10.x が新規に依存する (XML パースの安全化用)。 PSF-2.0 は
+          # permissive で copyleft 条項を持たず、 配布物に含めても頒布義務は
+          # 発生しない。 SPDX 標準名だが allow-licenses に足すと PSF-2.0 全体を
+          # 無条件許可することになるため、 既存方針どおり package 単位に絞る。
+          #
+          # pkg:pypi/pillow: MIT-CMU (HPND 系の permissive license)。 12.3.0 で
+          # license 表記が `MIT-CMU` として機械可読化された (12.2.0 時点では
+          # 検出されず素通りしていた) だけで、 ライセンス自体の変更はない。
+          # copyleft なし。
           allow-dependencies-licenses: >-
             pkg:pypi/astroid,
+            pkg:pypi/defusedxml,
+            pkg:pypi/pillow,
             pkg:pypi/matplotlib,
             pkg:pypi/mypy,
             pkg:pypi/pylint,
@@ -77,6 +90,21 @@ jobs:
             pkg:pypi/llvmlite,
             pkg:pypi/soxr,
             pkg:npm/protobufjs
+          # 修正版が存在しない advisory の carve-out。
+          # fail-on-severity: high のため、 upstream が未修正の high advisory は
+          # 「依存を上げても下げても該当する」 のに PR で依存行を触った瞬間だけ
+          # gate が落ちる (既存依存は dependency-review の検査対象外のため)。
+          # 結果として脆弱性を減らす PR がブロックされるので、 patched 版が
+          # 出るまで GHSA 単位で明示 carve-out する。
+          #
+          # GHSA-8mgp-746c-j5xp (CVE-2026-81726, 2026-09-02 公開):
+          # NLTK の model-artifact API が pathsec を回避し許可 root 外の
+          # ファイルに触れる。 range は `<= 3.10.3` で nltk の最新 3.10.3 でも
+          # patched 版が存在しない (first_patched_version: null)。
+          # piper-plus での nltk 利用は g2p-en 経由の cmudict ロードのみで、
+          # model artifact のパスを外部入力から組み立てる経路はない。
+          # nltk 側に修正版が出たら本 carve-out を外して lock を上げる。
+          allow-ghsas: GHSA-8mgp-746c-j5xp
           # 自動 fail にせず、PR comment で報告
           warn-only: false
           # vulnerability scope

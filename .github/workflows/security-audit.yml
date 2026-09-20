@@ -64,6 +64,14 @@ jobs:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
           license-check: true
+          # 修正版が存在しない advisory の carve-out (dependency-review.yml と同期)。
+          # GHSA-8mgp-746c-j5xp (CVE-2026-81726, high): NLTK の model-artifact API が
+          # pathsec を回避する。 range `<= 3.10.3` で最新 3.10.3 でも patched 版なし
+          # (first_patched_version: null)。 依存を上げても下げても該当するため、
+          # 依存行を触った PR だけが落ちる状態になる。 piper-plus での nltk 利用は
+          # g2p-en 経由の cmudict ロードのみで model artifact のパスを外部入力から
+          # 組み立てる経路はない。 修正版が出たら carve-out を外す。
+          allow-ghsas: GHSA-8mgp-746c-j5xp
           # 許容ライセンス (OSS 一般 + Unicode/OpenSSL/Zlib などライブラリ系)
           allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Unicode-DFS-2016, Unicode-3.0, CC0-1.0, MPL-2.0, Zlib, OpenSSL
           # dev / lint / docs 用 transitive dependency の例外
@@ -102,8 +110,19 @@ jobs:
           #   3. 1.0.0 から機械可読な license_expression を宣言するようになった
           #      だけで、 0.5.x も classifier では LGPLv2+。 本 carve-out は新規
           #      exposure ではなく既存実態の明文化。
+          #
+          # pkg:pypi/defusedxml: PSF-2.0 (Python Software Foundation License 2.0)。
+          # nltk 3.10.x が新規に依存する (XML パースの安全化用)。 permissive で
+          # copyleft 条項を持たない。 allow-licenses に足すと PSF-2.0 全体を無条件
+          # 許可することになるため package 単位に絞る。
+          #
+          # pkg:pypi/pillow: MIT-CMU (HPND 系の permissive license)。 12.3.0 で
+          # license 表記が機械可読化された (12.2.0 までは検出されず素通り) だけで
+          # ライセンス自体の変更はない。 copyleft なし。
           allow-dependencies-licenses: >-
             pkg:pypi/astroid,
+            pkg:pypi/defusedxml,
+            pkg:pypi/pillow,
             pkg:pypi/matplotlib,
             pkg:pypi/mypy,
             pkg:pypi/pylint,
