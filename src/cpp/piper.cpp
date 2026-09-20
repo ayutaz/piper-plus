@@ -38,6 +38,7 @@
 #include "phoneme_parser.hpp"
 #include "phoneme_timing_concat.hpp"
 #include "trim_helpers.hpp"
+#include "timing_helpers.hpp"
 #include "language_detector.hpp"
 #include "spanish_phonemize.hpp"
 #include "french_phonemize.hpp"
@@ -97,27 +98,14 @@ constexpr int MAX_INTRA_THREADS = 4;
 // VITS predicts an inflated EOS under the padded context that emits an
 // audible artifact otherwise. 0 = drop the entire EOS region.
 
-// PUA to multi-char phoneme mapping for display
-static const std::unordered_map<char32_t, std::string> puaToPhoneme = {
-    {0xE000, "a:"}, {0xE001, "i:"}, {0xE002, "u:"}, {0xE003, "e:"}, {0xE004, "o:"},
-    {0xE005, "cl"}, {0xE006, "ky"}, {0xE007, "kw"}, {0xE008, "gy"}, {0xE009, "gw"},
-    {0xE00A, "ty"}, {0xE00B, "dy"}, {0xE00C, "py"}, {0xE00D, "by"}, {0xE00E, "ch"},
-    {0xE00F, "ts"}, {0xE010, "sh"}, {0xE011, "zy"}, {0xE012, "hy"}, {0xE013, "ny"},
-    {0xE014, "my"}, {0xE015, "ry"},
-    // Question type markers (Issue #204)
-    {0xE016, "?!"}, {0xE017, "?."}, {0xE018, "?~"},
-    // N phoneme variants (Issue #207)
-    {0xE019, "N_m"}, {0xE01A, "N_n"}, {0xE01B, "N_ng"}, {0xE01C, "N_uvular"},
-    // Multilingual phoneme tokens
-    {0xE01D, "rr"}, {0xE01E, "y_vowel"}
-};
 
 // Convert phoneme to readable string for logging
 static std::string phonemeToString(Phoneme ph) {
     // Check if it's a PUA character
     if (ph >= 0xE000 && ph <= 0xF8FF) {
-        auto it = puaToPhoneme.find(ph);
-        if (it != puaToPhoneme.end()) {
+        const auto &pua = puaToPhonemeMap();
+        auto it = pua.find(ph);
+        if (it != pua.end()) {
             return it->second;
         }
     }
@@ -132,15 +120,14 @@ const std::string instanceName{"piper"};
 
 std::string getVersion() { return VERSION; }
 
-// True if the string is a single UTF-8 codepoint
-bool isSingleCodepoint(std::string s) {
-  return utf8::distance(s.begin(), s.end()) == 1;
-}
+// True if the string is a single UTF-8 codepoint.
+// Exported via piper.hpp; the implementation lives in timing_helpers.hpp so
+// the timing walk can use it without linking this translation unit.
+bool isSingleCodepoint(std::string s) { return isSingleCodepointUtf8(s); }
 
 // Get the first UTF-8 codepoint of a string
 Phoneme getCodepoint(std::string s) {
-  utf8::iterator character_iter(s.begin(), s.begin(), s.end());
-  return *character_iter;
+  return static_cast<Phoneme>(firstCodepointUtf8(s));
 }
 
 // Load JSON config information for phonemization
@@ -333,8 +320,6 @@ void parseModelConfig(json &configRoot, ModelConfig &modelConfig) {
 } /* parseModelConfig */
 
 // Constants for phoneme timing
-static const std::string UNKNOWN_PHONEME = "?";
-static const float JAPANESE_CL_OVERLAP_RATIO = 0.3f;
 static const int DEFAULT_HOP_SIZE = 256;
 
 // Resolve hop_size from the voice config, falling back to DEFAULT_HOP_SIZE
@@ -365,7 +350,12 @@ static void appendUnitTimings(SynthesisResult &out, const SynthesisResult &unit,
   out.hasTimingInfo = true;
 }
 
-// Helper function to extract phoneme timings from duration information
+// Extract phoneme timings from duration information.
+//
+// The walk itself lives in timing_helpers.hpp so that
+// tests/test_phoneme_timing_parity.cpp can exercise the real arithmetic --
+// this translation unit pulls in onnxruntime, which the parity test cannot
+// link, so it used to check a hand-written copy of the algorithm instead.
 std::vector<PhonemeInfo> extractTimingsFromDurations(
     const std::vector<float>& durations,
     const std::vector<PhonemeId>& phonemeIds,
@@ -374,85 +364,25 @@ std::vector<PhonemeInfo> extractTimingsFromDurations(
     int sampleRate,
     PhonemeType phonemeType
 ) {
+    const std::vector<TimingEntry> entries = computePhonemeTimings(
+        durations, phonemeIds, idMap, hopSize, sampleRate,
+        usesOpenJTalk(phonemeType));
+
+    // TimingEntry and PhonemeInfo are layout-identical but distinct types:
+    // PhonemeInfo is part of the exported SynthesisResult, so it stays in
+    // piper.hpp (which the ABI gate diffs) rather than being replaced by the
+    // helper's type.
     std::vector<PhonemeInfo> timings;
-
-    // Build reverse map from phoneme ID to UTF-8 string.
-    // idMap key is Phoneme (char32_t); encode it properly so isSingleCodepoint()
-    // and the utf8-checked functions never see invalid byte sequences.
-    std::unordered_map<PhonemeId, std::string> phonemeIdToStringMap;
-    for (const auto& [phonemeChar, ids] : idMap) {
-        if (!ids.empty()) {
-            std::string phonemeUtf8;
-            utf8::append(static_cast<uint32_t>(phonemeChar),
-                         std::back_inserter(phonemeUtf8));
-            phonemeIdToStringMap[ids[0]] = std::move(phonemeUtf8);
-        }
-    }
-
-    float frameLength = static_cast<float>(hopSize) / sampleRate;
-    float currentTime = 0.0f;
-    int currentFrame = 0;
-
-    for (size_t i = 0; i < phonemeIds.size() && i < durations.size(); ++i) {
-        PhonemeId id = phonemeIds[i];
-        float duration = durations[i];  // Duration in frames
-
-        // Skip special tokens (PAD, BOS, EOS)
-        if (id == 0 || id == 1 || id == 2) {
-            currentFrame += static_cast<int>(duration);
-            currentTime += duration * frameLength;
-            continue;
-        }
-
-        // Get phoneme string
-        std::string phonemeStr = UNKNOWN_PHONEME;
-        auto it = phonemeIdToStringMap.find(id);
-        if (it != phonemeIdToStringMap.end()) {
-            phonemeStr = it->second;
-        } else {
-            // Try to decode single character
-            if (id > 2 && id < 128) {
-                phonemeStr = std::string(1, static_cast<char>(id));
-            }
-        }
-
+    timings.reserve(entries.size());
+    for (const auto& e : entries) {
         PhonemeInfo info;
-        info.phoneme = phonemeStr;
-        info.start_time = currentTime;
-        info.start_frame = currentFrame;
-
-        currentFrame += static_cast<int>(duration);
-        currentTime += duration * frameLength;
-
-        info.end_time = currentTime;
-        info.end_frame = currentFrame;
-
-        timings.push_back(info);
+        info.phoneme = e.phoneme;
+        info.start_time = e.start_time;
+        info.end_time = e.end_time;
+        info.start_frame = e.start_frame;
+        info.end_frame = e.end_frame;
+        timings.push_back(std::move(info));
     }
-
-    // Adjust timings for Japanese if needed
-    if (usesOpenJTalk(phonemeType)) {
-        for (size_t i = 0; i < timings.size(); ++i) {
-            // Convert PUA mapped phonemes back to original
-            if (isSingleCodepoint(timings[i].phoneme)) {
-                // Get the first codepoint (handles multi-byte UTF-8, e.g. PUA U+E000+)
-                Phoneme ph = getCodepoint(timings[i].phoneme);
-                auto it = puaToPhoneme.find(ph);
-                if (it != puaToPhoneme.end()) {
-                    timings[i].phoneme = it->second;
-                }
-            }
-
-            // Adjust timing for specific phonemes like 'cl' (促音)
-            if (timings[i].phoneme == "cl" && i > 0) {
-                // Overlap with previous phoneme
-                float overlap = (timings[i].end_time - timings[i].start_time) * JAPANESE_CL_OVERLAP_RATIO;
-                timings[i-1].end_time += overlap;
-                timings[i].start_time += overlap;
-            }
-        }
-    }
-
     return timings;
 }
 
