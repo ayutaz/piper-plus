@@ -45,7 +45,7 @@ type TimingResult struct {
 // src/wasm/openjtalk-web/src/timing.js (buildPhonemeIdToTokenMap).
 //
 // Iteration order: Python dicts and JS objects preserve insertion order, so
-// "first" is well defined there. Go map iteration is randomised, so keys are
+// "first" is well defined there. Go map iteration is randomized, so keys are
 // SORTED before iterating to make the result deterministic. Order cannot affect
 // the outcome for maps without ID collisions, which is every shipped model (the
 // in-tree fixture has 173 keys and zero collisions); a colliding map may pick a

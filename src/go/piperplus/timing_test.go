@@ -434,7 +434,7 @@ func TestBuildPhonemeIDReverseMap_PassesMultiCharKeysThrough(t *testing.T) {
 }
 
 func TestBuildPhonemeIDReverseMap_FirstWinsIsDeterministic(t *testing.T) {
-	// Two keys claim id 9. Go map iteration is randomised, so the
+	// Two keys claim id 9. Go map iteration is randomized, so the
 	// implementation sorts keys: "aa" must win on every run.
 	m := map[string][]int64{"zz": {9}, "aa": {9}}
 	for i := 0; i < 16; i++ {
