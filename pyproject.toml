@@ -492,3 +492,11 @@ directory = "htmlcov"
 
 [tool.coverage.xml]
 output = "coverage.xml"
+
+[tool.pyrefly]
+search_path = [
+    "src/python",
+    "src/python/g2p",
+    "src/python_run",
+    "."
+]

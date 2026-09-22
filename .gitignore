@@ -53,9 +53,12 @@ lightning_logs/
 !.claude/README.md
 settings.local.json
 
-# Generated audio files
+# Generated audio & archive files
 *.wav
 !test/**/*.wav
+*.tar
+*.tar.gz
+*.zip
 
 # Test artifacts
 test_piper/

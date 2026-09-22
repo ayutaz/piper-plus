@@ -120,12 +120,14 @@ def _supports_named_safe_globals() -> bool:
 
 
 if _torch is not None:
-    if _supports_named_safe_globals():
-        _torch.serialization.add_safe_globals(
-            [(cls, name) for name, cls in SAFE_GLOBAL_TARGETS.items()]
-        )
-    else:  # pragma: no cover — legacy torch, weights_only defaults to False
-        _torch.serialization.add_safe_globals([pathlib.PosixPath, pathlib.WindowsPath])
+    add_safe_globals_fn = getattr(_torch.serialization, "add_safe_globals", None)
+    if add_safe_globals_fn is not None:
+        if _supports_named_safe_globals():
+            add_safe_globals_fn(
+                [(cls, name) for name, cls in SAFE_GLOBAL_TARGETS.items()]
+            )
+        else:  # pragma: no cover — legacy torch, weights_only defaults to False
+            add_safe_globals_fn([pathlib.PosixPath, pathlib.WindowsPath])
 
 
 def apply_windows_pathlib_aliases() -> None:

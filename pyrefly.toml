@@ -1,0 +1,7 @@
+# Pyrefly configuration for piper-plus workspace
+search_path = [
+    "src/python",
+    "src/python/g2p",
+    "src/python_run",
+    "."
+]
