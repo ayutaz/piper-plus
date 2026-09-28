@@ -93,9 +93,34 @@ jobs:
           echo "Will verify version: $VERSION"
           echo "Will verify packages: $PACKAGES"
 
-      - name: Check if VERSION is already published (schedule guard)
+      - name: Check if VERSION is already published (unpublished-version guard)
         id: published_check
-        if: github.event_name == 'schedule'
+        # ガードを **効かせる** (404 = 未公開として PyPI job を skip):
+        #   - schedule: 最新公開版の再検証。 VERSION が次サイクルへ bump 済みの
+        #     間は skip する (従来からの振る舞い)。
+        #   - workflow_run で upstream が "Manual Release" 以外: trigger に並ぶ
+        #     残り 5 workflow (npm publish / Rust g2p / Go g2p / Shared Library /
+        #     Kotlin G2P) は **PyPI へ publish しない**。 PyPI publisher は
+        #     dev-create-release.yml (= "Manual Release") だけなので、 これらの
+        #     完了で PyPI@VERSION を検証して落とすのは偽陽性。
+        #   - workflow_dispatch で version 未指定: input の説明通り
+        #     "Empty = latest VERSION file" で schedule と同じ意味になる。
+        #
+        # ガードを **効かせない** (404 = 本物の失敗として fail させる):
+        #   - workflow_run で upstream が "Manual Release": PyPI publish 直後なので、
+        #     publish が success なのに成果物が無いのは検知すべき異常。
+        #   - workflow_dispatch で version を明示指定: 運用者がその版を検証したいと
+        #     明言しているので 404 を黙殺しない。
+        #
+        # 旧実装は `github.event_name == 'schedule'` のみだったため、 workflow_run
+        # 経由だと `skip_unpublished` が 'false' のまま verify-pypi が走り、
+        # VERSION が未公開の間は必ず HTTP 404 で落ちていた。
+        if: >-
+          github.event_name == 'schedule' ||
+          (github.event_name == 'workflow_run' &&
+           github.event.workflow_run.name != 'Manual Release') ||
+          (github.event_name == 'workflow_dispatch' &&
+           github.event.inputs.version == '')
         run: |
           VERSION="${{ steps.resolve.outputs.version }}"
           # On scheduled runs we re-verify the LATEST published release. If
@@ -459,7 +484,21 @@ jobs:
       - name: Open GitHub issue
         env:
           GH_TOKEN: ${{ github.token }}
+          # 本 job に checkout step が無いため、 `gh` が cwd からリポジトリを
+          # 推定できず "not a repository" エラーで即死していた。 つまり
+          # **検証失敗の通知経路自体が機能していなかった**。
+          # checkout step を追加するより GH_REPO を与える方が軽い。
+          GH_REPO: ${{ github.repository }}
         run: |
+          # ラベルが未作成だと `gh issue list --label` も
+          # `gh issue create --label` も fail する (本リポジトリに
+          # release-verify-failure は存在しなかった)。 手動作成に依存せず
+          # 冪等に用意する。 既存の場合は非 0 で戻るので無視する。
+          gh label create release-verify-failure \
+            --color B60205 \
+            --description "Release Artifact Verification が検出した公開成果物の不整合" \
+            >/dev/null 2>&1 || true
+
           BODY=$(cat <<EOF
           Automated release-verify run failed on \`${{ github.sha }}\`.
 
