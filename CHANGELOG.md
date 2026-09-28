@@ -211,6 +211,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C# 辞書: 公開時に宛先が既に存在する場合 (`IOException` かつ `IsValidDictionary(finalDictPath)`) は**既存を残して自分の staging を捨てる**。同じ URL・同じ検証済み SHA256 なので他プロセスの複製は同等に妥当であり、誰かが open しているかもしれないディレクトリを置換するより安全
 - tests: 回帰テストを 5 件追加した。staging が `dataDir` の内側にあること、名前に pid を含むこと、呼び出し毎に**異なる**こと、seq が単調増加すること、そして `IsValidDictionary` が**必要ファイルを 1 つ欠いたディレクトリを拒否する**こと (atomic move が守っている性質そのもの)。**実測 (変異試験)**: 4 種 (staging 名を定数に / staging を `dataDir` 外に / 名前から pid を除去 / seq を増分しない) が **4/4 検出**
 
+- Rust: Strategy C の先頭無音分の timing シフトが `total_duration_ms` を**二重計上**しないようにした。 #725 で `total_duration_ms` を「実際に出力した音声長」(`result.audio.len()`) から求めるようになり、 その音声には Strategy C の前後無音が**既に含まれる**。 本 PR の shift 処理は元々 entry 由来の total を前提に `+= offset_ms` していたため、 両者が合流すると 300 ms 相当が二重に乗る。 entry の shift だけを残し total への加算を落とした。 **実測** (`test/models/multilingual-test-medium.onnx`、 `"Sol"`、 `--sentence-silence 0`): `total_duration_ms` 811.156 / 実 WAV 811.156 で `100.00%`、 最初の entry の `start_ms` は 346.440 (= 先頭無音分ずれている)、 音素列は `['s','ˈ','ɑ','l']` で SSML マークアップの混入なし
+
 ### Changed
 
 - ライセンス方針: `train` extra 限定の copyleft 依存を「明文化された例外」として受理する規定を `CONTRIBUTING.md` に追加。 `soxr` (LGPL-2.1-or-later) は `librosa` 0.11 の必須依存で `train` extra にのみ入り、 PyPI に publish される wheel (`src/python_run` 由来、 依存は `src/python_run/requirements.txt` が宣言) には含まれないため再頒布が発生せず LGPL の義務も生じない。 これまで CI の `allow-dependencies-licenses` には carve-out が入る一方で `CONTRIBUTING.md` は「LGPL はバージョンを問わず禁止」のままだったため、 設定と明文の方針が食い違っていた。 併せて、 scanner の parser bug 回避のための carve-out (`typing-extensions` / `llvmlite`、 実際には copyleft ではない) は方針例外ではなく、 例外表に載せてはならないことを明記

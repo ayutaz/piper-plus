@@ -693,7 +693,10 @@ fn main() -> Result<()> {
                                     entry.start_ms += offset_ms;
                                     entry.end_ms += offset_ms;
                                 }
-                                timing.total_duration_ms += offset_ms;
+                                // total は上で result.audio から取っており、
+                                // その audio には Strategy C の前後無音が
+                                // 既に含まれる。ここで offset を足すと
+                                // 300 ms の二重計上になる。
                             }
                             let output = match format.as_str() {
                                 "json" => timing.to_json().unwrap_or_default(),
