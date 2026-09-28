@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
+
 from piper_plus.timing import (
     DEFAULT_HOP_LENGTH,
     PhonemeTimingInfo,
@@ -413,9 +414,7 @@ def test_srt_rounding_cases_would_detect_banker_rounding():
     import math
 
     discriminating = [
-        ms
-        for ms, _ in _srt_rounding_cases()
-        if ms % 1 == 0.5 and int(ms) % 2 == 0
+        ms for ms, _ in _srt_rounding_cases() if ms % 1 == 0.5 and int(ms) % 2 == 0
     ]
     assert discriminating, (
         "no case in the contract has a .5 fraction over an even integer, so "
@@ -601,7 +600,7 @@ def test_tsv_escapes_newline_in_phoneme_name():
     # Literal newline inside phoneme should be escaped
     assert "a\\nb" in tsv
     # We should still have exactly 2 non-empty lines (header + 1 data row)
-    non_empty_lines = [l for l in tsv.split("\n") if l.strip()]
+    non_empty_lines = [line for line in tsv.split("\n") if line.strip()]
     assert len(non_empty_lines) == 2
 
 
@@ -630,3 +629,42 @@ def test_json_roundtrip_precision_large_duration():
     original_ms = result.phonemes[0].duration_ms
     parsed_ms = parsed["phonemes"][0]["duration_ms"]
     assert abs(parsed_ms - original_ms) < 1e-3  # Allow small relative error
+
+
+# ---------------------------------------------------------------------------
+# PAD / BOS / EOS are skipped (contract [calculation.special_ids], issue #697)
+# ---------------------------------------------------------------------------
+
+
+def test_special_phoneme_ids_are_exactly_pad_bos_eos():
+    from piper_plus.voice import _SPECIAL_PHONEME_IDS
+
+    assert frozenset({0, 1, 2}) == _SPECIAL_PHONEME_IDS
+    for ordinary in (3, 7, -1, 128, 9999):
+        assert ordinary not in _SPECIAL_PHONEME_IDS
+
+
+def test_filtering_after_the_walk_keeps_survivor_positions():
+    """The filter must run AFTER the cursor walk.
+
+    Removing the specials first would pull the remaining entries forward, so
+    their timestamps would stop pointing at their position in the stream. This
+    reproduces the ordering the caller in ``voice.py`` relies on.
+    """
+    from piper_plus.voice import _SPECIAL_PHONEME_IDS
+
+    ids = [1, 7, 0, 8, 2]  # BOS, h, PAD, o, EOS
+    tokens = ["^", "h", "_", "o", "$"]
+    result = durations_to_timing([2.0, 4.0, 3.0, 5.0, 2.0], tokens, 24000, 240)
+
+    kept = [
+        entry
+        for pid, entry in zip(ids, result.phonemes, strict=True)
+        if pid not in _SPECIAL_PHONEME_IDS
+    ]
+
+    assert [e.phoneme for e in kept] == ["h", "o"]
+    # 240/24000*1000 = 10 ms per frame: BOS occupies 0-20, h 20-60,
+    # PAD 60-90, o 90-140. The survivors keep exactly those positions.
+    assert kept[0].start_ms == 20.0
+    assert kept[1].start_ms == 90.0

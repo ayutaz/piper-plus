@@ -108,6 +108,46 @@ func BuiltinPUANames() map[string]string {
 	return names
 }
 
+// SpecialPhonemeIDs are PAD / BOS / EOS.
+//
+// The cursor walk advances over these but emits no timing entry for them
+// (docs/spec/phoneme-timing-contract.toml [calculation.special_ids]). They are
+// not phonemes, so they are useless for lip-sync, subtitles and forced
+// alignment alike, and Strategy A's pads are trimmed OUT of the WAV -- an
+// entry for one points at audio that is not there.
+var SpecialPhonemeIDs = [3]int64{0, 1, 2}
+
+// IsSpecialPhonemeID reports whether id is PAD, BOS or EOS.
+func IsSpecialPhonemeID(id int64) bool {
+	for _, special := range SpecialPhonemeIDs {
+		if id == special {
+			return true
+		}
+	}
+	return false
+}
+
+// DropSpecialIDEntries removes PAD / BOS / EOS entries from an already-walked
+// result.
+//
+// The filter runs AFTER the walk: filtering first would pull the remaining
+// entries forward, so their timestamps would stop pointing at their position
+// in the stream. phonemeIDs must be in the same order and of the same length
+// as result.Phonemes; a mismatch leaves the result untouched, because keeping
+// extra entries is less harmful than dropping the wrong ones.
+func DropSpecialIDEntries(result *TimingResult, phonemeIDs []int64) {
+	if result == nil || len(phonemeIDs) != len(result.Phonemes) {
+		return
+	}
+	kept := make([]PhonemeTimingInfo, 0, len(result.Phonemes))
+	for i, entry := range result.Phonemes {
+		if !IsSpecialPhonemeID(phonemeIDs[i]) {
+			kept = append(kept, entry)
+		}
+	}
+	result.Phonemes = kept
+}
+
 // ResolveTimingTokens picks the display names for a timing result.
 //
 // It returns the reverse-mapped phoneme names when phonemeIDs lines up with

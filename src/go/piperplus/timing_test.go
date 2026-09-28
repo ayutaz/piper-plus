@@ -647,3 +647,57 @@ func TestResolveTimingTokens_ExplicitEmptyMapKeepsCodepointFallback(t *testing.T
 		t.Errorf("tokens[0] = %q; want U+E019", tokens[0])
 	}
 }
+
+func TestDropSpecialIDEntries_DropsOnlySpecials(t *testing.T) {
+	got, err := DurationsToTiming([]float32{2, 4, 3, 5, 2},
+		[]string{"^", "h", "_", "o", "$"}, 24000, 240)
+	if err != nil {
+		t.Fatalf("DurationsToTiming: %v", err)
+	}
+	before := make([]float64, len(got.Phonemes))
+	for i, p := range got.Phonemes {
+		before[i] = p.StartMs
+	}
+
+	DropSpecialIDEntries(got, []int64{1, 7, 0, 8, 2})
+
+	if len(got.Phonemes) != 2 {
+		t.Fatalf("len = %d; want 2 (%v)", len(got.Phonemes), got.Phonemes)
+	}
+	if got.Phonemes[0].Phoneme != "h" || got.Phonemes[1].Phoneme != "o" {
+		t.Errorf("phonemes = %q, %q; want h, o",
+			got.Phonemes[0].Phoneme, got.Phonemes[1].Phoneme)
+	}
+	// The survivors keep the positions the walk gave them: the filter runs
+	// AFTER the walk, so nothing is pulled forward.
+	if got.Phonemes[0].StartMs != before[1] || got.Phonemes[1].StartMs != before[3] {
+		t.Errorf("positions moved: got %g, %g; want %g, %g",
+			got.Phonemes[0].StartMs, got.Phonemes[1].StartMs, before[1], before[3])
+	}
+}
+
+func TestDropSpecialIDEntries_LeavesEntriesOnLengthMismatch(t *testing.T) {
+	// Guessing would risk dropping real phonemes; extra entries are the
+	// lesser harm (contract: on_length_mismatch).
+	got, err := DurationsToTiming([]float32{2, 4, 2}, []string{"^", "h", "$"}, 24000, 240)
+	if err != nil {
+		t.Fatalf("DurationsToTiming: %v", err)
+	}
+	DropSpecialIDEntries(got, []int64{1, 7})
+	if len(got.Phonemes) != 3 {
+		t.Errorf("len = %d; want 3 (mismatch must leave entries untouched)", len(got.Phonemes))
+	}
+}
+
+func TestIsSpecialPhonemeID_IsExactlyPadBosEos(t *testing.T) {
+	for _, id := range []int64{0, 1, 2} {
+		if !IsSpecialPhonemeID(id) {
+			t.Errorf("%d must be special", id)
+		}
+	}
+	for _, id := range []int64{3, 7, -1, 128, 9999} {
+		if IsSpecialPhonemeID(id) {
+			t.Errorf("%d must not be special", id)
+		}
+	}
+}

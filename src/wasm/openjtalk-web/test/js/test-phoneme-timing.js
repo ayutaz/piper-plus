@@ -18,6 +18,7 @@ import {
   timingToJsonCompact,
   timingToSrt,
   timingToTsv,
+  dropSpecialIdEntries,
 } from "../../src/timing.js";
 
 // Frame time at 22050 Hz with 256 hop length: (256 / 22050) * 1000 ≈ 11.60998 ms
@@ -788,4 +789,35 @@ describe("timingToSrt - negative input clamping", () => {
       );
     });
   }
+});
+
+describe("dropSpecialIdEntries (contract [calculation.special_ids])", () => {
+  it("drops only PAD / BOS / EOS and keeps the survivors in place", () => {
+    const result = durationsToTiming([2, 4, 3, 5, 2], 24000, 240, [
+      "^",
+      "h",
+      "_",
+      "o",
+      "$",
+    ]);
+    const before = result.phonemes.map((p) => p.start_ms);
+
+    dropSpecialIdEntries(result, [1, 7, 0, 8, 2]);
+
+    assert.deepStrictEqual(
+      result.phonemes.map((p) => p.phoneme),
+      ["h", "o"]
+    );
+    // The filter runs AFTER the walk, so nothing is pulled forward.
+    assert.strictEqual(result.phonemes[0].start_ms, before[1]);
+    assert.strictEqual(result.phonemes[1].start_ms, before[3]);
+  });
+
+  it("leaves every entry when the id count does not match", () => {
+    // Guessing would risk dropping real phonemes; extra entries are the
+    // lesser harm (contract: on_length_mismatch).
+    const result = durationsToTiming([2, 4, 2], 24000, 240, ["^", "h", "$"]);
+    dropSpecialIdEntries(result, [1, 7]);
+    assert.strictEqual(result.phonemes.length, 3);
+  });
 });

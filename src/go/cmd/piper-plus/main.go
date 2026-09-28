@@ -614,6 +614,19 @@ func writeTiming(result *piperplus.SynthesisResult, voice *piperplus.Voice, logg
 		return fmt.Errorf("failed to compute timing: %w", err)
 	}
 
+	// Drop PAD / BOS / EOS entries (contract [calculation.special_ids]).
+	// Applied after the walk, so the surviving entries keep their positions.
+	piperplus.DropSpecialIDEntries(timing, result.PhonemeIDs)
+
+	// total is the length of the stream the caller receives, not the cursor
+	// sum -- the cursor also counts padding and EOS regions that were trimmed
+	// OUT of the audio, so it overshoots the real WAV (measured 105.3% in the
+	// Rust CLI, same arithmetic). C++ moved to this basis in #662 and Python
+	// in #660.
+	if result.SampleRate > 0 {
+		timing.TotalDurationMs = float64(len(result.Audio)) / float64(result.SampleRate) * 1000.0
+	}
+
 	var data []byte
 	switch strings.ToLower(timingFormat) {
 	case "tsv":

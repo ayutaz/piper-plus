@@ -239,6 +239,40 @@ pub fn resolve_timing_tokens(
     }
 }
 
+/// PAD / BOS / EOS の phoneme ID。
+///
+/// cursor walk はこれらの上を進むが entry は出さない
+/// (`docs/spec/phoneme-timing-contract.toml` `[calculation.special_ids]`)。
+/// 音素ではないので lip-sync / 字幕 / 強制アライメントのどの用途でも
+/// 使えず、さらに Strategy A の pad は WAV から trim されるため、entry を
+/// 出すと**存在しない音声**を指すことになる。
+pub const SPECIAL_PHONEME_IDS: [i64; 3] = [0, 1, 2];
+
+/// `id` が PAD / BOS / EOS なら true。
+pub fn is_special_phoneme_id(id: i64) -> bool {
+    SPECIAL_PHONEME_IDS.contains(&id)
+}
+
+/// cursor walk 済みの entry から PAD / BOS / EOS 由来のものを落とす。
+///
+/// フィルタは walk の**後**に掛ける: 先に間引くと残った entry の開始位置が
+/// 前に詰まり、タイムスタンプがストリーム上の位置を指さなくなる。
+/// `phoneme_ids` は `result.phonemes` と同じ並び・同じ長さであること。
+/// 対応が取れないなら間引かない — 誤ったエントリを落とすより余分な
+/// エントリが残るほうが害が小さい。
+pub fn drop_special_id_entries(result: &mut TimingResult, phoneme_ids: &[i64]) {
+    if phoneme_ids.len() != result.phonemes.len() {
+        return;
+    }
+    let mut kept = Vec::with_capacity(result.phonemes.len());
+    for (id, entry) in phoneme_ids.iter().zip(result.phonemes.iter()) {
+        if !is_special_phoneme_id(*id) {
+            kept.push(entry.clone());
+        }
+    }
+    result.phonemes = kept;
+}
+
 pub fn durations_to_timing(
     durations: &[f32],
     phoneme_tokens: &[String],
@@ -1155,6 +1189,49 @@ mod tests {
             resolve_timing_tokens(Some(&ids), ids.len(), &sample_id_map(), Some(&pua));
         assert!(resolved);
         assert_eq!(tokens, vec!["N_m", "a"]);
+    }
+
+    #[test]
+    fn drops_only_the_special_id_entries() {
+        let toks = tokens(&["^", "h", "_", "o", "$"]);
+        let mut result =
+            durations_to_timing(&[2.0, 4.0, 3.0, 5.0, 2.0], &toks, 24000, 240).expect("walk");
+        let before: Vec<f64> = result.phonemes.iter().map(|p| p.start_ms).collect();
+
+        drop_special_id_entries(&mut result, &[1, 7, 0, 8, 2]);
+
+        assert_eq!(
+            result
+                .phonemes
+                .iter()
+                .map(|p| p.phoneme.as_str())
+                .collect::<Vec<_>>(),
+            vec!["h", "o"]
+        );
+        // The surviving entries keep the positions the walk gave them: the
+        // filter runs AFTER the walk, so nothing is pulled forward.
+        assert!((result.phonemes[0].start_ms - before[1]).abs() < 1e-9);
+        assert!((result.phonemes[1].start_ms - before[3]).abs() < 1e-9);
+    }
+
+    #[test]
+    fn keeps_every_entry_when_the_id_count_does_not_match() {
+        // Guessing would risk dropping real phonemes; extra entries are the
+        // lesser harm (contract: on_length_mismatch).
+        let toks = tokens(&["^", "h", "$"]);
+        let mut result = durations_to_timing(&[2.0, 4.0, 2.0], &toks, 24000, 240).expect("walk");
+        drop_special_id_entries(&mut result, &[1, 7]);
+        assert_eq!(result.phonemes.len(), 3);
+    }
+
+    #[test]
+    fn special_id_set_is_exactly_pad_bos_eos() {
+        for id in [0, 1, 2] {
+            assert!(is_special_phoneme_id(id), "{id} must be special");
+        }
+        for id in [3, 7, -1, 128, 9999] {
+            assert!(!is_special_phoneme_id(id), "{id} must not be special");
+        }
     }
 
     #[test]
