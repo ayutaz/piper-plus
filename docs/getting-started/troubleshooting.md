@@ -402,7 +402,7 @@ advisory is corrected upstream, the finding disappears with no code change.
   code change required.
 - To stop a future *resolution* from regressing into a truly-affected version,
   add a lower-bound floor for the transitive package in
-  `src/python_run/requirements.txt` (e.g. `nltk>=3.9.4`, `joblib>=1.5.0`).
+  `src/python_run/requirements.txt` (e.g. `nltk>=3.10.0`, `joblib>=1.5.0`).
 - Avoid `pip-audit --ignore-vuln <ID>` unless the advisory is a documented,
   vendor-disputed false positive; if used, add a comment citing the dispute and
   a removal condition so the suppression cannot hide a future genuine finding.
