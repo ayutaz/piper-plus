@@ -227,6 +227,26 @@ mod tests {
     }
 
     #[test]
+    fn padding_is_split_evenly_so_half_leads_the_speech() {
+        // The CLI shifts timing by half the inserted silence, so the split
+        // has to be exactly even. An uneven split would put the timestamps
+        // off by the difference, which is the kind of error that reads as
+        // "timing is slightly wrong" rather than as a bug.
+        let audio = vec![1i16; 100];
+        let padded = pad_silence_for_short_text(&audio, 22050);
+        let inserted = padded.len() - audio.len();
+        assert_eq!(inserted % 2, 0, "inserted silence must split evenly");
+
+        let lead = inserted / 2;
+        assert!(padded[..lead].iter().all(|&s| s == 0));
+        assert!(padded[lead + audio.len()..].iter().all(|&s| s == 0));
+        assert_eq!(padded[lead..lead + audio.len()], audio[..]);
+
+        // 300 ms at 22050 Hz on each side.
+        assert_eq!(lead, 6615);
+    }
+
+    #[test]
     fn padding_leaves_empty_audio_alone() {
         assert!(pad_silence_for_short_text(&[], 22050).is_empty());
     }

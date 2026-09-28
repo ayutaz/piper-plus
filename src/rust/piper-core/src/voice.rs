@@ -495,9 +495,16 @@ impl PiperVoice {
         //    ストリーム位置として使う場合はパッド分を足す必要がある — それは
         //    #697 の扱いで、ここで暗黙に混ぜない。
         if is_short {
+            let before = result.audio.len();
             result.audio =
                 crate::short_text::pad_silence_for_short_text(&result.audio, result.sample_rate);
             result.audio_seconds = result.audio.len() as f64 / f64::from(result.sample_rate);
+            // Half the inserted silence sits in FRONT of the speech, so every
+            // timing entry is that much later in the stream the caller
+            // receives. Publishing the amount lets the CLI shift them; not
+            // publishing it would make short-text timing read 300 ms early.
+            let inserted = result.audio.len().saturating_sub(before);
+            result.leading_silence_seconds = (inserted / 2) as f64 / f64::from(result.sample_rate);
         }
 
         Ok(result)
