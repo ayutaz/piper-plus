@@ -141,10 +141,13 @@ pub struct SynthesisResult {
     ///
     /// `durations` と**同じ長さ・同じ並び**なので、index 対応で音素名を
     /// 引き当てられる (issue #656)。呼び出し元が `phonemize_to_ids(text)` を
-    /// 再実行して対応付けるのは誤りである: Strategy C は 10 文字以下の
-    /// テキストを `<break time="300ms"/>` で SSML ラップするため合成に使う
-    /// 音素列がテキスト由来のものと別物になり (実測で +100 ID)、Strategy A の
-    /// padding も前方に pad を挿入して index をずらす。
+    /// 再実行して対応付けるのは誤りである: Strategy A の padding が前方に
+    /// pad を挿入して index をずらすため。
+    ///
+    /// Strategy C も以前は原因の一つだった — 10 文字以下のテキストを SSML で
+    /// ラップし、その文字列を phonemizer に渡していたので音素列がテキスト
+    /// 由来のものと別物になっていた (実測で +100 ID)。#694 で音声レベルの
+    /// パディングに変えたため、この経路での乖離は無くなった。
     pub phoneme_ids: Option<Vec<i64>>,
 }
 

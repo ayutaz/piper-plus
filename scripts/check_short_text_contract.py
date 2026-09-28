@@ -83,6 +83,39 @@ def main() -> int:
     ]
 
     errors: list[str] = []
+
+    # Strategy C must be applied to the AUDIO, not by handing SSML text to a
+    # phonemizer.
+    #
+    # `[ssml_injection].silence_pad_ms` is defined as silence "prepended and
+    # appended to short text audio". The Rust synthesis path instead called
+    # `wrap_short_text_ssml(text)` and passed the resulting string to
+    # `phonemize_with_prosody`, which does not parse SSML -- so `<speak>`,
+    # `<break` and `time=` were phonemised and SPOKEN (issue #694, visible in
+    # `--timing json` as `s p ˈ i ː k` / `b ɹ ˈ e ɪ k` / `t ˈ a ɪ m`). The
+    # text wrapper stays available for pipelines that do parse SSML, which is
+    # why its mere existence cannot be the check; what matters is that the
+    # synthesis path does not use it.
+    rust_voice = REPO_ROOT / "src/rust/piper-core/src/voice.rs"
+    if not rust_voice.is_file():
+        errors.append(f"  rust voice.rs not found at {rust_voice}")
+    else:
+        source = rust_voice.read_text(encoding="utf-8", errors="replace")
+        code = re.sub(r"//[^\n]*", "", source)
+        if "wrap_short_text_ssml(" in code:
+            errors.append(
+                "  rust voice.rs: synthesis path calls wrap_short_text_ssml(); "
+                "Strategy C must pad the AUDIO (pad_silence_for_short_text) -- "
+                "passing the SSML string to the phonemizer makes the markup "
+                "audible (issue #694)"
+            )
+        if "pad_silence_for_short_text(" not in code:
+            errors.append(
+                "  rust voice.rs: synthesis path does not call "
+                "pad_silence_for_short_text(); short-text silence padding is "
+                "not being applied at all"
+            )
+
     for label, path, name, expected in expectations:
         literal = _read_constant(path, name)
         actual = _coerce(literal)
