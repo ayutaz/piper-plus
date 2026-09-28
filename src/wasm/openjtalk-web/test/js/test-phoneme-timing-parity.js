@@ -15,7 +15,12 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
-import { durationsToTiming, timingToSrt, timingToTsv } from "../../src/timing.js";
+import {
+  buildPhonemeIdToTokenMap,
+  durationsToTiming,
+  timingToSrt,
+  timingToTsv,
+} from "../../src/timing.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_PATH = resolve(
@@ -107,4 +112,66 @@ describe("phoneme timing parity (WASM/JS ↔ canonical Python)", () => {
       );
     });
   }
+});
+
+/**
+ * Reverse-map parity (issue #698).
+ *
+ * The cases above start from resolved token strings, so nothing in them says
+ * how phoneme_id_map is turned back into names. The contract said first-wins
+ * without defining "first", and the runtimes split three/three -- python / js
+ * / csharp iterated in insertion order, cpp / rust / go sorted. Every shipped
+ * model is collision-free, so all six agreed byte-for-byte and no test could
+ * see it.
+ */
+describe("reverse map parity (WASM/JS ↔ canonical Python)", () => {
+  it("fixture carries reverse_map_cases", () => {
+    assert.ok(
+      Array.isArray(fixture.reverse_map_cases),
+      "fixture has no reverse_map_cases; regenerate with scripts/regenerate_timing_fixture.py"
+    );
+    assert.ok(fixture.reverse_map_cases.length > 0);
+  });
+
+  for (const caseDef of fixture.reverse_map_cases ?? []) {
+    it(`reverse map: ${caseDef.name}`, () => {
+      const { phoneme_id_map, pua_names } = caseDef.inputs;
+      const got = buildPhonemeIdToTokenMap(phoneme_id_map, pua_names);
+
+      // Object keys are strings on both sides, so compare as-is.
+      assert.deepStrictEqual(got, caseDef.expected);
+    });
+  }
+
+  it("includes a mirrored colliding case", () => {
+    // Anti-vacuity: without a MIRRORED colliding case key order is
+    // unobservable. A collision-free map resolves identically under any
+    // iteration order, and a single colliding map can be satisfied by a
+    // runtime that happens to receive its keys already sorted.
+    const ordersByKeySet = new Map();
+    for (const caseDef of fixture.reverse_map_cases ?? []) {
+      const idMap = caseDef.inputs.phoneme_id_map;
+      const seen = new Set();
+      let collides = false;
+      for (const ids of Object.values(idMap)) {
+        for (const id of ids) {
+          if (seen.has(id)) collides = true;
+          seen.add(id);
+        }
+      }
+      if (!collides) continue;
+      const keys = Object.keys(idMap);
+      const keySet = [...keys].sort().join("\u0000");
+      const orders = ordersByKeySet.get(keySet) ?? new Set();
+      orders.add(keys.join("\u0000"));
+      ordersByKeySet.set(keySet, orders);
+    }
+
+    assert.ok(
+      [...ordersByKeySet.values()].some((orders) => orders.size >= 2),
+      "no colliding key set is written in two different orders, so these " +
+        "cases cannot detect a runtime that iterates phoneme_id_map in " +
+        "insertion order"
+    );
+  });
 });

@@ -29,11 +29,14 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
 
 #include "json.hpp"
+#include "timing_helpers.hpp"
 
 namespace {
 
@@ -219,4 +222,136 @@ TEST(PhonemeTimingParity, EmptyInputProducesEmptyResult) {
   EXPECT_TRUE(got.phonemes.empty());
   EXPECT_DOUBLE_EQ(got.total_duration_ms, 0.0);
   EXPECT_EQ(got.sample_rate, 22050);
+}
+
+// ---------------------------------------------------------------------------
+// Reverse-map parity (issue #698).
+//
+// The cases above start from resolved token strings, so nothing in them says
+// how phoneme_id_map is turned back into names. The contract said first-wins
+// without defining "first", and the runtimes split three/three -- python / js
+// / csharp iterated in insertion order, cpp / rust / go sorted. Every shipped
+// model is collision-free, so all six agreed byte-for-byte and no test could
+// see it.
+//
+// PhonemeIdMap is std::map<char32_t, ...>, so only single-codepoint keys can
+// be represented -- which is why the fixture uses them. A multi-codepoint key
+// is reported rather than skipped: it would mean the fixture has grown a case
+// this runtime cannot express, and silently passing over it is how a gap gets
+// missed.
+// ---------------------------------------------------------------------------
+
+TEST(PhonemeTimingParity, ReverseMapCasesMatchTheFixture) {
+  const auto fixture = loadFixture();
+  ASSERT_TRUE(fixture.contains("reverse_map_cases"))
+      << "fixture has no reverse_map_cases; regenerate with "
+         "scripts/regenerate_timing_fixture.py";
+  const auto& cases = fixture["reverse_map_cases"];
+  ASSERT_GT(cases.size(), 0u);
+
+  for (const auto& test_case : cases) {
+    const std::string name = test_case.value("name", "<unnamed>");
+    SCOPED_TRACE("case=" + name);
+
+    const auto& inputs = test_case["inputs"];
+    piper::PhonemeIdMap idMap;
+    for (const auto& [key, ids] : inputs["phoneme_id_map"].items()) {
+      ASSERT_TRUE(piper::isSingleCodepointUtf8(key))
+          << "key " << key << " is not a single codepoint, which "
+          << "PhonemeIdMap (std::map<char32_t, ...>) cannot represent";
+      const char32_t cp = piper::firstCodepointUtf8(key);
+      for (const auto& id : ids) {
+        idMap[cp].push_back(id.get<piper::PhonemeId>());
+      }
+    }
+
+    // The PUA table is built in rather than injected here, exactly as the
+    // production walk uses it, so a case whose `pua_names` disagrees with
+    // puaToPhonemeMap() would be comparing two different tables. Assert the
+    // agreement instead of assuming it.
+    if (inputs.contains("pua_names") && inputs["pua_names"].is_object()) {
+      const auto& pua = piper::puaToPhonemeMap();
+      for (const auto& [key, name_json] : inputs["pua_names"].items()) {
+        ASSERT_TRUE(piper::isSingleCodepointUtf8(key));
+        const auto it = pua.find(piper::firstCodepointUtf8(key));
+        ASSERT_NE(it, pua.end())
+            << "the fixture names a PUA codepoint that puaToPhonemeMap() does "
+               "not; the fixture and the PUA consistency gate disagree";
+        EXPECT_EQ(it->second, name_json.get<std::string>());
+      }
+    }
+
+    const auto got = piper::buildPhonemeIdToStringMap(idMap);
+
+    const auto& expected = test_case["expected"];
+    EXPECT_EQ(got.size(), expected.size());
+    for (const auto& [id_str, want] : expected.items()) {
+      const auto id = static_cast<piper::PhonemeId>(std::stoll(id_str));
+      const auto it = got.find(id);
+      ASSERT_NE(it, got.end()) << "id " << id << " missing from the reverse map";
+      EXPECT_EQ(it->second, want.get<std::string>());
+    }
+  }
+}
+
+// Anti-vacuity: without a MIRRORED colliding case, key order is unobservable.
+// A collision-free map resolves identically under any iteration order, and a
+// single colliding map can be satisfied by a runtime that happens to receive
+// its keys already sorted.
+//
+// nlohmann::json does NOT preserve object key order -- its default object
+// type is std::map, which sorts -- so the file is re-parsed here as
+// ordered_json (available since 3.9; the bundled copy is 3.11.2). Without
+// that, both spellings of the mirrored pair collapse to the same sorted key
+// list and this check cannot distinguish them; measured, it failed before the
+// switch.
+TEST(PhonemeTimingParity, ReverseMapCasesIncludeAMirroredCollision) {
+  const fs::path path = findFixturePath();
+  std::ifstream in(path);
+  ASSERT_TRUE(in.good()) << "cannot open " << path;
+  std::stringstream buffer;
+  buffer << in.rdbuf();
+  const auto fixture = nlohmann::ordered_json::parse(buffer.str());
+  ASSERT_TRUE(fixture.contains("reverse_map_cases"));
+
+  std::map<std::string, std::set<std::string>> orders_by_keyset;
+  for (const auto& test_case : fixture["reverse_map_cases"]) {
+    const auto& idMap = test_case["inputs"]["phoneme_id_map"];
+    std::set<long long> seen;
+    bool collides = false;
+    std::vector<std::string> keys;
+    for (const auto& [key, ids] : idMap.items()) {
+      keys.push_back(key);
+      for (const auto& id : ids) {
+        if (!seen.insert(id.get<long long>()).second) {
+          collides = true;
+        }
+      }
+    }
+    if (!collides) {
+      continue;
+    }
+    std::vector<std::string> sorted_keys = keys;
+    std::sort(sorted_keys.begin(), sorted_keys.end());
+    const auto join = [](const std::vector<std::string>& parts) {
+      std::string out;
+      for (const auto& part : parts) {
+        out += part;
+        out += '\x01';
+      }
+      return out;
+    };
+    orders_by_keyset[join(sorted_keys)].insert(join(keys));
+  }
+
+  bool mirrored = false;
+  for (const auto& [keyset, orders] : orders_by_keyset) {
+    if (orders.size() >= 2) {
+      mirrored = true;
+    }
+  }
+  EXPECT_TRUE(mirrored)
+      << "no colliding key set is written in two different orders, so these "
+         "cases cannot detect a runtime that iterates phoneme_id_map in "
+         "insertion order";
 }

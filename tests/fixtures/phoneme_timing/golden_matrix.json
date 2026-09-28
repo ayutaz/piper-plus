@@ -912,5 +912,109 @@
         "srt": "1\n00:00:00,000 --> 00:00:00,000\na\n\n2\n00:00:00,000 --> 00:00:00,000\nb\n\n3\n00:00:00,000 --> 00:00:00,000\nc\n\n"
       }
     }
+  ],
+  "reverse_map_cases": [
+    {
+      "name": "collision_sorted_key_wins",
+      "description": "Two keys claim id 9. The winner is the one that sorts first, not the one written first: insertion order would give 'z'.",
+      "inputs": {
+        "phoneme_id_map": {
+          "z": [
+            9
+          ],
+          "a": [
+            9
+          ]
+        },
+        "pua_names": null
+      },
+      "expected": {
+        "9": "a"
+      }
+    },
+    {
+      "name": "collision_reversed_input_order_same_winner",
+      "description": "The same map with the keys written the other way round. An insertion-order runtime flips its answer here; a sorted one cannot. Without this pair a runtime that happened to receive the keys already sorted would look conformant.",
+      "inputs": {
+        "phoneme_id_map": {
+          "a": [
+            9
+          ],
+          "z": [
+            9
+          ]
+        },
+        "pua_names": null
+      },
+      "expected": {
+        "9": "a"
+      }
+    },
+    {
+      "name": "every_id_of_a_key_resolves",
+      "description": "Contract example: {\"b\": [6, 7]} -> {6: 'b', 7: 'b'}.",
+      "inputs": {
+        "phoneme_id_map": {
+          "a": [
+            5
+          ],
+          "b": [
+            6,
+            7
+          ]
+        },
+        "pua_names": null
+      },
+      "expected": {
+        "5": "a",
+        "6": "b",
+        "7": "b"
+      }
+    },
+    {
+      "name": "pua_name_beats_the_hex_fallback",
+      "description": "An explicit PUA name wins over the U+XXXX fallback, and an unnamed PUA codepoint falls back to uppercase 4-digit hex.",
+      "inputs": {
+        "phoneme_id_map": {
+          "": [
+            42
+          ],
+          "": [
+            43
+          ],
+          "a": [
+            5
+          ]
+        },
+        "pua_names": {
+          "": "N_m"
+        }
+      },
+      "expected": {
+        "5": "a",
+        "42": "N_m",
+        "43": "U+E7FF"
+      }
+    },
+    {
+      "name": "pua_collides_with_ascii_lower_key_wins",
+      "description": "An ASCII key and a PUA key claim the same id. ASCII sorts first, so the resolved name is 'a' rather than 'N_m' -- the case that distinguishes sorted order from 'PUA is special'.",
+      "inputs": {
+        "phoneme_id_map": {
+          "": [
+            9
+          ],
+          "a": [
+            9
+          ]
+        },
+        "pua_names": {
+          "": "N_m"
+        }
+      },
+      "expected": {
+        "9": "a"
+      }
+    }
   ]
 }

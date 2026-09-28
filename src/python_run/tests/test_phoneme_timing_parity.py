@@ -378,3 +378,66 @@ def test_srt_blank_line_between_cues_per_spec():
     assert "\n\n" in srt, "SRT cues must be separated by a blank line per spec"
     # Last cue also ends with \n\n (empty trailing block).
     assert srt.endswith("\n\n")
+
+
+# ---------------------------------------------------------------------------
+# Reverse-map key order (issue #698)
+#
+# The cases above start from resolved token strings, so nothing in them says
+# how phoneme_id_map is turned back into names. The contract said first-wins
+# without defining "first", and the runtimes split three/three -- python / js
+# / csharp iterated in insertion order, cpp / rust / go sorted. Every shipped
+# model is collision-free, so all six agreed byte-for-byte and no test could
+# see it. `reverse_map_cases` is what sees it.
+# ---------------------------------------------------------------------------
+
+
+def _reverse_map_cases():
+    fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+    assert "reverse_map_cases" in fixture, (
+        "the fixture has no reverse_map_cases block; regenerate with "
+        "scripts/regenerate_timing_fixture.py"
+    )
+    cases = fixture["reverse_map_cases"]
+    assert cases, "reverse_map_cases is empty"
+    return cases
+
+
+def test_reverse_map_cases_match_the_fixture():
+    from piper_plus.timing import build_phoneme_id_reverse_map
+
+    for case in _reverse_map_cases():
+        inputs = case["inputs"]
+        got = build_phoneme_id_reverse_map(
+            inputs["phoneme_id_map"], inputs["pua_names"]
+        )
+        expected = {int(k): v for k, v in case["expected"].items()}
+        assert got == expected, f"case {case['name']}"
+
+
+def test_reverse_map_cases_include_a_mirrored_collision():
+    """Anti-vacuity: without one, key order is unobservable.
+
+    A collision-free map resolves identically under any iteration order, and a
+    single colliding map can be satisfied by a runtime that happens to receive
+    its keys already sorted. The pair is what an insertion-order runtime
+    cannot pass.
+    """
+    by_keyset: dict[frozenset[str], set[tuple[str, ...]]] = {}
+    for case in _reverse_map_cases():
+        id_map = case["inputs"]["phoneme_id_map"]
+        seen: set[int] = set()
+        collides = False
+        for ids in id_map.values():
+            for phoneme_id in ids:
+                if phoneme_id in seen:
+                    collides = True
+                seen.add(phoneme_id)
+        if collides:
+            keys = tuple(id_map)
+            by_keyset.setdefault(frozenset(keys), set()).add(keys)
+
+    assert any(len(orders) >= 2 for orders in by_keyset.values()), (
+        "no colliding case is mirrored, so these cases cannot detect a "
+        "runtime that iterates phoneme_id_map in insertion order"
+    )

@@ -29,6 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src/python_run"))
 
 from piper_plus.timing import (  # noqa: E402
+    build_phoneme_id_reverse_map,
     durations_to_timing,
     timing_to_srt,
     timing_to_tsv,
@@ -186,6 +187,85 @@ def _compute_expected(case: dict) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Reverse-map cases (issue #698).
+#
+# The cases above start from already-resolved token STRINGS, so they cannot
+# express anything about how phoneme_id_map is turned back into names. The
+# contract says first-wins on an ID collision, but until #698 it did not say
+# what "first" meant, and the runtimes split three/three: python / js / csharp
+# iterated in insertion order while cpp / rust / go iterated sorted. No
+# shipped model collides, so every runtime agreed byte-for-byte and nothing
+# could detect the divergence -- these cases are what detects it.
+#
+# Keys are single codepoints because C++'s PhonemeIdMap is
+# std::map<char32_t, ...>: a multi-character key like "zz" cannot be
+# represented there, and real models do not have one (multi-character tokens
+# are folded into PUA codepoints, which is what `pua_names` covers).
+# ---------------------------------------------------------------------------
+
+REVERSE_MAP_CASES: list[dict] = [
+    {
+        "name": "collision_sorted_key_wins",
+        "description": (
+            "Two keys claim id 9. The winner is the one that sorts first, "
+            "not the one written first: insertion order would give 'z'."
+        ),
+        "inputs": {"phoneme_id_map": {"z": [9], "a": [9]}, "pua_names": None},
+    },
+    {
+        "name": "collision_reversed_input_order_same_winner",
+        "description": (
+            "The same map with the keys written the other way round. An "
+            "insertion-order runtime flips its answer here; a sorted one "
+            "cannot. Without this pair a runtime that happened to receive "
+            "the keys already sorted would look conformant."
+        ),
+        "inputs": {"phoneme_id_map": {"a": [9], "z": [9]}, "pua_names": None},
+    },
+    {
+        "name": "every_id_of_a_key_resolves",
+        "description": "Contract example: {\"b\": [6, 7]} -> {6: 'b', 7: 'b'}.",
+        "inputs": {"phoneme_id_map": {"a": [5], "b": [6, 7]}, "pua_names": None},
+    },
+    {
+        "name": "pua_name_beats_the_hex_fallback",
+        "description": (
+            "An explicit PUA name wins over the U+XXXX fallback, and an "
+            "unnamed PUA codepoint falls back to uppercase 4-digit hex."
+        ),
+        "inputs": {
+            "phoneme_id_map": {"\ue019": [42], "\ue7ff": [43], "a": [5]},
+            "pua_names": {"\ue019": "N_m"},
+        },
+    },
+    {
+        "name": "pua_collides_with_ascii_lower_key_wins",
+        "description": (
+            "An ASCII key and a PUA key claim the same id. ASCII sorts "
+            "first, so the resolved name is 'a' rather than 'N_m' -- the "
+            "case that distinguishes sorted order from 'PUA is special'."
+        ),
+        "inputs": {
+            "phoneme_id_map": {"\ue019": [9], "a": [9]},
+            "pua_names": {"\ue019": "N_m"},
+        },
+    },
+]
+
+
+def _compute_reverse_map_expected(case: dict) -> dict:
+    inputs = case["inputs"]
+    reverse = build_phoneme_id_reverse_map(
+        inputs["phoneme_id_map"], inputs["pua_names"]
+    )
+    # JSON object keys must be strings; every consumer parses them back to int.
+    return {str(k): v for k, v in sorted(reverse.items())}
+
+
+MIN_REVERSE_MAP_COLLISION_CASES = 2
+
+
 def build_fixture() -> dict:
     return {
         "schema_version": 1,
@@ -197,6 +277,10 @@ def build_fixture() -> dict:
         ),
         "calculation_formula": "frame_time_ms = (hop_length / sample_rate) * 1000",
         "cases": [{**case, "expected": _compute_expected(case)} for case in CASES],
+        "reverse_map_cases": [
+            {**case, "expected": _compute_reverse_map_expected(case)}
+            for case in REVERSE_MAP_CASES
+        ],
     }
 
 
@@ -240,7 +324,51 @@ def _validate_discriminating_power(cases: list[dict]) -> list[str]:
             "tolerance, so a narrower accumulator goes undetected."
         )
 
+    # A reverse-map case list with no COLLIDING id detects nothing about key
+    # order: every runtime agrees on a collision-free map regardless of how it
+    # iterates, which is precisely why the three/three split went unnoticed
+    # (issue #698). Two are required, with the keys written in opposite
+    # orders -- one alone would be satisfied by a runtime that happened to
+    # receive the keys already sorted.
+    colliding = [
+        c for c in REVERSE_MAP_CASES if _has_id_collision(c["inputs"]["phoneme_id_map"])
+    ]
+    if len(colliding) < MIN_REVERSE_MAP_COLLISION_CASES:
+        problems.append(
+            f"only {len(colliding)} reverse-map case(s) contain an id claimed "
+            f"by more than one key (need >= {MIN_REVERSE_MAP_COLLISION_CASES}). "
+            "Without a collision, first-wins key order is unobservable and the "
+            "cases cannot detect a runtime that iterates in insertion order."
+        )
+    else:
+        # A MIRRORED PAIR is required, not merely two different key orders:
+        # the same key set written both ways. An insertion-order runtime
+        # answers differently for the two members and so cannot pass both,
+        # whereas two unrelated colliding maps can both happen to arrive
+        # already sorted.
+        orders_by_keyset: dict[frozenset[str], set[tuple[str, ...]]] = {}
+        for case in colliding:
+            keys = tuple(case["inputs"]["phoneme_id_map"])
+            orders_by_keyset.setdefault(frozenset(keys), set()).add(keys)
+        if not any(len(orders) >= 2 for orders in orders_by_keyset.values()):
+            problems.append(
+                "no colliding reverse-map case is mirrored (the same key set "
+                "written in both orders), so a runtime that iterates in "
+                "insertion order could still pass by receiving every case "
+                "already sorted."
+            )
+
     return problems
+
+
+def _has_id_collision(phoneme_id_map: dict[str, list[int]]) -> bool:
+    seen: set[int] = set()
+    for ids in phoneme_id_map.values():
+        for phoneme_id in ids:
+            if phoneme_id in seen:
+                return True
+            seen.add(phoneme_id)
+    return False
 
 
 def _serialize(fixture: dict) -> str:

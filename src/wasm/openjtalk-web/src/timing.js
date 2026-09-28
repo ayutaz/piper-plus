@@ -286,7 +286,17 @@ export function buildPhonemeIdToTokenMap(phonemeIdMap, puaToMultiChar = null) {
     return reverse;
   }
 
-  for (const [char, ids] of Object.entries(phonemeIdMap)) {
+  // Keys are SORTED, not taken in insertion order, so that "first" in
+  // first-wins means the same thing in all six runtimes
+  // (contract [reverse_map.collision_resolution] key_order, issue #698).
+  // The default comparator sorts by UTF-16 code unit, which agrees with the
+  // code point order Python/C++ use and the UTF-8 byte order Rust/Go use for
+  // every key that can occur (ASCII .. PUA, all inside the BMP).
+  const sortedEntries = Object.entries(phonemeIdMap).sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  );
+
+  for (const [char, ids] of sortedEntries) {
     if (!Array.isArray(ids)) {
       continue;
     }
