@@ -183,15 +183,15 @@ public sealed class TimingWriterTests
         Assert.True(lines.Length >= 3, $"Expected at least 3 lines, got {lines.Length}");
 
         // Spec column header
-        Assert.Equal("start_ms\tend_ms\tduration_ms\tphoneme", lines[0].TrimEnd('\r'));
+        Assert.Equal("start_ms\tend_ms\tduration_ms\tphoneme", lines[0]);
 
         // First data row
-        var cols1 = lines[1].TrimEnd('\r').Split('\t');
+        var cols1 = lines[1].Split('\t');
         Assert.Equal(4, cols1.Length);
         Assert.Equal("a", cols1[3]);
 
         // Second data row
-        var cols2 = lines[2].TrimEnd('\r').Split('\t');
+        var cols2 = lines[2].Split('\t');
         Assert.Equal(4, cols2.Length);
         Assert.Equal("k", cols2[3]);
 
@@ -270,8 +270,8 @@ public sealed class TimingWriterTests
         string srt = reader.ReadToEnd();
 
         // Cue 1: index "1" + timestamp + phoneme + blank line
-        Assert.Contains("1\n", srt.Replace("\r\n", "\n"));
-        Assert.Contains("2\n", srt.Replace("\r\n", "\n"));
+        Assert.Contains("1\n", srt);
+        Assert.Contains("2\n", srt);
 
         // Timestamp format: HH:MM:SS,mmm with " --> " separator (spec).
         Assert.Matches(@"\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}", srt);
@@ -280,8 +280,8 @@ public sealed class TimingWriterTests
         Assert.Contains("00:00:00,000 --> ", srt);
 
         // Phonemes appear after their timestamp lines.
-        Assert.Contains("\na\n", srt.Replace("\r\n", "\n"));
-        Assert.Contains("\nk\n", srt.Replace("\r\n", "\n"));
+        Assert.Contains("\na\n", srt);
+        Assert.Contains("\nk\n", srt);
     }
 
     // ================================================================
@@ -630,5 +630,80 @@ public sealed class TimingWriterTests
         Assert.Equal("durations", ex.ParamName);
         Assert.Contains("durations length (3)", ex.Message);
         Assert.Contains("phoneme_tokens length (1)", ex.Message);
+    }
+
+    // ================================================================
+    // Line endings: the contract pins LF, and StreamWriter defaults to
+    // Environment.NewLine.
+    //
+    // The defect survived because the assertions normalised CRLF away
+    // (srt.Replace("\r\n", "\n"), lines[N].TrimEnd('\r')) while the Windows
+    // CI job stayed green. Those normalisations are gone.
+    //
+    // The DoesNotContain('\r') cases below are the Windows-CI net: on Linux
+    // and macOS Environment.NewLine is already "\n", so they pass whether or
+    // not the writer was configured. ForceLf_OverwritesACrlfNewLine is the
+    // one that fails everywhere, because it hands ForceLf a writer whose
+    // NewLine is already CRLF.
+    // ================================================================
+    [Fact]
+    public void ForceLf_OverwritesACrlfNewLine()
+    {
+        // NewLine is pre-set to CRLF so this fails on EVERY platform if
+        // ForceLf stops assigning. Asserting against a freshly constructed
+        // writer would not: Environment.NewLine is already "\n" on Linux and
+        // macOS, so dropping the assignment kept 44 tests green there
+        // (measured).
+        using var ms = new MemoryStream();
+        using var raw = new StreamWriter(ms, Encoding.UTF8, leaveOpen: true)
+        {
+            NewLine = "\r\n",
+        };
+
+        Assert.Equal("\n", TimingWriter.ForceLf(raw).NewLine);
+    }
+
+    [Fact]
+    public void WriteTsv_EmitsNoCarriageReturn()
+    {
+        var entries = new List<TimingWriter.PhonemeTimingEntry>
+        {
+            new("a", 0f, 10f, 10f),
+            new("k", 10f, 25f, 15f),
+        };
+
+        using var ms = new MemoryStream();
+        TimingWriter.WriteTsv(ms, entries);
+
+        Assert.DoesNotContain((byte)'\r', ms.ToArray());
+    }
+
+    [Fact]
+    public void WriteSrt_EmitsNoCarriageReturn()
+    {
+        var entries = new List<TimingWriter.PhonemeTimingEntry>
+        {
+            new("a", 0f, 10f, 10f),
+            new("k", 10f, 25f, 15f),
+        };
+
+        using var ms = new MemoryStream();
+        TimingWriter.WriteSrt(ms, entries);
+
+        Assert.DoesNotContain((byte)'\r', ms.ToArray());
+    }
+
+    [Fact]
+    public void WriteJson_EmitsNoCarriageReturn()
+    {
+        var entries = new List<TimingWriter.PhonemeTimingEntry>
+        {
+            new("a", 0f, 10f, 10f),
+        };
+
+        using var ms = new MemoryStream();
+        TimingWriter.WriteJson(ms, entries, 22050);
+
+        Assert.DoesNotContain((byte)'\r', ms.ToArray());
     }
 }

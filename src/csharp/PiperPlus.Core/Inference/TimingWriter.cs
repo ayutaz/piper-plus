@@ -251,7 +251,8 @@ public static class TimingWriter
 
         ArgumentNullException.ThrowIfNull(entries);
 
-        using var writer = new StreamWriter(filePath, append: false, encoding: System.Text.Encoding.UTF8);
+        using var writer = ForceLf(
+            new StreamWriter(filePath, append: false, encoding: Utf8NoBom));
         WriteTsvCore(writer, entries);
     }
 
@@ -263,7 +264,8 @@ public static class TimingWriter
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(entries);
 
-        using var writer = new StreamWriter(stream, encoding: System.Text.Encoding.UTF8, leaveOpen: true);
+        using var writer = ForceLf(
+            new StreamWriter(stream, encoding: Utf8NoBom, leaveOpen: true));
         WriteTsvCore(writer, entries);
     }
 
@@ -410,6 +412,41 @@ public static class TimingWriter
         };
     }
 
+    /// <summary>
+    /// BOM-less UTF-8 for every timing output format.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="System.Text.Encoding.UTF8"/> emits a byte-order mark, and
+    /// the TSV writers used it while the SRT writers already opted out. The
+    /// result was a BOM on C# TSV output that no other runtime produces —
+    /// invisible until the golden fixture started pinning the rendered bytes,
+    /// because every assertion compared parsed values.
+    /// </remarks>
+    private static readonly System.Text.UTF8Encoding Utf8NoBom =
+        new(encoderShouldEmitUTF8Identifier: false);
+
+    /// <summary>
+    /// Forces LF line endings on a writer used for timing output.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="StreamWriter.NewLine"/> defaults to
+    /// <see cref="Environment.NewLine"/>, which is CRLF on Windows. The
+    /// contract pins LF —
+    /// <c>[output_formats.tsv].row_separator = "\n"</c> and
+    /// <c>[output_formats.srt].cue_format</c> — and the other five runtimes
+    /// embed <c>"\n"</c> as a literal, so leaving the default made Windows
+    /// output byte-differ from every other platform and runtime.
+    ///
+    /// Applied through one factory rather than at each of the four writer
+    /// creation sites: three of four would have been an easy miss, and a
+    /// missed site only shows up on Windows.
+    /// </remarks>
+    internal static StreamWriter ForceLf(StreamWriter writer)
+    {
+        writer.NewLine = "\n";
+        return writer;
+    }
+
     private static void WriteTsvCore(StreamWriter writer, List<PhonemeTimingEntry> entries)
     {
         // Spec column header (docs/spec/phoneme-timing-contract.toml [output_formats.tsv]).
@@ -473,10 +510,10 @@ public static class TimingWriter
 
         // Use BOM-less UTF-8 — SRT players often choke on the BOM and the
         // spec output examples are byte-clean.
-        using var writer = new StreamWriter(
+        using var writer = ForceLf(new StreamWriter(
             filePath,
             append: false,
-            encoding: new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            encoding: Utf8NoBom));
         WriteSrtCore(writer, entries);
     }
 
@@ -488,10 +525,10 @@ public static class TimingWriter
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(entries);
 
-        using var writer = new StreamWriter(
+        using var writer = ForceLf(new StreamWriter(
             stream,
-            encoding: new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
-            leaveOpen: true);
+            encoding: Utf8NoBom,
+            leaveOpen: true));
         WriteSrtCore(writer, entries);
     }
 
@@ -584,5 +621,10 @@ internal sealed class TimingResultDto
 /// </summary>
 [JsonSerializable(typeof(List<TimingDto>))]
 [JsonSerializable(typeof(TimingResultDto))]
-[JsonSourceGenerationOptions(WriteIndented = true)]
+
+// NewLine is pinned to LF. `WriteIndented` writes Environment.NewLine, so on
+// Windows the JSON came out CRLF while the contract pins LF and the other five
+// runtimes emit LF — measured: WriteJson_EmitsNoCarriageReturn failed on
+// windows-latest and passed on macOS, which is why a local run never saw it.
+[JsonSourceGenerationOptions(WriteIndented = true, NewLine = "\n")]
 internal partial class TimingJsonContext : JsonSerializerContext;

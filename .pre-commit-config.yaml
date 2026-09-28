@@ -256,6 +256,24 @@ repos:
       # どのテストも CI step もどちらの分岐も実行していなかった。 判定を
       # 共有 helper (resolve_timing_tokens / ResolveTimingTokens) に置き、
       # CLI がそれを呼ぶことと両分岐のテストが存在することを強制する。
+      # contract は全出力形式で LF を pin しているが、 プラットフォーム既定に
+      # 任せると Windows で CRLF になる。 実際に 2 ランタイムがそうなっていた:
+      # C# は StreamWriter.NewLine を未設定 (既定 = Environment.NewLine) で、
+      # テストが CRLF を正規化して隠していた。 C++ CLI は timing ファイルを
+      # binary モードで開いておらず MSVC のテキストモードが変換していた
+      # (CLI E2E gate は Windows を除外している)。
+      #
+      # 単体テストだけでは守れない — Linux / macOS では
+      # Environment.NewLine が既に LF なので、 出力バイトの assert は
+      # コードが正しいかに関わらず通る。 検出できるのは「LF を強制して
+      # いるか」という機構側の検査であり、 それをこの gate が静的に行う。
+      - id: timing-newline-parity
+        name: "timing output forces LF (6 runtimes vs contract toml)"
+        entry: uv run --no-sync python scripts/check_timing_newline_parity.py
+        language: system
+        files: ^(src/python_run/piper_plus/timing\.py|src/rust/piper-core/src/timing\.rs|src/go/piperplus/timing\.go|src/wasm/openjtalk-web/src/timing\.js|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/cpp/main\.cpp|docs/spec/phoneme-timing-contract\.toml|scripts/check_timing_newline_parity\.py)$
+        pass_filenames: false
+
       - id: reverse-map-parity
         name: "phoneme ID reverse map + CLI wiring (6 runtimes vs contract toml)"
         entry: uv run --no-sync python scripts/check_reverse_map_parity.py

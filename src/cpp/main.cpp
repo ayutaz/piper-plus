@@ -1039,7 +1039,11 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
 
   // Output phoneme timing information if requested
   if (runConfig.outputTimingPath && result.hasTimingInfo) {
-    ofstream timingFile(runConfig.outputTimingPath.value());
+    // ios::binary: without it MSVC's text mode translates every '\n' into
+    // "\r\n", so Windows timing files byte-differ from every other platform
+    // while the contract pins '\n'
+    // (docs/spec/phoneme-timing-contract.toml [output_formats]).
+    ofstream timingFile(runConfig.outputTimingPath.value(), ios::binary);
     if (timingFile.is_open()) {
       if (runConfig.timingFormat == RunConfig::FORMAT_JSON) {
         // Pass the emitted sample count so total_duration_ms is the stream

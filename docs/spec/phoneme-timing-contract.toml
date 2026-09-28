@@ -283,6 +283,16 @@ ensure_ascii = false
 
 [output_formats.tsv]
 header = "start_ms\tend_ms\tduration_ms\tphoneme"
+# Byte-for-byte conformance, verified by the golden fixture's `tsv` field:
+#   python / rust / go / js / csharp : conformant
+#   cpp                              : NON-CONFORMANT -- emits 8 columns led
+#     by `phoneme` (plus start/end in seconds and start_frame/end_frame).
+#     Tracked separately because fixing it changes the C++ CLI's output for
+#     existing consumers; see the issue linked from CHANGELOG.
+# Until spec_version 1.2 the fixture held only float milliseconds, so this
+# layer was unchecked everywhere: the C++ column divergence and a UTF-8 BOM on
+# C# TSV output both surfaced the moment the rendered text was pinned.
+byte_parity_verified_by = "tests/fixtures/phoneme_timing/golden_matrix.json (expected.tsv)"
 column_separator = "\t"
 row_separator = "\n"
 trailing_newline = true
@@ -323,6 +333,9 @@ indexing_starts_at = 1
 # With `negative_input` below clamping to 0 first, all six runtimes then agree
 # bit-for-bit on every input.
 rounding = "half_away_from_zero"
+# Byte-for-byte conformance verified by the fixture's `srt` field across
+# all six runtimes (the C++ cue format matches; only its TSV diverges).
+byte_parity_verified_by = "tests/fixtures/phoneme_timing/golden_matrix.json (expected.srt)"
 # Negative milliseconds must be clamped to 0 before rounding, so the timestamp
 # is well-formed rather than sign-leaking into every field. Cursor walks clamp
 # negative frames already ([calculation.negative_handling]), so this is only

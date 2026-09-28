@@ -28,7 +28,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # Make the runtime package importable without installation.
 sys.path.insert(0, str(REPO_ROOT / "src/python_run"))
 
-from piper_plus.timing import durations_to_timing  # noqa: E402
+from piper_plus.timing import (  # noqa: E402
+    durations_to_timing,
+    timing_to_srt,
+    timing_to_tsv,
+)
 
 
 FIXTURE_PATH = REPO_ROOT / "tests/fixtures/phoneme_timing/golden_matrix.json"
@@ -168,6 +172,17 @@ def _compute_expected(case: dict) -> dict:
         "phonemes": [asdict(p) for p in result.phonemes],
         "total_duration_ms": result.total_duration_ms,
         "sample_rate": result.sample_rate,
+        # Formatted output, byte for byte.
+        #
+        # Until spec_version 1.2 the fixture held only float milliseconds, so
+        # the FORMATTING layer of every runtime was unchecked -- no case
+        # mentioned "srt" at all. Three defects were found there separately
+        # (#681 rounding at .5, #683 CRLF on Windows, #684 a thousands
+        # separator in the cue index), each by inspection rather than by a
+        # test. Pinning the rendered text closes that layer: a runtime whose
+        # numbers agree but whose rendering does not now fails.
+        "tsv": timing_to_tsv(result),
+        "srt": timing_to_srt(result),
     }
 
 

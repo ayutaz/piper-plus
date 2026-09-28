@@ -15,7 +15,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
-import { durationsToTiming } from "../../src/timing.js";
+import { durationsToTiming, timingToSrt, timingToTsv } from "../../src/timing.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_PATH = resolve(
@@ -45,6 +45,8 @@ describe("phoneme timing parity (WASM/JS ↔ canonical Python)", () => {
         phonemes: expectedPhonemes,
         total_duration_ms: expectedTotal,
         sample_rate: expectedSampleRate,
+        tsv: expectedTsv,
+        srt: expectedSrt,
       } = caseDef.expected;
 
       const result = durationsToTiming(
@@ -86,6 +88,22 @@ describe("phoneme timing parity (WASM/JS ↔ canonical Python)", () => {
       assert.ok(
         approxEqual(result.total_duration_ms, expectedTotal),
         `[${caseDef.name}] total_duration_ms got=${result.total_duration_ms} want=${expectedTotal}`
+      );
+
+      // Formatted-output parity, byte for byte. The fixture held only float
+      // milliseconds until spec_version 1.2, so the FORMATTING layer went
+      // unchecked in every runtime -- rounding at .5 (#681), CRLF on Windows
+      // (#683) and a thousands separator in the cue index (#684) were each
+      // found by reading code, not by a failing test.
+      assert.strictEqual(
+        timingToTsv(result),
+        expectedTsv,
+        `[${caseDef.name}] TSV bytes differ from the fixture`
+      );
+      assert.strictEqual(
+        timingToSrt(result),
+        expectedSrt,
+        `[${caseDef.name}] SRT bytes differ from the fixture`
       );
     });
   }

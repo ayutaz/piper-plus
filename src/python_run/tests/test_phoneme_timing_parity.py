@@ -129,6 +129,25 @@ def test_canonical_python_matches_fixture(case: dict):
         f"Python={result.total_duration_ms}, expected={expected['total_duration_ms']}"
     )
 
+    # Formatted-output parity, byte for byte.
+    #
+    # The fixture held only float milliseconds until spec_version 1.2, so the
+    # FORMATTING layer went unchecked in every runtime -- no case even
+    # mentioned "srt". Three defects were found there one at a time by reading
+    # code rather than by a failing test: rounding at .5 (#681), CRLF on
+    # Windows (#683), a thousands separator in the cue index (#684). Comparing
+    # the rendered text is what makes that layer testable.
+    assert timing_to_tsv(result) == expected["tsv"], (
+        f"case '{case['name']}': TSV bytes differ from the fixture"
+    )
+    assert timing_to_srt(result) == expected["srt"], (
+        f"case '{case['name']}': SRT bytes differ from the fixture"
+    )
+    # No runtime may emit a carriage return: the contract pins LF and the
+    # other five embed it as a literal (#683).
+    assert "\r" not in expected["tsv"], f"case '{case['name']}': fixture TSV has CR"
+    assert "\r" not in expected["srt"], f"case '{case['name']}': fixture SRT has CR"
+
     # per-phoneme parity
     for i, (got, want) in enumerate(zip(result.phonemes, expected["phonemes"])):
         assert got.phoneme == want["phoneme"], (

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using PiperPlus.Core.Inference;
 
@@ -73,6 +74,27 @@ public sealed class TimingWriterParityTests
                 actual.DurationMs,
                 precision: 3);
         }
+
+        // Formatted-output parity, byte for byte.
+        //
+        // The fixture held only float milliseconds until spec_version 1.2, so
+        // the FORMATTING layer went unchecked in every runtime. Three defects
+        // were found there one at a time by reading code rather than by a
+        // failing test: rounding at .5 (#681), CRLF on Windows (#683), a
+        // thousands separator in the cue index (#684). This is also the
+        // assertion that fails on Windows if ForceLf is ever dropped, since it
+        // compares bytes instead of normalising them away.
+        using var tsvStream = new MemoryStream();
+        TimingWriter.WriteTsv(tsvStream, entries);
+        Assert.Equal(
+            expected.GetProperty("tsv").GetString(),
+            Encoding.UTF8.GetString(tsvStream.ToArray()));
+
+        using var srtStream = new MemoryStream();
+        TimingWriter.WriteSrt(srtStream, entries);
+        Assert.Equal(
+            expected.GetProperty("srt").GetString(),
+            Encoding.UTF8.GetString(srtStream.ToArray()));
     }
 
     [Fact]
