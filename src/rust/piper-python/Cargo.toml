@@ -23,15 +23,23 @@ crate-type = ["cdylib"]
 # link against libpython directly via the `auto-initialize` dev-dependency
 # feature without colliding with the cdylib's "Python is the host" mode.
 piper_core = { package = "piper-plus", path = "../piper-core", version = "0.5.0", features = ["naist-jdic", "onnx"] }
-pyo3 = { version = "0.24" }
-numpy = "0.24"
+# pyo3 / numpy はバージョンを揃える必要がある (numpy crate が pyo3 を
+# 再 export するため)。 numpy 0.29.0 の `[dependencies.pyo3]` は
+# `version = "0.29.0"` を要求する。
+#
+# 0.24 -> 0.29 で以下の 2 API が削除されたため lib.rs 側も追従済み:
+#   Python::with_gil  -> Python::attach  (src/marker.rs)
+#   py.allow_threads  -> py.detach       (Ungil bound は維持)
+# 置換は名称のみで、 GIL の取得/解放というセマンティクスは変わらない。
+pyo3 = { version = "0.29" }
+numpy = "0.29"
 
 # Dev deps: enable auto-initialize so unit tests can acquire the GIL with
-# Python::with_gil without an external Python embedding setup.  This pulls
+# Python::attach without an external Python embedding setup.  This pulls
 # in the libpython runtime only for the `cargo test` binary; the wheel
 # build still receives `extension-module` via maturin (see comment above).
 [dev-dependencies]
-pyo3 = { version = "0.24", features = ["auto-initialize"] }
+pyo3 = { version = "0.29", features = ["auto-initialize"] }
 
 [features]
 default = []

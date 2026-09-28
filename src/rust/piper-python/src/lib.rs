@@ -43,14 +43,14 @@ fn piper_err_to_pyerr(err: piper_core::PiperError) -> PyErr {
 
 /// Wrapper around a raw mutable pointer that implements `Send`.
 ///
-/// SAFETY: This is safe to use with `py.allow_threads` because that function
+/// SAFETY: This is safe to use with `py.detach` because that function
 /// only releases the Python GIL -- the closure still executes on the **same**
 /// OS thread that holds `&mut self`.  No cross-thread data race can occur.
 /// The wrapper must NOT be stored or sent to another thread outside of
-/// `allow_threads`.
+/// `detach`.
 struct SendPtr<T>(*mut T);
 
-// SAFETY: SendPtr is only used within py.allow_threads which runs the
+// SAFETY: SendPtr is only used within py.detach which runs the
 // closure on the same OS thread.  The Send impl exists solely to satisfy
 // the Ungil bound.
 unsafe impl<T> Send for SendPtr<T> {}
@@ -74,7 +74,13 @@ impl<T> SendPtr<T> {
 ///
 /// Contains the generated audio samples and timing information.
 /// Audio can be accessed as numpy arrays (int16 or float32) or saved to WAV.
-#[pyclass]
+// pyo3 0.29: `#[pyclass]` + `Clone` に対する `FromPyObject` の自動 derive は
+// opt-in へ移行中で、 明示しないと deprecation 警告が出る
+// (CI は `cargo clippy -- -D warnings` なので警告は fail になる)。
+// SynthesisResult は戻り値専用 (`PyResult<SynthesisResult>` /
+// `PyResult<Vec<SynthesisResult>>`) で、 Python から引数として渡る経路が無い。
+// よって使われない抽出経路を増やさない `skip_from_py_object` を選ぶ。
+#[pyclass(skip_from_py_object)]
 #[derive(Clone)]
 struct SynthesisResult {
     /// Duration of the generated audio in seconds.
@@ -252,17 +258,17 @@ impl PiperVoice {
     ) -> PyResult<SynthesisResult> {
         // Copy parameters into owned values for the closure (text is &str,
         // language is Option<&str> -- we need owned copies to move into
-        // allow_threads).
+        // detach).
         let text_owned = text.to_string();
         let language_owned = language.map(|s| s.to_string());
 
         // SAFETY: We wrap the raw pointer in SendPtr to satisfy the Ungil
-        // bound required by allow_threads.  This is safe because
-        // allow_threads only releases the GIL -- the closure still runs on
+        // bound required by detach.  This is safe because
+        // detach only releases the GIL -- the closure still runs on
         // the same OS thread that holds &mut self, so no data race occurs.
         let inner_ptr = SendPtr(&mut self.inner as *mut piper_core::PiperVoice);
 
-        let result = py.allow_threads(move || {
+        let result = py.detach(move || {
             let inner = unsafe { inner_ptr.as_mut() };
             inner.synthesize_with_params(
                 &text_owned,
@@ -321,7 +327,7 @@ impl PiperVoice {
     ) -> PyResult<Vec<SynthesisResult>> {
         let inner_ptr = SendPtr(&mut self.inner as *mut piper_core::PiperVoice);
 
-        let results = py.allow_threads(move || {
+        let results = py.detach(move || {
             let inner = unsafe { inner_ptr.as_mut() };
             let mut out = Vec::with_capacity(texts.len());
             for text in &texts {
@@ -386,7 +392,7 @@ impl PiperVoice {
 
         let inner_ptr = SendPtr(&mut self.inner as *mut piper_core::PiperVoice);
 
-        let result = py.allow_threads(move || {
+        let result = py.detach(move || {
             let inner = unsafe { inner_ptr.as_mut() };
             let r = inner.synthesize_with_params(
                 &text_owned,
@@ -504,7 +510,7 @@ fn piper_plus(m: &Bound<'_, PyModule>) -> PyResult<()> {
 //
 //   1. `SendPtr<T>` -- a hand-rolled `unsafe impl Send` wrapper used to
 //      satisfy PyO3's `Ungil` bound when releasing the GIL via
-//      `py.allow_threads`.  If the `Send` bound regresses (e.g. an `*mut T`
+//      `py.detach`.  If the `Send` bound regresses (e.g. an `*mut T`
 //      field is accidentally replaced by a non-`Send` type) the wrapper would
 //      silently lose its GIL-release capability.  These tests pin the
 //      contract at compile time + run time.
@@ -551,7 +557,7 @@ mod tests {
     /// A `SendPtr` value can actually move across an `std::thread::spawn`
     /// boundary -- run-time confirmation that the trait bound is honoured.
     ///
-    /// This mirrors what `py.allow_threads` does internally: the closure
+    /// This mirrors what `py.detach` does internally: the closure
     /// (which captures `SendPtr`) must be `Send` to be scheduled.
     #[test]
     fn test_send_ptr_can_cross_thread_boundary() {
@@ -625,7 +631,7 @@ mod tests {
     //   _ (everything else, incl. InvalidArgument, Inference, Streaming,
     //     ModelLoad, Phonemize, ...)             -> PyRuntimeError
     //
-    // Every test below acquires the GIL via `Python::with_gil`; this
+    // Every test below acquires the GIL via `Python::attach`; this
     // requires the `pyo3/auto-initialize` dev-dependency feature.
 
     /// `AudioOutput(std::io::Error)` should map to `PyIOError`.  This is
@@ -635,7 +641,7 @@ mod tests {
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "missing.wav");
         let err = piper_core::PiperError::AudioOutput(io_err);
         let py_err = piper_err_to_pyerr(err);
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             assert!(
                 py_err.is_instance_of::<PyIOError>(py),
                 "AudioOutput should map to PyIOError, got: {}",
@@ -649,7 +655,7 @@ mod tests {
     fn test_piper_err_to_pyerr_wav_write_maps_to_py_io_error() {
         let err = piper_core::PiperError::WavWrite("disk full".to_string());
         let py_err = piper_err_to_pyerr(err);
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             assert!(
                 py_err.is_instance_of::<PyIOError>(py),
                 "WavWrite should map to PyIOError, got: {}",
@@ -666,7 +672,7 @@ mod tests {
             path: "/tmp/missing.json".to_string(),
         };
         let py_err = piper_err_to_pyerr(err);
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             assert!(
                 py_err.is_instance_of::<PyValueError>(py),
                 "ConfigNotFound should map to PyValueError, got: {}",
@@ -682,7 +688,7 @@ mod tests {
             reason: "missing audio.sample_rate".to_string(),
         };
         let py_err = piper_err_to_pyerr(err);
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             assert!(
                 py_err.is_instance_of::<PyValueError>(py),
                 "InvalidConfig should map to PyValueError, got: {}",
@@ -698,7 +704,7 @@ mod tests {
             code: "xx".to_string(),
         };
         let py_err = piper_err_to_pyerr(err);
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             assert!(
                 py_err.is_instance_of::<PyValueError>(py),
                 "UnsupportedLanguage should map to PyValueError, got: {}",
@@ -714,7 +720,7 @@ mod tests {
             phoneme: "ʈʃ".to_string(),
         };
         let py_err = piper_err_to_pyerr(err);
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             assert!(
                 py_err.is_instance_of::<PyValueError>(py),
                 "UnknownPhoneme should map to PyValueError, got: {}",
@@ -731,7 +737,7 @@ mod tests {
             phoneme: "_PAD_".to_string(),
         };
         let py_err = piper_err_to_pyerr(err);
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             assert!(
                 py_err.is_instance_of::<PyValueError>(py),
                 "PhonemeIdNotFound should map to PyValueError, got: {}",
@@ -750,7 +756,7 @@ mod tests {
             reason: "speaker_id out of range".to_string(),
         };
         let py_err = piper_err_to_pyerr(err);
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             assert!(
                 py_err.is_instance_of::<PyRuntimeError>(py),
                 "InvalidArgument falls through to PyRuntimeError (NOT \
@@ -768,7 +774,7 @@ mod tests {
     fn test_piper_err_to_pyerr_runtime_error_maps_to_py_runtime_error() {
         let err = piper_core::PiperError::Inference("ORT session failed".to_string());
         let py_err = piper_err_to_pyerr(err);
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             assert!(
                 py_err.is_instance_of::<PyRuntimeError>(py),
                 "Inference should map to PyRuntimeError, got: {}",
@@ -784,7 +790,7 @@ mod tests {
     fn test_piper_err_to_pyerr_synthesis_error_maps_correctly() {
         let err = piper_core::PiperError::Streaming("sentence boundary failure".to_string());
         let py_err = piper_err_to_pyerr(err);
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             assert!(
                 py_err.is_instance_of::<PyRuntimeError>(py),
                 "Streaming should map to PyRuntimeError, got: {}",
@@ -799,7 +805,7 @@ mod tests {
     fn test_piper_err_to_pyerr_unknown_error_maps_to_py_runtime_error() {
         let err = piper_core::PiperError::ModelLoad("opaque ORT failure".to_string());
         let py_err = piper_err_to_pyerr(err);
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             assert!(
                 py_err.is_instance_of::<PyRuntimeError>(py),
                 "ModelLoad (fallback _) should map to PyRuntimeError, got: {}",
