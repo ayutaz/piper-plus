@@ -11,6 +11,7 @@
 #include <unordered_set>
 
 #include "library_path.h"
+#include "download_validation.hpp"
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -173,62 +174,6 @@ static std::optional<fs::path> findUpstreamVoicesJson() {
     }
 
     return std::nullopt;
-}
-
-// Shell-safe for URLs: allowlist approach.
-// Only allow alphanumerics, hyphens, underscores, dots, forward slashes,
-// colons, and percent (for URL-encoded characters).
-// Explicitly rejects shell metacharacters: ' $ ` ( ) ; | & < > ~ # ! { } etc.
-static bool isSafeForShell(const std::string& s) {
-    for (char c : s) {
-        if (!std::isalnum(static_cast<unsigned char>(c)) &&
-            c != '-' && c != '_' && c != '.' && c != '/' &&
-            c != ':' && c != '%') {
-            return false;
-        }
-    }
-    return !s.empty();
-}
-
-// Shell-safe for file paths: allows backslashes for Windows path separators.
-// Explicitly rejects shell metacharacters: ' $ ` ( ) ; | & < > ~ # ! { } etc.
-static bool isSafeForShellPath(const std::string& s) {
-    for (char c : s) {
-        if (!std::isalnum(static_cast<unsigned char>(c)) &&
-            c != '-' && c != '_' && c != '.' && c != '/' &&
-            c != '\\' && c != ':') {
-            return false;
-        }
-    }
-    return !s.empty();
-}
-
-// Validate that a voice key contains no path traversal characters.
-// Rejects "..", "/", and "\" to prevent directory escape.
-static bool isSafeVoiceKey(const std::string& key) {
-    if (key.empty()) return false;
-    if (key.find("..") != std::string::npos) return false;
-    if (key.find('/') != std::string::npos) return false;
-    if (key.find('\\') != std::string::npos) return false;
-    return true;
-}
-
-// Validate that a repoId contains only safe characters (alphanumerics, hyphens,
-// underscores, dots, and a single forward slash separating owner/repo).
-static bool isSafeRepoId(const std::string& repoId) {
-    if (repoId.empty()) return false;
-    int slashCount = 0;
-    for (char c : repoId) {
-        if (c == '/') {
-            ++slashCount;
-            if (slashCount > 1) return false;  // only one slash allowed
-        } else if (!std::isalnum(static_cast<unsigned char>(c)) &&
-                   c != '-' && c != '_' && c != '.') {
-            return false;
-        }
-    }
-    // Must have exactly one slash (owner/repo format)
-    return slashCount == 1;
 }
 
 // Download a single file using system() with curl/wget/PowerShell

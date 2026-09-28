@@ -9,6 +9,8 @@
  */
 
 #include <gtest/gtest.h>
+
+#include "dictionary_search.hpp"
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -439,43 +441,28 @@ TEST(Utf8ValidationTest, InvalidUtf8ReturnsEmpty) {
 }
 
 // =========================================================================
-// 12. findDictionaryFile logic tests (3)
+// 12. findDictionaryFile logic tests
 //
-// findDictionaryFile and getExeDir are static in piper.cpp and cannot be
-// linked from this test binary (it does not link onnxruntime).  We
-// replicate the same 3-tier search algorithm here so the logic is
-// validated without pulling in the full piper.cpp dependency.
+// These now drive the PRODUCTION search (src/cpp/dictionary_search.hpp,
+// called by piper.cpp:findDictionaryFile). The function used to be `static`
+// inside piper.cpp -- unreachable from here, since this binary does not link
+// onnxruntime -- so this file carried a hand-written copy that skipped tier 2
+// entirely. A copy cannot detect a change to the search ORDER, which is the
+// only thing the function decides (issue #703). The header takes the exe
+// directory and the environment value as parameters so a test can control
+// both.
 // =========================================================================
 
 namespace {
 
-// Replicates piper.cpp findDictionaryFile() search logic:
-//   1. modelDir/<filename>
-//   2. <exeDir>/../share/piper-plus/dicts/<filename>  (skipped here — no exe context)
-//   3. PIPER_PLUS_DICTIONARIES_PATH/<filename>
-// Returns first existing path, or empty string.
+// Thin adapter matching the old replica's signature, so the existing cases
+// keep reading the same way. Tier 2 is exercised separately below.
 std::string findDictionaryFileTestImpl(const std::string &filename,
                                        const std::string &modelDir) {
-    namespace fs = std::filesystem;
-
-    // 1. Model directory
-    fs::path p1 = fs::path(modelDir) / filename;
-    if (fs::exists(p1)) {
-        return p1.string();
-    }
-
-    // 2. (exe-relative path skipped in test context)
-
-    // 3. Environment variable
-    const char *envPath = std::getenv("PIPER_PLUS_DICTIONARIES_PATH");
-    if (envPath && envPath[0] != '\0') {
-        fs::path p3 = fs::path(envPath) / filename;
-        if (fs::exists(p3)) {
-            return p3.string();
-        }
-    }
-
-    return {};
+    return piper::findDictionaryFileIn(
+               filename, modelDir, [] { return std::filesystem::path(); },
+               std::getenv("PIPER_PLUS_DICTIONARIES_PATH"))
+        .path;
 }
 
 // RAII helper to set/unset an environment variable for the scope of a test.
@@ -523,6 +510,140 @@ private:
 };
 
 } // anonymous namespace
+
+// The search ORDER is the only thing this function decides, and the old
+// replica could not test it: it skipped tier 2 (exe-relative) entirely, so
+// nothing pinned that a dictionary shipped beside the model wins over an
+// installed one, or that the environment variable is last rather than first.
+// Getting the order wrong degrades G2P silently instead of failing.
+TEST(FindDictionaryFileTest, ModelDirWinsOverExeRelativeAndEnv) {
+    const std::string filename = "cmudict_data.json";
+
+    TempDir modelDir;
+    std::ofstream(modelDir.path() / filename) << "{\"from\": \"model\"}";
+
+    // Tier 2 candidate: <exeDir>/../share/piper-plus/dicts/<filename>
+    TempDir exeRoot;
+    const auto dicts = exeRoot.path() / ".." / "share" / "piper-plus" / "dicts";
+    std::filesystem::create_directories(dicts);
+    std::ofstream(dicts / filename) << "{\"from\": \"exe\"}";
+
+    TempDir envDir;
+    std::ofstream(envDir.path() / filename) << "{\"from\": \"env\"}";
+
+    const auto result = piper::findDictionaryFileIn(
+        filename, modelDir.path().string(), [&] { return exeRoot.path(); },
+        envDir.path().string().c_str());
+
+    EXPECT_EQ(result.tier, piper::DictionaryTier::ModelDir)
+        << "the model directory must win when all three tiers have the file";
+    EXPECT_NE(result.path.find(modelDir.path().string()), std::string::npos);
+}
+
+TEST(FindDictionaryFileTest, ExeRelativeWinsOverEnv) {
+    const std::string filename = "pinyin_single.json";
+
+    TempDir emptyModelDir;  // tier 1 absent
+
+    TempDir exeRoot;
+    const auto dicts = exeRoot.path() / ".." / "share" / "piper-plus" / "dicts";
+    std::filesystem::create_directories(dicts);
+    std::ofstream(dicts / filename) << "{}";
+
+    TempDir envDir;
+    std::ofstream(envDir.path() / filename) << "{}";
+
+    const auto result = piper::findDictionaryFileIn(
+        filename, emptyModelDir.path().string(), [&] { return exeRoot.path(); },
+        envDir.path().string().c_str());
+
+    EXPECT_EQ(result.tier, piper::DictionaryTier::ExeRelative)
+        << "the installed location must win over the environment variable";
+}
+
+TEST(FindDictionaryFileTest, EnvVarIsTheLastResort) {
+    const std::string filename = "pinyin_phrases.json";
+
+    TempDir emptyModelDir;
+    TempDir exeRoot;  // no dicts subtree -> tier 2 absent
+
+    TempDir envDir;
+    std::ofstream(envDir.path() / filename) << "{}";
+
+    const auto result = piper::findDictionaryFileIn(
+        filename, emptyModelDir.path().string(), [&] { return exeRoot.path(); },
+        envDir.path().string().c_str());
+
+    EXPECT_EQ(result.tier, piper::DictionaryTier::EnvironmentVar);
+}
+
+// RAII: run a test body from a chosen working directory.
+//
+// Needed because an empty tier base composes into a RELATIVE path
+// ("../share/piper-plus/dicts/x" for tier 2, bare "x" for tier 3), which
+// resolves against the process CWD. Without controlling the CWD, a test
+// cannot tell "the tier was skipped" from "the relative path happened not to
+// exist" -- measured: dropping either emptiness guard left all 52 tests green.
+class ScopedCwd {
+public:
+    explicit ScopedCwd(const std::filesystem::path &dir)
+        : previous_(std::filesystem::current_path()) {
+        std::filesystem::current_path(dir);
+    }
+    ~ScopedCwd() { std::filesystem::current_path(previous_); }
+private:
+    std::filesystem::path previous_;
+};
+
+TEST(FindDictionaryFileTest, EmptyExeDirSkipsTierTwoEvenWhenTheRelativePathExists) {
+    // getExeDir() returns an empty path when it cannot determine the location.
+    // An empty base must SKIP tier 2, not fall through to
+    // "../share/piper-plus/dicts/<filename>" relative to the CWD.
+    const std::string filename = "cmudict_data.json";
+
+    TempDir sandbox;
+    const auto workdir = sandbox.path() / "work";
+    std::filesystem::create_directories(workdir);
+    // Plant exactly what an empty exeDir would compose to, relative to workdir.
+    const auto bait = sandbox.path() / "share" / "piper-plus" / "dicts";
+    std::filesystem::create_directories(bait);
+    std::ofstream(bait / filename) << "{}";
+
+    TempDir emptyModelDir;
+    ScopedCwd cwd(workdir);
+
+    const auto result = piper::findDictionaryFileIn(
+        filename, emptyModelDir.path().string(),
+        [] { return std::filesystem::path(); }, nullptr);
+
+    EXPECT_EQ(result.tier, piper::DictionaryTier::NotFound)
+        << "an empty exe dir must not probe a CWD-relative path; got "
+        << result.path;
+    EXPECT_TRUE(result.path.empty());
+}
+
+TEST(FindDictionaryFileTest, NullAndEmptyEnvValueAreBothTreatedAsUnset) {
+    // An empty env value composes to the bare filename, which resolves
+    // against the CWD. Planting the file there proves the emptiness check is
+    // what stops it, rather than the file merely being absent.
+    const std::string filename = "cmudict_data.json";
+
+    TempDir sandbox;
+    std::ofstream(sandbox.path() / filename) << "{}";
+
+    TempDir emptyModelDir;
+    ScopedCwd cwd(sandbox.path());
+
+    for (const char* env : {static_cast<const char*>(nullptr), ""}) {
+        const auto result = piper::findDictionaryFileIn(
+            filename, emptyModelDir.path().string(),
+            [] { return std::filesystem::path(); }, env);
+        EXPECT_EQ(result.tier, piper::DictionaryTier::NotFound)
+            << "env value " << (env == nullptr ? "nullptr" : "(empty)")
+            << " must not resolve the bare filename against the CWD; got "
+            << result.path;
+    }
+}
 
 TEST(FindDictionaryFileTest, EnvVarOverride) {
     // Create a temp directory with a dummy dictionary file
