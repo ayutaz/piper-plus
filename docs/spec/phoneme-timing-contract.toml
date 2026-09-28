@@ -46,6 +46,58 @@ for each (duration_frames, phoneme_token) in zip(durations, tokens):
 total_duration_ms = cursor_ms
 """
 
+[calculation.special_ids]
+# PAD / BOS / EOS advance the cursor but produce NO timing entry.
+#
+# This was previously stated only in passing, inside a
+# [concatenation] forbidden_offset_sources string that described the C++
+# behaviour. It was never normative, and the runtimes split 4-2 on it:
+# python / js / rust / go emitted entries for these ids while csharp / cpp
+# skipped them, so the same model and the same input produced different entry
+# counts depending on the runtime (issue #697).
+#
+# Skipping is the rule because:
+#   1. They are not phonemes. Every documented consumer -- lip-sync,
+#      subtitles, forced alignment -- has to filter them out first.
+#   2. Strategy A's pads are trimmed OUT of the delivered audio
+#      (short-text-contract.toml [trim]), so an entry for one points at audio
+#      that is not there.
+#   3. With them skipped, the last entry's end_ms lands exactly on the audio
+#      end: measured 100.0% (diff 0.000 ms) in C++ and Python at
+#      sentence_silence = 0.
+ids = [0, 1, 2]                 # PAD, BOS, EOS
+emits_entry = false
+advances_cursor = true
+# The invariant: a surviving entry's start_ms / start_frame must equal what
+# the cursor held when the walk reached it. Dropping the specials from the id
+# list BEFORE the walk breaks this -- it pulls the remaining entries forward,
+# so their timestamps stop pointing at their position in the stream.
+#
+# Two implementations satisfy it and both are in the tree:
+#   skip_during_walk   -- csharp, cpp: advance the cursor, emit nothing
+#   filter_after_walk  -- python, rust, go, js: walk everything, then remove
+#                         the entries whose id is special
+# They are observationally identical. `skip_during_walk` has no length
+# mismatch to handle; `filter_after_walk` does, see on_length_mismatch below.
+filter_order = "after_cursor_walk"   # legacy key name, kept for compatibility
+position_invariant = "surviving_entries_keep_walk_positions"
+allowed_implementations = ["skip_during_walk", "filter_after_walk"]
+# On a length mismatch between the id list and the entry list, emit
+# everything rather than guess: keeping extra entries is less harmful than
+# dropping the wrong ones.
+on_length_mismatch = "leave_entries_untouched"
+
+[calculation.total_duration_ms]
+# The length of the stream the caller receives, NOT the sum of the cursor
+# walk.
+#
+# The cursor also counts padding and EOS regions that the trims remove from
+# the audio, so summing it overshoots the real WAV -- measured 105.3% in the
+# Rust CLI on a 66-id utterance. C++ moved to the emitted-sample basis in
+# #662 and Python in #660; rust / go followed in #697.
+basis = "emitted_interleaved_samples / (sample_rate * channels) * 1000"
+conformance = "python, cpp, rust, go: emitted samples. csharp, js: cursor sum (they do not own the output stream; the embedding application does)."
+
 [calculation.frame_quantization]
 # The `durations` tensor is exported BEFORE `torch.ceil`, but the decoder
 # allocates `ceil(d_i)` frames to phoneme i. Timing must use the ceil'd value,

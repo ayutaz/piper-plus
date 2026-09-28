@@ -49,7 +49,7 @@ import { WebGPUSessionManager } from "./webgpu-session-manager.js";
 import { StreamingTTSPipeline } from "./streaming-pipeline.js";
 import { ModelManager } from "./model-manager.js";
 import { AudioResult } from "./audio-result.js";
-import { DEFAULT_HOP_LENGTH, buildPhonemeIdToTokenMap, durationsToTiming } from "./timing.js";
+import { DEFAULT_HOP_LENGTH, buildPhonemeIdToTokenMap, durationsToTiming, dropSpecialIdEntries } from "./timing.js";
 import { RustWasmAdapter } from "./phonemizer/rust-wasm-adapter.js";
 import { JsG2pAdapter } from "./phonemizer/js-g2p-adapter.js";
 import { CompositePhonemizer } from "./phonemizer/composite-phonemizer.js";
@@ -1067,7 +1067,16 @@ export class PiperPlus {
           ? durations.subarray(0, minLen)
           : Array.from(durations).slice(0, minLen);
 
-    return durationsToTiming(alignedDurations, sampleRate, DEFAULT_HOP_LENGTH, tokens);
+    const timing = durationsToTiming(
+      alignedDurations,
+      sampleRate,
+      DEFAULT_HOP_LENGTH,
+      tokens
+    );
+
+    // Drop PAD / BOS / EOS entries (contract [calculation.special_ids]).
+    // Applied after the walk, so the surviving entries keep their positions.
+    return dropSpecialIdEntries(timing, phonemeIds.slice(0, minLen));
   }
 
   /**

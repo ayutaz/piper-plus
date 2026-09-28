@@ -59,6 +59,46 @@ export const DEFAULT_HOP_LENGTH = 256;
  * @throws {Error} If `sampleRate <= 0`, `hopLength <= 0`, or `phonemeTokens`
  *   length differs from `durations` length.
  */
+/**
+ * PAD / BOS / EOS phoneme ids.
+ *
+ * The cursor walk advances over these but emits no timing entry for them
+ * (docs/spec/phoneme-timing-contract.toml [calculation.special_ids]). They
+ * are not phonemes, so they are useless for lip-sync, subtitles and forced
+ * alignment alike, and Strategy A's pads are trimmed OUT of the audio — an
+ * entry for one points at audio that is not there.
+ *
+ * @type {ReadonlySet<number>}
+ */
+export const SPECIAL_PHONEME_IDS = new Set([0, 1, 2]);
+
+/**
+ * Remove PAD / BOS / EOS entries from an already-walked result.
+ *
+ * The filter runs AFTER the walk: filtering first would pull the remaining
+ * entries forward, so their timestamps would stop pointing at their position
+ * in the stream. `phonemeIds` must be in the same order and of the same
+ * length as `result.phonemes`; a mismatch leaves the result untouched,
+ * because keeping extra entries is less harmful than dropping the wrong ones.
+ *
+ * @param {object} result - Timing result to filter in place.
+ * @param {ArrayLike<number>} phonemeIds - Ids aligned with result.phonemes.
+ * @returns {object} The same result object.
+ */
+export function dropSpecialIdEntries(result, phonemeIds) {
+  if (!result || !phonemeIds || phonemeIds.length !== result.phonemes.length) {
+    return result;
+  }
+  const kept = [];
+  for (let i = 0; i < result.phonemes.length; i++) {
+    if (!SPECIAL_PHONEME_IDS.has(phonemeIds[i])) {
+      kept.push(result.phonemes[i]);
+    }
+  }
+  result.phonemes = kept;
+  return result;
+}
+
 export function durationsToTiming(
   durations,
   sampleRate,

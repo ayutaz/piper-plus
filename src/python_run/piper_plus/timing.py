@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_HOP_LENGTH: int = 256
 
+# PAD / BOS / EOS. The cursor walk advances over these but emits no timing
+# entry for them (contract: [calculation.special_ids]). Declared here rather
+# than in voice.py so the id set sits in the same module as the walk, as it
+# does in timing.rs / timing.go / timing.js.
+SPECIAL_PHONEME_IDS: frozenset[int] = frozenset({0, 1, 2})
+
 
 @dataclass
 class PhonemeTimingInfo:

@@ -1054,11 +1054,19 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
     }
   }
 
-  // Extract phoneme timing information using the original (pre-padding)
-  // sequence so callers see indices aligned with their input.
+  // Extract phoneme timing information.
+  //
+  // The ids MUST be the padded sequence, not `originalPhonemeIds`: the walk
+  // pairs durations[i] with phonemeIds[i], and `paddedDurations` came back
+  // from a model that was fed the PADDED ids. The padded layout is
+  // [BOS, pad x frontPad, ...body..., pad x backPad, EOS], so pairing it with
+  // the pre-padding sequence shifts the body by `frontPad` and every real
+  // phoneme is handed a pad's duration (issue #689). The old comment claimed
+  // pre-padding ids let "callers see indices aligned with their input", but
+  // an index that points at the wrong duration is not alignment.
   if (haveDurations && voice != nullptr) {
     result.phonemeTimings = extractTimingsFromDurations(
-        paddedDurations, originalPhonemeIds,
+        paddedDurations, phonemeIds,
         voice->phonemizeConfig.phonemeIdMap,
         hopSize,
         voice->synthesisConfig.sampleRate,
@@ -1274,8 +1282,9 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
       // Reuses the function-scope hopSize resolved above; re-declaring it
       // here would shadow it (CodeQL cpp/declaration-hides-variable) and
       // recompute the identical value.
+      // Padded ids, for the same reason as the int16 path above (#689).
       result.phonemeTimings = extractTimingsFromDurations(
-          durationVec, originalPhonemeIds,
+          durationVec, phonemeIds,
           voice->phonemizeConfig.phonemeIdMap,
           hopSize,
           voice->synthesisConfig.sampleRate,

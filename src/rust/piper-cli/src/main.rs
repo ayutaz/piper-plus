@@ -666,7 +666,20 @@ fn main() -> Result<()> {
                         result.sample_rate,
                         piper_plus::timing::DEFAULT_HOP_LENGTH,
                     ) {
-                        Ok(timing) => {
+                        Ok(mut timing) => {
+                            // PAD / BOS / EOS の entry を落とす (contract
+                            // [calculation.special_ids])。walk の後に掛ける
+                            // ので残った entry の位置は動かない。
+                            if let Some(ids) = result.phoneme_ids.as_deref() {
+                                piper_plus::timing::drop_special_id_entries(&mut timing, ids);
+                            }
+                            // total は「呼び出し元が受け取るストリームの長さ」。
+                            // cursor の合計ではない — cursor は trim された
+                            // padding / EOS 区間も数えるため、実 WAV を
+                            // 超過する (実測 105.3%)。C++ は #662 で、Python は
+                            // #660 で同じ基準に移っている。
+                            timing.total_duration_ms =
+                                result.audio.len() as f64 / f64::from(result.sample_rate) * 1000.0;
                             let output = match format.as_str() {
                                 "json" => timing.to_json().unwrap_or_default(),
                                 "tsv" => timing.to_tsv(),

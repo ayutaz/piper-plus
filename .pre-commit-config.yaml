@@ -284,6 +284,27 @@ repos:
         files: ^(docs/spec/phoneme-timing-contract\.toml|src/python_run/piper_plus/timing\.py|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/rust/piper-core/src/timing\.rs|src/rust/piper-cli/src/main\.rs|src/go/piperplus/timing\.go|src/go/piperplus/timing_test\.go|src/go/cmd/piper-plus/main\.go|src/wasm/openjtalk-web/src/timing\.js|src/cpp/piper\.cpp|scripts/check_reverse_map_parity\.py)$
         pass_filenames: false
 
+      # PAD / BOS / EOS (id 0/1/2) は cursor を進めるが timing entry を
+      # 出さない、 という契約 ([calculation.special_ids])。 この節を書く前は
+      # python/rust/go/js が entry を出し csharp/cpp が出さない 4-2 split で、
+      # 同じモデル・同じ入力でも呼ぶランタイム次第で entry 数が変わっていた
+      # (issue #697)。 consumer (lip-sync / 字幕 / forced alignment) は
+      # どのランタイムと話しているかを知らないと出力を解釈できなかった。
+      #
+      # 契約が許す実装は 2 通りで両方 tree にある:
+      #   skip_during_walk  (csharp/cpp)  walk 中に cursor だけ進めて emit しない
+      #   filter_after_walk (python/rust/go/js) walk 後に special の entry を除去
+      # gate は「id 集合の宣言」「production の適用箇所」「named test」を
+      # ランタイム毎に検査する。 適用箇所の pattern は必ず引数か分岐条件を
+      # 含める — 関数名だけでは定義側にも一致し、 呼び出しを削除しても gate が
+      # 緑のままになる (reverse-map-parity 初版で実際に起きた vacuity)。
+      - id: special-ids-parity
+        name: "PAD/BOS/EOS skip parity (6 runtimes vs contract toml)"
+        entry: uv run --no-sync python scripts/check_special_ids_parity.py
+        language: system
+        files: ^(docs/spec/phoneme-timing-contract\.toml|src/python_run/piper_plus/timing\.py|src/python_run/piper_plus/voice\.py|src/python_run/tests/test_phoneme_timing\.py|src/rust/piper-core/src/timing\.rs|src/rust/piper-cli/src/main\.rs|src/go/piperplus/timing\.go|src/go/piperplus/timing_test\.go|src/go/cmd/piper-plus/main\.go|src/wasm/openjtalk-web/src/timing\.js|src/wasm/openjtalk-web/src/index\.js|src/wasm/openjtalk-web/test/js/test-phoneme-timing\.js|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/csharp/PiperPlus\.Core\.Tests/TimingWriterTests\.cs|src/cpp/timing_helpers\.hpp|src/cpp/tests/test_timing_helpers\.cpp|scripts/check_special_ids_parity\.py)$
+        pass_filenames: false
+
       - id: srt-rounding-parity
         name: "SRT ms rounding parity (6 runtimes vs contract toml)"
         entry: uv run --no-sync python scripts/check_srt_rounding_parity.py

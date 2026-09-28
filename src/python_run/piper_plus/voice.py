@@ -15,6 +15,7 @@ from .config import PhonemeType, PiperConfig
 from .const import BOS, EOS, PAD
 from .phonemize.token_mapper import FIXED_PUA_MAPPING
 from .timing import (
+    SPECIAL_PHONEME_IDS as _SPECIAL_PHONEME_IDS,
     PhonemeTimingInfo,
     TimingResult,
     build_phoneme_id_reverse_map,
@@ -53,6 +54,7 @@ MIN_BODY_FOR_STRATEGY_A = 3
 
 SHORT_TEXT_CHARS = 10
 SILENCE_PAD_MS = 300
+
 TRIM_THRESHOLD_RMS = 0.01
 TRIM_MIN_SAMPLES = 2205  # 22050 Hz * 0.1 s
 
@@ -1303,6 +1305,7 @@ class PiperVoice:
                     min_len = min(len(dur_list), len(tokens))
                     dur_list = dur_list[:min_len]
                     tokens = tokens[:min_len]
+                    ids_for_timing = list(original_ids[:min_len])
 
                     timing = durations_to_timing(
                         dur_list,
@@ -1311,7 +1314,20 @@ class PiperVoice:
                         hop_length=self.config.hop_size,
                     )
 
-                    for p in timing.phonemes:
+                    # PAD / BOS / EOS は cursor を進めるが entry は出さない。
+                    #
+                    # docs/spec/phoneme-timing-contract.toml
+                    # [calculation.special_ids] の規定。これらは音素ではなく、
+                    # lip-sync / 字幕 / 強制アライメントのどの用途でも使えない。
+                    # さらに Strategy A の pad は WAV から trim されるため、
+                    # entry を出すと**存在しない音声**を指すことになる。
+                    #
+                    # フィルタは cursor walk の**後**に掛ける: 先に間引くと
+                    # 残ったエントリの開始位置が前に詰まり、タイムスタンプが
+                    # ストリーム上の位置を指さなくなる。
+                    for pid, p in zip(ids_for_timing, timing.phonemes, strict=False):
+                        if pid in _SPECIAL_PHONEME_IDS:
+                            continue
                         all_timing_entries.append(
                             PhonemeTimingInfo(
                                 phoneme=p.phoneme,
