@@ -9,6 +9,7 @@ on:
       - 'src/wasm/g2p/**'
       - 'tests/fixtures/g2p/**'
       - '.github/workflows/g2p-cross-platform-ci.yml'
+      - 'scripts/check_pua_consistency.py'
   pull_request:
     paths:
       - 'src/python/g2p/**'
@@ -17,6 +18,7 @@ on:
       - 'tests/fixtures/g2p/**'
       - '.github/workflows/g2p-cross-platform-ci.yml'
 
+      - 'scripts/check_pua_consistency.py'
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true

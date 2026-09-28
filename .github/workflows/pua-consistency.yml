@@ -27,6 +27,8 @@ on:
       - 'docs/spec/pua-contract.toml'
       - 'scripts/check_pua_consistency.py'
       - '.github/workflows/pua-consistency.yml'
+      - 'scripts/regenerate_test_fixture.py'
+      - 'scripts/test_sync_gates_meta.py'
   pull_request:
     paths:
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
@@ -43,6 +45,8 @@ on:
       - 'docs/spec/pua-contract.toml'
       - 'scripts/check_pua_consistency.py'
       - '.github/workflows/pua-consistency.yml'
+      - 'scripts/regenerate_test_fixture.py'
+      - 'scripts/test_sync_gates_meta.py'
   schedule:
     # Weekly: catch a stale *distributed* (HuggingFace) config — e.g. the
     # v1.12.0 ɔɪ/œ̃/ɐ̃ multi-codepoint leak that broke C++ inference on Windows.

@@ -10,6 +10,10 @@ on:
       - 'src/python/piper_train/infer_onnx.py'
       - 'src/python/piper_train/ort_utils.py'
       - '.github/workflows/deploy-huggingface.yml'
+      - 'scripts/check_hf_space_frontmatter.py'
+      - 'scripts/check_hf_space_gradio_sync.py'
+      - 'scripts/verify_hf_space_runtime.py'
+      - 'test/models/multilingual-test-medium.onnx'
   workflow_dispatch:
     inputs:
       deployment_message:

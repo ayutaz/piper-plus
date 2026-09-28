@@ -23,6 +23,7 @@ on:
       - 'cmake/EmbedJson.cmake'
       - 'cmake/PiperCommon.cmake'
       - '.github/workflows/zh-en-loanword-sync.yml'
+      - 'scripts/test_sync_gates_meta.py'
   pull_request:
     paths:
       - '**/zh_en_loanword.json'
@@ -33,6 +34,7 @@ on:
       - 'cmake/EmbedJson.cmake'
       - 'cmake/PiperCommon.cmake'
       - '.github/workflows/zh-en-loanword-sync.yml'
+      - 'scripts/test_sync_gates_meta.py'
   workflow_dispatch:
 
 concurrency:

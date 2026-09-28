@@ -12,6 +12,7 @@ on:
       - 'test/**'
       - '.github/workflows/test-japanese-tts.yml'
       - '.github/workflows/build-piper.yml'
+      - 'scripts/test_japanese_tts.py'
   workflow_dispatch:
   workflow_call:
 

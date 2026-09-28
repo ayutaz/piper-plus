@@ -8,6 +8,8 @@ on:
       - 'src/wasm/**'
       - 'src/rust/piper-wasm/**'
       - '.github/workflows/deploy-webassembly-demo.yml'
+      - 'scripts/verify_pages_assets.py'
+      - 'test/models/multilingual-test-medium.onnx'
   workflow_dispatch:
     inputs:
       deploy_message:

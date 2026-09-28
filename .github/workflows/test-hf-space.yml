@@ -16,12 +16,14 @@ on:
       - 'src/python/piper_train/vits/wavfile.py'
       - '.github/workflows/test-hf-space.yml'
       - '.github/workflows/deploy-huggingface.yml'
+      - 'scripts/check_hf_space_frontmatter.py'
   pull_request:
     paths:
       - 'huggingface-space/**'
       - 'src/python/g2p/**'
       - 'src/python/piper_train/infer_onnx.py'
       - 'src/python/piper_train/ort_utils.py'
+      - 'scripts/check_hf_space_frontmatter.py'
   workflow_dispatch:
 
 concurrency:

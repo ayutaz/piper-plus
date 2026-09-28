@@ -192,28 +192,28 @@ repos:
         entry: uv run --no-sync python scripts/check_pua_consistency.py --check-version
         language: system
         # Mirror of paths in .github/workflows/pua-consistency.yml
-        files: ^(src/python/g2p/piper_plus_g2p/data/pua\.json|src/python/g2p/piper_plus_g2p/encode/.+|src/python_run/piper_plus/phonemize/token_mapper\.py|src/rust/piper-plus-g2p/src/token_map\.rs|src/go/phonemize/pua\.go|src/go/phonemize/pua_test\.go|src/wasm/g2p/src/pua-map\.js|src/csharp/PiperPlus\.Core/Mapping/OpenJTalkToPiperMapping\.cs|src/cpp/phoneme_parser\.cpp)$
+        files: ^(src/python/g2p/piper_plus_g2p/data/pua\.json|src/python/g2p/piper_plus_g2p/encode/.+|src/python_run/piper_plus/phonemize/token_mapper\.py|src/rust/piper-plus-g2p/src/token_map\.rs|src/go/phonemize/pua\.go|src/go/phonemize/pua_test\.go|src/wasm/g2p/src/pua-map\.js|src/csharp/PiperPlus\.Core/Mapping/OpenJTalkToPiperMapping\.cs|src/cpp/phoneme_parser\.cpp|Sources/PiperPlusG2P/PUAMap\.swift|docs/spec/pua\-contract\.toml|scripts/check_pua_consistency\.py)$
         pass_filenames: false
 
       - id: pua-fixture-drift
         name: Test fixture in sync with pua.json
         entry: uv run --no-sync python scripts/regenerate_test_fixture.py --check
         language: system
-        files: ^(src/python/g2p/piper_plus_g2p/data/pua\.json|tests/fixtures/g2p/phoneme_test_cases\.json)$
+        files: ^(src/python/g2p/piper_plus_g2p/data/pua\.json|tests/fixtures/g2p/phoneme_test_cases\.json|scripts/regenerate_test_fixture\.py)$
         pass_filenames: false
 
       - id: dictionary-consistency
         name: Custom dictionaries (data/dictionaries → WASM assets) byte-equal
         entry: uv run --no-sync python scripts/check_dictionary_consistency.py
         language: system
-        files: ^(data/dictionaries/(default_common|default_tech|additional_tech)_dict\.json|src/wasm/openjtalk-web/assets/(default_common|default_tech|additional_tech)_dict\.json)$
+        files: ^(data/dictionaries/(default_common|default_tech|additional_tech)_dict\.json|src/wasm/openjtalk-web/assets/(default_common|default_tech|additional_tech)_dict\.json|docs/spec/dictionary\-mirrors\.toml|scripts/_mirror_check\.py|scripts/check_dictionary_consistency\.py)$
         pass_filenames: false
 
       - id: ruff-version-sync
         name: ruff version pin synchronization (5 sites across pre-commit/workflows/pyproject)
         entry: uv run --no-sync python scripts/check_ruff_version_sync.py
         language: system
-        files: ^(\.pre-commit-config\.yaml|\.github/workflows/python-lint\.yml|pyproject\.toml|scripts/check_ruff_version_sync\.py)$
+        files: ^(\.pre-commit-config\.yaml|\.github/workflows/python-lint\.yml|pyproject\.toml|scripts/check_ruff_version_sync\.py|src/python/g2p/pyproject\.toml|src/python/pyproject\.toml)$
         pass_filenames: false
 
       # `exports["./wasm/*"]` は 3 箇所が揃って初めて出荷される — package.json の
@@ -274,6 +274,27 @@ repos:
         files: ^(src/python_run/piper_plus/timing\.py|src/rust/piper-core/src/timing\.rs|src/go/piperplus/timing\.go|src/wasm/openjtalk-web/src/timing\.js|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/cpp/main\.cpp|docs/spec/phoneme-timing-contract\.toml|scripts/check_timing_newline_parity\.py)$
         pass_filenames: false
 
+      # ゲートは trigger が見せてくれる範囲しか守れない。 GitHub は
+      # on.*.paths に該当する変更が無ければ workflow を起動せず、 pre-commit
+      # は files: に一致しなければ hook を走らせない。 つまり 「file X が
+      # 存在すること」 を検査する job は、 X だけを触る PR では一度も走らない
+      # — それが検出したい唯一の変更であっても。
+      #
+      # 実例:
+      #   - timing-parity.yml は 「parity テストを削除したら fail する」 と
+      #     宣言しながら、 守る 6 ファイルが paths: に無かった
+      #   - reverse-map-parity hook は piper-cli/src/main.rs を読むのに
+      #     files: に含めておらず、 CLI だけの変更で走らなかった
+      #   - docs/spec/loanword-mirrors.toml (何を比較するかの宣言) は
+      #     workflow にも hook にも登録が無く、 ミラーを 1 件削除する PR が
+      #     ゲートを起動しなかった
+      - id: trigger-coverage
+        name: "gate trigger coverage (workflow paths: / pre-commit files:)"
+        entry: uv run --no-sync python scripts/check_trigger_coverage.py
+        language: system
+        files: ^(\.github/workflows/.*\.yml|\.pre-commit-config\.yaml|scripts/check_trigger_coverage\.py)$
+        pass_filenames: false
+
       - id: reverse-map-parity
         name: "phoneme ID reverse map + CLI wiring (6 runtimes vs contract toml)"
         entry: uv run --no-sync python scripts/check_reverse_map_parity.py
@@ -316,7 +337,7 @@ repos:
         name: "pre-commit files regex coverage (meta gate)"
         entry: uv run --no-sync python scripts/check_precommit_file_regex.py
         language: system
-        files: ^(\.pre-commit-config\.yaml|scripts/check_precommit_file_regex\.py)$
+        files: ^(\.pre-commit-config\.yaml|scripts/check_precommit_file_regex\.py|src/python_run/requirements\.txt)$
         pass_filenames: false
 
       # v2.0 `piper` -> `piper_plus` rename (commit b86df3f9) の carryover
@@ -332,7 +353,7 @@ repos:
         name: no legacy `import piper` / `from piper import` (v2.0 rename gate)
         entry: uv run --no-sync python scripts/check_no_legacy_piper_imports.py
         language: system
-        files: \.py$
+        files: ^(.*\.py|docs/design/piper\-plus\-module\-rename\-v2\.md|scripts/check_no_legacy_piper_imports\.py)$
         pass_filenames: true
 
       # SSML subset 仕様 byte-for-byte 三方向 drift gate。
@@ -343,7 +364,7 @@ repos:
         name: SSML subset contract (toml ↔ python ↔ fixture)
         entry: uv run --no-sync python scripts/check_ssml_contract.py
         language: system
-        files: ^(docs/spec/ssml-contract\.toml|src/python/g2p/piper_plus_g2p/ssml\.py|tests/fixtures/ssml/contract\.json|scripts/check_ssml_contract\.py|scripts/regenerate_ssml_fixture\.py)$
+        files: ^(docs/spec/ssml-contract\.toml|src/python/g2p/piper_plus_g2p/ssml\.py|tests/fixtures/ssml/contract\.json|scripts/check_ssml_contract\.py|scripts/regenerate_ssml_fixture\.py|src/wasm/g2p/src/ssml\.js)$
         pass_filenames: false
 
       # Streaming API 表面 (function 名 / return 型 / sentence boundary) の
@@ -362,7 +383,7 @@ repos:
         name: Swift G2P xcframework ABI contract
         entry: uv run --no-sync python scripts/check_swift_g2p_contract.py
         language: system
-        files: ^(docs/spec/swift-g2p-contract\.toml|Sources/PiperPlusG2P/|scripts/check_swift_g2p_contract\.py)
+        files: ^(^(docs/spec/swift-g2p-contract\.toml|Sources/PiperPlusG2P/|scripts/check_swift_g2p_contract\.py)|scripts/check_pua_consistency\.py|src/python/g2p/piper_plus_g2p/data/pua\.json)$
         pass_filenames: false
 
       # M2 T-005: docs/spec/model-sha256-manifest.toml の構造健全性 gate。
@@ -372,7 +393,7 @@ repos:
         name: model-sha256-manifest.toml structural gate
         entry: uv run python scripts/check_model_sha256_manifest.py
         language: system
-        files: ^(docs/spec/model-sha256-manifest\.toml|scripts/check_model_sha256_manifest\.py)$
+        files: ^(docs/spec/model-sha256-manifest\.toml|scripts/check_model_sha256_manifest\.py|scripts/verify_model_checksums\.py)$
         pass_filenames: false
 
       # M2 T-006: docs/spec/artifact-retention-contract.toml gate。
@@ -446,7 +467,7 @@ repos:
         name: Short-text strategy contract (6 runtimes vs toml)
         entry: uv run --no-sync python scripts/check_short_text_contract.py
         language: system
-        files: ^(docs/spec/short-text-contract\.toml|scripts/check_short_text_contract\.py|src/python_run/piper_plus/voice\.py|src/rust/piper-core/src/short_text\.rs|src/go/piperplus/.*\.go)$
+        files: ^(docs/spec/short-text-contract\.toml|scripts/check_short_text_contract\.py|src/python_run/piper_plus/voice\.py|src/rust/piper-core/src/short_text\.rs|src/go/piperplus/.*\.go|src/python/piper_train/infer_onnx\.py)$
         pass_filenames: false
 
       # Text splitter (.!?。！？．) 終止符による文単位分割の cross-runtime
@@ -456,7 +477,7 @@ repos:
         name: Text splitter contract (sentence-boundary parity)
         entry: uv run --no-sync python scripts/check_text_splitter_contract.py
         language: system
-        files: ^(docs/spec/text-splitter-contract\.toml|scripts/check_text_splitter_contract\.py|src/python_run/piper_plus/text_splitter\.py|src/rust/piper-core/src/streaming\.rs)$
+        files: ^(docs/spec/text-splitter-contract\.toml|scripts/check_text_splitter_contract\.py|src/python_run/piper_plus/text_splitter\.py|src/rust/piper-core/src/streaming\.rs|scripts/regenerate_text_splitter_fixture\.py)$
         pass_filenames: false
 
       # ONNX export の opset / checker / shape_inference / FP16 / EMA contract
@@ -475,7 +496,7 @@ repos:
         name: Inference input contract (cross-runtime parity)
         entry: uv run --no-sync python scripts/check_inference_input_contract.py
         language: system
-        files: ^(docs/spec/inference-input-contract\.toml|scripts/check_inference_input_contract\.py|src/python_run/piper_plus/voice\.py|src/rust/piper-core/src/(engine|inference)\.rs|src/go/piperplus/synthesize\.go|src/csharp/PiperPlus\.Core/Inference/PiperSession\.cs|src/cpp/piper_plus\.cpp)$
+        files: ^(docs/spec/inference-input-contract\.toml|scripts/check_inference_input_contract\.py|src/python_run/piper_plus/voice\.py|src/rust/piper-core/src/(engine|inference)\.rs|src/go/piperplus/synthesize\.go|src/csharp/PiperPlus\.Core/Inference/PiperSession\.cs|src/cpp/piper_plus\.cpp|src/python/piper_train/infer_onnx\.py|src/python/piper_train/speaker_encoder/ecapa_tdnn\.py|src/python_run/piper_plus/http_server\.py)$
         pass_filenames: false
 
       # Audio output format (sample_rate=22050 / 16-bit / mono / LE) の
@@ -495,7 +516,7 @@ repos:
         name: ORT session initialization contract
         entry: uv run --no-sync python scripts/check_ort_session_contract.py
         language: system
-        files: ^(docs/spec/ort-session-contract\.toml|scripts/check_ort_session_contract\.py|src/python/piper_train/ort_utils\.py|src/python_run/piper_plus/voice\.py|src/rust/piper-core/src/session\.rs|src/go/piperplus/.*\.go)$
+        files: ^(docs/spec/ort-session-contract\.toml|scripts/check_ort_session_contract\.py|src/python/piper_train/ort_utils\.py|src/python_run/piper_plus/voice\.py|src/rust/piper-core/src/session\.rs|src/go/piperplus/.*\.go|tests/fixtures/ort_session/contract\.json)$
         pass_filenames: false
 
       # ORT provider (CPU/CUDA/CoreML) parity contract gate。
@@ -512,7 +533,7 @@ repos:
         name: Speaker encoder (ECAPA-TDNN) contract
         entry: uv run --no-sync python scripts/check_speaker_encoder_contract.py
         language: system
-        files: ^(docs/spec/.*speaker.*\.toml|scripts/check_speaker_encoder_contract\.py|src/python/piper_train/speaker_encoder/.*\.py)$
+        files: ^(docs/spec/.*speaker.*\.toml|scripts/check_speaker_encoder_contract\.py|src/python/piper_train/speaker_encoder/.*\.py|src/cpp/tests/test_speaker_encoder_e2e\.cpp|src/cpp/tests/test_speaker_encoder_golden\.cpp|src/csharp/PiperPlus\.Core\.Tests/SpeakerEncoderE2ETests\.cs|src/csharp/PiperPlus\.Core\.Tests/SpeakerEncoderTests\.cs|src/go/piperplus/speaker_encoder_e2e_test\.go|src/go/piperplus/speaker_encoder_test\.go|src/rust/piper\-core/tests/test_speaker_encoder_e2e\.rs|src/rust/piper\-core/tests/test_speaker_encoder_golden\.rs|src/wasm/openjtalk\-web/test/js/test\-speaker\-encoder\-e2e\.js|src/wasm/openjtalk\-web/test/js/test\-speaker\-encoder\-golden\.js|test/fixtures/speaker_encoder_golden\.json|test/generate_speaker_encoder_golden\.py|test/test_speaker_encoder_e2e\.py)$
         pass_filenames: false
 
       # PT BR/EU dialect (5 phenomena post-processing) contract gate。
@@ -521,7 +542,7 @@ repos:
         name: Portuguese BR/EU dialect rule contract
         entry: uv run --no-sync python scripts/check_pt_dialect_contract.py
         language: system
-        files: ^(docs/spec/pt-dialect-contract\.toml|scripts/check_pt_dialect_contract\.py|src/python/g2p/piper_plus_g2p/portuguese\.py)$
+        files: ^(docs/spec/pt-dialect-contract\.toml|scripts/check_pt_dialect_contract\.py|src/python/g2p/piper_plus_g2p/portuguese\.py|src/python_run/tests/test_pt_dialect_parity\.py|tests/fixtures/g2p/pt_dialect_parity\.json)$
         pass_filenames: false
 
       # 「ん」 4 つの allophone (N_m / N_n / N_ng / N_uvular) の同化規則
@@ -680,7 +701,7 @@ repos:
         name: zh_en_loanword.json byte-equal across 10 mirrors + 8 fixtures
         entry: uv run --no-sync python scripts/check_loanword_consistency.py
         language: system
-        files: (zh_en_loanword(_matrix)?\.json|scripts/check_loanword_(consistency|forward_compat)\.py|tests/fixtures/g2p/zh_en_loanword_forward_compat\.json|cmake/(EmbedJson|PiperCommon)\.cmake)$
+        files: (zh_en_loanword(_matrix)?\.json|scripts/check_loanword_(consistency|forward_compat)\.py|tests/fixtures/g2p/zh_en_loanword_forward_compat\.json|cmake/(EmbedJson|PiperCommon)\.cmake|docs/spec/loanword\-mirrors\.toml)$
         pass_filenames: false
 
       - id: loanword-forward-compat
@@ -697,7 +718,7 @@ repos:
         # modified by this hook" → forward-compat gate spuriously fails.
         entry: bash -c 'cd src/python/g2p && uv run --frozen python ../../../scripts/check_loanword_forward_compat.py'
         language: system
-        files: (zh_en_loanword(_matrix)?\.json|scripts/check_loanword_forward_compat\.py|tests/fixtures/g2p/zh_en_loanword_forward_compat\.json)$
+        files: (zh_en_loanword(_matrix)?\.json|scripts/check_loanword_forward_compat\.py|tests/fixtures/g2p/zh_en_loanword_forward_compat\.json|docs/reference/zh\-en\-loanword/README\.md)$
         pass_filenames: false
 
       # Mirror of .github/workflows/ort-version-sync.yml. Same Dependabot
@@ -707,7 +728,7 @@ repos:
         name: ONNX Runtime version pin synchronization (cmake + workflows + workspace)
         entry: uv run --no-sync python scripts/check_ort_versions.py
         language: system
-        files: ^(cmake/(OnnxRuntime|find_onnxruntime_windows)\.cmake|scripts/check_ort_versions\.py|\.github/workflows/(ort-version-sync|release-shared-lib|android-build|release-kotlin-g2p|kotlin-g2p-ci|build-piper|_build-test-cpp)\.yml|docker/cpp-dev/Dockerfile|src/python/pyproject\.toml|src/python_run/(requirements(_gpu)?\.txt|setup\.py)|src/csharp/.*\.csproj|src/go/go\.mod|src/wasm/openjtalk-web/package\.json)$
+        files: ^(cmake/(OnnxRuntime|find_onnxruntime_windows)\.cmake|scripts/check_ort_versions\.py|\.github/workflows/(ort-version-sync|release-shared-lib|android-build|release-kotlin-g2p|kotlin-g2p-ci|build-piper|_build-test-cpp)\.yml|docker/cpp-dev/Dockerfile|src/python/pyproject\.toml|src/python_run/(requirements(_gpu)?\.txt|setup\.py)|src/csharp/.*\.csproj|src/go/go\.mod|src/wasm/openjtalk-web/package\.json|docs/reference/ort\-versions\.md|src/rust/piper\-core/Cargo\.toml)$
         pass_filenames: false
 
       # Mirror of .github/workflows/parity-hub.yml (voice-catalog matrix
@@ -717,7 +738,7 @@ repos:
         name: voice catalog parity (canonical vs 5 runtime mirrors)
         entry: uv run --no-sync python scripts/check_voice_catalog_parity.py
         language: system
-        files: ^(test/model_resolution_vectors\.json|src/python_run/piper_plus/download\.py|src/cpp/piper_plus_voices\.json|src/rust/piper-core/src/model_download\.rs|src/csharp/PiperPlus\.Core/Config/VoiceCatalog\.cs|src/go/piperplus/voice_catalog\.go|scripts/check_voice_catalog_parity\.py)$
+        files: ^(test/model_resolution_vectors\.json|src/python_run/piper_plus/download\.py|src/cpp/piper_plus_voices\.json|src/rust/piper-core/src/model_download\.rs|src/csharp/PiperPlus\.Core/Config/VoiceCatalog\.cs|src/go/piperplus/voice_catalog\.go|scripts/check_voice_catalog_parity\.py|src/python_run/piper_plus/voices\.json)$
         pass_filenames: false
 
       # Mirror of .github/workflows/action-pin-gate.yml. Codespell-baseline
@@ -803,7 +824,7 @@ repos:
         name: Lockfile consistency (9 runtimes)
         entry: uv run --no-sync python scripts/check_lockfile_consistency.py
         language: system
-        files: ^(uv\.lock|src/rust/Cargo\.lock|src/go/(go\.sum|phonemize/go\.sum)|src/wasm/openjtalk-web/package-lock\.json|src/csharp/PiperPlus\.(Core|Cli)/packages\.lock\.json|android/(piper-plus|piper-plus-g2p)/gradle\.lockfile|scripts/check_lockfile_consistency\.py)$
+        files: ^(uv\.lock|src/rust/Cargo\.lock|src/go/(go\.sum|phonemize/go\.sum)|src/wasm/openjtalk-web/package-lock\.json|src/csharp/PiperPlus\.(Core|Cli)/packages\.lock\.json|android/(piper-plus|piper-plus-g2p)/gradle\.lockfile|scripts/check_lockfile_consistency\.py|android/build\.gradle\.kts)$
         pass_filenames: false
 
       # Benchmark JSON sanity gate (Wave 3).
@@ -838,7 +859,7 @@ repos:
         name: spec TOML [meta] schema (24 specs)
         entry: uv run --no-sync python scripts/check_spec_meta.py
         language: system
-        files: ^(docs/spec/.*\.toml|scripts/check_spec_meta\.py)$
+        files: ^(docs/spec/.*\.toml|scripts/check_spec_meta\.py|scripts/migrate_spec_meta\.py)$
         pass_filenames: false
 
       # Version manifest sync gate (Wave 3, S-4 Release 自動化).
@@ -889,7 +910,7 @@ repos:
         name: CLI --help vs docs/guides/development/cli-usage.md (Python runtime CLI)
         entry: bash -c 'if ! python -c "import piper_plus" 2>/dev/null; then echo "[skip] piper-plus runtime not importable"; exit 0; fi; tmp=$(mktemp); python -m piper_plus --help > "$tmp" 2>&1 || { echo "[skip] --help failed"; rm -f "$tmp"; exit 0; }; python scripts/check_cli_help_drift.py --help-file "$tmp" --docs docs/guides/development/cli-usage.md --mode stale-only --allow=--custom-dict --allow=--gpu-device-id --allow=--json-input --allow=--language --allow=--model-dir --allow=--output-timing --allow=--phoneme-silence --allow=--quiet --allow=--raw-phonemes --allow=--streaming --allow=--test-mode --allow=--text --allow=--timing-format --allow=--use-cuda; rc=$?; rm -f "$tmp"; exit $rc'
         language: system
-        files: ^(src/python_run/piper_plus/.*\.py|docs/guides/development/cli-usage\.md|scripts/check_cli_help_drift\.py)$
+        files: ^(src/python_run/piper_plus/.*\.py|docs/guides/development/cli-usage\.md|scripts/check_cli_help_drift\.py|docs/migration/v1\.11\-to\-v1\.12\.md)$
         pass_filenames: false
 
       # Host-specific secret-path leak detection. CLAUDE.md documents the
