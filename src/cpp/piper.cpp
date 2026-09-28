@@ -39,6 +39,7 @@
 #include "phoneme_timing_concat.hpp"
 #include "trim_helpers.hpp"
 #include "timing_helpers.hpp"
+#include "dictionary_search.hpp"
 #include "language_detector.hpp"
 #include "spanish_phonemize.hpp"
 #include "french_phonemize.hpp"
@@ -575,42 +576,35 @@ static std::filesystem::path getExeDir() {
 //   2. <exe_dir>/../share/piper-plus/dicts/<filename>  (installed)
 //   3. PIPER_PLUS_DICTIONARIES_PATH/<filename>          (env override)
 // Returns the first path that exists, or empty string if not found.
+// Dictionary search. The 3-tier algorithm lives in dictionary_search.hpp so
+// that tests/test_multilingual_g2p.cpp can exercise the real search ORDER --
+// it used to carry a hand-written copy, which cannot detect a reordering
+// (issue #703). This wrapper supplies the two pieces of ambient state the
+// header takes as parameters.
 static std::string findDictionaryFile(const std::string &filename,
                                       const std::string &modelDir) {
-  namespace fs = std::filesystem;
+  const auto result = findDictionaryFileIn(
+      filename, modelDir, [] { return getExeDir(); },
+      std::getenv("PIPER_PLUS_DICTIONARIES_PATH"));
 
-  // 1. Model directory
-  fs::path p1 = fs::path(modelDir) / filename;
-  if (fs::exists(p1)) {
-    spdlog::debug("Dictionary '{}' found in model dir: {}", filename, p1.string());
-    return p1.string();
+  switch (result.tier) {
+  case DictionaryTier::ModelDir:
+    spdlog::debug("Dictionary '{}' found in model dir: {}", filename,
+                  result.path);
+    break;
+  case DictionaryTier::ExeRelative:
+    spdlog::debug("Dictionary '{}' found in exe-relative dir: {}", filename,
+                  result.path);
+    break;
+  case DictionaryTier::EnvironmentVar:
+    spdlog::debug("Dictionary '{}' found via PIPER_PLUS_DICTIONARIES_PATH: {}",
+                  filename, result.path);
+    break;
+  case DictionaryTier::NotFound:
+    spdlog::debug("Dictionary '{}' not found in any search path", filename);
+    break;
   }
-
-  // 2. Exe-relative path: <exe_dir>/../share/piper-plus/dicts/<filename>
-  auto exeDir = getExeDir();
-  if (!exeDir.empty()) {
-    fs::path p2 = exeDir / ".." / "share" / "piper-plus" / "dicts" / filename;
-    if (fs::exists(p2)) {
-      std::error_code ec;
-      auto resolved = fs::weakly_canonical(p2, ec);
-      std::string checkPath = ec ? p2.string() : resolved.string();
-      spdlog::debug("Dictionary '{}' found in exe-relative dir: {}", filename, checkPath);
-      return checkPath;
-    }
-  }
-
-  // 3. Environment variable PIPER_PLUS_DICTIONARIES_PATH
-  const char *envPath = std::getenv("PIPER_PLUS_DICTIONARIES_PATH");
-  if (envPath && envPath[0] != '\0') {
-    fs::path p3 = fs::path(envPath) / filename;
-    if (fs::exists(p3)) {
-      spdlog::debug("Dictionary '{}' found via PIPER_PLUS_DICTIONARIES_PATH: {}", filename, p3.string());
-      return p3.string();
-    }
-  }
-
-  spdlog::debug("Dictionary '{}' not found in any search path", filename);
-  return {};
+  return result.path;
 }
 
 // Load Onnx model and JSON config file

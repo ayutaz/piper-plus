@@ -5,6 +5,8 @@
 #include <cstdlib>
 #include <cctype>
 
+#include "download_validation.hpp"
+
 // Test utility functions used by model downloader
 // These tests don't require network access
 
@@ -55,57 +57,17 @@ std::string extractModelName(const std::string& key) {
     return key.substr(pos + 1, lastPos - pos - 1);
 }
 
-// --- Security validation helpers (inline replicas of static functions in model_manager.cpp) ---
-
-// Shell-safe for URLs: reject backslashes (Unix shell escape character).
-// Only allow alphanumerics, hyphens, underscores, dots, forward slashes, and colons.
-bool isSafeForShell(const std::string& s) {
-    for (char c : s) {
-        if (!std::isalnum(static_cast<unsigned char>(c)) &&
-            c != '-' && c != '_' && c != '.' && c != '/' &&
-            c != ':') {
-            return false;
-        }
-    }
-    return !s.empty();
-}
-
-// Shell-safe for file paths: allows backslashes for Windows path separators.
-bool isSafeForShellPath(const std::string& s) {
-    for (char c : s) {
-        if (!std::isalnum(static_cast<unsigned char>(c)) &&
-            c != '-' && c != '_' && c != '.' && c != '/' &&
-            c != '\\' && c != ':') {
-            return false;
-        }
-    }
-    return !s.empty();
-}
-
-// Validate that a voice key contains no path traversal characters.
-bool isSafeVoiceKey(const std::string& key) {
-    if (key.empty()) return false;
-    if (key.find("..") != std::string::npos) return false;
-    if (key.find('/') != std::string::npos) return false;
-    if (key.find('\\') != std::string::npos) return false;
-    return true;
-}
-
-// Validate that a repoId has exactly one slash and only safe characters.
-bool isSafeRepoId(const std::string& repoId) {
-    if (repoId.empty()) return false;
-    int slashCount = 0;
-    for (char c : repoId) {
-        if (c == '/') {
-            ++slashCount;
-            if (slashCount > 1) return false;
-        } else if (!std::isalnum(static_cast<unsigned char>(c)) &&
-                   c != '-' && c != '_' && c != '.') {
-            return false;
-        }
-    }
-    return slashCount == 1;
-}
+// Security validators come from the production header (see the include
+// above). They used to be hand-written copies of the `static` functions in
+// model_manager.cpp, so every assertion below ran against the copy rather
+// than against the code that guards downloadFile()'s system() call. The
+// copies had already drifted: production allows '%' for URL-encoded
+// characters and the replica did not. Full account in
+// src/cpp/download_validation.hpp (issue #703).
+using piper::isSafeForShell;
+using piper::isSafeForShellPath;
+using piper::isSafeRepoId;
+using piper::isSafeVoiceKey;
 
 // Validate that a URL starts with the expected HuggingFace prefix.
 bool isHuggingFaceUrl(const std::string& url) {
@@ -296,6 +258,54 @@ TEST(SecurityValidationTest, WindowsPathAccepted) {
 TEST(SecurityValidationTest, UnixPathAccepted) {
     EXPECT_TRUE(isSafeForShellPath("/home/user/.local/share/piper-plus/model.onnx"));
     EXPECT_TRUE(isSafeForShellPath("/tmp/piper-plus/models/config.json"));
+}
+
+// Each shell metacharacter, ISOLATED.
+//
+// The existing UnsafeUrlWithShellChars cases embed a space ("a;rm -rf /"), and
+// a space is rejected by the allowlist on its own -- so the assertion passed
+// no matter what the allowlist said about ';'. Measured: adding ';' to the
+// production allowlist left all 34 tests green. One character per string, with
+// no other rejectable character present, is the only shape that isolates the
+// decision.
+TEST(SecurityValidationTest, EachShellMetacharacterIsRejectedInIsolation) {
+    // Command chaining / substitution / redirection / globbing / expansion.
+    const char* metacharacters[] = {
+        ";", "|", "&", "$", "`", "(", ")", "<", ">", "~", "#", "!",
+        "{", "}", "[", "]", "*", "?", "'", "\"", "\\", " ", "\t", "\n",
+        "\r", "^", ",", "=", "+", "@",
+    };
+    for (const char* meta : metacharacters) {
+        const std::string url = std::string("https://example.com/a") + meta + "b";
+        EXPECT_FALSE(isSafeForShell(url))
+            << "isSafeForShell accepted the metacharacter " << meta
+            << " in " << url
+            << " -- downloadFile() passes this string to system()";
+    }
+}
+
+// Same isolation for the path validator, which deliberately differs from the
+// URL one: it allows '\\' (Windows separator) and rejects '%' (cmd.exe expands
+// %VAR%). Pinning both directions keeps the two from being "simplified" into
+// one allowlist.
+TEST(SecurityValidationTest, PathValidatorAllowsBackslashButRejectsPercent) {
+    EXPECT_TRUE(isSafeForShellPath("C:\\Users\\model.onnx"));
+    EXPECT_FALSE(isSafeForShellPath("C:\\Users\\%USERNAME%\\model.onnx"));
+    // And the URL validator is the mirror image.
+    EXPECT_TRUE(isSafeForShell("https://example.com/a%20b"));
+    EXPECT_FALSE(isSafeForShell("https://example.com/a\\b"));
+}
+
+TEST(SecurityValidationTest, PathValidatorRejectsEachMetacharacterInIsolation) {
+    const char* metacharacters[] = {
+        ";", "|", "&", "$", "`", "(", ")", "<", ">", "~", "#", "!",
+        "{", "}", "[", "]", "*", "?", "'", "\"", " ", "%",
+    };
+    for (const char* meta : metacharacters) {
+        const std::string path = std::string("/tmp/a") + meta + "b.onnx";
+        EXPECT_FALSE(isSafeForShellPath(path))
+            << "isSafeForShellPath accepted the metacharacter " << meta;
+    }
 }
 
 // ============================================

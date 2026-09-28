@@ -175,6 +175,16 @@ foreach(test_source ${TEST_SOURCES})
         )
     endif()
 
+    # test_download_utils includes ../download_validation.hpp, i.e. the
+    # PRODUCTION shell-injection / path-traversal validators rather than
+    # hand-written copies (issue #703). Header-only and dependency-free, so no
+    # extra link libraries and no piper.cpp linkage -- only the include path.
+    if(${test_name} STREQUAL "test_download_utils")
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
+    endif()
+
     # test_short_text_mitigation now includes ../trim_helpers.hpp, i.e. the
     # PRODUCTION trim helpers rather than hand-written copies, so it needs the
     # src/cpp include path and spdlog (one debug line per helper). It still
