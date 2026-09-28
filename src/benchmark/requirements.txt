@@ -1,2 +1,13 @@
+# TorchScript / ONNX の RTF マイクロベンチマーク用。 CI からは実行されない
+# (使い方は README.md)。
+#
+# torch: root pyproject.toml の `torch>=2.11.0` に合わせる。 旧 pin `~=1.11.0`
+# は 2022 年系列に張り付き、 critical RCE GHSA-53q9-r3pm-6pq6 と high 2 件
+# (GHSA-pg7h-5qx3-wjr3 / GHSA-5pcm-hx3q-hm94) を抱えていた。 Dependabot の
+# 提案 (#701) は `~=1.13.1` で、 上限 `<1.14` のため critical が残るので
+# close した。
+#
+# onnxruntime: #700 で `~=1.11.0` から更新済み。 canonical な Python ORT の
+# floor (`>=1.26.0`、 docs/reference/ort-versions.md) を上回る。
 onnxruntime~=1.30.0
-torch~=1.11.0
+torch>=2.11.0
