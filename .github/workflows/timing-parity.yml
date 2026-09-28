@@ -31,6 +31,25 @@ on:
       - 'scripts/regenerate_timing_fixture.py'
       - 'docs/spec/phoneme-timing-contract.toml'
       - '.github/workflows/timing-parity.yml'
+      # The five other runtime implementations. Without these a PR that
+      # changes only, say, timing.rs never runs the drift check.
+      - 'src/rust/piper-core/src/timing.rs'
+      - 'src/go/piperplus/timing.go'
+      - 'src/wasm/openjtalk-web/src/timing.js'
+      - 'src/csharp/PiperPlus.Core/Inference/TimingWriter.cs'
+      - 'src/cpp/timing_helpers.hpp'
+      - 'src/cpp/piper.cpp'
+      # The per-runtime parity tests that `per-runtime-presence` below exists
+      # to stop anyone deleting. They were NOT listed, so a PR that deleted
+      # one skipped this workflow entirely and the guard never ran -- the one
+      # change it was written to catch was the one it could not see.
+      - 'src/python_run/tests/test_phoneme_timing_parity.py'
+      - 'src/rust/piper-core/tests/test_phoneme_timing_parity.rs'
+      - 'src/go/piperplus/timing_parity_test.go'
+      - 'src/cpp/tests/test_phoneme_timing_parity.cpp'
+      - 'src/cpp/tests/test_timing_helpers.cpp'
+      - 'src/csharp/PiperPlus.Core.Tests/TimingWriterParityTests.cs'
+      - 'src/wasm/openjtalk-web/test/js/test-phoneme-timing-parity.js'
   push:
     branches: [ dev ]
     paths:
@@ -38,6 +57,26 @@ on:
       - 'tests/fixtures/phoneme_timing/**'
       - 'scripts/regenerate_timing_fixture.py'
       - 'docs/spec/phoneme-timing-contract.toml'
+      - '.github/workflows/timing-parity.yml'
+      # The five other runtime implementations. Without these a PR that
+      # changes only, say, timing.rs never runs the drift check.
+      - 'src/rust/piper-core/src/timing.rs'
+      - 'src/go/piperplus/timing.go'
+      - 'src/wasm/openjtalk-web/src/timing.js'
+      - 'src/csharp/PiperPlus.Core/Inference/TimingWriter.cs'
+      - 'src/cpp/timing_helpers.hpp'
+      - 'src/cpp/piper.cpp'
+      # The per-runtime parity tests that `per-runtime-presence` below exists
+      # to stop anyone deleting. They were NOT listed, so a PR that deleted
+      # one skipped this workflow entirely and the guard never ran -- the one
+      # change it was written to catch was the one it could not see.
+      - 'src/python_run/tests/test_phoneme_timing_parity.py'
+      - 'src/rust/piper-core/tests/test_phoneme_timing_parity.rs'
+      - 'src/go/piperplus/timing_parity_test.go'
+      - 'src/cpp/tests/test_phoneme_timing_parity.cpp'
+      - 'src/cpp/tests/test_timing_helpers.cpp'
+      - 'src/csharp/PiperPlus.Core.Tests/TimingWriterParityTests.cs'
+      - 'src/wasm/openjtalk-web/test/js/test-phoneme-timing-parity.js'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
@@ -72,7 +111,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6.1.0
 
-      - name: Assert all 6 per-runtime parity test files exist
+      - name: Assert all per-runtime parity test files exist
         run: |
           set -e
           missing=0
@@ -88,6 +127,7 @@ jobs:
           check src/rust/piper-core/tests/test_phoneme_timing_parity.rs
           check src/go/piperplus/timing_parity_test.go
           check src/cpp/tests/test_phoneme_timing_parity.cpp
+          check src/cpp/tests/test_timing_helpers.cpp
           check src/csharp/PiperPlus.Core.Tests/TimingWriterParityTests.cs
           check src/wasm/openjtalk-web/test/js/test-phoneme-timing-parity.js
           if [ "$missing" -ne 0 ]; then

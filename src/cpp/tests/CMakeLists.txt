@@ -956,6 +956,25 @@ set_tests_properties(test_phoneme_timing_parity PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
+# Direct tests for the PRODUCTION phoneme timing cursor walk
+# (src/cpp/timing_helpers.hpp, called by piper.cpp:extractTimingsFromDurations).
+# The parity test above reads the cross-runtime fixture but re-implements the
+# spec algorithm, so until this target existed the C++ timing arithmetic had
+# no coverage at all. The header depends only on phoneme_ids.hpp + utf8, so
+# this links gtest alone -- no onnxruntime.
+add_executable(test_timing_helpers test_timing_helpers.cpp)
+target_include_directories(test_timing_helpers PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../
+)
+target_link_libraries(test_timing_helpers
+    gtest_main
+)
+add_test(NAME test_timing_helpers COMMAND test_timing_helpers)
+set_tests_properties(test_timing_helpers PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 # Cross-runtime speaker encoder mel parity test.
 # Reads test/fixtures/speaker_encoder_golden.json (generated from the Python
 # torchaudio reference) and asserts the spec mel pipeline (Hann + slaney mel
