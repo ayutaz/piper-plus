@@ -68,7 +68,12 @@ RUNTIMES: dict[str, dict[str, object]] = {
         "file": "src/csharp/PiperPlus.Core/Inference/TimingWriter.cs",
         # StreamWriter.NewLine defaults to Environment.NewLine, so the
         # assignment is what makes the output platform-independent.
+        # Two independent LF decisions: the StreamWriter (TSV/SRT) and the
+        # JSON source-gen context. WriteIndented writes
+        # Environment.NewLine, so the JSON path needed its own pin -- caught
+        # on windows-latest by a test that passes on macOS.
         "requires": [r'writer\.NewLine = "\\n";'],
+        "also_requires": [r'NewLine = "\\n"\)\]'],
         "forbids": [r"Environment\.NewLine"],
         "note": "StreamWriter.NewLine must be assigned, not defaulted",
     },
@@ -117,6 +122,14 @@ def main() -> int:
                 f"{runtime} ({rel}): none of the LF-forcing idioms "
                 f"{accepted} appear -- {spec['note']}"
             )
+        # Additional idioms that must ALL be present (a runtime with more than
+        # one place to get the newline wrong).
+        for pattern in spec.get("also_requires", []):  # type: ignore[union-attr]
+            if not re.search(str(pattern), source):
+                failures.append(
+                    f"{runtime} ({rel}): missing {pattern!r} -- a second "
+                    "newline decision is left to the platform default"
+                )
 
         # Forbidden idioms are checked against code only. The C# fix's own doc
         # comment names Environment.NewLine to explain what it replaces, and a

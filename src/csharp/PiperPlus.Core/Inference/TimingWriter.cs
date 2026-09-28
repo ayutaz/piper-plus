@@ -621,5 +621,10 @@ internal sealed class TimingResultDto
 /// </summary>
 [JsonSerializable(typeof(List<TimingDto>))]
 [JsonSerializable(typeof(TimingResultDto))]
-[JsonSourceGenerationOptions(WriteIndented = true)]
+
+// NewLine is pinned to LF. `WriteIndented` writes Environment.NewLine, so on
+// Windows the JSON came out CRLF while the contract pins LF and the other five
+// runtimes emit LF — measured: WriteJson_EmitsNoCarriageReturn failed on
+// windows-latest and passed on macOS, which is why a local run never saw it.
+[JsonSourceGenerationOptions(WriteIndented = true, NewLine = "\n")]
 internal partial class TimingJsonContext : JsonSerializerContext;
