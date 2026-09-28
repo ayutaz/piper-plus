@@ -51,6 +51,23 @@ public sealed class CliIntegrationTests
             tfmDir.Name,
             "PiperPlus.Cli.dll"));
 
+        // The path is composed from the TEST assembly's location, so a
+        // configuration or TFM the CLI was not built for yields a path that
+        // simply does not exist. `dotnet <missing.dll>` then exits non-zero
+        // with a message that none of SkipIfBuildFailed's signatures match,
+        // and the caller's `Assert.Equal(0, exitCode)` reports
+        // "Expected: 0 / Actual: 1" and nothing else. Saying so here turns an
+        // unactionable flake into a one-line diagnosis.
+        if (!File.Exists(cliAssemblyPath))
+        {
+            throw new InvalidOperationException(
+                $"PiperPlus.Cli.dll not found at {cliAssemblyPath}. "
+                + $"Resolved from test assembly at {assemblyDir} "
+                + $"(config={configDir.Name}, tfm={tfmDir.Name}). "
+                + "Build PiperPlus.Cli for the same configuration and TFM as "
+                + "the test project before running the CLI integration tests.");
+        }
+
         return cliAssemblyPath;
     }
 
@@ -58,6 +75,45 @@ public sealed class CliIntegrationTests
     /// If the CLI subprocess failed due to an environment issue (missing pre-built
     /// DLL, .NET SDK/runtime mismatch), skips the test instead of failing it.
     /// </summary>
+    /// <summary>
+    /// Asserts the CLI exited 0, reporting its output when it did not.
+    /// </summary>
+    /// <remarks>
+    /// A bare <c>Assert.Equal(0, exitCode)</c> reports "Expected: 0 /
+    /// Actual: 1" and nothing else, which is all an intermittent CLI failure
+    /// ever left behind — several occurrences on <c>dev</c> and on PR branches
+    /// produced exactly that and no way to tell a genuine non-zero exit from a
+    /// missing assembly or a crash. Including stdout and stderr makes the next
+    /// occurrence diagnosable from the CI log alone.
+    /// </remarks>
+    private static void AssertCliSucceeded(
+        int exitCode,
+        string? stdout,
+        string? stderr,
+        string invocation)
+    {
+        if (exitCode == 0)
+        {
+            return;
+        }
+
+        Assert.Fail(
+            $"CLI `{invocation}` exited {exitCode} (expected 0).\n"
+            + $"stdout: {Truncate(stdout)}\n"
+            + $"stderr: {Truncate(stderr)}");
+    }
+
+    private static string Truncate(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return "(empty)";
+        }
+
+        const int limit = 2000;
+        return text.Length <= limit ? text : text[..limit] + "... (truncated)";
+    }
+
     private static void SkipIfBuildFailed(int exitCode, string stderr)
     {
         if (exitCode != 0
@@ -184,7 +240,7 @@ public sealed class CliIntegrationTests
         (int exitCode, string? stdout, string? stderr) = await RunCliAsync("--version");
         SkipIfBuildFailed(exitCode, stderr);
 
-        Assert.Equal(0, exitCode);
+        AssertCliSucceeded(exitCode, stdout, stderr, "--version");
 
         // --version writes to stdout via Console.WriteLine
         string combined = stdout + stderr;
