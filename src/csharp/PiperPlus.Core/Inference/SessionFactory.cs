@@ -51,6 +51,13 @@ public static class SessionFactory
     internal const string DisableWarmupEnvVar = "PIPER_PLUS_DISABLE_WARMUP";
 
     /// <summary>
+    /// Environment variable to skip the optimized model cache (.opt.onnx + .ok).
+    /// When set to <c>"1"</c>, <c>"true"</c> or <c>"yes"</c> (case-insensitive),
+    /// the cache is neither read nor written. Mirrors the Python
+    /// <c>PIPER_PLUS_DISABLE_CACHE</c> behaviour (ort_utils.py).
+    /// </summary>
+    internal const string DisableCacheEnvVar = "PIPER_PLUS_DISABLE_CACHE";
+
     /// <summary>
     /// Monotonic sequence for optimized-model cache temp names.
     /// </summary>
@@ -65,14 +72,10 @@ public static class SessionFactory
     /// </remarks>
     private static long tempCacheSeq;
 
-    private static long NextTempCacheSeq() => Interlocked.Increment(ref tempCacheSeq);
-
-    /// Environment variable to skip the optimized model cache (.opt.onnx + .ok).
-    /// When set to <c>"1"</c>, <c>"true"</c> or <c>"yes"</c> (case-insensitive),
-    /// the cache is neither read nor written. Mirrors the Python
-    /// <c>PIPER_PLUS_DISABLE_CACHE</c> behaviour (ort_utils.py).
+    /// <summary>
+    /// Returns the next temp-name sequence number.
     /// </summary>
-    internal const string DisableCacheEnvVar = "PIPER_PLUS_DISABLE_CACHE";
+    private static long NextTempCacheSeq() => Interlocked.Increment(ref tempCacheSeq);
 
     /// <summary>
     /// Default number of warmup inference runs.
