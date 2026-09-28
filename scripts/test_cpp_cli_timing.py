@@ -651,6 +651,75 @@ def case_no_flag_writes_nothing(binary: Path, model: Path, config: Path) -> str:
         return "no timing side effects"
 
 
+def case_ssml_timing_is_written(binary: Path, model: Path, config: Path) -> str:
+    """`--ssml --output-timing` must write a file with shifted offsets.
+
+    ssml_synth.cpp accumulated inferSeconds and audioSeconds per segment but
+    never forwarded phonemeTimings, so result.hasTimingInfo stayed false and
+    main.cpp's write gate never fired -- the CLI logged "no phoneme timing is
+    available" and produced nothing (issue #692). The audio was fine, which is
+    why it read as a timing-only gap.
+
+    Two assertions matter: the file exists, and exactly ONE entry starts at 0.
+    Without the per-segment cursor shift every segment would restart at 0, so
+    the count is what distinguishes "forwarded" from "forwarded but unshifted".
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        workdir = Path(tmp)
+        wav = workdir / "out.wav"
+        timing = workdir / "t.json"
+        proc = subprocess.run(
+            [
+                str(binary.resolve()),
+                "--model", str(model.resolve()),
+                "--config", str(config.resolve()),
+                "--ssml",
+                "--output_file", str(wav),
+                "--output-timing", str(timing),
+            ],
+            input='<speak>Hola mundo. <break time="300ms"/> Buenas noches.</speak>\n',
+            capture_output=True,
+            text=True,
+            timeout=300,
+            cwd=workdir,
+        )
+        log = proc.stdout + proc.stderr
+        _check(proc.returncode == 0, f"CLI exited {proc.returncode}\n{log}")
+        _check(
+            timing.exists(),
+            f"--ssml --output-timing wrote no file\n{log}",
+        )
+
+        data = json.loads(timing.read_text(encoding="utf-8"))
+        entries = data["phonemes"]
+        _check(len(entries) > 0, f"timing file has no entries\n{log}")
+
+        zero_starts = [e for e in entries if e["start_ms"] == 0]
+        _check(
+            len(zero_starts) == 1,
+            f"expected exactly 1 entry at start_ms=0 (the first segment), got "
+            f"{len(zero_starts)} -- segments are not being shifted by the "
+            f"cursor\n{log}",
+        )
+
+        starts = [e["start_ms"] for e in entries]
+        _check(
+            starts == sorted(starts),
+            "entries are not monotonically ordered across segments",
+        )
+
+        _frames, wav_seconds = wav_info(wav)
+        wav_ms = wav_seconds * 1000.0
+        _check(
+            abs(data["total_duration_ms"] - wav_ms) < 1.0,
+            f"total_duration_ms {data['total_duration_ms']:.3f} != wav "
+            f"{wav_ms:.3f}",
+        )
+        return (
+            f"{len(entries)} entries, 1 zero start, total={wav_ms:.1f}ms"
+        )
+
+
 CASES = (
     ("single_sentence_json", case_single_sentence_json),
     ("multi_unit_offsets", case_multi_unit_offsets),
@@ -660,6 +729,7 @@ CASES = (
      case_total_duration_in_every_output_mode),
     ("missing_timing_is_diagnosed", case_missing_timing_is_diagnosed),
     ("no_flag_writes_nothing", case_no_flag_writes_nothing),
+    ("ssml_timing_is_written", case_ssml_timing_is_written),
 )
 
 

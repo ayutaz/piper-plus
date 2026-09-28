@@ -24,10 +24,23 @@ struct WavHeader {
 };
 
 // Write WAV file header only
+// `numInterleavedSamples` counts SAMPLES, not frames: for stereo, one frame
+// contributes two. That is what every caller passes -- `audioBuffer.size()`,
+// where the decoder's output is interleaved -- and it is the same convention
+// `piper_plus::timing::ConcatCursor` uses (`samples / (sampleRate *
+// channels)`).
+//
+// The parameter used to be named `numSamples` and the body multiplied by
+// `channels`, i.e. it read the argument as a FRAME count. The two conventions
+// disagreed in opposite directions while the CLI handed the same
+// `audioBuffer.size()` to both, so `channels > 1` was guaranteed to break one
+// of them: `dataSize` came out `channels` times too large (issue #693).
+// Harmless so far only because nothing in the C++ tree sets `channels` above
+// 1 -- which is exactly why it went unnoticed rather than why it was safe.
 void writeWavHeader(int sampleRate, int sampleWidth, int channels,
-                    uint32_t numSamples, std::ostream &audioFile) {
+                    uint32_t numInterleavedSamples, std::ostream &audioFile) {
   WavHeader header;
-  header.dataSize = numSamples * sampleWidth * channels;
+  header.dataSize = numInterleavedSamples * sampleWidth;
   header.chunkSize = header.dataSize + sizeof(WavHeader) - 8;
   header.sampleRate = sampleRate;
   header.numChannels = channels;

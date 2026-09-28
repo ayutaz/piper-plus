@@ -69,6 +69,7 @@ set(TEST_SOURCES
     test_speaker_encoder_golden.cpp
     test_voice_cloning_cli.cpp
     test_speaker_embedding.cpp
+    test_channels_convention.cpp
 )
 
 # Add Unix-only tests (require open_jtalk binary or Unix APIs)
@@ -179,6 +180,16 @@ foreach(test_source ${TEST_SOURCES})
     # PRODUCTION shell-injection / path-traversal validators rather than
     # hand-written copies (issue #703). Header-only and dependency-free, so no
     # extra link libraries and no piper.cpp linkage -- only the include path.
+    # test_channels_convention includes ../wavfile.hpp and
+    # ../phoneme_timing_concat.hpp, i.e. the PRODUCTION header writer and the
+    # timing cursor, to check they read one sample count the same way
+    # (issue #693). Both are header-only and ORT-free.
+    if(${test_name} STREQUAL "test_channels_convention")
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
+    endif()
+
     if(${test_name} STREQUAL "test_download_utils")
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
