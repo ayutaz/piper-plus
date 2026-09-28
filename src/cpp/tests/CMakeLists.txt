@@ -70,6 +70,7 @@ set(TEST_SOURCES
     test_voice_cloning_cli.cpp
     test_speaker_embedding.cpp
     test_channels_convention.cpp
+    test_output_name.cpp
 )
 
 # Add Unix-only tests (require open_jtalk binary or Unix APIs)

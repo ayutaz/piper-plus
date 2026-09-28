@@ -720,6 +720,62 @@ def case_ssml_timing_is_written(binary: Path, model: Path, config: Path) -> str:
         )
 
 
+def case_output_dir_names_are_unique_and_plain(
+    binary: Path, model: Path, config: Path
+) -> str:
+    """`--output_dir` must write one file per line, with parseable names.
+
+    Two properties, both previously untested (issue #696):
+
+      1. Uniqueness -- the name used to be a bare timestamp, so two utterances
+         in the same clock tick produced one file with exit code 0 and a
+         "Wrote ..." line for each. Silent data loss.
+      2. No locale grouping -- main() installs a global "en_US.UTF-8" locale
+         and the name is composed on a stream that inherited it, so the
+         nanosecond timestamp came out as
+         "1,790,576,108,571,824,000.wav" (measured). Commas break shell
+         globbing and any consumer that parses the name.
+
+    Three short lines are used because short utterances are what land in the
+    same tick.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        workdir = Path(tmp)
+        out_dir = workdir / "out"
+        out_dir.mkdir()
+        proc = subprocess.run(
+            [
+                str(binary.resolve()),
+                "--model", str(model.resolve()),
+                "--config", str(config.resolve()),
+                "--output_dir", str(out_dir),
+            ],
+            input="Hola.\nSol\nBuenas noches.\n",
+            capture_output=True,
+            text=True,
+            timeout=300,
+            cwd=workdir,
+        )
+        log = proc.stdout + proc.stderr
+        _check(proc.returncode == 0, f"CLI exited {proc.returncode}\n{log}")
+
+        wavs = sorted(out_dir.glob("*.wav"))
+        _check(
+            len(wavs) == 3,
+            f"expected 3 WAVs for 3 input lines, got {len(wavs)}: "
+            f"{[w.name for w in wavs]}\n{log}",
+        )
+        for wav in wavs:
+            _check(
+                "," not in wav.name,
+                f"filename carries locale thousands separators: {wav.name}",
+            )
+            _check(
+                wav.stat().st_size > 44,
+                f"{wav.name} is header-only ({wav.stat().st_size} bytes)",
+            )
+        return f"3 distinct plain names: {wavs[0].name} .. {wavs[-1].name}"
+
 CASES = (
     ("single_sentence_json", case_single_sentence_json),
     ("multi_unit_offsets", case_multi_unit_offsets),
@@ -730,6 +786,8 @@ CASES = (
     ("missing_timing_is_diagnosed", case_missing_timing_is_diagnosed),
     ("no_flag_writes_nothing", case_no_flag_writes_nothing),
     ("ssml_timing_is_written", case_ssml_timing_is_written),
+    ("output_dir_names_are_unique_and_plain",
+     case_output_dir_names_are_unique_and_plain),
 )
 
 
