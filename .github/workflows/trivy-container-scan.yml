@@ -224,7 +224,7 @@ jobs:
       # /usr/share/dotnet / android SDK / ghc / haskell / boost / aspnet
       # を削除し、 swap も無効化することで maximum disk を解放。
       - name: Free disk space (aggressive)
-        uses: jlumbroso/free-disk-space@v1.3.1
+        uses: jlumbroso/free-disk-space@v1.3.2
         with:
           tool-cache: true
           android: true
