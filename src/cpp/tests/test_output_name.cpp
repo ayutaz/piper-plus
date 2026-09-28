@@ -24,12 +24,15 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <atomic>
 #include <iomanip>
 #include <locale>
 #include <set>
 #include <sstream>
+#include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -74,12 +77,17 @@ TEST(OutputName, NoThousandsSeparatorUnderAGroupingLocale) {
   // "1,790,576,108,571,824,000_0000.wav".
   const std::locale previous = std::locale();
   bool installed = false;
-  for (const char* name : {"en_US.UTF-8", "en_US.utf8", "C.UTF-8"}) {
+  // MSVC does not accept the POSIX-style names; it wants "en-US" or
+  // "English_United States.1252". Offering both keeps the check meaningful on
+  // Windows instead of silently skipping there -- which matters because
+  // Windows is where main()'s global locale is most likely to differ.
+  for (const char* name : {"en_US.UTF-8", "en_US.utf8", "en-US",
+                           "English_United States.1252", "C.UTF-8"}) {
     try {
       std::locale::global(std::locale(name));
       installed = true;
       break;
-    } catch (const std::runtime_error&) {
+    } catch (const std::exception&) {
       continue;
     }
   }
@@ -101,12 +109,17 @@ TEST(OutputName, NoThousandsSeparatorUnderAGroupingLocale) {
 TEST(OutputNameGate, GroupingLocaleActuallyGroupsWithoutTheImbue) {
   const std::locale previous = std::locale();
   bool installed = false;
-  for (const char* name : {"en_US.UTF-8", "en_US.utf8", "C.UTF-8"}) {
+  // MSVC does not accept the POSIX-style names; it wants "en-US" or
+  // "English_United States.1252". Offering both keeps the check meaningful on
+  // Windows instead of silently skipping there -- which matters because
+  // Windows is where main()'s global locale is most likely to differ.
+  for (const char* name : {"en_US.UTF-8", "en_US.utf8", "en-US",
+                           "English_United States.1252", "C.UTF-8"}) {
     try {
       std::locale::global(std::locale(name));
       installed = true;
       break;
-    } catch (const std::runtime_error&) {
+    } catch (const std::exception&) {
       continue;
     }
   }
