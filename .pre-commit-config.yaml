@@ -391,7 +391,7 @@ repos:
       # 実 SHA256 突合は publish パイプライン (verify_model_checksums.py) 側。
       - id: model-sha256-manifest
         name: model-sha256-manifest.toml structural gate
-        entry: uv run python scripts/check_model_sha256_manifest.py
+        entry: uv run --no-sync python scripts/check_model_sha256_manifest.py
         language: system
         files: ^(docs/spec/model-sha256-manifest\.toml|scripts/check_model_sha256_manifest\.py|scripts/verify_model_checksums\.py)$
         pass_filenames: false
@@ -401,7 +401,7 @@ repos:
       # 現在 mode=warn (baseline 違反 6 件あり、 fail 化は別 PR)。
       - id: artifact-retention
         name: artifact-retention-contract.toml gate
-        entry: uv run python scripts/check_artifact_retention.py
+        entry: uv run --no-sync python scripts/check_artifact_retention.py
         language: system
         files: ^(docs/spec/artifact-retention-contract\.toml|\.github/workflows/.*\.ya?ml|scripts/check_artifact_retention\.py)$
         pass_filenames: false
@@ -410,7 +410,7 @@ repos:
       # phase-1/2 runtime の dependency/CI flag 同期 + retry-count-max-2 invariant。
       - id: test-flake-retry
         name: test-flake-retry-contract.toml gate
-        entry: uv run python scripts/check_test_flake_retry.py
+        entry: uv run --no-sync python scripts/check_test_flake_retry.py
         language: system
         files: ^(docs/spec/test-flake-retry-contract\.toml|src/python_run/pyproject\.toml|\.github/workflows/python-tests\.yml|scripts/check_test_flake_retry\.py)$
         pass_filenames: false

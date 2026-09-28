@@ -312,6 +312,35 @@ def check_precommit(tracked: set[str]) -> list[str]:
     return failures
 
 
+def check_precommit_entries_avoid_sync() -> list[str]:
+    """`uv run` without `--no-sync` or `--frozen` lets a hook rewrite uv.lock.
+
+    pre-commit then reports "files were modified by this hook" and fails the
+    run even though the gate itself passed -- which is exactly what happened:
+    three of 63 script-backed hooks omitted the flag, and one of them failed
+    CI with its own output reading "aligned with all upload steps".
+    """
+    text = PRECOMMIT_CONFIG.read_text(encoding="utf-8", errors="replace")
+    failures: list[str] = []
+    for block in re.split(r"\n      - id: ", text)[1:]:
+        hook_id = block.split("\n", 1)[0].strip()
+        entry = re.search(r"entry:\s*(.+)", block)
+        if not entry:
+            continue
+        command = entry.group(1)
+        # --no-sync skips the sync; --frozen refuses to update the lockfile.
+        # Either one keeps uv.lock untouched, so both are accepted.
+        if "uv run" in command and not any(
+            flag in command for flag in ("--no-sync", "--frozen")
+        ):
+            failures.append(
+                f"precommit:{hook_id}: `uv run` without `--no-sync` or "
+                "`--frozen` can rewrite uv.lock, which pre-commit reports as "
+                '"files were modified by this hook"'
+            )
+    return failures
+
+
 def check_allowlist_is_live(tracked: set[str]) -> list[str]:
     """An allowlist entry for a path nobody references any more is dead weight.
 
@@ -335,6 +364,7 @@ def main() -> int:
     tracked = tracked_files()
     failures = (
         check_allowlist_is_live(tracked)
+        + check_precommit_entries_avoid_sync()
         + check_workflows(tracked)
         + check_precommit(tracked)
     )
