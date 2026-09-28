@@ -31,6 +31,8 @@
 namespace {
 
 using piper::computePhonemeTimings;
+using piper::formatPuaFallback;
+using piper::isPuaCodepoint;
 using piper::PhonemeId;
 using piper::PhonemeIdMap;
 using piper::TimingEntry;
@@ -228,14 +230,14 @@ TEST(TimingHelpers, AsciiFallbackMasksUnmappedIdsWithControlCharacters) {
       << "not \"?\": the ASCII branch wins for 2 < id < 128";
 }
 
-TEST(TimingHelpers, OnlyTheFirstIdOfAMultiIdKeyResolves) {
-  // PINS A KNOWN DEFECT. buildPhonemeIdToStringMap registers ids[0] only, so a
-  // phoneme carrying several ids resolves for the first and falls back to "?"
-  // for the rest. The identical bug was fixed in C# under issue #656; C++ is
-  // tracked separately. Pinned so the fix is a deliberate, visible change.
+TEST(TimingHelpers, EveryIdOfAMultiIdKeyResolves) {
+  // [reverse_map]: the contract's own example is {"b": [6, 7]} ->
+  // {6: 'b', 7: 'b'}. buildPhonemeIdToStringMap registered ids[0] only until
+  // issue #656's C++ half, so the remaining ids fell back to "?".
+  //
   // Ids are >= 128 on purpose: for 2 < id < 128 the walk falls back to
   // decoding the id as its own ASCII character, which would mask the defect
-  // behind a plausible-looking (but wrong) single-char name. Id 7 renders as
+  // behind a plausible-looking (but wrong) single-char name. Id 7 rendered as
   // BEL, not "?" -- verified by running this test with {6, 7}.
   PhonemeIdMap m;
   m[U'b'] = {200, 201};
@@ -246,10 +248,32 @@ TEST(TimingHelpers, OnlyTheFirstIdOfAMultiIdKeyResolves) {
 
   ASSERT_EQ(out.size(), 2u);
   EXPECT_EQ(out[0].phoneme, "b");
-  EXPECT_EQ(out[1].phoneme, "?") << "second id of the same key is unresolved";
+  EXPECT_EQ(out[1].phoneme, "b")
+      << "the second id of the same key must resolve to the same name";
 }
 
-TEST(TimingHelpers, PuaRenameOnlyAppliesWhenJapaneseAdjustmentsAreOn) {
+// [reverse_map.collision_resolution]: first wins. Iteration order over an
+// unordered_map is unspecified, so the build sorts keys by codepoint to make
+// "first" mean something; without that this test would be flaky rather than
+// wrong.
+TEST(TimingHelpers, CollidingIdsResolveToTheLowerCodepointKey) {
+  PhonemeIdMap m;
+  m[U'b'] = {200};
+  m[U'a'] = {200};  // same id, lower codepoint
+
+  const auto out =
+      computePhonemeTimings({4.0f}, {200}, m, kHop, kRate, false);
+
+  ASSERT_EQ(out.size(), 1u);
+  EXPECT_EQ(out[0].phoneme, "a");
+}
+
+// The PUA -> token rename used to be gated on the Japanese adjustment pass,
+// so the same model and the same id produced "N_m" or a raw U+E019 glyph
+// depending on what the caller asked for. The table is not
+// Japanese-specific -- U+E01D "rr" and U+E01E "y_vowel" are multilingual --
+// and the canonical implementation resolves unconditionally.
+TEST(TimingHelpers, PuaNamesResolveRegardlessOfJapaneseAdjustments) {
   PhonemeIdMap m;
   m[static_cast<char32_t>(0xE019)] = {10};  // N_m
   const std::vector<float> durations = {4.0f};
@@ -257,11 +281,61 @@ TEST(TimingHelpers, PuaRenameOnlyAppliesWhenJapaneseAdjustmentsAreOn) {
 
   const auto off = computePhonemeTimings(durations, ids, m, kHop, kRate, false);
   ASSERT_EQ(off.size(), 1u);
-  EXPECT_NE(off[0].phoneme, "N_m") << "raw PUA codepoint when the pass is off";
+  EXPECT_EQ(off[0].phoneme, "N_m");
 
   const auto on = computePhonemeTimings(durations, ids, m, kHop, kRate, true);
   ASSERT_EQ(on.size(), 1u);
   EXPECT_EQ(on[0].phoneme, "N_m");
+}
+
+// A multilingual PUA token, to show the table is not language-gated.
+TEST(TimingHelpers, MultilingualPuaTokenResolvesWithAdjustmentsOff) {
+  PhonemeIdMap m;
+  m[static_cast<char32_t>(0xE01D)] = {11};  // rr (Spanish trill)
+
+  const auto out = computePhonemeTimings({4.0f}, {11}, m, kHop, kRate, false);
+
+  ASSERT_EQ(out.size(), 1u);
+  EXPECT_EQ(out[0].phoneme, "rr");
+}
+
+// [reverse_map.pua_handling]: a PUA codepoint with no name renders as
+// "U+XXXX" in uppercase hex. C++ emitted the raw codepoint -- an unprintable
+// glyph that identifies nothing -- which is the defect C# carried until issue
+// #656. The gate that should have caught it was matching the "U+0029"-style
+// codepoint comments in isClosingPunctuation instead of any output format.
+TEST(TimingHelpers, UnnamedPuaCodepointRendersAsUPlusHex) {
+  PhonemeIdMap m;
+  m[static_cast<char32_t>(0xE7FF)] = {12};  // far outside the fixed table
+
+  const auto out = computePhonemeTimings({4.0f}, {12}, m, kHop, kRate, false);
+
+  ASSERT_EQ(out.size(), 1u);
+  EXPECT_EQ(out[0].phoneme, "U+E7FF");
+}
+
+// Uppercase hex, 4 digits, zero-padded -- the contract's fallback_format is
+// "U+{HEX:04X}", and the canonical Python produces "U+E019" not "U+e019".
+TEST(TimingHelpers, PuaFallbackUsesUppercaseFourDigitHex) {
+  EXPECT_EQ(formatPuaFallback(0xE000), "U+E000");
+  EXPECT_EQ(formatPuaFallback(0xE7FF), "U+E7FF");
+  EXPECT_EQ(formatPuaFallback(0xF8FF), "U+F8FF");
+}
+
+// The range bounds are inclusive, and a non-PUA codepoint must NOT be
+// rewritten -- otherwise ordinary phonemes would come out as "U+0061".
+TEST(TimingHelpers, PuaRangeBoundsAreInclusiveAndExcludeOrdinaryCodepoints) {
+  EXPECT_TRUE(isPuaCodepoint(0xE000));
+  EXPECT_TRUE(isPuaCodepoint(0xF8FF));
+  EXPECT_FALSE(isPuaCodepoint(0xDFFF));
+  EXPECT_FALSE(isPuaCodepoint(0xF900));
+  EXPECT_FALSE(isPuaCodepoint(U'a'));
+
+  PhonemeIdMap m;
+  m[U'a'] = {200};
+  const auto out = computePhonemeTimings({4.0f}, {200}, m, kHop, kRate, false);
+  ASSERT_EQ(out.size(), 1u);
+  EXPECT_EQ(out[0].phoneme, "a");
 }
 
 TEST(TimingHelpers, GeminateOverlapMovesTheBoundaryBackwards) {

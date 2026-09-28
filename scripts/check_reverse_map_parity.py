@@ -72,8 +72,13 @@ RUNTIMES: dict[str, dict[str, object]] = {
         "first_wins": "TryAdd",
     },
     "cpp": {
-        "file": "src/cpp/piper.cpp",
-        "first_wins": "find",
+        # The map moved out of piper.cpp into an ORT-free header so tests
+        # could reach it (issue #703). Pointing at piper.cpp was also how the
+        # `U+` check went vacuous: piper.cpp's isClosingPunctuation documents
+        # its cases as "// U+0029 Right Parenthesis", which satisfied a bare
+        # search for "U+" while C++ had no U+XXXX fallback at all.
+        "file": "src/cpp/timing_helpers.hpp",
+        "first_wins": "emplace",
     },
 }
 
@@ -82,6 +87,43 @@ PUA_UPPER = re.compile(r"(0x)?f8ff", re.IGNORECASE)
 # "U+%04X", f"U+{...:04X}", `U+${...}` etc. All of them contain "U+" adjacent
 # to a format directive; requiring 04X specifically would reject the JS form.
 PUA_FORMAT = re.compile(r"U\+")
+
+# Comment syntax per file extension. Matching is done on comment-stripped
+# source because a PROSE mention of "U+E000" is not an implementation of the
+# fallback -- and that is not hypothetical: with `cpp` pointed at piper.cpp,
+# the "U+0029 Right Parenthesis" annotations on isClosingPunctuation's cases
+# satisfied the `U+` check for years while C++ emitted the raw PUA codepoint.
+LINE_COMMENT_PREFIXES = {
+    ".py": ("#",),
+    ".rs": ("//",),
+    ".go": ("//",),
+    ".js": ("//",),
+    ".cs": ("//",),
+    ".cpp": ("//",),
+    ".hpp": ("//",),
+}
+
+
+def strip_comments(source: str, suffix: str) -> str:
+    """Remove line comments and /* */ blocks so prose cannot satisfy a check.
+
+    Deliberately crude: it does not track string literals, so a "//" inside a
+    string is also dropped. That direction is safe -- it can only make the
+    gate stricter, never let a missing implementation through.
+    """
+    prefixes = LINE_COMMENT_PREFIXES.get(suffix, ("#", "//"))
+    if suffix not in (".py",):
+        # Block comments first; they span lines.
+        source = re.sub(r"/\*.*?\*/", " ", source, flags=re.DOTALL)
+    out: list[str] = []
+    for line in source.split("\n"):
+        cut = len(line)
+        for prefix in prefixes:
+            idx = line.find(prefix)
+            if idx != -1:
+                cut = min(cut, idx)
+        out.append(line[:cut])
+    return "\n".join(out)
 
 # The token-resolution decision must live in the shared helper, not inline in
 # the CLI. `forbidden_in_cli` is what inlining looks like: if the CLI builds the
@@ -228,7 +270,9 @@ def main() -> int:
             failures.append(f"{runtime}: file not found: {rel}")
             continue
 
-        source = path.read_text(encoding="utf-8", errors="replace")
+        source = strip_comments(
+            path.read_text(encoding="utf-8", errors="replace"), path.suffix
+        )
         problems: list[str] = []
 
         if not PUA_LOWER.search(source) or not PUA_UPPER.search(source):
