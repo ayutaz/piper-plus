@@ -42,7 +42,7 @@ export const DEFAULT_HOP_LENGTH = 256;
  * Calculation matches the Rust/Go/Python implementations exactly:
  *   frame_time_ms = (hop_length / sample_rate) * 1000
  *   for each duration:
- *     duration_ms = max(frames, 0) * frame_time_ms
+ *     duration_ms = ceil(max(frames, 0)) * frame_time_ms
  *     start_ms = cursor_ms
  *     end_ms = cursor_ms + duration_ms
  *     cursor_ms = end_ms
@@ -105,7 +105,10 @@ export function durationsToTiming(
         `negative phoneme duration clamped to 0 (index=${i}, value=${raw})`
       );
     }
-    const frames = raw > 0 ? raw : 0;
+    // Clamp first, then quantise: Math.ceil(-2) is -2, so quantising a
+    // negative before clamping would let the cursor run backwards
+    // (contract: order = "clamp_then_ceil").
+    const frames = Math.ceil(raw > 0 ? raw : 0);
     const durationMs = frames * frameTimeMs;
     const startMs = cursorMs;
     const endMs = cursorMs + durationMs;

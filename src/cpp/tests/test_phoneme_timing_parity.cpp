@@ -10,7 +10,7 @@
 //   frame_time_ms = (hop_length / sample_rate) * 1000
 //   cursor_ms = 0.0
 //   for each (duration_frames, phoneme_token):
-//       duration_ms = max(duration_frames, 0.0) * frame_time_ms
+//       duration_ms = ceil(max(duration_frames, 0.0)) * frame_time_ms
 //       start_ms = cursor_ms
 //       end_ms   = cursor_ms + duration_ms
 //       yield {phoneme, start_ms, end_ms, duration_ms}
@@ -76,6 +76,9 @@ ComputedResult computeFromSpec(const std::vector<double>& durations,
     if (dur_frames < 0.0) {
       dur_frames = 0.0;  // spec [calculation.negative_handling]
     }
+    // spec_version 1.2 [calculation.frame_quantization]: the decoder allocates
+    // ceil(d_i) frames, so quantise AFTER the clamp (ceil(-2.0) is -2.0).
+    dur_frames = std::ceil(dur_frames);
     const double duration_ms = dur_frames * frame_time_ms;
     ComputedEntry e{phoneme_tokens[i], cursor_ms, cursor_ms + duration_ms,
                     duration_ms};

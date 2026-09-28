@@ -138,7 +138,11 @@ def durations_to_timing(
                 token,
                 dur,
             )
-        dur_frames = max(dur, 0.0)
+        # Clamp first, then quantise: ``math.ceil(-2.0)`` is ``-2``, so
+        # quantising a negative before clamping would let the cursor run
+        # backwards. See the contract's
+        # ``[calculation.negative_handling] order = "clamp_then_ceil"``.
+        dur_frames = math.ceil(max(dur, 0.0))
         duration_ms = dur_frames * frame_time_ms
         start_ms = cursor_ms
         end_ms = cursor_ms + duration_ms

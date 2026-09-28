@@ -95,14 +95,11 @@ TEST(TimingHelpers, PadIdZeroIsSkippedToo) {
 // Duration arithmetic -- the values issue #653 will change
 // ---------------------------------------------------------------------------
 
-TEST(TimingHelpers, FractionalDurationsAreUsedRaw) {
-  // PINS PRE-#653 BEHAVIOUR. The ONNX `durations` output is exported before
-  // `torch.ceil`, but the decoder allocates ceil(d_i) frames to phoneme i, so
-  // these times are systematically short (measured: 73-76% of real audio).
-  // When #653 lands, this expectation must change to the ceil'd values --
-  // that is the point of pinning it. Integer-only fixtures cannot catch the
-  // difference because ceil(int) == int, which is exactly why the shared
-  // golden matrix (all 7 cases integer) misses it.
+TEST(TimingHelpers, FractionalDurationsAreCeiled) {
+  // #653: the ONNX `durations` output is exported BEFORE `torch.ceil`, but the
+  // decoder allocates ceil(d_i) frames to phoneme i (generate_path differences
+  // cumsum(w_ceil)). Using the raw value reports an utterance systematically
+  // short -- measured 73-76% of the emitted audio.
   const std::vector<float> durations = {2.5f, 3.5f};
   const std::vector<PhonemeId> ids = {3, 4};
 
@@ -110,17 +107,18 @@ TEST(TimingHelpers, FractionalDurationsAreUsedRaw) {
                                          kRate, false);
 
   ASSERT_EQ(out.size(), 2u);
-  EXPECT_NEAR(out[0].end_time, 2.5 * frameSeconds(), 1e-6)
-      << "raw 2.5 frames, not ceil(2.5)=3";
-  EXPECT_NEAR(out[1].end_time, 6.0 * frameSeconds(), 1e-6)
-      << "raw 2.5+3.5, not ceil(2.5)+ceil(3.5)=7";
+  EXPECT_NEAR(out[0].end_time, 3.0 * frameSeconds(), 1e-6)
+      << "ceil(2.5) = 3, not the raw 2.5";
+  EXPECT_NEAR(out[1].end_time, 7.0 * frameSeconds(), 1e-6)
+      << "ceil(2.5)+ceil(3.5) = 7, not the raw 6.0";
 }
 
-TEST(TimingHelpers, FrameIndicesTruncateWhileTimesDoNot) {
-  // PINS A KNOWN INTERNAL INCONSISTENCY (issue #653): start_frame/end_frame
-  // accumulate `static_cast<long long>(duration)` (truncation) while
-  // start_time/end_time accumulate the raw value. For 2.7 frames the two
-  // disagree: frame 2, time 2.7. Both should end up on the same ceil basis.
+TEST(TimingHelpers, FrameIndicesAndTimesShareTheCeilBasis) {
+  // Before #653 these disagreed: start_frame/end_frame accumulated
+  // `static_cast<long long>(duration)` (truncation) while start_time/end_time
+  // accumulated the raw value, so 2.7 frames gave frame 2 but time 2.7. Both
+  // now quantise the same way, which is what makes end_frame usable as a
+  // sample offset (`end_frame * hop`).
   const std::vector<float> durations = {2.7f};
   const std::vector<PhonemeId> ids = {3};
 
@@ -128,19 +126,20 @@ TEST(TimingHelpers, FrameIndicesTruncateWhileTimesDoNot) {
                                          kRate, false);
 
   ASSERT_EQ(out.size(), 1u);
-  EXPECT_EQ(out[0].end_frame, 2) << "truncating cast";
-  EXPECT_NEAR(out[0].end_time, 2.7 * frameSeconds(), 1e-6) << "raw float";
-  // State the disagreement explicitly so a fix cannot land silently.
-  EXPECT_NE(static_cast<double>(out[0].end_frame) * frameSeconds(),
-            static_cast<double>(out[0].end_time));
+  EXPECT_EQ(out[0].end_frame, 3) << "ceil(2.7) = 3";
+  EXPECT_NEAR(out[0].end_time, 3.0 * frameSeconds(), 1e-6);
+  // The two representations must now agree exactly.
+  EXPECT_NEAR(static_cast<double>(out[0].end_frame) * frameSeconds(),
+              static_cast<double>(out[0].end_time), 1e-6);
 }
 
-TEST(TimingHelpers, NegativeDurationsAreNotClamped) {
-  // PINS A DIVERGENCE. docs/spec/phoneme-timing-contract.toml
-  // [calculation.negative_handling] says negative durations clamp to 0 with a
-  // warning, and Python/Rust/Go/JS/C# all do. C++ does not: it adds the
-  // negative value, moving the cursor BACKWARDS. Recorded here rather than
-  // fixed under cover of an extraction.
+TEST(TimingHelpers, NegativeDurationsClampToZeroBeforeCeil) {
+  // docs/spec/phoneme-timing-contract.toml [calculation.negative_handling]:
+  // clamp to 0, then quantise. C++ used to add the negative value outright,
+  // moving the cursor BACKWARDS so that end_ms < start_ms.
+  //
+  // The order matters and this case pins it: ceil(-2.0) is -2.0, so
+  // quantising before clamping would leave the backwards motion intact.
   const std::vector<float> durations = {5.0f, -2.0f, 5.0f};
   const std::vector<PhonemeId> ids = {3, 4, 5};
 
@@ -148,10 +147,12 @@ TEST(TimingHelpers, NegativeDurationsAreNotClamped) {
                                          kRate, false);
 
   ASSERT_EQ(out.size(), 3u);
-  EXPECT_NEAR(out[1].end_time, 3.0 * frameSeconds(), 1e-6)
-      << "5 + (-2) = 3: the cursor went backwards instead of clamping";
-  EXPECT_LT(out[1].end_time, out[1].start_time)
-      << "end before start -- the observable symptom";
+  EXPECT_NEAR(out[1].end_time, 5.0 * frameSeconds(), 1e-6)
+      << "the negative contributes 0 frames, so the cursor holds at 5";
+  EXPECT_NEAR(out[1].start_time, out[1].end_time, 1e-6)
+      << "zero-length span, not a backwards one";
+  EXPECT_GE(out[1].end_time, out[1].start_time);
+  EXPECT_EQ(out[1].end_frame, 5);
 }
 
 // ---------------------------------------------------------------------------
