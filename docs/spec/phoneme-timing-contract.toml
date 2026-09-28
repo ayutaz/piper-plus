@@ -8,7 +8,7 @@
 # adhering to this spec.
 
 [meta]
-spec_version = "1.1"
+spec_version = "1.2"
 last_updated = "2026-09-18"
 applies_to = ["python", "rust", "go", "cpp", "csharp", "wasm-js"]
 forward_compat_policy = "strict"
@@ -36,7 +36,9 @@ Each phoneme's end_ms equals the next phoneme's start_ms (continuous boundaries)
 algorithm = """
 cursor_ms = 0.0
 for each (duration_frames, phoneme_token) in zip(durations, tokens):
-    duration_ms = max(duration_frames, 0.0) * frame_time_ms
+    # ceil AFTER the negative clamp -- see [calculation.frame_quantization].
+    frames = ceil(max(duration_frames, 0.0))
+    duration_ms = frames * frame_time_ms
     start_ms = cursor_ms
     end_ms = cursor_ms + duration_ms
     yield {phoneme, start_ms, end_ms, duration_ms}
@@ -44,11 +46,73 @@ for each (duration_frames, phoneme_token) in zip(durations, tokens):
 total_duration_ms = cursor_ms
 """
 
+[calculation.frame_quantization]
+# The `durations` tensor is exported BEFORE `torch.ceil`, but the decoder
+# allocates `ceil(d_i)` frames to phoneme i. Timing must use the ceil'd value,
+# or it reports an utterance systematically shorter than the audio.
+#
+# src/python/piper_train/export_onnx.py:
+#     w = torch.exp(logw) * x_mask * length_scale
+#     durations = w.squeeze(1)      # <- the ONNX output, pre-ceil
+#     w_ceil = torch.ceil(w)        # <- what the attention path actually uses
+#     attn = commons.generate_path(w_ceil, attn_mask)
+#
+# commons.generate_path takes `cumsum(w_ceil)` and differences it, so phoneme i
+# occupies exactly the frames [sum_{j<i} ceil(d_j), sum_{j<=i} ceil(d_j)).
+# Cumulative ceil is therefore EXACT, not an approximation.
+applies_to = "every duration value, after the negative clamp"
+formula = "frames_i = ceil(max(d_i, 0.0))"
+rationale = "the decoder allocates ceil(d_i) frames; the exported tensor is pre-ceil"
+# Measured on test/models/multilingual-test-medium.onnx (hop=256, 22050Hz):
+# sum(ceil(d)) equals the emitted frame count exactly in every case, while the
+# raw sum is 73-76% of it. Error grows with phoneme count, so the tail of a
+# long utterance drifts furthest -- the worst case for lip-sync and subtitles.
+[[calculation.frame_quantization.measurements]]
+text = "Hola, esta es una prueba."
+phoneme_ids = 66
+sum_raw_frames = 90.566
+sum_ceil_frames = 123
+emitted_frames = 123
+raw_over_emitted = 0.736
+[[calculation.frame_quantization.measurements]]
+text = "Hola."
+phoneme_ids = 16
+sum_raw_frames = 26.685
+sum_ceil_frames = 35
+emitted_frames = 35
+raw_over_emitted = 0.762
+[[calculation.frame_quantization.measurements]]
+text = "Sol"
+phoneme_ids = 10
+sum_raw_frames = 20.527
+sum_ceil_frames = 27
+emitted_frames = 27
+raw_over_emitted = 0.760
+[[calculation.frame_quantization.measurements]]
+text = "long spanish sentence, 208 phoneme ids"
+phoneme_ids = 208
+sum_raw_frames = 263.979
+sum_ceil_frames = 358
+emitted_frames = 358
+raw_over_emitted = 0.737
+
+[calculation.frame_quantization.fixture_requirements]
+# The golden fixture used every-case-integer durations until spec_version 1.2.
+# `ceil(int) == int`, so it could not tell a conforming implementation from one
+# that skipped the quantisation: applying ceil to the Go implementation passed
+# the old fixture and fails the current one. Enforced by
+# scripts/regenerate_timing_fixture.py.
+min_fractional_cases = 2
+min_longest_case_entries = 50
+
 [calculation.negative_handling]
 # Negative durations should be clamped to 0.0 with a warning logged
 clamp_to = 0.0
 log_level = "warning"
 # Negative values must NOT raise an exception (gracefully degrade)
+# Order matters: clamp FIRST, then ceil. ceil(-2.0) is -2.0, so quantising
+# before clamping would leave the cursor free to run backwards.
+order = "clamp_then_ceil"
 
 # ============================================================================
 # Concatenation across multiple inferences (spec_version 1.1)

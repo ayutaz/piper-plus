@@ -193,7 +193,10 @@ func DurationsToTiming(durations []float32, phonemeTokens []string, sampleRate, 
 				"phoneme", phonemeTokens[i],
 				"value", durations[i])
 		}
-		durationMs := math.Max(0, float64(durations[i])) * msPerFrame
+		// Clamp first, then quantise: math.Ceil(-2) is -2, so quantising a
+		// negative before clamping would let the cursor run backwards
+		// (contract: order = "clamp_then_ceil").
+		durationMs := math.Ceil(math.Max(0, float64(durations[i]))) * msPerFrame
 		startMs := cumMs
 		endMs := startMs + durationMs
 

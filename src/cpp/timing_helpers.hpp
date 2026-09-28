@@ -29,6 +29,7 @@
 #define PIPER_PLUS_TIMING_HELPERS_HPP
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -149,11 +150,11 @@ inline void applyJapanesePhonemeAdjustments(std::vector<TimingEntry> &timings) {
 // without emitting entries for them".
 //
 // `durations` are frame counts straight from the ONNX `durations` output.
-// They are pre-`torch.ceil`, while the decoder allocates `ceil(d_i)` frames to
-// phoneme i -- that discrepancy is issue #653 and is NOT addressed here; this
-// extraction deliberately preserves the current arithmetic so the parity
-// fixture keeps its present values and the change that fixes #653 shows up as
-// a fixture diff rather than being folded into a refactor.
+// They are exported pre-`torch.ceil`, while the decoder allocates `ceil(d_i)`
+// frames to phoneme i (generate_path differences `cumsum(w_ceil)`), so each
+// value is quantised here before it moves the cursor -- see
+// docs/spec/phoneme-timing-contract.toml [calculation.frame_quantization].
+// Using the raw value reported 73-76% of the emitted audio length.
 //
 // `applyJapaneseAdjustments` controls the PUA rename + geminate overlap pass,
 // which piper.cpp runs only for OpenJTalk phoneme types.
@@ -178,7 +179,12 @@ inline std::vector<TimingEntry> computePhonemeTimings(
   const std::size_t n = std::min(phonemeIds.size(), durations.size());
   for (std::size_t i = 0; i < n; ++i) {
     const PhonemeId id = phonemeIds[i];
-    const double duration = static_cast<double>(durations[i]);
+    // Clamp first, then quantise -- ceil(-2.0) is -2.0, so quantising a
+    // negative before clamping would leave the cursor free to run backwards
+    // (docs/spec/phoneme-timing-contract.toml [calculation.negative_handling]
+    // `order = "clamp_then_ceil"`).
+    const double duration =
+        std::ceil(std::max(0.0, static_cast<double>(durations[i])));
 
     // Skip special tokens (PAD, BOS, EOS): advance the cursor only.
     if (id == 0 || id == 1 || id == 2) {

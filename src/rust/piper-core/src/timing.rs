@@ -269,7 +269,10 @@ pub fn durations_to_timing(
     let mut cursor_ms: f64 = 0.0;
 
     for (dur, token) in durations.iter().zip(phoneme_tokens.iter()) {
-        let dur_frames = (*dur).max(0.0) as f64;
+        // Clamp first, then quantise: `(-2.0f64).ceil()` is `-2.0`, so
+        // quantising a negative before clamping would let the cursor run
+        // backwards (contract: `order = "clamp_then_ceil"`).
+        let dur_frames = f64::from((*dur).max(0.0)).ceil();
         let duration_ms = dur_frames * frame_time_ms;
         let start_ms = cursor_ms;
         let end_ms = cursor_ms + duration_ms;
@@ -914,12 +917,16 @@ mod tests {
 
     #[test]
     fn test_very_small_durations_precision() {
-        // 0.001 frames at sample_rate=1000, hop=1 => 0.001 ms per frame
-        let durations = vec![0.001_f32];
+        // Sub-millisecond spans come from a small FRAME, not a fractional
+        // frame count: since spec_version 1.2 every duration is quantised with
+        // `ceil`, so `0.001` frames would round up to a whole frame. Here one
+        // frame is 0.001 ms (hop=1 at 1 MHz), which keeps the original point
+        // of this test -- that TSV renders sub-millisecond values via `{:.3}`.
+        let durations = vec![1.0_f32];
         let toks = tokens(&["tiny"]);
-        let result = durations_to_timing(&durations, &toks, 1000, 1).unwrap();
+        let result = durations_to_timing(&durations, &toks, 1_000_000, 1).unwrap();
 
-        // frame_time_ms = 1.0 ms; duration = 0.001 * 1.0 = 0.001 ms
+        // frame_time_ms = 0.001 ms; duration = ceil(1.0) * 0.001 = 0.001 ms
         let expected = 0.001_f64;
         assert!(
             (result.phonemes[0].duration_ms - expected).abs() < 1e-9,

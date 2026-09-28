@@ -116,9 +116,12 @@ public static class TimingWriter
         {
             long id = phonemeIds[i];
 
-            // Negative durations are clamped to 0 — matches Python canonical
-            // (durations_to_timing) and the cross-runtime golden fixture.
-            float frameDuration = Math.Max(0f, durations[i]);
+            // Negative durations are clamped to 0, then quantised to whole
+            // frames — matches Python canonical (durations_to_timing) and the
+            // cross-runtime golden fixture. Order matters: MathF.Ceiling(-2f)
+            // is -2f, so quantising before clamping would let the cursor run
+            // backwards (contract: order = "clamp_then_ceil").
+            float frameDuration = MathF.Ceiling(Math.Max(0f, durations[i]));
 
             // Skip special tokens (PAD=0, BOS=1, EOS=2) — advance clock only.
             if (id is 0 or 1 or 2)
