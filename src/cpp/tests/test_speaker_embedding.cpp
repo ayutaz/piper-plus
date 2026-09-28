@@ -1,4 +1,6 @@
 #include <gtest/gtest.h>
+
+#include "speaker_embedding_io.hpp"
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -9,82 +11,37 @@
 #include <string>
 #include <vector>
 
-// Standalone reimplementation of loadSpeakerEmbedding() from main.cpp.
-// We replicate the logic here rather than including main.cpp so that the test
-// has no dependency on spdlog, onnxruntime, or the rest of the binary.
-// If the production implementation ever changes, this mirror must be updated.
+// The PRODUCTION loaders, from src/cpp/speaker_embedding_io.hpp (called by
+// main.cpp:loadSpeakerEmbedding / loadSpeakerEmbeddingBin).
+//
+// This file used to carry a hand-written copy and say "If the production
+// implementation ever changes, this mirror must be updated" -- nothing
+// enforced that, so every assertion below ran against the copy rather than
+// against what ships (issue #703).
 namespace {
 
-constexpr int64_t EXPECTED_DIM = 192;
+constexpr int64_t EXPECTED_DIM = piper::kSpeakerEmbeddingDim;
 
-// Mirror of loadSpeakerEmbedding() in src/cpp/main.cpp.
-// Reads 192 float32 values from either:
-//   - a raw binary file  (192 × float32 = 768 bytes exactly), or
-//   - a NumPy .npy v1/v2 file (magic "\x93NUMPY" + 2-byte version +
-//     2-byte headerLen (LE) + headerLen bytes of dict + float32 data).
-// If the number of parsed floats != 192 the result is padded/truncated to 192.
-std::vector<float> loadSpeakerEmbeddingImpl(const std::filesystem::path &path) {
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file.good()) {
-        throw std::runtime_error("Cannot open speaker embedding file: " +
-                                 path.string());
-    }
+// Records whether the loader had to pad or truncate. The production callback
+// is spdlog::warn, which a test cannot observe; padding with zeros yields a
+// valid-looking but wrong voice instead of an error, so whether it fired is
+// the interesting part.
+struct DimensionAdjustment {
+  bool fired = false;
+  std::size_t actual = 0;
+  int64_t expected = 0;
+};
 
-    auto fileSize = file.tellg();
-    file.seekg(0, std::ios::beg);
-
-    // Detect NumPy magic: "\x93NUMPY"
-    char magic[6] = {};
-    file.read(magic, 6);
-    file.seekg(0, std::ios::beg);
-
-    std::vector<float> embedding;
-
-    if (magic[0] == '\x93' && magic[1] == 'N' && magic[2] == 'U' &&
-        magic[3] == 'M' && magic[4] == 'P' && magic[5] == 'Y') {
-        // NumPy .npy v1.0 / v2.0 format
-        // Layout: magic(6) + major(1) + minor(1) + headerLen(2 or 4, LE) + header + data
-        file.seekg(6, std::ios::beg);
-        uint8_t majorVersion = 0;
-        file.read(reinterpret_cast<char *>(&majorVersion), 1);
-        // Seek to headerLen field (offset 8)
-        file.seekg(8, std::ios::beg);
-        size_t dataOffset;
-        if (majorVersion >= 2) {
-            // v2.0+: headerLen is uint32_t at offset 8, data starts at 12 + headerLen
-            uint32_t headerLen = 0;
-            file.read(reinterpret_cast<char *>(&headerLen), sizeof(headerLen));
-            dataOffset = 12 + headerLen;
-        } else {
-            // v1.0: headerLen is uint16_t at offset 8, data starts at 10 + headerLen
-            uint16_t headerLen = 0;
-            file.read(reinterpret_cast<char *>(&headerLen), sizeof(headerLen));
-            dataOffset = 10 + headerLen;
+std::vector<float> loadSpeakerEmbeddingImpl(const std::filesystem::path &path,
+                                            DimensionAdjustment *adjust = nullptr) {
+  return piper::loadSpeakerEmbeddingIn(
+      path, [adjust](std::size_t actual, int64_t expected) {
+        if (adjust != nullptr) {
+          adjust->fired = true;
+          adjust->actual = actual;
+          adjust->expected = expected;
         }
-        // Seek to start of float data
-        file.seekg(static_cast<std::streamoff>(dataOffset), std::ios::beg);
-
-        auto dataStart  = file.tellg();
-        auto dataBytes  = fileSize - dataStart;
-        auto numFloats  = static_cast<int64_t>(dataBytes) / sizeof(float);
-
-        embedding.resize(numFloats);
-        file.read(reinterpret_cast<char *>(embedding.data()),
-                  numFloats * sizeof(float));
-    } else {
-        // Raw binary
-        auto numFloats = static_cast<int64_t>(fileSize) / sizeof(float);
-        embedding.resize(numFloats);
-        file.read(reinterpret_cast<char *>(embedding.data()),
-                  numFloats * sizeof(float));
-    }
-
-    // Pad or truncate to 192
-    if (static_cast<int64_t>(embedding.size()) != EXPECTED_DIM) {
-        embedding.resize(EXPECTED_DIM, 0.0f);
-    }
-
-    return embedding;
+      });
 }
 
 // Write raw float32 data to a temp file and return its path.
@@ -533,4 +490,149 @@ TEST(ZeroShotE2E, EmbeddingAffectsInference) {
     }
     EXPECT_TRUE(configsDiffer)
         << "Two different embeddings must yield different SynthesisConfig values";
+}
+
+// ===========================================================================
+// loadSpeakerEmbeddingBin -- the CLI's --speaker-embedding path (issue #703).
+//
+// This one was `static` in main.cpp, so it had NO test of any kind, not even
+// a replica. It is the cross-runtime format: a file written by the Rust CLI's
+// --speaker-embedding must load here identically. Unlike the .npy-aware
+// loader it deliberately does not pad or truncate -- the caller compares the
+// length against the model's own speaker_embedding dimension and fails on a
+// mismatch -- so "returns exactly what the file holds" is the contract.
+// ===========================================================================
+
+class SpeakerEmbeddingBinTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        tempDir = std::filesystem::temp_directory_path() / "piper_spk_emb_bin_test";
+        std::filesystem::create_directories(tempDir);
+    }
+    void TearDown() override {
+        std::error_code ec;
+        std::filesystem::remove_all(tempDir, ec);
+    }
+    std::filesystem::path tempDir;
+};
+
+TEST_F(SpeakerEmbeddingBinTest, ReturnsExactlyTheFloatsInTheFile) {
+    // 5 floats, not 192: the raw loader must NOT normalise the length.
+    const std::vector<float> values = {1.0f, -2.5f, 0.0f, 3.25f, -0.125f};
+    const auto path = writeRawBinary(tempDir, "raw5.bin", values);
+
+    const auto got = piper::loadSpeakerEmbeddingBinIn(path);
+
+    ASSERT_EQ(got.size(), values.size())
+        << "the raw loader padded or truncated; that is the .npy loader's job";
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        EXPECT_FLOAT_EQ(got[i], values[i]) << "at index " << i;
+    }
+}
+
+TEST_F(SpeakerEmbeddingBinTest, ReadsAFull192DimEmbedding) {
+    std::vector<float> values(EXPECTED_DIM);
+    for (int64_t i = 0; i < EXPECTED_DIM; ++i) {
+        values[static_cast<std::size_t>(i)] = static_cast<float>(i) * 0.01f;
+    }
+    const auto path = writeRawBinary(tempDir, "raw192.bin", values);
+
+    const auto got = piper::loadSpeakerEmbeddingBinIn(path);
+
+    ASSERT_EQ(static_cast<int64_t>(got.size()), EXPECTED_DIM);
+    EXPECT_FLOAT_EQ(got.front(), 0.0f);
+    EXPECT_FLOAT_EQ(got.back(), static_cast<float>(EXPECTED_DIM - 1) * 0.01f);
+}
+
+TEST_F(SpeakerEmbeddingBinTest, RejectsASizeThatIsNotAMultipleOfFour) {
+    // A truncated transfer is the realistic cause. Reading it as floats would
+    // silently drop the trailing partial value and produce a usable-looking
+    // embedding, so this has to throw.
+    const auto path = tempDir / "odd.bin";
+    {
+        std::ofstream f(path, std::ios::binary);
+        const char bytes[] = {1, 2, 3, 4, 5};
+        f.write(bytes, sizeof(bytes));
+    }
+
+    EXPECT_THROW(piper::loadSpeakerEmbeddingBinIn(path), std::runtime_error);
+}
+
+TEST_F(SpeakerEmbeddingBinTest, RejectsAMissingFile) {
+    // The message is asserted, not just the type: removing the `!f.good()`
+    // guard still throws, because tellg() returns -1 on a failed stream and
+    // the `bytes < 0` guard catches it. Both are runtime_error, so a
+    // type-only assertion cannot tell which one fired -- and the user is told
+    // "failed to stat" for a file that simply is not there.
+    try {
+        piper::loadSpeakerEmbeddingBinIn(tempDir / "absent.bin");
+        FAIL() << "a missing file was accepted";
+    } catch (const std::runtime_error &e) {
+        EXPECT_NE(std::string(e.what()).find("Failed to open"),
+                  std::string::npos)
+            << "expected the open guard to reject a missing file, got: "
+            << e.what();
+    }
+}
+
+TEST_F(SpeakerEmbeddingBinTest, AnEmptyFileYieldsAnEmptyVectorNotAThrow) {
+    // 0 is a multiple of 4, so this is not a format error. The caller's
+    // dimension check is what rejects it, and it must get a chance to run.
+    const auto path = tempDir / "empty.bin";
+    { std::ofstream f(path, std::ios::binary); }
+
+    const auto got = piper::loadSpeakerEmbeddingBinIn(path);
+    EXPECT_TRUE(got.empty());
+}
+
+// ===========================================================================
+// The padding/truncation notification on the .npy-aware loader.
+//
+// Padding with zeros produces a valid-looking but WRONG voice rather than an
+// error, so whether the caller is told is the whole safety margin. The old
+// replica dropped the spdlog::warn entirely, so no test could see it.
+// ===========================================================================
+
+TEST_F(SpeakerEmbeddingTest, ShortEmbeddingReportsTheAdjustmentItMade) {
+    const std::vector<float> values(100, 0.5f);
+    const auto path = writeRawBinary(tempDir, "short100.bin", values);
+
+    DimensionAdjustment adjust;
+    const auto got = loadSpeakerEmbeddingImpl(path, &adjust);
+
+    ASSERT_EQ(static_cast<int64_t>(got.size()), EXPECTED_DIM);
+    EXPECT_TRUE(adjust.fired)
+        << "the embedding was padded from 100 to 192 without telling anyone";
+    EXPECT_EQ(adjust.actual, 100u);
+    EXPECT_EQ(adjust.expected, EXPECTED_DIM);
+    // Padding is zeros, appended -- the real values must survive in place.
+    EXPECT_FLOAT_EQ(got[99], 0.5f);
+    EXPECT_FLOAT_EQ(got[100], 0.0f);
+}
+
+TEST_F(SpeakerEmbeddingTest, ExactLengthEmbeddingReportsNoAdjustment) {
+    // Anti-vacuity for the case above: a callback that fired unconditionally
+    // would satisfy it while saying nothing about the length check.
+    const std::vector<float> values(EXPECTED_DIM, 0.25f);
+    const auto path = writeRawBinary(tempDir, "exact192.bin", values);
+
+    DimensionAdjustment adjust;
+    const auto got = loadSpeakerEmbeddingImpl(path, &adjust);
+
+    ASSERT_EQ(static_cast<int64_t>(got.size()), EXPECTED_DIM);
+    EXPECT_FALSE(adjust.fired);
+}
+
+TEST_F(SpeakerEmbeddingTest, LongEmbeddingIsTruncatedAndReported) {
+    std::vector<float> values(EXPECTED_DIM + 8, 0.75f);
+    values.back() = 9.0f;  // would only survive if truncation were skipped
+    const auto path = writeRawBinary(tempDir, "long200.bin", values);
+
+    DimensionAdjustment adjust;
+    const auto got = loadSpeakerEmbeddingImpl(path, &adjust);
+
+    ASSERT_EQ(static_cast<int64_t>(got.size()), EXPECTED_DIM);
+    EXPECT_TRUE(adjust.fired);
+    EXPECT_EQ(adjust.actual, static_cast<std::size_t>(EXPECTED_DIM + 8));
+    EXPECT_FLOAT_EQ(got.back(), 0.75f);
 }

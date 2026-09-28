@@ -34,6 +34,7 @@
 
 #include <onnxruntime_cxx_api.h>
 
+#include "speaker_embedding_io.hpp"
 #include "json.hpp"
 #include "piper.hpp"
 #include "phoneme_parser.hpp"
@@ -174,103 +175,19 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
                  piper::Voice &voice, piper::SynthesisResult &result,
                  bool jsonInput, std::unique_ptr<piper::CustomDictionary> &customDict);
 
-// Load a speaker embedding from a raw float32 little-endian binary file.
-// Format matches the Rust CLI's `--speaker-embedding` (src/rust/piper-cli/
-// src/main.rs:load_speaker_embedding), allowing cross-runtime portability.
+// Both loaders live in speaker_embedding_io.hpp so the tests can reach them;
+// see that header for why they were extracted (issue #703).
 static std::vector<float> loadSpeakerEmbeddingBin(const filesystem::path &path) {
-  ifstream f(path, ios::binary | ios::ate);
-  if (!f.good()) {
-    throw runtime_error("Failed to open speaker embedding file: " +
-                        path.string());
-  }
-  auto bytes = static_cast<std::streamsize>(f.tellg());
-  if (bytes < 0) {
-    throw runtime_error("Failed to stat speaker embedding file: " +
-                        path.string());
-  }
-  if (bytes % 4 != 0) {
-    throw runtime_error(
-        "Speaker embedding file size (" + std::to_string(bytes) +
-        " bytes) is not a multiple of 4 (float32)");
-  }
-  f.seekg(0, ios::beg);
-  std::vector<float> floats(static_cast<size_t>(bytes) / sizeof(float));
-  if (!floats.empty()) {
-    f.read(reinterpret_cast<char *>(floats.data()), bytes);
-    if (!f) {
-      throw runtime_error("Failed to read speaker embedding file: " +
-                          path.string());
-    }
-  }
-  return floats;
+  return piper::loadSpeakerEmbeddingBinIn(path);
 }
 
-// Load speaker embedding from a raw binary file (192 float32 = 768 bytes)
-// or a NumPy .npy file (header + 192 float32).
 std::vector<float> loadSpeakerEmbedding(const filesystem::path &path) {
-  const int64_t expectedDim = 192;
-
-  ifstream file(path, ios::binary | ios::ate);
-  if (!file.good()) {
-    throw runtime_error("Cannot open speaker embedding file: " + path.string());
-  }
-
-  auto fileSize = file.tellg();
-  file.seekg(0, ios::beg);
-
-  // Detect NumPy .npy format: starts with magic "\x93NUMPY"
-  char magic[6] = {};
-  file.read(magic, 6);
-  file.seekg(0, ios::beg);
-
-  std::vector<float> embedding;
-
-  if (magic[0] == '\x93' && magic[1] == 'N' && magic[2] == 'U' &&
-      magic[3] == 'M' && magic[4] == 'P' && magic[5] == 'Y') {
-    // NumPy .npy v1.0/v2.0 format
-    // Layout: magic(6) + major(1) + minor(1) + headerLen(2 or 4) + header + data
-    file.seekg(6, ios::beg);
-    uint8_t majorVersion = 0;
-    file.read(reinterpret_cast<char *>(&majorVersion), 1);
-    // Seek to headerLen field (offset 8)
-    file.seekg(8, ios::beg);
-    size_t dataOffset;
-    if (majorVersion >= 2) {
-      // v2.0+: headerLen is uint32_t at offset 8, data starts at 12 + headerLen
-      uint32_t headerLen = 0;
-      file.read(reinterpret_cast<char *>(&headerLen), sizeof(headerLen));
-      dataOffset = 12 + headerLen;
-    } else {
-      // v1.0: headerLen is uint16_t at offset 8, data starts at 10 + headerLen
-      uint16_t headerLen = 0;
-      file.read(reinterpret_cast<char *>(&headerLen), sizeof(headerLen));
-      dataOffset = 10 + headerLen;
-    }
-    // Skip the header dict string
-    file.seekg(static_cast<std::streamoff>(dataOffset), ios::beg);
-
-    auto dataStart = file.tellg();
-    auto dataBytes = fileSize - dataStart;
-    auto numFloats = static_cast<int64_t>(dataBytes) / sizeof(float);
-
-    embedding.resize(numFloats);
-    file.read(reinterpret_cast<char *>(embedding.data()),
-              numFloats * sizeof(float));
-  } else {
-    // Raw binary: expect exactly 192 * 4 = 768 bytes
-    auto numFloats = static_cast<int64_t>(fileSize) / sizeof(float);
-    embedding.resize(numFloats);
-    file.read(reinterpret_cast<char *>(embedding.data()),
-              numFloats * sizeof(float));
-  }
-
-  if (static_cast<int64_t>(embedding.size()) != expectedDim) {
-    spdlog::warn("Speaker embedding has {} values, expected {}; padding/truncating",
-                 embedding.size(), expectedDim);
-    embedding.resize(expectedDim, 0.0f);
-  }
-
-  return embedding;
+  return piper::loadSpeakerEmbeddingIn(
+      path, [](std::size_t actual, std::int64_t expected) {
+        spdlog::warn(
+            "Speaker embedding has {} values, expected {}; padding/truncating",
+            actual, expected);
+      });
 }
 
 // ----------------------------------------------------------------------------
