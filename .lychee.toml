@@ -78,6 +78,21 @@ exclude = [
   # plus citation tables in docs/. Excluding the canonical URL is safer
   # than racing against the host's uptime on every PR.
   "^https?://www\\.speech\\.cs\\.cmu\\.edu/cgi-bin/cmudict",
+  # ISCA Archive (Interspeech proceedings). The host's TLS certificate has
+  # expired -- `curl -v https://www.isca-archive.org/` reports "SSL
+  # certificate problem: certificate has expired" -- so every link to it
+  # fails, and lychee scans all of docs/ regardless of what a PR touched.
+  # That made this a blocker on EVERY pull request that edits any .md file,
+  # not just the two documents holding the links
+  # (docs/design/zero-shot-quality-improvement-plan.md and
+  # docs/research/decoder-upgrades-istftnet2-and-mswavehax.md).
+  #
+  # These are canonical citation URLs for published papers, so the right
+  # response is to keep citing them and stop blocking on a certificate we do
+  # not control -- the same reasoning as the CMU entry above. Revisit once
+  # ISCA renews; the URLs themselves are correct -- with the certificate
+  # check disabled they return 200 (`curl -k` measured).
+  "^https?://www\\.isca-archive\\.org/",
 ]
 
 # Excluded paths (regex matched against full path)
