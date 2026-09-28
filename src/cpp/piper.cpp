@@ -39,6 +39,7 @@
 #include "phoneme_timing_concat.hpp"
 #include "trim_helpers.hpp"
 #include "timing_helpers.hpp"
+#include "timing_format.hpp"
 #include "dictionary_search.hpp"
 #include "language_detector.hpp"
 #include "spanish_phonemize.hpp"
@@ -3122,116 +3123,45 @@ void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
                        totalDurationMs);
 }
 
-// Output phoneme timing information as TSV.
-//
-// Header combines the spec-canonical millisecond columns with the legacy
-// frame/seconds columns so both old and new consumers can parse the file.
-//   phoneme\tstart_ms\tend_ms\tduration_ms\tstart\tend\tstart_frame\tend_frame
-void outputTimingsAsTSV(const std::vector<PhonemeInfo> &timings,
-                        std::ostream &output) {
-    output << "phoneme\tstart_ms\tend_ms\tduration_ms\tstart\tend\tstart_frame\tend_frame"
-           << std::endl;
+namespace {
 
-    // Use fixed precision (3 decimals) for ms columns per spec
-    // [output_formats.tsv].float_precision = 3.
-    //
-    // The locale must be pinned, not inherited. The CLI installs a global
-    // "en_US.UTF-8" locale (main.cpp), and every stream constructed after that
-    // -- including the ofstream behind --output-timing -- inherits its
-    // numpunct, which groups thousands. Any entry past 1 second was then
-    // written as `1,011.541`, which no TSV consumer can parse as a number and
-    // which the spec's float_precision = 3 format does not allow. It
-    // reproduced only where that locale exists, since main.cpp falls back to
-    // the classic locale when the runtime lacks it.
-    const std::locale savedLocale = output.getloc();
-    const std::ios_base::fmtflags savedFlags = output.flags();
-    const std::streamsize savedPrecision = output.precision();
-    output.imbue(std::locale::classic());
-    output.setf(std::ios_base::fixed, std::ios_base::floatfield);
-    output.precision(3);
-
+// PhonemeInfo stores seconds as float; the formatters take milliseconds so the
+// parity test can drive them straight from the fixture (see timing_format.hpp).
+std::vector<timing_format::FormatRow> toFormatRows(
+    const std::vector<PhonemeInfo> &timings) {
+    std::vector<timing_format::FormatRow> rows;
+    rows.reserve(timings.size());
     for (const auto &info : timings) {
         const double startMs = static_cast<double>(info.start_time) * 1000.0;
         const double endMs = static_cast<double>(info.end_time) * 1000.0;
-        const double durationMs = endMs - startMs;
-
-        output << info.phoneme << "\t"
-               << startMs << "\t"
-               << endMs << "\t"
-               << durationMs << "\t"
-               << info.start_time << "\t"
-               << info.end_time << "\t"
-               << info.start_frame << "\t"
-               << info.end_frame << std::endl;
+        rows.push_back({info.phoneme, startMs, endMs, endMs - startMs});
     }
-
-    output.flags(savedFlags);
-    output.precision(savedPrecision);
-    output.imbue(savedLocale);
+    return rows;
 }
 
-// Output phoneme timing information as SubRip subtitle (SRT) format.
+} // namespace
+
+// Output phoneme timing information as TSV, per
+// docs/spec/phoneme-timing-contract.toml [output_formats.tsv]:
+//   start_ms\tend_ms\tduration_ms\tphoneme
 //
-// Spec [output_formats.srt]:
-//   timestamp_format = "HH:MM:SS,mmm"
-//   cue_format       = "{index}\n{start} --> {end}\n{phoneme}\n\n"
-//   indexing starts at 1
-// Encoding: UTF-8 without BOM (default for ofstream — we just emit raw text).
+// This emitted eight columns led by `phoneme`, with `start` / `end` in seconds
+// and `start_frame` / `end_frame`, until issue #716. The extra columns are gone
+// rather than moved: the contract pins `header` byte-for-byte, and every value
+// in them is derivable from the four that remain.
+void outputTimingsAsTSV(const std::vector<PhonemeInfo> &timings,
+                        std::ostream &output) {
+    timing_format::writeTsv(output, toFormatRows(timings));
+}
+
+// Output phoneme timing information as SubRip subtitle (SRT) format, per
+// [output_formats.srt]. sampleRate / hopSize are accepted for signature
+// compatibility; the cue text is derived entirely from the timing entries.
 void outputTimingsAsSRT(const std::vector<PhonemeInfo> &timings,
                         std::ostream &output,
                         double /*sampleRate*/,
                         int /*hopSize*/) {
-    auto formatTimestamp = [](double ms) -> std::string {
-        if (ms < 0.0) {
-            ms = 0.0;
-        }
-        // Round to nearest millisecond before splitting, half away from zero
-        // per the contract's [output_formats.srt].rounding.
-        //
-        // std::llround, not `static_cast<long long>(ms + 0.5)`: adding 0.5 can
-        // round up in binary64, so the sum idiom disagrees with a true round()
-        // at ms = 0.49999999999999994 (the largest double below 0.5), where
-        // `ms + 0.5` is exactly 1.0. Rust f64::round, Go math.Round and JS
-        // Math.round all yield 0 there. The float-seconds storage of
-        // PhonemeInfo makes that input unreachable through this writer, but
-        // the idiom is what the contract pins across six runtimes, so it must
-        // be the correct one rather than one that happens not to be exercised.
-        const long long total_ms = std::llround(ms);
-        const long long millis = total_ms % 1000;
-        const long long total_secs = total_ms / 1000;
-        const long long secs = total_secs % 60;
-        const long long total_mins = total_secs / 60;
-        const long long mins = total_mins % 60;
-        const long long hours = total_mins / 60;
-
-        char buf[32];
-        std::snprintf(buf, sizeof(buf), "%02lld:%02lld:%02lld,%03lld",
-                      hours, mins, secs, millis);
-        return std::string(buf);
-    };
-
-    // Pin the classic locale, as outputTimingsAsTSV does. The cue index is
-    // streamed as an integer, and the CLI installs a global "en_US.UTF-8"
-    // locale (main.cpp) whose numpunct groups thousands -- cue 1000 came out as
-    // "1,000", which is not an integer to any SRT parser. The timestamps are
-    // built with snprintf so they were never affected, which is why only the
-    // index needs this.
-    const std::locale savedLocale = output.getloc();
-    output.imbue(std::locale::classic());
-
-    for (size_t i = 0; i < timings.size(); ++i) {
-        const auto &info = timings[i];
-        const double startMs = static_cast<double>(info.start_time) * 1000.0;
-        const double endMs = static_cast<double>(info.end_time) * 1000.0;
-
-        // 1-based index per spec.
-        output << (i + 1) << "\n"
-               << formatTimestamp(startMs) << " --> "
-               << formatTimestamp(endMs) << "\n"
-               << info.phoneme << "\n\n";
-    }
-
-    output.imbue(savedLocale);
+    timing_format::writeSrt(output, toFormatRows(timings));
 }
 
 void warmupModel(ModelSession &session, int runs) {

@@ -852,11 +852,13 @@ TEST(TimingTsvWriterLocaleTest, NumericColumnsHaveNoThousandsSeparator) {
     std::string line;
     while (std::getline(lines, line)) {
         const std::vector<std::string> columns = splitTabs(line);
-        ASSERT_EQ(columns.size(), 8u) << "row='" << line << "'";
-        // Columns 1..5 are floating point; 6..7 are integers. None of them may
-        // carry a digit-group separator, and each must round-trip through
-        // std::stod consuming the whole field.
-        for (std::size_t i = 1; i < columns.size(); ++i) {
+        // [output_formats.tsv]: start_ms, end_ms, duration_ms, phoneme.
+        // Eight columns led by `phoneme` until issue #716.
+        ASSERT_EQ(columns.size(), 4u) << "row='" << line << "'";
+        // Columns 0..2 are floating point, column 3 is the phoneme. None of
+        // the numeric ones may carry a digit-group separator, and each must
+        // round-trip through std::stod consuming the whole field.
+        for (std::size_t i = 0; i + 1 < columns.size(); ++i) {
             EXPECT_EQ(columns[i].find(','), std::string::npos)
                 << "column " << i << " of row '" << line
                 << "' contains a thousands separator, so the TSV is not "

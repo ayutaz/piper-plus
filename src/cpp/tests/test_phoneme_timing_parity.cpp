@@ -29,6 +29,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <locale>
 #include <map>
 #include <set>
 #include <sstream>
@@ -36,6 +37,7 @@
 #include <vector>
 
 #include "json.hpp"
+#include "timing_format.hpp"
 #include "timing_helpers.hpp"
 
 namespace {
@@ -139,6 +141,177 @@ json loadFixture() {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+
+// ---------------------------------------------------------------------------
+// Rendered-output byte parity (issue #716).
+//
+// Everything above compares PARSED numbers, so the formatting layer -- column
+// order, precision, locale, escaping, separators, trailing newline -- was
+// unchecked in every runtime until the fixture started carrying the rendered
+// text at spec_version 1.2. The moment it did, two defects surfaced at that
+// layer: a UTF-8 BOM on C# TSV output, and the C++ CLI emitting eight columns
+// led by `phoneme` instead of the contract's four led by `start_ms`.
+//
+// These cases call the PRODUCTION writers (src/cpp/timing_format.hpp, used by
+// piper.cpp:outputTimingsAsTSV / outputTimingsAsSRT) and compare the result
+// byte-for-byte with the fixture, which is what the other five runtimes do.
+//
+// The rows are built from the fixture's millisecond values rather than from
+// PhonemeInfo's float32 seconds, deliberately: that isolates the formatting
+// from the storage round-trip, which the numeric assertions above already
+// cover to kAbsTolMs. Feeding seconds here would make a formatting regression
+// and a precision regression indistinguishable.
+// ---------------------------------------------------------------------------
+
+std::vector<piper::timing_format::FormatRow> rowsFromFixture(
+    const json& expected_phonemes) {
+  std::vector<piper::timing_format::FormatRow> rows;
+  rows.reserve(expected_phonemes.size());
+  for (const auto& entry : expected_phonemes) {
+    rows.push_back({entry["phoneme"].get<std::string>(),
+                    entry["start_ms"].get<double>(),
+                    entry["end_ms"].get<double>(),
+                    entry["duration_ms"].get<double>()});
+  }
+  return rows;
+}
+
+// A locale whose numpunct groups thousands, so the writers' locale pinning is
+// actually exercised. Hand-rolled rather than named ("en_US.UTF-8") so the
+// grouping is identical on every runner regardless of installed locales.
+class CommaGroupingNumpunct : public std::numpunct<char> {
+ protected:
+  char do_thousands_sep() const override { return ','; }
+  std::string do_grouping() const override { return "\3"; }
+};
+
+TEST(PhonemeTimingParity, TsvMatchesFixtureByteForByte) {
+  const auto fixture = loadFixture();
+  std::size_t cases_with_tsv = 0;
+
+  for (const auto& test_case : fixture["cases"]) {
+    const std::string name = test_case.value("name", "<unnamed>");
+    const auto& expected = test_case["expected"];
+    if (!expected.contains("tsv")) {
+      continue;
+    }
+    SCOPED_TRACE("case=" + name);
+    ++cases_with_tsv;
+
+    std::ostringstream out;
+    // Grouping locale on purpose: `1,011.541` is what an unpinned writer
+    // produced, and it is not a number to any TSV consumer.
+    out.imbue(std::locale(std::locale::classic(), new CommaGroupingNumpunct));
+    piper::timing_format::writeTsv(out, rowsFromFixture(expected["phonemes"]));
+
+    EXPECT_EQ(out.str(), expected["tsv"].get<std::string>())
+        << "rendered TSV differs from the fixture in case " << name;
+  }
+
+  // Anti-vacuity: with no `tsv` field in any case the loop above asserts
+  // nothing, which is exactly the state that let the column divergence ship.
+  EXPECT_GT(cases_with_tsv, 0u)
+      << "no fixture case carries an `expected.tsv` field, so this test "
+         "compared nothing -- regenerate with scripts/regenerate_timing_fixture.py";
+}
+
+TEST(PhonemeTimingParity, SrtMatchesFixtureByteForByte) {
+  const auto fixture = loadFixture();
+  std::size_t cases_with_srt = 0;
+
+  for (const auto& test_case : fixture["cases"]) {
+    const std::string name = test_case.value("name", "<unnamed>");
+    const auto& expected = test_case["expected"];
+    if (!expected.contains("srt")) {
+      continue;
+    }
+    SCOPED_TRACE("case=" + name);
+    ++cases_with_srt;
+
+    std::ostringstream out;
+    // The cue index is streamed as an integer, so the grouping locale is what
+    // turned cue 1000 into "1,000".
+    out.imbue(std::locale(std::locale::classic(), new CommaGroupingNumpunct));
+    piper::timing_format::writeSrt(out, rowsFromFixture(expected["phonemes"]));
+
+    EXPECT_EQ(out.str(), expected["srt"].get<std::string>())
+        << "rendered SRT differs from the fixture in case " << name;
+  }
+
+  EXPECT_GT(cases_with_srt, 0u)
+      << "no fixture case carries an `expected.srt` field, so this test "
+         "compared nothing";
+}
+
+// The contract pins the header string itself. Asserting it separately gives a
+// one-line failure when only the header moves, instead of a whole-file diff.
+TEST(PhonemeTimingParity, TsvHeaderMatchesContract) {
+  std::ostringstream out;
+  piper::timing_format::writeTsv(out, {});
+  EXPECT_EQ(out.str(), "start_ms\tend_ms\tduration_ms\tphoneme\n");
+}
+
+// The SRT cue index is streamed as an integer, so a grouping locale turns cue
+// 1000 into "1,000" -- not an integer to any SRT parser. No fixture case is
+// long enough to reach the boundary (the longest has 60 entries), so removing
+// the writer's locale guard passed every byte-parity comparison above. This
+// case is the one that fails: 1000 cues, and the index must stay plain.
+TEST(PhonemeTimingParity, SrtCueIndexPastOneThousandHasNoGroupingSeparator) {
+  std::vector<piper::timing_format::FormatRow> rows;
+  rows.reserve(1000);
+  for (int i = 0; i < 1000; ++i) {
+    const double start = static_cast<double>(i);
+    rows.push_back({"a", start, start + 1.0, 1.0});
+  }
+
+  std::ostringstream out;
+  out.imbue(std::locale(std::locale::classic(), new CommaGroupingNumpunct));
+  piper::timing_format::writeSrt(out, rows);
+
+  // Only the index lines are checked for a comma: the timestamp format is
+  // "HH:MM:SS,mmm", so a comma there is the contract's decimal separator, not
+  // a grouping artifact. Cue blocks are "index\ntimestamps\nphoneme\n\n",
+  // so the index is every 4th line.
+  std::vector<std::string> indices;
+  {
+    std::istringstream lines(out.str());
+    std::string line;
+    for (std::size_t n = 0; std::getline(lines, line); ++n) {
+      if (n % 4 == 0) {
+        indices.push_back(line);
+      }
+    }
+  }
+
+  ASSERT_EQ(indices.size(), 1000u);
+  EXPECT_EQ(indices.front(), "1");
+  EXPECT_EQ(indices.back(), "1000")
+      << "cue 1000 did not come out plain, so either the index is grouped "
+         "(the writer is inheriting the caller's locale instead of pinning "
+         "the classic one) or the cue layout changed";
+  for (std::size_t i = 0; i < indices.size(); ++i) {
+    EXPECT_EQ(indices[i].find(','), std::string::npos)
+        << "cue index " << (i + 1) << " ('" << indices[i]
+        << "') carries a digit-group separator";
+  }
+}
+
+// [output_formats.tsv] escape_tab_in_phoneme / escape_newline_in_phoneme.
+// A token carrying a literal tab or newline would invent a column or a row.
+TEST(PhonemeTimingParity, TsvEscapesTabAndNewlineInPhoneme) {
+  std::ostringstream out;
+  piper::timing_format::writeTsv(
+      out, {{"a\tb", 0.0, 1.0, 1.0}, {"c\nd", 1.0, 2.0, 1.0}});
+
+  const std::string text = out.str();
+  EXPECT_NE(text.find("a\\tb"), std::string::npos);
+  EXPECT_NE(text.find("c\\nd"), std::string::npos);
+  // Header + 2 rows, each terminated: exactly 3 newlines, and no stray tab
+  // beyond the 3 separators per row plus the 3 in the header.
+  EXPECT_EQ(std::count(text.begin(), text.end(), '\n'), 3);
+  EXPECT_EQ(std::count(text.begin(), text.end(), '\t'), 9);
+}
 
 // Smoke test: fixture is loadable and at the expected schema version.
 TEST(PhonemeTimingParity, FixtureLoadsAndIsSchemaV1) {
