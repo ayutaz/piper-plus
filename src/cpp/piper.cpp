@@ -342,13 +342,7 @@ static int resolveHopSize(const Voice *voice) {
 // unchanged.
 static void appendUnitTimings(SynthesisResult &out, const SynthesisResult &unit,
                               const piper_plus::timing::ConcatCursor &cursor) {
-  if (!unit.hasTimingInfo || unit.phonemeTimings.empty()) {
-    return;
-  }
-
-  piper_plus::timing::appendShifted(out.phonemeTimings, unit.phonemeTimings,
-                                    cursor);
-  out.hasTimingInfo = true;
+  piper_plus::timing::appendUnitTimings(out, unit, cursor);
 }
 
 // Extract phoneme timings from duration information.

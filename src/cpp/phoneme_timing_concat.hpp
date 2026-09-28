@@ -105,6 +105,28 @@ void appendShifted(
     }
 }
 
+
+// Append `unit`'s timings to `out`, shifted by `cursor`, and mark `out` as
+// carrying timing.
+//
+// Templated on the result type so this stays ORT-free: SynthesisResult lives
+// in piper.hpp, which includes onnxruntime_cxx_api.h. It was a `static`
+// function inside piper.cpp, which is why src/cpp/ssml_synth.cpp -- split out
+// of main.cpp by a later change -- could not call it and silently dropped
+// every segment's timing (issue #692). That is the same omission as #652,
+// where five aggregating paths each discarded per-unit timing; those were
+// fixed together, but the SSML path was still inside main.cpp at the time and
+// was not among them.
+template <typename Result>
+void appendUnitTimings(Result &out, const Result &unit,
+                       const ConcatCursor &cursor) {
+    if (!unit.hasTimingInfo || unit.phonemeTimings.empty()) {
+        return;
+    }
+    appendShifted(out.phonemeTimings, unit.phonemeTimings, cursor);
+    out.hasTimingInfo = true;
+}
+
 } // namespace timing
 } // namespace piper_plus
 

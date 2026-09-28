@@ -649,14 +649,23 @@ void rawOutputProc(vector<int16_t> &sharedAudioBuffer, mutex &mutAudio,
 // that header defines `writeWavHeader` with external linkage at namespace
 // scope, and piper_common.a already exports it — including it in main.cpp
 // causes a duplicate-symbol linker error.
+// `audioBuffer` holds INTERLEAVED samples, matching writeWavHeader and
+// piper_plus::timing::ConcatCursor (issue #693). `channels` was hardcoded to
+// 1 here and `voice.synthesisConfig.channels` was never read, so a
+// multi-channel config would have produced a mono header over interleaved
+// data.
 static void writeWavFromBuffer(const vector<int16_t> &audioBuffer,
-                               int sampleRate, std::ostream &out) {
+                               int sampleRate, int channels,
+                               std::ostream &out) {
   const uint32_t numSamples = static_cast<uint32_t>(audioBuffer.size());
-  const uint16_t numChannels = 1;
+  const uint16_t numChannels = static_cast<uint16_t>(std::max(1, channels));
   const uint16_t bitsPerSample = 16;
   const uint16_t blockAlign = numChannels * (bitsPerSample / 8);
   const uint32_t byteRate = static_cast<uint32_t>(sampleRate) * blockAlign;
-  const uint32_t dataSize = numSamples * blockAlign;
+  // numSamples is interleaved, so the byte count is samples x sample width,
+  // NOT samples x blockAlign (which would multiply by channels a second
+  // time).
+  const uint32_t dataSize = numSamples * (bitsPerSample / 8);
   const uint32_t chunkSize = dataSize + 36;
 
   auto wU32 = [&](uint32_t v) {
@@ -863,7 +872,8 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
                            nullptr, externalProsodyPtr);
       }
       emittedSamples = audioBuffer.size();
-      writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, audioFile);
+      writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate,
+                         voice.synthesisConfig.channels, audioFile);
     }
     cout << outputPath.string() << endl;
   } else if (outputType == OUTPUT_FILE) {
@@ -907,7 +917,8 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
                            nullptr, externalProsodyPtr);
       }
       emittedSamples = audioBuffer.size();
-      writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, audioFile);
+      writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate,
+                         voice.synthesisConfig.channels, audioFile);
     }
     cout << outputPath.string() << endl;
   } else if (outputType == OUTPUT_STDOUT) {
@@ -932,7 +943,8 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
                            nullptr, externalProsodyPtr);
       }
       emittedSamples = audioBuffer.size();
-      writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, cout);
+      writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate,
+                         voice.synthesisConfig.channels, cout);
     }
   } else if (outputType == OUTPUT_RAW) {
     // Raw output to stdout

@@ -1,9 +1,11 @@
 #include "ssml_synth.hpp"
 
+#include <algorithm>
 #include <exception>
 
 #include <spdlog/spdlog.h>
 
+#include "phoneme_timing_concat.hpp"
 #include "ssml.hpp"
 
 namespace piper {
@@ -38,6 +40,26 @@ void synthesizeSsmlToBuffer(const std::string &ssmlText, PiperConfig &config,
         voice.synthesisConfig.lengthScale = originalLengthScale;
         continue;
       }
+      // Publish this segment's timing BEFORE its audio lands in the
+      // buffer, shifted by what the buffer already holds. That offset is the
+      // position the segment occupies in the stream the caller receives, so
+      // it has to be read before the insert -- exactly the rule the five
+      // aggregating paths in piper.cpp follow.
+      //
+      // Without this the per-segment timings were dropped and
+      // result.hasTimingInfo stayed false, so main.cpp's write gate never
+      // fired and `--ssml --output-timing FILE` produced no file at all
+      // (issue #692). Same omission as #652; the SSML path was still inside
+      // main.cpp when those five were fixed.
+      {
+        piper_plus::timing::ConcatCursor cursor;
+        cursor.samples = audioBuffer.size();
+        cursor.sampleRate = sampleRate;
+        cursor.channels = std::max(1, voice.synthesisConfig.channels);
+        cursor.hopSize = 256;
+        piper_plus::timing::appendUnitTimings(result, segResult, cursor);
+      }
+
       audioBuffer.insert(audioBuffer.end(), segAudio.begin(), segAudio.end());
       result.inferSeconds += segResult.inferSeconds;
       // Measure the segment as the samples it actually contributed rather
