@@ -46,3 +46,34 @@ gradle/wrapper/gradle-wrapper.properties text eol=lf
 
 # Gradle wrapper jar is binary
 *.jar binary
+
+# CHANGELOG.md: keep BOTH sides of a conflicting hunk instead of failing.
+#
+# The file is append-only within `## [Unreleased]`, and every PR adds entries
+# to the same few lines, so any two concurrent PRs conflict there and nothing
+# else. Measured during the timing work: nine open PRs all touching
+# CHANGELOG.md meant each merge put the other eight into CONFLICTING, and the
+# resolution was mechanical every single time -- keep both sides, in order.
+#
+# `union` is git's built-in low-level driver for exactly this: on a hunk both
+# sides changed, it concatenates their lines rather than writing conflict
+# markers. Verified on a scratch repo: rebasing a branch that prepends one
+# entry onto a branch that prepended another yields both, in order, with zero
+# conflict markers.
+#
+# The trade-off is that a genuine CONTRADICTION -- two PRs editing the same
+# existing sentence differently -- now merges silently to both versions
+# instead of stopping. That is acceptable here and only here: entries are
+# additive prose, the result is reviewed in the PR diff, and
+# `scripts/check_changelog_format.py` / `check_changelog_unreleased.py` /
+# `check_migration_changelog_parity.py` still run on the merged text. Do NOT
+# extend `merge=union` to source files, where the same behaviour would
+# silently produce code that compiles and is wrong.
+#
+# Scope: the pattern has no leading slash, so it matches CHANGELOG.md at ANY
+# depth -- the root file plus the three package changelogs
+# (src/python/g2p, src/wasm/g2p, src/wasm/openjtalk-web). That is intended:
+# all four have the same append-only [Unreleased] shape. CHANGELOG-archive.md
+# is deliberately NOT matched; it is historical and a conflict there means
+# something is rewriting the past, which should stop and be looked at.
+CHANGELOG.md merge=union
