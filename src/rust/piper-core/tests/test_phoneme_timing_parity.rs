@@ -50,6 +50,8 @@ struct Expected {
     phonemes: Vec<ExpectedPhoneme>,
     total_duration_ms: f64,
     sample_rate: u32,
+    tsv: String,
+    srt: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -115,6 +117,26 @@ fn matches_python_canonical_output() {
             case.name,
             result.total_duration_ms,
             case.expected.total_duration_ms
+        );
+
+        // Formatted-output parity, byte for byte.
+        //
+        // The fixture held only float milliseconds until spec_version 1.2, so
+        // the FORMATTING layer went unchecked in every runtime. Three defects
+        // were found there one at a time by reading code rather than by a
+        // failing test: rounding at .5 (#681), CRLF on Windows (#683), a
+        // thousands separator in the cue index (#684).
+        assert_eq!(
+            result.to_tsv(),
+            case.expected.tsv,
+            "case '{}': TSV bytes differ from the fixture",
+            case.name
+        );
+        assert_eq!(
+            result.to_srt(),
+            case.expected.srt,
+            "case '{}': SRT bytes differ from the fixture",
+            case.name
         );
 
         // phoneme array length parity

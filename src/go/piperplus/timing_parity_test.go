@@ -33,6 +33,8 @@ type goldenPhoneme struct {
 type goldenExpected struct {
 	Phonemes        []goldenPhoneme `json:"phonemes"`
 	TotalDurationMs float64         `json:"total_duration_ms"`
+	TSV             string          `json:"tsv"`
+	SRT             string          `json:"srt"`
 	SampleRate      int             `json:"sample_rate"`
 }
 
@@ -98,6 +100,18 @@ func TestTimingParity_GoldenMatrix(t *testing.T) {
 			}
 			if math.Abs(got.TotalDurationMs-c.Expected.TotalDurationMs) > eps {
 				t.Errorf("total_duration_ms: got %g, want %g", got.TotalDurationMs, c.Expected.TotalDurationMs)
+			}
+
+			// Formatted-output parity, byte for byte. The fixture held only
+			// float milliseconds until spec_version 1.2, so the FORMATTING
+			// layer went unchecked in every runtime -- rounding at .5 (#681),
+			// CRLF on Windows (#683) and a thousands separator in the cue
+			// index (#684) were each found by reading code, not by a test.
+			if gotTSV := got.ToTSV(); gotTSV != c.Expected.TSV {
+				t.Errorf("TSV bytes differ from the fixture:\ngot  %q\nwant %q", gotTSV, c.Expected.TSV)
+			}
+			if gotSRT := got.ToSRT(); gotSRT != c.Expected.SRT {
+				t.Errorf("SRT bytes differ from the fixture:\ngot  %q\nwant %q", gotSRT, c.Expected.SRT)
 			}
 			if len(got.Phonemes) != len(c.Expected.Phonemes) {
 				t.Fatalf("phonemes length: got %d, want %d", len(got.Phonemes), len(c.Expected.Phonemes))
