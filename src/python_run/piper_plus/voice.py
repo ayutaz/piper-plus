@@ -1,4 +1,5 @@
 import io
+import itertools
 import json
 import logging
 import os
@@ -54,6 +55,16 @@ MIN_BODY_FOR_STRATEGY_A = 3
 
 SHORT_TEXT_CHARS = 10
 SILENCE_PAD_MS = 300
+
+# Monotonic sequence for optimized-model cache temp names.
+#
+# Uniqueness needs two parts: the pid separates processes, this counter
+# separates writers WITHIN one process. Neither a timestamp nor a truncated
+# UUID is sufficient on its own -- a nanosecond clock returned the same value
+# for two consecutive calls in the Rust port (measured), and uuid4().hex[:8] is
+# only 32 bits, which collided 6 times in 200_000 draws. `next()` on
+# itertools.count is atomic.
+_TEMP_CACHE_SEQ = itertools.count()
 
 TRIM_THRESHOLD_RMS = 0.01
 TRIM_MIN_SAMPLES = 2205  # 22050 Hz * 0.1 s
@@ -302,6 +313,9 @@ def _load_session_inline(
     cache_path = model_p.with_suffix(f".{device_label}.opt.onnx")
     sentinel_path = Path(str(cache_path) + ".ok")
     use_cached = not _disable_cache and cache_path.exists() and sentinel_path.exists()
+    # Set only on the cache-miss path below; bound here so the publish guard
+    # cannot depend on `and` short-circuiting to stay defined.
+    temp_cache_path: Path | None = None
 
     if _disable_cache:
         _LOGGER.info("Model cache disabled via PIPER_PLUS_DISABLE_CACHE")
@@ -321,14 +335,24 @@ def _load_session_inline(
                 cache_path.unlink()
             except OSError:
                 pass
+        # Point ORT at a per-writer TEMP path, never at cache_path itself.
+        # Two sessions created concurrently for the same model would otherwise
+        # ask ORT to write the same file at once; on Windows the second open is
+        # denied and the constructor throws (issue #686). The sentinel cannot
+        # help, because it is written AFTER the file and so cannot protect the
+        # file while it is being produced. Contract: [cache.concurrency].
+        temp_cache_path = Path(
+            f"{cache_path}.{os.getpid()}.{next(_TEMP_CACHE_SEQ):08x}.tmp"
+        )
         try:
-            sess_options.optimized_model_filepath = str(cache_path)
+            sess_options.optimized_model_filepath = str(temp_cache_path)
         except Exception as exc:
             _LOGGER.warning(
                 "Could not set optimized model path %s: %s (continuing without cache)",
-                cache_path,
+                temp_cache_path,
                 exc,
             )
+            temp_cache_path = None
         effective_model_path = str(model_path)
 
     session = onnxruntime.InferenceSession(
@@ -337,13 +361,34 @@ def _load_session_inline(
         providers=providers,
     )
 
-    # Write sentinel if cache was created
-    if not _disable_cache and not use_cached and cache_path.exists():
+    # Publish the cache: rename the temp onto cache_path, then write the
+    # sentinel. Rename within one directory is atomic on POSIX and on Windows,
+    # so a concurrent reader sees either the old complete file or the new
+    # complete one, never a partial write.
+    if (
+        not _disable_cache
+        and not use_cached
+        and temp_cache_path is not None
+        and temp_cache_path.exists()
+    ):
         try:
+            os.replace(temp_cache_path, cache_path)
             sentinel_path.write_text("ok")
             _LOGGER.info("Cache sentinel written: %s", sentinel_path)
         except OSError as exc:
-            _LOGGER.warning("Failed to write sentinel %s: %s", sentinel_path, exc)
+            # Losing the race is not an error: another writer already produced
+            # an equally valid cache, or holds the destination open (Windows
+            # denies the replace). The session in hand was built from the
+            # original model and is correct either way.
+            _LOGGER.warning(
+                "Could not publish optimized model cache %s: %s (continuing)",
+                cache_path,
+                exc,
+            )
+            try:
+                temp_cache_path.unlink()
+            except OSError:
+                pass
 
     return session
 

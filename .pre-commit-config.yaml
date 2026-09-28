@@ -332,6 +332,25 @@ repos:
         files: ^(docs/spec/phoneme-timing-contract\.toml|src/python_run/piper_plus/timing\.py|src/python_run/piper_plus/voice\.py|src/python_run/tests/test_phoneme_timing\.py|src/rust/piper-core/src/timing\.rs|src/rust/piper-cli/src/main\.rs|src/go/piperplus/timing\.go|src/go/piperplus/timing_test\.go|src/go/cmd/piper-plus/main\.go|src/wasm/openjtalk-web/src/timing\.js|src/wasm/openjtalk-web/src/index\.js|src/wasm/openjtalk-web/test/js/test-phoneme-timing\.js|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/csharp/PiperPlus\.Core\.Tests/TimingWriterTests\.cs|src/cpp/timing_helpers\.hpp|src/cpp/tests/test_timing_helpers\.cpp|scripts/check_special_ids_parity\.py)$
         pass_filenames: false
 
+      # ORT の最適化済みモデルキャッシュは temp へ書いて rename で公開する
+      # ([cache.concurrency])。4 実装すべてが共有の .opt.onnx へ ORT を直接
+      # 向けており、同じモデルに対して並行に 2 セッションを作ると両方が同じ
+      # ファイルへの書き込みを ORT に要求していた。Windows では 2 つ目の
+      # open が拒否され session コンストラクタが throw する (issue #686)。
+      # xUnit は test collection を並列実行するので ZeroShotE2ETests が
+      # これを踏み、他 1453 件は通るため断続的 flake に見えていた。
+      #
+      # temp 名の一意部分は「プロセスローカルな単調カウンタ」であることも
+      # 検査する。timestamp と切り詰め UUID はどちらも実測で失敗した
+      # (nanosecond clock が連続 2 呼び出しで同値 / 32bit が 20 万回中 6 件
+      # 衝突) ため、レースをプロセス内に移すだけになる。
+      - id: ort-cache-concurrency
+        name: "ORT cache published by rename (4 impls vs contract toml)"
+        entry: uv run --no-sync python scripts/check_ort_cache_concurrency.py
+        language: system
+        files: ^(docs/spec/ort-session-contract\.toml|src/python/piper_train/ort_utils\.py|src/python/tests/test_ort_utils\.py|src/python_run/piper_plus/voice\.py|src/python_run/tests/test_runtime\.py|src/csharp/PiperPlus\.Core/Inference/SessionFactory\.cs|src/rust/piper-core/src/engine\.rs|scripts/check_ort_cache_concurrency\.py|scripts/gate_source\.py)$
+        pass_filenames: false
+
       - id: srt-rounding-parity
         name: "SRT ms rounding parity (6 runtimes vs contract toml)"
         entry: uv run --no-sync python scripts/check_srt_rounding_parity.py

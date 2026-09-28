@@ -53,9 +53,59 @@ device_label_cuda_format = "cuda{device_id}"  # "cuda0", "cuda1" (no dots)
 [cache.behavior]
 # Cache hit:  .opt.onnx + .ok both exist → load with ORT_DISABLE_ALL
 # Incomplete: .opt.onnx only (no .ok) → delete .opt.onnx, re-optimize
-# Miss:       neither exists → optimize, save .opt.onnx, write .ok
+# Miss:       neither exists → optimize, save to a UNIQUE TEMP path, rename
+#             it onto .opt.onnx, then write .ok (see [cache.concurrency])
 # Load failure: cached model fails to load → delete both, re-optimize
 # Write failure: PermissionError/OSError → warn, continue without cache
+
+[cache.concurrency]
+# ORT must be pointed at a per-writer TEMP path, never at .opt.onnx itself.
+#
+# Every implementation used to set optimized_model_filepath to the shared
+# .opt.onnx, so two sessions created concurrently for the same model asked ORT
+# to write the same file at the same time. On Windows the second open is
+# denied and the session constructor throws; the sentinel does not help,
+# because it is written after the file, so it cannot protect the file while it
+# is being produced.
+#
+# Measured (issue #686): `csharp-tests (windows-latest)` had
+# ZeroShotE2ETests.ZeroShot_Inference_ProducesAudio and
+# ZeroShot_DifferentEmbeddings_ProduceDifferentAudio fail in the same
+# millisecond -- xUnit runs them in parallel -- with
+#   [ErrorCode:Fail] Load model from ...\zero-shot-test.cpu.opt.onnx failed:
+#   system error number 13
+# (13 = EACCES). 1453 other tests passed in the same run, which is why this
+# read as an intermittent flake rather than a defect for months.
+#
+# The write is therefore: optimize into `{optimized_path}.{pid}.{unique}.tmp`,
+# then rename that onto `{optimized_path}`, then write the sentinel. Rename
+# within one directory is atomic on POSIX (`rename(2)`) and on Windows
+# (`MoveFileEx` with MOVEFILE_REPLACE_EXISTING), so a reader sees either the
+# old complete file or the new complete file, never a partial one.
+temp_suffix_format = "{optimized_path}.{pid}.{seq:08x}.tmp"
+# `unique` is a PROCESS-LOCAL MONOTONIC COUNTER, not a timestamp and not a
+# truncated UUID. Two parts are required: the pid separates processes, the
+# counter separates writers within one process.
+#
+# Both weaker sources were tried and measured to fail:
+#   - SystemTime::now().subsec_nanos() returned the SAME value for two
+#     consecutive calls in the Rust port, which moved the race inside the
+#     process instead of removing it (caught by
+#     `temp_cache_paths_differ_between_writers`)
+#   - uuid4().hex[:8] / Guid prefix is 32 bits, which collided 6 times in
+#     200,000 draws -- the birthday bound, ~4.7 expected
+unique_source = "process_local_monotonic_counter"
+rename_is_atomic_within_directory = true
+# Losing the rename race is NOT an error: another writer already produced an
+# equally valid cache, or is holding the destination open (Windows denies the
+# replace). Discard the temp and carry on -- the session in hand was built
+# from the original model and is correct either way.
+on_rename_failure = "discard_temp_and_continue"
+# A crash between "ORT wrote the temp" and "rename" leaves an orphaned .tmp.
+# It is never read (the name is unique per writer) and is harmless. Sweeping
+# other writers' temps is deliberately NOT done: a .tmp that looks stale may
+# be a live write by a slower process.
+orphan_temp_policy = "leave_in_place"
 
 [env_vars]
 # Environment variables for runtime control
