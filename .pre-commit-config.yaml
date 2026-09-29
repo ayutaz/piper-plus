@@ -473,7 +473,7 @@ repos:
         name: Short-text strategy contract (6 runtimes vs toml)
         entry: uv run --no-sync python scripts/check_short_text_contract.py
         language: system
-        files: ^(docs/spec/short-text-contract\.toml|scripts/check_short_text_contract\.py|src/python_run/piper_plus/voice\.py|src/rust/piper-core/src/short_text\.rs|src/go/piperplus/.*\.go|src/python/piper_train/infer_onnx\.py)$
+        files: ^(docs/spec/short-text-contract\.toml|scripts/check_short_text_contract\.py|src/python_run/piper_plus/voice\.py|src/rust/piper-core/src/short_text\.rs|src/rust/piper-core/src/voice\.rs|src/go/piperplus/.*\.go|src/python/piper_train/infer_onnx\.py)$
         pass_filenames: false
 
       # Text splitter (.!?。！？．) 終止符による文単位分割の cross-runtime
