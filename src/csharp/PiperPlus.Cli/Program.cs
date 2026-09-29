@@ -69,7 +69,7 @@ internal sealed class JsonlUtterance
     AllowTrailingCommas = true)]
 internal partial class CliJsonContext : JsonSerializerContext;
 
-internal static class Program
+internal static partial class Program
 {
     private static int Main(string[] args)
     {
@@ -80,7 +80,7 @@ internal static class Program
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[ERR] Fatal error: {ex.Message}");
+            WriteFatalDiagnostics(ex, Console.Error);
             return 1;
         }
     }

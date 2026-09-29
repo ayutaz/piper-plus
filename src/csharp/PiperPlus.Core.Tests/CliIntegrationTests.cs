@@ -100,7 +100,54 @@ public sealed class CliIntegrationTests
         Assert.Fail(
             $"CLI `{invocation}` exited {exitCode} (expected 0).\n"
             + $"stdout: {Truncate(stdout)}\n"
-            + $"stderr: {Truncate(stderr)}");
+            + $"stderr: {Truncate(stderr)}\n"
+            + $"child runtime env: {DescribeInheritedRuntimeEnv()}");
+    }
+
+    /// <summary>
+    /// Describes the .NET runtime environment variables the spawned CLI
+    /// inherits.
+    /// </summary>
+    /// <remarks>
+    /// Issue #735: `--version` intermittently exits 1 with a
+    /// FileNotFoundException that names no file, and one standing hypothesis
+    /// is that the coverage collector's instrumentation leaks into the child
+    /// (<c>dotnet test --collect:"XPlat Code Coverage"</c> sets
+    /// <c>DOTNET_STARTUP_HOOKS</c> / <c>CORECLR_*</c>, and
+    /// <see cref="RunCliAsync"/> does not scrub the environment). Printing
+    /// them on failure is what decides that hypothesis; guessing from the
+    /// message alone is not possible.
+    ///
+    /// Values are included, not just names: a hook path that points at a file
+    /// which no longer exists is the shape being looked for, and the name
+    /// alone would not show it.
+    /// </remarks>
+    private static string DescribeInheritedRuntimeEnv()
+    {
+        string[] keys =
+        [
+            "DOTNET_STARTUP_HOOKS",
+            "CORECLR_ENABLE_PROFILING",
+            "CORECLR_PROFILER",
+            "CORECLR_PROFILER_PATH",
+            "CORECLR_PROFILER_PATH_64",
+            "DOTNET_ROOT",
+            "DOTNET_MULTILEVEL_LOOKUP",
+        ];
+
+        var present = new List<string>();
+        foreach (string key in keys)
+        {
+            string? value = Environment.GetEnvironmentVariable(key);
+            if (!string.IsNullOrEmpty(value))
+            {
+                present.Add($"{key}={value}");
+            }
+        }
+
+        return present.Count == 0
+            ? "(none of the tracked DOTNET_*/CORECLR_* vars are set)"
+            : string.Join("; ", present);
     }
 
     private static string Truncate(string? text)
