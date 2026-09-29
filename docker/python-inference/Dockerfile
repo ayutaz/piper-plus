@@ -117,14 +117,21 @@ RUN uv pip install --system --no-cache -r /app/requirements_webui.txt
 # `trivy-python-inference` は setuptools 70.3.0 (CVE-2025-47273 /
 # CVE-2026-59890) と msgpack 1.1.2 (GHSA-6v7p-g79w-8964) を報告し続けている。
 # 70.3.0 は apt 版 (68.1.2) でも上の pip 導入版 (84.0.0) でもない第三の版で、
-# 在処が未特定だった。 この列挙により、 上の `--no-cache` で解消するか、
-# 別の場所に残っているかが同じ CI run で判明する。
-RUN echo "--- python dist-info / egg-info in image ---" && \
-    find / -xdev \
-      \( -name 'setuptools-*.dist-info' -o -name 'setuptools-*.egg-info' \
-         -o -name 'msgpack-*.dist-info' -o -name 'msgpack-*.egg-info' \) \
-      -print 2>/dev/null | sort && \
-    echo "--- end dist-info listing ---"
+# 在処が未特定。
+#
+# ディレクトリ名 (`setuptools-*.dist-info`) で探すと、 名前に版を持たない
+# `*.egg-info` や vendored コピーを取り逃がす。 Trivy 自身は `METADATA` /
+# `PKG-INFO` の `Name:` を見るので、 こちらも中身で探す。
+#
+# パイプを使わないのは hadolint DL4006 (パイプを含む RUN は SHELL に
+# `-o pipefail` が必要) を避けるため。 本 Dockerfile 全体の SHELL を
+# 変えるより、 診断側でパイプを使わない方が影響が小さい。
+RUN echo "--- setuptools / msgpack metadata in image ---"; \
+    find / -xdev \( -name METADATA -o -name PKG-INFO \) \
+      -exec grep -l -e '^Name: setuptools$' -e '^Name: msgpack$' {} + > /tmp/pkghits.txt 2>/dev/null; \
+    while read -r f; do echo "== $f"; grep -e '^Name: ' -e '^Version: ' "$f"; done < /tmp/pkghits.txt; \
+    rm -f /tmp/pkghits.txt; \
+    echo "--- end metadata listing ---"
 
 # Pre-download NLTK data for g2p-en (both old and new resource names for NLTK compatibility)
 # Use a shared path so data is accessible after USER switch to non-root
