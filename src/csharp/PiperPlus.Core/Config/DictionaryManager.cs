@@ -435,6 +435,9 @@ public static class DictionaryManager
     /// </remarks>
     private static long stagingSeq;
 
+    /// <summary>
+    /// Returns the next staging directory sequence number.
+    /// </summary>
     /// <remarks>
     /// <c>internal</c> so DictionaryManagerTests can assert that two callers
     /// never receive the same staging name -- a constant or timestamp-derived
