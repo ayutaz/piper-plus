@@ -37,6 +37,12 @@
   <ItemGroup>
     <Compile Include="..\PiperPlus.Cli\DotNetG2PEngine.cs" Link="Adapters\DotNetG2PEngine.cs" />
     <Compile Include="..\PiperPlus.Cli\DotNetEnglishG2PEngine.cs" Link="Adapters\DotNetEnglishG2PEngine.cs" />
+    <!-- Program.WriteFatalDiagnostics: the format of the CLI's fatal-error
+         output is what issue #735 depends on the next time its intermittent
+         failure happens, so it is asserted rather than hoped for. Program.cs
+         itself cannot be source-linked (its Main would collide with the test
+         host's entry point), which is why the method lives in its own file. -->
+    <Compile Include="..\PiperPlus.Cli\FatalDiagnostics.cs" Link="Adapters\FatalDiagnostics.cs" />
   </ItemGroup>
 
 </Project>
