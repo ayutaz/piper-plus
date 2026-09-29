@@ -3,9 +3,13 @@ Runtime tests for piper voice synthesis
 Tests actual implementation without excessive mocking
 """
 
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pytest
 from piper_plus.util import audio_float_to_int16
+from piper_plus.voice import _load_session_inline
 
 
 class TestAudioUtils:
@@ -219,3 +223,101 @@ class TestFileHash:
         test_file.write_text("Different content")
         hash3 = get_file_hash(str(test_file))
         assert hash3 != hash1
+
+
+# ---------------------------------------------------------------------------
+# ORT optimized-model cache concurrency (issue #686)
+#
+# The runtime loader used to set `optimized_model_filepath` to the shared
+# `.opt.onnx`, so two sessions created concurrently for the same model asked
+# ORT to write the same file at once. On Windows the second open is denied and
+# the constructor throws. The sentinel cannot help: it is written *after* the
+# file, so it cannot protect the file while it is being produced.
+#
+# Contract: docs/spec/ort-session-contract.toml [cache.concurrency].
+# ---------------------------------------------------------------------------
+
+
+def _fake_session_writing_its_target(written: list[str]):
+    """An InferenceSession stand-in that writes whatever ORT was pointed at."""
+    session = MagicMock()
+    session.get_providers.return_value = ["CPUExecutionProvider"]
+
+    def side_effect(path, sess_options=None, providers=None):
+        target = getattr(sess_options, "optimized_model_filepath", "")
+        if target:
+            written.append(target)
+            Path(target).write_bytes(b"optimized")
+        return session
+
+    return session, side_effect
+
+
+def test_runtime_cache_points_ort_at_a_temp_then_publishes(tmp_path, monkeypatch):
+    monkeypatch.delenv("PIPER_PLUS_DISABLE_CACHE", raising=False)
+    model = tmp_path / "model.onnx"
+    model.write_bytes(b"dummy")
+    cache = tmp_path / "model.cpu.opt.onnx"
+    written: list[str] = []
+    _, side_effect = _fake_session_writing_its_target(written)
+
+    with patch(
+        "piper_plus.voice.onnxruntime.InferenceSession", side_effect=side_effect
+    ):
+        _load_session_inline(str(model), use_cuda=False)
+
+    assert len(written) == 1
+    target = written[0]
+    assert target != str(cache), (
+        "ORT was pointed at the shared cache path; a concurrent writer would "
+        "collide on it (issue #686)"
+    )
+    assert target.endswith(".tmp")
+    assert cache.read_bytes() == b"optimized"
+    assert not Path(target).exists()
+    assert (tmp_path / "model.cpu.opt.onnx.ok").exists()
+
+
+def test_runtime_cache_temp_paths_differ_between_writers(tmp_path, monkeypatch):
+    """Anti-vacuity: a constant temp name would still collide."""
+    monkeypatch.delenv("PIPER_PLUS_DISABLE_CACHE", raising=False)
+    model = tmp_path / "model.onnx"
+    model.write_bytes(b"dummy")
+    written: list[str] = []
+    _, side_effect = _fake_session_writing_its_target(written)
+
+    with patch(
+        "piper_plus.voice.onnxruntime.InferenceSession", side_effect=side_effect
+    ):
+        _load_session_inline(str(model), use_cuda=False)
+        (tmp_path / "model.cpu.opt.onnx").unlink()
+        (tmp_path / "model.cpu.opt.onnx.ok").unlink()
+        _load_session_inline(str(model), use_cuda=False)
+
+    assert len(written) == 2
+    assert written[0] != written[1]
+
+
+def test_runtime_cache_lost_rename_race_does_not_fail_the_load(tmp_path, monkeypatch):
+    """A lost race leaves no sentinel, no temp, and a working session.
+
+    Writing the sentinel when the rename did not happen would advertise a file
+    that is not there, and the next run would try to load it and fail.
+    """
+    monkeypatch.delenv("PIPER_PLUS_DISABLE_CACHE", raising=False)
+    model = tmp_path / "model.onnx"
+    model.write_bytes(b"dummy")
+    written: list[str] = []
+    _, side_effect = _fake_session_writing_its_target(written)
+
+    with (
+        patch(
+            "piper_plus.voice.onnxruntime.InferenceSession", side_effect=side_effect
+        ),
+        patch("piper_plus.voice.os.replace", side_effect=OSError("denied")),
+    ):
+        session = _load_session_inline(str(model), use_cuda=False)
+
+    assert session is not None
+    assert not (tmp_path / "model.cpu.opt.onnx.ok").exists()
+    assert not Path(written[0]).exists()

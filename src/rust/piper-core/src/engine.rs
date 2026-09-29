@@ -556,27 +556,77 @@ impl OnnxEngine {
             }
         }
 
-        // 通常パス: 元モデルをロードし、最適化結果をキャッシュに保存
+        // 通常パス: 元モデルをロードし、最適化結果をキャッシュに保存。
+        //
+        // ORT には optimized_path ではなく writer 固有の TEMP を渡す。同じ
+        // モデルに対して並行に 2 セッションを作ると、両方が同じファイルへの
+        // 書き込みを ORT に要求することになり、Windows では 2 つ目の open が
+        // 拒否されてコンストラクタが throw する (issue #686)。sentinel は
+        // ファイルの「後」に書かれるので、生成中のファイルを守れない。
+        // 規約: docs/spec/ort-session-contract.toml [cache.concurrency]。
+        let temp_optimized_path = Self::build_temp_cache_path(&optimized_path);
         let (session, actual_device) = Self::build_session(
             model_path,
             num_intra_threads,
             &device_type,
             false,
-            Some(&optimized_path),
+            Some(&temp_optimized_path),
         )?;
 
         tracing::info!("Using device: {}", actual_device);
 
-        // F1: セッション作成成功後にセンチネルファイルを書き込む
-        if optimized_path.exists() {
-            if let Err(e) = std::fs::write(&sentinel_path, b"ok") {
-                tracing::warn!("Failed to write sentinel {:?}: {}", sentinel_path, e);
-            } else {
-                tracing::info!("Cache sentinel written: {:?}", sentinel_path);
+        // 公開: temp を optimized_path へ rename し、その後 sentinel を書く。
+        // 同一ディレクトリ内の rename は POSIX でも Windows でも atomic なので、
+        // 並行する reader は「古い完全なファイル」か「新しい完全なファイル」の
+        // どちらかを見る。途中状態は見えない。
+        if temp_optimized_path.exists() {
+            match std::fs::rename(&temp_optimized_path, &optimized_path) {
+                Ok(()) => {
+                    if let Err(e) = std::fs::write(&sentinel_path, b"ok") {
+                        tracing::warn!("Failed to write sentinel {:?}: {}", sentinel_path, e);
+                    } else {
+                        tracing::info!("Cache sentinel written: {:?}", sentinel_path);
+                    }
+                }
+                Err(e) => {
+                    // race に負けるのはエラーではない: 別の writer が既に
+                    // 同等に妥当なキャッシュを作った、あるいは宛先を open
+                    // しているだけ (Windows は replace を拒否する)。手元の
+                    // session は元モデルから構築済みでどちらでも正しい。
+                    tracing::warn!(
+                        "Could not publish optimized model cache {:?}: {} (continuing)",
+                        optimized_path,
+                        e
+                    );
+                    let _ = std::fs::remove_file(&temp_optimized_path);
+                }
             }
         }
 
         Self::finish_load(session, config)
+    }
+
+    /// writer 固有の temp キャッシュパスを作る。
+    ///
+    /// 一意性は 2 つの要素で担保する:
+    ///   - pid       : プロセス間で重複しない
+    ///   - カウンタ  : プロセス内で重複しない
+    ///
+    /// 時刻だけでは足りない。`SystemTime::now().subsec_nanos()` を使った初版は
+    /// 同一プロセス内の連続 2 呼び出しで**同じ値**を返し
+    /// (実測: `...58694.1d578d08.tmp` が 2 回)、直そうとしているレースを
+    /// プロセス内に移すだけだった。単調カウンタならその窓が存在しない。
+    ///
+    /// crash で orphan が残り得るが、名前が一意なので誰も読まない。他の writer
+    /// の temp を掃除しないのは意図的 — 古く見える .tmp が遅いプロセスの進行中
+    /// の書き込みである可能性がある
+    /// (規約: [cache.concurrency] orphan_temp_policy)。
+    fn build_temp_cache_path(optimized_path: &std::path::Path) -> std::path::PathBuf {
+        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let seq = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let mut s = optimized_path.as_os_str().to_owned();
+        s.push(format!(".{}.{:08x}.tmp", std::process::id(), seq));
+        std::path::PathBuf::from(s)
     }
 
     /// SessionBuilder を構築し、モデルファイルからセッションをコミットする。
@@ -1501,6 +1551,80 @@ mod tests {
         let model_path = PathBuf::from("/data/models/test.onnx");
         let opt_path = build_cache_path(&model_path, "cpu");
         assert_eq!(opt_path.parent(), model_path.parent());
+    }
+
+    // -----------------------------------------------------------------------
+    // ORT optimized-model cache concurrency (issue #686)
+    //
+    // Every implementation used to point ORT at the shared `.opt.onnx`, so two
+    // sessions created concurrently for the same model asked ORT to write the
+    // same file at once. On Windows the second open is denied and the session
+    // constructor throws. The sentinel cannot help: it is written AFTER the
+    // file, so it cannot protect the file while it is being produced.
+    // Contract: docs/spec/ort-session-contract.toml [cache.concurrency].
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn temp_cache_path_is_not_the_shared_cache_path() {
+        let opt = PathBuf::from("/models/model.cpu.opt.onnx");
+        let temp = OnnxEngine::build_temp_cache_path(&opt);
+
+        assert_ne!(
+            temp, opt,
+            "ORT would be pointed at the shared cache path, so a concurrent \
+             writer would collide on it (issue #686)"
+        );
+        assert!(
+            temp.to_string_lossy().starts_with(&*opt.to_string_lossy()),
+            "the temp must sit next to the cache so the rename stays within \
+             one directory and therefore atomic: {temp:?}"
+        );
+        assert!(temp.extension().is_some_and(|e| e == "tmp"), "{temp:?}");
+    }
+
+    #[test]
+    fn temp_cache_paths_differ_between_writers() {
+        // Anti-vacuity: a constant temp name would still collide. This
+        // caught a real defect in the first version of the helper, which
+        // derived the unique part from SystemTime::now().subsec_nanos() and
+        // returned the SAME name for two consecutive calls -- moving the race
+        // it was meant to fix inside the process instead of removing it.
+        let opt = PathBuf::from("/models/model.cpu.opt.onnx");
+        let a = OnnxEngine::build_temp_cache_path(&opt);
+        let b = OnnxEngine::build_temp_cache_path(&opt);
+        assert_ne!(a, b, "both writers were handed the same temp path");
+    }
+
+    #[test]
+    fn temp_cache_path_carries_the_process_id() {
+        // Across processes the nanosecond part can coincide; the pid is what
+        // makes the name unique between them.
+        let opt = PathBuf::from("/models/model.cpu.opt.onnx");
+        let temp = OnnxEngine::build_temp_cache_path(&opt);
+        let name = temp.to_string_lossy().to_string();
+        assert!(
+            name.contains(&format!(".{}.", std::process::id())),
+            "temp name has no pid component: {name}"
+        );
+    }
+
+    #[test]
+    fn rename_within_a_directory_publishes_atomically() {
+        // The mechanism the fix relies on, exercised directly: a rename in one
+        // directory replaces the destination in a single step, so a reader
+        // sees either the old complete file or the new complete one.
+        let dir = std::env::temp_dir().join(format!("pp-686-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let dest = dir.join("model.cpu.opt.onnx");
+        let temp = OnnxEngine::build_temp_cache_path(&dest);
+
+        std::fs::write(&dest, b"old").expect("seed dest");
+        std::fs::write(&temp, b"new").expect("seed temp");
+        std::fs::rename(&temp, &dest).expect("rename");
+
+        assert_eq!(std::fs::read(&dest).expect("read dest"), b"new");
+        assert!(!temp.exists(), "the temp must be consumed by the rename");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

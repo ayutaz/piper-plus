@@ -934,3 +934,130 @@ class TestCacheConcurrentRace:
             assert (
                 captured["level"] == onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
             )
+
+
+class TestModelCacheConcurrency:
+    """ORT must write to a per-writer temp, then rename (issue #686).
+
+    Every implementation used to set ``optimized_model_filepath`` to the shared
+    ``.opt.onnx``, so two sessions created concurrently for the same model asked
+    ORT to write the same file at once. On Windows the second open is denied and
+    the constructor throws. The sentinel cannot help: it is written *after* the
+    file, so it cannot protect the file while it is being produced.
+
+    Contract: ``docs/spec/ort-session-contract.toml`` ``[cache.concurrency]``.
+    """
+
+    def _capture_session(self, written: list[str]):
+        mock_session = MagicMock(spec=onnxruntime.InferenceSession)
+        mock_session.get_providers.return_value = ["CPUExecutionProvider"]
+
+        def side_effect(path, sess_options=None, providers=None):
+            target = getattr(sess_options, "optimized_model_filepath", "")
+            if target:
+                written.append(target)
+                Path(target).write_bytes(b"optimized")
+            return mock_session
+
+        return mock_session, side_effect
+
+    def test_ort_is_pointed_at_a_temp_not_the_cache_path(self, tmp_path):
+        model = tmp_path / "model.onnx"
+        model.write_bytes(b"dummy")
+        cache = tmp_path / "model.cpu.opt.onnx"
+        written: list[str] = []
+        _, side_effect = self._capture_session(written)
+
+        with patch(
+            "piper_train.ort_utils.onnxruntime.InferenceSession",
+            side_effect=side_effect,
+        ):
+            create_session_with_cache(model, device="cpu")
+
+        assert len(written) == 1
+        target = written[0]
+        assert target != str(cache), (
+            "ORT was pointed at the shared cache path; a concurrent writer "
+            "would collide on it (issue #686)"
+        )
+        assert target.endswith(".tmp")
+        assert target.startswith(str(cache))
+        # Published, and the temp is gone.
+        assert cache.read_bytes() == b"optimized"
+        assert not Path(target).exists()
+        assert (tmp_path / "model.cpu.opt.onnx.ok").exists()
+
+    def test_two_writers_get_distinct_temp_paths(self, tmp_path):
+        """Anti-vacuity: a constant temp name would still collide."""
+        model = tmp_path / "model.onnx"
+        model.write_bytes(b"dummy")
+        written: list[str] = []
+        _, side_effect = self._capture_session(written)
+
+        with patch(
+            "piper_train.ort_utils.onnxruntime.InferenceSession",
+            side_effect=side_effect,
+        ):
+            create_session_with_cache(model, device="cpu")
+            # Remove the published cache so the second call is also a miss.
+            (tmp_path / "model.cpu.opt.onnx").unlink()
+            (tmp_path / "model.cpu.opt.onnx.ok").unlink()
+            create_session_with_cache(model, device="cpu")
+
+        assert len(written) == 2
+        assert written[0] != written[1], (
+            "both writers were given the same temp path, so they would still "
+            "collide with each other"
+        )
+
+    def test_sentinel_is_not_written_when_the_rename_fails(self, tmp_path):
+        """Losing the race must not publish a sentinel for an absent cache.
+
+        The sentinel is the only thing that makes a cache loadable, so writing
+        it when the rename did not happen would advertise a file that is not
+        there -- the next run would try to load it and fail.
+        """
+        model = tmp_path / "model.onnx"
+        model.write_bytes(b"dummy")
+        written: list[str] = []
+        _, side_effect = self._capture_session(written)
+
+        with (
+            patch(
+                "piper_train.ort_utils.onnxruntime.InferenceSession",
+                side_effect=side_effect,
+            ),
+            patch("piper_train.ort_utils.os.replace", side_effect=OSError("denied")),
+        ):
+            session = create_session_with_cache(model, device="cpu")
+
+        assert session is not None, "a lost rename race must not fail the load"
+        assert not (tmp_path / "model.cpu.opt.onnx.ok").exists()
+        # The temp is cleaned up rather than left for nobody to read.
+        assert not Path(written[0]).exists()
+
+    def test_load_still_succeeds_when_the_rename_fails(self, tmp_path):
+        """The session is built from the ORIGINAL model, so it stays valid."""
+        model = tmp_path / "model.onnx"
+        model.write_bytes(b"dummy")
+        loaded: list[str] = []
+        mock_session = MagicMock(spec=onnxruntime.InferenceSession)
+        mock_session.get_providers.return_value = ["CPUExecutionProvider"]
+
+        def side_effect(path, sess_options=None, providers=None):
+            loaded.append(str(path))
+            target = getattr(sess_options, "optimized_model_filepath", "")
+            if target:
+                Path(target).write_bytes(b"optimized")
+            return mock_session
+
+        with (
+            patch(
+                "piper_train.ort_utils.onnxruntime.InferenceSession",
+                side_effect=side_effect,
+            ),
+            patch("piper_train.ort_utils.os.replace", side_effect=OSError("denied")),
+        ):
+            create_session_with_cache(model, device="cpu")
+
+        assert loaded == [str(model)]

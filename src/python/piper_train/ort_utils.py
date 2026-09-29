@@ -4,6 +4,7 @@ Provides optimized SessionOptions aligned with the C# (SessionFactory.cs)
 and Rust (engine.rs) engine implementations.
 """
 
+import itertools
 import logging
 import os
 import time
@@ -14,6 +15,21 @@ import onnxruntime
 
 
 _LOGGER = logging.getLogger(__name__)
+
+# Monotonic sequence for optimized-model cache temp names.
+#
+# Uniqueness needs two parts: the pid separates processes, this counter
+# separates writers WITHIN one process. Neither a timestamp nor a truncated
+# UUID is sufficient on its own -- a nanosecond clock returned the same value
+# for two consecutive calls in the Rust port (measured), and uuid4().hex[:8] is
+# only 32 bits, which collided 6 times in 200_000 draws. A counter has no such
+# window.
+_TEMP_CACHE_SEQ = itertools.count()
+
+
+def _next_temp_seq() -> int:
+    """Next temp-name sequence number. ``next()`` on itertools.count is atomic."""
+    return next(_TEMP_CACHE_SEQ)
 
 
 # VITS is a small model (15-75MB); more than 4 intra-op threads
@@ -217,13 +233,22 @@ def create_session_with_cache(
     _cache_requested = False
     cache_dir = cache_path.parent
     if os.access(cache_dir, os.W_OK):
+        # Point ORT at a per-writer TEMP path, never at cache_path itself.
+        # Two sessions created concurrently for the same model would otherwise
+        # ask ORT to write the same file at once; on Windows the second open is
+        # denied and the constructor throws (issue #686). The sentinel cannot
+        # help, because it is written AFTER the file and so cannot protect the
+        # file while it is being produced. Contract: [cache.concurrency].
+        _temp_cache_path = Path(
+            f"{cache_path}.{os.getpid()}.{_next_temp_seq():08x}.tmp"
+        )
         try:
-            opts.optimized_model_filepath = str(cache_path)
+            opts.optimized_model_filepath = str(_temp_cache_path)
             _cache_requested = True
         except Exception as exc:
             _LOGGER.warning(
                 "Could not set optimized model path %s: %s (continuing without cache)",
-                cache_path,
+                _temp_cache_path,
                 exc,
             )
     else:
@@ -235,13 +260,29 @@ def create_session_with_cache(
         str(model_path), sess_options=opts, providers=providers
     )
 
-    # Write sentinel only if we actually requested cache generation
-    if _cache_requested and cache_path.exists():
+    # Publish the cache: rename the temp onto cache_path, then write the
+    # sentinel. Rename within one directory is atomic on POSIX and on Windows,
+    # so a concurrent reader sees either the old complete file or the new
+    # complete one, never a partial write.
+    if _cache_requested and _temp_cache_path.exists():
         try:
+            os.replace(_temp_cache_path, cache_path)
             sentinel_path.write_text("ok")
             _LOGGER.info("Cache sentinel written: %s", sentinel_path)
         except OSError as exc:
-            _LOGGER.warning("Failed to write sentinel %s: %s", sentinel_path, exc)
+            # Losing the race is not an error: another writer already produced
+            # an equally valid cache, or holds the destination open (Windows
+            # denies the replace). The session in hand was built from the
+            # original model and is correct either way.
+            _LOGGER.warning(
+                "Could not publish optimized model cache %s: %s (continuing)",
+                cache_path,
+                exc,
+            )
+            try:
+                _temp_cache_path.unlink()
+            except OSError:
+                pass
 
     return session
 

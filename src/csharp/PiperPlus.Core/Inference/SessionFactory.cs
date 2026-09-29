@@ -59,6 +59,25 @@ public static class SessionFactory
     internal const string DisableCacheEnvVar = "PIPER_PLUS_DISABLE_CACHE";
 
     /// <summary>
+    /// Monotonic sequence for optimized-model cache temp names.
+    /// </summary>
+    /// <remarks>
+    /// Uniqueness needs two parts: <see cref="Environment.ProcessId"/>
+    /// separates processes, this counter separates writers WITHIN one process.
+    /// Neither a timestamp nor a truncated GUID is sufficient on its own -- a
+    /// nanosecond clock returned the same value for two consecutive calls in
+    /// the Rust port (measured), and an 8-hex-digit GUID prefix is only 32
+    /// bits, which collided 6 times in 200,000 draws. A counter has no such
+    /// window.
+    /// </remarks>
+    private static long tempCacheSeq;
+
+    /// <summary>
+    /// Returns the next temp-name sequence number.
+    /// </summary>
+    private static long NextTempCacheSeq() => Interlocked.Increment(ref tempCacheSeq);
+
+    /// <summary>
     /// Default number of warmup inference runs.
     /// ORT JIT cache stabilises in 1-2 runs; 2 provides a safety margin.
     /// </summary>
@@ -147,6 +166,10 @@ public static class SessionFactory
         var sentinelPath = optimizedPath + ".ok";
         string effectiveModelPath;
 
+        // Set only on the cache-miss path below; declared here so the publish
+        // block after session creation can see it.
+        string? tempOptimizedPath = null;
+
         // PIPER_PLUS_DISABLE_CACHE: スキップキャッシュ読み書き (Python ort_utils.py と整合)
         bool cacheDisabled = IsTruthyEnv(DisableCacheEnvVar);
 
@@ -183,16 +206,35 @@ public static class SessionFactory
                 }
             }
 
+            // Point ORT at a per-writer TEMP path, never at optimizedPath
+            // itself. Two sessions created concurrently for the same model
+            // would otherwise ask ORT to write the same file at once; on
+            // Windows the second open is denied and the constructor throws:
+            //
+            //   [ErrorCode:Fail] Load model from ...\zero-shot-test.cpu.opt.onnx
+            //   failed:system error number 13
+            //
+            // which is issue #686. xUnit runs test collections in parallel, so
+            // ZeroShotE2ETests hit it in the same millisecond while 1453 other
+            // tests passed -- the reason it read as a flake for months. The
+            // sentinel cannot help: it is written AFTER the file, so it cannot
+            // protect the file while it is being produced.
+            // Contract: docs/spec/ort-session-contract.toml [cache.concurrency].
+            tempOptimizedPath =
+                $"{optimizedPath}.{Environment.ProcessId}.{NextTempCacheSeq():x8}.tmp";
             try
             {
-                options.OptimizedModelFilePath = optimizedPath;
-                logger.LogInformation("ORT will save optimized model to {Path}", optimizedPath);
+                options.OptimizedModelFilePath = tempOptimizedPath;
+                logger.LogInformation(
+                    "ORT will save optimized model to {Path} (published to {Final})",
+                    tempOptimizedPath, optimizedPath);
             }
             catch (Exception ex)
             {
                 logger.LogWarning(
                     "Could not set optimized model path {Path}: {Message} (continuing without cache)",
-                    optimizedPath, ex.Message);
+                    tempOptimizedPath, ex.Message);
+                tempOptimizedPath = null;
             }
 
             effectiveModelPath = modelPath;
@@ -207,16 +249,35 @@ public static class SessionFactory
         // F1: セッション作成成功後にセンチネルファイルを書き込む
         // (cacheDisabled の場合は OptimizedModelFilePath を設定していないので
         // optimizedPath は生成されない → このブロックも自然にスキップされる)
-        if (!cacheDisabled && !useCached && File.Exists(optimizedPath))
+        // Publish the cache: move the temp onto optimizedPath, then write the
+        // sentinel. A move within one directory is atomic on POSIX and on
+        // Windows, so a concurrent reader sees either the old complete file or
+        // the new complete one, never a partial write.
+        if (!cacheDisabled && !useCached
+            && tempOptimizedPath is not null && File.Exists(tempOptimizedPath))
         {
             try
             {
+                File.Move(tempOptimizedPath, optimizedPath, overwrite: true);
                 File.WriteAllText(sentinelPath, "ok");
                 logger.LogInformation("Cache sentinel written: {Path}", sentinelPath);
             }
             catch (Exception ex)
             {
-                logger.LogWarning("Failed to write sentinel {Path}: {Message}", sentinelPath, ex.Message);
+                // Losing the race is not an error: another writer already
+                // produced an equally valid cache, or holds the destination
+                // open (Windows denies the replace). The session in hand was
+                // built from the original model and is correct either way.
+                logger.LogWarning(
+                    "Could not publish optimized model cache {Path}: {Message} (continuing)",
+                    optimizedPath, ex.Message);
+                try
+                {
+                    File.Delete(tempOptimizedPath);
+                }
+                catch
+                { /* best effort */
+                }
             }
         }
 
