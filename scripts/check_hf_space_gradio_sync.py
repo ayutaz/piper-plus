@@ -29,7 +29,8 @@ because leaving it out lets the security floor rot in exactly one place:
     gate only covered the two HF files.
 
 It is user-facing (all 8 README translations tell users to run
-``uv pip install -r src/python_run/requirements_webui.txt``) and is COPYed by
+``uv pip install -r src/python_run/requirements_webui.txt``), and is pulled
+into the images by a ``COPY`` line in
 ``docker/webui/Dockerfile`` and ``docker/python-inference/Dockerfile``
 (plus ``.cpu``), so one drift reaches both manual installs and the images.
 
