@@ -487,4 +487,92 @@ public sealed class DictionaryManagerTests : IDisposable
 
         return tempDir;
     }
+
+    // ================================================================
+    // Cross-process staging (issue #735 / PR #728 CI failure)
+    //
+    // `S_dictDownloadLock` is a SemaphoreSlim, so it serialises callers
+    // within one process only. The download used to write its archive,
+    // its ".tmp" and its EXTRACTION straight into the shared data
+    // directory, so a second OS process could see the dictionary directory
+    // half populated. `dotnet test <sln>` runs PiperPlus.Cli.Tests and
+    // PiperPlus.Core.Tests in parallel and the latter spawns
+    // `dotnet PiperPlus.Cli.dll`, which is exactly that situation.
+    //
+    // Measured: `System.IO.IOException: The process cannot access the file
+    // '.../open_jtalk_dic_utf_8-1.11/sys.dic' because it is being used by
+    // another process.` at DotNetG2P.MeCab SystemDictionary.Load.
+    // ================================================================
+    [Fact]
+    public void BuildStagingDirPath_IsUnderTheDataDirectory()
+    {
+        // The staging directory must sit inside dataDir so that publishing it
+        // is a rename within one filesystem, which is what makes the move
+        // atomic. A temp directory elsewhere could cross a mount point and
+        // degrade to copy-then-delete.
+        string dataDir = Path.Join(Path.GetTempPath(), "pp-staging-test");
+        string staging = DictionaryManager.BuildStagingDirPath(dataDir);
+
+        Assert.StartsWith(dataDir, staging, StringComparison.Ordinal);
+        Assert.NotEqual(dataDir, staging);
+    }
+
+    [Fact]
+    public void BuildStagingDirPath_CarriesTheProcessId()
+    {
+        // Across processes the counter restarts at 0, so the pid is what
+        // separates them.
+        string staging = DictionaryManager.BuildStagingDirPath("/tmp/pp");
+
+        Assert.Contains(
+            $".{Environment.ProcessId}.",
+            staging,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildStagingDirPath_DiffersBetweenCallers()
+    {
+        // Anti-vacuity: a constant name would let a retry collide with its own
+        // leftovers, and two in-process callers with each other.
+        string a = DictionaryManager.BuildStagingDirPath("/tmp/pp");
+        string b = DictionaryManager.BuildStagingDirPath("/tmp/pp");
+
+        Assert.NotEqual(a, b);
+    }
+
+    [Fact]
+    public void NextStagingSeq_IncreasesMonotonically()
+    {
+        long first = DictionaryManager.NextStagingSeq();
+        long second = DictionaryManager.NextStagingSeq();
+
+        Assert.True(second > first, $"expected {second} > {first}");
+    }
+
+    [Fact]
+    public void IsValidDictionary_RejectsADirectoryMissingOneFile()
+    {
+        // This is the property the atomic move exists to preserve: a directory
+        // that is mid-extract must not be accepted. Without the move,
+        // FindDictionary() could return this to MeCabTokenizer.
+        string dir = Path.Join(Path.GetTempPath(), $"pp-partial-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            // Everything except one required entry.
+            foreach (string name in new[] { "char.bin", "matrix.bin", "unk.dic" })
+            {
+                File.WriteAllText(Path.Join(dir, name), "x");
+            }
+
+            Assert.False(
+                DictionaryManager.IsValidDictionary(dir),
+                "a dictionary missing sys.dic was accepted as valid");
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
 }

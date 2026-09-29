@@ -303,7 +303,44 @@ public static class DictionaryManager
     {
         Directory.CreateDirectory(dataDir);
 
-        var archivePath = Path.Join(dataDir, "open_jtalk_dic_utf_8-1.11.tar.gz");
+        // Everything happens in a PER-PROCESS staging directory, and the
+        // finished dictionary is moved into place in one step.
+        //
+        // S_dictDownloadLock is a SemaphoreSlim, so it serialises callers
+        // within one process only. Three things here were shared across
+        // processes and raced:
+        //
+        //   1. the archive's ".tmp" (opened FileMode.Create + FileShare.None,
+        //      so the second process simply failed),
+        //   2. the archive itself (one process could File.Move onto it while
+        //      another was computing its SHA256),
+        //   3. the extraction target -- ExtractTarGzAsync wrote straight into
+        //      dataDir, so FindDictionary() in another process could see the
+        //      dictionary directory HALF POPULATED and hand it to
+        //      MeCabTokenizer.
+        //
+        // Measured (PR #728 CI, `build-and-test (ubuntu-24.04)`):
+        //   System.IO.IOException: The process cannot access the file
+        //   '.../open_jtalk_dic_utf_8-1.11/sys.dic' because it is being used
+        //   by another process.
+        //     at DotNetG2P.MeCab.Dictionary.SystemDictionary.Load
+        //     at PiperPlus.Cli.DotNetG2PEngine..ctor
+        // `dotnet test <sln>` runs PiperPlus.Cli.Tests and
+        // PiperPlus.Core.Tests in parallel, and the latter's
+        // CliIntegrationTests spawns `dotnet PiperPlus.Cli.dll` -- two OS
+        // processes sharing ~/.local/share/piper-plus. Issue #735 is the same
+        // race landing on the other side of it (FileNotFoundException for a
+        // file the winner had not extracted yet).
+        //
+        // A named Mutex is not used: its cross-process semantics on Unix
+        // differ from Windows, and the atomic move makes correctness
+        // independent of it. Two processes may both download -- wasteful but
+        // correct, and the loser's staging directory is discarded.
+        var stagingDir = BuildStagingDirPath(dataDir);
+        Directory.CreateDirectory(stagingDir);
+
+        var finalDictPath = Path.Join(dataDir, DictionaryDirName);
+        var archivePath = Path.Join(stagingDir, "open_jtalk_dic_utf_8-1.11.tar.gz");
         var tempPath = archivePath + ".tmp";
 
         try
@@ -349,21 +386,93 @@ public static class DictionaryManager
 
             Console.Error.WriteLine("Checksum verified.");
 
-            // Extract tar.gz
+            // Extract tar.gz into the staging directory, never into dataDir.
             Console.Error.WriteLine("Extracting dictionary ...");
-            await ExtractTarGzAsync(archivePath, dataDir, ct).ConfigureAwait(false);
-            Console.Error.WriteLine("OpenJTalk dictionary installed successfully.");
-        }
-        catch
-        {
-            // Clean up partial temp file on failure
-            TryDelete(tempPath);
-            throw;
+            await ExtractTarGzAsync(archivePath, stagingDir, ct).ConfigureAwait(false);
+
+            // Publish in one step. Directory.Move within a filesystem is a
+            // rename, so another process sees either no dictionary or a
+            // complete one -- never a partially extracted directory.
+            var stagedDictPath = Path.Join(stagingDir, DictionaryDirName);
+            if (!IsValidDictionary(stagedDictPath))
+            {
+                throw new InvalidOperationException(
+                    $"Extraction completed but the staged dictionary is incomplete. " +
+                    $"Expected {string.Join(", ", RequiredFiles)} at: {stagedDictPath}");
+            }
+
+            try
+            {
+                Directory.Move(stagedDictPath, finalDictPath);
+                Console.Error.WriteLine("OpenJTalk dictionary installed successfully.");
+            }
+            catch (IOException) when (IsValidDictionary(finalDictPath))
+            {
+                // Another process published first. Its copy is equally valid
+                // (same URL, same verified SHA256), so keep it and drop ours
+                // rather than replacing a directory someone may have open.
+                Console.Error.WriteLine(
+                    "OpenJTalk dictionary was installed concurrently by another process; "
+                    + "using the existing copy.");
+            }
         }
         finally
         {
-            // Clean up archive (successful or not, we don't need it)
-            TryDelete(archivePath);
+            // The staging directory holds the archive, its .tmp and anything
+            // left over from a failed extract. None of it is shared with
+            // another process, so removing it unconditionally is safe.
+            TryDeleteDirectory(stagingDir);
+        }
+    }
+
+    /// <summary>
+    /// Monotonic sequence for staging directory names.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Environment.ProcessId"/> separates processes; this counter
+    /// separates callers within one process, so a retry after a failed
+    /// download cannot collide with its own leftovers.
+    /// </remarks>
+    private static long stagingSeq;
+
+    /// <summary>
+    /// Returns the next staging directory sequence number.
+    /// </summary>
+    /// <remarks>
+    /// <c>internal</c> so DictionaryManagerTests can assert that two callers
+    /// never receive the same staging name -- a constant or timestamp-derived
+    /// name would move the cross-process race inside the process, which is
+    /// what happened in the Rust port of the ORT cache fix (#686).
+    /// </remarks>
+    internal static long NextStagingSeq() => Interlocked.Increment(ref stagingSeq);
+
+    /// <summary>
+    /// Builds the per-process staging directory path used while downloading
+    /// and extracting. Exposed for tests; see <see cref="NextStagingSeq"/>.
+    /// </summary>
+    internal static string BuildStagingDirPath(string dataDir) =>
+        Path.Join(dataDir, $".staging.{Environment.ProcessId}.{NextStagingSeq():x8}");
+
+    /// <summary>
+    /// Best-effort recursive delete. Used only for per-process staging
+    /// directories, never for a published dictionary.
+    /// </summary>
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+            {
+                Directory.Delete(path, recursive: true);
+            }
+        }
+        catch (IOException)
+        {
+            // best effort
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // best effort
         }
     }
 
@@ -605,16 +714,5 @@ public static class DictionaryManager
         }
 
         return System.Text.Encoding.ASCII.GetString(buffer, offset, end - offset);
-    }
-
-    private static void TryDelete(string path)
-    {
-        try
-        {
-            File.Delete(path);
-        }
-        catch
-        { /* best-effort cleanup */
-        }
     }
 }
