@@ -9,6 +9,7 @@ on:
       - 'src/rust/piper-wasm/**'
       - '.github/workflows/deploy-webassembly-demo.yml'
       - 'scripts/verify_pages_assets.py'
+      - 'scripts/check_deploy_json_imports.py'
       - 'test/models/multilingual-test-medium.onnx'
   workflow_dispatch:
     inputs:
@@ -230,6 +231,19 @@ jobs:
             cp -r src/wasm/g2p/src/* deploy/g2p/src/
           fi
 
+          # data/ as well: detect.js imports ../data/sv_function_words.json as
+          # a JSON module. Only src/ was copied, so Pages answered that path
+          # with its 404 HTML, the browser rejected the module on MIME type
+          # ("text/html"), and the demo's Synthesize button never enabled
+          # (issue #733). The pre-deploy gate did not catch it because its
+          # required-file list is hand-maintained and nobody extended it when
+          # the import was added -- `check_deploy_json_imports.py` below now
+          # derives that requirement from the source instead.
+          if [ -d "src/wasm/g2p/data" ]; then
+            mkdir -p deploy/g2p/data
+            cp -r src/wasm/g2p/data/* deploy/g2p/data/
+          fi
+
           # RTF multi-runtime bench 表を /bench/multi-runtime/ に含める。
           # データは gh-pages ブランチの dev/bench/multi-runtime/index.html に保存済み。
           # ファイルが存在しない場合はスキップ（初回デプロイ時など）。
@@ -275,6 +289,7 @@ jobs:
             "deploy/multilingual-demo/index.html"
             "deploy/src/index.js"
             "deploy/g2p/src/index.js"
+            "deploy/g2p/data/sv_function_words.json"
             "deploy/dist/rust-wasm/piper_plus_wasm.js"
             "deploy/dist/rust-wasm/piper_plus_wasm_bg.wasm"
           )
@@ -311,6 +326,18 @@ jobs:
             exit 1
           fi
           echo "Pre-deploy gate OK"
+
+      - name: Pre-deploy gate -- relative JSON-module imports resolve
+        # The list above is hand-maintained, which is how #733 shipped: it
+        # named deploy/g2p/src/index.js and was never extended when detect.js
+        # started importing ../data/sv_function_words.json. This step derives
+        # the requirement from the bundle's own JavaScript, so a new import
+        # cannot 404 silently because a list went stale.
+        #
+        # `python3`, not `uv run`: the build job has no uv setup, and the
+        # script imports only re / sys / pathlib, so adding one would buy
+        # nothing. Every runner ships python3.
+        run: python3 scripts/check_deploy_json_imports.py deploy
 
       - name: Validate import maps in deployed HTML
         run: |
