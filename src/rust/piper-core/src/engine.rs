@@ -141,11 +141,23 @@ pub struct SynthesisResult {
     ///
     /// `durations` と**同じ長さ・同じ並び**なので、index 対応で音素名を
     /// 引き当てられる (issue #656)。呼び出し元が `phonemize_to_ids(text)` を
-    /// 再実行して対応付けるのは誤りである: Strategy C は 10 文字以下の
-    /// テキストを `<break time="300ms"/>` で SSML ラップするため合成に使う
-    /// 音素列がテキスト由来のものと別物になり (実測で +100 ID)、Strategy A の
-    /// padding も前方に pad を挿入して index をずらす。
+    /// 再実行して対応付けるのは誤りである: Strategy A の padding が前方に
+    /// pad を挿入して index をずらすため。
+    ///
+    /// Strategy C も以前は原因の一つだった — 10 文字以下のテキストを SSML で
+    /// ラップし、その文字列を phonemizer に渡していたので音素列がテキスト
+    /// 由来のものと別物になっていた (実測で +100 ID)。#694 で音声レベルの
+    /// パディングに変えたため、この経路での乖離は無くなった。
     pub phoneme_ids: Option<Vec<i64>>,
+    /// 音声の先頭に挿入された無音の秒数 (Strategy C)。
+    ///
+    /// `durations` / `phoneme_ids` は**合成された音声**に対応しており、
+    /// この無音は含まない。したがって timing をストリーム位置として使う
+    /// 呼び出し元は、各エントリをこの分だけ後ろにずらす必要がある。
+    /// ずらさないと短文の timing が 300 ms 早くなる (#694 の音声レベル
+    /// パディング導入で生じ、#697 と同じ「timing と実ストリームの対応」
+    /// の問題)。
+    pub leading_silence_seconds: f64,
 }
 
 impl SynthesisResult {
@@ -1066,6 +1078,7 @@ impl OnnxEngine {
             audio_seconds,
             durations,
             phoneme_ids: Some(ids_used),
+            leading_silence_seconds: 0.0,
         })
     }
 
@@ -1227,6 +1240,7 @@ mod tests {
             audio_seconds: 1.0,
             durations: None,
             phoneme_ids: None,
+            leading_silence_seconds: 0.0,
         };
         assert!((result.real_time_factor() - 0.5).abs() < 1e-6);
     }
@@ -1240,6 +1254,7 @@ mod tests {
             audio_seconds: 0.0,
             durations: None,
             phoneme_ids: None,
+            leading_silence_seconds: 0.0,
         };
         assert!((result.real_time_factor()).abs() < 1e-6);
     }
@@ -1324,6 +1339,7 @@ mod tests {
             audio_seconds: 1.0,
             durations: Some(vec![1.0, 2.0, 3.0]),
             phoneme_ids: Some(vec![1, 8, 2]),
+            leading_silence_seconds: 0.0,
         };
         let durations = result.durations.as_ref().unwrap();
         assert_eq!(durations.len(), 3);
@@ -1342,6 +1358,7 @@ mod tests {
             audio_seconds: 0.0,
             durations: None,
             phoneme_ids: None,
+            leading_silence_seconds: 0.0,
         };
         assert!((result.real_time_factor() - 0.0).abs() < 1e-6);
     }

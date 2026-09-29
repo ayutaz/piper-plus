@@ -680,6 +680,24 @@ fn main() -> Result<()> {
                             // #660 で同じ基準に移っている。
                             timing.total_duration_ms =
                                 result.audio.len() as f64 / f64::from(result.sample_rate) * 1000.0;
+                            // Strategy C prepends silence to the AUDIO, so
+                            // every entry sits that much later in the stream
+                            // the caller receives. durations describe the
+                            // synthesized speech only, so the shift has to be
+                            // applied here or short-text timing reads 300 ms
+                            // early (#694 introduced the padding; this keeps
+                            // the timestamps pointing at the delivered WAV).
+                            let offset_ms = result.leading_silence_seconds * 1000.0;
+                            if offset_ms > 0.0 {
+                                for entry in &mut timing.phonemes {
+                                    entry.start_ms += offset_ms;
+                                    entry.end_ms += offset_ms;
+                                }
+                                // total は上で result.audio から取っており、
+                                // その audio には Strategy C の前後無音が
+                                // 既に含まれる。ここで offset を足すと
+                                // 300 ms の二重計上になる。
+                            }
                             let output = match format.as_str() {
                                 "json" => timing.to_json().unwrap_or_default(),
                                 "tsv" => timing.to_tsv(),

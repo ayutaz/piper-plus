@@ -21,9 +21,49 @@ const SILENCE_PAD_MS: u32 = 300;
 ///
 /// 両方を満たす場合、テキストを
 /// `<speak><break time="{SILENCE_PAD_MS}ms"/>{text}<break time="{SILENCE_PAD_MS}ms"/></speak>`
+///
+/// これは **SSML パーサを持つパイプライン向け**である。合成経路は
+/// [`pad_silence_for_short_text`] を使うこと — この文字列をそのまま
+/// phonemizer に渡すとマークアップが読み上げられる (issue #694)。
 /// に変換して返す。
 ///
 /// そうでなければ元のテキストをそのまま返す。
+/// 短テキストかどうか (Strategy C の発動条件)
+///
+/// 空白を除いた文字数が [`SHORT_TEXT_CHARS`] 以下で、かつ呼び出し側が自前の
+/// SSML を渡していない場合に true。
+pub fn is_short_text(text: &str) -> bool {
+    let trimmed = text.trim();
+    if trimmed.starts_with("<speak>") || trimmed.starts_with("<speak ") {
+        return false;
+    }
+    trimmed.chars().filter(|c| !c.is_whitespace()).count() <= SHORT_TEXT_CHARS
+}
+
+/// 合成済み音声の前後に [`SILENCE_PAD_MS`] の無音を挿入する (Strategy C)
+///
+/// `docs/spec/short-text-contract.toml` `[ssml_injection]` は
+/// `silence_pad_ms` を「短テキスト**音声**の前後に付与する無音」と規定して
+/// いる。[`wrap_short_text_ssml`] はその同じ意図を SSML テキストとして
+/// 表現したもので、**SSML パーサを持つパイプライン向け**である。
+///
+/// 合成経路がこちらではなくテキスト版を使い、その文字列を SSML として
+/// パースせずに phonemizer へ渡していたため、`<speak>` `<break` `time=`
+/// が英語として読み上げられていた (issue #694)。`--timing json` の音素列に
+/// `s p ˈ i ː k` (= speak) `b ɹ ˈ e ɪ k` (= break) `t ˈ a ɪ m` (= time) が
+/// 現れることで発覚した。
+pub fn pad_silence_for_short_text(audio: &[i16], sample_rate: u32) -> Vec<i16> {
+    if audio.is_empty() {
+        return audio.to_vec();
+    }
+    let silence_samples = ((u64::from(sample_rate) * u64::from(SILENCE_PAD_MS)) / 1000) as usize;
+    let mut padded = Vec::with_capacity(silence_samples * 2 + audio.len());
+    padded.resize(silence_samples, 0);
+    padded.extend_from_slice(audio);
+    padded.resize(padded.len() + silence_samples, 0);
+    padded
+}
+
 pub fn wrap_short_text_ssml(text: &str) -> String {
     let trimmed = text.trim();
 
@@ -171,5 +211,60 @@ mod tests {
     fn test_gt_escaped() {
         let result = wrap_short_text_ssml("2>1");
         assert!(result.contains("2&gt;1"));
+    }
+
+    #[test]
+    fn pads_short_text_audio_with_silence_on_both_sides() {
+        let audio = vec![100i16, 200, 300];
+        let padded = pad_silence_for_short_text(&audio, 22050);
+
+        // 300 ms at 22050 Hz = 6615 samples on each side.
+        let pad = 6615usize;
+        assert_eq!(padded.len(), pad * 2 + audio.len());
+        assert!(padded[..pad].iter().all(|&s| s == 0));
+        assert_eq!(&padded[pad..pad + audio.len()], audio.as_slice());
+        assert!(padded[pad + audio.len()..].iter().all(|&s| s == 0));
+    }
+
+    #[test]
+    fn padding_is_split_evenly_so_half_leads_the_speech() {
+        // The CLI shifts timing by half the inserted silence, so the split
+        // has to be exactly even. An uneven split would put the timestamps
+        // off by the difference, which is the kind of error that reads as
+        // "timing is slightly wrong" rather than as a bug.
+        let audio = vec![1i16; 100];
+        let padded = pad_silence_for_short_text(&audio, 22050);
+        let inserted = padded.len() - audio.len();
+        assert_eq!(inserted % 2, 0, "inserted silence must split evenly");
+
+        let lead = inserted / 2;
+        assert!(padded[..lead].iter().all(|&s| s == 0));
+        assert!(padded[lead + audio.len()..].iter().all(|&s| s == 0));
+        assert_eq!(padded[lead..lead + audio.len()], audio[..]);
+
+        // 300 ms at 22050 Hz on each side.
+        assert_eq!(lead, 6615);
+    }
+
+    #[test]
+    fn padding_leaves_empty_audio_alone() {
+        assert!(pad_silence_for_short_text(&[], 22050).is_empty());
+    }
+
+    #[test]
+    fn short_text_detection_matches_the_wrapper_condition() {
+        // The two must agree, otherwise the audio gets padded for inputs the
+        // contract does not consider short (or vice versa).
+        for text in ["Sol", "Hola", "a b c", "  hi  "] {
+            assert!(is_short_text(text), "{text:?} should be short");
+            assert!(wrap_short_text_ssml(text).starts_with("<speak>"));
+        }
+        for text in [
+            "Hola, esta es una prueba.",
+            "<speak>already ssml</speak>",
+            "<speak version=\"1.0\">x</speak>",
+        ] {
+            assert!(!is_short_text(text), "{text:?} should not be short");
+        }
     }
 }

@@ -417,12 +417,23 @@ impl PiperVoice {
         text: &str,
         params: &SynthesisParams,
     ) -> Result<SynthesisResult, PiperError> {
-        // Strategy C: 短テキストを SSML <break> でラップ
-        let effective_text = crate::short_text::wrap_short_text_ssml(text);
-        let text_ref = effective_text.as_str();
+        // Strategy C は音声レベルで適用する (下の 7 番)。
+        //
+        // ここでは `wrap_short_text_ssml(text)` を呼んで、その SSML 文字列を
+        // phonemizer に渡していた。`phonemize_with_prosody` は SSML を
+        // 解釈しないので、`<speak>` `<break` `time=` が**英語として読み上げ
+        // られていた** (issue #694)。`--timing json` の音素列に
+        // `s p ˈ i ː k` (= speak) / `b ɹ ˈ e ɪ k` (= break) /
+        // `t ˈ a ɪ m` (= time) が現れることで発覚した。
+        //
+        // contract (`[ssml_injection].silence_pad_ms`) は無音を「短テキスト
+        // **音声**の前後に付与する」と規定しており、C# / Python も音声側で
+        // 実装している。テキストラッパは SSML パーサを持つパイプライン向けの
+        // 別 API として残す。
+        let is_short = crate::short_text::is_short_text(text);
 
         // 1. Phonemize: テキストをトークン列 + プロソディ情報に変換
-        let (tokens, prosody) = self.phonemizer.phonemize_with_prosody(text_ref)?;
+        let (tokens, prosody) = self.phonemizer.phonemize_with_prosody(text)?;
 
         // 2. Convert tokens to IDs using phoneme_id_map
         let phoneme_id_map = self
@@ -476,7 +487,27 @@ impl PiperVoice {
             noise_w: params.noise_w,
         };
 
-        self.engine.synthesize(&request)
+        let mut result = self.engine.synthesize(&request)?;
+
+        // 7. Strategy C: 短テキストの音声前後に無音を挿入する。
+        //    durations / phoneme_ids は合成された音声に対応したままなので、
+        //    timing のオフセットはこのパッドを含まない。呼び出し側が timing を
+        //    ストリーム位置として使う場合はパッド分を足す必要がある — それは
+        //    #697 の扱いで、ここで暗黙に混ぜない。
+        if is_short {
+            let before = result.audio.len();
+            result.audio =
+                crate::short_text::pad_silence_for_short_text(&result.audio, result.sample_rate);
+            result.audio_seconds = result.audio.len() as f64 / f64::from(result.sample_rate);
+            // Half the inserted silence sits in FRONT of the speech, so every
+            // timing entry is that much later in the stream the caller
+            // receives. Publishing the amount lets the CLI shift them; not
+            // publishing it would make short-text timing read 300 ms early.
+            let inserted = result.audio.len().saturating_sub(before);
+            result.leading_silence_seconds = (inserted / 2) as f64 / f64::from(result.sample_rate);
+        }
+
+        Ok(result)
     }
 
     /// テキストを音声に変換 (旧 API)
