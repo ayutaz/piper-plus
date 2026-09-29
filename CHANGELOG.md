@@ -219,6 +219,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Rust: Strategy C の先頭無音分の timing シフトが `total_duration_ms` を**二重計上**しないようにした。 #725 で `total_duration_ms` を「実際に出力した音声長」(`result.audio.len()`) から求めるようになり、 その音声には Strategy C の前後無音が**既に含まれる**。 本 PR の shift 処理は元々 entry 由来の total を前提に `+= offset_ms` していたため、 両者が合流すると 300 ms 相当が二重に乗る。 entry の shift だけを残し total への加算を落とした。 **実測** (`test/models/multilingual-test-medium.onnx`、 `"Sol"`、 `--sentence-silence 0`): `total_duration_ms` 811.156 / 実 WAV 811.156 で `100.00%`、 最初の entry の `start_ms` は 346.440 (= 先頭無音分ずれている)、 音素列は `['s','ˈ','ɑ','l']` で SSML マークアップの混入なし
 
+- ci: `short-text-contract` hook の `files:` に `src/rust/piper-core/src/voice.rs` を追加した。#694 の修正 (PR #722) で gate に「Rust の合成経路は `wrap_short_text_ssml(` を呼ばず `pad_silence_for_short_text(` を呼ぶこと」という規則を入れ、その検査対象が `voice.rs` になったが、**trigger に追加し忘れていた** — `voice.rs` だけを書き換える PR では short-text gate が一度も走らない状態だった。#656 の C++ 分で同じ取り落としをして PR #738 で塞いだのと**同型の 2 回目**である。いずれも `trigger-coverage` gate (#704 / #706) が検出した。**実測**: 追加したパスを外す変異で `trigger-coverage` が exit 1 になることを確認
+
 ### Changed
 
 - ライセンス方針: `train` extra 限定の copyleft 依存を「明文化された例外」として受理する規定を `CONTRIBUTING.md` に追加。 `soxr` (LGPL-2.1-or-later) は `librosa` 0.11 の必須依存で `train` extra にのみ入り、 PyPI に publish される wheel (`src/python_run` 由来、 依存は `src/python_run/requirements.txt` が宣言) には含まれないため再頒布が発生せず LGPL の義務も生じない。 これまで CI の `allow-dependencies-licenses` には carve-out が入る一方で `CONTRIBUTING.md` は「LGPL はバージョンを問わず禁止」のままだったため、 設定と明文の方針が食い違っていた。 併せて、 scanner の parser bug 回避のための carve-out (`typing-extensions` / `llvmlite`、 実際には copyleft ではない) は方針例外ではなく、 例外表に載せてはならないことを明記
