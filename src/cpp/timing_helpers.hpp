@@ -29,6 +29,7 @@
 #define PIPER_PLUS_TIMING_HELPERS_HPP
 
 #include <algorithm>
+#include <cstdio>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -95,24 +96,82 @@ inline char32_t firstCodepointUtf8(const std::string &s) {
   return static_cast<char32_t>(*it);
 }
 
+// docs/spec/phoneme-timing-contract.toml [reverse_map.pua_handling]:
+// a PUA codepoint (U+E000..U+F8FF) with no explicit name renders as
+// "U+XXXX" in uppercase hex.
+inline constexpr char32_t kPuaLower = 0xE000;
+inline constexpr char32_t kPuaUpper = 0xF8FF;
+
+inline bool isPuaCodepoint(char32_t c) {
+  return c >= kPuaLower && c <= kPuaUpper;
+}
+
+inline std::string formatPuaFallback(char32_t c) {
+  char buf[16];
+  std::snprintf(buf, sizeof(buf), "U+%04X", static_cast<unsigned>(c));
+  return std::string(buf);
+}
+
+// Display name for one phoneme_id_map key.
+//
+// The key is a codepoint, and for multi-character tokens (a:, cl, ky, N_m,
+// ?!, rr, ...) it is a PUA codepoint standing in for the token. Resolving it
+// is unconditional, matching the canonical implementation
+// (src/python_run/piper_plus/timing.py): the PUA table is not
+// Japanese-specific -- U+E01D "rr" and U+E01E "y_vowel" are multilingual --
+// and a name that depended on which language the caller asked for would not
+// be a name.
+inline std::string phonemeDisplayName(char32_t phonemeChar) {
+  if (isPuaCodepoint(phonemeChar)) {
+    const auto &pua = puaToPhonemeMap();
+    const auto it = pua.find(phonemeChar);
+    if (it != pua.end()) {
+      return it->second;
+    }
+    // An unnamed PUA codepoint. Emitting the raw character would hand the
+    // consumer an unprintable glyph that identifies nothing; "U+E7FF" at
+    // least says which id is unknown.
+    return formatPuaFallback(phonemeChar);
+  }
+  std::string utf8Str;
+  utf8::append(static_cast<uint32_t>(phonemeChar), std::back_inserter(utf8Str));
+  return utf8Str;
+}
+
 // Build "phoneme id -> display string" from the model's phoneme_id_map.
 //
-// NOTE: only ids[0] of each key is registered, so a phoneme mapped to several
-// ids resolves for its first id and falls back to "?" for the rest. That is
-// the behaviour piper.cpp shipped; the same defect was fixed in C# under
-// issue #656 and is tracked for C++ separately rather than being changed here
-// under cover of an extraction.
+// EVERY id of a key is registered, per [reverse_map]: the contract's own
+// example is {"b": [6, 7]} -> {6: 'b', 7: 'b'}. piper.cpp registered only
+// ids[0], so a phoneme mapped to several ids resolved for its first id and
+// fell back to "?" for the rest -- the same defect C# carried until issue
+// #656, left for C++ because the gate that should have caught it was matching
+// the codepoint comments in isClosingPunctuation rather than any output
+// format.
+//
+// Collisions are first-wins ([reverse_map.collision_resolution]). Iteration
+// order over an unordered_map is unspecified, so keys are visited in
+// codepoint order to make "first" deterministic; see `key_order` in the
+// contract, which records that the six runtimes do not agree on this and that
+// no shipped model has a collision.
 inline std::unordered_map<PhonemeId, std::string>
 buildPhonemeIdToStringMap(const PhonemeIdMap &idMap) {
+  std::vector<char32_t> keys;
+  keys.reserve(idMap.size());
+  for (const auto &entry : idMap) {
+    keys.push_back(entry.first);
+  }
+  std::sort(keys.begin(), keys.end());
+
   std::unordered_map<PhonemeId, std::string> out;
-  for (const auto &[phonemeChar, ids] : idMap) {
+  for (const char32_t phonemeChar : keys) {
+    const auto &ids = idMap.at(phonemeChar);
     if (ids.empty()) {
       continue;
     }
-    std::string phonemeUtf8;
-    utf8::append(static_cast<uint32_t>(phonemeChar),
-                 std::back_inserter(phonemeUtf8));
-    out[ids[0]] = std::move(phonemeUtf8);
+    const std::string display = phonemeDisplayName(phonemeChar);
+    for (const PhonemeId id : ids) {
+      out.emplace(id, display);  // emplace = first wins
+    }
   }
   return out;
 }
@@ -120,15 +179,11 @@ buildPhonemeIdToStringMap(const PhonemeIdMap &idMap) {
 // PUA display rename + geminate overlap. Split out so a test can drive it
 // directly instead of having to construct an OpenJTalk voice.
 inline void applyJapanesePhonemeAdjustments(std::vector<TimingEntry> &timings) {
-  const auto &pua = puaToPhonemeMap();
   for (std::size_t i = 0; i < timings.size(); ++i) {
-    // Convert PUA mapped phonemes back to original.
-    if (isSingleCodepointUtf8(timings[i].phoneme)) {
-      auto it = pua.find(firstCodepointUtf8(timings[i].phoneme));
-      if (it != pua.end()) {
-        timings[i].phoneme = it->second;
-      }
-    }
+    // The PUA -> token rename used to happen here, gated on the caller asking
+    // for Japanese adjustments. It is now unconditional in
+    // phonemeDisplayName, so by the time entries reach this function "cl" is
+    // already spelled out; only the geminate timing shift is language-specific.
 
     // 促音 (geminate) overlaps backwards into the previous phoneme.
     if (timings[i].phoneme == "cl" && i > 0) {
