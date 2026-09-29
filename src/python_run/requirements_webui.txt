@@ -1,9 +1,20 @@
 # Gradio WebUI requirements
 # Requires Python 3.11+
 #
-# 6.15.0 未満は CVE-2026-48545 (Cookie Injection via Shared Proxy Client) の
-# 影響を受ける。 6.21.0 は huggingface-space/requirements.txt が既に採用済みで、
-# WebUI が使う Gradio API (Blocks / Audio / Slider 等のコアコンポーネントのみ)
-# に破壊的変更はない。
-gradio==6.21.0
+# gradio の pin は 3 箇所を完全一致させる (scripts/check_hf_space_gradio_sync.py
+# が gate 化):
+#   1. huggingface-space/README.md      frontmatter `sdk_version:`
+#   2. huggingface-space/requirements.txt  `gradio==`
+#   3. 本ファイル                          `gradio==`
+#
+# 1 と 2 は HF Spaces が両方を 1 回の pip install に注入するため不一致だと
+# BUILD_ERROR になる (ハード要件)。 本ファイルはその制約を受けないが、
+# 同期対象に入れないと security floor だけ取り残される。 実際 6.14.0 の頃に
+# CVE-2026-48545 (Cookie Injection、 gradio < 6.15.0) を抱えたまま放置され、
+# その後 1/2 を 6.26.0 へ上げた際も本ファイルだけ 6.21.0 に残った。
+#
+# 本ファイルは README 8 言語版が `uv pip install -r` で直接案内するユーザー向け
+# 導入手順で、 docker/webui/Dockerfile と docker/python-inference/Dockerfile
+# (.cpu 含む) も COPY するため、 1 箇所の drift が手動導入と Docker 双方に効く。
+gradio==6.26.0
 numpy>=1.26.4,<2.3

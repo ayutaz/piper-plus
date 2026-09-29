@@ -17,13 +17,34 @@ This script enforces ``X.Y.Z == A.B.C`` so Dependabot bumps that only touch
 ``requirements.txt`` cannot silently drift away from the SDK version pinned
 in the README frontmatter.
 
+A third pin site is also checked: ``src/python_run/requirements_webui.txt``.
+Its rationale is **different** from the two above -- it is not part of the HF
+Space build, so it cannot trigger the pip resolve failure. It is included
+because leaving it out lets the security floor rot in exactly one place:
+
+  * That file sat at ``gradio==6.14.0`` while carrying CVE-2026-48545
+    (Cookie Injection via Shared Proxy Client, gradio < 6.15.0).
+  * After it was brought to 6.21.0 to match the HF Space, the HF Space pair
+    later moved to 6.26.0 -- and this file was left behind again, because the
+    gate only covered the two HF files.
+
+It is user-facing (all 8 README translations tell users to run
+``uv pip install -r src/python_run/requirements_webui.txt``), and is pulled
+into the images by a ``COPY`` line in
+``docker/webui/Dockerfile`` and ``docker/python-inference/Dockerfile``
+(plus ``.cpu``), so one drift reaches both manual installs and the images.
+
+This mirrors the existing ``scripts/check_ruff_version_sync.py`` convention:
+several pin sites for one tool must agree exactly, and the gate names every
+site so a removed pin cannot make the check silently pass.
+
 Usage:
     python scripts/check_hf_space_gradio_sync.py
 
 Exit codes:
-    0 -- versions match exactly
-    1 -- versions disagree, or either file is missing / malformed /
-         contains an empty pin (HF Space cannot run without both values)
+    0 -- all three pin sites agree exactly
+    1 -- any pair disagrees, or a file is missing / malformed /
+         contains an empty pin
 """
 
 from __future__ import annotations
@@ -35,6 +56,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 README = REPO_ROOT / "huggingface-space" / "README.md"
 REQUIREMENTS = REPO_ROOT / "huggingface-space" / "requirements.txt"
+# HF Space の build には関与しないが、 security floor の drift を防ぐため
+# 同期対象に含める (上の docstring 参照)。
+WEBUI_REQUIREMENTS = REPO_ROOT / "src" / "python_run" / "requirements_webui.txt"
 
 
 def _extract_frontmatter_sdk_version(readme_path: Path) -> str | None:
@@ -84,6 +108,7 @@ def _extract_requirements_gradio(req_path: Path) -> str | None:
 def main() -> int:
     sdk_version = _extract_frontmatter_sdk_version(README)
     req_version = _extract_requirements_gradio(REQUIREMENTS)
+    webui_version = _extract_requirements_gradio(WEBUI_REQUIREMENTS)
 
     errors: list[str] = []
 
@@ -97,7 +122,17 @@ def main() -> int:
             f"{REQUIREMENTS.relative_to(REPO_ROOT)}: no `gradio==X.Y.Z` exact "
             "pin found (HF build expects this to match the README sdk_version)"
         )
+    if webui_version is None:
+        errors.append(
+            f"{WEBUI_REQUIREMENTS.relative_to(REPO_ROOT)}: no `gradio==X.Y.Z` "
+            "exact pin found. Do not drop this pin -- the file is what the "
+            "README translations tell users to install and what the WebUI / "
+            "python-inference images COPY, so an unpinned gradio there "
+            "reintroduces the silent security-floor drift this gate exists "
+            "to catch."
+        )
 
+    # HF Space 側の 2 サイトは build のハード要件なので、 専用の説明を出す。
     if sdk_version and req_version and sdk_version != req_version:
         errors.append(
             "HF Space gradio version drift detected:\n"
@@ -109,21 +144,32 @@ def main() -> int:
             "(BUILD_ERROR with misleading 'cache miss' message)."
         )
 
+    # 3 サイト目は build を壊さないぶん気付かれにくい。 失敗理由を分けて出す。
+    if sdk_version and webui_version and sdk_version != webui_version:
+        errors.append(
+            "WebUI gradio version drift detected:\n"
+            f"  {README.relative_to(REPO_ROOT)} sdk_version: {sdk_version}\n"
+            f"  {WEBUI_REQUIREMENTS.relative_to(REPO_ROOT)} gradio==  {webui_version}\n"
+            "  This pair does NOT break any build, which is exactly why it "
+            "rots unnoticed: the file previously sat at 6.14.0 with "
+            "CVE-2026-48545 open, and was left at 6.21.0 again when the HF "
+            "Space pair moved to 6.26.0. Bump it together with the HF Space "
+            "pin so the security floor cannot lag in one place."
+        )
+
     if errors:
-        print("HF Space gradio sync check FAILED:")
+        print("gradio pin sync check FAILED:")
         for e in errors:
             print(f"  - {e}")
         print(
-            "\nTo fix: edit either huggingface-space/README.md "
-            "(sdk_version) or huggingface-space/requirements.txt (gradio==) "
-            "so the two values agree."
+            "\nTo fix: make all three pins agree --\n"
+            "  huggingface-space/README.md          (frontmatter sdk_version)\n"
+            "  huggingface-space/requirements.txt   (gradio==)\n"
+            "  src/python_run/requirements_webui.txt (gradio==)"
         )
         return 1
 
-    print(
-        f"OK: gradio sdk_version ({sdk_version}) == requirements.txt pin "
-        f"({req_version})"
-    )
+    print(f"OK: all 3 gradio pin sites agree ({sdk_version})")
     return 0
 
 
