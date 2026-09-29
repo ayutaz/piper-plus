@@ -98,12 +98,33 @@ COPY pyproject.toml /app/pyproject.toml
 COPY src/python/ /app/src/python/
 
 # Install piper_plus_g2p (standalone G2P package) and piper_train
-RUN uv pip install --system "/app/src/python/g2p"
-RUN uv pip install --system "/app/src/python[inference-gpu]"
+#
+# `--no-cache` は必須 (省略可能な最適化ではない)。 uv は既定で展開済み wheel を
+# `/root/.cache/uv/archive-v*/` に残し、 そこには完全な `*.dist-info` が含まれる。
+# Trivy の python-pkg analyzer は「イメージ内のあらゆる `*.dist-info`」を
+# インストール済みパッケージとして拾うため、 キャッシュに落ちただけの版まで
+# 脆弱性として報告される。 後段レイヤで `rm -rf` しても **イメージサイズは
+# 減らない** (前段レイヤに残る) ので、 最初から書かせない。
+RUN uv pip install --system --no-cache "/app/src/python/g2p"
+RUN uv pip install --system --no-cache "/app/src/python[inference-gpu]"
 
 # Install Gradio WebUI requirements
 COPY src/python_run/requirements_webui.txt /app/requirements_webui.txt
-RUN uv pip install --system -r /app/requirements_webui.txt
+RUN uv pip install --system --no-cache -r /app/requirements_webui.txt
+
+# 診断: Trivy が実際に何を見るのかをビルドログに残す。
+#
+# `trivy-python-inference` は setuptools 70.3.0 (CVE-2025-47273 /
+# CVE-2026-59890) と msgpack 1.1.2 (GHSA-6v7p-g79w-8964) を報告し続けている。
+# 70.3.0 は apt 版 (68.1.2) でも上の pip 導入版 (84.0.0) でもない第三の版で、
+# 在処が未特定だった。 この列挙により、 上の `--no-cache` で解消するか、
+# 別の場所に残っているかが同じ CI run で判明する。
+RUN echo "--- python dist-info / egg-info in image ---" && \
+    find / -xdev \
+      \( -name 'setuptools-*.dist-info' -o -name 'setuptools-*.egg-info' \
+         -o -name 'msgpack-*.dist-info' -o -name 'msgpack-*.egg-info' \) \
+      -print 2>/dev/null | sort && \
+    echo "--- end dist-info listing ---"
 
 # Pre-download NLTK data for g2p-en (both old and new resource names for NLTK compatibility)
 # Use a shared path so data is accessible after USER switch to non-root
