@@ -1,9 +1,21 @@
-// Comprehensive unit tests for splitTextToSentences() codepoint-based
-// implementation (Issue #343 fix).
+// Unit tests for the PRODUCTION sentence splitter (src/cpp/sentence_split.hpp,
+// called by piper.cpp:splitTextToSentences). Issue #343 / #346 regressions.
 //
-// These tests mirror the algorithm in piper.cpp but are self-contained
-// (no ONNX Runtime dependency). The integration path is covered by
-// test_streaming.cpp which calls textToAudioStreaming() -> splitTextToSentences().
+// Until issue #703 this file carried hand-written copies of all four functions
+// and said so ("These tests mirror the algorithm in piper.cpp"), so every
+// assertion below ran against the copy rather than against what ships. A
+// mirror cannot catch drift in the thing it mirrors, and this one had already
+// lost production's `utf8::is_valid` guard -- the one input that can walk
+// `utf8::unchecked` off the end was the one the tests could not reach.
+//
+// The functions now come from the header. Only the argument spelling is
+// adapted: the tests name phoneme types, the algorithm switches on a
+// punctuation set, and PhonemeType cannot express the third one (usesOpenJTalk
+// is true for both of its values, which is why `EnglishPhonemes = 99` had to
+// be invented here). SentenceSplitMode names all three.
+//
+// The integration path is covered by test_streaming.cpp, which calls
+// textToAudioStreaming() -> splitTextToSentences().
 
 #include <gtest/gtest.h>
 #include <string>
@@ -11,145 +23,45 @@
 #include <cstdint>
 #include <functional>
 
+#include "sentence_split.hpp"
 #include "utf8_utils.hpp"
 
-// Local copies of PhonemeType / usesOpenJTalk to avoid pulling in piper.hpp
-// (which requires onnxruntime_cxx_api.h).
+// The tests name phoneme types; the splitter takes a punctuation set. These
+// map one to the other, matching piper.cpp:phonemeTypeToSplitMode for the two
+// real PhonemeType values. EnglishPhonemes has no PhonemeType counterpart --
+// production cannot reach the ASCII branch today -- but the branch exists and
+// is tested, so the spelling is kept.
 namespace {
 
 enum TestPhonemeType {
   OpenJTalkPhonemes = 0,
   MultilingualPhonemes = 1,
-  // Synthetic value for English-only tests
   EnglishPhonemes = 99,
 };
 
-bool usesOpenJTalk(TestPhonemeType type) {
-  return type == OpenJTalkPhonemes || type == MultilingualPhonemes;
+piper::SentenceSplitMode toSplitMode(TestPhonemeType type) {
+  switch (type) {
+    case MultilingualPhonemes:
+      return piper::SentenceSplitMode::Multilingual;
+    case OpenJTalkPhonemes:
+      return piper::SentenceSplitMode::OpenJTalk;
+    case EnglishPhonemes:
+      return piper::SentenceSplitMode::Ascii;
+  }
+  return piper::SentenceSplitMode::Ascii;
 }
 
-// ---- Mirror of piper.cpp isPunctCodepoint ----
-bool isPunctCodepoint(char32_t c) {
-  switch (c) {
-    case U'\u3002': case U'\u3001': case U'\uFF01': case U'\uFF1F':
-    case U'.': case U'!': case U'?': case U',': case U';': case U':':
-      return true;
-    default:
-      return false;
-  }
+// Thin adapters so the existing call sites below are unchanged.
+std::vector<std::string> splitTextToSentences(const std::string &text,
+                                              TestPhonemeType phonemeType,
+                                              size_t maxChunkSize = 0) {
+  return piper::splitTextToSentencesIn(text, toSplitMode(phonemeType),
+                                       maxChunkSize);
 }
 
-// ---- Mirror of piper.cpp calculateDynamicChunkSize ----
-size_t calculateDynamicChunkSize(const std::vector<char32_t>& cps,
-                                  size_t baseSize = 50) {
-  size_t cpLen = cps.size();
-  if (cpLen < baseSize * 2) return cpLen;
-  size_t punctCount = 0;
-  for (char32_t c : cps) {
-    if (isPunctCodepoint(c)) punctCount++;
-  }
-  float punctDensity = static_cast<float>(punctCount) / static_cast<float>(cpLen);
-  if (punctDensity > 0.05f) return baseSize;
-  if (punctDensity < 0.02f) return baseSize * 3;
-  return baseSize * 2;
-}
-
-// ---- Mirror of piper.cpp isClosingPunctuation (Issue #346, M1) ----
-bool isClosingPunctuation(char32_t c) {
-  switch (c) {
-    case U')': case U']': case U'}': case U'"': case U'\'':
-    case U'\u300D': // 」 Right Corner Bracket
-    case U'\u300F': // 』 Right White Corner Bracket
-    case U'\uFF09': // ） Fullwidth Right Parenthesis
-    case U'\uFF3D': // ］ Fullwidth Right Square Bracket
-    case U'\u3011': // 】 Right Black Lenticular Bracket
-    case U'\uFF63': // ｣  Halfwidth Right Corner Bracket
-    case U'\u201D': // "  Right Double Quotation Mark
-    case U'\u2019': // '  Right Single Quotation Mark
-    case U'\u00BB': // »  Right-Pointing Double Angle Quotation Mark
-      return true;
-    default:
-      return false;
-  }
-}
-
-// ---- Mirror of piper.cpp splitTextToSentences ----
-std::vector<std::string> splitTextToSentences(
-    const std::string &text,
-    TestPhonemeType phonemeType,
-    size_t maxChunkSize = 0) {
-
-  if (text.empty()) return {};
-
-  using piper::utf8_util::toCodepoints;
-  using piper::utf8_util::cpsToUtf8;
-
-  auto cps = toCodepoints(text);
-  size_t cpLen = cps.size();
-
-  size_t baseSize = maxChunkSize > 0 ? maxChunkSize : 50;
-  size_t dynamicChunkSize = calculateDynamicChunkSize(cps, baseSize);
-
-  auto isBoundaryPunct = [&](char32_t c) -> bool {
-    if (phonemeType == MultilingualPhonemes) {
-      return c == U'\u3002' || c == U'\uFF01' || c == U'\uFF1F' ||
-             c == U'\uFF0E' || c == U'.' || c == U'!' || c == U'?' ||
-             c == U'\u2026';
-    } else if (usesOpenJTalk(phonemeType)) {
-      return c == U'\u3002' || c == U'\uFF01' || c == U'\uFF1F' ||
-             c == U'\u3001';
-    } else {
-      return c == U'.' || c == U'!' || c == U'?' || c == U',' ||
-             c == U';' || c == U':';
-    }
-  };
-
-  auto isSentenceTerminator = [&](char32_t c) -> bool {
-    if (phonemeType == MultilingualPhonemes) {
-      return c == U'\u3002' || c == U'\uFF01' || c == U'\uFF1F' ||
-             c == U'\uFF0E' || c == U'.' || c == U'!' || c == U'?';
-    } else if (usesOpenJTalk(phonemeType)) {
-      return c == U'\u3002' || c == U'\uFF01' || c == U'\uFF1F';
-    } else {
-      return c == U'.' || c == U'!' || c == U'?';
-    }
-  };
-
-  std::vector<std::string> chunks;
-  size_t sentenceStart = 0;
-
-  for (size_t i = 0; i < cpLen; ++i) {
-    char32_t c = cps[i];
-    if (isBoundaryPunct(c)) {
-      bool hasTerminator = isSentenceTerminator(c);
-      size_t punctEnd = i + 1;
-      while (punctEnd < cpLen && isBoundaryPunct(cps[punctEnd])) {
-        if (isSentenceTerminator(cps[punctEnd])) hasTerminator = true;
-        punctEnd++;
-      }
-      // Issue #346: Consume closing brackets/quotes after sentence terminator
-      if (hasTerminator) {
-        while (punctEnd < cpLen && isClosingPunctuation(cps[punctEnd])) {
-          punctEnd++;
-        }
-      }
-      i = punctEnd - 1;
-      size_t chunkLen = punctEnd - sentenceStart;
-      if (hasTerminator || chunkLen > dynamicChunkSize) {
-        std::string chunk = cpsToUtf8(cps, sentenceStart, chunkLen);
-        if (!chunk.empty()) chunks.push_back(chunk);
-        sentenceStart = punctEnd;
-      }
-    }
-  }
-
-  if (sentenceStart < cpLen) {
-    std::string remaining = cpsToUtf8(cps, sentenceStart, cpLen - sentenceStart);
-    if (!remaining.empty()) chunks.push_back(remaining);
-  }
-
-  return chunks;
-}
+using piper::calculateDynamicChunkSize;
+using piper::isClosingPunctuation;
+using piper::isPunctCodepoint;
 
 } // anonymous namespace
 
@@ -563,4 +475,89 @@ TEST(SplitSentencesTest, CJKClosingBracket_OpenJTalkMode) {
   ASSERT_EQ(result.size(), 2u);
   EXPECT_EQ(result[0], u8"「こんにちは。」");
   EXPECT_EQ(result[1], u8"次の文。");
+}
+
+// ========================================================================
+// The guard the replica had lost (issue #703).
+//
+// toCodepoints() uses utf8::unchecked, which walks off the end of malformed
+// input. Production has guarded against that since #343 by validating first
+// and handing the text back as a single chunk; the hand-written copy in this
+// file had no such check, so the one input that can crash the real function
+// was the one these tests could not reach.
+// ========================================================================
+
+TEST(SplitSentencesTest, InvalidUtf8IsReturnedAsOneChunkNotDecoded) {
+  // 0xFF is not a legal UTF-8 lead byte anywhere.
+  // The literal is split so `\xFE` cannot swallow the following `d` as a third
+  // hex digit (\xFEd is out of range and does not compile).
+  const std::string malformed = std::string("abc.\xFF\xFE" "def.");
+  const auto result = splitTextToSentences(malformed, EnglishPhonemes);
+
+  ASSERT_EQ(result.size(), 1u)
+      << "malformed input was decoded instead of passed through";
+  EXPECT_EQ(result[0], malformed);
+}
+
+TEST(SplitSentencesTest, InvalidUtf8CallbackFiresExactlyOnce) {
+  int calls = 0;
+  const std::string malformed = "a\xC3.";  // truncated 2-byte sequence
+  const auto result = piper::splitTextToSentencesIn(
+      malformed, piper::SentenceSplitMode::Ascii, 0, [&calls]() { ++calls; });
+
+  EXPECT_EQ(calls, 1);
+  ASSERT_EQ(result.size(), 1u);
+  EXPECT_EQ(result[0], malformed);
+}
+
+TEST(SplitSentencesTest, ValidUtf8DoesNotFireTheInvalidCallback) {
+  // Anti-vacuity for the two cases above: a callback that fired on every
+  // input would satisfy them while telling us nothing about validation.
+  int calls = 0;
+  const auto result = piper::splitTextToSentencesIn(
+      u8"こんにちは。ありがとう。", piper::SentenceSplitMode::OpenJTalk, 0,
+      [&calls]() { ++calls; });
+
+  EXPECT_EQ(calls, 0);
+  EXPECT_EQ(result.size(), 2u);
+}
+
+// A missing callback must not crash: piper.cpp always passes one, but the
+// adapters in this file and any future caller may not.
+TEST(SplitSentencesTest, InvalidUtf8WithNoCallbackStillPassesThrough) {
+  const std::string malformed = "x\xF0\x9F.";  // truncated 4-byte sequence
+  const auto result = piper::splitTextToSentencesIn(
+      malformed, piper::SentenceSplitMode::Ascii);
+
+  ASSERT_EQ(result.size(), 1u);
+  EXPECT_EQ(result[0], malformed);
+}
+
+// The ellipsis (U+2026) is a boundary in Multilingual mode but NOT a
+// terminator, so it only splits once the chunk has outgrown dynamicChunkSize.
+// Nothing tested it: dropping it from the boundary set passed all 44 cases
+// above (measured). Note U+2026 is absent from isPunctCodepoint, so the
+// density here is 0 and dynamicChunkSize is baseSize * 3 = 30.
+TEST(SplitSentencesTest, MultilingualEllipsisSplitsAnOvergrownChunk) {
+  const std::string text = std::string(40, 'a') + u8"…" + std::string(10, 'b');
+  const auto result = splitTextToSentences(text, MultilingualPhonemes,
+                                           /*maxChunkSize=*/10);
+
+  ASSERT_EQ(result.size(), 2u)
+      << "the ellipsis did not act as a boundary, so the 51-codepoint text "
+         "never split";
+  EXPECT_EQ(result[0], std::string(40, 'a') + u8"…");
+  EXPECT_EQ(result[1], std::string(10, 'b'));
+}
+
+// Anti-vacuity for the case above: below the chunk-size threshold the same
+// ellipsis must NOT split, which is what makes it a boundary rather than a
+// terminator. A mutation that promoted it to terminator would pass the case
+// above and fail this one.
+TEST(SplitSentencesTest, MultilingualEllipsisAloneDoesNotSplit) {
+  const auto result =
+      splitTextToSentences(u8"hola…mundo", MultilingualPhonemes);
+
+  ASSERT_EQ(result.size(), 1u);
+  EXPECT_EQ(result[0], u8"hola…mundo");
 }

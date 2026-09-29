@@ -237,6 +237,14 @@ foreach(test_source ${TEST_SOURCES})
         )
     endif()
 
+    # These tests call production headers under src/cpp directly rather than a
+    # hand-written copy (issue #703), so they need src/cpp on the include path.
+    if(${test_name} STREQUAL "test_speaker_embedding")
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
+    endif()
+
     # Issue #383 Phase 1: parallelism helper test needs src/cpp on include path.
     if(${test_name} STREQUAL "test_g2p_parallelism")
         target_include_directories(${test_name} PRIVATE

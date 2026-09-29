@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using PiperPlus.Core.Inference;
 
 namespace PiperPlus.Core.Tests;
 
@@ -13,194 +14,40 @@ namespace PiperPlus.Core.Tests;
 /// </summary>
 public class SpeakerEncoderTests
 {
-    // Mel parameters — must match all runtimes
-    private const int SR = 16000;
-    private const int NFFT = 400; // Kaldi frame_length=25ms at 16kHz = 400 samples
-    private const int HopLength = 160;
-    private const int NMels = 80;
-    private const float Fmin = 20f;
-    private const float Fmax = 7600f;
+    // Mel parameters, taken FROM production rather than restated. Local
+    // copies would let the test keep passing after production changed one of
+    // them, which is the same defect as the replicated algorithm below.
+    private const int SR = SpeakerEncoder.MelSampleRate;
+    private const int NFFT = SpeakerEncoder.MelNFft;
+    private const int HopLength = SpeakerEncoder.MelHopLength;
+    private const int NMels = SpeakerEncoder.MelNMels;
+    private const float Fmin = SpeakerEncoder.MelFmin;
+    private const float Fmax = SpeakerEncoder.MelFmax;
 
     // ------------------------------------------------------------------
-    // Internal reimplementation for unit testing (mirrors SpeakerEncoder
-    // private methods; identical algorithm)
+    // The PRODUCTION mel pipeline, from PiperPlus.Core.Inference.SpeakerEncoder.
+    //
+    // This file used to carry its own copy of all of it -- "Internal
+    // reimplementation for unit testing (mirrors SpeakerEncoder private
+    // methods; identical algorithm)" -- so the cross-runtime golden
+    // comparison below ran against the copy and could not catch drift in what
+    // ships (issue #703). The production members are `internal` and the
+    // project already declares InternalsVisibleTo for this assembly, so they
+    // are called directly now; only the aliases below are local.
     // ------------------------------------------------------------------
-    private static float HzToMel(float hz) => 2595f * MathF.Log10(1f + (hz / 700f));
+    private static float HzToMel(float hz) => SpeakerEncoder.HzToMel(hz);
 
-    private static float MelToHz(float mel) => 700f * (MathF.Pow(10f, mel / 2595f) - 1f);
+    private static float MelToHz(float mel) => SpeakerEncoder.MelToHz(mel);
 
-    private static float[] HannWindow(int length)
-    {
-        float[] w = new float[length];
-        for (int n = 0; n < length; n++)
-        {
-            w[n] = 0.5f * (1f - MathF.Cos(2f * MathF.PI * n / length));
-        }
+    private static float[] HannWindow(int length) => SpeakerEncoder.HannWindow(length);
 
-        return w;
-    }
+    private static float[] CreateMelFilterbank() => SpeakerEncoder.CreateMelFilterbank();
 
-    private static float[] CreateMelFilterbank()
-    {
-        int fftBins = (NFFT / 2) + 1;
-        float[] filterbank = new float[NMels * fftBins];
+    private static float[] ComputeMelSpectrogram(float[] samples) =>
+        SpeakerEncoder.ComputeMelSpectrogram(samples);
 
-        float melFmin = HzToMel(Fmin);
-        float melFmax = HzToMel(Fmax);
-
-        float[] melPoints = new float[NMels + 2];
-        for (int i = 0; i < melPoints.Length; i++)
-        {
-            melPoints[i] = melFmin + ((melFmax - melFmin) * i / (NMels + 1));
-        }
-
-        float[] binPoints = new float[melPoints.Length];
-        for (int i = 0; i < melPoints.Length; i++)
-        {
-            binPoints[i] = MelToHz(melPoints[i]) * NFFT / SR;
-        }
-
-        for (int m = 0; m < NMels; m++)
-        {
-            int left = (int)MathF.Floor(binPoints[m]);
-            int center = (int)MathF.Floor(binPoints[m + 1]);
-            int right = (int)MathF.Floor(binPoints[m + 2]);
-
-            if (left == center && center == right)
-            {
-                center = Math.Min(center + 1, fftBins - 1);
-                right = Math.Min(right + 2, fftBins - 1);
-            }
-            else if (left == center)
-            {
-                center = Math.Min(center + 1, fftBins - 1);
-            }
-
-            if (center == right)
-            {
-                right = Math.Min(right + 1, fftBins - 1);
-            }
-
-            for (int k = left; k < center; k++)
-            {
-                if (center > left)
-                {
-                    filterbank[(m * fftBins) + k] = (float)(k - left) / (center - left);
-                }
-            }
-
-            for (int k = center; k < right; k++)
-            {
-                if (right > center)
-                {
-                    filterbank[(m * fftBins) + k] = (float)(right - k) / (right - center);
-                }
-            }
-
-            if (center < fftBins)
-            {
-                filterbank[(m * fftBins) + center] = MathF.Max(filterbank[(m * fftBins) + center], 1.0f);
-            }
-        }
-
-        return filterbank;
-    }
-
-    private static float[] ComputeMelSpectrogram(float[] samples)
-    {
-        float[] melFilters = CreateMelFilterbank();
-        float[] window = HannWindow(NFFT);
-
-        int nFrames = samples.Length >= NFFT
-            ? ((samples.Length - NFFT) / HopLength) + 1
-            : 0;
-
-        int fftBins = (NFFT / 2) + 1;
-
-        // Frame-major layout: melSpec[frameIdx * NMels + melIdx]
-        // CAM++ expects input shape [batch, T, 80] (time-first)
-        float[] melSpec = new float[nFrames * NMels];
-
-        for (int frameIdx = 0; frameIdx < nFrames; frameIdx++)
-        {
-            int start = frameIdx * HopLength;
-
-            float[] powerSpec = new float[fftBins];
-            for (int k = 0; k < fftBins; k++)
-            {
-                float real = 0, imag = 0;
-                float freq = -2f * MathF.PI * k / NFFT;
-                for (int n = 0; n < NFFT; n++)
-                {
-                    float sample = (start + n < samples.Length)
-                        ? samples[start + n] * window[n]
-                        : 0f;
-                    float angle = freq * n;
-                    real += sample * MathF.Cos(angle);
-                    imag += sample * MathF.Sin(angle);
-                }
-
-                powerSpec[k] = (real * real) + (imag * imag);
-            }
-
-            for (int melIdx = 0; melIdx < NMels; melIdx++)
-            {
-                float energy = 0;
-                for (int k = 0; k < fftBins; k++)
-                {
-                    energy += melFilters[(melIdx * fftBins) + k] * powerSpec[k];
-                }
-
-                melSpec[(frameIdx * NMels) + melIdx] = MathF.Log(MathF.Max(energy, 1e-10f));
-            }
-        }
-
-        // CMVN: subtract per-band mean across time (matches production SpeakerEncoder)
-        if (nFrames > 0)
-        {
-            for (int melIdx = 0; melIdx < NMels; melIdx++)
-            {
-                float sum = 0f;
-                for (int frameIdx = 0; frameIdx < nFrames; frameIdx++)
-                {
-                    sum += melSpec[(frameIdx * NMels) + melIdx];
-                }
-
-                float mean = sum / nFrames;
-                for (int frameIdx = 0; frameIdx < nFrames; frameIdx++)
-                {
-                    melSpec[(frameIdx * NMels) + melIdx] -= mean;
-                }
-            }
-        }
-
-        return melSpec;
-    }
-
-    private static float[] ResampleLinear(float[] samples, int fromRate, int toRate)
-    {
-        double ratio = (double)fromRate / toRate;
-        int outputLen = (int)Math.Ceiling(samples.Length / ratio);
-        float[] output = new float[outputLen];
-
-        for (int i = 0; i < outputLen; i++)
-        {
-            double srcPos = i * ratio;
-            int idx = (int)srcPos;
-            float frac = (float)(srcPos - idx);
-
-            if (idx + 1 < samples.Length)
-            {
-                output[i] = (samples[idx] * (1f - frac)) + (samples[idx + 1] * frac);
-            }
-            else if (idx < samples.Length)
-            {
-                output[i] = samples[idx];
-            }
-        }
-
-        return output;
-    }
+    private static float[] ResampleLinear(float[] samples, int fromRate, int toRate) =>
+        SpeakerEncoder.ResampleLinear(samples, fromRate, toRate);
 
     // ------------------------------------------------------------------
     // Signal generators

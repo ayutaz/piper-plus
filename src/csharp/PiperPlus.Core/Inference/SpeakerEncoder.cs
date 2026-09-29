@@ -20,12 +20,20 @@ namespace PiperPlus.Core.Inference;
 /// </remarks>
 public sealed class SpeakerEncoder : IDisposable
 {
-    private const int MelSampleRate = 16000;
-    private const int MelNFft = 400; // Kaldi frame_length=25ms at 16kHz = 400 samples
-    private const int MelHopLength = 160;
-    private const int MelNMels = 80;
-    private const float MelFmin = 20f;
-    private const float MelFmax = 7600f;
+    // These constants and the mel helpers below are `internal`, not
+    // `private`, so PiperPlus.Core.Tests can call the production code.
+    // SpeakerEncoderTests.cs used to carry its own copy of the whole mel
+    // pipeline -- "Internal reimplementation for unit testing (mirrors
+    // SpeakerEncoder private methods; identical algorithm)" -- and its
+    // cross-runtime golden comparison ran against that copy, so it could not
+    // catch drift in what ships (issue #703). Internal members are absent
+    // from PublicAPI.Shipped.txt, so the public API surface is unchanged.
+    internal const int MelSampleRate = 16000;
+    internal const int MelNFft = 400; // Kaldi frame_length=25ms at 16kHz = 400 samples
+    internal const int MelHopLength = 160;
+    internal const int MelNMels = 80;
+    internal const float MelFmin = 20f;
+    internal const float MelFmax = 7600f;
 
     private readonly InferenceSession _session;
     private bool _disposed;
@@ -240,7 +248,7 @@ public sealed class SpeakerEncoder : IDisposable
     // ------------------------------------------------------------------
     // Internal: Audio processing
     // ------------------------------------------------------------------
-    private static float[] ResampleLinear(float[] samples, int fromRate, int toRate)
+    internal static float[] ResampleLinear(float[] samples, int fromRate, int toRate)
     {
         double ratio = (double)fromRate / toRate;
         int outputLen = (int)Math.Ceiling(samples.Length / ratio);
@@ -265,7 +273,7 @@ public sealed class SpeakerEncoder : IDisposable
         return output;
     }
 
-    private static float[] ComputeMelSpectrogram(float[] samples)
+    internal static float[] ComputeMelSpectrogram(float[] samples)
     {
         float[] melFilters = CreateMelFilterbank();
         float[] window = HannWindow(MelNFft);
@@ -338,7 +346,7 @@ public sealed class SpeakerEncoder : IDisposable
         return melSpec;
     }
 
-    private static float[] HannWindow(int length)
+    internal static float[] HannWindow(int length)
     {
         float[] window = new float[length];
         for (int n = 0; n < length; n++)
@@ -349,7 +357,7 @@ public sealed class SpeakerEncoder : IDisposable
         return window;
     }
 
-    private static float[] CreateMelFilterbank()
+    internal static float[] CreateMelFilterbank()
     {
         int fftBins = (MelNFft / 2) + 1;
         float[] filterbank = new float[MelNMels * fftBins];
@@ -421,7 +429,7 @@ public sealed class SpeakerEncoder : IDisposable
         return filterbank;
     }
 
-    private static float HzToMel(float hz) => 2595f * MathF.Log10(1f + (hz / 700f));
+    internal static float HzToMel(float hz) => 2595f * MathF.Log10(1f + (hz / 700f));
 
-    private static float MelToHz(float mel) => 700f * (MathF.Pow(10f, mel / 2595f) - 1f);
+    internal static float MelToHz(float mel) => 700f * (MathF.Pow(10f, mel / 2595f) - 1f);
 }
