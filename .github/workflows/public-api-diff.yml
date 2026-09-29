@@ -9,6 +9,7 @@ on:
       - 'src/go/**/*.go'
       - 'src/csharp/**/PiperPlus.Core/**/*.cs'
       - '.github/workflows/public-api-diff.yml'
+      - 'src/csharp/PiperPlus.Core/PublicAPI.Unshipped.txt'
   workflow_dispatch:
 
 permissions:

@@ -32,6 +32,7 @@ on:
       - 'src/csharp/PiperPlus.Core/Inference/PiperSession.cs'
       - 'tests/fixtures/mb_istft_speaker_embedding/**'
       - '.github/workflows/integration-tests-issue-426.yml'
+      - 'scripts/check_onnx_inputs.py'
   workflow_dispatch:
 
 concurrency:

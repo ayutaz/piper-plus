@@ -56,6 +56,12 @@ SHORT_TEXT_TOML = REPO_ROOT / "docs/spec/short-text-contract.toml"
 TEXT_SPLITTER_TOML = REPO_ROOT / "docs/spec/text-splitter-contract.toml"
 SSML_TOML = REPO_ROOT / "docs/spec/ssml-contract.toml"
 LANGUAGE_ID_MAP_TOML = REPO_ROOT / "docs/spec/language-id-map-contract.toml"
+PHONEME_TIMING_TOML = REPO_ROOT / "docs/spec/phoneme-timing-contract.toml"
+SWEDISH_LID_SOURCE = REPO_ROOT / "src/python/g2p/piper_plus_g2p/data/sv_function_words.json"
+PRECOMMIT_CONFIG = REPO_ROOT / ".pre-commit-config.yaml"
+TIMING_PARITY_WORKFLOW = REPO_ROOT / ".github/workflows/timing-parity.yml"
+RUST_TIMING = REPO_ROOT / "src/rust/piper-core/src/timing.rs"
+GO_TIMING = REPO_ROOT / "src/go/piperplus/timing.go"
 
 
 @contextmanager
@@ -381,3 +387,124 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+# ---------------------------------------------------------------------------
+# Gates added after the original seven. Each of these was written with a
+# manual mutation run and no automated proof of detection power, which is a
+# snapshot rather than a guarantee: a later refactor can turn a check vacuous
+# and nothing notices until someone repeats the mutation by hand. One case was
+# measured doing exactly that -- a reverse-map check matched the FUNCTION
+# DEFINITION of the helper it was looking for, so deleting the call site left
+# the gate green.
+# ---------------------------------------------------------------------------
+
+
+def test_swedish_lid_gate_detects_source_drift() -> None:
+    """CLAUDE.md calls this gate the same shape as the loanword one, but it had
+    no detection-power test while the loanword gate did."""
+    with temporarily_mutate_bytes(SWEDISH_LID_SOURCE):
+        rc = run_gate("check_swedish_lid_consistency.py")
+    assert rc == 1, (
+        f"swedish LID gate failed to detect drift on the canonical source "
+        f"(expected rc=1, got rc={rc})"
+    )
+
+
+def test_swedish_lid_gate_passes_clean_tree() -> None:
+    rc = run_gate("check_swedish_lid_consistency.py")
+    assert rc == 0, f"swedish LID gate failed on a clean tree (rc={rc})"
+
+
+def test_reverse_map_gate_detects_missing_first_wins_guard() -> None:
+    """Removing a runtime's first-wins guard must fail the gate.
+
+    Without the guard a collision resolves from unordered map iteration, i.e.
+    differently on each run.
+    """
+    with temporarily_replace_in_file(RUST_TIMING, "or_insert_with", "insert_over"):
+        rc = run_gate("check_reverse_map_parity.py")
+    assert rc == 1, f"reverse map gate missed a dropped first-wins guard (rc={rc})"
+
+
+def test_reverse_map_gate_detects_cli_bypassing_the_shared_helper() -> None:
+    """The CLI must delegate the alignment decision, not re-derive it.
+
+    Re-deriving puts the decision back where no test reached either branch,
+    which is the state issue #656 shipped in.
+    """
+    with temporarily_replace_in_file(
+        GO_TIMING, "pua = BuiltinPUANames()", "pua = map[string]string{}"
+    ):
+        rc = run_gate("check_reverse_map_parity.py")
+    assert rc == 1, f"reverse map gate missed a dropped builtin PUA table (rc={rc})"
+
+
+def test_reverse_map_gate_passes_clean_tree() -> None:
+    rc = run_gate("check_reverse_map_parity.py")
+    assert rc == 0, f"reverse map gate failed on a clean tree (rc={rc})"
+
+
+def test_srt_rounding_gate_detects_wrong_idiom() -> None:
+    """Rounding mode is the whole point of this gate: banker's rounding and
+    half-away-from-zero disagree on .5, which is every other frame boundary."""
+    with temporarily_replace_in_file(GO_TIMING, "math.Round", "math.Trunc"):
+        rc = run_gate("check_srt_rounding_parity.py")
+    assert rc == 1, f"SRT rounding gate missed a changed rounding idiom (rc={rc})"
+
+
+def test_srt_rounding_gate_passes_clean_tree() -> None:
+    rc = run_gate("check_srt_rounding_parity.py")
+    assert rc == 0, f"SRT rounding gate failed on a clean tree (rc={rc})"
+
+
+def test_timing_fixture_gate_detects_stale_fixture() -> None:
+    """The fixture is generated from the canonical implementation, so a change
+    to the implementation without a regeneration must fail."""
+    with temporarily_replace_in_file(
+        REPO_ROOT / "src/python_run/piper_plus/timing.py",
+        "dur_frames = math.ceil(max(dur, 0.0))",
+        "dur_frames = max(dur, 0.0)",
+    ):
+        rc = run_gate("regenerate_timing_fixture.py", "--check")
+    assert rc == 1, f"timing fixture gate missed a stale fixture (rc={rc})"
+
+
+def test_timing_fixture_gate_detects_loss_of_discriminating_power() -> None:
+    """Integer-only cases cannot tell a conforming implementation from one that
+    skips the frame quantisation, because ceil(int) == int. Measured: applying
+    ceil to the Go implementation passed the integer-only fixture."""
+    with temporarily_replace_in_file(
+        REPO_ROOT / "scripts/regenerate_timing_fixture.py",
+        "MIN_FRACTIONAL_CASES = 2",
+        "MIN_FRACTIONAL_CASES = 99",
+    ):
+        rc = run_gate("regenerate_timing_fixture.py", "--check")
+    assert rc == 1, f"fixture guard missed a loss of fractional cases (rc={rc})"
+
+
+def test_trigger_coverage_gate_detects_an_unguarded_presence_check() -> None:
+    """timing-parity.yml's presence job exists to stop a parity test being
+    deleted, and that only works if the test is in the trigger."""
+    with temporarily_replace_in_file(
+        TIMING_PARITY_WORKFLOW,
+        "      - 'src/go/piperplus/timing_parity_test.go'\n",
+        "",
+    ):
+        rc = run_gate("check_trigger_coverage.py")
+    assert rc == 1, f"trigger coverage gate missed an unguarded presence check (rc={rc})"
+
+
+def test_trigger_coverage_gate_refuses_to_exempt_a_mirror_declaration() -> None:
+    """A *-mirrors.toml file is the list of things the gate compares. Editing it
+    changes coverage, so it must always re-run and must not be allowlistable."""
+    with temporarily_replace_in_file(
+        PRECOMMIT_CONFIG, "docs/spec/dictionary\\-mirrors\\.toml|", ""
+    ):
+        rc = run_gate("check_trigger_coverage.py")
+    assert rc == 1, f"trigger coverage gate let a mirror declaration go unguarded (rc={rc})"
+
+
+def test_trigger_coverage_gate_passes_clean_tree() -> None:
+    rc = run_gate("check_trigger_coverage.py")
+    assert rc == 0, f"trigger coverage gate failed on a clean tree (rc={rc})"

@@ -24,6 +24,7 @@ on:
       - 'docker/wyoming/**'
       - '.github/workflows/python-tests.yml'
 
+      - 'scripts/check_python_run_test_coverage.py'
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
