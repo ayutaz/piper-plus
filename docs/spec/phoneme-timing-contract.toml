@@ -491,32 +491,47 @@ forbidden_patterns = { python = [
 # from the model config's phoneme_id_map.
 
 [reverse_map.collision_resolution]
-# When multiple phoneme strings map to the same ID, the first occurrence
-# (by iteration order over phoneme_id_map keys) is preserved. Later
-# duplicates are ignored. Both Python and JavaScript implementations use
-# this first-wins semantics for deterministic cross-runtime behavior.
+# When multiple phoneme strings map to the same ID, the first occurrence in
+# `key_order` below is preserved and later duplicates are ignored.
 # Python: `if phoneme_id not in reverse_map: reverse_map[phoneme_id] = display`
 # JS:     `if (!(id in reverse)) { reverse[id] = display; }`
+# C++:    `out.emplace(id, display)`  (emplace does not overwrite)
 strategy = "first-wins"
 
-# "First" is only well defined if the key order is. It currently is NOT the
-# same across runtimes, so first-wins picks the same winner everywhere ONLY for
-# collision-free maps:
+# "First" is only well defined if the key order is, so the keys are SORTED
+# before iteration in all six runtimes (issue #698). Before that they were not:
 #
 #   python / js / csharp : insertion order (dict / object / Dictionary)
 #   cpp                  : sorted by codepoint (PhonemeIdMap is std::map)
-#   rust / go            : sorted by UTF-8 key bytes (HashMap / map have no
-#                          iteration order at all, so sorting is the only way
-#                          to be deterministic run-to-run)
+#   rust / go            : sorted by UTF-8 key bytes
 #
-# Every shipped model is collision-free -- the in-tree 173-key fixture has 0
-# ids claimed by more than one phoneme -- so the winner is identical in
-# practice and the runtimes agree byte-for-byte. A map WITH a collision would
-# diverge (e.g. {"zz": [9], "aa": [9]} gives 'zz' under insertion order and
-# 'aa' under sorted order). Unifying on one order is tracked separately; it
-# touches the canonical implementation and therefore belongs with the next
-# spec_version bump rather than being slipped in silently.
-key_order = "runtime-dependent (see above); collision-free maps are unaffected"
+# so {"z": [9], "a": [9]} resolved id 9 to 'z' in three runtimes and 'a' in
+# the other three. No shipped model was affected -- the in-tree 173-key
+# fixture has 0 ids claimed by more than one phoneme, so the winner was
+# identical in practice and the runtimes agreed byte-for-byte -- but the
+# contract said "first-wins" without saying what "first" meant, so parity
+# would have broken silently the first time a colliding model appeared. Rust
+# and Go additionally have NO iteration order (HashMap / map), so without
+# sorting their winner could change between runs of the same process.
+#
+# Sorted, not insertion order: insertion order means "the order the JSON
+# happened to be written in", which is arbitrary, and reproducing it in Rust
+# and Go needs serde_json's preserve_order + IndexMap and a token-level
+# json.Decoder walk respectively -- a lot of machinery to preserve an
+# accident.
+#
+# The three spellings of "sorted" agree for every key that can occur:
+#   python  sorted(dict)                -> by code point
+#   js      Array.prototype.sort()      -> by UTF-16 code unit
+#   csharp  OrderBy(StringComparer.Ordinal) -> by UTF-16 code unit
+#   cpp     std::map<char32_t>          -> by code point
+#   rust    Vec<&String>::sort()        -> by UTF-8 byte
+#   go      sort.Strings()              -> by UTF-8 byte
+# UTF-8 byte order and code point order are identical by construction, and
+# UTF-16 code unit order matches both throughout the BMP except for
+# surrogates (U+D800..U+DFFF), which cannot appear in a phoneme key. Keys run
+# from ASCII up to the PUA (U+E000..U+F8FF), all inside the BMP.
+key_order = "sorted ascending by key (code point / UTF-8 byte / UTF-16 ordinal agree for all valid keys)"
 
 [reverse_map.pua_handling]
 # PUA characters (U+E000–U+F8FF) without an explicit name mapping should be

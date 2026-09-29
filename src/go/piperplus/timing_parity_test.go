@@ -13,6 +13,9 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -45,9 +48,30 @@ type goldenCase struct {
 	Expected    goldenExpected `json:"expected"`
 }
 
+// goldenReverseMapCase covers the reverse map (issue #698). The cases above
+// start from resolved token strings, so nothing in them says how
+// phoneme_id_map is turned back into names. The contract said first-wins
+// without defining "first", and the runtimes split three/three -- python /
+// js / csharp iterated in insertion order, cpp / rust / go sorted. Every
+// shipped model is collision-free, so all six agreed byte-for-byte and no
+// test could see it.
+type goldenReverseMapInputs struct {
+	PhonemeIDMap map[string][]int64 `json:"phoneme_id_map"`
+	PUANames     map[string]string  `json:"pua_names"`
+}
+
+type goldenReverseMapCase struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Inputs      goldenReverseMapInputs `json:"inputs"`
+	// JSON object keys are strings; parsed back to int64 at comparison time.
+	Expected map[string]string `json:"expected"`
+}
+
 type goldenMatrix struct {
-	SchemaVersion int          `json:"schema_version"`
-	Cases         []goldenCase `json:"cases"`
+	SchemaVersion   int                    `json:"schema_version"`
+	Cases           []goldenCase           `json:"cases"`
+	ReverseMapCases []goldenReverseMapCase `json:"reverse_map_cases"`
 }
 
 func loadGoldenMatrix(t *testing.T) goldenMatrix {
@@ -67,6 +91,10 @@ func loadGoldenMatrix(t *testing.T) goldenMatrix {
 	}
 	if len(m.Cases) == 0 {
 		t.Fatalf("golden matrix has no cases")
+	}
+	if len(m.ReverseMapCases) == 0 {
+		t.Fatalf("golden matrix has no reverse_map_cases; regenerate with " +
+			"scripts/regenerate_timing_fixture.py")
 	}
 	return m
 }
@@ -133,4 +161,75 @@ func TestTimingParity_GoldenMatrix(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestReverseMapParity_GoldenMatrix asserts the reverse map agrees with the
+// canonical Python implementation, including which key wins an id collision.
+func TestReverseMapParity_GoldenMatrix(t *testing.T) {
+	m := loadGoldenMatrix(t)
+
+	for _, c := range m.ReverseMapCases {
+		t.Run(c.Name, func(t *testing.T) {
+			got := BuildPhonemeIDReverseMap(c.Inputs.PhonemeIDMap, c.Inputs.PUANames)
+			if len(got) != len(c.Expected) {
+				t.Fatalf("entry count: got %d, want %d (%v vs %v)",
+					len(got), len(c.Expected), got, c.Expected)
+			}
+			for key, want := range c.Expected {
+				id, err := strconv.ParseInt(key, 10, 64)
+				if err != nil {
+					t.Fatalf("expected key %q is not an integer: %v", key, err)
+				}
+				if got[id] != want {
+					t.Errorf("id %d: got %q, want %q", id, got[id], want)
+				}
+			}
+		})
+	}
+}
+
+// TestReverseMapParity_MirroredCollisionExists is anti-vacuity: without a
+// MIRRORED colliding case, key order is unobservable. A collision-free map
+// resolves identically under any iteration order, and a single colliding map
+// can be satisfied by a runtime that happens to receive its keys already
+// sorted.
+//
+// Go's json.Unmarshal into a map loses the JSON key order, so the pair is
+// identified by the same key SET appearing in two cases rather than by the
+// orders themselves -- the generator (scripts/regenerate_timing_fixture.py)
+// is what asserts the two spellings differ.
+func TestReverseMapParity_MirroredCollisionExists(t *testing.T) {
+	m := loadGoldenMatrix(t)
+	countByKeySet := map[string]int{}
+
+	for _, c := range m.ReverseMapCases {
+		seen := map[int64]bool{}
+		collides := false
+		for _, ids := range c.Inputs.PhonemeIDMap {
+			for _, id := range ids {
+				if seen[id] {
+					collides = true
+				}
+				seen[id] = true
+			}
+		}
+		if !collides {
+			continue
+		}
+		keys := make([]string, 0, len(c.Inputs.PhonemeIDMap))
+		for k := range c.Inputs.PhonemeIDMap {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		countByKeySet[strings.Join(keys, "\x00")]++
+	}
+
+	for _, n := range countByKeySet {
+		if n >= 2 {
+			return
+		}
+	}
+	t.Fatalf("no colliding key set appears twice in the fixture, so these " +
+		"cases cannot detect a runtime that iterates phoneme_id_map in " +
+		"insertion order")
 }

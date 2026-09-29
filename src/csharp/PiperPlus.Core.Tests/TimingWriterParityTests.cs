@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -211,5 +212,159 @@ public sealed class TimingWriterParityTests
 
         throw new FileNotFoundException(
             $"golden_matrix.json not found walking up from {AppContext.BaseDirectory}");
+    }
+
+    /// <summary>
+    /// Reverse-map parity (issue #698).
+    ///
+    /// The timing cases above start from resolved token strings, so nothing in
+    /// them says how phoneme_id_map is turned back into names. The contract
+    /// said first-wins without defining "first", and the runtimes split
+    /// three/three -- Python / JS / C# iterated in insertion order, C++ / Rust
+    /// / Go sorted. Every shipped model is collision-free, so all six agreed
+    /// byte-for-byte and no test could see it.
+    ///
+    /// C# sources PUA names from its own <see
+    /// cref="Mapping.OpenJTalkToPiperMapping.CharToToken"/> table rather than
+    /// from an injected dictionary, so a fixture case is comparable only when
+    /// its <c>pua_names</c> agrees with that table (or it has no PUA key at
+    /// all). That is asserted rather than assumed: the table is pinned
+    /// byte-for-byte to the canonical pua.json by the PUA consistency gate, so
+    /// a case that violates it means the fixture and the gate disagree, which
+    /// this test should report rather than skip.
+    /// </summary>
+    [Fact]
+    public void ReverseMapParity_GoldenMatrix()
+    {
+        JsonElement fixture = LoadFixture();
+        Assert.True(
+            fixture.TryGetProperty("reverse_map_cases", out JsonElement cases),
+            "fixture has no reverse_map_cases; regenerate with scripts/regenerate_timing_fixture.py");
+        Assert.True(cases.GetArrayLength() > 0, "reverse_map_cases is empty");
+
+        foreach (JsonElement caseElement in cases.EnumerateArray())
+        {
+            string name = caseElement.GetProperty("name").GetString()!;
+            JsonElement inputs = caseElement.GetProperty("inputs");
+            JsonElement idMapElement = inputs.GetProperty("phoneme_id_map");
+
+            var phonemeIdMap = new Dictionary<string, int[]>();
+            foreach (JsonProperty entry in idMapElement.EnumerateObject())
+            {
+                phonemeIdMap[entry.Name] = entry.Value.EnumerateArray()
+                    .Select(e => e.GetInt32())
+                    .ToArray();
+            }
+
+            AssertPuaNamesMatchBuiltInTable(name, inputs, phonemeIdMap);
+
+            Dictionary<long, string> got = TimingWriter.BuildReverseIdMap(phonemeIdMap);
+
+            JsonElement expected = caseElement.GetProperty("expected");
+            int expectedCount = expected.EnumerateObject().Count();
+            Assert.Equal(expectedCount, got.Count);
+            foreach (JsonProperty entry in expected.EnumerateObject())
+            {
+                long id = long.Parse(entry.Name, System.Globalization.CultureInfo.InvariantCulture);
+                Assert.True(
+                    got.TryGetValue(id, out string? actual),
+                    $"case {name}: id {id} is missing from the reverse map");
+                Assert.Equal(entry.Value.GetString(), actual);
+            }
+        }
+    }
+
+    private static void AssertPuaNamesMatchBuiltInTable(
+        string caseName, JsonElement inputs, Dictionary<string, int[]> phonemeIdMap)
+    {
+        var declared = new Dictionary<string, string>();
+        if (inputs.TryGetProperty("pua_names", out JsonElement puaNames)
+            && puaNames.ValueKind == JsonValueKind.Object)
+        {
+            foreach (JsonProperty entry in puaNames.EnumerateObject())
+            {
+                declared[entry.Name] = entry.Value.GetString()!;
+            }
+        }
+
+        foreach (string key in phonemeIdMap.Keys)
+        {
+            if (key.Length != 1)
+            {
+                continue;
+            }
+
+            char ch = key[0];
+            bool inTable = Mapping.OpenJTalkToPiperMapping.CharToToken
+                .TryGetValue(ch, out string? builtIn);
+            bool inFixture = declared.TryGetValue(key, out string? fromFixture);
+
+            if (inTable && inFixture)
+            {
+                Assert.Equal(fromFixture, builtIn);
+            }
+            else if (inTable != inFixture)
+            {
+                Assert.Fail(
+                    $"case {caseName}: PUA key U+{(int)ch:X4} is "
+                    + (inTable ? "named by C#'s CharToToken but not by the fixture"
+                               : "named by the fixture but not by C#'s CharToToken")
+                    + " -- the fixture and the PUA consistency gate disagree, so the "
+                    + "comparison would be meaningless rather than merely inapplicable");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Anti-vacuity: without a MIRRORED colliding case, key order is
+    /// unobservable. A collision-free map resolves identically under any
+    /// iteration order, and a single colliding map can be satisfied by a
+    /// runtime that happens to receive its keys already sorted.
+    /// </summary>
+    [Fact]
+    public void ReverseMapParity_IncludesAMirroredCollision()
+    {
+        JsonElement fixture = LoadFixture();
+        Assert.True(fixture.TryGetProperty("reverse_map_cases", out JsonElement cases));
+
+        var ordersByKeySet = new Dictionary<string, HashSet<string>>();
+        foreach (JsonElement caseElement in cases.EnumerateArray())
+        {
+            JsonElement idMap = caseElement.GetProperty("inputs").GetProperty("phoneme_id_map");
+            var seen = new HashSet<int>();
+            bool collides = false;
+            var keys = new List<string>();
+            foreach (JsonProperty entry in idMap.EnumerateObject())
+            {
+                keys.Add(entry.Name);
+                foreach (JsonElement id in entry.Value.EnumerateArray())
+                {
+                    if (!seen.Add(id.GetInt32()))
+                    {
+                        collides = true;
+                    }
+                }
+            }
+
+            if (!collides)
+            {
+                continue;
+            }
+
+            string keySet = string.Join("\u0000", keys.OrderBy(k => k, StringComparer.Ordinal));
+            string order = string.Join("\u0000", keys);
+            if (!ordersByKeySet.TryGetValue(keySet, out HashSet<string>? orders))
+            {
+                orders = [];
+                ordersByKeySet[keySet] = orders;
+            }
+
+            orders.Add(order);
+        }
+
+        Assert.True(
+            ordersByKeySet.Values.Any(orders => orders.Count >= 2),
+            "no colliding key set is written in two different orders, so these cases "
+            + "cannot detect a runtime that iterates phoneme_id_map in insertion order");
     }
 }

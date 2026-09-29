@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -303,11 +304,27 @@ public static class TimingWriter
     /// CharToToken was emitted raw instead of as <c>U+XXXX</c>, which the
     /// contract requires and which Python, Rust, Go, JS and C++ all produce.
     /// </summary>
-    private static Dictionary<long, string> BuildReverseIdMap(
+    /// <remarks>
+    /// <c>internal</c>, not <c>private</c>, so TimingWriterParityTests can
+    /// compare it against the cross-runtime fixture's reverse_map_cases
+    /// (issue #698). Internal members are absent from PublicAPI.Shipped.txt,
+    /// so the public API surface is unchanged.
+    /// </remarks>
+    internal static Dictionary<long, string> BuildReverseIdMap(
         Dictionary<string, int[]> phonemeIdMap)
     {
         var reverse = new Dictionary<long, string>(phonemeIdMap.Count);
-        foreach ((string? phonemeStr, int[]? ids) in phonemeIdMap)
+
+        // Keys are SORTED, not taken in insertion order, so that "first" in
+        // first-wins means the same thing in all six runtimes
+        // (contract [reverse_map.collision_resolution] key_order, issue #698).
+        // StringComparer.Ordinal sorts by UTF-16 code unit, which agrees with
+        // the code point order Python/C++ use and the UTF-8 byte order
+        // Rust/Go use for every key that can occur (ASCII .. PUA, all inside
+        // the BMP). CurrentCulture would NOT: it is locale-dependent and
+        // treats punctuation as ignorable.
+        foreach ((string? phonemeStr, int[]? ids) in
+                 phonemeIdMap.OrderBy(kv => kv.Key, StringComparer.Ordinal))
         {
             if (ids is { Length: > 0 })
             {

@@ -28,6 +28,27 @@ const TOLERANCE_MS: f64 = 1e-3;
 struct Fixture {
     schema_version: u32,
     cases: Vec<Case>,
+    reverse_map_cases: Vec<ReverseMapCase>,
+}
+
+/// Reverse-map cases (issue #698). `cases` above start from resolved token
+/// strings, so nothing in them says how `phoneme_id_map` is turned back into
+/// names. The contract said first-wins without defining "first", and the
+/// runtimes split three/three -- python / js / csharp iterated in insertion
+/// order, cpp / rust / go sorted. Every shipped model is collision-free, so
+/// all six agreed byte-for-byte and no test could see it.
+#[derive(Debug, Deserialize)]
+struct ReverseMapCase {
+    name: String,
+    inputs: ReverseMapInputs,
+    /// JSON object keys are strings; parsed back to i64 below.
+    expected: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ReverseMapInputs {
+    phoneme_id_map: std::collections::HashMap<String, Vec<i64>>,
+    pua_names: Option<std::collections::HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -222,4 +243,68 @@ fn continuous_boundaries_are_preserved() {
             );
         }
     }
+}
+
+#[test]
+fn reverse_map_cases_match_the_fixture() {
+    let fixture = load_fixture();
+
+    for case in &fixture.reverse_map_cases {
+        let got = piper_plus::timing::build_phoneme_id_reverse_map(
+            &case.inputs.phoneme_id_map,
+            case.inputs.pua_names.as_ref(),
+        );
+        let expected: std::collections::HashMap<i64, String> = case
+            .expected
+            .iter()
+            .map(|(k, v)| (k.parse::<i64>().expect("id is an integer"), v.clone()))
+            .collect();
+
+        assert_eq!(got, expected, "case {}", case.name);
+    }
+}
+
+/// Anti-vacuity: without a MIRRORED colliding case, key order is
+/// unobservable. A collision-free map resolves identically under any
+/// iteration order, and a single colliding map can be satisfied by a runtime
+/// that happens to receive its keys already sorted.
+#[test]
+fn reverse_map_cases_include_a_mirrored_collision() {
+    let fixture = load_fixture();
+    let mut orders_by_keyset: std::collections::HashMap<
+        std::collections::BTreeSet<String>,
+        std::collections::BTreeSet<Vec<String>>,
+    > = std::collections::HashMap::new();
+
+    for case in &fixture.reverse_map_cases {
+        let mut seen = std::collections::BTreeSet::new();
+        let mut collides = false;
+        for ids in case.inputs.phoneme_id_map.values() {
+            for id in ids {
+                if !seen.insert(*id) {
+                    collides = true;
+                }
+            }
+        }
+        if !collides {
+            continue;
+        }
+        // serde_json into a HashMap loses the JSON's key order, so the
+        // mirrored pair is identified by the winner disagreeing with
+        // insertion order rather than by the order itself. Both members share
+        // the same key SET, and there are two of them.
+        let keyset: std::collections::BTreeSet<String> =
+            case.inputs.phoneme_id_map.keys().cloned().collect();
+        orders_by_keyset
+            .entry(keyset)
+            .or_default()
+            .insert(vec![case.name.clone()]);
+    }
+
+    assert!(
+        orders_by_keyset.values().any(|names| names.len() >= 2),
+        "no colliding key set appears twice in the fixture, so these cases \
+         cannot detect a runtime that iterates phoneme_id_map in insertion \
+         order"
+    );
 }

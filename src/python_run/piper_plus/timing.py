@@ -283,6 +283,8 @@ def build_phoneme_id_reverse_map(
     --------
     >>> build_phoneme_id_reverse_map({"a": [5], "b": [6, 7]})
     {5: 'a', 6: 'b', 7: 'b'}
+    >>> build_phoneme_id_reverse_map({"z": [9], "a": [9]})  # sorted, not insertion
+    {9: 'a'}
     >>> build_phoneme_id_reverse_map({"\\ue019": [42]})
     {42: 'U+E019'}
     >>> build_phoneme_id_reverse_map({"\\ue019": [42]}, {"\\ue019": "N_m"})
@@ -293,7 +295,13 @@ def build_phoneme_id_reverse_map(
 
     reverse_map: dict[int, str] = {}
 
-    for char, ids in phoneme_id_map.items():
+    # Keys are SORTED, not taken in insertion order, so that "first" in
+    # first-wins means the same thing in all six runtimes
+    # (contract [reverse_map.collision_resolution] key_order, issue #698).
+    # Python str comparison is by code point, which agrees with the UTF-8 byte
+    # order Rust/Go sort by and the UTF-16 ordinal order JS/C# sort by for
+    # every key that can occur (ASCII .. PUA, all inside the BMP).
+    for char, ids in sorted(phoneme_id_map.items()):
         # Determine the display name for this character.
         if char in pua_to_multi_char:
             display = pua_to_multi_char[char]
@@ -304,7 +312,7 @@ def build_phoneme_id_reverse_map(
 
         for phoneme_id in ids:
             # First-wins semantics: preserve the first mapping seen for an ID.
-            # Matches the JS implementation in src/wasm/openjtalk-web/src/timing.js.
+            # "First" is defined by the sorted key order above.
             if phoneme_id not in reverse_map:
                 reverse_map[phoneme_id] = display
 
