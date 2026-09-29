@@ -331,3 +331,62 @@ def test_json_input_multi_line_directory_mode(tmp_path):
     assert len(wavs) == 2, f"expected 2 WAVs, got {wavs}"
     for w in wavs:
         assert _read_wav_meta(w)["frames"] > 0
+
+
+# ---------------------------------------------------------------------------
+# Auto-generated output names must not collide (issue #696)
+# ---------------------------------------------------------------------------
+
+
+def test_output_dir_names_are_unique_under_a_coarse_clock(monkeypatch, tmp_path):
+    """Two utterances finishing in the same clock tick must not overwrite.
+
+    ``--output_dir`` names each file from a timestamp alone. On CPython 3.12
+    for Windows ``time.monotonic()`` is backed by ``GetTickCount64`` with a
+    ~15.6 ms resolution, so two short utterances routinely land in the same
+    tick, the second file gets the first one's name, and the first output is
+    gone -- with exit code 0 and a "Wrote ..." line for both.
+
+    The clock is pinned to a single value here rather than relying on a real
+    coarse platform: that reproduces the collision deterministically on every
+    OS, which is what the Windows-only flake could not do.
+    """
+    from piper_plus import __main__ as cli
+
+    monkeypatch.setattr(cli.time, "monotonic_ns", lambda: 332234000000)
+
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    names = {cli._auto_output_name(out_dir) for _ in range(5)}
+
+    assert len(names) == 5, (
+        f"expected 5 distinct names from one clock value, got {len(names)}: "
+        f"{sorted(str(n) for n in names)}"
+    )
+    for name in names:
+        assert name.parent == out_dir
+        assert name.suffix == ".wav"
+
+
+def test_auto_output_names_sort_in_creation_order(monkeypatch, tmp_path):
+    """The names must still sort chronologically.
+
+    The timestamp prefix is what makes ``sorted(out_dir.glob("*.wav"))`` line
+    up with the input order, so the uniqueness suffix has to be zero-padded
+    rather than appended as a bare integer -- otherwise index 10 sorts before
+    index 2.
+    """
+    from piper_plus import __main__ as cli
+
+    clock = {"t": 1000}
+    monkeypatch.setattr(cli.time, "monotonic_ns", lambda: clock["t"])
+
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    names = [cli._auto_output_name(out_dir) for _ in range(12)]
+    assert [str(n) for n in names] == sorted(str(n) for n in names), (
+        "auto-generated names must sort in creation order; got "
+        f"{[n.name for n in names]}"
+    )

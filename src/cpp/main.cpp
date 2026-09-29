@@ -1,4 +1,6 @@
 #include <chrono>
+#include <iomanip>
+#include <atomic>
 #include <condition_variable>
 #include <filesystem>
 #include <fstream>
@@ -842,10 +844,32 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
   if (outputType == OUTPUT_DIRECTORY) {
     // In --text mode, use "output.wav" instead of timestamp
     stringstream outputName;
+    // Pin the classic locale. main() installs a global "en_US.UTF-8" locale,
+    // and every stream constructed after that inherits its numpunct, which
+    // groups thousands -- the nanosecond timestamp came out as
+    // "1,790,576,108,571,824,000.wav" (measured). Commas in a filename are
+    // legal but break shell globbing and any consumer that parses the name,
+    // and the grouping only appears where that locale exists, since main()
+    // falls back to the classic locale when the runtime lacks it. Same defect
+    // class as the TSV/SRT writers, which pin the locale for the same reason.
+    outputName.imbue(std::locale::classic());
     if (runConfig.textInput) {
       outputName << "output.wav";
     } else {
-      outputName << timestamp << ".wav";
+      // Timestamp plus a monotonic counter. The timestamp alone is not
+      // unique: two utterances can land in the same clock tick, and the
+      // second file then overwrites the first with exit code 0 and a
+      // "Wrote ..." line for both (issue #696, measured on the Python CLI
+      // where the clock is coarser). chrono::system_clock has a finer
+      // resolution than Python's monotonic on Windows, so a collision here
+      // is far less likely -- but "less likely" is not a guarantee, and the
+      // failure mode is silent data loss.
+      //
+      // Zero-padded so names keep sorting in creation order; an unpadded
+      // suffix would sort 10 before 2.
+      static std::atomic<unsigned long long> autoNameCounter{0};
+      outputName << timestamp << "_" << std::setfill('0') << std::setw(4)
+                 << autoNameCounter.fetch_add(1) << ".wav";
     }
     filesystem::path outputPath = runConfig.outputPath.value();
     outputPath.append(outputName.str());

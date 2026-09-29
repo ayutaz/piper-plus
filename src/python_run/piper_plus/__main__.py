@@ -1,4 +1,5 @@
 import argparse
+import itertools
 import logging
 import os
 import platform
@@ -64,6 +65,25 @@ def play_audio_file(file_path: str, sample_rate: int = 22050) -> None:
 
     except Exception as e:
         _LOGGER.error("Failed to play audio: %s", e)
+
+
+# Monotonically increasing suffix for auto-generated output names.
+#
+# `time.monotonic_ns()` alone is not unique: on CPython 3.12 for Windows
+# `time.monotonic()` is backed by GetTickCount64 with a ~15.6 ms resolution, so
+# two short utterances routinely finish inside one tick. The second file then
+# takes the first one's name and the first output is gone -- with exit code 0
+# and a "Wrote ..." line for both, so nothing tells the caller (issue #696).
+#
+# The counter is zero-padded to keep names sorting in creation order, which is
+# what makes `sorted(out_dir.glob("*.wav"))` line up with the input: an
+# unpadded suffix would sort 10 before 2.
+_auto_output_counter = itertools.count()
+
+
+def _auto_output_name(output_dir: Path) -> Path:
+    """Return a unique ``<timestamp>_<n>.wav`` path inside *output_dir*."""
+    return output_dir / f"{time.monotonic_ns()}_{next(_auto_output_counter):04d}.wav"
 
 
 def main() -> None:
@@ -306,7 +326,7 @@ def main() -> None:
             if line_output:
                 wav_path: Path | None = Path(line_output)
             elif output_dir is not None:
-                wav_path = output_dir / f"{time.monotonic_ns()}.wav"
+                wav_path = _auto_output_name(output_dir)
             elif single_output is not None and not wrote_any:
                 wav_path = single_output
             else:
@@ -369,7 +389,7 @@ def main() -> None:
             if not line:
                 continue
 
-            wav_path = output_dir / f"{time.monotonic_ns()}.wav"
+            wav_path = _auto_output_name(output_dir)
             with wave.open(str(wav_path), "wb") as wav_file:
                 voice.synthesize(line, wav_file, **synthesize_args)
 
