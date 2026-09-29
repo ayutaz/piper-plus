@@ -302,7 +302,13 @@ repos:
         # CLI とテストのパスも trigger に含める: gate の CLI wiring section が
         # それらを読むため、 含めないと CLI だけを書き換えた変更で gate が
         # 走らず (= inline 化の再発を検出できず) 素通りする。
-        files: ^(docs/spec/phoneme-timing-contract\.toml|src/python_run/piper_plus/timing\.py|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/rust/piper-core/src/timing\.rs|src/rust/piper-cli/src/main\.rs|src/go/piperplus/timing\.go|src/go/piperplus/timing_test\.go|src/go/cmd/piper-plus/main\.go|src/wasm/openjtalk-web/src/timing\.js|src/cpp/piper\.cpp|scripts/check_reverse_map_parity\.py)$
+        #
+        # timing_helpers.hpp: #656 の C++ 分で gate の cpp 参照先を piper.cpp
+        # から同ファイルへ移したが、 trigger に追加し忘れていた。 この穴は
+        # trigger-coverage gate (#704 / #706) が検出した — 「gate は trigger が
+        # 見せてくれる範囲しか守れない」 という、 その gate を書いた理由が
+        # そのまま自分に当たった形。
+        files: ^(docs/spec/phoneme-timing-contract\.toml|src/python_run/piper_plus/timing\.py|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/rust/piper-core/src/timing\.rs|src/rust/piper-cli/src/main\.rs|src/go/piperplus/timing\.go|src/go/piperplus/timing_test\.go|src/go/cmd/piper-plus/main\.go|src/wasm/openjtalk-web/src/timing\.js|src/cpp/piper\.cpp|src/cpp/timing_helpers\.hpp|scripts/check_reverse_map_parity\.py)$
         pass_filenames: false
 
       # PAD / BOS / EOS (id 0/1/2) は cursor を進めるが timing entry を
