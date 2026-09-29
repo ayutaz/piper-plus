@@ -162,9 +162,16 @@ class TestTrimPaddingByDurations:
         assert result[0] == audio[1100]
 
     @pytest.mark.unit
-    def test_trims_back_padding_preserves_normal_eos(self):
-        # Back padding stripped, EOS=1 frame preserved (eos_max_frames=6).
-        # Layout: [body=2, body=4, pad=3, pad=3, pad=3, EOS=1] with front_pad=0
+    def test_trims_back_padding_and_bos_preserving_normal_eos(self):
+        # Layout: [BOS=2, body=4, pad=3, pad=3, pad=3, EOS=1], front_pad=0.
+        #
+        # BOS is stripped even with front_pad == 0: the front region is
+        # durations[0 : 1 + front_pad], which is durations[0:1] = BOS. Python
+        # used to gate the whole front trim on `front_pad > 0` and drop 0
+        # samples here, while C++ / Rust / Go / C# all ran their loop once and
+        # removed the BOS duration -- a 4-vs-1 split that the C++ comment
+        # ("so every runtime produces byte-equal output") explicitly denied
+        # (issue #688).
         durations = np.array([2.0, 4.0, 3.0, 3.0, 3.0, 1.0], dtype=np.float32)
         hop = 100
         total_samples = int(durations.sum() * hop)  # 1600
@@ -172,10 +179,37 @@ class TestTrimPaddingByDurations:
         result = _trim_padding_by_durations(
             audio, durations, front_pad=0, back_pad=3, hop_size=hop, eos_max_frames=6
         )
-        # Trim back padding only (3+3+3)*100 = 900; EOS=1 frame stays in audio.
-        assert len(result) == total_samples - 900
-        # The last 100 samples (= 1 frame * hop) of the result are the EOS region.
+        # Front: BOS = 2 frames = 200 samples. Back: (3+3+3)*100 = 900.
+        # EOS = 1 frame <= eos_max_frames = 6, so it stays.
+        assert len(result) == total_samples - 200 - 900
+        assert result[0] == audio[200]
         assert result[-1] == audio[total_samples - 900 - 1]
+
+    @pytest.mark.unit
+    def test_front_trim_covers_bos_at_front_pad_zero(self):
+        """The front region is durations[0 : 1 + front_pad], never empty.
+
+        Pinned separately from the case above because it is the whole content
+        of issue #688: with front_pad == 0 the slice is still durations[0:1],
+        so the BOS duration comes off. Gating on `front_pad > 0` made Python
+        the only runtime that kept it.
+        """
+        durations = np.array([5.0, 4.0, 3.0, 2.0], dtype=np.float32)
+        hop = 100
+        total_samples = int(durations.sum() * hop)  # 1400
+        audio = np.arange(total_samples, dtype=np.int16)
+
+        result = _trim_padding_by_durations(
+            audio, durations, front_pad=0, back_pad=1, hop_size=hop, eos_max_frames=6
+        )
+
+        # BOS = 5 frames = 500 samples off the front; back_pad = 1 takes
+        # durations[-2] = 3 frames = 300 samples; EOS = 2 <= 6 stays.
+        assert len(result) == total_samples - 500 - 300
+        assert result[0] == audio[500], (
+            "the BOS region must be trimmed at front_pad == 0, matching "
+            "C++ / Rust / Go / C#"
+        )
 
     @pytest.mark.unit
     def test_clamps_inflated_eos_duration(self):

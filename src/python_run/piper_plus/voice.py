@@ -438,9 +438,14 @@ def _trim_padding_by_durations(
         return audio
 
     # BOS + front padding samples (stripped).
-    front_samples = (
-        int(durations_1d[0 : 1 + front_pad].sum() * hop_size) if front_pad > 0 else 0
-    )
+    #
+    # No `front_pad > 0` gate: the slice is durations[0 : 1 + front_pad],
+    # which is durations[0:1] = BOS even at front_pad == 0, so the BOS region
+    # comes off either way. C++ / Rust / Go / C# all run their loop once and
+    # remove it; gating here made Python the only runtime that kept it, which
+    # the C++ comment ("so every runtime produces byte-equal output")
+    # explicitly denied (issue #688).
+    front_samples = int(durations_1d[0 : 1 + front_pad].sum() * hop_size)
 
     # Back padding samples + EOS excess (over eos_max_frames) samples.
     back_pad_samples = (
