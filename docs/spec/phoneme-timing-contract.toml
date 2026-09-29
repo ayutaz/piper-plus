@@ -336,11 +336,13 @@ ensure_ascii = false
 [output_formats.tsv]
 header = "start_ms\tend_ms\tduration_ms\tphoneme"
 # Byte-for-byte conformance, verified by the golden fixture's `tsv` field:
-#   python / rust / go / js / csharp : conformant
-#   cpp                              : NON-CONFORMANT -- emits 8 columns led
-#     by `phoneme` (plus start/end in seconds and start_frame/end_frame).
-#     Tracked separately because fixing it changes the C++ CLI's output for
-#     existing consumers; see the issue linked from CHANGELOG.
+#   python / rust / go / js / csharp / cpp : conformant
+# C++ emitted 8 columns led by `phoneme` (plus start/end in seconds and
+# start_frame/end_frame) until issue #716. The extra columns were dropped
+# rather than appended: `header` is pinned byte-for-byte, so a trailing column
+# breaks parity exactly as a reordering does, and every value in them is
+# derivable from the four that remain (`start` = `start_ms / 1000`,
+# `start_frame` = `start_ms * sample_rate / hop_size / 1000`).
 # Until spec_version 1.2 the fixture held only float milliseconds, so this
 # layer was unchecked everywhere: the C++ column divergence and a UTF-8 BOM on
 # C# TSV output both surfaced the moment the rendered text was pinned.
@@ -457,7 +459,7 @@ csharp = { file = "src/csharp/PiperPlus.Core/Inference/TimingWriter.cs", idiom =
 rust = { file = "src/rust/piper-core/src/timing.rs", idiom = "ms.round() as u64", test_file = "src/rust/piper-core/src/timing.rs" }
 go = { file = "src/go/piperplus/timing.go", idiom = "math.Round(ms)", clamp_idiom = "if ms < 0 {", test_file = "src/go/piperplus/timing_test.go" }
 js = { file = "src/wasm/openjtalk-web/src/timing.js", idiom = "Math.round(Math.max(ms, 0))", clamp_idiom = "Math.max(ms, 0)", test_file = "src/wasm/openjtalk-web/test/js/test-phoneme-timing.js" }
-cpp = { file = "src/cpp/piper.cpp", idiom = "std::llround(ms)", clamp_idiom = "if (ms < 0.0)", test_file = "src/cpp/tests/test_phoneme_timing_text_path.cpp", test_uses_float_seconds = true, formatter_precision = "float32" }
+cpp = { file = "src/cpp/timing_format.hpp", idiom = "std::llround(ms)", clamp_idiom = "if (ms < 0.0)", test_file = "src/cpp/tests/test_phoneme_timing_text_path.cpp", test_uses_float_seconds = true, formatter_precision = "float32" }
 
 # Idioms that round half to EVEN in the runtime's language. Present in a
 # formatter file, any of these is the #681 regression.

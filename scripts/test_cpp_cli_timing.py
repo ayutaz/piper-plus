@@ -77,9 +77,10 @@ MULTI_SENTENCE_TEXT = "Hola mundo. Adios amigo. Buenos dias."
 # Split into phrases by --phoneme-silence so the CLI runs several inferences.
 MULTI_UNIT_TEXT = "Hola mundo. Adios amigo."
 
-TSV_HEADER = (
-    "phoneme\tstart_ms\tend_ms\tduration_ms\tstart\tend\tstart_frame\tend_frame"
-)
+# docs/spec/phoneme-timing-contract.toml [output_formats.tsv].header.
+# The C++ CLI emitted eight columns led by `phoneme` until issue #716.
+TSV_HEADER = "start_ms\tend_ms\tduration_ms\tphoneme"
+TSV_COLUMNS = 4
 
 # Rust/Go emit `ph_0` / `p0` instead of phoneme names (#656). The C++ path uses
 # the PUA reverse map and must never degrade to that shape.
@@ -428,14 +429,15 @@ def case_tsv_format(binary: Path, model: Path, config: Path) -> str:
         for number, line in enumerate(lines[1:], start=2):
             columns = line.split("\t")
             _check(
-                len(columns) == 8,
-                f"TSV line {number} has {len(columns)} columns, expected 8",
+                len(columns) == TSV_COLUMNS,
+                f"TSV line {number} has {len(columns)} columns, expected "
+                f"{TSV_COLUMNS}",
             )
             _check(
-                not PLACEHOLDER_RE.match(columns[0]),
-                f"TSV line {number} phoneme is the placeholder '{columns[0]}'",
+                not PLACEHOLDER_RE.match(columns[3]),
+                f"TSV line {number} phoneme is the placeholder '{columns[3]}'",
             )
-            start, end = float(columns[1]), float(columns[2])
+            start, end = float(columns[0]), float(columns[1])
             _check(end >= start, f"TSV line {number} ends before it starts")
             _check(
                 start >= previous_start,

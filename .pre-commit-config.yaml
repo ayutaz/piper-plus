@@ -336,7 +336,7 @@ repos:
         name: "SRT ms rounding parity (6 runtimes vs contract toml)"
         entry: uv run --no-sync python scripts/check_srt_rounding_parity.py
         language: system
-        files: ^(docs/spec/phoneme-timing-contract\.toml|src/python_run/piper_plus/timing\.py|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/rust/piper-core/src/timing\.rs|src/go/piperplus/timing\.go|src/wasm/openjtalk-web/src/timing\.js|src/cpp/piper\.cpp|scripts/check_srt_rounding_parity\.py)$
+        files: ^(docs/spec/phoneme-timing-contract\.toml|src/python_run/piper_plus/timing\.py|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/rust/piper-core/src/timing\.rs|src/go/piperplus/timing\.go|src/wasm/openjtalk-web/src/timing\.js|src/cpp/piper\.cpp|src/cpp/timing_format\.hpp|scripts/check_srt_rounding_parity\.py)$
         pass_filenames: false
 
       - id: precommit-file-regex
@@ -782,7 +782,7 @@ repos:
         name: phoneme-timing formula anchors (6 runtimes vs contract toml)
         entry: uv run --no-sync python scripts/check_phoneme_timing_contract.py
         language: system
-        files: ^(docs/spec/phoneme-timing-contract\.toml|src/python_run/piper_plus/timing\.py|src/rust/piper-core/src/timing\.rs|src/go/piperplus/timing\.go|src/cpp/piper\.cpp|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/wasm/openjtalk-web/src/timing\.js|scripts/check_phoneme_timing_contract\.py)$
+        files: ^(docs/spec/phoneme-timing-contract\.toml|src/python_run/piper_plus/timing\.py|src/rust/piper-core/src/timing\.rs|src/go/piperplus/timing\.go|src/cpp/piper\.cpp|src/cpp/timing_format\.hpp|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/wasm/openjtalk-web/src/timing\.js|scripts/check_phoneme_timing_contract\.py)$
         pass_filenames: false
 
       # CLI flag hyphen-form parity across 5 runtime CLIs. Contract data

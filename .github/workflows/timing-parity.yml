@@ -38,6 +38,7 @@ on:
       - 'src/wasm/openjtalk-web/src/timing.js'
       - 'src/csharp/PiperPlus.Core/Inference/TimingWriter.cs'
       - 'src/cpp/timing_helpers.hpp'
+      - 'src/cpp/timing_format.hpp'
       - 'src/cpp/piper.cpp'
       # The per-runtime parity tests that `per-runtime-presence` below exists
       # to stop anyone deleting. They were NOT listed, so a PR that deleted
@@ -65,6 +66,7 @@ on:
       - 'src/wasm/openjtalk-web/src/timing.js'
       - 'src/csharp/PiperPlus.Core/Inference/TimingWriter.cs'
       - 'src/cpp/timing_helpers.hpp'
+      - 'src/cpp/timing_format.hpp'
       - 'src/cpp/piper.cpp'
       # The per-runtime parity tests that `per-runtime-presence` below exists
       # to stop anyone deleting. They were NOT listed, so a PR that deleted
