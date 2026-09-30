@@ -24,6 +24,8 @@ on:
       - 'cmake/PiperCommon.cmake'
       - '.github/workflows/zh-en-loanword-sync.yml'
       - 'scripts/test_sync_gates_meta.py'
+      - 'docs/reference/zh-en-loanword/README.md'
+      - 'docs/spec/loanword-mirrors.toml'
   pull_request:
     paths:
       - '**/zh_en_loanword.json'
@@ -35,6 +37,8 @@ on:
       - 'cmake/PiperCommon.cmake'
       - '.github/workflows/zh-en-loanword-sync.yml'
       - 'scripts/test_sync_gates_meta.py'
+      - 'docs/reference/zh-en-loanword/README.md'
+      - 'docs/spec/loanword-mirrors.toml'
   workflow_dispatch:
 
 concurrency:

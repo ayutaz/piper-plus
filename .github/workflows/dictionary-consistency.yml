@@ -16,6 +16,8 @@ on:
       - 'src/wasm/openjtalk-web/assets/additional_tech_dict.json'
       - 'scripts/check_dictionary_consistency.py'
       - '.github/workflows/dictionary-consistency.yml'
+      - 'docs/spec/dictionary-mirrors.toml'
+      - 'scripts/_mirror_check.py'
   pull_request:
     paths:
       - 'data/dictionaries/**.json'
@@ -24,6 +26,8 @@ on:
       - 'src/wasm/openjtalk-web/assets/additional_tech_dict.json'
       - 'scripts/check_dictionary_consistency.py'
       - '.github/workflows/dictionary-consistency.yml'
+      - 'docs/spec/dictionary-mirrors.toml'
+      - 'scripts/_mirror_check.py'
   workflow_dispatch:
 
 concurrency:

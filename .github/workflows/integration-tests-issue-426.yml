@@ -33,6 +33,7 @@ on:
       - 'tests/fixtures/mb_istft_speaker_embedding/**'
       - '.github/workflows/integration-tests-issue-426.yml'
       - 'scripts/check_onnx_inputs.py'
+      - 'src/python/piper_train/vits/models.py'
   workflow_dispatch:
 
 concurrency:

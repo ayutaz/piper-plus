@@ -10,6 +10,11 @@ on:
       - 'tests/fixtures/g2p/**'
       - '.github/workflows/g2p-cross-platform-ci.yml'
       - 'scripts/check_pua_consistency.py'
+      - 'Sources/PiperPlusG2P/PUAMap.swift'
+      - 'docs/spec/pua-contract.toml'
+      - 'src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs'
+      - 'src/go/phonemize/pua.go'
+      - 'src/python_run/piper_plus/phonemize/token_mapper.py'
   pull_request:
     paths:
       - 'src/python/g2p/**'
@@ -19,6 +24,11 @@ on:
       - '.github/workflows/g2p-cross-platform-ci.yml'
 
       - 'scripts/check_pua_consistency.py'
+      - 'Sources/PiperPlusG2P/PUAMap.swift'
+      - 'docs/spec/pua-contract.toml'
+      - 'src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs'
+      - 'src/go/phonemize/pua.go'
+      - 'src/python_run/piper_plus/phonemize/token_mapper.py'
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
