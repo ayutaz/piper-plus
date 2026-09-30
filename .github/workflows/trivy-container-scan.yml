@@ -160,6 +160,39 @@ jobs:
           ignore-unfixed: true
           exit-code: '0'
 
+      # 一時診断 (調査が終わったら削除する)。
+      #
+      # `trivy-python-inference` と `trivy-webui-distroless` が setuptools
+      # 70.3.0 / msgpack 1.1.2 を報告し続けている。 rule 名は
+      # `LanguageSpecificPackageVulnerability` なので python-pkg analyzer
+      # (イメージ内の dist-info / egg-info 実体) 由来のはずだが、 Dockerfile 内で
+      # `METADATA` / `PKG-INFO` の `Name:` を全走査しても setuptools 84.0.0
+      # しか出てこない。
+      #
+      # SARIF は Target を `Python` (class 名) にするだけで `PkgPath` を
+      # 持たないため、 どのファイルを読んでいるのか SARIF からは辿れない。
+      # JSON 出力には `PkgPath` が入るので、 それを 1 回だけ取る。
+      #
+      # 対象は調査中の 2 cell のみ。 全 cell で追加 invoke すると
+      # 「DB download + analysis を 1 回に削減」 (PR #498 review #9) の趣旨を
+      # 損なうため広げない。
+      - name: Diagnose python-pkg PkgPath (temporary)
+        if: matrix.target.name == 'python-inference' || matrix.target.name == 'webui-distroless'
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: piper-plus-${{ matrix.target.name }}:trivy-scan
+          format: json
+          output: trivy-diag-${{ matrix.target.name }}.json
+          severity: CRITICAL,HIGH,MEDIUM
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Print PkgPath for setuptools / msgpack (temporary)
+        if: matrix.target.name == 'python-inference' || matrix.target.name == 'webui-distroless'
+        env:
+          DIAG_JSON: trivy-diag-${{ matrix.target.name }}.json
+        run: python scripts/print_trivy_pkgpath.py "$DIAG_JSON"
+
       - name: Upload SARIF to GitHub Security tab
         if: always()
         uses: github/codeql-action/upload-sarif@v3.38.0
