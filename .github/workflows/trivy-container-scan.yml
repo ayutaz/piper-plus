@@ -25,11 +25,15 @@ on:
       - '.github/workflows/trivy-container-scan.yml'
       - 'scripts/check_trivy_sarif.py'
       - 'tests/scripts/test_check_trivy_sarif.py'
+      # 抑止リストを触る変更で scan が走らないと、 その編集が検証されない
+      # (ゲートは trigger が見せる範囲しか守れない)。
+      - '.trivyignore.yaml'
   push:
     branches: [dev, main]
     paths:
       - 'docker/**/Dockerfile*'
       - 'scripts/check_trivy_sarif.py'
+      - '.trivyignore.yaml'
   workflow_dispatch:
   schedule:
     # 週 1 で base image の新規 CVE を catch する。
@@ -158,6 +162,11 @@ jobs:
           #    SARIF には HIGH/MEDIUM も載せるが、 PR を fail させるのは
           #    CRITICAL のみという conservative 設定を維持。
           ignore-unfixed: true
+          # 3) trivyignores: 実体のない phantom entry を PURL 単位で抑止
+          #    (setuptools 70.3.0 / msgpack 1.1.2)。 版まで含めた PURL で
+          #    絞っているので、 実在パッケージの検知は維持される。
+          #    運用ルールと解除条件は .trivyignore.yaml と #748 を参照。
+          trivyignores: .trivyignore.yaml
           exit-code: '0'
 
       - name: Upload SARIF to GitHub Security tab
@@ -259,6 +268,11 @@ jobs:
           output: trivy-heavy-${{ matrix.target.name }}.sarif
           severity: CRITICAL,HIGH,MEDIUM
           ignore-unfixed: true
+          # 3) trivyignores: 実体のない phantom entry を PURL 単位で抑止
+          #    (setuptools 70.3.0 / msgpack 1.1.2)。 版まで含めた PURL で
+          #    絞っているので、 実在パッケージの検知は維持される。
+          #    運用ルールと解除条件は .trivyignore.yaml と #748 を参照。
+          trivyignores: .trivyignore.yaml
           exit-code: '0'
 
       - name: Upload heavy SARIF
