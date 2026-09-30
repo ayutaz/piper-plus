@@ -9,7 +9,7 @@
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
 [![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
 
-> **📢 v2.0.0 Changements incompatibles (2026-05):** Images Docker par défaut unifiées vers CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (pilote NVIDIA hôte **R570+** requis ; les pilotes plus anciens ne peuvent pas démarrer les nouvelles images) / entraînement mis à jour vers torch 2.11+cu128 (les checkpoints produits avec torch 2.2 ne peuvent plus être repris) / TF32 + bf16-mixed sont les nouvelles valeurs par défaut de l'entraînement. Détails : [docs/migration/v1.12-to-v2.0.md](docs/migration/v1.12-to-v2.0.md)
+> **📢 v2.0.0 Changements incompatibles (non publiée, branche dev):** Images Docker par défaut unifiées vers CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (pilote NVIDIA hôte **R570+** requis ; les pilotes plus anciens ne peuvent pas démarrer les nouvelles images) / entraînement mis à jour vers torch 2.11+cu128 (les checkpoints produits avec torch 2.2 ne peuvent plus être repris) / TF32 + bf16-mixed sont les nouvelles valeurs par défaut de l'entraînement. Détails : [docs/migration/v1.12-to-v2.0.md](docs/migration/v1.12-to-v2.0.md). Remarque : le `piper-plus` le plus récent sur PyPI est la v1.13.0, dont la commande / le module s'appellent `piper` / `python -m piper` ; les noms `piper-plus` / `python -m piper_plus` utilisés dans ce README s'appliquent à partir de la v2.0.0 (ou d'une installation depuis les sources `src/python_run`).
 
 **Paquets :**
 
