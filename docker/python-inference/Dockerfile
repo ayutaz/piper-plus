@@ -99,39 +99,24 @@ COPY src/python/ /app/src/python/
 
 # Install piper_plus_g2p (standalone G2P package) and piper_train
 #
-# `--no-cache` は必須 (省略可能な最適化ではない)。 uv は既定で展開済み wheel を
-# `/root/.cache/uv/archive-v*/` に残し、 そこには完全な `*.dist-info` が含まれる。
-# Trivy の python-pkg analyzer は「イメージ内のあらゆる `*.dist-info`」を
-# インストール済みパッケージとして拾うため、 キャッシュに落ちただけの版まで
-# 脆弱性として報告される。 後段レイヤで `rm -rf` しても **イメージサイズは
-# 減らない** (前段レイヤに残る) ので、 最初から書かせない。
+# `--no-cache` で uv のキャッシュをイメージに残さない。 uv は既定で展開済み
+# wheel を `/root/.cache/uv/archive-v*/` に置き、 これは実行時に一切使われない
+# 純粋な死荷重。 後段レイヤで `rm -rf` してもイメージサイズは減らない
+# (前段レイヤに残る) ので、 最初から書かせない。
+#
+# 注意: これは `trivy-python-inference` が報告する setuptools 70.3.0 /
+# msgpack 1.1.2 の対策では **ない**。 CI 上で検証した結果、 `--no-cache` を
+# 入れても Trivy の結果は変わらず (HIGH=2 MEDIUM=1 のまま)、 かつイメージ内の
+# setuptools は 84.0.0 の 1 件のみ (Trivy と同じ `METADATA` の `Name:` 基準で
+# 全走査して確認) だった。 報告されている版はイメージに存在せず、 在処は
+# 未特定のまま。 SARIF には `PkgPath` が出ないため、 追跡には Trivy の JSON
+# 出力が要る (別 PR)。
 RUN uv pip install --system --no-cache "/app/src/python/g2p"
 RUN uv pip install --system --no-cache "/app/src/python[inference-gpu]"
 
 # Install Gradio WebUI requirements
 COPY src/python_run/requirements_webui.txt /app/requirements_webui.txt
 RUN uv pip install --system --no-cache -r /app/requirements_webui.txt
-
-# 診断: Trivy が実際に何を見るのかをビルドログに残す。
-#
-# `trivy-python-inference` は setuptools 70.3.0 (CVE-2025-47273 /
-# CVE-2026-59890) と msgpack 1.1.2 (GHSA-6v7p-g79w-8964) を報告し続けている。
-# 70.3.0 は apt 版 (68.1.2) でも上の pip 導入版 (84.0.0) でもない第三の版で、
-# 在処が未特定。
-#
-# ディレクトリ名 (`setuptools-*.dist-info`) で探すと、 名前に版を持たない
-# `*.egg-info` や vendored コピーを取り逃がす。 Trivy 自身は `METADATA` /
-# `PKG-INFO` の `Name:` を見るので、 こちらも中身で探す。
-#
-# パイプを使わないのは hadolint DL4006 (パイプを含む RUN は SHELL に
-# `-o pipefail` が必要) を避けるため。 本 Dockerfile 全体の SHELL を
-# 変えるより、 診断側でパイプを使わない方が影響が小さい。
-RUN echo "--- setuptools / msgpack metadata in image ---"; \
-    find / -xdev \( -name METADATA -o -name PKG-INFO \) \
-      -exec grep -l -e '^Name: setuptools$' -e '^Name: msgpack$' {} + > /tmp/pkghits.txt 2>/dev/null; \
-    while read -r f; do echo "== $f"; grep -e '^Name: ' -e '^Version: ' "$f"; done < /tmp/pkghits.txt; \
-    rm -f /tmp/pkghits.txt; \
-    echo "--- end metadata listing ---"
 
 # Pre-download NLTK data for g2p-en (both old and new resource names for NLTK compatibility)
 # Use a shared path so data is accessible after USER switch to non-root
