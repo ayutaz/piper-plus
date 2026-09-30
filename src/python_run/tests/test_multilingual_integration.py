@@ -4,16 +4,28 @@ These tests use real phonemizer libraries to ensure the runtime package
 produces correct phonemes for all 6 supported languages.
 """
 
+import importlib.util
+
 import pytest
+
+
+def _require_pyopenjtalk():
+    """Skip unless an OpenJTalk binding is importable.
+
+    The ``pyopenjtalk-plus`` distribution installs the ``pyopenjtalk``
+    import package (there is no ``pyopenjtalk_plus`` module), so checking
+    only ``pyopenjtalk_plus`` would skip these tests on every environment.
+    Mirror the runtime's own import order (``piper_plus.phonemize.japanese``).
+    """
+    for name in ("pyopenjtalk_plus", "pyopenjtalk"):
+        if importlib.util.find_spec(name) is not None:
+            return
+    pytest.skip("pyopenjtalk-plus not installed")
 
 
 def test_japanese_phonemize_real():
     """Call phonemize_japanese with real pyopenjtalk and verify output."""
-    pyopenjtalk = pytest.importorskip(
-        "pyopenjtalk_plus",
-        reason="pyopenjtalk-plus not installed",
-    )
-    del pyopenjtalk  # only needed for the skip check
+    _require_pyopenjtalk()
 
     from piper_plus.phonemize.japanese import phonemize_japanese
 
@@ -78,11 +90,7 @@ def test_portuguese_phonemize_real():
 
 def test_japanese_long_text_splitting():
     """Verify that long Japanese text is split and does not crash OpenJTalk."""
-    pyopenjtalk = pytest.importorskip(
-        "pyopenjtalk_plus",
-        reason="pyopenjtalk-plus not installed",
-    )
-    del pyopenjtalk
+    _require_pyopenjtalk()
 
     from piper_plus.phonemize.japanese import phonemize_japanese
 
@@ -112,10 +120,7 @@ def test_japanese_n_variants_in_id_map():
 
 def test_multilingual_phonemizer_all_languages():
     """Create MultilingualPhonemizer with all 6 languages and test each."""
-    pytest.importorskip(
-        "pyopenjtalk_plus",
-        reason="pyopenjtalk-plus not installed",
-    )
+    _require_pyopenjtalk()
     pytest.importorskip("g2p_en", reason="g2p_en not installed")
     pytest.importorskip("pypinyin", reason="pypinyin not installed")
 
@@ -139,10 +144,7 @@ def test_multilingual_phonemizer_all_languages():
 
 def test_multilingual_code_switching():
     """Test mixed Japanese-English text produces more tokens than either alone."""
-    pytest.importorskip(
-        "pyopenjtalk_plus",
-        reason="pyopenjtalk-plus not installed",
-    )
+    _require_pyopenjtalk()
     pytest.importorskip("g2p_en", reason="g2p_en not installed")
 
     from piper_plus.phonemize.multilingual import MultilingualPhonemizer
@@ -164,18 +166,18 @@ def test_multilingual_code_switching():
 def test_training_runtime_consistency():
     """Compare token counts between training and runtime phonemizers.
 
-    Skipped automatically in CI / pip-only environments where
-    piper_train is not installed.
+    Skipped automatically in pip-only environments where the training-side
+    G2P package (piper-plus-g2p) is not installed.
     """
-    pytest.importorskip(
-        "pyopenjtalk_plus",
-        reason="pyopenjtalk-plus not installed",
-    )
+    _require_pyopenjtalk()
     pytest.importorskip("g2p_en", reason="g2p_en not installed")
     pytest.importorskip("pypinyin", reason="pypinyin not installed")
+    # The training-side phonemizer lives in the piper-plus-g2p package
+    # (``piper_plus_g2p.multilingual``); ``piper_train.phonemize`` no longer
+    # exists, so importing it made this test skip unconditionally.
     piper_train_ml = pytest.importorskip(
-        "piper_train.phonemize.multilingual",
-        reason="piper_train not installed (dev-only)",
+        "piper_plus_g2p.multilingual",
+        reason="piper-plus-g2p not installed (training-side G2P)",
     )
 
     from piper_plus.phonemize.multilingual import (
