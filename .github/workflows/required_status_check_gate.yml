@@ -84,10 +84,30 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_EVENT: ${{ github.event.workflow_run.event }}
         run: |
+          # Which monitored spokes may legitimately be absent depends on the
+          # event, because two of them are path-filtered on pull_request but
+          # NOT on push:
+          #
+          #   spoke                        pull_request   push
+          #   Memory regression            paths          paths
+          #   PUA Consistency Gate         paths          paths
+          #   Multi-Runtime RTF Benchmark  paths          (none)
+          #   Parity Hub                   paths          (none)
+          #   CodeQL                       (none)         (none)
+          #
+          # So on a push to dev, RTF and Parity Hub MUST run, and exempting
+          # them there would silently drop them from the gate. A `workflow_run`
+          # firing carries the ORIGINAL event in
+          # github.event.workflow_run.event, so a spoke completing on a
+          # feature-branch PR still gets the pull_request list.
+          PR_FILTERED="Multi-Runtime RTF Benchmark,Memory regression (per-language),Parity Hub,PUA Consistency Gate"
+          PUSH_FILTERED="Memory regression (per-language),PUA Consistency Gate"
           if [ "${EVENT_NAME}" = "pull_request" ]; then
             echo "sha=${PR_HEAD_SHA}" >> "$GITHUB_OUTPUT"
             echo "pr=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+            echo "paths_filtered=${PR_FILTERED}" >> "$GITHUB_OUTPUT"
             # No supersede branch on pull_request. The base ref was passed
             # here, and --branch-for-supersede compares head_sha against that
             # branch's TIP -- a PR head is never the tip of its own base, so
@@ -106,6 +126,11 @@ jobs:
             # head branch so the next step can look it up if needed.
             echo "pr=" >> "$GITHUB_OUTPUT"
             echo "base_branch=${RUN_HEAD_BRANCH}" >> "$GITHUB_OUTPUT"
+            if [ "${RUN_EVENT}" = "pull_request" ]; then
+              echo "paths_filtered=${PR_FILTERED}" >> "$GITHUB_OUTPUT"
+            else
+              echo "paths_filtered=${PUSH_FILTERED}" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
       - name: Aggregate spoke conclusions
@@ -114,6 +139,7 @@ jobs:
           HEAD_SHA: ${{ steps.ctx.outputs.sha }}
           PR_NUMBER: ${{ steps.ctx.outputs.pr }}
           BASE_BRANCH: ${{ steps.ctx.outputs.base_branch }}
+          PATHS_FILTERED: ${{ steps.ctx.outputs.paths_filtered }}
         run: |
           set -euo pipefail
           extra_args=()
@@ -127,7 +153,7 @@ jobs:
             --head-sha "${HEAD_SHA}" \
             --repo "${GITHUB_REPOSITORY}" \
             --monitored "${MONITORED_WORKFLOWS}" \
-            --paths-filtered "Multi-Runtime RTF Benchmark,Memory regression (per-language),Parity Hub,PUA Consistency Gate" \
+            --paths-filtered "${PATHS_FILTERED}" \
             --on-cancelled fail \
             --on-skipped fail \
             "${extra_args[@]}"

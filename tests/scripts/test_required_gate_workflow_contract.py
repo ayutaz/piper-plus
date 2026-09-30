@@ -60,9 +60,16 @@ def monitored(gate_text: str) -> list[str]:
 
 
 @pytest.fixture(scope="module")
-def declared_paths_filtered(gate_text: str) -> list[str]:
-    match = re.search(r'--paths-filtered "([^"]*)"', gate_text)
-    assert match, "--paths-filtered not found in the gate workflow"
+def declared_pr_filtered(gate_text: str) -> list[str]:
+    match = re.search(r'PR_FILTERED="([^"]*)"', gate_text)
+    assert match, "PR_FILTERED not found in the gate workflow"
+    return _comma_list(match.group(1))
+
+
+@pytest.fixture(scope="module")
+def declared_push_filtered(gate_text: str) -> list[str]:
+    match = re.search(r'PUSH_FILTERED="([^"]*)"', gate_text)
+    assert match, "PUSH_FILTERED not found in the gate workflow"
     return _comma_list(match.group(1))
 
 
@@ -81,6 +88,26 @@ def _has_pull_request_paths_filter(path: Path) -> bool:
     return isinstance(pull_request, dict) and bool(pull_request.get("paths"))
 
 
+def _may_be_absent_on_push_to_dev(path: Path) -> bool:
+    """Can this workflow legitimately not run on a push to ``dev``?
+
+    Yes if it has no ``push`` trigger, if ``dev`` is outside its push
+    branches, or if its push trigger carries a paths filter. Otherwise a push
+    to dev MUST produce a run, so the hub must not exempt it there.
+    """
+    push = _triggers(_load(path)).get("push")
+    if push is None:
+        return True
+    if not isinstance(push, dict):
+        return False
+    if push.get("paths"):
+        return True
+    branches = push.get("branches")
+    if isinstance(branches, list) and "dev" not in branches:
+        return True
+    return False
+
+
 def test_every_monitored_spoke_resolves_to_a_workflow(monitored, workflow_by_name):
     """A renamed spoke must not vanish from the hub silently.
 
@@ -94,10 +121,10 @@ def test_every_monitored_spoke_resolves_to_a_workflow(monitored, workflow_by_nam
     assert not unresolved, f"monitored spokes with no matching workflow: {unresolved}"
 
 
-def test_paths_filtered_declares_exactly_the_filtered_spokes(
-    monitored, declared_paths_filtered, workflow_by_name
+def test_pr_list_declares_exactly_the_pull_request_filtered_spokes(
+    monitored, declared_pr_filtered, workflow_by_name
 ):
-    """--paths-filtered must equal the monitored spokes that really are filtered.
+    """PR_FILTERED must equal the monitored spokes filtered on pull_request.
 
     Under-declaring fails the gate on any PR whose diff misses that spoke's
     paths (the original symptom). Over-declaring exempts a spoke that should
@@ -108,27 +135,67 @@ def test_paths_filtered_declares_exactly_the_filtered_spokes(
         for name in monitored
         if _has_pull_request_paths_filter(workflow_by_name[name])
     }
-    assert set(declared_paths_filtered) == actually_filtered
+    assert set(declared_pr_filtered) == actually_filtered
+
+
+def test_push_list_declares_exactly_the_spokes_that_may_skip_a_dev_push(
+    monitored, declared_push_filtered, workflow_by_name
+):
+    """PUSH_FILTERED must be derived from the PUSH triggers, not the PR ones.
+
+    Two monitored spokes (Multi-Runtime RTF Benchmark, Parity Hub) are
+    path-filtered on pull_request but have NO paths filter on push, so a push
+    to dev must produce a run for them. Reusing the pull_request list on the
+    push path would exempt them exactly where they are mandatory.
+    """
+    may_be_absent = {
+        name
+        for name in monitored
+        if _may_be_absent_on_push_to_dev(workflow_by_name[name])
+    }
+    assert set(declared_push_filtered) == may_be_absent
+
+
+def test_the_two_lists_actually_differ(declared_pr_filtered, declared_push_filtered):
+    """Anti-vacuity for the pair above: one list must not stand in for both.
+
+    If they were equal, both tests would still pass while the event-awareness
+    this fix adds had been collapsed back to a single hardcoded list.
+    """
+    assert set(declared_pr_filtered) != set(declared_push_filtered)
+    assert set(declared_push_filtered) < set(declared_pr_filtered)
 
 
 def test_a_monitored_spoke_without_a_paths_filter_stays_undeclared(
-    monitored, declared_paths_filtered, workflow_by_name
+    monitored, declared_pr_filtered, declared_push_filtered, workflow_by_name
 ):
-    """Anti-vacuity: the equality above must not be "declare everything".
+    """Anti-vacuity: the equalities above must not be "declare everything".
 
-    At least one monitored spoke runs on every PR (no paths filter), and a
-    missing run for it is a real gate failure, so it must be absent from
-    --paths-filtered. Without this, widening the list to all five would still
-    satisfy the test above.
+    At least one monitored spoke runs on every PR and every push (no paths
+    filter either way), and a missing run for it is a real gate failure, so it
+    must be absent from BOTH lists. Without this, widening a list to all five
+    would still satisfy the equality tests.
     """
     unfiltered = [
         name
         for name in monitored
         if not _has_pull_request_paths_filter(workflow_by_name[name])
+        and not _may_be_absent_on_push_to_dev(workflow_by_name[name])
     ]
-    assert unfiltered, "expected at least one monitored spoke with no paths filter"
+    assert unfiltered, "expected at least one spoke mandatory on both events"
     for name in unfiltered:
-        assert name not in declared_paths_filtered, name
+        assert name not in declared_pr_filtered, name
+        assert name not in declared_push_filtered, name
+
+
+def test_run_step_uses_the_resolved_list_not_a_hardcoded_one(gate_text):
+    """The gate must be invoked with the ctx step's output.
+
+    Re-hardcoding a literal here would reintroduce a single event-blind list
+    while both declaration tests above kept passing.
+    """
+    assert '--paths-filtered "${PATHS_FILTERED}"' in gate_text
+    assert "PATHS_FILTERED: ${{ steps.ctx.outputs.paths_filtered }}" in gate_text
 
 
 def test_pull_request_firing_passes_no_supersede_branch(gate_text):
@@ -156,3 +223,30 @@ def test_workflow_run_firing_still_passes_its_head_branch(gate_text):
     """
     else_branch = gate_text.split('= "pull_request" ]; then', 1)[1].split("else", 1)[1]
     assert 'echo "base_branch=${RUN_HEAD_BRANCH}"' in else_branch
+
+
+def test_workflow_run_firing_dispatches_on_the_original_event(gate_text):
+    """A workflow_run firing must pick its list from the ORIGINAL event.
+
+    ``workflow_run`` fires whenever a monitored spoke completes -- including
+    spokes that ran for a feature-branch pull_request. Those spokes ARE
+    path-filtered, so collapsing the workflow_run path to the push list makes
+    the hub demand runs that a PR's diff never triggers. The original event is
+    carried in ``github.event.workflow_run.event``, so the branch must test
+    RUN_EVENT and select PR_FILTERED for pull_request.
+
+    Pinned because a mutation that replaced this condition with a constant was
+    NOT caught by the declaration tests: both lists stayed correct while only
+    the dispatch between them was broken.
+    """
+    assert "RUN_EVENT: ${{ github.event.workflow_run.event }}" in gate_text
+    else_branch = gate_text.split('= "pull_request" ]; then', 1)[1].split("else", 1)[1]
+    dispatch = re.search(
+        r'if \[ "\$\{RUN_EVENT\}" = "pull_request" \]; then\s*\n'
+        r'\s*echo "paths_filtered=\$\{PR_FILTERED\}".*?\n'
+        r"\s*else\s*\n"
+        r'\s*echo "paths_filtered=\$\{PUSH_FILTERED\}"',
+        else_branch,
+        re.S,
+    )
+    assert dispatch, else_branch
