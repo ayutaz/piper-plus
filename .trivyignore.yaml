@@ -1,0 +1,54 @@
+# Trivy の検知抑止 (trivy-action の `trivyignores` 経由で読ませる)。
+#
+# 運用ルール (`.github/workflows/security-audit.yml` の `--ignore-vuln` と同型):
+#   一 advisory = 一エントリ + `statement` に理由 + 解除条件 + tracking issue。
+#   `purls` は必ず **版まで含めて** 書く。 `id` だけで抑止すると、 将来
+#   実体のあるパッケージが同 CVE に該当したときにそれも隠れてしまう。
+#   `expired_at` を必ず設定し、 放置されても自動で抑止が切れるようにする。
+#
+# ── 現在抑止しているもの ──
+#
+# Trivy が **イメージ内に実体が無いパッケージ** を報告する。 `format: json` +
+# `list-all-pkgs: true` で `Results[].Packages[]` を出すと差が明確に出る:
+#
+#   Name=msgpack     Version=1.1.2   FilePath=None  Licenses=None
+#   Name=setuptools  Version=70.3.0  FilePath=None  Licenses=None
+#   Name=setuptools  Version=84.0.0  FilePath='usr/local/lib/python3.13/
+#                                    dist-packages/setuptools-84.0.0.dist-info/
+#                                    METADATA'   Licenses=['MIT']
+#
+# 実際にインストールされている 84.0.0 は FilePath と Licenses を両方持つ。
+# 報告されている 2 件はどちらも空で、 イメージ内のどのファイルにも対応しない。
+# 構成のまったく違う 2 イメージ (CUDA+Ubuntu の python-inference と distroless の
+# webui-distroless) が同一の `PkgIdentifier.UID` を返すことも整合する。
+#
+# 詳しい調査経緯と否定した仮説 (uv キャッシュ / apt 版残骸 / uv バイナリ /
+# イメージ内 SBOM / リポジトリ側ファイル / Trivy キャッシュ) は #748 に記録。
+
+vulnerabilities:
+  # setuptools: PackageIndex の path traversal。 fix は 78.1.1。
+  - id: CVE-2025-47273
+    purls:
+      - "pkg:pypi/setuptools@70.3.0"
+    statement: >-
+      実体のない phantom entry (FilePath / Licenses が両方空)。
+      実在する setuptools は 84.0.0 で fix 済み。 詳細と解除条件は #748。
+    expired_at: 2027-03-31
+
+  # setuptools: fix は 83.0.0。 上と同じ phantom entry。
+  - id: CVE-2026-59890
+    purls:
+      - "pkg:pypi/setuptools@70.3.0"
+    statement: >-
+      実体のない phantom entry (FilePath / Licenses が両方空)。
+      実在する setuptools は 84.0.0 で fix 済み。 詳細と解除条件は #748。
+    expired_at: 2027-03-31
+
+  # msgpack: fix は 1.2.1。 イメージ内に msgpack の実体は 1 件も無い。
+  - id: GHSA-6v7p-g79w-8964
+    purls:
+      - "pkg:pypi/msgpack@1.1.2"
+    statement: >-
+      実体のない phantom entry (FilePath / Licenses が両方空)。
+      イメージ内に msgpack のメタデータは存在しない。 詳細と解除条件は #748。
+    expired_at: 2027-03-31
