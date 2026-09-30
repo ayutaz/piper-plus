@@ -4677,8 +4677,8 @@
     },
     {
       "file": "docs/migration/README.md",
-      "line_start": 36,
-      "line_end": 41,
+      "line_start": 46,
+      "line_end": 51,
       "language_raw": "markdown",
       "language": "unknown",
       "category": "skip_warranted",
