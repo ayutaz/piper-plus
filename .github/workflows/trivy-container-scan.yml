@@ -186,6 +186,9 @@ jobs:
           severity: CRITICAL,HIGH,MEDIUM
           ignore-unfixed: true
           exit-code: '0'
+          # Vulnerabilities 側の PkgPath が空だったため、 Packages 側の
+          # FilePath も見る。 これが空なら finding にファイルの裏付けが無い。
+          list-all-pkgs: true
 
       - name: Print PkgPath for setuptools / msgpack (temporary)
         if: matrix.target.name == 'python-inference' || matrix.target.name == 'webui-distroless'
