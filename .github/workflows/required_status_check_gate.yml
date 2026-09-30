@@ -82,14 +82,24 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           if [ "${EVENT_NAME}" = "pull_request" ]; then
             echo "sha=${PR_HEAD_SHA}" >> "$GITHUB_OUTPUT"
             echo "pr=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
-            echo "base_branch=${PR_BASE_REF}" >> "$GITHUB_OUTPUT"
+            # No supersede branch on pull_request. The base ref was passed
+            # here, and --branch-for-supersede compares head_sha against that
+            # branch's TIP -- a PR head is never the tip of its own base, so
+            # the gate deferred and exited 0 on every pull_request firing
+            # without ever aggregating a spoke (measured: 4/4 runs printed
+            # "Head SHA <pr-head> is no longer the branch tip (latest: <dev
+            # tip>)"). The supersede guard exists for the workflow_run path,
+            # where a spoke completing late can fire the gate on a stale SHA;
+            # on pull_request, `synchronize` re-fires with the new head SHA
+            # and the checks list shows the latest run for that SHA, so a
+            # stale verdict cannot linger.
+            echo "base_branch=" >> "$GITHUB_OUTPUT"
           else
             echo "sha=${RUN_HEAD_SHA}" >> "$GITHUB_OUTPUT"
             # `workflow_run` doesn't carry the PR number directly; surface the
@@ -117,7 +127,7 @@ jobs:
             --head-sha "${HEAD_SHA}" \
             --repo "${GITHUB_REPOSITORY}" \
             --monitored "${MONITORED_WORKFLOWS}" \
-            --paths-filtered "Memory regression (per-language),PUA Consistency Gate" \
+            --paths-filtered "Multi-Runtime RTF Benchmark,Memory regression (per-language),Parity Hub,PUA Consistency Gate" \
             --on-cancelled fail \
             --on-skipped fail \
             "${extra_args[@]}"
