@@ -15,6 +15,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enforces this automatically.
 -->
 
+<!--
+  The block below was drafted as `## [2.0.0] - 2026-05-25` but that release
+  was NEVER cut: the newest tag is v1.13.0 (2026-06-15) and PyPI's newest
+  piper-plus is 1.13.0. The heading also sat ABOVE [1.13.0] while carrying
+  an EARLIER date, so the file claimed a release that does not exist.
+  Its entries are unreleased, so they live here until a release is cut.
+-->
+
+Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13 + CUDA 12.8 + Ubuntu 24.04** で完全統一する fully-aligned 戦略 migration。 新 GPU (T4 / RTX 6000 Ada / RTX 5090) サポート + TF32 / bf16-mixed default 化。
+加えて Issue #590: **`piper` → `piper_plus` / `piper-plus` フル改名 (クリーンブレーク)** により本家 `piper-tts` (rhasspy/piper) と同一環境への pip 共存が可能に。
+
+### Breaking
+
+- **Default Docker images now require CUDA 12.8 + host NVIDIA driver R570+**
+  ([`docker/python-train/Dockerfile`](docker/python-train/Dockerfile),
+  [`docker/python-inference/Dockerfile`](docker/python-inference/Dockerfile)).
+  Base image bumped from `nvidia/cuda:12.6.3-...-ubuntu22.04` to
+  `nvidia/cuda:12.8.1-...-ubuntu24.04`. Hosts running NVIDIA driver R525
+  (12.6) or older will fail to start the new images. See
+  [Docker base image upgrade](docs/migration/v1.12-to-v2.0.md#docker-base-image-upgrade).
+- **Default Python interpreter inside Docker images is 3.13** (was 3.11).
+  `requires-python = ">=3.11"` is unchanged; PyPI installs on Python
+  3.11/3.12 remain supported. Only the Docker image default has shifted.
+  See [Python 3.13 default](docs/migration/v1.12-to-v2.0.md#python-313-default).
+- **PyTorch wheel bumped from 2.2.1+cu121 to 2.11.0+cu128** in the
+  training image. Required for RTX 5090 (Blackwell sm_120) support.
+  See [PyTorch upgrade](docs/migration/v1.12-to-v2.0.md#pytorch-upgrade).
+- **Loading checkpoints generated with torch 2.2 is no longer supported**
+  in v2.0 training images. Existing ONNX models continue to work for
+  inference. Users who need to continue fine-tuning from a torch-2.2
+  checkpoint must stay on the v1.12 Docker image tag (preserved
+  indefinitely in registry).
+  See [Checkpoint resume non-support](docs/migration/v1.12-to-v2.0.md#checkpoint-resume-non-support).
+- **distroless final images bumped from debian12 to debian13**
+  ([`docker/python-inference/Dockerfile.cpu.distroless`](docker/python-inference/Dockerfile.cpu.distroless),
+  [`docker/webui/Dockerfile.distroless`](docker/webui/Dockerfile.distroless)).
+  Internal Python paths shifted from `/usr/local/lib/python3.11` to
+  `/usr/local/lib/python3.13`.
+  See [distroless image upgrade](docs/migration/v1.12-to-v2.0.md#distroless-image-upgrade).
+- **TF32 is now enabled by default in training** via
+  `torch.backends.cuda.matmul.allow_tf32 = True` and
+  `torch.backends.cudnn.allow_tf32 = True`. This is a noop on sm_75 and
+  older GPUs (T4 included). For Ada Lovelace / Blackwell, matmul/conv
+  are ~1.3-1.5x faster but lose bit-exact reproducibility vs strict FP32.
+  See [TF32 default ON](docs/migration/v1.12-to-v2.0.md#tf32-default-on).
+- **Canonical training precision in CLAUDE.md Template A/B is now
+  `--precision bf16-mixed`** (was `--precision 32-true`). The `32-true`
+  option remains available for legacy V100 compatibility / strict
+  numerical reproducibility, but is no longer the recommended default.
+  New GPU (Ada 6000 / RTX 5090) users get BF16 Tensor Core acceleration
+  by default.
+  See [bf16-mixed Template default](docs/migration/v1.12-to-v2.0.md#bf16-mixed-template-default).
+- **Python import: `import piper` / `from piper.X import ...` は削除**、
+  `import piper_plus` / `from piper_plus.X import ...` に置換 (Issue #590、
+  互換 shim なし)。 本家 `piper-tts` (rhasspy/piper) を co-install した環境で
+  `from piper import ...` を書くと本家の `PiperVoice` が解決される (当 fork ではない)。
+  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
+- **Python CLI entry-point `piper` は削除**、 `piper-plus` に置換 (Issue #590)。
+  `pip install piper-plus` (v2.0) 後に `piper` コマンドは存在しない。
+  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
+- **Python module 実行**: `python -m piper` / `python -m piper.webui` / `python -m piper.http_server`
+  を削除、 `python -m piper_plus` / `python -m piper_plus.webui` / `python -m piper_plus.http_server`
+  に置換 (Issue #590)。
+  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
+- **C++ プリビルドバイナリ**: `./bin/piper` / `piper.exe` を `./bin/piper-plus` / `piper-plus.exe`
+  に rename (Issue #590)。 CMake target 名 `piper` は据置 (`OUTPUT_NAME "piper-plus"` で出力名のみ変更)。
+  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
+- **リリースアセット名**: `piper-<os>-<arch>.tar.gz` / `.zip` を
+  `piper-plus-cpp-<os>-<arch>.tar.gz` / `.zip` に rename
+  (C# `piper-plus-cli-*` / Rust `piper-plus-rs-cli-*` との接頭辞衝突回避に `-cpp-` 識別子、
+  Issue #590)。 旧タグ添付資産は per-tag で不変。
+  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
+- **共有辞書 / キャッシュ dir**: `share/piper/` / `~/.local/share/piper` / `%APPDATA%\piper` 等を
+  `share/piper-plus/` / `~/.local/share/piper-plus` / `%APPDATA%\piper-plus` に移動
+  (Issue #590)。 既に DL 済みの辞書・モデルは再取得または手動移動が必要。
+  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
+- **環境変数 prefix**: `PIPER_*` (例 `PIPER_MODEL_DIR` / `PIPER_DISABLE_WARMUP`) を
+  `PIPER_PLUS_*` (例 `PIPER_PLUS_MODEL_DIR` / `PIPER_PLUS_DISABLE_WARMUP`) に統一 (Issue #590)。
+  学習側 (`piper_train`) の env var、 Docker container Unix user `piper`、 および
+  Wyoming Docker container 内の PIPER_MODEL / PIPER_LANGUAGE / PIPER_SPEAKER_ID / PIPER_PORT
+  (Home Assistant 既存ユーザー互換性のため据置) は scope 外。
+  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
+
 ### Security
 
 - WebUI: `src/python_run/requirements_webui.txt` の Gradio を `6.21.0` → `6.26.0` に揃え、**gradio pin の同期ゲートを 2 サイトから 3 サイトへ拡張**した (`scripts/check_hf_space_gradio_sync.py`)。 従来のゲートは `huggingface-space/README.md` の `sdk_version` と `huggingface-space/requirements.txt` しか照合しておらず、 **WebUI 側の pin はどのゲートにも守られていなかった**。 その結果 `6.14.0` のまま CVE-2026-48545 を抱えて放置され、 その後 HF Space 側を `6.26.0` へ上げた際にも WebUI だけ `6.21.0` に取り残された。 本ファイルは README 8 言語版が `uv pip install -r` で直接案内し `docker/webui/Dockerfile` と `docker/python-inference/Dockerfile` (`.cpu` 含む) も COPY するため、 1 箇所の drift が手動導入と Docker 双方に効く。 なお `test-hf-space.yml` の trigger paths への 3 サイト目追加は別途必要 (ゲートは trigger が見せる範囲しか守れず、 現状は `requirements_webui.txt` だけを触る PR ではゲートが起動しない)。 `huggingface-space/**` を触る PR では起動するため、 本件で実際に起きた 「HF Space を上げて WebUI が取り残される」経路は本 PR で塞がる。 `uv pip compile` で `gradio 6.26.0` + 既存の numpy 制約 (`>=1.26.4,<2.3`) が `numpy 2.2.6` に解決することを確認済み。
@@ -27,9 +110,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - wasm: `RustWasmAdapter.create()` に `options.jaDict` を追加し、 `ja-external` / `multilingual-external` variant へ外部 JA 辞書を投入できるようにした。 取得 → SHA-256 検証 → 投入の順で適用し、 検証前には投入しない (版違いの blob が `setJapaneseDictionary` を throw させたときに壊れた状態を残さないため)。 **既定 URL は意図的に持たせていない** — `setJapaneseDictionary` は日本語音素化をまるごと差し替えるので、 辞書同梱ビルドの出力が暗黙のダウンロードで変わってはならない。 失敗しても reject しない: `index.js` の catch は `ja` と `zh` をまとめて WASM 経路から外すため、 日本語の失敗が動作中の中国語を巻き添えにする。 代わりに `japaneseDictionaryStatus` (`"not-requested"` / `"unsupported"` / `"loaded"` / `"failed"`) を公開し、 辞書同梱ビルドで指定が無視されたケースを呼び出し側が判別できるようにした
 - ci: `multilingual-external` を build matrix の 4 番目の variant として追加した。 辞書が要るのは `ja` と `zh` だけで `ko` / `es` / `fr` / `pt` / `sv` は規則ベースのため、 日本語を使わない利用者は現在 55MB の NAIST-JDIC を無駄に払っている (`multilingual` の wasm は 57.2 MiB、 `ja-lite` は 1.56 MiB)。 `rust-tests.yml` が `wasm-pack test` で既に検証しているのに配布 artifact としては一度もビルドされていなかった。 **npm の `exports` にはまだ追加しない** — `ja` の外部辞書 blob が未公開のため、 今 subpath を生やすと「宣言はあるが日本語が passthrough に落ちる」という、 まさに `./wasm/ja` で直した欠陥を再生産する
 - tools: `tools/ja-dict-blob` を追加した。 `setJapaneseDictionary` が要求する bincode 直列化 `jpreprocess::Dictionary` を生成する手段がリポジトリにも公開先にも存在せず、 外部辞書 variant の日本語は `PassthroughPhonemizer` のままエラーも出さずに文字単位へ劣化していた。 出力は 58,026,142 B (gzip 18,957,365 B)、 3 回の独立実行で byte-identical (sha256 `bd0e46d9...`) を確認済み。 blob は magic bytes も version field も持たない生の bincode dump なので、 版・バイト数・SHA-256 を sidecar JSON へ書き出して pin できるようにした。 `naist-jdic` feature がビルド時に ~19MB を DL するため workspace member にはしていない
+- **`docs/migration/v1.12-to-v2.0.md`**: v2.0.0 マイグレーションガイド (Issue #527 + Zero-Shot TTS 統合リリース)。 設計の根拠 / ADR / 未決事項 / 実装履歴は [Issue #527](https://github.com/ayutaz/piper-plus/issues/527) + [PR #569](https://github.com/ayutaz/piper-plus/pull/569) を canonical source とする。
+- **`torch.backends.cuda.matmul.allow_tf32 = True`** in
+  [`src/python/piper_train/__main__.py`](src/python/piper_train/__main__.py)
+  (DR-007、 Ada/Blackwell で TF32 Tensor Core 透過適用)。
+- **rhasspy/piper (`piper-tts`) との pip 同一環境共存サポート**
+  ([Issue #590](https://github.com/ayutaz/piper-plus/issues/590)):
+  import 名 / CLI 名 / バイナリ名 / 環境変数 prefix / 共有 dir を全て `piper_plus` /
+  `piper-plus` / `PIPER_PLUS_*` に改名したことで、 本家 `piper-tts` と `piper-plus`
+  を同一 venv に co-install できるようになった。 新メンタルモデル:
+  `import piper` = 本家 rhasspy/piper、 `import piper_plus` = 当 fork
+  (完全独立、 名前空間衝突なし)。
+  See [新メンタルモデル](docs/migration/v1.12-to-v2.0.md#新メンタルモデル-最重要).
+- **高レベル API `piper_plus.api` サブモジュール統合**
+  ([Issue #590](https://github.com/ayutaz/piper-plus/issues/590)):
+  旧 `src/python/piper_plus/` (Wyoming Docker が独自 ONNX 推論エンジンで使用) を
+  `src/python_run/piper_plus/api/` に物理統合。 `from piper_plus.api import PiperPlus`
+  で高レベル API を利用可能。 旧 top-level `piper_plus` (高レベル API) と
+  runtime `piper` (PiperVoice) の名前空間衝突を解消。
 
 ### Fixed
 
+- ci: migration guide の anchor slug 規則を GitHub の実挙動に合わせた (`scripts/check_migration_xref.py` / `docs/migration/README.md` / fixture テスト)。 規則は **underscore と連続空白をどちらも `-` に潰す**としていたが、 GitHub は**どちらも潰さない**。 そのため「規則どおりに書いたリンクが GitHub 上では 404 になる」という逆転が起きていた。 **実測** (GitHub のレンダリング結果を取得): Issue #590 の見出しは `id="user-content-piper--piper_plus--piper-plus-改名-issue-590"`、 `# v1.12 → v2.0 migration guide` は `id="user-content-v112--v20-migration-guide"` — underscore が残り、 矢印を除去した跡の 2 空白が `--` として残る。 実アンカー 4 件すべてに一致することを確認した。 この不一致は `### Breaking` が未リリースの `[2.0.0]` セクション配下にあり gate が skip していたため露見していなかった
+- docs: CHANGELOG の `## [2.0.0] - 2026-05-25` セクションを `[Unreleased]` に統合した。 **2.0.0 はリリースされていない** — 最新タグは `v1.13.0` (2026-06-15)、 PyPI の最新も `1.13.0` で、 `2.0.0` のタグも GitHub リリースも存在しない。 それにもかかわらず見出しが `[1.13.0] - 2026-06-13` の**上**に**より古い日付**で置かれており、 ファイルが存在しないリリースを主張していた。 このため v1.x のリリース見出しを足すと `check_changelog_format` が降順違反で fail し、 **v1.x のリリース自体ができない状態**だった (実測: `[1.14.0]` を仮に足すと `version '2.0.0' must be strictly older than '1.14.0'`)。 統合後は同じ検査が通る。 エントリは 192 + 24 = 216 件で欠落なし
 - **C++: `--ssml --output-timing` が timing ファイルを作らなかったのを修正した (#692)。** `ssml_synth.cpp` は segment ごとに `inferSeconds` / `audioSeconds` を積算しながら `phonemeTimings` / `hasTimingInfo` を呼び出し元へ転送しておらず、`main.cpp` の書き出しゲートが false のまま通らなかった。音声は正常に出る (#659 で修正済み) ため timing だけが欠ける形で、診断ログは出るので silent failure ではないが SSML と timing の組み合わせが機能していなかった。**#652 とまったく同じ omission** — あちらは 5 つの集約経路が per-unit timing を捨てていた問題で PR #658 でまとめて直したが、SSML 経路は当時まだ `main.cpp` 内の `static` で、PR #661 で切り出した際も転送は入らなかった。segment の音声を buffer に入れる**前**に、buffer が既に保持している分を offset として timing を publish する (これは piper.cpp の 5 経路が守っているのと同じ規則)。**実測**: `<speak>Hola mundo. <break time="300ms"/> Buenas noches.</speak>` で 23 エントリ / `start_ms == 0` が **1 件のみ** (offset が効いている) / 単調性違反 0 / `total_duration_ms` 1756.508 ms が実 WAV と**完全一致**
 - **C++: サンプル数に対する `channels` の扱いが 2 か所で逆向きだったのを統一した (#693)。** `writeWavHeader` は引数を**フレーム数**として `channels` を掛け、`piper_plus::timing::ConcatCursor` は**インタリーブ済みサンプル数**として `channels` で割っていた。CLI は同じ `audioBuffer.size()` を両方に渡すため、`channels > 1` では片方が必ず誤る (`dataSize` が channels 倍に膨らむ)。デコーダ出力はマルチチャンネルならインタリーブされるので **`ConcatCursor` 側が正しい**。`writeWavHeader` の引数名を `numInterleavedSamples` に改め `dataSize = numInterleavedSamples * sampleWidth` にした。併せて `main.cpp` の `writeWavFromBuffer` が `numChannels = 1` を**ハードコード**して `voice.synthesisConfig.channels` を参照していなかったのを修正した。`channels` は現状どの経路でも 1 なので**挙動は不変**だが、それは安全だった理由ではなく気付かれなかった理由である
 - C++: `appendUnitTimings` を `piper.cpp` の `static` から `phoneme_timing_concat.hpp` の template に移した。`static` だったため `ssml_synth.cpp` (後から `main.cpp` から切り出された) が呼べず、#692 の原因になっていた。`SynthesisResult` は `piper.hpp` (ORT 依存) にあるので result 型を template 引数にして ORT 非依存を保つ
@@ -237,6 +340,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C#: `WriteFatalDiagnostics` を `src/csharp/PiperPlus.Cli/FatalDiagnostics.cs` に切り出し、`PiperPlus.Cli.Tests` へソースリンクした。`Main` の catch 内にインラインで置くと**どのテストからも到達できない** (#703 と同じ欠陥クラス)。`Program.cs` 自体はソースリンクできない (`Main` がテストホストの entry point と衝突する) ため専用ファイルにした — 同テストプロジェクトが `DotNetG2PEngine` で既に使っている方式
 - tests: 上記の回帰テストを 6 件追加した。例外の型が出ること / `FileName` を持つときだけ「Missing file」行が出ること (常に出す実装を弾く anti-vacuity) / stack trace が出ること / inner exception を**最後まで**辿ること / 既存の `[ERR] Fatal error:` 行が**先頭のまま**であること (CI ログや issue の引用との連続性を壊さないため)。**実測 (変異試験)**: 6 種が **6/6 検出**
 - docs: #735 で挙げていた「カバレッジの startup hook が漏れている」仮説を**否定した**。`DOTNET_STARTUP_HOOKS=/nonexistent/hook.dll` で CLI を起動すると CLR が `Main` 到達**前**に `Unhandled exception. System.ArgumentException: Startup hook assembly ... failed to load` を出す (実測) のに対し、観測された失敗は CLI 自身の `[ERR] Fatal error:` を出している。つまり `Main` には入っており、startup hook のロード失敗ではない
+- **`monotonic_align/setup.py`**: `from distutils.core import setup` →
+  `from setuptools import setup`。 distutils は Python 3.12 で stdlib から
+  削除済 (PEP 632)、 setuptools shim 経由で偶然動いていた状態を明示化。
+- **Rust security bump** (Issue #590 / PR #598 内): `piper-plus-g2p` の
+  `quick-xml` を 0.37 → 0.41 に bump し
+  [RUSTSEC-2026-0194 / 0195](https://rustsec.org) (Severity 7.5)、
+  および `crossbeam-epoch` 0.9.18 → 0.9.20 を解消。 併せて `piper-core`
+  の SSML parser 実装を `piper_plus_g2p::ssml` の re-export へ切替、
+  `piper-core` 側の `quick-xml` 直接依存を除去 (downstream `piper-plus`
+  クレートの dep tree 縮小 / attack surface 減)。
 
 ### Changed
 
@@ -247,107 +360,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 学習: `--resume-from-multispeaker-checkpoint` の実処理がインライン複製から `load_multispeaker_checkpoint()` に一本化された。 同関数はどこからも呼ばれない dead code で、 インライン側と挙動が食い違っていた (関数側のみ HiFi-GAN ckpt を明示エラーにし、 インライン側のみ weight_norm キーを remap していた)。 統合の結果、 **FT 経路でも v1.11 以前の HiFi-GAN ckpt が明示エラーになる** (従来は無言で大量の missing keys を出して継続していた)。 同様に `export_onnx` の EMA 適用も 2 箇所の複製を `apply_ema_shadow_params()` に集約した
 
 - CI: `g2p-python-ci.yml` の `test extras` job で venv を workspace 内 (`.venv-extras/`) ではなく `${RUNNER_TEMP}/venv-extras` に作るよう変更。 当 job は `uv.lock` を経由せず PyPI から fresh resolve するため nltk 3.10.x を引くが、 3.10 で追加された `nltk/inisec.py` の `NLTKSafeImportFinder` が「解決先ファイルが cwd 配下に物理的に存在する」モジュールを一律ブロックするため、 workspace 内 venv だと site-packages 全体が誤検知され `import nltk` 自体が `ImportError: Blocked import of regex from current working directory` で失敗していた。 エラーメッセージが案内する `-P` / `PYTHONSAFEPATH=1` は判定基準が sys.path ではなくファイルの物理位置のため回避にならないことを実測で確認済み
-
-## [2.0.0] - 2026-05-25
-
-Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13 + CUDA 12.8 + Ubuntu 24.04** で完全統一する fully-aligned 戦略 migration。 新 GPU (T4 / RTX 6000 Ada / RTX 5090) サポート + TF32 / bf16-mixed default 化。
-加えて Issue #590: **`piper` → `piper_plus` / `piper-plus` フル改名 (クリーンブレーク)** により本家 `piper-tts` (rhasspy/piper) と同一環境への pip 共存が可能に。
-
-### Breaking
-
-- **Default Docker images now require CUDA 12.8 + host NVIDIA driver R570+**
-  ([`docker/python-train/Dockerfile`](docker/python-train/Dockerfile),
-  [`docker/python-inference/Dockerfile`](docker/python-inference/Dockerfile)).
-  Base image bumped from `nvidia/cuda:12.6.3-...-ubuntu22.04` to
-  `nvidia/cuda:12.8.1-...-ubuntu24.04`. Hosts running NVIDIA driver R525
-  (12.6) or older will fail to start the new images. See
-  [Docker base image upgrade](docs/migration/v1.12-to-v2.0.md#docker-base-image-upgrade).
-- **Default Python interpreter inside Docker images is 3.13** (was 3.11).
-  `requires-python = ">=3.11"` is unchanged; PyPI installs on Python
-  3.11/3.12 remain supported. Only the Docker image default has shifted.
-  See [Python 3.13 default](docs/migration/v1.12-to-v2.0.md#python-313-default).
-- **PyTorch wheel bumped from 2.2.1+cu121 to 2.11.0+cu128** in the
-  training image. Required for RTX 5090 (Blackwell sm_120) support.
-  See [PyTorch upgrade](docs/migration/v1.12-to-v2.0.md#pytorch-upgrade).
-- **Loading checkpoints generated with torch 2.2 is no longer supported**
-  in v2.0 training images. Existing ONNX models continue to work for
-  inference. Users who need to continue fine-tuning from a torch-2.2
-  checkpoint must stay on the v1.12 Docker image tag (preserved
-  indefinitely in registry).
-  See [Checkpoint resume non-support](docs/migration/v1.12-to-v2.0.md#checkpoint-resume-non-support).
-- **distroless final images bumped from debian12 to debian13**
-  ([`docker/python-inference/Dockerfile.cpu.distroless`](docker/python-inference/Dockerfile.cpu.distroless),
-  [`docker/webui/Dockerfile.distroless`](docker/webui/Dockerfile.distroless)).
-  Internal Python paths shifted from `/usr/local/lib/python3.11` to
-  `/usr/local/lib/python3.13`.
-  See [distroless image upgrade](docs/migration/v1.12-to-v2.0.md#distroless-image-upgrade).
-- **TF32 is now enabled by default in training** via
-  `torch.backends.cuda.matmul.allow_tf32 = True` and
-  `torch.backends.cudnn.allow_tf32 = True`. This is a noop on sm_75 and
-  older GPUs (T4 included). For Ada Lovelace / Blackwell, matmul/conv
-  are ~1.3-1.5x faster but lose bit-exact reproducibility vs strict FP32.
-  See [TF32 default ON](docs/migration/v1.12-to-v2.0.md#tf32-default-on).
-- **Canonical training precision in CLAUDE.md Template A/B is now
-  `--precision bf16-mixed`** (was `--precision 32-true`). The `32-true`
-  option remains available for legacy V100 compatibility / strict
-  numerical reproducibility, but is no longer the recommended default.
-  New GPU (Ada 6000 / RTX 5090) users get BF16 Tensor Core acceleration
-  by default.
-  See [bf16-mixed Template default](docs/migration/v1.12-to-v2.0.md#bf16-mixed-template-default).
-- **Python import: `import piper` / `from piper.X import ...` は削除**、
-  `import piper_plus` / `from piper_plus.X import ...` に置換 (Issue #590、
-  互換 shim なし)。 本家 `piper-tts` (rhasspy/piper) を co-install した環境で
-  `from piper import ...` を書くと本家の `PiperVoice` が解決される (当 fork ではない)。
-  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
-- **Python CLI entry-point `piper` は削除**、 `piper-plus` に置換 (Issue #590)。
-  `pip install piper-plus` (v2.0) 後に `piper` コマンドは存在しない。
-  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
-- **Python module 実行**: `python -m piper` / `python -m piper.webui` / `python -m piper.http_server`
-  を削除、 `python -m piper_plus` / `python -m piper_plus.webui` / `python -m piper_plus.http_server`
-  に置換 (Issue #590)。
-  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
-- **C++ プリビルドバイナリ**: `./bin/piper` / `piper.exe` を `./bin/piper-plus` / `piper-plus.exe`
-  に rename (Issue #590)。 CMake target 名 `piper` は据置 (`OUTPUT_NAME "piper-plus"` で出力名のみ変更)。
-  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
-- **リリースアセット名**: `piper-<os>-<arch>.tar.gz` / `.zip` を
-  `piper-plus-cpp-<os>-<arch>.tar.gz` / `.zip` に rename
-  (C# `piper-plus-cli-*` / Rust `piper-plus-rs-cli-*` との接頭辞衝突回避に `-cpp-` 識別子、
-  Issue #590)。 旧タグ添付資産は per-tag で不変。
-  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
-- **共有辞書 / キャッシュ dir**: `share/piper/` / `~/.local/share/piper` / `%APPDATA%\piper` 等を
-  `share/piper-plus/` / `~/.local/share/piper-plus` / `%APPDATA%\piper-plus` に移動
-  (Issue #590)。 既に DL 済みの辞書・モデルは再取得または手動移動が必要。
-  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
-- **環境変数 prefix**: `PIPER_*` (例 `PIPER_MODEL_DIR` / `PIPER_DISABLE_WARMUP`) を
-  `PIPER_PLUS_*` (例 `PIPER_PLUS_MODEL_DIR` / `PIPER_PLUS_DISABLE_WARMUP`) に統一 (Issue #590)。
-  学習側 (`piper_train`) の env var、 Docker container Unix user `piper`、 および
-  Wyoming Docker container 内の PIPER_MODEL / PIPER_LANGUAGE / PIPER_SPEAKER_ID / PIPER_PORT
-  (Home Assistant 既存ユーザー互換性のため据置) は scope 外。
-  See [piper → piper_plus 改名](docs/migration/v1.12-to-v2.0.md#piper--piper_plus--piper-plus-改名-issue-590).
-
-### Added
-
-- **`docs/migration/v1.12-to-v2.0.md`**: v2.0.0 マイグレーションガイド (Issue #527 + Zero-Shot TTS 統合リリース)。 設計の根拠 / ADR / 未決事項 / 実装履歴は [Issue #527](https://github.com/ayutaz/piper-plus/issues/527) + [PR #569](https://github.com/ayutaz/piper-plus/pull/569) を canonical source とする。
-- **`torch.backends.cuda.matmul.allow_tf32 = True`** in
-  [`src/python/piper_train/__main__.py`](src/python/piper_train/__main__.py)
-  (DR-007、 Ada/Blackwell で TF32 Tensor Core 透過適用)。
-- **rhasspy/piper (`piper-tts`) との pip 同一環境共存サポート**
-  ([Issue #590](https://github.com/ayutaz/piper-plus/issues/590)):
-  import 名 / CLI 名 / バイナリ名 / 環境変数 prefix / 共有 dir を全て `piper_plus` /
-  `piper-plus` / `PIPER_PLUS_*` に改名したことで、 本家 `piper-tts` と `piper-plus`
-  を同一 venv に co-install できるようになった。 新メンタルモデル:
-  `import piper` = 本家 rhasspy/piper、 `import piper_plus` = 当 fork
-  (完全独立、 名前空間衝突なし)。
-  See [新メンタルモデル](docs/migration/v1.12-to-v2.0.md#新メンタルモデル-最重要).
-- **高レベル API `piper_plus.api` サブモジュール統合**
-  ([Issue #590](https://github.com/ayutaz/piper-plus/issues/590)):
-  旧 `src/python/piper_plus/` (Wyoming Docker が独自 ONNX 推論エンジンで使用) を
-  `src/python_run/piper_plus/api/` に物理統合。 `from piper_plus.api import PiperPlus`
-  で高レベル API を利用可能。 旧 top-level `piper_plus` (高レベル API) と
-  runtime `piper` (PiperVoice) の名前空間衝突を解消。
-
-### Changed
-
 - **CI workflow**: 20 個の workflow で `python-version` を `'3.11'` から
   `'3.13'` に bump (matrix workflow `python-tests` / `g2p-python-ci` は
   3.11/3.12/3.13 網羅で据置。 `build-phonemize-wheels` は piper-phonemize が
@@ -359,19 +371,6 @@ Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13
   `--no-wavlm` を削除 (Ada/Blackwell では WavLM 有効が canonical)。
 - **docs/guides/training/**: V100 言及を新 GPU (T4 / Ada 6000 / RTX 5090)
   前提に置換。
-
-### Fixed
-
-- **`monotonic_align/setup.py`**: `from distutils.core import setup` →
-  `from setuptools import setup`。 distutils は Python 3.12 で stdlib から
-  削除済 (PEP 632)、 setuptools shim 経由で偶然動いていた状態を明示化。
-- **Rust security bump** (Issue #590 / PR #598 内): `piper-plus-g2p` の
-  `quick-xml` を 0.37 → 0.41 に bump し
-  [RUSTSEC-2026-0194 / 0195](https://rustsec.org) (Severity 7.5)、
-  および `crossbeam-epoch` 0.9.18 → 0.9.20 を解消。 併せて `piper-core`
-  の SSML parser 実装を `piper_plus_g2p::ssml` の re-export へ切替、
-  `piper-core` 側の `quick-xml` 直接依存を除去 (downstream `piper-plus`
-  クレートの dep tree 縮小 / attack surface 減)。
 
 ## [1.13.0] - 2026-06-13
 

@@ -59,14 +59,28 @@ class Section:
 def slugify(heading: str) -> str:
     """GitHub Markdown 互換の anchor slug を返す。
 
-    Markdown フレーバーの厳密仕様は未公開だが、 GitHub の挙動は
-    ``ascii lowercase → remove non-alphanumeric (except space, dash) →
-    spaces to dashes`` で近似できる。 連続 dash の collapse は
-    GitHub は行わないが、 fixture テストで pinning する。
+    GitHub の挙動 (github-slugger) は
+    ``lowercase → remove punctuation except - and _ → spaces to dashes``。
+    連続 dash の collapse は GitHub は行わないので、 ここでも行わない。
+
+    UNDERSCORE IS PRESERVED. 以前は ``[\\s_]+`` で underscore も dash に
+    潰しており、 そのぶん GitHub の実アンカーと食い違っていた。 実測 --
+    ``docs/migration/v1.12-to-v2.0.md`` の
+    ``## `piper` → `piper_plus` / `piper-plus` 改名 (Issue #590)`` を
+    GitHub がレンダリングすると
+
+        id="user-content-piper--piper_plus--piper-plus-改名-issue-590"
+
+    となり underscore が残る。 潰す実装では、 **この gate を通るリンクが
+    GitHub 上では 404 になる** という逆転が起きていた。
     """
     s = heading.strip().lower()
     s = re.sub(r"[^\w\s-]", "", s, flags=re.UNICODE)
-    s = re.sub(r"[\s_]+", "-", s)
+    # Each whitespace char, NOT runs: GitHub does not collapse. Measured --
+    # ``# v1.12 → v2.0 migration guide`` renders as
+    # ``id="user-content-v112--v20-migration-guide"`` (double dash, because
+    # removing the arrow leaves the two spaces that surrounded it).
+    s = re.sub(r"\s", "-", s)
     return s.strip("-")
 
 

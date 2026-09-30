@@ -14,7 +14,7 @@ H2 anchor slug の算出:
 
 1. lower-case にする
 2. `[^\w\s-]` (`\w` = alphanum + underscore) に該当する文字を削除
-3. 連続する空白 / underscore を単一 `-` に置換
+3. 空白 1 文字ごとに `-` へ置換 (**連続空白は潰さない**、 **underscore もそのまま残す**)
 4. 先頭・末尾の `-` を trim
 
 例:
@@ -24,6 +24,16 @@ H2 anchor slug の算出:
 | `## foo removal` | `#foo-removal` |
 | ``## `Generator` class removal`` | `#generator-class-removal` |
 | `## config schema v2` | `#config-schema-v2` |
+| ``## `piper` → `piper_plus` 改名`` | `#piper--piper_plus-改名` |
+| `## v1.12 → v2.0 migration guide` | `#v112--v20-migration-guide` |
+
+> underscore は **dash に潰さない**。 GitHub の実アンカーを実測して確認済み:
+> `docs/migration/v1.12-to-v2.0.md` の Issue #590 見出しは GitHub 上で
+> `id="user-content-piper--piper_plus--piper-plus-改名-issue-590"` になる。
+> 連続空白も同様に潰さない — 矢印などを除去した跡の 2 つの空白が `--` として
+> 残る (`# v1.12 → v2.0 migration guide` → `#v112--v20-migration-guide`)。
+> 以前はどちらも潰す規則だったため、 規則どおりに書いたリンクが GitHub で
+> 壊れるという逆転が起きていた。
 
 絵文字や日本語を含む見出しは、 上記アルゴリズム後に空になる可能性があります。 その場合は ASCII subset の代替見出しを併設するか、 CHANGELOG 側から anchor を省略してください (anchor なしのファイル link は許可されます)。
 

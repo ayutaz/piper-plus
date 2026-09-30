@@ -122,14 +122,23 @@ def test_versioned_breaking_is_ignored(xref, stage, tmp_path, capsys):
 
 def test_slugify_handles_unicode(xref):
     assert xref.slugify("Foo Bar") == "foo-bar"
-    assert xref.slugify("foo_bar") == "foo-bar"
+    # Underscore is PRESERVED: GitHub does not collapse it. Measured on
+    # docs/migration/v1.12-to-v2.0.md, whose Issue #590 heading renders as
+    # id="user-content-piper--piper_plus--piper-plus-改名-issue-590".
+    # This assertion used to demand "foo-bar", which made a link that
+    # satisfied the gate 404 on GitHub.
+    assert xref.slugify("foo_bar") == "foo_bar"
     assert xref.slugify("`Generator` class removal") == "generator-class-removal"
     # The actual GitHub slug collapses runs of `-` differently per renderer;
     # this assertion pins our implementation's deterministic behaviour so
     # `\s+` runs (whether or not they used to contain `→`) collapse to a
     # single dash. Drift here is OK as long as the fixture-side migration doc
     # uses the matching anchor.
-    assert xref.slugify("v1.12 → v1.13 migration guide") == "v112-v113-migration-guide"
+    # Double dash: removing the arrow leaves the two spaces around it, and
+    # GitHub does not collapse whitespace runs. Measured --
+    # "# v1.12 → v2.0 migration guide" renders as
+    # id="user-content-v112--v20-migration-guide".
+    assert xref.slugify("v1.12 → v1.13 migration guide") == "v112--v113-migration-guide"
 
 
 def test_parse_extracts_continuation_lines(xref):
