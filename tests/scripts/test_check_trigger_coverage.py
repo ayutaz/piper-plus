@@ -20,6 +20,12 @@ Measured on dev before the fix, with fully explicit (no-glob) paths lists:
     gap was known and recorded in CHANGELOG as "別途必要" precisely because
     nothing caught it automatically.
 
+This example needed a SECOND fix to be reached at all: the workflow-side scan
+began after the ``run:`` line, so it read only ``run: |`` bodies, and
+test-hf-space.yml invokes that gate as a one-liner. 20 workflows here do the
+same, so every such invocation was invisible until the capture was widened to
+start on the ``run:`` line itself.
+
 These tests pin the new behaviour so disabling it fails here rather than
 silently reducing the gate to its old, weaker form.
 """
@@ -151,3 +157,63 @@ def test_mirror_declarations_are_recognised(tc):
     assert tc.MIRROR_DECLARATION_RE.match("docs/spec/dictionary-mirrors.toml")
     assert tc.MIRROR_DECLARATION_RE.match("docs/spec/loanword-mirrors.toml")
     assert not tc.MIRROR_DECLARATION_RE.match("docs/spec/pua-contract.toml")
+
+
+def test_gate_invoked_on_the_run_line_itself_is_found(tc):
+    """A one-liner ``run: python scripts/check_x.py`` must be seen.
+
+    The scan used to start AFTER the ``run:`` line, so it only ever read
+    ``run: |`` bodies. 20 workflows here invoke a gate as a one-liner, and
+    every one of those invocations was invisible -- including
+    ``test-hf-space.yml``, whose ``paths:`` therefore never had to cover the
+    third gradio pin site the gate compares.
+    """
+    tracked = {
+        "scripts/check_hf_space_gradio_sync.py",
+        "src/python_run/requirements_webui.txt",
+    }
+    text = (
+        "jobs:\n"
+        "  gate:\n"
+        "    steps:\n"
+        "      - name: gradio pin sync\n"
+        "        run: python scripts/check_hf_space_gradio_sync.py\n"
+    )
+    found = tc.referenced_paths(text, tracked)
+    assert "scripts/check_hf_space_gradio_sync.py" in found
+    # And its inputs come along, which is the whole point of resolving it.
+    assert "src/python_run/requirements_webui.txt" in found
+
+
+def test_multi_line_run_block_still_works(tc):
+    """Anti-regression for the fix above: ``run: |`` bodies must still parse.
+
+    Widening the capture to start on the ``run:`` line must not drop the
+    indented continuation lines that were the only thing it read before.
+    """
+    tracked = {"scripts/check_pua_consistency.py"}
+    text = (
+        "jobs:\n"
+        "  gate:\n"
+        "    steps:\n"
+        "      - name: pua\n"
+        "        run: |\n"
+        "          python scripts/check_pua_consistency.py\n"
+    )
+    assert "scripts/check_pua_consistency.py" in tc.referenced_paths(text, tracked)
+
+
+def test_docstring_only_mentions_are_allowlisted_not_path_added(tc):
+    """The two ruff floors must be exempt by REASON, not by a paths: entry.
+
+    ``check_ruff_version_sync.py`` names src/python/pyproject.toml and
+    src/python/g2p/pyproject.toml in its docstring precisely to say it does
+    NOT check them (they carry ``ruff>=``, a floor, not a pin). Adding them to
+    ruff-version-sync.yml's paths: would run the gate on changes it ignores;
+    the allowlist records why instead. Pinned so the reasons cannot be
+    silently dropped in favour of a path.
+    """
+    entries = tc.ALLOWLIST["ruff-version-sync.yml"]
+    for path in ("src/python/pyproject.toml", "src/python/g2p/pyproject.toml"):
+        assert path in entries, path
+        assert entries[path].strip(), path
