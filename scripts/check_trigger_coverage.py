@@ -68,6 +68,13 @@ MIRROR_DECLARATION_RE = re.compile(r"^docs/spec/[\w-]+-mirrors\.toml$")
 # (trigger, referenced path) pairs that are deliberately NOT wired up.
 # Key: workflow filename or "precommit:<hook-id>". Value: {path: reason}.
 ALLOWLIST: dict[str, dict[str, str]] = {
+    "deploy-huggingface.yml": {
+        "scripts/check_ruff_version_sync.py": (
+            "same docstring cross-reference as in test-hf-space.yml: "
+            "check_hf_space_gradio_sync.py names it to cite a convention "
+            "(\"This mirrors the existing ...\"), not to read it"
+        ),
+    },
     "cli-help-extract.yml": {
         "src/rust/Cargo.toml": (
             "read only to discover the workspace version string; a version bump "
@@ -92,7 +99,22 @@ ALLOWLIST: dict[str, dict[str, str]] = {
             "of paths (push tags has no paths filter)"
         ),
     },
+    "ruff-version-sync.yml": {
+        "src/python/pyproject.toml": (
+            "named in check_ruff_version_sync.py's docstring as a site that is "
+            "INTENTIONALLY NOT checked: it declares ruff>=0.12 (a minimum), not "
+            "the pinned tool version, and lags the active pin deliberately"
+        ),
+        "src/python/g2p/pyproject.toml": (
+            "same as src/python/pyproject.toml: ruff>=0.8.0 is a floor, not a "
+            "pin, and is listed in the docstring only to say it is excluded"
+        ),
+    },
     "test-hf-space.yml": {
+        "scripts/check_ruff_version_sync.py": (
+            "cross-reference in check_hf_space_gradio_sync.py's docstring "
+            "(\"This mirrors the existing ... convention\"), not an input it reads"
+        ),
         "src/python/piper_train/vits/utils.py": (
             "transitive import of infer_onnx.py, which is listed"
         ),
@@ -273,7 +295,12 @@ def referenced_paths(text: str, tracked: set[str]) -> set[str]:
     """Repo files the workflow ASSERTS on, the gate scripts it invokes, and
     the files those scripts read."""
     found: set[str] = set()
-    for block in re.findall(r"run:[^\n]*\n((?:[ \t]+[^\n]*\n|\n)+)", text):
+    # The captured region starts ON the ``run:`` line, not after it: a gate
+    # invoked as a one-liner (``run: python scripts/check_x.py``) puts the
+    # script name on that very line. Anchoring after the newline read only
+    # ``run: |`` bodies, so every one-liner gate was invisible -- 20 of the
+    # workflows here invoke a gate that way.
+    for block in re.findall(r"run:([^\n]*\n(?:[ \t]+[^\n]*\n|\n)*)", text):
         for line in block.splitlines():
             if ASSERTION_RE.search(line):
                 for candidate in PATH_RE.findall(line):
