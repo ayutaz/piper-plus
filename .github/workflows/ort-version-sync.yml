@@ -41,6 +41,8 @@ on:
       - 'src/csharp/**/*.csproj'
       - 'src/go/go.mod'
       - 'src/wasm/openjtalk-web/package.json'
+      - 'docs/reference/ort-versions.md'
+      - 'src/rust/piper-core/Cargo.toml'
   pull_request:
     paths:
       # Source of truth + script
@@ -65,6 +67,8 @@ on:
       - 'src/csharp/**/*.csproj'
       - 'src/go/go.mod'
       - 'src/wasm/openjtalk-web/package.json'
+      - 'docs/reference/ort-versions.md'
+      - 'src/rust/piper-core/Cargo.toml'
   workflow_dispatch:
 
 concurrency:

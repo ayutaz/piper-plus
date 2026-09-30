@@ -14,6 +14,8 @@ on:
       - 'scripts/check_hf_space_gradio_sync.py'
       - 'scripts/verify_hf_space_runtime.py'
       - 'test/models/multilingual-test-medium.onnx'
+      - 'scripts/check_ruff_version_sync.py'
+      - 'src/python_run/requirements_webui.txt'
   workflow_dispatch:
     inputs:
       deployment_message:

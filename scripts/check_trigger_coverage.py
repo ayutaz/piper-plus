@@ -134,7 +134,25 @@ ALLOWLIST: dict[str, dict[str, str]] = {
 #
 # The hook is not left unguarded by the exclusion: its `files:` regex lists
 # this script, so editing the gate re-runs the gate.
-SELF_ANALYSIS_EXEMPT_SCRIPTS = {"scripts/check_trigger_coverage.py"}
+# Scripts that name repo paths as DATA rather than reading them as inputs.
+# Resolving their "inputs" would demand that every workflow invoking them list
+# everything they enumerate.
+#
+#   check_trigger_coverage.py   -- audits every workflow and hook, so it names
+#                                  all of them
+#   test_sync_gates_meta.py     -- a meta-test over the other sync gates: it
+#                                  names 7 `scripts/check_*.py` and their
+#                                  contract TOMLs in order to mutate each one
+#                                  and assert the gate notices. Measured: not
+#                                  exempting it produced 41 of 54 findings
+#                                  (21 on zh-en-loanword-sync.yml, 20 on
+#                                  pua-consistency.yml), all of them demands
+#                                  that those workflows trigger on contracts
+#                                  they have nothing to do with.
+SELF_ANALYSIS_EXEMPT_SCRIPTS = {
+    "scripts/check_trigger_coverage.py",
+    "scripts/test_sync_gates_meta.py",
+}
 
 
 def tracked_files() -> set[str]:
@@ -212,8 +230,48 @@ ASSERTION_RE = re.compile(
 GATE_SCRIPT_RE = re.compile(r"(scripts/(?:check|test|verify)_[\w_]+\.py)")
 
 
+def gate_script_inputs(script_rel: str, tracked: set[str]) -> set[str]:
+    """Repo files a gate script reads.
+
+    The pre-commit side has always done this (``check_precommit`` opens the
+    entry script and takes every tracked path it names). The workflow side did
+    NOT: it only scanned the workflow YAML, so it required the SCRIPT to be in
+    ``paths:`` but never its INPUTS. A gate could therefore be given a new file
+    to compare and go un-triggered by changes to that file.
+
+    Measured on dev before this was added:
+
+      * ``contract-gates-extended.yml`` invokes
+        ``check_audio_format_contract.py``, which names
+        ``src/python_run/piper_plus/voice.py``,
+        ``src/go/piperplus/synthesize.go`` and
+        ``src/csharp/PiperPlus.Core/Inference/PiperSession.cs`` -- none of
+        which were in that workflow's (fully explicit, no-glob) paths list.
+      * ``dictionary-consistency.yml`` invokes
+        ``check_dictionary_consistency.py``, which reads
+        ``docs/spec/dictionary-mirrors.toml`` -- a MIRROR DECLARATION, which
+        this gate's own rule says may never be exempted.
+      * ``test-hf-space.yml`` invokes ``check_hf_space_gradio_sync.py``, which
+        gained ``src/python_run/requirements_webui.txt`` as a third pin site.
+        That gap was known: CHANGELOG records it as "別途必要" because nothing
+        caught it automatically.
+
+    Scripts under SELF_ANALYSIS_EXEMPT_SCRIPTS are skipped for the same reason
+    they are on the pre-commit side -- a checker that names paths as DATA
+    (this file names every workflow it audits) would otherwise demand them all.
+    """
+    if script_rel in SELF_ANALYSIS_EXEMPT_SCRIPTS:
+        return set()
+    script = REPO_ROOT / script_rel
+    if not script.is_file():
+        return set()
+    source = script.read_text(encoding="utf-8", errors="replace")
+    return {p for p in PATH_RE.findall(source) if p in tracked}
+
+
 def referenced_paths(text: str, tracked: set[str]) -> set[str]:
-    """Repo files the workflow ASSERTS on, plus the gate scripts it invokes."""
+    """Repo files the workflow ASSERTS on, the gate scripts it invokes, and
+    the files those scripts read."""
     found: set[str] = set()
     for block in re.findall(r"run:[^\n]*\n((?:[ \t]+[^\n]*\n|\n)+)", text):
         for line in block.splitlines():
@@ -228,6 +286,10 @@ def referenced_paths(text: str, tracked: set[str]) -> set[str]:
         for candidate in PATH_RE.findall(block):
             if candidate in tracked and MIRROR_DECLARATION_RE.match(candidate):
                 found.add(candidate)
+
+    # What the invoked gates READ, not just the gates themselves.
+    for script_rel in sorted(g for g in found if GATE_SCRIPT_RE.fullmatch(g)):
+        found |= gate_script_inputs(script_rel, tracked)
     return found
 
 
