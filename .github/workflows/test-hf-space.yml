@@ -17,6 +17,11 @@ on:
       - '.github/workflows/test-hf-space.yml'
       - '.github/workflows/deploy-huggingface.yml'
       - 'scripts/check_hf_space_frontmatter.py'
+      # gradio pin の 3 サイト目とゲート本体。 これらが無いと
+      # requirements_webui.txt だけを触る変更でゲートが起動せず、
+      # 3 サイト照合に拡張した意味が無くなる。
+      - 'src/python_run/requirements_webui.txt'
+      - 'scripts/check_hf_space_gradio_sync.py'
   pull_request:
     paths:
       - 'huggingface-space/**'
@@ -24,6 +29,12 @@ on:
       - 'src/python/piper_train/infer_onnx.py'
       - 'src/python/piper_train/ort_utils.py'
       - 'scripts/check_hf_space_frontmatter.py'
+      - 'src/python_run/requirements_webui.txt'
+      - 'scripts/check_hf_space_gradio_sync.py'
+      # 自分自身。 push 側には既に入っているが pull_request 側に無く、
+      # この workflow の定義だけを変える PR では本 workflow が起動しなかった
+      # (= trigger の変更が CI で検証されないまま merge できた)。
+      - '.github/workflows/test-hf-space.yml'
   workflow_dispatch:
 
 concurrency:
