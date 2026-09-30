@@ -98,12 +98,25 @@ COPY pyproject.toml /app/pyproject.toml
 COPY src/python/ /app/src/python/
 
 # Install piper_plus_g2p (standalone G2P package) and piper_train
-RUN uv pip install --system "/app/src/python/g2p"
-RUN uv pip install --system "/app/src/python[inference-gpu]"
+#
+# `--no-cache` で uv のキャッシュをイメージに残さない。 uv は既定で展開済み
+# wheel を `/root/.cache/uv/archive-v*/` に置き、 これは実行時に一切使われない
+# 純粋な死荷重。 後段レイヤで `rm -rf` してもイメージサイズは減らない
+# (前段レイヤに残る) ので、 最初から書かせない。
+#
+# 注意: これは `trivy-python-inference` が報告する setuptools 70.3.0 /
+# msgpack 1.1.2 の対策では **ない**。 CI 上で検証した結果、 `--no-cache` を
+# 入れても Trivy の結果は変わらず (HIGH=2 MEDIUM=1 のまま)、 かつイメージ内の
+# setuptools は 84.0.0 の 1 件のみ (Trivy と同じ `METADATA` の `Name:` 基準で
+# 全走査して確認) だった。 報告されている版はイメージに存在せず、 在処は
+# 未特定のまま。 SARIF には `PkgPath` が出ないため、 追跡には Trivy の JSON
+# 出力が要る (別 PR)。
+RUN uv pip install --system --no-cache "/app/src/python/g2p"
+RUN uv pip install --system --no-cache "/app/src/python[inference-gpu]"
 
 # Install Gradio WebUI requirements
 COPY src/python_run/requirements_webui.txt /app/requirements_webui.txt
-RUN uv pip install --system -r /app/requirements_webui.txt
+RUN uv pip install --system --no-cache -r /app/requirements_webui.txt
 
 # Pre-download NLTK data for g2p-en (both old and new resource names for NLTK compatibility)
 # Use a shared path so data is accessible after USER switch to non-root
