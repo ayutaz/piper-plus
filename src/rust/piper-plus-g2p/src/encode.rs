@@ -65,6 +65,11 @@ pub struct PiperEncoder {
 }
 
 impl PiperEncoder {
+    /// Encode an already-transcribed IPA string using the target model's vocabulary.
+    pub fn encode_ipa(&self, _ipa: &str) -> Result<Vec<i64>, G2pError> {
+        Err(G2pError::Phonemize("IPA input is not implemented".into()))
+    }
+
     /// Create a new encoder from a phoneme ID map.
     pub fn new(id_map: PhonemeIdMap, mode: UnknownTokenMode) -> Result<Self, G2pError> {
         let bos_id = id_map

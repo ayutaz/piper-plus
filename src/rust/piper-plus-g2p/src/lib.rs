@@ -48,6 +48,7 @@
 pub mod custom_dict;
 pub mod encode;
 pub mod error;
+pub mod ipa;
 pub mod phonemizer;
 pub mod ssml;
 pub mod token_map;
@@ -75,4 +76,5 @@ pub mod ffi;
 
 pub use encode::{PiperEncoder, UnknownTokenMode};
 pub use error::G2pError;
+pub use ipa::IpaTokenizer;
 pub use phonemizer::{PhonemeIdMap, Phonemizer, PhonemizerRegistry, ProsodyFeature, ProsodyInfo};
