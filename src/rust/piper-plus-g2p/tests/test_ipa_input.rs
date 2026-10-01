@@ -18,31 +18,49 @@ fn encode(entries: &[(&str, &[i64])], ipa: &str) -> Vec<i64> {
 
 #[test]
 fn single_symbols_need_no_language_backend() {
-    assert_eq!(encode(&[("k", &[3]), ("a", &[4])], "ka"), [1, 0, 3, 0, 4, 0, 2]);
+    assert_eq!(
+        encode(&[("k", &[3]), ("a", &[4])], "ka"),
+        [1, 0, 3, 0, 4, 0, 2]
+    );
 }
 
 #[test]
 fn pua_affricate_is_one_token() {
     let model = map(&[("\u{e054}", &[3]), ("a", &[4])]);
-    assert_eq!(IpaTokenizer::new(&model).tokenize("tʃa").unwrap(), ["tʃ", "a"]);
-    assert_eq!(encode(&[("\u{e054}", &[3]), ("a", &[4])], "tʃa"), [1, 0, 3, 0, 4, 0, 2]);
+    assert_eq!(
+        IpaTokenizer::new(&model).tokenize("tʃa").unwrap(),
+        ["tʃ", "a"]
+    );
+    assert_eq!(
+        encode(&[("\u{e054}", &[3]), ("a", &[4])], "tʃa"),
+        [1, 0, 3, 0, 4, 0, 2]
+    );
 }
 
 #[test]
 fn legacy_model_keeps_character_ids_without_requiring_pua() {
-    assert_eq!(encode(&[("t", &[3]), ("ʃ", &[4])], "tʃ"), [1, 0, 3, 0, 4, 0, 2]);
+    assert_eq!(
+        encode(&[("t", &[3]), ("ʃ", &[4])], "tʃ"),
+        [1, 0, 3, 0, 4, 0, 2]
+    );
 }
 
 #[test]
 fn combining_mark_and_aspiration_use_longest_supported_token() {
     let model = map(&[("\u{e056}", &[3]), ("\u{e023}", &[4]), ("\u{e024}", &[5])]);
-    assert_eq!(IpaTokenizer::new(&model).tokenize("ɛ̃tɕʰ").unwrap(), ["ɛ̃", "tɕʰ"]);
+    assert_eq!(
+        IpaTokenizer::new(&model).tokenize("ɛ̃tɕʰ").unwrap(),
+        ["ɛ̃", "tɕʰ"]
+    );
 }
 
 #[test]
 fn unsupported_global_pua_alias_does_not_override_model_segmentation() {
     let model = map(&[("a", &[3]), ("n", &[4])]);
-    assert_eq!(IpaTokenizer::new(&model).tokenize("an").unwrap(), ["a", "n"]);
+    assert_eq!(
+        IpaTokenizer::new(&model).tokenize("an").unwrap(),
+        ["a", "n"]
+    );
 }
 
 #[test]
@@ -53,22 +71,34 @@ fn ambiguous_supported_compound_is_greedy() {
 
 #[test]
 fn direct_multi_character_keys_are_supported() {
-    assert_eq!(encode(&[("tʃ", &[3]), ("iː", &[4])], "tʃiː"), [1, 0, 3, 0, 4, 0, 2]);
+    assert_eq!(
+        encode(&[("tʃ", &[3]), ("iː", &[4])], "tʃiː"),
+        [1, 0, 3, 0, 4, 0, 2]
+    );
 }
 
 #[test]
 fn literal_model_key_wins_over_pua_alias() {
-    assert_eq!(encode(&[("tʃ", &[3]), ("\u{e054}", &[9])], "tʃ"), [1, 0, 3, 0, 2]);
+    assert_eq!(
+        encode(&[("tʃ", &[3]), ("\u{e054}", &[9])], "tʃ"),
+        [1, 0, 3, 0, 2]
+    );
 }
 
 #[test]
 fn multiple_ids_get_one_pad_per_model_token() {
-    assert_eq!(encode(&[("a", &[3, 4]), ("n", &[5])], "an"), [1, 0, 3, 4, 0, 5, 0, 2]);
+    assert_eq!(
+        encode(&[("a", &[3, 4]), ("n", &[5])], "an"),
+        [1, 0, 3, 4, 0, 5, 0, 2]
+    );
 }
 
 #[test]
 fn word_boundary_and_stress_are_preserved_when_supported() {
-    assert_eq!(encode(&[("ˈ", &[3]), ("a", &[4]), (" ", &[5])], "ˈa a"), [1, 0, 3, 0, 4, 0, 5, 0, 4, 0, 2]);
+    assert_eq!(
+        encode(&[("ˈ", &[3]), ("a", &[4]), (" ", &[5])], "ˈa a"),
+        [1, 0, 3, 0, 4, 0, 5, 0, 4, 0, 2]
+    );
 }
 
 #[test]
@@ -115,5 +145,31 @@ fn unicode_spellings_are_not_automatically_normalized() {
 #[test]
 fn existing_encoding_contract_is_unchanged() {
     let encoder = PiperEncoder::new(map(&[("a", &[3])]), UnknownTokenMode::Skip).unwrap();
-    assert_eq!(encoder.encode(&["a".into(), "Z".into()]).unwrap(), [1, 0, 3, 0, 0, 2]);
+    assert_eq!(
+        encoder.encode(&["a".into(), "Z".into()]).unwrap(),
+        [1, 0, 3, 0, 0, 2]
+    );
+}
+
+#[test]
+fn literal_internal_spellings_are_supported() {
+    assert_eq!(
+        encode(&[("y_vowel", &[3]), ("N_m", &[4])], "y_vowelN_m"),
+        [1, 0, 3, 0, 4, 0, 2]
+    );
+}
+
+#[test]
+fn every_canonical_pua_spelling_roundtrips() {
+    for &(token, codepoint) in piper_plus_g2p::token_map::FIXED_PUA_MAP.iter() {
+        let key = char::from_u32(codepoint).unwrap().to_string();
+        let model = map(&[(&key, &[3])]);
+        assert_eq!(IpaTokenizer::new(&model).tokenize(token).unwrap(), [token]);
+        assert_eq!(encode(&[(&key, &[3])], token), [1, 0, 3, 0, 2]);
+    }
+}
+
+#[test]
+fn encoded_pua_input_is_accepted_without_double_conversion() {
+    assert_eq!(encode(&[("\u{e054}", &[3])], "\u{e054}"), [1, 0, 3, 0, 2]);
 }

@@ -14,6 +14,9 @@ use crate::token_map::token_to_pua;
 ///
 /// Each token is a single character (regular or PUA). The token is looked up
 /// in the phoneme_id_map to get the corresponding integer ID(s).
+/// This is an exact lookup: it does not perform PUA conversion or insert
+/// BOS/EOS/PAD. Prefer [`PiperEncoder::encode`] for G2P token lists and
+/// [`PiperEncoder::encode_ipa`] for already-transcribed IPA strings.
 pub fn tokens_to_ids(
     tokens: &[String],
     phoneme_id_map: &PhonemeIdMap,
@@ -66,8 +69,34 @@ pub struct PiperEncoder {
 
 impl PiperEncoder {
     /// Encode an already-transcribed IPA string using the target model's vocabulary.
-    pub fn encode_ipa(&self, _ipa: &str) -> Result<Vec<i64>, G2pError> {
-        Err(G2pError::Phonemize("IPA input is not implemented".into()))
+    ///
+    /// No language registration or G2P backend is required. Uses
+    /// [`crate::IpaTokenizer`] for longest-match segmentation, exact model-key
+    /// lookup before canonical PUA aliases, and BOS/EOS/PAD insertion.
+    /// Unknown symbols always fail, even in [`UnknownTokenMode::Skip`] mode,
+    /// so a transcription is never silently changed. The model must have
+    /// learned the requested sounds; this method adds no phonemes to it.
+    pub fn encode_ipa(&self, ipa: &str) -> Result<Vec<i64>, G2pError> {
+        let tokens = crate::IpaTokenizer::new(&self.id_map).tokenize(ipa)?;
+        let mut ids = vec![self.bos_id, self.pad_id];
+        for token in tokens {
+            let id_list = self
+                .id_map
+                .get(&token)
+                .filter(|ids| !ids.is_empty())
+                .or_else(|| {
+                    token_to_pua(&token)
+                        .and_then(|ch| self.id_map.get(&ch.to_string()))
+                        .filter(|ids| !ids.is_empty())
+                })
+                .ok_or_else(|| G2pError::PhonemeIdNotFound {
+                    phoneme: token.clone(),
+                })?;
+            ids.extend(id_list.iter().copied());
+            ids.push(self.pad_id);
+        }
+        ids.push(self.eos_id);
+        Ok(ids)
     }
 
     /// Create a new encoder from a phoneme ID map.

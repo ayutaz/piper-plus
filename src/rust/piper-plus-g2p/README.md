@@ -18,7 +18,7 @@ piper-plus-g2p = { version = "0.4", features = ["naist-jdic"] }
 ```
 
 ```rust
-use piper_plus_g2p::{Phonemizer, PhonemizerRegistry};
+use piper_plus_g2p::{Phonemizer, PhonemizerRegistry, PiperEncoder, UnknownTokenMode};
 use piper_plus_g2p::english::EnglishPhonemizer;
 
 let mut registry = PhonemizerRegistry::new();
@@ -30,7 +30,8 @@ let (tokens, prosody) = phonemizer
     .unwrap();
 
 // Encode tokens to phoneme IDs for a Piper ONNX model:
-// let ids = piper_plus_g2p::encode::tokens_to_ids(&tokens, &phoneme_id_map)?;
+// let encoder = PiperEncoder::new(phoneme_id_map, UnknownTokenMode::Strict)?;
+// let ids = encoder.encode(&tokens)?;
 ```
 
 ## Feature Flags
@@ -97,6 +98,61 @@ use piper_plus_g2p::encode::{PiperEncoder, UnknownTokenMode};
 let encoder = PiperEncoder::new(phoneme_id_map, UnknownTokenMode::Strict)?;
 let phoneme_ids = encoder.encode(&tokens)?;
 ```
+
+### Direct IPA input (Rust, next release)
+
+If your application already produces IPA, for example for a constructed language
+in a game, skip the language phonemizer entirely:
+
+```rust
+use piper_plus_g2p::{PhonemeIdMap, PiperEncoder, UnknownTokenMode};
+
+let config: serde_json::Value =
+    serde_json::from_str(&std::fs::read_to_string("voice.onnx.json")?)?;
+let map: PhonemeIdMap = serde_json::from_value(config["phoneme_id_map"].clone())?;
+let encoder = PiperEncoder::new(map, UnknownTokenMode::Strict)?;
+let phoneme_ids = encoder.encode_ipa("ka")?;
+```
+
+Use the config shipped with the **same ONNX model** used for synthesis. IPA has no
+universal numeric ID table. No G2P registration, dictionary, or language backend
+is required; `default-features = false` is sufficient for this API.
+
+`encode_ipa` uses the following rules:
+
+- Match the longest token supported by the target model. Canonical PUA spellings
+  are considered only when that PUA key is present in the model's map.
+- Resolve literal model keys before PUA aliases. For example, `tʃ` can map to
+  one PUA token in a piper-plus model, or to `t` and `ʃ` in a character-based
+  model. Direct multi-character keys are supported as well.
+- Add `BOS, PAD, token IDs, PAD, ..., EOS`. A token may expand to multiple IDs;
+  the PAD is inserted after the whole ID list.
+- Reject unknown symbols with their UTF-8 byte offset, even when the encoder
+  was constructed with `UnknownTokenMode::Skip`.
+- Preserve spaces as word-boundary tokens **only if the model supports them**.
+  Spaces are not separators between manually specified phonemes. Do not include
+  transcription wrappers such as `/ka/` or `[ka]`.
+- Reject empty input and caller-supplied `^`, `$`, `_` boundary/padding markers.
+
+You can inspect segmentation separately with
+`IpaTokenizer::new(&map).tokenize("ka")?` before creating the encoder.
+
+**Ambiguity:** if both `an` and `a`/`n` are supported, the string `an` selects the
+compound token. To control boundaries, use `encoder.encode(&["a".into(),
+"n".into()])` under the existing G2P/PUA encoding convention. This token-array
+API retains its previous behavior, including how it handles unknown symbols.
+
+**Notation and acoustic limits:** matching is literal. Unicode normalization,
+tie-bar removal (`t͡ʃ` to `tʃ`), and substitutions such as `y` to `y_vowel`,
+`r` to `rr`, or Japanese `iː` to `i:` are not inferred. Use the model's token
+spellings explicitly. The tokenizer also accepts existing internal token
+spellings; it is not a validator for the complete IPA standard. ID conversion
+does not add untrained sounds or derive accent, tone, or prosody features.
+Constructed-language pronunciation quality still depends on the trained model.
+
+`encode::tokens_to_ids` is a lower-level exact map lookup for already-encoded
+symbols. It performs neither PUA conversion nor BOS/EOS/PAD insertion; it is not
+the general entry point for clean IPA input.
 
 ## C FFI (Mobile Bindings)
 
