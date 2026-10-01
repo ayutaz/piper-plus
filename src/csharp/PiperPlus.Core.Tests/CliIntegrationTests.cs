@@ -240,6 +240,17 @@ public sealed class CliIntegrationTests
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
+
+            // Pin the child's cwd instead of inheriting the test host's.
+            // CustomDictionaryTests runs in parallel with this class and
+            // switches the process-wide cwd to a temp directory that it then
+            // deletes. A child spawned inside that window inherits the doomed
+            // directory; on Linux getcwd() then fails with ENOENT, which .NET
+            // surfaces as the parameterless FileNotFoundException
+            // ("Unable to find the specified file.") from the CLI's
+            // `--output_dir` DefaultValueFactory (Directory.GetCurrentDirectory)
+            // during Parse(), i.e. before `--version` is handled (Issue #735).
+            WorkingDirectory = AppContext.BaseDirectory,
         };
 
         // Use ArgumentList to avoid quoting/escaping issues with spaces in paths.

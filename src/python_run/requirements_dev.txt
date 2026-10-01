@@ -3,4 +3,4 @@ flake8==6.1.0
 isort==5.13.2
 mypy==0.991
 pylint==2.17.7
-ruff==0.15.12
+ruff==0.15.15

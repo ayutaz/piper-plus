@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import sys
 import tempfile
 from pathlib import Path
 
@@ -302,7 +303,16 @@ class TestM11SpotCheck:
 
 
 class TestM11CLI:
-    """M1.1: CLI integration tests."""
+    """M1.1: CLI integration tests.
+
+    The CLI is run with ``sys.executable`` -- the interpreter under test,
+    which already has ``piper_train`` installed -- rather than ``uv run``.
+    ``uv run`` resolves and syncs the whole uv workspace (torch from the
+    pytorch-cu128 index, the training stack, ...) into a separate venv
+    before running, so these ``unit`` tests needed ``uv`` on PATH plus
+    network access and exercised a different environment from the one
+    being tested.
+    """
 
     def _make_lexicon(self, entries: list[tuple[str, str]], path: Path) -> None:
         with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -313,7 +323,7 @@ class TestM11CLI:
     def test_cli_input_not_found(self):
         import subprocess
         result = subprocess.run(
-            ["uv", "run", "python", "-m", "piper_train.tools.convert_nst_dictionary",
+            [sys.executable, "-m", "piper_train.tools.convert_nst_dictionary",
              "-i", "nonexistent.txt", "-o", "out.json"],
             capture_output=True, text=True,
         )
@@ -333,7 +343,7 @@ class TestM11CLI:
 
             import subprocess
             result = subprocess.run(
-                ["uv", "run", "python", "-m", "piper_train.tools.convert_nst_dictionary",
+                [sys.executable, "-m", "piper_train.tools.convert_nst_dictionary",
                  "-i", str(inp), "-o", str(out), "-q"],
                 capture_output=True, text=True,
                 env={**__import__("os").environ, "PYTHONUTF8": "1"},
@@ -354,7 +364,7 @@ class TestM11CLI:
 
             import subprocess
             result = subprocess.run(
-                ["uv", "run", "python", "-m", "piper_train.tools.convert_nst_dictionary",
+                [sys.executable, "-m", "piper_train.tools.convert_nst_dictionary",
                  "-i", str(inp), "-o", str(out), "--gzip", "-q"],
                 capture_output=True, text=True,
                 env={**__import__("os").environ, "PYTHONUTF8": "1"},
@@ -376,7 +386,7 @@ class TestM11CLI:
 
             import subprocess
             result = subprocess.run(
-                ["uv", "run", "python", "-m", "piper_train.tools.convert_nst_dictionary",
+                [sys.executable, "-m", "piper_train.tools.convert_nst_dictionary",
                  "-i", str(inp), "-o", str(out), "--validate", "-q"],
                 capture_output=True, text=True,
                 env={**__import__("os").environ, "PYTHONUTF8": "1"},
@@ -397,7 +407,7 @@ class TestM11CLI:
 
             import subprocess
             result = subprocess.run(
-                ["uv", "run", "python", "-m", "piper_train.tools.convert_nst_dictionary",
+                [sys.executable, "-m", "piper_train.tools.convert_nst_dictionary",
                  "-i", str(inp), "-o", str(out), "--validate", "-q"],
                 capture_output=True, text=True,
                 env={**__import__("os").environ, "PYTHONUTF8": "1"},
@@ -418,7 +428,7 @@ class TestM11CLI:
 
             import subprocess
             subprocess.run(
-                ["uv", "run", "python", "-m", "piper_train.tools.convert_nst_dictionary",
+                [sys.executable, "-m", "piper_train.tools.convert_nst_dictionary",
                  "-i", str(inp), "-o", str(out), "-q"],
                 capture_output=True, text=True,
                 env={**__import__("os").environ, "PYTHONUTF8": "1"},
