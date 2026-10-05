@@ -13,6 +13,8 @@ on:
       - 'CMakeLists.txt'
       - 'Dockerfile'
       - '.github/workflows/test-arm64-tts.yml'
+      - 'scripts/check_arm64_archive.py'
+      - 'tests/scripts/test_check_arm64_archive.py'
   workflow_dispatch:
 
 concurrency:
@@ -90,7 +92,7 @@ jobs:
 
   test-linux-arm64-native:
     name: Test Linux ARM64 TTS (Native)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
 
     steps:
@@ -99,63 +101,41 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Build using Docker buildx on native platform
+      - name: Verify native ARM64 runner
         run: |
-          # Use buildx to build without QEMU emulation
-          docker buildx create --use --name native-builder --driver docker-container
+          test "$(uname -m)" = aarch64
 
-          # Build for ARM64 without running (export from builder stage)
-          docker buildx build \
-            --platform linux/arm64 \
-            --target builder \
-            --output type=local,dest=/tmp/arm64-build \
-            --progress=plain \
-            --cache-from type=gha \
-            --cache-to type=gha,mode=max \
-            -f Dockerfile .
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
 
-      - name: Check build artifacts
+      - name: Test artifact validator
         run: |
-          echo "=== Checking ARM64 build artifacts ==="
-          if [ -d /tmp/arm64-build ]; then
-            echo "Contents of /tmp/arm64-build:"
-            ls -la /tmp/arm64-build/
-            echo "Looking for dist directory:"
-            find /tmp/arm64-build -name "dist" -type d | head -10
-            echo "Looking for tar.gz files:"
-            find /tmp/arm64-build -name "*.tar.gz" -type f | head -10
-            echo "All files in build output:"
-            find /tmp/arm64-build -type f | head -20
-          else
-            echo "Build artifacts not found"
-            exit 1
-          fi
+          python -m pip install 'pytest>=9.1.1,<10'
+          python -m pytest tests/scripts/test_check_arm64_archive.py -q --override-ini="addopts="
 
-      - name: Create ARM64 archive if needed
-        run: |
-          # Check if tar.gz exists, if not create it from build output
-          if [ -f /tmp/arm64-build/dist/piper-plus-cpp-arm64.tar.gz ]; then
-            echo "Archive found in dist directory"
-            cp /tmp/arm64-build/dist/piper-plus-cpp-arm64.tar.gz /tmp/
-          elif [ -d /tmp/arm64-build/install ]; then
-            echo "Creating archive from install directory"
-            cd /tmp/arm64-build
-            tar -czf /tmp/piper-plus-cpp-arm64.tar.gz install/
-          elif [ -d /tmp/arm64-build/build/install ]; then
-            echo "Creating archive from build/install directory"
-            cd /tmp/arm64-build/build
-            tar -czf /tmp/piper-plus-cpp-arm64.tar.gz install/
-          else
-            echo "No suitable directory found for archiving"
-            find /tmp/arm64-build -type d | head -20
-            exit 1
-          fi
-          ls -la /tmp/piper-plus-cpp-arm64.tar.gz
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.12.0
+
+      # The Dockerfile's final scratch stage exports only the release tarball.
+      # Exporting `builder` copies the entire rootfs and exhausted the old
+      # 30-minute limit after compilation had already finished (Issue #752).
+      - name: Build and export ARM64 archive
+        uses: docker/build-push-action@v6.19.2
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/arm64
+          outputs: type=local,dest=/tmp/arm64-build
+          cache-from: type=gha,scope=arm64-native
+          cache-to: type=gha,scope=arm64-native,mode=max
+
+      - name: Validate exported ARM64 executable
+        run: python scripts/check_arm64_archive.py /tmp/arm64-build/piper-plus-cpp-linux-arm64.tar.gz
 
       - name: Upload ARM64 artifacts
         uses: actions/upload-artifact@v4.6.2
         with:
           name: piper-plus-cpp-arm64-binary
-          path: |
-            /tmp/piper-plus-cpp-arm64.tar.gz
+          path: /tmp/arm64-build/piper-plus-cpp-linux-arm64.tar.gz
           if-no-files-found: error
