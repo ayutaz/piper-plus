@@ -45,6 +45,8 @@ train = [
     "onnxsim-prebuilt",
     "onnxscript>=0.7.0",
     "piper-plus-g2p[all]",
+    "torch==2.11.0",
+    "torchaudio==2.11.0",
 ]
 
 inference = [
