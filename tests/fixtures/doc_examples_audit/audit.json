@@ -379,8 +379,8 @@
     },
     {
       "file": "docs/features/phoneme-input.md",
-      "line_start": 492,
-      "line_end": 494,
+      "line_start": 511,
+      "line_end": 513,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
