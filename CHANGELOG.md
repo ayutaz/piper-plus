@@ -131,6 +131,10 @@ Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13
 
 ### Fixed
 
+- dependencies: pin workspace torch / torchaudio and benchmark torch to 2.11.0;
+  keep the existing cu128 wheels and require a dedicated compatibility review
+  for routine version updates instead of raising the supported minimum to 2.14.
+
 - **tests: `src/python_run/tests/test_multilingual_integration.py` の実 G2P 統合テスト 6 件が、どの環境でも常に skip されていたのを修正した。** `pytest.importorskip("pyopenjtalk_plus")` でゲートしていたが、`pyopenjtalk-plus` ディストリビューションが提供する import 名は `pyopenjtalk` であり `pyopenjtalk_plus` モジュールは存在しない。ランタイム本体 (`piper_plus/phonemize/japanese.py`) と同じ順で両方の名前を探すヘルパに置き換えた。併せて `test_training_runtime_consistency` が存在しない `piper_train.phonemize.multilingual` を import していたため無条件 skip になっていたのを、学習側 G2P の実体である `piper_plus_g2p.multilingual` に向け直した。**実測**: 修正前 6 passed / 6 skipped → 修正後 12 passed (6 言語で runtime / 学習側のトークン数が一致)
 - tests: `src/python/tests/test_swedish_m1_1_m1_2.py::TestM11CLI` の 6 件が CLI を `uv run python -m ...` で起動していたのを `sys.executable -m ...` に改めた。`uv run` は実行前に uv workspace 全体 (pytorch-cu128 index の torch を含む) を resolve / sync するため、`unit` テストが `uv` と download.pytorch.org への到達性を暗黙に要求し、しかもテスト対象とは別の venv の CLI を検査していた。**実測** (pytorch index 到達不可の環境): 修正前 6 failed / 40 passed → 修正後 46 passed
 - **tests: C# `CliIntegrationTests` の子プロセスが、並列実行中の `CustomDictionaryTests` が削除する一時ディレクトリを cwd として継承しうる問題を修正した (#735)。** `CustomDictionaryTests` はプロセス全体の cwd を一時ディレクトリへ切り替えた後にそのディレクトリを削除する。その間に起動された CLI は削除済みの cwd を継承し、Linux では `getcwd()` が ENOENT で失敗して .NET が引数なしの `FileNotFoundException` ("Unable to find the specified file.") を投げる。CLI は `--output_dir` の `DefaultValueFactory` (`Directory.GetCurrentDirectory()`) を Parse 中に評価するため、`--version` の early exit より前に落ちる — #735 の観測 (stdout 空 / 同一文言 / Linux のみ) と一致する。`RunCliAsync` で `WorkingDirectory = AppContext.BaseDirectory` を明示した (この環境には dotnet が無いため未実行。次回 CI で確認が必要)

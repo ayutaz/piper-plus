@@ -205,14 +205,13 @@ def test_argparse_precision_default_is_bf16_mixed():
 def test_torch_211_cu128_resolution_on_linux():
     """On Linux, torch must resolve to a cu128 build per the uv source marker.
 
-    On Windows, the CPU wheel is acceptable (no cu128 marker for Windows in
-    pyproject.toml). The important contract on Windows is just that the
-    pin (``torch>=2.11.0``) imported successfully.
+    The exact public version must be 2.11.0 on every platform. Local build
+    suffixes such as ``+cu128`` remain valid under the ``torch==2.11.0`` pin.
+    The workspace's cu128 source marker covers Linux and Windows.
     """
-    # Basic version pin (pyproject: torch>=2.11.0)
-    major, minor, *_ = torch.__version__.split("+")[0].split(".")
-    assert (int(major), int(minor)) >= (2, 11), (
-        f"torch>={2}.{11} required, got {torch.__version__}"
+    # Exact release pin, independent of the CPU/CUDA wheel's local suffix.
+    assert torch.__version__.split("+")[0] == "2.11.0", (
+        f"torch==2.11.0 required, got {torch.__version__}"
     )
 
     if sys.platform == "linux":

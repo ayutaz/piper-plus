@@ -116,6 +116,18 @@ updates:
       # すり抜ける (CI が緑でもマージしてはいけない)。事例: #649。
       # cap の引き上げは CUDA 13 base image bump とセットで専用 PR で行う。
       - dependency-name: "onnxruntime-gpu"
+      # torch / torchaudio は検証済み 2.11.0 に固定する。更新は学習・推論・
+      # モデル export と cu128 wheel を検証する専用 PR で同時に行う。
+      - dependency-name: "torch"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
+      - dependency-name: "torchaudio"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
       # pyopenjtalk-plus は dependabot で更新しない (PEP 440 post-release 書き換えバグ)。
       # post-release への bump 時に root pyproject.toml の `pyopenjtalk-plus>=0.4` を
       # `pyopenjtalk-plus*` という PEP 508 として不正な requirement に書き換えるため、
@@ -182,6 +194,12 @@ updates:
       - dependency-name: "*"
         update-types:
           - "version-update:semver-major"
+      # workspace と同じ torch 2.11.0 を使う。定期更新で pin を解除しない。
+      - dependency-name: "torch"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
 
   # Rust: src/rust (Cargo workspace)
   - package-ecosystem: "cargo"
