@@ -17,6 +17,22 @@ def test_go_module_bundles_canonical_mit_license():
     ).read_text(encoding="utf-8")
 
 
+@pytest.mark.parametrize("variant", ["Dockerfile", "Dockerfile.distroless"])
+def test_cpp_docker_builders_copy_required_notices(variant):
+    import shlex
+
+    dockerfile = ROOT / "docker/cpp-inference" / variant
+    text = dockerfile.read_text(encoding="utf-8")
+    copied = {
+        source
+        for line in text.splitlines()
+        if line.startswith("COPY ") and "--from=" not in line
+        for source in shlex.split(line)[1:-1]
+    }
+    assert "LICENSE.md" in copied, "CMake install needs the repository license"
+    assert "src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES" in copied
+
+
 def layout(tmp_path):
     files = [
         "include/piper_plus.h",
