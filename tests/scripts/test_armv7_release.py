@@ -107,6 +107,6 @@ def test_eigen_uses_verified_upstream_dependency_commit():
     script = (ROOT / "scripts/build_ort_armv7.sh").read_text(encoding="utf-8")
     assert "--use_preinstalled_eigen" in script
     assert "--eigen_path" in script
-    assert '$work/cmake/deps.txt' in script
+    assert "$work/cmake/deps.txt" in script
     assert 'git -C "$work/eigen" fetch --depth 1 origin "$eigen_commit"' in script
     assert 'test "$(git -C "$work/eigen" rev-parse HEAD)" = "$eigen_commit"' in script
