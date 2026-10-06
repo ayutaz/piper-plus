@@ -399,7 +399,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           pip install 'pytest>=9.1.1,<10' PyYAML
-          python -m pytest tests/scripts/test_wasm_onnx_ci_contract.py -q -o addopts=
+          python -m pytest tests/scripts/test_wasm_onnx_ci_contract.py tests/scripts/test_python_release_wheels.py -q -o addopts=
       - name: Install exact ORT Web and local G2P (no native binary download)
         env:
           ORT_VERSION: ${{ matrix.ort }}

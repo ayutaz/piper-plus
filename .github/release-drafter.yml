@@ -17,6 +17,7 @@
 
 name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
+tag-prefix: 'v'
 
 # semver bump rules — labels から RESOLVED_VERSION を決定する。
 version-resolver:

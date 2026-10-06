@@ -261,6 +261,7 @@ jobs:
       - name: Check wheels
         run: |
           ls -la dist/
+          python scripts/check_python_release_wheel.py --name piper-plus --version "$(cat VERSION)" dist/*.whl
           if ls dist/*.whl 1> /dev/null 2>&1; then
             twine check dist/*.whl
           else
