@@ -65,11 +65,15 @@ def test_release_tags_sign_every_image(job, step_name, reference, expected):
         (root / ".github/workflows/docker-build.yml").read_text(encoding="utf-8")
     )
     step = next(s for s in data["jobs"][job]["steps"] if s.get("name") == step_name)
-    expression = re.sub(
-        r"startsWith\(github\.ref,\s*'([^']+)'\)",
-        lambda match: str(reference.startswith(match[1])),
-        step["if"],
-    ).replace("||", "or").replace("&&", "and")
+    expression = (
+        re.sub(
+            r"startsWith\(github\.ref,\s*'([^']+)'\)",
+            lambda match: str(reference.startswith(match[1])),
+            step["if"],
+        )
+        .replace("||", "or")
+        .replace("&&", "and")
+    )
     tree = ast.parse(expression, mode="eval")
     assert all(
         isinstance(node, (ast.Expression, ast.BoolOp, ast.Or, ast.And, ast.Constant))

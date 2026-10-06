@@ -28,6 +28,9 @@ on:
       - 'CMakeLists.txt'
       - '.github/workflows/docker-build.yml'
       - 'tests/scripts/test_docker_release_tags.py'
+      - 'tests/scripts/test_docker_signature_recovery.py'
+      - 'scripts/resolve_docker_release_images.py'
+      - '.github/workflows/release-docker-signatures.yml'
     tags:
       - 'docker-v*'
       - 'v*'
@@ -46,6 +49,9 @@ on:
       - 'CMakeLists.txt'
       - '.github/workflows/docker-build.yml'
       - 'tests/scripts/test_docker_release_tags.py'
+      - 'tests/scripts/test_docker_signature_recovery.py'
+      - 'scripts/resolve_docker_release_images.py'
+      - '.github/workflows/release-docker-signatures.yml'
   workflow_dispatch:
 
 # 同一 PR への連続 push で古い build を cancel。 push to dev は cancel しない
@@ -82,6 +88,8 @@ jobs:
           "${RUNNER_TEMP}/venv-docker-inference/bin/python" -m pytest \
             docker/python-inference/test_phoneme_encoding.py \
             tests/scripts/test_docker_release_tags.py -o addopts= -q
+          "${RUNNER_TEMP}/venv-docker-inference/bin/python" -m pytest \
+            tests/scripts/test_docker_signature_recovery.py -o addopts= -q
 
   build-python-inference:
     needs: inference-regression
@@ -142,13 +150,13 @@ jobs:
           sbom: true
 
       - name: Install Cosign
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
       - name: Sign the published image
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -292,13 +300,13 @@ jobs:
           sbom: true
 
       - name: Install Cosign
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
       - name: Sign the published image
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -417,13 +425,13 @@ jobs:
           sbom: true
 
       - name: Install Cosign
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
       - name: Sign the published image
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -494,13 +502,13 @@ jobs:
           sbom: true
 
       - name: Install Cosign
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
       - name: Sign the published image
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -576,13 +584,13 @@ jobs:
           sbom: true
 
       - name: Install Cosign
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
       - name: Sign the published image
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -661,13 +669,13 @@ jobs:
           sbom: true
 
       - name: Install Cosign
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
       - name: Sign the published image
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -792,13 +800,13 @@ jobs:
           sbom: true
 
       - name: Install Cosign
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
       - name: Sign the published image
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
