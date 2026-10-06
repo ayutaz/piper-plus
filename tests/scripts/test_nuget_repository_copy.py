@@ -88,3 +88,18 @@ def test_public_nuget_copy_is_verified_before_final_attestation():
     )
     assert publish < verify < attest
     assert "dotnet nuget verify" in steps[verify]["run"]
+
+
+def test_nuget_download_allows_bounded_registry_propagation(tmp_path, monkeypatch):
+    spec = importlib.util.spec_from_file_location("nuget_download", ROOT / "scripts/check_nuget_package.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    commands = []
+    monkeypatch.setattr(module.subprocess, "run", lambda command, **kwargs: commands.append((command, kwargs)))
+    module.download_public_copy(package(tmp_path / "built.nupkg"), tmp_path / "public.nupkg")
+    command, kwargs = commands[0]
+    assert kwargs["check"] is True
+    assert "--retry-all-errors" in command  # Registry 404s must be retried too.
+    assert int(command[command.index("--retry") + 1]) >= 120
+    assert int(command[command.index("--retry-max-time") + 1]) == 1200
+    assert int(command[command.index("--max-time") + 1]) <= 30
