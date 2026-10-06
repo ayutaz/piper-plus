@@ -1,0 +1,38 @@
+[
+  {
+    "file": "speaker-192-mask2.onnx",
+    "dimension": 192,
+    "maskRank": 2,
+    "sha256": "f7356c9bdcbd5648dc6368dd8511878d51a2464875eabcb6eff41fcae4c9ccf9"
+  },
+  {
+    "file": "speaker-256-mask2.onnx",
+    "dimension": 256,
+    "maskRank": 2,
+    "sha256": "067eee85ca03b23c579a21c25d3129edd4c315b40b4980ca0b6ef64f55f0611a"
+  },
+  {
+    "file": "speaker-320-mask1.onnx",
+    "dimension": 320,
+    "maskRank": 1,
+    "sha256": "2b8358d9f193d48bff043ee9e206bd5c954d7b2368d274ad73073c13966bb137"
+  },
+  {
+    "file": "speaker-192-no-mask.onnx",
+    "dimension": 192,
+    "maskRank": 0,
+    "sha256": "034c1eb81567f7b0379ed8c432a9e9b5a6ac3c9afc330e638b2af872722cc386"
+  },
+  {
+    "file": "speaker-dynamic-mask2.onnx",
+    "dimension": "embedding_dim",
+    "maskRank": 2,
+    "sha256": "8f5e3c51cf86dc66f9786d1d1281b7da74982243375f58be3bdf919231c5e581"
+  },
+  {
+    "file": "no-speaker.onnx",
+    "dimension": null,
+    "maskRank": 0,
+    "sha256": "1b8ff358d24eed8bb0af84e3c0a0e16ea0da79317f620d48bf09a2572e56dfbc"
+  }
+]
