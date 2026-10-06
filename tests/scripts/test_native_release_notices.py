@@ -29,8 +29,10 @@ def test_cpp_docker_builders_copy_required_notices(variant):
         if line.startswith("COPY ") and "--from=" not in line
         for source in shlex.split(line)[1:-1]
     }
+    for source in copied:
+        assert (ROOT / source).exists(), f"COPY source does not exist: {source}"
     assert "LICENSE.md" in copied, "CMake install needs the repository license"
-    assert "src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES" in copied
+    assert "src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md" in copied
 
 
 def layout(tmp_path):
