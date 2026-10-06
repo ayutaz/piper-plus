@@ -29,7 +29,7 @@ repos:
         entry: python scripts/check_release_regressions.py
         language: python
         additional_dependencies: ['pytest>=9.1.1,<10', PyYAML]
-        files: ^(\.github/workflows/(ci|rust-tests|csharp-ci|release-rust|release-csharp|release-verify|docker-build|release-docker-signatures|release-shared-lib|cosign-release-artifacts)\.yml|\.pre-commit-config\.yaml|scripts/(check_release_regressions|release_checksums|prepare_release_draft|resolve_docker_release_images)\.py|tests/scripts/test_(release_regression_guards|prepare_release_draft|docker_release_tags|docker_signature_recovery)\.py|src/rust/piper-core/(src/engine\.rs|tests/test_embedding_dimensions\.rs)|src/csharp/PiperPlus\.Core/Inference/SessionFactory\.cs|src/csharp/PiperPlus\.Core\.Tests/CacheStorageTests\.cs|tests/fixtures/ort_session/.*)$
+        files: ^(\.github/workflows/(ci|rust-tests|csharp-ci|release-rust|release-csharp|release-verify|rekor-verify|docker-build|release-docker-signatures|release-shared-lib|cosign-release-artifacts)\.yml|\.pre-commit-config\.yaml|scripts/(check_release_regressions|release_checksums|prepare_release_draft|verify_public_release|resolve_docker_release_images)\.py|tests/scripts/test_(release_regression_guards|prepare_release_draft|public_release_verification|docker_release_tags|docker_signature_recovery)\.py|src/rust/piper-core/(src/engine\.rs|tests/test_embedding_dimensions\.rs)|src/csharp/PiperPlus\.Core/Inference/SessionFactory\.cs|src/csharp/PiperPlus\.Core\.Tests/CacheStorageTests\.cs|tests/fixtures/ort_session/.*)$
         pass_filenames: false
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
