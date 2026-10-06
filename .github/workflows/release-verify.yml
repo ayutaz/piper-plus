@@ -63,18 +63,29 @@ jobs:
     runs-on: ubuntu-24.04
     if: |
       github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion == 'success'
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     outputs:
+      source_sha: ${{ steps.resolve.outputs.source_sha }}
       version: ${{ steps.resolve.outputs.version }}
       packages: ${{ steps.resolve.outputs.packages }}
+      crate_names: ${{ steps.resolve.outputs.crate_names }}
       skip_unpublished: ${{ steps.published_check.outputs.skip_unpublished || 'false' }}
     steps:
       - uses: actions/checkout@v6.1.0
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Resolve version + package list
         id: resolve
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          INPUT_PACKAGES: ${{ github.event.inputs.packages }}
+          UPSTREAM_WORKFLOW: ${{ github.event.workflow_run.name }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          INPUT_VERSION="${{ github.event.inputs.version }}"
+          set -euo pipefail
+          echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           if [ -n "$INPUT_VERSION" ]; then
             VERSION="$INPUT_VERSION"
           else
@@ -82,45 +93,40 @@ jobs:
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-          INPUT_PACKAGES="${{ github.event.inputs.packages }}"
           if [ -n "$INPUT_PACKAGES" ]; then
             PACKAGES="$INPUT_PACKAGES"
+          elif [ "$EVENT_NAME" = "workflow_run" ]; then
+            case "$UPSTREAM_WORKFLOW" in
+              "Manual Release") PACKAGES="pypi,nuget,crates" ;;
+              "npm publish") PACKAGES="npm" ;;
+              "Publish piper-plus-g2p (Rust)") PACKAGES="crates" ;;
+              "Release Kotlin G2P (Maven Central)") PACKAGES="maven" ;;
+              *) PACKAGES="" ;;
+            esac
           else
             PACKAGES="pypi,npm,nuget,crates,maven"
           fi
+          for package in ${PACKAGES//,/ }; do
+            case "$package" in pypi|npm|nuget|crates|maven) ;; *) echo "::error::Unknown registry: $package"; exit 1 ;; esac
+          done
           echo "packages=${PACKAGES}" >> "$GITHUB_OUTPUT"
+          if [ "$UPSTREAM_WORKFLOW" = "Publish piper-plus-g2p (Rust)" ]; then
+            echo "crate_names=piper-plus-g2p" >> "$GITHUB_OUTPUT"
+          else
+            echo "crate_names=piper-plus piper-plus-cli piper-plus-g2p" >> "$GITHUB_OUTPUT"
+          fi
 
           echo "Will verify version: $VERSION"
           echo "Will verify packages: $PACKAGES"
 
       - name: Check if VERSION is already published (unpublished-version guard)
         id: published_check
-        # ガードを **効かせる** (404 = 未公開として PyPI job を skip):
-        #   - schedule: 最新公開版の再検証。 VERSION が次サイクルへ bump 済みの
-        #     間は skip する (従来からの振る舞い)。
-        #   - workflow_run で upstream が "Manual Release" 以外: trigger に並ぶ
-        #     残り 5 workflow (npm publish / Rust g2p / Go g2p / Shared Library /
-        #     Kotlin G2P) は **PyPI へ publish しない**。 PyPI publisher は
-        #     dev-create-release.yml (= "Manual Release") だけなので、 これらの
-        #     完了で PyPI@VERSION を検証して落とすのは偽陽性。
-        #   - workflow_dispatch で version 未指定: input の説明通り
-        #     "Empty = latest VERSION file" で schedule と同じ意味になる。
-        #
-        # ガードを **効かせない** (404 = 本物の失敗として fail させる):
-        #   - workflow_run で upstream が "Manual Release": PyPI publish 直後なので、
-        #     publish が success なのに成果物が無いのは検知すべき異常。
-        #   - workflow_dispatch で version を明示指定: 運用者がその版を検証したいと
-        #     明言しているので 404 を黙殺しない。
-        #
-        # 旧実装は `github.event_name == 'schedule'` のみだったため、 workflow_run
-        # 経由だと `skip_unpublished` が 'false' のまま verify-pypi が走り、
-        # VERSION が未公開の間は必ず HTTP 404 で落ちていた。
+        # Daily/default checks can encounter a deliberately unreleased VERSION.
+        # Explicit versions and successful PyPI publishers must verify strictly.
         if: >-
-          github.event_name == 'schedule' ||
-          (github.event_name == 'workflow_run' &&
-           github.event.workflow_run.name != 'Manual Release') ||
-          (github.event_name == 'workflow_dispatch' &&
-           github.event.inputs.version == '')
+          contains(steps.resolve.outputs.packages, 'pypi') &&
+          (github.event_name == 'schedule' ||
+           (github.event_name == 'workflow_dispatch' && github.event.inputs.version == ''))
         run: |
           VERSION="${{ steps.resolve.outputs.version }}"
           # On scheduled runs we re-verify the LATEST published release. If
@@ -154,13 +160,19 @@ jobs:
     if: contains(needs.gate.outputs.packages, 'pypi') && needs.gate.outputs.skip_unpublished != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v6.1.0
+        with:
+          ref: ${{ needs.gate.outputs.source_sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v6.2.0
         with:
-          python-version: '3.13'
+          python-version: ${{ matrix.python }}
 
       - name: Verify package metadata on PyPI
         run: |
@@ -186,15 +198,15 @@ jobs:
       - name: Verify pip can install (smoke)
         run: |
           VERSION="${{ needs.gate.outputs.version }}"
-          # `pip show` after install gives the installed metadata blob —
-          # verifies dependencies resolved cleanly. We use a temp venv so
-          # this doesn't touch the runner's site-packages.
+          # Resolve the real published dependencies in a clean environment.
           python3 -m venv /tmp/verify-venv
-          /tmp/verify-venv/bin/pip install --no-deps "piper-plus==${VERSION}" || {
-            echo "::warning::pip install --no-deps piper-plus==${VERSION} failed; package may not be visible yet on the index mirror."
-            exit 0
+          /tmp/verify-venv/bin/pip install "piper-plus==${VERSION}" || {
+            echo "::error::pip install piper-plus==${VERSION} failed"
+            exit 1
           }
           /tmp/verify-venv/bin/pip show piper-plus
+          /tmp/verify-venv/bin/python -c 'import piper_plus'
+          /tmp/verify-venv/bin/python -m piper_plus --help
 
       - name: Verify SLSA attestation (gh attestation verify)
         env:
@@ -216,14 +228,14 @@ jobs:
                   print(f['url']); break
           ")
           if [ -z "$WHEEL_URL" ]; then
-            echo "::warning::No universal wheel found for piper-plus@$VERSION — skipping attestation verify."
-            exit 0
+            echo "::error::No universal wheel found for piper-plus@$VERSION"
+            exit 1
           fi
           curl -sLo wheel.whl "$WHEEL_URL"
           ls -lh wheel.whl
           if ! gh attestation verify wheel.whl --repo ${{ github.repository }}; then
             echo "::error::SLSA attestation verification FAILED for piper-plus@$VERSION"
-            echo "VERIFY_FAILED_PYPI=1" >> "$GITHUB_ENV"
+            exit 1
           else
             echo "PyPI wheel attestation verified."
           fi
@@ -236,6 +248,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6.1.0
+        with:
+          ref: ${{ needs.gate.outputs.source_sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v6.5.0
@@ -257,8 +271,8 @@ jobs:
           # `dist.attestations` block when --provenance was used. A missing
           # block on a tagged release is a regression.
           npm view "piper-plus@${NPM_VERSION}" --json > /tmp/npm.json || {
-            echo "::warning::npm view failed for piper-plus@${NPM_VERSION} — package may not exist yet."
-            exit 0
+            echo "::error::npm view failed for piper-plus@${NPM_VERSION} — package may not exist yet."
+            exit 1
           }
           if ! python3 -c "
           import json, sys
@@ -267,13 +281,16 @@ jobs:
           # or a list of versions. Normalise.
           if isinstance(d, list):
               d = next((v for v in d if v.get('version') == '${NPM_VERSION}'), {})
+          if d.get('version') != '${NPM_VERSION}':
+              print('::error::npm package version does not match the requested version.')
+              sys.exit(1)
           atts = d.get('dist', {}).get('attestations')
           if not atts:
               print('::error::npm package piper-plus@${NPM_VERSION} has NO provenance attestations attached.')
               sys.exit(1)
           print('npm provenance present:', json.dumps(atts, indent=2)[:400])
           "; then
-            echo "VERIFY_FAILED_NPM=1" >> "$GITHUB_ENV"
+            exit 1
           fi
 
       - name: Verify SLSA attestation via gh CLI
@@ -286,17 +303,17 @@ jobs:
           mkdir -p /tmp/npm-tarball
           cd /tmp/npm-tarball
           npm pack "piper-plus@${NPM_VERSION}" || {
-            echo "::warning::npm pack failed for piper-plus@${NPM_VERSION} — skipping attestation verify."
-            exit 0
+            echo "::error::npm pack failed for piper-plus@${NPM_VERSION}"
+            exit 1
           }
           TARBALL=$(ls *.tgz | head -1)
           if [ -z "$TARBALL" ]; then
-            echo "::warning::No tarball produced — skipping."
-            exit 0
+            echo "::error::No tarball produced"
+            exit 1
           fi
           if ! gh attestation verify "$TARBALL" --repo ${{ github.repository }}; then
             echo "::error::SLSA attestation verification FAILED for piper-plus@${NPM_VERSION}"
-            echo "VERIFY_FAILED_NPM=1" >> "$GITHUB_ENV"
+            exit 1
           else
             echo "npm tarball attestation verified."
           fi
@@ -309,6 +326,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6.1.0
+        with:
+          ref: ${{ needs.gate.outputs.source_sha }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5.4.0
@@ -327,6 +346,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           CORE="${{ steps.nuget_versions.outputs.core }}"
           CLI="${{ steps.nuget_versions.outputs.cli }}"
           mkdir -p /tmp/nuget && cd /tmp/nuget
@@ -337,8 +357,8 @@ jobs:
             echo "Fetching: $URL"
             HTTP=$(curl -sLo "${NAME}.${VER}.nupkg" -w "%{http_code}" "$URL")
             if [ "$HTTP" != "200" ]; then
-              echo "::warning::NuGet fetch returned HTTP $HTTP for $NAME@$VER — package may not exist yet."
-              continue
+              echo "::error::NuGet fetch returned HTTP $HTTP for $NAME@$VER — package may not exist yet."
+              exit 1
             fi
             ls -lh "${NAME}.${VER}.nupkg"
 
@@ -354,12 +374,11 @@ jobs:
               echo "::warning::dotnet nuget verify failed for ${NAME}@${VER}"
             fi
 
-            # SLSA attestation verify (will fail until v1.12.x publish
-            # produces the first attested package — that's expected,
-            # gated as warning).
+            # The newly published package must have matching build provenance.
             if ! gh attestation verify "${NAME}.${VER}.nupkg" --repo ${{ github.repository }} 2>/tmp/att.log; then
-              echo "::warning::SLSA attestation not found for ${NAME}@${VER} — first attested release is in flight."
+              echo "::error::SLSA attestation not found for ${NAME}@${VER}"
               cat /tmp/att.log
+              exit 1
             else
               echo "${NAME}@${VER}: SLSA attestation verified."
             fi
@@ -367,12 +386,16 @@ jobs:
 
   verify-crates:
     name: Verify crates.io piper-plus
+    env:
+      CRATE_NAMES: ${{ needs.gate.outputs.crate_names }}
     needs: gate
     if: contains(needs.gate.outputs.packages, 'crates')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6.1.0
+        with:
+          ref: ${{ needs.gate.outputs.source_sha }}
 
       - name: Resolve crate versions
         id: crate_versions
@@ -382,31 +405,35 @@ jobs:
 
       - name: Verify crates.io metadata
         run: |
+          set -euo pipefail
           VER="${{ steps.crate_versions.outputs.version }}"
-          for CRATE in piper-plus piper-plus-cli piper-plus-g2p; do
+          for CRATE in ${CRATE_NAMES:-piper-plus piper-plus-cli piper-plus-g2p}; do
             URL="https://crates.io/api/v1/crates/${CRATE}/${VER}"
             echo "Fetching: $URL"
             HTTP=$(curl -sL -H "Accept: application/json" -w "%{http_code}" -o /tmp/crate.json "$URL")
             if [ "$HTTP" != "200" ]; then
-              echo "::warning::crates.io fetch returned HTTP $HTTP for ${CRATE}@${VER}"
-              continue
+              echo "::error::crates.io fetch returned HTTP $HTTP for ${CRATE}@${VER}"
+              exit 1
             fi
             REPORTED=$(python3 -c "import json; print(json.load(open('/tmp/crate.json'))['version']['num'])" 2>/dev/null || echo "?")
             echo "crates.io ${CRATE}: reported=${REPORTED} expected=${VER}"
+            test "$REPORTED" = "$VER"
           done
 
       - name: Verify SLSA attestation
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           VER="${{ steps.crate_versions.outputs.version }}"
           mkdir -p /tmp/crates && cd /tmp/crates
-          for CRATE in piper-plus piper-plus-cli piper-plus-g2p; do
+          for CRATE in ${CRATE_NAMES:-piper-plus piper-plus-cli piper-plus-g2p}; do
             DL="https://crates.io/api/v1/crates/${CRATE}/${VER}/download"
-            curl -sL -o "${CRATE}-${VER}.crate" "$DL"
-            ls -lh "${CRATE}-${VER}.crate" || continue
+            curl -fsSL -o "${CRATE}-${VER}.crate" "$DL"
+            ls -lh "${CRATE}-${VER}.crate" || exit 1
             if ! gh attestation verify "${CRATE}-${VER}.crate" --repo ${{ github.repository }} 2>/tmp/att.log; then
-              echo "::warning::SLSA attestation not found for ${CRATE}@${VER} — first attested release is in flight."
+              echo "::error::SLSA attestation not found for ${CRATE}@${VER}"
+              exit 1
             else
               echo "${CRATE}@${VER}: SLSA attestation verified."
             fi
@@ -420,6 +447,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6.1.0
+        with:
+          ref: ${{ needs.gate.outputs.source_sha }}
 
       - name: Resolve Kotlin AAR version
         id: maven_version
@@ -431,6 +460,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           VER="${{ steps.maven_version.outputs.version }}"
           BASE="https://repo1.maven.org/maven2/io/github/ayutaz/piper-plus-g2p-android/${VER}"
           AAR="piper-plus-g2p-android-${VER}.aar"
@@ -440,8 +470,8 @@ jobs:
           for FILE in "$AAR" "$POM" "${AAR}.asc" "${POM}.asc"; do
             HTTP=$(curl -sL -o "$FILE" -w "%{http_code}" "${BASE}/${FILE}")
             if [ "$HTTP" != "200" ]; then
-              echo "::warning::Maven Central fetch returned HTTP $HTTP for ${FILE} — package may not exist yet."
-              rm -f "$FILE"
+              echo "::error::Maven Central fetch returned HTTP $HTTP for ${FILE} — package may not exist yet."
+              exit 1
             else
               echo "Fetched: $FILE ($(stat -c%s "$FILE") bytes)"
             fi
@@ -460,7 +490,8 @@ jobs:
           # release-kotlin-g2p.yml).
           if [ -f "$AAR" ]; then
             if ! gh attestation verify "$AAR" --repo ${{ github.repository }} 2>/tmp/att.log; then
-              echo "::warning::SLSA attestation not found for piper-plus-g2p-android@${VER}"
+              echo "::error::SLSA attestation not found for piper-plus-g2p-android@${VER}"
+              exit 1
             else
               echo "piper-plus-g2p-android@${VER}: SLSA attestation verified."
             fi
