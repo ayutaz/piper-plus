@@ -1210,9 +1210,13 @@ jobs:
       - name: Generate checksums
         shell: bash
         run: |
-          cd artifacts
-          find . -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec sha256sum {} \; > checksums-sha256.txt
-          cat checksums-sha256.txt
+          set -euo pipefail
+          python3 scripts/release_checksums.py artifacts --output artifacts/checksums-sha256.txt
+          # GitHub assets download into one flat directory, not builder subdirectories.
+          mkdir checksum-download
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} checksum-download/ \;
+          python3 scripts/release_checksums.py checksum-download --verify artifacts/checksums-sha256.txt
+          (cd checksum-download && sha256sum --check ../artifacts/checksums-sha256.txt)
 
       - name: Verify Package.swift checksums match xcframework assets
         # Cross-check: the SHA-256 declared in Package.swift MUST match the

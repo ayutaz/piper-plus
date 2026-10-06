@@ -166,6 +166,12 @@ jobs:
             images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
+          for image in ${images}; do
+            cosign verify \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$GITHUB_SHA" "$image"
+          done
 
       # --- Docker Hub publish (tag push or workflow_dispatch only) ---
       #
@@ -316,6 +322,12 @@ jobs:
             images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
+          for image in ${images}; do
+            cosign verify \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$GITHUB_SHA" "$image"
+          done
 
   # Trial distroless variants. Build-only (never pushed to ghcr.io)
   # until a promotion PR validates each image's runtime behaviour
@@ -441,6 +453,12 @@ jobs:
             images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
+          for image in ${images}; do
+            cosign verify \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$GITHUB_SHA" "$image"
+          done
 
   build-cpp-dev:
     runs-on: ubuntu-latest
@@ -518,6 +536,12 @@ jobs:
             images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
+          for image in ${images}; do
+            cosign verify \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$GITHUB_SHA" "$image"
+          done
 
   build-cpp-inference:
     runs-on: ubuntu-latest
@@ -600,6 +624,12 @@ jobs:
             images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
+          for image in ${images}; do
+            cosign verify \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$GITHUB_SHA" "$image"
+          done
 
   # Multi-arch is critical here: Home Assistant ships on Raspberry Pi
   # (arm64) and the docker-build job is the only path users have to a
@@ -685,6 +715,12 @@ jobs:
             images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
+          for image in ${images}; do
+            cosign verify \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$GITHUB_SHA" "$image"
+          done
 
       # --- Docker Hub publish (tag push or workflow_dispatch only) ---
       # Fail-fast on missing credentials — see python-inference job above
@@ -816,6 +852,12 @@ jobs:
             images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
+          for image in ${images}; do
+            cosign verify \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$GITHUB_SHA" "$image"
+          done
 
       # --- Docker Hub publish (tag push or workflow_dispatch only) ---
       # Fail-fast on missing credentials — see python-inference job above

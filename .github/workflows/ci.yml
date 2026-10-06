@@ -32,6 +32,7 @@ jobs:
         run: |
           pip install 'pytest>=9.1.1,<10' PyYAML
           python -m pytest tests/scripts/test_release_publish_enforcement.py tests/scripts/test_native_release_notices.py tests/scripts/test_xcframework_archive.py tests/scripts/test_nuget_repository_copy.py tests/scripts/test_armv7_release.py tests/scripts/test_swift_release_consumer.py -q -o addopts=
+          python scripts/check_release_regressions.py
 
   changes:
     runs-on: ubuntu-24.04
@@ -389,6 +390,14 @@ jobs:
 
       - name: Check piper-plus-python
         run: cargo check -p piper-plus-python
+
+      - name: Build mandatory cache regression fixtures
+        run: |
+          python -m pip install onnx==1.22.0
+          python ../../tests/fixtures/ort_session/build_embedding_fixture.py
+
+      - name: Require actual ONNX cache and embedding inference
+        run: cargo test --locked -p piper-plus --no-default-features --features onnx --test test_embedding_dimensions
 
   # Small, real ORT Web graphs verify input shapes on every PR, without Rust.
   wasm-onnx-contract:

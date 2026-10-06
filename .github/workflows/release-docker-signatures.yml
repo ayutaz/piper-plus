@@ -64,6 +64,10 @@ jobs:
           set -euo pipefail
           while IFS= read -r image; do
             cosign sign --yes "$image"
+            cosign verify \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$GITHUB_SHA" "$image"
           done < docker-signature-references.txt
       - name: Preserve digest and source verification
         if: always()
