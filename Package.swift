@@ -50,7 +50,7 @@ import PackageDescription
 // Updated manually before each tag push (see header comment, step 3).
 // SHA-256 values from the verified pre-tag workflow artifacts.
 let version = "2.0.0"
-let checksum = "6371744444562fabfcfd624e09a94f36ca7c2a5fe30b28bfdcb82ba26034a0ac"
+let checksum = "4c5e26d3d515a1f3e347661fb3e12cfb774df1bfeb706f9df3232801aac496d7"
 
 // G2P-only artifact — produced by the same release workflow but as a
 // separate xcframework that does NOT depend on ONNX Runtime. Consumers
@@ -59,7 +59,7 @@ let checksum = "6371744444562fabfcfd624e09a94f36ca7c2a5fe30b28bfdcb82ba26034a0ac
 // Both products are published as assets of v2.0.0, following the pre-tag
 // checksum procedure above. Consumers should depend on a published tag.
 let g2pVersion = "2.0.0"
-let g2pChecksum = "259a3372e9f5918ed00b517d17e629eb4bfc364b454737de3faa541e621a1ea4"
+let g2pChecksum = "fcde67e9951b1bee77e8b886d69ef5cdd77ee71e35902b37ebfce01abd8402e3"
 
 let package = Package(
     name: "PiperPlus",
