@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Sign all seven published Docker images for both project and Docker-specific release tags. Allow signature repair only from an immutable signing tag after every public image's digest, version, source revision, and expected platform set has been verified.
+- Rust 0.5.2 and C# 0.5.1: continue inference from the original ONNX model when its directory cannot store an optimized cache. Check the writer's temporary path before asking ONNX Runtime to save; exercise read-only storage, normal cache creation/reload, and invalid models in PR CI.
 - Rust 0.5.1: use the ONNX model's declared speaker embedding dimension instead of forcing 192 values. Supports both 192- and 256-dimensional models; rejects mismatched explicit embeddings instead of silently truncating them.
 - Run actual embedding dimension inference on every Rust PR CI matrix, and allow up to 20 minutes for NuGet.org propagation before verifying repository-signed downloads.
 

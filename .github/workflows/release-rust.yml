@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '準備済みRustタグのバージョン（例: 0.5.1）。同じタグを選んで実行してください'
+        description: '準備済みRustタグのバージョン（例: 0.5.2）。同じタグを選んで実行してください'
         required: true
         type: string
 
@@ -79,8 +79,8 @@ jobs:
             jq -e '.isDraft == true' release.json
           else
             gh release create "$tag" --verify-tag --draft \
-              --title "Rust ${RELEASE_VERSION}: 話者埋め込み次元の修正" \
-              --notes 'ONNXの宣言に従って192次元・256次元の話者埋め込みを扱う修正版です。公開前に配布物と実推論を検証します。'
+              --title "Rust ${RELEASE_VERSION}: ONNX推論の修正" \
+              --notes 'ONNXモデルの宣言とキャッシュ保存先の権限を考慮した推論の修正版です。公開前に配布物と実推論を検証します。'
           fi
           echo "tag_name=${tag}" >> "$GITHUB_OUTPUT"
 

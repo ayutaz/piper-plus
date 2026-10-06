@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -481,3 +482,64 @@ def test_release_drafter_protects_tagged_and_asset_drafts():
     )
     assert guard["id"] == "guard"
     assert action["if"] == "steps.guard.outputs.safe_to_update == 'true'"
+
+
+def test_csharp_patch_selects_only_nuget_registry(tmp_path):
+    result = shell(
+        tmp_path,
+        step("release-verify.yml", "gate", "Resolve version + package list")["run"],
+        stubs={"git": "echo verified-source"},
+        env={
+            "INPUT_VERSION": "0.5.1",
+            "INPUT_PACKAGES": "",
+            "UPSTREAM_WORKFLOW": "Release CSharp patch",
+            "EVENT_NAME": "workflow_run",
+            "GITHUB_OUTPUT": str(tmp_path / "output"),
+        },
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "packages=nuget" in (tmp_path / "output").read_text(encoding="utf-8")
+
+
+def test_csharp_patch_requires_cache_regression_before_publication():
+    jobs = workflow("release-csharp.yml")["jobs"]
+    assert jobs["create_release"]["needs"] == ["validate", "test"]
+    assert jobs["publish_nuget"]["needs"] == "create_release"
+    assert jobs["csharp-cli"]["needs"] == "create_release"
+    assert any("CacheStorageTests" in s.get("run", "") for s in jobs["test"]["steps"])
+    assert any(
+        s.get("uses", "").startswith("actions/attest-build-provenance@")
+        for s in jobs["csharp-cli"]["steps"]
+    )
+
+
+@pytest.mark.parametrize(
+    "reference,project_version,matching_source,success",
+    [
+        ("refs/tags/csharp-v0.5.1", "0.5.1", True, True),
+        ("refs/heads/dev", "0.5.1", True, False),
+        ("refs/tags/csharp-v0.5.1", "0.5.0", True, False),
+        ("refs/tags/csharp-v0.5.1", "0.5.1", False, False),
+    ],
+)
+def test_csharp_patch_validates_immutable_tag_and_both_versions(
+    tmp_path, reference, project_version, matching_source, success
+):
+    for project in ("PiperPlus.Core", "PiperPlus.Cli"):
+        folder = tmp_path / "src/csharp" / project
+        folder.mkdir(parents=True)
+        (folder / f"{project}.csproj").write_text(
+            f"<Project><PropertyGroup><Version>{project_version}</Version></PropertyGroup></Project>\n",
+            encoding="utf-8",
+        )
+    python_path = Path(sys.executable).as_posix()
+    if os.name == "nt":
+        python_path = "/" + python_path[0].lower() + python_path[2:]
+    git = "echo verified-source" if matching_source else 'echo "$2"'
+    result = shell(
+        tmp_path,
+        step("release-csharp.yml", "validate", "Validate immutable CSharp tag")["run"],
+        stubs={"git": git, "python3": f'exec "{python_path}" "$@"'},
+        env={"RELEASE_VERSION": "0.5.1", "GITHUB_REF": reference},
+    )
+    assert (result.returncode == 0) is success, result.stdout + result.stderr
