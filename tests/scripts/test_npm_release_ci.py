@@ -44,3 +44,10 @@ def test_distribution_verification_is_in_required_pr_job():
         s.get("run", "") for s in ci["jobs"]["wasm-onnx-contract"]["steps"]
     )
     assert "test_npm_release_ci.py" in commands
+
+
+def test_local_g2p_install_does_not_rewrite_packed_dependencies():
+    steps = workflow("ci.yml")["jobs"]["npm-package-tests"]["steps"]
+    installs = [s["run"] for s in steps if "file:../g2p" in s.get("run", "")]
+    assert installs
+    assert all("--no-save" in command for command in installs)

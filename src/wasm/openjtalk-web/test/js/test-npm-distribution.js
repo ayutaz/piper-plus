@@ -79,3 +79,10 @@ test("rejects an empty export map", (t) => {
   save();
   assert.throws(() => verifyDistribution(root, "0.8.0"), /export/i);
 });
+
+test("rejects a packed dependency rewritten to a local checkout", (t) => {
+  const { root, manifest, save } = distribution(t);
+  manifest.dependencies = { "@piper-plus/g2p": "file:../g2p" };
+  save();
+  assert.throws(() => verifyDistribution(root, "0.8.0"), /local dependency/i);
+});
