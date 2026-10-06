@@ -3,6 +3,7 @@
 import hashlib
 import importlib.util
 import os
+import plistlib
 import zipfile
 from pathlib import Path
 
@@ -22,7 +23,7 @@ def archiver():
 def fixture(parent, reversed_order=False):
     source = parent / "example.xcframework"
     entries = [
-        ("Info.plist", b"plist"),
+        ("Info.plist", plistlib.dumps({"AvailableLibraries": [], "CFBundlePackageType": "XFWK"})),
         ("slice/Headers/a.h", b"header"),
         ("slice/lib.a", b"library" * 1000),
     ]
@@ -74,3 +75,28 @@ def test_release_uses_deterministic_g2p_archive():
     )
     assert "python3 scripts/zip_xcframework.py" in command
     assert "zip -ry" not in command
+
+
+def test_xcode_plist_order_does_not_change_checksum(tmp_path):
+    first, second = fixture(tmp_path / "first"), fixture(tmp_path / "second")
+    libraries = [
+        {"LibraryIdentifier": "ios-arm64_x86_64-simulator", "SupportedArchitectures": ["arm64", "x86_64"], "SupportedPlatform": "ios", "SupportedPlatformVariant": "simulator"},
+        {"LibraryIdentifier": "macos-arm64_x86_64", "SupportedArchitectures": ["arm64", "x86_64"], "SupportedPlatform": "macos"},
+    ]
+    one = {"AvailableLibraries": libraries, "CFBundlePackageType": "XFWK"}
+    two = {"CFBundlePackageType": "XFWK", "AvailableLibraries": [{**item, "SupportedArchitectures": list(reversed(item["SupportedArchitectures"]))} for item in reversed(libraries)]}
+    (first / "Info.plist").write_bytes(plistlib.dumps(one))
+    (second / "Info.plist").write_bytes(plistlib.dumps(two, sort_keys=False))
+    targets = [tmp_path / "one.zip", tmp_path / "two.zip"]
+    archiver()(first, targets[0])
+    archiver()(second, targets[1])
+    assert targets[0].read_bytes() == targets[1].read_bytes()
+    with zipfile.ZipFile(targets[0]) as archive:
+        assert plistlib.loads(archive.read("example.xcframework/Info.plist")) == one
+
+
+def test_synthesis_also_uses_canonical_plist_packaging():
+    import yaml
+    workflow = yaml.safe_load((ROOT / ".github/workflows/release-shared-lib.yml").read_text(encoding="utf-8"))
+    command = next(step["run"] for step in workflow["jobs"]["assemble-xcframework"]["steps"] if step.get("name") == "Zip xcframework")
+    assert "python3 scripts/zip_xcframework.py" in command
