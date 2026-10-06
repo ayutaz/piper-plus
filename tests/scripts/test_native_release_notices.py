@@ -116,3 +116,20 @@ def test_missing_ort_license_fails_install(tmp_path):
     )
     assert result.returncode != 0
     assert "ONNX Runtime LICENSE" in result.stdout + result.stderr
+
+@pytest.mark.parametrize("notice", ["LICENSE.md", "src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md"])
+def test_docker_context_preserves_installed_notices(tmp_path, notice):
+    # These basename globs and exact exceptions have the same matching rules
+    # in Git and Docker. Exercise the actual ignore file without a Docker daemon.
+    subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True)
+    (tmp_path / ".gitignore").write_text(
+        (ROOT / ".dockerignore").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    target = tmp_path / notice
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("notice fixture", encoding="utf-8")
+    result = subprocess.run(
+        ["git", "-C", str(tmp_path), "check-ignore", "--no-index", notice],
+        capture_output=True, encoding="utf-8", check=False,
+    )
+    assert result.returncode == 1, f"Docker context excludes {notice}: {result.stdout}"
