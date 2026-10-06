@@ -30,6 +30,12 @@ Thumbs.db
 docs/
 *.md
 !docker/README.md
+# Required by CMake install and Python package license metadata.
+!LICENSE.md
+!src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md
+!src/python_run/LICENSE.md
+!src/python_g2p/LICENSE.md
+!src/python_g2p/THIRD_PARTY_LICENSES.md
 
 # Test files
 test/
