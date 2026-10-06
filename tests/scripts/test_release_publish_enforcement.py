@@ -481,3 +481,20 @@ def test_release_drafter_protects_tagged_and_asset_drafts():
     )
     assert guard["id"] == "guard"
     assert action["if"] == "steps.guard.outputs.safe_to_update == 'true'"
+
+
+def test_csharp_patch_selects_only_nuget_registry(tmp_path):
+    result = shell(
+        tmp_path,
+        step("release-verify.yml", "gate", "Resolve version + package list")["run"],
+        stubs={"git": "echo verified-source"},
+        env={
+            "INPUT_VERSION": "0.5.1",
+            "INPUT_PACKAGES": "",
+            "UPSTREAM_WORKFLOW": "Release CSharp patch",
+            "EVENT_NAME": "workflow_run",
+            "GITHUB_OUTPUT": str(tmp_path / "output"),
+        },
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "packages=nuget" in (tmp_path / "output").read_text(encoding="utf-8")
