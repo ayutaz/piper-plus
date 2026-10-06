@@ -388,6 +388,7 @@ jobs:
     name: Verify crates.io piper-plus
     env:
       CRATE_NAMES: ${{ needs.gate.outputs.crate_names }}
+      CRATES_USER_AGENT: 'piper-plus-release-verify (https://github.com/${{ github.repository }})'
     needs: gate
     if: contains(needs.gate.outputs.packages, 'crates')
     runs-on: ubuntu-24.04
@@ -410,7 +411,7 @@ jobs:
           for CRATE in ${CRATE_NAMES:-piper-plus piper-plus-cli piper-plus-g2p}; do
             URL="https://crates.io/api/v1/crates/${CRATE}/${VER}"
             echo "Fetching: $URL"
-            HTTP=$(curl -sL -H "Accept: application/json" -w "%{http_code}" -o /tmp/crate.json "$URL")
+            HTTP=$(curl -sL --user-agent "$CRATES_USER_AGENT" -H "Accept: application/json" -w "%{http_code}" -o /tmp/crate.json "$URL")
             if [ "$HTTP" != "200" ]; then
               echo "::error::crates.io fetch returned HTTP $HTTP for ${CRATE}@${VER}"
               exit 1
@@ -429,7 +430,7 @@ jobs:
           mkdir -p /tmp/crates && cd /tmp/crates
           for CRATE in ${CRATE_NAMES:-piper-plus piper-plus-cli piper-plus-g2p}; do
             DL="https://crates.io/api/v1/crates/${CRATE}/${VER}/download"
-            curl -fsSL -o "${CRATE}-${VER}.crate" "$DL"
+            curl -fsSL --user-agent "$CRATES_USER_AGENT" -o "${CRATE}-${VER}.crate" "$DL"
             ls -lh "${CRATE}-${VER}.crate" || exit 1
             if ! gh attestation verify "${CRATE}-${VER}.crate" --repo ${{ github.repository }} 2>/tmp/att.log; then
               echo "::error::SLSA attestation not found for ${CRATE}@${VER}"
