@@ -237,3 +237,111 @@ def test_post_publish_verifies_only_the_registries_that_workflow_publishes(
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert f"packages={packages}\n" in output.read_text(encoding="utf-8")
+
+
+def test_python_g2p_manual_publication_is_guarded_and_serialized():
+    config = workflow("g2p-python-ci.yml")
+    assert (
+        config["on"]["workflow_dispatch"]["inputs"]["release_tag"]["required"] == "true"
+    )
+    assert "release_tag" in config["concurrency"]["group"]
+    assert (
+        config["concurrency"]["cancel-in-progress"]
+        == "${{ github.event_name == 'pull_request' }}"
+    )
+    publish = config["jobs"]["publish"]
+    assert "workflow_dispatch" in publish["if"]
+    assert "validate-release" in publish["needs"]
+
+
+def g2p_release_repository(tmp_path):
+    source = tmp_path / "src/python/g2p"
+    source.mkdir(parents=True)
+    (source / "pyproject.toml").write_text(
+        '[project]\nversion = "0.3.0"\n', encoding="utf-8"
+    )
+    (source / "dictionary.json").write_text('{"original": true}\n', encoding="utf-8")
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts/check_python_release_wheel.py").write_text(
+        "# wheel verifier\n", encoding="utf-8"
+    )
+
+    def git(*args):
+        return subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=Release Test",
+                "-c",
+                "user.email=release-test@example.invalid",
+                *args,
+            ],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    git("init")
+    git("add", ".")
+    git("commit", "-m", "release source")
+    git("tag", "python-g2p-v0.3.0")
+    ci = tmp_path / ".github/workflows"
+    ci.mkdir(parents=True)
+    (ci / "g2p-python-ci.yml").write_text("# add manual dispatch\n", encoding="utf-8")
+    git("add", ".")
+    git("commit", "-m", "CI recovery only")
+    return git, source
+
+
+def g2p_release_guard(tmp_path, tag="python-g2p-v0.3.0"):
+    script = step(
+        "g2p-python-ci.yml", "validate-release", "Validate Python G2P release source"
+    )["run"]
+    return shell(
+        tmp_path,
+        script,
+        env={
+            "EVENT_NAME": "workflow_dispatch",
+            "RELEASE_TAG": tag,
+            "GITHUB_REF": "refs/heads/dev",
+            "GITHUB_OUTPUT": str(tmp_path / "guard-output"),
+        },
+    )
+
+
+def test_g2p_manual_release_accepts_ci_only_changes(tmp_path):
+    g2p_release_repository(tmp_path)
+    result = g2p_release_guard(tmp_path)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("kind", ["committed", "dirty", "untracked"])
+def test_g2p_manual_release_rejects_changed_package(tmp_path, kind):
+    git, source = g2p_release_repository(tmp_path)
+    if kind == "untracked":
+        (source / "injected.json").write_text("{}\n", encoding="utf-8")
+    else:
+        (source / "dictionary.json").write_text('{"changed": true}\n', encoding="utf-8")
+        if kind == "committed":
+            git("add", ".")
+            git("commit", "-m", "changed package source")
+    result = g2p_release_guard(tmp_path)
+    assert result.returncode != 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "tag", ["python-g2p-v0.4.0", "python-g2p-v0.3.0;touch injected"]
+)
+def test_g2p_manual_release_rejects_invalid_or_mismatched_tag(tmp_path, tag):
+    g2p_release_repository(tmp_path)
+    result = g2p_release_guard(tmp_path, tag)
+    assert result.returncode != 0, result.stdout + result.stderr
+    assert not (tmp_path / "injected").exists()
+
+
+def test_g2p_manual_release_rejects_missing_tag(tmp_path):
+    git, _ = g2p_release_repository(tmp_path)
+    git("tag", "-d", "python-g2p-v0.3.0")
+    result = g2p_release_guard(tmp_path)
+    assert result.returncode != 0, result.stdout + result.stderr
