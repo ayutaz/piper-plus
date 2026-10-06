@@ -1,0 +1,266 @@
+name: Release CSharp patch
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '準備済みC#タグのバージョン（例: 0.5.1）。同じタグを選んで実行してください'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6.1.0
+        with:
+          fetch-depth: 0
+      - name: Validate immutable CSharp tag
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$GITHUB_REF" = "refs/tags/csharp-v${RELEASE_VERSION}"
+          test "$(git rev-parse "refs/tags/csharp-v${RELEASE_VERSION}^{commit}")" = "$(git rev-parse HEAD)"
+          python3 - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          for project in ('PiperPlus.Core', 'PiperPlus.Cli'):
+              path = Path('src/csharp') / project / f'{project}.csproj'
+              assert ET.parse(path).findtext('PropertyGroup/Version') == os.environ['RELEASE_VERSION']
+          PY
+
+  test:
+    needs: validate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5.4.0
+        with:
+          dotnet-version: 10.0.x
+      - name: Run actual cache storage inference regressions
+        run: >-
+          dotnet test src/csharp/PiperPlus.Core.Tests/PiperPlus.Core.Tests.csproj
+          -c Release --filter FullyQualifiedName~CacheStorageTests
+
+  create_release:
+    needs: [validate, test]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    outputs:
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - name: Create or reuse verified draft
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          tag="csharp-v${RELEASE_VERSION}"
+          if gh release view "$tag" --json isDraft > release.json; then
+            jq -e '.isDraft == true' release.json
+          else
+            gh release create "$tag" --verify-tag --draft \
+              --title "C# ${RELEASE_VERSION}: 読み取り専用モデルでの推論を修正" \
+              --notes 'キャッシュ保存先へ書き込めない場合も元のONNXモデルから推論する修正版です。公開前に配布物と実推論を検証します。'
+          fi
+          echo "tag_name=${tag}" >> "$GITHUB_OUTPUT"
+
+  csharp-cli:
+    name: Build C# CLI (${{ matrix.rid }})
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    needs: create_release
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+            archive_ext: zip
+            cross: false
+          - rid: win-arm64
+            os: windows-latest
+            archive_ext: zip
+            cross: true
+          - rid: linux-x64
+            os: ubuntu-24.04
+            archive_ext: tar.gz
+            cross: false
+          - rid: linux-arm64
+            os: ubuntu-24.04
+            archive_ext: tar.gz
+            cross: true
+          - rid: osx-x64
+            os: macos-14
+            archive_ext: tar.gz
+            cross: true
+          - rid: osx-arm64
+            os: macos-14
+            archive_ext: tar.gz
+            cross: false
+    steps:
+      - uses: actions/checkout@v6.1.0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5.4.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish C# CLI
+        shell: bash
+        run: |
+          PUBLISH_ARGS="-c Release -r ${{ matrix.rid }} --self-contained true"
+          PUBLISH_ARGS="$PUBLISH_ARGS -p:PublishSingleFile=true -p:PublishTrimmed=true"
+          # C# CLI uses its own version from csproj (independent from PyPI version)
+
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            PUBLISH_ARGS="$PUBLISH_ARGS -p:PublishReadyToRun=false"
+          else
+            PUBLISH_ARGS="$PUBLISH_ARGS -p:PublishReadyToRun=true"
+          fi
+
+          dotnet publish src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj $PUBLISH_ARGS -o publish/
+
+      - name: Include project license
+        shell: bash
+        run: cp LICENSE.md publish/
+
+      - name: Create archive (tar.gz)
+        if: matrix.archive_ext == 'tar.gz'
+        run: tar -czf piper-plus-cli-${{ matrix.rid }}.tar.gz -C publish .
+
+      - name: Create archive (zip)
+        if: matrix.archive_ext == 'zip'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path publish/* -DestinationPath piper-plus-cli-${{ matrix.rid }}.zip
+
+      - name: Show archive size
+        run: ls -lh piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive_ext }}
+        shell: bash
+
+      - name: Attest CLI archive
+        uses: actions/attest-build-provenance@v3.2.0
+        with:
+          subject-path: 'piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive_ext }}'
+
+      - name: Upload Release Asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release upload "${{ needs.create_release.outputs.tag_name }}" \
+            "piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive_ext }}" \
+            --clobber
+
+  # Publish to NuGet
+  publish_nuget:
+    name: Publish to NuGet
+    timeout-minutes: 45
+    needs: create_release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write       # required by attest-build-provenance
+      attestations: write
+    steps:
+      - uses: actions/checkout@v6.1.0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5.4.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Pack NuGet packages
+        run: |
+          # NuGet packages use their own version from csproj (independent from PyPI version)
+          dotnet pack src/csharp/PiperPlus.Core/PiperPlus.Core.csproj \
+            -c Release -o nupkgs/
+          dotnet pack src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj \
+            -c Release -o nupkgs/
+          echo "Packages created:"
+          ls -lh nupkgs/
+
+      - name: Sign NuGet packages
+        # Code-sign the .nupkg files so consumers can verify authorship
+        # via `nuget verify -All`. Requires the secrets `NuGetSignCert`
+        # (PFX, base64) and `NuGetSignCertPassword`. If neither is set,
+        # we emit a warning and continue — signing is opt-in until the
+        # cert is provisioned (Azure Trusted Signing / Sectigo / etc).
+        env:
+          NUGET_SIGN_CERT_BASE64: ${{ secrets.NuGetSignCert }}
+          NUGET_SIGN_CERT_PASSWORD: ${{ secrets.NuGetSignCertPassword }}
+        run: |
+          if [ -z "$NUGET_SIGN_CERT_BASE64" ] || [ -z "$NUGET_SIGN_CERT_PASSWORD" ]; then
+            echo "::warning::NuGetSignCert / NuGetSignCertPassword secret not set — skipping NuGet code signing. Packages will publish unsigned."
+            exit 0
+          fi
+          echo "$NUGET_SIGN_CERT_BASE64" | base64 -d > /tmp/nuget-sign.pfx
+          for pkg in nupkgs/*.nupkg; do
+            echo "Signing: $pkg"
+            dotnet nuget sign "$pkg" \
+              --certificate-path /tmp/nuget-sign.pfx \
+              --certificate-password "$NUGET_SIGN_CERT_PASSWORD" \
+              --timestamper http://timestamp.digicert.com \
+              || { echo "::error::Failed to sign $pkg"; exit 1; }
+          done
+          rm -f /tmp/nuget-sign.pfx
+          echo "Signed packages:"
+          ls -lh nupkgs/
+
+      - name: Generate SLSA build provenance attestation (NuGet)
+        # Attest the *signed* nupkgs (or unsigned if signing was skipped).
+        # `gh attestation verify` against the published package downloads
+        # the .nupkg and matches it against this attestation.
+        if: hashFiles('nupkgs/*.nupkg') != ''
+        uses: actions/attest-build-provenance@v3.2.0
+        with:
+          subject-path: 'nupkgs/*.nupkg'
+
+      - name: Publish to NuGet
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [ -n "$NUGET_API_KEY" ]; then
+            for pkg in nupkgs/*.nupkg; do
+              dotnet nuget push "$pkg" \
+                --api-key "$NUGET_API_KEY" \
+                --source https://api.nuget.org/v3/index.json \
+                --skip-duplicate
+            done
+          else
+            echo "::error::NUGET_API_KEY is required to publish this release"
+            exit 1
+          fi
+
+      - name: Verify repository-signed public NuGet copies
+        run: |
+          set -euo pipefail
+          for package in nupkgs/*.nupkg; do
+            public="published-nupkgs/$(basename "$package")"
+            python3 scripts/check_nuget_package.py "$package" "$public" --download
+            dotnet nuget verify "$public"
+          done
+
+      - name: Attest exact public NuGet packages
+        uses: actions/attest-build-provenance@v3.2.0
+        with:
+          subject-path: 'published-nupkgs/*.nupkg'

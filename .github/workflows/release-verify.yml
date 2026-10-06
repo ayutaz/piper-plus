@@ -25,6 +25,7 @@ on:
     workflows:
       - "Manual Release"
       - "Release Rust patch"
+      - "Release CSharp patch"
       - "npm publish"
       - "Publish piper-plus-g2p (Rust)"
       - "Publish piper-plus-g2p (Go)"
@@ -100,6 +101,7 @@ jobs:
             case "$UPSTREAM_WORKFLOW" in
               "Manual Release") PACKAGES="pypi,nuget,crates" ;;
               "Release Rust patch") PACKAGES="crates" ;;
+              "Release CSharp patch") PACKAGES="nuget" ;;
               "npm publish") PACKAGES="npm" ;;
               "Publish piper-plus-g2p (Rust)") PACKAGES="crates" ;;
               "Release Kotlin G2P (Maven Central)") PACKAGES="maven" ;;
