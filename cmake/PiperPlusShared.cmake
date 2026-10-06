@@ -241,18 +241,6 @@ if(NOT PIPER_APPLE_EMBEDDED AND NOT ANDROID)
   endif()
 endif()
 
-# --- ONNX Runtime license ---
-set(_ort_license "${ONNXRUNTIME_DIR}/../ort_dl/src/onnxruntime_external/LICENSE")
-if(NOT EXISTS "${_ort_license}")
-  # Fallback: try common locations
-  set(_ort_license "${ONNXRUNTIME_DIR}/LICENSE")
-endif()
-if(EXISTS "${_ort_license}")
-  install(FILES "${_ort_license}"
-          DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/onnxruntime
-          RENAME LICENSE)
-endif()
-
 # --- Dictionary install (optional) ---
 # OpenJTalk dictionary
 if(EXISTS "${CMAKE_BINARY_DIR}/oj/dic")

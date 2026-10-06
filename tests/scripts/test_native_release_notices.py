@@ -35,6 +35,19 @@ def layout(tmp_path):
     return tmp_path
 
 
+def test_complete_native_layout_is_accepted(tmp_path):
+    subprocess.run(
+        [
+            "cmake",
+            f"-DPREFIX={layout(tmp_path)}",
+            "-P",
+            str(ROOT / "cmake/verify_install_layout.cmake"),
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+
 @pytest.mark.parametrize(
     "missing",
     ["share/licenses/piper-plus/LICENSE.md", "share/licenses/onnxruntime/LICENSE"],
@@ -43,9 +56,14 @@ def test_native_layout_requires_license_text(tmp_path, missing):
     prefix = layout(tmp_path)
     (prefix / missing).unlink()
     result = subprocess.run(
-        ["cmake", f"-DPREFIX={prefix}", "-P", str(ROOT / "cmake/verify_install_layout.cmake")],
+        [
+            "cmake",
+            f"-DPREFIX={prefix}",
+            "-P",
+            str(ROOT / "cmake/verify_install_layout.cmake"),
+        ],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         check=False,
     )
     assert result.returncode != 0
@@ -69,7 +87,9 @@ def test_ort_notices_are_resolved_at_install_time(tmp_path, sdk_path):
     # ExternalProject downloads the SDK after CMake configuration.
     sdk.mkdir(parents=True)
     (sdk / "LICENSE").write_text("ORT license fixture", encoding="utf-8")
-    (sdk / "ThirdPartyNotices.txt").write_text("ORT third party fixture", encoding="utf-8")
+    (sdk / "ThirdPartyNotices.txt").write_text(
+        "ORT third party fixture", encoding="utf-8"
+    )
     subprocess.run(
         ["cmake", f"-DCMAKE_INSTALL_PREFIX={prefix}", "-P", str(script)],
         check=True,
@@ -91,6 +111,8 @@ def test_missing_ort_license_fails_install(tmp_path):
         f'include("{script.as_posix()}")\n',
         encoding="utf-8",
     )
-    result = subprocess.run(["cmake", "-P", str(runner)], capture_output=True, text=True, check=False)
+    result = subprocess.run(
+        ["cmake", "-P", str(runner)], capture_output=True, encoding="utf-8", check=False
+    )
     assert result.returncode != 0
     assert "ONNX Runtime LICENSE" in result.stdout + result.stderr
