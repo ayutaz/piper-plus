@@ -108,6 +108,11 @@ test("CSS10 official demo synthesizes and plays all six languages", async ({ pag
     expect(wav.stats.frames).toBeGreaterThan(0);
     expect(wav.stats.finite).toBe(true);
     expect(wav.stats.nonzero).toBe(true);
+    if (language === "zh") {
+      // This pinned sentence collapses to <0.5s when the pinyin dictionaries
+      // are missing and Chinese silently falls back to character passthrough.
+      expect(wav.stats.frames / wav.stats.rate).toBeGreaterThan(1);
+    }
     await page.waitForFunction(() => document.querySelector("#audioPlayer").currentTime > 0);
     await page.locator("#audioPlayer").evaluate((el) => el.pause());
     await writeFile(info.outputPath(`css10-${language}.wav`), bytes);

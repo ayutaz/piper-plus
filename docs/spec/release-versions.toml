@@ -97,7 +97,7 @@ expected_prefix = "0.4."
 # ---------------------------------------------------------------------------
 [npm.synthesis]
 manifest = "src/wasm/openjtalk-web/package.json"
-expected_prefix = "0.7."
+expected_prefix = "0.8."
 
 [npm.g2p]
 manifest = "src/wasm/g2p/package.json"
