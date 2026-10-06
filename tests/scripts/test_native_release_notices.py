@@ -138,3 +138,20 @@ def test_docker_context_preserves_installed_notices(tmp_path, notice):
         check=False,
     )
     assert result.returncode == 1, f"Docker context excludes {notice}: {result.stdout}"
+
+@pytest.mark.parametrize(
+    ("workflow", "job", "step_name"),
+    [
+        ("build-piper.yml", "build", "Create distribution package (Unix)"),
+        ("build-piper.yml", "build", "Create distribution package (Windows)"),
+        ("dev-build-all.yml", "build_linux_armv7", "Build in Docker"),
+    ],
+)
+def test_cli_archives_use_canonical_notice_install(workflow, job, step_name):
+    import yaml
+
+    document = yaml.safe_load((ROOT / ".github/workflows" / workflow).read_text(encoding="utf-8"))
+    step = next(item for item in document["jobs"][job]["steps"] if item.get("name") == step_name)
+    command = step["run"]
+    assert "cmake --install build" in command
+    assert "--prefix dist/piper-plus" in command
