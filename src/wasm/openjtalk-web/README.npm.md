@@ -28,7 +28,7 @@ piper-plus is built for projects that need high-quality multilingual TTS in the 
 - **IndexedDB caching** -- models are cached after the first download
 - **Bundled Japanese dictionary** -- NAIST-JDIC compiled into WASM binary (~19MB gzip), no separate download
 - **Structured error codes** -- errors carry a `.code` property for programmatic handling
-- **~4 MB npm package** -- models are downloaded on demand from HuggingFace
+- **Bundled WASM and Japanese dictionary** -- voice models are downloaded on demand from HuggingFace
 
 ## Install
 
@@ -41,6 +41,14 @@ npm install piper-plus onnxruntime-web
 Version 0.8.0 requires ONNX Runtime Web 1.22.0 or later. Speaker embedding
 dimensions and mask shapes are read from the loaded model's public input
 metadata. ONNX Runtime Web 1.21 does not provide this API.
+
+To update an existing installation:
+
+```bash
+npm install piper-plus@0.8.0 onnxruntime-web@1.22.0
+```
+
+For importmap users, update both CDN URLs as shown below.
 
 ## Quick Start
 

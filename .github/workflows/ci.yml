@@ -91,6 +91,7 @@ jobs:
               - '.github/workflows/deploy-webassembly-demo.yml'
               - '.github/workflows/test-webassembly.yml'
               - 'tests/scripts/test_wasm_onnx_ci_contract.py'
+              - 'tests/scripts/test_npm_release_ci.py'
             zh-en-data:
               # Source-of-truth + 6 mirrors. Any drift in any mirror should
               # trigger every per-runtime test job, not just the JSON sync gate.
@@ -399,7 +400,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           pip install 'pytest>=9.1.1,<10' PyYAML
-          python -m pytest tests/scripts/test_wasm_onnx_ci_contract.py tests/scripts/test_python_release_wheels.py -q -o addopts=
+          python -m pytest tests/scripts/test_wasm_onnx_ci_contract.py tests/scripts/test_python_release_wheels.py tests/scripts/test_npm_release_ci.py -q -o addopts=
       - name: Install exact ORT Web and local G2P (no native binary download)
         env:
           ORT_VERSION: ${{ matrix.ort }}
@@ -464,7 +465,7 @@ jobs:
         run: cargo test -p piper-plus-wasm --features ja-external --no-fail-fast
 
       - name: Install dependencies (with local @piper-plus/g2p)
-        run: npm install "@piper-plus/g2p@file:../g2p"
+        run: npm install --no-save "@piper-plus/g2p@file:../g2p"
 
       - name: Run npm package tests
         run: npm run test:npm-package:all
@@ -483,6 +484,9 @@ jobs:
 
       - name: Test browser synthesis with public models
         run: npm run test:browser
+
+      - name: Test packed npm distribution in a clean consumer
+        run: npm run test:distribution
 
       - name: Upload browser results
         if: always()
