@@ -1,0 +1,37 @@
+name: Verify public SwiftPM release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Published release version (e.g. 2.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6.1.0
+        with:
+          ref: v${{ inputs.version }}
+      - name: Prepare isolated public consumer
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          test "$(tr -d '\r\n' < VERSION)" = "$RELEASE_VERSION"
+          python3 scripts/check_swift_release_consumer.py \
+            --version "$RELEASE_VERSION" \
+            --destination "$RUNNER_TEMP/swift-release-consumer"
+      - name: Resolve public binary artifacts and run G2P
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/swift-release-consumer"
+          swift package resolve
+          swift build
+          swift run --skip-build ReleaseConsumer

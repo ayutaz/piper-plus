@@ -31,7 +31,7 @@ jobs:
       - name: Test release failure handling
         run: |
           pip install 'pytest>=9.1.1,<10' PyYAML
-          python -m pytest tests/scripts/test_release_publish_enforcement.py tests/scripts/test_native_release_notices.py tests/scripts/test_xcframework_archive.py tests/scripts/test_nuget_repository_copy.py tests/scripts/test_armv7_release.py -q -o addopts=
+          python -m pytest tests/scripts/test_release_publish_enforcement.py tests/scripts/test_native_release_notices.py tests/scripts/test_xcframework_archive.py tests/scripts/test_nuget_repository_copy.py tests/scripts/test_armv7_release.py tests/scripts/test_swift_release_consumer.py -q -o addopts=
 
   changes:
     runs-on: ubuntu-24.04
