@@ -9,6 +9,14 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def test_go_module_bundles_canonical_mit_license():
+    # Go's module proxy did not copy the repository's LICENSE.md into v0.2.0.
+    # A nested module needs its own recognized LICENSE filename.
+    assert (ROOT / "src/go/phonemize/LICENSE").read_text(encoding="utf-8") == (
+        ROOT / "LICENSE.md"
+    ).read_text(encoding="utf-8")
+
+
 def layout(tmp_path):
     files = [
         "include/piper_plus.h",
