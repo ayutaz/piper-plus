@@ -381,10 +381,16 @@ def test_rust_pr_ci_requires_real_embedding_fixture_inference():
 def test_rust_coverage_prepares_mandatory_embedding_fixtures():
     steps = workflow("rust-tests.yml")["jobs"]["coverage"]["steps"]
     coverage_index = next(
-        i for i, s in enumerate(steps) if "cargo llvm-cov --workspace" in s.get("run", "")
+        i
+        for i, s in enumerate(steps)
+        if "cargo llvm-cov --workspace" in s.get("run", "")
     )
     fixture_index = next(
-        (i for i, s in enumerate(steps) if "build_embedding_fixture.py" in s.get("run", "")),
+        (
+            i
+            for i, s in enumerate(steps)
+            if "build_embedding_fixture.py" in s.get("run", "")
+        ),
         None,
     )
     assert fixture_index is not None, "Coverage must build required ONNX fixtures"
