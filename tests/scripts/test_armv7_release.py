@@ -1,5 +1,8 @@
 """Reject the x64 SDK that previously reached the ARMv7 linker."""
 
+import hashlib
+import io
+import json
 import subprocess
 from pathlib import Path
 
@@ -110,3 +113,52 @@ def test_eigen_uses_verified_upstream_dependency_commit():
     assert "$work/cmake/deps.txt" in script
     assert 'git -C "$work/eigen" fetch --depth 1 origin "$eigen_commit"' in script
     assert 'test "$(git -C "$work/eigen" rev-parse HEAD)" = "$eigen_commit"' in script
+
+
+def test_model_fetch_uses_published_config_and_verifies_bytes(tmp_path, monkeypatch):
+    """Execute the CI downloader against the published model file layout."""
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/build-linux-armv7.yml").read_text(encoding="utf-8")
+    )
+    code = next(
+        s["run"]
+        for s in workflow["jobs"]["build"]["steps"]
+        if s.get("name") == "Fetch pinned synthesis model"
+    )
+    payloads = {"voice.onnx": b"onnx model", "config.json": b'{"sample_rate":22050}'}
+    manifest = tmp_path / "src/wasm/openjtalk-web/test/browser/models.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(
+        json.dumps(
+            [
+                {
+                    "key": "tsukuyomi",
+                    "repo": "test/voice",
+                    "revision": "pinned-commit",
+                    "onnx": "voice.onnx",
+                    "onnxSha256": hashlib.sha256(payloads["voice.onnx"]).hexdigest(),
+                    "configSha256": hashlib.sha256(payloads["config.json"]).hexdigest(),
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    requests = []
+
+    def fetch(url, timeout):
+        requests.append(url)
+        base = "https://huggingface.co/test/voice/resolve/pinned-commit/"
+        assert url.startswith(base)
+        return io.BytesIO(payloads[url.removeprefix(base)])
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("urllib.request.urlopen", fetch)
+    exec(compile(code, "ARMv7 model fetch", "exec"), {})
+    assert len(requests) == 2
+    assert (tmp_path / "armv7-smoke/model.onnx").read_bytes() == payloads["voice.onnx"]
+    assert (tmp_path / "armv7-smoke/model.onnx.json").read_bytes() == payloads[
+        "config.json"
+    ]
+    payloads["config.json"] = b"tampered config"
+    with pytest.raises(AssertionError):
+        exec(compile(code, "ARMv7 model fetch", "exec"), {})
