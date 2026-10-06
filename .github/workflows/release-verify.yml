@@ -325,7 +325,7 @@ jobs:
     needs: gate
     if: contains(needs.gate.outputs.packages, 'nuget')
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6.1.0
         with:
@@ -357,7 +357,10 @@ jobs:
             NAME="${PKG%/*}"; VER="${PKG#*/}"
             URL="https://api.nuget.org/v3-flatcontainer/${NAME,,}/${VER}/${NAME,,}.${VER}.nupkg"
             echo "Fetching: $URL"
-            HTTP=$(curl -sLo "${NAME}.${VER}.nupkg" -w "%{http_code}" "$URL")
+            HTTP=$(curl --fail --silent --show-error --location \
+              --retry 120 --retry-all-errors --retry-delay 10 \
+              --retry-max-time 1200 --connect-timeout 10 --max-time 30 \
+              -o "${NAME}.${VER}.nupkg" -w "%{http_code}" "$URL")
             if [ "$HTTP" != "200" ]; then
               echo "::error::NuGet fetch returned HTTP $HTTP for $NAME@$VER — package may not exist yet."
               exit 1
@@ -446,7 +449,7 @@ jobs:
     needs: gate
     if: contains(needs.gate.outputs.packages, 'maven')
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6.1.0
         with:
@@ -470,7 +473,10 @@ jobs:
 
           mkdir -p /tmp/maven && cd /tmp/maven
           for FILE in "$AAR" "$POM" "${AAR}.asc" "${POM}.asc"; do
-            HTTP=$(curl -sL -o "$FILE" -w "%{http_code}" "${BASE}/${FILE}")
+            HTTP=$(curl --fail --silent --show-error --location \
+              --retry 120 --retry-all-errors --retry-delay 10 \
+              --retry-max-time 1200 --connect-timeout 10 --max-time 30 \
+              -o "$FILE" -w "%{http_code}" "${BASE}/${FILE}")
             if [ "$HTTP" != "200" ]; then
               echo "::error::Maven Central fetch returned HTTP $HTTP for ${FILE} — package may not exist yet."
               exit 1
