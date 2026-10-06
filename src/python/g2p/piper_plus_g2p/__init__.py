@@ -1,6 +1,6 @@
 """piper-plus-g2p: Multilingual G2P for TTS."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from .base import Phonemizer, ProsodyInfo
 from .encode.encoder import PiperEncoder

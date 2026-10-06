@@ -6,12 +6,14 @@ on:
     paths:
       - 'src/python/g2p/**'
       - '.github/workflows/g2p-python-ci.yml'
+      - 'scripts/check_python_release_wheel.py'
     tags:
       - 'python-g2p-v*'
   pull_request:
     paths:
       - 'src/python/g2p/**'
       - '.github/workflows/g2p-python-ci.yml'
+      - 'scripts/check_python_release_wheel.py'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}

@@ -69,11 +69,16 @@ def test_legacy_piper_module_is_not_shipped(tmp_path):
 def test_g2p_module_version_matches_distribution_metadata():
     package = ROOT / "src/python/g2p"
     manifest = tomllib.loads((package / "pyproject.toml").read_text(encoding="utf-8"))
-    module = ast.parse((package / "piper_plus_g2p/__init__.py").read_text(encoding="utf-8"))
+    module = ast.parse(
+        (package / "piper_plus_g2p/__init__.py").read_text(encoding="utf-8")
+    )
     version = next(
         ast.literal_eval(node.value)
         for node in module.body
         if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "__version__" for target in node.targets)
+        and any(
+            isinstance(target, ast.Name) and target.id == "__version__"
+            for target in node.targets
+        )
     )
     assert version == manifest["project"]["version"]

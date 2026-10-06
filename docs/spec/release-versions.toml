@@ -112,12 +112,12 @@ expected_prefix = "0.4."
 [swift.synthesis]
 manifest = "Package.swift"
 field = "version"
-expected_prefix = "1.13."
+expected_prefix = "2.0."
 
 [swift.g2p]
 manifest = "Package.swift"
 field = "g2pVersion"
-expected_prefix = "1.14."
+expected_prefix = "2.0."
 
 # ---------------------------------------------------------------------------
 # Maven Central — io.github.ayutaz:piper-plus-g2p-android
