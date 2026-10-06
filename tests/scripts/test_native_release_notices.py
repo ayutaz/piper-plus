@@ -145,7 +145,12 @@ def test_missing_ort_license_fails_install(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "notice", ["LICENSE.md", "src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md"]
+    "notice",
+    [
+        "LICENSE.md",
+        "src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md",
+        "src/python/g2p/THIRD_PARTY_LICENSES.md",
+    ],
 )
 def test_docker_context_preserves_installed_notices(tmp_path, notice):
     # Require explicit notice exceptions with a conservative ignore check.
