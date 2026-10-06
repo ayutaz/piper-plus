@@ -74,9 +74,10 @@ jobs:
         run: |
           mkdir -p artifacts
           cd artifacts
-          # Skip .sig / .pem (前回 sign 結果の二重 sign 防止)。
+          set -euo pipefail
+          # Skip signatures from previous runs, including Cosign bundles.
           gh release view "$TAG" --json assets --jq '.assets[].name' \
-            | grep -vE '\.(sig|pem)$' \
+            | grep -vE '(\.(sig|pem)$|\.cosign\.bundle$)' \
             | while read -r name; do
                 echo "Downloading: $name"
                 gh release download "$TAG" --pattern "$name" --clobber
@@ -87,28 +88,35 @@ jobs:
         env:
           COSIGN_EXPERIMENTAL: "1"
         run: |
+          set -euo pipefail
           cd artifacts
+          count=0
           for asset in *; do
             # skip directories and existing signatures
             if [ -d "$asset" ]; then continue; fi
             case "$asset" in
-              *.sig|*.pem) continue ;;
+              *.sig|*.pem|*.cosign.bundle) continue ;;
             esac
+            test -f "$asset"
             echo "Signing: $asset"
             cosign sign-blob --yes \
               --bundle "${asset}.cosign.bundle" \
-              "$asset" || {
-                echo "::warning::cosign failed for $asset (continuing)"
-                continue
-              }
+              "$asset"
+            test -s "${asset}.cosign.bundle"
+            cosign verify-blob --bundle "${asset}.cosign.bundle" \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$GITHUB_SHA" "$asset"
+            count=$((count + 1))
           done
-          ls -la *.cosign.bundle 2>/dev/null || echo "no bundles generated"
+          test "$count" -gt 0
 
       - name: Upload signatures to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
+          set -euo pipefail
           cd artifacts
           for sig in *.cosign.bundle; do
             if [ ! -f "$sig" ]; then continue; fi
