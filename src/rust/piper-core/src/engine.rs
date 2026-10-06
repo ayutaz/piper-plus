@@ -540,7 +540,7 @@ impl OnnxEngine {
             tracing::info!("Loading pre-optimized model from {:?}", optimized_path);
             match Self::build_session(&optimized_path, num_intra_threads, &device_type, true, None)
             {
-                Ok((session, actual_device)) => {
+                Ok((session, actual_device, _)) => {
                     tracing::info!("Using device: {}", actual_device);
                     return Self::finish_load(session, config);
                 }
@@ -565,7 +565,7 @@ impl OnnxEngine {
         // ファイルの「後」に書かれるので、生成中のファイルを守れない。
         // 規約: docs/spec/ort-session-contract.toml [cache.concurrency]。
         let temp_optimized_path = Self::build_temp_cache_path(&optimized_path);
-        let (session, actual_device) = Self::build_session(
+        let (session, actual_device, cache_save_enabled) = Self::build_session(
             model_path,
             num_intra_threads,
             &device_type,
@@ -579,7 +579,7 @@ impl OnnxEngine {
         // 同一ディレクトリ内の rename は POSIX でも Windows でも atomic なので、
         // 並行する reader は「古い完全なファイル」か「新しい完全なファイル」の
         // どちらかを見る。途中状態は見えない。
-        if temp_optimized_path.exists() {
+        if cache_save_enabled && temp_optimized_path.exists() {
             match std::fs::rename(&temp_optimized_path, &optimized_path) {
                 Ok(()) => {
                     if let Err(e) = std::fs::write(&sentinel_path, b"ok") {
@@ -633,13 +633,16 @@ impl OnnxEngine {
     ///
     /// `cached` が `true` の場合は最適化をスキップし、`false` の場合は
     /// `cache_save_path` に最適化結果を保存する。
+    /// 戻り値の bool は保存が実際に有効になった場合のみ true。
+    /// プローブに失敗したパスの既存ファイルをキャッシュとして公開しない。
     fn build_session(
         model_path: &Path,
         num_intra_threads: usize,
         device_type: &crate::gpu::DeviceType,
         cached: bool,
         cache_save_path: Option<&std::path::Path>,
-    ) -> Result<(Session, crate::gpu::DeviceType), PiperError> {
+    ) -> Result<(Session, crate::gpu::DeviceType, bool), PiperError> {
+        let mut cache_save_enabled = false;
         let mut builder = Session::builder()
             .map_err(|e| PiperError::ModelLoad(e.to_string()))?
             .with_intra_threads(num_intra_threads)
@@ -663,19 +666,38 @@ impl OnnxEngine {
                 .map_err(|e| PiperError::ModelLoad(format!("optimization_level: {e}")))?;
         } else if let Some(save_path) = cache_save_path {
             // 初回: 最適化を実行し、結果を .opt.onnx に保存
-            // 書き込み権限がない場合は warning のみでフォールバック
-            match builder.with_optimized_model_path(save_path) {
-                Ok(b) => {
-                    builder = b;
-                    tracing::info!("ORT will save optimized model to {:?}", save_path);
-                }
+            // ORT はパス設定時ではなく commit_from_file 時に保存するため、
+            // writer 固有のパスへ実際に書き込めるか先に確認する。
+            let writable = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(save_path)
+                .and_then(|probe| {
+                    drop(probe);
+                    std::fs::remove_file(save_path)
+                });
+            match writable {
+                Ok(()) => match builder.with_optimized_model_path(save_path) {
+                    Ok(b) => {
+                        builder = b;
+                        cache_save_enabled = true;
+                        tracing::info!("ORT will save optimized model to {:?}", save_path);
+                    }
+                    Err(e) => {
+                        let msg = e.to_string();
+                        builder = e.recover();
+                        tracing::warn!(
+                            "Could not set optimized model path {:?}: {} (continuing without cache)",
+                            save_path,
+                            msg
+                        );
+                    }
+                },
                 Err(e) => {
-                    let msg = e.to_string();
-                    builder = e.recover();
                     tracing::warn!(
-                        "Could not set optimized model path {:?}: {} (continuing without cache)",
+                        "Could not write optimized model path {:?}: {} (continuing without cache)",
                         save_path,
-                        msg
+                        e
                     );
                 }
             }
@@ -689,7 +711,7 @@ impl OnnxEngine {
             .commit_from_file(model_path)
             .map_err(|e| PiperError::ModelLoad(e.to_string()))?;
 
-        Ok((session, actual_device))
+        Ok((session, actual_device, cache_save_enabled))
     }
 
     /// セッションからモデル能力を検出し、`OnnxEngine` を構築する。
