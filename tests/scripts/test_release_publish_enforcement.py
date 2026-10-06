@@ -1,7 +1,7 @@
 """Execute release shell steps: failed/missing publications must fail the job."""
 
-import os
 import importlib.util
+import os
 import re
 import shutil
 import subprocess
@@ -390,20 +390,38 @@ def test_registry_verifiers_wait_for_bounded_distribution_propagation(job):
 
 
 def test_release_drafter_protects_tagged_and_asset_drafts():
-    spec = importlib.util.spec_from_file_location("draft_guard", ROOT / "scripts/check_release_drafter_guard.py")
+    spec = importlib.util.spec_from_file_location(
+        "draft_guard", ROOT / "scripts/check_release_drafter_guard.py"
+    )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     releases = [
         {"id": 1, "draft": True, "tag_name": "v1.13.1", "assets": []},
         {"id": 2, "draft": True, "tag_name": "v2.0.0", "assets": []},
-        {"id": 3, "draft": True, "tag_name": "rust-v0.5.1", "assets": [{"name": "cli.zip"}]},
-        {"id": 4, "draft": False, "tag_name": "v1.13.0", "assets": [{"name": "cli.zip"}]},
+        {
+            "id": 3,
+            "draft": True,
+            "tag_name": "rust-v0.5.1",
+            "assets": [{"name": "cli.zip"}],
+        },
+        {
+            "id": 4,
+            "draft": False,
+            "tag_name": "v1.13.0",
+            "assets": [{"name": "cli.zip"}],
+        },
     ]
     assert module.protected_drafts(releases, {"v2.0.0", "v1.13.0"}) == [2, 3]
     assert module.protected_drafts([releases[0], releases[3]], {"v1.13.0"}) == []
     config = workflow("release-drafter.yml")
     steps = config["jobs"]["update_release_draft"]["steps"]
-    guard = next(s for s in steps if "check_release_drafter_guard.py" in s.get("run", ""))
-    action = next(s for s in steps if s.get("uses", "").startswith("release-drafter/release-drafter@"))
+    guard = next(
+        s for s in steps if "check_release_drafter_guard.py" in s.get("run", "")
+    )
+    action = next(
+        s
+        for s in steps
+        if s.get("uses", "").startswith("release-drafter/release-drafter@")
+    )
     assert guard["id"] == "guard"
     assert action["if"] == "steps.guard.outputs.safe_to_update == 'true'"
