@@ -12,6 +12,11 @@ export function verifyDistribution(nodeModules, expectedVersion) {
       `Package version mismatch: ${pkg.name}@${pkg.version}, expected piper-plus@${expectedVersion}`
     );
   }
+  for (const [name, spec] of Object.entries(pkg.dependencies || {})) {
+    if (/^(file:|link:|workspace:)/.test(spec)) {
+      throw new Error(`Distribution contains local dependency: ${name}@${spec}`);
+    }
+  }
   const exports = [];
   function flatten(value) {
     if (typeof value === "string") {
