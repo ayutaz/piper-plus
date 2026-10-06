@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "piper-plus-g2p"
-version = "0.2.0"
+version = "0.3.0"
 description = "Multilingual G2P (Grapheme-to-Phoneme) for TTS — eSpeak-ng free, MIT licensed"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -66,6 +66,9 @@ Documentation = "https://github.com/ayutaz/piper-plus/tree/dev/src/python/g2p#re
 
 [tool.hatch.build.targets.wheel]
 packages = ["piper_plus_g2p"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"THIRD_PARTY_LICENSES.md" = "piper_plus_g2p/THIRD_PARTY_LICENSES.md"
 
 [tool.ruff]
 target-version = "py311"

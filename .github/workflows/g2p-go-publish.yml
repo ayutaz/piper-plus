@@ -90,6 +90,6 @@ jobs:
           MODULE="github.com/ayutaz/piper-plus/src/go/phonemize"
           VERSION="v${{ steps.version.outputs.version }}"
           echo "Requesting indexing for $MODULE@$VERSION"
-          curl -s "https://proxy.golang.org/${MODULE}/@v/${VERSION}.info" || true
+          curl -fSL --retry 5 --retry-all-errors --retry-delay 10 "https://proxy.golang.org/${MODULE}/@v/${VERSION}.info"
           echo ""
           echo "Module will be available at: https://pkg.go.dev/${MODULE}@${VERSION}"

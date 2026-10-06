@@ -8,7 +8,7 @@
 //
 // Consumer usage (just one package):
 //
-//   .package(url: "https://github.com/ayutaz/piper-plus", from: "1.13.0")
+//   .package(url: "https://github.com/ayutaz/piper-plus", from: "2.0.0")
 //
 // `import PiperPlus` then re-exports the C API from the bundled xcframework,
 // and onnxruntime is linked automatically through the wrapper target.
@@ -28,9 +28,9 @@
 //   2. Download the artifact zip locally and compute its checksum:
 //        swift package compute-checksum libpiper_plus-ios.xcframework.zip
 //   3. Update the `version` and `checksum` constants below to match the
-//      upcoming release tag (e.g. `v1.13.0`) and the computed checksum.
-//   4. Commit on `dev`:    `chore(spm): bump Package.swift to v1.13.0`
-//   5. Tag on `dev`:       `git tag v1.13.0 && git push origin v1.13.0`
+//      upcoming release tag (e.g. `v2.0.0`) and the computed checksum.
+//   4. Commit on `dev`:    `chore(spm): bump Package.swift to v2.0.0`
+//   5. Tag on `dev`:       `git tag v2.0.0 && git push origin v2.0.0`
 //      The release workflow re-builds the same artifact (deterministic), so
 //      the checksum continues to match. SwiftPM resolution against the new
 //      tag now succeeds.
@@ -48,32 +48,18 @@
 import PackageDescription
 
 // Updated manually before each tag push (see header comment, step 3).
-// The placeholder values below are intentionally invalid until the first
-// v1.13.0 release lands; `swift package resolve` succeeds only against tags
-// where this manifest was updated to match a published release asset.
-let version = "1.13.0"
-let checksum = "33870ebd45ac24685033901831d0910fdfb1c7f1acb5d1176966ba2239031552"
+// SHA-256 values from the verified pre-tag workflow artifacts.
+let version = "2.0.0"
+let checksum = "4c5e26d3d515a1f3e347661fb3e12cfb774df1bfeb706f9df3232801aac496d7"
 
 // G2P-only artifact — produced by the same release workflow but as a
 // separate xcframework that does NOT depend on ONNX Runtime. Consumers
 // who need only G2P (text → IPA tokens) can pull just `PiperPlusG2P`.
-// Bumped independently of the synthesis `version` above: the G2P product
-// debuts in v1.14.0 (Issue #387), one tag after the synthesis xcframework
-// (which shipped at v1.13.0 per Issue #377). Both follow the same manual
-// release procedure documented in the file header.
-//
-// The G2P xcframework ships iOS device + iOS simulator + macOS slices as
-// of v1.14.0 — the artifact name is `-apple-` (not `-ios-`) to reflect
-// the broader Apple platform coverage. The synthesis xcframework remains
-// iOS-only because its ORT dependency has its own macOS distribution.
-//
-// IMPORTANT: until the v1.14.0 tag publishes the xcframework asset and
-// this checksum is updated, `swift package resolve` against this manifest
-// will fail with "artifact has changed checksum" / "asset not found".
-// Consumers should depend on a *tagged* version (`from: "1.14.0"`), not
-// the dev branch.
-let g2pVersion = "1.14.0"
-let g2pChecksum = "0000000000000000000000000000000000000000000000000000000000000000"
+// The G2P xcframework includes iOS device + iOS simulator + macOS slices.
+// Both products are published as assets of v2.0.0, following the pre-tag
+// checksum procedure above. Consumers should depend on a published tag.
+let g2pVersion = "2.0.0"
+let g2pChecksum = "fcde67e9951b1bee77e8b886d69ef5cdd77ee71e35902b37ebfce01abd8402e3"
 
 let package = Package(
     name: "PiperPlus",
@@ -138,7 +124,7 @@ let package = Package(
         ),
         // PiperPlusG2P (Issue #387) — Swift wrapper around the Rust
         // piper-plus-g2p crate's C FFI. Independent from the synthesis
-        // engine: no ORT dependency, ~3-5 MB xcframework after compression.
+        // engine: no ORT dependency, bundled dictionaries in the xcframework.
         .target(
             name: "PiperPlusG2P",
             dependencies: [
@@ -174,8 +160,7 @@ let package = Package(
         ),
         // Synthesis-engine smoke tests. Like PiperPlusG2PTests, these
         // cannot be exercised from the release manifest until the
-        // matching xcframework asset is published (placeholder checksum
-        // above prevents `swift package resolve` pre-tag). See
+        // matching xcframework asset is published. See
         // tests/PiperPlusTests/PiperPlusSmokeTests.swift header for the
         // CI-swap path required to run these on PRs (needs a macOS
         // slice in libpiper_plus, not yet built — Issue tracking TBD).

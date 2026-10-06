@@ -18,6 +18,8 @@ on:
       - 'Sources/PiperPlusG2P/**'
       - 'tests/PiperPlusG2PTests/**'
       - 'Package.swift'
+      - 'scripts/zip_xcframework.py'
+      - 'tests/scripts/test_xcframework_archive.py'
       - 'cmake/**'
       - 'src/cpp/**'
       - 'CMakeLists.txt'
@@ -635,17 +637,9 @@ jobs:
       - name: Zip xcframework
         run: |
           set -euo pipefail
-          # Reproducible zip — the Package.swift binaryTarget checksum must survive the
-          # dispatch-build -> tag-build rebuild (the release job's Gate 2 compares the
-          # declared `let checksum` against a fresh sha256 of this zip and hard-fails on
-          # mismatch). `zip` stores a per-entry modification time, so we (1) normalise
-          # every entry's mtime to a fixed epoch (`touch -h`, not following symlinks),
-          # (2) feed a byte-sorted file list for a stable member order, and (3) pass -X
-          # to drop the platform extra field (uid/gid/hi-res time). -y keeps symlinks as
-          # symlinks (Apple framework layout). Combined with ZERO_AR_DATE on the .a build,
-          # the archive is byte-identical across runs of the same source.
-          find piper_plus.xcframework -exec touch -h -t 202001010000.00 {} +
-          find piper_plus.xcframework -print | LC_ALL=C sort | zip -X -y libpiper_plus-ios.xcframework.zip -@
+          # Normalize ZIP metadata and Xcode's nondeterministic library ordering.
+          # Both Apple products use the same packaging contract.
+          python3 scripts/zip_xcframework.py piper_plus.xcframework libpiper_plus-ios.xcframework.zip
           ls -la libpiper_plus-ios.xcframework.zip
           echo "sha256:"
           shasum -a 256 libpiper_plus-ios.xcframework.zip
@@ -915,7 +909,7 @@ jobs:
           # `-apple` (not `-ios`) reflects that the xcframework now ships
           # iOS device + simulator + macOS slices. Consumers reference this
           # name in Package.swift's binaryTarget URL.
-          zip -ry libpiper_plus_g2p-apple.xcframework.zip piper_plus_g2p.xcframework
+          python3 scripts/zip_xcframework.py piper_plus_g2p.xcframework libpiper_plus_g2p-apple.xcframework.zip
           ls -la libpiper_plus_g2p-apple.xcframework.zip
           echo "sha256:"
           shasum -a 256 libpiper_plus_g2p-apple.xcframework.zip

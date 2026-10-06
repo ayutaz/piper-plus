@@ -75,10 +75,11 @@ RUN apt-get update \
 
 WORKDIR /workspace
 
-COPY CMakeLists.txt VERSION ./
+COPY CMakeLists.txt VERSION LICENSE.md ./
 COPY cmake/ cmake/
 COPY src/cpp/ src/cpp/
 COPY src/rust/piper-plus-g2p/data/ src/rust/piper-plus-g2p/data/
+COPY src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md
 
 RUN mkdir -p build && cd build && \
     cmake .. \

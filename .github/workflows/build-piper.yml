@@ -271,6 +271,9 @@ jobs:
           mkdir -p dist/piper-plus/lib
           mkdir -p dist/piper-plus/share
 
+          # Use canonical install rules for notices and phonemizer dictionaries.
+          cmake --install build --config ${{ inputs.build-type }} --prefix dist/piper-plus
+
           # Copy main binary
           if [ -f "build/piper-plus" ]; then
             cp build/piper-plus dist/piper-plus/bin/
@@ -466,6 +469,10 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist/piper-plus/bin
           New-Item -ItemType Directory -Force -Path dist/piper-plus/lib
           New-Item -ItemType Directory -Force -Path dist/piper-plus/share
+
+          # Use canonical install rules for notices and phonemizer dictionaries.
+          cmake --install build --config ${{ inputs.build-type }} --prefix dist/piper-plus
+          if ($LASTEXITCODE -ne 0) { throw "Canonical CLI install failed" }
 
           # Copy main binary
           if (Test-Path "build/${{ inputs.build-type }}/piper-plus.exe") {

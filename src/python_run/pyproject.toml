@@ -22,7 +22,7 @@
 # -----------------------------------------------------------------------------
 
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -30,7 +30,8 @@ name = "piper-plus"
 description = "A fast, high-quality neural text-to-speech system supporting 8 languages (ja/en/zh/ko/es/fr/pt/sv) with VITS architecture."
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE.md"]
 authors = [
     {name = "yousan", email = "rabbitcats77@gmail.com"},
 ]
@@ -39,7 +40,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Topic :: Text Processing :: Linguistic",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",

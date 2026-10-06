@@ -1,0 +1,21 @@
+# ExternalProject downloads ORT after configuration. Resolve notices when
+# cmake --install runs, using the same SDK roots as the linked library.
+set(_ort_roots "@PIPER_ORT_ROOTS@")
+set(_ort_notice_root "")
+foreach(_root IN LISTS _ort_roots)
+  if(NOT _root STREQUAL "" AND EXISTS "${_root}/LICENSE")
+    set(_ort_notice_root "${_root}")
+    break()
+  endif()
+endforeach()
+if(_ort_notice_root STREQUAL "")
+  message(FATAL_ERROR "ONNX Runtime LICENSE not found in linked SDK roots: ${_ort_roots}")
+endif()
+file(INSTALL
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/@CMAKE_INSTALL_DATADIR@/licenses/onnxruntime"
+  TYPE FILE FILES "${_ort_notice_root}/LICENSE")
+if(EXISTS "${_ort_notice_root}/ThirdPartyNotices.txt")
+  file(INSTALL
+    DESTINATION "${CMAKE_INSTALL_PREFIX}/@CMAKE_INSTALL_DATADIR@/licenses/onnxruntime"
+    TYPE FILE FILES "${_ort_notice_root}/ThirdPartyNotices.txt")
+endif()

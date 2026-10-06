@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /workspace
 
 # Copy build files and source code
-COPY CMakeLists.txt VERSION ./
+COPY CMakeLists.txt VERSION LICENSE.md ./
 COPY cmake/ cmake/
 COPY src/cpp/ src/cpp/
 # Phonemizer dictionaries (CMU English, Chinese pinyin) live with the
@@ -30,6 +30,7 @@ COPY src/cpp/ src/cpp/
 # read from a single source. cpp-inference doesn't compile the Rust crate,
 # but cmake/Install.cmake still installs these JSONs to share/piper-plus/dicts/.
 COPY src/rust/piper-plus-g2p/data/ src/rust/piper-plus-g2p/data/
+COPY src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md
 
 # Build piper-plus (all C++ deps resolved via CMake ExternalProject)
 RUN mkdir -p build && cd build && \

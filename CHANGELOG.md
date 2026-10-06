@@ -15,13 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enforces this automatically.
 -->
 
-<!--
-  The block below was drafted as `## [2.0.0] - 2026-05-25` but that release
-  was NEVER cut: the newest tag is v1.13.0 (2026-06-15) and PyPI's newest
-  piper-plus is 1.13.0. The heading also sat ABOVE [1.13.0] while carrying
-  an EARLIER date, so the file claimed a release that does not exist.
-  Its entries are unreleased, so they live here until a release is cut.
--->
+## [2.0.0] - 2026-10-06
+
 
 Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13 + CUDA 12.8 + Ubuntu 24.04** で完全統一する fully-aligned 戦略 migration。 新 GPU (T4 / RTX 6000 Ada / RTX 5090) サポート + TF32 / bf16-mixed default 化。
 加えて Issue #590: **`piper` → `piper_plus` / `piper-plus` フル改名 (クリーンブレーク)** により本家 `piper-tts` (rhasspy/piper) と同一環境への pip 共存が可能に。

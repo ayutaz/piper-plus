@@ -246,6 +246,7 @@ jobs:
       - name: Check wheels
         run: |
           ls -la dist/
+          python scripts/check_python_release_wheel.py --name piper-plus --version "$(cat VERSION)" dist/*.whl
           if ls dist/*.whl 1> /dev/null 2>&1; then
             twine check dist/*.whl
           else
@@ -431,6 +432,19 @@ jobs:
             exit 1
           fi
 
+      - name: Verify repository-signed public NuGet copies
+        run: |
+          set -euo pipefail
+          for package in nupkgs/*.nupkg; do
+            public="published-nupkgs/$(basename "$package")"
+            python3 scripts/check_nuget_package.py "$package" "$public" --download
+            dotnet nuget verify "$public"
+          done
+
+      - name: Attest exact public NuGet packages
+        uses: actions/attest-build-provenance@v3.2.0
+        with:
+          subject-path: 'published-nupkgs/*.nupkg'
   # Publish to crates.io
   publish_crates:
     name: Publish to crates.io

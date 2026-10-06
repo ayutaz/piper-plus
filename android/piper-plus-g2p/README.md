@@ -23,7 +23,7 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("io.github.ayutaz:piper-plus-g2p-android:1.0.0")
+    implementation("io.github.ayutaz:piper-plus-g2p-android:1.0.1")
 }
 ```
 

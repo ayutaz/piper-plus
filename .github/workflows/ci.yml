@@ -31,7 +31,7 @@ jobs:
       - name: Test release failure handling
         run: |
           pip install 'pytest>=9.1.1,<10' PyYAML
-          python -m pytest tests/scripts/test_release_publish_enforcement.py -q -o addopts=
+          python -m pytest tests/scripts/test_release_publish_enforcement.py tests/scripts/test_native_release_notices.py tests/scripts/test_xcframework_archive.py tests/scripts/test_nuget_repository_copy.py tests/scripts/test_armv7_release.py tests/scripts/test_swift_release_consumer.py -q -o addopts=
 
   changes:
     runs-on: ubuntu-24.04
@@ -413,7 +413,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           pip install 'pytest>=9.1.1,<10' PyYAML
-          python -m pytest tests/scripts/test_wasm_onnx_ci_contract.py tests/scripts/test_npm_release_ci.py -q -o addopts=
+          python -m pytest tests/scripts/test_wasm_onnx_ci_contract.py tests/scripts/test_python_release_wheels.py tests/scripts/test_npm_release_ci.py -q -o addopts=
       - name: Install exact ORT Web and local G2P (no native binary download)
         env:
           ORT_VERSION: ${{ matrix.ort }}

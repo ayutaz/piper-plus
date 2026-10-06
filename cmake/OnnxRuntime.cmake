@@ -1,6 +1,12 @@
 # cmake/OnnxRuntime.cmake
 # ONNX Runtime download + platform-specific configuration
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+   CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm|armhf|armv[5-8].*)$")
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/OnnxRuntimeArmv7.cmake)
+  piper_check_linux_armv7_ort("${ONNXRUNTIME_DIR}")
+endif()
+
 # ---- ONNX Runtime ---
 if(WIN32)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/find_onnxruntime_windows.cmake)
