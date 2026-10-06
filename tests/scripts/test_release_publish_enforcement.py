@@ -375,3 +375,14 @@ def test_rust_pr_ci_requires_real_embedding_fixture_inference():
     steps = workflow("rust-tests.yml")["jobs"]["test"]["steps"]
     assert any("build_embedding_fixture.py" in s.get("run", "") for s in steps)
     assert any("--test test_embedding_dimensions" in s.get("run", "") for s in steps)
+
+
+@pytest.mark.parametrize("job", ["verify-maven", "verify-nuget"])
+def test_registry_verifiers_wait_for_bounded_distribution_propagation(job):
+    config = workflow("release-verify.yml")["jobs"][job]
+    script = "\n".join(s.get("run", "") for s in config["steps"])
+    assert "--retry 120" in script
+    assert "--retry-all-errors" in script
+    assert "--retry-max-time 1200" in script
+    assert "--max-time 30" in script
+    assert int(config["timeout-minutes"]) >= (90 if job == "verify-maven" else 45)
