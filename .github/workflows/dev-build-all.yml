@@ -90,6 +90,7 @@ jobs:
               ninja -j1
               cd ..
               mkdir -p dist/piper-plus/bin dist/piper-plus/lib dist/piper-plus/share
+              cmake --install build --config Release --prefix dist/piper-plus || exit 1
               cp build/piper-plus dist/piper-plus/bin/
               find build -name '*.so*' -type f -exec cp {} dist/piper-plus/lib/ \; 2>/dev/null || true
 

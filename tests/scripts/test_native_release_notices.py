@@ -122,8 +122,8 @@ def test_missing_ort_license_fails_install(tmp_path):
     "notice", ["LICENSE.md", "src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md"]
 )
 def test_docker_context_preserves_installed_notices(tmp_path, notice):
-    # These basename globs and exact exceptions have the same matching rules
-    # in Git and Docker. Exercise the actual ignore file without a Docker daemon.
+    # Require explicit notice exceptions with a conservative ignore check.
+    # The ARM64 CI build also exercises the real Docker context and install.
     subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True)
     (tmp_path / ".gitignore").write_text(
         (ROOT / ".dockerignore").read_text(encoding="utf-8"), encoding="utf-8"
@@ -139,6 +139,7 @@ def test_docker_context_preserves_installed_notices(tmp_path, notice):
     )
     assert result.returncode == 1, f"Docker context excludes {notice}: {result.stdout}"
 
+
 @pytest.mark.parametrize(
     ("workflow", "job", "step_name"),
     [
@@ -150,8 +151,12 @@ def test_docker_context_preserves_installed_notices(tmp_path, notice):
 def test_cli_archives_use_canonical_notice_install(workflow, job, step_name):
     import yaml
 
-    document = yaml.safe_load((ROOT / ".github/workflows" / workflow).read_text(encoding="utf-8"))
-    step = next(item for item in document["jobs"][job]["steps"] if item.get("name") == step_name)
+    document = yaml.safe_load(
+        (ROOT / ".github/workflows" / workflow).read_text(encoding="utf-8")
+    )
+    step = next(
+        item for item in document["jobs"][job]["steps"] if item.get("name") == step_name
+    )
     command = step["run"]
     assert "cmake --install build" in command
     assert "--prefix dist/piper-plus" in command
