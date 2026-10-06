@@ -40,6 +40,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
+from piper_plus_g2p.encode.pua import FIXED_PUA_MAPPING
 from piper_plus_g2p.registry import get_phonemizer
 from piper_train.ort_utils import create_session_with_cache, warmup_onnx_session
 
@@ -149,6 +150,15 @@ except ImportError:
     FASTAPI_AVAILABLE = False
 
 
+def _phoneme_ids(phoneme: str, id_map: dict[str, list[int]]) -> list[int] | None:
+    """Resolve legacy tokens or their canonical PUA symbol without changing IDs."""
+    ids = id_map.get(phoneme)
+    if ids is not None:
+        return ids
+    codepoint = FIXED_PUA_MAPPING.get(phoneme)
+    return id_map.get(chr(codepoint)) if codepoint is not None else None
+
+
 def text_to_phoneme_ids_and_prosody(
     text: str,
     phoneme_id_map: dict[str, list[int]],
@@ -162,8 +172,8 @@ def text_to_phoneme_ids_and_prosody(
     prosody_features: list[dict | None] = []
 
     for phoneme, prosody_info in zip(phonemes, prosody_info_list, strict=True):
-        if phoneme in phoneme_id_map:
-            ids = phoneme_id_map[phoneme]
+        ids = _phoneme_ids(phoneme, phoneme_id_map)
+        if ids is not None:
             phoneme_ids.extend(ids)
             for _ in ids:
                 if prosody_info is not None:
@@ -396,8 +406,8 @@ class PiperInferenceEngine:
         prosody_features: list[dict | None] = []
         token_for_id: list[str] = []
         for phoneme, prosody_info in zip(phonemes, prosody_info_list, strict=True):
-            if phoneme in self.phoneme_id_map:
-                ids = self.phoneme_id_map[phoneme]
+            ids = _phoneme_ids(phoneme, self.phoneme_id_map)
+            if ids is not None:
                 phoneme_ids.extend(ids)
                 token_for_id.extend([phoneme] * len(ids))
                 for _ in ids:

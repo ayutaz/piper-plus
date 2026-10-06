@@ -27,6 +27,7 @@ on:
       - 'pyproject.toml'
       - 'CMakeLists.txt'
       - '.github/workflows/docker-build.yml'
+      - 'tests/scripts/test_docker_release_tags.py'
     tags:
       - 'docker-v*'
       - 'v*'
@@ -44,6 +45,7 @@ on:
       - 'pyproject.toml'
       - 'CMakeLists.txt'
       - '.github/workflows/docker-build.yml'
+      - 'tests/scripts/test_docker_release_tags.py'
   workflow_dispatch:
 
 # 同一 PR への連続 push で古い build を cancel。 push to dev は cancel しない
@@ -60,7 +62,29 @@ permissions:
   contents: read
 
 jobs:
+  inference-regression:
+    name: Docker inference PUA regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - uses: astral-sh/setup-uv@v6.8.0
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - name: Install isolated inference test dependencies
+        run: |
+          uv venv --python 3.13 "${RUNNER_TEMP}/venv-docker-inference"
+          uv pip install --python "${RUNNER_TEMP}/venv-docker-inference/bin/python" \
+            pytest pyyaml numpy soundfile onnxruntime ./src/python/g2p
+      - name: Check synthesis, timing and release tag regression
+        run: |
+          "${RUNNER_TEMP}/venv-docker-inference/bin/python" -m pytest \
+            docker/python-inference/test_phoneme_encoding.py \
+            tests/scripts/test_docker_release_tags.py -o addopts= -q
+
   build-python-inference:
+    needs: inference-regression
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -96,6 +120,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
+            type=match,pattern=docker-v(.*),group=1
             type=sha
 
       - name: Build and push to ghcr.io
@@ -178,6 +203,7 @@ jobs:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/piper-plus-api
           tags: |
             type=semver,pattern={{version}},prefix=
+            type=match,pattern=docker-v(.*),group=1,prefix=
             type=semver,pattern={{major}}.{{minor}},prefix=
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
 
@@ -203,6 +229,7 @@ jobs:
   # `-cpu` suffix on ghcr.io so consumers can pin explicitly:
   #   ghcr.io/.../python-inference:dev-cpu
   build-python-inference-cpu:
+    needs: inference-regression
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -242,6 +269,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
+            type=match,pattern=docker-v(.*),group=1
             type=sha
 
       - name: Build and push CPU image (multi-arch)
@@ -366,6 +394,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
+            type=match,pattern=docker-v(.*),group=1
             type=sha
 
       - name: Build and push
@@ -441,6 +470,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
+            type=match,pattern=docker-v(.*),group=1
             type=sha
 
       - name: Build and push
@@ -522,6 +552,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
+            type=match,pattern=docker-v(.*),group=1
             type=sha
 
       - name: Build and push
@@ -606,6 +637,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
+            type=match,pattern=docker-v(.*),group=1
             type=sha
 
       - name: Build and push to ghcr.io
@@ -682,6 +714,7 @@ jobs:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/wyoming-piper-plus
           tags: |
             type=semver,pattern={{version}},prefix=
+            type=match,pattern=docker-v(.*),group=1,prefix=
             type=semver,pattern={{major}}.{{minor}},prefix=
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
 
@@ -701,6 +734,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   build-webui:
+    needs: inference-regression
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -737,6 +771,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
+            type=match,pattern=docker-v(.*),group=1
             type=sha
 
       - name: Build and push to ghcr.io
@@ -810,6 +845,7 @@ jobs:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/piper-plus-webui
           tags: |
             type=semver,pattern={{version}},prefix=
+            type=match,pattern=docker-v(.*),group=1,prefix=
             type=semver,pattern={{major}}.{{minor}},prefix=
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
 
