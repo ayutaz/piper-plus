@@ -6,6 +6,7 @@ from pathlib import Path
 
 
 TESTS = [
+    "tests/scripts/test_prepare_release_draft.py",
     "tests/scripts/test_release_regression_guards.py",
     "tests/scripts/test_docker_release_tags.py",
     "tests/scripts/test_docker_signature_recovery.py",

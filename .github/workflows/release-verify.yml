@@ -46,6 +46,10 @@ on:
         description: 'Comma-separated list of registries to verify (pypi,npm,nuget,crates,maven). Empty = all.'
         required: false
         type: string
+      prepare_draft:
+        description: '下書きに修正版を反映するルートバージョン（例: 2.0.0）。公開せず、署名・全配布物のチェックサムを検証します'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -58,6 +62,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  prepare-draft:
+    name: Verify and prepare draft on hosted runner
+    if: github.event_name == 'workflow_dispatch' && inputs.prepare_draft != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      attestations: read
+    concurrency:
+      group: release-draft-${{ inputs.prepare_draft }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6.1.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-dotnet@v5.4.0
+        with:
+          dotnet-version: 10.0.x
+      - name: Test draft guards before touching release assets
+        run: |
+          python -m pip install 'pytest>=9.1.1,<10'
+          python -m pytest tests/scripts/test_prepare_release_draft.py -q -o addopts=
+      - name: Verify public packages and update the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ROOT_VERSION: ${{ inputs.prepare_draft }}
+        run: >-
+          python scripts/prepare_release_draft.py
+          --version "$ROOT_VERSION" --directory "$RUNNER_TEMP/release-verification"
+      - name: Preserve cryptographic verification evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: release-draft-verification-${{ inputs.prepare_draft }}
+          path: ${{ runner.temp }}/release-verification/proof/
+          if-no-files-found: error
+
   # Skip when the upstream publish workflow failed (no point verifying a
   # publish that didn't happen). Always run for schedule/workflow_dispatch.
   gate:
