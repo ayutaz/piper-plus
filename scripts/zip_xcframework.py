@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import plistlib
 import shutil
 import stat
 import zipfile
@@ -15,6 +16,11 @@ def create_archive(source: Path, destination: Path) -> None:
     destination = destination.resolve()
     if not source.is_dir() or destination.is_relative_to(source):
         raise ValueError("Use an xcframework directory and an archive outside it")
+    metadata = plistlib.loads((source / "Info.plist").read_bytes())
+    metadata["AvailableLibraries"].sort(key=lambda item: item["LibraryIdentifier"])
+    for library in metadata["AvailableLibraries"]:
+        library["SupportedArchitectures"].sort()
+    canonical_plist = plistlib.dumps(metadata, sort_keys=True)
     entries = sorted(
         [source, *source.rglob("*")],
         key=lambda path: path.relative_to(source.parent).as_posix(),
@@ -41,6 +47,8 @@ def create_archive(source: Path, destination: Path) -> None:
                 archive.writestr(info, b"")
             elif is_link:
                 archive.writestr(info, os.readlink(path).encode("utf-8"))
+            elif path == source / "Info.plist":
+                archive.writestr(info, canonical_plist)
             else:
                 with path.open("rb") as original, archive.open(info, "w") as packed:
                     shutil.copyfileobj(original, packed, 1024 * 1024)
