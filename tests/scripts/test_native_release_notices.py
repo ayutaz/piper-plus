@@ -145,7 +145,7 @@ def test_docker_context_preserves_installed_notices(tmp_path, notice):
     [
         ("build-piper.yml", "build", "Create distribution package (Unix)"),
         ("build-piper.yml", "build", "Create distribution package (Windows)"),
-        ("dev-build-all.yml", "build_linux_armv7", "Build in Docker"),
+        ("build-linux-armv7.yml", "build", "Build in Docker"),
     ],
 )
 def test_cli_archives_use_canonical_notice_install(workflow, job, step_name):

@@ -64,7 +64,9 @@ def test_armv7_release_build_uses_source_sdk_and_real_runtime():
         (ROOT / ".github/workflows/build-linux-armv7.yml").read_text(encoding="utf-8")
     )
     steps = workflow["jobs"]["build"]["steps"]
-    source = next(s for s in steps if s.get("name") == "Build pinned ARMv7 ONNX Runtime")
+    source = next(
+        s for s in steps if s.get("name") == "Build pinned ARMv7 ONNX Runtime"
+    )
     assert "scripts/build_ort_armv7.sh" in source["run"]
     native = next(s for s in steps if s.get("name") == "Build in Docker")["run"]
     assert "bash -euo pipefail" in native
@@ -94,6 +96,8 @@ def test_armv7_source_build_is_pinned_and_cross_compiles():
 
 
 def test_armv7_regression_tests_are_required_on_every_pr():
-    workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    )
     steps = workflow["jobs"]["release-contract"]["steps"]
     assert any("test_armv7_release.py" in s.get("run", "") for s in steps)
