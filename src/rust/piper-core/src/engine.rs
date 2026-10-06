@@ -786,7 +786,7 @@ impl OnnxEngine {
     /// 1. `input` (phoneme_ids): int64 \[1, phoneme_length\]
     /// 2. `input_lengths`: int64 \[1\]
     /// 3. `scales`: float32 \[3\] = \[noise_scale, length_scale, noise_w\]
-    /// 4. `speaker_embedding` (条件付き): float32 \[1, 192\] -- has_spk_emb が true のとき
+    /// 4. `speaker_embedding` (条件付き): float32 \[1, embedding_dim\]
     /// 5. `sid` (条件付き): int64 \[1\] -- has_sid が true かつ speaker_embedding が無いとき
     /// 6. `lid` (条件付き): int64 \[1\] -- has_lid が true のとき
     /// 7. `prosody_features` (条件付き): int64 \[1, phoneme_length, 3\]
@@ -860,31 +860,6 @@ impl OnnxEngine {
             vec![noise_scale, request.length_scale, noise_w].into_boxed_slice(),
         ))
         .map_err(|e| PiperError::Inference(format!("scales tensor: {e}")))?;
-
-        // 4. speaker_embedding: float32 [1, 192] (条件付き — sid より優先)
-        const SPK_EMB_DIM: usize = 192;
-        let spk_emb_tensor = if self.capabilities.has_spk_emb {
-            let mut emb = if let Some(ref e) = request.speaker_embedding {
-                e.clone()
-            } else {
-                tracing::warn!("Model expects speaker_embedding but none provided; using zeros");
-                vec![0.0f32; SPK_EMB_DIM]
-            };
-            if emb.len() != SPK_EMB_DIM {
-                tracing::warn!(
-                    "Speaker embedding has {} values, expected {}; padding/truncating",
-                    emb.len(),
-                    SPK_EMB_DIM
-                );
-                emb.resize(SPK_EMB_DIM, 0.0);
-            }
-            Some(
-                Tensor::from_array(([1_usize, SPK_EMB_DIM], emb.into_boxed_slice()))
-                    .map_err(|e| PiperError::Inference(format!("speaker_embedding tensor: {e}")))?,
-            )
-        } else {
-            None
-        };
 
         // 5. sid: int64 [1] (条件付き — model が input として declare すれば feed)
         //
@@ -991,17 +966,12 @@ impl OnnxEngine {
         inputs.push(("input_lengths".into(), (&lengths_tensor).into()));
         inputs.push(("scales".into(), (&scales_tensor).into()));
 
-        if let Some(ref t) = spk_emb_tensor {
+        if let Some(ref t) = speaker_emb_tensor {
             inputs.push(("speaker_embedding".into(), t.into()));
         }
         if let Some(ref t) = speaker_emb_mask_tensor {
             inputs.push(("speaker_embedding_mask".into(), t.into()));
         }
-        // `speaker_emb_tensor` (Issue #426 dynamic-dim path) is retained
-        // alongside the legacy 192-dim `spk_emb_tensor` so both ModelCapabilities
-        // codepaths compile; the embedding ORT input is fed via spk_emb_tensor
-        // above (both branches share the `has_input("speaker_embedding")` gate).
-        let _ = &speaker_emb_tensor;
         if let Some(ref t) = sid_tensor {
             inputs.push(("sid".into(), t.into()));
         }

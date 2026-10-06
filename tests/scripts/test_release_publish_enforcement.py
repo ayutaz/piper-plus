@@ -352,15 +352,20 @@ def test_rust_patch_requires_actual_inference_and_immutable_tag():
     assert jobs["create_release"]["needs"] == ["validate", "test"]
     assert jobs["publish_crates"]["needs"] == "create_release"
     assert jobs["rust-cli"]["needs"] == "create_release"
-    validation = step("release-rust.yml", "validate", "Validate immutable Rust tag")["run"]
-    assert 'refs/tags/rust-v${RELEASE_VERSION}^{commit}' in validation
-    assert 'git rev-parse HEAD' in validation
-    assert 'workspace' in validation
+    validation = step("release-rust.yml", "validate", "Validate immutable Rust tag")[
+        "run"
+    ]
+    assert "refs/tags/rust-v${RELEASE_VERSION}^{commit}" in validation
+    assert "git rev-parse HEAD" in validation
+    assert "workspace" in validation
     steps = jobs["test"]["steps"]
     assert any("build_embedding_fixture.py" in s.get("run", "") for s in steps)
     assert any("--test test_embedding_dimensions" in s.get("run", "") for s in steps)
     archive_steps = jobs["rust-cli"]["steps"]
-    assert any(s.get("uses", "").startswith("actions/attest-build-provenance@") for s in archive_steps)
+    assert any(
+        s.get("uses", "").startswith("actions/attest-build-provenance@")
+        for s in archive_steps
+    )
     assert "--clobber" not in str(archive_steps)
 
 

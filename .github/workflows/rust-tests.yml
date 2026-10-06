@@ -72,6 +72,16 @@ jobs:
       with:
         workspaces: src/rust -> target
 
+    - uses: actions/setup-python@v6.2.0
+      with:
+        python-version: '3.13'
+    - name: Build mandatory embedding dimension fixtures
+      run: |
+        python -m pip install onnx==1.22.0
+        python ../../tests/fixtures/ort_session/build_embedding_fixture.py
+    - name: Run actual embedding dimension inference (onnx feature)
+      run: cargo test --locked -p piper-plus --no-default-features --features onnx --test test_embedding_dimensions
+
     - name: Run tests (default features)
       run: cargo test -p piper-plus --no-fail-fast
 
