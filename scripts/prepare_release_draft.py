@@ -91,6 +91,15 @@ def check_download(path, descriptor):
         raise ValueError(f"download differs from GitHub descriptor: {path.name}")
 
 
+def validate_component(release, component):
+    expected = {name for name, kind in native_assets().items() if kind == component}
+    names = [asset["name"] for asset in release["assets"]]
+    actual = set(names)
+    allowed = expected | {name + ".cosign.bundle" for name in expected}
+    if len(names) != len(actual) or not expected <= actual <= allowed:
+        raise ValueError(f"component inventory mismatch: {component}")
+
+
 def run(*args):
     return subprocess.run(args, check=True, text=True, capture_output=True).stdout
 
@@ -229,10 +238,7 @@ def main():
         "csharp": release(f"csharp-v{csharp}"),
     }
     for component, value in components.items():
-        names = [asset["name"] for asset in value["assets"]]
-        expected = {name for name, kind in native_assets().items() if kind == component}
-        if len(names) != len(set(names)) or set(names) != expected:
-            raise ValueError(f"component inventory mismatch: {component}")
+        validate_component(value, component)
     final = {}
     for old in root["assets"]:
         name = old["name"]

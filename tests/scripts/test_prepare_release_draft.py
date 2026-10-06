@@ -68,3 +68,17 @@ def test_missing_server_digest_is_not_accepted(tmp_path):
     path.write_bytes(b"payload")
     with pytest.raises(ValueError, match="download"):
         module.check_download(path, {"size": 7, "digest": None})
+
+
+def test_preparing_a_draft_after_component_signing_preserves_exact_payloads():
+    names = {name for name, kind in module.native_assets().items() if kind == "rust"}
+    assets = [{"name": name} for name in names | {n + ".cosign.bundle" for n in names}]
+    module.validate_component({"assets": assets}, "rust")
+    with pytest.raises(ValueError, match="inventory"):
+        module.validate_component(
+            {"assets": assets + [{"name": "untrusted.zip"}]}, "rust"
+        )
+    with pytest.raises(ValueError, match="inventory"):
+        module.validate_component(
+            {"assets": [{"name": n + ".cosign.bundle"} for n in names]}, "rust"
+        )
