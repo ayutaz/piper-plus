@@ -378,6 +378,20 @@ def test_rust_pr_ci_requires_real_embedding_fixture_inference():
     assert any("--test test_embedding_dimensions" in s.get("run", "") for s in steps)
 
 
+def test_rust_coverage_prepares_mandatory_embedding_fixtures():
+    steps = workflow("rust-tests.yml")["jobs"]["coverage"]["steps"]
+    coverage_index = next(
+        i for i, s in enumerate(steps) if "cargo llvm-cov --workspace" in s.get("run", "")
+    )
+    fixture_index = next(
+        (i for i, s in enumerate(steps) if "build_embedding_fixture.py" in s.get("run", "")),
+        None,
+    )
+    assert fixture_index is not None, "Coverage must build required ONNX fixtures"
+    assert fixture_index < coverage_index
+    assert "onnx==1.22.0" in steps[fixture_index]["run"]
+
+
 @pytest.mark.parametrize("job", ["verify-maven", "verify-nuget"])
 def test_registry_verifiers_wait_for_bounded_distribution_propagation(job):
     config = workflow("release-verify.yml")["jobs"][job]
