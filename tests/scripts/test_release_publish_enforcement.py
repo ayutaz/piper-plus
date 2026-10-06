@@ -1,5 +1,6 @@
 """Execute release shell steps: failed/missing publications must fail the job."""
 
+import importlib.util
 import os
 import re
 import shutil
@@ -213,6 +214,7 @@ def test_shared_library_release_stays_draft_until_verification():
     [
         ("npm publish", "npm"),
         ("Manual Release", "pypi,nuget,crates"),
+        ("Release Rust patch", "crates"),
         ("Release Shared Library", ""),
         ("Release Kotlin G2P (Maven Central)", "maven"),
     ],
@@ -345,3 +347,101 @@ def test_g2p_manual_release_rejects_missing_tag(tmp_path):
     git("tag", "-d", "python-g2p-v0.3.0")
     result = g2p_release_guard(tmp_path)
     assert result.returncode != 0, result.stdout + result.stderr
+
+
+def test_rust_patch_requires_actual_inference_and_immutable_tag():
+    data = workflow("release-rust.yml")
+    jobs = data["jobs"]
+    assert jobs["create_release"]["needs"] == ["validate", "test"]
+    assert jobs["publish_crates"]["needs"] == "create_release"
+    assert jobs["rust-cli"]["needs"] == "create_release"
+    validation = step("release-rust.yml", "validate", "Validate immutable Rust tag")[
+        "run"
+    ]
+    assert "refs/tags/rust-v${RELEASE_VERSION}^{commit}" in validation
+    assert "git rev-parse HEAD" in validation
+    assert "workspace" in validation
+    steps = jobs["test"]["steps"]
+    assert any("build_embedding_fixture.py" in s.get("run", "") for s in steps)
+    assert any("--test test_embedding_dimensions" in s.get("run", "") for s in steps)
+    archive_steps = jobs["rust-cli"]["steps"]
+    assert any(
+        s.get("uses", "").startswith("actions/attest-build-provenance@")
+        for s in archive_steps
+    )
+    assert "--clobber" not in str(archive_steps)
+
+
+def test_rust_pr_ci_requires_real_embedding_fixture_inference():
+    steps = workflow("rust-tests.yml")["jobs"]["test"]["steps"]
+    assert any("build_embedding_fixture.py" in s.get("run", "") for s in steps)
+    assert any("--test test_embedding_dimensions" in s.get("run", "") for s in steps)
+
+
+def test_rust_coverage_prepares_mandatory_embedding_fixtures():
+    steps = workflow("rust-tests.yml")["jobs"]["coverage"]["steps"]
+    coverage_index = next(
+        i
+        for i, s in enumerate(steps)
+        if "cargo llvm-cov --workspace" in s.get("run", "")
+    )
+    fixture_index = next(
+        (
+            i
+            for i, s in enumerate(steps)
+            if "build_embedding_fixture.py" in s.get("run", "")
+        ),
+        None,
+    )
+    assert fixture_index is not None, "Coverage must build required ONNX fixtures"
+    assert fixture_index < coverage_index
+    assert "onnx==1.22.0" in steps[fixture_index]["run"]
+
+
+@pytest.mark.parametrize("job", ["verify-maven", "verify-nuget"])
+def test_registry_verifiers_wait_for_bounded_distribution_propagation(job):
+    config = workflow("release-verify.yml")["jobs"][job]
+    script = "\n".join(s.get("run", "") for s in config["steps"])
+    assert "--retry 120" in script
+    assert "--retry-all-errors" in script
+    assert "--retry-max-time 1200" in script
+    assert "--max-time 30" in script
+    assert int(config["timeout-minutes"]) >= (90 if job == "verify-maven" else 45)
+
+
+def test_release_drafter_protects_tagged_and_asset_drafts():
+    spec = importlib.util.spec_from_file_location(
+        "draft_guard", ROOT / "scripts/check_release_drafter_guard.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    releases = [
+        {"id": 1, "draft": True, "tag_name": "v1.13.1", "assets": []},
+        {"id": 2, "draft": True, "tag_name": "v2.0.0", "assets": []},
+        {
+            "id": 3,
+            "draft": True,
+            "tag_name": "rust-v0.5.1",
+            "assets": [{"name": "cli.zip"}],
+        },
+        {
+            "id": 4,
+            "draft": False,
+            "tag_name": "v1.13.0",
+            "assets": [{"name": "cli.zip"}],
+        },
+    ]
+    assert module.protected_drafts(releases, {"v2.0.0", "v1.13.0"}) == [2, 3]
+    assert module.protected_drafts([releases[0], releases[3]], {"v1.13.0"}) == []
+    config = workflow("release-drafter.yml")
+    steps = config["jobs"]["update_release_draft"]["steps"]
+    guard = next(
+        s for s in steps if "check_release_drafter_guard.py" in s.get("run", "")
+    )
+    action = next(
+        s
+        for s in steps
+        if s.get("uses", "").startswith("release-drafter/release-drafter@")
+    )
+    assert guard["id"] == "guard"
+    assert action["if"] == "steps.guard.outputs.safe_to_update == 'true'"

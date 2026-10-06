@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Rust 0.5.1: use the ONNX model's declared speaker embedding dimension instead of forcing 192 values. Supports both 192- and 256-dimensional models; rejects mismatched explicit embeddings instead of silently truncating them.
+- Run actual embedding dimension inference on every Rust PR CI matrix, and allow up to 20 minutes for NuGet.org propagation before verifying repository-signed downloads.
+
 <!--
   Breaking changes must be listed under `### Breaking` and each entry must
   include at least one `[label](docs/migration/v<X>-to-v<Y>.md#anchor)`
