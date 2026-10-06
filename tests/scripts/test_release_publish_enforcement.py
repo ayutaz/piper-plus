@@ -27,6 +27,42 @@ def step(name, job, title):
     )
 
 
+@pytest.mark.parametrize(
+    "title", ["Verify crates.io metadata", "Verify SLSA attestation"]
+)
+def test_crates_requests_include_contact_user_agent(tmp_path, title):
+    config = workflow("release-verify.yml")["jobs"]["verify-crates"]
+    user_agent = (
+        config["env"]
+        .get("CRATES_USER_AGENT", "")
+        .replace("${{ github.repository }}", "ayutaz/piper-plus")
+    )
+    curl = r"""
+    identified=0
+    output=
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        --user-agent|-A)
+          shift
+          case "$1" in *https://github.com/ayutaz/piper-plus*) identified=1 ;; esac
+          ;;
+        -o) shift; output="$1" ;;
+      esac
+      shift
+    done
+    [ "$identified" = 1 ] || exit 22
+    printf '{"version":{"num":"0.8.0"}}' > "$output"
+    printf 200
+    """
+    result = shell(
+        tmp_path,
+        step("release-verify.yml", "verify-crates", title)["run"],
+        stubs={"curl": curl, "python3": "echo 0.8.0", "gh": "exit 0"},
+        env={"CRATES_USER_AGENT": user_agent},
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def shell(tmp_path, script, stubs=None, env=None):
     commands = tmp_path / "commands"
     commands.mkdir(exist_ok=True)
