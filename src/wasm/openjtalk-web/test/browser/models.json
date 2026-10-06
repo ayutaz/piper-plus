@@ -1,0 +1,18 @@
+[
+  {
+    "key": "css10",
+    "repo": "ayousanz/piper-plus-css10-ja-6lang",
+    "revision": "bd0d812d4db9182ecdb907ef074becf9e230c17f",
+    "onnx": "css10-ja-6lang-fp16.onnx",
+    "onnxSha256": "5ebc51dbf897238523f3df0d6e0f6c93033bc5cda3f8602a8379ebe2a4738c42",
+    "configSha256": "3c613dacf139349c20159433559b2e94e6364e9a340d95245f3de6006f453fcc"
+  },
+  {
+    "key": "tsukuyomi",
+    "repo": "ayousanz/piper-plus-tsukuyomi-chan",
+    "revision": "36b59c825c36bd386b8960cf3f604382f52f2a87",
+    "onnx": "tsukuyomi-chan-6lang-fp16.onnx",
+    "onnxSha256": "5289e9b6eaf21080803b7fe1c4dc85b5491d4c216121207a41df18dd5f68e5d7",
+    "configSha256": "516058f405ec914140f34832a9d8bb5d8272ba62af9bc7ffb29349715a539780"
+  }
+]

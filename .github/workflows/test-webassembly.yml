@@ -120,6 +120,10 @@ jobs:
         node --test test/js/test-piper-plus-g2p-init.js
         node --test test/js/test-piper-plus-wasm-g2p.js
 
+    - name: Test real ONNX input contracts
+      working-directory: src/wasm/openjtalk-web
+      run: npm run test:onnx-inputs
+
     - name: Run openjtalk-web unit tests (with coverage)
       working-directory: src/wasm/openjtalk-web
       run: |

@@ -88,7 +88,7 @@ export interface SynthesizeOptions {
   /** Controls phoneme duration variation. Default: 0.5. */
   noiseW?: number;
   /**
-   * Optional speaker embedding for voice cloning (typically 256-dim,
+   * Optional speaker embedding for voice cloning (dimension must match the model,
    * L2-normalized). When present, the VITS `speaker_embedding` and
    * `speaker_embedding_mask` tensors are wired into the inference feed.
    * Mirrors the `--speaker-embedding` flag in Python / Rust / Go / C# /

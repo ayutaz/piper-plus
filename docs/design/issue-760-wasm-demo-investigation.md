@@ -88,4 +88,4 @@ README の importmap 最小例にも独立した問題候補がある。現在�
 5. **ブラウザ確認**: Windows / Chrome で公式デモと同じ配布レイアウト、README importmap / Basic Usage を実行し、モデル読込、合成、WAV 生成、再生を確認する。公式デモの 6 言語を確認する。参照音声の voice cloning は対応する encoder と TTS モデルの次元の組を別に検証する。
 6. **配布と追跡**: 回帰テストを CI に組み込み、CHANGELOG と README を更新する。npm `0.7.0` は既存配布なので、利用者へ修正を届けるには新バージョン公開が必要。Pages 更新後の URL でも確認し、成果を Issue に紐づける。
 
-現時点の完了範囲は原因調査・worktree 作成・修正計画まで。コード修正、PR 作成、npm 公開、Pages デプロイ、Issue close は未実施。
+初回調査時点の完了範囲は原因調査・worktree 作成・修正計画まで。続く実装と検証は [実装検証記録](issue-760-wasm-demo-verification.md) を参照。

@@ -70,6 +70,9 @@ jobs:
       - name: Run npm package tests
         run: npm run test:npm-package:all
 
+      - name: Test real ONNX input contracts
+        run: npm run test:onnx-inputs
+
   wasm-build:
     uses: ./.github/workflows/build-wasm-reusable.yml
 

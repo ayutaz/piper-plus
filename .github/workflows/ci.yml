@@ -88,6 +88,9 @@ jobs:
               - '.github/workflows/ci.yml'
               - '.github/workflows/wasm-build.yml'
               - '.github/workflows/npm-publish.yml'
+              - '.github/workflows/deploy-webassembly-demo.yml'
+              - '.github/workflows/test-webassembly.yml'
+              - 'tests/scripts/test_wasm_onnx_ci_contract.py'
             zh-en-data:
               # Source-of-truth + 6 mirrors. Any drift in any mirror should
               # trigger every per-runtime test job, not just the JSON sync gate.
@@ -373,11 +376,49 @@ jobs:
       - name: Check piper-plus-python
         run: cargo check -p piper-plus-python
 
+  # Small, real ORT Web graphs verify input shapes on every PR, without Rust.
+  wasm-onnx-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        ort: ['1.22.0', '1.30.0']
+    defaults:
+      run:
+        working-directory: src/wasm/openjtalk-web
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - uses: actions/setup-node@v6.5.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - name: Test workflow enforcement
+        working-directory: ${{ github.workspace }}
+        run: |
+          pip install 'pytest>=9.1.1,<10' PyYAML
+          python -m pytest tests/scripts/test_wasm_onnx_ci_contract.py -q -o addopts=
+      - name: Install exact ORT Web and local G2P (no native binary download)
+        env:
+          ORT_VERSION: ${{ matrix.ort }}
+        run: npm install --ignore-scripts --no-save --no-audit --no-fund "onnxruntime-web@${ORT_VERSION}" '@piper-plus/g2p@file:../g2p'
+      - name: Test real ONNX input contracts
+        run: npm run test:onnx-inputs
+      - name: Upload ONNX test report
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: wasm-onnx-contract-${{ matrix.ort }}
+          path: src/wasm/openjtalk-web/test-results/onnx-inputs.xml
+          if-no-files-found: error
+
   npm-package-tests:
     needs: [changes]
     if: ${{ needs.changes.outputs.wasm == 'true' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.ci-config-wasm == 'true' || needs.changes.outputs.zh-en-data == 'true' || needs.changes.outputs.swedish-lid-data == 'true' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: src/wasm/openjtalk-web
@@ -428,6 +469,31 @@ jobs:
       - name: Run npm package tests
         run: npm run test:npm-package:all
 
+      - name: Test real ONNX input contracts
+        run: npm run test:onnx-inputs
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Cache pinned public models
+        uses: actions/cache@v4.3.0
+        with:
+          path: src/wasm/openjtalk-web/test/browser/models
+          key: browser-tts-models-${{ hashFiles('src/wasm/openjtalk-web/test/browser/models.json') }}
+
+      - name: Test browser synthesis with public models
+        run: npm run test:browser
+
+      - name: Upload browser results
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: wasm-browser-synthesis
+          path: |
+            src/wasm/openjtalk-web/test-results
+            src/wasm/openjtalk-web/playwright-report
+          if-no-files-found: warn
+
       - name: Verify shipping chain and tarball contents
         # This is the only lane where real wasm-pack output sits in dist/, so
         # it is the only place the tarball check can run outside publishing.
@@ -450,8 +516,13 @@ jobs:
       - python-tests
       - rust-tests
       - npm-package-tests
+      - wasm-onnx-contract
     runs-on: ubuntu-24.04
     steps:
+      - name: Require successful ONNX contract checks
+        env:
+          WASM_CONTRACT_RESULT: ${{ needs.wasm-onnx-contract.result }}
+        run: test "$WASM_CONTRACT_RESULT" = "success"
       - name: Check all job results
         run: |
           results=("${{ needs.cpp-tests.result }}" "${{ needs.csharp-tests.result }}" "${{ needs.csharp-build.result }}" "${{ needs.python-tests.result }}" "${{ needs.rust-tests.result }}" "${{ needs.npm-package-tests.result }}")

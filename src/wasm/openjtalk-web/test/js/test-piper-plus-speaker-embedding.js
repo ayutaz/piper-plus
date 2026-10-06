@@ -32,17 +32,7 @@ globalThis.ort = {
 // Import
 // ---------------------------------------------------------------------------
 
-let PiperPlus, AudioResult;
-
-try {
-  const mod = await import("../../src/index.js");
-  PiperPlus = mod.PiperPlus;
-  AudioResult = mod.AudioResult;
-} catch {
-  // import errors → tests skip via the guard below
-}
-
-const skip = PiperPlus === undefined || PiperPlus === null;
+import { PiperPlus, AudioResult } from "../../src/index.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -74,12 +64,10 @@ function createMockInstance(overrides = {}) {
     // PR #222 split-by-export-mode: WASM gates speaker_embedding_mask
     // feed on `inputNames.has("speaker_embedding_mask")`. Mock declares
     // both inputs so the gate path is exercised by the test.
-    inputNames: [
-      "input",
-      "input_lengths",
-      "scales",
-      "speaker_embedding",
-      "speaker_embedding_mask",
+    inputNames: ["input", "input_lengths", "scales", "speaker_embedding", "speaker_embedding_mask"],
+    inputMetadata: [
+      { name: "speaker_embedding", isTensor: true, type: "float32", shape: ["batch", 256] },
+      { name: "speaker_embedding_mask", isTensor: true, type: "int64", shape: ["batch", 1] },
     ],
     run: async (feeds) => {
       capturedFeeds.push(feeds);
@@ -127,7 +115,7 @@ function randomEmbedding(dim = 256, seed = 1) {
 // Tests
 // ===========================================================================
 
-describe("PiperPlus.synthesize() — speakerEmbedding option", { skip }, () => {
+describe("PiperPlus.synthesize() — speakerEmbedding option", () => {
   it("zeros 埋め込みを渡しても synthesize が AudioResult を返す", async () => {
     const instance = createMockInstance();
     const result = await instance.synthesize("こんにちは", {
@@ -159,20 +147,18 @@ describe("PiperPlus.synthesize() — speakerEmbedding option", { skip }, () => {
     assert.equal(feeds.speaker_embedding.type, "float32");
     assert.strictEqual(feeds.speaker_embedding.data, emb);
     assert.ok(feeds.speaker_embedding_mask, "speaker_embedding_mask must be wired");
-    assert.deepEqual(feeds.speaker_embedding_mask.dims, [1]);
+    assert.deepEqual(feeds.speaker_embedding_mask.dims, [1, 1]);
   });
 
-  it("speakerEmbedding 未指定なら feeds に speaker_embedding が含まれない (back-compat)", async () => {
+  it("speakerEmbedding 未指定ならモデルの次元でゼロ埋め込みと mask=0 を渡す", async () => {
     const instance = createMockInstance();
     await instance.synthesize("こんにちは");
 
     const feeds = instance._capturedFeeds[0];
-    assert.equal(
-      feeds.speaker_embedding,
-      undefined,
-      "synthesize() without speakerEmbedding must not attach the tensor"
-    );
-    assert.equal(feeds.speaker_embedding_mask, undefined);
+    assert.deepEqual(feeds.speaker_embedding.dims, [1, 256]);
+    assert.ok(feeds.speaker_embedding.data.every((x) => x === 0));
+    assert.deepEqual(feeds.speaker_embedding_mask.dims, [1, 1]);
+    assert.deepEqual(Array.from(feeds.speaker_embedding_mask.data), [0n]);
   });
 
   it("Float32Array でない speakerEmbedding は TypeError を投げる", async () => {
@@ -196,7 +182,7 @@ describe("PiperPlus.synthesize() — speakerEmbedding option", { skip }, () => {
   });
 });
 
-describe("PiperPlus.synthesizeFromReferenceAudio() — high-level API", { skip }, () => {
+describe("PiperPlus.synthesizeFromReferenceAudio() — high-level API", () => {
   // Fake SpeakerEncoder that records inputs and returns a fixed embedding.
   function makeFakeEncoder(returnEmbedding) {
     const calls = [];
@@ -298,7 +284,7 @@ describe("PiperPlus.synthesizeFromReferenceAudio() — high-level API", { skip }
   });
 });
 
-describe("PiperPlus speaker-encoder re-export", { skip }, () => {
+describe("PiperPlus speaker-encoder re-export", () => {
   it("SpeakerEncoder クラスが index.js から re-export されている", async () => {
     const mod = await import("../../src/index.js");
     assert.equal(typeof mod.SpeakerEncoder, "function");

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Prepare npm 0.8.0: require ONNX Runtime Web >=1.22.0 for public input metadata; update the demo and README importmap accordingly.
+
+### Fixed
+
+- Read speaker embedding dimensions and mask ranks from the ONNX graph instead of sending fixed 192-dimensional embeddings and rank-1 masks (#760). Reject invalid embeddings with explicit errors.
+
+### Added
+
+- Mandatory PR tests with tiny real ORT Web graphs on 1.22.0 and 1.30.0, plus Chromium synthesis/playback tests using pinned CSS10 and Tsukuyomi models.
+
 ## [0.7.0] - 2026-08-28
 
 ### Added

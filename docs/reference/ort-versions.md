@@ -56,7 +56,7 @@ exact-match group.
 | Android (release) | 1.20.0 | exact ✓ | AAR (Maven Central) |
 | Android (PR CI)   | 1.20.0 | exact ✓ | AAR (Maven Central) |
 | Kotlin G2P (release/CI) | 1.20.0 | exact ✓ | `release-kotlin-g2p.yml`, `kotlin-g2p-ci.yml` |
-| JS/WASM  | `>=1.21.0`  | `>=1.20.0` ✓ | `onnxruntime-web` (npm, peerDependency) |
+| JS/WASM  | `>=1.22.0`  | `>=1.20.0` ✓ | `onnxruntime-web` (npm, peerDependency; input metadata required) |
 
 ## CI Workflow References
 
