@@ -82,6 +82,11 @@ def test_armv7_release_build_uses_source_sdk_and_real_runtime():
         (ROOT / ".github/workflows/dev-build-all.yml").read_text(encoding="utf-8")
     )["jobs"]["build_linux_armv7"]
     assert caller["uses"] == "./.github/workflows/build-linux-armv7.yml"
+    save = next(s for s in steps if s.get("uses") == "actions/cache/save@v4.3.0")
+    restore = next(s for s in steps if s.get("id") == "sdk-cache")
+    assert save["with"] == restore["with"]
+    fetch = next(s for s in steps if s.get("name") == "Fetch pinned synthesis model")
+    assert steps.index(source) < steps.index(save) < steps.index(fetch)
 
 
 def test_armv7_source_build_is_pinned_and_cross_compiles():

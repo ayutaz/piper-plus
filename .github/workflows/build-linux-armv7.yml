@@ -49,6 +49,13 @@ jobs:
           sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf ninja-build
           bash scripts/build_ort_armv7.sh ort-armv7
 
+      - name: Save verified ARMv7 SDK before runtime tests
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4.3.0
+        with:
+          path: ort-armv7
+          key: ort-armv7-${{ runner.os }}-${{ hashFiles('scripts/build_ort_armv7.sh', 'cmake/linux-armv7-toolchain.cmake', 'cmake/OnnxRuntime.cmake') }}
+
       - name: Fetch pinned synthesis model
         shell: python
         run: |
@@ -63,7 +70,7 @@ jobs:
           base = f"https://huggingface.co/{model['repo']}/resolve/{model['revision']}/"
           for remote, local, digest in [
               (model['onnx'], 'model.onnx', model['onnxSha256']),
-              (model['onnx'] + '.json', 'model.onnx.json', model['configSha256']),
+              ('config.json', 'model.onnx.json', model['configSha256']),
           ]:
               with urlopen(base + remote, timeout=180) as response:
                   data = response.read()
