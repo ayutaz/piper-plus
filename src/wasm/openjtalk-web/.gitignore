@@ -45,3 +45,7 @@ coverage/
 tools/hts_engine_API/
 tools/wasm_open_jtalk/
 wasm_open_jtalk_reference/
+
+# Browser and ONNX regression reports
+/test-results/
+/playwright-report/

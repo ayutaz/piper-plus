@@ -19,6 +19,8 @@ export { ModelManager } from "./model-manager.js";
 export { AudioResult } from "./audio-result.js";
 export { SpeakerEncoder } from "./speaker-encoder.js";
 
+import { readSpeakerInputContract, createSpeakerFeeds } from "./onnx-input-contract.js";
+
 // Re-export the SSML parser from `@piper-plus/g2p` at the top-level so that
 // `piper-plus` consumers do not need a second package dependency to detect /
 // parse SSML before feeding it to `synthesize()`. The actual TTS-side
@@ -49,7 +51,12 @@ import { WebGPUSessionManager } from "./webgpu-session-manager.js";
 import { StreamingTTSPipeline } from "./streaming-pipeline.js";
 import { ModelManager } from "./model-manager.js";
 import { AudioResult } from "./audio-result.js";
-import { DEFAULT_HOP_LENGTH, buildPhonemeIdToTokenMap, durationsToTiming, dropSpecialIdEntries } from "./timing.js";
+import {
+  DEFAULT_HOP_LENGTH,
+  buildPhonemeIdToTokenMap,
+  durationsToTiming,
+  dropSpecialIdEntries,
+} from "./timing.js";
 import { RustWasmAdapter } from "./phonemizer/rust-wasm-adapter.js";
 import { JsG2pAdapter } from "./phonemizer/js-g2p-adapter.js";
 import { CompositePhonemizer } from "./phonemizer/composite-phonemizer.js";
@@ -277,12 +284,7 @@ export function trimPaddingByDurations(
  * @param {number} [eosMaxFrames=TRIM_EOS_MAX_FRAMES]
  * @returns {Float32Array} Trimmed audio (or the original if inputs are inconsistent)
  */
-export function trimEosRegion(
-  audio,
-  durations,
-  hopSize,
-  eosMaxFrames = TRIM_EOS_MAX_FRAMES
-) {
+export function trimEosRegion(audio, durations, hopSize, eosMaxFrames = TRIM_EOS_MAX_FRAMES) {
   if (hopSize <= 0 || durations == null || durations.length === 0) {
     return audio;
   }
@@ -420,6 +422,8 @@ export class PiperPlus {
     this._ort = null;
     this._initialized = false;
     this._warmupPromise = null;
+    this._speakerInputSession = null;
+    this._speakerInputContract = null;
   }
 
   // -------------------------------------------------------------------------
@@ -465,7 +469,7 @@ export class PiperPlus {
    * @param {number} [options.lengthScale]
    * @param {number} [options.noiseW]
    * @param {Float32Array} [options.speakerEmbedding] - Optional speaker
-   *   embedding (typically 256-dim, L2-normalized) for voice cloning. When
+   *   embedding (dimension must match the loaded model) for voice cloning. When
    *   present, the `speaker_embedding` / `speaker_embedding_mask` tensors are
    *   wired into the VITS ONNX feed alongside the standard inputs. This is the
    *   unified entry point — backward compatible with the older
@@ -557,11 +561,7 @@ export class PiperPlus {
       // this for padded inputs; this branch applies the same EOS-region
       // drop to long-text outputs.
       const hopSize = this._config.audio?.hop_size ?? DEFAULT_HOP_SIZE;
-      audioData = trimEosRegion(
-        audioData,
-        durations,
-        hopSize > 0 ? hopSize : DEFAULT_HOP_SIZE
-      );
+      audioData = trimEosRegion(audioData, durations, hopSize > 0 ? hopSize : DEFAULT_HOP_SIZE);
     }
 
     // 3. Wrap result — include phoneme timing when the model supports it
@@ -687,7 +687,7 @@ export class PiperPlus {
       throw new Error("speakerEmbedding must be non-empty");
     }
     // PR #222 split-by-export-mode: 192 (CAM++ canonical) and 256
-    // (ECAPA-TDNN legacy) are both valid. ORT validates the actual shape
+    // (ECAPA-TDNN legacy) are both valid. The input contract validates shape
     // against the model's declared input at inference time, so we don't
     // hard-code a value here. See docs/spec/inference-input-contract.toml.
 
@@ -840,6 +840,8 @@ export class PiperPlus {
       this._phonemizer = null;
     }
     this._sessionManager = null;
+    this._speakerInputSession = null;
+    this._speakerInputContract = null;
     this._modelUrl = null;
     this._warmupPromise = null;
     this._initialized = false;
@@ -915,9 +917,7 @@ export class PiperPlus {
 
       // Detect model capabilities from ONNX input names so downstream code
       // can opt the speaker_embedding / prosody_features tensors in or out.
-      const inputNames = this._session.inputNames || [];
-      this._hasSpeakerEmbedding = inputNames.includes("speaker_embedding");
-      this._hasProsodyFeatures = inputNames.includes("prosody_features");
+      this._refreshInputContract();
 
       progress({ stage: "model", progress: 0.7, message: "Model loaded." });
 
@@ -1067,12 +1067,7 @@ export class PiperPlus {
           ? durations.subarray(0, minLen)
           : Array.from(durations).slice(0, minLen);
 
-    const timing = durationsToTiming(
-      alignedDurations,
-      sampleRate,
-      DEFAULT_HOP_LENGTH,
-      tokens
-    );
+    const timing = durationsToTiming(alignedDurations, sampleRate, DEFAULT_HOP_LENGTH, tokens);
 
     // Drop PAD / BOS / EOS entries (contract [calculation.special_ids]).
     // Applied after the walk, so the surviving entries keep their positions.
@@ -1095,6 +1090,9 @@ export class PiperPlus {
     { noiseScale, lengthScale, noiseW, language, speakerEmbedding }
   ) {
     const ort = this._ort;
+    if (this._speakerInputSession !== this._session) {
+      this._refreshInputContract();
+    }
 
     const inputTensor = new ort.Tensor(
       "int64",
@@ -1128,43 +1126,7 @@ export class PiperPlus {
       }
     }
 
-    // Attach speaker embedding for voice cloning.
-    // Guard speaker_embedding_mask behind the session's actual input names:
-    // older ONNX exports omit the mask tensor and ORT rejects unknown feeds
-    // (mirrors Python ort_utils / infer_onnx Bug B fix).
-    const sessionInputNames = new Set(this._session.inputNames || []);
-    const hasSpeakerEmbeddingMask = sessionInputNames.has("speaker_embedding_mask");
-    if (this._hasSpeakerEmbedding) {
-      // Zero-shot / voice-cloning model: speaker_embedding is a required input.
-      if (speakerEmbedding && speakerEmbedding.length > 0) {
-        feeds.speaker_embedding = new ort.Tensor("float32", speakerEmbedding, [
-          1,
-          speakerEmbedding.length,
-        ]);
-        if (hasSpeakerEmbeddingMask) {
-          feeds.speaker_embedding_mask = new ort.Tensor("int64", new BigInt64Array([1n]), [1]);
-        }
-      } else {
-        console.warn(
-          "[piper-plus] Model expects 'speaker_embedding' but none provided; using zero vector."
-        );
-        feeds.speaker_embedding = new ort.Tensor("float32", new Float32Array(192), [1, 192]);
-        if (hasSpeakerEmbeddingMask) {
-          feeds.speaker_embedding_mask = new ort.Tensor("int64", new BigInt64Array([0n]), [1]);
-        }
-      }
-    } else if (speakerEmbedding && speakerEmbedding.length > 0) {
-      // Non-zero-shot model: pass embedding only when explicitly provided
-      // (mirrors Python/Rust/Go/C# runtimes that allow optional speaker
-      // embedding override on models that happen to accept it).
-      feeds.speaker_embedding = new ort.Tensor("float32", speakerEmbedding, [
-        1,
-        speakerEmbedding.length,
-      ]);
-      if (hasSpeakerEmbeddingMask) {
-        feeds.speaker_embedding_mask = new ort.Tensor("int64", new BigInt64Array([1n]), [1]);
-      }
-    }
+    Object.assign(feeds, createSpeakerFeeds(ort, this._speakerInputContract, speakerEmbedding));
 
     // Attach prosody features when the model supports them
     if (prosodyFeatures && this._config.prosody_id_map && this._hasProsodyFeatures) {
@@ -1199,6 +1161,10 @@ export class PiperPlus {
         // Force WASM by removing GPU reference
         this._sessionManager._gpu = undefined;
         this._session = await this._sessionManager.createSession(this._modelUrl);
+        this._refreshInputContract();
+        delete feeds.speaker_embedding;
+        delete feeds.speaker_embedding_mask;
+        Object.assign(feeds, createSpeakerFeeds(ort, this._speakerInputContract, speakerEmbedding));
         results = await this._session.run(feeds);
       } else {
         throw e;
@@ -1254,5 +1220,14 @@ export class PiperPlus {
     if (!this._initialized) {
       throw new Error("PiperPlus is not initialized. Call PiperPlus.initialize() first.");
     }
+  }
+
+  /** Refresh capabilities whenever a new ONNX session is installed. */
+  _refreshInputContract() {
+    const contract = readSpeakerInputContract(this._session);
+    this._speakerInputContract = contract;
+    this._speakerInputSession = this._session;
+    this._hasSpeakerEmbedding = contract.embedding !== null;
+    this._hasProsodyFeatures = (this._session.inputNames || []).includes("prosody_features");
   }
 }

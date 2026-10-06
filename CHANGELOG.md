@@ -28,6 +28,8 @@ Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13
 
 ### Breaking
 
+- **npm `piper-plus` 0.8.0 requires ONNX Runtime Web >=1.22.0** to read model input shapes through public metadata. See [Browser ONNX Runtime minimum](docs/migration/v1.12-to-v2.0.md#browser-onnx-runtime-minimum).
+
 - **Default Docker images now require CUDA 12.8 + host NVIDIA driver R570+**
   ([`docker/python-train/Dockerfile`](docker/python-train/Dockerfile),
   [`docker/python-inference/Dockerfile`](docker/python-inference/Dockerfile)).
@@ -137,6 +139,8 @@ Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13
   runtime `piper` (PiperVoice) の名前空間衝突を解消。
 
 ### Fixed
+
+- **WASM demo speaker inputs (#760)**: derive embedding dimensions and mask ranks from the loaded ONNX model, fixing the CSS10/Tsukuyomi 192-versus-256 and rank-1-versus-rank-2 failures. Add real ORT Web regression tests and browser synthesis checks to PR CI.
 
 - dependencies: pin workspace torch / torchaudio and benchmark torch to 2.11.0;
   keep the existing cu128 wheels and require a dedicated compatibility review
