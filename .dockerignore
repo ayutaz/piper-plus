@@ -34,8 +34,8 @@ docs/
 !LICENSE.md
 !src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md
 !src/python_run/LICENSE.md
-!src/python_g2p/LICENSE.md
-!src/python_g2p/THIRD_PARTY_LICENSES.md
+!src/python/g2p/LICENSE
+!src/python/g2p/THIRD_PARTY_LICENSES.md
 
 # Test files
 test/

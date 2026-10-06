@@ -30,7 +30,7 @@ COPY src/cpp/ src/cpp/
 # read from a single source. cpp-inference doesn't compile the Rust crate,
 # but cmake/Install.cmake still installs these JSONs to share/piper-plus/dicts/.
 COPY src/rust/piper-plus-g2p/data/ src/rust/piper-plus-g2p/data/
-COPY src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES
+COPY src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md
 
 # Build piper-plus (all C++ deps resolved via CMake ExternalProject)
 RUN mkdir -p build && cd build && \
