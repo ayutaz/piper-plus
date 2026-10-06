@@ -1,6 +1,8 @@
 """A release wheel must include the modules and dictionaries its users need."""
 
+import ast
 import importlib.util
+import tomllib
 import zipfile
 from pathlib import Path
 
@@ -62,3 +64,16 @@ def test_missing_runtime_files_fail(tmp_path, missing):
 def test_legacy_piper_module_is_not_shipped(tmp_path):
     with pytest.raises(ValueError, match="legacy"):
         MODULE.verify_wheel(wheel(tmp_path, legacy=True), "piper-plus", "2.0.0")
+
+
+def test_g2p_module_version_matches_distribution_metadata():
+    package = ROOT / "src/python/g2p"
+    manifest = tomllib.loads((package / "pyproject.toml").read_text(encoding="utf-8"))
+    module = ast.parse((package / "piper_plus_g2p/__init__.py").read_text(encoding="utf-8"))
+    version = next(
+        ast.literal_eval(node.value)
+        for node in module.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "__version__" for target in node.targets)
+    )
+    assert version == manifest["project"]["version"]
