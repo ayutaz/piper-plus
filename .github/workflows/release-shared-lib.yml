@@ -1296,6 +1296,7 @@ jobs:
             MODEL_CARD.md
             LICENSE_ATTRIBUTIONS.md
           generate_release_notes: true
+          draft: true
 
       # NOTE: Package.swift checksum is NOT updated by this workflow.
       # SwiftPM resolves `binaryTarget(url:, checksum:)` against the manifest

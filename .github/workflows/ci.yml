@@ -20,6 +20,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  release-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - name: Test release failure handling
+        run: |
+          pip install 'pytest>=9.1.1,<10' PyYAML
+          python -m pytest tests/scripts/test_release_publish_enforcement.py -q -o addopts=
+
   changes:
     runs-on: ubuntu-24.04
     permissions:
@@ -514,6 +527,7 @@ jobs:
   ci-required:
     if: always()
     needs:
+      - release-contract
       - cpp-tests
       - csharp-tests
       - csharp-build
@@ -523,6 +537,10 @@ jobs:
       - wasm-onnx-contract
     runs-on: ubuntu-24.04
     steps:
+      - name: Require successful release contracts
+        env:
+          RELEASE_CONTRACT_RESULT: ${{ needs.release-contract.result }}
+        run: test "$RELEASE_CONTRACT_RESULT" = "success"
       - name: Require successful ONNX contract checks
         env:
           WASM_CONTRACT_RESULT: ${{ needs.wasm-onnx-contract.result }}
