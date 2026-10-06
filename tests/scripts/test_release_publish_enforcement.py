@@ -346,6 +346,8 @@ def test_g2p_manual_release_rejects_missing_tag(tmp_path):
     git("tag", "-d", "python-g2p-v0.3.0")
     result = g2p_release_guard(tmp_path)
     assert result.returncode != 0, result.stdout + result.stderr
+
+
 def test_rust_patch_requires_actual_inference_and_immutable_tag():
     data = workflow("release-rust.yml")
     jobs = data["jobs"]
