@@ -18,6 +18,8 @@ on:
       - 'Sources/PiperPlusG2P/**'
       - 'tests/PiperPlusG2PTests/**'
       - 'Package.swift'
+      - 'scripts/zip_xcframework.py'
+      - 'tests/scripts/test_xcframework_archive.py'
       - 'cmake/**'
       - 'src/cpp/**'
       - 'CMakeLists.txt'
@@ -915,7 +917,7 @@ jobs:
           # `-apple` (not `-ios`) reflects that the xcframework now ships
           # iOS device + simulator + macOS slices. Consumers reference this
           # name in Package.swift's binaryTarget URL.
-          zip -ry libpiper_plus_g2p-apple.xcframework.zip piper_plus_g2p.xcframework
+          python3 scripts/zip_xcframework.py piper_plus_g2p.xcframework libpiper_plus_g2p-apple.xcframework.zip
           ls -la libpiper_plus_g2p-apple.xcframework.zip
           echo "sha256:"
           shasum -a 256 libpiper_plus_g2p-apple.xcframework.zip
