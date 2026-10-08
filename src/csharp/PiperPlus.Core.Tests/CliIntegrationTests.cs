@@ -228,7 +228,7 @@ public sealed class CliIntegrationTests
     /// (observed: macos-14 arm64, .NET 9 SDK 9.0.313). The CI workflow builds the CLI
     /// in Release mode before tests run, so the DLL is guaranteed to exist.
     /// </remarks>
-    private static async Task<(int ExitCode, string StdOut, string StdErr)> RunCliAsync(
+    internal static async Task<(int ExitCode, string StdOut, string StdErr)> RunCliAsync(
         params string[] args)
     {
         string cliAssemblyPath = GetCliAssemblyPath();
