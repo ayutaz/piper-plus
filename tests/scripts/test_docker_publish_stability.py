@@ -173,3 +173,60 @@ def test_public_runtime_rejects_a_mutable_tag(monkeypatch, tmp_path):
     module = runtime_module(monkeypatch, tmp_path)
     with pytest.raises(ValueError, match="immutable"):
         module.verify_and_pull("ghcr.io/owner/api:2.0.1", tmp_path / "signature.json")
+
+
+@pytest.mark.parametrize("status", [401, 404])
+def test_public_hub_retries_then_returns_a_resolved_image(
+    monkeypatch, tmp_path, status
+):
+    module = runtime_module(monkeypatch, tmp_path)
+    attempts = []
+    waits = []
+    fetch = object()
+    expected = {"digest": "sha256:" + "b" * 64}
+
+    def resolve(repository, version, source, arches, fetcher):
+        assert (repository, version, source, arches, fetcher) == (
+            "owner/api",
+            "2.0.1",
+            "a" * 40,
+            ["amd64"],
+            fetch,
+        )
+        attempts.append(repository)
+        if len(attempts) == 1:
+            raise module.urllib.error.HTTPError(
+                "https://registry", status, "pending", {}, None
+            )
+        return expected
+
+    result, public_fetch = module.resolve_public_hub(
+        "owner/api", ["amd64"], lambda repository: fetch, resolve, waits.append
+    )
+    assert result is expected
+    assert public_fetch is fetch
+    assert len(attempts) == 2
+    assert waits == [15]
+
+
+@pytest.mark.parametrize("status, attempts_expected", [(404, 24), (503, 1)])
+def test_public_hub_failure_raises_without_an_uninitialized_result(
+    monkeypatch, tmp_path, status, attempts_expected
+):
+    module = runtime_module(monkeypatch, tmp_path)
+    attempts = []
+    waits = []
+
+    def resolve(*args):
+        attempts.append(args)
+        raise module.urllib.error.HTTPError(
+            "https://registry", status, "unavailable", {}, None
+        )
+
+    with pytest.raises(module.urllib.error.HTTPError) as error:
+        module.resolve_public_hub(
+            "owner/api", ["amd64"], lambda repository: object(), resolve, waits.append
+        )
+    assert error.value.code == status
+    assert len(attempts) == attempts_expected
+    assert len(waits) == attempts_expected - 1
