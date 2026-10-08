@@ -17,6 +17,41 @@ public sealed class CliIntegrationTests
     private const int ProcessTimeoutMs = 30_000;
 
     /// <summary>
+    /// Finds dotnet without resolving the process-wide current directory.
+    /// </summary>
+    private static string GetDotnetHostPath()
+    {
+        string? configured = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
+        if (!string.IsNullOrEmpty(configured) && Path.IsPathFullyQualified(configured)
+            && File.Exists(configured))
+        {
+            return configured;
+        }
+
+        string executable = OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet";
+        string[] roots =
+        [
+            Environment.GetEnvironmentVariable("DOTNET_ROOT") ?? string.Empty,
+            Path.GetDirectoryName(Environment.ProcessPath) ?? string.Empty,
+        ];
+        string[] searchPath = (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+        foreach (string directory in roots.Concat(searchPath))
+        {
+            if (Path.IsPathFullyQualified(directory))
+            {
+                string candidate = Path.Combine(directory, executable);
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        throw new FileNotFoundException("An absolute dotnet host was not found in DOTNET_HOST_PATH, DOTNET_ROOT or PATH.");
+    }
+
+    /// <summary>
     /// Returns the absolute path to the pre-built <c>PiperPlus.Cli.dll</c>.
     /// Resolves relative to the test assembly location: tests live under
     /// <c>PiperPlus.Core.Tests/bin/&lt;config&gt;/&lt;tfm&gt;/</c>, and the CLI
@@ -235,7 +270,7 @@ public sealed class CliIntegrationTests
 
         var psi = new ProcessStartInfo
         {
-            FileName = "dotnet",
+            FileName = GetDotnetHostPath(),
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
