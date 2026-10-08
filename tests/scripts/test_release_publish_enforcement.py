@@ -150,14 +150,14 @@ def test_release_creation_never_deletes_an_existing_release_or_tag():
 
 
 def test_missing_nuget_credential_fails(tmp_path):
-    script = step("dev-create-release.yml", "publish_nuget", "Publish to NuGet")["run"]
+    script = step("release-csharp.yml", "publish_nuget", "Publish to NuGet")["run"]
     result = shell(tmp_path, script, env={"NUGET_API_KEY": ""})
     assert result.returncode != 0, result.stdout + result.stderr
 
 
 def test_missing_crates_credential_fails(tmp_path):
     script = step(
-        "dev-create-release.yml",
+        "release-rust.yml",
         "publish_crates",
         "Publish piper-plus-g2p (dependency)",
     )["run"]
@@ -205,7 +205,7 @@ def test_release_summary_is_a_real_gate(tmp_path, result):
 
 
 def test_crates_are_packaged_attested_and_published_in_dependency_order():
-    steps = workflow("dev-create-release.yml")["jobs"]["publish_crates"]["steps"]
+    steps = workflow("release-rust.yml")["jobs"]["publish_crates"]["steps"]
     positions = []
     for crate, title in [
         ("piper-plus-g2p", "Publish piper-plus-g2p (dependency)"),
