@@ -88,6 +88,27 @@ def hub_fetcher(repository):
     return fetch
 
 
+def resolve_public_hub(
+    repository,
+    arches,
+    fetcher_factory=hub_fetcher,
+    resolver=resolve_image,
+    sleeper=time.sleep,
+):
+    """Wait for propagation and return only a successfully resolved release."""
+    for attempt in range(24):
+        try:
+            fetch = fetcher_factory(repository)
+            image = resolver(repository, VERSION, SOURCE, arches, fetch)
+            return image, fetch
+        except urllib.error.HTTPError as error:
+            if error.code not in {401, 404} or attempt == 23:
+                raise
+            print("Waiting for the public DockerHub release tag", flush=True)
+            sleeper(15)
+    raise RuntimeError("DockerHub release could not be resolved")
+
+
 def fetch_model():
     MODEL.mkdir()
     base = "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/36b59c825c36bd386b8960cf3f604382f52f2a87/"
@@ -230,16 +251,7 @@ def main():
         public_fetcher(f"ayutaz/piper-plus/{name}"),
     )
     hub_repository = f"{os.environ['DOCKERHUB_OWNER']}/{HUB_NAMES[name]}"
-    for attempt in range(24):
-        try:
-            hub_fetch = hub_fetcher(hub_repository)
-            hub = resolve_image(hub_repository, VERSION, SOURCE, arches, hub_fetch)
-            break
-        except urllib.error.HTTPError as error:
-            if error.code not in {401, 404} or attempt == 23:
-                raise
-            print("Waiting for the public DockerHub release tag", flush=True)
-            time.sleep(15)
+    hub, hub_fetch = resolve_public_hub(hub_repository, arches)
     hub["image"] = f"docker.io/{hub_repository}:{VERSION}"
     hub["reference"] = f"docker.io/{hub_repository}@{hub['digest']}"
     assert (
