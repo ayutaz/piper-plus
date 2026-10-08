@@ -190,7 +190,7 @@ def main():
         arches,
         public_fetcher(f"ayutaz/piper-plus/{name}"),
     )
-    hub_repository = f"ayutaz/{HUB_NAMES[name]}"
+    hub_repository = f"ayousanz/{HUB_NAMES[name]}"
     hub_fetch = hub_fetcher(hub_repository)
     hub = resolve_image(hub_repository, VERSION, SOURCE, arches, hub_fetch)
     hub["image"] = f"docker.io/{hub_repository}:{VERSION}"
