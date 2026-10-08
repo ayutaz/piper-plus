@@ -5,10 +5,13 @@ on:
     paths:
       - '**/*.md'
       - '.lychee.toml'
+      - '.github/workflows/link-check.yml'
   push:
     branches: [dev, main]
     paths:
       - '**/*.md'
+      - '.lychee.toml'
+      - '.github/workflows/link-check.yml'
   schedule:
     - cron: '0 6 * * 1'  # Mondays 06:00 UTC — catch link rot
   workflow_dispatch:
@@ -24,6 +27,7 @@ concurrency:
 jobs:
   lychee:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6.1.0
 
