@@ -1,0 +1,77 @@
+name: CSharp deleted working directory regression
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/csharp/**'
+      - '.github/workflows/csharp-cwd-regression.yml'
+      - 'tests/scripts/test_csharp_cwd_regression.py'
+  push:
+    branches: [dev]
+    paths:
+      - 'src/csharp/**'
+      - '.github/workflows/csharp-cwd-regression.yml'
+      - 'tests/scripts/test_csharp_cwd_regression.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-dotnet@v5.4.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Check regression workflow enforcement
+        run: |
+          pip install 'pytest>=9.1.1,<10' PyYAML
+          python -m pytest tests/scripts/test_csharp_cwd_regression.py -q -o addopts=
+      - name: Restore isolated hosted build
+        run: dotnet restore src/csharp/PiperPlus.sln
+      - name: Prove RED without cwd pin and GREEN with the actual launcher
+        run: |
+          set -euo pipefail
+          source=src/csharp/PiperPlus.Core.Tests/CliIntegrationTests.cs
+          trap 'git restore src/csharp/PiperPlus.Core.Tests/CliIntegrationTests.cs' EXIT
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("src/csharp/PiperPlus.Core.Tests/CliIntegrationTests.cs")
+          text = path.read_text(encoding="utf-8")
+          pin = "            WorkingDirectory = AppContext.BaseDirectory,\n"
+          assert text.count(pin) == 1
+          path.write_text(text.replace(pin, ""), encoding="utf-8")
+          PY
+          dotnet build src/csharp/PiperPlus.sln -c Release --no-restore
+          set +e
+          dotnet test src/csharp/PiperPlus.Core.Tests -c Release --no-build \
+            --filter FullyQualifiedName~Version_FromDeletedParentDirectory_Succeeds \
+            --logger 'console;verbosity=normal' > baseline.log 2>&1
+          baseline_status=$?
+          set -e
+          cat baseline.log
+          test "$baseline_status" -ne 0
+          grep -E 'FileNotFoundException|Unable to find the specified file' baseline.log
+          git restore "$source"
+          dotnet build src/csharp/PiperPlus.sln -c Release --no-restore
+          dotnet test src/csharp/PiperPlus.Core.Tests -c Release --no-build \
+            --filter FullyQualifiedName~Version_FromDeletedParentDirectory_Succeeds \
+            --collect:"XPlat Code Coverage" \
+            --logger 'trx;LogFileName=cwd-regression.trx' \
+            --results-directory cwd-proof
+      - name: Preserve reproducer and coverage evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: csharp-cwd-regression
+          path: |
+            baseline.log
+            cwd-proof/
+          if-no-files-found: error
