@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -194,7 +195,15 @@ def main():
     )
     hub_repository = f"ayousanz/{HUB_NAMES[name]}"
     hub_fetch = hub_fetcher(hub_repository)
-    hub = resolve_image(hub_repository, VERSION, SOURCE, arches, hub_fetch)
+    for attempt in range(24):
+        try:
+            hub = resolve_image(hub_repository, VERSION, SOURCE, arches, hub_fetch)
+            break
+        except urllib.error.HTTPError as error:
+            if error.code not in {401, 404} or attempt == 23:
+                raise
+            print("Waiting for the public DockerHub release tag", flush=True)
+            time.sleep(15)
     hub["image"] = f"docker.io/{hub_repository}:{VERSION}"
     hub["reference"] = f"docker.io/{hub_repository}@{hub['digest']}"
     assert (
