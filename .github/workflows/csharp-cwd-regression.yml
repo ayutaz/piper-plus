@@ -45,7 +45,7 @@ jobs:
           from pathlib import Path
           path = Path("src/csharp/PiperPlus.Core.Tests/CliIntegrationTests.cs")
           text = path.read_text(encoding="utf-8")
-          pin = "WorkingDirectory = AppContext.BaseDirectory,"
+          pin = "            WorkingDirectory = AppContext.BaseDirectory,\n"
           assert text.count(pin) == 1
           path.write_text(text.replace(pin, ""), encoding="utf-8")
           PY

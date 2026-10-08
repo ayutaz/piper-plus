@@ -27,6 +27,7 @@ public sealed class CliWorkingDirectoryTests
         {
             Directory.SetCurrentDirectory(doomedDirectory);
             Directory.Delete(doomedDirectory);
+
             // Use the same launcher as every CLI integration test. The CLI
             // must not inherit the parent's now-unlinked working directory.
             result = await CliIntegrationTests.RunCliAsync("--version");
@@ -40,7 +41,8 @@ public sealed class CliWorkingDirectoryTests
             }
         }
 
-        Assert.True(result.ExitCode == 0,
+        Assert.True(
+            result.ExitCode == 0,
             $"CLI failed from a deleted parent cwd. stdout={result.StdOut}; stderr={result.StdErr}");
         Assert.Matches(@"\d+\.\d+\.\d+", result.StdOut);
         Assert.DoesNotContain("Fatal error", result.StdErr, StringComparison.OrdinalIgnoreCase);
