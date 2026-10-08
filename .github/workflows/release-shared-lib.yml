@@ -1099,6 +1099,7 @@ jobs:
           sparse-checkout: |
             Package.swift
             scripts/generate_model_card.py
+            scripts/release_checksums.py
             data-sources.yml
           sparse-checkout-cone-mode: false
 
