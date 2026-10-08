@@ -50,6 +50,14 @@ on:
         description: 'Recover shared archives from a completed tag build into its draft; no rebuild or tag changes'
         required: false
         type: string
+      shared_recovery_run:
+        description: 'Successful signed recovery-receipt run to verify during draft preparation'
+        required: false
+        type: string
+      shared_recovery_source:
+        description: 'Exact 40-character SHA of the trusted recovery verifier'
+        required: false
+        type: string
       prepare_draft:
         description: '下書きに修正版を反映するルートバージョン（例: 2.0.0）。公開せず、署名・全配布物のチェックサムを検証します'
         required: false
@@ -139,6 +147,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
+      actions: read
       attestations: read
     concurrency:
       group: release-draft-${{ inputs.prepare_draft }}
@@ -161,9 +170,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ROOT_VERSION: ${{ inputs.prepare_draft }}
+          SHARED_RECOVERY_RUN: ${{ inputs.shared_recovery_run }}
+          SHARED_RECOVERY_SOURCE: ${{ inputs.shared_recovery_source }}
         run: >-
           python scripts/prepare_release_draft.py
           --version "$ROOT_VERSION" --directory "$RUNNER_TEMP/release-verification"
+          --shared-recovery-run "$SHARED_RECOVERY_RUN" --shared-recovery-source "$SHARED_RECOVERY_SOURCE"
       - name: Preserve cryptographic verification evidence
         if: always()
         uses: actions/upload-artifact@v7.0.0

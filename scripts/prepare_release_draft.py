@@ -219,10 +219,146 @@ def verify_registry(rust, csharp, directory, proof):
     )
 
 
+def validate_shared_receipt(receipt, root_tag):
+    from check_shared_release_recovery import archives
+
+    expected = {output for _, output in archives(root_tag).values()}
+    records = receipt.get("artifacts", [])
+    names = [record["payload"] for record in records]
+    ids = [record["artifact_id"] for record in records]
+    if (
+        receipt.get("tag") != root_tag
+        or receipt.get("source") != source(root_tag)
+        or not isinstance(receipt.get("build_run"), int)
+        or receipt["build_run"] <= 0
+        or len(names) != len(expected)
+        or set(names) != expected
+        or len(set(ids)) != len(ids)
+    ):
+        raise ValueError("Recovery receipt source/inventory mismatch")
+    for record in records:
+        if (
+            not isinstance(record["artifact_id"], int)
+            or record["artifact_id"] <= 0
+            or not re.fullmatch(r"[a-f0-9]{64}", record["sha256"])
+            or not re.fullmatch(r"sha256:[a-f0-9]{64}", record["artifact_digest"])
+        ):
+            raise ValueError("Recovery receipt digest mismatch")
+    return {record["payload"]: record["sha256"] for record in records}
+
+
+def validate_recovery_invocation(results, run_id, attempt):
+    expected = f"https://github.com/{REPO}/actions/runs/{run_id}/attempts/{attempt}"
+    if not any(
+        item["verificationResult"]["statement"]["predicate"]["runDetails"]["metadata"][
+            "invocationId"
+        ]
+        == expected
+        for item in results
+    ):
+        raise ValueError("Recovery attestation invocation mismatch")
+
+
+def shared_recovery(run_id, verifier_sha, root_tag, proof):
+    from check_shared_release_recovery import archives, validate_jobs, validate_run
+
+    if not run_id and not verifier_sha:
+        return None
+    if not re.fullmatch(r"[1-9][0-9]*", run_id) or not re.fullmatch(
+        r"[a-f0-9]{40}", verifier_sha
+    ):
+        raise ValueError("Recovery requires both explicit run ID and verifier SHA")
+
+    def api(path):
+        return json.loads(run("gh", "api", f"repos/{REPO}/{path}"))
+
+    recovery_run = api(f"actions/runs/{run_id}")
+    expected = {
+        "head_sha": verifier_sha,
+        "event": "workflow_dispatch",
+        "path": ".github/workflows/release-verify.yml",
+        "status": "completed",
+        "conclusion": "success",
+    }
+    if any(recovery_run.get(key) != value for key, value in expected.items()):
+        raise ValueError("Recovery verifier source or result mismatch")
+    branch = recovery_run["head_branch"]
+    if not re.fullmatch(r"[A-Za-z0-9_./-]+", branch):
+        raise ValueError("Invalid recovery source branch")
+    directory = proof / "shared-recovery"
+    directory.mkdir()
+    run(
+        "gh",
+        "run",
+        "download",
+        run_id,
+        "--repo",
+        REPO,
+        "--name",
+        "shared-release-recovery-proof",
+        "--dir",
+        str(directory),
+    )
+    path = directory / "shared-recovery-proof.json"
+    verified = run(
+        "gh",
+        "attestation",
+        "verify",
+        str(path),
+        "--repo",
+        REPO,
+        "--source-ref",
+        f"refs/heads/{branch}",
+        "--source-digest",
+        verifier_sha,
+        "--signer-digest",
+        verifier_sha,
+        "--signer-workflow",
+        f"{REPO}/.github/workflows/release-verify.yml",
+        "--deny-self-hosted-runners",
+        "--format",
+        "json",
+    )
+    validate_recovery_invocation(
+        json.loads(verified), run_id, recovery_run["run_attempt"]
+    )
+    (directory / "attestation.json").write_text(verified, encoding="utf-8")
+    receipt = json.loads(path.read_text(encoding="utf-8"))
+    recovered = validate_shared_receipt(receipt, root_tag)
+    build_id = receipt["build_run"]
+    validate_run(api(f"actions/runs/{build_id}"), source(root_tag), root_tag)
+    validate_jobs(api(f"actions/runs/{build_id}/jobs?per_page=100")["jobs"])
+    descriptors = {
+        item["id"]: item
+        for item in api(f"actions/runs/{build_id}/artifacts?per_page=100")["artifacts"]
+    }
+    names = {output: name for name, (_, output) in archives(root_tag).items()}
+    for record in receipt["artifacts"]:
+        item = descriptors.get(record["artifact_id"], {})
+        if (
+            item.get("name") != names[record["payload"]]
+            or item.get("digest") != record["artifact_digest"]
+            or item.get("expired") is not False
+        ):
+            raise ValueError(
+                "Recovery receipt does not match original build artifact descriptors"
+            )
+    return recovered
+
+
+def verify_shared(path, root_tag, proof, recovered):
+    if recovered is None:
+        attest(path, root_tag, "release-shared-lib.yml", proof)
+    elif path.name not in recovered or digest(path) != recovered[path.name]:
+        raise ValueError("Shared payload does not match signed recovery receipt")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", required=True)
     parser.add_argument("--directory", type=Path, required=True)
+    parser.add_argument("--shared-recovery-run", default="")
+    parser.add_argument("--shared-recovery-source", default="")
     args = parser.parse_args()
     root_tag = f"v{version(args.version)}"
     rust = version(
@@ -243,6 +379,9 @@ def main():
         item.mkdir(parents=True, exist_ok=False)
     root = release(root_tag)
     validate_root(root, args.version)
+    recovered = shared_recovery(
+        args.shared_recovery_run, args.shared_recovery_source, root_tag, proof
+    )
     records = verify_registry(rust, csharp, registry, proof)
     components = {
         "rust": release(f"rust-v{rust}"),
@@ -277,7 +416,7 @@ def main():
         if component:
             attest(path, selected["tag_name"], f"release-{component}.yml", proof)
         elif name.startswith(("libpiper_plus", "piper-plus-shared-")):
-            attest(path, root_tag, "release-shared-lib.yml", proof)
+            verify_shared(path, root_tag, proof, recovered)
         final[name] = digest(path)
     manifest = "".join(f"{final[name]}  {name}\n" for name in sorted(final))
     checksum = payloads / "checksums-sha256.txt"
@@ -319,6 +458,8 @@ def main():
                 "csharp_tag": f"csharp-v{csharp}",
                 "csharp_source": source(f"csharp-v{csharp}"),
                 "registry_packages": records,
+                "shared_recovery_run": args.shared_recovery_run or None,
+                "shared_recovery_source": args.shared_recovery_source or None,
                 "gnu_sha256sum_verified": True,
             },
             indent=2,

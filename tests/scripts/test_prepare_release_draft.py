@@ -82,3 +82,223 @@ def test_preparing_a_draft_after_component_signing_preserves_exact_payloads():
         module.validate_component(
             {"assets": [{"name": n + ".cosign.bundle"} for n in names]}, "rust"
         )
+
+
+@pytest.mark.parametrize(
+    "corruption", [None, "source", "tag", "missing", "duplicate", "digest"]
+)
+def test_recovery_receipt_must_bind_exact_source_and_every_shared_asset(
+    monkeypatch, corruption
+):
+    from check_shared_release_recovery import archives
+
+    monkeypatch.setattr(module, "source", lambda tag: "a" * 40)
+    records = [
+        {
+            "artifact_id": i + 1,
+            "artifact_digest": "sha256:" + "c" * 64,
+            "payload": output,
+            "sha256": "b" * 64,
+        }
+        for i, (_, output) in enumerate(archives("v2.0.1").values())
+    ]
+    receipt = {
+        "source": "a" * 40,
+        "tag": "v2.0.1",
+        "build_run": 71,
+        "artifacts": records,
+    }
+    if corruption in ("source", "tag"):
+        receipt[corruption] = "unrelated"
+    elif corruption == "missing":
+        records.pop()
+    elif corruption == "duplicate":
+        records[-1] = records[0]
+    elif corruption == "digest":
+        records[0]["sha256"] = "not-a-digest"
+    if corruption:
+        with pytest.raises(ValueError):
+            module.validate_shared_receipt(receipt, "v2.0.1")
+    else:
+        result = module.validate_shared_receipt(receipt, "v2.0.1")
+        assert len(result) == 9 and set(result.values()) == {"b" * 64}
+
+
+def test_normal_shared_verification_still_requires_original_build_attestation(
+    tmp_path, monkeypatch
+):
+    calls = []
+    monkeypatch.setattr(module, "attest", lambda *args: calls.append(args))
+    module.verify_shared(tmp_path / "native.zip", "v2.0.1", tmp_path, None)
+    assert calls == [
+        (tmp_path / "native.zip", "v2.0.1", "release-shared-lib.yml", tmp_path)
+    ]
+    with pytest.raises(ValueError):
+        module.verify_shared(tmp_path / "native.zip", "v2.0.1", tmp_path, {})
+
+
+@pytest.mark.parametrize(
+    "invocation",
+    [
+        "https://github.com/ayutaz/piper-plus/actions/runs/77/attempts/1",
+        "https://github.com/ayutaz/piper-plus/actions/runs/78/attempts/1",
+    ],
+)
+def test_recovery_signature_must_match_exact_workflow_invocation(invocation):
+    verified = [
+        {
+            "verificationResult": {
+                "statement": {
+                    "predicate": {
+                        "runDetails": {"metadata": {"invocationId": invocation}}
+                    }
+                }
+            }
+        }
+    ]
+    if "/runs/77/" in invocation:
+        module.validate_recovery_invocation(verified, "77", 1)
+    else:
+        with pytest.raises(ValueError):
+            module.validate_recovery_invocation(verified, "77", 1)
+
+
+@pytest.mark.parametrize(
+    "corruption", [None, "verifier", "signature", "invocation", "artifact", "build"]
+)
+def test_signed_recovery_chain_binds_verifier_invocation_build_and_artifact(
+    tmp_path, monkeypatch, corruption
+):
+    import json
+    import subprocess
+
+    from check_shared_release_recovery import archives
+
+    root_sha, verifier_sha = "a" * 40, "b" * 40
+    monkeypatch.setattr(module, "source", lambda tag: root_sha)
+    specs = archives("v2.0.1")
+    records = [
+        {
+            "artifact_id": i + 1,
+            "artifact_digest": "sha256:" + "c" * 64,
+            "payload": output,
+            "sha256": "d" * 64,
+        }
+        for i, (_, output) in enumerate(specs.values())
+    ]
+    receipt = {
+        "source": root_sha,
+        "tag": "v2.0.1",
+        "build_run": 71,
+        "artifacts": records,
+    }
+    descriptors = [
+        {
+            "id": i + 1,
+            "name": name,
+            "digest": "sha256:" + ("0" if corruption == "artifact" else "c") * 64,
+            "expired": False,
+        }
+        for i, name in enumerate(specs)
+    ]
+    calls = []
+
+    def run(*args):
+        calls.append(args)
+        if args[:2] == ("gh", "api"):
+            route = args[2]
+            if route.endswith("/77"):
+                return json.dumps(
+                    {
+                        "head_sha": "0" * 40
+                        if corruption == "verifier"
+                        else verifier_sha,
+                        "head_branch": "fix/recovery",
+                        "event": "workflow_dispatch",
+                        "path": ".github/workflows/release-verify.yml",
+                        "status": "completed",
+                        "conclusion": "success",
+                        "run_attempt": 1,
+                    }
+                )
+            if route.endswith("/71"):
+                return json.dumps(
+                    {
+                        "head_sha": "0" * 40 if corruption == "build" else root_sha,
+                        "head_branch": "v2.0.1",
+                        "event": "push",
+                        "path": ".github/workflows/release-shared-lib.yml",
+                        "status": "completed",
+                    }
+                )
+            if "/jobs?" in route:
+                return json.dumps(
+                    {
+                        "jobs": [
+                            {"name": "Build windows-x64", "conclusion": "success"},
+                            {
+                                "name": "Create Release",
+                                "conclusion": "failure",
+                                "steps": [
+                                    {
+                                        "name": "Generate checksums",
+                                        "conclusion": "failure",
+                                    }
+                                ],
+                            },
+                        ]
+                    }
+                )
+            if "/artifacts?" in route:
+                return json.dumps({"artifacts": descriptors})
+            pytest.fail(route)
+        if args[:3] == ("gh", "run", "download"):
+            (Path(args[-1]) / "shared-recovery-proof.json").write_text(
+                json.dumps(receipt)
+            )
+            return ""
+        if args[:3] == ("gh", "attestation", "verify"):
+            assert "--source-ref" in args and "refs/heads/fix/recovery" in args
+            assert args[args.index("--source-digest") + 1] == verifier_sha
+            assert args[args.index("--signer-digest") + 1] == verifier_sha
+            assert "--deny-self-hosted-runners" in args
+            if corruption == "signature":
+                raise subprocess.CalledProcessError(1, args)
+            run_id = 78 if corruption == "invocation" else 77
+            return json.dumps(
+                [
+                    {
+                        "verificationResult": {
+                            "statement": {
+                                "predicate": {
+                                    "runDetails": {
+                                        "metadata": {
+                                            "invocationId": f"https://github.com/ayutaz/piper-plus/actions/runs/{run_id}/attempts/1"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ]
+            )
+        pytest.fail(str(args))
+
+    monkeypatch.setattr(module, "run", run)
+    if corruption:
+        with pytest.raises((ValueError, subprocess.CalledProcessError)):
+            module.shared_recovery("77", verifier_sha, "v2.0.1", tmp_path)
+    else:
+        result = module.shared_recovery("77", verifier_sha, "v2.0.1", tmp_path)
+        assert len(result) == 9 and set(result.values()) == {"d" * 64}
+        assert (tmp_path / "shared-recovery/attestation.json").is_file()
+
+
+def test_draft_preparer_can_read_signed_recovery_artifacts():
+    import yaml
+
+    config = yaml.load(
+        (ROOT / ".github/workflows/release-verify.yml").read_text(encoding="utf-8"),
+        Loader=yaml.BaseLoader,
+    )
+    assert config["jobs"]["prepare-draft"]["permissions"].get("actions") == "read"
