@@ -15,6 +15,13 @@ def main():
         parser.error("Invalid release version: expected MAJOR.MINOR.PATCH")
     destination = args.destination
     destination.mkdir(parents=True, exist_ok=True)
+    # Only the immutable 2.0.0 manifest needs this documented workaround.
+    # Later releases must prove that their own transitive SDK pin works.
+    ort_override = (
+        '.package(url: "https://github.com/microsoft/onnxruntime-swift-package-manager", exact: "1.20.0"),'
+        if args.version == "2.0.0"
+        else ""
+    )
     (destination / "Package.swift").write_text(
         dedent(
             """\
@@ -25,12 +32,7 @@ def main():
                 platforms: [.macOS(.v13)],
                 dependencies: [
                     .package(url: "https://github.com/ayutaz/piper-plus", exact: "__VERSION__"),
-                    // v2.0.0 has an open-ended transitive SDK requirement.
-                    // This is a consumer constraint; the public package is untouched.
-                    .package(
-                        url: "https://github.com/microsoft/onnxruntime-swift-package-manager",
-                        exact: "1.20.0"
-                    ),
+                    __ORT_OVERRIDE__
                 ],
                 targets: [
                     .executableTarget(
@@ -42,7 +44,9 @@ def main():
                 ]
             )
             """
-        ).replace("__VERSION__", args.version),
+        )
+        .replace("__VERSION__", args.version)
+        .replace("__ORT_OVERRIDE__", ort_override),
         encoding="utf-8",
     )
     source = destination / "Sources/ReleaseConsumer/main.swift"

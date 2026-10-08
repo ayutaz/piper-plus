@@ -51,19 +51,31 @@ def test_public_consumer_pins_the_compatible_official_ort_release(tmp_path):
     result = prepare(tmp_path, "2.0.0")
     assert result.returncode == 0, result.stderr
     manifest = (tmp_path / "Package.swift").read_text(encoding="utf-8")
-    assert 'https://github.com/microsoft/onnxruntime-swift-package-manager' in manifest
+    assert "https://github.com/microsoft/onnxruntime-swift-package-manager" in manifest
     assert 'exact: "1.20.0"' in manifest
     # The consumer must still fetch the actual public piper-plus package.
     assert 'exact: "2.0.0"' in manifest
-    assert 'path:' not in manifest
+    assert "path:" not in manifest
+
+
+@pytest.mark.parametrize("version", ["2.0.1", "2.1.0"])
+def test_fixed_releases_resolve_without_consumer_ort_override(tmp_path, version):
+    result = prepare(tmp_path, version)
+    assert result.returncode == 0, result.stderr
+    manifest = (tmp_path / "Package.swift").read_text(encoding="utf-8")
+    assert f'exact: "{version}"' in manifest
+    assert "onnxruntime-swift-package-manager" not in manifest
+    assert "path:" not in manifest
 
 
 def test_release_manifest_does_not_float_to_a_higher_macos_requirement():
     manifest = (ROOT / "Package.swift").read_text(encoding="utf-8")
-    dependency = manifest.split('url: "https://github.com/microsoft/onnxruntime-swift-package-manager"')[1].split('),', 1)[0]
+    dependency = manifest.split(
+        'url: "https://github.com/microsoft/onnxruntime-swift-package-manager"'
+    )[1].split("),", 1)[0]
     assert 'exact: "1.20.0"' in dependency
-    assert 'from:' not in dependency
-    assert '.macOS(.v13)' in manifest
+    assert "from:" not in dependency
+    assert ".macOS(.v13)" in manifest
 
 
 @pytest.mark.parametrize("version", ["dev", "v2.0.0", "2.0", '2.0.0")', "2.0.0\n"])
@@ -96,7 +108,9 @@ def test_public_swift_consumer_workflow_runs_actual_release_manifest():
 
 
 def test_swift_dependency_regression_is_checked_by_commit_hook():
-    config = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8"))
+    config = yaml.safe_load(
+        (ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+    )
     hook = next(
         hook
         for repo in config["repos"]
