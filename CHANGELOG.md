@@ -7,12 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-10-08
+
 ### Fixed
+
+- SwiftPM: pin the official ONNX Runtime 1.20.0 package and verify the published 2.0.1 consumer without an application-side SDK override.
+- Docker: bound independent build-cache operations, mirror the exact GHCR digest to Docker Hub, and verify signatures against the identical digest pulled for actual public-image synthesis.
+- Browser/npm 0.8.1: synchronize the demo and installation examples with the ONNX Runtime Web 1.30.0 validation pin. Check drift in PR CI and pre-commit.
+- C#: add a deleted-parent-working-directory CLI reproducer, including enforced RED/GREEN checks on Linux CI for the existing launcher fix (Issue #735).
+- Documentation: update the 2.0 migration examples and give the strict external-link check explicit concurrency, retry, and timeout limits.
 
 - Sign all seven published Docker images for both project and Docker-specific release tags. Allow signature repair only from an immutable signing tag after every public image's digest, version, source revision, and expected platform set has been verified.
 - Rust 0.5.2 and C# 0.5.1: continue inference from the original ONNX model when its directory cannot store an optimized cache. Check the writer's temporary path before asking ONNX Runtime to save; exercise read-only storage, normal cache creation/reload, and invalid models in PR CI.
 - Rust 0.5.1: use the ONNX model's declared speaker embedding dimension instead of forcing 192 values. Supports both 192- and 256-dimensional models; rejects mismatched explicit embeddings instead of silently truncating them.
 - Run actual embedding dimension inference on every Rust PR CI matrix, and allow up to 20 minutes for NuGet.org propagation before verifying repository-signed downloads.
+
+### Changed
+
+- Update the PyO3 0.29.3 lockfile, the Python workspace dependency lockfile, and pinned Rust/SBOM CI actions. Keep torch and torchaudio at 2.11.0, including the existing CUDA local version.
 
 <!--
   Breaking changes must be listed under `### Breaking` and each entry must

@@ -38,14 +38,14 @@ npm install piper-plus onnxruntime-web
 
 `onnxruntime-web` is a peer dependency and must be installed alongside `piper-plus`.
 
-Version 0.8.0 requires ONNX Runtime Web 1.22.0 or later. Speaker embedding
+Version 0.8.1 requires ONNX Runtime Web 1.22.0 or later. Speaker embedding
 dimensions and mask shapes are read from the loaded model's public input
 metadata. ONNX Runtime Web 1.21 does not provide this API.
 
 To update an existing installation:
 
 ```bash
-npm install piper-plus@0.8.0 onnxruntime-web@1.30.0
+npm install piper-plus@0.8.1 onnxruntime-web@1.30.0
 ```
 
 For importmap users, update both CDN URLs as shown below.
@@ -58,7 +58,7 @@ For importmap users, update both CDN URLs as shown below.
 <script type="importmap">
 {
   "imports": {
-    "piper-plus": "https://cdn.jsdelivr.net/npm/piper-plus@0.8.0/src/index.js",
+    "piper-plus": "https://cdn.jsdelivr.net/npm/piper-plus@0.8.1/src/index.js",
     "@piper-plus/g2p": "https://cdn.jsdelivr.net/npm/@piper-plus/g2p@0.4.2/src/index.js",
     "onnxruntime-web": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/ort.min.mjs"
   }
