@@ -292,13 +292,3 @@ def test_signed_recovery_chain_binds_verifier_invocation_build_and_artifact(
         result = module.shared_recovery("77", verifier_sha, "v2.0.1", tmp_path)
         assert len(result) == 9 and set(result.values()) == {"d" * 64}
         assert (tmp_path / "shared-recovery/attestation.json").is_file()
-
-
-def test_draft_preparer_can_read_signed_recovery_artifacts():
-    import yaml
-
-    config = yaml.load(
-        (ROOT / ".github/workflows/release-verify.yml").read_text(encoding="utf-8"),
-        Loader=yaml.BaseLoader,
-    )
-    assert config["jobs"]["prepare-draft"]["permissions"].get("actions") == "read"

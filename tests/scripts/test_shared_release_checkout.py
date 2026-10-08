@@ -150,3 +150,12 @@ def test_recovery_requires_both_swift_manifest_checksums(tmp_path, corruption):
             module.verify_swift(tmp_path, "v2.0.1", "\n".join(lines))
     else:
         module.verify_swift(tmp_path, "v2.0.1", "\n".join(lines))
+
+
+def test_draft_preparer_can_read_signed_recovery_artifacts():
+
+    config = yaml.load(
+        (ROOT / ".github/workflows/release-verify.yml").read_text(encoding="utf-8"),
+        Loader=yaml.BaseLoader,
+    )
+    assert config["jobs"]["prepare-draft"]["permissions"].get("actions") == "read"
