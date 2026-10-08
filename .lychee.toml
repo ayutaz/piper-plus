@@ -11,8 +11,10 @@ include_mail = false
 
 # Network config
 max_redirects = 5
-max_concurrency = 10
-timeout = 20
+# Limit pressure on external sites; persistent failures still fail CI.
+max_concurrency = 5
+max_retries = 3
+timeout = 30
 retry_wait_time = 2
 
 # Don't fail on these (transient + private)
