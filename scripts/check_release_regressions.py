@@ -11,6 +11,7 @@ TESTS = [
     "tests/scripts/test_release_regression_guards.py",
     "tests/scripts/test_docker_release_tags.py",
     "tests/scripts/test_docker_signature_recovery.py",
+    "tests/scripts/test_docker_publish_stability.py",
 ]
 
 
