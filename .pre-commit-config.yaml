@@ -24,6 +24,13 @@
 repos:
   - repo: local
     hooks:
+      - id: swift-release-compatibility
+        name: Swift release dependency and public consumer compatibility
+        entry: python scripts/check_swift_release_compatibility.py
+        language: python
+        additional_dependencies: ['pytest>=9.1.1,<10', PyYAML]
+        files: ^(Package\.swift|scripts/check_swift_release_(consumer|compatibility)\.py|tests/scripts/test_swift_release_consumer\.py|\.github/workflows/release-swift-consumer\.yml|\.pre-commit-config\.yaml)$
+        pass_filenames: false
       - id: release-regressions
         name: Release regressions (cache CI, Docker signatures, flat checksums)
         entry: python scripts/check_release_regressions.py

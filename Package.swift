@@ -95,7 +95,9 @@ let package = Package(
         // so consumers don't have to declare it themselves.
         .package(
             url: "https://github.com/microsoft/onnxruntime-swift-package-manager",
-            from: "1.17.0"
+            // 1.24.x raises macOS to 14 even when only G2P is consumed.
+            // Keep the SDK compatible with our macOS 13 support contract.
+            exact: "1.20.0"
         ),
     ],
     targets: [

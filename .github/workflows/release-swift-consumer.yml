@@ -19,19 +19,33 @@ jobs:
       - uses: actions/checkout@v6.1.0
         with:
           ref: v${{ inputs.version }}
+      - uses: actions/checkout@v6.1.0
+        with:
+          ref: ${{ github.sha }}
+          path: consumer-verifier
       - name: Prepare isolated public consumer
         env:
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           test "$(tr -d '\r\n' < VERSION)" = "$RELEASE_VERSION"
-          python3 scripts/check_swift_release_consumer.py \
+          python3 consumer-verifier/scripts/check_swift_release_consumer.py \
             --version "$RELEASE_VERSION" \
             --destination "$RUNNER_TEMP/swift-release-consumer"
       - name: Resolve public binary artifacts and run G2P
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/swift-release-consumer"
-          swift package resolve
-          swift build
-          swift run --skip-build ReleaseConsumer
+          swift package resolve 2>&1 | tee resolve.log
+          swift build 2>&1 | tee build.log
+          swift run --skip-build ReleaseConsumer 2>&1 | tee phonemes.log
+      - name: Preserve public consumer dependency and runtime proof
+        if: always()
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: public-swift-consumer-${{ inputs.version }}
+          path: |
+            ${{ runner.temp }}/swift-release-consumer/*.log
+            ${{ runner.temp }}/swift-release-consumer/Package.swift
+            ${{ runner.temp }}/swift-release-consumer/Package.resolved
+          if-no-files-found: error
