@@ -2,6 +2,7 @@
 
 import fnmatch
 import importlib.util
+import re
 from pathlib import Path
 
 import pytest
@@ -18,7 +19,10 @@ def test_sparse_release_checkout_contains_every_executed_script():
     )
     steps = workflow["jobs"]["release"]["steps"]
     patterns = steps[0]["with"]["sparse-checkout"].splitlines()
-    for path in ("scripts/generate_model_card.py", "scripts/release_checksums.py"):
+    scripts = "\n".join(step.get("run", "") for step in steps)
+    executed = re.findall(r"python(?:3)?\s+(scripts/[\w/.-]+\.py)", scripts)
+    assert executed
+    for path in set(executed):
         assert any(fnmatch.fnmatch(path, pattern) for pattern in patterns), (
             f"Release checkout omits {path}"
         )
@@ -118,3 +122,31 @@ def test_recovery_workflow_checks_out_immutable_source_and_never_overwrites():
     assert "--clobber" not in scripts and "git push" not in scripts
     assert "isDraft" in scripts
     assert "inputs.recover_shared_run == ''" in workflow["jobs"]["gate"]["if"]
+
+
+@pytest.mark.parametrize("corruption", [None, "version", "bytes"])
+def test_recovery_requires_both_swift_manifest_checksums(tmp_path, corruption):
+    import hashlib
+
+    module = recovery()
+    lines = []
+    for variable, checksum, name in [
+        ("version", "checksum", "libpiper_plus-ios-v2.0.1.xcframework.zip"),
+        ("g2pVersion", "g2pChecksum", "libpiper_plus_g2p-apple-v2.0.1.xcframework.zip"),
+    ]:
+        data = name.encode()
+        (tmp_path / name).write_bytes(data)
+        version = "2.0.2" if corruption == "version" else "2.0.1"
+        lines.extend(
+            [
+                f'let {variable} = "{version}"',
+                f'let {checksum} = "{hashlib.sha256(data).hexdigest()}"',
+            ]
+        )
+    if corruption == "bytes":
+        (tmp_path / name).write_bytes(b"changed native archive")
+    if corruption:
+        with pytest.raises(ValueError, match="SwiftPM manifest mismatch"):
+            module.verify_swift(tmp_path, "v2.0.1", "\n".join(lines))
+    else:
+        module.verify_swift(tmp_path, "v2.0.1", "\n".join(lines))
