@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -35,6 +36,36 @@ SCRIPTS = Path(__file__).resolve().parent
 
 def command(*args, **kwargs):
     return subprocess.run(args, check=True, timeout=180, **kwargs)
+
+
+def verify_and_pull(reference, proof_path, runner=subprocess.run):
+    """Verify and execute the same immutable published image."""
+    if not re.fullmatch(r"[^\s@]+@sha256:[0-9a-f]{64}", reference):
+        raise ValueError("An immutable image digest reference is required")
+    repository = os.environ["GITHUB_REPOSITORY"]
+    result = runner(
+        [
+            "cosign",
+            "verify",
+            "--certificate-identity",
+            f"https://github.com/{repository}/.github/workflows/docker-build.yml@refs/tags/docker-v{VERSION}",
+            "--certificate-oidc-issuer",
+            "https://token.actions.githubusercontent.com",
+            "--certificate-github-workflow-sha",
+            SOURCE,
+            reference,
+        ],
+        check=True,
+        capture_output=True,
+        timeout=180,
+    )
+    proof_path.parent.mkdir(parents=True, exist_ok=True)
+    proof_path.write_bytes(result.stdout)
+    runner(
+        ["docker", "pull", "--platform", "linux/amd64", reference],
+        check=True,
+        timeout=600,
+    )
 
 
 def hub_fetcher(repository):
@@ -222,12 +253,7 @@ def main():
     fetch_model()
     for registry, image in (("ghcr", ghcr), ("dockerhub", hub)):
         reference = image["reference"]
-        # Pull resolves actual public bytes; the Docker engine validates layer digests.
-        subprocess.run(
-            ["docker", "pull", "--platform", "linux/amd64", reference],
-            check=True,
-            timeout=600,
-        )
+        verify_and_pull(reference, Path("signature-proof") / f"{name}-{registry}.json")
         runtime(name, reference, PROOF / registry)
         print(
             json.dumps(
