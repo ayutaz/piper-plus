@@ -194,9 +194,9 @@ def main():
         public_fetcher(f"ayutaz/piper-plus/{name}"),
     )
     hub_repository = f"ayousanz/{HUB_NAMES[name]}"
-    hub_fetch = hub_fetcher(hub_repository)
     for attempt in range(24):
         try:
+            hub_fetch = hub_fetcher(hub_repository)
             hub = resolve_image(hub_repository, VERSION, SOURCE, arches, hub_fetch)
             break
         except urllib.error.HTTPError as error:
