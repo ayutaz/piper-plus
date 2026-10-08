@@ -70,7 +70,7 @@ def test_duplicate_members_cannot_hide_changed_payload(tmp_path):
 
 def test_public_nuget_copy_is_verified_before_final_attestation():
     workflow = yaml.safe_load(
-        (ROOT / ".github/workflows/dev-create-release.yml").read_text(encoding="utf-8")
+        (ROOT / ".github/workflows/release-csharp.yml").read_text(encoding="utf-8")
     )
     steps = workflow["jobs"]["publish_nuget"]["steps"]
     publish = next(

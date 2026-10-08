@@ -353,226 +353,68 @@ jobs:
             "piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive_ext }}" \
             --clobber
 
-  # Publish to NuGet
+  # Component packages are immutable and published by their own tag workflows.
   publish_nuget:
-    name: Publish to NuGet
+    name: Verify existing nuget packages
     needs: create_release
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: read
-      id-token: write       # required by attest-build-provenance
-      attestations: write
+      attestations: read
     steps:
       - uses: actions/checkout@v6.1.0
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5.4.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-dotnet@v5.4.0
         with:
           dotnet-version: 10.0.x
-
-      - name: Pack NuGet packages
-        run: |
-          # NuGet packages use their own version from csproj (independent from PyPI version)
-          dotnet pack src/csharp/PiperPlus.Core/PiperPlus.Core.csproj \
-            -c Release -o nupkgs/
-          dotnet pack src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj \
-            -c Release -o nupkgs/
-          echo "Packages created:"
-          ls -lh nupkgs/
-
-      - name: Sign NuGet packages
-        # Code-sign the .nupkg files so consumers can verify authorship
-        # via `nuget verify -All`. Requires the secrets `NuGetSignCert`
-        # (PFX, base64) and `NuGetSignCertPassword`. If neither is set,
-        # we emit a warning and continue — signing is opt-in until the
-        # cert is provisioned (Azure Trusted Signing / Sectigo / etc).
+      - name: Verify immutable component registry packages
         env:
-          NUGET_SIGN_CERT_BASE64: ${{ secrets.NuGetSignCert }}
-          NUGET_SIGN_CERT_PASSWORD: ${{ secrets.NuGetSignCertPassword }}
-        run: |
-          if [ -z "$NUGET_SIGN_CERT_BASE64" ] || [ -z "$NUGET_SIGN_CERT_PASSWORD" ]; then
-            echo "::warning::NuGetSignCert / NuGetSignCertPassword secret not set — skipping NuGet code signing. Packages will publish unsigned."
-            exit 0
-          fi
-          echo "$NUGET_SIGN_CERT_BASE64" | base64 -d > /tmp/nuget-sign.pfx
-          for pkg in nupkgs/*.nupkg; do
-            echo "Signing: $pkg"
-            dotnet nuget sign "$pkg" \
-              --certificate-path /tmp/nuget-sign.pfx \
-              --certificate-password "$NUGET_SIGN_CERT_PASSWORD" \
-              --timestamper http://timestamp.digicert.com \
-              || { echo "::error::Failed to sign $pkg"; exit 1; }
-          done
-          rm -f /tmp/nuget-sign.pfx
-          echo "Signed packages:"
-          ls -lh nupkgs/
-
-      - name: Generate SLSA build provenance attestation (NuGet)
-        # Attest the *signed* nupkgs (or unsigned if signing was skipped).
-        # `gh attestation verify` against the published package downloads
-        # the .nupkg and matches it against this attestation.
-        if: hashFiles('nupkgs/*.nupkg') != ''
-        uses: actions/attest-build-provenance@v3.2.0
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python scripts/check_component_registry.py
+          --component nuget --directory "$RUNNER_TEMP/nuget-verification"
+      - name: Preserve component verification evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.0
         with:
-          subject-path: 'nupkgs/*.nupkg'
+          name: root-release-nuget-verification
+          path: ${{ runner.temp }}/nuget-verification/proof/
+          if-no-files-found: error
 
-      - name: Publish to NuGet
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        run: |
-          if [ -n "$NUGET_API_KEY" ]; then
-            for pkg in nupkgs/*.nupkg; do
-              dotnet nuget push "$pkg" \
-                --api-key "$NUGET_API_KEY" \
-                --source https://api.nuget.org/v3/index.json \
-                --skip-duplicate
-            done
-          else
-            echo "::error::NUGET_API_KEY is required to publish this release"
-            exit 1
-          fi
-
-      - name: Verify repository-signed public NuGet copies
-        run: |
-          set -euo pipefail
-          for package in nupkgs/*.nupkg; do
-            public="published-nupkgs/$(basename "$package")"
-            python3 scripts/check_nuget_package.py "$package" "$public" --download
-            dotnet nuget verify "$public"
-          done
-
-      - name: Attest exact public NuGet packages
-        uses: actions/attest-build-provenance@v3.2.0
-        with:
-          subject-path: 'published-nupkgs/*.nupkg'
-  # Publish to crates.io
+  # Component packages are immutable and published by their own tag workflows.
   publish_crates:
-    name: Publish to crates.io
+    name: Verify existing crates packages
     needs: create_release
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: read
-      id-token: write       # required by attest-build-provenance
-      attestations: write
+      attestations: read
     steps:
       - uses: actions/checkout@v6.1.0
-
-      - name: Validate crate version
-        working-directory: src/rust
-        run: |
-          CRATE_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
-          RELEASE_VERSION="${{ github.event.inputs.version }}"
-          echo "Crate version: $CRATE_VERSION"
-          echo "Release version: $RELEASE_VERSION"
-          if [ "$CRATE_VERSION" != "$RELEASE_VERSION" ]; then
-            echo "::notice::Rust crate version ($CRATE_VERSION) differs from release version ($RELEASE_VERSION). Rust packages use independent versioning."
-          fi
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Package piper-plus-g2p
-        working-directory: src/rust
-        run: cargo package -p piper-plus-g2p --allow-dirty --no-verify --locked
-
-      - name: Attest piper-plus-g2p
-        uses: actions/attest-build-provenance@v3.2.0
         with:
-          subject-path: 'src/rust/target/package/piper-plus-g2p-[0-9]*.crate'
-
-      - name: Publish piper-plus-g2p (dependency)
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        working-directory: src/rust
-        run: |
-          if [ -n "$CARGO_REGISTRY_TOKEN" ]; then
-            set +e
-            OUTPUT=$(cargo publish -p piper-plus-g2p --allow-dirty 2>&1)
-            STATUS=$?
-            set -e
-            echo "$OUTPUT"
-            if [ "$STATUS" -ne 0 ]; then
-              if echo "$OUTPUT" | grep -q "already uploaded\|already exists"; then
-                echo "⚠️ piper-plus-g2p already published on crates.io (continuing)"
-              else
-                echo "::error::Failed to publish piper-plus-g2p to crates.io"
-                exit "$STATUS"
-              fi
-            fi
-            # Wait for crates.io index to update
-            sleep 30
-          else
-            echo "::error::CARGO_REGISTRY_TOKEN is required to publish this release"
-            exit 1
-          fi
-
-      - name: Package piper-plus
-        working-directory: src/rust
-        run: cargo package -p piper-plus --allow-dirty --no-verify --locked
-
-      - name: Attest piper-plus
-        uses: actions/attest-build-provenance@v3.2.0
+          fetch-depth: 0
+      - uses: actions/setup-python@v6.2.0
         with:
-          subject-path: 'src/rust/target/package/piper-plus-[0-9]*.crate'
-
-      - name: Publish piper-plus (core)
+          python-version: '3.13'
+      - name: Verify immutable component registry packages
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        working-directory: src/rust
-        run: |
-          if [ -n "$CARGO_REGISTRY_TOKEN" ]; then
-            set +e
-            OUTPUT=$(cargo publish -p piper-plus --allow-dirty 2>&1)
-            STATUS=$?
-            set -e
-            echo "$OUTPUT"
-            if [ "$STATUS" -ne 0 ]; then
-              if echo "$OUTPUT" | grep -q "already uploaded\|already exists"; then
-                echo "⚠️ piper-plus version already published on crates.io (continuing)"
-              else
-                echo "::error::Failed to publish piper-plus to crates.io"
-                exit "$STATUS"
-              fi
-            fi
-          else
-            echo "::error::CARGO_REGISTRY_TOKEN is required to publish this release"
-            exit 1
-          fi
-
-      - name: Package piper-plus-cli
-        working-directory: src/rust
-        run: cargo package -p piper-plus-cli --allow-dirty --no-verify --locked
-
-      - name: Attest piper-plus-cli
-        uses: actions/attest-build-provenance@v3.2.0
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python scripts/check_component_registry.py
+          --component crates --directory "$RUNNER_TEMP/crates-verification"
+      - name: Preserve component verification evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.0
         with:
-          subject-path: 'src/rust/target/package/piper-plus-cli-[0-9]*.crate'
-
-      - name: Publish piper-plus-cli
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        working-directory: src/rust
-        run: |
-          if [ -n "$CARGO_REGISTRY_TOKEN" ]; then
-            # Wait for crates.io index to update
-            sleep 30
-            set +e
-            OUTPUT=$(cargo publish -p piper-plus-cli --allow-dirty 2>&1)
-            STATUS=$?
-            set -e
-            echo "$OUTPUT"
-            if [ "$STATUS" -ne 0 ]; then
-              if echo "$OUTPUT" | grep -q "already uploaded\|already exists"; then
-                echo "⚠️ piper-plus-cli version already published on crates.io (continuing)"
-              else
-                echo "::error::Failed to publish piper-plus-cli to crates.io"
-                exit "$STATUS"
-              fi
-            fi
-          else
-            echo "::error::CARGO_REGISTRY_TOKEN is required to publish this release"
-            exit 1
-          fi
+          name: root-release-crates-verification
+          path: ${{ runner.temp }}/crates-verification/proof/
+          if-no-files-found: error
 
   # Rust CLI builds
   rust-cli:

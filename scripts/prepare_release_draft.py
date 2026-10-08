@@ -160,7 +160,7 @@ def fetch(url, path):
             out.write(chunk)
 
 
-def verify_registry(rust, csharp, directory, proof):
+def verify_crates(rust, directory, proof):
     records = []
     for name in ("piper-plus-g2p", "piper-plus", "piper-plus-cli"):
         path = directory / f"{name}-{rust}.crate"
@@ -181,6 +181,11 @@ def verify_registry(rust, csharp, directory, proof):
                 raise ValueError(f"crate source mismatch: {name}")
         sha = attest(path, tag, "release-rust.yml", proof)
         records.append({"name": path.name, "sha256": digest(path), "source": sha})
+    return records
+
+
+def verify_nuget(csharp, directory, proof):
+    records = []
     for name in ("piperplus.core", "piperplus.cli"):
         path = directory / f"{name}.{csharp}.nupkg"
         fetch(
@@ -206,6 +211,12 @@ def verify_registry(rust, csharp, directory, proof):
         sha = attest(path, tag, "release-csharp.yml", proof)
         records.append({"name": path.name, "sha256": digest(path), "source": sha})
     return records
+
+
+def verify_registry(rust, csharp, directory, proof):
+    return verify_crates(rust, directory, proof) + verify_nuget(
+        csharp, directory, proof
+    )
 
 
 def main():
