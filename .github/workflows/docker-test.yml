@@ -8,12 +8,65 @@ on:
         default: '["python-inference","webui","wyoming"]'
         required: true
         type: string
+      publish_api:
+        description: '署名検証済みGHCRのAPIイメージを同一digestのままDockerHubへ公開'
+        default: false
+        required: false
+        type: boolean
 
 permissions:
   contents: read
 
 jobs:
+  publish-api:
+    if: inputs.publish_api
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - uses: sigstore/cosign-installer@v3.10.1
+        with:
+          cosign-release: 'v2.4.1'
+      - name: Verify immutable source, architecture and release signature
+        run: |
+          set -euo pipefail
+          python ci/release_docker/prepare_api_copy.py
+          cosign verify \
+            --certificate-identity 'https://github.com/ayutaz/piper-plus/.github/workflows/release-docker-signatures.yml@refs/tags/docker-signatures-v2.0.0' \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+            --certificate-github-workflow-sha 'fa88f56bc39e951be0123a3c0c81e6ca73e24c80' \
+            'ghcr.io/ayutaz/piper-plus/python-inference@sha256:90674b00ba5b8f2c93f561b3229193a9591d6a8d4cea6c6139dc4efe270aca5b' \
+            > public-docker-copy-proof/cosign-verification.json
+      - uses: docker/login-action@v4.6.0
+        with:
+          username: ayousanz
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Copy exact published bytes without rebuilding
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends skopeo
+          for tag in 2.0.0 latest; do
+            skopeo copy --all --preserve-digests \
+              --dest-authfile "$HOME/.docker/config.json" \
+              --digestfile "public-docker-copy-proof/${tag}.digest" \
+              'docker://ghcr.io/ayutaz/piper-plus/python-inference@sha256:90674b00ba5b8f2c93f561b3229193a9591d6a8d4cea6c6139dc4efe270aca5b' \
+              "docker://docker.io/ayousanz/piper-plus-api:${tag}"
+            test "$(cat "public-docker-copy-proof/${tag}.digest")" = 'sha256:90674b00ba5b8f2c93f561b3229193a9591d6a8d4cea6c6139dc4efe270aca5b'
+          done
+      - name: Preserve immutable publication evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: public-docker-api-copy-2.0.0
+          path: public-docker-copy-proof/
+          if-no-files-found: error
   public-runtime:
+    needs: publish-api
+    if: ${{ always() && !cancelled() && (needs.publish-api.result == 'success' || needs.publish-api.result == 'skipped') }}
     name: Public GHCR and DockerHub (${{ matrix.image }})
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -26,7 +79,7 @@ jobs:
       - name: Free hosted runner disk space
         if: matrix.image == 'python-inference'
         run: |
-          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/lib/android
           sudo docker image prune --all --force
           sudo apt-get clean
       - uses: actions/setup-python@v6.2.0
