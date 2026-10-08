@@ -106,7 +106,8 @@ def runtime(name, reference, directory):
             "--entrypoint",
             "python",
             reference,
-            "/proof/verify-corrected-gpu-image-cpu-runtime.py",
+            "-c",
+            "import runpy; runpy.run_path('/proof/verify-corrected-gpu-image-cpu-runtime.py', run_name='__main__')",
         )
         return
     if name == "webui":
@@ -118,7 +119,8 @@ def runtime(name, reference, directory):
             "--entrypoint",
             "python",
             reference,
-            "/proof/verify-webui-runtime.py",
+            "-c",
+            "import runpy; runpy.run_path('/proof/verify-webui-runtime.py', run_name='__main__')",
         )
         start_args = []
         check_script = "/proof/verify-webui-http-runtime.py"
