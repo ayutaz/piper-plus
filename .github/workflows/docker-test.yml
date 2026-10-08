@@ -2,6 +2,12 @@ name: Docker public release verification
 
 on:
   workflow_dispatch:
+    inputs:
+      images:
+        description: '検証するイメージ名のJSON配列'
+        default: '["python-inference","webui","wyoming"]'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -14,10 +20,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [python-inference, webui, wyoming]
+        image: ${{ fromJSON(inputs.images) }}
     steps:
       - uses: actions/checkout@v6.1.0
       - name: Free hosted runner disk space
+        if: matrix.image == 'python-inference'
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/android /opt/hostedtoolcache/CodeQL
           sudo docker image prune --all --force
