@@ -20,6 +20,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  release-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - name: Test release failure handling
+        run: |
+          pip install 'pytest>=9.1.1,<10' PyYAML
+          python -m pytest tests/scripts/test_release_publish_enforcement.py tests/scripts/test_native_release_notices.py tests/scripts/test_xcframework_archive.py tests/scripts/test_nuget_repository_copy.py tests/scripts/test_armv7_release.py tests/scripts/test_swift_release_consumer.py -q -o addopts=
+          python scripts/check_release_regressions.py
+
   changes:
     runs-on: ubuntu-24.04
     permissions:
@@ -91,6 +105,7 @@ jobs:
               - '.github/workflows/deploy-webassembly-demo.yml'
               - '.github/workflows/test-webassembly.yml'
               - 'tests/scripts/test_wasm_onnx_ci_contract.py'
+              - 'tests/scripts/test_npm_release_ci.py'
             zh-en-data:
               # Source-of-truth + 6 mirrors. Any drift in any mirror should
               # trigger every per-runtime test job, not just the JSON sync gate.
@@ -376,6 +391,14 @@ jobs:
       - name: Check piper-plus-python
         run: cargo check -p piper-plus-python
 
+      - name: Build mandatory cache regression fixtures
+        run: |
+          python -m pip install onnx==1.22.0
+          python ../../tests/fixtures/ort_session/build_embedding_fixture.py
+
+      - name: Require actual ONNX cache and embedding inference
+        run: cargo test --locked -p piper-plus --no-default-features --features onnx --test test_embedding_dimensions
+
   # Small, real ORT Web graphs verify input shapes on every PR, without Rust.
   wasm-onnx-contract:
     runs-on: ubuntu-24.04
@@ -399,7 +422,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           pip install 'pytest>=9.1.1,<10' PyYAML
-          python -m pytest tests/scripts/test_wasm_onnx_ci_contract.py -q -o addopts=
+          python -m pytest tests/scripts/test_wasm_onnx_ci_contract.py tests/scripts/test_python_release_wheels.py tests/scripts/test_npm_release_ci.py -q -o addopts=
       - name: Install exact ORT Web and local G2P (no native binary download)
         env:
           ORT_VERSION: ${{ matrix.ort }}
@@ -464,7 +487,7 @@ jobs:
         run: cargo test -p piper-plus-wasm --features ja-external --no-fail-fast
 
       - name: Install dependencies (with local @piper-plus/g2p)
-        run: npm install "@piper-plus/g2p@file:../g2p"
+        run: npm install --no-save "@piper-plus/g2p@file:../g2p"
 
       - name: Run npm package tests
         run: npm run test:npm-package:all
@@ -483,6 +506,9 @@ jobs:
 
       - name: Test browser synthesis with public models
         run: npm run test:browser
+
+      - name: Test packed npm distribution in a clean consumer
+        run: npm run test:distribution
 
       - name: Upload browser results
         if: always()
@@ -510,6 +536,7 @@ jobs:
   ci-required:
     if: always()
     needs:
+      - release-contract
       - cpp-tests
       - csharp-tests
       - csharp-build
@@ -519,6 +546,10 @@ jobs:
       - wasm-onnx-contract
     runs-on: ubuntu-24.04
     steps:
+      - name: Require successful release contracts
+        env:
+          RELEASE_CONTRACT_RESULT: ${{ needs.release-contract.result }}
+        run: test "$RELEASE_CONTRACT_RESULT" = "success"
       - name: Require successful ONNX contract checks
         env:
           WASM_CONTRACT_RESULT: ${{ needs.wasm-onnx-contract.result }}

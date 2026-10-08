@@ -1,0 +1,78 @@
+name: Repair Docker release signatures
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'ビルド済みDockerのバージョン（例: 2.0.0）。docker-signatures-v同版のタグで実行'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sign:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6.1.0
+        with:
+          fetch-depth: 0
+      - name: Validate immutable signing and build tags
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$GITHUB_REF" = "refs/tags/docker-signatures-v${RELEASE_VERSION}"
+          test "$(git rev-parse "refs/tags/docker-signatures-v${RELEASE_VERSION}^{commit}")" = "$(git rev-parse HEAD)"
+          SOURCE_REVISION=$(git rev-parse "refs/tags/docker-v${RELEASE_VERSION}^{commit}")
+          [[ "$SOURCE_REVISION" =~ ^[a-f0-9]{40}$ ]]
+          echo "SOURCE_REVISION=${SOURCE_REVISION}" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - name: Preflight every public release image
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          python scripts/resolve_docker_release_images.py \
+            --version "$RELEASE_VERSION" --source-revision "$SOURCE_REVISION" \
+            --output docker-signature-resolution.json \
+            --references docker-signature-references.txt
+      - name: Log in to GHCR
+        uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.10.1
+        with:
+          cosign-release: 'v2.4.1'
+      - name: Sign verified immutable image digests
+        run: |
+          set -euo pipefail
+          while IFS= read -r image; do
+            cosign sign --yes "$image"
+            cosign verify \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$GITHUB_SHA" "$image"
+          done < docker-signature-references.txt
+      - name: Preserve digest and source verification
+        if: always()
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: docker-signature-resolution
+          path: docker-signature-resolution.json
+          if-no-files-found: error

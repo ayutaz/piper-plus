@@ -27,6 +27,10 @@ on:
       - 'pyproject.toml'
       - 'CMakeLists.txt'
       - '.github/workflows/docker-build.yml'
+      - 'tests/scripts/test_docker_release_tags.py'
+      - 'tests/scripts/test_docker_signature_recovery.py'
+      - 'scripts/resolve_docker_release_images.py'
+      - '.github/workflows/release-docker-signatures.yml'
     tags:
       - 'docker-v*'
       - 'v*'
@@ -44,6 +48,10 @@ on:
       - 'pyproject.toml'
       - 'CMakeLists.txt'
       - '.github/workflows/docker-build.yml'
+      - 'tests/scripts/test_docker_release_tags.py'
+      - 'tests/scripts/test_docker_signature_recovery.py'
+      - 'scripts/resolve_docker_release_images.py'
+      - '.github/workflows/release-docker-signatures.yml'
   workflow_dispatch:
 
 # 同一 PR への連続 push で古い build を cancel。 push to dev は cancel しない
@@ -60,7 +68,31 @@ permissions:
   contents: read
 
 jobs:
+  inference-regression:
+    name: Docker inference PUA regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - uses: astral-sh/setup-uv@v6.8.0
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - name: Install isolated inference test dependencies
+        run: |
+          uv venv --python 3.13 "${RUNNER_TEMP}/venv-docker-inference"
+          uv pip install --python "${RUNNER_TEMP}/venv-docker-inference/bin/python" \
+            pytest pyyaml numpy soundfile onnxruntime ./src/python/g2p
+      - name: Check synthesis, timing and release tag regression
+        run: |
+          "${RUNNER_TEMP}/venv-docker-inference/bin/python" -m pytest \
+            docker/python-inference/test_phoneme_encoding.py \
+            tests/scripts/test_docker_release_tags.py -o addopts= -q
+          "${RUNNER_TEMP}/venv-docker-inference/bin/python" -m pytest \
+            tests/scripts/test_docker_signature_recovery.py -o addopts= -q
+
   build-python-inference:
+    needs: inference-regression
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -96,6 +128,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
+            type=match,pattern=docker-v(.*),group=1
             type=sha
 
       - name: Build and push to ghcr.io
@@ -117,13 +150,13 @@ jobs:
           sbom: true
 
       - name: Install Cosign
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
       - name: Sign the published image
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -133,6 +166,12 @@ jobs:
             images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
+          for image in ${images}; do
+            cosign verify \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$GITHUB_SHA" "$image"
+          done
 
       # --- Docker Hub publish (tag push or workflow_dispatch only) ---
       #
@@ -178,6 +217,7 @@ jobs:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/piper-plus-api
           tags: |
             type=semver,pattern={{version}},prefix=
+            type=match,pattern=docker-v(.*),group=1,prefix=
             type=semver,pattern={{major}}.{{minor}},prefix=
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
 
@@ -203,6 +243,7 @@ jobs:
   # `-cpu` suffix on ghcr.io so consumers can pin explicitly:
   #   ghcr.io/.../python-inference:dev-cpu
   build-python-inference-cpu:
+    needs: inference-regression
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -242,6 +283,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
+            type=match,pattern=docker-v(.*),group=1
             type=sha
 
       - name: Build and push CPU image (multi-arch)
@@ -264,13 +306,13 @@ jobs:
           sbom: true
 
       - name: Install Cosign
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
       - name: Sign the published image
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -280,6 +322,12 @@ jobs:
             images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
+          for image in ${images}; do
+            cosign verify \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$GITHUB_SHA" "$image"
+          done
 
   # Trial distroless variants. Build-only (never pushed to ghcr.io)
   # until a promotion PR validates each image's runtime behaviour
@@ -366,6 +414,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
+            type=match,pattern=docker-v(.*),group=1
             type=sha
 
       - name: Build and push
@@ -388,13 +437,13 @@ jobs:
           sbom: true
 
       - name: Install Cosign
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
       - name: Sign the published image
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -404,6 +453,12 @@ jobs:
             images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
+          for image in ${images}; do
+            cosign verify \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$GITHUB_SHA" "$image"
+          done
 
   build-cpp-dev:
     runs-on: ubuntu-latest
@@ -441,6 +496,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
+            type=match,pattern=docker-v(.*),group=1
             type=sha
 
       - name: Build and push
@@ -464,13 +520,13 @@ jobs:
           sbom: true
 
       - name: Install Cosign
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
       - name: Sign the published image
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -480,6 +536,12 @@ jobs:
             images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
+          for image in ${images}; do
+            cosign verify \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$GITHUB_SHA" "$image"
+          done
 
   build-cpp-inference:
     runs-on: ubuntu-latest
@@ -522,6 +584,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
+            type=match,pattern=docker-v(.*),group=1
             type=sha
 
       - name: Build and push
@@ -545,13 +608,13 @@ jobs:
           sbom: true
 
       - name: Install Cosign
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
       - name: Sign the published image
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -561,6 +624,12 @@ jobs:
             images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
+          for image in ${images}; do
+            cosign verify \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$GITHUB_SHA" "$image"
+          done
 
   # Multi-arch is critical here: Home Assistant ships on Raspberry Pi
   # (arm64) and the docker-build job is the only path users have to a
@@ -606,6 +675,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
+            type=match,pattern=docker-v(.*),group=1
             type=sha
 
       - name: Build and push to ghcr.io
@@ -629,13 +699,13 @@ jobs:
           sbom: true
 
       - name: Install Cosign
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
       - name: Sign the published image
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -645,6 +715,12 @@ jobs:
             images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
+          for image in ${images}; do
+            cosign verify \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$GITHUB_SHA" "$image"
+          done
 
       # --- Docker Hub publish (tag push or workflow_dispatch only) ---
       # Fail-fast on missing credentials — see python-inference job above
@@ -682,6 +758,7 @@ jobs:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/wyoming-piper-plus
           tags: |
             type=semver,pattern={{version}},prefix=
+            type=match,pattern=docker-v(.*),group=1,prefix=
             type=semver,pattern={{major}}.{{minor}},prefix=
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
 
@@ -701,6 +778,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   build-webui:
+    needs: inference-regression
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -737,6 +815,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
+            type=match,pattern=docker-v(.*),group=1
             type=sha
 
       - name: Build and push to ghcr.io
@@ -757,13 +836,13 @@ jobs:
           sbom: true
 
       - name: Install Cosign
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
       - name: Sign the published image
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -773,6 +852,12 @@ jobs:
             images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
+          for image in ${images}; do
+            cosign verify \
+              --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$GITHUB_SHA" "$image"
+          done
 
       # --- Docker Hub publish (tag push or workflow_dispatch only) ---
       # Fail-fast on missing credentials — see python-inference job above
@@ -810,6 +895,7 @@ jobs:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/piper-plus-webui
           tags: |
             type=semver,pattern={{version}},prefix=
+            type=match,pattern=docker-v(.*),group=1,prefix=
             type=semver,pattern={{major}}.{{minor}},prefix=
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
 

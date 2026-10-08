@@ -12,6 +12,24 @@ Swift integration for piper-plus on **iOS** (device + simulator).
 
 ## SPM Quick Start
 
+### v2.0.0 dependency compatibility
+
+The published `v2.0.0` manifest permits newer ONNX Runtime SDKs. SDK 1.24.x
+requires macOS 14, which conflicts with the package's macOS 13 declaration,
+including when consuming only `PiperPlusG2P`. Add this constraint to your app's
+`dependencies` alongside piper-plus when using `v2.0.0`:
+
+```swift
+.package(url: "https://github.com/ayutaz/piper-plus", exact: "2.0.0"),
+.package(
+    url: "https://github.com/microsoft/onnxruntime-swift-package-manager",
+    exact: "1.20.0"
+),
+```
+
+This uses the unmodified public release and the official Microsoft SDK.
+The development manifest pins the compatible SDK for the next release.
+
 ### Step 1: Add piper-plus as a dependency
 
 Starting from v1.13.0, `piper-plus`'s `Package.swift` wraps the binary xcframework in a Swift `target` that depends on the official `onnxruntime-swift-package-manager` package. **ORT is therefore pulled transitively** — consumers only declare `piper-plus`:

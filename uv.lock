@@ -3409,7 +3409,7 @@ provides-extras = ["gpu", "http", "test"]
 
 [[package]]
 name = "piper-plus-g2p"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "src/python/g2p" }
 
 [package.optional-dependencies]

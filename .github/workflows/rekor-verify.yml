@@ -24,6 +24,10 @@ on:
         description: "Number of recent releases to verify"
         required: false
         default: "10"
+      tag:
+        description: "厳密に確認する公開タグ（v2.0.0 / rust-v0.5.2 / csharp-v0.5.1）。匿名ダウンロードと全署名を検証し、欠落を許容しません"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -34,7 +38,45 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify-public:
+    if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6.1.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - uses: sigstore/cosign-installer@v3.10.1
+        with:
+          cosign-release: 'v2.4.1'
+      - name: Test public verification guards
+        run: |
+          python -m pip install 'pytest>=9.1.1,<10'
+          python -m pytest tests/scripts/test_public_release_verification.py -q -o addopts=
+      - name: Verify every public payload and pinned signature
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: >-
+          python scripts/verify_public_release.py --tag "$RELEASE_TAG"
+          --directory "$RUNNER_TEMP/public-release-verification"
+      - name: Preserve public verification evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: public-release-verification-${{ inputs.tag }}
+          path: |
+            ${{ runner.temp }}/public-release-verification/*.json
+            ${{ runner.temp }}/public-release-verification/*.log
+            ${{ runner.temp }}/public-release-verification/*.cosign.bundle
+          if-no-files-found: error
+
   verify:
+    if: github.event_name != 'workflow_dispatch' || inputs.tag == ''
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

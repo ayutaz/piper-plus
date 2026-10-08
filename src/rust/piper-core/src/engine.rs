@@ -540,7 +540,7 @@ impl OnnxEngine {
             tracing::info!("Loading pre-optimized model from {:?}", optimized_path);
             match Self::build_session(&optimized_path, num_intra_threads, &device_type, true, None)
             {
-                Ok((session, actual_device)) => {
+                Ok((session, actual_device, _)) => {
                     tracing::info!("Using device: {}", actual_device);
                     return Self::finish_load(session, config);
                 }
@@ -565,7 +565,7 @@ impl OnnxEngine {
         // ファイルの「後」に書かれるので、生成中のファイルを守れない。
         // 規約: docs/spec/ort-session-contract.toml [cache.concurrency]。
         let temp_optimized_path = Self::build_temp_cache_path(&optimized_path);
-        let (session, actual_device) = Self::build_session(
+        let (session, actual_device, cache_save_enabled) = Self::build_session(
             model_path,
             num_intra_threads,
             &device_type,
@@ -579,7 +579,7 @@ impl OnnxEngine {
         // 同一ディレクトリ内の rename は POSIX でも Windows でも atomic なので、
         // 並行する reader は「古い完全なファイル」か「新しい完全なファイル」の
         // どちらかを見る。途中状態は見えない。
-        if temp_optimized_path.exists() {
+        if cache_save_enabled && temp_optimized_path.exists() {
             match std::fs::rename(&temp_optimized_path, &optimized_path) {
                 Ok(()) => {
                     if let Err(e) = std::fs::write(&sentinel_path, b"ok") {
@@ -633,13 +633,16 @@ impl OnnxEngine {
     ///
     /// `cached` が `true` の場合は最適化をスキップし、`false` の場合は
     /// `cache_save_path` に最適化結果を保存する。
+    /// 戻り値の bool は保存が実際に有効になった場合のみ true。
+    /// プローブに失敗したパスの既存ファイルをキャッシュとして公開しない。
     fn build_session(
         model_path: &Path,
         num_intra_threads: usize,
         device_type: &crate::gpu::DeviceType,
         cached: bool,
         cache_save_path: Option<&std::path::Path>,
-    ) -> Result<(Session, crate::gpu::DeviceType), PiperError> {
+    ) -> Result<(Session, crate::gpu::DeviceType, bool), PiperError> {
+        let mut cache_save_enabled = false;
         let mut builder = Session::builder()
             .map_err(|e| PiperError::ModelLoad(e.to_string()))?
             .with_intra_threads(num_intra_threads)
@@ -663,19 +666,38 @@ impl OnnxEngine {
                 .map_err(|e| PiperError::ModelLoad(format!("optimization_level: {e}")))?;
         } else if let Some(save_path) = cache_save_path {
             // 初回: 最適化を実行し、結果を .opt.onnx に保存
-            // 書き込み権限がない場合は warning のみでフォールバック
-            match builder.with_optimized_model_path(save_path) {
-                Ok(b) => {
-                    builder = b;
-                    tracing::info!("ORT will save optimized model to {:?}", save_path);
-                }
+            // ORT はパス設定時ではなく commit_from_file 時に保存するため、
+            // writer 固有のパスへ実際に書き込めるか先に確認する。
+            let writable = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(save_path)
+                .and_then(|probe| {
+                    drop(probe);
+                    std::fs::remove_file(save_path)
+                });
+            match writable {
+                Ok(()) => match builder.with_optimized_model_path(save_path) {
+                    Ok(b) => {
+                        builder = b;
+                        cache_save_enabled = true;
+                        tracing::info!("ORT will save optimized model to {:?}", save_path);
+                    }
+                    Err(e) => {
+                        let msg = e.to_string();
+                        builder = e.recover();
+                        tracing::warn!(
+                            "Could not set optimized model path {:?}: {} (continuing without cache)",
+                            save_path,
+                            msg
+                        );
+                    }
+                },
                 Err(e) => {
-                    let msg = e.to_string();
-                    builder = e.recover();
                     tracing::warn!(
-                        "Could not set optimized model path {:?}: {} (continuing without cache)",
+                        "Could not write optimized model path {:?}: {} (continuing without cache)",
                         save_path,
-                        msg
+                        e
                     );
                 }
             }
@@ -689,7 +711,7 @@ impl OnnxEngine {
             .commit_from_file(model_path)
             .map_err(|e| PiperError::ModelLoad(e.to_string()))?;
 
-        Ok((session, actual_device))
+        Ok((session, actual_device, cache_save_enabled))
     }
 
     /// セッションからモデル能力を検出し、`OnnxEngine` を構築する。
@@ -786,7 +808,7 @@ impl OnnxEngine {
     /// 1. `input` (phoneme_ids): int64 \[1, phoneme_length\]
     /// 2. `input_lengths`: int64 \[1\]
     /// 3. `scales`: float32 \[3\] = \[noise_scale, length_scale, noise_w\]
-    /// 4. `speaker_embedding` (条件付き): float32 \[1, 192\] -- has_spk_emb が true のとき
+    /// 4. `speaker_embedding` (条件付き): float32 \[1, embedding_dim\]
     /// 5. `sid` (条件付き): int64 \[1\] -- has_sid が true かつ speaker_embedding が無いとき
     /// 6. `lid` (条件付き): int64 \[1\] -- has_lid が true のとき
     /// 7. `prosody_features` (条件付き): int64 \[1, phoneme_length, 3\]
@@ -860,31 +882,6 @@ impl OnnxEngine {
             vec![noise_scale, request.length_scale, noise_w].into_boxed_slice(),
         ))
         .map_err(|e| PiperError::Inference(format!("scales tensor: {e}")))?;
-
-        // 4. speaker_embedding: float32 [1, 192] (条件付き — sid より優先)
-        const SPK_EMB_DIM: usize = 192;
-        let spk_emb_tensor = if self.capabilities.has_spk_emb {
-            let mut emb = if let Some(ref e) = request.speaker_embedding {
-                e.clone()
-            } else {
-                tracing::warn!("Model expects speaker_embedding but none provided; using zeros");
-                vec![0.0f32; SPK_EMB_DIM]
-            };
-            if emb.len() != SPK_EMB_DIM {
-                tracing::warn!(
-                    "Speaker embedding has {} values, expected {}; padding/truncating",
-                    emb.len(),
-                    SPK_EMB_DIM
-                );
-                emb.resize(SPK_EMB_DIM, 0.0);
-            }
-            Some(
-                Tensor::from_array(([1_usize, SPK_EMB_DIM], emb.into_boxed_slice()))
-                    .map_err(|e| PiperError::Inference(format!("speaker_embedding tensor: {e}")))?,
-            )
-        } else {
-            None
-        };
 
         // 5. sid: int64 [1] (条件付き — model が input として declare すれば feed)
         //
@@ -991,17 +988,12 @@ impl OnnxEngine {
         inputs.push(("input_lengths".into(), (&lengths_tensor).into()));
         inputs.push(("scales".into(), (&scales_tensor).into()));
 
-        if let Some(ref t) = spk_emb_tensor {
+        if let Some(ref t) = speaker_emb_tensor {
             inputs.push(("speaker_embedding".into(), t.into()));
         }
         if let Some(ref t) = speaker_emb_mask_tensor {
             inputs.push(("speaker_embedding_mask".into(), t.into()));
         }
-        // `speaker_emb_tensor` (Issue #426 dynamic-dim path) is retained
-        // alongside the legacy 192-dim `spk_emb_tensor` so both ModelCapabilities
-        // codepaths compile; the embedding ORT input is fed via spk_emb_tensor
-        // above (both branches share the `has_input("speaker_embedding")` gate).
-        let _ = &speaker_emb_tensor;
         if let Some(ref t) = sid_tensor {
             inputs.push(("sid".into(), t.into()));
         }

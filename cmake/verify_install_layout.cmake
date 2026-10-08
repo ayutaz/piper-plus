@@ -95,12 +95,9 @@ check_exists("${PREFIX}/lib/cmake/PiperPlus/PiperPlusConfigVersion.cmake" "CMake
 # G2P dictionaries
 check_exists("${PREFIX}/share/piper-plus/dicts/cmudict_data.json" "CMU English dictionary")
 
-# ONNX Runtime license
-if(IS_DIRECTORY "${PREFIX}/share/licenses/onnxruntime")
-  message(STATUS "  OK: ONNX Runtime license directory")
-else()
-  message(STATUS "  INFO: ONNX Runtime license directory not found (optional)")
-endif()
+# License texts are part of the distributed archive, not optional metadata.
+check_exists("${PREFIX}/share/licenses/piper-plus/LICENSE.md" "Project MIT LICENSE")
+check_exists("${PREFIX}/share/licenses/onnxruntime/LICENSE" "ONNX Runtime LICENSE")
 
 # Summary
 if(_errors GREATER 0)

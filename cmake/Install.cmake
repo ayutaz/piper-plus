@@ -1,6 +1,25 @@
 # cmake/Install.cmake
 # Install rules for piper executable + dictionaries + Windows DLL handling
 
+include(GNUInstallDirs)
+
+# --- Release notices ---
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md"
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/piper-plus)
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md"
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/piper-plus-g2p)
+if(NOT ANDROID AND NOT PIPER_APPLE_EMBEDDED)
+  set(PIPER_ORT_ROOTS
+      "${ONNXRUNTIME_ROOT};${ONNXRUNTIME_DIR};${CMAKE_CURRENT_BINARY_DIR}/ort_dl/src/onnxruntime_external")
+  if(ONNXRUNTIME_INCLUDE_DIR)
+    get_filename_component(_ort_include_root "${ONNXRUNTIME_INCLUDE_DIR}" DIRECTORY)
+    list(APPEND PIPER_ORT_ROOTS "${_ort_include_root}")
+  endif()
+  configure_file(cmake/InstallOrtNotices.cmake.in
+                 ${CMAKE_CURRENT_BINARY_DIR}/InstallOrtNotices.cmake @ONLY)
+  install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/InstallOrtNotices.cmake)
+endif()
+
 # ---- piper executable install ----
 if(TARGET piper)
   install(

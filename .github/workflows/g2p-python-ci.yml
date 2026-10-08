@@ -6,22 +6,62 @@ on:
     paths:
       - 'src/python/g2p/**'
       - '.github/workflows/g2p-python-ci.yml'
+      - 'scripts/check_python_release_wheel.py'
     tags:
       - 'python-g2p-v*'
   pull_request:
     paths:
       - 'src/python/g2p/**'
       - '.github/workflows/g2p-python-ci.yml'
+      - 'scripts/check_python_release_wheel.py'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: '既存の公開用タグ（例: python-g2p-v0.3.0）。パッケージ内容が一致する場合だけ公開します'
+        required: true
+        type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.inputs.release_tag && format('refs/tags/{0}', github.event.inputs.release_tag) || github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
+  validate-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.1.0
+        with:
+          fetch-depth: 0
+      - name: Validate Python G2P release source
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" != "workflow_dispatch" ] && [[ "$GITHUB_REF" != refs/tags/python-g2p-v* ]]; then
+            echo "Regular CI: no publication requested"
+            exit 0
+          fi
+          [[ "$RELEASE_TAG" =~ ^python-g2p-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::Invalid Python G2P release tag"
+            exit 1
+          }
+          TAG_VERSION="${RELEASE_TAG#python-g2p-v}"
+          PACKAGE_VERSION=$(python -c 'import tomllib; print(tomllib.load(open("src/python/g2p/pyproject.toml", "rb"))["project"]["version"])')
+          test "$TAG_VERSION" = "$PACKAGE_VERSION"
+          TAG_COMMIT=$(git rev-parse --verify "refs/tags/${RELEASE_TAG}^{commit}")
+          # Recovery may change CI, but must not change the package at its tag.
+          git diff --exit-code "$TAG_COMMIT" HEAD -- src/python/g2p scripts/check_python_release_wheel.py
+          test -z "$(git status --porcelain -- src/python/g2p scripts/check_python_release_wheel.py)"
+          echo "Verified release tag: $RELEASE_TAG ($TAG_COMMIT)"
+          echo "Build/provenance source: $(git rev-parse HEAD)"
+
   lint:
+    needs: validate-release
     name: lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -49,6 +89,7 @@ jobs:
         run: uv run mypy --ignore-missing-imports piper_plus_g2p/
 
   test:
+    needs: validate-release
     name: test (${{ matrix.os }}, ${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
@@ -85,6 +126,7 @@ jobs:
           retention-days: 7
 
   rust-check:
+    needs: validate-release
     name: rust-check
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -123,6 +165,8 @@ jobs:
           ls -la dist/
           test -f dist/piper_plus_g2p-*.whl
           test -f dist/piper_plus_g2p-*.tar.gz
+          VERSION=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          python ../../../scripts/check_python_release_wheel.py --name piper-plus-g2p --version "$VERSION" dist/*.whl
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4.6.2
@@ -132,6 +176,7 @@ jobs:
           retention-days: 7
 
   test-extras:
+    needs: validate-release
     name: test extras (${{ matrix.extra }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -162,21 +207,24 @@ jobs:
   publish:
     name: publish
     runs-on: ubuntu-latest
-    needs: [build]
-    if: startsWith(github.ref, 'refs/tags/python-g2p-v')
+    needs: [validate-release, build, test-extras]
+    if: startsWith(github.ref, 'refs/tags/python-g2p-v') || github.event_name == 'workflow_dispatch'
     timeout-minutes: 10
     environment: pypi
     permissions:
       contents: read
       id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v6.1.0
 
       - uses: astral-sh/setup-uv@v6.8.0
 
       - name: Verify version matches tag
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
         run: |
-          TAG_VERSION="${GITHUB_REF#refs/tags/python-g2p-v}"
+          TAG_VERSION="${RELEASE_TAG#python-g2p-v}"
           TOML_VERSION=$(grep '^version' src/python/g2p/pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
           echo "Tag version: $TAG_VERSION"
           echo "pyproject.toml version: $TOML_VERSION"
@@ -185,8 +233,16 @@ jobs:
             exit 1
           fi
 
-      - run: uv build
-        working-directory: src/python/g2p
+      - name: Download verified distributions
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: dist
+          path: src/python/g2p/dist/
+
+      - name: Generate build provenance
+        uses: actions/attest-build-provenance@v3.2.0
+        with:
+          subject-path: 'src/python/g2p/dist/*'
 
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:

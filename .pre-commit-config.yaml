@@ -22,6 +22,23 @@
 #   scripts/check_ruff_version_sync.py (ruff-version-sync gate, 5 pin sites).
 
 repos:
+  - repo: local
+    hooks:
+      - id: swift-release-compatibility
+        name: Swift release dependency and public consumer compatibility
+        entry: python scripts/check_swift_release_compatibility.py
+        language: python
+        additional_dependencies: ['pytest>=9.1.1,<10', PyYAML]
+        files: ^(Package\.swift|scripts/check_swift_release_(consumer|compatibility)\.py|tests/scripts/test_swift_release_consumer\.py|\.github/workflows/release-swift-consumer\.yml|\.pre-commit-config\.yaml)$
+        pass_filenames: false
+      - id: release-regressions
+        name: Release regressions (cache CI, Docker signatures, flat checksums)
+        entry: python scripts/check_release_regressions.py
+        language: python
+        additional_dependencies: ['pytest>=9.1.1,<10', PyYAML]
+        files: ^(\.github/workflows/(ci|rust-tests|csharp-ci|release-rust|release-csharp|release-verify|rekor-verify|docker-build|release-docker-signatures|release-shared-lib|cosign-release-artifacts)\.yml|\.pre-commit-config\.yaml|scripts/(check_release_regressions|release_checksums|prepare_release_draft|verify_public_release|resolve_docker_release_images)\.py|tests/scripts/test_(release_regression_guards|prepare_release_draft|public_release_verification|docker_release_tags|docker_signature_recovery)\.py|src/rust/piper-core/(src/engine\.rs|tests/test_embedding_dimensions\.rs)|src/csharp/PiperPlus\.Core/Inference/SessionFactory\.cs|src/csharp/PiperPlus\.Core\.Tests/CacheStorageTests\.cs|tests/fixtures/ort_session/.*)$
+        pass_filenames: false
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.15
     hooks:
@@ -1096,6 +1113,8 @@ repos:
     rev: v1.35.1
     hooks:
       - id: yamllint
+        # Japanese config comments must decode as UTF-8 on Windows as well.
+        entry: python -X utf8 -m yamllint
         # --strict は外す: 既存 indentation スタイル (block sequence -2 indent
         # が大量) を 全 workflow 書き直す影響が大きい。 error (duplicate-keys
         # 等) のみ block、 warning は info として出力させる。

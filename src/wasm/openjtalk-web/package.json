@@ -33,6 +33,8 @@
     "src/**/*.js",
     "bin/**/*.js",
     "dist/rust-wasm/**",
+    "assets/pinyin_single.json",
+    "assets/pinyin_phrases.json",
     "types/",
     "THIRD-PARTY-LICENSES.md",
     "LICENSE.md",
@@ -51,7 +53,7 @@
     "regenerate:types": "node scripts/regenerate-types-constants.mjs",
     "check:types": "node scripts/regenerate-types-constants.mjs --check",
     "test:wasm-g2p": "node --test test/js/test-piper-plus-wasm-g2p.js",
-    "test:npm-package:all": "node --test test/js/test-audio-result.js test/js/test-audio-result-wav-edge.js test/js/test-audio-result-timing.js test/js/test-piper-plus.js test/js/test-piper-plus-boundary.js test/js/test-piper-plus-init-success.js test/js/test-piper-plus-init-integration.js test/js/test-piper-plus-synthesize-flow.js test/js/test-piper-plus-speaker-embedding.js test/js/test-piper-plus-ssml.js test/js/test-piper-plus-g2p-init.js test/js/test-piper-plus-wasm-g2p.js test/js/test-piper-plus-timing.js test/js/test-phoneme-timing.js test/js/test-speaker-embedding.js test/js/test-importmap.js test/js/test-model-manager.js test/js/test-model-manager-load.js test/js/test-model-manager-cache.js test/js/test-model-manager-boundary.js test/js/test-dictionary-cache.js test/js/test-g2p-golden.js test/js/test-npm-package.js test/js/test-rust-wasm-adapter.js test/js/test-onnx-input-contract.js",
+    "test:npm-package:all": "node --test test/js/test-audio-result.js test/js/test-audio-result-wav-edge.js test/js/test-audio-result-timing.js test/js/test-piper-plus.js test/js/test-piper-plus-boundary.js test/js/test-piper-plus-init-success.js test/js/test-piper-plus-init-integration.js test/js/test-piper-plus-synthesize-flow.js test/js/test-piper-plus-speaker-embedding.js test/js/test-piper-plus-ssml.js test/js/test-piper-plus-g2p-init.js test/js/test-piper-plus-wasm-g2p.js test/js/test-piper-plus-timing.js test/js/test-phoneme-timing.js test/js/test-speaker-embedding.js test/js/test-importmap.js test/js/test-model-manager.js test/js/test-model-manager-load.js test/js/test-model-manager-cache.js test/js/test-model-manager-boundary.js test/js/test-dictionary-cache.js test/js/test-g2p-golden.js test/js/test-npm-package.js test/js/test-rust-wasm-adapter.js test/js/test-onnx-input-contract.js test/js/test-npm-distribution.js",
     "test:ssml": "node --test test/js/test-piper-plus-ssml.js",
     "setup:wasm": "echo 'Downloading pre-built WASM from GitHub Releases...' && mkdir -p dist/rust-wasm && echo 'Run: gh release download --repo ayutaz/piper-plus --pattern piper-plus-wasm-* -D dist/rust-wasm' && echo 'Or build locally: npm run build:wasm:multilingual'",
     "build:wasm": "cd ../../rust/piper-wasm && wasm-pack build --target web --release --out-dir ../../wasm/openjtalk-web/dist/rust-wasm",
@@ -69,6 +71,7 @@
     "typecheck": "tsc --noEmit",
     "test:onnx-inputs": "node scripts/run-onnx-input-tests.mjs test/js/test-onnx-input-contract.js test/js/test-piper-plus-onnx-inputs.js",
     "test:browser": "node test/browser/prepare-models.mjs && playwright test && node scripts/check-browser-report.mjs",
+    "test:distribution": "node scripts/npm-distribution.mjs",
     "probe:demo": "playwright test --grep \"CSS10 official demo\""
   },
   "dependencies": {

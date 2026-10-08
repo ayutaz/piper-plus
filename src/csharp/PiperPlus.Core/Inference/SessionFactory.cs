@@ -224,6 +224,16 @@ public static class SessionFactory
                 $"{optimizedPath}.{Environment.ProcessId}.{NextTempCacheSeq():x8}.tmp";
             try
             {
+                // Probe the actual target before asking ORT to save a model.
+                // Native ORT reports Unix errno 13/30 for unwritable locations;
+                // its managed exception constructor cannot map those values.
+                // Cache storage is optional: keep loading the original model
+                // when this per-writer probe cannot be created or removed.
+                using (File.Open(tempOptimizedPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                {
+                }
+
+                File.Delete(tempOptimizedPath);
                 options.OptimizedModelFilePath = tempOptimizedPath;
                 logger.LogInformation(
                     "ORT will save optimized model to {Path} (published to {Final})",

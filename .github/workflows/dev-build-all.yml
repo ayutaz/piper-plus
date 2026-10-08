@@ -54,66 +54,12 @@ jobs:
       artifact-name: piper-plus-cpp-windows-x64
       cache-key-prefix: piper-plus-cpp-windows-x64
 
-  # ARM builds still need custom Docker-based build
+  # Reuse the same native build and synthesis verification exercised on PRs.
   build_linux_armv7:
     name: Build Linux ARMv7
-    runs-on: ubuntu-24.04
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v6.1.0
-        with:
-          submodules: true
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4.0.0
-        with:
-          platforms: arm
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.12.0
-
-      - name: Build in Docker
-        run: |
-          # Pull the image first to handle any authentication issues
-          docker pull --platform linux/arm/v7 debian:trixie || docker pull debian:trixie
-          docker run --rm \
-            --platform linux/arm/v7 \
-            -v "$(pwd)":/workspace \
-            -w /workspace \
-            debian:trixie \
-            bash -c "
-              apt-get update && apt-get install -y \
-                build-essential cmake git pkg-config \
-                libicu-dev libespeak-ng-dev ninja-build ccache
-              mkdir -p build && cd build
-              cmake .. -DCMAKE_BUILD_TYPE=Release -GNinja
-              ninja -j1
-              cd ..
-              mkdir -p dist/piper-plus/bin dist/piper-plus/lib dist/piper-plus/share
-              cp build/piper-plus dist/piper-plus/bin/
-              find build -name '*.so*' -type f -exec cp {} dist/piper-plus/lib/ \; 2>/dev/null || true
-
-              # Copy espeak-ng-data if available
-              if [ -d /usr/share/espeak-ng-data ]; then
-                cp -r /usr/share/espeak-ng-data dist/piper-plus/share/
-              fi
-
-              cd dist && tar czf piper-plus-cpp-linux-armv7.tar.gz piper-plus/
-            "
-
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4.6.2
-        with:
-          name: piper-plus-cpp-linux-armv7
-          path: dist/piper-plus-cpp-linux-armv7.tar.gz
-
-      - name: Upload to release
-        if: inputs.release_upload_url != '' && inputs.release_upload_url != null
-        uses: ./.github/actions/retry-upload
-        with:
-          upload_url: ${{ inputs.release_upload_url }}
-          asset_path: dist/piper-plus-cpp-linux-armv7.tar.gz
-          asset_name: piper-plus-cpp-linux-armv7.tar.gz
+    uses: ./.github/workflows/build-linux-armv7.yml
+    with:
+      release_upload_url: ${{ inputs.release_upload_url }}
 
   build_linux_arm64:
     name: Build Linux ARM64

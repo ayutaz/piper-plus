@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'バージョン（例: 1.4.0, 1.4.0.dev1, 1.4.0a1） - タグ名はvを付けて自動生成されます'
+        description: '準備済みタグのバージョン（例: 2.0.0）。同じタグを選んで実行してください'
         required: true
         type: string
       release_name:
@@ -40,40 +40,24 @@ jobs:
           fetch-depth: 0
 
       - name: Validate version format
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
         run: |
-          VERSION="${{ github.event.inputs.version }}"
-          # Allow any version format (including dev, alpha, beta, rc versions)
-          # Examples: 1.4.0, 1.4.0.dev1, 1.4.0a1, 1.4.0b2, 1.4.0rc1
-          echo "Version provided: $VERSION"
-          echo "Version format validation removed - accepting all PEP 440 compatible formats"
-
-      # Update VERSION file first (before validation)
-      - name: Update VERSION file dynamically
-        run: |
-          VERSION="${{ github.event.inputs.version }}"
-          echo "Updating VERSION file to: $VERSION"
-
-          # Backup original VERSION file
-          if [ -f "VERSION" ]; then
-            cp VERSION VERSION.backup
-            echo "Backed up original VERSION file"
+          set -euo pipefail
+          if ! printf '%s\n' "$RELEASE_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+([.-]?[a-zA-Z]+[0-9]+(\.[0-9]+)*)?$'; then
+            echo "::error::Invalid release version: $RELEASE_VERSION"
+            exit 1
           fi
+          test "$(tr -d '\n\r' < VERSION)" = "$RELEASE_VERSION"
 
-          # Update VERSION file with the input version
-          echo "$VERSION" > VERSION
-          echo "✅ VERSION file updated to: $VERSION"
-
-          # Show the change
-          echo "VERSION file contents:"
-          cat VERSION
-
-      # Validate after VERSION file has been updated
+      # The selected commit must already contain the requested release version.
+      # Validate the committed version before creating any release
       - name: Validate version consistency across files
         run: |
           VERSION="${{ github.event.inputs.version }}"
           echo "Checking version consistency for: $VERSION"
 
-          # Check VERSION file (should now match after update)
+          # Check the version committed at the selected tag.
           if [ -f "VERSION" ]; then
             FILE_VERSION=$(cat VERSION | tr -d '\n\r')
             if [ "$FILE_VERSION" != "$VERSION" ]; then
@@ -169,23 +153,24 @@ jobs:
         run: |
           TAG_NAME="${{ steps.get_release_name.outputs.tag_name }}"
 
-          # Check if tag already exists
+          set -euo pipefail
+          # Tags are pushed explicitly from the verified commit before dispatch.
+          # GITHUB_TOKEN-created tags do not trigger downstream release workflows.
+          TAG_COMMIT=$(git rev-parse "refs/tags/${TAG_NAME}^{commit}")
+          test "$TAG_COMMIT" = "$(git rev-parse HEAD)"
           if gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            echo "::warning::Tag $TAG_NAME already exists. Deleting existing release and tag."
-            gh release delete "$TAG_NAME" --yes || true
-            git push origin --delete "$TAG_NAME" || true
+            IS_DRAFT=$(gh release view "$TAG_NAME" --json isDraft --jq '.isDraft')
+            if [ "$IS_DRAFT" != "true" ]; then
+              echo "::error::Release $TAG_NAME is already public; refusing to overwrite it."
+              exit 1
+            fi
+            echo "Reusing draft release for verified tag: $TAG_NAME"
+          else
+            gh release create "$TAG_NAME" \
+              --title "${{ steps.get_release_name.outputs.name }}" \
+              --notes "${{ steps.get_release_notes.outputs.body }}" \
+              --draft --verify-tag
           fi
-
-          # Create release without --json flag (not supported by gh release create)
-          echo "Creating release with tag: $TAG_NAME"
-          gh release create "$TAG_NAME" \
-            --title "${{ steps.get_release_name.outputs.name }}" \
-            --notes "${{ steps.get_release_notes.outputs.body }}" \
-            --draft \
-            --target "${{ github.sha }}" || {
-            echo "::error::Failed to create release"
-            exit 1
-          }
 
           # Get release information using gh release view with --json
           echo "Fetching release information..."
@@ -261,10 +246,12 @@ jobs:
       - name: Check wheels
         run: |
           ls -la dist/
+          python scripts/check_python_release_wheel.py --name piper-plus --version "$(cat VERSION)" dist/*.whl
           if ls dist/*.whl 1> /dev/null 2>&1; then
             twine check dist/*.whl
           else
-            echo "No wheel files found, skipping check"
+            echo "::error::No wheel files found"
+            exit 1
           fi
 
       - name: Generate SLSA build provenance attestation (wheels)
@@ -441,9 +428,23 @@ jobs:
                 --skip-duplicate
             done
           else
-            echo "⚠️ NUGET_API_KEY not found, skipping NuGet publish"
+            echo "::error::NUGET_API_KEY is required to publish this release"
+            exit 1
           fi
 
+      - name: Verify repository-signed public NuGet copies
+        run: |
+          set -euo pipefail
+          for package in nupkgs/*.nupkg; do
+            public="published-nupkgs/$(basename "$package")"
+            python3 scripts/check_nuget_package.py "$package" "$public" --download
+            dotnet nuget verify "$public"
+          done
+
+      - name: Attest exact public NuGet packages
+        uses: actions/attest-build-provenance@v3.2.0
+        with:
+          subject-path: 'published-nupkgs/*.nupkg'
   # Publish to crates.io
   publish_crates:
     name: Publish to crates.io
@@ -470,33 +471,14 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Package crates (for attestation)
-        # Run `cargo package` ahead of `cargo publish` so the .crate files
-        # exist on disk for attest-build-provenance. cargo publish below
-        # repackages internally but produces byte-identical bundles when
-        # the working tree is unchanged.
-        #
-        # --no-verify is REQUIRED here: the default verify build resolves
-        # internal deps against the crates.io index, but on a version bump the
-        # new versions are not published yet (e.g. packaging piper-plus 0.5.0
-        # fails with `failed to select a version for the requirement
-        # piper-plus-g2p = "^0.5.0"` because only 0.4.0/0.2.0 are on the index).
-        # We only need the .crate bundle for attestation here; the real
-        # `cargo publish` steps below verify in dependency order (g2p -> core ->
-        # cli) with index-propagation waits, so they resolve correctly.
+      - name: Package piper-plus-g2p
         working-directory: src/rust
-        run: |
-          cargo package -p piper-plus-g2p --allow-dirty --no-verify
-          cargo package -p piper-plus --allow-dirty --no-verify
-          cargo package -p piper-plus-cli --allow-dirty --no-verify
-          echo "Packaged crates:"
-          ls -lh target/package/*.crate
+        run: cargo package -p piper-plus-g2p --allow-dirty --no-verify --locked
 
-      - name: Generate SLSA build provenance attestation (crates)
-        if: hashFiles('src/rust/target/package/*.crate') != ''
+      - name: Attest piper-plus-g2p
         uses: actions/attest-build-provenance@v3.2.0
         with:
-          subject-path: 'src/rust/target/package/*.crate'
+          subject-path: 'src/rust/target/package/piper-plus-g2p-[0-9]*.crate'
 
       - name: Publish piper-plus-g2p (dependency)
         env:
@@ -520,8 +502,18 @@ jobs:
             # Wait for crates.io index to update
             sleep 30
           else
-            echo "⚠️ CARGO_REGISTRY_TOKEN not found, skipping crates.io publish"
+            echo "::error::CARGO_REGISTRY_TOKEN is required to publish this release"
+            exit 1
           fi
+
+      - name: Package piper-plus
+        working-directory: src/rust
+        run: cargo package -p piper-plus --allow-dirty --no-verify --locked
+
+      - name: Attest piper-plus
+        uses: actions/attest-build-provenance@v3.2.0
+        with:
+          subject-path: 'src/rust/target/package/piper-plus-[0-9]*.crate'
 
       - name: Publish piper-plus (core)
         env:
@@ -543,8 +535,18 @@ jobs:
               fi
             fi
           else
-            echo "⚠️ CARGO_REGISTRY_TOKEN not found, skipping crates.io publish"
+            echo "::error::CARGO_REGISTRY_TOKEN is required to publish this release"
+            exit 1
           fi
+
+      - name: Package piper-plus-cli
+        working-directory: src/rust
+        run: cargo package -p piper-plus-cli --allow-dirty --no-verify --locked
+
+      - name: Attest piper-plus-cli
+        uses: actions/attest-build-provenance@v3.2.0
+        with:
+          subject-path: 'src/rust/target/package/piper-plus-cli-[0-9]*.crate'
 
       - name: Publish piper-plus-cli
         env:
@@ -568,7 +570,8 @@ jobs:
               fi
             fi
           else
-            echo "⚠️ CARGO_REGISTRY_TOKEN not found, skipping crates.io publish"
+            echo "::error::CARGO_REGISTRY_TOKEN is required to publish this release"
+            exit 1
           fi
 
   # Rust CLI builds
@@ -660,6 +663,13 @@ jobs:
     steps:
       - name: Summary
         run: |
+          set -euo pipefail
+          for result in "${{ needs.create_release.result }}" "${{ needs.build_all.result }}" "${{ needs.publish_pypi.result }}" "${{ needs.publish_nuget.result }}" "${{ needs.publish_crates.result }}" "${{ needs.csharp-cli.result }}" "${{ needs.rust-cli.result }}"; do
+            if [ "$result" != "success" ]; then
+              echo "::error::Release is incomplete: $result"
+              exit 1
+            fi
+          done
           echo "## Release Summary"
           echo ""
           echo "**Release Name:** ${{ needs.create_release.outputs.release_name }}"

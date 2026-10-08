@@ -1,0 +1,18 @@
+# ORT 1.20 has no Linux ARM32 prebuilt SDK. Never substitute the x64 SDK.
+function(piper_check_linux_armv7_ort sdk)
+  set(_library "${sdk}/lib/libonnxruntime.so")
+  if("${sdk}" STREQUAL "" OR NOT EXISTS "${_library}")
+    message(FATAL_ERROR "Linux ARMv7 requires an ARM32 ONNXRUNTIME_DIR SDK; build it with scripts/build_ort_armv7.sh")
+  endif()
+  file(READ "${_library}" _header LIMIT 20 HEX)
+  string(LENGTH "${_header}" _length)
+  if(_length LESS 40 OR NOT _header MATCHES "^7f454c4601(01|02)01")
+    message(FATAL_ERROR "Linux ARMv7 requires a 32-bit ARM ELF ONNX Runtime library: ${_library}")
+  endif()
+  string(SUBSTRING "${_header}" 10 2 _endian)
+  string(SUBSTRING "${_header}" 36 4 _machine)
+  if(NOT ((_endian STREQUAL "01" AND _machine STREQUAL "2800") OR
+          (_endian STREQUAL "02" AND _machine STREQUAL "0028")))
+    message(FATAL_ERROR "Linux ARMv7 ONNX Runtime library has the wrong ELF machine: ${_library}")
+  endif()
+endfunction()

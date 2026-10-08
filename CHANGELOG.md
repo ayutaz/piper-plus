@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Sign all seven published Docker images for both project and Docker-specific release tags. Allow signature repair only from an immutable signing tag after every public image's digest, version, source revision, and expected platform set has been verified.
+- Rust 0.5.2 and C# 0.5.1: continue inference from the original ONNX model when its directory cannot store an optimized cache. Check the writer's temporary path before asking ONNX Runtime to save; exercise read-only storage, normal cache creation/reload, and invalid models in PR CI.
+- Rust 0.5.1: use the ONNX model's declared speaker embedding dimension instead of forcing 192 values. Supports both 192- and 256-dimensional models; rejects mismatched explicit embeddings instead of silently truncating them.
+- Run actual embedding dimension inference on every Rust PR CI matrix, and allow up to 20 minutes for NuGet.org propagation before verifying repository-signed downloads.
+
 <!--
   Breaking changes must be listed under `### Breaking` and each entry must
   include at least one `[label](docs/migration/v<X>-to-v<Y>.md#anchor)`
@@ -15,13 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enforces this automatically.
 -->
 
-<!--
-  The block below was drafted as `## [2.0.0] - 2026-05-25` but that release
-  was NEVER cut: the newest tag is v1.13.0 (2026-06-15) and PyPI's newest
-  piper-plus is 1.13.0. The heading also sat ABOVE [1.13.0] while carrying
-  an EARLIER date, so the file claimed a release that does not exist.
-  Its entries are unreleased, so they live here until a release is cut.
--->
+## [2.0.0] - 2026-10-06
+
 
 Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13 + CUDA 12.8 + Ubuntu 24.04** で完全統一する fully-aligned 戦略 migration。 新 GPU (T4 / RTX 6000 Ada / RTX 5090) サポート + TF32 / bf16-mixed default 化。
 加えて Issue #590: **`piper` → `piper_plus` / `piper-plus` フル改名 (クリーンブレーク)** により本家 `piper-tts` (rhasspy/piper) と同一環境への pip 共存が可能に。

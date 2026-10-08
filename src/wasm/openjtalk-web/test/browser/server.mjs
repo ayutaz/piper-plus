@@ -2,7 +2,9 @@ import http from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-const packageRoot = path.resolve(fileURLToPath(new URL("../../", import.meta.url)));
+const harnessRoot = path.resolve(fileURLToPath(new URL("../../", import.meta.url)));
+const distributionRoot = process.env.PIPER_PLUS_DISTRIBUTION_ROOT;
+const packageRoot = distributionRoot ? path.join(distributionRoot, "piper-plus") : harnessRoot;
 const mime = {
   ".js": "text/javascript",
   ".mjs": "text/javascript",
@@ -21,7 +23,7 @@ const server = http.createServer(async (req, res) => {
     let type = mime[path.extname(pathname)] || "application/octet-stream";
     if (pathname === "/") {
       const html = await readFile(
-        path.join(packageRoot, "test/multilingual-demo/index.html"),
+        path.join(harnessRoot, "test/multilingual-demo/index.html"),
         "utf8"
       );
       // Match the relative-path rewrite in the Pages deployment workflow.
@@ -48,15 +50,20 @@ const server = http.createServer(async (req, res) => {
       let base = packageRoot;
       let relative = pathname.slice(1);
       if (pathname.startsWith("/g2p/")) {
-        base = path.resolve(packageRoot, "../g2p");
+        base = distributionRoot
+          ? path.join(distributionRoot, "@piper-plus/g2p")
+          : path.resolve(packageRoot, "../g2p");
         relative = pathname.slice(5);
       }
       if (pathname.startsWith("/ort/")) {
-        base = path.join(packageRoot, "node_modules/onnxruntime-web/dist");
+        base = path.join(
+          distributionRoot || path.join(packageRoot, "node_modules"),
+          "onnxruntime-web/dist"
+        );
         relative = pathname.slice(5);
       }
       if (pathname.startsWith("/models/")) {
-        base = path.join(packageRoot, "test/browser/models");
+        base = path.join(harnessRoot, "test/browser/models");
         relative = pathname.slice(8);
       }
       const file = path.resolve(base, relative);
