@@ -25,6 +25,12 @@ def main():
                 platforms: [.macOS(.v13)],
                 dependencies: [
                     .package(url: "https://github.com/ayutaz/piper-plus", exact: "__VERSION__"),
+                    // v2.0.0 has an open-ended transitive SDK requirement.
+                    // This is a consumer constraint; the public package is untouched.
+                    .package(
+                        url: "https://github.com/microsoft/onnxruntime-swift-package-manager",
+                        exact: "1.20.0"
+                    ),
                 ],
                 targets: [
                     .executableTarget(
