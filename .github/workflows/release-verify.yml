@@ -46,6 +46,18 @@ on:
         description: 'Comma-separated list of registries to verify (pypi,npm,nuget,crates,maven). Empty = all.'
         required: false
         type: string
+      recover_shared_run:
+        description: 'Recover shared archives from a completed tag build into its draft; no rebuild or tag changes'
+        required: false
+        type: string
+      shared_recovery_run:
+        description: 'Successful signed recovery-receipt run to verify during draft preparation'
+        required: false
+        type: string
+      shared_recovery_source:
+        description: 'Exact 40-character SHA of the trusted recovery verifier'
+        required: false
+        type: string
       prepare_draft:
         description: '下書きに修正版を反映するルートバージョン（例: 2.0.0）。公開せず、署名・全配布物のチェックサムを検証します'
         required: false
@@ -62,6 +74,72 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  recover-shared:
+    if: github.event_name == 'workflow_dispatch' && inputs.recover_shared_run != ''
+    concurrency:
+      group: release-shared-recovery-${{ inputs.version }}
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+      attestations: write
+      id-token: write
+    steps:
+      - name: Checkout original immutable release source
+        uses: actions/checkout@v6.1.0
+        with:
+          ref: v${{ inputs.version }}
+          fetch-depth: 0
+          path: source
+      - name: Checkout recovery verifier
+        uses: actions/checkout@v6.1.0
+        with:
+          ref: ${{ github.sha }}
+          path: verifier
+          sparse-checkout: scripts
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - name: Verify original build and recover exact artifact bytes
+        working-directory: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          BUILD_RUN: ${{ inputs.recover_shared_run }}
+        run: >-
+          python ../verifier/scripts/check_shared_release_recovery.py
+          --version "$RELEASE_VERSION" --run-id "$BUILD_RUN"
+          --directory "$RUNNER_TEMP/recovered-shared"
+      - name: Generate notices and flat checksums
+        working-directory: source
+        run: |
+          python -m pip install PyYAML
+          python scripts/generate_model_card.py validate
+          python scripts/generate_model_card.py generate --model-card "$RUNNER_TEMP/recovered-shared/MODEL_CARD.md" --attributions "$RUNNER_TEMP/recovered-shared/LICENSE_ATTRIBUTIONS.md"
+          python scripts/release_checksums.py "$RUNNER_TEMP/recovered-shared" --output "$RUNNER_TEMP/recovered-shared/checksums-sha256.txt"
+          python scripts/release_checksums.py "$RUNNER_TEMP/recovered-shared" --verify "$RUNNER_TEMP/recovered-shared/checksums-sha256.txt"
+      - name: Attest recovery verification receipt
+        uses: actions/attest-build-provenance@v3.2.0
+        with:
+          subject-path: ${{ runner.temp }}/shared-recovery-proof.json
+      - name: Upload new files to the existing draft without overwriting
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          test "$(gh release view "v${RELEASE_VERSION}" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = true
+          gh release upload "v${RELEASE_VERSION}" --repo "$GITHUB_REPOSITORY" "$RUNNER_TEMP"/recovered-shared/*
+      - name: Preserve recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: shared-release-recovery-proof
+          path: ${{ runner.temp }}/shared-recovery-proof.json
+          if-no-files-found: error
+
   prepare-draft:
     name: Verify and prepare draft on hosted runner
     if: github.event_name == 'workflow_dispatch' && inputs.prepare_draft != ''
@@ -69,6 +147,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
+      actions: read
       attestations: read
     concurrency:
       group: release-draft-${{ inputs.prepare_draft }}
@@ -91,9 +170,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ROOT_VERSION: ${{ inputs.prepare_draft }}
+          SHARED_RECOVERY_RUN: ${{ inputs.shared_recovery_run }}
+          SHARED_RECOVERY_SOURCE: ${{ inputs.shared_recovery_source }}
         run: >-
           python scripts/prepare_release_draft.py
           --version "$ROOT_VERSION" --directory "$RUNNER_TEMP/release-verification"
+          --shared-recovery-run "$SHARED_RECOVERY_RUN" --shared-recovery-source "$SHARED_RECOVERY_SOURCE"
       - name: Preserve cryptographic verification evidence
         if: always()
         uses: actions/upload-artifact@v7.0.0
@@ -108,9 +190,10 @@ jobs:
     name: Gate (skip on failed upstream)
     runs-on: ubuntu-24.04
     if: |
-      github.event_name != 'workflow_run' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_repository.full_name == github.repository)
+      inputs.recover_shared_run == '' &&
+      (github.event_name != 'workflow_run' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_repository.full_name == github.repository))
     outputs:
       source_sha: ${{ steps.resolve.outputs.source_sha }}
       version: ${{ steps.resolve.outputs.version }}
