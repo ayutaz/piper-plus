@@ -28,6 +28,12 @@ def test_real_workflow_has_bounded_independent_caches_and_no_hub_rebuild():
     assert load("check_docker_publish_stability").check(workflow()) == []
 
 
+def test_root_release_does_not_rebuild_the_docker_release_again():
+    data = workflow()
+    triggers = data.get("on", data.get(True))
+    assert triggers["push"]["tags"] == ["docker-v*"]
+
+
 @pytest.mark.parametrize("mutation", ["shared", "timeout", "fatal", "rebuild"])
 def test_guard_rejects_publication_regressions(mutation):
     data = copy.deepcopy(workflow())

@@ -35,8 +35,9 @@ on:
       - 'scripts/resolve_docker_release_images.py'
       - '.github/workflows/release-docker-signatures.yml'
     tags:
+      # A root v* release reuses this independently published Docker release.
+      # Building both tag families rebuilt the same seven images twice.
       - 'docker-v*'
-      - 'v*'
   # PR でも build-only で同じ Dockerfile を回し、 dev push 限定で潜む
   # Dockerfile 起因の失敗 (wget silent fail / OS update による package
   # 取得失敗等) を早期検知する。 ghcr.io login / cosign sign / Docker Hub
