@@ -1,0 +1,85 @@
+name: Public Docker release consumer
+
+on:
+  workflow_run:
+    workflows: [Docker Build and Push]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Numeric Docker release version, e.g. 2.0.1'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  public-runtime:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       startsWith(github.event.workflow_run.head_branch, 'docker-v'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [python-inference, webui, wyoming]
+    steps:
+      - name: Select immutable release tag
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          COMPLETED_TAG: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          version="${INPUT_VERSION:-${COMPLETED_TAG#docker-v}}"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=docker-v$version" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v6.1.0
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - name: Resolve exact source
+        run: echo "RELEASE_SOURCE=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - uses: sigstore/cosign-installer@v3.10.1
+        with:
+          cosign-release: 'v2.4.1'
+      - name: Free hosted runner disk space
+        if: matrix.image == 'python-inference'
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo docker image prune --all --force
+          sudo apt-get clean
+      - name: Verify public signatures and run actual Japanese synthesis
+        env:
+          RELEASE_IMAGE: ${{ matrix.image }}
+          DOCKERHUB_OWNER: ${{ vars.DOCKERHUB_PUBLIC_OWNER || 'ayousanz' }}
+        run: |
+          set -euo pipefail
+          case "$RELEASE_IMAGE" in
+            python-inference) hub=piper-plus-api ;;
+            webui) hub=piper-plus-webui ;;
+            wyoming) hub=wyoming-piper-plus ;;
+          esac
+          mkdir signature-proof
+          for image in "ghcr.io/${GITHUB_REPOSITORY}/${RELEASE_IMAGE}:${RELEASE_VERSION}" "docker.io/${DOCKERHUB_OWNER}/${hub}:${RELEASE_VERSION}"; do
+            cosign verify \
+              --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/docker-build.yml@refs/tags/${RELEASE_TAG}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-sha "$RELEASE_SOURCE" "$image" \
+              > "signature-proof/$(echo "$image" | tr '/:' '--').json"
+          done
+          python ci/release_docker/run_public_runtime.py "$RELEASE_IMAGE"
+      - name: Preserve signatures, exact image resolution and audio evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: public-docker-${{ matrix.image }}-${{ env.RELEASE_VERSION }}
+          path: |
+            signature-proof/
+            public-docker-proof/
+          if-no-files-found: error
