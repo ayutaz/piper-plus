@@ -2,6 +2,7 @@
 
 import copy
 import importlib.util
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -101,9 +102,6 @@ def test_release_consumer_uses_tag_source_and_verifies_both_registries():
     )
     assert "workflow_run:" in text
     assert "ref: ${{ env.RELEASE_TAG }}" in text
-    assert '--certificate-github-workflow-sha "$RELEASE_SOURCE"' in text
-    assert "ghcr.io/${GITHUB_REPOSITORY}" in text
-    assert "docker.io/${DOCKERHUB_OWNER}" in text
     assert "python ci/release_docker/run_public_runtime.py" in text
     source = (ROOT / "ci/release_docker/run_public_runtime.py").read_text(
         encoding="utf-8"
@@ -111,3 +109,67 @@ def test_release_consumer_uses_tag_source_and_verifies_both_registries():
     assert 'os.environ["RELEASE_VERSION"]' in source
     assert 'os.environ["RELEASE_SOURCE"]' in source
     assert 'ghcr["digest"] == hub["digest"]' in source
+    assert 'for registry, image in (("ghcr", ghcr), ("dockerhub", hub))' in source
+    assert "verify_and_pull(" in source
+
+
+def runtime_module(monkeypatch, tmp_path):
+    for name, value in {
+        "RELEASE_VERSION": "2.0.1",
+        "RELEASE_SOURCE": "a" * 40,
+        "RUNNER_TEMP": str(tmp_path),
+        "GITHUB_REPOSITORY": "ayutaz/piper-plus",
+    }.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.syspath_prepend(str(ROOT / "scripts"))
+    spec = importlib.util.spec_from_file_location(
+        "public_runtime", ROOT / "ci/release_docker/run_public_runtime.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_public_runtime_verifies_and_pulls_the_identical_immutable_reference(
+    monkeypatch, tmp_path
+):
+    module = runtime_module(monkeypatch, tmp_path)
+    reference = "docker.io/owner/api@sha256:" + "b" * 64
+    calls = []
+
+    def runner(args, **kwargs):
+        calls.append(args)
+        return type("Result", (), {"stdout": b'[{"verified":true}]'})()
+
+    module.verify_and_pull(reference, tmp_path / "signature.json", runner)
+    assert len(calls) == 2
+    assert calls[0][0:2] == ["cosign", "verify"]
+    assert calls[1][0:2] == ["docker", "pull"]
+    assert calls[0][-1] == calls[1][-1] == reference
+    assert (
+        "https://github.com/ayutaz/piper-plus/.github/workflows/docker-build.yml@refs/tags/docker-v2.0.1"
+        in calls[0]
+    )
+    assert "a" * 40 in calls[0]
+
+
+def test_invalid_public_signature_stops_before_pull(monkeypatch, tmp_path):
+    module = runtime_module(monkeypatch, tmp_path)
+    calls = []
+
+    def runner(args, **kwargs):
+        calls.append(args)
+        raise subprocess.CalledProcessError(1, args)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        module.verify_and_pull(
+            "ghcr.io/owner/api@sha256:" + "b" * 64, tmp_path / "signature.json", runner
+        )
+    assert len(calls) == 1
+    assert calls[0][0] == "cosign"
+
+
+def test_public_runtime_rejects_a_mutable_tag(monkeypatch, tmp_path):
+    module = runtime_module(monkeypatch, tmp_path)
+    with pytest.raises(ValueError, match="immutable"):
+        module.verify_and_pull("ghcr.io/owner/api:2.0.1", tmp_path / "signature.json")

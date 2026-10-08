@@ -60,19 +60,6 @@ jobs:
           DOCKERHUB_OWNER: ${{ vars.DOCKERHUB_PUBLIC_OWNER || 'ayousanz' }}
         run: |
           set -euo pipefail
-          case "$RELEASE_IMAGE" in
-            python-inference) hub=piper-plus-api ;;
-            webui) hub=piper-plus-webui ;;
-            wyoming) hub=wyoming-piper-plus ;;
-          esac
-          mkdir signature-proof
-          for image in "ghcr.io/${GITHUB_REPOSITORY}/${RELEASE_IMAGE}:${RELEASE_VERSION}" "docker.io/${DOCKERHUB_OWNER}/${hub}:${RELEASE_VERSION}"; do
-            cosign verify \
-              --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/docker-build.yml@refs/tags/${RELEASE_TAG}" \
-              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
-              --certificate-github-workflow-sha "$RELEASE_SOURCE" "$image" \
-              > "signature-proof/$(echo "$image" | tr '/:' '--').json"
-          done
           python ci/release_docker/run_public_runtime.py "$RELEASE_IMAGE"
       - name: Preserve signatures, exact image resolution and audio evidence
         if: always()
