@@ -12,8 +12,8 @@ import pytest
 
 # extract_speaker_embedding requires torch + torchaudio + soundfile at import time.
 # Skip the whole module (collection-time) on minimal CI envs that don't install them.
-pytest.importorskip("torchaudio")
-pytest.importorskip("soundfile")
+pytest.importorskip("torchaudio", reason="speaker extraction requires torchaudio")
+pytest.importorskip("soundfile", reason="speaker extraction requires soundfile")
 
 # conftest.py adds src/python to sys.path so this import works
 from piper_train import extract_speaker_embedding as ese  # noqa: E402
@@ -344,21 +344,21 @@ class TestExtractPerUtteranceShortCircuit:
         return ds
 
     def test_all_existing_skips_extraction_and_writes_jsonl(self, tmp_path):
-        """全ての embedding が既に存在するときは extraction スキップ + jsonl 更新"""
-        ds = self._build_dataset(tmp_path, n=4)
-        emb_dir = ds / "speaker_embeddings"
-        emb_dir.mkdir()
-        # 全発話分の .npy を事前に作成 (内容は空ファイルで OK、glob で stem だけ拾う)
-        for i in range(4):
-            (emb_dir / f"utt{i}.npy").touch()
-
-        # session は呼び出されない経路
-        fake_session = mock.MagicMock()
+        """来歴・内容を検証済みのcacheだけを再利用しjsonlへ設定する。"""
+        fixture = TestDefaultFastPath()
+        ds = fixture._make_dataset_with_pt(tmp_path, n_utts=3)
+        fake_session = fixture._make_fake_session()
+        encoder = tmp_path / "encoder.onnx"
+        encoder.write_bytes(b"fixture-model")
+        fake_session._model_path = str(encoder)
+        ese.extract_per_utterance(fake_session, ds, num_workers=0, update_jsonl=False)
+        fake_session.run.reset_mock()
 
         ese.extract_per_utterance(
             session=fake_session,
             dataset_dir=ds,
             update_jsonl=True,
+            num_workers=0,
         )
 
         # session.run が呼ばれていない (extraction なし)
@@ -367,28 +367,32 @@ class TestExtractPerUtteranceShortCircuit:
         # dataset.jsonl が更新されている (speaker_embedding_path が追加)
         with open(ds / "dataset.jsonl", encoding="utf-8") as f:
             entries = [json.loads(line) for line in f]
-        assert len(entries) == 4
-        for i, e in enumerate(entries):
-            assert e["speaker_embedding_path"] == f"speaker_embeddings/utt{i}.npy"
+        assert len(entries) == 3
+        for e in entries:
+            path = ds / e["speaker_embedding_path"]
+            assert path.exists() and path.with_suffix(".json").exists()
 
         # bak が作成されている
         assert (ds / "dataset.jsonl.bak").exists()
 
     def test_no_update_jsonl_skips_jsonl_write(self, tmp_path):
         """--no-update-jsonl 相当 (update_jsonl=False) では jsonl が変更されない"""
-        ds = self._build_dataset(tmp_path, n=4)
-        emb_dir = ds / "speaker_embeddings"
-        emb_dir.mkdir()
-        for i in range(4):
-            (emb_dir / f"utt{i}.npy").touch()
+        fixture = TestDefaultFastPath()
+        ds = fixture._make_dataset_with_pt(tmp_path, n_utts=3)
+        fake_session = fixture._make_fake_session()
+        encoder = tmp_path / "encoder.onnx"
+        encoder.write_bytes(b"fixture-model")
+        fake_session._model_path = str(encoder)
+        ese.extract_per_utterance(fake_session, ds, num_workers=0, update_jsonl=False)
+        fake_session.run.reset_mock()
 
         original_jsonl = (ds / "dataset.jsonl").read_text(encoding="utf-8")
 
-        fake_session = mock.MagicMock()
         ese.extract_per_utterance(
             session=fake_session,
             dataset_dir=ds,
             update_jsonl=False,
+            num_workers=0,
         )
 
         # jsonl が変更されていない

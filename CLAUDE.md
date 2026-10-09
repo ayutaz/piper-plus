@@ -26,8 +26,9 @@ VITS ベースの高品質ニューラル TTS。**6言語マルチリンガル�
 > **2026-10-09 工程1完了**: [改善計画](docs/design/zero-shot-recovery-and-improvement-plan-2026-10-09.md)の
 > G/D/WavLM周期・validation KL guardをTDDで修正。関連207テスト成功 (実Lightning/CPU Gloo含む)。
 > clock・EMA・旧checkpointのweights-only移行は[仕様](docs/spec/training-batch-schedule.md)を参照。
-> 工程2以降、full-model GPU smoke、追加学習、音声品質比較は未実施。
-> **次の着手**: 工程2A/2B (embedding契約・manifest/path・cache) → 2C (runtime入力検証)。
+> **2026-10-10現在**: 工程2A/2B (embedding契約・manifest/path・cache) は実装中（未コミット）、関連CPUテスト57件成功。
+> **次の作業**: 2A/2Bの残件確認・hook・commit → 2C (runtime入力検証) → 3 (固定参照・推論評価・strict CER)。
+> 詳細は[工程2〜3 TDD計画](docs/design/zero-shot-stage2-3-tdd-plan-2026-10-10.md)。full-model GPU smoke、追加学習、音声品質比較は未実施。
 > 工程0の比較条件固定を並行し、工程0〜3の完了後にモデル比較へ進む。詳細は改善計画 §2/5/11。
 
 > **2026-08-25時点の学習結果**: v11 (carrier head 構造保証) は R3 安全装置により ep29/80 で正規停止 — 調波構造の技術検証成功 (comb-HNR 14.6dB = GT 超え、v10b 4.6)、実用は学習量不足で不成立。以後の修正・再評価・追加学習の順序は上記2026-10-09改善計画を参照。
