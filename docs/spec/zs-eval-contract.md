@@ -256,3 +256,10 @@ python -m piper_train.tools.eval_zs_secs \
   manifest に pin)。早期 epoch は未成熟で当然 fail するため abort 条件では
   なく **ep40 以降の昇格 gate**。ASR モデル・文セット・正規化規則の変更は
   事前登録を無効化する (§6 と同じ goalpost moving 禁止)
+
+正式gateは`eval_cer --manifest <pinned-manifest> --clips-dir <generated-wavs>`で実行する。
+manifestの固定条件、期待ID集合、raw WAV/hash、ASR revisionを検査し、全件ASR成功時に判定する。
+missing/extra/duplicate、正規化後の空text、3文未満、条件不一致、ASR失敗は正式合格にならない。
+`--manifest`なしの従来TSV診断は`gate_passed=null`で正式判定から分離する。
+準備・raw/EMA/ONNX生成・exit/JSONの詳細は
+[推論評価仕様](zero-shot-inference-evaluation.md)を参照。閾値とep40条件は本節の値を維持する。

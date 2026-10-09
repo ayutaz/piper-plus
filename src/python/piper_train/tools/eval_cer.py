@@ -23,8 +23,14 @@ import json
 import logging
 import statistics
 import unicodedata
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
+
+import numpy as np
+
+from ..embedding_cache import atomic_write, file_sha256
+from ..evaluation_manifest import load_manifest
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -95,6 +101,7 @@ def evaluate_clips(
 def build_whisper_transcribe_fn(
     model_name: str = "openai/whisper-small",
     language: str = "ja",
+    revision: str | None = None,
 ) -> Callable[[Path], str]:
     """transformers の whisper pipeline で transcribe_fn を作る (CPU)。
 
@@ -107,6 +114,7 @@ def build_whisper_transcribe_fn(
         "automatic-speech-recognition",
         model=model_name,
         device=-1,
+        **({"revision": revision} if revision is not None else {}),
     )
 
     def transcribe(wav: Path) -> str:
@@ -119,24 +127,196 @@ def build_whisper_transcribe_fn(
     return transcribe
 
 
+def _read_texts(path: Path) -> dict[str, str]:
+    refs = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        tid, text = line.split("\t", 1)
+        if tid in refs:
+            raise ValueError(f"duplicate text ID: {tid}")
+        refs[tid] = text
+    return refs
+
+
+def _strict_inputs(args) -> tuple[dict, dict, list[tuple[Path, str]]]:
+    manifest = load_manifest(Path(args.manifest))
+    asr = manifest["asr"]
+    for name, expected in [
+        ("asr_model", asr["model"]),
+        ("asr_revision", asr["revision"]),
+        ("language", asr["language"]),
+    ]:
+        provided = getattr(args, name)
+        if provided is not None and provided != expected:
+            raise ValueError(f"Pinned {name} mismatch")
+    refs = {clip["id"]: clip["text"] for clip in manifest["clips"]}
+    if len(refs) < 3:
+        raise ValueError("strict CER requires at least 3 clips")
+    if any(not normalize_text(text) for text in refs.values()):
+        raise ValueError("reference text is empty after normalization")
+    if args.texts and _read_texts(Path(args.texts)) != refs:
+        raise ValueError("texts must exactly match the pinned manifest")
+    directory = Path(args.clips_dir)
+    wavs = list(directory.glob("*.wav"))
+    if {wav.stem for wav in wavs} != set(refs) or len(wavs) != len(refs):
+        raise ValueError("WAV IDs must exactly match expected IDs (missing/extra)")
+    generation = json.loads((directory / "generation.json").read_text(encoding="utf-8"))
+    if generation["version"] != 1:
+        raise ValueError("Unsupported generation report version")
+    if (
+        generation["manifest_sha256"] != file_sha256(Path(args.manifest))
+        or generation["conditions_sha256"] != manifest["conditions_sha256"]
+    ):
+        raise ValueError("generation manifest/conditions hash mismatch")
+    if (
+        generation["model_sha256"]
+        != manifest["models"][generation["backend"]]["sha256"]
+    ):
+        raise ValueError("generation model hash mismatch")
+    for field in ("sample_rate", "scales", "seed"):
+        if generation[field] != manifest[field]:
+            raise ValueError(f"generation {field} mismatch")
+    if (
+        generation["ground_truth_f0_or_duration"] is not False
+        or generation["audio_encoding"] != "float32-raw"
+    ):
+        raise ValueError("strict CER requires predicted inference and raw audio")
+    if (
+        manifest.get("training_epoch") is not None
+        and generation.get("training_epoch") != manifest["training_epoch"]
+    ):
+        raise ValueError("generation training epoch mismatch")
+    generated = generation["clips"]
+    if len(generated) != len(refs) or {clip["id"] for clip in generated} != set(refs):
+        raise ValueError("generation clip IDs missing/extra/duplicate")
+    hashes = {clip["id"]: clip["wav_sha256"] for clip in generated}
+    expected_clips = {clip["id"]: clip for clip in manifest["clips"]}
+    expected_ordinals = {clip["id"]: i for i, clip in enumerate(manifest["clips"])}
+    for clip in generated:
+        expected = expected_clips[clip["id"]]
+        for field in ("text_sha256", "speaker_embedding_sha256", "reference_audio"):
+            if clip[field] != expected[field]:
+                raise ValueError(f"generation {field} mismatch for {clip['id']}")
+        if clip["seed"] != manifest["seed"] + expected_ordinals[clip["id"]]:
+            raise ValueError(f"generation seed mismatch for {clip['id']}")
+    if any(file_sha256(wav) != hashes[wav.stem] for wav in wavs):
+        raise ValueError("generated WAV hash mismatch")
+    from ..vits.wavfile import read  # noqa: PLC0415
+
+    for wav in wavs:
+        sample_rate, audio = read(wav)
+        if (
+            sample_rate != manifest["sample_rate"]
+            or audio.dtype != np.float32
+            or audio.ndim != 1
+            or not audio.size
+            or not np.isfinite(audio).all()
+        ):
+            raise ValueError(f"Invalid raw float32 evaluation waveform: {wav.name}")
+    return (
+        manifest,
+        generation,
+        [(directory / (tid + ".wav"), ref) for tid, ref in refs.items()],
+    )
+
+
+def _evaluate_strict(args) -> tuple[dict, int]:
+    pairs = []
+    result = {
+        "mode": "strict",
+        "gate_passed": False,
+        "cer_median": None,
+        "cer_mean": None,
+        "n_clips": 0,
+        "failed_clips": [],
+    }
+    try:
+        manifest, generation, pairs = _strict_inputs(args)
+        asr = manifest["asr"]
+        result.update(
+            {
+                "manifest_sha256": file_sha256(Path(args.manifest)),
+                "conditions_sha256": manifest["conditions_sha256"],
+                "asr_model": asr["model"],
+                "asr_revision": asr["revision"],
+                "language": asr["language"],
+                "normalization": asr["normalization"],
+                "training_epoch": generation.get("training_epoch"),
+                "n_expected": len(pairs),
+                "per_file": {},
+            }
+        )
+        transcribe = build_whisper_transcribe_fn(
+            asr["model"], asr["language"], revision=asr["revision"]
+        )
+        scores = []
+        for wav, ref in pairs:
+            try:
+                hypothesis = transcribe(wav)
+                if not isinstance(hypothesis, str):
+                    raise ValueError("ASR transcript must be a string")
+                score = cer(ref, hypothesis)
+                result["per_file"][wav.stem] = {
+                    "cer": score,
+                    "transcript": hypothesis,
+                    "reference": ref,
+                }
+                scores.append(score)
+            except Exception as exc:
+                result["failed_clips"].append({"id": wav.stem, "error": str(exc)})
+        result["n_clips"] = len(scores)
+        if not result["failed_clips"]:
+            result["cer_median"] = statistics.median(scores)
+            result["cer_mean"] = statistics.fmean(scores)
+            epoch = result["training_epoch"]
+            result["eligible_for_promotion"] = type(epoch) is int and epoch >= 40
+            result["gate_passed"] = (
+                result["eligible_for_promotion"] and result["cer_median"] <= 0.30
+            )
+        return result, 0 if result["gate_passed"] else 1
+    except Exception as exc:
+        result["error"] = str(exc)
+        if pairs and not result["failed_clips"]:
+            result["failed_clips"] = [
+                {"id": wav.stem, "error": str(exc)} for wav, _ref in pairs
+            ]
+        return result, 2
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--clips-dir", required=True, help="tid.wav のディレクトリ")
     ap.add_argument(
-        "--texts", required=True, help="参照テキスト tsv (tid<TAB>text、listen_texts 形式)"
+        "--texts", help="参照テキスト tsv (tid<TAB>text、listen_texts 形式)"
     )
     ap.add_argument("--json-out", help="集計 JSON の出力先")
-    ap.add_argument("--asr-model", default="openai/whisper-small")
-    ap.add_argument("--language", default="ja")
+    ap.add_argument(
+        "--manifest", help="Pinned evaluation manifest; enables strict promotion gate"
+    )
+    ap.add_argument("--asr-model")
+    ap.add_argument("--asr-revision")
+    ap.add_argument("--language")
     args = ap.parse_args()
 
-    refs: dict[str, str] = {}
-    for line in Path(args.texts).read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        tid, text = line.split("\t", 1)
-        refs[tid] = text
+    if args.manifest:
+        result, exit_code = _evaluate_strict(args)
+        if args.json_out:
+            atomic_write(
+                Path(args.json_out),
+                lambda target: target.write(
+                    json.dumps(result, ensure_ascii=False, indent=2).encode("utf-8")
+                ),
+            )
+        print(json.dumps(result, ensure_ascii=False))
+        return exit_code
+    if not args.texts:
+        ap.error("diagnostic mode requires --texts; strict mode uses --manifest")
+    args.asr_model = args.asr_model or "openai/whisper-small"
+    args.language = args.language or "ja"
+
+    refs = _read_texts(Path(args.texts))
 
     pairs = []
     for wav in sorted(Path(args.clips_dir).glob("*.wav")):
@@ -147,9 +327,14 @@ def main() -> int:
     if not pairs:
         raise SystemExit(f"評価対象なし: {args.clips_dir}")
 
-    transcribe = build_whisper_transcribe_fn(args.asr_model, args.language)
+    transcribe = build_whisper_transcribe_fn(
+        args.asr_model, args.language, revision=args.asr_revision
+    )
     result = evaluate_clips(pairs, transcribe)
+    result["mode"] = "diagnostic"
+    result["gate_passed"] = None
     result["asr_model"] = args.asr_model
+    result["asr_revision"] = args.asr_revision
     result["language"] = args.language
 
     for tid, r in result["per_file"].items():
