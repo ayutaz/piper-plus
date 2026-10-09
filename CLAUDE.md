@@ -29,7 +29,11 @@ VITS ベースの高品質ニューラル TTS。**6言語マルチリンガル�
 > **2026-10-10現在**: 工程2A/2Bは`c7cbbbb9`でcommit済み、CPUテスト57件・必須hook成功。
 > 工程2C (CLI/Voice/HTTP/loader) は`3ea95490`でcommit・必須hook完了、関連15ファイル348件成功。
 > 工程3は実装・CPU完了条件を充足。関連72件、既存checkpoint/export・runtimeを含む回帰504件成功。
-> 操作方法: [推論評価仕様](docs/spec/zero-shot-inference-evaluation.md)。工程3の変更は本更新と合わせてcommit。
+> 工程3本体は`b1194f65`、隔離gate補完は`14930282`でcommit・必須hook完了（95件成功）。
+> uv/CUDA対応後は99件成功。RTX 4070 Ti SUPERで実小型モデルの監視・export・raw/EMA生成とRNG復元を確認。
+> Python実行は`uv run`、依存追加は`uv add`。Torch処理はGPUを使い、CLIでは`--device cuda`を指定する。
+> ASR deviceもmanifestへ固定。実ASRの品質検証は未実施。ONNX検証はCPU。
+> 操作方法: [推論評価仕様](docs/spec/zero-shot-inference-evaluation.md)。
 > **次の工程**: 工程0の実成果物固定 → 工程4の品質比較。実ASR/実encoder品質・追加学習は未実施。
 > 詳細は[工程2〜3 TDD計画](docs/design/zero-shot-stage2-3-tdd-plan-2026-10-10.md)。full-model GPU smoke、追加学習、音声品質比較は未実施。
 > 工程0の比較条件固定を並行し、工程0〜3の完了後にモデル比較へ進む。詳細は改善計画 §2/5/11。

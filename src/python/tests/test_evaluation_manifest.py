@@ -210,7 +210,7 @@ def test_raw_ema_and_onnx_generation_share_conditions_and_emit_raw_wav(
     monkeypatch.setattr(
         generation,
         "load_torch_generator",
-        lambda path: (raw_generator, checkpoint, 22050),
+        lambda path, **kwargs: (raw_generator, checkpoint, 22050),
     )
     feeds = []
 
@@ -293,7 +293,7 @@ def test_ema_generation_refuses_to_label_raw_weights_as_ema(
     monkeypatch.setattr(
         generation,
         "load_torch_generator",
-        lambda path: (model, {}, 22050),
+        lambda path, **kwargs: (model, {}, 22050),
     )
     with pytest.raises(ValueError, match="EMA"):
         generation.generate_audio(
@@ -318,7 +318,7 @@ def test_generation_rejects_checkpoint_condition_mismatch(
     monkeypatch.setattr(
         generation,
         "load_torch_generator",
-        lambda path: (
+        lambda path, **kwargs: (
             model,
             {"epoch": 39 if failure == "epoch-mismatch" else 40},
             22050,
@@ -371,7 +371,9 @@ def test_failed_ema_generation_restores_weights_modes_and_rng(
         "ema_generator_state": {"shadow_params": {"weight": torch.ones(1, 1)}}
     }
     monkeypatch.setattr(
-        generation, "load_torch_generator", lambda path: (model, checkpoint, 22050)
+        generation,
+        "load_torch_generator",
+        lambda path, **kwargs: (model, checkpoint, 22050),
     )
     with pytest.raises(RuntimeError, match="fixture generation failure"):
         generation.generate_audio(
@@ -459,7 +461,7 @@ def test_real_torch_checkpoint_loader_preserves_rng_and_generates_audio(
     assert torch.equal(before, torch.random.get_rng_state())
     assert rate == 22050
     for name, value in model.model_g.state_dict().items():
-        assert torch.equal(value, loaded.state_dict()[name]), name
+        assert torch.equal(value.cpu(), loaded.state_dict()[name].cpu()), name
     for row in rows:
         row["phoneme_ids"] = [1] + [10] * 16 + [2]
         row["audio_norm_path"] = "audio.pt"
@@ -509,6 +511,7 @@ def test_real_torch_checkpoint_loader_preserves_rng_and_generates_audio(
     assert reference.norm().item() == pytest.approx(1)
     fixed = model._load_test_dataset(dataset_path)[0]
     torch.testing.assert_close(fixed.speaker_embedding, reference)
+    model.to(next(loaded.parameters()).device)
     model._test_dataset = model._load_test_dataset(dataset_path)
     model.hparams.dataset_dir = source.parent
     model.hparams.audio_log_epochs = 1
@@ -564,10 +567,10 @@ def test_real_torch_checkpoint_loader_preserves_rng_and_generates_audio(
         torch.onnx.export(
             exported,
             (
-                torch.tensor([rows[0]["phoneme_ids"]]),
-                torch.tensor([len(rows[0]["phoneme_ids"])]),
-                torch.tensor([0.4, 1.0, 0.5]),
-                reference.unsqueeze(0),
+                torch.tensor([rows[0]["phoneme_ids"]], device=model.device),
+                torch.tensor([len(rows[0]["phoneme_ids"])], device=model.device),
+                torch.tensor([0.4, 1.0, 0.5], device=model.device),
+                reference.unsqueeze(0).to(model.device),
             ),
             str(onnx_path),
             opset_version=15,
@@ -607,7 +610,9 @@ def test_real_torch_checkpoint_loader_preserves_rng_and_generates_audio(
     # the state at entry, independently of earlier dataset preparation.
     before = torch.random.get_rng_state().clone()
     monkeypatch.setattr(
-        generation, "load_torch_generator", lambda path: (loaded, _checkpoint, rate)
+        generation,
+        "load_torch_generator",
+        lambda path, **kwargs: (loaded, _checkpoint, rate),
     )
     output = source.parent / "real-audio"
     monkeypatch.setattr(
@@ -749,3 +754,136 @@ def test_real_onnx_named_audio_output_and_per_clip_seed(evaluation_inputs, monke
     for a, b in zip(*arrays, strict=True):
         np.testing.assert_array_equal(a, b)
     assert not np.array_equal(arrays[0][0], arrays[0][1])
+
+
+def test_cuda_real_checkpoint_inference_restores_rng_and_generates_raw_ema(
+    evaluation_inputs,
+    monkeypatch,
+):
+    torch = pytest.importorskip(
+        "torch", reason="CUDA inference validation requires Torch"
+    )
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA GPU required for real Torch evaluation validation")
+    pytest.importorskip("pytorch_lightning", reason="real CUDA checkpoint loading")
+    import copy
+    import sys
+
+    from piper_train.evaluation_manifest import create_manifest
+    from piper_train.inference_eval import isolated_inference
+    from piper_train.tools import generate_eval_audio as generation
+    from piper_train.vits.lightning import VitsModel
+
+    source, rows, options = evaluation_inputs
+    model = VitsModel(
+        num_symbols=50,
+        num_speakers=2,
+        dataset=None,
+        use_wavlm_discriminator=False,
+        inter_channels=8,
+        hidden_channels=8,
+        filter_channels=16,
+        n_heads=2,
+        n_layers=1,
+        n_layers_q=1,
+        gin_channels=16,
+        prosody_dim=0,
+        use_sdp=False,
+        upsample_initial_channel=32,
+        upsample_rates=(2, 2),
+        upsample_kernel_sizes=(4, 4),
+        resblock_kernel_sizes=(3,),
+        resblock_dilation_sizes=((1, 2),),
+    )
+    checkpoint = {
+        "hyper_parameters": dict(model.hparams),
+        "state_dict": model.state_dict(),
+        "epoch": 40,
+        "ema_generator_state": {
+            "shadow_params": {
+                name: parameter.detach().clone()
+                for name, parameter in model.model_g.dec.named_parameters()
+            }
+        },
+        "ema_spk_proj_state": {
+            "shadow_params": {
+                name: parameter.detach().clone()
+                for name, parameter in model.model_g.spk_proj.named_parameters()
+            }
+        },
+    }
+    torch.save(checkpoint, source.parent / "model.ckpt")
+    loaded, _checkpoint, rate = generation.load_torch_generator(
+        source.parent / "model.ckpt", device="cuda"
+    )
+    assert rate == 22050 and all(parameter.is_cuda for parameter in loaded.parameters())
+    loaded.spk_proj.eval()
+    weights = copy.deepcopy(loaded.state_dict())
+    before_cpu, before_cuda = (
+        torch.random.get_rng_state().clone(),
+        torch.cuda.get_rng_state().clone(),
+    )
+    text = torch.tensor([[1] + [10] * 16 + [2]], device="cuda")
+    reference = torch.ones(1, 192, device="cuda") / np.sqrt(192)
+    with isolated_inference(loaded, seed=42):
+        audio = loaded.infer(
+            text, torch.tensor([18], device="cuda"), speaker_embeddings=reference
+        )[0]
+        assert audio.is_cuda and torch.isfinite(audio).all() and not audio.requires_grad
+    assert loaded.training and not loaded.spk_proj.training
+    assert torch.equal(before_cpu, torch.random.get_rng_state())
+    assert torch.equal(before_cuda, torch.cuda.get_rng_state())
+    with pytest.raises(RuntimeError, match="CUDA fixture failure"):
+        with isolated_inference(loaded, seed=99):
+            torch.randn(8, device="cuda")
+            raise RuntimeError("CUDA fixture failure")
+    assert torch.equal(before_cuda, torch.cuda.get_rng_state())
+    for name, value in loaded.state_dict().items():
+        assert torch.equal(value, weights[name]), name
+    for row in rows:
+        row["phoneme_ids"] = [1] + [10] * 16 + [2]
+    source.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+    create_manifest(**options, training_epoch=40)
+    for backend in ("torch-raw", "torch-ema"):
+        if backend == "torch-raw":
+            monkeypatch.setattr(
+                sys,
+                "argv",
+                [
+                    "generation",
+                    "generate",
+                    "--manifest",
+                    str(options["output_path"]),
+                    "--backend",
+                    backend,
+                    "--output-dir",
+                    str(source.parent / backend),
+                    "--device",
+                    "cuda",
+                ],
+            )
+            assert generation.main() == 0
+            report = json.loads(
+                (source.parent / backend / "generation.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+        else:
+            report = generation.generate_audio(
+                options["output_path"], backend, source.parent / backend, device="cuda"
+            )
+        assert (
+            report["execution_device"].startswith("cuda") and len(report["clips"]) == 3
+        )
+        assert torch.equal(before_cpu, torch.random.get_rng_state())
+        assert torch.equal(before_cuda, torch.cuda.get_rng_state())
+
+
+def test_explicit_cuda_does_not_fall_back_to_cpu(evaluation_inputs, monkeypatch):
+    torch = pytest.importorskip("torch", reason="Torch CUDA device selection")
+    from piper_train.tools.generate_eval_audio import load_torch_generator
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    source, _rows, _options = evaluation_inputs
+    with pytest.raises(ValueError, match="CUDA requested"):
+        load_torch_generator(source.parent / "model.ckpt", device="cuda")

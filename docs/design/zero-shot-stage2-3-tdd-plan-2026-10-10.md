@@ -6,7 +6,8 @@
 工程3A/3Bと統合の実装・CPU完了条件を充足。関連4ファイル72 passed。
 回帰はtrain/export側349 passed・8 skipped・1 deselected、runtime側155 passed。
 追加で、同じ実Synthesizerの既存wrapperによるONNX exportと3backend生成を2件で確認した。
-工程3の変更は本更新と合わせてcheckpoint commitする。
+工程3本体は`b1194f65`、隔離gate補完は`14930282`でcommit・必須hook完了（95 passed）。
+追加のuv/CUDA対応は関連5ファイル99 passed。実小型モデルのTorch処理はGPUで検証した。
 全体方針は[改善計画](zero-shot-recovery-and-improvement-plan-2026-10-09.md)。
 工程1のCPU検証結果は保持し、工程2A→2B→2C→3A→3B→統合の順に進める。
 工程0の実データ/成果物固定と、工程4以降のモデル品質比較・GPU学習は別工程。
@@ -113,7 +114,8 @@ CLI・HTTPの変換済みvectorとVoiceの再検証が一致することを確�
 ## 6. TDDの単位と証拠
 
 各単位で新しい回帰テストの失敗を確認→実装→対象テスト→整形/hook→scoped commit。
-必要以上のfull modelやmodel downloadをCPU回帰テストへ入れない。
+Pythonの依存追加は`uv add`、実行は`uv run`で管理する。
+Torchの推論・監視・export検証はGPUを使う。必要以上のfull modelやmodel downloadを回帰へ入れない。
 
 | 単位 | 先に失敗させる項目 | 完了時の証拠 |
 |---|---|---|
@@ -153,4 +155,16 @@ encoder/frontendとASRのstubは接続・gateの証拠に限定する。
 工程3本体は`b1194f65`で必須hook成功後にcommit済み。
 最終監査で共有推論contextとCERの隔離gate対象漏れも失敗テストへ追加し、
 trainingからCERのimport、CERからTorch/VITSのimportを検出する対象とtriggerを補完した。
-この補完は後続の独立checkpointとして記録する。
+この補完は`14930282`でcommit・必須hook完了。関連5ファイル95 passed。
+
+### uv / CUDAの追加条件（2026-10-10）
+
+- RTX 4070 Ti SUPER / Torch 2.11.0+cu128で、通常/compile形式の実小型モデルをCUDAへ配置し、
+  固定参照監視・既存wrapperによるexport・raw/EMA生成を確認。ONNXはCPUで検証した。
+- `generate --device cuda`はGPUがなければ失敗。実行deviceをreportへ記録する。
+  GPU RNGは正常終了・例外時とも復元し、重みと混在train/eval flagを保持する。
+- ASRのCUDA指定はmanifestへpinし、CLI不一致を初期化前に拒否する。
+  初期化引数はmodule stubで検証。実ASRやencoderのdownload・品質評価は実施していない。
+- 最終回帰は`uv run --no-sync python -m pytest`、offline設定で99 passed。
+  504件の広いCPU回帰はCUDA対応前の結果で、GPUで全件を再実行した数ではない。
+- `uv lock --check --offline`成功。CUDA Torch/SciPyは既存依存のため、今回の追加依存はない。
