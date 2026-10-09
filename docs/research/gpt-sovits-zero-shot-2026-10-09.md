@@ -5,6 +5,10 @@
 実施範囲: 公式資料・実コードの調査、保存済み学習ログの再解析、改善候補の反証レビュー。
 新規合成・学習・GPUレンタル・モデル公開・品質承認は実施していない。
 
+追補: [既存実装の不具合監査](zero-shot-implementation-audit-2026-10-09.md)で、
+実LightningのG/D更新周期とWavLM discriminator無更新をCPU再現した。
+以下のモデル改善案に着手する前に、更新周期・manifest/cache・KL監視状態を修正する。
+
 ## 1. 判断に必要な結論
 
 1. **最新モデル系列はV5 (`v5dev` / `v5turbo`)**。GitHubの最新正式releaseタグは
