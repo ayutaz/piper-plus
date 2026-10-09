@@ -12,6 +12,9 @@ from torch import autocast
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset, random_split
 
+from piper_plus.embedding import validate_embedding
+
+from ..inference_eval import isolated_inference
 from .commons import (
     migrate_prefilm_decoder_cond,
     migrate_prefilm_optimizer_states,
@@ -915,7 +918,38 @@ class VitsModel(pl.LightningModule):
 
         with open(test_utterances_path, encoding="utf-8") as f:
             for line in f:
+                if not line.strip():
+                    continue
                 data = json.loads(line.strip())
+
+                embedding = None
+                embedding_path = None
+                try:
+                    if data.get("speaker_embedding") is not None:
+                        embedding = data["speaker_embedding"]
+                    elif data.get("speaker_embedding_path") is not None:
+                        embedding_path = Path(data["speaker_embedding_path"])
+                        if not embedding_path.is_absolute():
+                            embedding_path = (
+                                test_utterances_path.parent / embedding_path
+                            )
+                        embedding = np.load(embedding_path, allow_pickle=False)
+                    if embedding is not None:
+                        if not self.hparams.get("use_zero_shot", True) or not hasattr(
+                            self.model_g, "spk_proj"
+                        ):
+                            raise ValueError(
+                                "speaker_embedding conditioning is unsupported/disabled for this model"
+                            )
+                        embedding = torch.from_numpy(
+                            validate_embedding(
+                                embedding, self.hparams.get("spk_embed_dim", 192)
+                            )
+                        )
+                except (ValueError, OSError) as exc:
+                    raise ValueError(
+                        f"speaker_embedding for {data.get('id', data.get('text'))}: {exc}"
+                    ) from exc
 
                 # Mixed sentences (language_id == -1) need phonemization
                 if data.get("language_id", 0) == -1:
@@ -972,6 +1006,9 @@ class VitsModel(pl.LightningModule):
                     language_id=data.get("language_id", 0),
                     prosody_features=data.get("prosody_features"),
                     text=data["text"],  # Store original text for logging
+                    speaker_embedding=embedding,
+                    speaker_embedding_path=embedding_path,
+                    utterance_id=data.get("id"),
                 )
                 utterances.append(utt)
 
@@ -2663,7 +2700,7 @@ class VitsModel(pl.LightningModule):
                             for i in range(getattr(self.hparams, "num_languages", 1))
                         }
 
-                    with torch.no_grad():  # Disable gradient computation
+                    with isolated_inference(self.model_g, self.hparams.get("seed", 42)):
                         for utt_idx, test_utt in enumerate(self._test_dataset):
                             # Generate audio.
                             # non_blocking=True on H2D copies keeps the pipeline
@@ -2680,9 +2717,8 @@ class VitsModel(pl.LightningModule):
 
                             # Resolve speaker embedding for zero-shot
                             spk_emb = None
-                            if (
-                                self.hparams.get("use_zero_shot", True)
-                                and self.hparams.num_speakers > 1
+                            if self.hparams.get("use_zero_shot", True) and hasattr(
+                                self.model_g, "spk_proj"
                             ):
                                 if (
                                     hasattr(test_utt, "speaker_embedding")
@@ -2716,6 +2752,15 @@ class VitsModel(pl.LightningModule):
                                 lid = None
 
                             noise_scale, length_scale, noise_scale_w = scales
+                            prosody = getattr(test_utt, "prosody_features", None)
+                            if prosody is not None:
+                                if not isinstance(prosody, torch.Tensor):
+                                    prosody = PiperDataset._prosody_features_to_tensor(
+                                        prosody
+                                    )
+                                prosody = prosody.unsqueeze(0).to(
+                                    self.device, non_blocking=True
+                                )
                             test_audio, *_ = self.model_g.infer(
                                 text,
                                 text_lengths,
@@ -2725,6 +2770,7 @@ class VitsModel(pl.LightningModule):
                                 length_scale=length_scale,
                                 noise_scale_w=noise_scale_w,
                                 speaker_embeddings=spk_emb,
+                                prosody_features=prosody,
                             )
                             test_audio = test_audio.detach()
                             test_audio = test_audio * (
@@ -2739,7 +2785,12 @@ class VitsModel(pl.LightningModule):
                                 test_utt.text if test_utt.text else f"sample_{utt_idx}"
                             )
                             speaker_str = (
-                                "zero-shot" if spk_emb is not None else "single"
+                                "zero-shot"
+                                if getattr(test_utt, "speaker_embedding", None)
+                                is not None
+                                else "no-reference"
+                                if spk_emb is not None
+                                else "single"
                             )
                             lang_str = language_map.get(
                                 lid.item() if lid is not None else 0, "unknown"
@@ -2747,7 +2798,7 @@ class VitsModel(pl.LightningModule):
                             noise_scale, length_scale, noise_scale_w = scales
 
                             # Create WandB audio
-                            caption = f"{text_str} | {speaker_str} | {lang_str} | noise={noise_scale:.3f},len={length_scale:.2f},noisew={noise_scale_w:.2f}"
+                            caption = f"{text_str} | {speaker_str} | {lang_str} | display-normalized | noise={noise_scale:.3f},len={length_scale:.2f},noisew={noise_scale_w:.2f}"
                             wandb_audio = wandb.Audio(
                                 audio_np,
                                 sample_rate=self.hparams.sample_rate,

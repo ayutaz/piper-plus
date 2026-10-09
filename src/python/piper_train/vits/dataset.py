@@ -57,6 +57,9 @@ class Utterance:
     # ``tools/extract_f0.py`` が書き、``f0_dir`` 指定時か jsonl の ``f0_path``
     # から解決される。``None`` のときは S-2 が無効 (後方互換)。
     f0_path: Path | None = None
+    # Fixed inference monitoring references (no target audio/F0 required).
+    speaker_embedding: FloatTensor | None = None
+    utterance_id: str | None = None
 
 
 @dataclass

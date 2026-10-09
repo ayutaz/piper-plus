@@ -71,6 +71,14 @@ See the [release checklist](docs/guides/development/python-release-2.0.2.md).
 
 ### Added
 
+- **Zero-shotの固定推論評価**: `piper_train.tools.generate_eval_audio`で参照・text・
+  source/model hash・scales/seed・ASR revisionを固定し、Torch raw/既存EMA/ONNXから
+  振幅正規化しないfloat32 WAVと生成reportを保存。`eval_cer --manifest`は期待clip集合・
+  実WAV形式・生成来歴を検査し、全件成功時だけ既存CER/epoch昇格gateを判定する。
+  従来のTSV診断は維持。WandB監視も固定参照/prosodyをinferへ渡し、推論後のmode/RNGを復元する。
+  仕様: [推論評価](docs/spec/zero-shot-inference-evaluation.md)。CPU fixtureによる機能検証であり、
+  学習済みモデルの品質改善は未評価。
+
 - **v11 条件付け改修 (Phase 0 診断準拠、opt-in、default は v10b 互換)**:
   `--use-adain-decoder` (P3: decoder resblock への zero-init AdaIN、s1 重心
   s1×3+s2×1 — 律速の主座 [SECS 損失の 78%] への直撃) / `--use-adaln-encp`
