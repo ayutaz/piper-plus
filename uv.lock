@@ -3731,6 +3731,7 @@ version = "2.0.0"
 source = { editable = "src/python" }
 dependencies = [
     { name = "numpy" },
+    { name = "piper-plus" },
     { name = "piper-plus-g2p" },
 ]
 
@@ -3824,6 +3825,7 @@ requires-dist = [
     { name = "onnxruntime-gpu", marker = "extra == 'inference-gpu'", specifier = ">=1.20.1,<1.26" },
     { name = "onnxscript", marker = "extra == 'train'", specifier = ">=0.7.0" },
     { name = "onnxsim-prebuilt", marker = "extra == 'train'" },
+    { name = "piper-plus", editable = "src/python_run" },
     { name = "piper-plus-g2p", editable = "src/python/g2p" },
     { name = "piper-plus-g2p", extras = ["all"], marker = "extra == 'inference'", editable = "src/python/g2p" },
     { name = "piper-plus-g2p", extras = ["all"], marker = "extra == 'inference-gpu'", editable = "src/python/g2p" },
