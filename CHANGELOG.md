@@ -382,6 +382,16 @@ See the [release checklist](docs/guides/development/python-release-2.0.2.md).
 
 ### Fixed
 
+- **Zero-shot manual optimizationの周期とKL監視**: G/D/WavLMの判定を
+  同一の永続training batch indexへ統一し、D:G=2:1でG更新が毎batch走る問題と
+  WavLM D更新の停止を修正。G lossの周期補償をG更新頻度に合わせ、EMAは成功した
+  G optimizer更新だけで進める。validation/sanityがtrainingのKL cap streakを
+  増加・reset・abortする問題も修正。実Lightning/CPU Glooを含む関連207テスト成功。
+  [仕様と検証範囲](docs/spec/training-batch-schedule.md)。
+- **旧公開checkpointのSTFT loss buffer互換性**: 後から追加されたfull/high-band
+  STFTの固定window/band_weightが欠落する場合だけ設定から補完し、strict loadを維持。
+  保存済みbufferと学習parameterは上書きせず、公開shape snapshotも変更しない。
+
 - **`--reference-audio` / `--speaker-encoder-model` being silently ignored in
   `piper_train.infer_onnx`**: the documented voice-cloning flags had separate
   argparse dests from the canonical fields consumed by the speaker-embedding
@@ -409,6 +419,12 @@ See the [release checklist](docs/guides/development/python-release-2.0.2.md).
   compatibility.
 
 ### Changed
+
+- **Training checkpointのresume契約**: batch周期・G/D実更新数・KL streakを
+  version付きmetadataとして保存。metadataのない旧checkpointのstrict training resumeは
+  明示エラーとなる。旧weightsで追加学習する場合は`--resume-weights-only`を指定して
+  新runとして開始する。推論用weights読み込みは維持。
+  EMAのstart/apply-every設定はVitsModelでは成功したG更新数単位へ変更。
 
 - **`--trainable-pqmf-synthesis` を封印 (CLI で明示エラー)**: v10b 本走で GAN が
   合成フィルタを band3 +6.9dB 増幅へドリフトさせた実測 (残存ノイズ診断 doc §3、

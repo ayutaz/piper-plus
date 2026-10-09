@@ -393,11 +393,15 @@ def normalize_checkpoint_state_dict(
        MB-iSTFT one: their ``dec.cond`` tensors have identical shapes, and only
        the ``subband_conv_post`` / ``pqmf`` marker keys distinguish them.
     3. ``remap_weight_norm_keys`` — key rename (DDP parametrization format).
-    4. ``migrate_prefilm_decoder_cond`` — value reshape, and therefore **last**:
+    4. ``migrate_prefilm_decoder_cond`` — value reshape after key renames:
        it looks target shapes up in *model_sd* by key, so it silently does
        nothing if the keys have not been canonicalised first (a
        ``model_g.dec._orig_mod.cond.weight`` key matches neither the regex nor
        *model_sd*, and the load then fails with the original size mismatch).
+    5. Backfill absent fixed full/high-band STFT loss buffers from the model's
+       configured defaults. These training-only windows/weights were added
+       after published checkpoints; never replace saved values or learned
+       parameters, and keep strict loading for every other missing key.
 
     Raises ``RuntimeError`` with a migration message for HiFi-GAN checkpoints.
     """
@@ -408,6 +412,13 @@ def normalize_checkpoint_state_dict(
 
     cleaned = remap_weight_norm_keys(cleaned, model_sd)
     cleaned, n_migrated = migrate_prefilm_decoder_cond(cleaned, model_sd)
+
+    for key, target in model_sd.items():
+        if key not in cleaned and re.fullmatch(
+            r"(?:full|hiband)_stft_loss\.stft_losses\.\d+\.(?:window|band_weight)",
+            key,
+        ):
+            cleaned[key] = target.detach().clone()
 
     return cleaned, {"stripped": n_stripped, "cond_migrated": n_migrated}
 

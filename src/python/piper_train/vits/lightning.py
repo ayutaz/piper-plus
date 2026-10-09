@@ -81,6 +81,7 @@ _KL_CAP = 1e4
 # MAS alignments kept raw KL at the cap from step ~30 to the end of an
 # 80-epoch run while non_finite_skip=0% looked healthy).
 _KL_CAP_ABORT_DEFAULT = 300
+_TRAINING_SCHEDULE_VERSION = 1
 
 
 def _kl_cap_abort_steps_from_env() -> int:
@@ -97,24 +98,6 @@ def _kl_cap_abort_steps_from_env() -> int:
             _KL_CAP_ABORT_DEFAULT,
         )
         return _KL_CAP_ABORT_DEFAULT
-
-
-def _schedule_batch_index(module, batch_idx: int) -> int:
-    """Batch counter that drives the G/D/WavLM update periods.
-
-    Under manual optimization ``global_step`` advances once per optimizer
-    step (G and D each count), so it cannot express "every N batches":
-    ``global_step % d_update_interval`` let G update on every batch, and the
-    D-side WavLM check (evaluated after the G step) never fired for
-    ``wavlm_every_n_steps=2``. The fit loop's total batch index counts
-    batches across epochs and is restored on strict resume. Without a real
-    trainer (unit tests driving ``training_step`` directly) the in-epoch
-    ``batch_idx`` is used.
-    """
-    trainer = getattr(module, "_trainer", None)
-    if isinstance(trainer, pl.Trainer):
-        return trainer.fit_loop.epoch_loop.total_batch_idx
-    return batch_idx
 
 
 def normalize_id_tensor(
@@ -818,6 +801,103 @@ class VitsModel(pl.LightningModule):
         # KL-cap sticking guard state (see _update_kl_cap_guard)
         self._kl_cap_consecutive = 0
         self._kl_cap_abort_steps = _kl_cap_abort_steps_from_env()
+        self._reset_training_progress()
+
+    def _reset_training_progress(self) -> None:
+        """Start a new batch schedule independently of optimizer/global_step."""
+        self.training_batches_seen = 0
+        self._training_batch_index = 0
+        self.generator_updates = 0
+        self.discriminator_updates = 0
+        self.generator_updated_this_batch = False
+        self._kl_cap_consecutive = 0
+
+    def on_save_checkpoint(self, checkpoint: dict) -> None:
+        """Persist the next batch phase and actual G/D step counts."""
+        checkpoint["training_schedule_state"] = {
+            "version": _TRAINING_SCHEDULE_VERSION,
+            "batches_seen": self.training_batches_seen,
+            "generator_updates": self.generator_updates,
+            "discriminator_updates": self.discriminator_updates,
+            "kl_cap_consecutive": self._kl_cap_consecutive,
+        }
+
+    def _restore_training_progress(self, checkpoint: dict) -> None:
+        state = checkpoint.get("training_schedule_state")
+        if state is None:
+            trainer = self._trainer
+            fn = getattr(getattr(trainer, "state", None), "fn", None)
+            if getattr(fn, "value", fn) == "fit":
+                # ValueError is intentional: the CLI's graceful-resume fallback
+                # must not silently turn an unknowable schedule into a resume.
+                raise ValueError(
+                    "Checkpoint has no training batch schedule; strict resume "
+                    "cannot recover it from optimizer global_step. Use "
+                    "--resume-weights-only to start a new run from these weights."
+                )
+            self._reset_training_progress()
+            _LOGGER.warning(
+                "Legacy checkpoint has no training batch schedule. Weights can "
+                "be loaded for inference or a new run; batch/update counters reset."
+            )
+            return
+        if (
+            not isinstance(state, dict)
+            or type(state.get("version")) is not int
+            or state.get("version") != _TRAINING_SCHEDULE_VERSION
+        ):
+            raise ValueError("Unsupported training_schedule_state version")
+        keys = (
+            "batches_seen",
+            "generator_updates",
+            "discriminator_updates",
+            "kl_cap_consecutive",
+        )
+        if any(type(state.get(key)) is not int or state[key] < 0 for key in keys):
+            raise ValueError("Invalid training_schedule_state counters")
+        if any(state[key] > state["batches_seen"] for key in keys[1:3]):
+            raise ValueError("Optimizer update counts exceed received training batches")
+        self.training_batches_seen = state["batches_seen"]
+        self._training_batch_index = max(0, self.training_batches_seen - 1)
+        self.generator_updates = state["generator_updates"]
+        self.discriminator_updates = state["discriminator_updates"]
+        self._kl_cap_consecutive = state["kl_cap_consecutive"]
+        self.generator_updated_this_batch = False
+
+    def _wavlm_due(self, *, generator: bool = False) -> bool:
+        """Use the same latched batch index for G and D WavLM decisions."""
+        due = self._training_batch_index % self.hparams.wavlm_every_n_steps == 0
+        if generator and self.training:
+            due = (
+                due and self._training_batch_index % self.hparams.d_update_interval == 0
+            )
+        return due
+
+    def _wavlm_g_loss_scale(self) -> int:
+        """Compensate WavLM frequency among scheduled G updates, not batches.
+
+        G updates every d batches, WavLM every w: their intersection is every
+        lcm(d,w) batches, hence every w/gcd(d,w) generator updates.
+        """
+        w = self.hparams.wavlm_every_n_steps
+        return w // math.gcd(w, self.hparams.d_update_interval)
+
+    @staticmethod
+    def _step_optimizer(optimizer) -> bool:
+        """Observe a raw optimizer step, including precision-plugin skips."""
+        raw_optimizer = getattr(optimizer, "optimizer", optimizer)
+        stepped = False
+
+        def mark_step(*_args):
+            nonlocal stepped
+            stepped = True
+
+        handle = raw_optimizer.register_step_post_hook(mark_step)
+        try:
+            optimizer.step()
+        finally:
+            handle.remove()
+        return stepped
 
     def _load_test_dataset(self, test_utterances_path: Path):
         """Load fixed test dataset for WandB audio logging.
@@ -1004,6 +1084,7 @@ class VitsModel(pl.LightningModule):
         Handles checkpoints predating the Multi-scale FiLM decoder (issue
         #616), plus the ``torch.compile`` and DDP weight-norm key formats.
         """
+        self._restore_training_progress(checkpoint)
         model_sd = self.state_dict()
 
         state_dict = checkpoint.get("state_dict")
@@ -1396,6 +1477,8 @@ class VitsModel(pl.LightningModule):
         Env override: ``PIPER_PLUS_KL_CAP_ABORT_STEPS`` (default 300,
         0 disables the abort; the error logs still fire).
         """
+        if not self.training:
+            return
         if not kl_raw >= _KL_CAP:
             self._kl_cap_consecutive = 0
             return
@@ -1426,7 +1509,7 @@ class VitsModel(pl.LightningModule):
     def _grad_probe_due(self) -> bool:
         """この step が per-loss grad-norm probe の対象かを判定する (A-1c)。
 
-        判定は ``global_step`` と hparams のみに依存するため DDP 全 rank で
+        判定は batch index と hparams のみに依存するため DDP 全 rank で
         同一の結果になる (rank 分岐で autograd を呼ばないための前提条件)。
         無効時 (default: grad_probe_every=0) は int 比較 1 回で即 False を
         返し、テンソル操作は一切発生しない。
@@ -1434,7 +1517,10 @@ class VitsModel(pl.LightningModule):
         every = int(self.hparams.get("grad_probe_every", 0) or 0)
         if every <= 0 or not self.training or not torch.is_grad_enabled():
             return False
-        return self.global_step % every == 0
+        return (
+            self._training_batch_index % every == 0
+            and self._training_batch_index % self.hparams.d_update_interval == 0
+        )
 
     def _run_grad_probe(self, batch: Batch) -> None:
         """収集済み loss 成分の勾配ノルムを probe して logger に記録する。
@@ -1479,7 +1565,7 @@ class VitsModel(pl.LightningModule):
     def _telemetry_due(self) -> bool:
         """この step が変調統計テレメトリ (v11 D-2) の対象かを判定する。
 
-        ``global_step`` と hparams のみに依存するため DDP 全 rank で同一
+        batch index と hparams のみに依存するため DDP 全 rank で同一
         (rank 分岐で計算量が変わっても collective を含まないので安全側だが、
         due 判定自体も決定論に揃えておく)。無効時 (telemetry_every=0) は
         int 比較 1 回で即 False。
@@ -1487,7 +1573,7 @@ class VitsModel(pl.LightningModule):
         every = int(self.hparams.get("telemetry_every", 0) or 0)
         if every <= 0 or not self.training:
             return False
-        return self.global_step % every == 0
+        return self._training_batch_index % every == 0
 
     def _log_modulation_telemetry(
         self, batch: Batch, speaker_embeddings, language_ids
@@ -1524,16 +1610,22 @@ class VitsModel(pl.LightningModule):
             )
 
     def training_step(self, batch: Batch, batch_idx: int):
+        # Count every received training batch, including non-finite/LF skips.
+        # Keep this index unchanged across both optimizer steps in this batch.
+        self._training_batch_index = self.training_batches_seen
+        self.training_batches_seen += 1
+        self.generator_updated_this_batch = False
+        self._log_with_batch_info(
+            "training_batches_seen", self.training_batches_seen, batch
+        )
         # Manual optimization for multiple optimizers
         opt_g, opt_d = self.optimizers()
 
         # D:G update ratio: G forward is always needed (produces _y, _y_hat for D),
-        # but G backward+step only runs every d_update_interval steps.
+        # but G backward+step only runs every d_update_interval batches.
         d_update_interval = self.hparams.d_update_interval
         grad_clip = getattr(self.hparams, "grad_clip", None)
-        schedule_batch_idx = _schedule_batch_index(self, batch_idx)
-        self._schedule_batch_idx = schedule_batch_idx
-        update_generator = schedule_batch_idx % d_update_interval == 0
+        update_generator = self._training_batch_index % d_update_interval == 0
 
         # Periodic batch-info log for debugging (CUDA illegal access の発生位置特定用)
         if batch_idx % 50 == 0:
@@ -1568,6 +1660,7 @@ class VitsModel(pl.LightningModule):
                 local_finite,
             )
             self._log_with_batch_info("non_finite_skip", 1.0, batch)
+            self._log_with_batch_info("d_step_skipped_nonfinite_g", 1.0, batch)
             opt_g.zero_grad(set_to_none=True)
             opt_d.zero_grad(set_to_none=True)
             self._y = None
@@ -1575,13 +1668,16 @@ class VitsModel(pl.LightningModule):
             self._spk_cond = None
             # T1 (A-1c): skip 時も probe 用の loss 参照を解放 (graph を保持しない)
             self._grad_probe_losses = None
+            self._lf_step_active = False
             return
 
         # T1 (roadmap A-1c): per-loss grad-norm probe。combined backward の前に
         # retain_graph=True で各 loss 成分の勾配ノルムを測る (probe due の step
         # のみ dict が置かれる。DDP 全 rank で同一に実行、log は rank 0 のみ)。
-        if self._grad_probe_losses is not None:
+        if update_generator and self._grad_probe_losses is not None:
             self._run_grad_probe(batch)
+        elif not update_generator:
+            self._grad_probe_losses = None
 
         if update_generator:
             # Train generator: backward + optimizer step
@@ -1589,22 +1685,26 @@ class VitsModel(pl.LightningModule):
             self.manual_backward(loss_g)
             if grad_clip is not None:
                 torch.nn.utils.clip_grad_norm_(self.model_g.parameters(), grad_clip)
-            opt_g.step()
+            if self._step_optimizer(opt_g):
+                self.generator_updates += 1
+                self.generator_updated_this_batch = True
+                self._log_with_batch_info(
+                    "optimizer_updates_g", self.generator_updates, batch
+                )
+            else:
+                self._log_with_batch_info("g_step_skipped_optimizer", 1.0, batch)
         else:
             # Skip G update on this step (D-only step)
             self._log_with_batch_info("g_step_skipped", 1.0, batch)
 
         # v10 §3.3 (Latent Filling): LF step は LFCL のみで G を更新し、D 更新
         # は skip する (論文準拠 — s̃ に対応する実波形が存在しないため D の
-        # real/fake ペアが定義できない)。should_run_latent_filling_step が
-        # global_step の決定論的関数なので全 rank が同時に skip し DDP 整合が
-        # 保たれる。LF は G 更新 step に限定される (d_update_interval 配線)
-        # ため、ここに来た時点で opt_g.step() は必ず実行済み = global_step は
-        # 前進しており、update_generator=False との重なりで optimizer.step()
-        # ゼロのまま return する決定論的ラッチは構造的に起きない。
+        # real/fake ペアが定義できない)。LF は latched batch index の決定論的
+        # 関数で G 更新 batch に限定される。batch clock は skip でも前進する。
         if self._lf_step_active:
             self._lf_step_active = False
             self._log_with_batch_info("lf_step", 1.0, batch)
+            self._log_with_batch_info("d_step_skipped_latent_filling", 1.0, batch)
             self._y = None
             self._y_hat = None
             self._spk_cond = None
@@ -1625,6 +1725,7 @@ class VitsModel(pl.LightningModule):
                 local_finite,
             )
             opt_d.zero_grad(set_to_none=True)
+            self._log_with_batch_info("d_step_skipped_nonfinite_d", 1.0, batch)
             self._y = None
             self._y_hat = None
             self._spk_cond = None
@@ -1640,7 +1741,13 @@ class VitsModel(pl.LightningModule):
             if self.model_c_spk is not None:
                 d_params = d_params + list(self.model_c_spk.parameters())
             torch.nn.utils.clip_grad_norm_(d_params, grad_clip)
-        opt_d.step()
+        if self._step_optimizer(opt_d):
+            self.discriminator_updates += 1
+            self._log_with_batch_info(
+                "optimizer_updates_d", self.discriminator_updates, batch
+            )
+        else:
+            self._log_with_batch_info("d_step_skipped_optimizer", 1.0, batch)
 
         # Clear instance variables to release references
         self._y = None
@@ -1660,28 +1767,6 @@ class VitsModel(pl.LightningModule):
         # 旧挙動を復旧する必要が出た場合は CLI ``--enable-legacy-flush`` を
         # 追加して ``MEMORY_CLEANUP_FREQUENCY`` gated な flush を再有効化する
         # (今のところ需要が確認されるまでは未実装)。
-
-    def _wavlm_due(self, *, generator: bool = False) -> bool:
-        """Whether this batch runs the WavLM discriminator.
-
-        G and D read the same batch index latched in ``training_step``. On the
-        G side the WavLM loss only matters on batches where G is updated, so it
-        is computed only when both periods coincide.
-        """
-        idx = getattr(self, "_schedule_batch_idx", 0)
-        due = idx % self.hparams.wavlm_every_n_steps == 0
-        if generator and self.training:
-            due = due and idx % self.hparams.d_update_interval == 0
-        return due
-
-    def _wavlm_g_loss_scale(self) -> int:
-        """Compensate the G-side WavLM frequency among G updates, not batches.
-
-        G updates every d batches and WavLM runs every w batches, so they
-        coincide every lcm(d, w) batches, i.e. every w / gcd(w, d) G updates.
-        """
-        w = self.hparams.wavlm_every_n_steps
-        return w // math.gcd(w, self.hparams.d_update_interval)
 
     def _log_with_batch_info(
         self, key: str, value, batch: Batch = None, batch_size: int = None
@@ -1757,10 +1842,12 @@ class VitsModel(pl.LightningModule):
         # (graph を跨いで保持しないよう参照も解放)
         self._grad_probe_losses = None
 
-        # 乱数は global_step 由来 seed の CPU generator から引く: 再現性 +
+        # 乱数は batch index 由来 seed の CPU generator から引く: 再現性 +
         # グローバル RNG stream (rand_slice_segments 等) を汚さない
         g_lf = torch.Generator()
-        g_lf.manual_seed((int(self.global_step) * 2654435761 + 0x9E3779B9) % (2**63))
+        g_lf.manual_seed(
+            (self._training_batch_index * 2654435761 + 0x9E3779B9) % (2**63)
+        )
         # speaker_ids を渡し同一話者ペアの補間 (≒恒等) を除外する。
         # language-balanced sampling + samples_per_speaker>1 では言語グループ
         # が 1 話者の複数発話だけになる batch が典型的にあり、これがないと
@@ -1866,12 +1953,9 @@ class VitsModel(pl.LightningModule):
         # 確率 τ の step で条件 embedding を s̃ (同一言語補間 or 微小 noise) に
         # 置換し、G の損失を LFCL のみに置換する (recon/mel/KL/GAN skip。
         # D 更新 skip は training_step 側が _lf_step_active flag で行う)。
-        # should_run_latent_filling_step は global_step の決定論的関数なので
+        # should_run_latent_filling_step は batch index の決定論的関数なので
         # 全 rank が同時に LF step になり DDP の all_reduce 整合が保たれる。
-        # d_update_interval を配線するのはラッチ防止 (G 更新なしの D-only
-        # step で LF が発動すると optimizer.step() ゼロ → global_step 凍結 →
-        # 全 batch が永久に同一分岐の no-op になる)。詳細は
-        # should_run_latent_filling_step の docstring 参照。
+        # d_update_interval を配線し、LFCL の G 更新が走る batch のみに限定する。
         self._lf_step_active = False
         if self.training and speaker_embeddings is not None:
             lf_tau = float(getattr(self.hparams, "latent_filling_tau", 0.0) or 0.0)
@@ -1879,7 +1963,7 @@ class VitsModel(pl.LightningModule):
                 lf_tau > 0
                 and self.scl_encoder is not None
                 and should_run_latent_filling_step(
-                    self.global_step,
+                    self._training_batch_index,
                     lf_tau,
                     d_update_interval=self.hparams.d_update_interval,
                 )
@@ -2264,7 +2348,7 @@ class VitsModel(pl.LightningModule):
                     getattr(self.hparams, "swap_spk_ramp_epochs", 5),
                 )
                 if ramp > 0:
-                    # perm は global_step 由来 seed で決定論 (グローバル RNG
+                    # perm は batch index 由来 seed で決定論 (グローバル RNG
                     # stream を消費しない — default-off 経路の再現性を守る)。
                     # speaker_ids を渡し同一話者ペアを valid=False にする:
                     # swap 相手が同一話者だと z_p の中身の話者 = 目標話者と
@@ -2273,7 +2357,7 @@ class VitsModel(pl.LightningModule):
                     # 通常 SCL に退化するため
                     g_swap = torch.Generator()
                     g_swap.manual_seed(
-                        (int(self.global_step) * 2654435761 + 0x517CC1B7) % (2**63)
+                        (self._training_batch_index * 2654435761 + 0x517CC1B7) % (2**63)
                     )
                     perm, valid_mask = build_same_language_permutation(
                         speaker_embeddings.size(0),
