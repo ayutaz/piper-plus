@@ -2,6 +2,7 @@
 
 import json
 import sys
+from types import ModuleType
 
 import numpy as np
 import pytest
@@ -17,6 +18,25 @@ from piper_train.vits.wavfile import write
 
 
 pytestmark = pytest.mark.unit
+
+
+def test_whisper_initialization_passes_cuda_without_download(monkeypatch):
+    # Replace the module itself: Transformers' lazy imports can bypass an
+    # attribute patch and accidentally initialize a real pretrained model.
+    transformers = ModuleType("transformers")
+    monkeypatch.setenv("HF_HUB_OFFLINE", "1")
+    monkeypatch.setenv("TRANSFORMERS_OFFLINE", "1")
+    calls = []
+
+    def factory(task, **kwargs):
+        calls.append((task, kwargs))
+        return lambda path, **options: {"text": "fixture"}
+
+    transformers.pipeline = factory
+    monkeypatch.setitem(sys.modules, "transformers", transformers)
+    transcribe = eval_cer.build_whisper_transcribe_fn(revision="a" * 40)
+    assert transcribe("fixture.wav") == "fixture"
+    assert calls[0][1]["device"] == "cuda"
 
 
 @pytest.fixture
@@ -85,8 +105,8 @@ def strict_case(tmp_path, monkeypatch):
     ]
     calls = []
 
-    def asr(model, language, revision=None):
-        calls.append((model, language, revision))
+    def asr(model, language, revision=None, device="cuda"):
+        calls.append((model, language, revision, device))
         return lambda wav: rows[int(wav.stem[1:])]["text"]
 
     monkeypatch.setattr(eval_cer, "build_whisper_transcribe_fn", asr)
@@ -101,7 +121,7 @@ def test_strict_cli_pins_asr_and_passes_complete_three_clip_gate(strict_case):
     assert result["gate_passed"] is True and result["n_clips"] == 3
     assert result["cer_median"] == 0
     assert result["manifest_sha256"] == file_sha256(manifest_path)
-    assert calls == [("openai/whisper-small", "ja", "a" * 40)]
+    assert calls == [("openai/whisper-small", "ja", "a" * 40, "cuda")]
 
 
 @pytest.mark.parametrize("damage", ["wrong-sample-rate", "int16", "nonfinite"])
@@ -143,7 +163,7 @@ def test_diagnostic_cli_keeps_single_clip_and_honors_explicit_asr_revision(
     result = json.loads(result_path.read_text(encoding="utf-8"))
     assert result["n_clips"] == 1 and result["cer_median"] == 0
     assert result["mode"] == "diagnostic" and result["gate_passed"] is None
-    assert calls == [("openai/whisper-small", "ja", "c" * 40)]
+    assert calls == [("openai/whisper-small", "ja", "c" * 40, "cuda")]
 
 
 @pytest.mark.parametrize(
@@ -158,6 +178,7 @@ def test_diagnostic_cli_keeps_single_clip_and_honors_explicit_asr_revision(
         "n=1",
         "asr-model",
         "asr-revision",
+        "asr-device",
         "language",
         "duplicate-texts",
         "empty-normalized-text",
@@ -208,6 +229,8 @@ def test_strict_cli_rejects_invalid_sets_before_asr(strict_case, damage):
         texts = clips / "texts.tsv"
         texts.write_text("t0\tこんにちは\nt0\tありがとう\n", encoding="utf-8")
         args += ["--texts", str(texts)]
+    elif damage == "asr-device":
+        args += ["--asr-device", "cpu"]
     else:
         args += ["--" + damage, "different"]
     (clips / "generation.json").write_text(json.dumps(generation))

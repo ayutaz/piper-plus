@@ -20,13 +20,18 @@ from ..evaluation_manifest import (
 )
 
 
-def load_torch_generator(path):
+def load_torch_generator(path, *, device="auto"):
     """Reuse checkpoint migration; strictly load G without external teachers."""
     import torch  # noqa: PLC0415
 
     from ..inference_eval import isolated_inference  # noqa: PLC0415
     from ..vits.lightning import VitsModel  # noqa: PLC0415
 
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    target_device = torch.device(device)
+    if target_device.type == "cuda" and not torch.cuda.is_available():
+        raise ValueError("CUDA requested but no CUDA GPU is available")
     checkpoint = torch.load(path, map_location="cpu", weights_only=False)
     parameters = {
         **checkpoint["hyper_parameters"],
@@ -45,6 +50,7 @@ def load_torch_generator(path):
             if name.startswith("model_g.")
         }
         model.model_g.load_state_dict(generator_state, strict=True)
+        model.model_g.to(target_device)
     return model.model_g, checkpoint, model.hparams.sample_rate
 
 
@@ -79,7 +85,9 @@ def _prosody(clip):
     )[None, :, :]
 
 
-def generate_audio(manifest_path: Path, backend: str, output_dir: Path) -> dict:
+def generate_audio(
+    manifest_path: Path, backend: str, output_dir: Path, *, device="auto"
+) -> dict:
     """Generate all expected clips; publish a report only on complete success."""
     from ..vits.wavfile import write  # noqa: PLC0415
 
@@ -96,7 +104,9 @@ def generate_audio(manifest_path: Path, backend: str, output_dir: Path) -> dict:
     restored_weights = None
     ema_report = {}
     if backend in ("torch-raw", "torch-ema"):
-        generator, checkpoint, sample_rate = load_torch_generator(model_spec["path"])
+        generator, checkpoint, sample_rate = load_torch_generator(
+            model_spec["path"], device=device
+        )
         if not hasattr(generator, "spk_proj"):
             raise ValueError(
                 "Checkpoint does not support speaker_embedding conditioning"
@@ -129,6 +139,9 @@ def generate_audio(manifest_path: Path, backend: str, output_dir: Path) -> dict:
     result = {
         "version": 1,
         "backend": backend,
+        "execution_device": str(next(generator.parameters()).device)
+        if generator is not None
+        else "CPUExecutionProvider",
         "manifest_sha256": file_sha256(manifest_path),
         "conditions_sha256": manifest["conditions_sha256"],
         "model_sha256": model_spec["sha256"],
@@ -275,6 +288,7 @@ def main() -> int:
     prepare.add_argument("--sample-rate", type=int, default=22050)
     prepare.add_argument("--embedding-dimension", type=int, default=192)
     prepare.add_argument("--asr-revision", required=True)
+    prepare.add_argument("--asr-device", choices=("cuda", "cpu"), default="cuda")
     prepare.add_argument("--source-revision")
     prepare.add_argument("--seed", type=int, default=42)
     prepare.add_argument(
@@ -287,6 +301,12 @@ def main() -> int:
     generate.add_argument("--manifest", required=True, type=Path)
     generate.add_argument("--backend", required=True, choices=BACKENDS)
     generate.add_argument("--output-dir", required=True, type=Path)
+    generate.add_argument(
+        "--device",
+        choices=("auto", "cuda", "cpu"),
+        default="auto",
+        help="Torch device; auto prefers CUDA, explicit cuda never falls back",
+    )
     args = parser.parse_args()
     if args.command == "prepare":
         revision = args.source_revision
@@ -312,12 +332,13 @@ def main() -> int:
             dimension=args.embedding_dimension,
             source_revision=revision,
             asr_revision=args.asr_revision,
+            asr_device=args.asr_device,
             seed=args.seed,
             scales=args.scales,
             training_epoch=args.epoch,
         )
     else:
-        generate_audio(args.manifest, args.backend, args.output_dir)
+        generate_audio(args.manifest, args.backend, args.output_dir, device=args.device)
     return 0
 
 

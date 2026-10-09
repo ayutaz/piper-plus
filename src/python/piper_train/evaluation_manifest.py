@@ -172,6 +172,8 @@ def validate_manifest(manifest: dict, *, verify_files: bool = True) -> dict:
             for key in ("model", "language")
         ):
             raise ValueError("Missing ASR model/language")
+        if asr["device"] not in ("cuda", "cpu"):
+            raise ValueError("Invalid ASR device")
         if (
             not isinstance(manifest["models"], dict)
             or not manifest["models"]
@@ -213,6 +215,7 @@ def create_manifest(
     scales=(0.4, 1.0, 0.5),
     seed=42,
     asr_model="openai/whisper-small",
+    asr_device="cuda",
     language="ja",
     dimension=192,
     lock_path: Path | None = None,
@@ -280,6 +283,7 @@ def create_manifest(
             "model": asr_model,
             "revision": asr_revision,
             "language": language,
+            "device": asr_device,
             "normalization": NORMALIZATION_VERSION,
         },
         "clips": clips,

@@ -1,10 +1,10 @@
 # zero-shot不具合修正・品質改善計画（2026-10-09）
 
-**状態: 工程1〜3の実装・CPU完了条件を充足。工程2A/2Bは`c7cbbbb9`、57件成功。工程2Cは`3ea95490`、348件成功。工程3は関連72件成功、既存checkpoint/exportを含む回帰504件成功。工程3の変更は本更新と合わせてcheckpoint commitする。工程0の実成果物固定は未完了、工程4〜6は未着手。追加学習・品質比較は未実施。**
+**状態: 工程1〜3の機能実装・検証完了。工程2A/2Bは`c7cbbbb9`、57件成功。工程2Cは`3ea95490`、348件成功。工程3本体は`b1194f65`、隔離gate補完は`14930282`。初回CPU検証72件・回帰504件、gate補完後95件成功。uv/CUDA対応後は99件成功。工程0の実成果物固定は未完了、工程4〜6は未着手。追加学習・品質比較は未実施。**
 
 対象ブランチ: `feat/zero-shot-v8-dataset-scaling`。
 計画開始時HEAD: `9629d68f`。
-最終更新: 2026-10-10。工程2C確定HEAD: `3ea95490`。工程3の変更・検証結果を本更新へ反映。
+最終更新: 2026-10-10。工程3のcommit・uv/CUDA対応・検証結果を本更新へ反映。
 工程1のコミット: `f35b2b07`（周期・状態復元・互換性）、`3efaaa71`（validation raw KL記録）。
 根拠: [GPT-SoVITS調査](../research/gpt-sovits-zero-shot-2026-10-09.md)、
 [既存実装監査](../research/zero-shot-implementation-audit-2026-10-09.md)、
@@ -37,7 +37,7 @@ WavLM更新周期の不具合は確定しているが、v11の話者類似度低
 | 0 | 未完了。修正sourceは確認済み | run manifest、data/cache/artifact監査 | hash・入力条件・比較対象が揃う |
 | 1 | **実装・CPU検証完了** | batch周期、KL状態、実更新EMA、checkpoint互換性、207件成功 | CPU完了条件は充足。GPU/full-model確認は工程5 |
 | 2 | **実装・CPU検証・必須hook・commit完了** | 抽出/cache57件、入力全経路/既存互換348件成功 | 工程3へ受け渡し済み |
-| 3 | **実装・CPU完了条件充足** | 固定話者参照、raw/EMA/ONNX推論評価、strict CER。関連72件、回帰504件成功 | CPUの参照/集合/来歴/状態・統合検証を充足。実品質は工程4 |
+| 3 | **機能実装・検証完了** | 固定話者参照、raw/EMA/ONNX推論評価、strict CER。初回CPU72件/回帰504件、uv/CUDA対応後99件成功 | 参照/集合/来歴/状態・統合検証を充足。実品質は工程4 |
 | 4 | 未着手 | 同条件のraw/EMA/ONNX比較、参照抽出比較 | 再現可能なbaselineとGPU実験の仕様が揃う |
 | 5 | 未着手 | full-model smoke、原因分離run、v11b候補 | 機械検証・既存品質gate・人手評価を順に満たす |
 | 6 | 未着手 | v12参照系列入力契約、小型参照encoder、A/B | global-only対照に対する利得と配布/速度予算を確認 |
@@ -308,7 +308,11 @@ GPT-SoVITSでの公式SIM改善量をPiperの期待改善量に転用しない�
 - 学習用CAM++と評価専用ECAPAを分離し、評価統計をloss/rewardへ流用しない。
 - 読みの一致・話者類似・自然さ・ノイズを人手で別々に確認する。ASR一致だけで品質承認しない。
 
-工程0〜3はGPUなしで進める。工程4は手元の成果物と計算環境に合わせて実行方法を決める。
+Pythonの依存追加は`uv add`、実行は`uv run`を使う。Torchの処理はGPUで実行する。
+工程3の実小型モデルはRTX 4070 Ti SUPER / Torch 2.11.0+cu128で監視・export・
+raw/EMA生成とGPU RNG復元を検証済み。ONNXはCPU検証を維持する。
+ASR deviceはmanifestへ固定し、CUDA指定の初期化はdownloadなしのstubで確認した。
+実ASR/学習済みモデルの品質評価は別工程。工程4は手元の成果物と計算環境に合わせて実行方法を決める。
 工程5/6の有料GPU利用・本走は、候補provider、GPU数、step/epoch上限、実測時間、
 費用上限、停止条件、成果物回収先を提示して実行前に確認する。
 過去の価格・学習時間を現在の確定見積りとして扱わない。
@@ -320,13 +324,16 @@ GPT-SoVITSでの公式SIM改善量をPiperの期待改善量に転用しない�
 | 1 | training counter・KL状態修正 | **完了**。`f35b2b07` / `3efaaa71`、仕様・207テスト |
 | 2 | 工程2A/2B: embedding契約、抽出manifest/path・cache | **完了**。`c7cbbbb9`、関連CPUテスト57件・必須hook成功 |
 | 3 | 工程2C: embedding入力の共通検証 | **完了**。`3ea95490`、CLI/Voice/HTTP/loader、関連15ファイル348件成功・必須hook成功 |
-| 4 | 固定参照・推論評価・strict CER | **実装・CPU完了条件充足**。関連72件、既存互換を含む回帰504件成功。推論評価仕様とartifact/CLIを追加 |
+| 4 | 固定参照・推論評価・strict CER | **完了**。`b1194f65` / `14930282`。CPU回帰504件、uv/CUDA対応後99件成功。推論評価仕様とartifact/CLIを追加 |
 | 5 | 比較harness・前処理契約・事前登録 | 未着手。eval CLI、run manifests、recipe、計測結果 |
 | 6 | opt-in EMA scope、v12設計/実装 | 未着手。それぞれ独立した変更とA/B |
 
 工程1〜3の機能検証は完了し、**次は工程0/4の実成果物固定と品質比較**。工程0の棚卸しを進め、
 source・data・参照・評価集合を固定できるまで正式なモデル比較を開始しない。
 各単位で失敗テスト→修正→対象テスト/CI→意味あるcheckpoint commitを行う。
-依存追加が必要ならuvで管理する。feature branchからdev向けPRでレビューする。
+依存追加は`uv add`で管理する。feature branchからdev向けPRでレビューする。
 大型model/build/DDP検証は対応可能なCIまたは事前に決めたGPU環境へ寄せる。
-今回の更新は工程3の実装・CPU完了条件と統合回帰の証拠を反映したもの。工程3の変更は本更新と合わせてcheckpoint commitする。追加学習・品質比較・PR作成・公開は未実施。
+今回の更新は工程3のcommit・統合回帰とuv/CUDA対応の証拠を反映したもの。
+99件はoffline設定でuvから実行。CUDA対応前のCPU回帰504件をGPU全件検証として扱わない。
+`uv lock --check --offline`成功。既存CUDA Torch/SciPyを使用し、新しい依存追加は不要だった。
+追加学習・品質比較・PR作成・公開は未実施。

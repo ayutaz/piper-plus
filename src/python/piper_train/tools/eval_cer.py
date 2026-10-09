@@ -102,8 +102,9 @@ def build_whisper_transcribe_fn(
     model_name: str = "openai/whisper-small",
     language: str = "ja",
     revision: str | None = None,
+    device: str = "cuda",
 ) -> Callable[[Path], str]:
-    """transformers の whisper pipeline で transcribe_fn を作る (CPU)。
+    """transformers の whisper pipeline で transcribe_fn を作る (CUDA既定)。
 
     追加依存なし (transformers は train extras に既存)。モデルは初回に
     HF Hub から自動 DL される。
@@ -113,7 +114,7 @@ def build_whisper_transcribe_fn(
     pipe = pipeline(
         "automatic-speech-recognition",
         model=model_name,
-        device=-1,
+        device=device,
         **({"revision": revision} if revision is not None else {}),
     )
 
@@ -146,6 +147,7 @@ def _strict_inputs(args) -> tuple[dict, dict, list[tuple[Path, str]]]:
         ("asr_model", asr["model"]),
         ("asr_revision", asr["revision"]),
         ("language", asr["language"]),
+        ("asr_device", asr["device"]),
     ]:
         provided = getattr(args, name)
         if provided is not None and provided != expected:
@@ -240,6 +242,7 @@ def _evaluate_strict(args) -> tuple[dict, int]:
                 "conditions_sha256": manifest["conditions_sha256"],
                 "asr_model": asr["model"],
                 "asr_revision": asr["revision"],
+                "asr_device": asr["device"],
                 "language": asr["language"],
                 "normalization": asr["normalization"],
                 "training_epoch": generation.get("training_epoch"),
@@ -248,7 +251,10 @@ def _evaluate_strict(args) -> tuple[dict, int]:
             }
         )
         transcribe = build_whisper_transcribe_fn(
-            asr["model"], asr["language"], revision=asr["revision"]
+            asr["model"],
+            asr["language"],
+            revision=asr["revision"],
+            device=asr["device"],
         )
         scores = []
         for wav, ref in pairs:
@@ -298,6 +304,7 @@ def main() -> int:
     ap.add_argument("--asr-model")
     ap.add_argument("--asr-revision")
     ap.add_argument("--language")
+    ap.add_argument("--asr-device", choices=("cuda", "cpu"))
     args = ap.parse_args()
 
     if args.manifest:
@@ -315,6 +322,7 @@ def main() -> int:
         ap.error("diagnostic mode requires --texts; strict mode uses --manifest")
     args.asr_model = args.asr_model or "openai/whisper-small"
     args.language = args.language or "ja"
+    args.asr_device = args.asr_device or "cuda"
 
     refs = _read_texts(Path(args.texts))
 
@@ -328,13 +336,17 @@ def main() -> int:
         raise SystemExit(f"評価対象なし: {args.clips_dir}")
 
     transcribe = build_whisper_transcribe_fn(
-        args.asr_model, args.language, revision=args.asr_revision
+        args.asr_model,
+        args.language,
+        revision=args.asr_revision,
+        device=args.asr_device,
     )
     result = evaluate_clips(pairs, transcribe)
     result["mode"] = "diagnostic"
     result["gate_passed"] = None
     result["asr_model"] = args.asr_model
     result["asr_revision"] = args.asr_revision
+    result["asr_device"] = args.asr_device
     result["language"] = args.language
 
     for tid, r in result["per_file"].items():
