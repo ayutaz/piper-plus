@@ -337,3 +337,22 @@ source・data・参照・評価集合を固定できるまで正式なモデル�
 99件はoffline設定でuvから実行。CUDA対応前のCPU回帰504件をGPU全件検証として扱わない。
 `uv lock --check --offline`成功。既存CUDA Torch/SciPyを使用し、新しい依存追加は不要だった。
 追加学習・品質比較・PR作成・公開は未実施。
+
+## 12. 一般公開先と研究保存先（2026-10-10ユーザー指定）
+
+Zero-Shot対応ベースモデルの一般公開先は
+[`ayousanz/piper-plus-base`](https://huggingface.co/ayousanz/piper-plus-base)、
+そのベースをつくよみちゃんで追加学習したモデルの一般公開先は
+[`ayousanz/piper-plus-tsukuyomi-chan`](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
+とする。gate付きリポジトリはユーザー自身の研究データ保存用であり、
+一般向けモデルの配布先として案内しない。
+
+2026-10-10の未認証HF API確認では、両公開先は`private=false`・`gated=false`。
+現在の公開ファイルはベース側が`model.ckpt`と`config.json`、つくよみちゃん側が
+`tsukuyomi-chan-6lang-fp16.onnx`と`config.json`。この確認は公開状態・ファイル一覧の
+確認であり、新しいZero-Shotモデルの公開完了やv2.0.0での実推論検証を意味しない。
+
+工程0/4で公開候補の来歴・品質を確定し、必要な学習とつくよみちゃんFTを実施した後、
+checkpoint・ONNX・対応config・必要な話者encoderの取得手順・モデルカード・評価結果を
+揃えて公開する。既存配布ファイルの互換性と旧版の取得方法を明示する。
+公開先の指定によって工程0〜6の検証順序は変更しない。
