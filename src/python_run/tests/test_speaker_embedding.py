@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
+
 from piper_plus.config import PiperConfig
 from piper_plus.voice import PiperVoice
 
@@ -84,6 +85,49 @@ def _make_voice(
 # Test: synthesize_ids_to_raw — speaker_embedding passthrough
 # ---------------------------------------------------------------------------
 class TestSynthesizeIdsToRaw:
+    @pytest.mark.parametrize(
+        "embedding",
+        [
+            np.zeros(192),
+            np.full(192, np.nan),
+            np.full(192, np.inf),
+            np.ones(256),
+            np.ones((2, 96)),
+        ],
+    )
+    def test_invalid_reference_is_rejected_before_ort(self, embedding):
+        voice = _make_voice(
+            onnx_input_names=["input", "input_lengths", "scales", "speaker_embedding"]
+        )
+        with pytest.raises(ValueError, match="speaker_embedding"):
+            voice.synthesize_ids_to_raw(
+                [1] + [10] * 48 + [2], speaker_embedding=embedding
+            )
+        voice.session.run.assert_not_called()
+
+    @pytest.mark.parametrize("dimension", [192, 256])
+    def test_reference_is_normalized_using_graph_dimension(self, dimension):
+        voice = _make_voice(
+            onnx_input_names=[
+                "input",
+                "input_lengths",
+                "scales",
+                "speaker_embedding",
+                "speaker_embedding_mask",
+            ]
+        )
+        for item in voice.session.get_inputs():
+            if item.name == "speaker_embedding":
+                item.shape = [1, dimension]
+        vector = np.arange(1, dimension + 1, dtype=np.float32)
+        original = vector.copy()
+        voice.synthesize_ids_to_raw([1] + [10] * 48 + [2], speaker_embedding=vector)
+        feeds = voice.session.run.call_args[0][1]
+        assert feeds["speaker_embedding"].shape == (1, dimension)
+        assert np.linalg.norm(feeds["speaker_embedding"]) == pytest.approx(1)
+        assert feeds["speaker_embedding_mask"].tolist() == [[1]]
+        np.testing.assert_array_equal(vector, original)
+
     @pytest.mark.unit
     def test_speaker_embedding_passed_to_session(self):
         """When speaker_embedding input exists and embedding provided, tensor shape is [1,192]."""
@@ -111,8 +155,8 @@ class TestSynthesizeIdsToRaw:
         assert emb_tensor.dtype == np.float32
 
     @pytest.mark.unit
-    def test_speaker_embedding_values_preserved(self):
-        """The values of the embedding are not modified (only reshaped)."""
+    def test_speaker_embedding_normalized_without_mutating_caller(self):
+        """The ORT feed is normalized while caller values stay unchanged."""
         voice = _make_voice(
             num_speakers=1,
             onnx_input_names=["input", "input_lengths", "scales", "speaker_embedding"],
@@ -124,7 +168,11 @@ class TestSynthesizeIdsToRaw:
 
         call_args = voice.session.run.call_args[0][1]
         emb_tensor = call_args["speaker_embedding"]
-        np.testing.assert_array_equal(emb_tensor.flatten(), embedding)
+        np.testing.assert_allclose(
+            emb_tensor.flatten(),
+            embedding.astype(np.float64) / np.linalg.norm(embedding.astype(np.float64)),
+        )
+        np.testing.assert_array_equal(embedding, np.arange(192, dtype=np.float32))
 
     @pytest.mark.unit
     def test_2d_embedding_accepted(self):

@@ -1021,6 +1021,7 @@ class VitsModel(pl.LightningModule):
                 validate_cache=validate_cache,
                 precomputed_mel_dir=precomputed_mel_dir,
                 f0_dir=f0_dir,
+                speaker_embedding_dim=self.hparams.get("spk_embed_dim", 192),
             )
             valid_set_size = int(len(full_dataset) * validation_split)
             train_set_size = len(full_dataset) - valid_set_size
@@ -1041,6 +1042,7 @@ class VitsModel(pl.LightningModule):
                 validate_cache=validate_cache,
                 precomputed_mel_dir=precomputed_mel_dir,
                 f0_dir=f0_dir,
+                speaker_embedding_dim=self.hparams.get("spk_embed_dim", 192),
             )
             valid_set_size = int(len(full_dataset) * validation_split)
             train_set_size = len(full_dataset) - valid_set_size - num_test_examples

@@ -11,10 +11,11 @@ from unittest.mock import MagicMock
 import pytest
 
 
-pytest.importorskip("fastapi")
-pytest.importorskip("httpx")
+pytest.importorskip("fastapi", reason="timing HTTP tests require FastAPI")
+pytest.importorskip("httpx", reason="timing HTTP tests require httpx")
 
 from fastapi.testclient import TestClient  # noqa: E402
+
 from piper_plus.http_server import create_app  # noqa: E402
 from piper_plus.timing import PhonemeTimingInfo, TimingResult  # noqa: E402
 
@@ -541,7 +542,7 @@ class TestTimingEndpointSpeakerEmbedding:
         import numpy as np
 
         client, captured = self._build(mock_timing_result)
-        payload = {"text": "hi", "speaker_embedding": [0.0] * 192}
+        payload = {"text": "hi", "speaker_embedding": [1.0] * 192}
         resp = client.post("/api/phoneme-timing", json=payload)
 
         assert resp.status_code == 200
@@ -549,6 +550,7 @@ class TestTimingEndpointSpeakerEmbedding:
         assert isinstance(emb, np.ndarray)
         assert emb.shape == (192,)
         assert emb.dtype == np.float32
+        assert np.linalg.norm(emb) == pytest.approx(1)
 
     def test_speaker_embedding_invalid_dimension_400(self, mock_timing_result):
         client, _captured = self._build(mock_timing_result)

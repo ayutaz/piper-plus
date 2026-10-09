@@ -24,7 +24,10 @@ def validate_embedding(values, dimension: int = 192) -> np.ndarray:
     condition is handled by the caller; an explicit zero vector is invalid.
     """
     try:
-        vector = np.asarray(values, dtype=np.float64)
+        vector = np.asarray(values)
+        if np.iscomplexobj(vector):
+            raise ValueError("speaker_embedding must contain real values")
+        vector = np.asarray(vector, dtype=np.float64)
     except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError("speaker_embedding must contain numeric values") from exc
     if vector.shape == (1, dimension):

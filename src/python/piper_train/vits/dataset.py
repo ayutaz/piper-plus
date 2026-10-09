@@ -12,6 +12,8 @@ import torch
 from torch import FloatTensor, LongTensor
 from torch.utils.data import Dataset
 
+from piper_plus.embedding import validate_embedding
+
 
 _LOGGER = logging.getLogger("vits.dataset")
 
@@ -153,8 +155,12 @@ class PiperDataset(Dataset):
         validate_cache: bool = False,
         precomputed_mel_dir: Path | str | None = None,
         f0_dir: Path | str | None = None,
+        speaker_embedding_dim: int = 192,
     ):
         self.utterances: list[Utterance] = []
+        if speaker_embedding_dim < 1:
+            raise ValueError("speaker_embedding_dim must be positive")
+        self.speaker_embedding_dim = speaker_embedding_dim
 
         # Resolve the precomputed spectrogram cache directory once. When the
         # directory does not exist we treat it as absent (falls back to
@@ -247,21 +253,20 @@ class PiperDataset(Dataset):
         # Load speaker embedding from .npy file if available
         speaker_embedding_tensor = None
         if utt.speaker_embedding_path is not None:
-            spk_emb = np.load(utt.speaker_embedding_path, allow_pickle=False).astype(
-                np.float32
-            )
-            if spk_emb.ndim != 1:
-                raise ValueError(
-                    f"speaker_embedding must be 1-D, got shape {spk_emb.shape} "
-                    f"from {utt.speaker_embedding_path}"
-                )
             expected_dim = getattr(self, "speaker_embedding_dim", 192)
-            if spk_emb.shape[0] != expected_dim:
-                raise ValueError(
-                    f"speaker_embedding dim must be {expected_dim}, got {spk_emb.shape[0]} "
-                    f"from {utt.speaker_embedding_path}"
+            try:
+                spk_emb = np.load(utt.speaker_embedding_path, allow_pickle=False)
+                if spk_emb.ndim != 1:
+                    raise ValueError(
+                        f"speaker_embedding must be 1-D, got shape {spk_emb.shape}"
+                    )
+                speaker_embedding_tensor = torch.from_numpy(
+                    validate_embedding(spk_emb, expected_dim)
                 )
-            speaker_embedding_tensor = torch.from_numpy(spk_emb)
+            except (ValueError, OSError) as exc:
+                raise ValueError(
+                    f"speaker_embedding: {exc} from {utt.speaker_embedding_path}"
+                ) from exc
 
         # v10b S-2: GT F0 (fp16 cache → fp32)。spectrogram とのフレーム数差は
         # 2 段階で扱う:

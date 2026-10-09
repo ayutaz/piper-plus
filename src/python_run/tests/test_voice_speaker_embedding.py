@@ -19,6 +19,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import numpy as np
+
 from piper_plus.config import PhonemeType, PiperConfig
 from piper_plus.voice import PiperVoice
 
@@ -210,9 +211,9 @@ class TestStreamRawThreadsSpeakerEmbedding:
 
         feed = session.run.call_args[0][1]
         assert "speaker_embedding" in feed
-        np.testing.assert_array_equal(
+        np.testing.assert_allclose(
             feed["speaker_embedding"][0],
-            emb,
+            emb / np.linalg.norm(emb),
         )
         # mask=1 indicates a real embedding was supplied
         assert feed["speaker_embedding_mask"][0, 0] == 1
@@ -238,7 +239,9 @@ class TestStreamRawThreadsSpeakerEmbedding:
             assert session.run.call_count >= 3
             for call in session.run.call_args_list:
                 feed = call[0][1]
-                np.testing.assert_array_equal(feed["speaker_embedding"][0], emb)
+                np.testing.assert_allclose(
+                    feed["speaker_embedding"][0], emb / np.linalg.norm(emb)
+                )
         finally:
             if old is None:
                 del os.environ["PIPER_PLUS_G2P_PARALLELISM"]
