@@ -30,6 +30,7 @@ def _make_stub(abort_steps: int = 300, consecutive: int = 0) -> SimpleNamespace:
         _kl_cap_consecutive=consecutive,
         _kl_cap_abort_steps=abort_steps,
         global_step=123,
+        training=True,
     )
 
 
@@ -99,6 +100,27 @@ class TestAbort:
                 VitsModel._update_kl_cap_guard(stub, vits_lightning._KL_CAP)
         errors = [r for r in caplog.records if "pinned" in r.getMessage()]
         assert len(errors) == 2, "expected ERROR at steps 50 and 100"
+
+
+@pytest.mark.parametrize("raw_kl", [1.0, 20000.0, float("nan")])
+def test_validation_does_not_change_training_kl_streak(raw_kl):
+    """Use the real validation wrapper and guard, with numerical G/D stand-ins."""
+    stub = _make_stub(abort_steps=3, consecutive=2)
+    stub.training = False
+    stub.training_batches_seen = 7
+    stub.log = lambda *_args, **_kwargs: None
+    stub._log_with_batch_info = lambda *_args, **_kwargs: None
+
+    def loss_g(_batch):
+        VitsModel._update_kl_cap_guard(stub, raw_kl)
+        return vits_lightning.torch.tensor(1.0)
+
+    stub.training_step_g = loss_g
+    stub.training_step_d = lambda _batch: vits_lightning.torch.tensor(2.0)
+    for index in range(3):
+        VitsModel.validation_step(stub, None, index)
+    assert stub._kl_cap_consecutive == 2
+    assert stub.training_batches_seen == 7
 
 
 class TestEnvParsing:

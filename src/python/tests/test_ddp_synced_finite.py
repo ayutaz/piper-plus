@@ -158,12 +158,19 @@ class _FakeOpt:
     def __init__(self):
         self.zero_grad_calls = 0
         self.step_calls = 0
+        self._step_hook = None
 
     def zero_grad(self, set_to_none: bool = False):
         self.zero_grad_calls += 1
 
     def step(self):
         self.step_calls += 1
+        if self._step_hook:
+            self._step_hook(self, (), {})
+
+    def register_step_post_hook(self, hook):
+        self._step_hook = hook
+        return mock.Mock(remove=lambda: setattr(self, "_step_hook", None))
 
 
 class _FakeBatch:
@@ -189,6 +196,13 @@ def _make_fake_model(
     fake = mock.MagicMock()
     fake.hparams = _FakeHparams(d_update_interval=d_update_interval)
     fake.global_step = 0
+    fake.training_batches_seen = 0
+    fake._training_batch_index = 0
+    fake.generator_updates = 0
+    fake.discriminator_updates = 0
+    fake.generator_updated_this_batch = False
+    fake._grad_probe_losses = None
+    fake._step_optimizer = VitsModel._step_optimizer
     fake._y = None
     fake._y_hat = None
     # v10 §3.3: Latent Filling step flag (MagicMock の auto-attr は truthy に

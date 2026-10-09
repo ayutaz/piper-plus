@@ -1305,6 +1305,9 @@ def load_weights_only_checkpoint(checkpoint_path: str, model) -> tuple[list, lis
         state_dict, model.state_dict(), checkpoint_path=checkpoint_path
     )
     missing, unexpected = model.load_state_dict(normalized_sd, strict=False)
+    reset_progress = getattr(model, "_reset_training_progress", None)
+    if callable(reset_progress):
+        reset_progress()
     _LOGGER.info(
         "Warm-restart weights loaded (strict=False): missing=%d (fresh-init kept), "
         "unexpected=%d (dropped)",
@@ -1971,6 +1974,7 @@ def main():
                 checkpoint_path=args.resume_from_checkpoint,
             )
             model.load_state_dict(normalized_sd, strict=False)
+            model._reset_training_progress()
 
             _LOGGER.warning(
                 "Weights were loaded with strict=False, but optimizer state and "

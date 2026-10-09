@@ -1,6 +1,6 @@
 # zero-shot不具合修正・品質改善計画（2026-10-09）
 
-**状態: 計画策定済み。実装・追加学習は未着手。**
+**状態: 工程1の実装・CPU検証完了。工程0の成果物固定と工程2以降は未着手。追加学習は未実施。**
 
 対象ブランチ: `feat/zero-shot-v8-dataset-scaling`。
 計画開始時HEAD: `9629d68f`。
@@ -56,6 +56,13 @@ WavLM更新周期の不具合は確定しているが、v11の話者類似度低
 GPUの提供者・料金・現在の接続可否は本計画では確認していない。
 
 ## 4. 工程1: trainingの確定バグを修正（最初の実装）
+
+2026-10-09に実装・CPU検証を完了。仕様・clock一覧・checkpoint移行は
+[Training batch周期の仕様](../spec/training-batch-schedule.md)を参照。
+関連12ファイルのテストは**207 passed**。実Lightningの小型モデルで周期・resume・
+precision skip・validationを検証し、2 CPU Gloo rankで非有限判定と周期の一致も確認した。
+公開checkpointの固定loss buffer欠落は作業前HEADでも再現し、互換補完を加えてgateを通した。
+full-modelのGPU/DDP/AMP smokeと音声品質評価は工程5に残す。
 
 ### 4.1 G/D/WavLMの周期
 
