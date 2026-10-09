@@ -7,39 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.0.1] - 2026-10-08
-
-### Fixed
-
-- SwiftPM: pin the official ONNX Runtime 1.20.0 package and verify the published 2.0.1 consumer without an application-side SDK override.
-- Docker: bound independent build-cache operations, mirror the exact GHCR digest to Docker Hub, and verify signatures against the identical digest pulled for actual public-image synthesis.
-- Browser/npm 0.8.1: synchronize the demo and installation examples with the ONNX Runtime Web 1.30.0 validation pin. Check drift in PR CI and pre-commit.
-- C#: add a deleted-parent-working-directory CLI reproducer, including enforced RED/GREEN checks on Linux CI for the existing launcher fix (Issue #735).
-- Documentation: update the 2.0 migration examples and give the strict external-link check explicit concurrency, retry, and timeout limits.
-
-- Sign all seven published Docker images for both project and Docker-specific release tags. Allow signature repair only from an immutable signing tag after every public image's digest, version, source revision, and expected platform set has been verified.
-- Rust 0.5.2 and C# 0.5.1: continue inference from the original ONNX model when its directory cannot store an optimized cache. Check the writer's temporary path before asking ONNX Runtime to save; exercise read-only storage, normal cache creation/reload, and invalid models in PR CI.
-- Rust 0.5.1: use the ONNX model's declared speaker embedding dimension instead of forcing 192 values. Supports both 192- and 256-dimensional models; rejects mismatched explicit embeddings instead of silently truncating them.
-- Run actual embedding dimension inference on every Rust PR CI matrix, and allow up to 20 minutes for NuGet.org propagation before verifying repository-signed downloads.
-
-### Changed
-
-- Update the PyO3 0.29.3 lockfile, the Python workspace dependency lockfile, and pinned Rust/SBOM CI actions. Keep torch and torchaudio at 2.11.0, including the existing CUDA local version.
-
-<!--
-  Breaking changes must be listed under `### Breaking` and each entry must
-  include at least one `[label](docs/migration/v<X>-to-v<Y>.md#anchor)`
-  link. See `docs/migration/README.md` for the anchor slug rules.
-  `scripts/check_migration_xref.py` (workflow `Migration Guide Lint`)
-  enforces this automatically.
--->
-
-## [2.0.0] - 2026-10-06
-
-### Security
-
-- CI: `Required Status Check Gate` (`.github/workflows/required_status_check_gate.yml`) に script injection があったのを修正。 `workflow_run` イベント経路で fork 側の branch 名 (`github.event.workflow_run.head_branch`) を `run:` ブロックへ直接展開しており、 git の ref 名は `$( )` や backtick を含められるため任意コマンドが実行可能だった。 `workflow_run` は fork PR 由来でも base repo の write context で発火し、 当 job は `pull-requests: write` を持つ。 さらに直前の `actions/checkout` が `persist-credentials: false` を指定していなかったため、 注入されたコマンドから `.git/config` 経由で `GITHUB_TOKEN` を回収できる状態だった (pwn-request パターン)。 同 repo 内の `pr-title-check.yml` / `pr-body-validate.yml` が既に採っている `env:` 経由で shell 変数として参照する形に統一し、 併せて checkout に `persist-credentials: false` を追加して多層防御とした (`check_required_gate.py` は stdlib `urllib` のみで `GITHUB_TOKEN` env から認証しており git credential helper を使わないことを確認済み)。 `.github/workflows/*.yml` の `run:` ブロック全件を走査し、 外部から制御可能な `github.event.*` フィールドを展開している箇所が他に無いことを確認済み
-
 ### Added
 
 - **v11 条件付け改修 (Phase 0 診断準拠、opt-in、default は v10b 互換)**:
@@ -49,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   g_lang 干渉を分離 [P0-4]) / `--no-snac-stats` (P5: SNAC 統計注入の除去
   -394k param、LOO で無害と実測) / `--telemetry-every` (D-2 変調テレメトリ
   常設 — 話者依存分散比で SNAC 型死荷重を検知可能に)
+
 - **v11 Phase A (opt-in、default は v10b 互換)**: `--use-carrier-head` (A′
   担体化 harmonic-plus-noise head — band0/1 の voiced 調波を F0 位相テンプレート
   担体からのみ描画、noise 枝は log σ 9ch。がびがび (A3) の構造保証、敵対的
@@ -59,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   評価系: `tools/measure_comb_hnr` (調波間ノイズのゲーム不能量、出力自身の
   F0 トラックで測定) + `tools/eval_seen_speaker_id` (seen 話者 N 択識別、
   診断専用) + eval_zs_secs への comb_hnr ブロック統合
+
 - **v10b S-2 F0 明示経路 (opt-in、default は現行 bit 互換)**: `--use-f0-path` で
   frame prior からの F0+V/UV 予測 (GT frame-level F0 回帰 — 評価契約 §2 の明示
   例外形) + decoder への 2 点注入 (frame 格子 F0/VUV concat + **head 格子
@@ -69,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   エラー検出付き — 評価側 measure_prosody の librosa.pyin と推定器を意図的に
   分離) と Phase D go/no-go 用 `tools/f0_shift_ablation` (±semitone シフト
   追従率) を新設。設計: docs/design/zero-shot-v10b-s2-f0-design.md
+
 - **v10b Phase B 識別器系 (opt-in、default は v10a 互換)**: `--use-jcu-mrd`
   (S-1a: MRD の各 resolution に GANSpeech 型 JCU 条件分岐を追加 — speaker
   embedding を FC → 時間・周波数展開 → 共有 body に concat し、無条件項と条件項を
@@ -85,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   勾配を当てる。長窓でフレーム数が減るため活性化コストは既存 2048 分岐の 0.94x) /
   `--ema-scope extended` (S-5: EMA 対象を flow / enc_p / spk_proj_dp に拡張。
   scope を ckpt に記録し `export_onnx` が適用先を自動判別)
+
 - **v10b Phase B デコーダ系 (opt-in、default は v10a 互換)**: `--upsample-mode
   resize` (H-1: transposed conv を nearest-resize + lowpass 初期化 Conv1d に置換、
   フレーム格子トーンコムの発生源除去 — 初期化直後の実測でコム超過 8.4→2.1dB。
@@ -93,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   合成フィルタを canonical 初期化で学習可能化)。合成チェーン単体テスト (H-2a) と
   白色雑音帯域応答テスト (H-5) を新設。`scripts/bench_decoder_cpu.py` で
   decoder 単体 CPU ベンチ (推論コスト gate は Phase D の ONNX ベンチで最終判定)
+
 - **zero-shot 評価の音響メトリクス群 (v10b Phase A)**: `eval_zs_secs` を schema
   `zs-eval-v3` に拡張 — SR/128 格子コム超過 + >4kHz 残差 autocorr
   (`piper_train.tools.measure_comb_artifacts`、ざらつきのゲーム不能量) /
@@ -112,16 +84,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   multi-speaker zero-shot noise lives. STFT computed in fp32 under any
   autocast (bf16 cuFFT incident hardening). Tests:
   `tests/test_mrd_discriminator.py`.
+
 - **Full-band linear-frequency MR-STFT loss** (`--c-full-stft`, default 0):
   spectral convergence + log-magnitude L1 over fft 512/1024/2048 on the
   full-band output, complementing mel L1 whose high-frequency bins are too
   coarse to constrain 5-11 kHz structure.
+
 - **`piper_train.tools.measure_band_noise`** (voiced high-band excess, dB):
   purpose-built metric for the zero-shot high-band noise that UTMOS / HNR /
   CPPS et al. cannot detect. Validated on real A/B data: single-speaker FT
   -15.5 dB vs garbled zero-shot -9 dB (6 dB separation). For same-text /
   same-speaker A/B comparison in v9 smoke/eval. Tests:
   `tests/test_measure_band_noise.py`.
+
 - **Pre-commit gate `test-threshold-relaxation`**
   ([`scripts/check_test_threshold_relaxation.py`](scripts/check_test_threshold_relaxation.py)):
   blocks commits that weaken a numeric test threshold (lower `assert x > N`
@@ -136,6 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   canonical >=55 dB criterion as `xfail(strict=True)` so fixing the filter
   bank forces promotion of the real gate. Tests:
   `tests/scripts/test_check_test_threshold_relaxation.py`.
+
 - **Differentiable Speaker Consistency Loss (SCL)** in `piper_train`: a
   PyTorch port of the CAM++ speaker encoder
   (`piper_train/speaker_encoder/campplus_torch.py`, ported from 3D-Speaker,
@@ -150,6 +126,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   false-negative masking via speaker ids) and a `--segment-size` CLI flag
   (longer decoder slices give the speaker encoder a usable window). Tests:
   `tests/test_scl_differentiable.py`.
+
 - **`--resume-weights-only` (warm restart)** in `piper_train`: loads model
   weights from a checkpoint with `strict=False` and starts a fresh training
   run (epoch 0, new optimizer / LR schedule). Enables continuation runs whose
@@ -158,6 +135,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fresh-initialized), or replacing an exhausted cosine LR schedule. Mutually
   exclusive with the strict resume flags (fail-fast at startup). Tests:
   `tests/test_resume_weights_only.py`.
+
 - **Training divergence guards (zero-shot v8 incident hardening)**: the first
   3 Super-MAS Triton dispatches are now parity-validated at runtime against
   the Cython MAS reference — on mismatch (IoU < 0.90) the process permanently
@@ -173,6 +151,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `non_finite_skip` stayed at 0%. Tests:
   `tests/test_super_mas_dispatch.py::TestRuntimeParityValidation`,
   `tests/test_kl_cap_guard.py`.
+
 - **Zero-shot v10 speaker-signal and wiring interventions** in `piper_train`
   ([design doc](docs/design/zero-shot-v10-design.md)). All new behaviour is
   opt-in; with the flags at their defaults the training graph, checkpoints
@@ -214,6 +193,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     zero-init decoder FiLM stage layers (AdaLN-Zero analysis).
 
   Tests: `tests/test_v10_structure.py`, `tests/test_v10_speaker_signal.py`.
+
 - **`piper_train.tools.eval_zs_secs` zs-eval-v2**: the report JSON now
   carries `schema: "zs-eval-v2"` (additive fields only, v1 readers keep
   working) with the new `gap_same_minus_cross` metric (direct observation
@@ -226,23 +206,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_eval_zs_secs.py`.
 
 ### Fixed
-
-- CI: GitHub Actions の pin 安全ゲート (`scripts/check_action_pins.py`) が、 検査対象の `uses:` 行の **52% を素通りしていた**問題を修正。 `USES_RE` が `^\s*uses:` だったため YAML のリスト形式 (`- uses: foo/bar@v1`、 step の書き方としては圧倒的多数) にマッチせず、 806 行中 388 行しか分類されていなかった。 結果として 17 workflow に散らばる 38 件の sliding-major 参照 (`Swatinem/rust-cache@v2` × 23 等) が不可視のまま、 ゲートは `OK no new sliding-tag references.` を出して exit 0 していた。 これは本ゲートの存在理由である PR #414 の事故 (`sigstore/cosign-installer@v4` が upstream で削除され 7 job が同時に落ちた) と同じクラスの参照である。 併せて (1) 値が quote されている場合に version が `v6'` と読まれ hard FAIL が WARN に無言で降格する経路を封じ、 (2) 探索対象を `*.yaml` と `.github/actions/**/action.yml` (pre-commit hook の `files:` が以前からカバーを主張していたが実装が伴っていなかった) へ拡張し、 (3) `run: |` 等の block scalar 内の `uses:` を誤検出しないようにした。 新たに可視化された 5 参照は `scripts/action_pins_baseline.txt` へ根拠付きで grandfather している (SemVer への移行は別 PR)
-- CI: 上記ゲートが「探索結果 0 件」を「違反なし」として exit 0 していた fail-open を閉じた。 workflows ディレクトリが存在しない / リネームされている場合や、 正規表現が壊れて 1 件も収集できない場合に `OK ... (0 total uses)` と表示して成功扱いになっており、 本ゲートが塞ごうとしている「盲目を成功として報告する」欠陥そのものを再現していた。 併せて `tests/scripts/test_check_action_pins.py` を新規追加し、 `Action Pin Safety Gate` workflow から実行するようにした (`tests/scripts/` は `pytest.ini` の `testpaths` に含まれず、 従来どの CI job からも実行されていなかった)
-- CI: Trivy コンテナスキャンの CRITICAL ゲートが構造上 no-op で、 一度も発火できていなかった問題を修正。 `trivy-container-scan.yml` の 2 箇所 (`scan` / `scan-heavy`) にあった inline python heredoc は severity を `runs[].results[].properties.tags` から読んでいたが、 Trivy は severity tag を `runs[].tool.driver.rules[].properties.tags` 側に置き、 `results[].properties` には `github/alertNumber` / `github/alertUrl` しか載せない。 実 SARIF 3 本で確認したところ tag を持つ result は 188 件中 0 件、 rule 側は 46 件中 46 件で、 CRITICAL カウンタは常に 0 に固定されていた。 解析ロジックを `scripts/check_trivy_sarif.py` に集約し、 rule join (`ruleId` / `rule.id` → `ruleIndex` / `rule.index`、 `tool.driver.rules` と `tool.extensions[].rules` の双方) と severity 解決 (rule tags → result tags → message.text → CVSS band) を実装したうえで、 severity 別 breakdown を必ず出力するようにした (CRITICAL=0 の run でも「ゲートが実際に数えた」ことがログで監査できる)。 併せて SARIF の欠損 / 破損を exit 2 の明示エラーに変更した (SARIF は直前の step が生成するため、 欠損は「所見なし」ではなくスキャン破損を意味する)
-- CI: 上記ゲートの単体テスト (`tests/scripts/test_check_trivy_sarif.py`、 21 ケース) を追加し、 `Trivy Container Scan` workflow に専用 job として登録した。 `tests/scripts/` は `pytest.ini` の `testpaths` に含まれておらず、 従来どの CI job からも実行されていなかった。 旧実装の読み方 (result 側 tags) への回帰と、 index join 経路の欠落を検出する
-- 学習ツール: `piper_train.tools.batch_spectrograms._save_spec` が、 一時ファイルの作成そのものに失敗した場合に `UnboundLocalError` を投げて本来のエラーを覆い隠していた問題を修正。 `tempfile.mkstemp` を、 その戻り値 `tmp_path` を参照する cleanup ハンドラと同じ `try` に置いていたため、 mkstemp が失敗 (ENOSPC / EACCES / 親ディレクトリ不在) すると except 側で未束縛の `tmp_path` に触れていた。 併せて、 例外を無言で握り潰していた箇所に同 file の `_load_pt` と同じ粒度の warning ログを追加し、 `_save_spec` の戻り値を成否 bool にして `run()` が失敗を `skipped` に計上するようにした (従来は全書き込みが失敗した batch でも `processed=N skipped=0` と報告され、 1 件も書けていないことが表に出なかった)
-- CI: distroless trial イメージ (`Dockerfile.cpu.distroless`) で `import onnxruntime` が SIGSEGV (exit 139) し、 `src/python/**` を触る全 PR がブロックされていた問題を修正。 ORT 1.29 が import 時に新設した device discovery (`device_discovery.cc`、 `/sys/devices` を走査して PCI bus ID を読む) が distroless の最小ファイルシステム上でクラッシュする。 本イメージ限定で `onnxruntime<1.29` に上限を設ける (canonical `Dockerfile.cpu` では ORT 1.29 が正常動作することを実測で確認済みのため、 そちらと通常のインストールは巻き込まない)。 シンボル欠落 / ライブラリ欠落 / インタプリタのパッチレベル差 / 実行ユーザー / seccomp はいずれも実測で棄却済み (根拠は Dockerfile のコメントに記録)。 併せて smoke test に `-X faulthandler` を追加し、 次に native crash が起きた際に `exit 139` だけでなく Python トレースバックが出るようにした。 「nonroot 65532 で動く」という誤ったコメントも実測値 (uid 0) に訂正
-- 開発ツール: `.claude/hooks/guard-bash.sh` の `is_in_skill` が、 同一セッションで skill を再呼び出しした際に harness が挿入する `(Re-invocation of /<name> — ...)` メタ行 (`"isMeta":true`) を「新しいユーザー入力」と誤判定し、 **2 回目以降の `/create-pr` を常に deny** していた問題を修正 (1 セッションで複数 PR を出す流れが丸ごと塞がる)。 併せて `.claude/hooks/test-guard-bash.sh` の「許可」ケースが exit code しか見ておらず (hook は deny 時も exit 0 で JSON を stdout に出すため) **全て空振りしていた**のを、 出力が空であることまで検査するよう強化。 この振る舞いテストを pre-commit gate (`guard-bash-behaviour`) として登録し、 shellcheck では原理的に検出できない判定ロジックの回帰を commit 時点で捕まえるようにした
-- ドキュメント: `docs/guides/development/pretrained-models.md` の 6lang base model 記述を実態に合わせて修正。 HF `ayousanz/piper-plus-base` の `model.ckpt` は 2026-05-03 に HiFi-GAN 版から **MB-iSTFT-VITS2 版** (75 epoch scratch、 `epoch=74-step=500034`) へ差し替え済みだが、 表が「6-Language Base (HiFi-GAN)」、 注記が「MB-iSTFT 版は未アップロード」のまま残っていた。 併せて `dev` (v2.0) では `model_g.dec.cond` の size mismatch で読み込めないこと ([Issue #616](https://github.com/ayutaz/piper-plus/issues/616)) と、 互換タグ `v1.13.0` を使う回避策を明記
-- `notebooks/finetune.ipynb`: HF に存在しないファイル名 `epoch=74-step=504712.ckpt` を DL しようとして 404 で失敗していたのを `model.ckpt` に修正。 併せて (1) 公開中の ckpt と互換なリリースタグ `v1.13.0` を固定 clone するよう変更 (`dev` は Multi-scale FiLM 導入で decoder 形状が変わり ckpt を読めない)、 (2) `phoneme_id_map` / `num_symbols` を `get_phoneme_id_map()` (KO/SV を含む 8 言語統合マップ、 185 symbol) ではなく HF `config.json` (173 symbol) から取得するよう変更し、 `model_g.enc_p.emb.weight` の 173 vs 185 size mismatch を解消
-- CI: `_build-test-cpp.yml` のテストモデル取得 step を削除。 `https://huggingface.co/ayousanz/piper-plus-base/resolve/main/multilingual-test-medium.onnx` は 404 を返すようになっていたが `curl ... || true` で握り潰されており、 integration test がモデル無しで黙って劣化しうる状態だった。 実際には `test/models/multilingual-test-medium.onnx` は LFS ではない通常の blob として commit 済みで checkout 時点から存在するため、 cache + download をまとめて削除し、 存在確認して欠けていたら fail-fast する step に置き換え
-- 学習: CPython 3.13 で `torch.load` が既存 ckpt を `UnpicklingError: GLOBAL pathlib.PosixPath was not an allowed global` で拒否する問題を修正。 `torch.serialization.add_safe_globals([cls])` (bare 形式) は登録キーを **読み手側の** `cls.__module__` から導出するが、 unpickler は **書き手側が記録した文字列**を引く。 CPython 3.13 が具象 path クラスを `pathlib._local` へ移した (3.14 で `pathlib` に復帰) ため両者が一致せず、 3.12 以前で保存した ckpt が 3.13 で読めなくなっていた (逆方向も同様)。 `piper_train._compat` が `pathlib` / `pathlib._local` の両綴りを `(callable, name)` タプル形式で明示登録するようにし、 `weights_only=False` 経路用の Windows alias も両モジュールへ適用する。 併せて `piper_train/__main__.py` と `scripts/convert_multi_to_single_speaker.py` にあった同ロジックの複製 (drift 元) を canonical 実装への委譲に置き換え、 CI で 1 度も実行されていなかった `tests/test_compat.py` に `unit` マーカーを付与
-- 契約: `docs/spec/phoneme-set-version.toml` が `num_symbols = 173` を「IMMUTABLE」と宣言する一方、 実コードの `get_phoneme_id_map("multilingual")` は #300 (Swedish 追加) 以降ずっと 185 を返しており、 仕様と実装が乖離していた問題を修正。 原因は gate (`scripts/check_phoneme_set_version.py`) が toml の自己整合と `pua.json` の entry 数しか見ておらず、 **インベントリを実際に構築する関数を一度も呼んでいなかった**こと (契約自体も `pua.json` + 公開モデル config を書き写して作られており、 当初からコードを参照していなかった)。 加えて pre-commit の `files` regex に `id_maps.py` が含まれておらず、 **インベントリ本体を編集しても発火する hook が 1 つも存在しなかった**
-- 契約: 単一 pin をやめ、 live inventory (185 / `symbol_set_version = "1.1"`) と出荷済み snapshot (173 / `"1.0"`) を分けて表現するようにした。 両者は append-only な関係であることを実測で確認済み (`sha256(live[:173])` が HF 公開モデルの `phoneme_id_map` と完全一致)。 gate は (1) live の長さ、 (2) live 全体の digest (並べ替え検出)、 (3) 各 snapshot が live の厳密な prefix であること、 を検査する。 長さのみの検査では v1.12.0 が実際に出荷した「185 のまま id 94/149/153 が公開モデルと食い違う」ケースを検出できない
-- テスト: `tests/test_swedish_phonemizer.py` の `assert len(id_map) > 180` / `>= 173` という緩い assert (Swedish 12 記号の追加を通した張本人) を、 契約の厳密値 + digest 照合に置換。 `src/python/g2p/tests/test_phoneme_inventory.py` を新規追加し、 id の連続性・snapshot prefix 不変・合成言語コード間の一致を pin
-- 学習 / エクスポート: 公開ベースモデル (`ayousanz/piper-plus-base`) を含む Multi-scale FiLM 導入前 (PR #579 以前) の MB-iSTFT ckpt が `RuntimeError: size mismatch for model_g.dec.cond.weight` で読み込めない問題を修正 ([Issue #616](https://github.com/ayutaz/piper-plus/issues/616))。 PR #579 が `MBiSTFTGenerator.cond` の出力チャネルを 2 倍 (FiLM の scale + shift) に拡幅したため、 ONNX エクスポート / FT (`--resume-from-multispeaker-checkpoint`) / 学習再開 (`--resume_from_checkpoint`) の全経路が落ちていた (`strict=False` は size mismatch を緩めない)。 `piper_train.vits.commons.migrate_prefilm_decoder_cond` が旧 `cond` 重みを FiLM の shift 側に載せ scale 側をゼロ埋めする。 `_apply_film` は `scale = sigmoid(scale_raw) + 0.5` なので `scale_raw = 0` で gain が厳密に 1.0 となり、 旧 `x + cond(g)` と **ビット単位で同一**の出力になる (公開 ckpt 実機で max abs diff = 0.0 を確認)。 `cond_layers` は model 側と同じくゼロで backfill。 適用は `VitsModel.on_load_checkpoint` に置いたため `load_from_checkpoint` / `trainer.fit(ckpt_path=)` の両方が透過的に救われる
-- 学習: 上記 ckpt からの学習再開で optimizer state が黙って失われる問題を修正。 `optimizer.load_state_dict` は shape を検証しないため、 pre-FiLM の Adam moment が拡幅後の param にそのままロードされ、 最初の `step()` で `RuntimeError` になり、 それを resume の fallback が飲み込んで **epoch 0 から再学習**していた。 パラメータ順序を検証できる場合は moment を同じ規則で拡幅し、 検証できない場合は optimizer state を破棄したうえで警告を出す (黙って epoch 0 に戻る経路を塞ぐ)。 fallback 自体も `UnpicklingError` を捕捉対象に加え、 「重みのみロードし epoch 0 から開始する」ことを warning で明示するようにした
 
 - **`--reference-audio` / `--speaker-encoder-model` being silently ignored in
   `piper_train.infer_onnx`**: the documented voice-cloning flags had separate
@@ -272,14 +235,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- ライセンス方針: `train` extra 限定の copyleft 依存を「明文化された例外」として受理する規定を `CONTRIBUTING.md` に追加。 `soxr` (LGPL-2.1-or-later) は `librosa` 0.11 の必須依存で `train` extra にのみ入り、 PyPI に publish される wheel (`src/python_run` 由来、 依存は `src/python_run/requirements.txt` が宣言) には含まれないため再頒布が発生せず LGPL の義務も生じない。 これまで CI の `allow-dependencies-licenses` には carve-out が入る一方で `CONTRIBUTING.md` は「LGPL はバージョンを問わず禁止」のままだったため、 設定と明文の方針が食い違っていた。 併せて、 scanner の parser bug 回避のための carve-out (`typing-extensions` / `llvmlite`、 実際には copyleft ではない) は方針例外ではなく、 例外表に載せてはならないことを明記
-
-- Rust: `ort` を 2.0.0-rc.12 → rc.13 に更新したことに伴い、 `piper-core` の EP feature (`cuda` / `coreml` / `directml` / `tensorrt`) を weak-dependency 構文 (`ort?/cuda` 等) で `ort` 側へ転送するようにした。 rc.13 から `ort::ep::{CUDA, CoreML, DirectML, TensorRT}` が `ort` 自身の Cargo feature でcfg-gate されるようになり、 転送しないと EP 構造体が解決できずビルドが落ちる。 **利用者影響 2 点**: (1) rc.13 の `ort-sys` prebuilt distribution は `cuda13` タグのみで `cuda12` が存在しないため、 `cuda` feature を有効化する場合は CUDA 13 ランタイムが必要になる (Python / C# / Go / C++ の各ランタイムは従来どおり CUDA 12.x)。 (2) 4 つの EP を同時に含む prebuilt distribution が存在しないため `cargo build --all-features` は `ort-sys` のリンク時に失敗する (`cargo check` / `cargo clippy --all-features` はリンクしないため影響なし)。 単一 EP を指定してビルドすること (例 `--features onnx,cuda`)。 経緯と根拠は `docs/reference/ort-versions.md`、 ランタイム別の CUDA 要求は `docs/spec/ort-provider-contract.toml` に記録
-
-- 学習: `--resume-from-multispeaker-checkpoint` の実処理がインライン複製から `load_multispeaker_checkpoint()` に一本化された。 同関数はどこからも呼ばれない dead code で、 インライン側と挙動が食い違っていた (関数側のみ HiFi-GAN ckpt を明示エラーにし、 インライン側のみ weight_norm キーを remap していた)。 統合の結果、 **FT 経路でも v1.11 以前の HiFi-GAN ckpt が明示エラーになる** (従来は無言で大量の missing keys を出して継続していた)。 同様に `export_onnx` の EMA 適用も 2 箇所の複製を `apply_ema_shadow_params()` に集約した
-
-- CI: `g2p-python-ci.yml` の `test extras` job で venv を workspace 内 (`.venv-extras/`) ではなく `${RUNNER_TEMP}/venv-extras` に作るよう変更。 当 job は `uv.lock` を経由せず PyPI から fresh resolve するため nltk 3.10.x を引くが、 3.10 で追加された `nltk/inisec.py` の `NLTKSafeImportFinder` が「解決先ファイルが cwd 配下に物理的に存在する」モジュールを一律ブロックするため、 workspace 内 venv だと site-packages 全体が誤検知され `import nltk` 自体が `ImportError: Blocked import of regex from current working directory` で失敗していた。 エラーメッセージが案内する `-P` / `PYTHONSAFEPATH=1` は判定基準が sys.path ではなくファイルの物理位置のため回避にならないことを実測で確認済み
-
 - **`--trainable-pqmf-synthesis` を封印 (CLI で明示エラー)**: v10b 本走で GAN が
   合成フィルタを band3 +6.9dB 増幅へドリフトさせた実測 (残存ノイズ診断 doc §3、
   「制約なき自由度の gaming」4 例目) に基づく。PR 正則化の実装まで解除しない。
@@ -295,7 +250,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Latent Filling path (`--latent-filling-tau`) is the intended
   replacement regularizer.
 
-## [2.0.0] - 2026-05-25
+## [2.0.1] - 2026-10-08
+
+### Fixed
+
+- SwiftPM: pin the official ONNX Runtime 1.20.0 package and verify the published 2.0.1 consumer without an application-side SDK override.
+- Docker: bound independent build-cache operations, mirror the exact GHCR digest to Docker Hub, and verify signatures against the identical digest pulled for actual public-image synthesis.
+- Browser/npm 0.8.1: synchronize the demo and installation examples with the ONNX Runtime Web 1.30.0 validation pin. Check drift in PR CI and pre-commit.
+- C#: add a deleted-parent-working-directory CLI reproducer, including enforced RED/GREEN checks on Linux CI for the existing launcher fix (Issue #735).
+- Documentation: update the 2.0 migration examples and give the strict external-link check explicit concurrency, retry, and timeout limits.
+
+- Sign all seven published Docker images for both project and Docker-specific release tags. Allow signature repair only from an immutable signing tag after every public image's digest, version, source revision, and expected platform set has been verified.
+- Rust 0.5.2 and C# 0.5.1: continue inference from the original ONNX model when its directory cannot store an optimized cache. Check the writer's temporary path before asking ONNX Runtime to save; exercise read-only storage, normal cache creation/reload, and invalid models in PR CI.
+- Rust 0.5.1: use the ONNX model's declared speaker embedding dimension instead of forcing 192 values. Supports both 192- and 256-dimensional models; rejects mismatched explicit embeddings instead of silently truncating them.
+- Run actual embedding dimension inference on every Rust PR CI matrix, and allow up to 20 minutes for NuGet.org propagation before verifying repository-signed downloads.
+
+### Changed
+
+- Update the PyO3 0.29.3 lockfile, the Python workspace dependency lockfile, and pinned Rust/SBOM CI actions. Keep torch and torchaudio at 2.11.0, including the existing CUDA local version.
+
+<!--
+  Breaking changes must be listed under `### Breaking` and each entry must
+  include at least one `[label](docs/migration/v<X>-to-v<Y>.md#anchor)`
+  link. See `docs/migration/README.md` for the anchor slug rules.
+  `scripts/check_migration_xref.py` (workflow `Migration Guide Lint`)
+  enforces this automatically.
+-->
+
+## [2.0.0] - 2026-10-06
+
 
 Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13 + CUDA 12.8 + Ubuntu 24.04** で完全統一する fully-aligned 戦略 migration。 新 GPU (T4 / RTX 6000 Ada / RTX 5090) サポート + TF32 / bf16-mixed default 化。
 加えて Issue #590: **`piper` → `piper_plus` / `piper-plus` フル改名 (クリーンブレーク)** により本家 `piper-tts` (rhasspy/piper) と同一環境への pip 共存が可能に。
