@@ -62,6 +62,16 @@ def gate():
 
 @pytest.mark.unit
 class TestClassifyRole:
+    def test_shared_inference_context_and_cer_are_in_scope(self, gate):
+        assert gate.classify_role("src/python/piper_train/inference_eval.py") == "train"
+        assert (
+            gate.classify_role("src/python/piper_train/tools/eval_cer.py") == "metric"
+        )
+
+    def test_shared_context_cannot_import_cer(self, gate):
+        assert gate.scan_text("train", "from .tools.eval_cer import cer\n")
+        assert gate.scan_text("train", "import piper_train.tools.eval_cer\n")
+
     def test_train_scope(self, gate):
         assert gate.classify_role("src/python/piper_train/vits/lightning.py") == "train"
         assert gate.classify_role("src/python/piper_train/vits/models.py") == "train"

@@ -21,6 +21,9 @@
 Torch CPU/使用CUDA device、NumPy、PythonのRNGを復元する。例外時も復元する。
 この経路はoptimizer、EMA更新callback、DINO teacher/center更新を呼ばない。
 DDPの既存rank0監視と全rank barrierは維持する。
+既存のメトリクス隔離gateは共有`inference_eval.py`もtraining scopeとして検査し、
+CERのimportを禁止する。CER側のTorch/VITS importも禁止し、WAV検査には既存SciPy依存を使う。
+helper/CERだけの変更でもpre-commitの隔離gateが動く。
 
 WandB音声は従来の表示用振幅正規化を維持し、captionへ`display-normalized`を付ける。
 参照指定は`zero-shot`、参照なしzero vectorは`no-reference`と記録する。
