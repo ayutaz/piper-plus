@@ -32,7 +32,7 @@ class Generator(torch.nn.Module):
         )
         random.random()
         np.random.random()
-        return (torch.randn(1, 1, 32) * self.dec.weight,)
+        return (torch.randn(1, 1, 32, device=self.dec.weight.device) * self.dec.weight,)
 
 
 class Monitor(lightning.VitsModel):
@@ -49,7 +49,7 @@ class Monitor(lightning.VitsModel):
                 "seed": 42,
             }
         )
-        self.model_g = Generator()
+        self.model_g = Generator().to("cuda" if torch.cuda.is_available() else "cpu")
         self._trainer = SimpleNamespace(
             is_global_zero=True, world_size=1, current_epoch=0, global_step=5
         )

@@ -3,7 +3,7 @@
 更新: 2026-10-10。工程3の機能仕様。
 全体の順序は[改善計画](../design/zero-shot-recovery-and-improvement-plan-2026-10-09.md)、
 閾値は[評価契約](zs-eval-contract.md)を参照する。
-本仕様のCPU fixture成功は実装の証拠であり、学習済みモデルの品質承認ではない。
+本仕様のCPU/CUDA fixture成功は実装の証拠であり、学習済みモデルの品質承認ではない。
 
 ## 1. Training中の音声監視
 
@@ -55,7 +55,7 @@ WandB音声は従来の表示用振幅正規化を維持し、captionへ`display
 | source | Git revision、入力JSONLとuv.lockのpath/SHA256、training/runtime/G2Pの実Python sourceとpackage設定のpath/SHA256 |
 | clips | ID、textとhash、phoneme IDs、language/speaker ID、embeddingとhash、全参照WAVとhash、prosody |
 | generation | sample rate、embedding次元、scales `[noise,length,noise_w]`、seed、training epoch |
-| ASR | model名、40桁commit revision、language、`nfkc-strip-PZS-v1` |
+| ASR | model名、40桁commit revision、language、device、`nfkc-strip-PZS-v1` |
 | models | `torch-raw`、`torch-ema`、`onnx`ごとのpath/SHA256 |
 
 Git revisionは基点の記録であり、未コミット変更を含む実コードは`source.files`のhashで固定する。
@@ -69,22 +69,23 @@ epochは非負整数またはnull。未知epochを品質昇格に使わない。
 
 ## 3. CLIでの準備と生成
 
-以下はrepo rootの既存Windows `.venv`を使うPowerShell例。
+Pythonはuvで管理する。依存の追加は`uv add`、実行は`uv run`を使う。
+以下はrepo rootの既存uv環境を使うPowerShell例。Torch処理はCUDAで実行する。
 ASR revisionは利用するモデルの確認済み40桁commit SHAへ置換する。
 prepare/generateはASR・speaker encoderのdownloadを行わない。
 
 ```powershell
-.venv/Scripts/python.exe -m piper_train.tools.generate_eval_audio prepare `
+uv run --no-sync python -m piper_train.tools.generate_eval_audio prepare `
   --test-jsonl evaluation/test.jsonl --output evaluation/manifest.json `
   --checkpoint checkpoints/model.ckpt --onnx models/model.onnx `
-  --asr-revision <40桁commit-SHA> --epoch 40 `
+  --asr-revision <40桁commit-SHA> --asr-device cuda --epoch 40 `
   --sample-rate 22050 --embedding-dimension 192 --seed 42 --scales 0.4 1.0 0.5
 
-.venv/Scripts/python.exe -m piper_train.tools.generate_eval_audio generate `
-  --manifest evaluation/manifest.json --backend torch-raw --output-dir evaluation/raw
-.venv/Scripts/python.exe -m piper_train.tools.generate_eval_audio generate `
-  --manifest evaluation/manifest.json --backend torch-ema --output-dir evaluation/ema
-.venv/Scripts/python.exe -m piper_train.tools.generate_eval_audio generate `
+uv run --no-sync python -m piper_train.tools.generate_eval_audio generate `
+  --manifest evaluation/manifest.json --backend torch-raw --device cuda --output-dir evaluation/raw
+uv run --no-sync python -m piper_train.tools.generate_eval_audio generate `
+  --manifest evaluation/manifest.json --backend torch-ema --device cuda --output-dir evaluation/ema
+uv run --no-sync python -m piper_train.tools.generate_eval_audio generate `
   --manifest evaluation/manifest.json --backend onnx --output-dir evaluation/onnx
 ```
 
@@ -92,6 +93,9 @@ prepareの`--source-revision`未指定時は現在のGit HEADを記録する。
 checkpointだけ、ONNXだけを登録することも可能。ASRの既定は`openai/whisper-small`、languageは`ja`。
 ONNXのepochはexport元から確認して`--epoch`へ指定する。
 Torchではcheckpointの実epochと指定epochの不一致を生成前に拒否する。
+Torchの`--device auto`はCUDAを優先する。上記の明示`cuda`指定はGPUがなければ失敗し、
+CPUへfallbackしない。ASRはCUDA既定で、deviceもmanifestの比較条件へ含める。
+CPU互換用の指定は残すが、本作業のTorch検証・運用はCUDAを使う。
 
 各backendの処理:
 
@@ -116,13 +120,13 @@ output directoryは空であることが必須。各WAVをatomic保存し、全c
 途中失敗したdirectoryは正式結果にならず、再試行には新しい空directoryを使う。
 
 `generation.json`はmanifest/conditions/model hash、source、backend、sample rate、scales、seed、
-実epoch、EMA適用件数、`ground_truth_f0_or_duration=false`、`audio_encoding=float32-raw`と、
+実epoch、実行device、EMA適用件数、`ground_truth_f0_or_duration=false`、`audio_encoding=float32-raw`と、
 各clipの参照/text/WAV hash・実seedを持つ。
 
 ## 4. Strict CERと自由診断
 
 ```powershell
-.venv/Scripts/python.exe -m piper_train.tools.eval_cer `
+uv run --no-sync python -m piper_train.tools.eval_cer `
   --manifest evaluation/manifest.json --clips-dir evaluation/raw --json-out evaluation/raw-cer.json
 ```
 
@@ -135,9 +139,9 @@ ASRを作る前に次を検査する。
 4. generationのmanifest/model/conditions hash、sample rate/scales/seed、
    参照/text hash、clip別seed、epoch、raw/predicted条件がmanifestと一致。
 5. WAV hashがreportと一致し、実WAVが指定sample rate・mono float32・非空・finite。
-6. CLIでASR model/revision/languageを指定した場合、manifestと完全一致。
+6. CLIでASR model/revision/language/deviceを指定した場合、manifestと完全一致。
 
-ASRはmanifestのrevisionを指定して初期化する。全件のCERを記録し、完全成功時だけmedian/meanを集計する。
+ASRはmanifestのrevision/deviceで初期化する。全件のCERを記録し、完全成功時だけmedian/meanを集計する。
 ASR初期化失敗やclipごとの失敗は`failed_clips`へ残し、部分成功を正式合格にしない。
 結果JSONはatomic保存し、manifest/conditions hash、ASR条件、normalization、epoch、
 期待/成功件数、transcript、gate判定を記録する。
@@ -155,9 +159,14 @@ ASR初期化失敗やclipごとの失敗は`failed_clips`へ残し、部分成�
 
 ## 5. 検証範囲
 
-工程3の関連4ファイルは72 passed（2026-10-10、CPU）。
+工程3の初回CPU検証は関連4ファイル72 passed。隔離gate補完後は95 passed。
+CUDA対応後は関連5ファイル99 passed（2026-10-10）。
+RTX 4070 Ti SUPER / Torch 2.11.0+cu128で、実小型モデルのraw/EMA生成・監視・exportと
+CPU/CUDA RNGの正常時・例外時復元を確認した。ONNXはCPUで検証する。
 実小型Synthesizerの通常/compile形式checkpoint、既存EMA、抽出wrapper→loader→固定監視→
 prepare/generate CLI→strict CER、実ONNXの補助出力順・seed再現、失敗時復元を含む。
 encoder/frontendとASRのfixtureは接続・gateの機能検証用。
 実encoderの抽出品質、実WhisperのCER、学習済みモデルの音声品質は未評価。
-実データ固定・品質比較・GPU/full-model検証は工程0/4/5で行う。
+ASRのCUDA指定はdownloadを伴わないmodule stubで検証し、回帰実行時もoffline設定を使った。
+既存uv.lockの整合性も`uv lock --check --offline`で確認。追加依存は不要だった。
+実データ固定・品質比較・full-model GPU学習検証は工程0/4/5で行う。

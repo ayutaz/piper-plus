@@ -189,7 +189,9 @@ See the [release checklist](docs/guides/development/python-release-2.0.2.md).
   振幅正規化しないfloat32 WAVと生成reportを保存。`eval_cer --manifest`は期待clip集合・
   実WAV形式・生成来歴を検査し、全件成功時だけ既存CER/epoch昇格gateを判定する。
   従来のTSV診断は維持。WandB監視も固定参照/prosodyをinferへ渡し、推論後のmode/RNGを復元する。
-  仕様: [推論評価](docs/spec/zero-shot-inference-evaluation.md)。CPU fixtureによる機能検証であり、
+  Torch生成はCUDAに対応し、`--device cuda`でCPUへのfallbackを防ぐ。ASRはCUDA既定で
+  deviceをmanifestへ固定し、生成reportにも実行deviceを記録する。
+  仕様: [推論評価](docs/spec/zero-shot-inference-evaluation.md)。CPU/CUDA fixtureによる機能検証であり、
   学習済みモデルの品質改善は未評価。
 
 - **v11 条件付け改修 (Phase 0 診断準拠、opt-in、default は v10b 互換)**:
