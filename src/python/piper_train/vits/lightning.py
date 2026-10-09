@@ -1472,6 +1472,10 @@ class VitsModel(pl.LightningModule):
         0 disables the abort; the error logs still fire).
         """
         if not self.training:
+            # validation_step owns this temporary capture. Standalone eval
+            # calls must not introduce or change persistent training state.
+            if hasattr(self, "_validation_kl_raw"):
+                self._validation_kl_raw = kl_raw
             return
         if not kl_raw >= _KL_CAP:
             self._kl_cap_consecutive = 0
@@ -2599,14 +2603,19 @@ class VitsModel(pl.LightningModule):
         # during validation.  We restore self.log immediately after.
         _orig_log = self.log
         self.log = lambda *_args, **_kwargs: None  # no-op
+        self._validation_kl_raw = None
         try:
             loss_g = self.training_step_g(batch)
             loss_d = self.training_step_d(batch)
         finally:
             self.log = _orig_log
+            kl_raw = self._validation_kl_raw
+            del self._validation_kl_raw
 
         val_loss = loss_g + loss_d
         self._log_with_batch_info("val_loss", val_loss, batch)
+        if kl_raw is not None:
+            self._log_with_batch_info("val_kl_raw", kl_raw, batch)
         return val_loss
 
     def on_validation_epoch_end(self):
