@@ -27,8 +27,10 @@ VITS ベースの高品質ニューラル TTS。**6言語マルチリンガル�
 > G/D/WavLM周期・validation KL guardをTDDで修正。関連207テスト成功 (実Lightning/CPU Gloo含む)。
 > clock・EMA・旧checkpointのweights-only移行は[仕様](docs/spec/training-batch-schedule.md)を参照。
 > 工程2以降、full-model GPU smoke、追加学習、音声品質比較は未実施。
+> **次の着手**: 工程2A/2B (embedding契約・manifest/path・cache) → 2C (runtime入力検証)。
+> 工程0の比較条件固定を並行し、工程0〜3の完了後にモデル比較へ進む。詳細は改善計画 §2/5/11。
 
-> **最新状態 (2026-08-25): v11 (carrier head 構造保証) は R3 安全装置により ep29/80 で正規停止 — 調波構造の技術検証成功 (comb-HNR 14.6dB = GT 超え、v10b 4.6)、実用は学習量不足で不成立。次は v11b (ramp 修正 + CER gate + export 修理)。**
+> **2026-08-25時点の学習結果**: v11 (carrier head 構造保証) は R3 安全装置により ep29/80 で正規停止 — 調波構造の技術検証成功 (comb-HNR 14.6dB = GT 超え、v10b 4.6)、実用は学習量不足で不成立。以後の修正・再評価・追加学習の順序は上記2026-10-09改善計画を参照。
 >
 > - **v11 最終結論 (2026-08-25)**: [zero-shot-v11-roadmap.md §5](docs/design/zero-shot-v11-roadmap.md) が canonical。要点: ①carrier head で がびがび残存成分 (A3) の構造保証を実証、②ep19→25 で敵対 ramp による dual-encoder 乖離崩壊 (encoder 騙し 6 例目) → R3 が正規停止、③ONNX export の 2 バグは**修理完了 (2026-08-25)**: `--no-ema` フラグ (a12609b1) + main() の infer 手書き複製を build_infer_forward に一本化 (ca76d6ea、AdaLN g_spk 断線の根治、FP16 export で 14.4dB 回復実測)、④評価系の明瞭度盲点は**解消済み** — `piper_train.tools.eval_cer` 実装 (ca12027e) + gate 事前登録 (契約 §7、median ≤ 0.30 / ep40+ 昇格判定。較正: 明瞭 v10b ep79 = 0.095 vs 不明瞭 v11 ep9 = 1.43)。成果物: HF `checkpoints-v11/` + `v11-results/`、ログ/TB はローカル `piper-v11-local/box-evac/`
 > - **dev リベース (2026-08-25)**: `origin/dev` を取り込み。#616 (Multi-scale FiLM 導入前 ckpt の自動移行) + #619 (py3.13 pathlib ckpt 読み込み) が入り、ckpt state_dict 正規化は `normalize_checkpoint_state_dict` に一本化 (073062b1 で `--resume-weights-only` 経路も追従)。v7 時代に本ブランチ独自だった FiLM 復活パッチは upstream 化された。**リベースにより本 doc 内の pre-rebase コミットハッシュは非到達** (ローカル `backup/pre-rebase-dev-20260825` に退避済み)
