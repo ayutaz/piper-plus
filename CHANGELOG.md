@@ -382,6 +382,12 @@ See the [release checklist](docs/guides/development/python-release-2.0.2.md).
 
 ### Fixed
 
+- **Python zero-shot embedding抽出・cache**: dataset相対pathと指定output directoryを反映し、
+  同名音声のcache衝突、失敗entryへの存在しないembedding pathの公開を修正。
+  音声・encoder・抽出設定の来歴と保存hashを確認して再利用し、旧cacheは保持する。
+  `--dry-run-cache`で抽出なしに監査、shard完了後は`--finalize-manifest`で確定できる。
+  per-speakerの`--workers`を実処理へ接続し、非対応経路での指定を明示エラーにする。
+
 - **Zero-shot manual optimizationの周期とKL監視**: G/D/WavLMの判定を
   同一の永続training batch indexへ統一し、D:G=2:1でG更新が毎batch走る問題と
   WavLM D更新の停止を修正。G lossの周期補償をG更新頻度に合わせ、EMAは成功した

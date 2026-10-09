@@ -348,7 +348,7 @@ jobs:
     - name: Run runtime speaker embedding tests
       run: |
         cd src/python_run
-        pytest tests/test_speaker_embedding.py tests/test_zero_shot_e2e.py -v --tb=short --override-ini="addopts="
+        pytest tests/test_speaker_embedding.py tests/test_embedding_validation.py tests/test_zero_shot_e2e.py -v --tb=short --override-ini="addopts="
       env:
         PYTHONUTF8: '1'
 

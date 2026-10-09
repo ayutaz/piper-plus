@@ -29,6 +29,7 @@ import json
 import logging
 import os
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -37,6 +38,14 @@ import soundfile as sf
 import torch
 import torchaudio
 
+from piper_plus.embedding import validate_embedding
+from piper_train.embedding_cache import (
+    atomic_write,
+    cache_key,
+    file_sha256,
+    read_verified,
+    save_verified,
+)
 from piper_train.norm_audio import load_audio_norm_tensor
 
 
@@ -141,11 +150,7 @@ def extract_embedding(
     fbank_input = np.expand_dims(fbank, axis=0).astype(np.float32)
     input_name = session.get_inputs()[0].name
     outputs = session.run(None, {input_name: fbank_input})
-    embedding = np.squeeze(outputs[0])
-    norm = np.linalg.norm(embedding)
-    if norm > 0:
-        embedding = embedding / norm
-    return embedding
+    return validate_embedding(outputs[0])
 
 
 def extract_from_files(
@@ -165,11 +170,7 @@ def extract_from_files(
         fbank = preprocess_audio(wav_path)
         emb = extract_embedding(session, fbank)
         embeddings.append(emb)
-    avg_embedding = np.mean(embeddings, axis=0)
-    norm = np.linalg.norm(avg_embedding)
-    if norm > 0:
-        avg_embedding = avg_embedding / norm
-    return avg_embedding
+    return validate_embedding(np.mean(embeddings, axis=0))
 
 
 def extract_from_dataset(
@@ -182,7 +183,10 @@ def extract_from_dataset(
     workers: int = 4,
 ) -> None:
     """dataset.jsonl から話者ごとにembeddingを一括抽出する（平均化モード）。"""
-    jsonl_path = Path(dataset_dir) / "dataset.jsonl"
+    dataset_dir = Path(dataset_dir).resolve()
+    if workers < 1:
+        raise ValueError("workers must be at least 1")
+    jsonl_path = dataset_dir / "dataset.jsonl"
     if not jsonl_path.exists():
         msg = "dataset.jsonl not found in " + str(dataset_dir)
         raise FileNotFoundError(msg)
@@ -198,6 +202,7 @@ def extract_from_dataset(
             speaker_id = utt.get("speaker_id", 0)
             audio_path = utt.get("audio_norm_path")
             if audio_path:
+                audio_path = str(dataset_dir / audio_path)
                 speaker_utterances.setdefault(speaker_id, []).append(audio_path)
 
     output_dir = Path(output_dir)
@@ -235,19 +240,18 @@ def extract_from_dataset(
         )
 
         # Extract embeddings
-        embeddings = []
-        for pt_path in selected:
+        def extract_one(pt_path):
             fbank = _load_audio_from_pt(pt_path, source_sr=source_sr)
-            emb = extract_embedding(session, fbank)
-            embeddings.append(emb)
+            return extract_embedding(session, fbank)
 
-        avg_embedding = np.mean(embeddings, axis=0)
-        norm = np.linalg.norm(avg_embedding)
-        if norm > 0:
-            avg_embedding = avg_embedding / norm
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            embeddings = list(pool.map(extract_one, selected))
+        avg_embedding = validate_embedding(np.mean(embeddings, axis=0))
 
         output_path = output_dir / f"speaker_{speaker_id}.npy"
-        np.save(str(output_path), avg_embedding)
+        atomic_write(
+            output_path, lambda target, vector=avg_embedding: np.save(target, vector)
+        )
         _LOGGER.info(
             "Saved: %s (norm=%.4f)", output_path, np.linalg.norm(avg_embedding)
         )
@@ -290,9 +294,9 @@ class _FbankDataset(torch.utils.data.Dataset):
 
     def _reflect_pad_to(self, fbank: torch.Tensor, target: int) -> torch.Tensor:
         T = fbank.shape[0]
-        if T == target:
+        if target == T:
             return fbank
-        if T > target:
+        if target < T:
             return fbank[:target]
         fb_t = fbank.transpose(0, 1).unsqueeze(0)  # [1, mel, T]
         pad_amount = target - T
@@ -312,10 +316,10 @@ class _FbankDataset(torch.utils.data.Dataset):
         """
         target = self.fixed_frames
         T = fbank.shape[0]
-        if T <= target:
+        if target >= T:
             # T <= target: 情報が少ないので同じ fbank を先頭寄せ・末尾寄せの 2 chunk に
             padded = self._reflect_pad_to(fbank, target)  # [target, mel]
-            if T <= target // 2:
+            if target // 2 >= T:
                 # 極端に短い発話は 1 chunk で十分 (情報の冗長性を上げる意味がない)
                 return padded.unsqueeze(0)
             # 2 chunk: (a) 先頭寄せ (original+reflect後半) (b) 末尾寄せ (reflect前半+original)
@@ -395,7 +399,7 @@ def _collate_fbanks_chunked(
     indices, fbank_chunks, stems, valids = zip(*batch, strict=False)
     chunks_per_utt = [f.shape[0] for f in fbank_chunks]
     # 各 chunk は同一 shape [T, mel] なので concat
-    flat = torch.cat([f for f in fbank_chunks], dim=0).numpy().astype(np.float32)
+    flat = torch.cat(list(fbank_chunks), dim=0).numpy().astype(np.float32)
     # 形状: [Σn_chunks, T, mel]
     return (list(indices), flat, chunks_per_utt, list(stems), list(valids))
 
@@ -440,17 +444,26 @@ def _filter_for_shard(items: list, shard: int, num_shards: int) -> list:
     return [item for i, item in enumerate(items) if i % num_shards == shard]
 
 
+def _manifest_path(path: Path, dataset_dir: Path) -> str:
+    try:
+        return Path(os.path.relpath(path, dataset_dir)).as_posix()
+    except ValueError:  # Windows directories on different drives.
+        return str(path.resolve())
+
+
 def _write_updated_jsonl(dataset_dir: Path, entries: list[dict]) -> None:
     """dataset.jsonlをバックアップして更新する。"""
     output_jsonl = dataset_dir / "dataset.jsonl"
     backup_path = dataset_dir / "dataset.jsonl.bak"
-    shutil.copy2(output_jsonl, backup_path)
+    if not backup_path.exists():
+        shutil.copy2(output_jsonl, backup_path)
     _LOGGER.info("Backed up original to: %s", backup_path)
 
-    with open(output_jsonl, "w", encoding="utf-8") as f:
+    def write(target):
         for entry in entries:
-            json.dump(entry, f, ensure_ascii=True)
-            f.write("\n")
+            target.write((json.dumps(entry, ensure_ascii=True) + "\n").encode())
+
+    atomic_write(output_jsonl, write)
 
     _LOGGER.info(
         "Updated dataset.jsonl with speaker_embedding_path (%d entries)", len(entries)
@@ -471,7 +484,10 @@ def extract_per_utterance(
     chunk_batch: int = 128,
     use_batch_infer: bool = False,
     use_length_sort: bool | None = None,
-) -> None:
+    encoder_path: str | Path | None = None,
+    dry_run: bool = False,
+    finalize_only: bool = False,
+) -> dict:
     """dataset.jsonl の各発話ごとにembeddingを抽出し、dataset.jsonlを更新する。
 
     **v2 (2026-07-09) 以降のデフォルト**: A'' 案 (chunked mean pooling) を default 有効化。
@@ -509,14 +525,59 @@ def extract_per_utterance(
         use_length_sort: Force length-based bucket sorting. None=auto (True if
             ``fixed_frames > 0`` or ``use_batch_infer=True``).
     """
-    dataset_dir = Path(dataset_dir)
+    dataset_dir = Path(dataset_dir).resolve()
     jsonl_path = dataset_dir / "dataset.jsonl"
     if not jsonl_path.exists():
         msg = "dataset.jsonl not found in " + str(dataset_dir)
         raise FileNotFoundError(msg)
 
-    emb_dir = dataset_dir / "speaker_embeddings"
-    emb_dir.mkdir(parents=True, exist_ok=True)
+    if num_shards < 1 or not 0 <= shard < num_shards:
+        raise ValueError("invalid shard/num_shards")
+    if num_shards > 1 and update_jsonl and not dry_run:
+        raise ValueError(
+            "sharded extraction requires --no-update-jsonl; finalize separately"
+        )
+    if batch_size < 1 or chunk_batch < 1 or num_workers < 0:
+        raise ValueError("invalid batch size or worker count")
+    emb_dir = (
+        Path(output_dir).resolve() if output_dir else dataset_dir / "speaker_embeddings"
+    )
+    fixed_frames = int(os.environ.get("PIPER_PLUS_EMB_FIXED_FRAMES", fixed_frames))
+    use_batch_infer = (
+        os.environ.get("PIPER_PLUS_EMB_BATCH_INFER", str(int(use_batch_infer))) == "1"
+    )
+    if fixed_frames < 0:
+        raise ValueError("fixed_frames must be nonnegative")
+    model_path = encoder_path or getattr(session, "_model_path", None)
+    model_hash = (
+        file_sha256(Path(model_path))
+        if isinstance(model_path, (str, Path)) and Path(model_path).is_file()
+        else None
+    )
+    if use_length_sort is None:
+        use_length_sort = fixed_frames > 0 or use_batch_infer
+    if os.environ.get("PIPER_PLUS_EMB_LENGTH_SORT") == "1":
+        use_length_sort = True
+    settings = {
+        "version": 1,
+        "encoder_sha256": model_hash,
+        "dimension": 192,
+        "source_sr": source_sr,
+        "target_sr": 16000,
+        "resampler": "torchaudio.transforms.Resample",
+        "fbank_version": "kaldi-80-25ms-10ms-cmvn-v1",
+        "torchaudio_version": torchaudio.__version__,
+        "fixed_frames": fixed_frames,
+        "batch_size": batch_size,
+        "chunk_batch": chunk_batch,
+        "length_sort": use_length_sort,
+        "chunk_hop_ratio": 0.5,
+        "pooling": "chunk-l2-mean-l2"
+        if fixed_frames
+        else "padded"
+        if use_batch_infer
+        else "whole-utterance",
+    }
 
     # Load all entries
     entries: list[dict] = []
@@ -528,37 +589,63 @@ def extract_per_utterance(
 
     _LOGGER.info("Total utterances: %d", len(entries))
 
-    # Pre-cache existing embeddings
-    existing_stems = {p.stem for p in emb_dir.glob("*.npy")}
-    _LOGGER.info("Already extracted: %d embeddings (pre-cached)", len(existing_stems))
-
     # Build items to extract
     items_to_extract: list[tuple[int, Path, str]] = []
+    metadata_by_index = {}
+    report = {"reuse": 0, "reextract": 0, "missing": 0, "legacy": 0, "entries": []}
     skipped = 0
     fail = 0
     for i, utt in enumerate(entries):
+        if i % num_shards != shard:
+            continue
+        utt.pop("speaker_embedding_path", None)
         audio_norm_path = utt.get("audio_norm_path")
         if not audio_norm_path:
             fail += 1
+            report["missing"] += 1
+            report["entries"].append({"index": i, "status": "missing"})
             continue
         pt_path = Path(audio_norm_path)
-        stem = pt_path.stem
-        npy_rel = "speaker_embeddings/" + stem + ".npy"
-        utt["speaker_embedding_path"] = npy_rel
-
-        if stem in existing_stems:
-            skipped += 1
-            continue
-
         if not pt_path.is_absolute():
             pt_path = dataset_dir / pt_path
 
         if not pt_path.exists():
             _LOGGER.warning("File not found, skipping: %s", pt_path)
             fail += 1
+            report["missing"] += 1
+            report["entries"].append(
+                {"index": i, "status": "missing", "audio": str(audio_norm_path)}
+            )
             continue
+        metadata = {**settings, "audio_sha256": file_sha256(pt_path)}
+        metadata_by_index[i] = metadata
+        key = cache_key(metadata)
+        path = emb_dir / (key + ".npy")
+        legacy = (emb_dir / (pt_path.stem + ".npy")).exists()
+        report["legacy"] += int(legacy)
+        if read_verified(path, metadata) is not None:
+            skipped += 1
+            report["reuse"] += 1
+            utt["speaker_embedding_path"] = _manifest_path(path, dataset_dir)
+            status = "reuse"
+        else:
+            report["reextract"] += 1
+            items_to_extract.append((i, pt_path, key))
+            status = "reextract"
+        report["entries"].append(
+            {
+                "index": i,
+                "status": status,
+                "legacy": legacy,
+                "audio": str(audio_norm_path),
+                "embedding": _manifest_path(path, dataset_dir),
+            }
+        )
 
-        items_to_extract.append((i, pt_path, stem))
+    if dry_run:
+        return report
+    if finalize_only and (fail or items_to_extract):
+        raise RuntimeError("embedding shards incomplete; manifest was not updated")
 
     _LOGGER.info(
         "To extract: %d, skipped (existing): %d, failed: %d",
@@ -567,22 +654,14 @@ def extract_per_utterance(
         fail,
     )
 
-    if num_shards > 1:
-        before = len(items_to_extract)
-        items_to_extract = _filter_for_shard(items_to_extract, shard, num_shards)
-        _LOGGER.info(
-            "Shard %d/%d: filtered %d -> %d items",
-            shard,
-            num_shards,
-            before,
-            len(items_to_extract),
-        )
-
     if not items_to_extract:
-        _LOGGER.info("All embeddings already extracted (or shard empty)")
+        if fail and not skipped:
+            raise RuntimeError(
+                "speaker embedding extraction failed; manifest was not updated"
+            )
         if update_jsonl:
             _write_updated_jsonl(dataset_dir, entries)
-        return
+        return report
 
     # items を fbank 長 (audio_norm .pt サイズ) でソートしてバッチ内の pad 差を最小化
     # v2 default: fixed_frames=400 (A''案) + chunk_batch=128 で GPU batched inference
@@ -638,6 +717,52 @@ def extract_per_utterance(
 
     input_name = session.get_inputs()[0].name
     success = 0
+
+    def infer(features, binding=None, output_name=None):
+        try:
+            if binding is None:
+                result = session.run(None, {input_name: features})[0]
+            else:
+                ort_input = onnxruntime.OrtValue.ortvalue_from_numpy(
+                    features, "cuda", 0
+                )
+                binding.bind_input(
+                    name=input_name,
+                    device_type="cuda",
+                    device_id=0,
+                    element_type=features.dtype,
+                    shape=features.shape,
+                    buffer_ptr=ort_input.data_ptr(),
+                )
+                binding.bind_output(output_name, device_type="cuda", device_id=0)
+                try:
+                    session.run_with_iobinding(binding)
+                    result = binding.get_outputs()[0].numpy()
+                finally:
+                    binding.clear_binding_inputs()
+                    binding.clear_binding_outputs()
+            if np.asarray(result).shape != (features.shape[0], 192):
+                raise ValueError(
+                    f"Unexpected encoder output shape: {np.asarray(result).shape}"
+                )
+            return result
+        except Exception as exc:
+            _LOGGER.warning(
+                "Encoder inference failed for %d rows: %s", features.shape[0], exc
+            )
+            return np.full((features.shape[0], 192), np.nan, dtype=np.float32)
+
+    def publish(index, key, values):
+        nonlocal success, fail
+        try:
+            path = emb_dir / (key + ".npy")
+            save_verified(path, values, metadata_by_index[index])
+            entries[index]["speaker_embedding_path"] = _manifest_path(path, dataset_dir)
+            success += 1
+        except (ValueError, OSError) as exc:
+            fail += 1
+            _LOGGER.warning("Invalid embedding for entry %d: %s", index, exc)
+
     total_batches = len(loader)
 
     mode_label = "per-utt"
@@ -664,7 +789,7 @@ def extract_per_utterance(
             # 大きな batch を chunk_batch 単位でさらに分割 (GPU メモリ節約 + graph replay 対応)
             all_chunk_embs = []
             for i in range(0, flat.shape[0], chunk_batch):
-                out = session.run(None, {input_name: flat[i : i + chunk_batch]})[0]
+                out = infer(flat[i : i + chunk_batch])
                 all_chunk_embs.append(out)
             chunk_embs = np.concatenate(all_chunk_embs, axis=0)
             # 発話ごとに切り出して平均 → L2 正規化
@@ -677,15 +802,15 @@ def extract_per_utterance(
                 utt_chunks = chunk_embs[offset : offset + n_chunks]  # [n_chunks, 192]
                 offset += n_chunks
                 # 各 chunk を L2 正規化してから平均 → 再 L2 正規化
-                cnorms = np.linalg.norm(utt_chunks, axis=-1, keepdims=True)
-                cnorms = np.where(cnorms > 1e-8, cnorms, 1.0)
-                utt_chunks_normed = utt_chunks / cnorms
-                utt_emb = utt_chunks_normed.mean(axis=0)
-                enorm = np.linalg.norm(utt_emb)
-                if enorm > 1e-8:
-                    utt_emb = utt_emb / enorm
-                np.save(str(emb_dir / (stems[j] + ".npy")), utt_emb)
-                success += 1
+                try:
+                    utt_emb = np.stack(
+                        [validate_embedding(row) for row in utt_chunks]
+                    ).mean(axis=0)
+                except ValueError as exc:
+                    fail += 1
+                    _LOGGER.warning("Invalid chunk embedding: %s", exc)
+                    continue
+                publish(indices[j], stems[j], utt_emb)
             if (batch_idx + 1) % 50 == 0:
                 _LOGGER.info(
                     "Batch %d/%d (success=%d, fail=%d)",
@@ -695,21 +820,17 @@ def extract_per_utterance(
                     fail,
                 )
     elif use_batch_infer:
-        for batch_idx, (indices, padded, lengths, stems, valids) in enumerate(loader):
+        for batch_idx, (indices, padded, _lengths, stems, valids) in enumerate(loader):
             valid_mask = np.array(valids, dtype=bool)
             if not valid_mask.any():
                 fail += int((~valid_mask).sum())
                 continue
-            embeddings = session.run(None, {input_name: padded})[0]
-            norms = np.linalg.norm(embeddings, axis=-1, keepdims=True)
-            norms = np.where(norms > 1e-8, norms, 1.0)
-            embeddings = embeddings / norms
+            embeddings = infer(padded)
             for j in range(len(stems)):
                 if not valids[j]:
                     fail += 1
                     continue
-                np.save(str(emb_dir / (stems[j] + ".npy")), embeddings[j])
-                success += 1
+                publish(indices[j], stems[j], embeddings[j])
             if (batch_idx + 1) % 50 == 0:
                 _LOGGER.info(
                     "Batch %d/%d (success=%d, fail=%d)",
@@ -735,33 +856,8 @@ def extract_per_utterance(
                     continue
 
                 fbank_input = np.expand_dims(fbank, axis=0)
-                if io_binding is not None:
-                    # IO binding: 入力 numpy → GPU、出力 GPU → numpy を明示制御
-                    ort_input = onnxruntime.OrtValue.ortvalue_from_numpy(
-                        fbank_input, "cuda", 0
-                    )
-                    io_binding.bind_input(
-                        name=input_name,
-                        device_type="cuda",
-                        device_id=0,
-                        element_type=fbank_input.dtype,
-                        shape=fbank_input.shape,
-                        buffer_ptr=ort_input.data_ptr(),
-                    )
-                    io_binding.bind_output(output_name, device_type="cuda", device_id=0)
-                    session.run_with_iobinding(io_binding)
-                    embedding = io_binding.get_outputs()[0].numpy()
-                    io_binding.clear_binding_inputs()
-                    io_binding.clear_binding_outputs()
-                else:
-                    embedding = session.run(None, {input_name: fbank_input})[0]
-                embedding = np.squeeze(embedding)
-                norm = np.linalg.norm(embedding)
-                if norm > 1e-8:
-                    embedding = embedding / norm
-                npy_path = emb_dir / (stem + ".npy")
-                np.save(str(npy_path), embedding)
-                success += 1
+                embedding = infer(fbank_input, io_binding, output_name)
+                publish(_entry_idx, stem, embedding)
 
             if (batch_idx + 1) % 50 == 0:
                 _LOGGER.info(
@@ -779,7 +875,7 @@ def extract_per_utterance(
         len(entries),
     )
 
-    if entries and success == 0:
+    if fail and success + skipped == 0:
         # 全滅は環境/コード起因 (例: audio_norm cache の形式不整合) であり、
         # jsonl に実在しない embedding path を書いて「成功」扱いにしてはならない
         raise RuntimeError(
@@ -791,6 +887,7 @@ def extract_per_utterance(
         _write_updated_jsonl(dataset_dir, entries)
     else:
         _LOGGER.info("Skipping dataset.jsonl update (--no-update-jsonl)")
+    return {**report, "success": success, "failed": fail}
 
 
 def main() -> None:
@@ -811,7 +908,10 @@ def main() -> None:
     )
     parser.add_argument("--output-dir", help="Output directory (for --dataset-dir)")
     parser.add_argument(
-        "--workers", type=int, default=4, help="Number of parallel workers"
+        "--workers",
+        type=int,
+        default=None,
+        help="Per-speaker extraction threads (default: 4); per-utterance uses --num-workers",
     )
     parser.add_argument(
         "--max-utterances",
@@ -898,6 +998,16 @@ def main() -> None:
         action="store_true",
         help="Force length-based bucket sorting. Auto-enabled when --fixed-frames > 0.",
     )
+    parser.add_argument(
+        "--dry-run-cache",
+        action="store_true",
+        help="Audit per-utterance cache provenance without extraction or file changes",
+    )
+    parser.add_argument(
+        "--finalize-manifest",
+        action="store_true",
+        help="Verify all per-utterance shard results and publish manifest without extraction",
+    )
 
     args = parser.parse_args()
 
@@ -922,6 +1032,36 @@ def main() -> None:
     if args.dataset_dir and not args.per_utterance and not args.output_dir:
         parser.error(
             "--output-dir is required with --dataset-dir (unless --per-utterance)"
+        )
+
+    if args.workers is not None and (not args.dataset_dir or args.per_utterance):
+        parser.error(
+            "--workers applies only to per-speaker dataset extraction; use --num-workers for per-utterance"
+        )
+    if args.dry_run_cache or args.finalize_manifest:
+        if not args.dataset_dir or not args.per_utterance or args.num_shards != 1:
+            parser.error(
+                "cache audit/finalization requires unsharded --dataset-dir --per-utterance"
+            )
+        report = extract_per_utterance(
+            None,
+            dataset_dir=args.dataset_dir,
+            output_dir=args.output_dir,
+            source_sr=args.source_sample_rate,
+            batch_size=args.batch_size,
+            chunk_batch=args.chunk_batch,
+            use_length_sort=True if args.length_sort else None,
+            fixed_frames=0 if args.disable_fixed_frames else args.fixed_frames,
+            use_batch_infer=args.batch_infer_padded,
+            encoder_path=args.encoder,
+            dry_run=args.dry_run_cache,
+            finalize_only=args.finalize_manifest,
+        )
+        print(json.dumps(report, ensure_ascii=False))
+        return
+    if args.num_shards > 1 and not args.no_update_jsonl:
+        parser.error(
+            "sharded extraction requires --no-update-jsonl; use --finalize-manifest afterward"
         )
 
     # Create ONNX session
@@ -1002,6 +1142,7 @@ def main() -> None:
                 chunk_batch=args.chunk_batch,
                 use_batch_infer=args.batch_infer_padded,
                 use_length_sort=True if args.length_sort else None,
+                encoder_path=args.encoder,
             )
         else:
             extract_from_dataset(
@@ -1011,6 +1152,7 @@ def main() -> None:
                 max_utterances=args.max_utterances,
                 min_duration=args.min_duration,
                 source_sr=args.source_sample_rate,
+                workers=4 if args.workers is None else args.workers,
             )
 
 
