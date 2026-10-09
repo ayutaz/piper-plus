@@ -44,6 +44,37 @@ UPSAMPLE_INITIAL_CHANNEL = 32
 INITIAL_CHANNEL = 16
 
 
+def test_old_checkpoint_backfills_only_fixed_added_loss_buffers():
+    from piper_train.vits.stft_loss import HighBandSTFTLoss, MultiResolutionSTFTLoss
+
+    model = nn.Module()
+    model.full_stft_loss = MultiResolutionSTFTLoss()
+    model.hiband_stft_loss = HighBandSTFTLoss()
+    model.learned = nn.Linear(1, 1)
+    target = model.state_dict()
+    saved = {
+        key: value.clone()
+        for key, value in target.items()
+        if not key.startswith(("full_stft_loss.", "hiband_stft_loss."))
+    }
+    # A recorded fixed buffer must remain intact, even if its values differ
+    # from the current defaults. Only absent legacy keys may be backfilled.
+    existing = "hiband_stft_loss.stft_losses.0.band_weight"
+    saved[existing] = torch.ones_like(target[existing])
+    restored, _ = normalize_checkpoint_state_dict(saved, target)
+    model.load_state_dict(restored, strict=True)
+    for key in target:
+        expected = saved.get(key, target[key])
+        assert torch.equal(restored[key], expected)
+    assert existing in saved and len(saved) == 3  # input was not mutated
+
+    missing_parameter = dict(saved)
+    missing_parameter.pop("learned.weight")
+    restored, _ = normalize_checkpoint_state_dict(missing_parameter, target)
+    with pytest.raises(RuntimeError, match=r"learned\.weight"):
+        model.load_state_dict(restored, strict=True)
+
+
 def _make_generator() -> MBiSTFTGenerator:
     """A small MB-iSTFT generator with the current (FiLM) conditioning."""
     return MBiSTFTGenerator(
@@ -239,8 +270,8 @@ class TestNormalizeCheckpointStateDict:
 
         assert stats["cond_migrated"] == 2
         assert set(normalized) == set(model_sd)
-        for key in model_sd:
-            assert normalized[key].shape == model_sd[key].shape
+        for key, value in model_sd.items():
+            assert normalized[key].shape == value.shape
 
     def test_migration_runs_after_orig_mod_strip(self) -> None:
         """`torch.compile` keys must be canonicalised before the reshape.
@@ -259,6 +290,7 @@ class TestNormalizeCheckpointStateDict:
 
         normalized, stats = normalize_checkpoint_state_dict(saved, model_sd)
 
+        assert len(normalized) == len(model_sd)
         assert stats["stripped"] > 0
         assert stats["cond_migrated"] == 2, (
             "cond migration must run after _orig_mod stripping"

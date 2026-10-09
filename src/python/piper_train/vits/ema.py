@@ -192,7 +192,7 @@ class EMACallback(Callback):
         self._init_extended(model)
 
     def on_train_batch_end(self, trainer, model, outputs, batch, batch_idx):
-        """Update EMA after each training step."""
+        """Update EMA on successful generator updates, not D-only/skip batches."""
         # Bug 1 fix: sync shadow params to correct device after checkpoint resume
         if self._needs_device_sync:
             device = next(model.parameters()).device
@@ -200,7 +200,13 @@ class EMACallback(Callback):
                 ema.to(device)
             self._needs_device_sync = False
 
-        step = trainer.global_step
+        if hasattr(model, "generator_updated_this_batch"):
+            if not model.generator_updated_this_batch:
+                return
+            step = model.generator_updates
+        else:
+            # Compatibility for other LightningModules using this callback.
+            step = trainer.global_step
 
         if step >= self.start_step and step % self.apply_ema_every_n_steps == 0:
             for ema in self._all_emas():
