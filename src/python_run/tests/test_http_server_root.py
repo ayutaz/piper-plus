@@ -12,18 +12,23 @@ happy path of `/`. This file fills the audit gaps:
 
 from __future__ import annotations
 
+import base64
+import json
 import logging
 import wave
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 
 
-pytest.importorskip("fastapi")
-pytest.importorskip("httpx")
-pytest.importorskip("uvicorn")
+pytest.importorskip("fastapi", reason="HTTP tests require FastAPI")
+pytest.importorskip("httpx", reason="HTTP tests require httpx")
+pytest.importorskip("uvicorn", reason="HTTP module requires uvicorn")
 
 from fastapi.testclient import TestClient  # noqa: E402
+
 from piper_plus.http_server import (  # noqa: E402
     MAX_TEXT_BYTES,
     _parse_bool_flag,
@@ -329,6 +334,51 @@ class TestSynthesizeEndpointSpeakerEmbedding:
     i.e. the wrong speaker.
     """
 
+    @pytest.mark.parametrize("route", ["/", "/api/phoneme-timing"])
+    @pytest.mark.parametrize(
+        "embedding",
+        [
+            [0.0] * 192,
+            [float("nan")] * 192,
+            [float("inf")] * 192,
+            ["bad"] * 192,
+            [[1.0] * 96] * 2,
+            "%%%",
+            base64.b64encode(b"abc").decode(),
+        ],
+    )
+    def test_invalid_reference_returns_400_before_synthesis(self, route, embedding):
+        voice = _make_voice()
+        with TestClient(create_app(voice, {})) as client:
+            response = client.post(
+                route,
+                content=json.dumps({"text": "hi", "speaker_embedding": embedding}),
+                headers={"content-type": "application/json"},
+            )
+        assert response.status_code == 400
+        assert "speaker_embedding" in response.json()["error"]
+        voice.synthesize.assert_not_called()
+        voice.synthesize_with_timing.assert_not_called()
+
+    @pytest.mark.parametrize("encoded", [False, True])
+    def test_legacy_graph_256_reference_is_normalized(self, encoded):
+        voice = _make_voice()
+        voice.session.get_inputs.return_value = [
+            SimpleNamespace(name="speaker_embedding", shape=[1, 256])
+        ]
+        vector = np.arange(1, 257, dtype=np.float32)
+        payload = (
+            base64.b64encode(vector.tobytes()).decode() if encoded else vector.tolist()
+        )
+        with TestClient(create_app(voice, {})) as client:
+            response = client.post(
+                "/", json={"text": "hi", "speaker_embedding": payload}
+            )
+        assert response.status_code == 200
+        forwarded = voice.synthesize.call_args.kwargs["speaker_embedding"]
+        assert forwarded.shape == (256,)
+        assert np.linalg.norm(forwarded) == pytest.approx(1)
+
     def test_root_endpoint_accepts_speaker_embedding_post_field(self):
         import numpy as np
 
@@ -350,7 +400,9 @@ class TestSynthesizeEndpointSpeakerEmbedding:
             f"speaker_embedding should be np.ndarray, got {type(forwarded)}"
         )
         assert forwarded.shape[-1] == 192
-        np.testing.assert_allclose(forwarded.reshape(-1), emb)
+        np.testing.assert_allclose(
+            forwarded.reshape(-1), np.asarray(emb) / np.linalg.norm(emb)
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -394,6 +446,9 @@ class TestHttpServerStartup:
         )
         forwarded = kwargs["speaker_embedding"]
         if isinstance(forwarded, np.ndarray):
-            np.testing.assert_allclose(forwarded.reshape(-1), per_request_emb)
+            np.testing.assert_allclose(
+                forwarded.reshape(-1),
+                np.asarray(per_request_emb) / np.linalg.norm(per_request_emb),
+            )
         else:
             assert list(forwarded) == per_request_emb

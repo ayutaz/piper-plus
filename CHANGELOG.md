@@ -382,6 +382,12 @@ See the [release checklist](docs/guides/development/python-release-2.0.2.md).
 
 ### Fixed
 
+- **Python zero-shot入力検証**: CLI・JSONL・Voice・HTTP・training loaderで
+  shape/finite/norm検査とL2正規化を共通化。不正参照は明示エラー、HTTPでは400を返す。
+  ONNX graphの固定192/256次元を維持し、参照なしはmask=0へ修正。
+  inference JSONLのdataset相対embedding pathを読み込む。
+  詳細は[入力契約](docs/spec/speaker-embedding-input.md)を参照。
+
 - **Python zero-shot embedding抽出・cache**: dataset相対pathと指定output directoryを反映し、
   同名音声のcache衝突、失敗entryへの存在しないembedding pathの公開を修正。
   音声・encoder・抽出設定の来歴と保存hashを確認して再利用し、旧cacheは保持する。

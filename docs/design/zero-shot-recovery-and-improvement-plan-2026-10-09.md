@@ -1,10 +1,10 @@
 # zero-shot不具合修正・品質改善計画（2026-10-09）
 
-**状態: 工程1の実装・CPU検証完了。工程2A/2Bは実装中（未コミット）、関連CPUテスト57件成功。工程0の比較条件固定は未完了、工程2Cと工程3〜6は未着手。追加学習・品質比較は未実施。**
+**状態: 工程1/2の実装・CPU検証完了。工程2A/2Bは`c7cbbbb9`、57件成功。工程2Cは作業treeで348件成功、必須hook・commit待ち。工程0の比較条件固定は未完了、工程3〜6は未着手。追加学習・品質比較は未実施。**
 
 対象ブランチ: `feat/zero-shot-v8-dataset-scaling`。
 計画開始時HEAD: `9629d68f`。
-最終更新: 2026-10-10、現在HEAD: `13a847c7`（工程2A/2Bの変更は作業tree）。
+最終更新: 2026-10-10、現在HEAD: `c7cbbbb9`（工程2Cの変更は作業tree）。
 工程1のコミット: `f35b2b07`（周期・状態復元・互換性）、`3efaaa71`（validation raw KL記録）。
 根拠: [GPT-SoVITS調査](../research/gpt-sovits-zero-shot-2026-10-09.md)、
 [既存実装監査](../research/zero-shot-implementation-audit-2026-10-09.md)、
@@ -36,13 +36,13 @@ WavLM更新周期の不具合は確定しているが、v11の話者類似度低
 |---|---|---|---|
 | 0 | 未完了。修正sourceは確認済み | run manifest、data/cache/artifact監査 | hash・入力条件・比較対象が揃う |
 | 1 | **実装・CPU検証完了** | batch周期、KL状態、実更新EMA、checkpoint互換性、207件成功 | CPU完了条件は充足。GPU/full-model確認は工程5 |
-| 2 | **2A/2B実装中、2C未着手** | embedding抽出・cache・runtime validator。関連CPUテスト57件成功 | 衝突/失敗/旧cache/不正入力を検出、既存経路の互換維持 |
+| 2 | **実装・CPU検証完了、2C hook・commit待ち** | 抽出/cache57件、入力全経路/既存互換348件成功 | 必須hook成功後、工程3へ進む |
 | 3 | 未着手 | 固定話者参照、推論評価、strict CER集合検査 | 参照条件と期待clip全件を検証できる |
 | 4 | 未着手 | 同条件のraw/EMA/ONNX比較、参照抽出比較 | 再現可能なbaselineとGPU実験の仕様が揃う |
 | 5 | 未着手 | full-model smoke、原因分離run、v11b候補 | 機械検証・既存品質gate・人手評価を順に満たす |
 | 6 | 未着手 | v12参照系列入力契約、小型参照encoder、A/B | global-only対照に対する利得と配布/速度予算を確認 |
 
-次は工程2A/2Bの残件・検証を終えてcommitし、工程2Cへ進む。工程0の棚卸し・固定は並行して進められる。
+次は工程2Cの必須hook・commitを終えて工程3へ進む。工程0の棚卸し・固定は並行して進められる。
 工程2/3のfixtureによるCPU開発は実データの全回収を待つ必要はないが、
 実成果物での工程4の比較を開始する前に工程0〜3を完了させる。
 工程6の設計は先行可能だが、追加学習は工程5の基準評価を確立してから判断する。
@@ -303,15 +303,15 @@ GPT-SoVITSでの公式SIM改善量をPiperの期待改善量に転用しない�
 | 順 | PR/commit単位 | 状態・主な対象 |
 |---|---|---|
 | 1 | training counter・KL状態修正 | **完了**。`f35b2b07` / `3efaaa71`、仕様・207テスト |
-| 2 | 工程2A/2B: embedding契約、抽出manifest/path・cache | **実装中（未コミット）**。共通validator・抽出/cache関連CPUテスト57件成功、残件確認とhook待ち |
-| 3 | 工程2C: embedding入力の共通検証 | 未着手。`infer_onnx.py`、Python Voice/HTTP、training loader |
+| 2 | 工程2A/2B: embedding契約、抽出manifest/path・cache | **完了**。`c7cbbbb9`、関連CPUテスト57件・必須hook成功 |
+| 3 | 工程2C: embedding入力の共通検証 | **実装・CPU検証完了、hook・commit待ち**。CLI/Voice/HTTP/loader、関連15ファイル348件成功 |
 | 4 | 固定参照・推論評価・strict CER | 未着手。validation/audio logging、`tools/eval_cer.py`、gate tests |
 | 5 | 比較harness・前処理契約・事前登録 | 未着手。eval CLI、run manifests、recipe、計測結果 |
 | 6 | opt-in EMA scope、v12設計/実装 | 未着手。それぞれ独立した変更とA/B |
 
-工程1を再実装せず、**工程2A/2Bを仕上げて2C→3へ進む**。工程0の棚卸しは並行作業とし、
+工程1/2を再実装せず、**工程2Cをcommitして工程3へ進む**。工程0の棚卸しは並行作業とし、
 source・data・参照・評価集合を固定できるまで正式なモデル比較を開始しない。
 各単位で失敗テスト→修正→対象テスト/CI→意味あるcheckpoint commitを行う。
 依存追加が必要ならuvで管理する。feature branchからdev向けPRでレビューする。
 大型model/build/DDP検証は対応可能なCIまたは事前に決めたGPU環境へ寄せる。
-今回の更新は工程2A/2Bの作業treeとCPUテスト結果を計画へ反映したもの。工程2の全経路統合と工程3は未完了。追加学習・品質比較・PR作成・公開は未実施。
+今回の更新は工程2の実装とCPUテスト結果を計画へ反映したもの。工程2Cの必須hook・commitと工程3は未完了。追加学習・品質比較・PR作成・公開は未実施。

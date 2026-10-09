@@ -6,6 +6,19 @@ import pytest
 from piper_plus.embedding import embedding_dimension, validate_embedding
 
 
+def test_complex_reference_is_rejected_without_discarding_imaginary_values():
+    with pytest.raises(ValueError, match="speaker_embedding"):
+        validate_embedding(np.ones(192, dtype=np.complex64) * (1 + 2j))
+
+
+def test_normalization_is_stable_when_runtime_revalidates_a_vector():
+    original = np.arange(1, 193, dtype=np.float64)
+    normalized = validate_embedding(original)
+    np.testing.assert_allclose(validate_embedding(normalized), normalized)
+    with pytest.raises(ValueError, match="norm"):
+        validate_embedding(np.full(192, 1e-12))
+
+
 @pytest.mark.parametrize("dimension", [192, 256])
 @pytest.mark.parametrize("batched", [False, True])
 def test_single_speaker_is_normalized_without_mutating_caller(dimension, batched):
