@@ -1,12 +1,17 @@
 # zero-shot不具合修正・品質改善計画（2026-10-09）
 
-**状態: 工程1の実装・CPU検証完了。工程0の成果物固定と工程2以降は未着手。追加学習は未実施。**
+**状態: 工程1の実装・CPU検証完了。次の実装は工程2。工程0の比較条件固定は未完了、工程2〜6は未着手。追加学習・品質比較は未実施。**
 
 対象ブランチ: `feat/zero-shot-v8-dataset-scaling`。
 計画開始時HEAD: `9629d68f`。
+最終更新: 2026-10-09、実装確認時HEAD: `3efaaa71`。
+工程1のコミット: `f35b2b07`（周期・状態復元・互換性）、`3efaaa71`（validation raw KL記録）。
 根拠: [GPT-SoVITS調査](../research/gpt-sovits-zero-shot-2026-10-09.md)、
 [既存実装監査](../research/zero-shot-implementation-audit-2026-10-09.md)、
-[評価契約](../spec/zs-eval-contract.md)。
+[評価契約](../spec/zs-eval-contract.md)、[工程1の実装仕様](../spec/training-batch-schedule.md)。
+
+工程1の207件成功は直前の実装検証結果。本更新ではcommit・source・仕様の整合性を
+確認し、その検証を再実行したものではない。工程1の実装後、この作業ではpush・PR作成を行っていない。
 
 本計画は、2026-10-09時点で確認した不具合と反証を踏まえた次工程の参照先とする。
 旧[v11 roadmap](zero-shot-v11-roadmap.md)の過去の実測・成果物記録は維持するが、
@@ -27,23 +32,26 @@ WavLM更新周期の不具合は確定しているが、v11の話者類似度低
 
 ## 2. 工程と依存関係
 
-| 工程 | 作業 | 成果物 | 次工程へ進む条件 |
+| 工程 | 現在の状態 | 作業・成果物 | 次工程へ進む条件 |
 |---|---|---|---|
-| 0 | source・データ・評価条件を固定 | run manifest、data/cache監査結果 | hash・入力条件・比較対象が揃う |
-| 1 | G/D周期とKL監視状態を修正 | training修正、実Lightning回帰テスト | 周期・resume・skip・validationのテスト成功 |
-| 2 | embedding抽出・cache・runtime検証を修正 | metadata付きcache、manifest、入力validator | 衝突/失敗/旧cache/不正入力を検出、既存経路の互換維持 |
-| 3 | 推論条件で評価できるようにする | 固定話者参照、推論評価、strict CER集合検査 | 参照条件と期待clip全件を検証できる |
-| 4 | 既存checkpoint再評価と低コスト比較 | 同条件のraw/EMA/ONNX比較、参照抽出比較 | 再現可能な修正後baselineとGPU実験の仕様が揃う |
-| 5 | 修正後学習と単一要因実験 | smoke、原因分離run、v11b候補 | 機械検証・既存品質gate・人手評価を順に満たす |
-| 6 | v12参照系列入力を設計・検証 | 新入力契約、小型参照encoder、A/B結果 | global-only対照に対する利得と配布/速度予算を確認 |
+| 0 | 未完了。修正sourceは確認済み | run manifest、data/cache/artifact監査 | hash・入力条件・比較対象が揃う |
+| 1 | **実装・CPU検証完了** | batch周期、KL状態、実更新EMA、checkpoint互換性、207件成功 | CPU完了条件は充足。GPU/full-model確認は工程5 |
+| 2 | **次の実装、未着手** | embedding抽出・cache・runtime validator | 衝突/失敗/旧cache/不正入力を検出、既存経路の互換維持 |
+| 3 | 未着手 | 固定話者参照、推論評価、strict CER集合検査 | 参照条件と期待clip全件を検証できる |
+| 4 | 未着手 | 同条件のraw/EMA/ONNX比較、参照抽出比較 | 再現可能なbaselineとGPU実験の仕様が揃う |
+| 5 | 未着手 | full-model smoke、原因分離run、v11b候補 | 機械検証・既存品質gate・人手評価を順に満たす |
+| 6 | 未着手 | v12参照系列入力契約、小型参照encoder、A/B | global-only対照に対する利得と配布/速度予算を確認 |
 
-工程1と2は独立実装可能。工程3は両方の仕様が定まってから統合する。
-工程4以降のモデル比較には工程1〜3が必要。
+次は工程2を実装する。工程0の棚卸し・固定は並行して進められる。
+工程2/3のfixtureによるCPU開発は実データの全回収を待つ必要はないが、
+実成果物での工程4の比較を開始する前に工程0〜3を完了させる。
 工程6の設計は先行可能だが、追加学習は工程5の基準評価を確立してから判断する。
 
 ## 3. 工程0: 比較条件とデータの固定
 
 - source SHA、依存lock、training/eval設定、seed、speaker encoder ID/SHAを記録する。
+- batch schedule version、`d_update_interval`、`wavlm_every_n_steps`、G loss補償倍率、
+  EMAのscope/start/apply-everyとその単位も記録する。旧global_step単位と新G更新数単位を混同しない。
 - 既存checkpoint、ONNX、参照WAV、評価text、holdout/floor集合の所在とSHA256を確認する。
   手元にない成果物は「未回収」と記録し、過去のpathを存在確認済みとして扱わない。
 - 学習/holdoutのspeaker IDと音声hashの交差、同名stem、missing file、embeddingの
@@ -64,43 +72,66 @@ precision skip・validationを検証し、2 CPU Gloo rankで非有限判定と�
 公開checkpointの固定loss buffer欠落は作業前HEADでも再現し、互換補完を加えてgateを通した。
 full-modelのGPU/DDP/AMP smokeと音声品質評価は工程5に残す。
 
-### 4.1 G/D/WavLMの周期
+### 4.1 実装済みの内容
 
-永続training batch counterを導入し、batch開始時の同じ値でG更新・WavLM G/D計算を判定する。
-`global_step`はLightningのoptimizer更新数として残し、batch周期の代用にしない。
+- `training_batches_seen`を受領ごとに1回進め、固定したbatch indexでG/D/WavLMを判定。
+  loss非有限/LF/precision skipでもclockは進み、validation/sanityでは進まない。
+- G/Dの成功したraw optimizer更新数とskip理由を記録。EMAは成功したG更新だけで進む。
+- WavLM G補償を`w / gcd(d,w)`へ変更。D補償はbatch周期`w`。
+- LF抽選・seed、swap seed、telemetry、gradient probeをbatch clockへ接続。
+  LR schedulerはepoch、DINO teacher/centerは従来のtraining G forward基準を維持。
+- checkpointにschedule version 1、受領数、G/D実更新数、KL streakを保存・検証して復元。
+- KL guardはtraining限定。validation/sanityのraw KLは`val_kl_raw`として独立記録。
+- 旧公開checkpointにないfull/high-band STFT固定bufferだけを補完してstrict loadを維持。
 
-- counterはtraining batch受領ごとに1回進める。loss非有限skipでも進める仕様を固定する。
-- validation/sanityはcounterを進めない。
-- 実際のG/D optimizer更新数も別に記録し、latent fillingなどDを省く経路はskip理由を記録する。
-- scheduler、EMA、DINO、swap-SCL、latent filling、telemetry、gradient probeについて、
-  batch周期かoptimizer更新周期かを一覧化して、意図に沿うcounterへ接続する。
-- WavLMの周期補償倍率は、実際の計算頻度と整合させる。
-  Gの更新周期との組合せも確認し、lossの過大/過小適用を防ぐ。
+### 4.2 完了条件と確認結果
 
-checkpointへcounterとschedule versionを保存する。
-旧checkpointには正確なbatch counterがないため、optimizer合計stepから無条件に逆算しない。
-旧checkpointの推論は維持し、追加学習はweights-only開始と厳密resumeを明示的に区別する。
-復元不能な旧状態を「完全に同じresume」と報告しない。
+TDDで不具合を失敗テストにしてから修正し、以下を確認済み。
 
-### 4.2 KL監視
+| 完了条件 | 確認結果 |
+|---|---|
+| 実Lightning 8batch、D:G=2:1 | **G4回/D8回** |
+| D:G=1:1、WavLM 2batch周期 | **WavLM G/Dとも4回**、D head重み変化あり |
+| D:G=2:1/3:1とWavLM周期の交点 | gateとG loss補償倍率が一致 |
+| epoch末/epoch途中checkpoint | batch周期・更新数・KL streakを復元 |
+| G/D非有限loss、LFのD skip | 受領数は進み、skip理由と更新回数が一致 |
+| precision pluginがG/D raw stepを省略 | 実更新counterとEMAが実際のstep回数に一致 |
+| 片方のCPU Gloo rankだけ非有限 | 両rankのskip判断・受領数・更新数が一致 |
+| 実Lightning validation/sanity | training counter・KL streak不変、raw KL独立記録 |
+| 公開checkpoint互換性gate | pinned shapeからstrict load成功、snapshot変更なし |
 
-training時だけKL cap streakを更新する。validation/sanityがstreakを増加・reset・abortしない仕様にする。
-abort閾値と検知内容は維持し、validationのKLは別の監視値として記録する。
+主要テストは[test_training_batch_schedule.py](../../src/python/tests/test_training_batch_schedule.py)、
+[test_kl_cap_guard.py](../../src/python/tests/test_kl_cap_guard.py)、
+[test_checkpoint_film_migration.py](../../src/python/tests/test_checkpoint_film_migration.py)。
+関連12ファイルで207件成功、両コミットの必須pre-commit hookも成功。
 
-### 完了条件
+### 4.3 次の実行で守る復元・検証条件
 
-TDDで現行不具合を失敗テストにしてから修正する。
+metadataのない旧checkpointの**strict training resumeは明示エラー**。
+旧weightsから追加学習する場合は`--resume_from_checkpoint <checkpoint>`と
+`--resume-weights-only`で新runとして開始し、optimizer/scheduler/loopとclockを継承しない。
+旧checkpointの推論用weights読み込みは維持している。
+新checkpointの周期復元を、DataLoader位置/RNGの厳密な復元と同一視しない。
 
-- 実Lightningで8batch、D:G=2:1 → **G4回/D8回**。
-- D:G=1:1、WavLM 2batch周期 → **WavLM G/Dとも4回**、D headの重み変化あり。
-- D:G=2:1とWavLM周期の組合せを追加確認する。
-- checkpoint途中保存/復元後も周期が連続する。
-- G/Dの非有限loss、latent fillingのD skip、DDP rank間の判断を確認する。
-- validation/sanityでtraining counter・KL streakが変化しない。
-
-まずCPUの小型モデルで検証し、DDP/AMP/full modelは工程5のsmokeで確認する。
+CPU検査は小型G/DとWavLM headを使ったもの。実pretrained WavLMとfull model、
+実GPU AMP、DDPのgradient同期、品質改善は未検証。
+Windows Glooで断続的native access violationを観測した経緯は仕様書に記録済み。
+最終実行はprocess隔離・OMP/MKL thread数1で成功したが、環境問題の根治とは断定しない。
+工程5のGPU smokeでは、実更新数・grad・resumeを改めて検証する。
 
 ## 5. 工程2: embedding pipelineとruntime入力を修正
+
+### 次の実装順と受け渡し
+
+| 単位 | 作業・対象 | 完了して次へ渡すもの |
+|---|---|---|
+| 2A | shape/finite/norm、path基準、cache metadata/version、失敗時manifest方針を定義 | 抽出・loader・runtimeで共有する仕様と失敗fixture |
+| 2B | `extract_speaker_embedding.py`のmanifest/path/atomic保存・cache・workersを修正 | 成功entryだけを参照するmanifest、衝突/破損検知、旧cache dry-run |
+| 2C | `infer_onnx.py`、Python `voice.py`/`http_server.py`、training loaderの入力検証を統合 | 192/256次元graphごとの契約、既存の正常入力とfallbackの回帰検証 |
+
+2Aを先に固定し、2B/2Cが別の正規化・欠損判定を作らないようにする。
+各実装を失敗テスト→修正→対象テスト→commitで分ける。
+実encoderの品質比較と大規模cache再抽出はこのCPU実装修正の完了条件に含めず、工程4/5で扱う。
 
 ### 5.1 manifest/path
 
@@ -137,7 +168,8 @@ caller embeddingのshape、finite、normを確認し、有効な参照vectorの�
   参照未設定のゼロ条件音声は、その条件を明示して記録する。
 - reconstruction validation lossは用途を明記して残す。
   **予測F0・予測duration・実参照embeddingでの推論評価**を別経路で追加する。
-- KL guard等のtraining状態をevaluationが変更しないことを確認する。
+- 工程1で確認済みのKL guard・batch clock不変テストを維持し、新しい推論評価経路でも
+  G/D optimizer・EMA・DINO teacher/center等のtraining状態を変更しないことを確認する。
 - CER score CLIへstrict mode、または独立のgate wrapperを追加する。
   pinned manifestとWAV/text IDの一致、missing/余分なclip、最低3文、ASR model/正規化条件を検証する。
 - seedだけで全経路が決定的になると仮定せず、carrier noise等の乱数条件・seed・生成artifact hashを記録する。
@@ -179,10 +211,14 @@ GPT-SoVITSから参考にする最初の要素は、参照音声処理と参照�
 ### 8.1 機械smoke
 
 工程1〜3の修正、監査済みdataset、同じ生成器構造で基準recipeを固定する。
+工程0のmanifestでschedule version 1とEMAのG更新数単位を固定し、
+旧global_step軸だけで旧runと同じ進行だと判定しない。
 まず100〜300 training batch程度を上限とするfull-model smokeを計画し、実測で費用を見積もる。
 G/D/WavLM更新数、head重み変化、module別grad、SCLの実encoder/positive数/fallback、
 F0予測率、非有限skip、save/resume/exportを確認する。
-DDP/AMPは使用予定の設定で追加確認する。
+DDP/AMPは使用予定の設定で追加確認する。CPUのprecision plugin模擬だけで
+実GradScalerのskip/overflow動作を検証済みとは扱わない。
+新形式checkpointからstrict resumeし、weights-only開始とは別に確認する。
 この短いsmokeではCER/自然さの到達を要求せず、学習機構の成立だけを判定する。
 
 ### 8.2 修正後基準runと単一要因比較
@@ -262,17 +298,18 @@ GPT-SoVITSでの公式SIM改善量をPiperの期待改善量に転用しない�
 
 ## 11. 実装単位と着手順
 
-| 順 | PR/commit単位 | 主な対象 |
+| 順 | PR/commit単位 | 状態・主な対象 |
 |---|---|---|
-| 1 | training counter・KL状態修正 | `vits/lightning.py`、実Lightning回帰テスト |
-| 2 | 抽出manifest/path・cache | `extract_speaker_embedding.py`、dataset fixture tests |
-| 3 | embedding入力の共通検証 | `infer_onnx.py`、Python Voice/HTTP、dataset loader |
-| 4 | 固定参照・推論評価・strict CER | validation/audio logging、`tools/eval_cer.py`、gate tests |
-| 5 | 比較harness・前処理契約・事前登録 | eval CLI、run manifests、training recipe、計測結果 |
-| 6 | opt-in EMA scope、v12設計/実装 | それぞれ独立した変更とA/B |
+| 1 | training counter・KL状態修正 | **完了**。`f35b2b07` / `3efaaa71`、仕様・207テスト |
+| 2 | 工程2A/2B: embedding契約、抽出manifest/path・cache | **次の実装**。`extract_speaker_embedding.py`、fixture tests |
+| 3 | 工程2C: embedding入力の共通検証 | 未着手。`infer_onnx.py`、Python Voice/HTTP、training loader |
+| 4 | 固定参照・推論評価・strict CER | 未着手。validation/audio logging、`tools/eval_cer.py`、gate tests |
+| 5 | 比較harness・前処理契約・事前登録 | 未着手。eval CLI、run manifests、recipe、計測結果 |
+| 6 | opt-in EMA scope、v12設計/実装 | 未着手。それぞれ独立した変更とA/B |
 
-最初に着手するのは**PR1相当: 更新周期とKL監視状態のTDD修正**。
+工程1を再実装せず、**工程2A/2Bから着手**する。工程0の棚卸しは並行作業とし、
+source・data・参照・評価集合を固定できるまで正式なモデル比較を開始しない。
 各単位で失敗テスト→修正→対象テスト/CI→意味あるcheckpoint commitを行う。
 依存追加が必要ならuvで管理する。feature branchからdev向けPRでレビューする。
 大型model/build/DDP検証は対応可能なCIまたは事前に決めたGPU環境へ寄せる。
-本計画作成では実装・学習・PR作成・公開は行わず、計画を保存する。
+今回の更新範囲は計画と参照案内の同期。工程1以外の実装・学習・品質比較・PR作成・公開は未実施。
