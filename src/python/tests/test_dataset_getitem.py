@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 
-torch = pytest.importorskip("torch")
+torch = pytest.importorskip("torch", reason="dataset tensors require torch")
 
 from piper_train.vits.dataset import (  # noqa: E402
     PiperDataset,
@@ -71,6 +71,50 @@ def _make_dataset_with_utterances(utterances):
     dataset = PiperDataset.__new__(PiperDataset)
     dataset.utterances = list(utterances)
     return dataset
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "vector",
+    [
+        np.zeros(192),
+        np.full(192, np.nan),
+        np.full(192, np.inf),
+        np.ones(256),
+        np.ones((1, 192)),
+    ],
+)
+def test_getitem_rejects_invalid_speaker_embedding_with_path(tmp_path, vector):
+    utt = _make_utterance(tmp_path)
+    utt.speaker_embedding_path = tmp_path / "invalid-reference.npy"
+    np.save(utt.speaker_embedding_path, vector)
+    dataset = _make_dataset_with_utterances([utt])
+    with pytest.raises(ValueError, match=r"invalid-reference\.npy"):
+        dataset[0]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("dimension", [192, 256])
+def test_getitem_normalizes_reference_with_configured_dimension(tmp_path, dimension):
+    utt = _make_utterance(tmp_path)
+    utt.speaker_embedding_path = tmp_path / "reference.npy"
+    vector = np.arange(1, dimension + 1, dtype=np.float32)
+    np.save(utt.speaker_embedding_path, vector)
+    dataset = PiperDataset([], speaker_embedding_dim=dimension)
+    dataset.utterances = [utt]
+    result = dataset[0].speaker_embedding
+    assert result.shape == (dimension,) and result.dtype == torch.float32
+    assert result.norm().item() == pytest.approx(1)
+    np.testing.assert_array_equal(np.load(utt.speaker_embedding_path), vector)
+
+
+@pytest.mark.unit
+def test_getitem_reports_corrupt_embedding_path(tmp_path):
+    utt = _make_utterance(tmp_path)
+    utt.speaker_embedding_path = tmp_path / "corrupt-reference.npy"
+    utt.speaker_embedding_path.write_bytes(b"interrupted numpy file")
+    with pytest.raises(ValueError, match=r"corrupt-reference\.npy"):
+        _make_dataset_with_utterances([utt])[0]
 
 
 @pytest.mark.unit

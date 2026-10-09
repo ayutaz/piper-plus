@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import binascii
 import io
 import json
 import logging
@@ -34,6 +35,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 
 from . import PiperVoice
 from .download import ensure_voice_exists, find_voice, get_voices
+from .embedding import embedding_dimension, validate_embedding
 from .timing import timing_to_json, timing_to_tsv
 
 
@@ -166,36 +168,27 @@ class _InvalidEmbedding(Exception):
 _EXPECTED_EMBEDDING_DIM = 192
 
 
-def _parse_speaker_embedding(value: Any) -> np.ndarray:
+def _parse_speaker_embedding(
+    value: Any, dimension: int = _EXPECTED_EMBEDDING_DIM
+) -> np.ndarray:
     """Parse a speaker_embedding payload (list[float] or base64 str) to ndarray.
 
-    Raises ``_InvalidEmbedding`` when dimension is not 192 or value is malformed.
+    Raises ``_InvalidEmbedding`` for malformed, nonfinite or zero references.
     """
-    if isinstance(value, str):
-        try:
-            raw = base64.b64decode(value)
-        except Exception as exc:
-            raise _InvalidEmbedding(
-                f"speaker_embedding base64 decode failed: {exc}"
-            ) from exc
-        emb = np.frombuffer(raw, dtype=np.float32).copy()
-    elif isinstance(value, (list, tuple)):
-        emb = np.asarray(value, dtype=np.float32)
-    else:
-        raise _InvalidEmbedding(
-            "speaker_embedding must be a list[float] or base64-encoded string"
-        )
-
-    if emb.ndim != 1 or emb.shape[-1] != _EXPECTED_EMBEDDING_DIM:
-        raise _InvalidEmbedding(
-            f"speaker_embedding has wrong dimension: expected {_EXPECTED_EMBEDDING_DIM}, "
-            f"got {emb.shape}"
-        )
-    return emb
+    try:
+        if isinstance(value, str):
+            raw = base64.b64decode(value, validate=True)
+            value = np.frombuffer(raw, dtype=np.float32)
+        elif not isinstance(value, (list, tuple)):
+            raise ValueError("must be a list[float] or base64-encoded string")
+        return validate_embedding(value, dimension)
+    except (ValueError, TypeError, OverflowError, binascii.Error) as exc:
+        raise _InvalidEmbedding(f"speaker_embedding: {exc}") from exc
 
 
 async def _parse_json_body(
     request: Request,
+    embedding_dim: int = _EXPECTED_EMBEDDING_DIM,
 ) -> tuple[str | None, np.ndarray | None, int | None]:
     """Parse a JSON POST body for ``text``, ``speaker_embedding``, ``speaker_id``.
 
@@ -238,7 +231,7 @@ async def _parse_json_body(
 
     emb: np.ndarray | None = None
     if "speaker_embedding" in payload and payload["speaker_embedding"] is not None:
-        emb = _parse_speaker_embedding(payload["speaker_embedding"])
+        emb = _parse_speaker_embedding(payload["speaker_embedding"], embedding_dim)
 
     sid = payload.get("speaker_id")
     if sid is not None and not isinstance(sid, int):
@@ -263,6 +256,12 @@ def _error_response(status_code: int, message: str) -> JSONResponse:
 
 def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
     """Build a FastAPI app wired to the loaded voice."""
+    session = getattr(voice, "session", None)
+    embedding_dim = (
+        embedding_dimension(session.get_inputs())
+        if session is not None
+        else _EXPECTED_EMBEDDING_DIM
+    )
     app = FastAPI(
         title="Piper TTS HTTP Server",
         description="Synthesize speech and return WAV audio.",
@@ -288,7 +287,9 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
         request_speaker_id: int | None = None
         body_text: str | None = None
         try:
-            json_text, json_emb, json_sid = await _parse_json_body(request)
+            json_text, json_emb, json_sid = await _parse_json_body(
+                request, embedding_dim
+            )
         except _RequestTooLarge:
             return _error_response(413, f"Request body exceeds {MAX_TEXT_BYTES} bytes")
         except _InvalidEmbedding as exc:
@@ -376,7 +377,9 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
         request_speaker_id: int | None = None
         body_text: str | None = None
         try:
-            json_text, json_emb, json_sid = await _parse_json_body(request)
+            json_text, json_emb, json_sid = await _parse_json_body(
+                request, embedding_dim
+            )
         except _RequestTooLarge:
             return _error_response(413, f"Request body exceeds {MAX_TEXT_BYTES} bytes")
         except _InvalidEmbedding as exc:

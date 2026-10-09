@@ -10,6 +10,8 @@ from pathlib import Path
 
 import numpy as np
 
+from piper_plus.embedding import embedding_dimension, validate_embedding
+
 from .ort_utils import create_session_with_cache, warmup_onnx_session
 from .vits.utils import audio_float_to_int16
 from .vits.wavfile import write as write_wav
@@ -445,6 +447,7 @@ def _resolve_speaker_embedding(
     speaker_id: int | None,
     model_path: Path,
     dataset_dir: Path | None,
+    embedding_dim: int = _SPK_EMBED_DIM,
 ) -> np.ndarray | None:
     """Resolve speaker embedding from the various input sources.
 
@@ -454,7 +457,7 @@ def _resolve_speaker_embedding(
       3. --speaker-id (look up pre-computed per-speaker embedding)
 
     Returns:
-        np.ndarray of shape [192] or None if no embedding can be resolved.
+        A validated unit vector of shape [embedding_dim], or None when absent.
     """
     # 1. Direct .npy file
     if speaker_embedding_path is not None:
@@ -462,14 +465,7 @@ def _resolve_speaker_embedding(
         if not emb_path.exists():
             _LOGGER.error("Speaker embedding file not found: %s", emb_path)
             sys.exit(1)
-        emb = np.load(str(emb_path)).astype(np.float32)
-        if emb.shape != (_SPK_EMBED_DIM,):
-            _LOGGER.error(
-                "Speaker embedding has wrong shape: %s (expected (%d,))",
-                emb.shape,
-                _SPK_EMBED_DIM,
-            )
-            sys.exit(1)
+        emb = validate_embedding(np.load(emb_path, allow_pickle=False), embedding_dim)
         _LOGGER.info("Loaded speaker embedding from %s", emb_path)
         return emb
 
@@ -490,7 +486,10 @@ def _resolve_speaker_embedding(
                 "Specify --speaker-encoder or place campplus.onnx near the model."
             )
             sys.exit(1)
-        return _extract_speaker_embedding_from_audio(audio_path, encoder_path)
+        return validate_embedding(
+            _extract_speaker_embedding_from_audio(audio_path, encoder_path),
+            embedding_dim,
+        )
 
     # 3. Look up by speaker_id in pre-computed embeddings
     if speaker_id is not None:
@@ -503,9 +502,9 @@ def _resolve_speaker_embedding(
         for search_dir in search_dirs:
             npy_path = search_dir / f"speaker_{speaker_id}.npy"
             if npy_path.exists():
-                emb = np.load(str(npy_path)).astype(np.float32)
-                if emb.ndim != 1 or emb.shape[0] != _SPK_EMBED_DIM:
-                    emb = emb.reshape(_SPK_EMBED_DIM)
+                emb = validate_embedding(
+                    np.load(npy_path, allow_pickle=False), embedding_dim
+                )
                 _LOGGER.info(
                     "Loaded per-speaker embedding for speaker_id=%d from %s",
                     speaker_id,
@@ -895,6 +894,7 @@ def main():
 
     # Check which optional inputs the ONNX model accepts
     input_names = [inp.name for inp in model.get_inputs()]
+    spk_embedding_dim = embedding_dimension(model.get_inputs())
     has_prosody = "prosody_features" in input_names
     has_sid = "sid" in input_names
     has_spk_emb = "speaker_embedding" in input_names
@@ -923,6 +923,7 @@ def main():
             speaker_id=args.speaker_id,
             model_path=model_path,
             dataset_dir=dataset_dir,
+            embedding_dim=spk_embedding_dim,
         )
         if resolved_spk_emb is None and (
             args.speaker_audio is not None or args.speaker_embedding is not None
@@ -936,7 +937,6 @@ def main():
                 "Using zero embedding (output quality will be poor). "
                 "Use --speaker-audio, --speaker-embedding, or --speaker-id."
             )
-            resolved_spk_emb = np.zeros(_SPK_EMBED_DIM, dtype=np.float32)
     elif args.speaker_audio is not None or args.speaker_embedding is not None:
         _LOGGER.warning(
             "Model does not have speaker_embedding input. "
@@ -1075,14 +1075,27 @@ def main():
             # Per-utterance embedding from JSONL overrides the CLI-resolved one
             utt_spk_emb = utt.get("speaker_embedding")
             if utt_spk_emb is not None:
-                spk_emb = np.array(utt_spk_emb, dtype=np.float32)
+                spk_emb = validate_embedding(utt_spk_emb, spk_embedding_dim)
+            elif utt.get("speaker_embedding_path") is not None:
+                embedding_path = Path(utt["speaker_embedding_path"])
+                if not embedding_path.is_absolute():
+                    embedding_path = Path(args.dataset_dir or ".") / embedding_path
+                spk_emb = validate_embedding(
+                    np.load(embedding_path, allow_pickle=False), spk_embedding_dim
+                )
             else:
                 spk_emb = resolved_spk_emb
-            inputs["speaker_embedding"] = np.expand_dims(spk_emb, 0)  # [1, 192]
+            inputs["speaker_embedding"] = (
+                np.zeros((1, spk_embedding_dim), dtype=np.float32)
+                if spk_emb is None
+                else validate_embedding(spk_emb, spk_embedding_dim)[None, :]
+            )
             if has_spk_emb_mask:
                 # Shape [1, 1] (rank-2) to match the ONNX export contract;
                 # matches voice.py:_warmup_session and python_run feed path.
-                inputs["speaker_embedding_mask"] = np.ones((1, 1), dtype=np.int64)
+                inputs["speaker_embedding_mask"] = np.array(
+                    [[int(spk_emb is not None)]], dtype=np.int64
+                )
         if has_sid:
             sid = None
             if speaker_id is not None:

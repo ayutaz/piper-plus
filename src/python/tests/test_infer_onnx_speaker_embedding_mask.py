@@ -14,6 +14,7 @@ behaviour stays correct once the production code is patched.
 
 from __future__ import annotations
 
+import io
 import json
 import sys
 from pathlib import Path
@@ -28,6 +29,153 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(_REPO_ROOT / "src" / "python"))
 
 from piper_train import infer_onnx  # noqa: E402
+
+
+pytestmark = pytest.mark.unit
+
+
+@pytest.fixture
+def invoke_cli(tmp_path, monkeypatch):
+    def run(payload=None, vector=None, dimension=192):
+        model_path = tmp_path / "model.onnx"
+        model_path.write_bytes(b"fixture")
+        _write_minimal_config(model_path)
+        session = _make_session_mock(
+            [
+                "input",
+                "input_lengths",
+                "scales",
+                "sid",
+                "speaker_embedding",
+                "speaker_embedding_mask",
+            ]
+        )
+        for item in session.get_inputs():
+            if item.name == "speaker_embedding":
+                item.shape = [1, dimension]
+        args = [
+            "infer",
+            "--model",
+            str(model_path),
+            "--output-dir",
+            str(tmp_path / "output"),
+            "--dataset-dir",
+            str(tmp_path),
+        ]
+        if vector is not None:
+            path = tmp_path / "reference.npy"
+            np.save(path, vector)
+            args += ["--speaker-embedding", str(path)]
+        if payload is None:
+            args += ["--text", "abcde"]
+        else:
+            monkeypatch.setattr(
+                sys,
+                "stdin",
+                io.StringIO(
+                    json.dumps({"phoneme_ids": [1] + [10] * 16 + [2], **payload}) + "\n"
+                ),
+            )
+        monkeypatch.setattr(sys, "argv", args)
+        monkeypatch.setattr(
+            infer_onnx, "create_session_with_cache", lambda *args, **kwargs: session
+        )
+        monkeypatch.setattr(
+            infer_onnx, "warmup_onnx_session", lambda *args, **kwargs: None
+        )
+        return session, infer_onnx.main
+
+    return run
+
+
+@pytest.mark.parametrize("jsonl", [False, True])
+def test_cli_no_reference_feeds_zero_with_mask_zero(invoke_cli, jsonl):
+    session, run = invoke_cli({} if jsonl else None)
+    run()
+    feeds = session.run.call_args.args[1]
+    assert not feeds["speaker_embedding"].any()
+    assert feeds["speaker_embedding_mask"].tolist() == [[0]]
+    assert "sid" in feeds
+
+
+@pytest.mark.parametrize("jsonl", [False, True])
+@pytest.mark.parametrize("dimension", [192, 256])
+def test_cli_normalizes_reference_using_graph_dimension(invoke_cli, jsonl, dimension):
+    vector = np.arange(1, dimension + 1, dtype=np.float32)
+    session, run = invoke_cli(
+        {"speaker_embedding": vector.tolist()} if jsonl else None,
+        None if jsonl else vector,
+        dimension,
+    )
+    run()
+    feeds = session.run.call_args.args[1]
+    assert feeds["speaker_embedding"].shape == (1, dimension)
+    assert np.linalg.norm(feeds["speaker_embedding"]) == pytest.approx(1)
+    assert feeds["speaker_embedding_mask"].tolist() == [[1]]
+
+
+@pytest.mark.parametrize("jsonl", [False, True])
+@pytest.mark.parametrize(
+    "vector",
+    [
+        np.zeros(192),
+        np.full(192, np.nan),
+        np.full(192, np.inf),
+        np.ones((2, 96)),
+        np.ones(256),
+    ],
+)
+def test_cli_rejects_invalid_explicit_reference_before_ort(invoke_cli, jsonl, vector):
+    session, run = invoke_cli(
+        {"speaker_embedding": vector.tolist()} if jsonl else None,
+        None if jsonl else vector,
+    )
+    with pytest.raises((ValueError, SystemExit)):
+        run()
+    session.run.assert_not_called()
+
+
+def test_cli_jsonl_resolves_dataset_relative_embedding_path(invoke_cli, tmp_path):
+    vector = np.arange(1, 193, dtype=np.float32)
+    np.save(tmp_path / "entry.npy", vector)
+    session, run = invoke_cli({"speaker_embedding_path": "entry.npy"})
+    run()
+    feeds = session.run.call_args.args[1]
+    np.testing.assert_allclose(
+        feeds["speaker_embedding"][0],
+        vector.astype(np.float64) / np.linalg.norm(vector.astype(np.float64)),
+    )
+    assert feeds["speaker_embedding_mask"].tolist() == [[1]]
+
+
+@pytest.mark.parametrize("source", ["file", "speaker-id", "audio"])
+@pytest.mark.parametrize("valid", [False, True])
+def test_resolver_validates_all_reference_sources(tmp_path, monkeypatch, source, valid):
+    vector = np.arange(1, 193, dtype=np.float32) if valid else np.full(192, np.nan)
+    np.save(tmp_path / "speaker_7.npy", vector)
+    audio = tmp_path / "ref.wav"
+    encoder = tmp_path / "encoder.onnx"
+    audio.write_bytes(b"fixture")
+    encoder.write_bytes(b"fixture")
+    monkeypatch.setattr(
+        infer_onnx, "_extract_speaker_embedding_from_audio", lambda *args: vector
+    )
+    options = {
+        "speaker_audio": str(audio) if source == "audio" else None,
+        "speaker_encoder": str(encoder),
+        "speaker_embedding_path": str(tmp_path / "speaker_7.npy")
+        if source == "file"
+        else None,
+        "speaker_id": 7 if source == "speaker-id" else None,
+        "model_path": tmp_path / "model.onnx",
+        "dataset_dir": tmp_path,
+    }
+    if valid:
+        result = infer_onnx._resolve_speaker_embedding(**options)
+        assert np.linalg.norm(result) == pytest.approx(1)
+    else:
+        with pytest.raises(ValueError, match="speaker_embedding"):
+            infer_onnx._resolve_speaker_embedding(**options)
 
 
 def _make_session_mock(input_names: list[str]) -> MagicMock:

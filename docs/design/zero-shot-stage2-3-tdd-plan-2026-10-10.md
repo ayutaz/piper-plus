@@ -1,25 +1,26 @@
 # Zero-shot工程2〜3の詳細実装・TDD計画
 
 作成: 2026-10-10。開始HEAD: `13a847c7`。
-状態: 工程2A/2Bを実装中（未コミット）。関連3ファイルのCPUテストは57 passed。
-工程2C/3は未着手。完了判定は下表の実装・検証結果を揃えてから行う。
+状態: 工程2A/2Bは`c7cbbbb9`で実装・必須hook完了、関連3ファイル57 passed。
+工程2Cは実装・CPU検証完了（未コミット）、関連15ファイル348 passed。
+工程3は未着手。全体の完了判定は下表の実装・検証結果を揃えてから行う。
 全体方針は[改善計画](zero-shot-recovery-and-improvement-plan-2026-10-09.md)。
 工程1のCPU検証結果は保持し、工程2A→2B→2C→3A→3B→統合の順に進める。
 工程0の実データ/成果物固定と、工程4以降のモデル品質比較・GPU学習は別工程。
 
 ## 現在地と直近の順序
 
-1. 工程2A/2Bの残件を確認する。共通validator、path/manifest、cache来歴、dry-run、
-   shard確定、失敗entryの扱いは実装中。cache identityに結果へ影響する抽出設定が
-   全て含まれることを確認し、整形・必須hookを通してcheckpoint commitする。
-2. 工程2CでCLI/JSONL、Voice、HTTP、training loaderへ共通validatorを接続する。
-   不正な明示参照を拒否し、無参照だけmask=0、固定192/256次元の互換性を検証する。
-3. 工程3Aで固定参照がinferへ渡る評価経路とraw/EMA/ONNX共通manifestを整備する。
-4. 工程3Bでstrict CERの集合検査、固定ASR条件、失敗時exitを実装する。
-5. 抽出からruntime/loader、推論評価、CERまでの接続とcheckpoint/export互換性を確認する。
+1. 工程2Cの整形・必須hookを通してcheckpoint commitする。
+   CLI/JSONL、Voice、HTTP、training loaderの入力契約は
+   [speaker embedding入力仕様](../spec/speaker-embedding-input.md)へ記録済み。
+2. 工程3Aで固定参照がinferへ渡る評価経路とraw/EMA/ONNX共通manifestを整備する。
+3. 工程3Bでstrict CERの集合検査、固定ASR条件、失敗時exitを実装する。
+4. 抽出からruntime/loader、推論評価、CERまでの接続とcheckpoint/export互換性を確認する。
 
 57 passedの対象は`test_embedding_manifest_cache.py`、`test_extract_speaker_embedding.py`、
-`test_embedding_validation.py`。fixtureによる機能検証であり、実encoderの品質、
+`test_embedding_validation.py`。工程2CはCLI/Voice/HTTP/loader、dataset parser/F0、
+JSONL/timing、実ONNX fixtureを含む15ファイルで348 passed。
+これらはfixtureによる機能検証であり、実encoderの品質、
 実データ全量の再抽出、音声品質改善を確認した結果ではない。
 
 ## 1. 共通契約（2A）
