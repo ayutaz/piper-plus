@@ -47,7 +47,7 @@ validation lossは復元用lossであり、推論条件の品質評価は計画�
 | EMA start/apply-every設定 | VitsModelではG更新数単位。他のLightningModuleは従来のglobal_step互換 |
 | DINO teacher/center | 従来どおり通常trainingのG forward内。student/teacherのfinite guardを維持。G optimizer成功回数とは別 |
 | LR scheduler | 従来どおりepoch末に各schedulerを進める |
-| KL cap streak | trainingのraw KLのみ。validation/sanityでは増加・reset・abortしない |
+| KL cap streak | trainingのraw KLのみ。validation/sanityでは増加・reset・abortしない。評価値は`val_kl_raw`へ別途記録 |
 | Lightning global_step | Lightningの管理と既存logに残す。batch周期の判定には使わない |
 
 DINOの構成上の退化懸念と`c_dino=0`推奨は既存設計どおり。
@@ -69,6 +69,7 @@ post hookで確認した場合だけ増やす。Lightning wrapperを呼んだだ
 | `d_step_skipped_nonfinite_d` | D loss非有限のrankがありDを中止 |
 | `lf_step` / `d_step_skipped_latent_filling` | LF batchのDを省略 |
 | `g_step_skipped_optimizer` / `d_step_skipped_optimizer` | precision plugin等がraw stepを実行しなかった |
+| `val_kl_raw` | validation/sanityのclamp・weight適用前KL。training guardとは分離 |
 
 G/D lossのfinite判定は既存のrank間all-reduceを使う。
 G非有限で中止した場合もLF flagとgraph参照を解放する。

@@ -14,6 +14,7 @@ SimpleNamespace stand-in without constructing the full LightningModule.
 
 from __future__ import annotations
 
+import math
 from types import SimpleNamespace
 
 import pytest
@@ -109,7 +110,8 @@ def test_validation_does_not_change_training_kl_streak(raw_kl):
     stub.training = False
     stub.training_batches_seen = 7
     stub.log = lambda *_args, **_kwargs: None
-    stub._log_with_batch_info = lambda *_args, **_kwargs: None
+    logs = []
+    stub._log_with_batch_info = lambda key, value, _batch: logs.append((key, value))
 
     def loss_g(_batch):
         VitsModel._update_kl_cap_guard(stub, raw_kl)
@@ -121,6 +123,13 @@ def test_validation_does_not_change_training_kl_streak(raw_kl):
         VitsModel.validation_step(stub, None, index)
     assert stub._kl_cap_consecutive == 2
     assert stub.training_batches_seen == 7
+    values = [value for key, value in logs if key == "val_kl_raw"]
+    assert len(values) == 3
+    assert all(
+        value == raw_kl or (math.isnan(value) and math.isnan(raw_kl))
+        for value in values
+    )
+    assert not hasattr(stub, "_validation_kl_raw")
 
 
 class TestEnvParsing:

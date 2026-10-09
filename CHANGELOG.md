@@ -386,7 +386,8 @@ See the [release checklist](docs/guides/development/python-release-2.0.2.md).
   同一の永続training batch indexへ統一し、D:G=2:1でG更新が毎batch走る問題と
   WavLM D更新の停止を修正。G lossの周期補償をG更新頻度に合わせ、EMAは成功した
   G optimizer更新だけで進める。validation/sanityがtrainingのKL cap streakを
-  増加・reset・abortする問題も修正。実Lightning/CPU Glooを含む関連207テスト成功。
+  増加・reset・abortする問題も修正し、評価時のraw KLは`val_kl_raw`として分離。
+  実Lightning/CPU Glooを含む関連207テスト成功。
   [仕様と検証範囲](docs/spec/training-batch-schedule.md)。
 - **旧公開checkpointのSTFT loss buffer互換性**: 後から追加されたfull/high-band
   STFTの固定window/band_weightが欠落する場合だけ設定から補完し、strict loadを維持。
