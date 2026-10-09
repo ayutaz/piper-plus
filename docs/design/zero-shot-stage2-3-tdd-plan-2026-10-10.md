@@ -2,20 +2,27 @@
 
 作成: 2026-10-10。開始HEAD: `13a847c7`。
 状態: 工程2A/2Bは`c7cbbbb9`で実装・必須hook完了、関連3ファイル57 passed。
-工程2Cは実装・CPU検証完了（未コミット）、関連15ファイル348 passed。
-工程3は未着手。全体の完了判定は下表の実装・検証結果を揃えてから行う。
+工程2Cは`3ea95490`で実装・必須hook完了、関連15ファイル348 passed。
+工程3A/3Bと統合の実装・CPU完了条件を充足。関連4ファイル72 passed。
+回帰はtrain/export側349 passed・8 skipped・1 deselected、runtime側155 passed。
+追加で、同じ実Synthesizerの既存wrapperによるONNX exportと3backend生成を2件で確認した。
+工程3の変更は本更新と合わせてcheckpoint commitする。
 全体方針は[改善計画](zero-shot-recovery-and-improvement-plan-2026-10-09.md)。
 工程1のCPU検証結果は保持し、工程2A→2B→2C→3A→3B→統合の順に進める。
 工程0の実データ/成果物固定と、工程4以降のモデル品質比較・GPU学習は別工程。
 
-## 現在地と直近の順序
+## 現在地と次工程
 
-1. 工程2Cの整形・必須hookを通してcheckpoint commitする。
-   CLI/JSONL、Voice、HTTP、training loaderの入力契約は
-   [speaker embedding入力仕様](../spec/speaker-embedding-input.md)へ記録済み。
-2. 工程3Aで固定参照がinferへ渡る評価経路とraw/EMA/ONNX共通manifestを整備する。
-3. 工程3Bでstrict CERの集合検査、固定ASR条件、失敗時exitを実装する。
-4. 抽出からruntime/loader、推論評価、CERまでの接続とcheckpoint/export互換性を確認する。
+工程2〜3の機能実装は完了。次は工程0の実データ/成果物固定を終えて工程4の品質比較へ進む。
+有料GPU・追加学習は工程5/6として別途実行条件を決める。
+操作方法とartifact契約は[推論評価仕様](../spec/zero-shot-inference-evaluation.md)。
+
+固定参照とprosodyのinferへの接続、無参照caption、RNGとmodeの復元、
+小型の実Synthesizerによるcheckpoint読込・音声生成、strict CERの集合・hash・ASR条件・
+epoch判定、実WAV形式、異常終了時復元を含む4ファイルで72件成功した。
+同じ実モデルの通常/compile形式checkpointからraw/既存EMA/ONNXを生成し、
+抽出wrapper→loader→固定監視→prepare/generate CLI→strict CERの接続も確認した。
+ASR stubによる結果はgateの機能検証であり、実モデルの明瞭度や品質を示さない。
 
 57 passedの対象は`test_embedding_manifest_cache.py`、`test_extract_speaker_embedding.py`、
 `test_embedding_validation.py`。工程2CはCLI/Voice/HTTP/loader、dataset parser/F0、
@@ -119,3 +126,26 @@ CLI・HTTPの変換済みvectorとVoiceの再検証が一致することを確�
 
 実データ全量のcache再抽出・checkpoint品質再評価は工程0/4/5として未実施を明記する。
 この計画の完了は、工程2〜3の機能と回帰検証の成立であり、品質承認や公開ではない。
+
+## 7. 完了条件と現在の証拠
+
+| 要求 | 確認結果・主な証拠 |
+|---|---|
+| 2A: 共通vector契約、192/256互換、不正入力拒否 | `test_embedding_validation.py`。2A/2B checkpoint `c7cbbbb9` |
+| 2B: 3抽出経路、来歴cache、path/manifest/atomic/shard/workers/dry-run | `test_embedding_manifest_cache.py`、`test_extract_speaker_embedding.py`。関連3ファイル57 passed |
+| 2C: CLI/JSONL、Voice、HTTP、loaderと無参照mask | `3ea95490`。関連15ファイル348 passed、正常旧入力・実ONNX fixtureを含む |
+| 3A: 固定参照/prosody、predicted infer、無参照caption、raw/表示音声の区別 | `test_inference_evaluation.py`と実Synthesizerを使う`test_evaluation_manifest.py` |
+| 3A: mode/RNG、optimizer、DINO teacher/center、clock/KL状態を変更しない | 実VitsModelの監視前後state_dict/clock/RNG一致、optimizer非呼出し、異常終了時復元 |
+| 3A: raw/既存EMA/ONNXの共通manifest・来歴・artifact hash | 実小型Synthesizerを`build_infer_forward`経由でexport。3backendの条件hash一致、EMA原重み復元、実ORT seed再生成 |
+| 3B: 全期待ID/条件、ASR pin、minimum 3、既存epoch/CER gate | `test_strict_cer.py`のstrict/診断CLI、missing/extra/duplicate、不整合・ASR失敗は非zero exit |
+| 統合: 抽出から推論評価/CER、checkpoint/export互換 | 実Synthesizerの通常/compile checkpoint経路、抽出→loader/監視→CLI→strict CER。既存checkpoint gateを含む回帰504 passed |
+
+504件はtrain側21ファイル349件とruntime側5ファイル155件の別processでの結果。
+8 skippedは既存の条件付きテスト、1 deselectedは工程1で確認済みの2-rank Glooテスト。
+工程3ではそのDDPテストを再実行していない。full-model GPU/DDP/AMP確認は工程5に残す。
+ローカルの空の旧`src/python/piper_plus` directoryによるnamespace探索競合は、
+検証processの`PYTHONPATH`へ正式`src/python_run`を指定して回避した。保持対象は削除していない。
+
+TDDでは参照断線・不正入力、ONNX先頭補助出力、epoch/seed/source来歴不足、
+strict集合/条件不足、実WAV形式未検査、診断revision未反映の失敗を確認してから修正した。
+encoder/frontendとASRのstubは接続・gateの証拠に限定する。
