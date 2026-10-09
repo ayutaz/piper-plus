@@ -202,7 +202,7 @@ def _strict_inputs(args) -> tuple[dict, dict, list[tuple[Path, str]]]:
             raise ValueError(f"generation seed mismatch for {clip['id']}")
     if any(file_sha256(wav) != hashes[wav.stem] for wav in wavs):
         raise ValueError("generated WAV hash mismatch")
-    from ..vits.wavfile import read  # noqa: PLC0415
+    from scipy.io.wavfile import read  # noqa: PLC0415
 
     for wav in wavs:
         sample_rate, audio = read(wav)

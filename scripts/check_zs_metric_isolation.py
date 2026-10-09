@@ -9,7 +9,8 @@ frozen encoder 崩壊は v10a-r2 §10)。同じ事故を評価メトリクス (�
 (学習流用の恒久禁止) を regex で強制する。
 
 Rule A (学習 → 評価の方向、E-8 本体):
-    学習コード (``src/python/piper_train/vits/**`` + ``piper_train/__main__.py``)
+    学習コード (``src/python/piper_train/vits/**`` + ``piper_train/__main__.py``
+    + 学習から呼ぶ共有推論context ``piper_train/inference_eval.py``)
     からメトリクスモジュール (measure_band_noise / measure_comb_artifacts /
     measure_prosody / acoustic_frames / eval_zs_secs) を import したら fail。
     共有 helper の acoustic_frames も ban list に含む (迂回 import の穴を塞ぐ)。
@@ -71,6 +72,7 @@ METRIC_MODULES: tuple[str, ...] = (
     "acoustic_frames",
     "eval_zs_secs",
     "eval_seen_speaker_id",
+    "eval_cer",
 )
 
 _METRIC_ALT = "|".join(METRIC_MODULES)
@@ -168,14 +170,17 @@ ALLOWLIST: frozenset[str] = frozenset()
 def classify_role(rel_posix: str) -> str | None:
     """repo 相対 POSIX パス → "train" / "metric" / None (scope 外)。
 
-    - "train": piper_train/vits/**/*.py + piper_train/__main__.py
-    - "metric": METRIC_MODULES の 5 ファイル
+    - "train": piper_train/vits/**/*.py + __main__.py + inference_eval.py
+    - "metric": METRIC_MODULES の各ファイル
     - None: それ以外 (tools/ のオフライン前処理・テスト・export 等 —
       契約 §2 禁止事項 4 の例外境界【仕様 D18】)
     """
     if rel_posix in _METRIC_PATHS:
         return "metric"
-    if rel_posix == "src/python/piper_train/__main__.py":
+    if rel_posix in (
+        "src/python/piper_train/__main__.py",
+        "src/python/piper_train/inference_eval.py",
+    ):
         return "train"
     if rel_posix.startswith("src/python/piper_train/vits/") and rel_posix.endswith(
         ".py"
