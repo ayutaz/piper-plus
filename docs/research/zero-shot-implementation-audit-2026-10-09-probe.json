@@ -1,0 +1,432 @@
+{
+  "torch": "2.11.0+cu128",
+  "pytorch_lightning": "2.6.6",
+  "device": "cpu",
+  "source": "src/python/piper_train/vits/lightning.py",
+  "source_sha256": "058fd3d7637a75a8139b9f1c14598393ae761cfabf6f7b1d3018b68db2808e3d",
+  "method": "CPU reproduction of the existing manual-optimizer schedule.\n\nUses the real VitsModel.training_step and training_step_d with small linear\nmodules. Only generator waveform/loss computation is replaced. The WavLM G\ngate is compiled from the existing training_step_g AST, rather than rewritten.\nNo pretrained model, audio synthesis, GPU training, or network is used.\n",
+  "cases": [
+    {
+      "d_update_interval": 1,
+      "wavlm_every_n_steps": 2,
+      "batches": 8,
+      "g_updates": 8,
+      "d_updates": 8,
+      "final_global_step": 16,
+      "wavlm_g_count": 8,
+      "wavlm_d_count": 0,
+      "wavlm_head_max_abs_change": 0.0,
+      "rows": [
+        {
+          "batch": 0,
+          "g_entry_global_step": 0,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 1
+        },
+        {
+          "batch": 1,
+          "g_entry_global_step": 2,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 3
+        },
+        {
+          "batch": 2,
+          "g_entry_global_step": 4,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 5
+        },
+        {
+          "batch": 3,
+          "g_entry_global_step": 6,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 7
+        },
+        {
+          "batch": 4,
+          "g_entry_global_step": 8,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 9
+        },
+        {
+          "batch": 5,
+          "g_entry_global_step": 10,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 11
+        },
+        {
+          "batch": 6,
+          "g_entry_global_step": 12,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 13
+        },
+        {
+          "batch": 7,
+          "g_entry_global_step": 14,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 15
+        }
+      ]
+    },
+    {
+      "d_update_interval": 2,
+      "wavlm_every_n_steps": 2,
+      "batches": 8,
+      "g_updates": 8,
+      "d_updates": 8,
+      "final_global_step": 16,
+      "wavlm_g_count": 8,
+      "wavlm_d_count": 0,
+      "wavlm_head_max_abs_change": 0.0,
+      "rows": [
+        {
+          "batch": 0,
+          "g_entry_global_step": 0,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 1
+        },
+        {
+          "batch": 1,
+          "g_entry_global_step": 2,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 3
+        },
+        {
+          "batch": 2,
+          "g_entry_global_step": 4,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 5
+        },
+        {
+          "batch": 3,
+          "g_entry_global_step": 6,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 7
+        },
+        {
+          "batch": 4,
+          "g_entry_global_step": 8,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 9
+        },
+        {
+          "batch": 5,
+          "g_entry_global_step": 10,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 11
+        },
+        {
+          "batch": 6,
+          "g_entry_global_step": 12,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 13
+        },
+        {
+          "batch": 7,
+          "g_entry_global_step": 14,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 15
+        }
+      ]
+    },
+    {
+      "d_update_interval": 3,
+      "wavlm_every_n_steps": 2,
+      "batches": 8,
+      "g_updates": 4,
+      "d_updates": 8,
+      "final_global_step": 12,
+      "wavlm_g_count": 4,
+      "wavlm_d_count": 4,
+      "wavlm_head_max_abs_change": 0.21365660429000854,
+      "rows": [
+        {
+          "batch": 0,
+          "g_entry_global_step": 0,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 1
+        },
+        {
+          "batch": 1,
+          "g_entry_global_step": 2,
+          "g_update": false,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 2
+        },
+        {
+          "batch": 2,
+          "g_entry_global_step": 3,
+          "g_update": true,
+          "wavlm_g_gate": false,
+          "d_entry_global_step": 4
+        },
+        {
+          "batch": 3,
+          "g_entry_global_step": 5,
+          "g_update": false,
+          "wavlm_g_gate": false,
+          "d_entry_global_step": 5
+        },
+        {
+          "batch": 4,
+          "g_entry_global_step": 6,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 7
+        },
+        {
+          "batch": 5,
+          "g_entry_global_step": 8,
+          "g_update": false,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 8
+        },
+        {
+          "batch": 6,
+          "g_entry_global_step": 9,
+          "g_update": true,
+          "wavlm_g_gate": false,
+          "d_entry_global_step": 10
+        },
+        {
+          "batch": 7,
+          "g_entry_global_step": 11,
+          "g_update": false,
+          "wavlm_g_gate": false,
+          "d_entry_global_step": 11
+        }
+      ]
+    },
+    {
+      "d_update_interval": 1,
+      "wavlm_every_n_steps": 1,
+      "batches": 8,
+      "g_updates": 8,
+      "d_updates": 8,
+      "final_global_step": 16,
+      "wavlm_g_count": 8,
+      "wavlm_d_count": 8,
+      "wavlm_head_max_abs_change": 0.20377755165100098,
+      "rows": [
+        {
+          "batch": 0,
+          "g_entry_global_step": 0,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 1
+        },
+        {
+          "batch": 1,
+          "g_entry_global_step": 2,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 3
+        },
+        {
+          "batch": 2,
+          "g_entry_global_step": 4,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 5
+        },
+        {
+          "batch": 3,
+          "g_entry_global_step": 6,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 7
+        },
+        {
+          "batch": 4,
+          "g_entry_global_step": 8,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 9
+        },
+        {
+          "batch": 5,
+          "g_entry_global_step": 10,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 11
+        },
+        {
+          "batch": 6,
+          "g_entry_global_step": 12,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 13
+        },
+        {
+          "batch": 7,
+          "g_entry_global_step": 14,
+          "g_update": true,
+          "wavlm_g_gate": true,
+          "d_entry_global_step": 15
+        }
+      ]
+    }
+  ],
+  "evaluation_checks": {
+    "fixed_loader_ignored_embedding": {
+      "speaker_embedding": null,
+      "speaker_embedding_path": null
+    },
+    "eval_f0_gt_1_pred_2_probability_0_5": [
+      1.0,
+      2.0
+    ],
+    "eval_kl_guard_abort_threshold_3": [
+      {
+        "counter": 1,
+        "abort": false
+      },
+      {
+        "counter": 2,
+        "abort": false
+      },
+      {
+        "counter": 3,
+        "abort": "Raw KL pinned at the 1e+04 cap for 3 consecutive steps (step=0). Training has diverged and cannot recover — aborting instead of completing a garbage run. Check MAS alignment integrity (PIPER_PLUS_DISABLE_SUPER_MAS =1 forces the Cython reference) and loss_dur before resuming. Set PIPER_PLUS_KL_CAP_ABORT_STEPS=0 to disable this guard."
+      }
+    ],
+    "eval_kl_guard_counter_after_low_kl": 0,
+    "kl_method": "Original validation_step and KL guard; numerical G/D losses replaced. Unguarded production G call verified separately at lightning.py:1971."
+  },
+  "pipeline_probes": {
+    "output_dir_ignored": {
+      "custom_exists": false,
+      "dataset_default_exists": true,
+      "evidence": "extract_speaker_embedding.py:518-519,991-995"
+    },
+    "stem_collision": {
+      "json_paths": [
+        "speaker_embeddings/foo.npy",
+        "speaker_embeddings/foo.npy"
+      ],
+      "cache_files": [
+        "foo.npy"
+      ],
+      "evidence": "extract_speaker_embedding.py:540-551,687,762-763"
+    },
+    "missing_manifest": {
+      "json_paths": [
+        "speaker_embeddings/ok.npy",
+        "speaker_embeddings/missing.npy"
+      ],
+      "path_exists": [
+        true,
+        false
+      ],
+      "evidence": "extract_speaker_embedding.py:547,553-559,581-585,782-791"
+    },
+    "relative_dataset_path": {
+      "expected_output_exists": true,
+      "observed_output_exists": false,
+      "evidence": "extract_speaker_embedding.py:199-215,237-241; dataset.py:501-505"
+    },
+    "missing_only_manifest": {
+      "json_path": "speaker_embeddings/missing.npy",
+      "path_exists": false
+    },
+    "empty_cache": {
+      "encoder_calls": 0,
+      "json_path": "speaker_embeddings/empty.npy",
+      "load_failure": "EOFError"
+    },
+    "stale_cache": {
+      "first_calls": 1,
+      "second_calls": 0,
+      "cache_unchanged": true,
+      "evidence": "extract_speaker_embedding.py:531-551"
+    },
+    "invalid_direct_npy": {
+      "shape": [
+        192
+      ],
+      "finite": false,
+      "norm_is_finite": false,
+      "evidence": "infer_onnx.py:459-474"
+    },
+    "cer_missing_clip": {
+      "return_code": 0,
+      "input_wav_count": 2,
+      "matched_text_count": 1,
+      "reported_n_clips": 1,
+      "classification": "score CLI only; formal gate must enforce minimum count",
+      "evidence": "eval_cer.py:141-148; zs-eval-contract.md:255-258"
+    },
+    "training_runtime_fbank_difference": {
+      "valid": true,
+      "runtime_shape": [
+        198,
+        80
+      ],
+      "training_shape": [
+        198,
+        80
+      ],
+      "max_abs_difference": 1.6776776313781738,
+      "rmse": 0.07333307713270187,
+      "quality_claim": "preprocessing difference only; real CAM++ quality impact not measured",
+      "evidence": "extract_speaker_embedding.py:66-90,281,351-360"
+    }
+  },
+  "v11_archive": {
+    "path": "piper-v11-local/box-evac/box-final-evac.tar.gz",
+    "sha256": "23890ff5d3783844cb0d10e150392fa42a2e155ab4930bd6338746c28102fc2f",
+    "method": "TFRecord framing and Event protobuf; CRC not revalidated",
+    "runs": [
+      {
+        "run": "data/piper/output-v11/lightning_logs/version_0",
+        "hparams": {
+          "c_wavlm": 0.5,
+          "d_update_interval": 1,
+          "use_wavlm_discriminator": true,
+          "wavlm_every_n_steps": 2
+        },
+        "events": [
+          "data/piper/output-v11/lightning_logs/version_0/events.out.tfevents.1787488392.aa08089e9a14.6418.0"
+        ],
+        "wavlm_tag_counts": {
+          "loss_gen_wavlm": 325,
+          "loss_fm_wavlm": 325,
+          "loss_disc_wavlm": 0
+        }
+      },
+      {
+        "run": "data/piper/output-v11/lightning_logs/version_1",
+        "hparams": {
+          "c_wavlm": 0.5,
+          "d_update_interval": 1,
+          "use_wavlm_discriminator": true,
+          "wavlm_every_n_steps": 2
+        },
+        "events": [
+          "data/piper/output-v11/lightning_logs/version_1/events.out.tfevents.1787531238.aa08089e9a14.24328.0"
+        ],
+        "wavlm_tag_counts": {
+          "loss_gen_wavlm": 57,
+          "loss_fm_wavlm": 57,
+          "loss_disc_wavlm": 0
+        }
+      }
+    ]
+  }
+}
