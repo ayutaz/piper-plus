@@ -149,3 +149,8 @@ CLI・HTTPの変換済みvectorとVoiceの再検証が一致することを確�
 TDDでは参照断線・不正入力、ONNX先頭補助出力、epoch/seed/source来歴不足、
 strict集合/条件不足、実WAV形式未検査、診断revision未反映の失敗を確認してから修正した。
 encoder/frontendとASRのstubは接続・gateの証拠に限定する。
+
+工程3本体は`b1194f65`で必須hook成功後にcommit済み。
+最終監査で共有推論contextとCERの隔離gate対象漏れも失敗テストへ追加し、
+trainingからCERのimport、CERからTorch/VITSのimportを検出する対象とtriggerを補完した。
+この補完は後続の独立checkpointとして記録する。
