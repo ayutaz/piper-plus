@@ -2,8 +2,9 @@
 
 作成: 2026-10-10。状態: 既存500 epoch FTの照合、配布物の整形、
 Python consumer検証、公開前試聴資料の準備が完了。人手試聴と一般公開は未完了。
-ベース側のマージ後CIは47 workflow成功、Docker Build and Pushが実行中。
-この件数は本記録作成時のsnapshotで、最終結果ではない。
+ベース側のマージ後CIは50 workflow成功、1件skip、失敗・実行中なしで完了。
+対象commitは`b5f60734dadaf778cb5312859412276a20c113ff`。
+[Docker Build and Push](https://github.com/ayutaz/piper-plus/actions/runs/38039451529)も成功した。
 
 ## 公開対象と来歴
 
@@ -104,10 +105,46 @@ Piperはfloat出力を正規化してPCM化するため、PCMのfull-scale近傍
 推論で生成されたCPU最適化cache 2件は配布候補から除外し、ベース・公開例の
 MIT著作権/許諾文を同梱した。root READMEを含む公開対象は22ファイル。
 既存rootの説明を残したREADMEと固定revision付きアップロードのdry-runを用意した。
-試聴結果が未記録の間はapply経路で停止する。候補の新規コピーでは通常生成・
-公開例・strict checkpoint loadを確認済みだが、未認証の公開後検証とは区別する。
+試聴結果が未記録の間はapply経路で停止する。最終22ファイルの新規コピーで
+hash/sizeと通常生成・公開例・strict checkpoint loadを確認した。
+未認証の公開後検証とは区別する。
 公開後は新規保存先へ未認証で全ファイルを取得し、hash照合・通常生成・
 公開checkpoint読み込みを再確認する。HF commit、旧rootの保持、研究保存先の
 設定維持を確認してから完了とする。
 
 証拠・配布候補・試聴資料は`output/public-tsukuyomi-release-20261010/`に保存。
+
+## 公開実行と完了判定
+
+以下の配布helperと証拠は、今回のローカル作業workspaceの上記`output/`に保存している。
+GitHub checkoutだけに同名helperがあるとは扱わない。
+元録音・private評価embeddingは公開操作の対象に含めない。
+
+1. 日本語3文の読み・話者類似・自然さ・ノイズについて、人手の実回答と対象WAVの
+   SHA256を`human-review.json`に記録する。機械指標から回答を推定しない。
+   問題があれば原因を調べ、変更した対象を再検証・再試聴する。
+2. モデルカード・`verification.json`・manifestへ同じ試聴結果と判断範囲を反映し、
+   `human_review_status=recorded`にする。少数の日本語文の確認を全言語の品質承認へ
+   拡張しない。`SHA256SUMS`とmanifestを最終bytesから再計算する。
+   `finalize_bundle.py`はpending候補を生成する準備用であり、回答反映後にそのまま
+   再実行すると回答を上書きするため、公開直前の更新には使用しない。
+3. `publish_bundle.py`をapplyなしで実行し、公開対象22ファイル、hash、モデルカード、
+   公開先のgate/private設定と親revisionを検査する。
+   親revisionが`36b59c825c36bd386b8960cf3f604382f52f2a87`から変わっていれば、
+   変更内容を確認してから操作を組み直す。無条件に最新revisionへ追従しない。
+4. `publish_bundle.py --apply`で世代別directoryとroot READMEを一つのHF commitへ
+   追加する。研究保存先の設定変更、旧root model/configの置換、削除操作は含めない。
+   新しいcommitと追加対象のhashを`publication-receipt.json`へ記録する。
+5. `verify_release.py`をcandidate指定なしで実行する。HF token・netrcを使わない
+   HTTP sessionで公開commit固定の22ファイルを新規directoryへ取得する。
+   全ファイルのhash/size、manifest、`SHA256SUMS`を照合する。
+6. ダウンロードしたpairをPyPI `piper-plus==2.0.0`で通常生成し、公開例でも生成する。
+   checkpointを`weights_only=True`と現在のtraining modelへのstrict loadで確認する。
+   旧rootファイルとbase・研究保存先のrevision/private/gate設定の保持も照合する。
+7. 未認証取得・生成・checkpoint読み込み・保持条件が全て成功し、試聴結果と公開commit
+   が記録された時点で今回の公開工程を完了とする。失敗があれば完了扱いにせず、
+   取得したcommitと証拠を保持して原因を切り分ける。
+
+公開前の候補コピー検証は`verify_release.py --candidate`で行う。
+これは匿名公開取得の成功を意味しない。公開alias更新を含む新パッケージのリリース、
+他runtime/OS・Colab全工程の実モデル確認は後続工程として扱う。
