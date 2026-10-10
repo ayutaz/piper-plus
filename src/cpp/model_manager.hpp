@@ -27,6 +27,7 @@ struct VoiceInfo {
     std::string repoId;        // HuggingFace repo identifier (e.g., "ayousanz/piper-plus-tsukuyomi-chan")
     std::vector<VoiceFileInfo> files;
     std::vector<std::string> aliases;
+    std::string revision = "main"; // Optional pinned HuggingFace revision
 };
 
 // Get the default model directory (platform-specific)

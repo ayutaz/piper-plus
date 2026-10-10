@@ -287,6 +287,15 @@ pub fn builtin_registry() -> &'static [ModelInfo] {
     REGISTRY.get_or_init(|| {
         vec![
             ModelInfo {
+                name: "zero-shot-base-zs-v1".to_string(),
+                language: "ja-en-zh-es-fr-pt".to_string(),
+                quality: "experimental".to_string(),
+                description: "Experimental zs-v1 base; requires a CAM++ 192-dimensional reference embedding".to_string(),
+                model_url: "https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/base.onnx".to_string(),
+                config_url: "https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/base.onnx.json".to_string(),
+                size_bytes: Some(40_777_457),
+            },
+            ModelInfo {
                 name: "tsukuyomi-6lang-v2".to_string(),
                 language: "ja-en-zh-es-fr-pt".to_string(),
                 quality: "medium".to_string(),
@@ -323,6 +332,12 @@ pub fn builtin_registry() -> &'static [ModelInfo] {
 /// description match (case-insensitive).
 pub fn find_model(query: &str) -> Option<&'static ModelInfo> {
     let registry = builtin_registry();
+    let query = match query {
+        "base" | "ayousanz/piper-plus-base" | "multilingual-zero-shot-base-zs-v1" => {
+            "zero-shot-base-zs-v1"
+        }
+        other => other,
+    };
 
     // 1. Exact name match
     if let Some(m) = registry.iter().find(|m| m.name == query) {
@@ -383,8 +398,14 @@ pub fn resolve_model_path(
         .unwrap_or_else(default_model_dir);
 
     // Check if already cached
-    if is_model_cached(&model_info.name, &dir) {
-        let model_path = dir.join(format!("{}.onnx", model_info.name));
+    // Preserve the legacy name-based cache for existing released voices.
+    if model_info.name != "zero-shot-base-zs-v1" && is_model_cached(&model_info.name, &dir) {
+        return Ok(dir.join(format!("{}.onnx", model_info.name)));
+    }
+    let filename = model_info.model_url.rsplit('/').next().unwrap_or("");
+    let config_filename = model_info.config_url.rsplit('/').next().unwrap_or("");
+    if dir.join(filename).is_file() && dir.join(config_filename).is_file() {
+        let model_path = dir.join(filename);
         return Ok(model_path);
     }
 
@@ -962,5 +983,27 @@ mod tests {
         assert!(result.is_err());
         let msg = format!("{}", result.unwrap_err());
         assert!(msg.contains("not found"), "error message: {msg}");
+    }
+}
+
+#[cfg(test)]
+mod public_base_tests {
+    use super::*;
+    #[test]
+    fn pinned_alias_and_cached_url_filename() {
+        for alias in ["base", "zero-shot-base-zs-v1", "ayousanz/piper-plus-base"] {
+            let model = find_model(alias).expect("public base alias");
+            assert_eq!(model.quality, "experimental");
+            let prefix = "https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/";
+            assert_eq!(model.model_url, format!("{prefix}base.onnx"));
+            assert_eq!(model.config_url, format!("{prefix}base.onnx.json"));
+            let dir = tempfile::tempdir().unwrap();
+            std::fs::write(dir.path().join("base.onnx"), b"graph").unwrap();
+            std::fs::write(dir.path().join("base.onnx.json"), b"{}").unwrap();
+            assert_eq!(
+                resolve_model_path(alias, Some(dir.path())).unwrap(),
+                dir.path().join("base.onnx")
+            );
+        }
     }
 }

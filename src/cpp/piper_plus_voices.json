@@ -65,5 +65,39 @@
             "ja-css10"
         ],
         "description": "CSS10 Japanese 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT, 6841 utterances)"
+    },
+    "multilingual-zero-shot-base-zs-v1": {
+        "key": "multilingual-zero-shot-base-zs-v1",
+        "name": "zero-shot-base-zs-v1",
+        "language": {
+            "code": "multilingual",
+            "family": "multilingual",
+            "region": "",
+            "name_native": "Multilingual",
+            "name_english": "Multilingual",
+            "country_english": ""
+        },
+        "quality": "experimental",
+        "num_speakers": 571,
+        "speaker_id_map": {},
+        "source": "piper-plus",
+        "repo": "ayousanz/piper-plus-base",
+        "revision": "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1",
+        "files": {
+            "releases/zs-v1/base.onnx": {
+                "size_bytes": 40777457,
+                "md5_digest": ""
+            },
+            "releases/zs-v1/base.onnx.json": {
+                "size_bytes": 6417,
+                "md5_digest": ""
+            }
+        },
+        "aliases": [
+            "base",
+            "zero-shot-base-zs-v1",
+            "ayousanz/piper-plus-base"
+        ],
+        "description": "Experimental zs-v1 base; requires a CAM++ 192-dimensional reference embedding. Python 2.0.0 public example verified; no quality approval."
     }
 }

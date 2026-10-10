@@ -319,3 +319,17 @@ func TestNewModelManager_NilLogger(t *testing.T) {
 		t.Error("logger should not be nil when nil is passed to NewModelManager")
 	}
 }
+
+func TestBuildModelInfoPrefersMatchingSidecar(t *testing.T) {
+	directory := t.TempDir()
+	model := filepath.Join(directory, "base.onnx")
+	for _, path := range []string{model, model + ".json", filepath.Join(directory, "config.json")} {
+		if err := os.WriteFile(path, []byte("test"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	info, ok := buildModelInfo("base", model)
+	if !ok || info.ConfigPath != model+".json" {
+		t.Fatalf("wrong config: %+v", info)
+	}
+}

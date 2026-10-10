@@ -97,8 +97,14 @@ Cache directory 内で `{model_str}/*.onnx` または `{model_str}.onnx` を探�
 |-------|---------|-----------|
 | `tsukuyomi` | `ayousanz/piper-plus-tsukuyomi-chan` | `tsukuyomi-chan-6lang-fp16.onnx` |
 | `css10` | `ayousanz/piper-plus-css10-ja-6lang` | `css10-ja-6lang-fp16.onnx` |
+| `base` | `ayousanz/piper-plus-base` at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` | `releases/zs-v1/base.onnx` |
+| `zero-shot-base-zs-v1` | `ayousanz/piper-plus-base` at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` | `releases/zs-v1/base.onnx` |
 
-> `base` alias は v2.0 で削除されました。 HF `ayousanz/piper-plus-base` repo は現在 training checkpoint (`model.ckpt`) のみ公開しており、 直接推論用の ONNX が未 upload のため。 base 6lang ONNX 公開後に再登録予定。
+> `base` と `zero-shot-base-zs-v1` は、次のリリースで公開する pinned aliases です。
+> いずれも root の legacy `model.ckpt` を指さず、上記 revision の
+> `releases/zs-v1/base.onnx` と同じ世代の `config.json` を解決します。リリース済み
+> v2.0.0/v2.0.1 の alias 表には遡及して追加しません。`base.onnx` は 192 次元 CAM++
+> `speaker_embedding` を使う実験用 Zero-Shot base で、通常の参照なし音声用 alias ではありません。
 
 ---
 

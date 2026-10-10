@@ -446,3 +446,16 @@ int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
+
+TEST(ModelManager, PublicBasePinnedPair) {
+    for (const auto& alias : {"base", "zero-shot-base-zs-v1", "ayousanz/piper-plus-base"}) {
+        auto voice = piper::findVoice(alias);
+        ASSERT_TRUE(voice.has_value());
+        EXPECT_EQ(voice->revision, "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1");
+        EXPECT_EQ(voice->quality, "experimental");
+        EXPECT_EQ(voice->numSpeakers, 571);
+        ASSERT_EQ(voice->files.size(), 2u);
+        EXPECT_EQ(voice->files[0].relativePath, "releases/zs-v1/base.onnx");
+        EXPECT_EQ(voice->files[1].relativePath, "releases/zs-v1/base.onnx.json");
+    }
+}

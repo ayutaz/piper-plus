@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add a single-speaker fine-tuning dataset preparation helper that preserves the base model's phoneme and language IDs, validates cache paths, and rejects unsupported tokens and existing output directories.
-- Document the existing Zero-Shot base publication path and the zs-v1 artifact and consumer verification record.
-- Publish the existing v7 epoch32 experimental Zero-Shot base under `ayousanz/piper-plus-base/releases/zs-v1`, with a fine-tuning checkpoint, CAM++ encoder, dedicated config, hashes and runnable examples. Preserve the legacy root model and pin the published artifact revision in the model manifest.
+- Document the public experimental Zero-Shot base at Hugging Face revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` under `ayousanz/piper-plus-base/releases/zs-v1`, including the paired `base.onnx`/`base.onnx.json`, fine-tuning checkpoint, CAM++ encoder, hashes, runnable examples, and the published `piper-plus==2.0.0` consumer check. Preserve the legacy root files; this interim artifact is not a quality approval or a cross-runtime validation claim.
+- Add `base` and `zero-shot-base-zs-v1` aliases to the model catalogs and API/browser resolvers. Resolve the revision-pinned nested ONNX/config pair and isolate cache entries by revision and artifact path; published `piper-plus` 2.0.0 and 2.0.1 packages remain without these aliases.
 
 ## [2.0.1] - 2026-10-08
 

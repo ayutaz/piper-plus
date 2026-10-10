@@ -26,9 +26,13 @@ tar -xzf piper-plus-shared-macos-arm64.tar.gz -C /usr/local
 ### Download a model
 
 ```bash
-curl -LO https://huggingface.co/ayousanz/piper-plus-base/resolve/main/multilingual-test-medium.onnx
-curl -LO https://huggingface.co/ayousanz/piper-plus-base/resolve/main/multilingual-test-medium.onnx.json
+curl -LO https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx
+curl -LO https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx.json
 ```
+
+This FFI example demonstrates reference-free synthesis. The C++ speaker
+encoder path for `--reference-audio` is not implemented. For Zero-Shot
+embedding precomputation, follow the canonical [published zs-v1 README](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/README.md).
 
 The OpenJTalk dictionary is bundled in the release archive at `share/open_jtalk/dic/`.
 
@@ -53,14 +57,14 @@ dart run ffigen --config ffigen.yaml
 ### One-shot synthesis
 
 ```bash
-dart run example/main.dart multilingual-test-medium.onnx /usr/local/share/open_jtalk/dic \
+dart run example/main.dart tsukuyomi-chan-6lang-fp16.onnx /usr/local/share/open_jtalk/dic \
     "Hello, this is piper-plus." output.wav
 ```
 
 ### Streaming synthesis
 
 ```bash
-dart run example/streaming.dart multilingual-test-medium.onnx /usr/local/share/open_jtalk/dic \
+dart run example/streaming.dart tsukuyomi-chan-6lang-fp16.onnx /usr/local/share/open_jtalk/dic \
     "First sentence. Second sentence. Third sentence." streaming.wav
 ```
 

@@ -376,7 +376,7 @@ Resolves a model identifier to concrete URLs without downloading.
 |-------|-------------------|-------------|
 | Tsukuyomi-chan | `ayousanz/piper-plus-tsukuyomi-chan` | Japanese female voice, single-speaker, 6-language support |
 | CSS10 Japanese | `ayousanz/piper-plus-css10-ja-6lang` | Japanese voice, single-speaker, 6-language support |
-| Base (571 speakers) | `ayousanz/piper-plus-base` | Multi-speaker base model, 571 speakers across 6 languages |
+| zs-v1 (experimental) | Direct `base.onnx` URL below | v7 epoch32 Zero-Shot base, 571 speakers, 6 languages, 173 phonemes, CAM++ 192-dim embedding |
 
 Models can be specified by full HuggingFace repo name or shortcut:
 
@@ -387,6 +387,23 @@ const tts = await PiperPlus.initialize({ model: "ayousanz/piper-plus-tsukuyomi-c
 // Shortcut
 const tts = await PiperPlus.initialize({ model: "tsukuyomi", ort });
 ```
+
+The public `zs-v1` base is stored below a versioned subdirectory and must be
+loaded by its direct ONNX URL. Do not pass the repository name
+`ayousanz/piper-plus-base`: the repository also contains legacy root files and
+the generic repository resolver may pair the nested ONNX with the wrong root
+config. Use the matching `base.onnx.json` sidecar from the same directory:
+
+```javascript
+const zsRevision = "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1";
+const zsBaseUrl =
+  `https://huggingface.co/ayousanz/piper-plus-base/resolve/${zsRevision}/releases/zs-v1/base.onnx`;
+const tts = await PiperPlus.initialize({ model: zsBaseUrl, ort });
+```
+
+`zs-v1` is an experimental v7 epoch32 bundle. Reference-conditioned inference
+with the public bundle was verified with PyPI `piper-plus==2.0.0` only; this
+README does not claim verification on the WASM package or other runtimes.
 
 ### Using a Custom Model URL
 
@@ -425,21 +442,24 @@ The runtime exposes both features as first-class API surfaces:
 const audio = await piper.synthesize('<speak>Hello <break time="400ms"/>world.</speak>')
 // isSsml() / parseSsml() are also re-exported for inspection.
 
-// Voice Cloning — extract a 256-dim ECAPA-TDNN speaker_embedding from a
-// reference WAV and inject it into synthesize(). `synthesizeFromReferenceAudio`
-// is an instance method on PiperPlus.
-import { SpeakerEncoder } from 'piper-plus'
-const encoder = await SpeakerEncoder.initialize({
-    modelUrl: 'https://huggingface.co/.../speaker_encoder.onnx',
-})
-const cloned = await piper.synthesizeFromReferenceAudio({
-    text: 'こんにちは。',
-    referenceWav: refWavFloat32Array, // or AudioBuffer
-    encoder,
-    sampleRate: 22050, // only required when referenceWav is a Float32Array
-    options: { language: 'ja' },
-})
+// Voice Cloning — pass a model-compatible, pre-computed speaker_embedding.
+// The public zs-v1 bundle uses a CAM++ 192-dim Float32Array.
+// Application-specific loader for the embedding produced by the published example.
+const embedding192 = await loadEmbeddingFromPublishedExample()
+const cloned = await piper.synthesizeWithVoiceCloning(
+  'こんにちは。',
+  embedding192,
+  { language: 'ja' },
+)
 ```
+
+See the [published zs-v1 README](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/README.md)
+for the canonical reference-audio and embedding-precomputation flow. The
+model's ONNX input metadata determines the embedding dimension; legacy models
+may use 256-dim ECAPA-TDNN while zs-v1 uses CAM++ 192-dim. The public bundle's
+reference-conditioned inference was verified with PyPI `piper-plus==2.0.0`
+only; this README does not claim verification of the WASM package with that
+bundle.
 
 `synthesizeSsml`, `synthesizeFromReferenceAudio`, and the `speakerEmbedding`
 option on `synthesize()` are available from `piper-plus 0.6.0` onwards (PR #478,

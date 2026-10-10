@@ -31,13 +31,20 @@ The legacy root files remain separate; use the config bundled with the selected 
 
 | Model | Languages | Speakers | Description | Download |
 |---|---|---|---|---|
-| 6-Language Base (MB-iSTFT-VITS2) | JA/EN/ZH/ES/FR/PT | 571 | Multilingual pre-trained (508,187 utterances, VITS + Prosody). **75 epochs scratch / `epoch=74-step=500034`**, MB-iSTFT + PQMF decoder (`upsample_rates=(4, 4)` × iSTFT(4) × PQMF(4) = 256x), language-balanced sampling, WavLM-disabled (V100 friendly). `num_symbols=173` / `num_languages=6` / `prosody_dim=16` / `gin_channels=512`. Actual HF files: `model.ckpt` (302 MB, training checkpoint for FT) + `config.json`. | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
+| Legacy 6-Language Base (MB-iSTFT-VITS2) | JA/EN/ZH/ES/FR/PT | 571 | Retained root-era multilingual checkpoint (508,187 utterances, VITS + Prosody). **75 epochs scratch / `epoch=74-step=500034`**, MB-iSTFT + PQMF decoder (`upsample_rates=(4, 4)` × iSTFT(4) × PQMF(4) = 256x), language-balanced sampling, WavLM-disabled (V100 friendly). `num_symbols=173` / `num_languages=6` / `prosody_dim=16` / `gin_channels=512`. Root files remain `model.ckpt` + `config.json` for legacy fine-tuning; they do not provide the new CAM++ zero-shot path. | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
 
-> **Decoder 世代**: HF 上の `model.ckpt` は 2026-05-03 に HiFi-GAN 版から **MB-iSTFT-VITS2 版** (75 epoch scratch、 2.21x faster CPU inference、 [Issue #268](https://github.com/ayutaz/piper-plus/issues/268) / [PR #320](https://github.com/ayutaz/piper-plus/pull/320)) に差し替え済みです。 旧 HiFi-GAN 版の ckpt は配布されていません。 同じ学習 run の推論用 ONNX (`multilingual-6lang-mb-istft-scratch-75epoch.onnx`) の upload は [Issue #590](https://github.com/ayutaz/piper-plus/issues/590) follow-up にて予定。
+> **Decoder 世代**: HF root の `model.ckpt` は 2026-05-03 に HiFi-GAN 版から **MB-iSTFT-VITS2 版** (75 epoch scratch、 2.21x faster CPU inference、 [Issue #268](https://github.com/ayutaz/piper-plus/issues/268) / [PR #320](https://github.com/ayutaz/piper-plus/pull/320)) に差し替え済みです。 旧 HiFi-GAN 版の ckpt は配布されていません。 root の旧 run に対応する ONNX はこのガイドの公開推論モデルではありません。新しい公開ベースは下記 `releases/zs-v1` を使用してください。
 
 > **旧rootとZero-Shot baseの区別**: 旧root checkpointには現研究の192次元話者projectionがありません。
 > 旧decoder条件層の移行処理はv2.0.0のtraining sourceに実装されていますが、今回の公開検証は
 > 新しい`releases/zs-v1`を対象にしています。旧rootのFT互換と、新しいZero-Shot baseの両用途検証を混同しないでください。
+
+> **公開 zs-v1 の利用条件**: `releases/zs-v1/base.onnx` は v7 epoch32 の実験用
+> Zero-Shot base です。推論時は 192 次元 CAM++ `speaker_embedding` と対応する
+> `campplus.onnx` が必要です。通常の参照なし TTS API/Wyoming 音声として使うモデルではありません。
+> `base.ckpt` を単一話者へ追加学習して export した ONNX では、参照なし生成を確認済みですが、
+> これは機能確認であり品質承認ではありません。公開 bundle は revision
+> `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` に固定されています。
 
 > **音素表の世代差**: 本 ckpt は `num_symbols=173` (6 言語時代の inventory) で学習されています。 現行の `get_phoneme_id_map("ja-en-zh-es-fr-pt")` は KO/SV を含む 8 言語統合マップ (185 symbol) を 返すので、 これを使って FT すると `model_g.enc_p.emb.weight` が 173 vs 185 で size mismatch に なります。 FT 時は `get_phoneme_id_map()` ではなく HF `config.json` の `phoneme_id_map` / `num_symbols` をそのまま使ってください (`get_phoneme_id_map` の docstring が案内している経路。 `notebooks/finetune.ipynb` は対応済み)。
 
@@ -45,12 +52,13 @@ The legacy root files remain separate; use the config bundled with the selected 
 
 | Model | Languages | Speakers | Description | Download |
 |---|---|---|---|---|
-| v7 Multi-6lang Zero-Shot | JA/EN/ZH/ES/FR/PT | 571 + zero-shot | Zero-shot TTS base, scratch-trained 32 epochs (V100 × 4, 12.5 days, 2026-05-08〜2026-05-20). CAM++ (192-dim) speaker embedding + Multi-scale FiLM + DINO self-distill. SECS (zero-shot) **0.6879** at epoch 32. ONNX 38.9 MB FP16. | [HuggingFace (private)](https://huggingface.co/ayousanz/piper-plus-zero-shot-multi-6lang-v7) |
+| v7 Multi-6lang Zero-Shot (research) | JA/EN/ZH/ES/FR/PT | 571 + zero-shot | Research artifact: scratch-trained 32 epochs (V100 × 4, 12.5 days, 2026-05-08〜2026-05-20). CAM++ (192-dim) speaker embedding + Multi-scale FiLM + DINO self-distill. SECS (zero-shot) **0.6879** at epoch 32. Research repository remains private. | [HuggingFace (private)](https://huggingface.co/ayousanz/piper-plus-zero-shot-multi-6lang-v7) |
 | Tsukuyomi Zero-Shot FT | JA/EN/ZH/ES/FR/PT | 1 (single-speaker FT) | Single-speaker fine-tune from v7 zero-shot base, 500 epochs (2026-05-21, 51 min on RTX 4070 Ti SUPER). Tsukuyomi-chan reproducibility SECS (CAM++) **0.7749**. ONNX 38.2 MB FP16. | [HuggingFace (private)](https://huggingface.co/ayousanz/piper-plus-zero-shot-tsukuyomi) |
 | CAM++ Speaker Encoder | — | — | Apache-2.0 licensed CAM++ ONNX (ModelScope iic mirror, Voice Cloning 用 speaker embedding 抽出器、 192-dim L2 normalized). | [HuggingFace (private)](https://huggingface.co/ayousanz/campplus-onnx) |
 
 > **Research storage**: the private/gated repositories above retain research artifacts. General users should download
-> the ungated `piper-plus-base/releases/zs-v1` bundle, which includes the encoder and needs no access to research storage.
+> the ungated `piper-plus-base/releases/zs-v1` bundle at the pinned revision above, which includes `base.onnx`,
+> `base.ckpt`, `config.json`, `base.onnx.json`, `campplus.onnx`, and their hashes. It needs no access to research storage.
 > A new Tsukuyomi FT release from the same public base is the next stage and has not been published here.
 > Historical SECS scores above are not a new quality approval. Research details: [`docs/design/multi-6lang-zero-shot-v7-training-results.md`](../../design/multi-6lang-zero-shot-v7-training-results.md).
 

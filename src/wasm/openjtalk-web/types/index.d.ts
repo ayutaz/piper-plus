@@ -540,6 +540,9 @@ export class ModelManager {
    * Resolve a model identifier to concrete URLs for the ONNX model and its
    * companion config JSON.
    *
+   * The experimental "base" / "zero-shot-base-zs-v1" aliases use the pinned
+   * zs-v1 graph and sidecar, with a revision/path-specific cache key.
+   *
    * Accepted formats:
    *   - Registry shortcut: "css10"
    *   - HuggingFace repo:  "ayousanz/piper-plus-css10-ja-6lang"

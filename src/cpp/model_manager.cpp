@@ -43,8 +43,12 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
         "key": "ja_JP-tsukuyomi-chan-medium",
         "name": "tsukuyomi-chan",
         "language": {
-            "code": "ja_JP", "family": "ja",
-            "name_native": "日本語", "name_english": "Japanese"
+            "code": "ja_JP",
+            "family": "ja",
+            "region": "JP",
+            "name_native": "日本語",
+            "name_english": "Japanese",
+            "country_english": "Japan"
         },
         "quality": "medium",
         "num_speakers": 1,
@@ -61,15 +65,23 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
                 "md5_digest": ""
             }
         },
-        "aliases": ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"],
+        "aliases": [
+            "tsukuyomi",
+            "tsukuyomi-chan",
+            "ja-tsukuyomi"
+        ],
         "description": "Tsukuyomi-chan 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT)"
     },
     "ja_JP-css10-6lang-medium": {
         "key": "ja_JP-css10-6lang-medium",
         "name": "css10-6lang",
         "language": {
-            "code": "ja_JP", "family": "ja",
-            "name_native": "日本語", "name_english": "Japanese"
+            "code": "ja_JP",
+            "family": "ja",
+            "region": "JP",
+            "name_native": "日本語",
+            "name_english": "Japanese",
+            "country_english": "Japan"
         },
         "quality": "medium",
         "num_speakers": 1,
@@ -86,8 +98,47 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
                 "md5_digest": ""
             }
         },
-        "aliases": ["css10", "css10-6lang", "css10-ja", "ja-css10"],
+        "aliases": [
+            "css10",
+            "css10-6lang",
+            "css10-ja",
+            "ja-css10"
+        ],
         "description": "CSS10 Japanese 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT, 6841 utterances)"
+    },
+    "multilingual-zero-shot-base-zs-v1": {
+        "key": "multilingual-zero-shot-base-zs-v1",
+        "name": "zero-shot-base-zs-v1",
+        "language": {
+            "code": "multilingual",
+            "family": "multilingual",
+            "region": "",
+            "name_native": "Multilingual",
+            "name_english": "Multilingual",
+            "country_english": ""
+        },
+        "quality": "experimental",
+        "num_speakers": 571,
+        "speaker_id_map": {},
+        "source": "piper-plus",
+        "repo": "ayousanz/piper-plus-base",
+        "revision": "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1",
+        "files": {
+            "releases/zs-v1/base.onnx": {
+                "size_bytes": 40777457,
+                "md5_digest": ""
+            },
+            "releases/zs-v1/base.onnx.json": {
+                "size_bytes": 6417,
+                "md5_digest": ""
+            }
+        },
+        "aliases": [
+            "base",
+            "zero-shot-base-zs-v1",
+            "ayousanz/piper-plus-base"
+        ],
+        "description": "Experimental zs-v1 base; requires a CAM++ 192-dimensional reference embedding. Python 2.0.0 public example verified; no quality approval."
     }
 }
 )JSON";
@@ -119,6 +170,7 @@ static VoiceInfo parseVoiceEntry(const std::string& key,
 
     // HuggingFace repo (piper-plus voices)
     vi.repoId = entry.value("repo", "");
+    vi.revision = entry.value("revision", "main");
 
     // Language block
     if (entry.contains("language") && entry["language"].is_object()) {
@@ -350,6 +402,14 @@ std::vector<VoiceInfo> loadVoiceCatalog() {
                                      "unsafe repoId '{}'", key, repo);
                         continue;
                     }
+                    std::string revision = entry.value("revision", "main");
+                    if (revision.empty() || revision.find("..") != std::string::npos ||
+                        !std::all_of(revision.begin(), revision.end(), [](unsigned char c) {
+                            return std::isalnum(c) || c == '-' || c == '_' || c == '.';
+                        })) {
+                        spdlog::warn("Skipping upstream entry with unsafe revision: {}", key);
+                        continue;
+                    }
                     catalog.push_back(parseVoiceEntry(key, entry, "piper"));
                     existingKeys.insert(key);
                     ++count;
@@ -510,7 +570,7 @@ bool downloadModel(const std::string& modelName,
     std::string baseUrl;
     if (voice.source == "piper-plus") {
         // https://huggingface.co/{repo}/resolve/main/{filename}
-        baseUrl = "https://huggingface.co/" + voice.repoId + "/resolve/main/";
+        baseUrl = "https://huggingface.co/" + voice.repoId + "/resolve/" + voice.revision + "/";
     } else {
         // Upstream piper:
         // https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/{file_path}

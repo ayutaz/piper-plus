@@ -55,3 +55,18 @@ func TestVoiceCatalogEntry_OnnxFileName(t *testing.T) {
 		t.Errorf("unexpected onnx name: %s", name)
 	}
 }
+
+func TestPublicBasePinnedPair(t *testing.T) {
+	for _, alias := range []string{"base", "zero-shot-base-zs-v1", "ayousanz/piper-plus-base"} {
+		entry, ok := FindVoice(alias)
+		if !ok {
+			t.Fatalf("missing alias %s", alias)
+		}
+		if entry.Revision != "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1" || entry.Quality != "experimental" || entry.NumSpeakers != 571 {
+			t.Fatalf("wrong base metadata: %+v", entry)
+		}
+		if len(entry.Files) != 2 || entry.Files[0].RelativePath != "releases/zs-v1/base.onnx" || entry.Files[1].RelativePath != "releases/zs-v1/base.onnx.json" {
+			t.Fatalf("wrong TTS pair: %+v", entry.Files)
+		}
+	}
+}

@@ -43,10 +43,11 @@ exclude = [
   #  Issue #590 audit で public repo の broken link (`piper-plus-base-6lang-fp16.onnx` 等)
   #  が CI で検知できない状態になっていたため縮小)。 現在の除外対象は
   #  private / auth-required repo のみ (下の zero-shot 系ブロックで管理)。
-  # HuggingFace private repos for zero-shot TTS staging (will be unlisted once made public).
+  # HuggingFace private repos retain zero-shot TTS research artifacts after the
+  # ungated piper-plus-base/releases/zs-v1 publication.
   # campplus-onnx: speaker encoder pretrained weights (vendor redistribution gating)
-  # piper-plus-zero-shot-multi-6lang-v7: 6lang zero-shot base ckpt (still in training/audit)
-  # piper-plus-zero-shot-tsukuyomi: tsukuyomi-chan zero-shot FT (license review pending)
+  # piper-plus-zero-shot-multi-6lang-v7: retained 6lang zero-shot research artifacts
+  # piper-plus-zero-shot-tsukuyomi: retained tsukuyomi-chan zero-shot FT research artifacts
   # Referenced from CLAUDE.md and docs/handoff/zero-shot-tts-handoff-2026-06-20.md.
   "^https?://huggingface\\.co/ayousanz/(campplus-onnx|piper-plus-zero-shot-multi-6lang-v7|piper-plus-zero-shot-tsukuyomi)(/|$)",
   # Slack invites (private workspace)

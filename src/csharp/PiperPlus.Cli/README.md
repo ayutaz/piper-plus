@@ -69,15 +69,25 @@ Run `piper-plus --help` for the full set (model resolution, JSONL stdin, `--test
 
 ## Voice cloning (Speaker Encoder)
 
+The CLI accepts a pre-computed `speaker_embedding`. For the public `zs-v1`
+bundle, use the matching `base.onnx` and `base.onnx.json` from the pinned release
+directory, and use its bundled `campplus.onnx` for CAM++ 192-dim embeddings.
+The canonical reference-audio precomputation example is maintained in the
+[published zs-v1 README](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/README.md).
+
 ```bash
-piper-plus --model tsukuyomi \
-           --speaker-encoder-model models/speaker_encoder.onnx \
-           --reference-audio reference.wav \
+piper-plus --model models/zs-v1/base.onnx \
+           --config models/zs-v1/base.onnx.json \
+           --speaker-embedding embedding.bin \
            --text "Cloned voice example." \
            --output_file cloned.wav
 ```
 
-The speaker encoder produces a 256-dim L2-normalized embedding (ECAPA-TDNN) that is fed to the VITS model via the `speaker_embedding` input.
+The embedding dimension is declared by the loaded ONNX model. The public
+zs-v1 model uses a 192-dim L2-normalized CAM++ embedding; legacy models may
+use a 256-dim ECAPA-TDNN embedding. The public zs-v1 bundle was functionally
+verified with PyPI `piper-plus==2.0.0` only; this README does not claim
+verification of this .NET runtime with that bundle.
 
 ## Streaming + sentence splitting
 

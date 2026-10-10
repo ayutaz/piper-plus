@@ -61,6 +61,8 @@ cpp     = { id = "cpp",     cli = "piper-plus",             supports_dump_wav = 
 # Models are looked up by name; the workflow downloads them on demand.
 multilingual_test_medium = { hf = "ayousanz/piper-plus-css10-ja-6lang" }
 tsukuyomi_6lang_v2       = { hf = "ayousanz/piper-plus-tsukuyomi-chan" }
+# Retained root-era MB-iSTFT base. This entry is historical and is not the
+# public v2 Zero-Shot bundle below.
 mb_istft_base            = { hf = "ayousanz/piper-plus-base" }
 
 # Zero-shot test model entry — pins the `speaker_embedding` input contract
@@ -72,5 +74,19 @@ mb_istft_base            = { hf = "ayousanz/piper-plus-base" }
 # must be forwarded as `--speaker-embedding` to every runtime CLI.
 [models.zero_shot_test_model]
 hf = "ayousanz/piper-plus-zero-shot-multi-6lang-v7"
+has_speaker_embedding = true
+expected_embedding_dim = 192
+
+# Public copy of the same experimental v7 epoch32 graph. Keep the private
+# research entry above for research fixtures; this entry pins the public
+# revision and nested artifact path used by the zs-v1 bundle.
+[models.zero_shot_public_zs_v1]
+hf = "ayousanz/piper-plus-base"
+revision = "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1"
+model_file = "releases/zs-v1/base.onnx"
+config_file = "releases/zs-v1/config.json"
+encoder_file = "releases/zs-v1/campplus.onnx"
+model_sha256 = "e9860701a941db02149c7cfbe19cfb578c235c5e25020f1f592131d9b3b30f84"
+encoder_sha256 = "a6ac6a63997761ae2997373e2ee1c47040854b4b759ea41ec48e4e42df0f4d73"
 has_speaker_embedding = true
 expected_embedding_dim = 192

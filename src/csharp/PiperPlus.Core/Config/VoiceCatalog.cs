@@ -14,6 +14,23 @@ public static class VoiceCatalog
     private static readonly VoiceInfo[] BuiltInVoices =
     [
         new VoiceInfo(
+            Key: "multilingual-zero-shot-base-zs-v1",
+            Name: "zero-shot-base-zs-v1",
+            LanguageCode: "multilingual", LanguageFamily: "multilingual",
+            LanguageNameNative: "Multilingual", LanguageNameEnglish: "Multilingual",
+            Quality: "experimental", NumSpeakers: 571, Source: "piper-plus",
+            RepoId: "ayousanz/piper-plus-base",
+            Files:
+            [
+                new VoiceFileInfo("releases/zs-v1/base.onnx", 40777457, string.Empty),
+                new VoiceFileInfo("releases/zs-v1/base.onnx.json", 6417, string.Empty),
+            ],
+            Aliases: ["base", "zero-shot-base-zs-v1", "ayousanz/piper-plus-base"],
+            Description: "Experimental base; requires a CAM++ 192-dimensional reference embedding")
+        {
+            Revision = "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1",
+        },
+        new VoiceInfo(
             Key: "ja_JP-tsukuyomi-chan-medium",
             Name: "tsukuyomi-chan",
             LanguageCode: "ja_JP",

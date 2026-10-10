@@ -17,7 +17,7 @@ with ONNX Runtime inference via [yalue/onnxruntime_go](https://github.com/yalue/
 - Session pooling for concurrent synthesis (`VoicePool`)
 - Phoneme timing extraction (JSON / TSV / SRT)
 - **SSML basic profile** — `<speak>`, `<break>`, `<prosody rate>` via `piperplus/ssml` (W3C SSML subset, shared canonical with the Rust `piper-plus-g2p::ssml` mirror)
-- **Voice cloning** — `--reference-audio` + `--speaker-encoder-model` flags extract a 256-dim ECAPA-TDNN `speaker_embedding` and inject it into the ONNX `speaker_embedding` input (matches the Python / Rust / C# / WASM / C++ runtimes)
+- **Voice cloning** — `--reference-audio` + `--speaker-encoder-model` can supply a model-compatible `speaker_embedding`. The embedding dimension is read from the ONNX model; public zs-v1 uses CAM++ 192-dim embeddings, while legacy models may use ECAPA-TDNN 256-dim embeddings. Cross-runtime verification of the public zs-v1 bundle is not claimed here.
 - Short-text strategies A/B/C (silence padding, dynamic scales, SSML `<break>` auto-injection)
 - Warmup + `.opt.onnx` session cache for faster cold start (shared `docs/spec/ort-session-contract.toml`)
 - ZH-EN code-switching loanword dispatch (byte-for-byte in sync with the canonical Python `zh_en_loanword.json` and the 9 other runtime mirrors)
@@ -167,15 +167,39 @@ piper-plus -m model.onnx -t "Hello" --streaming | aplay -r 22050 -f S16_LE
 | `--json-input` | | Read JSONL `{phoneme_ids, speaker_id?, ...}` from path / stdin |
 | `--output-timing` | | Write phoneme timing to file |
 | `--timing-format` | `json` | Timing output format (json / tsv / srt) |
-| `--reference-audio` | | Voice cloning: extract `speaker_embedding` from this WAV |
-| `--speaker-embedding` | | Voice cloning: load a pre-computed 256-dim embedding (.bin / .npy) |
-| `--speaker-encoder-model` | | Voice cloning: ECAPA-TDNN ONNX model used with `--reference-audio` |
+| `--reference-audio` | | Voice cloning input WAV; use with a compatible encoder model and the published zs-v1 preprocessing flow |
+| `--speaker-embedding` | | Voice cloning: load a pre-computed model-compatible embedding (.bin / .npy) |
+| `--speaker-encoder-model` | | Speaker encoder ONNX used with `--reference-audio`; its output dimension must match the loaded TTS model |
 | `--model-dir` | `${PIPER_PLUS_MODEL_DIR}` | Model cache directory (defaults to `~/.cache/piper-plus`) |
-| `--list-models` | | List available pre-trained models (optionally filtered by language) |
-| `--download-model` | | Download a model by alias (e.g. `tsukuyomi`) and exit |
+| `--list-models` | | List models already downloaded in the cache |
+| `--download-model` | | Download one model/config file by HTTPS URL and exit |
 | `--version` | | Print version (resolved from build ldflags) and exit |
 | `--quiet` | `false` | Suppress informational output |
 | `--debug` | `false` | Enable debug logging |
+
+### Public zs-v1 model files
+
+For the experimental public Zero-Shot base, download the files from the
+versioned `releases/zs-v1` directory and keep the matching ONNX/config pair
+together:
+
+```bash
+ZS_REV=3620ed788667cb76f08bd6cf2db8152c1f4c8bd1
+ZS_URL="https://huggingface.co/ayousanz/piper-plus-base/resolve/${ZS_REV}/releases/zs-v1"
+mkdir -p models/zs-v1
+curl -L "${ZS_URL}/base.onnx" -o models/zs-v1/base.onnx
+curl -L "${ZS_URL}/base.onnx.json" -o models/zs-v1/base.onnx.json
+curl -L "${ZS_URL}/config.json" -o models/zs-v1/config.json
+curl -L "${ZS_URL}/campplus.onnx" -o models/zs-v1/campplus.onnx
+```
+
+Load it with `-m models/zs-v1/base.onnx -c models/zs-v1/config.json`.
+Do not combine it with the legacy root `config.json` or `model.ckpt`. The
+published [zs-v1 README](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/README.md)
+contains the canonical reference-audio embedding precomputation example.
+The public bundle's reference-conditioned inference was verified with PyPI
+`piper-plus==2.0.0` only. The `--download-model` option accepts a URL; no
+public `base` alias is provided by this Go runtime.
 
 ## API Reference / APIリファレンス
 

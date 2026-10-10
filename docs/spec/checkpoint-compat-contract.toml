@@ -979,3 +979,17 @@ win_length = 1024
 "ups.1.bias" = "64"
 "ups.1.weight_g" = "128x1x1"
 "ups.1.weight_v" = "128x64x16"
+
+# Public v2 Zero-Shot base note
+# -----------------------------
+# The pinned `releases/zs-v1/base.ckpt` is a separately packaged v7 epoch32
+# experimental checkpoint. It is not the retained root `model.ckpt` snapshot
+# above: it carries the v2 CAM++/Multi-scale-FiLM speaker-conditioning path and
+# is intended for fine-tuning, not full-run resume. Add its generated key/shape
+# snapshot in a follow-up gate change before treating it as a strict published
+# checkpoint entry. The public artifact is pinned by:
+#   repo:     ayousanz/piper-plus-base
+#   revision: 3620ed788667cb76f08bd6cf2db8152c1f4c8bd1
+#   file:     releases/zs-v1/base.ckpt
+#   sha256:   86d0362241c2a3a898d23b9c4bce416ca97725024075fb844ae630e7f9b121f0
+#   embedding: 192-dimensional CAM++

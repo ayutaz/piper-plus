@@ -46,9 +46,10 @@ CANONICAL = REPO_ROOT / "test/model_resolution_vectors.json"
 MIRRORS: dict[str, Path] = {
     # NOTE: `src/python_run/piper_plus/voices.json` contains the 97-language
     # rhasspy upstream catalog only; piper-plus-specific models live in
-    # `download.py`'s `PIPER_PLUS_MODELS` registry instead.
+    # `download.py`'s `PIPER_PLUS_VOICES` registry instead.
     "Python download.py": REPO_ROOT / "src/python_run/piper_plus/download.py",
     "C++ piper_plus_voices.json": REPO_ROOT / "src/cpp/piper_plus_voices.json",
+    "C++ embedded catalog": REPO_ROOT / "src/cpp/model_manager.cpp",
     "Rust model_download.rs": REPO_ROOT / "src/rust/piper-core/src/model_download.rs",
     "C# VoiceCatalog.cs": REPO_ROOT
     / "src/csharp/PiperPlus.Core/Config/VoiceCatalog.cs",
@@ -90,6 +91,11 @@ def check_entry(
     onnx = entry.get("onnx_file")
     if onnx and onnx not in text:
         failures.append(f"  [{mirror_label}] {entry_key}: onnx_file '{onnx}' not found")
+
+    for field in ("config_file", "revision"):
+        value = entry.get(field)
+        if value and value not in text:
+            failures.append(f"  [{mirror_label}] {entry_key}: {field} '{value}' not found")
 
     aliases = entry.get("aliases", [])
     if aliases:

@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
-[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
+[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)
 [![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
 
 **패키지:**
@@ -48,7 +48,7 @@
 - **8개 언어 지원** — 일본어, 영어, 중국어, 스페인어, 프랑스어, 포르투갈어, 스웨덴어, 한국어 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) *학습된 모델은 6개 언어 (JA/EN/ZH/ES/FR/PT) 를 지원합니다*
 - **일본어 TTS** — OpenJTalk 통합, 운율 정보 (A1/A2/A3), 의문사 마커 (#204), 문맥 의존 'ん' 변이형 (#207)
 - **영어 TTS** — GPL-free G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), espeak-ng 불필요
-- **다중 화자** — 571 화자 지원 (학습용 기본 모델), SpeakerBalancedBatchSampler, 언어 그룹 균등 샘플링
+- **다중 화자** — 실험용 Zero-Shot/FT 번들 `zs-v1`의 571 화자, SpeakerBalancedBatchSampler, 언어 그룹 균등 샘플링
 - **커스텀 사전** — 200개 이상의 기술 용어 발음 사전 내장
 - **음소 입력** — `[[ phonemes ]]` 표기법으로 직접 지정 — [가이드](docs/features/phoneme-input.md)
 
@@ -73,13 +73,13 @@
 - **C# CLI** — .NET 10 크로스 플랫폼, 8개 언어 다중 언어, ONNX 추론, **Phoneme Timing 출력 (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli, 스트리밍, CUDA/CoreML/DirectML 지원, **Phoneme Timing 출력 (JSON/TSV/SRT)**, 사전 자동 다운로드
 - **[Go CLI](src/go/README.md)** — HTTP API 서버, 세션 풀링, Docker 지원, 단일 바이너리, **Phoneme Timing 출력 (JSON/TSV/SRT)**
-- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 6개 런타임 (Python/Rust/C#/Go/WASM/C++) 모두 지원
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 모델 호환 사전 계산 `speaker_embedding` 입력을 런타임 기능 수준에서 6개 런타임 (Python/Rust/C#/Go/WASM/C++) 모두 지원합니다. C++ CLI/C API는 사전 계산 embedding만 받으며, C++의 `--reference-audio` 추출은 구현되지 않았습니다. 공개 `zs-v1` 실제 추론은 Python `piper-plus==2.0.0`에서만 기능 검증되었습니다.
 - **SSML 지원** — `<speak>`, `<break>`, `<prosody rate="...">` 4개 런타임 (Python/Rust/C#/Go) 지원
 - **단문 품질 개선 (Strategy A/B/C)** — Silence Padding, Dynamic Scales, SSML `<break>` 자동 삽입을 6개 런타임 모두에서 지원
 
 ### 런타임별 기능 지원
 
-6개 런타임 (Python/Rust/C#/Go/JS-WASM/C++) 에서 동등한 8개 언어 다중 언어 합성 제공. Phoneme Timing, 스트리밍 (문장 단위 분할 포함), Voice Cloning, 커스텀 사전은 모든 런타임에서 지원합니다. SSML은 4개 런타임 (Python/Rust/C#/Go), HTTP API는 2개 런타임 (Python/Go) 에서 지원합니다.
+6개 런타임 (Python/Rust/C#/Go/JS-WASM/C++) 에서 동등한 8개 언어 다중 언어 합성 제공. Phoneme Timing, 스트리밍 (문장 단위 분할 포함), 모델 호환 사전 계산 embedding 입력을 사용하는 Voice Cloning, 커스텀 사전은 런타임 기능으로 지원합니다. C++는 사전 계산 embedding만 받고 `--reference-audio`는 구현되지 않았습니다. 공개 `zs-v1` 실제 추론은 Python `piper-plus==2.0.0`에서만 검증되었으므로 다른 런타임에서의 해당 번들 검증을 의미하지 않습니다. SSML은 4개 런타임 (Python/Rust/C#/Go), HTTP API는 2개 런타임 (Python/Go) 에서 지원합니다.
 
 ### 플랫폼
 
@@ -640,11 +640,13 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 | 츠쿠요미짱 6lang | JA/EN/ZH/ES/FR/PT | 1 | 츠쿠요미짱 음성, 6개 언어 지원, FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
 | CSS10 일본어 6lang | JA/EN/ZH/ES/FR/PT | 1 | CSS10 일본어 음성, 6개 언어 지원, FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang) |
 
-**학습용 기본 모델 (파인튜닝용):**
+**Zero-Shot/FT 기본 모델 (실험용):**
 
 | 모델 | 언어 | 화자 수 | 설명 | 다운로드 |
 |---|---|---|---|---|
-| 6개 언어 기본 모델 | JA/EN/ZH/ES/FR/PT | 571 | 다중 언어 사전 학습 완료 (508,187 발화, VITS + Prosody) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
+| `zs-v1` Zero-Shot/FT 기본 모델 | JA/EN/ZH/ES/FR/PT | 571 | v7 epoch32 실험 모델, 173 음소, 192차원 CAM++ 화자 임베딩 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) |
+
+> Zero-Shot에는 `campplus.onnx`로 추출한 참조 embedding과 `base.onnx`가 필요합니다. 파인튜닝은 `base.ckpt`와 함께 제공된 `config.json`을 사용합니다. 공개 예제는 PyPI `piper-plus==2.0.0`에서 기능만 확인했습니다. 이 모델은 실험용이며 노이즈와 음성 전이 한계가 남아 있고, 품질 승인이나 사람의 청취 승인을 의미하지 않습니다. `base` 및 `zero-shot-base-zs-v1` alias는 소스 브랜치/다음 릴리스용이며 공개된 2.0.0/2.0.1에는 아직 없습니다. 루트 `model.ckpt`는 별도의 legacy 파일입니다.
 
 ### 모델 다운로드
 
@@ -668,25 +670,13 @@ curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyo
 
 ### 6개 언어 기본 모델 특징 (학습용)
 
-- 아키텍처: VITS + Prosody Features
-- 학습 데이터: 508,187 발화 (571 화자, 6개 언어)
-- 샘플링 레이트: 22,050 Hz
-- 심볼 수: 173
-- 운율 특성: A1/A2/A3 운율 정보 (일본어)
-- 언어 그룹 균등 샘플링: 자동 활성화
+- `zs-v1`: v7 epoch32 실험용 Zero-Shot/FT 기본 모델
+- 언어: JA/EN/ZH/ES/FR/PT; 571 화자
+- 샘플링 레이트: 22,050 Hz; 173 음소
+- 화자 조건화: 192차원 CAM++ embedding
+- Zero-Shot에는 참조 embedding이 필요하며, 파인튜닝은 `base.ckpt`와 일치하는 `config.json`을 사용
 
-**지원 언어:**
-
-| 언어 | 코드 | language_id | 화자 수 | 발화 수 | 소스 |
-|---|---|---|---|---|---|
-| 일본어 | ja | 0 | 20 | 60,148 | MOE-Speech |
-| 영어 | en | 1 | 310 | 74,912 | LibriTTS-R |
-| 중국어 | zh | 2 | 142 | 63,223 | AISHELL-3 |
-| 스페인어 | es | 3 | 63 | 168,374 | CML-TTS |
-| 프랑스어 | fr | 4 | 28 | 107,464 | CML-TTS |
-| 포르투갈어 | pt | 5 | 8 | 34,066 | CML-TTS |
-
-> **Note:** piper-plus는 독자적인 아키텍처 확장(다중 언어 임베딩, Prosody A1/A2/A3, 173 심볼)을 적용하고 있으므로 upstream Piper의 체크포인트/ONNX 모델과의 호환성이 없습니다. piper-plus 전용 모델을 이용해 주세요.
+> **Note:** piper-plus는 독자적인 아키텍처 확장을 사용하므로 upstream Piper 체크포인트/ONNX와 호환되지 않습니다. 선택한 모델에 포함된 `config.json`을 사용하고, 루트 `model.ckpt`는 별도의 legacy 파일로 취급해 주세요.
 
 ---
 
@@ -747,7 +737,7 @@ Piper를 Unity에서 사용하기 위한 플러그인: [github.com/ayutaz/uPiper
 
 ### 음성 모델 (Voices)
 
-piper-plus 모델: [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) (6개 언어 기본 모델) · [Tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
+piper-plus 모델: [`zs-v1` Zero-Shot/FT 기본 모델](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) · [Tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
 
 > **Note:** piper-plus는 자체 G2P 및 음소 시스템을 사용하므로 upstream Piper 모델 (rhasspy/piper-voices)은 호환되지 않습니다.
 

@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
-[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
+[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)
 [![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
 
 **软件包：**
@@ -48,7 +48,7 @@
 - **8语言支持** — 日语、英语、普通话、西班牙语、法语、葡萄牙语、瑞典语、韩语 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) *训练模型覆盖6种语言 (JA/EN/ZH/ES/FR/PT)*
 - **日语 TTS** — OpenJTalk 集成、韵律特征 (A1/A2/A3)、疑问标记 (#204)、上下文相关「ん」变体 (#207)
 - **英语 TTS** — 无 GPL 依赖的 G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0)，无需 espeak-ng
-- **多说话人** — 571说话人的6语言基础模型，SpeakerBalancedBatchSampler，语言均衡采样自动启用
+- **多说话人** — 实验性 Zero-Shot/FT bundle `zs-v1` 包含571位说话人，SpeakerBalancedBatchSampler，语言均衡采样自动启用
 - **自定义词典** — 内置 200+ 技术术语发音词典
 - **音素输入** — 使用 `[[ phonemes ]]` 标记直接指定音素 — [指南](docs/features/phoneme-input.md)
 
@@ -73,13 +73,13 @@
 - **C# CLI** — .NET 10 跨平台，8语言多语言支持，ONNX 推理，**Phoneme Timing 输出 (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli，流式处理，CUDA/CoreML/DirectML 支持，**Phoneme Timing 输出 (JSON/TSV/SRT)**，词典自动下载
 - **[Go CLI](src/go/README.md)** — HTTP API服务器、会话池、Docker、单一二进制文件、**Phoneme Timing 输出 (JSON/TSV/SRT)**
-- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 6 个运行时 (Python/Rust/C#/Go/WASM/C++) 全部支持
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 6 个运行时 (Python/Rust/C#/Go/WASM/C++) 均支持模型兼容的预计算 `speaker_embedding` 输入（属于运行时能力支持）。C++ CLI/C API 仅接受预计算 embedding；C++ 尚未实现通过 `--reference-audio` 提取 embedding。公开 `zs-v1` 的实际推理仅使用 Python `piper-plus==2.0.0` 完成功能验证。
 - **SSML 支持** — `<speak>`、`<break>`、`<prosody rate="...">` 在 4 个运行时 (Python/Rust/C#/Go) 中支持
 - **短文本质量改进 (Strategy A/B/C)** — Silence Padding、Dynamic Scales、SSML `<break>` 自动注入在全部 6 个运行时中支持
 
 ### 各运行时功能支持
 
-6 个运行时 (Python/Rust/C#/Go/JS-WASM/C++) 提供等效的 8 语言多语言合成。Phoneme Timing、流式处理（含按句分割）、Voice Cloning、自定义词典在所有运行时均可用。SSML 在 4 个运行时 (Python/Rust/C#/Go) 中支持，HTTP API 在 2 个运行时 (Python/Go) 中支持。
+6 个运行时 (Python/Rust/C#/Go/JS-WASM/C++) 提供等效的 8 语言多语言合成。Phoneme Timing、流式处理（含按句分割）、使用模型兼容预计算 embedding 输入的 Voice Cloning、自定义词典属于运行时能力支持。C++ 仅接受预计算 embedding，尚未实现 `--reference-audio`。公开 `zs-v1` 的实际推理仅在 Python `piper-plus==2.0.0` 中验证；这不表示已在其他运行时验证该 bundle。SSML 在 4 个运行时 (Python/Rust/C#/Go) 中支持，HTTP API 在 2 个运行时 (Python/Go) 中支持。
 
 ### 平台
 
@@ -650,11 +650,13 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 | Tsukuyomi-chan 6lang | JA/EN/ZH/ES/FR/PT | 1 | Tsukuyomi-chan 语音，6语言支持，FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
 | CSS10 日语 6lang | JA/EN/ZH/ES/FR/PT | 1 | CSS10 日语语音，6语言支持，FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang) |
 
-**训练用基础模型（用于微调）：**
+**Zero-Shot/FT 基础模型（实验性）：**
 
 | 模型 | 语言 | 说话人数 | 说明 | 下载 |
 |---|---|---|---|---|
-| 6语言基础模型 | JA/EN/ZH/ES/FR/PT | 571 | 多语言预训练 (508,187条语音, VITS + Prosody) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
+| `zs-v1` Zero-Shot/FT 基础模型 | JA/EN/ZH/ES/FR/PT | 571 | v7 epoch32 实验模型，173个音素，192维 CAM++ 说话人 embedding | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) |
+
+> Zero-Shot 推理使用 `base.onnx`，并需要通过 `campplus.onnx` 提取参考 embedding；微调使用 `base.ckpt` 和随附的 `config.json`。公开示例已通过 PyPI `piper-plus==2.0.0` 完成功能验证。该模型仍为实验模型，存在噪声和声音迁移限制；这不代表质量批准或人工试听通过。`base` 和 `zero-shot-base-zs-v1` alias 面向源码分支/下一版本，尚未包含在公开的 2.0.0/2.0.1 中。根目录 `model.ckpt` 仍是独立的 legacy 文件。
 
 ### 模型下载
 
@@ -678,29 +680,15 @@ curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyo
 
 ### 6语言基础模型特征（训练用）
 
-**piper-plus-base 特征：**
+**`zs-v1` 特征：**
 
-- 架构：VITS + 韵律特征 (Prosody Features)
-- 语言：6种 — 日语 (ja)、英语 (en)、普通话 (zh)、西班牙语 (es)、法语 (fr)、葡萄牙语 (pt)
-- 训练数据：508,187 条语音（571 位说话人）
-- 采样率：22,050 Hz
-- 音素数：173
-- 韵律特征：A1/A2/A3 韵律信息（日语）
-- 扩展音素：疑问标记、上下文相关「ん」变体
-- 语言均衡采样：自动启用
+- v7 epoch32 实验性 Zero-Shot/FT 基础模型
+- 语言：JA/EN/ZH/ES/FR/PT；571 位说话人
+- 采样率：22,050 Hz；173 个音素
+- 说话人条件：192维 CAM++ embedding
+- Zero-Shot 需要参考 embedding；微调使用 `base.ckpt` 和匹配的 `config.json`
 
-**语言ID映射：**
-
-| 语言 | ID | 说话人数 | 语音数 | 来源 |
-|---|---|---|---|---|
-| 日语 (ja) | 0 | 20 | 60,148 | MOE-Speech |
-| 英语 (en) | 1 | 310 | 74,912 | LibriTTS-R |
-| 普通话 (zh) | 2 | 142 | 63,223 | AISHELL-3 |
-| 西班牙语 (es) | 3 | 63 | 168,374 | CML-TTS |
-| 法语 (fr) | 4 | 28 | 107,464 | CML-TTS |
-| 葡萄牙语 (pt) | 5 | 8 | 34,066 | CML-TTS |
-
-> **注意：** piper-plus 进行了独自的架构扩展（多语言嵌入、韵律 A1/A2/A3、173个符号），因此与 upstream Piper 的检查点/ONNX 模型不兼容。请使用 piper-plus 专用模型。
+> **注意：** piper-plus 使用自有架构扩展，与 upstream Piper 检查点/ONNX 模型不兼容。请使用所选模型随附的 `config.json`；根目录 `model.ckpt` 是独立的 legacy 文件。
 
 ---
 
@@ -761,7 +749,7 @@ Piper 的 Unity 插件：[github.com/ayutaz/uPiper](https://github.com/ayutaz/uP
 
 ### 语音模型 (Voices)
 
-piper-plus 模型：[piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base)（6语言基础模型）· [Tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
+piper-plus 模型：[`zs-v1` Zero-Shot/FT 基础模型](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) · [Tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
 
 > **注意：** piper-plus 使用自有的 G2P 和音素系统，因此上游 Piper 模型 (rhasspy/piper-voices) 不兼容。
 

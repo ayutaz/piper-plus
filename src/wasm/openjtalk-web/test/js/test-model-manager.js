@@ -576,7 +576,7 @@ describe("ModelManager", { skip }, () => {
       );
 
       const mgr = new ModelManager();
-      const urls = await mgr._resolveUrls("ayousanz/piper-plus-base");
+      const urls = await mgr._resolveUrls("test-org/generic-tts");
 
       assert.ok(urls.configUrl.endsWith(".onnx.json"));
     });
@@ -598,7 +598,7 @@ describe("ModelManager", { skip }, () => {
       );
 
       const mgr = new ModelManager();
-      const urls = await mgr._resolveUrls("ayousanz/piper-plus-base");
+      const urls = await mgr._resolveUrls("test-org/generic-tts");
 
       assert.ok(urls.configUrl.endsWith("/config.json"));
     });
@@ -627,7 +627,7 @@ describe("ModelManager", { skip }, () => {
       );
 
       const mgr = new ModelManager();
-      const urls = await mgr._resolveUrls("ayousanz/piper-plus-base");
+      const urls = await mgr._resolveUrls("test-org/generic-tts");
 
       assert.equal(urls.configFallbackUrl, null);
     });
@@ -649,7 +649,7 @@ describe("ModelManager", { skip }, () => {
       );
 
       const mgr = new ModelManager();
-      const urls = await mgr._resolveUrls("ayousanz/piper-plus-base");
+      const urls = await mgr._resolveUrls("test-org/generic-tts");
 
       assert.ok(urls.configUrl.includes("huggingface.co"));
     });
@@ -806,7 +806,7 @@ describe("ModelManager", { skip }, () => {
       const mgr = new ModelManager();
 
       await assert.rejects(
-        () => mgr.loadModel("ayousanz/piper-plus-base"),
+        () => mgr.loadModel("test-org/generic-tts"),
         (err) => {
           assert.ok(err.message.includes(".onnx") || err.message.includes("No"));
           return true;
@@ -881,4 +881,22 @@ describe("ModelManager", { skip }, () => {
       );
     });
   });
+});
+
+
+describe("pinned public zero-shot base", () => {
+  for (const alias of ["base", "zero-shot-base-zs-v1", "ayousanz/piper-plus-base"]) {
+    it(`resolves ${alias} without sibling auto-detection`, async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = () => { throw new Error("Pinned resolution must not query siblings"); };
+      try {
+        const urls = await new ModelManager().resolveUrls(alias);
+        const prefix = "https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/";
+        assert.equal(urls.modelUrl, prefix + "base.onnx");
+        assert.equal(urls.configUrl, prefix + "base.onnx.json");
+        assert.equal(urls.configFallbackUrl, null);
+        assert.equal(urls.cacheKey, prefix + "base.onnx");
+      } finally { globalThis.fetch = originalFetch; }
+    });
+  }
 });

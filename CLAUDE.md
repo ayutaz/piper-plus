@@ -520,7 +520,7 @@ cat test.jsonl | uv run python -m piper_train.infer_onnx --model <model.onnx> --
 | 学習速度が遅い (T4、 VRAM 16GB) | VRAM 制約を確認、 batch_size 8-12 に絞る / `--no-wavlm` で VRAM 1-2GB 節約 / 6lang base 規模なら Ada 6000 / RTX 5090 移行検討 |
 | ゾンビ GPU プロセス | `nvidia-smi --query-compute-apps=pid,used_memory --format=csv` で残存 PID 確認、 `kill` で解放 |
 | ONNX 変換エラー | `CUDA_VISIBLE_DEVICES=""` で CPU モード |
-| HiFi-GAN ckpt resume 失敗 | v1.12.0 で `Generator` 削除。MB-iSTFT base から再 FT (`piper-plus-base/model.ckpt`)。詳細: マイグレーションガイド |
+| HiFi-GAN ckpt resume 失敗 | v1.12.0 で `Generator` 削除。旧 v1.12/v1.13 系は legacy root の `piper-plus-base/model.ckpt` から再 FT。v2.0 系は、実験用 Zero-Shot/FT base `releases/zs-v1/base.ckpt` (revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1`) を使う。詳細: マイグレーションガイド |
 
 ---
 
@@ -528,7 +528,8 @@ cat test.jsonl | uv run python -m piper_train.infer_onnx --model <model.onnx> --
 
 | リソース | URL |
 |----------|-----|
-| 6lang ベース ckpt | `ayousanz/piper-plus-base` (HF) |
+| 6lang ベース ckpt (legacy root、v1.12/v1.13 系) | `ayousanz/piper-plus-base/model.ckpt` (HF) |
+| Zero-Shot/FT base `zs-v1` (v2.0 系、実験用) | [`releases/zs-v1/base.ckpt`](https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/base.ckpt) |
 | つくよみちゃん ONNX | `ayousanz/piper-plus-tsukuyomi-chan` (HF) |
 | CSS10 JA ONNX | `ayousanz/piper-plus-css10-ja-6lang` (HF) |
 | 20話者データセット | `ayousanz/moe-speech-20speakers-ljspeech` (HF) |

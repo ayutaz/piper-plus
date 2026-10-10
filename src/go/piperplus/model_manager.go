@@ -216,8 +216,11 @@ func buildModelInfo(name, onnxPath string) (ModelInfo, bool) {
 		SizeMB: float64(fi.Size()) / (1024 * 1024),
 	}
 
-	// Look for a config.json next to the .onnx file.
-	cfgPath := filepath.Join(filepath.Dir(onnxPath), "config.json")
+	// Prefer the model sidecar to avoid mixing a versioned graph with a legacy config.
+	cfgPath := onnxPath + ".json"
+	if _, err := os.Stat(cfgPath); err != nil {
+		cfgPath = filepath.Join(filepath.Dir(onnxPath), "config.json")
+	}
 	if _, err := os.Stat(cfgPath); err == nil {
 		info.ConfigPath = cfgPath
 	}

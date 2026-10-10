@@ -1,7 +1,34 @@
 # Speaker Encoder Contract
 
-Cross-runtime contract for the ECAPA-TDNN speaker encoder used by piper-plus
-voice cloning (`--reference-audio` / `--speaker-embedding`).
+Cross-runtime contract for the speaker encoders used by piper-plus voice cloning
+(`--reference-audio` / `--speaker-embedding`). This document retains the legacy
+ECAPA-TDNN 256-dimensional contract below and records the public v2 CAM++
+192-dimensional contract separately.
+
+## Public v2 Zero-Shot CAM++ encoder
+
+The public `zs-v1` bundle uses the CAM++ speaker encoder for the v7 epoch32
+experimental Zero-Shot base. The bundle is available without a gate at the
+pinned Hugging Face revision
+`3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` under
+`ayousanz/piper-plus-base/releases/zs-v1/`:
+
+| Artifact | Contract |
+|---|---|
+| TTS graph | `base.onnx` with the model-specific `config.json` |
+| Encoder | `campplus.onnx` |
+| Embedding | 192-dimensional, L2-normalized `float32` `speaker_embedding` |
+| Encoder SHA-256 | `a6ac6a63997761ae2997373e2ee1c47040854b4b759ea41ec48e4e42df0f4d73` |
+| Verification scope | Python `piper-plus==2.0.0` functional inference; other runtimes are not claimed |
+
+The CAM++ encoder and the TTS graph are a matched generation. Do not feed a
+legacy 256-dimensional ECAPA embedding into `base.onnx`, and do not treat the
+Zero-Shot base as an ordinary reference-free API voice. The public bundle is an
+experimental functional release; the embedding path has no new quality approval.
+
+The remainder of this document is the retained legacy ECAPA-TDNN 256-dimensional
+contract used by pre-v2 exports. New v2 Zero-Shot exports use the CAM++ contract
+above; runtimes must inspect the ONNX input dimension instead of assuming 256.
 
 This spec governs **two** layers of cross-runtime parity:
 
@@ -110,13 +137,19 @@ The path to a locally-cached encoder ONNX may be supplied via
 canonical way to run the gate against a *different* encoder without
 modifying the fixture.
 
-### ONNX distribution policy
+### Legacy ECAPA-TDNN ONNX distribution policy
 
-The encoder ONNX is **not** committed to the repo (Git LFS quota, ~14MB).
+The legacy ECAPA-TDNN encoder ONNX is **not** committed to the repo (Git LFS quota, ~14MB).
 Distribution is via Hugging Face Hub at `ayousanz/piper-plus-speaker-encoder`,
 pinned by `revision` tag (e.g. `v1.0.0`) so the test is reproducible. Each
 revision corresponds to a `[encoder_onnx].sha256` field in the fixture so a
 silent upstream replacement cannot drift the gate.
+
+This policy and the `ayousanz/piper-plus-speaker-encoder` fixture describe the
+legacy 256-dimensional ECAPA path only. The public CAM++ 192-dimensional
+encoder is distributed as `campplus.onnx` inside the pinned `zs-v1` bundle
+described above; it is a separate model generation and must not be substituted
+into the legacy 256-dimensional E2E fixture.
 
 This mirrors the TTS model alias pattern (`hf_hub_download` in
 `src/python/piper_train/model_manager.py`).

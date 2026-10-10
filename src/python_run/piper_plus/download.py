@@ -24,6 +24,30 @@ PIPER_PLUS_URL_FORMAT = "https://huggingface.co/{repo}/resolve/main/{file}"
 
 # piper-plus specific voice models
 PIPER_PLUS_VOICES: dict[str, Any] = {
+    "multilingual-zero-shot-base-zs-v1": {
+        "key": "multilingual-zero-shot-base-zs-v1",
+        "name": "zero-shot-base-zs-v1",
+        "language": {
+            "code": "multilingual",
+            "family": "multilingual",
+            "region": "",
+            "name_native": "Multilingual",
+            "name_english": "Multilingual",
+            "country_english": "",
+        },
+        "quality": "experimental",
+        "num_speakers": 571,
+        "speaker_id_map": {},
+        "source": "piper-plus",
+        "repo": "ayousanz/piper-plus-base",
+        "revision": "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1",
+        "files": {
+            "releases/zs-v1/base.onnx": {"size_bytes": 40777457, "md5_digest": ""},
+            "releases/zs-v1/base.onnx.json": {"size_bytes": 6417, "md5_digest": ""},
+        },
+        "aliases": ["base", "zero-shot-base-zs-v1", "ayousanz/piper-plus-base"],
+        "description": "Experimental zs-v1 base; requires a CAM++ 192-dimensional reference embedding. Python 2.0.0 public example verified; no quality approval.",
+    },
     "ja_JP-tsukuyomi-chan-medium": {
         "key": "ja_JP-tsukuyomi-chan-medium",
         "name": "tsukuyomi-chan",
@@ -200,9 +224,11 @@ def ensure_voice_exists(
             repo = voice_info.get("repo", "")
             if not _SAFE_REPO_RE.match(repo) or ".." in repo:
                 raise ValueError(f"Invalid repo value: {repo!r}")
-            file_url = PIPER_PLUS_URL_FORMAT.format(
-                repo=repo, file=Path(file_path).name
-            )
+            file_url = PIPER_PLUS_URL_FORMAT.format(repo=repo, file=file_path)
+            revision = voice_info.get("revision", "main")
+            if not re.fullmatch(r"[a-zA-Z0-9._-]+", revision) or ".." in revision:
+                raise ValueError(f"Invalid revision: {revision!r}")
+            file_url = file_url.replace("/resolve/main/", f"/resolve/{revision}/")
         else:
             file_url = URL_FORMAT.format(file=file_path)
 
@@ -249,8 +275,8 @@ def find_voice(name: str, data_dirs: Iterable[str | Path]) -> tuple[Path, Path]:
         if onnx_file and config_file:
             for data_dir in data_dirs:
                 data_dir = Path(data_dir)
-                onnx_path = data_dir / onnx_file
-                config_path = data_dir / config_file
+                onnx_path = data_dir / Path(onnx_file).name
+                config_path = data_dir / Path(config_file).name
 
                 if onnx_path.exists() and config_path.exists():
                     return onnx_path, config_path

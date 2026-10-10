@@ -73,7 +73,7 @@ Capabilities like multi-speaker (`HasSpeakerId`), multilingual (`HasLanguageId`)
 ## Features
 
 - **8 languages** — Japanese, English, Chinese, Korean, Spanish, French, Portuguese (Brazilian via `PortuguesePhonemizer` / European via `EuropeanPortuguesePhonemizer`), Swedish; combined codes auto-route to per-segment phonemizers via `MultilingualPhonemizer`.
-- **Voice cloning** — `SpeakerEncoder` extracts a 256-dim L2-normalized embedding from a reference WAV and feeds it through the ONNX `speaker_embedding` input.
+- **Voice cloning** — `SpeakerEncoder` follows the loaded ONNX model's declared embedding shape. The public zs-v1 bundle uses a 192-dim L2-normalized CAM++ embedding; legacy models may use 256-dim ECAPA-TDNN. See the [published zs-v1 README](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/README.md) for the canonical reference-audio precomputation flow.
 - **SSML basic profile** — `SsmlParser` covers `<speak>`, `<break time="...">`, `<prosody rate="...">`; matches the Python / Rust / Go runtimes.
 - **Phoneme timing** — when the model exposes a `durations` output, `PiperSession.Synthesize` returns timing data that `TimingWriter` can serialize as JSON / TSV / SRT.
 - **Custom dictionaries** — JSON v1.0/v2.0 (C++/Rust互換) and TSV formats supported via `CustomDictionary.LoadDictionaries`; default dictionaries auto-loaded by `LoadDefaults`.

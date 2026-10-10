@@ -10,15 +10,18 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Well-known model aliases
-#
-# Note: The `piper-plus-base` HF repo currently hosts only the training
-# checkpoint (`model.ckpt`) for fine-tuning; there is no `.onnx` file for
-# direct inference. A `"base"` alias was therefore removed to avoid a
-# HF 404 on `piper-plus --download-model base`. See docs/guides/development/
-# pretrained-models.md for the canonical model catalog. Add a `"base"`
-# alias back here once a base 6lang ONNX is uploaded to that repo.
+# The experimental base requires a reference embedding. These aliases select
+# its versioned TTS graph, never the auxiliary encoder or legacy root config.
+_PUBLIC_BASE = {
+    "repo_id": "ayousanz/piper-plus-base",
+    "revision": "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1",
+    "onnx_file": "releases/zs-v1/base.onnx",
+    "config_file": "releases/zs-v1/base.onnx.json",
+}
 MODEL_ALIASES: dict[str, dict[str, str]] = {
+    "base": _PUBLIC_BASE,
+    "zero-shot-base-zs-v1": _PUBLIC_BASE,
+    "ayousanz/piper-plus-base": _PUBLIC_BASE,
     "tsukuyomi": {
         "repo_id": "ayousanz/piper-plus-tsukuyomi-chan",
         "onnx_file": "tsukuyomi-chan-6lang-fp16.onnx",
@@ -77,6 +80,7 @@ def resolve_model(
             alias["config_file"],
             cache_dir,
             download,
+            revision=alias.get("revision"),
         )
 
     # Case 3: HuggingFace repo ID (contains '/')
@@ -134,8 +138,17 @@ def _download_from_hf(
     config_file: str | None,
     cache_dir: Path,
     download: bool,
+    revision: str | None = None,
 ) -> tuple[Path, Path]:
-    """Download model from HuggingFace Hub."""
+    """Resolve a Hub pair, isolating pinned releases from legacy caches."""
+    model_dir = cache_dir / repo_id.replace("/", "--")
+    if revision:
+        model_dir /= revision
+    if onnx_file and config_file:
+        existing_onnx = model_dir / onnx_file
+        existing_config = model_dir / config_file
+        if existing_onnx.is_file() and existing_config.is_file():
+            return existing_onnx, existing_config
     if not download:
         raise ModelNotFoundError(f"Model '{repo_id}' not in cache and download=False")
 
@@ -146,8 +159,6 @@ def _download_from_hf(
             "huggingface-hub is required for model download. "
             "Install with: pip install huggingface-hub"
         ) from None
-
-    model_dir = cache_dir / repo_id.replace("/", "--")
 
     # Auto-detect files if not specified
     if onnx_file is None or config_file is None:
@@ -184,6 +195,7 @@ def _download_from_hf(
                 local_dir=str(tmp_dir),
                 force_download=False,
                 resume_download=True,
+                revision=revision,
             )
         )
 
@@ -195,15 +207,24 @@ def _download_from_hf(
                 local_dir=str(tmp_dir),
                 force_download=False,
                 resume_download=True,
+                revision=revision,
             )
         )
 
         # Atomic move to final location
+        model_dir.parent.mkdir(parents=True, exist_ok=True)
         try:
             tmp_dir.rename(model_dir)
         except OSError:
             # Another process may have already created the directory
             if model_dir.exists():
+                # An interrupted download may have left an incomplete pair.
+                # Repair only our two files, preserving other cached artifacts.
+                for filename in (onnx_file, config_file):
+                    source = tmp_dir / filename
+                    target = model_dir / filename
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    source.replace(target)
                 shutil.rmtree(tmp_dir, ignore_errors=True)
             else:
                 raise

@@ -222,7 +222,7 @@ sha256 = "<computed-on-publish>"
 bytes = 0  # <computed-on-publish>
 
 # ---------------------------------------------------------------------------
-# Speaker Encoder (ECAPA-TDNN) — voice cloning
+# Legacy Speaker Encoder (ECAPA-TDNN) — pre-v2 voice cloning
 # ---------------------------------------------------------------------------
 [[models]]
 name = "speaker-encoder-ecapa-tdnn"
@@ -231,7 +231,7 @@ training_basis = "ECAPA-TDNN reference weights"
 hf_mirror_repo = "ayousanz/piper-plus-base"
 hf_mirror_url = "https://huggingface.co/ayousanz/piper-plus-base/resolve/main/encoder.onnx"
 publish_status = "pending"
-note = "Awaiting first publish; sha256 will be assigned at upload time."
+note = "Legacy pre-v2 contract retained for compatibility. The public v2 CAM++ encoder is bundled separately under zero-shot-base-zs-v1."
 
 [[models.artifacts]]
 filename = "encoder.onnx"
@@ -252,6 +252,9 @@ hf_mirror_repo = "ayousanz/piper-plus-base"
 hf_revision = "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1"
 hf_mirror_url = "https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/base.onnx"
 publish_status = "published"
+speaker_encoder = "campplus.onnx"
+speaker_encoder_kind = "cam-plus"
+speaker_embedding_dim = 192
 note = "Python PyPI 2.0.0 verified; other runtime/platform validation is not claimed. Full bundle manifest is releases/zs-v1/manifest.json."
 
 [[models.artifacts]]

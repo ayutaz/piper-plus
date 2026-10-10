@@ -126,12 +126,14 @@ speaker_encoder_source = "src/python/piper_train/speaker_encoder/export_encoder.
 [opset.divergence_justification]
 # The mismatch is required, not accidental.
 reason = """
-The speaker encoder is an ECAPA-TDNN architecture with an STFT operator on
-the input audio path. The ONNX `STFT` op was introduced in opset 17, so the
-speaker encoder cannot legally export below 17. The main TTS model contains
-no STFT op (MB-iSTFT is implemented as Conv1d kernels, not as the ONNX STFT
-op) and is pinned at 15 to maximize compatibility with older ORT releases
-embedded in mobile / edge runtimes.
+Speaker encoder exports are pinned at opset 17. The retained legacy
+ECAPA-TDNN path contains an STFT operator on the input audio path; the ONNX
+`STFT` op was introduced in opset 17, so that encoder cannot legally export
+below 17. The public v2 CAM++ encoder is also consumed as a separate speaker
+encoder artifact and keeps the same speaker-encoder opset floor. The main TTS
+model contains no STFT op (MB-iSTFT is implemented as Conv1d kernels, not as
+the ONNX STFT op) and is pinned at 15 to maximize compatibility with older ORT
+releases embedded in mobile / edge runtimes.
 """
 
 [opset.runtime_min_required]
@@ -156,7 +158,7 @@ scales         = "[noise_scale, length_scale, noise_w] (float32, shape=[3])"
 sid            = "speaker ID (int64, shape=[1]) — multi-speaker models only"
 lang           = "language ID (int64, shape=[1]) — multilingual models only"
 prosody_features = "prosody A1/A2/A3 features (float32, shape=[1, T, prosody_dim]) — when present"
-speaker_embedding = "ECAPA-TDNN embedding (float32, shape=[1, 256]) — voice cloning path"
+speaker_embedding = "Speaker embedding (float32, shape=[1, emb_dim]); emb_dim=256 for legacy ECAPA-TDNN exports and emb_dim=192 for public v2 CAM++ Zero-Shot exports"
 
 [tensor_names.outputs]
 output         = "audio waveform (float32, shape=[1, 1, T_samples])"

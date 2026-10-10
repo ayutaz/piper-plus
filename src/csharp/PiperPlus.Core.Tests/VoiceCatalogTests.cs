@@ -17,6 +17,21 @@ public sealed class VoiceCatalogTests : IDisposable
         Directory.CreateDirectory(_tempDir);
     }
 
+    [Theory]
+    [InlineData("base")]
+    [InlineData("zero-shot-base-zs-v1")]
+    [InlineData("ayousanz/piper-plus-base")]
+    public void PublicBase_ResolvesPinnedPair(string alias)
+    {
+        VoiceInfo voice = Assert.IsType<VoiceInfo>(ModelManager.FindVoice(alias));
+        Assert.Equal("3620ed788667cb76f08bd6cf2db8152c1f4c8bd1", voice.Revision);
+        Assert.Equal("experimental", voice.Quality);
+        Assert.Equal(571, voice.NumSpeakers);
+        Assert.Equal(
+            new[] { "releases/zs-v1/base.onnx", "releases/zs-v1/base.onnx.json" },
+            voice.Files.Select(f => f.RelativePath));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempDir))
@@ -43,11 +58,11 @@ public sealed class VoiceCatalogTests : IDisposable
     // Built-in catalog tests
     // ================================================================
     [Fact]
-    public void LoadBuiltInCatalog_ReturnsTwoModels()
+    public void LoadBuiltInCatalog_IncludesPublicBase()
     {
         IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadBuiltInCatalog();
 
-        Assert.Equal(2, catalog.Count);
+        Assert.Equal(3, catalog.Count);
     }
 
     [Fact]
@@ -119,7 +134,7 @@ public sealed class VoiceCatalogTests : IDisposable
         IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog(externalVoicesJsonPath: null);
 
         // Should contain the 2 built-in models
-        Assert.Equal(2, catalog.Count);
+        Assert.Equal(3, catalog.Count);
         Assert.Contains(catalog, v => v.Key == "ja_JP-tsukuyomi-chan-medium");
         Assert.Contains(catalog, v => v.Key == "ja_JP-css10-6lang-medium");
     }
@@ -150,8 +165,8 @@ public sealed class VoiceCatalogTests : IDisposable
         var path = WriteTempJson(externalJson);
         IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog(externalVoicesJsonPath: path);
 
-        // 2 built-in + 1 external = 3
-        Assert.Equal(3, catalog.Count);
+        // 3 built-in + 1 external = 4
+        Assert.Equal(4, catalog.Count);
         Assert.Contains(catalog, v => v.Key == "ja_JP-tsukuyomi-chan-medium");
         Assert.Contains(catalog, v => v.Key == "ja_JP-css10-6lang-medium");
         Assert.Contains(catalog, v => v.Key == "en_US-amy-medium");

@@ -26,4 +26,8 @@ public record VoiceInfo(
     string RepoId,
     IReadOnlyList<VoiceFileInfo> Files,
     IReadOnlyList<string> Aliases,
-    string Description = "");
+    string Description = "")
+{
+    /// <summary>HuggingFace revision for pinned model downloads.</summary>
+    public string Revision { get; init; } = "main";
+}

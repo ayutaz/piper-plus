@@ -24,10 +24,12 @@ priority = "HIGH"
 effort = "M (~1 週間)"
 status = "scaffold-only"
 description = """
-Speaker Encoder (ECAPA-TDNN) の E2E cross-runtime parity gate を 6 runtime
-拡張する。 現状は Mel parity Layer 1 のみ検証済 (contract-gates-extended.yml
-の speaker-encoder)。 E2E cosine gate (Layer 2) は scaffold 化されているが
-encoder ONNX が release されていない。
+Speaker Encoder (legacy ECAPA-TDNN 256-dim) の E2E cross-runtime parity gate
+を 6 runtime 拡張する。 現状は Mel parity Layer 1 のみ検証済
+(contract-gates-extended.yml の speaker-encoder)。 E2E cosine gate (Layer 2)
+は scaffold 化されており、legacy fixture 用の encoder ONNX は未公開のまま。
+公開済みの CAM++ 192-dim `campplus.onnx` / `zs-v1` は別世代であり、この
+deferred proposal の対象に遡及して含めない。
 """
 implementation = """
   1. ECAPA-TDNN ONNX を release (HF にアップロード + sha256-manifest 追加)

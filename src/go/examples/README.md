@@ -5,7 +5,16 @@ Example programs demonstrating piper-plus Go bindings usage.
 ## Prerequisites
 
 1. ONNX Runtime shared library (set `ONNX_RUNTIME_SHARED_LIBRARY_PATH`)
-2. A piper-plus ONNX model (e.g., from HuggingFace `ayousanz/piper-plus-base`)
+2. A reference-free Piper Plus ONNX model, such as the canonical
+   [Tsukuyomi-chan model](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
+   or [CSS10 Japanese model](https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang)
+
+For the experimental Zero-Shot base, download the pinned
+[`zs-v1` bundle](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)
+and pass `releases/zs-v1/base.onnx` together with its `config.json`. Do not
+use the legacy root `config.json` with that nested ONNX. The Go CLI accepts a
+model URL for `--download-model`; the public `base` / `zero-shot-base-zs-v1`
+aliases are not available in released Go binaries.
 
 ## Examples
 

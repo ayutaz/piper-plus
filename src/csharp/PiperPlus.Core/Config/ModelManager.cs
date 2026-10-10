@@ -256,6 +256,13 @@ public static class ModelManager
             return false;
         }
 
+        if (string.IsNullOrEmpty(voice.Revision) || voice.Revision.Contains("..") ||
+            voice.Revision.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '-' && c != '_' && c != '.'))
+        {
+            Console.Error.WriteLine("Error: invalid model revision.");
+            return false;
+        }
+
         // Ensure target directory exists
         Directory.CreateDirectory(modelDir);
 
@@ -263,7 +270,7 @@ public static class ModelManager
         string baseUrl;
         if (string.Equals(voice.Source, "piper-plus", StringComparison.Ordinal))
         {
-            baseUrl = $"{HuggingFacePrefix}{voice.RepoId}/resolve/main/";
+            baseUrl = $"{HuggingFacePrefix}{voice.RepoId}/resolve/{voice.Revision}/";
         }
         else
         {
@@ -418,7 +425,8 @@ public static class ModelManager
         if (onnxFile is not null)
         {
             var cachedPath = Path.Join(dir, Path.GetFileName(onnxFile.RelativePath));
-            if (File.Exists(cachedPath))
+            if (File.Exists(cachedPath) && (voice.Revision == "main" || voice.Files.All(f =>
+                File.Exists(Path.Join(dir, Path.GetFileName(f.RelativePath))))))
             {
                 return cachedPath;
             }

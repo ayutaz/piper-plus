@@ -65,6 +65,7 @@ on:
       # voice-catalog mirrors
       - 'src/python_run/piper_plus/download.py'
       - 'src/cpp/piper_plus_voices.json'
+      - 'src/cpp/model_manager.cpp'
       - 'src/rust/piper-core/src/model_download.rs'
       - 'src/csharp/PiperPlus.Core/Config/VoiceCatalog.cs'
       - 'src/go/piperplus/voice_catalog.go'
