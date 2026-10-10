@@ -99,8 +99,13 @@ Piperはfloat出力を正規化してPCM化するため、PCMのfull-scale近傍
 モデルカード、manifest、検証記録は現在`human_review_status=pending`。
 公開済み・品質承認済みと表示せず、試聴結果を記録してから公開判断する。
 
-公開前に20 manifest entryのhash/sizeとconfig pair、モデルカード、公開例、
+公開前に19 manifest entryのhash/sizeとconfig pair、モデルカード、公開例、
 試聴ページと全音声のHTTP取得を確認した。
+推論で生成されたCPU最適化cache 2件は配布候補から除外し、ベース・公開例の
+MIT著作権/許諾文を同梱した。root READMEを含む公開対象は22ファイル。
+既存rootの説明を残したREADMEと固定revision付きアップロードのdry-runを用意した。
+試聴結果が未記録の間はapply経路で停止する。候補の新規コピーでは通常生成・
+公開例・strict checkpoint loadを確認済みだが、未認証の公開後検証とは区別する。
 公開後は新規保存先へ未認証で全ファイルを取得し、hash照合・通常生成・
 公開checkpoint読み込みを再確認する。HF commit、旧rootの保持、研究保存先の
 設定維持を確認してから完了とする。
