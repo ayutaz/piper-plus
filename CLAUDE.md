@@ -193,6 +193,7 @@ echo "PID: $!"
 |-------|--------|------|------|
 | **6lang base (HiFi-GAN)** | 75 epoch (v1.11 系) | 完了 (2026-03-16) | `/data/piper/output-multilingual-6lang/` |
 | **6lang base MB-iSTFT** | 75 epoch スクラッチ | 完了 (2026-04-16) | `/data/piper/output-multilingual-6lang-mb-istft/multilingual-6lang-mb-istft-scratch-75epoch.onnx` |
+| **Zero-Shot base zs-v1** | v7 ep32 / step216326 | 実験用基準版を一般公開、PyPI 2.0.0推論・短いFTを確認 (2026-10-10) | [HF releases/zs-v1](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)。品質改善・人手試聴合格とは別 |
 | **つくよみちゃん 6lang-v2** | 6lang ベースから FT 500 epoch | 完了 (2026-03-16) | `/data/piper/output-tsukuyomi-finetune-6lang-v2/tsukuyomi-6lang-v2-fixed.onnx` |
 | **つくよみちゃん MB-iSTFT** | 6lang MB-iSTFT ベースから FT 500 epoch | 完了 (2026-05-02) | `/data/piper/output-tsukuyomi-mb-istft-finetune/tsukuyomi-mb-istft-500epoch.onnx` |
 | **つくよみちゃん Zero-Shot FT** | v7 ep32 zero-shot ベースから FT 500 epoch | 完了 (2026-05-21) | `/data/piper/eval-tsukuyomi-zs-ft/tsukuyomi-ft-epoch499-zs.onnx` (SECS 0.7749) |

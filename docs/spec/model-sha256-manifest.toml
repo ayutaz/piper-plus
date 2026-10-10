@@ -34,7 +34,7 @@
 
 [meta]
 spec_version = "1.0"
-last_updated = "2026-05-09"
+last_updated = "2026-10-10"
 canonical_source = "docs/spec/model-sha256-manifest.toml"
 hash_algorithm = "SHA-256"
 hash_encoding = "lowercase hex, 64 chars"
@@ -241,6 +241,47 @@ bytes = 0  # <computed-on-publish>
 # ============================================================================
 # Verification behaviour (runtime side)
 # ============================================================================
+
+# Public experimental baseline: manual versioned download, not a default voice alias.
+[[models]]
+name = "zero-shot-base-zs-v1"
+description = "Existing v7 epoch32 reference-conditioned and fine-tunable experimental base"
+training_basis = "v7 epoch32 step216326; interim checkpoint, not quality-approved"
+trained_languages = ["ja", "en", "zh", "es", "fr", "pt"]
+hf_mirror_repo = "ayousanz/piper-plus-base"
+hf_revision = "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1"
+hf_mirror_url = "https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/base.onnx"
+publish_status = "published"
+note = "Python PyPI 2.0.0 verified; other runtime/platform validation is not claimed. Full bundle manifest is releases/zs-v1/manifest.json."
+
+[[models.artifacts]]
+filename = "base.onnx"
+sha256 = "e9860701a941db02149c7cfbe19cfb578c235c5e25020f1f592131d9b3b30f84"
+bytes = 40777457
+
+[[models.artifacts]]
+filename = "base.onnx.json"
+role = "config"
+sha256 = "d085681edaa5029c54ea8329f3f23ed347ba46ca15cd80e766de9a6a643dafc0"
+bytes = 6417
+
+[[models.artifacts]]
+filename = "config.json"
+role = "config"
+sha256 = "d085681edaa5029c54ea8329f3f23ed347ba46ca15cd80e766de9a6a643dafc0"
+bytes = 6417
+
+[[models.artifacts]]
+filename = "base.ckpt"
+role = "fine_tuning_checkpoint"
+sha256 = "86d0362241c2a3a898d23b9c4bce416ca97725024075fb844ae630e7f9b121f0"
+bytes = 323378981
+
+[[models.artifacts]]
+filename = "campplus.onnx"
+role = "speaker_encoder"
+sha256 = "a6ac6a63997761ae2997373e2ee1c47040854b4b759ea41ec48e4e42df0f4d73"
+bytes = 28303423
 
 [verification]
 # How the loader behaves when the on-disk artifact's SHA-256 differs from

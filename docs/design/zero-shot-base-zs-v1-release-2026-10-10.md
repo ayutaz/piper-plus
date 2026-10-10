@@ -1,6 +1,6 @@
 # Zero-Shot base zs-v1 配布・検証記録
 
-状態: 公開前検証中。対象はbaseの選定・両用途検証・一般公開まで。
+状態: baseの選定・両用途検証・一般公開と公開後consumer確認が完了。
 つくよみちゃんの本追加学習と公開は次工程。
 
 ## 採用する基準版
@@ -86,3 +86,54 @@ revisionが変わっていた場合は内容を再確認し、競合を無視し
 公開後は認証なし・新規download先で全ファイルを取得してhashを照合し、
 公開済みconsumerで音声生成する。公開revision、配布hash、FT実測はこの記録に追記する。
 研究保存repoのprivate/gate設定は変更しない。
+
+### 2026-10-10の完了結果
+
+- 公開revision: [`3620ed788667cb76f08bd6cf2db8152c1f4c8bd1`](https://huggingface.co/ayousanz/piper-plus-base/commit/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1)。
+  [公開bundleと手順](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)。
+- 新規保存先へ、Authorization headerもnetrcも使わないHTTPで18ファイルを取得。
+  全ファイルの元bytes/hash、配布manifest、SHA256SUMSを照合し、全て成功。
+- 取得したencoderと公開例で実WAVのembeddingを抽出し、独立PyPI 2.0.0 consumerで生成。
+  出力は22050 Hz、2.984秒、RMS 0.2013の非無音WAV。
+  最終revision `3620ed78`の取得済みmodel/configと公開例による再生成も成功し、
+  22050 Hz、2.868秒、RMS 0.2413。確率的生成のため初回と波形は一致しない。
+- 公開checkpointは323,378,981 bytes、SHA256
+  `86d0362241c2a3a898d23b9c4bce416ca97725024075fb844ae630e7f9b121f0`。
+  未認証で取得した現物の`weights_only=True` loadとprojection `[512,192]`を確認。
+- configは6,417 bytes、SHA256
+  `d085681edaa5029c54ea8329f3f23ed347ba46ca15cd80e766de9a6a643dafc0`。
+- FT: 2 train batchでG/D各2 optimizer step、`global_step=4`。
+  generator 394 tensor、discriminator 111 tensorの更新を確認。
+  凍結したDPの最大差分は0、非有限tensorなし。
+- FT後のONNXは40,049,004 bytes、SHA256
+  `fe8269535551cd86e29f23487fa0267b1a26b9234f107b0e4ddd285ead0eafba`。
+  話者embedding入力を持たず、独立consumerで参照なし3文のWAV生成を確認。
+  これをつくよみちゃん完成版として公開していない。
+- GPU保存checkpointのexportにはCPU実行指定`CUDA_VISIBLE_DEVICES=-1`が必要だった。
+  WindowsでのRich出力には`PYTHONUTF8=1`を設定し、短いrunは`--checkpoint-epochs 1`
+  で保存を明示した。公開例に反映済み。
+- 実参照2本で、確率ノイズを0にした同一入力の再生成は完全一致。
+  参照を変更すると波形最大差分0.3223。これは入力が合成に作用する証拠であり、
+  話者再現品質の合格判定ではない。
+- 同一Windows CPUのwarm inference（52 IDs、G2P/loadを含まない）:
+  warmup5回、測定30回、p50 46.0ms、p95 60.4ms、RTF median 0.0344。
+  他機種・他モデルの過去benchmarkと直接の性能改善比較に使わない。
+- 旧root checkpointのLFS SHA256は維持。v7研究repoとencoder repoはprivateのまま、
+  v8研究repoはmanual gateのまま。つくよみちゃん公開revisionも元のまま。
+- 関連テスト19件、ruff、ONNX export契約、音素世代契約、モデルmanifest構造gateに合格。
+- 初回公開`4e1d7b83`のFT準備helperには、新規前処理のcwd基準相対cache pathを
+  dataset基準として二重に解決する不備があった。失敗テストで再現し、source修正
+  `aa370b9e`を公開revision `3620ed78`へ反映。model/config/encoderのbytesは維持し、
+  helper・provenance・manifest・SHA256SUMSを同じHF commitで更新した。
+- v2.0.0のCLIで実WAV8発話を新規前処理し、185音素の出力をbaseの173音素へ変換。
+  修正後のhelperを未認証で取得して同じ準備経路を通し、8件のID/cache対応を確認。
+  未認証で取得したbase checkpointから新規datasetを短くFTし、step4まで更新・保存した。
+  そのcheckpointをv2.0.0 sourceでONNX化し、独立PyPI 2.0.0 consumerで参照なし3文を生成。
+  新規経路のONNXは40,049,004 bytes、SHA256
+  `d139db47f1a163feba33ebc257a39651df387951111b990ca7b616aecbabde9b`。
+  全WAVは22050 Hz、1.846〜3.413秒、RMS 0.141〜0.176で非無音・有限値だった。
+  機能確認用の短いFTであり、クリッピングを含む音質や声の類似を承認したものではない。
+  公開後にも前処理から通した結果を、既存cacheだけでの検証と区別して残す。
+
+今回の証拠は`output/public-base-release-20261010/`のreceipt・匿名取得結果・consumer結果・
+FTログ/checkpoint・WAVに保存。機能検証と品質改善研究を分け、品質承認は未実施のまま記録する。

@@ -51,6 +51,7 @@ EXPECTED_MODELS = {
     "tsukuyomi-mb-istft",  # 現行 tsukuyomi
     "css10-ja-6lang",  # CSS10 JA 6lang
     "speaker-encoder-ecapa-tdnn",  # voice cloning
+    "zero-shot-base-zs-v1",  # public experimental v7 baseline
 }
 
 # Forward-compat boundary: schema_version values up to and including this

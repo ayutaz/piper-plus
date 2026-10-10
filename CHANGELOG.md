@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add a single-speaker fine-tuning dataset preparation helper that preserves the base model's phoneme and language IDs, validates cache paths, and rejects unsupported tokens and existing output directories.
 - Document the existing Zero-Shot base publication path and the zs-v1 artifact and consumer verification record.
+- Publish the existing v7 epoch32 experimental Zero-Shot base under `ayousanz/piper-plus-base/releases/zs-v1`, with a fine-tuning checkpoint, CAM++ encoder, dedicated config, hashes and runnable examples. Preserve the legacy root model and pin the published artifact revision in the model manifest.
 
 ## [2.0.1] - 2026-10-08
 
