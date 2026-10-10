@@ -202,6 +202,7 @@ Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13
 - tests: `GetCliAssemblyPath` がパスを組み立てるだけで**存在確認していなかった**のを修正した。パスは**テスト**アセンブリの位置から composeされるため、CLI がその構成・TFM でビルドされていないと存在しないパスが返り、`dotnet <missing.dll>` が `SkipIfBuildFailed` のどのシグネチャにも一致しないメッセージで非ゼロ終了する。存在確認を入れて、解決したパス・元のアセンブリ位置・構成・TFM を明示する例外にした。**実測**: `net10.0` の `PiperPlus.Cli.dll` を退避して `--no-build` で走らせると `PiperPlus.Cli.dll not found at ... (config=Release, tfm=net10.0)` が出る (`--no-build` を付けないと `dotnet test` が再ビルドして復元してしまうため、検証にはこれが必要)
 
 > 本修正は**根本原因の特定ではなく診断可能化**である。CI での `--version` が 1 を返す理由は現時点で不明で、`dotnet test` は CLI を再ビルドするため DLL 欠損は原因として否定される。次の発生時に stdout / stderr が残るので、そこから原因を特定する。
+
 - **Python: Strategy A の前方 trim が `front_pad == 0` のとき BOS 区間を削らず、他 4 ランタイムと不一致だったのを修正した (#688)。** 前方領域は `durations[0 : 1 + front_pad]` であり `front_pad == 0` でも `durations[0:1]` = BOS を含むが、Python だけ `if front_pad > 0 else 0` でゲートして **0 サンプルしか削っていなかった**。C++ / Rust / Go / C# はいずれもループが `i = 0` で必ず 1 回回って BOS の duration を削る。`src/cpp/piper.cpp` のコメントは "Mirrors src/python_run/piper_plus/voice.py ... so every runtime produces byte-equal output" と主張しており、その主張に反していた。**実測**: `durations = [5, 4, 3, 2]` / `hop = 100` / `front_pad = 0` / `back_pad = 1` で Python と C++ 実体を直接突き合わせ、修正後は**両者 `len = 600` / 先頭サンプル `= 500`** で一致 (修正前の Python は `len = 1100` / 先頭 `= 0`)
 - tests: 上記の回帰テストを 2 件追加した。`front_pad == 0` で BOS が削られることを単独で pin するケースと、既存の back-padding ケースを新挙動に更新したもの。**既存テストは乖離挙動を固定していた** (`front_pad=0` で trim 量 900 を期待) ため、それ自体が Python の outlier を保護していた。ゲートを戻す変異で新規テストが fail することを確認済み
 - **Python / C++: `--output_dir` の自動命名が衝突して出力を黙って上書きしていたのを修正した (#696)。** 名前が `time.monotonic_ns()` だけで決まっており、同一 clock tick 内に終わった発話が同名になって後の発話が前の発話を上書きしていた。**エラーも警告も出ず、返り値 0 と「Wrote ...」ログが発話ごとに出る**ため、欠落に気付く手段が無い。CPython 3.12 の Windows では `time.monotonic()` が `GetTickCount64` ベースで分解能が ~15.6 ms なので、短い発話は日常的に衝突する (PR #695 の CI で 2 行の JSONL に対し WAV が 1 個だけ残る形で顕在化)。単調増加カウンタを名前に加えた。**ゼロ埋め**しているのは `sorted(out_dir.glob("*.wav"))` が入力順と一致する性質を保つため — 埋めないと index 10 が 2 より前に並ぶ
@@ -888,6 +889,7 @@ Python ランタイムに完全な phoneme timing 出力機能を追加。VITS D
 - CI: `test_short_text_mitigation.py` / `.js` をワークフローに追加
 
 ### Fixed
+
 - Go `.npy` ファイルパーシング修正 — speaker embedding の NumPy v1/v2 フォーマット読み込みが正常に動作するよう修正
 - Rust JSONL `speaker_embedding` 上書きバグ修正 — JSONL 入力時に speaker_embedding フィールドが意図せず上書きされる問題を解消
 - C++ `piper_plus_c_api` の `std::optional` API 誤用を修正
@@ -917,6 +919,17 @@ Python ランタイムに完全な phoneme timing 出力機能を追加。VITS D
 - Rust: E2E テストから `#[ignore]` を削除（モデルファイルがリポジトリにトラッキング済み）
 - Golden test フィクスチャを `n_fft=400` で再生成
 
+- 短文「こんにちは。」が「あこんにちはた」と崩壊する問題を修正 (C++ ランタイム、UTF-8 コードポイントベースの文分割への置換 + 終止符直後の閉じ括弧を消費するロジック) (#363, #347, #348)
+- Wyoming HA 統合エラー + Docker g2p import + リリース配布を解決 (#362)
+- Go Dockerfile を `TARGETARCH` で arm64 対応 (multi-arch ビルド) (#366)
+- WavLM Discriminator: safetensors 未公開モデルに合わせて `use_safetensors=False` に変更 (#353)
+- Dependabot セキュリティアラート対応 (低リスク 7 件 + 高リスク 4 件) (#352, #364)
+- テスト品質監査 — 全 18 件の再実装テスト修正 + 本番コード改善 (#338)
+- C++ テスト全実行化 + 表面化した 11 テスト不具合修正 (#340)
+- CI `changes` ジョブに checkout ステップを追加 (#339)
+- crates.io 公開順序を修正 (#327)
+- Pages デプロイを `dev` ブランチに限定 (#328)
+
 ### Removed
 
 - 死んだコード `src/python_run/piper/espeak_phonemizer.py` を削除 (piper-plus は推論時に espeak-ng に依存しない)
@@ -930,19 +943,6 @@ Python ランタイムに完全な phoneme timing 出力機能を追加。VITS D
 - README の「30秒で試す」を OS 別ワンライナー化 + CLI バイナリ選択ガイド追加 (#360)
 - Rust `piper-python` バインディングを非推奨の `synthesize_text()` から `synthesize_with_params()` に移行
 - CI ワークフローを更新し、全 speaker embedding テストを実行するよう変更
-
-### Fixed
-
-- 短文「こんにちは。」が「あこんにちはた」と崩壊する問題を修正 (C++ ランタイム、UTF-8 コードポイントベースの文分割への置換 + 終止符直後の閉じ括弧を消費するロジック) (#363, #347, #348)
-- Wyoming HA 統合エラー + Docker g2p import + リリース配布を解決 (#362)
-- Go Dockerfile を `TARGETARCH` で arm64 対応 (multi-arch ビルド) (#366)
-- WavLM Discriminator: safetensors 未公開モデルに合わせて `use_safetensors=False` に変更 (#353)
-- Dependabot セキュリティアラート対応 (低リスク 7 件 + 高リスク 4 件) (#352, #364)
-- テスト品質監査 — 全 18 件の再実装テスト修正 + 本番コード改善 (#338)
-- C++ テスト全実行化 + 表面化した 11 テスト不具合修正 (#340)
-- CI `changes` ジョブに checkout ステップを追加 (#339)
-- crates.io 公開順序を修正 (#327)
-- Pages デプロイを `dev` ブランチに限定 (#328)
 
 ### Documentation
 
