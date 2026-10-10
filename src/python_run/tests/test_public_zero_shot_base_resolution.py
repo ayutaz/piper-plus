@@ -1,8 +1,10 @@
 """The public base must use its versioned TTS graph and matching vocabulary."""
 
 import io
+import sys
 from pathlib import Path
-from unittest.mock import patch
+from types import ModuleType
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -15,8 +17,18 @@ REPO = "ayousanz/piper-plus-base"
 RELEASE = "releases/zs-v1"
 
 
+@pytest.fixture
+def hub(monkeypatch):
+    """Exercise download calls without requiring the optional Hub package."""
+    module = ModuleType("huggingface_hub")
+    module.hf_hub_download = MagicMock()
+    module.list_repo_files = MagicMock()
+    monkeypatch.setitem(sys.modules, "huggingface_hub", module)
+    return module
+
+
 @pytest.mark.parametrize("name", ["base", "zero-shot-base-zs-v1", REPO])
-def test_api_base_uses_pinned_release_pair(name, tmp_path):
+def test_api_base_uses_pinned_release_pair(name, tmp_path, hub):
     calls = []
 
     def download(repo, filename, **kwargs):
@@ -26,18 +38,15 @@ def test_api_base_uses_pinned_release_pair(name, tmp_path):
         target.write_bytes(b"model" if filename.endswith(".onnx") else b"{}")
         return str(target)
 
-    with (
-        patch("huggingface_hub.hf_hub_download", side_effect=download),
-        patch("huggingface_hub.list_repo_files") as listing,
-    ):
-        model, config = resolve_model(name, cache_dir=tmp_path)
+    hub.hf_hub_download.side_effect = download
+    model, config = resolve_model(name, cache_dir=tmp_path)
     assert calls == [
         (REPO, f"{RELEASE}/base.onnx", REVISION),
         (REPO, f"{RELEASE}/base.onnx.json", REVISION),
     ]
     assert model.read_bytes() == b"model" and config.read_bytes() == b"{}"
     assert model.parent == config.parent
-    listing.assert_not_called()
+    hub.list_repo_files.assert_not_called()
 
 
 def test_api_base_cached_pair_is_usable_offline(tmp_path):
@@ -45,11 +54,10 @@ def test_api_base_cached_pair_is_usable_offline(tmp_path):
     directory.mkdir(parents=True)
     (directory / "base.onnx").write_bytes(b"model")
     (directory / "base.onnx.json").write_bytes(b"{}")
-    with patch("huggingface_hub.hf_hub_download") as download:
+    with patch.dict(sys.modules, {"huggingface_hub": None}):
         model, config = resolve_model("base", cache_dir=tmp_path, download=False)
     assert model == directory / "base.onnx"
     assert config == directory / "base.onnx.json"
-    download.assert_not_called()
 
 
 def test_cli_download_preserves_remote_subdirectory_and_local_pair(tmp_path):
@@ -80,7 +88,7 @@ def test_api_base_does_not_reuse_legacy_cache(tmp_path):
         resolve_model("base", cache_dir=tmp_path, download=False)
 
 
-def test_api_repairs_incomplete_pinned_cache(tmp_path):
+def test_api_repairs_incomplete_pinned_cache(tmp_path, hub):
     directory = tmp_path / "ayousanz--piper-plus-base" / REVISION / RELEASE
     directory.mkdir(parents=True)
     (directory / "base.onnx").write_bytes(b"incomplete old download")
@@ -91,7 +99,7 @@ def test_api_repairs_incomplete_pinned_cache(tmp_path):
         target.write_bytes(b"new" if filename.endswith(".onnx") else b"{}")
         return str(target)
 
-    with patch("huggingface_hub.hf_hub_download", side_effect=download):
-        model, config = resolve_model("base", cache_dir=tmp_path)
+    hub.hf_hub_download.side_effect = download
+    model, config = resolve_model("base", cache_dir=tmp_path)
     assert model.read_bytes() == b"new"
     assert config.read_bytes() == b"{}"

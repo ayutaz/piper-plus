@@ -203,9 +203,43 @@ public sealed class SecurityTests
                     string.IsNullOrWhiteSpace(alias),
                     $"Voice '{voice.Key}' has an empty alias");
                 Assert.DoesNotContain("..", alias);
-                Assert.DoesNotContain("/", alias);
                 Assert.DoesNotContain("\\", alias);
+                if (alias.Contains('/'))
+                {
+                    // A repository ID is a lookup alias, never a local file name.
+                    Assert.Equal(voice.RepoId, alias);
+                    Assert.True(InvokeIsSafeRepoId(alias));
+                }
+                else
+                {
+                    Assert.True(InvokeIsSafeVoiceKey(alias));
+                }
+
+                Assert.Same(voice, ModelManager.FindVoice(alias));
             }
+        }
+    }
+
+    [Fact]
+    public async Task PublicBase_RepoAlias_ResolvesOnlyCatalogFilesInModelDirectory()
+    {
+        var directory = Directory.CreateTempSubdirectory("piper-base-alias-");
+        try
+        {
+            var model = Path.Join(directory.FullName, "base.onnx");
+            File.WriteAllText(model, "cached model");
+            File.WriteAllText(model + ".json", "{}");
+
+            string resolved = await ModelManager.ResolveModelPathAsync(
+                "ayousanz/piper-plus-base", directory.FullName,
+                TestContext.Current.CancellationToken);
+
+            Assert.Equal(model, resolved);
+            Assert.False(Directory.Exists(Path.Join(directory.FullName, "ayousanz")));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
         }
     }
 
