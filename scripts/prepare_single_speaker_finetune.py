@@ -53,9 +53,17 @@ def prepare(source: Path, base_config: Path, output: Path) -> int:
         entry.pop("speaker_embedding_path", None)
         entry.pop("speaker_id", None)
         for key in ["audio_norm_path", "audio_spec_path"]:
-            path = (source / entry[key]).resolve()
-            if not path.is_file():
-                raise ValueError(f"Line {number}: missing cache {path}")
+            # New preprocess output can carry paths relative to its working
+            # directory; older prepared datasets use dataset-relative paths.
+            candidates = {(source / entry[key]).resolve(), Path(entry[key]).resolve()}
+            matches = [path for path in candidates if path.is_file()]
+            if not matches:
+                raise ValueError(f"Line {number}: missing cache {entry[key]}")
+            if len(matches) != 1:
+                raise ValueError(
+                    f"Line {number}: ambiguous cache {entry[key]}; use an absolute path"
+                )
+            path = matches[0]
             entry[key] = str(path)
         entries.append(entry)
     if not entries:

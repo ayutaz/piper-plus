@@ -80,3 +80,32 @@ def test_does_not_overwrite_existing_prepared_dataset(tmp_path):
     output.mkdir()
     with pytest.raises(FileExistsError):
         module.prepare(source, base, output)
+
+
+def test_accepts_preprocessor_cache_paths_relative_to_working_directory(
+    tmp_path, monkeypatch
+):
+    source, base, output = inputs(tmp_path)
+    entry = json.loads((source / "dataset.jsonl").read_text(encoding="utf-8"))
+    entry["audio_norm_path"] = "prepared/audio.pt"
+    entry["audio_spec_path"] = "prepared/audio.spec.pt"
+    (source / "dataset.jsonl").write_text(json.dumps(entry), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    module.prepare(source, base, output)
+    result = json.loads((output / "dataset.jsonl").read_text(encoding="utf-8"))
+    assert Path(result["audio_norm_path"]) == source / "audio.pt"
+    assert Path(result["audio_spec_path"]) == source / "audio.spec.pt"
+
+
+def test_rejects_ambiguous_cache_locations(tmp_path, monkeypatch):
+    source, base, output = inputs(tmp_path)
+    entry = json.loads((source / "dataset.jsonl").read_text(encoding="utf-8"))
+    entry["audio_norm_path"] = "prepared/audio.pt"
+    (source / "dataset.jsonl").write_text(json.dumps(entry), encoding="utf-8")
+    duplicate = source / "prepared"
+    duplicate.mkdir()
+    (duplicate / "audio.pt").write_bytes(b"different audio")
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValueError, match="ambiguous cache"):
+        module.prepare(source, base, output)
+    assert not output.exists()
