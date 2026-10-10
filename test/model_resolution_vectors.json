@@ -1,7 +1,7 @@
 {
   "_comment": "Model resolution test vectors -- shared across Python, Rust, C#, Go implementations",
   "_version": "1.0",
-  "_spec": "docs/spec/model-resolution.md",
+  "_spec": "docs/reference/model-resolution.md",
   "aliases": {
     "tsukuyomi": {
       "repo_id": "ayousanz/piper-plus-tsukuyomi-chan",

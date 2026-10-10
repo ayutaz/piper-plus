@@ -27,9 +27,7 @@ const MODEL_REGISTRY = {
 // combine the nested release with the repository's legacy root config.
 const PUBLIC_BASE_PREFIX =
   "https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/";
-const PUBLIC_BASE_ALIASES = new Set([
-  "base", "zero-shot-base-zs-v1", "ayousanz/piper-plus-base",
-]);
+const PUBLIC_BASE_ALIASES = new Set(["base", "zero-shot-base-zs-v1", "ayousanz/piper-plus-base"]);
 
 /**
  * Open (or create) the IndexedDB database used for model caching.
@@ -38,7 +36,7 @@ const PUBLIC_BASE_ALIASES = new Set([
  */
 function openDatabase(dbName) {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(dbName, DB_VERSION);
+    const request = globalThis.indexedDB.open(dbName, DB_VERSION);
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {

@@ -4,7 +4,7 @@
 
 `test/model_resolution_vectors.json` の `voice_catalog` を canonical source
 として、5 ランタイム (Python / C++ / Rust / C# / Go) の voice catalog
-mirror が同じ `repo_id` / `onnx_file` / `aliases` を持っているか確認する。
+mirror の `repo_id` / `onnx_file` / `config_file` / `revision` / `aliases` を確認する。
 
 Why: voice catalog は各ランタイムで「JSON ファイル」または「ハードコード」
 の形で分散しており、Python と C++ は JSON、Rust/C#/Go はソース内ハード
@@ -13,7 +13,7 @@ Why: voice catalog は各ランタイムで「JSON ファイル」または「�
 vector は既に存在するが CI gate がなかった (本 PR で追加)。
 
 検証粒度: 各 catalog entry について以下を assert
-  - canonical の `repo_id` / `onnx_file` が各ランタイムソースに出現
+  - canonical の `repo_id` / `onnx_file` / `config_file` と任意の `revision` が各ソースに出現
   - canonical の `aliases` のうち少なくとも 1 つが各ランタイムソースに出現
 
 これは完全な byte-for-byte 比較ではなく、「**同じモデルを指している**」

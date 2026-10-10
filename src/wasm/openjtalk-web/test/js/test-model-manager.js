@@ -45,7 +45,7 @@ function createMockIndexedDB() {
 function wrapMockResult(result) {
   const req = { result, error: null, onsuccess: null, onerror: null };
   // Fire onsuccess asynchronously, as the real IDB would.
-  queueMicrotask(() => {
+  globalThis.queueMicrotask(() => {
     if (req.onsuccess) {
       req.onsuccess();
     }
@@ -66,7 +66,7 @@ function installIndexedDBMock(mockDb) {
       onerror: null,
       onupgradeneeded: null,
     };
-    queueMicrotask(() => {
+    globalThis.queueMicrotask(() => {
       if (req.onsuccess) {
         req.onsuccess();
       }
@@ -883,20 +883,24 @@ describe("ModelManager", { skip }, () => {
   });
 });
 
-
 describe("pinned public zero-shot base", () => {
   for (const alias of ["base", "zero-shot-base-zs-v1", "ayousanz/piper-plus-base"]) {
     it(`resolves ${alias} without sibling auto-detection`, async () => {
       const originalFetch = globalThis.fetch;
-      globalThis.fetch = () => { throw new Error("Pinned resolution must not query siblings"); };
+      globalThis.fetch = () => {
+        throw new Error("Pinned resolution must not query siblings");
+      };
       try {
         const urls = await new ModelManager().resolveUrls(alias);
-        const prefix = "https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/";
+        const prefix =
+          "https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/";
         assert.equal(urls.modelUrl, prefix + "base.onnx");
         assert.equal(urls.configUrl, prefix + "base.onnx.json");
         assert.equal(urls.configFallbackUrl, null);
         assert.equal(urls.cacheKey, prefix + "base.onnx");
-      } finally { globalThis.fetch = originalFetch; }
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
     });
   }
 });
