@@ -17,6 +17,7 @@ type VoiceFileInfo struct {
 
 // VoiceCatalogEntry describes a voice model in the catalog.
 type VoiceCatalogEntry struct {
+	Revision        string          `json:"revision,omitempty"`
 	Key             string          `json:"key"`
 	Name            string          `json:"name"`
 	LanguageCode    string          `json:"language_code"`
@@ -53,6 +54,17 @@ func (e *VoiceCatalogEntry) OnnxFileName() string {
 
 // embeddedCatalog contains built-in piper-plus voice entries.
 var embeddedCatalog = []VoiceCatalogEntry{
+	{
+		Key: "multilingual-zero-shot-base-zs-v1", Name: "zero-shot-base-zs-v1",
+		LanguageCode: "multilingual", LanguageFamily: "multilingual", LanguageNative: "Multilingual", LanguageEnglish: "Multilingual",
+		Quality: "experimental", NumSpeakers: 571, Source: "piper-plus", RepoID: "ayousanz/piper-plus-base",
+		Revision: "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1",
+		Files: []VoiceFileInfo{
+			{RelativePath: "releases/zs-v1/base.onnx", SizeBytes: 40_777_457},
+			{RelativePath: "releases/zs-v1/base.onnx.json", SizeBytes: 6_417},
+		},
+		Aliases: []string{"base", "zero-shot-base-zs-v1", "ayousanz/piper-plus-base"},
+	},
 	{
 		Key: "ja_JP-tsukuyomi-chan-medium", Name: "tsukuyomi-chan",
 		LanguageCode: "ja_JP", LanguageFamily: "ja", LanguageNative: "日本語", LanguageEnglish: "Japanese",

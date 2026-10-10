@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add `base` and `zero-shot-base-zs-v1` registry aliases for the public experimental Zero-Shot bundle at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1`. Resolve its nested `releases/zs-v1/base.onnx` and matching `base.onnx.json` pair with revision-isolated cache keys; this records browser download resolution and does not claim browser synthesis or quality validation.
+
 ## [0.8.0] - 2026-10-06
 
 ### Changed
@@ -41,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **仕様:** `docs/spec/ssml-contract.toml` (`applies_to` に `"wasm"` を追加、status table を ✓ に更新)。`tests/fixtures/ssml/contract.json` と byte-for-byte 互換。
 
 **テスト:** `test/js/test-piper-plus-ssml.js` (23 件): re-export 確認 / `synthesize()` 自動 dispatch / segment iteration / `length_scale` 適用 / silence 挿入 / fixture parity。
+
 #### Speaker Encoder synthesize 統合 (#478)
 
 参照音声から話者埋め込みを作り、そのまま合成に流せる高位 API をブラウザ側に追加。CLI の `--reference-audio` + `--speaker-encoder-model` に相当する経路が JS だけで完結する。

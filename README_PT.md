@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
-[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
+[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)
 [![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
 
 **Pacotes:**
@@ -48,7 +48,7 @@ Sistema neural de texto para fala (TTS) de alta velocidade e alta qualidade. Uti
 - **Suporte a 8 idiomas** — Japonês, inglês, chinês, espanhol, francês, português, sueco e coreano (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) *O modelo treinado cobre 6 idiomas (JA/EN/ZH/ES/FR/PT)*
 - **TTS em japonês** — Integração com OpenJTalk, informações prosódicas (A1/A2/A3), marcadores de interrogação (#204), variantes contextuais de "ん" (#207)
 - **TTS em inglês** — G2P livre de GPL ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), sem necessidade de espeak-ng
-- **Multi-falante** — Suporte a 571 falantes (modelo base para treinamento), SpeakerBalancedBatchSampler, amostragem balanceada por grupo linguístico
+- **Multi-falante** — 571 falantes no bundle experimental Zero-Shot/FT `zs-v1`, SpeakerBalancedBatchSampler, amostragem balanceada por grupo linguístico
 - **Dicionário personalizado** — Dicionário de pronúncia integrado com mais de 200 termos técnicos
 - **Entrada de fonemas** — Especificação direta com notação `[[ fonemas ]]` — [Guia](docs/features/phoneme-input.md)
 
@@ -73,13 +73,13 @@ Sistema neural de texto para fala (TTS) de alta velocidade e alta qualidade. Uti
 - **C# CLI** — .NET 10 multiplataforma, 8 idiomas multilíngue, inferência ONNX, **saída de Phoneme Timing (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli, streaming, suporte CUDA/CoreML/DirectML, **saída de Phoneme Timing (JSON/TSV/SRT)**, download automático de dicionário
 - **[Go CLI](src/go/README.md)** — Servidor HTTP API, pool de sessões, compatível com Docker, binário único, **saída de Phoneme Timing (JSON/TSV/SRT)**
-- **Voice Cloning (Speaker Encoder + speaker_embedding)** — disponível em todos os 6 runtimes (Python/Rust/C#/Go/WASM/C++)
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — disponível como capacidade de runtime nos 6 runtimes (Python/Rust/C#/Go/WASM/C++) para entradas `speaker_embedding` pré-computadas e compatíveis com o modelo. A CLI e a API C++ aceitam apenas embeddings pré-computados; a extração por `--reference-audio` não está implementada em C++. A inferência pública de `zs-v1` só foi verificada funcionalmente com Python `piper-plus==2.0.0`.
 - **Suporte SSML** — `<speak>`, `<break>`, `<prosody rate="...">` disponíveis em 4 runtimes (Python/Rust/C#/Go)
 - **Melhoria de qualidade para textos curtos (Estratégia A/B/C)** — Silence Padding, Dynamic Scales e SSML `<break>` automático em todos os 6 runtimes
 
 ### Suporte a funcionalidades por runtime
 
-Síntese multilíngue equivalente em 8 idiomas em 6 runtimes (Python/Rust/C#/Go/JS-WASM/C++). Phoneme Timing, streaming (incluindo divisão por frases), Voice Cloning e dicionários personalizados estão disponíveis em todos os runtimes. SSML é suportado em 4 runtimes (Python/Rust/C#/Go) e a API HTTP em 2 runtimes (Python/Go).
+Síntese multilíngue equivalente em 8 idiomas em 6 runtimes (Python/Rust/C#/Go/JS-WASM/C++). Phoneme Timing, streaming (incluindo divisão por frases), Voice Cloning por entradas `speaker_embedding` pré-computadas e compatíveis com o modelo e dicionários personalizados são capacidades de runtime. C++ aceita apenas embeddings pré-computados e `--reference-audio` não está implementado. A inferência pública de `zs-v1` só foi verificada com Python `piper-plus==2.0.0`; isso não afirma verificação nos outros runtimes. SSML é suportado em 4 runtimes (Python/Rust/C#/Go) e a API HTTP em 2 runtimes (Python/Go).
 
 ### Plataformas
 
@@ -643,11 +643,13 @@ Modelos de síntese de voz para inferência estão disponíveis no Hugging Face.
 | Tsukuyomi-chan 6lang | JA/EN/ZH/ES/FR/PT | 1 | Voz Tsukuyomi-chan, 6 idiomas, FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
 | CSS10 Japonês 6lang | JA/EN/ZH/ES/FR/PT | 1 | Voz CSS10 japonês, 6 idiomas, FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang) |
 
-**Modelos base para treinamento (para fine-tuning):**
+**Modelo base Zero-Shot/FT (experimental):**
 
 | Modelo | Idiomas | Falantes | Descrição | Download |
 |---|---|---|---|---|
-| Modelo base 6 idiomas | JA/EN/ZH/ES/FR/PT | 571 | Pré-treinado multilíngue (508.187 enunciados, VITS + Prosody) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
+| Base `zs-v1` Zero-Shot/FT | JA/EN/ZH/ES/FR/PT | 571 | Experimental, v7 epoch32, 173 fonemas, embedding de falante CAM++ de 192 dimensões | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) |
+
+> `base.onnx` requer um embedding de referência extraído com `campplus.onnx` para Zero-Shot; `base.ckpt` é usado para fine-tuning com o `config.json` incluído. Os exemplos públicos foram verificados funcionalmente com PyPI `piper-plus==2.0.0`. O modelo é experimental: ainda há limites de ruído e transferência de voz; isso não representa aprovação de qualidade ou de escuta humana. Os aliases `base` e `zero-shot-base-zs-v1` pertencem à branch fonte/próximo lançamento e ainda não estão em 2.0.0/2.0.1. O `model.ckpt` raiz continua sendo um arquivo legacy separado.
 
 ### Download de modelos
 
@@ -671,25 +673,13 @@ curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyo
 
 ### Características do modelo base 6 idiomas (para treinamento)
 
-- Arquitetura: VITS + Prosody Features
-- Dados de treinamento: 508.187 enunciados (571 falantes, 6 idiomas)
-- Taxa de amostragem: 22.050 Hz
-- Número de símbolos: 173
-- Prosody Features: Informações prosódicas A1/A2/A3 (japonês)
-- Amostragem balanceada por grupo linguístico: habilitada automaticamente
+- `zs-v1`: base experimental Zero-Shot/FT do v7 epoch32
+- Idiomas: JA/EN/ZH/ES/FR/PT; 571 falantes
+- Taxa de amostragem: 22.050 Hz; 173 fonemas
+- Condicionamento de falante: embedding CAM++ de 192 dimensões
+- Zero-Shot requer um embedding de referência; o fine-tuning usa `base.ckpt` e o `config.json` correspondente
 
-**Idiomas suportados:**
-
-| Idioma | Código | language_id | Falantes | Enunciados | Fonte |
-|---|---|---|---|---|---|
-| Japonês | ja | 0 | 20 | 60.148 | MOE-Speech |
-| Inglês | en | 1 | 310 | 74.912 | LibriTTS-R |
-| Chinês | zh | 2 | 142 | 63.223 | AISHELL-3 |
-| Espanhol | es | 3 | 63 | 168.374 | CML-TTS |
-| Francês | fr | 4 | 28 | 107.464 | CML-TTS |
-| Português | pt | 5 | 8 | 34.066 | CML-TTS |
-
-> **Nota:** O piper-plus realiza extensões de arquitetura proprietárias (embedding multilíngue, Prosody A1/A2/A3, 173 símbolos), portanto não é compatível com checkpoints/modelos ONNX do Piper upstream. Utilize modelos exclusivos do piper-plus.
+> **Nota:** O piper-plus usa extensões próprias e não é compatível com checkpoints/modelos ONNX do Piper upstream. Use o `config.json` incluído com o modelo escolhido; o `model.ckpt` raiz é um arquivo legacy separado.
 
 ---
 
@@ -759,7 +749,7 @@ Plugin para usar o Piper no Unity: [github.com/ayutaz/uPiper](https://github.com
 
 ### Voices
 
-Modelos piper-plus: [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) (base 6 idiomas) · [Tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
+Modelos piper-plus: [base Zero-Shot/FT `zs-v1`](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) · [Tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
 
 > **Nota:** O piper-plus utiliza seu próprio sistema G2P e de fonemas, portanto os modelos do Piper upstream (rhasspy/piper-voices) NÃO são compatíveis.
 

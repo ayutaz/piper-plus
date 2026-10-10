@@ -149,7 +149,27 @@ curl "http://localhost:5000/api/phoneme-timing?text=Hello&language=en&format=jso
 |--------|------|--------|-------------|
 | [tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) | 6言語 (ja/en/zh/es/fr/pt) | 1 | `piper-plus --download-model tsukuyomi` |
 
-> [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) はファインチューニング用の training checkpoint (`model.ckpt`) のみ公開。 直接推論用 ONNX は今後アップロード予定 (別途 `piper-plus --download-model base` 対応)。
+### 公開 Zero-Shot / fine-tuning bundle (`zs-v1`)
+
+一般利用向けの Zero-Shot ベースは、固定 revision の
+[piper-plus-base/releases/zs-v1](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)
+から取得してください。これは v7 epoch32 の実験的チェックポイントで、JA/EN/ZH/ES/FR/PT、173 phonemes、CAM++ 192 次元です。
+通常の参照音声なし TTS には `tsukuyomi` などの既成音声を使い、`base.onnx` は参照 embedding を渡す Zero-Shot 推論または fine-tuning に使います。
+
+```bash
+ZS_REV=3620ed788667cb76f08bd6cf2db8152c1f4c8bd1
+ZS_URL="https://huggingface.co/ayousanz/piper-plus-base/resolve/${ZS_REV}/releases/zs-v1"
+mkdir -p models/zs-v1
+curl -L "${ZS_URL}/base.onnx" -o models/zs-v1/base.onnx
+curl -L "${ZS_URL}/base.onnx.json" -o models/zs-v1/base.onnx.json
+curl -L "${ZS_URL}/config.json" -o models/zs-v1/config.json
+curl -L "${ZS_URL}/campplus.onnx" -o models/zs-v1/campplus.onnx
+curl -L "${ZS_URL}/base.ckpt" -o models/zs-v1/base.ckpt
+```
+
+推論は `base.onnx` + `base.onnx.json`、追加学習は `base.ckpt` + 同じ bundle の `config.json` を使ってください。HF リポジトリ root の旧 `config.json` や `model.ckpt` と混在させないでください。公開 bundle の参照音声からの embedding 事前計算例は、[zs-v1 の公開 README](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/README.md) を参照してください。
+
+この bundle の reference-conditioned 推論は PyPI `piper-plus==2.0.0` で確認済みです。他の runtime/platform の同 bundle による推論確認や品質承認を意味しません。`base` / `zero-shot-base-zs-v1` alias は source branch / 次期リリース向けで、公開 2.0.0 / 2.0.1 には収録されていません。
 
 ## 対応言語
 
@@ -176,7 +196,7 @@ curl "http://localhost:5000/api/phoneme-timing?text=Hello&language=en&format=jso
 
 - [GitHub リポジトリ](https://github.com/ayutaz/piper-plus)
 - [Hugging Face デモ](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
-- [Hugging Face モデル](https://huggingface.co/ayousanz/piper-plus-base)
+- [Hugging Face zs-v1 bundle](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)
 - [ドキュメント](https://github.com/ayutaz/piper-plus/tree/dev/docs)
 
 ## ライセンス

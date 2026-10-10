@@ -1,5 +1,10 @@
 # Training Guide
 
+既存のZero-Shot baseを追加学習する場合は、[zs-v1の配布・検証記録](../../design/zero-shot-base-zs-v1-release-2026-10-10.md)を参照してください。
+音素数が同じでもIDの対応が異なる場合があります。前処理済みdatasetは
+`scripts/prepare_single_speaker_finetune.py --input-dir PREPARED --base-config BASE_CONFIG --output-dir ALIGNED`
+でbaseの音素・言語IDへ合わせてから使用します。このスクリプトは既存出力を上書きせず、学習に必要なaudio cacheの所在も確認します。
+
 Check out a [video training guide by Thorsten Müller](https://www.youtube.com/watch?v=b_we_jma220)
 
 For Windows, see [ssamjh's guide using WSL](https://ssamjh.nz/create-custom-piper-tts-voice/)
@@ -338,13 +343,22 @@ Zero-Shot TTS allows the model to reproduce a target speaker's voice from a refe
 
 ### Prerequisites: CAM++ Speaker Encoder
 
-Download the CAM++ ONNX model (~27 MB) from CosyVoice-300M:
+Download the CAM++ ONNX model from the public `zs-v1` bundle. Pin the Hugging
+Face revision and verify the published SHA-256 before using it with a matching
+v2 Zero-Shot checkpoint:
 
 ```bash
 mkdir -p /data/piper/models
-wget -q "https://huggingface.co/model-scope/CosyVoice-300M/resolve/main/campplus.onnx" \
+wget -q "https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/campplus.onnx" \
   -O /data/piper/models/campplus.onnx
+echo "a6ac6a63997761ae2997373e2ee1c47040854b4b759ea41ec48e4e42df0f4d73  /data/piper/models/campplus.onnx" \
+  | sha256sum -c -
 ```
+
+The verified public file is 192-dimensional and Apache-2.0 licensed. The
+`zs-v1` bundle also contains `base.onnx`, `base.ckpt`, and the matching config;
+it is an experimental functional release, not a quality-approved model. The
+private `ayousanz/campplus-onnx` research repository remains unchanged.
 
 ### Step 1: Extract Per-Utterance Speaker Embeddings
 

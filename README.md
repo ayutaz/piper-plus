@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
-[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
+[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)
 [![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
 
 **パッケージ:**
@@ -109,13 +109,13 @@ Python / Rust / Go / C# / C++ / WASM の 6 ランタイムを `multilingual-test
 - **C# CLI** — .NET 10 クロスプラットフォーム、8言語マルチリンガル、ONNX推論、**音素タイミング出力 (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応、**音素タイミング出力 (JSON/TSV/SRT)**、辞書自動ダウンロード
 - **[Go CLI](src/go/README.md)** — HTTP APIサーバー、セッションプーリング、Docker対応、シングルバイナリ、**音素タイミング出力 (JSON/TSV/SRT)**
-- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 全 6 ランタイム (Python/Rust/C#/Go/WASM/C++) 対応。C++ は CLI バイナリと `libpiper_plus` C API ライブラリの両形式で利用可。ECAPA-TDNN による参照音声からの話者 embedding 抽出 (`--reference-audio`)
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 全 6 ランタイム (Python/Rust/C#/Go/WASM/C++) でモデル互換の事前計算 `speaker_embedding` 入力に対応。C++ CLI/C API は事前計算 embedding のみ受け付け、`--reference-audio` による抽出は未実装。公開 `zs-v1` の実推論確認は Python `piper-plus==2.0.0` のみ。
 - **SSML サポート** — `<speak>`, `<break>`, `<prosody rate="...">` を Python/Rust/C#/Go/WASM/C++ の 6 ランタイムで実装 (C++ は CLI `--ssml` 経由)
 - **短文品質改善 (Strategy A/B/C)** — Silence Padding、Dynamic Scales、SSML `<break>` 自動注入を全 6 ランタイムで対応 (`docs/spec/short-text-contract.toml`)
 
 ### ランタイム別機能サポート
 
-6 ランタイム (Python/Rust/C#/Go/JS-WASM/C++) で同等の8言語マルチリンガル合成を実現。音素タイミング・ストリーミング (文単位分割含む)・Voice Cloning・カスタム辞書は全ランタイム対応。SSML は全 6 ランタイム対応 (C++ は CLI `--ssml` 経由、C API 非エクスポート)、HTTP API は Python/Go の 2 ランタイム対応。
+6 ランタイム (Python/Rust/C#/Go/JS-WASM/C++) で同等の8言語マルチリンガル合成を実現。音素タイミング・ストリーミング (文単位分割含む)・モデル互換の事前計算 embedding を使う Voice Cloning・カスタム辞書はランタイム機能として対応。C++ は事前計算 embedding のみで `--reference-audio` は未実装。公開 `zs-v1` の実推論確認は Python `piper-plus==2.0.0` のみで、他ランタイムの同バンドル検証を示すものではありません。SSML は全 6 ランタイム対応 (C++ は CLI `--ssml` 経由、C API 非エクスポート)、HTTP API は Python/Go の 2 ランタイム対応。
 
 ---
 
@@ -364,7 +364,9 @@ C++ CLI の詳細なコマンドラインオプション、JSON 入力フォー�
 
 公開されている piper-plus モデルの一覧、ダウンロード方法、6 言語ベースモデルの特徴、日本語 TTS の詳細は **[モデルガイド](docs/guides/development/pretrained-models.md)** を参照してください。
 
-主要モデル: `tsukuyomi` (日本語), `multilingual-6lang` (8 言語ベース), `bilingual-ja-en-v4` (日英 2 言語) — 詳細は HuggingFace の [ayousanz/piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) や [ayousanz/piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) を参照。
+主要モデル: `tsukuyomi` (日本語), `zs-v1` (6 言語 Zero-Shot/FT 実験ベース), `bilingual-ja-en-v4` (日英 2 言語) — 詳細は HuggingFace の [固定公開 zs-v1 バンドル](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) や [ayousanz/piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) を参照してください。
+
+> **Zero-Shot/FT ベース (`zs-v1`, 2026-10-10):** 固定公開バンドルは既存の v7 epoch 32 実験基準版（JA/EN/ZH/ES/FR/PT、571 話者、173 音素、CAM++ 192 次元）です。Zero-Shot 推論は `base.onnx` と同梱 `campplus.onnx` から抽出した参照 embedding、追加学習は `base.ckpt` と同梱 `config.json` を使ってください。PyPI `piper-plus==2.0.0` の公開例で機能確認済みですが、品質承認・人手試聴合格・最新/最高品質を意味しません。`base` / `zero-shot-base-zs-v1` alias はソースブランチ/次期リリース向けで、公開済み 2.0.0 / 2.0.1 には未収録です。ルートの `model.ckpt` は旧世代として別扱いです。
 
 ---
 
@@ -388,7 +390,7 @@ Piper を Unity で使用するプラグイン: [github.com/ayutaz/uPiper](https
 
 ### 音声モデル (Voices)
 
-piper-plus 専用モデル: [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) (6言語ベース) · [つくよみちゃん](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
+piper-plus 専用モデル: [zs-v1 Zero-Shot/FT ベース](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) · [つくよみちゃん](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
 
 > **Note:** piper-plus は独自の G2P・音素体系を使用しているため、upstream Piper (rhasspy/piper-voices) のモデルとは互換性がありません。
 

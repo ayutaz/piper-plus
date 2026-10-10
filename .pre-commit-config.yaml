@@ -793,7 +793,7 @@ repos:
         name: voice catalog parity (canonical vs 5 runtime mirrors)
         entry: uv run --no-sync python scripts/check_voice_catalog_parity.py
         language: system
-        files: ^(test/model_resolution_vectors\.json|src/python_run/piper_plus/download\.py|src/cpp/piper_plus_voices\.json|src/rust/piper-core/src/model_download\.rs|src/csharp/PiperPlus\.Core/Config/VoiceCatalog\.cs|src/go/piperplus/voice_catalog\.go|scripts/check_voice_catalog_parity\.py|src/python_run/piper_plus/voices\.json)$
+        files: ^(test/model_resolution_vectors\.json|src/python_run/piper_plus/download\.py|src/cpp/(piper_plus_voices\.json|model_manager\.cpp)|src/rust/piper-core/src/model_download\.rs|src/csharp/PiperPlus\.Core/Config/VoiceCatalog\.cs|src/go/piperplus/voice_catalog\.go|scripts/check_voice_catalog_parity\.py|src/python_run/piper_plus/voices\.json)$
         pass_filenames: false
 
       # Mirror of .github/workflows/action-pin-gate.yml. Codespell-baseline

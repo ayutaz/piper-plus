@@ -55,6 +55,7 @@ def _well_formed_manifest_toml() -> str:
         "tsukuyomi-mb-istft",
         "css10-ja-6lang",
         "speaker-encoder-ecapa-tdnn",
+        "zero-shot-base-zs-v1",
     ]:
         body += textwrap.dedent(f"""
             [[models]]

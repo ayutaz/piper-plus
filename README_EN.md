@@ -6,7 +6,7 @@ English | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_F
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
-[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
+[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)
 [![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
 
 **Packages:**
@@ -103,10 +103,10 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 - **C# CLI** — .NET 10 cross-platform, 8-language multilingual, ONNX inference, **phoneme timing output (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML support, **phoneme timing output (JSON/TSV/SRT)**, auto dictionary download
 - **[Go CLI](src/go/README.md)** — HTTP API server, session pooling, Docker, single binary, **phoneme timing output (JSON/TSV/SRT)**
-- **Voice Cloning (Speaker Encoder + speaker_embedding)** — supported by all 6 runtimes (Python/Rust/C#/Go/WASM/C++). C++ exposes both the CLI binary and the `libpiper_plus` C API shared library. Extract speaker embedding from a reference audio via ECAPA-TDNN (`--reference-audio`).
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — model-compatible precomputed `speaker_embedding` input is supported at the runtime capability level across all 6 runtimes (Python/Rust/C#/Go/WASM/C++). The C++ CLI and C API accept precomputed embeddings only; `--reference-audio` extraction is not implemented in C++. Public `zs-v1` inference was functionally verified only with Python `piper-plus==2.0.0`.
 - **SSML support** — `<speak>`, `<break>`, `<prosody rate="...">` implemented across 4 runtimes (Python/Rust/C#/Go).
 - **Short-text quality improvements (Strategy A/B/C)** — silence padding, dynamic scales, SSML `<break>` auto-injection deployed across all 6 runtimes (`docs/spec/short-text-contract.toml`).
-- Equivalent 8-language multilingual synthesis across 6 runtimes (Python/Rust/C#/Go/JS-WASM/C++).
+- Equivalent 8-language multilingual synthesis across 6 runtimes (Python/Rust/C#/Go/JS-WASM/C++). Voice Cloning here means runtime support for model-compatible precomputed embedding input; the C++ path accepts precomputed embeddings only, and `--reference-audio` is unimplemented. Public `zs-v1` inference was verified only with Python `piper-plus==2.0.0`, so this does not claim that bundle was verified on other runtimes.
 
 ---
 
@@ -353,7 +353,9 @@ Production-grade pretraining and fine-tuning command templates (6-language pretr
 
 For the list of available piper-plus models, download instructions, 6-language base model details, and Japanese TTS specifics, see **[Pre-trained Models Guide](docs/guides/development/pretrained-models.md)**.
 
-Main models: `tsukuyomi` (Japanese), `multilingual-6lang` (8-language base), `bilingual-ja-en-v4` (Japanese-English) — see HuggingFace [ayousanz/piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) and [ayousanz/piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan).
+Main models: `tsukuyomi` (Japanese), `zs-v1` (experimental 6-language Zero-Shot/FT base), `bilingual-ja-en-v4` (Japanese-English) — see the pinned HuggingFace [zs-v1 bundle](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) and [ayousanz/piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan).
+
+> **Zero-Shot/FT base (`zs-v1`, 2026-10-10):** The pinned public bundle is the existing v7 epoch32 experimental base (JA/EN/ZH/ES/FR/PT, 571 speakers, 173 phonemes, CAM++ 192-dim embeddings). Zero-Shot inference uses `base.onnx` with a reference embedding extracted by the bundled `campplus.onnx`; fine-tuning uses `base.ckpt` with the bundled `config.json`. The public examples were functionally verified with PyPI `piper-plus==2.0.0`, but this is not quality approval, human listening approval, or a latest/best model claim. The `base` / `zero-shot-base-zs-v1` aliases target the source branch/next release and are not in released 2.0.0 / 2.0.1. The root `model.ckpt` remains a separate legacy model.
 
 ---
 
@@ -386,7 +388,7 @@ Multilingual G2P (Grapheme-to-Phoneme) available as standalone packages:
 
 ### Voices
 
-piper-plus models: [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) (6-language base) · [Tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
+piper-plus models: [zs-v1 Zero-Shot/FT base](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) · [Tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
 
 > **Note:** piper-plus uses its own G2P and phoneme system, so upstream Piper models (rhasspy/piper-voices) are NOT compatible.
 

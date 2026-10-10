@@ -56,6 +56,10 @@ class PiperPlus:
         result.save("hello.wav")
         print(f"Duration: {result.duration:.2f}s")
 
+    The experimental ``base`` / ``zero-shot-base-zs-v1`` aliases select a
+    pinned graph and matching config. Reference-conditioned synthesis uses
+    the public bundle example; this high-level API does not accept embeddings.
+
     Args:
         model: Model file path, alias (``"tsukuyomi"``),
             or HuggingFace repo ID (``"ayousanz/piper-plus-tsukuyomi-chan"``).

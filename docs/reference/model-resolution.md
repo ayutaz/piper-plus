@@ -10,6 +10,10 @@
 
 本仕様は、piper-plus の4言語実装 (Python, Rust, C#, Go) における**モデル解決 (model resolution)** アルゴリズムを定義する。ユーザーが `--model` 引数に指定する文字列から、実際の ONNX モデルファイルと config.json のパスを決定するまでの手順を統一する。
 
+解決順序は統一を目指す仕様であり、全ランタイムで全経路が実装済みという意味ではない。
+現在の入口と差異は§6・§8を参照。特にGo CLIはURL取得とローカルcache検索のみで、
+voice catalogのaliasによる取得には接続していない。
+
 ---
 
 ## 1. Resolution Order
@@ -53,7 +57,7 @@ Voice catalog から以下の優先順位で検索する:
 1. **Exact key match** -- `ja_JP-tsukuyomi-chan-medium` のような完全キー
 2. **Name match** -- `tsukuyomi-chan` のような voice name
 3. **Alias match** -- `tsukuyomi`, `css10` のようなショートネーム
-4. **Partial name match** (Rust/Go) -- `tsukuyomi` が `tsukuyomi-6lang-v2` に部分一致
+4. **Partial name match** (Rust) -- `tsukuyomi` が `tsukuyomi-6lang-v2` に部分一致
 
 > **重要:** Partial match は曖昧な場合 (複数候補) はエラーとする。例: `6lang` は `tsukuyomi-6lang-v2` と `css10-6lang` の両方に一致するためエラー。
 
@@ -81,10 +85,11 @@ Cache directory 内で `{model_str}/*.onnx` または `{model_str}.onnx` を探�
 | `name` | string | Voice 名 (例: `tsukuyomi-chan`) |
 | `language_code` | string | Locale コード (例: `ja_JP`) |
 | `language_family` | string | 言語ファミリー (例: `ja`) |
-| `quality` | string | `low` / `medium` / `high` |
+| `quality` | string | `low` / `medium` / `high` / `experimental` |
 | `num_speakers` | int | 話者数 |
 | `source` | string | `piper-plus` or `piper` |
 | `repo_id` | string | HuggingFace リポジトリ ID |
+| `revision` | string (optional) | 固定HF revision。省略時は従来の`main` |
 | `files` | array/map | ダウンロード対象ファイル (ONNX + config) |
 | `aliases` | array | ショートネームのリスト |
 | `description` | string | 説明文 |
@@ -97,8 +102,15 @@ Cache directory 内で `{model_str}/*.onnx` または `{model_str}.onnx` を探�
 |-------|---------|-----------|
 | `tsukuyomi` | `ayousanz/piper-plus-tsukuyomi-chan` | `tsukuyomi-chan-6lang-fp16.onnx` |
 | `css10` | `ayousanz/piper-plus-css10-ja-6lang` | `css10-ja-6lang-fp16.onnx` |
+| `base` | `ayousanz/piper-plus-base` at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` | `releases/zs-v1/base.onnx` |
+| `zero-shot-base-zs-v1` | `ayousanz/piper-plus-base` at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` | `releases/zs-v1/base.onnx` |
+| `ayousanz/piper-plus-base` | `ayousanz/piper-plus-base` at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` | `releases/zs-v1/base.onnx` |
 
-> `base` alias は v2.0 で削除されました。 HF `ayousanz/piper-plus-base` repo は現在 training checkpoint (`model.ckpt`) のみ公開しており、 直接推論用の ONNX が未 upload のため。 base 6lang ONNX 公開後に再登録予定。
+> `base` と `zero-shot-base-zs-v1` は、次のリリースで公開する pinned aliases です。
+> いずれも root の legacy `model.ckpt` を指さず、上記 revision の
+> `releases/zs-v1/base.onnx` と対応する `releases/zs-v1/base.onnx.json` を解決します。リリース済み
+> v2.0.0/v2.0.1 の alias 表には遡及して追加しません。`base.onnx` は 192 次元 CAM++
+> `speaker_embedding` を使う実験用 Zero-Shot base で、通常の参照なし音声用 alias ではありません。
 
 ---
 
@@ -208,18 +220,19 @@ function find_config(onnx_path, explicit_config=None):
 | 機能 | Python | Rust | C# | Go |
 |------|--------|------|-----|-----|
 | Entry point | `_model_resolver.resolve_model()` | `model_download::resolve_model_path()` | `ModelManager.ResolveModelPathAsync()` | `ModelManager.FindModel()` |
-| Voice catalog | `model_manager._BUILTIN_CATALOG` | `model_download::builtin_registry()` | `VoiceCatalog.LoadMergedCatalog()` | -- (URL-based) |
+| Voice catalog | CLI: `download.PIPER_PLUS_VOICES`; API: `MODEL_ALIASES` | `model_download::builtin_registry()` | `VoiceCatalog.LoadMergedCatalog()` | metadataのみ。CLI未接続 |
 | Alias lookup | `MODEL_ALIASES` dict | `find_model()` (name/partial/desc) | `FindVoice()` (key/alias dict) | -- |
-| Config detection | `_find_config()` | `is_model_cached()` | Download 時に catalog から取得 | `buildModelInfo()` |
-| Cache dir | `~/.cache/piper-plus/models` | `default_model_dir()` | `GetDefaultModelDir()` | `DefaultCacheDir()` |
-| Download | `huggingface_hub` | `reqwest` (feature-gated) | `HttpClient` | `net/http` |
+| Config detection | API: `_find_config()`; CLI: `download.find_voice()` | `resolve_model_path()` | Download 時に catalog から取得 | `buildModelInfo()` |
+| Cache dir | API: `~/.cache/piper-plus/models`; CLI: 指定download dir | `default_model_dir()` | `GetDefaultModelDir()` | `DefaultCacheDir()` |
+| Download | API: `huggingface_hub`; CLI: `urlopen` | `reqwest` (feature-gated) | `HttpClient` | `net/http` |
 
 ### ソースファイル
 
 | 実装 | パス |
 |------|------|
 | Python (高レベル API) | `src/python_run/piper_plus/api/_model_resolver.py` |
-| Python (学習/推論) | `src/python/piper_train/model_manager.py` |
+| Python (推論CLIのcatalog/取得) | `src/python_run/piper_plus/download.py` |
+| Python (旧学習側の通常音声catalog) | `src/python/piper_train/model_manager.py`。公開baseの取得元ではない |
 | Rust | `src/rust/piper-core/src/model_download.rs` |
 | C# | `src/csharp/PiperPlus.Core/Config/ModelManager.cs` |
 | C++ | `src/cpp/model_manager.hpp`, `src/cpp/model_manager.cpp` |
@@ -258,6 +271,19 @@ function find_config(onnx_path, explicit_config=None):
 | 差異 | 現状 | 統一方針 |
 |------|------|---------|
 | Cache directory path | Python は `~/.cache/`, 他は platform data dir | Platform data dir に統一予定 |
-| Catalog format | Python は dict, Rust は Vec, C# は JSON | JSON catalog を正とし各言語で読み込み |
+| Catalog format | Python CLIはdict、Rust/C#/Goはsource内定義、C++はJSONと埋め込み定義 | JSON catalog を正とし各言語で読み込み |
 | Partial match | Rust のみ partial name + description match | 全実装で catalog alias ベースに統一予定 |
 | Auto-download | Python は `huggingface_hub`, 他は直接 HTTP | 各実装の依存に応じて許容 |
+
+
+## Public baseline cache and integrity scope
+
+For `zs-v1`, Python API and browser caches isolate the pinned revision/path.
+Python CLI and native catalogs pin download URLs but retain flat local filenames;
+those local filenames alone do not establish a file's revision or SHA-256.
+Use a separate model directory for the public baseline and verify files against
+its bundled manifest when importing/reusing manually downloaded artifacts.
+Browser resolution likewise does not enforce the release manifest's hashes;
+its existing hash check uses `config.sha256` when a config supplies that field.
+Inference uses `base.onnx` + `base.onnx.json`; fine-tuning uses `base.ckpt` +
+the same release's `config.json`. Never substitute the repository's legacy root config.

@@ -18,8 +18,10 @@ Run `pre-commit run --all-files` for a one-shot full sweep.
 > **v1.12.0 notes:** Python runtime now uses FastAPI (not Flask) for the HTTP server,
 > and the HTS-voice dependency has been removed from the Python runtime
 > (C++/Go/Rust/WASM continue to use OpenJTalk + HTS-voice). HiFi-GAN decoder ckpts
-> are no longer supported — use the MB-iSTFT base model `piper-plus-base` for
-> resume / fine-tuning. See `docs/migration/v1.11-to-v1.12.md`.
+> are no longer supported. The retained root `piper-plus-base/model.ckpt` is the
+> legacy MB-iSTFT fine-tuning source; the public v2 Zero-Shot + fine-tuning bundle is
+> the pinned `piper-plus-base/releases/zs-v1` base documented in the
+> [pre-trained models guide](pretrained-models.md). See `docs/migration/v1.11-to-v1.12.md`.
 
 ## Building C++ CLI
 

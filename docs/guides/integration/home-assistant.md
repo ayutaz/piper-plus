@@ -9,7 +9,11 @@ piper-plus を Home Assistant の TTS プロバイダーとして利用する方
 - Home Assistant 2024.1 以上 (Wyoming Protocol 統合を標準搭載)
 - Docker および Docker Compose がインストール済み (方法 1, 2)
 - piper-plus 用の ONNX モデルと config.json (自動ダウンロードも可能)
-  - HuggingFace: `ayousanz/piper-plus-tsukuyomi-chan` (つくよみちゃん 6 言語) または `ayousanz/piper-plus-base` (ベースモデル)
+  - HuggingFace: `ayousanz/piper-plus-tsukuyomi-chan` (つくよみちゃん 6 言語) または `ayousanz/piper-plus-css10-ja-6lang` (CSS10 6 言語)
+
+> `ayousanz/piper-plus-base` の `releases/zs-v1/base.onnx` は、192 次元 CAM++
+> `speaker_embedding` を必要とする実験用 Zero-Shot base です。現在の Wyoming
+> 統合で通常の参照なし TTS モデルとして扱う前提ではなく、Home Assistant の標準設定には使用しないでください。
 
 ---
 

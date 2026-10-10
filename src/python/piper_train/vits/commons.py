@@ -247,7 +247,7 @@ _LEGACY_HIFIGAN_MESSAGE = (
     "Checkpoint {path!r} appears to be from v1.11.0 or earlier (HiFi-GAN Generator). "
     "v1.12.0 unified the decoder to MB-iSTFT-VITS2, so HiFi-GAN ckpt files cannot be "
     "resumed for training. Fine-tune from the new MB-iSTFT base model instead:\n"
-    "    https://huggingface.co/ayousanz/piper-plus-base/resolve/main/model.ckpt\n"
+    "    v2.0: https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/base.ckpt (matching release config required)\n"
     "See docs/migration/v1.11-to-v1.12.md for the full migration guide."
 )
 

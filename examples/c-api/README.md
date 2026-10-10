@@ -15,10 +15,16 @@ tar -xzf piper-plus-shared-linux-x64.tar.gz -C /usr/local
 ### Download a model
 
 ```bash
-# Download the test model from HuggingFace
-curl -LO https://huggingface.co/ayousanz/piper-plus-base/resolve/main/multilingual-test-medium.onnx
-curl -LO https://huggingface.co/ayousanz/piper-plus-base/resolve/main/multilingual-test-medium.onnx.json
+# Download the canonical reference-free model from HuggingFace
+curl -LO https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx
+curl -LO https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx.json
 ```
+
+This C API example demonstrates reference-free synthesis. C++ reference-audio
+speaker-encoder inference is not implemented; use the published
+[`zs-v1` README](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/README.md)
+for the canonical embedding-precomputation workflow before using a compatible
+pre-computed embedding with another runtime.
 
 The OpenJTalk dictionary is bundled in the release archive at `share/open_jtalk/dic/`.
 
@@ -39,13 +45,13 @@ cmake --build build
 
 ```bash
 # One-shot synthesis (outputs WAV file)
-./basic multilingual-test-medium.onnx /usr/local/share/open_jtalk/dic "Hello world." output.wav
+./basic tsukuyomi-chan-6lang-fp16.onnx /usr/local/share/open_jtalk/dic "Hello world." output.wav
 
 # Streaming synthesis (outputs WAV file)
-./streaming multilingual-test-medium.onnx /usr/local/share/open_jtalk/dic "First. Second. Third." streaming.wav
+./streaming tsukuyomi-chan-6lang-fp16.onnx /usr/local/share/open_jtalk/dic "First. Second. Third." streaming.wav
 
 # Multi-language synthesis (outputs one WAV per language)
-./multi_language multilingual-test-medium.onnx /usr/local/share/open_jtalk/dic
+./multi_language tsukuyomi-chan-6lang-fp16.onnx /usr/local/share/open_jtalk/dic
 ```
 
 ### Multi-language example

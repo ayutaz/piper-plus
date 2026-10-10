@@ -33,6 +33,9 @@ internal sealed class VoiceJsonEntry
     [JsonPropertyName("repo")]
     public string Repo { get; set; } = string.Empty;
 
+    [JsonPropertyName("revision")]
+    public string Revision { get; set; } = "main";
+
     [JsonPropertyName("files")]
     public Dictionary<string, VoiceFileJson>? Files { get; set; }
 
@@ -121,7 +124,10 @@ internal static class VoiceJsonConverter
             RepoId: entry.Repo,
             Files: files,
             Aliases: entry.Aliases ?? [],
-            Description: entry.Description);
+            Description: entry.Description)
+        {
+            Revision = entry.Revision,
+        };
     }
 }
 

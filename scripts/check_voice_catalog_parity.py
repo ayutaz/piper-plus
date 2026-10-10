@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # editorconfig-checker-disable-file (docstring uses 2-space indented lists)
-"""Voice catalog parity checker across 5 runtimes.
+"""Voice catalog parity checker across five runtimes and six source mirrors.
 
 `test/model_resolution_vectors.json` の `voice_catalog` を canonical source
 として、5 ランタイム (Python / C++ / Rust / C# / Go) の voice catalog
-mirror が同じ `repo_id` / `onnx_file` / `aliases` を持っているか確認する。
+mirror の `repo_id` / `onnx_file` / `config_file` / `revision` / `aliases` を確認する。
 
 Why: voice catalog は各ランタイムで「JSON ファイル」または「ハードコード」
 の形で分散しており、Python と C++ は JSON、Rust/C#/Go はソース内ハード
@@ -13,7 +13,7 @@ Why: voice catalog は各ランタイムで「JSON ファイル」または「�
 vector は既に存在するが CI gate がなかった (本 PR で追加)。
 
 検証粒度: 各 catalog entry について以下を assert
-  - canonical の `repo_id` / `onnx_file` が各ランタイムソースに出現
+  - canonical の `repo_id` / `onnx_file` / `config_file` と任意の `revision` が各ソースに出現
   - canonical の `aliases` のうち少なくとも 1 つが各ランタイムソースに出現
 
 これは完全な byte-for-byte 比較ではなく、「**同じモデルを指している**」
@@ -46,9 +46,10 @@ CANONICAL = REPO_ROOT / "test/model_resolution_vectors.json"
 MIRRORS: dict[str, Path] = {
     # NOTE: `src/python_run/piper_plus/voices.json` contains the 97-language
     # rhasspy upstream catalog only; piper-plus-specific models live in
-    # `download.py`'s `PIPER_PLUS_MODELS` registry instead.
+    # `download.py`'s `PIPER_PLUS_VOICES` registry instead.
     "Python download.py": REPO_ROOT / "src/python_run/piper_plus/download.py",
     "C++ piper_plus_voices.json": REPO_ROOT / "src/cpp/piper_plus_voices.json",
+    "C++ embedded catalog": REPO_ROOT / "src/cpp/model_manager.cpp",
     "Rust model_download.rs": REPO_ROOT / "src/rust/piper-core/src/model_download.rs",
     "C# VoiceCatalog.cs": REPO_ROOT
     / "src/csharp/PiperPlus.Core/Config/VoiceCatalog.cs",
@@ -90,6 +91,11 @@ def check_entry(
     onnx = entry.get("onnx_file")
     if onnx and onnx not in text:
         failures.append(f"  [{mirror_label}] {entry_key}: onnx_file '{onnx}' not found")
+
+    for field in ("config_file", "revision"):
+        value = entry.get(field)
+        if value and value not in text:
+            failures.append(f"  [{mirror_label}] {entry_key}: {field} '{value}' not found")
 
     aliases = entry.get("aliases", [])
     if aliases:

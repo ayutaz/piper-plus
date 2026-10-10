@@ -21,10 +21,13 @@ const MODEL_REGISTRY = {
   "tsukuyomi-chan": "ayousanz/piper-plus-tsukuyomi-chan",
   css10: "ayousanz/piper-plus-css10-ja-6lang",
   "css10-ja": "ayousanz/piper-plus-css10-ja-6lang",
-  // Note: `base` alias was removed in v2.0. The HF `ayousanz/piper-plus-base`
-  // repo currently hosts only a training checkpoint (`model.ckpt`); no `.onnx`
-  // for direct inference. Re-add once a base 6lang ONNX is uploaded.
 };
+
+// Experimental reference-conditioned graph: do not auto-select an encoder or
+// combine the nested release with the repository's legacy root config.
+const PUBLIC_BASE_PREFIX =
+  "https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/";
+const PUBLIC_BASE_ALIASES = new Set(["base", "zero-shot-base-zs-v1", "ayousanz/piper-plus-base"]);
 
 /**
  * Open (or create) the IndexedDB database used for model caching.
@@ -33,7 +36,7 @@ const MODEL_REGISTRY = {
  */
 function openDatabase(dbName) {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(dbName, DB_VERSION);
+    const request = globalThis.indexedDB.open(dbName, DB_VERSION);
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -116,7 +119,7 @@ async function fetchWithProgress(url, onProgress) {
  *
  * Config resolution order:
  *   1. Sidecar: `{onnxFilename}.json` (e.g. `model.onnx.json`)
- *   2. Fallback: `config.json`
+ *   2. Fallback: `config.json` in the selected ONNX directory
  *
  * @param {string} repoName - e.g. "ayousanz/piper-plus-css10-ja-6lang"
  * @returns {Promise<{onnxFilename: string, configFilename: string}>}
@@ -145,14 +148,15 @@ async function resolveModelFiles(repoName) {
 
   // Resolve config: prefer sidecar {onnx}.json, fall back to config.json.
   const sidecarConfig = `${onnxFilename}.json`;
+  const directoryConfig = onnxFilename.slice(0, onnxFilename.lastIndexOf("/") + 1) + "config.json";
   let configFilename;
   if (filenames.includes(sidecarConfig)) {
     configFilename = sidecarConfig;
-  } else if (filenames.includes("config.json")) {
-    configFilename = "config.json";
+  } else if (filenames.includes(directoryConfig)) {
+    configFilename = directoryConfig;
   } else {
     throw new Error(
-      `No config file found in repository "${repoName}"; expected "${sidecarConfig}" or "config.json"`
+      `No config file found in repository "${repoName}"; expected "${sidecarConfig}" or "${directoryConfig}"`
     );
   }
 
@@ -216,6 +220,9 @@ export class ModelManager {
    * Resolve a model identifier to concrete URLs for the ONNX model and its
    * companion config JSON.
    *
+   * The experimental "base" / "zero-shot-base-zs-v1" aliases use the pinned
+   * zs-v1 graph and sidecar, with a revision/path-specific cache key.
+   *
    * Accepted formats:
    *   - Registry shortcut: "css10"
    *   - HuggingFace repo:  "ayousanz/piper-plus-css10-ja-6lang"
@@ -225,6 +232,15 @@ export class ModelManager {
    * @returns {Promise<{modelUrl: string, configUrl: string, configFallbackUrl: string|null, cacheKey: string}>}
    */
   async _resolveUrls(modelNameOrUrl) {
+    if (PUBLIC_BASE_ALIASES.has(modelNameOrUrl)) {
+      const modelUrl = PUBLIC_BASE_PREFIX + "base.onnx";
+      return {
+        modelUrl,
+        configUrl: PUBLIC_BASE_PREFIX + "base.onnx.json",
+        configFallbackUrl: null,
+        cacheKey: modelUrl,
+      };
+    }
     // Direct URL.
     if (/^https?:\/\//i.test(modelNameOrUrl)) {
       const modelUrl = modelNameOrUrl;

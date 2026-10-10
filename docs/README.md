@@ -97,6 +97,7 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 
 ## Design Documents
 
+- [Zero-Shot Public Model Release Plan](design/zero-shot-public-model-release-plan-2026-10-10.md) - 一般公開先2repoへのベース・つくよみちゃんFT配布計画、dev統合・品質評価・互換性・公開切替
 - [Zero-Shot Quality Improvement Plan](design/zero-shot-quality-improvement-plan.md) - Improvement roadmap for zero-shot speaker similarity (Phase 1 ✅ shipped via v7 multi-6lang)
 - [Multi-6lang Zero-Shot v7 Training Results](design/multi-6lang-zero-shot-v7-training-results.md) - Canonical v7 training results + 5 fix commit history
 

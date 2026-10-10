@@ -49,7 +49,11 @@ curl http://localhost:8000/health
 HuggingFace から取得可能です:
 
 - `ayousanz/piper-plus-tsukuyomi-chan` (日本語 6 言語対応)
-- `ayousanz/piper-plus-base` (ベースモデル)
+- `ayousanz/piper-plus-css10-ja-6lang` (CSS10 6 言語対応)
+
+`ayousanz/piper-plus-base` の `releases/zs-v1/base.onnx` は 192 次元 CAM++
+`speaker_embedding` を使う実験用 Zero-Shot base です。下記の通常の OpenAI 互換 API
+例（`speaker_id` のみ）では参照音声を渡せないため、一般的な参照なし voice として使用しないでください。
 
 ---
 

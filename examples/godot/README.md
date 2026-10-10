@@ -86,9 +86,13 @@ PKG_CONFIG_PATH=/path/to/piper-plus/lib/pkgconfig scons
 ### Download a Model
 
 ```bash
-curl -LO https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-6lang-v2-fixed.onnx
-curl -LO https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-6lang-v2-fixed.onnx.json
+curl -LO https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx
+curl -LO https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx.json
 ```
+
+This C API example uses a reference-free voice. C++ reference-audio
+speaker-encoder inference is not implemented. For Zero-Shot embedding
+precomputation, follow the canonical [published zs-v1 README](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/README.md).
 
 ## PiperTTS Node API
 

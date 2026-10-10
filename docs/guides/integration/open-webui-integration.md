@@ -9,7 +9,11 @@ piper-plus の OpenAI 互換 TTS API を Open WebUI に接続し、チャット�
 - Docker および Docker Compose がインストール済み
 - [Open WebUI](https://github.com/open-webui/open-webui) が稼働中
 - piper-plus 用の ONNX モデルと config.json を準備済み
-  - HuggingFace から取得可能: `ayousanz/piper-plus-tsukuyomi-chan` (日本語 6 言語対応) または `ayousanz/piper-plus-base` (ベースモデル)
+  - HuggingFace から取得可能: `ayousanz/piper-plus-tsukuyomi-chan` (日本語 6 言語対応) または `ayousanz/piper-plus-css10-ja-6lang` (6 言語対応)
+
+> `ayousanz/piper-plus-base` の `releases/zs-v1/base.onnx` は、192 次元 CAM++
+> `speaker_embedding` と参照音声由来の embedding を使う実験用 Zero-Shot base です。
+> この OpenAI 互換手順で説明する通常の参照なし TTS voice としては案内しません。
 
 ---
 
