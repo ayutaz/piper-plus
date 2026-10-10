@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789769972041,
+  "lastUpdate": 1791622531104,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1074,6 +1074,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 210.8,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b5f60734dadaf778cb5312859412276a20c113ff",
+          "message": "feat(models): 公開zs-v1ベースの案内と取得先を統一 (#792)\n\n* docs: zero-shotベースとつくよみちゃんの一般公開計画を追加\n\n- dev統合から固定評価・Vast.ai学習・FT・consumer検証・HF公開までの依存と完了条件を定義\n- 既存配布を保持する世代別パスとencoder取得・hash・rollbackを明記\n\n* docs: 学習済みzero-shotベースの先行公開を優先\n\n- 既存ベースの推論とFT確認から公開へ進む経路を追加\n- つくよみちゃんFTと品質改善研究を分離し再学習を公開の必須前提から外す\n\n* fix(training): baseに合わせて音素と言語IDを変換するFT準備を追加\n\n同じ音素数でも対応が異なるdatasetをそのまま追加学習しないようにする。\n既存Zero-Shot基準版の配布物と独立v2.0.0 consumer検証を記録する。\n\n* fix(training): 前処理の作業ディレクトリ基準キャッシュを解決\n\ndataset基準とcwd基準の相対パスに対応し、候補が曖昧な場合は拒否する。\n新規前処理からの準備経路と二重解決の回帰を検証する。\n\n* docs(models): zs-v1公開と未認証consumer検証結果を固定\n\n公開revisionとmodel/config/checkpoint/encoderのhashを記録する。\n旧rootと研究保存先を保持し、機能検証と未完了の品質承認を区別する。\n\n* docs: CHANGELOGの空行と重複Fixed見出しを整理\n\n- push前のMarkdown検査が既存書式で失敗するため空行を補う。\n- 同じreleaseのFixed項目をまとめ、項目の内容を維持する。\n\n* test(docs): 利用手順更新後のコード例位置を同期\n\n- pretrained-modelsとtraining-guideの追記で変わった行番号を再生成する。\n- コード内容と分類は維持し、CIのaudit snapshot照合を通す。\n\n* feat(models): 公開zs-v1ベースの案内と取得先を全ランタイムで同期\n\n- 公開ベースと旧root/研究用モデルを区別し、README・連携・学習・Colabを固定revisionに対応\n- nested ONNX/configの組み合わせとrevision別キャッシュを修正し、次期リリース向けaliasを追加\n- 既存音声の互換性を維持し、実験品質・参照embedding・Python検証範囲を明示\n\n* test(models): 公開モデル案内の書式と検証用スナップショットを同期\n\n- NotebookのJSON書式、browserのglobal参照、CHANGELOG見出しの空行を整合\n- カタログの参照仕様パスとコード例監査を最新差分へ同期\n\n* docs(models): 公開ベースの取得名と設定ペアの検証範囲を明確化\n\n- browserの次期aliasと既存配布版の直接URLを区別\n- 推論sidecarと追加学習config、flat cacheとmanifest検証の範囲を明記\n\n* test(models): 任意依存なしの取得検証とリポジトリ名の安全性を確認\n\n- Hugging Face の任意依存をテスト用moduleに置き換え、最小CI環境でも固定取得先を検証\n- offline cacheはHub packageなしで解決できることを確認\n- C#のrepo aliasはカタログ検索に限定し、保存パスと既存の攻撃拒否を検証\n\n* docs(models): 取得実装の参照先とSHA検証の実装範囲を同期\n\n- Python API/CLIと旧学習側catalogの役割を分け、現行の取得処理のパスを記載\n- experimental品質と固定revision、公開repo名aliasを解決仕様へ反映\n- SHA manifestの設計要件と現行loaderの検証範囲を区別し、コード例snapshotを同期",
+          "timestamp": "2026-10-10T17:53:27+09:00",
+          "tree_id": "d528d98bc9b3ff29ed5dcc50330c11f906b36e16",
+          "url": "https://github.com/ayutaz/piper-plus/commit/b5f60734dadaf778cb5312859412276a20c113ff"
+        },
+        "date": 1791622528664,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0859,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 21.8,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 23.3,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 899.4,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 211.2,
             "unit": "MB"
           },
           {
