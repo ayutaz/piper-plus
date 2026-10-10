@@ -388,11 +388,13 @@ const tts = await PiperPlus.initialize({ model: "ayousanz/piper-plus-tsukuyomi-c
 const tts = await PiperPlus.initialize({ model: "tsukuyomi", ort });
 ```
 
-The public `zs-v1` base is stored below a versioned subdirectory and must be
-loaded by its direct ONNX URL. Do not pass the repository name
-`ayousanz/piper-plus-base`: the repository also contains legacy root files and
-the generic repository resolver may pair the nested ONNX with the wrong root
-config. Use the matching `base.onnx.json` sidecar from the same directory:
+The public `zs-v1` base is stored below a versioned subdirectory. This source
+update recognizes `base`, `zero-shot-base-zs-v1`, and `ayousanz/piper-plus-base`
+as pinned aliases for its TTS graph and matching `base.onnx.json`, without
+repository sibling auto-detection. These aliases target the next npm release.
+For earlier packages, use the direct URL below to avoid legacy root files:
+The browser resolves pinned URLs; it does not validate the published release
+manifest hashes. Use the bundle manifest for separate integrity checks.
 
 ```javascript
 const zsRevision = "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1";

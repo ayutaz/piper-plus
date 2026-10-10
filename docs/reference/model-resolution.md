@@ -102,7 +102,7 @@ Cache directory 内で `{model_str}/*.onnx` または `{model_str}.onnx` を探�
 
 > `base` と `zero-shot-base-zs-v1` は、次のリリースで公開する pinned aliases です。
 > いずれも root の legacy `model.ckpt` を指さず、上記 revision の
-> `releases/zs-v1/base.onnx` と同じ世代の `config.json` を解決します。リリース済み
+> `releases/zs-v1/base.onnx` と対応する `releases/zs-v1/base.onnx.json` を解決します。リリース済み
 > v2.0.0/v2.0.1 の alias 表には遡及して追加しません。`base.onnx` は 192 次元 CAM++
 > `speaker_embedding` を使う実験用 Zero-Shot base で、通常の参照なし音声用 alias ではありません。
 
@@ -267,3 +267,16 @@ function find_config(onnx_path, explicit_config=None):
 | Catalog format | Python は dict, Rust は Vec, C# は JSON | JSON catalog を正とし各言語で読み込み |
 | Partial match | Rust のみ partial name + description match | 全実装で catalog alias ベースに統一予定 |
 | Auto-download | Python は `huggingface_hub`, 他は直接 HTTP | 各実装の依存に応じて許容 |
+
+
+## Public baseline cache and integrity scope
+
+For `zs-v1`, Python API and browser caches isolate the pinned revision/path.
+Python CLI and native catalogs pin download URLs but retain flat local filenames;
+those local filenames alone do not establish a file's revision or SHA-256.
+Use a separate model directory for the public baseline and verify files against
+its bundled manifest when importing/reusing manually downloaded artifacts.
+Browser resolution likewise does not enforce the release manifest's hashes;
+its existing hash check uses `config.sha256` when a config supplies that field.
+Inference uses `base.onnx` + `base.onnx.json`; fine-tuning uses `base.ckpt` +
+the same release's `config.json`. Never substitute the repository's legacy root config.

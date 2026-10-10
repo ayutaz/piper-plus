@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # editorconfig-checker-disable-file (docstring uses 2-space indented lists)
-"""Voice catalog parity checker across 5 runtimes.
+"""Voice catalog parity checker across five runtimes and six source mirrors.
 
 `test/model_resolution_vectors.json` の `voice_catalog` を canonical source
 として、5 ランタイム (Python / C++ / Rust / C# / Go) の voice catalog

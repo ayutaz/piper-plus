@@ -167,7 +167,7 @@ curl -L "${ZS_URL}/campplus.onnx" -o models/zs-v1/campplus.onnx
 curl -L "${ZS_URL}/base.ckpt" -o models/zs-v1/base.ckpt
 ```
 
-`base.onnx` と同じ bundle の `base.onnx.json` または `config.json` を必ず使ってください。HF リポジトリ root の旧 `config.json` や `model.ckpt` と混在させないでください。公開 bundle の参照音声からの embedding 事前計算例は、[zs-v1 の公開 README](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/README.md) を参照してください。
+推論は `base.onnx` + `base.onnx.json`、追加学習は `base.ckpt` + 同じ bundle の `config.json` を使ってください。HF リポジトリ root の旧 `config.json` や `model.ckpt` と混在させないでください。公開 bundle の参照音声からの embedding 事前計算例は、[zs-v1 の公開 README](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/README.md) を参照してください。
 
 この bundle の reference-conditioned 推論は PyPI `piper-plus==2.0.0` で確認済みです。他の runtime/platform の同 bundle による推論確認や品質承認を意味しません。`base` / `zero-shot-base-zs-v1` alias は source branch / 次期リリース向けで、公開 2.0.0 / 2.0.1 には収録されていません。
 

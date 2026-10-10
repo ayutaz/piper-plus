@@ -242,7 +242,8 @@ bytes = 0  # <computed-on-publish>
 # Verification behaviour (runtime side)
 # ============================================================================
 
-# Public experimental baseline: manual versioned download, not a default voice alias.
+# Public experimental baseline; not a default finished/reference-free voice.
+# Pinned convenience aliases are a source update for the next release.
 [[models]]
 name = "zero-shot-base-zs-v1"
 description = "Existing v7 epoch32 reference-conditioned and fine-tunable experimental base"

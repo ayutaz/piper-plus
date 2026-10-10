@@ -193,7 +193,7 @@ curl -L "${ZS_URL}/config.json" -o models/zs-v1/config.json
 curl -L "${ZS_URL}/campplus.onnx" -o models/zs-v1/campplus.onnx
 ```
 
-Load it with `-m models/zs-v1/base.onnx -c models/zs-v1/config.json`.
+Load it with `-m models/zs-v1/base.onnx -c models/zs-v1/base.onnx.json`.
 Do not combine it with the legacy root `config.json` or `model.ckpt`. The
 published [zs-v1 README](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/README.md)
 contains the canonical reference-audio embedding precomputation example.

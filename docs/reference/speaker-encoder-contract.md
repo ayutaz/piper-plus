@@ -15,7 +15,7 @@ pinned Hugging Face revision
 
 | Artifact | Contract |
 |---|---|
-| TTS graph | `base.onnx` with the model-specific `config.json` |
+| TTS graph | `base.onnx` with its matching `base.onnx.json` |
 | Encoder | `campplus.onnx` |
 | Embedding | 192-dimensional, L2-normalized `float32` `speaker_embedding` |
 | Encoder SHA-256 | `a6ac6a63997761ae2997373e2ee1c47040854b4b759ea41ec48e4e42df0f4d73` |
