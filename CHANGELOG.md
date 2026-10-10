@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add a single-speaker fine-tuning dataset preparation helper that preserves the base model's phoneme and language IDs, validates cache paths, and rejects unsupported tokens and existing output directories.
+- Document the existing Zero-Shot base publication path and the zs-v1 artifact and consumer verification record.
+
 ## [2.0.1] - 2026-10-08
 
 ### Fixed

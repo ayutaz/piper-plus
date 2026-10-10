@@ -1,6 +1,7 @@
 # Zero-Shotモデルの一般公開計画
 
 作成: 2026-10-10。状態: 計画作成。学習・アップロード・公開切替は未実施。
+実行状況は[zs-v1配布・検証記録](zero-shot-base-zs-v1-release-2026-10-10.md)を参照。
 計画ブランチ: `docs/zero-shot-public-model-release-plan-20261010`。
 起点dev: `421d06678b6ea760dcddb00c235df8f476628866`。
 研究ブランチの保存点: `4a8ed100`（`feat/zero-shot-v8-dataset-scaling`）。

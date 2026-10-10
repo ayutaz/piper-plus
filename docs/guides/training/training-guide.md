@@ -1,5 +1,10 @@
 # Training Guide
 
+既存のZero-Shot baseを追加学習する場合は、[zs-v1の配布・検証記録](../../design/zero-shot-base-zs-v1-release-2026-10-10.md)を参照してください。
+音素数が同じでもIDの対応が異なる場合があります。前処理済みdatasetは
+`scripts/prepare_single_speaker_finetune.py --input-dir PREPARED --base-config BASE_CONFIG --output-dir ALIGNED`
+でbaseの音素・言語IDへ合わせてから使用します。このスクリプトは既存出力を上書きせず、学習に必要なaudio cacheの所在も確認します。
+
 Check out a [video training guide by Thorsten Müller](https://www.youtube.com/watch?v=b_we_jma220)
 
 For Windows, see [ssamjh's guide using WSL](https://ssamjh.nz/create-custom-piper-tts-voice/)
