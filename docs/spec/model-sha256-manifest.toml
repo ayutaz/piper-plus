@@ -5,6 +5,11 @@
 # resolution path (Python, Rust, C#, Go, WASM, C++) MUST verify the
 # downloaded artifact's SHA-256 against the value pinned here before
 # loading. Hash mismatch is a hard error — never a warning.
+# These are normative verification requirements, not a claim that every
+# released loader currently enforces this manifest. For public zs-v1,
+# resolution pins the HF revision/URLs; automatic manifest SHA-256
+# enforcement remains incomplete. Verify imported files against the bundled
+# SHA256SUMS/manifest. See docs/reference/model-resolution.md for current scope.
 #
 # Why pin: HF mirrors are mutable storage. A silent re-upload (or supply
 # chain compromise) of a model under the same URL would otherwise change
@@ -20,17 +25,18 @@
 #      that bumps CHANGELOG.md and (if applicable) release-versions.toml.
 #   5. Publish.
 #
-# CI gate: scripts/check_model_manifest.py (planned) verifies that every
-# `<computed-on-publish>` placeholder is filled in before any release tag
-# is created.
+# Current CI gate: scripts/check_model_sha256_manifest.py validates structure
+# and published-entry hash/size fields. It does not download the artifacts
+# or establish that runtime loaders enforce the normative verification rules.
 #
 # Implementations:
 #   Python:    src/python_run/piper_plus/download.py
-#   Rust:      src/rust/piper-cli/src/download.rs
-#   C#:        src/csharp/PiperPlus.Cli/Download/ModelDownloader.cs
-#   Go:        src/go/cmd/piper-plus/download.go
-#   WASM:      src/wasm/openjtalk-web/src/model-download.js (browser fetch + subtle.digest)
-#   C++:       src/cpp/main.cpp (CLI download path)
+#   Python API: src/python_run/piper_plus/api/_model_resolver.py
+#   Rust:      src/rust/piper-core/src/model_download.rs
+#   C#:        src/csharp/PiperPlus.Core/Config/ModelManager.cs
+#   Go:        src/go/piperplus/model_manager.go
+#   WASM:      src/wasm/openjtalk-web/src/model-manager.js
+#   C++:       src/cpp/model_manager.cpp
 
 [meta]
 spec_version = "1.0"

@@ -1,14 +1,15 @@
 """Model manager for piper-plus voice catalog.
 
-Provides model listing, downloading, and resolution functionality
-matching the C++ model_manager.cpp and C# ModelManager.cs implementations.
+Provides the legacy training-side catalog for reference-free voice models.
+The public Zero-Shot base is resolved by piper_plus.download and its API
+resolver; fine-tuning uses the checkpoint from the published release bundle.
 """
 
 import os
 import sys
 
 
-# Embedded voice catalog (matches src/cpp/piper_plus_voices.json)
+# Legacy reference-free entries; the inference runtime has a separate catalog.
 _BUILTIN_CATALOG = {
     "ja_JP-tsukuyomi-chan-medium": {
         "key": "ja_JP-tsukuyomi-chan-medium",
