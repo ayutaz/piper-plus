@@ -27,7 +27,7 @@ TEXTS = [
     ("ja-3", "ja", "駅まで歩いてから、電車で会社に向かいます。"),
     ("en", "en", "Hello, today is a beautiful day."),
     ("zh", "zh", "你好，今天天气很好。"),
-    ("es", "es", "Hola, hoy hace buen tiempo."),
+    ("es", "es", "Hola, hoy hace buen tiempo."),  # codespell:ignore hace
     ("fr", "fr", "Bonjour, le soleil brille."),
     ("pt", "pt", "Olá, hoje está um belo dia."),
 ]
