@@ -98,3 +98,14 @@ Colab GPUの全工程や人手による音質評価は含まない。
 WASMはNode host上の`onnxruntime-web`を使い、`onnxruntime-node`をWASMの証拠にしない。
 既存npm Node CLIは256次元のzero embeddingとmaskを固定しているため、このbase確認では使わない。
 結果はActions artifactの`public-base-summary.json`と各runtimeのWAV/logに保存する。
+
+## Colabの確認状況
+
+2026-10-12に実際のColabページを確認し、補助スクリプトの取得pathが
+公開bundleの`examples/prepare_single_speaker_finetune.py`と一致していないことを発見した。
+取得pathを修正し、`token=False`による未認証取得と、hash不一致時の明示的な停止を追加した。
+ノートブックの実際のdownload関数を抽出するテストで、取得先・固定revision・未認証条件・
+hash不一致時の停止を確認する。これはColab GPU実行の成功を意味しない。
+
+T4接続は自動承認レビューが拒否したため未実施。具体的な接続と費用範囲の承認を得てから、
+短い追加学習・export・生成までの実環境検証を続ける。
