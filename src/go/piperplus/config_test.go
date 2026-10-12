@@ -159,15 +159,37 @@ func TestLoadConfig_InvalidMultilingualNoLangMap(t *testing.T) {
 	}
 }
 
-func TestLoadConfig_InvalidMultiSpeakerNoSpeakerMap(t *testing.T) {
-	_, err := LoadConfig(filepath.Join("testdata", "invalid_multispeaker_no_speaker_map.json"))
-	if err == nil {
-		t.Fatal("LoadConfig should return an error for multi-speaker model with empty speaker_id_map")
+func TestLoadConfig_MultiSpeakerNamesAreOptional(t *testing.T) {
+	cfg, err := LoadConfig(filepath.Join("testdata", "valid_multispeaker_no_speaker_map.json"))
+	if err != nil {
+		t.Fatalf("numeric speaker IDs do not require names: %v", err)
 	}
+	if cfg.NumSpeakers != 10 || len(cfg.SpeakerIDMap) != 0 {
+		t.Fatalf("speaker metadata changed: count=%d names=%v", cfg.NumSpeakers, cfg.SpeakerIDMap)
+	}
+}
 
-	var cfgErr *ConfigError
-	if !errors.As(err, &cfgErr) {
-		t.Errorf("error type = %T, want *ConfigError", err)
+func TestLoadConfig_ZeroShotTrainingSpeakersWithoutNames(t *testing.T) {
+	// zs-v1 keeps the 571 training speakers in metadata, but the ONNX graph
+	// takes speaker_embedding rather than sid. Names are not inference inputs.
+	path := filepath.Join(t.TempDir(), "base.onnx.json")
+	data := []byte(`{
+		"audio": {"sample_rate": 22050},
+		"phoneme_type": "multilingual",
+		"phoneme_id_map": {"_": [0], "^": [1], "$": [2]},
+		"num_speakers": 571,
+		"num_languages": 6,
+		"language_id_map": {"ja": 0, "en": 1, "zh": 2, "es": 3, "fr": 4, "pt": 5}
+	}`)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("zero-shot base config must load without speaker names: %v", err)
+	}
+	if cfg.NumSpeakers != 571 || cfg.NumLanguages != 6 || len(cfg.SpeakerIDMap) != 0 {
+		t.Fatalf("training metadata changed: %+v", cfg)
 	}
 }
 

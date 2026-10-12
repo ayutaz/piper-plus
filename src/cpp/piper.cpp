@@ -133,6 +133,25 @@ Phoneme getCodepoint(std::string s) {
   return static_cast<Phoneme>(firstCodepointUtf8(s));
 }
 
+// Public base configs retain these raw IPA tokens. Their internal PUA values
+// come from src/python/g2p/piper_plus_g2p/data/pua.json; model IDs stay intact.
+// Do not split arbitrary strings or silently take their first codepoint.
+static Phoneme configPhonemeCodepoint(const std::string &token) {
+  if (isSingleCodepoint(token)) {
+    return getCodepoint(token);
+  }
+  static const std::unordered_map<std::string, Phoneme> knownTokens = {
+      {"\u0254\u026A", 0xE062}, // English OY
+      {"\u0153\u0303", 0xE063}, // French nasal vowel
+      {"\u0250\u0303", 0xE064}, // Portuguese nasal vowel
+  };
+  auto known = knownTokens.find(token);
+  if (known != knownTokens.end()) {
+    return known->second;
+  }
+  throw std::runtime_error("Unknown multi-codepoint phoneme in phoneme id map: " + token);
+}
+
 // Load JSON config information for phonemization
 void parsePhonemizeConfig(json &configRoot, PhonemizeConfig &phonemizeConfig) {
   // {
@@ -168,24 +187,13 @@ void parsePhonemizeConfig(json &configRoot, PhonemizeConfig &phonemizeConfig) {
     auto phonemeIdMapValue = configRoot["phoneme_id_map"];
     for (auto &fromPhonemeItem : phonemeIdMapValue.items()) {
       std::string fromPhoneme = fromPhonemeItem.key();
-      if (!isSingleCodepoint(fromPhoneme)) {
-        std::stringstream idsStr;
-        for (auto &toIdValue : fromPhonemeItem.value()) {
-          PhonemeId toId = toIdValue.get<PhonemeId>();
-          idsStr << toId << ",";
-        }
-
-        spdlog::error("\"{}\" is not a single codepoint (ids={})", fromPhoneme,
-                      idsStr.str());
-        throw std::runtime_error(
-            "Phonemes must be one codepoint (phoneme id map)");
+      auto fromCodepoint = configPhonemeCodepoint(fromPhoneme);
+      auto ids = fromPhonemeItem.value().get<std::vector<PhonemeId>>();
+      auto existing = phonemizeConfig.phonemeIdMap.find(fromCodepoint);
+      if (existing != phonemizeConfig.phonemeIdMap.end() && existing->second != ids) {
+        throw std::runtime_error("Conflicting phoneme ID aliases: " + fromPhoneme);
       }
-
-      auto fromCodepoint = getCodepoint(fromPhoneme);
-      for (auto &toIdValue : fromPhonemeItem.value()) {
-        PhonemeId toId = toIdValue.get<PhonemeId>();
-        phonemizeConfig.phonemeIdMap[fromCodepoint].push_back(toId);
-      }
+      phonemizeConfig.phonemeIdMap[fromCodepoint] = std::move(ids);
     }
   }
 

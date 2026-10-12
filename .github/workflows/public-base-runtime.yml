@@ -10,6 +10,8 @@ on:
       - 'tests/scripts/test_public_base_runtime.py'
       - 'tests/scripts/test_finetune_notebook_download.py'
       - 'notebooks/finetune.ipynb'
+      - 'src/go/**'
+      - 'src/cpp/**'
   workflow_dispatch:
 
 permissions:
@@ -104,6 +106,7 @@ jobs:
           tar -xzf /tmp/ort.tgz -C /tmp
           echo 'ONNX_RUNTIME_SHARED_LIBRARY_PATH=/tmp/onnxruntime-linux-x64-1.24.4/lib/libonnxruntime.so' >> "$GITHUB_ENV"
           cd src/go
+          go test ./piperplus -run '^TestLoadConfig_' -count=1
           go build -o /tmp/piper-plus-go ./cmd/piper-plus
       - uses: actions/setup-dotnet@v5.4.0
         if: matrix.runtime == 'csharp'
@@ -115,8 +118,9 @@ jobs:
       - name: Build C++ CLI
         if: matrix.runtime == 'cpp'
         run: |
-          cmake -S . -B /tmp/public-base-cpp -DCMAKE_BUILD_TYPE=Release
-          cmake --build /tmp/public-base-cpp --target piper -j2
+          cmake -S . -B /tmp/public-base-cpp -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+          cmake --build /tmp/public-base-cpp --target piper test_phonemize_config -j2
+          ctest --test-dir /tmp/public-base-cpp -R '^test_phonemize_config$' --output-on-failure
       - uses: actions/setup-node@v6.5.0
         if: matrix.runtime == 'wasm'
         with:

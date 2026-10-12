@@ -99,6 +99,14 @@ WASMはNode host上の`onnxruntime-web`を使い、`onnxruntime-node`をWASMの�
 既存npm Node CLIは256次元のzero embeddingとmaskを固定しているため、このbase確認では使わない。
 結果はActions artifactの`public-base-summary.json`と各runtimeのWAV/logに保存する。
 
+初回の実モデルCIではPython/Rust/C#/WASMが成功し、Go/C++はconfigの読み込みで停止した。
+Goは`num_speakers=571`に対して話者名mapを必須にしていたが、名前は表示用metadataであり、
+推論入力の`sid`/`speaker_embedding`はONNX graphから判定する。名前を省略できるようにする。
+C++はraw IPAの`ɔɪ`/`œ̃`/`ɐ̃`を、それぞれ既知の内部PUA `U+E062`/`U+E063`/`U+E064`へ
+解決し、modelの音素IDを保持する。未知の複数コードポイント音素や、raw/PUA間でIDが競合するconfigは拒否する。
+公開済みmodel/configの変更は不要。GoのconfigテストとC++のparserテストを実モデルCIでも実行する。
+修正後の全6runtime成功は、再実行の結果が揃ってから記録する。
+
 ## Colabの確認状況
 
 2026-10-12に実際のColabページを確認し、補助スクリプトの取得pathが

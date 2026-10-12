@@ -80,6 +80,12 @@ rule = "Any multi-codepoint token in any inventory list must appear as a token i
 # key indicates a missing pua.json entry and would cause C++ runtime failure.
 
 [invariants.config_keys]
+# This remains the rule for generated/distributed configs. For existing public
+# configs, the C++ reader also accepts the three raw IPA aliases below and
+# resolves them to the canonical internal codepoint without changing model IDs:
+#   ɔɪ -> U+E062, œ̃ -> U+E063, ɐ̃ -> U+E064.
+# Unknown multi-codepoint tokens and conflicting raw/PUA IDs are rejected.
+# Regression tests: src/cpp/tests/test_phonemize_config.cpp.
 rule = "All keys in phoneme_id_map must satisfy len(key) == 1 (Python str sense, i.e. single Unicode codepoint)"
 enforced_by = [
     "encode/pua.py:map_token() — raises if input is multi-codepoint and not in mapping",
