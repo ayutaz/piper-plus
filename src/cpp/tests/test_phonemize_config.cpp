@@ -28,7 +28,7 @@ namespace {
 
 // UTF-8 encodings of the three IPA tokens that leaked as raw multi-codepoint
 // keys, plus their canonical PUA single-codepoint encodings.
-const std::string kOI = "\xC9\x94\xCA\xAA";       // ɔɪ  (U+0254 U+026A)
+const std::string kOI = "\xC9\x94\xC9\xAA";       // ɔɪ  (U+0254 U+026A)
 const std::string kOEtilde = "\xC5\x93\xCC\x83";  // œ̃   (U+0153 U+0303)
 const std::string kAtilde = "\xC9\x90\xCC\x83";   // ɐ̃   (U+0250 U+0303)
 const std::string kPuaOI = "\xEE\x81\xA2";        // U+E062
