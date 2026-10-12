@@ -4,8 +4,8 @@
   "totals": {
     "executable": 224,
     "needs_placeholder": 6,
-    "skip_warranted": 240,
-    "total": 470
+    "skip_warranted": 245,
+    "total": 475
   },
   "by_language": {
     "bash": {
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 195
+      "skip_warranted": 200
     },
     "wasm": {
       "executable": 10,
@@ -175,6 +175,81 @@
       ],
       "env_dependencies": [],
       "hash_sha1": "4a6a28df1e75be441fbc537e7d875a3a6eb9fbfc"
+    },
+    {
+      "file": "docs/design/tsukuyomi-publication-ready-2026-10-12.md",
+      "line_start": 38,
+      "line_end": 40,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "33c41a4b72f1bfa02be51985d3bb31805a272b8b"
+    },
+    {
+      "file": "docs/design/tsukuyomi-publication-ready-2026-10-12.md",
+      "line_start": 44,
+      "line_end": 46,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "7d895ec02e82002f78498829ce1eb098eb689e91"
+    },
+    {
+      "file": "docs/design/tsukuyomi-publication-ready-2026-10-12.md",
+      "line_start": 51,
+      "line_end": 53,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "5497f6419ec5e8e2d5a4d06a225840d535ce275c"
+    },
+    {
+      "file": "docs/design/tsukuyomi-publication-ready-2026-10-12.md",
+      "line_start": 58,
+      "line_end": 60,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "5b8515b91fc5fa058dc07703b2a7d5b6a5f125b6"
+    },
+    {
+      "file": "docs/design/tsukuyomi-publication-ready-2026-10-12.md",
+      "line_start": 72,
+      "line_end": 75,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "a3daeca983b96e3ce49f3887acf6009dfd3b92dd"
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
