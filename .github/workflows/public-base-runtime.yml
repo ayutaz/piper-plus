@@ -1,0 +1,171 @@
+name: Public Base Runtime Verification
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - '.github/workflows/public-base-runtime.yml'
+      - 'scripts/public_base_runtime.py'
+      - 'src/wasm/openjtalk-web/scripts/public-base-runtime.mjs'
+      - 'tests/scripts/test_public_base_runtime.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-base-runtime-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - uses: astral-sh/setup-uv@v6.8.0
+        with:
+          python-version: '3.13'
+      - name: Test evidence rejection without downloading models
+        run: >-
+          uv run --no-project --with pytest python -m pytest
+          tests/scripts/test_public_base_runtime.py -q --override-ini=addopts=
+      - name: Install inference and CPU CAM++ extraction dependencies
+        run: |
+          uv venv /tmp/base-env
+          uv pip install --python /tmp/base-env/bin/python torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+          uv pip install --python /tmp/base-env/bin/python -e src/python_run soundfile soxr
+      - name: Prepare pinned public inputs without HF credentials
+        run: |
+          /tmp/base-env/bin/python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
+          /tmp/base-env/bin/python scripts/public_base_runtime.py prepare --workspace /tmp/public-base-inputs
+      - uses: actions/upload-artifact@v4.6.2
+        with:
+          name: public-base-inputs
+          path: |
+            /tmp/public-base-inputs/base.onnx
+            /tmp/public-base-inputs/base.onnx.json
+            /tmp/public-base-inputs/campplus.onnx
+            /tmp/public-base-inputs/reference.wav
+            /tmp/public-base-inputs/embedding.npy
+            /tmp/public-base-inputs/cases.json
+            /tmp/public-base-inputs/inputs.json
+          if-no-files-found: error
+          retention-days: 7
+
+  infer:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [python, rust, go, csharp, cpp, wasm]
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v4.3.0
+        with:
+          name: public-base-inputs
+          path: /tmp/public-base-inputs
+      - name: Verify all downloaded model and generated input hashes
+        run: |
+          python -c "from pathlib import Path; from scripts.public_base_runtime import verify_files; verify_files(Path('/tmp/public-base-inputs'))"
+      - uses: astral-sh/setup-uv@v6.8.0
+        if: matrix.runtime == 'python'
+      - name: Install Python runtime
+        if: matrix.runtime == 'python'
+        run: |
+          uv venv /tmp/runtime-python
+          uv pip install --python /tmp/runtime-python/bin/python -e src/python_run
+      - uses: dtolnay/rust-toolchain@stable
+        if: matrix.runtime == 'rust'
+      - uses: Swatinem/rust-cache@v2
+        if: matrix.runtime == 'rust'
+        with:
+          workspaces: src/rust -> target
+      - name: Build Rust CLI
+        if: matrix.runtime == 'rust'
+        working-directory: src/rust
+        run: cargo build --release -p piper-plus-cli
+      - uses: actions/setup-go@v5.6.0
+        if: matrix.runtime == 'go'
+        with:
+          go-version: '1.26'
+      - name: Build Go CLI and install ONNX Runtime
+        if: matrix.runtime == 'go'
+        run: |
+          curl -fsSL https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-linux-x64-1.24.4.tgz -o /tmp/ort.tgz
+          tar -xzf /tmp/ort.tgz -C /tmp
+          echo 'ONNX_RUNTIME_SHARED_LIBRARY_PATH=/tmp/onnxruntime-linux-x64-1.24.4/lib/libonnxruntime.so' >> "$GITHUB_ENV"
+          cd src/go
+          go build -o /tmp/piper-plus-go ./cmd/piper-plus
+      - uses: actions/setup-dotnet@v5.4.0
+        if: matrix.runtime == 'csharp'
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build C# CLI
+        if: matrix.runtime == 'csharp'
+        run: dotnet build src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj -c Release
+      - name: Build C++ CLI
+        if: matrix.runtime == 'cpp'
+        run: |
+          cmake -S . -B /tmp/public-base-cpp -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/public-base-cpp --target piper -j2
+      - uses: actions/setup-node@v6.5.0
+        if: matrix.runtime == 'wasm'
+        with:
+          node-version: '24'
+      - name: Install actual ORT Web WASM and local G2P imports
+        if: matrix.runtime == 'wasm'
+        working-directory: src/wasm/openjtalk-web
+        run: npm install --ignore-scripts --no-save --no-package-lock "@piper-plus/g2p@file:../g2p"
+      - name: Run real public base inference
+        env:
+          RUNTIME: ${{ matrix.runtime }}
+        run: |
+          case "$RUNTIME" in
+            python) CLI=/tmp/runtime-python/bin/python ;;
+            rust) CLI="$GITHUB_WORKSPACE/src/rust/target/release/piper-plus-cli" ;;
+            go) CLI=/tmp/piper-plus-go ;;
+            csharp) CLI="$GITHUB_WORKSPACE/src/csharp/PiperPlus.Cli/bin/Release/net10.0/PiperPlus.Cli" ;;
+            cpp) CLI=/tmp/public-base-cpp/piper-plus ;;
+            wasm) node src/wasm/openjtalk-web/scripts/public-base-runtime.mjs /tmp/public-base-inputs ;;
+          esac
+          if [ "$RUNTIME" != wasm ]; then
+            python scripts/public_base_runtime.py run --workspace /tmp/public-base-inputs --runtime "$RUNTIME" --executable "$CLI"
+          fi
+      - name: Upload actual results and failure logs
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: public-base-${{ matrix.runtime }}
+          path: /tmp/public-base-inputs/${{ matrix.runtime }}
+          if-no-files-found: warn
+          retention-days: 30
+
+  summarize:
+    needs: infer
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v4.3.0
+        with:
+          pattern: public-base-*
+          path: /tmp/public-base-reports
+      - name: Require evidence from all six runtimes
+        run: |
+          python scripts/public_base_runtime.py summarize --workspace /tmp/public-base-reports --output /tmp/public-base-summary.json
+      - uses: actions/upload-artifact@v4.6.2
+        with:
+          name: public-base-summary
+          path: /tmp/public-base-summary.json
+          if-no-files-found: error
+          retention-days: 30

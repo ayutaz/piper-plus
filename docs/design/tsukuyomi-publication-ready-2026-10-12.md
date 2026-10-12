@@ -79,3 +79,22 @@ candidate検証は新規コピーによる事前確認で、匿名の公開取�
 別workspaceで実行する場合は、同じ環境と配布物を用意してから実行する。
 他runtime/OS・Colab GPU全工程の実モデル確認は別途の検証対象であり、
 この準備helperの成功をその確認済み証拠として扱わない。
+
+## 公開baseのruntime確認
+
+`.github/workflows/public-base-runtime.yml`で、公開済みbaseとCAM++を上記の固定revisionから
+未認証で取得し、固定SHA256を照合する。private/gated保存先は使用しない。
+参照音声は旧つくよみちゃん公開先の固定revisionにある合成sampleで、元録音ではない。
+CAM++からL2正規化した192次元embeddingを抽出し、日本語3文と他5言語の音素IDを作る。
+
+Python/Rust/Go/C#/C++のCLIと、実際のORT Web WASM providerを使うPiperPlus推論に
+同じ音素IDとembeddingを渡す。6runtimeの結果が全て揃わなければ集計は失敗する。
+各WAVの長さ・sample rate・非無音を確認し、noiseを0にした同一入力の再生成が一致することと、
+embeddingの符号だけを変えた場合に音声が変わることを確認する。
+符号反転はconditioningが無視されていないことの確認用で、声質評価には使わない。
+
+この工程は共通音素IDからの推論確認であり、native G2P、各OS、ブラウザUI、
+Colab GPUの全工程や人手による音質評価は含まない。
+WASMはNode host上の`onnxruntime-web`を使い、`onnxruntime-node`をWASMの証拠にしない。
+既存npm Node CLIは256次元のzero embeddingとmaskを固定しているため、このbase確認では使わない。
+結果はActions artifactの`public-base-summary.json`と各runtimeのWAV/logに保存する。
