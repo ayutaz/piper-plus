@@ -39,7 +39,7 @@ type VoiceConfig struct {
 	PhonemeIDMap      map[string][]int64  `json:"phoneme_id_map"`
 	NumSymbols        int                 `json:"num_symbols"`
 	NumSpeakers       int                 `json:"num_speakers"`
-	SpeakerIDMap      map[string]int64    `json:"speaker_id_map,omitempty"`
+	SpeakerIDMap      map[string]int64    `json:"speaker_id_map,omitempty"` // optional display names
 	PiperVersion      string              `json:"piper_version,omitempty"`
 	NumLanguages      int                 `json:"num_languages"`
 	LanguageIDMap     map[string]int64    `json:"language_id_map,omitempty"`
@@ -165,9 +165,9 @@ func (c *VoiceConfig) Validate() error {
 	if c.NumLanguages > 1 && len(c.LanguageIDMap) == 0 {
 		return fmt.Errorf("language_id_map is required for multilingual models (num_languages=%d)", c.NumLanguages)
 	}
-	if c.NumSpeakers > 1 && len(c.SpeakerIDMap) == 0 {
-		return fmt.Errorf("speaker_id_map is required for multi-speaker models (num_speakers=%d)", c.NumSpeakers)
-	}
+	// Speaker names are optional metadata. Numeric-ID models can omit them,
+	// and zero-shot models can retain the training speaker count without a sid
+	// input. newOnnxEngine detects sid/speaker_embedding from the ONNX graph.
 	return nil
 }
 
