@@ -43,18 +43,74 @@ def anonymous_metadata(session, repo, revision):
     return value
 
 
+def verify_lfs_attributes(session, revision, workspace, before, after_files):
+    """Allow only appended LFS rules for files in the actual upload receipt."""
+    contents = []
+    old = before["files"][".gitattributes"]
+    for commit, expected in (
+        (before["revision"], {"size": old["bytes"], "blobId": old["blob_id"]}),
+        (revision, after_files[".gitattributes"]),
+    ):
+        response = session.get(
+            f"https://huggingface.co/{REPO}/resolve/{commit}/.gitattributes",
+            timeout=30,
+        )
+        response.raise_for_status()
+        content = response.content
+        blob = hashlib.sha1(
+            f"blob {len(content)}\0".encode() + content, usedforsecurity=False
+        ).hexdigest()
+        if (
+            "Authorization" in response.request.headers
+            or len(content) != expected["size"]
+            or blob != expected["blobId"]
+        ):
+            raise ValueError(".gitattributes metadata mismatch")
+        contents.append(content)
+    original, current = contents
+    if not original.endswith(b"\n") or not current.startswith(original):
+        raise ValueError("existing .gitattributes rules changed")
+    receipt = read_json(workspace / "publication-receipt.json")
+    allowed = {
+        entry["path"]
+        for entry in receipt["files"]
+        if entry["path"].startswith("releases/zs-v1/")
+        and (after_files.get(entry["path"], {}).get("lfs") or {}).get("sha256")
+    }
+    suffix = " filter=lfs diff=lfs merge=lfs -text"
+    additions = current[len(original) :].decode("utf-8").splitlines()
+    paths = [line.removesuffix(suffix) for line in additions]
+    if (
+        not paths
+        or len(paths) != len(set(paths))
+        or any(
+            path not in allowed or line != path + suffix
+            for path, line in zip(paths, additions, strict=True)
+        )
+    ):
+        raise ValueError("unexpected .gitattributes addition")
+    return sorted(paths)
+
+
 def verify_retention(session, revision, workspace):
     before = read_json(workspace / "publication-before-state.json")
     target = anonymous_metadata(session, REPO, revision)
     if not (target["private"] is False and target["gated"] is False):
         raise ValueError("release verification failed")
     after_files = {file["rfilename"]: file for file in target["siblings"]}
+    lfs_additions = []
     for name, old in before["target"]["files"].items():
         if name == "README.md":
             continue
-        after = after_files[name]
-        if not (after["size"] == old["bytes"] and after["blobId"] == old["blob_id"]):
+        after = after_files.get(name)
+        if after is None:
             raise ValueError(name)
+        if not (after["size"] == old["bytes"] and after["blobId"] == old["blob_id"]):
+            if name != ".gitattributes":
+                raise ValueError(name)
+            lfs_additions = verify_lfs_attributes(
+                session, revision, workspace, before["target"], after_files
+            )
         if not (after.get("lfs") or {}).get("sha256") == old["lfs_sha256"]:
             raise ValueError(name)
     api = HfApi()
@@ -65,6 +121,7 @@ def verify_retention(session, revision, workspace):
         retained.append(old["repo"])
     return {
         "legacy_files_unchanged": True,
+        "lfs_attributes_appended_for_release": lfs_additions,
         "research_and_base_repositories_unchanged": retained,
     }
 

@@ -12,11 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add a single-speaker fine-tuning dataset preparation helper that preserves the base model's phoneme and language IDs, validates cache paths, and rejects unsupported tokens and existing output directories.
 - Document the public experimental Zero-Shot base at Hugging Face revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` under `ayousanz/piper-plus-base/releases/zs-v1`, including the paired `base.onnx`/`base.onnx.json`, fine-tuning checkpoint, CAM++ encoder, hashes, runnable examples, and the published `piper-plus==2.0.0` consumer check. Preserve the legacy root files; this interim artifact is not a quality approval or a cross-runtime validation claim.
 - Add `base` and `zero-shot-base-zs-v1` aliases to the model catalogs and API/browser resolvers. Resolve the revision-pinned nested ONNX/config pair and isolate cache entries by revision and artifact path; published `piper-plus` 2.0.0 and 2.0.1 packages remain without these aliases.
-- Add maintainer tools to prepare the Tsukuyomi release bundle, record actual listening results, validate publication prerequisites, and verify anonymous retrieval after publication. The new model remains unpublished until listening and publication are completed.
+- Add maintainer tools to prepare the Tsukuyomi release bundle, record actual listening results, validate publication prerequisites, and verify anonymous retrieval after publication. The experimental Tsukuyomi zs-v1 fine-tune is public at revision `93c1fb6d67c29accc9ddf52326bb4582b1b52a3d` after approval of three Japanese listening samples; existing model aliases retain the legacy root files.
 - Add revision- and hash-pinned public base inference checks for Python, Rust, Go, C#, C++, and actual ONNX Runtime Web WASM, including repeatability and speaker embedding conditioning checks.
 
 ### Fixed
 
+- Publication verification: allow Hugging Face to append LFS rules only for declared release files with LFS metadata, while rejecting changed existing attributes, unrelated additions, and any legacy payload drift.
 - Rust: update the locked `quinn-proto` dependency to 0.11.18 to address five RustSec advisories in 0.11.15, retaining the existing audit policy.
 - Go: allow omitted speaker display names when loading models that use numeric speaker IDs or retain a zero-shot base's training speaker count. Detect inference inputs from the ONNX graph.
 - C++: load the known raw IPA aliases `ɔɪ`, `œ̃`, and `ɐ̃` using their canonical internal PUA codepoints while preserving model IDs; reject unknown tokens and conflicting aliases.

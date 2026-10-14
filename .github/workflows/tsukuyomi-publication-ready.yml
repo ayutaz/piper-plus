@@ -6,6 +6,7 @@ on:
     paths:
       - 'scripts/tsukuyomi_release/**'
       - 'tests/scripts/test_tsukuyomi_release.py'
+      - 'tests/scripts/test_tsukuyomi_retention.py'
       - 'docs/design/tsukuyomi-publication-ready-2026-10-12.md'
       - '.github/workflows/tsukuyomi-publication-ready.yml'
   workflow_dispatch:
@@ -29,4 +30,5 @@ jobs:
       - name: Verify review records and publication guards without uploading
         run: >-
           uv run --no-project --with pytest --with requests --with huggingface-hub
-          python -m pytest tests/scripts/test_tsukuyomi_release.py -q --override-ini=addopts=
+          python -m pytest tests/scripts/test_tsukuyomi_release.py tests/scripts/test_tsukuyomi_retention.py
+          -q --override-ini=addopts=
