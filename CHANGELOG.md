@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Publication verification: allow Hugging Face to append LFS rules only for declared release files with LFS metadata, while rejecting changed existing attributes, unrelated additions, and any legacy payload drift.
+- Link-check CI: retry failed full scans twice with one concurrent request and no cached results to recover from intermittent external 5xx responses; persistent failures still block the job.
 - Rust: update the locked `quinn-proto` dependency to 0.11.18 to address five RustSec advisories in 0.11.15, retaining the existing audit policy.
 - Go: allow omitted speaker display names when loading models that use numeric speaker IDs or retain a zero-shot base's training speaker count. Detect inference inputs from the ONNX graph.
 - C++: load the known raw IPA aliases `ɔɪ`, `œ̃`, and `ɐ̃` using their canonical internal PUA codepoints while preserving model IDs; reject unknown tokens and conflicting aliases.
