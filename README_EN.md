@@ -357,6 +357,8 @@ Main models: `tsukuyomi` (Japanese), `zs-v1` (experimental 6-language Zero-Shot/
 
 > **Zero-Shot/FT base (`zs-v1`, 2026-10-10):** The pinned public bundle is the existing v7 epoch32 experimental base (JA/EN/ZH/ES/FR/PT, 571 speakers, 173 phonemes, CAM++ 192-dim embeddings). Zero-Shot inference uses `base.onnx` with a reference embedding extracted by the bundled `campplus.onnx`; fine-tuning uses `base.ckpt` with the bundled `config.json`. The public examples were functionally verified with PyPI `piper-plus==2.0.0`, but this is not quality approval, human listening approval, or a latest/best model claim. The `base` / `zero-shot-base-zs-v1` aliases target the source branch/next release and are not in released 2.0.0 / 2.0.1. The root `model.ckpt` remains a separate legacy model.
 
+> **Tsukuyomi FT (`zs-v1`, 2026-10-15):** The [pinned public release](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/tree/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1) is a fine-tune from the same public base generation. Use `tsukuyomi.onnx` with `tsukuyomi.onnx.json`; inference needs no reference audio or CAM++. The user approved the three Japanese listening samples for experimental publication. Existing `tsukuyomi` aliases still select the legacy root model; download this release through the pinned URLs in the [model guide](docs/guides/development/pretrained-models.md).
+
 ---
 
 ## Platforms

@@ -2,14 +2,14 @@
   "schema_version": 1,
   "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
-    "executable": 224,
+    "executable": 225,
     "needs_placeholder": 6,
     "skip_warranted": 245,
-    "total": 475
+    "total": 476
   },
   "by_language": {
     "bash": {
-      "executable": 164,
+      "executable": 165,
       "needs_placeholder": 6,
       "skip_warranted": 44
     },
@@ -178,8 +178,8 @@
     },
     {
       "file": "docs/design/tsukuyomi-publication-ready-2026-10-12.md",
-      "line_start": 38,
-      "line_end": 40,
+      "line_start": 58,
+      "line_end": 60,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -189,12 +189,12 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "33c41a4b72f1bfa02be51985d3bb31805a272b8b"
+      "hash_sha1": "41aee3ba46f1879cb87dcf7c1cf5855f30216bc0"
     },
     {
       "file": "docs/design/tsukuyomi-publication-ready-2026-10-12.md",
-      "line_start": 44,
-      "line_end": 46,
+      "line_start": 64,
+      "line_end": 66,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -208,8 +208,8 @@
     },
     {
       "file": "docs/design/tsukuyomi-publication-ready-2026-10-12.md",
-      "line_start": 51,
-      "line_end": 53,
+      "line_start": 71,
+      "line_end": 73,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -223,8 +223,8 @@
     },
     {
       "file": "docs/design/tsukuyomi-publication-ready-2026-10-12.md",
-      "line_start": 58,
-      "line_end": 60,
+      "line_start": 78,
+      "line_end": 80,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -238,8 +238,8 @@
     },
     {
       "file": "docs/design/tsukuyomi-publication-ready-2026-10-12.md",
-      "line_start": 72,
-      "line_end": 75,
+      "line_start": 92,
+      "line_end": 95,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2202,8 +2202,21 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 69,
-      "line_end": 73,
+      "line_start": 31,
+      "line_end": 36,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "eddb4155c5ccf5ccd7f9e508f1c77713f2dca0c8"
+    },
+    {
+      "file": "docs/guides/development/pretrained-models.md",
+      "line_start": 86,
+      "line_end": 90,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2217,8 +2230,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 77,
-      "line_end": 81,
+      "line_start": 94,
+      "line_end": 98,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",

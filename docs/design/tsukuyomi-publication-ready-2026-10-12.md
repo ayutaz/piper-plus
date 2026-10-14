@@ -1,16 +1,36 @@
-# つくよみちゃん: 試聴後の公開に向けた準備
+# つくよみちゃん: 公開準備と公開後の検証記録
 
 作成: 2026-10-12。公開先は`ayousanz/piper-plus-tsukuyomi-chan/releases/zs-v1/`。
 同じ公開base由来の既存500 epoch FTを使う。
-人手の試聴結果とHF公開はまだ未実施。技術的な公開準備と品質判定を区別する。
+2026-10-15に日本語3文の試聴承認を受領し、HF公開と匿名consumer検証を完了した。
 元の配布候補と試聴資料は`output/public-tsukuyomi-release-20261010/`に保持する。
 準備コピーは`output/publication-ready-20261012/prepared/`。
 
 過去の照合・比較結果は[検証記録のPR #793](https://github.com/ayutaz/piper-plus/pull/793)を参照。
 ベースはrevision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1`で公開済み。
-つくよみちゃん公開先の現在の親revisionは
-`36b59c825c36bd386b8960cf3f604382f52f2a87`。変更があれば公開前に調査する。
+公開commitは[`93c1fb6d67c29accc9ddf52326bb4582b1b52a3d`](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/tree/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1)。
+公開時の親revisionは`36b59c825c36bd386b8960cf3f604382f52f2a87`。
 旧root model/configとbase・研究保存先のprivate/gate設定は保持する。
+
+## 2026-10-15の公開結果
+
+- ユーザーの実回答「okです。問題ないので残りの対応を進めてください」を記録した。
+  読み・声の類似・自然さ・ノイズの確認依頼に対する一括承認として反映し、
+  項目別の詳細コメントは未提供であることも保持した。任意の文章・言語への品質保証にはしない。
+- 22ファイル、359,871,478 bytesを公開。ONNX/checkpoint/config/sampleは試聴候補から変更していない。
+- 公開commitから新規directoryへ認証header・token・netrcなしで全22ファイルを取得し、
+  size/hash、19件のmanifest、SHA256SUMSを照合した。
+- 公開PyPI `piper-plus==2.0.0`で参照なしの通常text APIと配布例を実行した。
+  checkpointは`weights_only=True`かつtraining modelの`strict=True`で読み込んだ。
+- 旧root payloadと5件のbase/研究保存先のrevision・ファイル・private/gate設定を保持した。
+  Hugging Faceが`.gitattributes`へ追加したのは、今回公開した日本語sample 2件のLFS ruleだけ。
+  保持確認は旧ruleのbytesを固定し、receipt内かつLFS metadataのあるrelease fileへの追記だけを許可する。
+- receipt: `output/publication-ready-20261012/prepared/publication-receipt.json`。
+  匿名検証: 同directoryの`anonymous-public-verification.json`。
+  重み・録音・認証情報をGitHubへ追加しない。
+
+以下は公開時の手順記録。`publish_bundle --apply`は同じ公開先への再実行を拒否するため、
+既に公開済みのbundleを再uploadする手順として実行しない。
 
 ## 試聴前に完了させる作業
 
@@ -36,7 +56,7 @@
    モデルカード・検証JSON・manifest・SHA256SUMSをまとめて更新する。
 
    ```powershell
-   uv run --no-sync python -m scripts.tsukuyomi_release.record_review --workspace output/publication-ready-20261012/prepared --review output/publication-ready-20261012/actual-human-review.json
+   uv run --no-sync python -m scripts.tsukuyomi_release.record_review --workspace output/publication-ready-20261012/prepared --review output/publication-ready-20261013/actual-human-review.json
    ```
 
 3. applyなしで公開前検査を行う。
@@ -105,7 +125,8 @@ Goは`num_speakers=571`に対して話者名mapを必須にしていたが、名
 C++はraw IPAの`ɔɪ`/`œ̃`/`ɐ̃`を、それぞれ既知の内部PUA `U+E062`/`U+E063`/`U+E064`へ
 解決し、modelの音素IDを保持する。未知の複数コードポイント音素や、raw/PUA間でIDが競合するconfigは拒否する。
 公開済みmodel/configの変更は不要。GoのconfigテストとC++のparserテストを実モデルCIでも実行する。
-修正後の全6runtime成功は、再実行の結果が揃ってから記録する。
+修正後の[Actions run 38189966578](https://github.com/ayutaz/piper-plus/actions/runs/38189966578)で
+全6runtimeが成功した。共通音素IDによる計60音声のhash/長さ/非無音とconditioningを照合済み。
 
 ## Colabの確認状況
 

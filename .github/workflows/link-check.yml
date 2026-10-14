@@ -41,6 +41,7 @@ jobs:
           restore-keys: lychee-
 
       - uses: lycheeverse/lychee-action@v2
+        id: link-scan
         with:
           # --base は URL or absolute path 必須。relative '.' は invalid。
           # root-relative link の解決は --root-dir で行う。
@@ -49,7 +50,29 @@ jobs:
             --no-progress
             --root-dir ${{ github.workspace }}
             './**/*.md'
-          fail: true  # strict gate — broken link は PR / push を block
+          # The final retry step retains the strict gate. v0.24.2 does not
+          # retry ErrorKind::RejectedStatusCode(5xx) through max_retries.
+          lycheeVersion: v0.24.2
+          fail: false
           jobSummary: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Retry failed full scans with lower concurrency
+        if: steps.link-scan.outputs.exit_code != '0'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Recheck every link; do not reuse cached errors or accept 5xx.
+          # A permanent broken link fails all attempts and still blocks CI.
+          for delay in 5 15; do
+            sleep "$delay"
+            if lychee --config .lychee.toml --no-progress --cache=false \
+              --max-concurrency 1 --root-dir "$GITHUB_WORKSPACE" \
+              --format markdown --output lychee/retry.md './**/*.md'; then
+              cat lychee/retry.md >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          done
+          cat lychee/retry.md >> "$GITHUB_STEP_SUMMARY"
+          exit 1

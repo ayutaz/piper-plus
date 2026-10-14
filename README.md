@@ -368,6 +368,8 @@ C++ CLI の詳細なコマンドラインオプション、JSON 入力フォー�
 
 > **Zero-Shot/FT ベース (`zs-v1`, 2026-10-10):** 固定公開バンドルは既存の v7 epoch 32 実験基準版（JA/EN/ZH/ES/FR/PT、571 話者、173 音素、CAM++ 192 次元）です。Zero-Shot 推論は `base.onnx` と同梱 `campplus.onnx` から抽出した参照 embedding、追加学習は `base.ckpt` と同梱 `config.json` を使ってください。PyPI `piper-plus==2.0.0` の公開例で機能確認済みですが、品質承認・人手試聴合格・最新/最高品質を意味しません。`base` / `zero-shot-base-zs-v1` alias はソースブランチ/次期リリース向けで、公開済み 2.0.0 / 2.0.1 には未収録です。ルートの `model.ckpt` は旧世代として別扱いです。
 
+> **つくよみちゃんFT (`zs-v1`, 2026-10-15):** 同じ公開base世代を追加学習した[固定公開モデル](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/tree/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1)を公開しました。`tsukuyomi.onnx`と`tsukuyomi.onnx.json`を組み合わせれば、参照音声やCAM++なしで生成できます。日本語3文の試聴承認済みの実験基準版です。既存の`tsukuyomi` aliasは引き続き旧rootモデルを選ぶため、新モデルは[モデルガイド](docs/guides/development/pretrained-models.md)の固定URLから取得してください。
+
 ---
 
 ## プラットフォーム
