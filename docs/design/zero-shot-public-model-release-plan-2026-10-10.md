@@ -1,8 +1,9 @@
 # Zero-Shotモデルの一般公開計画
 
-作成: 2026-10-10。状態: 既存baseの先行公開（R0〜R2）と公開後機能確認が完了。
-R3は同じbase由来の既存500 epoch FTを照合し、配布候補と試聴資料を準備済み。
-人手試聴・一般公開は未完了。[つくよみちゃん配布準備・検証記録](tsukuyomi-zs-v1-release-2026-10-10.md)を参照。
+作成: 2026-10-10。更新: 2026-10-15。既存baseの先行公開（R0〜R2）と公開後機能確認が完了。
+R3は同世代の既存500 epoch FTを再利用し、試聴承認・公開・匿名consumer確認を完了。
+実行結果は[つくよみちゃん公開記録](tsukuyomi-publication-ready-2026-10-12.md)を参照。
+候補選定時の詳細は[公開前検証の履歴](tsukuyomi-zs-v1-release-2026-10-10.md)を参照。
 実行状況は[zs-v1配布・検証記録](zero-shot-base-zs-v1-release-2026-10-10.md)を参照。
 計画ブランチ: `docs/zero-shot-public-model-release-plan-20261010`。
 起点dev: `421d06678b6ea760dcddb00c235df8f476628866`。

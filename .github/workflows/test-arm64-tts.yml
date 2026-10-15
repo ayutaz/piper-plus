@@ -11,6 +11,28 @@ on:
       - 'src/**'
       - 'test/**'
       - 'CMakeLists.txt'
+      - 'cmake/**'
+      - '.dockerignore'
+      - '.github/workflows/dev-build-all.yml'
+      - '.github/workflows/_build-linux-arm64.yml'
+      - 'scripts/check_arm64_runtime.py'
+      - 'tests/scripts/test_check_arm64_runtime.py'
+      - 'Dockerfile'
+      - '.github/workflows/test-arm64-tts.yml'
+      - 'scripts/check_arm64_archive.py'
+      - 'tests/scripts/test_check_arm64_archive.py'
+  push:
+    branches: [dev]
+    paths:
+      - 'src/**'
+      - 'test/**'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - '.dockerignore'
+      - '.github/workflows/dev-build-all.yml'
+      - '.github/workflows/_build-linux-arm64.yml'
+      - 'scripts/check_arm64_runtime.py'
+      - 'tests/scripts/test_check_arm64_runtime.py'
       - 'Dockerfile'
       - '.github/workflows/test-arm64-tts.yml'
       - 'scripts/check_arm64_archive.py'
@@ -22,120 +44,5 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-linux-arm64-emulated:
-    name: Test Linux ARM64 TTS (Emulated)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6.1.0
-        with:
-          submodules: recursive
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4.0.0
-        with:
-          platforms: arm64
-          image: tonistiigi/binfmt:latest
-
-      - name: Test ARM64 emulation with basic build
-        run: |
-          echo "Testing ARM64 emulation with lightweight build..."
-          docker run --rm --platform linux/arm64 alpine:latest uname -m
-
-          # Test basic compilation in ARM64 environment
-          docker run --rm --platform linux/arm64 --network=host ubuntu:24.04 bash -c "
-            set -e
-            for i in 1 2 3; do
-              apt-get update && apt-get install -y build-essential cmake && break
-              echo \"Retry \$i failed, waiting 5s...\"
-              sleep 5
-            done
-            echo 'int main() { return 0; }' > test.c
-            gcc test.c -o test
-            ./test && echo 'ARM64 compilation works'
-          "
-
-      - name: Test ARM64 cross-compilation setup
-        run: |
-          # Test if we can create ARM64 binaries (without full build)
-          cat > test-arm64.c << 'EOF'
-          #include <stdio.h>
-          int main() {
-              printf("ARM64 test binary\n");
-              return 0;
-          }
-          EOF
-
-          # Try to compile for ARM64 using Docker
-          docker run --rm --platform linux/arm64 --network=host -v $(pwd):/work ubuntu:24.04 bash -c "
-            set -e
-            for i in 1 2 3; do
-              apt-get update && apt-get install -y gcc && break
-              echo \"Retry \$i failed, waiting 5s...\"
-              sleep 5
-            done
-            cd /work
-            gcc test-arm64.c -o test-arm64
-            file test-arm64
-            ./test-arm64
-          " && echo "ARM64 cross-compilation successful" || echo "ARM64 test completed with warnings"
-
-      - name: Summary
-        run: |
-          echo "=== ARM64 Emulation Test Summary ==="
-          echo "✅ Basic ARM64 emulation verified"
-          echo "✅ ARM64 compilation tested"
-          echo "⚠️  Full TTS tests limited by QEMU performance"
-
-
-  test-linux-arm64-native:
-    name: Test Linux ARM64 TTS (Native)
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6.1.0
-        with:
-          submodules: recursive
-
-      - name: Verify native ARM64 runner
-        run: |
-          test "$(uname -m)" = aarch64
-
-      - uses: actions/setup-python@v6.2.0
-        with:
-          python-version: '3.13'
-
-      - name: Test artifact validator
-        run: |
-          python -m pip install 'pytest>=9.1.1,<10'
-          python -m pytest tests/scripts/test_check_arm64_archive.py -q --override-ini="addopts="
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.12.0
-
-      # The Dockerfile's final scratch stage exports only the release tarball.
-      # Exporting `builder` copies the entire rootfs and exhausted the old
-      # 30-minute limit after compilation had already finished (Issue #752).
-      - name: Build and export ARM64 archive
-        uses: docker/build-push-action@v6.19.2
-        with:
-          context: .
-          file: Dockerfile
-          platforms: linux/arm64
-          outputs: type=local,dest=/tmp/arm64-build
-          cache-from: type=gha,scope=arm64-native
-          cache-to: type=gha,scope=arm64-native,mode=max
-
-      - name: Validate exported ARM64 executable
-        run: python scripts/check_arm64_archive.py /tmp/arm64-build/piper-plus-cpp-linux-arm64.tar.gz
-
-      - name: Upload ARM64 artifacts
-        uses: actions/upload-artifact@v4.6.2
-        with:
-          name: piper-plus-cpp-arm64-binary
-          path: /tmp/arm64-build/piper-plus-cpp-linux-arm64.tar.gz
-          if-no-files-found: error
+  build-and-test:
+    uses: ./.github/workflows/_build-linux-arm64.yml

@@ -135,6 +135,8 @@ cd piper-plus
 
 **Linux (ARM64, Raspberry Pi 4/5):**
 
+**Corrección ARM64 aún no publicada:** las compilaciones requieren glibc 2.31 o posterior. El inicio y la síntesis en japonés se verificaron bajo QEMU con Debian Bullseye / Bookworm / Trixie de 64 bits. El hardware Raspberry Pi y Raspberry Pi OS siguen sin probarse. El archivo de la versión v2.0.1 no incluye esta corrección.
+
 ```bash
 curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
 tar xzf piper-plus-cpp.tar.gz

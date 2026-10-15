@@ -156,6 +156,8 @@ cd piper-plus
 
 **Linux (ARM64, Raspberry Pi 4/5):**
 
+**未リリースの ARM64 修正:** glibc 2.31 以上を対象とし、Debian Bullseye / Bookworm / Trixie（64bit）での起動と日本語音声生成を QEMU で確認済みです。Raspberry Pi 実機と Raspberry Pi OS 自体は未検証です。v2.0.1 の配布アーカイブには、この修正は含まれません。
+
 ```bash
 curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
 tar xzf piper-plus-cpp.tar.gz
@@ -367,6 +369,8 @@ C++ CLI の詳細なコマンドラインオプション、JSON 入力フォー�
 主要モデル: `tsukuyomi` (日本語), `zs-v1` (6 言語 Zero-Shot/FT 実験ベース), `bilingual-ja-en-v4` (日英 2 言語) — 詳細は HuggingFace の [固定公開 zs-v1 バンドル](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) や [ayousanz/piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) を参照してください。
 
 > **Zero-Shot/FT ベース (`zs-v1`, 2026-10-10):** 固定公開バンドルは既存の v7 epoch 32 実験基準版（JA/EN/ZH/ES/FR/PT、571 話者、173 音素、CAM++ 192 次元）です。Zero-Shot 推論は `base.onnx` と同梱 `campplus.onnx` から抽出した参照 embedding、追加学習は `base.ckpt` と同梱 `config.json` を使ってください。PyPI `piper-plus==2.0.0` の公開例で機能確認済みですが、品質承認・人手試聴合格・最新/最高品質を意味しません。`base` / `zero-shot-base-zs-v1` alias はソースブランチ/次期リリース向けで、公開済み 2.0.0 / 2.0.1 には未収録です。ルートの `model.ckpt` は旧世代として別扱いです。
+
+> **つくよみちゃんFT (`zs-v1`, 2026-10-15):** 同じ公開base世代を追加学習した[固定公開モデル](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/tree/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1)を公開しました。`tsukuyomi.onnx`と`tsukuyomi.onnx.json`を組み合わせれば、参照音声やCAM++なしで生成できます。日本語3文の試聴承認済みの実験基準版です。既存の`tsukuyomi` aliasは引き続き旧rootモデルを選ぶため、新モデルは[モデルガイド](docs/guides/development/pretrained-models.md)の固定URLから取得してください。
 
 ---
 

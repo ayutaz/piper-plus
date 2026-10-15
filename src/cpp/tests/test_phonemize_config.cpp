@@ -1,12 +1,6 @@
-// Regression guard for the v1.12.0 multi-codepoint phoneme leak (ɔɪ / œ̃ / ɐ̃).
-//
-// The HuggingFace-distributed tsukuyomi config.json carried these IPA tokens
-// as RAW multi-codepoint keys in phoneme_id_map instead of PUA-encoded single
-// codepoints. parsePhonemizeConfig() requires every key to be a single
-// codepoint (isSingleCodepoint), so loading that config threw / crashed the
-// C++ runtime on Windows. The canonical fix is to PUA-encode the keys (e.g.
-// œ̃ -> U+E063) before distribution; these tests pin both halves of the
-// contract so a future stale config or parser change is caught in CI.
+// Public configs can carry the IPA tokens ɔɪ / œ̃ / ɐ̃ as raw keys.
+// Resolve these known aliases to the canonical internal PUA codepoints without
+// changing their model IDs. Unknown tokens and conflicting aliases must fail.
 //
 //   ɔɪ = U+0254 U+026A  -> PUA U+E062
 //   œ̃  = U+0153 U+0303  -> PUA U+E063
@@ -34,7 +28,7 @@ namespace {
 
 // UTF-8 encodings of the three IPA tokens that leaked as raw multi-codepoint
 // keys, plus their canonical PUA single-codepoint encodings.
-const std::string kOI = "\xC9\x94\xCA\xAA";       // ɔɪ  (U+0254 U+026A)
+const std::string kOI = "\xC9\x94\xC9\xAA";       // ɔɪ  (U+0254 U+026A)
 const std::string kOEtilde = "\xC5\x93\xCC\x83";  // œ̃   (U+0153 U+0303)
 const std::string kAtilde = "\xC9\x90\xCC\x83";   // ɐ̃   (U+0250 U+0303)
 const std::string kPuaOI = "\xEE\x81\xA2";        // U+E062
@@ -59,19 +53,41 @@ TEST(PhonemizeConfigParse, PuaEncodedTokensAreSingleCodepoint) {
 
 // --- parsePhonemizeConfig end-to-end behavior
 
-TEST(PhonemizeConfigParse, RawMultiCodepointKeyIsRejected) {
-    // Mirrors the broken v1.12.0 tsukuyomi config: a raw multi-codepoint IPA
-    // key in phoneme_id_map. The parser must reject it (throw) rather than
-    // silently mis-map it — this is exactly the failure Windows users hit.
+TEST(PhonemizeConfigParse, RawKnownTokensPreserveModelIds) {
     json cfg = {
         {"phoneme_type", "multilingual"},
         {"phoneme_id_map",
          {
              {"_", {0}},
              {"a", {10}},
-             {kOEtilde, {149}},  // œ̃ as raw multi-codepoint -> must throw
+             {kOI, {94}},
+             {kOEtilde, {149}},
+             {kAtilde, {153}},
          }},
     };
+    piper::PhonemizeConfig pc;
+    ASSERT_NO_THROW(piper::parsePhonemizeConfig(cfg, pc));
+    EXPECT_EQ(pc.phonemeIdMap.at(0xE062), std::vector<piper::PhonemeId>({94}));
+    EXPECT_EQ(pc.phonemeIdMap.at(0xE063), std::vector<piper::PhonemeId>({149}));
+    EXPECT_EQ(pc.phonemeIdMap.at(0xE064), std::vector<piper::PhonemeId>({153}));
+    EXPECT_EQ(pc.phonemeIdMap.at(U'a'), std::vector<piper::PhonemeId>({10}));
+}
+
+TEST(PhonemizeConfigParse, UnknownMultiCodepointKeyIsRejected) {
+    json cfg = {{"phoneme_id_map", {{"unknown-token", {149}}}}};
+    piper::PhonemizeConfig pc;
+    EXPECT_THROW(piper::parsePhonemizeConfig(cfg, pc), std::runtime_error);
+}
+
+TEST(PhonemizeConfigParse, MatchingRawAndPuaAliasesDoNotDuplicateIds) {
+    json cfg = {{"phoneme_id_map", {{kOEtilde, {149}}, {kPuaOEtilde, {149}}}}};
+    piper::PhonemizeConfig pc;
+    ASSERT_NO_THROW(piper::parsePhonemizeConfig(cfg, pc));
+    EXPECT_EQ(pc.phonemeIdMap.at(0xE063), std::vector<piper::PhonemeId>({149}));
+}
+
+TEST(PhonemizeConfigParse, ConflictingRawAndPuaAliasesAreRejected) {
+    json cfg = {{"phoneme_id_map", {{kOEtilde, {149}}, {kPuaOEtilde, {150}}}}};
     piper::PhonemizeConfig pc;
     EXPECT_THROW(piper::parsePhonemizeConfig(cfg, pc), std::runtime_error);
 }

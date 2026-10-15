@@ -1,0 +1,133 @@
+name: Linux ARM64 build and compatibility (reusable)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test-linux-arm64-emulated:
+    name: ARM64 archive on Debian ${{ matrix.suite }} (QEMU)
+    needs: test-linux-arm64-native
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [bullseye, bookworm, trixie]
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: piper-plus-cpp-linux-arm64
+          path: dist
+      - uses: docker/setup-qemu-action@v4.0.0
+        with:
+          platforms: arm64
+          # QEMU 10.2.3, also used for the local Bullseye compatibility check.
+          image: tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+      - name: Verify tested archive checksum
+        working-directory: dist
+        run: sha256sum --check SHA256SUMS
+      - name: Verify actual archive startup and Japanese waveform
+        run: |
+          python scripts/check_arm64_runtime.py dist/piper-plus-cpp-linux-arm64.tar.gz \
+            --suite "${{ matrix.suite }}" --output-dir "arm64-smoke/${{ matrix.suite }}"
+      - name: Retain compatibility evidence (not device performance)
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: arm64-smoke-${{ matrix.suite }}
+          path: arm64-smoke/${{ matrix.suite }}/
+          if-no-files-found: error
+
+  test-linux-arm64-native:
+    name: Test Linux ARM64 TTS (Native)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.1.0
+        with:
+          submodules: recursive
+
+      - name: Verify native ARM64 runner
+        run: |
+          test "$(uname -m)" = aarch64
+
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+
+      - name: Test artifact validator
+        run: |
+          python -m pip install 'pytest>=9.1.1,<10'
+          python -m pytest tests/scripts/test_check_arm64_archive.py tests/scripts/test_check_arm64_runtime.py -q --override-ini="addopts="
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.12.0
+
+      # The Dockerfile's final scratch stage exports only the release tarball.
+      # Exporting `builder` copies the entire rootfs and exhausted the old
+      # 30-minute limit after compilation had already finished (Issue #752).
+      - name: Build and export ARM64 archive
+        uses: docker/build-push-action@v6.19.2
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/arm64
+          outputs: type=local,dest=/tmp/arm64-build
+          cache-from: type=gha,scope=arm64-native
+          cache-to: type=gha,scope=arm64-native,mode=max
+
+      - name: Verify reported v2.0.1 incompatibility is rejected
+        run: |
+          curl --fail --location --retry 3 --max-time 180 \
+            https://github.com/ayutaz/piper-plus/releases/download/v2.0.1/piper-plus-cpp-linux-arm64.tar.gz \
+            --output /tmp/old-arm64.tar.gz
+          echo 'f863aacf072091f3f0f1b292a62ecd423aedb5587ffffb97ca17562d969ef226  /tmp/old-arm64.tar.gz' | sha256sum --check
+          if python scripts/check_arm64_archive.py /tmp/old-arm64.tar.gz > /tmp/arm64-build/old-abi-rejection.log 2>&1; then
+            echo 'ERROR: incompatible v2.0.1 was accepted'
+            exit 1
+          fi
+          grep 'exceeds GLIBC_2.31' /tmp/arm64-build/old-abi-rejection.log
+
+      - name: Validate exported ARM64 executable
+        run: |
+          python scripts/check_arm64_archive.py /tmp/arm64-build/piper-plus-cpp-linux-arm64.tar.gz \
+            --report /tmp/arm64-build/abi-report.json
+
+      - name: Record raw ELF requirements and archive checksum
+        run: |
+          mkdir -p /tmp/arm64-inspect
+          tar xzf /tmp/arm64-build/piper-plus-cpp-linux-arm64.tar.gz -C /tmp/arm64-inspect
+          readelf --wide --version-info /tmp/arm64-inspect/piper-plus/bin/piper-plus > /tmp/arm64-build/readelf-versions.txt
+          readelf --wide --dynamic /tmp/arm64-inspect/piper-plus/bin/piper-plus > /tmp/arm64-build/readelf-dynamic.txt
+          cd /tmp/arm64-build
+          sha256sum piper-plus-cpp-linux-arm64.tar.gz > SHA256SUMS
+
+      - name: Upload build inspection evidence
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: arm64-build-evidence
+          path: |
+            /tmp/arm64-build/*.json
+            /tmp/arm64-build/*.txt
+            /tmp/arm64-build/*.log
+          if-no-files-found: warn
+
+      - name: Upload ARM64 artifacts
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: piper-plus-cpp-linux-arm64
+          path: |
+            /tmp/arm64-build/piper-plus-cpp-linux-arm64.tar.gz
+            /tmp/arm64-build/abi-report.json
+            /tmp/arm64-build/SHA256SUMS
+          if-no-files-found: error

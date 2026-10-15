@@ -1,0 +1,34 @@
+name: Tsukuyomi Publication Preparation
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'scripts/tsukuyomi_release/**'
+      - 'tests/scripts/test_tsukuyomi_release.py'
+      - 'tests/scripts/test_tsukuyomi_retention.py'
+      - 'docs/design/tsukuyomi-publication-ready-2026-10-12.md'
+      - '.github/workflows/tsukuyomi-publication-ready.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tsukuyomi-publication-preparation-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-record-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - uses: astral-sh/setup-uv@v6.8.0
+        with:
+          python-version: '3.13'
+      - name: Verify review records and publication guards without uploading
+        run: >-
+          uv run --no-project --with pytest --with requests --with huggingface-hub
+          python -m pytest tests/scripts/test_tsukuyomi_release.py tests/scripts/test_tsukuyomi_retention.py
+          -q --override-ini=addopts=

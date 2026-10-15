@@ -133,6 +133,8 @@ cd piper-plus
 
 **Linux (ARM64, 라즈베리 파이 4/5):**
 
+**아직 릴리스되지 않은 ARM64 수정:** glibc 2.31 이상을 대상으로 하며, QEMU의 Debian Bullseye / Bookworm / Trixie(64비트)에서 실행과 일본어 음성 생성을 확인했습니다. Raspberry Pi 실기기와 Raspberry Pi OS 자체는 아직 검증하지 않았습니다. v2.0.1 배포 아카이브에는 이 수정이 포함되지 않습니다.
+
 ```bash
 curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
 tar xzf piper-plus-cpp.tar.gz

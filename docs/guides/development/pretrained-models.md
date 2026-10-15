@@ -18,6 +18,23 @@ It is not a newly quality-approved or latest/best model. See the [release record
 and [published usage guide](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/README.md).
 The legacy root files remain separate; use the config bundled with the selected generation.
 
+**Tsukuyomi fine-tune from the public base (2026-10-15):**
+
+[Tsukuyomi zs-v1 is public without a gate](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/tree/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1).
+It is the existing 500 epoch fixed-voice fine-tune from the same v7 epoch32 generation as the public base.
+Use its `tsukuyomi.onnx` and `tsukuyomi.onnx.json` together; no reference WAV, speaker embedding or CAM++ is required.
+The user approved the three Japanese samples for experimental publication. This does not establish improved quality
+or approval for every language and text. A weights-only initializer, `tsukuyomi.ckpt`, is included for further fine-tuning.
+See the [publication record](../../design/tsukuyomi-publication-ready-2026-10-12.md).
+Existing `tsukuyomi` package aliases continue to download the legacy root model below.
+
+```bash
+mkdir -p models/tsukuyomi-zs-v1
+curl -fL -o models/tsukuyomi-zs-v1/tsukuyomi.onnx https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1/tsukuyomi.onnx
+curl -fL -o models/tsukuyomi-zs-v1/tsukuyomi.onnx.json https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1/tsukuyomi.onnx.json
+piper-plus --model models/tsukuyomi-zs-v1/tsukuyomi.onnx --config models/tsukuyomi-zs-v1/tsukuyomi.onnx.json --output-file output.wav "こんにちは。今日は良い天気ですね。"
+```
+
 **Inference Models (ready to use):**
 
 | Model | Languages | Speakers | Description | Download |
@@ -25,7 +42,7 @@ The legacy root files remain separate; use the config bundled with the selected 
 | Tsukuyomi-chan 6lang (canonical) | JA/EN/ZH/ES/FR/PT | 1 | Tsukuyomi-chan voice, 6-language, FP16. **500 epochs (2026-03-16)**, fine-tuned from 6-language base with `freeze-dp` + `emb_lang` unify for voice consistency across all 6 languages. Actual HF file: `tsukuyomi-chan-6lang-fp16.onnx`. ONNX size 39,652,717 bytes (37.8 MiB). | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
 | CSS10 Japanese 6lang | JA/EN/ZH/ES/FR/PT | 1 | CSS10 Japanese voice, 6-language, FP16. 50 epochs from 6-language base, 6,841 utterances. | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang) |
 
-> **MB-iSTFT / 6lang-v2 variants (upcoming)**: `tsukuyomi-mb-istft-500epoch.onnx` (500 epoch MB-iSTFT FT、 2.21x faster CPU inference) と `tsukuyomi-6lang-v2-fixed.onnx` (v3→v4→v2 段階改善版) は学習完了済みですが、 HF への upload はまだ実施されていません。 現在 canonical な推論用 ONNX は `tsukuyomi-chan-6lang-fp16.onnx` のみです。 進捗は [Issue #590](https://github.com/ayutaz/piper-plus/issues/590) / follow-up model publish tracking 参照。
+> **Other MB-iSTFT / 6lang-v2 variants**: historical candidates named `tsukuyomi-mb-istft-500epoch.onnx` and `tsukuyomi-6lang-v2-fixed.onnx` are separate from the public `releases/zs-v1/tsukuyomi.onnx` above. The legacy root filename remains `tsukuyomi-chan-6lang-fp16.onnx`; do not combine its config with the zs-v1 model. Historical tracking: [Issue #590](https://github.com/ayutaz/piper-plus/issues/590).
 
 **Base Models (for fine-tuning):**
 
@@ -59,7 +76,7 @@ The legacy root files remain separate; use the config bundled with the selected 
 > **Research storage**: the private/gated repositories above retain research artifacts. General users should download
 > the ungated `piper-plus-base/releases/zs-v1` bundle at the pinned revision above, which includes `base.onnx`,
 > `base.ckpt`, `config.json`, `base.onnx.json`, `campplus.onnx`, and their hashes. It needs no access to research storage.
-> A new Tsukuyomi FT release from the same public base is the next stage and has not been published here.
+> The fixed-voice Tsukuyomi FT is now public in `piper-plus-tsukuyomi-chan/releases/zs-v1` at the pinned revision above.
 > Historical SECS scores above are not a new quality approval. Research details: [`docs/design/multi-6lang-zero-shot-v7-training-results.md`](../../design/multi-6lang-zero-shot-v7-training-results.md).
 
 **Tsukuyomi-chan model:**
