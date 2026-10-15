@@ -81,6 +81,23 @@ def run_logged(command: list[str], output: Path, label: str) -> str:
     return result.stdout
 
 
+def inspect_image(image: str, output: Path) -> dict:
+    """Select ARM64 metadata when the Docker CLI supports platform inspection.
+
+    Docker 27's classic image store inspects the ARM64 image pulled above by
+    tag. Newer CLIs can also select ARM64 from a multi-platform image store.
+    A metadata failure or an unexpected architecture remains a hard error.
+    """
+    help_text = run_logged(
+        ["docker", "image", "inspect", "--help"], output, "image-inspect-help"
+    )
+    command = ["docker", "image", "inspect"]
+    if "--platform" in help_text:
+        command.extend(["--platform", "linux/arm64"])
+    command.append(image)
+    return json.loads(run_logged(command, output, "image"))[0]
+
+
 def check_runtime(
     archive: Path, model: Path, config: Path, suite: str, output: Path
 ) -> dict:
@@ -98,13 +115,7 @@ def check_runtime(
     }
     image = f"debian:{suite}"
     run_logged(["docker", "pull", "--platform", "linux/arm64", image], output, "pull")
-    identity = json.loads(
-        run_logged(
-            ["docker", "image", "inspect", "--platform", "linux/arm64", image],
-            output,
-            "image",
-        )
-    )[0]
+    identity = inspect_image(image, output)
     if identity["Architecture"] != "arm64":
         raise ValueError("Consumer image must be ARM64")
     script = r"""

@@ -82,8 +82,9 @@ def test_existing_waveform_cannot_make_a_rerun_pass(runtime, tmp_path):
         runtime.check_runtime(*inputs, "bullseye", output)
 
 
-def test_multi_platform_image_store_selects_arm64_metadata(
-    runtime, tmp_path, monkeypatch
+@pytest.mark.parametrize("modern_cli", [False, True])
+def test_image_metadata_supports_modern_and_legacy_docker(
+    runtime, tmp_path, monkeypatch, modern_cli
 ):
     inputs = []
     for name in ("archive", "model", "config"):
@@ -92,10 +93,21 @@ def test_multi_platform_image_store_selects_arm64_metadata(
         inputs.append(path)
 
     def run(command, output, label):
+        if label == "image-inspect-help":
+            return (
+                "Options: --platform string"
+                if modern_cli
+                else "Options: --format string"
+            )
         if label == "image":
-            architecture = "arm64" if "--platform" in command else "amd64"
-            return json.dumps([{"Architecture": architecture, "Id": "test-image"}])
+            if modern_cli:
+                assert command[3:5] == ["--platform", "linux/arm64"]
+            elif "--platform" in command:
+                raise ValueError("unknown flag: --platform")
+            return json.dumps([{"Architecture": "arm64", "Id": "sha256:arm64-image"}])
         if label == "container":
+            assert "debian:trixie" in command
+            assert command[command.index("--platform") + 1] == "linux/arm64"
             write_wav(output / "output.wav")
             return "PIPER_HELP_OK\nPIPER_SYNTH_OK\n"
         return ""
@@ -103,3 +115,14 @@ def test_multi_platform_image_store_selects_arm64_metadata(
     monkeypatch.setattr(runtime, "run_logged", run)
     report = runtime.check_runtime(*inputs, "trixie", tmp_path / "out")
     assert report["help"] == report["synthesis"] == "success"
+
+
+def test_image_inspection_errors_are_not_ignored(runtime, tmp_path, monkeypatch):
+    def run(command, output, label):
+        if label == "image-inspect-help":
+            return "Options: --format string"
+        raise ValueError("daemon unavailable")
+
+    monkeypatch.setattr(runtime, "run_logged", run)
+    with pytest.raises(ValueError, match="daemon unavailable"):
+        runtime.inspect_image("debian:bullseye", tmp_path)
