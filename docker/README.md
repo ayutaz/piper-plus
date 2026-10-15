@@ -2,7 +2,7 @@
 
 piper-plus の Docker 環境一式です。Python 推論 (CUDA / CPU)・学習、WebUI、Wyoming、C++ 推論・開発、Go の各イメージを提供します。
 
-Python 推論イメージは **GPL-free** です。espeak-ng / piper-phonemize に依存せず、g2p-en (Apache-2.0) と pyopenjtalk-plus を使用します。
+このソースからビルドするPython推論イメージは、英語バックエンドを許諾文付きで同梱し、外部 `g2p-en` とGPLの `Distance` への依存を除去しています。espeak-ng / piper-phonemize に依存せず、同梱G2P（Apache-2.0、一部MIT）と pyopenjtalk-plus を使用します。既存の公開イメージには修正が遡って反映されないため、[移行手順](../docs/migration/python-g2p-license.md)を参照してください。
 
 依存管理は全イメージで **uv** に統一されています。Python 推論イメージは
 `src/python/pyproject.toml` の extras を使い、WebUI の追加依存は

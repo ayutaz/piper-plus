@@ -1,0 +1,79 @@
+name: Python license and wheel consumers
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/python/**'
+      - 'src/python_run/**'
+      - 'environments/webui/**'
+      - 'huggingface-space/requirements.txt'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.pre-commit-config.yaml'
+      - 'scripts/check_bundled_english.py'
+      - 'scripts/check_python_licenses.py'
+      - 'scripts/check_english_consumer.py'
+      - 'scripts/run_python_license_consumer.py'
+      - 'tests/scripts/test_check_bundled_english.py'
+      - 'tests/scripts/test_check_python_licenses.py'
+      - 'tests/scripts/test_bundled_english_g2p.py'
+      - 'tests/fixtures/english_g2p_compat.json'
+      - 'docs/spec/model-sha256-manifest.toml'
+      - '.github/workflows/python-license.yml'
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-license-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - run: pip install pytest packaging
+      - run: python scripts/check_bundled_english.py
+      - run: python -m pytest tests/scripts/test_check_bundled_english.py tests/scripts/test_check_python_licenses.py -q --override-ini='addopts='
+
+  wheel-consumer:
+    name: Wheels (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-latest]
+        python: ['3.11', '3.13']
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: astral-sh/setup-uv@v6.8.0
+      - name: Build sdists and wheels, audit closure and compare pronunciation
+        env:
+          PYTHONUTF8: '1'
+          WORK_DIR: ${{ runner.temp }}/license-consumer
+          WITH_MODEL: ${{ matrix.os == 'ubuntu-24.04' && matrix.python == '3.13' && 'yes' || 'no' }}
+        run: >-
+          python -c "import os,subprocess,sys; args=[sys.executable,'scripts/run_python_license_consumer.py','--work-dir',os.environ['WORK_DIR']]; args+=['--with-model'] if os.environ['WITH_MODEL']=='yes' else []; subprocess.run(args,check=True)"
+      - name: Keep installed dependency and waveform evidence
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: python-license-${{ matrix.os }}-${{ matrix.python }}
+          path: |
+            ${{ runner.temp }}/license-consumer/licenses.json
+            ${{ runner.temp }}/license-consumer/evidence/consumer-report.json
+            ${{ runner.temp }}/license-consumer/evidence/*.wav
+          if-no-files-found: warn

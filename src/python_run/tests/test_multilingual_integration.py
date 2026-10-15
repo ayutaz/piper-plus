@@ -36,7 +36,9 @@ def test_japanese_phonemize_real():
 
 def test_english_phonemize_real():
     """Call phonemize_english with real g2p_en and verify output."""
-    pytest.importorskip("g2p_en", reason="g2p_en not installed")
+    pytest.importorskip(
+        "piper_plus._vendor.g2p_en", reason="English backend dependencies not installed"
+    )
 
     from piper_plus.phonemize.english import phonemize_english
 
@@ -121,7 +123,9 @@ def test_japanese_n_variants_in_id_map():
 def test_multilingual_phonemizer_all_languages():
     """Create MultilingualPhonemizer with all 6 languages and test each."""
     _require_pyopenjtalk()
-    pytest.importorskip("g2p_en", reason="g2p_en not installed")
+    pytest.importorskip(
+        "piper_plus._vendor.g2p_en", reason="English backend dependencies not installed"
+    )
     pytest.importorskip("pypinyin", reason="pypinyin not installed")
 
     from piper_plus.phonemize.multilingual import MultilingualPhonemizer
@@ -145,7 +149,9 @@ def test_multilingual_phonemizer_all_languages():
 def test_multilingual_code_switching():
     """Test mixed Japanese-English text produces more tokens than either alone."""
     _require_pyopenjtalk()
-    pytest.importorskip("g2p_en", reason="g2p_en not installed")
+    pytest.importorskip(
+        "piper_plus._vendor.g2p_en", reason="English backend dependencies not installed"
+    )
 
     from piper_plus.phonemize.multilingual import MultilingualPhonemizer
 
@@ -170,7 +176,9 @@ def test_training_runtime_consistency():
     G2P package (piper-plus-g2p) is not installed.
     """
     _require_pyopenjtalk()
-    pytest.importorskip("g2p_en", reason="g2p_en not installed")
+    pytest.importorskip(
+        "piper_plus._vendor.g2p_en", reason="English backend dependencies not installed"
+    )
     pytest.importorskip("pypinyin", reason="pypinyin not installed")
     # The training-side phonemizer lives in the piper-plus-g2p package
     # (``piper_plus_g2p.multilingual``); ``piper_train.phonemize`` no longer

@@ -13,7 +13,9 @@ def _require_pypinyin():
 
 
 def _require_g2p_en():
-    pytest.importorskip("g2p_en", reason="g2p_en not installed")
+    pytest.importorskip(
+        "piper_plus._vendor.g2p_en", reason="English backend dependencies not installed"
+    )
 
 
 def test_phonemize_embedded_english_acronym():

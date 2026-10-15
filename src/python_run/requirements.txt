@@ -5,10 +5,10 @@ numpy>=1.26.4,<3.0
 # Japanese phonemization (cross-platform, no espeak-ng dependency)
 pyopenjtalk-plus>=0.4.1.post8
 
-# English phonemization
-g2p-en>=2.1.0
+# Bundled Apache-2.0 English backend: numeral normalization
+inflect>=0.3.1
 
-# g2p-en transitive dependency security floors (chain: g2p-en -> nltk -> joblib).
+# Bundled English backend dependency security floors (NLTK -> joblib).
 # Keep these above the OSV/PyPA advisory affected ranges so a fresh dependency
 # resolution can never regress into a genuinely-vulnerable version. See
 # docs/getting-started/troubleshooting.md ("Security Audit CI Issues").

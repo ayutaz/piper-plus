@@ -141,27 +141,6 @@ wheels = [
 ]
 
 [[package]]
-name = "distance"
-version = "0.1.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/5c/1a/883e47df323437aefa0d0a92ccfb38895d9416bd0b56262c2e46a47767b8/Distance-0.1.3.tar.gz", hash = "sha256:60807584f5b6003f5c521aa73f39f51f631de3be5cccc5a1d67166fcbf0d4551", size = 180271, upload-time = "2013-11-21T00:14:34.152Z" }
-
-[[package]]
-name = "g2p-en"
-version = "2.1.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "distance" },
-    { name = "inflect" },
-    { name = "nltk" },
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5f/22/2c7acbe6164ed6cfd4301e9ad2dbde69c68d22268a0f9b5b0ee6052ed3ab/g2p_en-2.1.0.tar.gz", hash = "sha256:32ecb119827a3b10ea8c1197276f4ea4f44070ae56cbbd01f0f261875f556a58", size = 3116166, upload-time = "2019-12-31T01:16:12.753Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d7/d9/b77dc634a7a0c0c97716ba97dd0a28cbfa6267c96f359c4f27ed71cbd284/g2p_en-2.1.0-py3-none-any.whl", hash = "sha256:2a7aabf1fc7f270fcc3349881407988c9245173c2413debbe5432f4a4f31319f", size = 3117464, upload-time = "2019-12-31T01:16:03.286Z" },
-]
-
-[[package]]
 name = "g2pk2"
 version = "0.0.3"
 source = { registry = "https://pypi.org/simple" }
@@ -557,13 +536,16 @@ wheels = [
 
 [[package]]
 name = "piper-plus-g2p"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "." }
 
 [package.optional-dependencies]
 all = [
-    { name = "g2p-en" },
     { name = "g2pk2" },
+    { name = "inflect" },
+    { name = "joblib" },
+    { name = "nltk" },
+    { name = "numpy" },
     { name = "pyopenjtalk-plus" },
     { name = "pypinyin" },
 ]
@@ -576,7 +558,10 @@ dev = [
     { name = "ruff" },
 ]
 en = [
-    { name = "g2p-en" },
+    { name = "inflect" },
+    { name = "joblib" },
+    { name = "nltk" },
+    { name = "numpy" },
 ]
 ja = [
     { name = "pyopenjtalk-plus" },
@@ -590,12 +575,18 @@ zh = [
 
 [package.metadata]
 requires-dist = [
-    { name = "g2p-en", marker = "extra == 'all'", specifier = ">=2.1.0,<3" },
-    { name = "g2p-en", marker = "extra == 'en'", specifier = ">=2.1.0,<3" },
     { name = "g2pk2", marker = "extra == 'all'", specifier = ">=0.0.3,<1" },
     { name = "g2pk2", marker = "extra == 'ko'", specifier = ">=0.0.3,<1" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.0" },
+    { name = "inflect", marker = "extra == 'all'", specifier = ">=0.3.1" },
+    { name = "inflect", marker = "extra == 'en'", specifier = ">=0.3.1" },
+    { name = "joblib", marker = "extra == 'all'", specifier = ">=1.5.0" },
+    { name = "joblib", marker = "extra == 'en'", specifier = ">=1.5.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13" },
+    { name = "nltk", marker = "extra == 'all'", specifier = ">=3.10.0" },
+    { name = "nltk", marker = "extra == 'en'", specifier = ">=3.10.0" },
+    { name = "numpy", marker = "extra == 'all'", specifier = ">=1.26.4" },
+    { name = "numpy", marker = "extra == 'en'", specifier = ">=1.26.4" },
     { name = "pyopenjtalk-plus", marker = "extra == 'all'", specifier = ">=0.3,<1" },
     { name = "pyopenjtalk-plus", marker = "extra == 'ja'", specifier = ">=0.3,<1" },
     { name = "pypinyin", marker = "extra == 'all'", specifier = ">=0.55.0,<1" },

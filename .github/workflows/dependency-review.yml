@@ -78,7 +78,15 @@ jobs:
           # license 表記が `MIT-CMU` として機械可読化された (12.2.0 時点では
           # 検出されず素通りしていた) だけで、 ライセンス自体の変更はない。
           # copyleft なし。
+          # Published archives reviewed in docs/design/python-g2p-license-2026-10-16.md:
+          # audioop-lts 0.2.2: PSF-2.0 (scanner expands historical Python licenses).
+          # protobuf 7.36.2: BSD-3-Clause + original Google protobuf notice.
+          # regex 2026.9.29: Apache-2.0 AND CNRI-Python; both retained upstream.
+          # These package-scoped entries do not permit GPL dependencies.
           allow-dependencies-licenses: >-
+            pkg:pypi/audioop-lts,
+            pkg:pypi/protobuf,
+            pkg:pypi/regex,
             pkg:pypi/astroid,
             pkg:pypi/defusedxml,
             pkg:pypi/pillow,

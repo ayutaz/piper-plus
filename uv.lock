@@ -859,12 +859,6 @@ wheels = [
 ]
 
 [[package]]
-name = "distance"
-version = "0.1.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/5c/1a/883e47df323437aefa0d0a92ccfb38895d9416bd0b56262c2e46a47767b8/Distance-0.1.3.tar.gz", hash = "sha256:60807584f5b6003f5c521aa73f39f51f631de3be5cccc5a1d67166fcbf0d4551", size = 180271, upload-time = "2013-11-21T00:14:34.152Z" }
-
-[[package]]
 name = "distlib"
 version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1158,21 +1152,6 @@ wheels = [
 [package.optional-dependencies]
 http = [
     { name = "aiohttp" },
-]
-
-[[package]]
-name = "g2p-en"
-version = "2.1.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "distance" },
-    { name = "inflect" },
-    { name = "nltk" },
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5f/22/2c7acbe6164ed6cfd4301e9ad2dbde69c68d22268a0f9b5b0ee6052ed3ab/g2p_en-2.1.0.tar.gz", hash = "sha256:32ecb119827a3b10ea8c1197276f4ea4f44070ae56cbbd01f0f261875f556a58", size = 3116166, upload-time = "2019-12-31T01:16:12.753Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d7/d9/b77dc634a7a0c0c97716ba97dd0a28cbfa6267c96f359c4f27ed71cbd284/g2p_en-2.1.0-py3-none-any.whl", hash = "sha256:2a7aabf1fc7f270fcc3349881407988c9245173c2413debbe5432f4a4f31319f", size = 3117464, upload-time = "2019-12-31T01:16:03.286Z" },
 ]
 
 [[package]]
@@ -3346,7 +3325,7 @@ wheels = [
 name = "piper-plus"
 source = { editable = "src/python_run" }
 dependencies = [
-    { name = "g2p-en" },
+    { name = "inflect" },
     { name = "joblib" },
     { name = "nltk" },
     { name = "numpy" },
@@ -3377,7 +3356,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", marker = "extra == 'http'", specifier = ">=0.141.1,<1" },
-    { name = "g2p-en", specifier = ">=2.1.0" },
+    { name = "inflect", specifier = ">=0.3.1" },
     { name = "joblib", specifier = ">=1.5.0" },
     { name = "nltk", specifier = ">=3.10.0" },
     { name = "numpy", specifier = ">=1.26.4,<3.0" },
@@ -3402,8 +3381,11 @@ source = { editable = "src/python/g2p" }
 
 [package.optional-dependencies]
 all = [
-    { name = "g2p-en" },
     { name = "g2pk2" },
+    { name = "inflect" },
+    { name = "joblib" },
+    { name = "nltk" },
+    { name = "numpy" },
     { name = "pyopenjtalk-plus" },
     { name = "pypinyin" },
 ]
@@ -3416,7 +3398,10 @@ dev = [
     { name = "ruff" },
 ]
 en = [
-    { name = "g2p-en" },
+    { name = "inflect" },
+    { name = "joblib" },
+    { name = "nltk" },
+    { name = "numpy" },
 ]
 ja = [
     { name = "pyopenjtalk-plus" },
@@ -3430,12 +3415,18 @@ zh = [
 
 [package.metadata]
 requires-dist = [
-    { name = "g2p-en", marker = "extra == 'all'", specifier = ">=2.1.0,<3" },
-    { name = "g2p-en", marker = "extra == 'en'", specifier = ">=2.1.0,<3" },
     { name = "g2pk2", marker = "extra == 'all'", specifier = ">=0.0.3,<1" },
     { name = "g2pk2", marker = "extra == 'ko'", specifier = ">=0.0.3,<1" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.0" },
+    { name = "inflect", marker = "extra == 'all'", specifier = ">=0.3.1" },
+    { name = "inflect", marker = "extra == 'en'", specifier = ">=0.3.1" },
+    { name = "joblib", marker = "extra == 'all'", specifier = ">=1.5.0" },
+    { name = "joblib", marker = "extra == 'en'", specifier = ">=1.5.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13" },
+    { name = "nltk", marker = "extra == 'all'", specifier = ">=3.10.0" },
+    { name = "nltk", marker = "extra == 'en'", specifier = ">=3.10.0" },
+    { name = "numpy", marker = "extra == 'all'", specifier = ">=1.26.4" },
+    { name = "numpy", marker = "extra == 'en'", specifier = ">=1.26.4" },
     { name = "pyopenjtalk-plus", marker = "extra == 'all'", specifier = ">=0.3,<1" },
     { name = "pyopenjtalk-plus", marker = "extra == 'ja'", specifier = ">=0.3,<1" },
     { name = "pypinyin", marker = "extra == 'all'", specifier = ">=0.55.0,<1" },
@@ -3452,10 +3443,12 @@ name = "piper-plus-workspace"
 source = { virtual = "." }
 dependencies = [
     { name = "cython" },
-    { name = "g2p-en" },
     { name = "ghapi" },
     { name = "huggingface-hub" },
+    { name = "inflect" },
+    { name = "joblib" },
     { name = "librosa" },
+    { name = "nltk" },
     { name = "numpy" },
     { name = "onnx" },
     { name = "onnxscript" },
@@ -3495,7 +3488,9 @@ dev = [
 ]
 inference = [
     { name = "fastapi" },
-    { name = "g2p-en" },
+    { name = "inflect" },
+    { name = "joblib" },
+    { name = "nltk" },
     { name = "onnxruntime" },
     { name = "piper-plus", marker = "(extra == 'extra-10-piper-plus-cpu' and extra == 'extra-10-piper-plus-gpu') or (extra != 'extra-10-piper-plus-gpu' and extra == 'extra-20-piper-plus-workspace-inference') or (extra != 'extra-10-piper-plus-gpu' and extra != 'extra-20-piper-plus-workspace-inference-gpu') or (extra != 'extra-10-piper-plus-cpu' and extra == 'extra-20-piper-plus-workspace-inference') or (extra != 'extra-10-piper-plus-cpu' and extra != 'extra-20-piper-plus-workspace-inference-gpu') or (extra != 'extra-10-piper-plus-gpu' and extra == 'extra-20-piper-plus-workspace-inference-gpu' and extra == 'extra-20-piper-plus-workspace-train') or (extra != 'extra-10-piper-plus-gpu' and extra == 'extra-20-piper-plus-workspace-inference-gpu' and extra == 'group-20-piper-plus-workspace-cpu') or (extra != 'extra-10-piper-plus-cpu' and extra == 'extra-20-piper-plus-workspace-inference-gpu' and extra == 'extra-20-piper-plus-workspace-train') or (extra != 'extra-10-piper-plus-cpu' and extra == 'extra-20-piper-plus-workspace-inference-gpu' and extra == 'group-20-piper-plus-workspace-cpu')" },
     { name = "piper-plus", extra = ["cpu"], marker = "(extra == 'extra-10-piper-plus-cpu' and extra == 'extra-10-piper-plus-gpu') or (extra == 'extra-10-piper-plus-cpu' and extra == 'extra-20-piper-plus-workspace-inference') or (extra == 'extra-10-piper-plus-cpu' and extra != 'extra-20-piper-plus-workspace-inference-gpu') or (extra == 'extra-20-piper-plus-workspace-inference' and extra == 'extra-20-piper-plus-workspace-inference-gpu') or (extra != 'extra-10-piper-plus-cpu' and extra == 'extra-20-piper-plus-workspace-inference-gpu' and extra == 'extra-20-piper-plus-workspace-train') or (extra != 'extra-10-piper-plus-cpu' and extra == 'extra-20-piper-plus-workspace-inference-gpu' and extra == 'group-20-piper-plus-workspace-cpu') or (extra != 'extra-10-piper-plus-gpu' and extra != 'extra-20-piper-plus-workspace-inference' and extra == 'extra-20-piper-plus-workspace-inference-gpu' and extra == 'extra-20-piper-plus-workspace-train') or (extra != 'extra-10-piper-plus-gpu' and extra != 'extra-20-piper-plus-workspace-inference' and extra == 'extra-20-piper-plus-workspace-inference-gpu' and extra == 'group-20-piper-plus-workspace-cpu')" },
@@ -3505,7 +3500,9 @@ inference = [
 ]
 inference-gpu = [
     { name = "fastapi" },
-    { name = "g2p-en" },
+    { name = "inflect" },
+    { name = "joblib" },
+    { name = "nltk" },
     { name = "onnxruntime-gpu" },
     { name = "piper-plus", marker = "(extra == 'extra-10-piper-plus-cpu' and extra == 'extra-10-piper-plus-gpu') or (extra != 'extra-10-piper-plus-gpu' and extra == 'extra-20-piper-plus-workspace-inference-gpu') or (extra != 'extra-10-piper-plus-cpu' and extra == 'extra-20-piper-plus-workspace-inference-gpu')" },
     { name = "piper-plus", extra = ["gpu"], marker = "(extra == 'extra-10-piper-plus-cpu' and extra == 'extra-10-piper-plus-gpu') or (extra == 'extra-10-piper-plus-gpu' and extra == 'extra-20-piper-plus-workspace-inference-gpu') or (extra == 'extra-20-piper-plus-workspace-inference' and extra == 'extra-20-piper-plus-workspace-inference-gpu') or (extra == 'extra-20-piper-plus-workspace-inference-gpu' and extra == 'extra-20-piper-plus-workspace-train') or (extra == 'extra-20-piper-plus-workspace-inference-gpu' and extra == 'group-20-piper-plus-workspace-cpu')" },
@@ -3535,10 +3532,12 @@ test = [
 ]
 train = [
     { name = "einops" },
-    { name = "g2p-en" },
+    { name = "inflect" },
+    { name = "joblib" },
     { name = "librosa" },
     { name = "matplotlib" },
     { name = "mecab-python3" },
+    { name = "nltk" },
     { name = "numba" },
     { name = "onnx" },
     { name = "onnxruntime" },
@@ -3585,13 +3584,17 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'inference'", specifier = ">=0.141.1" },
     { name = "fastapi", marker = "extra == 'inference-gpu'", specifier = ">=0.141.1" },
     { name = "flake8", marker = "extra == 'dev'", specifier = "==6.1.0" },
-    { name = "g2p-en", specifier = ">=2.1.0" },
-    { name = "g2p-en", marker = "extra == 'inference'", specifier = ">=2.1.0" },
-    { name = "g2p-en", marker = "extra == 'inference-gpu'", specifier = ">=2.1.0" },
-    { name = "g2p-en", marker = "extra == 'train'", specifier = ">=2.1.0" },
     { name = "g2pk2", marker = "extra == 'multilingual'", specifier = ">=0.0.3" },
     { name = "ghapi", specifier = ">=1.1.1" },
     { name = "huggingface-hub", specifier = ">=0.36.2,<1.0" },
+    { name = "inflect", specifier = ">=0.3.1" },
+    { name = "inflect", marker = "extra == 'inference'", specifier = ">=0.3.1" },
+    { name = "inflect", marker = "extra == 'inference-gpu'", specifier = ">=0.3.1" },
+    { name = "inflect", marker = "extra == 'train'", specifier = ">=0.3.1" },
+    { name = "joblib", specifier = ">=1.5.0" },
+    { name = "joblib", marker = "extra == 'inference'", specifier = ">=1.5.0" },
+    { name = "joblib", marker = "extra == 'inference-gpu'", specifier = ">=1.5.0" },
+    { name = "joblib", marker = "extra == 'train'", specifier = ">=1.5.0" },
     { name = "librosa", specifier = ">=0.11.0" },
     { name = "librosa", marker = "extra == 'train'", specifier = ">=0.11.0" },
     { name = "matplotlib", marker = "extra == 'train'", specifier = ">=3.11.1" },
@@ -3599,6 +3602,10 @@ requires-dist = [
     { name = "mutmut", marker = "extra == 'dev'", specifier = ">=2.4,<3" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.20.2" },
     { name = "mypy", marker = "extra == 'test'", specifier = ">=1.20.2" },
+    { name = "nltk", specifier = ">=3.10.0" },
+    { name = "nltk", marker = "extra == 'inference'", specifier = ">=3.10.0" },
+    { name = "nltk", marker = "extra == 'inference-gpu'", specifier = ">=3.10.0" },
+    { name = "nltk", marker = "extra == 'train'", specifier = ">=3.10.0" },
     { name = "numba", marker = "extra == 'train'", specifier = ">=0.66.0" },
     { name = "numpy", specifier = "<2.5" },
     { name = "onnx", specifier = ">=1.22.0" },
@@ -3728,10 +3735,12 @@ test = [
 ]
 train = [
     { name = "einops" },
-    { name = "g2p-en" },
+    { name = "inflect" },
+    { name = "joblib" },
     { name = "librosa" },
     { name = "matplotlib" },
     { name = "mecab-python3" },
+    { name = "nltk" },
     { name = "numba" },
     { name = "onnx" },
     { name = "onnxruntime" },
@@ -3763,11 +3772,13 @@ requires-dist = [
     { name = "einops", marker = "extra == 'train'", specifier = ">=0.7" },
     { name = "fastapi", marker = "extra == 'inference'", specifier = ">=0.136.1" },
     { name = "fastapi", marker = "extra == 'inference-gpu'", specifier = ">=0.136.1" },
-    { name = "g2p-en", marker = "extra == 'train'", specifier = ">=2.1.0" },
+    { name = "inflect", marker = "extra == 'train'", specifier = ">=0.3.1" },
+    { name = "joblib", marker = "extra == 'train'", specifier = ">=1.5.0" },
     { name = "librosa", marker = "extra == 'train'", specifier = ">=0.11.0" },
     { name = "matplotlib", marker = "extra == 'train'", specifier = ">=3.10.9" },
     { name = "mecab-python3", marker = "extra == 'train'", specifier = ">=1.0" },
     { name = "mypy", marker = "extra == 'test'", specifier = ">=1.20.2" },
+    { name = "nltk", marker = "extra == 'train'", specifier = ">=3.10.0" },
     { name = "numba", marker = "extra == 'train'", specifier = ">=0.61.0" },
     { name = "numpy", specifier = "<2.5" },
     { name = "onnx", marker = "extra == 'train'", specifier = ">=1.21.0" },

@@ -61,6 +61,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+
 try:
     import tomllib  # Python 3.11+
 except ImportError:  # pragma: no cover - 3.10 fallback
@@ -94,9 +95,9 @@ CHECKS: list[tuple[str, str, str, tuple[str, ...], str, str]] = [
         "exact",
     ),
     (
-        "g2p-en",
-        "src/python_run/requirements.txt",
-        r"^g2p-en>=([0-9][0-9.]*)",
+        "bundled g2p-en",
+        "src/python_run/piper_plus/_vendor/g2p_en/provenance.json",
+        r'"version":\s*"([0-9.]+)"',
         ("english", "g2p_en"),
         "version",
         "exact",
@@ -128,7 +129,9 @@ class DriftError(RuntimeError):
     """Raised on a broken setup; the caller turns this into exit 1."""
 
 
-def spec_get(spec: dict[str, Any], path: tuple[str, ...], field: str, label: str) -> str:
+def spec_get(
+    spec: dict[str, Any], path: tuple[str, ...], field: str, label: str
+) -> str:
     node: Any = spec
     for key in path:
         if not isinstance(node, dict) or key not in node:
@@ -214,7 +217,9 @@ def check(*, verbose: bool = False) -> list[str]:
 
 def run(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--verbose", action="store_true", help="print every pin checked")
+    parser.add_argument(
+        "--verbose", action="store_true", help="print every pin checked"
+    )
     args = parser.parse_args(argv)
 
     try:

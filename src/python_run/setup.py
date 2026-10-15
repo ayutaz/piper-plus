@@ -6,6 +6,7 @@
 #   - リポジトリルートの VERSION ファイル (パッケージ外、 setuptools の
 #     `_assert_local` で `[tool.setuptools.dynamic]` の file 参照では弾かれる)
 #   - requirements.txt の解釈 (空行 / コメント行のフィルタリング)
+from email.parser import Parser
 from pathlib import Path
 
 from setuptools import setup
@@ -22,6 +23,15 @@ else:
     version_file_alt = this_dir.parent / "python" / "piper_train" / "VERSION"
     if version_file_alt.is_file():
         version = version_file_alt.read_text(encoding="utf-8").strip()
+    elif (this_dir / "PKG-INFO").is_file():
+        # An sdist has no repository-level VERSION. Preserve the version that
+        # setuptools recorded when creating it, including isolated uv builds.
+        metadata = Parser().parsestr(
+            (this_dir / "PKG-INFO").read_text(encoding="utf-8")
+        )
+        version = metadata["Version"]
+        if not version:
+            raise ValueError("Source archive has no Version metadata")
     else:
         version = "0.0.0"
 

@@ -17,7 +17,9 @@ dependencies = [
     "huggingface-hub>=0.36.2,<1.0",
     "numpy<2.5",
     "tensorboard>=2.21.0",
-    "g2p-en>=2.1.0",
+    "inflect>=0.3.1",
+    "nltk>=3.10.0",
+    "joblib>=1.5.0",
     "torch==2.11.0",
     "torchaudio==2.11.0",
     "pytorch-lightning>=2.6.5",
@@ -57,7 +59,9 @@ inference = [
     "onnxruntime>=1.28.0",
     "soundfile>=0.14.0",
     "pyopenjtalk-plus",
-    "g2p-en>=2.1.0",
+    "inflect>=0.3.1",
+    "nltk>=3.10.0",
+    "joblib>=1.5.0",
     "fastapi>=0.141.1",
     "uvicorn>=0.49.0",
 ]
@@ -70,7 +74,9 @@ inference-gpu = [
     "onnxruntime-gpu>=1.20.1,<1.26",
     "soundfile>=0.14.0",
     "pyopenjtalk-plus",
-    "g2p-en>=2.1.0",
+    "inflect>=0.3.1",
+    "nltk>=3.10.0",
+    "joblib>=1.5.0",
     "fastapi>=0.141.1",
     "uvicorn>=0.49.0",
 ]
@@ -96,7 +102,9 @@ train = [
     "pyopenjtalk-plus",
     "mecab-python3>=1.0",
     "unidic-lite>=1.0",
-    "g2p-en>=2.1.0",
+    "inflect>=0.3.1",
+    "nltk>=3.10.0",
+    "joblib>=1.5.0",
     "tensorboard>=2.21.0",
     "wandb>=0.28.1",
     "tqdm>=4.70.0",
@@ -208,6 +216,7 @@ conflicts = [
 package = false
 
 [tool.ruff]
+extend-exclude = ["**/_vendor"]
 # Ruffの基本設定
 line-length = 88  # blackと同じ行長
 target-version = "py311"  # Python 3.11以降をターゲット
@@ -418,6 +427,7 @@ source = [
     "src/python/g2p/piper_plus_g2p",
 ]
 omit = [
+    "*/_vendor/*",
     # ----- 既存 -----
     "*/tests/*",
     "*/test_*.py",

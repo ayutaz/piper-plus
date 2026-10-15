@@ -160,7 +160,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install dist/*.whl
-          pip install pyopenjtalk-plus g2p-en pypinyin
+          pip install pyopenjtalk-plus inflect "nltk>=3.10.0" "joblib>=1.5.0" pypinyin
           python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
 
       - name: Smoke test all 7 languages

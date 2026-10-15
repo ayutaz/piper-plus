@@ -453,7 +453,7 @@ jobs:
       - name: English phonemizer test
         run: |
           docker run --rm piper-python-train:test python -c "
-          from g2p_en import G2p
+          from piper_plus._vendor.g2p_en import G2p
           g2p = G2p()
           result = g2p('Hello world')
           assert result, 'g2p-en returned empty result'
