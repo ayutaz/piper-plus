@@ -133,6 +133,8 @@ cd piper-plus
 
 **Linux (ARM64，树莓派 4/5):**
 
+**尚未发布的 ARM64 修复：** 构建以 glibc 2.31 及以上为目标，已在 QEMU 下的 Debian Bullseye / Bookworm / Trixie（64 位）中验证启动和日语语音生成。尚未验证 Raspberry Pi 实机及 Raspberry Pi OS 本身。v2.0.1 发布归档不包含此修复。
+
 ```bash
 curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
 tar xzf piper-plus-cpp.tar.gz

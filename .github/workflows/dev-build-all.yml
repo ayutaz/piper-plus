@@ -62,39 +62,24 @@ jobs:
       release_upload_url: ${{ inputs.release_upload_url }}
 
   build_linux_arm64:
-    name: Build Linux ARM64
+    name: Build and verify Linux ARM64
+    uses: ./.github/workflows/_build-linux-arm64.yml
+
+  upload_linux_arm64:
+    name: Upload Linux ARM64 after all compatibility checks
+    needs: build_linux_arm64
+    if: inputs.release_upload_url != '' && inputs.release_upload_url != null
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6.1.0
-        with:
-          submodules: true
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4.0.0
-        with:
-          platforms: arm64
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.12.0
-
-      - name: Build in Docker
-        run: |
-          docker buildx build \
-            --platform linux/arm64 \
-            --build-arg CMAKE_BUILD_TYPE=Release \
-            --tag piper-arm64 \
-            --file Dockerfile \
-            --output type=local,dest=dist \
-            .
-
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4.6.2
+      - uses: actions/download-artifact@v8.0.1
         with:
           name: piper-plus-cpp-linux-arm64
-          path: dist/piper-plus-cpp-linux-arm64.tar.gz
-
-      - name: Upload to release
-        if: inputs.release_upload_url != '' && inputs.release_upload_url != null
+          path: dist
+      - name: Verify tested archive checksum
+        working-directory: dist
+        run: sha256sum --check SHA256SUMS
+      - name: Upload tested archive to release
         uses: ./.github/actions/retry-upload
         with:
           upload_url: ${{ inputs.release_upload_url }}
@@ -247,7 +232,7 @@ jobs:
   # Summary job
   summary:
     name: Build Summary
-    needs: [build_linux_x64, build_macos_arm64, build_windows_x64, build_linux_armv7, build_linux_arm64, build_python_wheels, test_python_wheels]
+    needs: [build_linux_x64, build_macos_arm64, build_windows_x64, build_linux_armv7, build_linux_arm64, upload_linux_arm64, build_python_wheels, test_python_wheels]
     if: always()
     runs-on: ubuntu-24.04
     outputs:
@@ -261,6 +246,7 @@ jobs:
              [[ "${{ needs.build_windows_x64.result }}" == "success" ]] && \
              [[ "${{ needs.build_linux_armv7.result }}" == "success" ]] && \
              [[ "${{ needs.build_linux_arm64.result }}" == "success" ]] && \
+             [[ "${{ needs.upload_linux_arm64.result }}" == "success" || "${{ needs.upload_linux_arm64.result }}" == "skipped" ]] && \
              [[ "${{ needs.build_python_wheels.result }}" == "success" ]] && \
              [[ "${{ needs.test_python_wheels.result }}" == "success" ]]; then
             echo "success=true" >> $GITHUB_OUTPUT
@@ -273,6 +259,7 @@ jobs:
             echo "  Windows x64: ${{ needs.build_windows_x64.result }}"
             echo "  Linux ARMv7: ${{ needs.build_linux_armv7.result }}"
             echo "  Linux ARM64: ${{ needs.build_linux_arm64.result }}"
+            echo "  ARM64 release upload: ${{ needs.upload_linux_arm64.result }}"
             echo "  Python Wheels: ${{ needs.build_python_wheels.result }}"
             echo "  Wheel Tests: ${{ needs.test_python_wheels.result }}"
             exit 1

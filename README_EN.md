@@ -195,6 +195,8 @@ cd piper-plus
 
 **Linux (ARM64, Raspberry Pi 4/5):**
 
+**Unreleased ARM64 fix:** Builds target glibc 2.31 or later. Startup and Japanese synthesis have been verified in 64-bit Debian Bullseye / Bookworm / Trixie containers under QEMU. Raspberry Pi hardware and Raspberry Pi OS itself remain untested. The v2.0.1 release archive does not include this fix.
+
 ```bash
 curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
 tar xzf piper-plus-cpp.tar.gz
