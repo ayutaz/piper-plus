@@ -9,6 +9,7 @@ on:
       - 'src/wasm/openjtalk-web/scripts/public-base-runtime.mjs'
       - 'tests/scripts/test_public_base_runtime.py'
       - 'tests/scripts/test_finetune_notebook_download.py'
+      - 'tests/scripts/test_finetune_notebook_runtime.py'
       - 'notebooks/finetune.ipynb'
       - 'src/go/**'
       - 'src/cpp/**'
@@ -34,6 +35,7 @@ jobs:
         run: >-
           uv run --no-project --with pytest python -m pytest
           tests/scripts/test_public_base_runtime.py tests/scripts/test_finetune_notebook_download.py
+          tests/scripts/test_finetune_notebook_runtime.py
           -q --override-ini=addopts=
       - name: Install inference and CPU CAM++ extraction dependencies
         run: |

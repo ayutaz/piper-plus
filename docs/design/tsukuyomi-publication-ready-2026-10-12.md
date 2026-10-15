@@ -136,5 +136,33 @@ C++はraw IPAの`ɔɪ`/`œ̃`/`ɐ̃`を、それぞれ既知の内部PUA `U+E062
 ノートブックの実際のdownload関数を抽出するテストで、取得先・固定revision・未認証条件・
 hash不一致時の停止を確認する。これはColab GPU実行の成功を意味しない。
 
-T4接続は自動承認レビューが拒否したため未実施。具体的な接続と費用範囲の承認を得てから、
-短い追加学習・export・生成までの実環境検証を続ける。
+2026-10-15に、定期購入・有料compute unitなしの無料Colab T4、費用上限0円で実環境検証を実施した。
+接続時の承認上の問題は解消済み。データは公開baseから作成した合成音声8件のみで、元録音・研究データは使用していない。
+セル内のファイル選択ではイベントが取得できなかったため、Colabのファイル欄から同じZIPをアップロードし、
+SHA256 `c42c719d159696f63c288e31c0ba81dbccb3080fbadda11f9ffa838499af1d06` を照合して展開した。
+Driveのmount・HF公開・有料リソースの購入は行っていない。
+
+実行中に判明した次の3点をノートブックで修正した。
+
+- v2.0.0の単一言語前処理は `language_id: null` を出力する。明示的な言語mapがない単一言語データに限りID 0を設定してから、固定公開helperで音素・言語IDを整合する。既存のmapは保持し、不明な非ゼロIDは拒否する。
+- Colabが継承させる `MPLBACKEND=module://matplotlib_inline.backend_inline` は別のuv環境では読み込めないため、学習前に `Agg` を指定する。
+- v2.0.0の明示的なModelCheckpointは `OUTPUT_DIR/checkpoints/` に保存する。旧Lightning loggerの保存先と両方を探索し、epoch・stepの数値で最新を選ぶ。未保存なら停止する。
+
+確認結果:
+
+| 項目 | 実際の結果 |
+|---|---|
+| 学習ソース | v2.0.0 / `61ac41b3d61d4f7a8856aa0bdd945d95e7f86515` |
+| GPU | Tesla T4、CUDA利用可能、VRAM 14.6 GB |
+| 環境 | Python 3.13、torch 2.11.0+cu128、Lightning 2.6.6、ONNX 1.23.0、ORT 1.30.0 |
+| 前処理・整合 | 8件、173音素、1話者、ja/en/zh/es/fr/ptのID map保持 |
+| 学習 | batch size 1、1 epoch、train上限2 batch、validation 0。ログとcheckpoint内のbatch completedが両方2 |
+| 保存checkpoint | epoch 0、global_step 4（手動最適化で2 batch × 2 optimizer）、927,047,382 bytes |
+| ONNX export | CPUで単一話者FP16、40,049,004 bytes。checker・shape inference成功 |
+| ONNX入力 | input、input_lengths、scales、lid、prosody_features。speaker_embeddingなし |
+| 参照なし生成 | 日本語2文、2.6006秒 / 2.8793秒、22050 Hz・mono・PCM16、有限値・非無音 |
+
+checkpoint SHA256: `20c19c803c8b90258c46084ff7cbf0a0b88a02dce9eb8e61e0faef645d327308`。
+ONNX SHA256: `d85753ce477f2e436c0ab246337150650f45c9e4717f46140cec8964eae52987`。
+この短い実行は学習経路の動作確認であり、声質改善・人手の品質承認・500 epoch完走・他言語評価を意味しない。
+公開済みモデルの置換も行っていない。
