@@ -2,14 +2,14 @@
   "schema_version": 1,
   "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
-    "executable": 222,
+    "executable": 225,
     "needs_placeholder": 7,
     "skip_warranted": 233,
-    "total": 462
+    "total": 465
   },
   "by_language": {
     "bash": {
-      "executable": 161,
+      "executable": 164,
       "needs_placeholder": 7,
       "skip_warranted": 44
     },
@@ -338,6 +338,19 @@
       ],
       "env_dependencies": [],
       "hash_sha1": "4a6a28df1e75be441fbc537e7d875a3a6eb9fbfc"
+    },
+    {
+      "file": "docs/design/python-g2p-license-2026-10-16.md",
+      "line_start": 62,
+      "line_end": 65,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "0389301435af809ea7c87758b1178fcd86b221ce"
     },
     {
       "file": "docs/design/tsukuyomi-publication-ready-2026-10-12.md",
@@ -4588,6 +4601,32 @@
       "directives_detected": [],
       "env_dependencies": [],
       "hash_sha1": "0af3dcef19eeb7e7f65ff99b969d6dc56b1351d6"
+    },
+    {
+      "file": "docs/migration/python-g2p-license.md",
+      "line_start": 26,
+      "line_end": 37,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "98148481b3e7ebed0d615c5879e9e3b3cea653b9"
+    },
+    {
+      "file": "docs/migration/python-g2p-license.md",
+      "line_start": 49,
+      "line_end": 53,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "35790daf100ca5c11ffdcf1bd6c9855450e9efc5"
     },
     {
       "file": "docs/migration/v1.11-to-v1.12.md",
