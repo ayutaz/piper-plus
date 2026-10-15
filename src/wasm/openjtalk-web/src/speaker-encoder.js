@@ -1,5 +1,6 @@
 /**
- * SpeakerEncoder — Browser-based voice cloning via ECAPA-TDNN / CAM++ ONNX models.
+ * SpeakerEncoder — Browser-based voice cloning via compatible ECAPA-TDNN or
+ * CAM++ ONNX models.
  *
  * Loads a speaker encoder model, computes mel spectrograms from AudioBuffer
  * or Float32Array input, and extracts speaker embeddings for voice cloning.

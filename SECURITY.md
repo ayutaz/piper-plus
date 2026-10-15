@@ -9,14 +9,15 @@ deployments.
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| 1.12.x  | Supported (current) | Receives security patches and bug fixes. |
-| 1.11.x  | End of Life (EOL) | No longer receiving security patches. Please upgrade. |
-| <= 1.10 | Unsupported | Pre-EOL releases; will not receive any fixes. |
+| 2.0.x | Supported (current Python/native release line) | Use the latest patch release. |
+| 1.x | Unsupported | Upgrade to the current release line. |
 
 If you are pinned to an unsupported release, please consult
-[`docs/migration/v1.11-to-v1.12.md`](docs/migration/v1.11-to-v1.12.md) for
-upgrade guidance (HiFi-GAN -> MB-iSTFT decoder, Flask -> FastAPI server, .NET
-TFM bumped to `net10.0`, etc.).
+the [migration index](docs/migration/README.md), including
+[v1.12 → v2.0](docs/migration/v1.12-to-v2.0.md), for upgrade guidance.
+Rust, npm, NuGet and Kotlin packages have independent version numbers;
+their current source versions are listed in
+[`docs/spec/release-versions.toml`](docs/spec/release-versions.toml).
 
 ## Reporting a Vulnerability
 
@@ -121,26 +122,35 @@ artifacts for inference: ONNX models do not execute arbitrary Python on load.
 
 ### Do not expose the HTTP server on `0.0.0.0` without authentication
 
-The bundled FastAPI server (`src/python_run/piper_plus/http_server.py`) and the
-OpenAI-compatible TTS API (`docker/python-inference/inference.py`) are intended
-for trusted local use. They do not ship with built-in authentication. If you
-must expose them beyond `localhost`, place them behind a reverse proxy
-(nginx / Caddy / Cloudflare Access / etc.) that enforces TLS and authentication
-or an mTLS-terminating gateway.
+The package HTTP server (`src/python_run/piper_plus/http_server.py`) has no
+built-in authentication. The Docker OpenAI-compatible TTS API
+(`docker/python-inference/inference.py`) supports Bearer authentication when
+`PIPER_PLUS_API_KEYS` is set to a comma-separated list of accepted keys;
+authentication is disabled when the variable is unset. The check covers
+`/synthesize`, `/v1/audio/speech`, `/v1/models` and
+`/v1/audio/speech/languages`. `/health` and `/api/phoneme-timing` do not use
+that authentication dependency, so a deployment requiring authentication
+for every route must enforce it at the proxy/gateway. See the
+[integration guide](docs/guides/integration/open-webui-integration.md).
+
+Bind local services to loopback when possible. For deployment beyond the
+trusted host, configure authentication and a TLS-terminating proxy/gateway;
+enabling Docker API keys does not add TLS or protect a different server.
 
 ### Verify SLSA provenance / build attestation on releases
 
-Recent release workflows (5 GitHub Actions workflows) attach SLSA build
-attestations to published artifacts. When consuming binaries, prefer
+Release workflows attach build attestations to supported published artifacts.
+When consuming binaries, check the release's attestation availability, prefer
 attestation-verified releases and verify the provenance with
 `gh attestation verify` (or your supply-chain tooling of choice) before
 deployment.
 
 ### Pin dependency versions
 
-Each runtime ships a lockfile (`uv.lock`, `Cargo.lock`, `package-lock.json`,
-NuGet `packages.lock.json`, etc.). Pin to the lockfile in production builds and
-keep an eye on Dependabot alerts.
+Use the tracked lockfiles provided for each build (`uv.lock`, `Cargo.lock`,
+`package-lock.json`, NuGet `packages.lock.json`, etc.) and the runtime's
+documented locked restore/install mode. Not every standalone example has a
+lockfile. Keep an eye on dependency alerts.
 
 ## Credit
 

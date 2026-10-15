@@ -13,7 +13,7 @@ PUA (Private Use Area) 関連の不変条件を一括検査します。`pua.json
 
 `docs/spec/pua-contract.toml` の 4 不変条件:
 
-1. **Cross-runtime consistency** — `pua.json` と 6 ランタイム (Python/Rust/Go/JS/C#/C++) のテーブルが byte-for-byte 一致
+1. **Cross-runtime consistency** — `pua.json` と checker が列挙する全 runtime source (Python runtime/G2P、Rust、Go、JS/WASM、C#、Swift) のテーブルが一致
 2. **Inventory coverage** — `id_maps.py` の language inventory に出てくる multi-codepoint token は全て `pua.json` に登録済み
 3. **Generated id_map keys** — `phoneme_id_map` の全 key が単一コードポイント (C++ runtime の制約)
 4. **PUA_COMPAT_VERSION sync** — 全ランタイムの compat version が `pua.json` の version 値と一致
@@ -30,7 +30,7 @@ PUA (Private Use Area) 関連の不変条件を一括検査します。`pua.json
 python scripts/check_pua_consistency.py --verbose --check-version
 ```
 
-期待: `OK: pua.json matches all 6 runtime tables` で終了。
+期待: `All runtimes are consistent with pua.json.` で終了。
 
 ### 2. Inventory + fail-fast invariants (Python)
 

@@ -139,3 +139,15 @@ revisionが変わっていた場合は内容を再確認し、競合を無視し
 
 今回の証拠は`output/public-base-release-20261010/`のreceipt・匿名取得結果・consumer結果・
 FTログ/checkpoint・WAVに保存。機能検証と品質改善研究を分け、品質承認は未実施のまま記録する。
+
+## 後続の source/runtime CI と package proof の区別
+
+公開後の [Public Base Runtime Verification run 38189966578](https://github.com/ayutaz/piper-plus/actions/runs/38189966578)
+は、固定した public base revision と CAM++ を使い、Python/Rust/Go/C#/C++/WASM の
+6 runtime job と summarize gate を成功させた。これは source/runtime CI の実モデル
+inference evidence であり、公開 bundle の品質承認ではない。
+
+独立 consumer package の証拠は、別記の PyPI `piper-plus==2.0.0` 実行である。
+source/runtime CI の成功を、released package `2.0.0`/`2.0.1` の全 runtime/platform
+対応や新しい model alias の存在へ拡張しない。公開 base は引き続き experimental、
+reference-conditioned、quality approval 未承認として扱う。

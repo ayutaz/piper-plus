@@ -4,7 +4,9 @@ piper-plus の Docker 環境一式です。Python 推論 (CUDA / CPU)・学習�
 
 Python 推論イメージは **GPL-free** です。espeak-ng / piper-phonemize に依存せず、g2p-en (Apache-2.0) と pyopenjtalk-plus を使用します。
 
-依存管理は全イメージで **uv** に統一されています（requirements.txt は使用しません）。
+依存管理は全イメージで **uv** に統一されています。Python 推論イメージは
+`src/python/pyproject.toml` の extras を使い、WebUI の追加依存は
+`src/python_run/requirements_webui.txt` から uv でインストールします。
 
 ## 利用可能な環境
 
@@ -50,7 +52,7 @@ docker build -t piper-plus-go -f src/go/docker/Dockerfile .
 
 ## Python 推論
 
-CPU/GPU 両対応の推論イメージです。`--device` オプションで実行デバイスを選択できます（`auto`/`cpu`/`gpu`）。`setup.py` の `[inference-gpu]` extras（onnxruntime-gpu 含む）でインストールされます。CPU のみの環境では `[inference]` extras も利用可能です。
+CPU/GPU 両対応の推論イメージです。`--device` オプションで実行デバイスを選択できます（`auto`/`cpu`/`gpu`）。依存は `src/python/pyproject.toml` の `[inference-gpu]` extras（onnxruntime-gpu 含む）でインストールされます。CPU のみの環境では `[inference]` extras も利用可能です。
 
 ### ビルド
 
@@ -148,7 +150,7 @@ response.stream_to_file("output.wav")
 
 ## Python 学習
 
-NVIDIA GPU を使用してモデルを学習するためのイメージです。`setup.py` の `[train]` extras でインストールされます。Multi-stage ビルドによりランタイムイメージのサイズを削減しています。
+NVIDIA GPU を使用してモデルを学習するためのイメージです。`src/python/pyproject.toml` の `[train]` extras でインストールされます。Multi-stage ビルドによりランタイムイメージのサイズを削減しています。
 
 ### ビルド
 
@@ -278,17 +280,17 @@ docker run --rm \
   bash -c 'echo "こんにちは" | piper-plus --model /app/models/model.onnx --output_file /app/output/output.wav'
 ```
 
-### MODEL_PATH 環境変数
+### モデル指定
 
-`MODEL_PATH` 環境変数を指定すると、entrypoint スクリプトが自動的に `PIPER_PLUS_MODEL_PATH` を設定します。
+C++ イメージではモデルを CLI の `--model` で明示してください。`MODEL_PATH` を
+設定して別の実行ファイルへ渡す旧 entrypoint の例はサポートされていません。
 
 ```bash
 docker run --rm \
   -v $(pwd)/models:/app/models:ro \
   -v $(pwd)/output:/app/output \
-  -e MODEL_PATH=/app/models/model.onnx \
   piper-cpp \
-  bash -c 'echo "こんにちは" | piper --output_file /app/output/output.wav'
+  bash -c 'echo "こんにちは" | piper-plus --model /app/models/model.onnx --output_file /app/output/output.wav'
 ```
 
 ## C++ 開発環境
@@ -459,7 +461,6 @@ Python 推論イメージと WebUI は GPU なしでも動作します。`--gpus
 | `GRADIO_SERVER_NAME` | WebUI | サーバーバインドアドレス (デフォルト: `0.0.0.0`) |
 | `GRADIO_SERVER_PORT` | WebUI | サーバーポート (デフォルト: `7860`) |
 | `CUDA_VISIBLE_DEVICES` | Python 学習 | CUDA デバイス選択 (ONNX 変換時は `""` を指定) |
-| `MODEL_PATH` | C++ 推論 | モデルファイルパス (entrypoint が `PIPER_PLUS_MODEL_PATH` に設定) |
 | `BUILD_TYPE` | C++ 開発 | CMake ビルドタイプ (デフォルト: `Release`) |
 | `RUN_TESTS` | C++ 開発 | `1` でビルド後にテスト実行 |
 | `COVERAGE` | C++ 開発 | `1` でカバレッジレポート生成 |
@@ -560,4 +561,4 @@ docker inspect --format='{{json .State.Health}}' <container_id>
 
 ### Python 推論で「モジュールが見つからない」エラー
 
-Python 推論イメージは `[inference-gpu]` extras のみをインストールしています。学習関連のモジュール (`pytorch_lightning`, `wandb` 等) は含まれません。推論には `piper_train.infer_onnx` を使用してください。
+Python 推論イメージは `[inference-gpu]` extras（CPU イメージは `[inference]`）をインストールしています。学習関連のモジュール (`pytorch_lightning`, `wandb` 等) は含まれません。推論には `piper_train.infer_onnx` を使用してください。

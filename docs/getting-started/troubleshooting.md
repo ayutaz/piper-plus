@@ -38,7 +38,7 @@ Error: Model file not found: model.onnx
 Model config doesn't exist
 ```
 
-**設定ファイルの検索順序**: piper は以下の順序で設定ファイルを自動検索します。
+**設定ファイルの検索順序**: C++ CLI では明示的な `--config`、`PIPER_PLUS_DEFAULT_CONFIG` を優先し、未指定なら以下を検索します。ランタイムごとの差は [モデル解決](../reference/model-resolution.md) を参照してください。
 
 1. `<モデル名>.onnx.json`（例: `model.onnx` → `model.onnx.json`）
 2. モデルと同じディレクトリ内の `config.json`（フォールバック）
@@ -71,7 +71,7 @@ Model config doesn't exist
 1. Check output file path has write permissions
 2. Verify `--output_file` parameter is specified
 3. Try `--output_raw` to test raw audio output
-4. Check system audio drivers are working
+4. Supply nonempty text through stdin or `--text`. Writing a WAV file does not require an audio playback device.
 
 ## Japanese TTS Issues
 
@@ -177,42 +177,21 @@ Error: Checksum mismatch! Expected abc123..., got def456...
 
 #### "UnicodeEncodeError" with Japanese Text
 
-**Solution**:
-
-```cmd
-REM Set console to UTF-8
-chcp 65001
-
-REM Use PowerShell instead
-powershell -Command "echo 'こんにちは' | .\piper-plus.exe --model model.onnx --output_file out.wav"
-```
+Use UTF-8 for the terminal and for text passed to native processes. In
+Windows PowerShell 5.1, changing the console code page alone does not set
+the encoding of native-process pipeline input.
 
 #### Windows で日本語テキストが文字化けする（No phoneme エラー）
 
-**症状**: PowerShell から日本語テキストをパイプすると、OpenJTalk が `No phoneme` で失敗する。
+PowerShell では、パイプ出力を明示的に UTF-8 に設定します。
 
-**原因**: Windows のコンソールエンコーディングが UTF-8 でないため、パイプ経由で文字化けが発生。
+```powershell
+$OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+"こんにちは。" | .\bin\piper-plus.exe --model .\models\model.onnx --language ja --output_file out.wav
+```
 
-**解決方法**:
-
-1. **cmd で `chcp 65001` を実行してから使用**:
-
-   ```cmd
-   chcp 65001
-   echo こんにちは | piper-plus.exe --model model.onnx --config config.json --output_file out.wav
-   ```
-
-2. **ファイル経由で入力** (最も確実):
-
-   ```cmd
-   REM UTF-8 BOMなしでテキストファイルを作成
-   powershell -Command "$utf8 = New-Object System.Text.UTF8Encoding($false); [System.IO.File]::WriteAllText('input.txt', 'こんにちは', $utf8)"
-
-   chcp 65001
-   type input.txt | piper-plus.exe --model model.onnx --config config.json --output_file out.wav
-   ```
-
-3. **v1.5.5以降**: piper-plus.exe 内部で `SetConsoleCP(CP_UTF8)` が呼び出されますが、一部の環境ではパイプ入力に効かない場合があります。その場合は方法2を使用してください。
+cmd では `chcp 65001` の後に UTF-8 ファイルを `type` で渡せます。
+具体的な配置と手順は [Windows セットアップ](windows-setup.md#日本語が文字化けする) を参照してください。
 
 #### "The filename, directory name, or volume label syntax is incorrect"
 
@@ -227,7 +206,7 @@ powershell -Command "echo 'こんにちは' | .\piper-plus.exe --model model.onn
 **If scripts are blocked**:
 
 ```powershell
-# Allow script execution (run as admin)
+# Set the policy for the current user if local policy allows it
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
@@ -244,6 +223,16 @@ xattr -cr /path/to/piper/
 
 ### Linux
 
+#### `GLIBC_2.xx not found` on ARM64
+
+The published v2.0.1 `piper-plus-cpp-linux-arm64.tar.gz` requires glibc
+2.38 and does not start on Debian Bullseye (2.31) or Bookworm (2.36).
+The fix on `dev` builds ARM64 on Bullseye and validates the archive on
+Bullseye, Bookworm and Trixie under QEMU; it is not part of the existing
+v2.0.1 release archive. Use the corrected source/CI artifact or wait for
+a release containing it. See [binary selection](binary-selection.md).
+Do not replace an operating system's libc with a copied shared library.
+
 #### Permission Denied
 
 **Solutions**:
@@ -253,7 +242,7 @@ xattr -cr /path/to/piper/
 chmod +x piper-plus/bin/piper-plus
 
 # Check SELinux (if applicable)
-sudo setenforce 0  # Temporary disable to test
+# If SELinux reports a denial, inspect its audit log and the target file context.
 ```
 
 ## Build Issues
@@ -264,7 +253,7 @@ sudo setenforce 0  # Temporary disable to test
 
 ```bash
 # Specify ONNX Runtime location
-cmake .. -DONNXRUNTIME_DIR=/path/to/onnxruntime
+cmake -S . -B build -DONNXRUNTIME_DIR=/path/to/onnxruntime
 ```
 
 ### OpenJTalk Build Fails
@@ -363,49 +352,22 @@ The *same commit* may pass in a later `schedule` run.
 > findings are reported in the log for information only. See the tier rationale
 > in `.github/workflows/security-audit.yml`.
 
-**Most common root cause**: a transient **upstream advisory-data defect**, not a
-real regression in this repo. OSV / PyPA advisories are sometimes auto-generated
-with a missing `last_affected` / `fixed` field, which OSV interprets as "all
-versions affected" — so even an already-patched version gets flagged. Once the
-advisory is corrected upstream, the finding disappears with no code change.
+**Diagnosis and resolution**:
 
-> Real example (2026-05): `nltk` `PYSEC-2026-97` and `joblib` `PYSEC-2024-277`
-> were generated on 2026-05-20 with `introduced: 0` and no `last_affected`, so
-> the safe versions `nltk 3.9.4` / `joblib 1.5.3` were flagged. The
-> `pypa/advisory-database` PR #289 ("Update records generated incorrectly",
-> 2026-05-21) added `last_affected: 3.9.2` / `1.4.2`, after which the same
-> commit passed.
+1. Record the failing step, resolved package version, advisory ID and fixed
+   versions. A transitive dependency is still part of the installed runtime;
+   do not assume the report is a false positive.
+2. Inspect the linked advisory and the dependency chain. Compare the resolved
+   version with the advisory's affected range. If advisory data was corrected
+   upstream, retain that evidence before rerunning the audit.
+3. Update the appropriate requirement/lockfile and run the relevant tests.
+   A successful rerun alone does not explain why the earlier finding vanished.
+4. An advisory suppression requires a documented reason and a removal
+   condition; it must not replace checking the affected version range.
 
-**Diagnosis**:
-
-1. Open the failed job and note which step failed (`Audit root requirements` vs
-   `Audit src/python_run`) and the exact `Name / Version / ID` rows.
-2. Check whether the flagged version is actually inside the advisory's affected
-   range by inspecting the advisory YAML `ranges` events:
-
-   ```bash
-   gh api repos/pypa/advisory-database/contents/vulns/<pkg>/<PYSEC-ID>.yaml \
-     -H "Accept: application/vnd.github.raw" | grep -E "introduced|last_affected|fixed"
-   ```
-
-3. If the resolved version is **above** `last_affected` (or `last_affected` is
-   missing entirely), suspect an upstream data defect. Inspect the advisory's
-   commit history to see whether the range was recently corrected:
-
-   ```bash
-   gh api "repos/pypa/advisory-database/commits?path=vulns/<pkg>/<PYSEC-ID>.yaml"
-   ```
-
-**Resolution**:
-
-- If upstream already corrected the range, a re-run / re-push clears it — no
-  code change required.
-- To stop a future *resolution* from regressing into a truly-affected version,
-  add a lower-bound floor for the transitive package in
-  `src/python_run/requirements.txt` (e.g. `nltk>=3.10.0`, `joblib>=1.5.0`).
-- Avoid `pip-audit --ignore-vuln <ID>` unless the advisory is a documented,
-  vendor-disputed false positive; if used, add a comment citing the dispute and
-  a removal condition so the suppression cannot hide a future genuine finding.
+See the [official pip-audit documentation](https://github.com/pypa/pip-audit#troubleshooting)
+for tool errors and vulnerability-service behavior. The workflow file remains
+the source of truth for this repository's blocking/informational policy.
 
 ## Training Troubleshooting
 
@@ -439,13 +401,7 @@ advisory is corrected upstream, the finding disappears with no code change.
 
 **Solutions**:
 
-1. Set NCCL environment variables (required for multi-GPU):
-
-   ```bash
-   export NCCL_DEBUG=WARN
-   export NCCL_P2P_DISABLE=1
-   export NCCL_IB_DISABLE=1
-   ```
+1. Confirm which process and device exhausted memory. NCCL transport overrides are not a general fix for GPU out-of-memory errors.
 
 2. Reduce `batch_size` and `samples_per_speaker`:
 
@@ -453,7 +409,7 @@ advisory is corrected upstream, the finding disappears with no code change.
    --batch-size 12 --samples-per-speaker 2
    ```
 
-3. Avoid resuming training from a checkpoint that was saved with a different batch size, as this can cause memory allocation issues.
+3. Check the model configuration, WavLM setting and other GPU processes. Batch size may be changed for a new run; distinguish a new fine-tune from full optimizer-state resume. See the [training guide](../guides/training/training-guide.md).
 
 ### ONNX Conversion Errors
 
@@ -481,7 +437,7 @@ advisory is corrected upstream, the finding disappears with no code change.
 
 **問題**: `dotnet` コマンドが認識されない
 
-**解決策**: .NET 10 SDK 以上をインストールしてください:
+**解決策**: ソースから実行・ビルドする場合は .NET 10 SDK をインストールしてください。セルフコンテインドの配布 CLI には別途 SDK/ランタイムは不要です:
 
 - <https://dotnet.microsoft.com/download>
 
@@ -502,4 +458,4 @@ dotnet restore src/csharp/PiperPlus.sln
 **解決策**:
 
 - Microsoft.ML.OnnxRuntime.Managed v1.24.3 が必要
-- GPU版を使用する場合は Microsoft.ML.OnnxRuntime.Gpu に変更
+- ネイティブ ONNX Runtime と選択プロバイダーを一致させてください。NuGet の Managed パッケージだけでは CUDA/DirectML は有効になりません。[C# CLI](../../src/csharp/PiperPlus.Cli/README.md) の配布・プロバイダー設定を参照してください。

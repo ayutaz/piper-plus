@@ -18,6 +18,8 @@ The `settings.gradle.kts` uses a Gradle composite build to consume the
 sibling `android/piper-plus-g2p/` module directly. Outside the repository,
 delete the `includeBuild(...)` block and rely on the published Maven
 Central artifact (`io.github.ayutaz:piper-plus-g2p-android:X.Y.Z`).
+The current published version is `1.0.1`:
+`io.github.ayutaz:piper-plus-g2p-android:1.0.1`.
 
 ## Run
 

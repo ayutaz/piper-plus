@@ -61,7 +61,7 @@ Issue #388 の Use case「Android のアプリ対応時」+ 既存ランタイ�
 ```kotlin
 // build.gradle.kts (アプリ側)
 dependencies {
-    implementation("io.github.ayutaz:piper-plus-g2p-android:1.0.0")
+    implementation("io.github.ayutaz:piper-plus-g2p-android:1.0.1")
 }
 
 // MainActivity.kt
@@ -189,7 +189,7 @@ android/
 ```text
 groupId:    io.github.ayutaz
 artifactId: piper-plus-g2p-android
-version:    1.0.0
+version:    1.0.1
 ```
 
 (`com.piperplus` は既存 AAR で使用中の Java/Kotlin パッケージ名 namespace。Maven Central groupId は `io.github.ayutaz` が DNS 検証不要で最も摩擦が少ない)

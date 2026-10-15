@@ -47,8 +47,8 @@ classifiers = [
 # version / dependencies は dynamic 化し、 setup.py が実解決を担当する。
 #   - version: ../../VERSION (リポジトリルートの canonical VERSION file) を
 #     setup.py が read してから `setup(version=...)` に渡す。
-#   - dependencies: requirements.txt (Issue #372 で ORT floor を C++ canonical
-#     に揃え済み) を setup.py がパースして `install_requires=...` に渡す。
+#   - dependencies: requirements.txt の共通依存を setup.py がパースして
+#     `install_requires=...` に渡す。ORT は cpu/gpu extra から一方を選択。
 # `[tool.setuptools.dynamic]` の file 参照を使わない理由は後段の Note を参照。
 dynamic = ["version", "dependencies"]
 
@@ -58,9 +58,11 @@ Repository = "https://github.com/ayutaz/piper-plus"
 Issues = "https://github.com/ayutaz/piper-plus/issues"
 
 [project.optional-dependencies]
+# Select one provider distribution; both supply the onnxruntime module.
+cpu = ["onnxruntime>=1.26.0"]
 # Issue #372: ORT floor must be >= C++ canonical (cmake/OnnxRuntime.cmake).
 # requirements_gpu.txt (`onnxruntime-gpu>=1.20.1,<1.26`) と揃える。 CPU runtime
-# の `onnxruntime>=1.26.0` (requirements.txt) とは意図的に異なる (下の #527
+# の `onnxruntime>=1.26.0` (cpu extra) とは意図的に異なる (下の #527
 # follow-up 参照: GPU 側だけ CUDA 13 要求を避けて <1.26 に留めている)。
 # Issue #527 follow-up: onnxruntime-gpu 1.26+ requires libcudart.so.13 (CUDA 13)
 # but DR-001 base image is CUDA 12.8.1. Cap to <1.26 until the CUDA 13 base

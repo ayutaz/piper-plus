@@ -2,15 +2,15 @@
   "schema_version": 1,
   "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
-    "executable": 225,
-    "needs_placeholder": 6,
-    "skip_warranted": 245,
-    "total": 476
+    "executable": 222,
+    "needs_placeholder": 7,
+    "skip_warranted": 233,
+    "total": 462
   },
   "by_language": {
     "bash": {
-      "executable": 165,
-      "needs_placeholder": 6,
+      "executable": 161,
+      "needs_placeholder": 7,
       "skip_warranted": 44
     },
     "csharp": {
@@ -24,7 +24,7 @@
       "skip_warranted": 0
     },
     "python": {
-      "executable": 30,
+      "executable": 31,
       "needs_placeholder": 0,
       "skip_warranted": 1
     },
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 200
+      "skip_warranted": 188
     },
     "wasm": {
       "executable": 10,
@@ -62,8 +62,8 @@
     },
     {
       "file": "docs/benchmark-mos.md",
-      "line_start": 86,
-      "line_end": 111,
+      "line_start": 109,
+      "line_end": 134,
       "language_raw": "yaml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -73,12 +73,12 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "c5ef14bbed6e59e208e3bdd37171deaa4a33d695"
+      "hash_sha1": "c75751eb3debe9614b8e9d520f58ca0b68aa6229"
     },
     {
       "file": "docs/benchmark-mos.md",
-      "line_start": 115,
-      "line_end": 123,
+      "line_start": 138,
+      "line_end": 146,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -92,8 +92,8 @@
     },
     {
       "file": "docs/benchmark-mos.md",
-      "line_start": 127,
-      "line_end": 137,
+      "line_start": 150,
+      "line_end": 160,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -105,8 +105,8 @@
     },
     {
       "file": "docs/benchmark-mos.md",
-      "line_start": 141,
-      "line_end": 147,
+      "line_start": 164,
+      "line_end": 170,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -118,8 +118,8 @@
     },
     {
       "file": "docs/benchmark-mos.md",
-      "line_start": 154,
-      "line_end": 173,
+      "line_start": 177,
+      "line_end": 196,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -130,6 +130,169 @@
       ],
       "env_dependencies": [],
       "hash_sha1": "2120a3bd7543ea08915070a99717bd1b755f8230"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 57,
+      "line_end": 62,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "85510cc1aed7a7b37cf55b6938d7b083dd5bf297"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 73,
+      "line_end": 80,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "0b5d5ac351ddefddcb009c82a2ca0ea4a11f6aa5"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 91,
+      "line_end": 97,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "5d7525f2744c3b0a099846edfbce8adebf214b86"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 110,
+      "line_end": 114,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "ceb230e4532293075e21caa392e5fbcbb4ca3485"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 123,
+      "line_end": 127,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "eed043ecb426841aa4a2abf740927d4a8661ee10"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 156,
+      "line_end": 160,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "f31fdeeda0a3e7b09f3557531f46a1ed60fa5509"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 196,
+      "line_end": 198,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "6b83f662af8997176db47c8731170a52007fa9fb"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 232,
+      "line_end": 234,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "e2e2fd555033b2a7145dd379f935504dbd72c00c"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 246,
+      "line_end": 249,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "2697355952298fb03dba03225f4929c785ccff72"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 259,
+      "line_end": 261,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "819a9e73a96c7730dba49b464ede7ffba37d67a9"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 299,
+      "line_end": 309,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "2c55c0311705757d50b2b884ad4a1130caa79932"
     },
     {
       "file": "docs/design/multi-6lang-zero-shot-v7-training-results.md",
@@ -163,8 +326,8 @@
     },
     {
       "file": "docs/design/piper-plus-module-rename-v2.md",
-      "line_start": 58,
-      "line_end": 66,
+      "line_start": 66,
+      "line_end": 74,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -178,68 +341,8 @@
     },
     {
       "file": "docs/design/tsukuyomi-publication-ready-2026-10-12.md",
-      "line_start": 58,
-      "line_end": 60,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "41aee3ba46f1879cb87dcf7c1cf5855f30216bc0"
-    },
-    {
-      "file": "docs/design/tsukuyomi-publication-ready-2026-10-12.md",
-      "line_start": 64,
-      "line_end": 66,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "7d895ec02e82002f78498829ce1eb098eb689e91"
-    },
-    {
-      "file": "docs/design/tsukuyomi-publication-ready-2026-10-12.md",
-      "line_start": 71,
-      "line_end": 73,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "5497f6419ec5e8e2d5a4d06a225840d535ce275c"
-    },
-    {
-      "file": "docs/design/tsukuyomi-publication-ready-2026-10-12.md",
-      "line_start": 78,
-      "line_end": 80,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "5b8515b91fc5fa058dc07703b2a7d5b6a5f125b6"
-    },
-    {
-      "file": "docs/design/tsukuyomi-publication-ready-2026-10-12.md",
-      "line_start": 92,
-      "line_end": 95,
+      "line_start": 74,
+      "line_end": 77,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -337,8 +440,8 @@
     },
     {
       "file": "docs/features/phoneme-input.md",
-      "line_start": 18,
-      "line_end": 20,
+      "line_start": 24,
+      "line_end": 26,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -346,12 +449,27 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "ce4b493cbb862c6c5885e47f33c76e3c26e75531"
+      "hash_sha1": "13652d4e0a9d3be68de5a54d7bd963c81b17e710"
     },
     {
       "file": "docs/features/phoneme-input.md",
-      "line_start": 28,
-      "line_end": 34,
+      "line_start": 42,
+      "line_end": 48,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "24b926be4195953046b3f5f00f54db864077342c"
+    },
+    {
+      "file": "docs/features/phoneme-input.md",
+      "line_start": 56,
+      "line_end": 62,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -359,12 +477,87 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "eb4a202e8b958b5b0ceaf1c10e9acc2601488017"
+      "hash_sha1": "cdd5d59a84aff85c53ca54828e257b0c65867761"
     },
     {
       "file": "docs/features/phoneme-input.md",
-      "line_start": 38,
-      "line_end": 44,
+      "line_start": 88,
+      "line_end": 94,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "66125359952e6310ffce6eeac2640cb485928b61"
+    },
+    {
+      "file": "docs/features/phoneme-input.md",
+      "line_start": 98,
+      "line_end": 104,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "fae840cd312ff10e17d2d8a40c45487505711cf3"
+    },
+    {
+      "file": "docs/features/phoneme-input.md",
+      "line_start": 108,
+      "line_end": 114,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "e167ef24fc0202a7b06a0f3d71d6164dccc9fa30"
+    },
+    {
+      "file": "docs/features/phoneme-input.md",
+      "line_start": 118,
+      "line_end": 124,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "f72903b7f6fce15c1e17bbcf9f3793f8e5f0167c"
+    },
+    {
+      "file": "docs/features/phoneme-input.md",
+      "line_start": 357,
+      "line_end": 360,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "78077567d602a63a4590ad700e79b852ace8a5f0"
+    },
+    {
+      "file": "docs/features/phoneme-input.md",
+      "line_start": 362,
+      "line_end": 365,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -372,90 +565,27 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "1d292e2a907c65aa3935a5c78414ef86221fa872"
+      "hash_sha1": "80a4a903e2ada6d9d694162404e637d24caee1d6"
     },
     {
       "file": "docs/features/phoneme-input.md",
-      "line_start": 70,
-      "line_end": 76,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
+      "line_start": 369,
+      "line_end": 371,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
       "placeholders_detected": [],
-      "directives_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
       "env_dependencies": [],
-      "hash_sha1": "098419c8f90f54715aa01e406630852dac5387cf"
+      "hash_sha1": "1f5a42b57700accc28ed2e8a6cb0495ea75d1837"
     },
     {
       "file": "docs/features/phoneme-input.md",
-      "line_start": 80,
-      "line_end": 86,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "80e62f0fb6ae31409a767d0e9022630cdebd42bc"
-    },
-    {
-      "file": "docs/features/phoneme-input.md",
-      "line_start": 90,
-      "line_end": 96,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "0469f08de04ad9d62e334f982777487afb01195f"
-    },
-    {
-      "file": "docs/features/phoneme-input.md",
-      "line_start": 100,
-      "line_end": 106,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "1d859f395f1f476d74365786bf232f21adadc0da"
-    },
-    {
-      "file": "docs/features/phoneme-input.md",
-      "line_start": 339,
-      "line_end": 345,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "d4c6ee5217728cbcf02277efc86f42051d8c82d4"
-    },
-    {
-      "file": "docs/features/phoneme-input.md",
-      "line_start": 349,
-      "line_end": 351,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "e0ae7593ad4aac752dc9cd5a65bfe27871be3763"
-    },
-    {
-      "file": "docs/features/phoneme-input.md",
-      "line_start": 511,
-      "line_end": 513,
+      "line_start": 534,
+      "line_end": 536,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -467,8 +597,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 20,
-      "line_end": 29,
+      "line_start": 27,
+      "line_end": 36,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -482,8 +612,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 42,
-      "line_end": 52,
+      "line_start": 49,
+      "line_end": 59,
       "language_raw": "json",
       "language": "unknown",
       "category": "skip_warranted",
@@ -497,8 +627,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 60,
-      "line_end": 65,
+      "line_start": 67,
+      "line_end": 72,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -512,8 +642,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 71,
-      "line_end": 79,
+      "line_start": 78,
+      "line_end": 86,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -527,8 +657,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 87,
-      "line_end": 98,
+      "line_start": 94,
+      "line_end": 105,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -540,8 +670,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 102,
-      "line_end": 116,
+      "line_start": 114,
+      "line_end": 128,
       "language_raw": "javascript",
       "language": "wasm",
       "category": "executable",
@@ -553,8 +683,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 120,
-      "line_end": 123,
+      "line_start": 132,
+      "line_end": 134,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -562,12 +692,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "f25e23aa6acccaf2ad4c602438af15a1d185761e"
+      "hash_sha1": "67bc36a8f75694afcde36c290dfc84377cdddd20"
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 127,
-      "line_end": 130,
+      "line_start": 142,
+      "line_end": 145,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -579,8 +709,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 134,
-      "line_end": 137,
+      "line_start": 149,
+      "line_end": 152,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -592,8 +722,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 141,
-      "line_end": 144,
+      "line_start": 156,
+      "line_end": 159,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -605,8 +735,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 152,
-      "line_end": 165,
+      "line_start": 167,
+      "line_end": 180,
       "language_raw": "javascript",
       "language": "wasm",
       "category": "executable",
@@ -618,8 +748,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 171,
-      "line_end": 174,
+      "line_start": 186,
+      "line_end": 189,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -631,8 +761,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 180,
-      "line_end": 184,
+      "line_start": 195,
+      "line_end": 199,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -645,7 +775,7 @@
     {
       "file": "docs/features/webui.md",
       "line_start": 17,
-      "line_end": 23,
+      "line_end": 21,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -653,12 +783,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "aa644b6e7e67289d29dc0fccf65b427fb4c8b081"
+      "hash_sha1": "df15a7ccd6e041c625e94611393f0b3b157e2961"
     },
     {
       "file": "docs/features/webui.md",
-      "line_start": 27,
-      "line_end": 37,
+      "line_start": 25,
+      "line_end": 34,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -666,12 +796,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "5496ce8b5abeb883a7579db6e82f9f4a0fb48a5d"
+      "hash_sha1": "2f4992164409530edfdfcf503aacad5bcb3019e3"
     },
     {
       "file": "docs/features/webui.md",
-      "line_start": 78,
-      "line_end": 91,
+      "line_start": 88,
+      "line_end": 102,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -681,12 +811,12 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "cd7cac45bc590be51da17301b8f5a7b7cc01cae0"
+      "hash_sha1": "bd3ee59ce86f09a4b9c8bceab83645d9047ed485"
     },
     {
       "file": "docs/features/webui.md",
-      "line_start": 104,
-      "line_end": 113,
+      "line_start": 115,
+      "line_end": 124,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -694,38 +824,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "e68cbea13c6b4d5c0c6331cdfbb498dbd1e040e8"
+      "hash_sha1": "a2244eb7b7dff36277c9d478af9fd98f601df97c"
     },
     {
-      "file": "docs/getting-started/binary-selection.md",
-      "line_start": 58,
-      "line_end": 63,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "e0aec94d1a8dfbdc2454020dec8ce53058bcd036"
-    },
-    {
-      "file": "docs/getting-started/binary-selection.md",
-      "line_start": 67,
-      "line_end": 71,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "274dce7a5a870b9998645757aa9cb426552932c9"
-    },
-    {
-      "file": "docs/getting-started/binary-selection.md",
-      "line_start": 77,
-      "line_end": 81,
+      "file": "docs/features/webui.md",
+      "line_start": 153,
+      "line_end": 156,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -735,12 +839,57 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "4b4899bc0d6cd9366b359bb7b3111eca7a5cbd06"
+      "hash_sha1": "73f8270a349ff48c25fb1f78c37d16e41d5e7adb"
     },
     {
       "file": "docs/getting-started/binary-selection.md",
-      "line_start": 91,
-      "line_end": 93,
+      "line_start": 61,
+      "line_end": 67,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "needs_placeholder",
+      "suggested_action": "wrap_with_doctest_skip_until_t011",
+      "placeholders_detected": [
+        "${VERSION}"
+      ],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "1781ebcec93564cc25b8165263f9c3f465bdc15f"
+    },
+    {
+      "file": "docs/getting-started/binary-selection.md",
+      "line_start": 71,
+      "line_end": 76,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "needs_placeholder",
+      "suggested_action": "wrap_with_doctest_skip_until_t011",
+      "placeholders_detected": [
+        "${VERSION}"
+      ],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "f2a8a31433a4d29abcf5815a32475165e52c99ff"
+    },
+    {
+      "file": "docs/getting-started/binary-selection.md",
+      "line_start": 82,
+      "line_end": 87,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "8a9a808aa5dbe26cf66f078a1f4574470b0e7754"
+    },
+    {
+      "file": "docs/getting-started/binary-selection.md",
+      "line_start": 97,
+      "line_end": 99,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -752,8 +901,8 @@
     },
     {
       "file": "docs/getting-started/binary-selection.md",
-      "line_start": 101,
-      "line_end": 104,
+      "line_start": 107,
+      "line_end": 110,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -804,8 +953,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 61,
-      "line_end": 63,
+      "line_start": 66,
+      "line_end": 68,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -817,8 +966,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 72,
-      "line_end": 74,
+      "line_start": 77,
+      "line_end": 79,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -830,8 +979,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 83,
-      "line_end": 86,
+      "line_start": 88,
+      "line_end": 91,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -843,8 +992,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 95,
-      "line_end": 99,
+      "line_start": 100,
+      "line_end": 104,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -856,8 +1005,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 111,
-      "line_end": 114,
+      "line_start": 116,
+      "line_end": 119,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -869,8 +1018,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 124,
-      "line_end": 127,
+      "line_start": 129,
+      "line_end": 132,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -882,8 +1031,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 138,
-      "line_end": 144,
+      "line_start": 143,
+      "line_end": 149,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -895,8 +1044,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 153,
-      "line_end": 159,
+      "line_start": 158,
+      "line_end": 164,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -908,8 +1057,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 171,
-      "line_end": 177,
+      "line_start": 176,
+      "line_end": 182,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -921,8 +1070,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 193,
-      "line_end": 196,
+      "line_start": 199,
+      "line_end": 202,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -934,8 +1083,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 205,
-      "line_end": 207,
+      "line_start": 211,
+      "line_end": 213,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -947,8 +1096,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 216,
-      "line_end": 218,
+      "line_start": 222,
+      "line_end": 224,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -960,8 +1109,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 227,
-      "line_end": 229,
+      "line_start": 233,
+      "line_end": 235,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -973,8 +1122,21 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 237,
-      "line_end": 239,
+      "line_start": 242,
+      "line_end": 244,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "9e8535d59fcee0e54dfb03fa1bfd874c2bb31394"
+    },
+    {
+      "file": "docs/getting-started/environment-variables.md",
+      "line_start": 252,
+      "line_end": 254,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -986,8 +1148,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 249,
-      "line_end": 251,
+      "line_start": 264,
+      "line_end": 266,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -999,8 +1161,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 259,
-      "line_end": 261,
+      "line_start": 274,
+      "line_end": 276,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1012,8 +1174,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 269,
-      "line_end": 271,
+      "line_start": 284,
+      "line_end": 286,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1025,8 +1187,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 277,
-      "line_end": 280,
+      "line_start": 292,
+      "line_end": 295,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1038,8 +1200,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 284,
-      "line_end": 292,
+      "line_start": 299,
+      "line_end": 307,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1051,8 +1213,8 @@
     },
     {
       "file": "docs/getting-started/environment-variables.md",
-      "line_start": 296,
-      "line_end": 301,
+      "line_start": 311,
+      "line_end": 316,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1060,7 +1222,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "671a2e603087befc2d2603c015f944defa22ba92"
+      "hash_sha1": "2fa65723a44655de0be715e27ef6da9a9d5424a0"
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
@@ -1217,53 +1379,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 182,
-      "line_end": 188,
-      "language_raw": "cmd",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "1e0a39a857462899fb6736af41764561fddedcb8"
-    },
-    {
-      "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 200,
-      "line_end": 203,
-      "language_raw": "cmd",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "f4dfa419301493338e388094998dd5dc629e83f9"
-    },
-    {
-      "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 207,
-      "line_end": 213,
-      "language_raw": "cmd",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "2544d27ac6f0710d0e46a3e84328ffc36f13a3f9"
-    },
-    {
-      "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 229,
-      "line_end": 232,
+      "line_start": 188,
+      "line_end": 191,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1273,12 +1390,27 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "80845eac48c156a00dba3a0cd03bc859394f10db"
+      "hash_sha1": "57adf96767b80af3d5cbbc8db6ec9892a85e4563"
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 240,
-      "line_end": 243,
+      "line_start": 208,
+      "line_end": 211,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "86892bbf30d3042debc0c7f95ab610666bd44244"
+    },
+    {
+      "file": "docs/getting-started/troubleshooting.md",
+      "line_start": 219,
+      "line_end": 222,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1290,7 +1422,20 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 251,
+      "line_start": 240,
+      "line_end": 246,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "61d6f1aa6367bd62656b9122b82828998985e1a3"
+    },
+    {
+      "file": "docs/getting-started/troubleshooting.md",
+      "line_start": 254,
       "line_end": 257,
       "language_raw": "bash",
       "language": "bash",
@@ -1299,25 +1444,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "4a1fa209eed574dd1c2e79b65b22cb190033025d"
+      "hash_sha1": "8aed977a2d215f22ff14ea47d2d37c637e1a98bf"
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
       "line_start": 265,
-      "line_end": 268,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "52c029fa40803f19cbb81810f324f4ce91e8e24b"
-    },
-    {
-      "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 276,
-      "line_end": 278,
+      "line_end": 267,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1329,8 +1461,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 282,
-      "line_end": 291,
+      "line_start": 271,
+      "line_end": 280,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1342,8 +1474,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 325,
-      "line_end": 327,
+      "line_start": 314,
+      "line_end": 316,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1355,38 +1487,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 386,
-      "line_end": 389,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "needs_placeholder",
-      "suggested_action": "wrap_with_doctest_skip_until_t011",
-      "placeholders_detected": [
-        "<PYSEC-ID>"
-      ],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "13bbd7405ae8337cf56168e444627af1429be951"
-    },
-    {
-      "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 395,
-      "line_end": 397,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "needs_placeholder",
-      "suggested_action": "wrap_with_doctest_skip_until_t011",
-      "placeholders_detected": [
-        "<PYSEC-ID>"
-      ],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "4490bd9ff4478b5a1ba96832edc65a8d3bd93cd5"
-    },
-    {
-      "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 420,
-      "line_end": 422,
+      "line_start": 382,
+      "line_end": 384,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1398,8 +1500,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 426,
-      "line_end": 428,
+      "line_start": 388,
+      "line_end": 390,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1411,8 +1513,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 432,
-      "line_end": 434,
+      "line_start": 394,
+      "line_end": 396,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1424,21 +1526,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 444,
-      "line_end": 448,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "3c538ce5fd1db3b8685d6d60766ab7888ace680f"
-    },
-    {
-      "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 452,
-      "line_end": 454,
+      "line_start": 408,
+      "line_end": 410,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1450,8 +1539,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 466,
-      "line_end": 469,
+      "line_start": 422,
+      "line_end": 425,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -1465,8 +1554,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 473,
-      "line_end": 476,
+      "line_start": 429,
+      "line_end": 432,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -1480,8 +1569,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 494,
-      "line_end": 496,
+      "line_start": 450,
+      "line_end": 452,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1493,8 +1582,8 @@
     },
     {
       "file": "docs/getting-started/windows-setup.md",
-      "line_start": 35,
-      "line_end": 44,
+      "line_start": 11,
+      "line_end": 13,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1504,12 +1593,12 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "59a2f3d49572af6b6cc5d3010e4f2a5b73bfa853"
+      "hash_sha1": "aadba405751d087d882f11826e8072961e81867f"
     },
     {
       "file": "docs/getting-started/windows-setup.md",
-      "line_start": 50,
-      "line_end": 58,
+      "line_start": 17,
+      "line_end": 22,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1519,12 +1608,72 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "b7c4c144928d6f42405b8c0d9372d12bf5cad850"
+      "hash_sha1": "a7ea8be1b04d6e3cb4d75ab164056cd8be7ea435"
     },
     {
       "file": "docs/getting-started/windows-setup.md",
-      "line_start": 62,
-      "line_end": 70,
+      "line_start": 39,
+      "line_end": 49,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "530d75841e54301de70495f24b8a89f2ba6c8246"
+    },
+    {
+      "file": "docs/getting-started/windows-setup.md",
+      "line_start": 59,
+      "line_end": 67,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "4e89fd92a923b40358aa976d3046552c9118e604"
+    },
+    {
+      "file": "docs/getting-started/windows-setup.md",
+      "line_start": 75,
+      "line_end": 78,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "a9b6295598c8c0feb9173f02e7ec7197a1fd68f5"
+    },
+    {
+      "file": "docs/getting-started/windows-setup.md",
+      "line_start": 86,
+      "line_end": 90,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "37c77f9ba3e84159178aabb0721d3103e3e7e5c3"
+    },
+    {
+      "file": "docs/getting-started/windows-setup.md",
+      "line_start": 100,
+      "line_end": 103,
       "language_raw": "cmd",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1534,412 +1683,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "a6c49fea0a6bc66f7d5ed54d20a481d85c8ce74b"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 76,
-      "line_end": 89,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "270c0e3f8af7b8457676680ef10f0d84fc70b331"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 93,
-      "line_end": 106,
-      "language_raw": "cmd",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "aedc3e5bb1e6dcec2a6f57bbe6032b1bd2fbd688"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 114,
-      "line_end": 128,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "fe36f57638c6fa47f70859488b59ae880de94355"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 136,
-      "line_end": 140,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "39d0ffc80f11199da484f9afd1cf8474dcc36567"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 146,
-      "line_end": 159,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "0202352bdeda52223185017de7483ebc4d98f968"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 168,
-      "line_end": 170,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "5f47b2ef873d037c9564f9e5ba80c4d66a824275"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 174,
-      "line_end": 176,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "b2476e28e99f4b81bea555eedf7e0d84e8da6154"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 184,
-      "line_end": 187,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "187449bdeee6f1206a82ea506dfd086a77755692"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 191,
-      "line_end": 195,
-      "language_raw": "cmd",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "11f941fe8699c6a817082a3fca78eb1353684238"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 199,
-      "line_end": 221,
-      "language_raw": "cpp",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "c97510892167750846ca1c134a799a4c53a4ff23"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 225,
-      "line_end": 243,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "2480978eca3adb05f4b4a667cdb462c0f933bf19"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 247,
-      "line_end": 249,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "4831ca54ef396e773a7a9a2b3c65b1c0c9444c09"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 255,
-      "line_end": 267,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "b702794abfa1de7264dac954c6e21edb27fc3da7"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 281,
-      "line_end": 306,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "7c14823366c4d902a0fd22fecdd9b194553908fc"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 314,
-      "line_end": 331,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "717880d1a5b2c747f98ac0a627cd808d777d742a"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 341,
-      "line_end": 344,
-      "language_raw": "cmd",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "95302f99ebcd99935fc77adb88e64e4d903264a5"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 352,
-      "line_end": 359,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "1ab43443f3de18de59f28901de82a9e17463a618"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 363,
-      "line_end": 366,
-      "language_raw": "cmd",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "e3c42e3648dcf59762efb1e8cc4a1fb6fbc4e3f7"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 372,
-      "line_end": 396,
-      "language_raw": "bat",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "7e2b55de640e616eacc95d50bf0ff049dd046bcf"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 400,
-      "line_end": 402,
-      "language_raw": "cmd",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "2d74adb1981cb495393be1423a195994261c152d"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 406,
-      "line_end": 419,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "6c06ddd3d82d98e306a8034e6f6c1c6edf0cb11e"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 427,
-      "line_end": 464,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "353242220520e3e2b9d0b6ced79bc1cba058dd10"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 481,
-      "line_end": 483,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "c4359d979e6580fe0534930f231c21db5784a44c"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 488,
-      "line_end": 490,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "11f5084247236251248ba9157d30a236953d2067"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 507,
-      "line_end": 517,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "a079d23ea8ad86a52f457303ada9e154a07a8594"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 528,
-      "line_end": 534,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "ca4c4218312531051be4036c73dc028cc820e749"
-    },
-    {
-      "file": "docs/getting-started/windows-setup.md",
-      "line_start": 538,
-      "line_end": 555,
-      "language_raw": "powershell",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "0ed1d44e48181829bd7c2aeee08f6d091b7f3508"
+      "hash_sha1": "51daeb5a2528d153b1c88dc1d81df77fc54e1413"
     },
     {
       "file": "docs/guides/development/adding-pua-codepoint.md",
@@ -2054,7 +1798,7 @@
     {
       "file": "docs/guides/development/building-from-source.md",
       "line_start": 44,
-      "line_end": 49,
+      "line_end": 50,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2062,12 +1806,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "474741fc342dbdbd613008ac530d16e7dc719c90"
+      "hash_sha1": "57bcf1275f417f930be27dae2289a0224eae5b3d"
     },
     {
       "file": "docs/guides/development/building-from-source.md",
-      "line_start": 55,
-      "line_end": 80,
+      "line_start": 56,
+      "line_end": 82,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2075,12 +1819,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "d914b41c37f1eeffc597e3d92bcfa8afd1ed46ca"
+      "hash_sha1": "96fd2ffb7000bae86917d4f017d48ee183c2455c"
     },
     {
       "file": "docs/guides/development/building-from-source.md",
-      "line_start": 84,
-      "line_end": 110,
+      "line_start": 86,
+      "line_end": 112,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2088,12 +1832,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "a4152d09152588308f21b4d4266a5e11ab479631"
+      "hash_sha1": "470487ab15415ea9a8cb7e041dcca2e431f10423"
     },
     {
       "file": "docs/guides/development/building-from-source.md",
-      "line_start": 116,
-      "line_end": 121,
+      "line_start": 118,
+      "line_end": 125,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2101,7 +1845,20 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "bac259bffccedd78c89eec547828c3917a8d7a75"
+      "hash_sha1": "f3ec959e779e2f34d56fffec1e4f3fdcf8611819"
+    },
+    {
+      "file": "docs/guides/development/building-from-source.md",
+      "line_start": 131,
+      "line_end": 133,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "82e06d0841b4195b332166485fe6686c59b1722c"
     },
     {
       "file": "docs/guides/development/cli-usage.md",
@@ -2160,7 +1917,7 @@
     {
       "file": "docs/guides/development/cli-usage.md",
       "line_start": 110,
-      "line_end": 120,
+      "line_end": 121,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2168,12 +1925,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "0ac1876dd0bcee2e7eae921289170bf04035cfb3"
+      "hash_sha1": "d3fd93d303661e4a17a07ddb361dab0f1b02c2e8"
     },
     {
       "file": "docs/guides/development/cli-usage.md",
-      "line_start": 137,
-      "line_end": 140,
+      "line_start": 138,
+      "line_end": 141,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2187,8 +1944,8 @@
     },
     {
       "file": "docs/guides/development/cli-usage.md",
-      "line_start": 144,
-      "line_end": 147,
+      "line_start": 145,
+      "line_end": 148,
       "language_raw": "cmd",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2202,8 +1959,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 31,
-      "line_end": 36,
+      "line_start": 34,
+      "line_end": 39,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2211,12 +1968,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "eddb4155c5ccf5ccd7f9e508f1c77713f2dca0c8"
+      "hash_sha1": "49e02e9fc7579aa6a163c3b96cc4bdecf42ec31a"
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 86,
-      "line_end": 90,
+      "line_start": 93,
+      "line_end": 97,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2230,8 +1987,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 94,
-      "line_end": 98,
+      "line_start": 101,
+      "line_end": 105,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2328,7 +2085,7 @@
     {
       "file": "docs/guides/integration/home-assistant.md",
       "line_start": 123,
-      "line_end": 136,
+      "line_end": 134,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2336,11 +2093,11 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "2ab476003c4ebfa9b84dd21c7c1762116dc773dd"
+      "hash_sha1": "4a9cd52bd9a459fcdbd36281416a2290818b7d1a"
     },
     {
       "file": "docs/guides/integration/home-assistant.md",
-      "line_start": 142,
+      "line_start": 140,
       "line_end": 161,
       "language_raw": "ini",
       "language": "unknown",
@@ -2351,7 +2108,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "7f80f4b78a7c2ab8f573f63c1b74bdf80dba1963"
+      "hash_sha1": "46b5555c6cebb316df0ad9fa49748eef106fdaf0"
     },
     {
       "file": "docs/guides/integration/home-assistant.md",
@@ -2595,7 +2352,7 @@
     {
       "file": "docs/guides/integration/llm-ecosystem.md",
       "line_start": 79,
-      "line_end": 93,
+      "line_end": 94,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -2603,12 +2360,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "a121cbb91a53babab62e6c3a7faf4a048e44a9e8"
+      "hash_sha1": "532931f164302b6b84f1cc701c3a1fe908da47cf"
     },
     {
       "file": "docs/guides/integration/llm-ecosystem.md",
-      "line_start": 101,
-      "line_end": 109,
+      "line_start": 102,
+      "line_end": 111,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -2616,12 +2373,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "d8352ed605c79b92cebcd08131a84b9f8b2f34a4"
+      "hash_sha1": "b3bea44a7efe1a34c5b8ff9d396fb118fa38b29a"
     },
     {
       "file": "docs/guides/integration/llm-ecosystem.md",
-      "line_start": 144,
-      "line_end": 166,
+      "line_start": 146,
+      "line_end": 169,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -2629,12 +2386,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "2f1a0f1427e0bcb7ee4be411b4da682e7736bb0b"
+      "hash_sha1": "bb47ca212a71ae6c80290ee781c4bba2eadc08d0"
     },
     {
       "file": "docs/guides/integration/llm-ecosystem.md",
-      "line_start": 170,
-      "line_end": 180,
+      "line_start": 173,
+      "line_end": 183,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -2646,8 +2403,8 @@
     },
     {
       "file": "docs/guides/integration/llm-ecosystem.md",
-      "line_start": 190,
-      "line_end": 192,
+      "line_start": 193,
+      "line_end": 195,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2661,8 +2418,8 @@
     },
     {
       "file": "docs/guides/integration/llm-ecosystem.md",
-      "line_start": 196,
-      "line_end": 224,
+      "line_start": 199,
+      "line_end": 228,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -2670,12 +2427,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "775b250e3058c007b1730553341c4626a53cd02b"
+      "hash_sha1": "d53fe8d7fc1f6fb7d7d429c5a7289914c7f3e943"
     },
     {
       "file": "docs/guides/integration/llm-ecosystem.md",
-      "line_start": 246,
-      "line_end": 248,
+      "line_start": 250,
+      "line_end": 252,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2687,8 +2444,8 @@
     },
     {
       "file": "docs/guides/integration/llm-ecosystem.md",
-      "line_start": 252,
-      "line_end": 254,
+      "line_start": 256,
+      "line_end": 258,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2700,8 +2457,8 @@
     },
     {
       "file": "docs/guides/integration/llm-ecosystem.md",
-      "line_start": 266,
-      "line_end": 268,
+      "line_start": 270,
+      "line_end": 272,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2713,8 +2470,8 @@
     },
     {
       "file": "docs/guides/integration/llm-ecosystem.md",
-      "line_start": 272,
-      "line_end": 274,
+      "line_start": 276,
+      "line_end": 278,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2726,8 +2483,8 @@
     },
     {
       "file": "docs/guides/integration/llm-ecosystem.md",
-      "line_start": 286,
-      "line_end": 289,
+      "line_start": 290,
+      "line_end": 293,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2766,7 +2523,7 @@
     {
       "file": "docs/guides/integration/open-webui-integration.md",
       "line_start": 51,
-      "line_end": 77,
+      "line_end": 79,
       "language_raw": "yaml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2776,12 +2533,12 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "03f8c06fbc657e99460ad8d0e24068d024754ac2"
+      "hash_sha1": "a5c46f353272cce20607772cdc48fc1f7d986f21"
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 79,
-      "line_end": 81,
+      "line_start": 81,
+      "line_end": 83,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2793,8 +2550,8 @@
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 87,
-      "line_end": 122,
+      "line_start": 89,
+      "line_end": 129,
       "language_raw": "yaml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2804,12 +2561,12 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "df6df0a1b418111d55583a4368184f72f01a7833"
+      "hash_sha1": "60818eb5d3ef0ca2036994056b45df7b03b409c2"
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 128,
-      "line_end": 142,
+      "line_start": 135,
+      "line_end": 149,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2817,12 +2574,27 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "dcc2722a511376cb47286c4eff4890c76a889767"
+      "hash_sha1": "5866ca2cc10baa164006c0897be46a2c7a20dfe0"
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 215,
-      "line_end": 227,
+      "line_start": 157,
+      "line_end": 169,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "needs_placeholder",
+      "suggested_action": "wrap_with_doctest_skip_until_t011",
+      "placeholders_detected": [
+        "${PIPER_PLUS_API_KEY}"
+      ],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "d17f1352e2bf4ce1b3f5a35baa5a568b1f416848"
+    },
+    {
+      "file": "docs/guides/integration/open-webui-integration.md",
+      "line_start": 246,
+      "line_end": 258,
       "language_raw": "json",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2836,8 +2608,8 @@
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 233,
-      "line_end": 237,
+      "line_start": 264,
+      "line_end": 268,
       "language_raw": "json",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2851,8 +2623,8 @@
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 245,
-      "line_end": 247,
+      "line_start": 276,
+      "line_end": 278,
       "language_raw": "json",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2866,8 +2638,8 @@
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 257,
-      "line_end": 259,
+      "line_start": 288,
+      "line_end": 290,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2879,8 +2651,8 @@
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 263,
-      "line_end": 265,
+      "line_start": 294,
+      "line_end": 296,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2892,8 +2664,8 @@
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 274,
-      "line_end": 276,
+      "line_start": 305,
+      "line_end": 307,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2905,8 +2677,8 @@
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 284,
-      "line_end": 286,
+      "line_start": 315,
+      "line_end": 317,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2918,8 +2690,8 @@
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 294,
-      "line_end": 301,
+      "line_start": 325,
+      "line_end": 332,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2971,7 +2743,7 @@
     {
       "file": "docs/guides/integration/wasm-bundler-guide.md",
       "line_start": 40,
-      "line_end": 46,
+      "line_end": 47,
       "language_raw": "js",
       "language": "wasm",
       "category": "executable",
@@ -2979,12 +2751,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "84d1c34b0ba7690141d60512acb23e35b3fc44c4"
+      "hash_sha1": "71cec7f278c3c4fc068e406041fc306713bf3c92"
     },
     {
       "file": "docs/guides/integration/wasm-bundler-guide.md",
-      "line_start": 52,
-      "line_end": 70,
+      "line_start": 53,
+      "line_end": 71,
       "language_raw": "js",
       "language": "wasm",
       "category": "executable",
@@ -2996,8 +2768,8 @@
     },
     {
       "file": "docs/guides/integration/wasm-bundler-guide.md",
-      "line_start": 74,
-      "line_end": 83,
+      "line_start": 75,
+      "line_end": 84,
       "language_raw": "js",
       "language": "wasm",
       "category": "executable",
@@ -3009,8 +2781,8 @@
     },
     {
       "file": "docs/guides/integration/wasm-bundler-guide.md",
-      "line_start": 102,
-      "line_end": 105,
+      "line_start": 103,
+      "line_end": 106,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3024,8 +2796,8 @@
     },
     {
       "file": "docs/guides/platform/android-g2p-dictionary.md",
-      "line_start": 33,
-      "line_end": 43,
+      "line_start": 35,
+      "line_end": 45,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3039,8 +2811,8 @@
     },
     {
       "file": "docs/guides/platform/android-g2p-dictionary.md",
-      "line_start": 52,
-      "line_end": 55,
+      "line_start": 54,
+      "line_end": 57,
       "language_raw": "kotlin",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3054,8 +2826,8 @@
     },
     {
       "file": "docs/guides/platform/android-g2p-dictionary.md",
-      "line_start": 67,
-      "line_end": 72,
+      "line_start": 70,
+      "line_end": 75,
       "language_raw": "kotlin",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3069,8 +2841,8 @@
     },
     {
       "file": "docs/guides/platform/android-g2p-dictionary.md",
-      "line_start": 93,
-      "line_end": 100,
+      "line_start": 106,
+      "line_end": 113,
       "language_raw": "kotlin",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3084,8 +2856,8 @@
     },
     {
       "file": "docs/guides/platform/android-g2p-dictionary.md",
-      "line_start": 114,
-      "line_end": 117,
+      "line_start": 127,
+      "line_end": 130,
       "language_raw": "kotlin",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3099,8 +2871,8 @@
     },
     {
       "file": "docs/guides/platform/android-g2p-dictionary.md",
-      "line_start": 136,
-      "line_end": 141,
+      "line_start": 153,
+      "line_end": 158,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -3123,7 +2895,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "3c9b0eec4f2a939813aecd2b0e4258f339d98a89"
+      "hash_sha1": "2688f06d6fd8b75edda33d43cc02e0ec58081346"
     },
     {
       "file": "docs/guides/platform/android-g2p-integration.md",
@@ -3200,8 +2972,8 @@
     },
     {
       "file": "docs/guides/platform/ios-integration.md",
-      "line_start": 41,
-      "line_end": 44,
+      "line_start": 46,
+      "line_end": 49,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -3209,12 +2981,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "64584616736d6a567d9ac3b88fae2560eb1a4fd7"
+      "hash_sha1": "648327e84100d588f3f263b4983ec4db18bffb89"
     },
     {
       "file": "docs/guides/platform/ios-integration.md",
-      "line_start": 48,
-      "line_end": 62,
+      "line_start": 53,
+      "line_end": 67,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3228,8 +3000,8 @@
     },
     {
       "file": "docs/guides/platform/ios-integration.md",
-      "line_start": 70,
-      "line_end": 73,
+      "line_start": 75,
+      "line_end": 78,
       "language_raw": "ruby",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3243,8 +3015,8 @@
     },
     {
       "file": "docs/guides/platform/ios-integration.md",
-      "line_start": 75,
-      "line_end": 77,
+      "line_start": 80,
+      "line_end": 82,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -3256,8 +3028,8 @@
     },
     {
       "file": "docs/guides/platform/ios-integration.md",
-      "line_start": 81,
-      "line_end": 89,
+      "line_start": 86,
+      "line_end": 94,
       "language_raw": "swift",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3271,8 +3043,8 @@
     },
     {
       "file": "docs/guides/platform/ios-integration.md",
-      "line_start": 95,
-      "line_end": 98,
+      "line_start": 100,
+      "line_end": 103,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -3284,8 +3056,8 @@
     },
     {
       "file": "docs/guides/platform/ios-integration.md",
-      "line_start": 126,
-      "line_end": 132,
+      "line_start": 131,
+      "line_end": 137,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -3297,8 +3069,8 @@
     },
     {
       "file": "docs/guides/platform/ios-integration.md",
-      "line_start": 146,
-      "line_end": 157,
+      "line_start": 151,
+      "line_end": 162,
       "language_raw": "swift",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3312,8 +3084,8 @@
     },
     {
       "file": "docs/guides/platform/ios-integration.md",
-      "line_start": 171,
-      "line_end": 178,
+      "line_start": 176,
+      "line_end": 183,
       "language_raw": "dart",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3327,8 +3099,8 @@
     },
     {
       "file": "docs/guides/platform/ios-integration.md",
-      "line_start": 182,
-      "line_end": 186,
+      "line_start": 187,
+      "line_end": 191,
       "language_raw": "swift",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3342,8 +3114,8 @@
     },
     {
       "file": "docs/guides/platform/ios-integration.md",
-      "line_start": 192,
-      "line_end": 197,
+      "line_start": 197,
+      "line_end": 202,
       "language_raw": "gdscript",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3357,8 +3129,8 @@
     },
     {
       "file": "docs/guides/platform/ios-integration.md",
-      "line_start": 263,
-      "line_end": 302,
+      "line_start": 268,
+      "line_end": 307,
       "language_raw": "xml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3372,8 +3144,8 @@
     },
     {
       "file": "docs/guides/platform/ios-integration.md",
-      "line_start": 310,
-      "line_end": 313,
+      "line_start": 315,
+      "line_end": 318,
       "language_raw": "xml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3387,8 +3159,8 @@
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
-      "line_start": 66,
-      "line_end": 87,
+      "line_start": 65,
+      "line_end": 86,
       "language_raw": "swift",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3398,12 +3170,12 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "37f2ebc63f7d0b36b3eb3b4219be85bd1ec7f918"
+      "hash_sha1": "3c14a1836a400e8571f803b908cb3d5c0cbd9c8d"
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
-      "line_start": 95,
-      "line_end": 98,
+      "line_start": 94,
+      "line_end": 97,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -3411,12 +3183,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "84465fd99e90d970f1c09e3af74f12ba9d9c9428"
+      "hash_sha1": "90009afada9bec8e585b7d06ea25b92c69c1a7ca"
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
-      "line_start": 110,
-      "line_end": 117,
+      "line_start": 109,
+      "line_end": 116,
       "language_raw": "swift",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3430,8 +3202,8 @@
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
-      "line_start": 121,
-      "line_end": 131,
+      "line_start": 120,
+      "line_end": 130,
       "language_raw": "swift",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3445,8 +3217,8 @@
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
-      "line_start": 135,
-      "line_end": 139,
+      "line_start": 134,
+      "line_end": 138,
       "language_raw": "swift",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3460,8 +3232,8 @@
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
-      "line_start": 143,
-      "line_end": 164,
+      "line_start": 142,
+      "line_end": 163,
       "language_raw": "swift",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3475,8 +3247,8 @@
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
-      "line_start": 177,
-      "line_end": 196,
+      "line_start": 176,
+      "line_end": 195,
       "language_raw": "swift",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3490,8 +3262,8 @@
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
-      "line_start": 234,
-      "line_end": 237,
+      "line_start": 233,
+      "line_end": 236,
       "language_raw": "xml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3514,7 +3286,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "c2184c8218df2ac3219ccbe28d9857b16fb6203f"
+      "hash_sha1": "e72a825a4982d7042a04152148ac07cb8fb4e6d4"
     },
     {
       "file": "docs/guides/testing/multilingual-testing.md",
@@ -3540,7 +3312,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "38a95b0bf9fc3d274c776b00a3ec60c1efe507a0"
+      "hash_sha1": "bf95c4e169236c638b22c9e9a7d18b3902f88b99"
     },
     {
       "file": "docs/guides/testing/multilingual-testing.md",
@@ -3553,12 +3325,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "5a16a55ab986d08b19867c0cae7a30941274ae4f"
+      "hash_sha1": "4a9a81d2f3e7d358cb64e9c4c43ac7737da0305c"
     },
     {
       "file": "docs/guides/testing/multilingual-testing.md",
       "line_start": 124,
-      "line_end": 126,
+      "line_end": 129,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -3566,12 +3338,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "af78c0343c5910ff58d0417c9e07732c0300ada9"
+      "hash_sha1": "495349ae2afbdb8f690fd7bba07f3543443f1c79"
     },
     {
       "file": "docs/guides/testing/multilingual-testing.md",
-      "line_start": 130,
-      "line_end": 134,
+      "line_start": 133,
+      "line_end": 137,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -3579,12 +3351,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "4056d7b7911a2e4848f51b0f5703e806add90752"
+      "hash_sha1": "f619bd8ee8b5380d8a0c78eb30bc7307eef3ea47"
     },
     {
       "file": "docs/guides/testing/multilingual-testing.md",
-      "line_start": 166,
-      "line_end": 214,
+      "line_start": 169,
+      "line_end": 217,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -3594,7 +3366,7 @@
       "env_dependencies": [
         "CUDA_VISIBLE_DEVICES"
       ],
-      "hash_sha1": "f9d33228c4d9b89ac8006acc04e450b8a3338ef4"
+      "hash_sha1": "54b37707ba23c3d69850fe730f44bca68324ae35"
     },
     {
       "file": "docs/guides/training/training-guide.md",
@@ -3633,12 +3405,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "56ded655687cdd6c8fba31faa74320b8e5961add"
+      "hash_sha1": "467ddb3eabcfc77a605b5411fd795c9a54e1a02d"
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 147,
-      "line_end": 149,
+      "line_start": 152,
+      "line_end": 154,
       "language_raw": "csv",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3652,8 +3424,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 155,
-      "line_end": 157,
+      "line_start": 160,
+      "line_end": 162,
       "language_raw": "csv",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3667,8 +3439,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 166,
-      "line_end": 174,
+      "line_start": 171,
+      "line_end": 179,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -3680,8 +3452,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 188,
-      "line_end": 194,
+      "line_start": 193,
+      "line_end": 199,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -3693,8 +3465,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 200,
-      "line_end": 206,
+      "line_start": 205,
+      "line_end": 211,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -3706,8 +3478,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 212,
-      "line_end": 216,
+      "line_start": 217,
+      "line_end": 221,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -3719,8 +3491,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 231,
-      "line_end": 240,
+      "line_start": 236,
+      "line_end": 246,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -3728,12 +3500,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "20a1c8d1e81018f4ed2f8900f366862cca64ad57"
+      "hash_sha1": "f40f86e6b1aed3a878f964766926cb2a8617fa36"
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 251,
-      "line_end": 258,
+      "line_start": 257,
+      "line_end": 264,
       "language_raw": "dockerfile",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3747,8 +3519,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 262,
-      "line_end": 275,
+      "line_start": 268,
+      "line_end": 281,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -3756,12 +3528,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "514f3f2336a3288c5bbc91e5bf5e19c50687a8f0"
+      "hash_sha1": "0d5a41a4ddd6ebfada36342836adc8b7d878426c"
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 288,
-      "line_end": 302,
+      "line_start": 301,
+      "line_end": 316,
       "language_raw": "sh",
       "language": "bash",
       "category": "needs_placeholder",
@@ -3771,12 +3543,12 @@
       ],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "48c2da53f556e9cd20d0de80f2de65456824e8f3"
+      "hash_sha1": "f96d4c031311b521739cd71898e6f019c92ca6bb"
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 318,
-      "line_end": 326,
+      "line_start": 342,
+      "line_end": 350,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -3784,12 +3556,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "82f679d40780138db5577e7abfa4438853346550"
+      "hash_sha1": "a53145b50280c2cd20c073ed7fa3afd7857896bd"
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 350,
-      "line_end": 356,
+      "line_start": 378,
+      "line_end": 384,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -3803,8 +3575,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 367,
-      "line_end": 379,
+      "line_start": 395,
+      "line_end": 407,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -3818,8 +3590,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 385,
-      "line_end": 402,
+      "line_start": 413,
+      "line_end": 430,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -3829,12 +3601,12 @@
       "env_dependencies": [
         "/data/piper/"
       ],
-      "hash_sha1": "49f7306882c7f8e955a7bea06348e2cca3227660"
+      "hash_sha1": "dc20801479d775870dd053346d9d34efe95ef12b"
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 432,
-      "line_end": 442,
+      "line_start": 460,
+      "line_end": 470,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -3844,12 +3616,12 @@
       "env_dependencies": [
         "CUDA_VISIBLE_DEVICES"
       ],
-      "hash_sha1": "893fb322bd47e142a44c3384023a90181b20a8eb"
+      "hash_sha1": "a2bebb016c1f494721b9a13377378b9cb3d5526e"
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 446,
-      "line_end": 461,
+      "line_start": 474,
+      "line_end": 489,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -3864,8 +3636,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 489,
-      "line_end": 502,
+      "line_start": 517,
+      "line_end": 530,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -3877,8 +3649,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 529,
-      "line_end": 543,
+      "line_start": 557,
+      "line_end": 571,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -3890,8 +3662,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 579,
-      "line_end": 583,
+      "line_start": 609,
+      "line_end": 613,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -3905,8 +3677,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 587,
-      "line_end": 592,
+      "line_start": 617,
+      "line_end": 622,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -3920,8 +3692,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 598,
-      "line_end": 605,
+      "line_start": 628,
+      "line_end": 635,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -3935,8 +3707,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 611,
-      "line_end": 618,
+      "line_start": 641,
+      "line_end": 648,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -3948,8 +3720,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 625,
-      "line_end": 646,
+      "line_start": 655,
+      "line_end": 676,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -3963,8 +3735,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 657,
-      "line_end": 664,
+      "line_start": 692,
+      "line_end": 699,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -3978,8 +3750,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 668,
-      "line_end": 675,
+      "line_start": 703,
+      "line_end": 710,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -3993,8 +3765,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 679,
-      "line_end": 686,
+      "line_start": 714,
+      "line_end": 721,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -4008,8 +3780,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 690,
-      "line_end": 697,
+      "line_start": 725,
+      "line_end": 732,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -4023,8 +3795,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 701,
-      "line_end": 708,
+      "line_start": 736,
+      "line_end": 743,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -4038,8 +3810,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 712,
-      "line_end": 719,
+      "line_start": 747,
+      "line_end": 754,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -4053,8 +3825,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 723,
-      "line_end": 730,
+      "line_start": 758,
+      "line_end": 765,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -4068,8 +3840,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 737,
-      "line_end": 739,
+      "line_start": 772,
+      "line_end": 774,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4081,8 +3853,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 749,
-      "line_end": 755,
+      "line_start": 787,
+      "line_end": 793,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -4092,12 +3864,12 @@
       "env_dependencies": [
         "wandb login"
       ],
-      "hash_sha1": "db0388a63898d7dba08f8db92100e49067d5368c"
+      "hash_sha1": "f1653764337337ccf78ea2ee8c6f9cd66e7d90e6"
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 779,
-      "line_end": 785,
+      "line_start": 817,
+      "line_end": 823,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4109,8 +3881,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 800,
-      "line_end": 804,
+      "line_start": 838,
+      "line_end": 842,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4124,8 +3896,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 808,
-      "line_end": 816,
+      "line_start": 846,
+      "line_end": 854,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4137,8 +3909,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 834,
-      "line_end": 841,
+      "line_start": 872,
+      "line_end": 879,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4150,8 +3922,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 857,
-      "line_end": 861,
+      "line_start": 895,
+      "line_end": 899,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -4165,8 +3937,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 865,
-      "line_end": 870,
+      "line_start": 903,
+      "line_end": 908,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -4180,8 +3952,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 876,
-      "line_end": 892,
+      "line_start": 914,
+      "line_end": 930,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4193,8 +3965,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 905,
-      "line_end": 908,
+      "line_start": 945,
+      "line_end": 948,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4206,8 +3978,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 938,
-      "line_end": 945,
+      "line_start": 978,
+      "line_end": 985,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4219,8 +3991,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 958,
-      "line_end": 963,
+      "line_start": 998,
+      "line_end": 1004,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4228,12 +4000,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "e80014fba5f4cf6de978080c3ba9e79437213f03"
+      "hash_sha1": "f447b8e5c6d73c6d595ea177557acd20e6106035"
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 978,
-      "line_end": 987,
+      "line_start": 1019,
+      "line_end": 1028,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4258,8 +4030,8 @@
     },
     {
       "file": "docs/guides/training/wavlm-guide.md",
-      "line_start": 67,
-      "line_end": 72,
+      "line_start": 70,
+      "line_end": 75,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -4271,8 +4043,8 @@
     },
     {
       "file": "docs/guides/training/wavlm-guide.md",
-      "line_start": 76,
-      "line_end": 81,
+      "line_start": 79,
+      "line_end": 84,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -4284,8 +4056,8 @@
     },
     {
       "file": "docs/guides/training/wavlm-guide.md",
-      "line_start": 95,
-      "line_end": 107,
+      "line_start": 99,
+      "line_end": 111,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -4297,8 +4069,8 @@
     },
     {
       "file": "docs/guides/training/wavlm-guide.md",
-      "line_start": 119,
-      "line_end": 124,
+      "line_start": 123,
+      "line_end": 128,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4312,8 +4084,8 @@
     },
     {
       "file": "docs/guides/training/wavlm-guide.md",
-      "line_start": 128,
-      "line_end": 134,
+      "line_start": 132,
+      "line_end": 138,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4327,8 +4099,8 @@
     },
     {
       "file": "docs/guides/training/wavlm-guide.md",
-      "line_start": 154,
-      "line_end": 161,
+      "line_start": 158,
+      "line_end": 165,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4338,12 +4110,12 @@
       "env_dependencies": [
         "CUDA_VISIBLE_DEVICES"
       ],
-      "hash_sha1": "9190a735313319a62613f36a476d5a8e584d582a"
+      "hash_sha1": "64eed7e92b5d78a3272e3cfd7fdbba76f4614cd6"
     },
     {
       "file": "docs/guides/training/wavlm-guide.md",
-      "line_start": 165,
-      "line_end": 167,
+      "line_start": 169,
+      "line_end": 171,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -4351,12 +4123,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "45ce728c9fec4fb24842528cee2ab9bcb11ff574"
+      "hash_sha1": "e565aa34bbf4e54e11e0adf110505d2f911a926f"
     },
     {
       "file": "docs/guides/training/wavlm-guide.md",
-      "line_start": 189,
-      "line_end": 201,
+      "line_start": 193,
+      "line_end": 205,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -4368,8 +4140,8 @@
     },
     {
       "file": "docs/guides/training/wavlm-guide.md",
-      "line_start": 207,
-      "line_end": 219,
+      "line_start": 211,
+      "line_end": 223,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -4381,8 +4153,8 @@
     },
     {
       "file": "docs/guides/training/wavlm-guide.md",
-      "line_start": 225,
-      "line_end": 232,
+      "line_start": 229,
+      "line_end": 236,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4396,8 +4168,8 @@
     },
     {
       "file": "docs/guides/training/wavlm-guide.md",
-      "line_start": 240,
-      "line_end": 244,
+      "line_start": 244,
+      "line_end": 249,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -4405,12 +4177,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "030878f99ab7af81135882e946c156bfe4abee63"
+      "hash_sha1": "4de0ca07edf83edba275ccc61638bdc69c95267c"
     },
     {
       "file": "docs/guides/training/wavlm-guide.md",
-      "line_start": 250,
-      "line_end": 255,
+      "line_start": 255,
+      "line_end": 260,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -4422,8 +4194,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 12,
-      "line_end": 29,
+      "line_start": 23,
+      "line_end": 40,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4437,8 +4209,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 84,
-      "line_end": 110,
+      "line_start": 95,
+      "line_end": 121,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4452,8 +4224,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 116,
-      "line_end": 119,
+      "line_start": 127,
+      "line_end": 130,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4467,8 +4239,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 123,
-      "line_end": 139,
+      "line_start": 134,
+      "line_end": 150,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4482,8 +4254,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 147,
-      "line_end": 152,
+      "line_start": 158,
+      "line_end": 163,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4497,8 +4269,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 184,
-      "line_end": 202,
+      "line_start": 195,
+      "line_end": 213,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4512,8 +4284,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 211,
-      "line_end": 216,
+      "line_start": 222,
+      "line_end": 227,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4525,8 +4297,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 224,
-      "line_end": 227,
+      "line_start": 235,
+      "line_end": 238,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4538,8 +4310,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 292,
-      "line_end": 319,
+      "line_start": 303,
+      "line_end": 330,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4553,8 +4325,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 326,
-      "line_end": 349,
+      "line_start": 337,
+      "line_end": 360,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4568,8 +4340,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 353,
-      "line_end": 358,
+      "line_start": 364,
+      "line_end": 369,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4583,8 +4355,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 364,
-      "line_end": 389,
+      "line_start": 375,
+      "line_end": 400,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4599,8 +4371,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 396,
-      "line_end": 414,
+      "line_start": 407,
+      "line_end": 425,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4614,8 +4386,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 422,
-      "line_end": 454,
+      "line_start": 433,
+      "line_end": 465,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4629,8 +4401,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 482,
-      "line_end": 506,
+      "line_start": 493,
+      "line_end": 517,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4644,8 +4416,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 522,
-      "line_end": 527,
+      "line_start": 533,
+      "line_end": 538,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4660,8 +4432,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 531,
-      "line_end": 536,
+      "line_start": 542,
+      "line_end": 547,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4676,8 +4448,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 556,
-      "line_end": 572,
+      "line_start": 567,
+      "line_end": 583,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4691,8 +4463,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 580,
-      "line_end": 605,
+      "line_start": 591,
+      "line_end": 616,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4707,8 +4479,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 609,
-      "line_end": 615,
+      "line_start": 620,
+      "line_end": 626,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4722,8 +4494,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 652,
-      "line_end": 657,
+      "line_start": 663,
+      "line_end": 668,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4737,8 +4509,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 663,
-      "line_end": 671,
+      "line_start": 674,
+      "line_end": 682,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4750,8 +4522,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 770,
-      "line_end": 853,
+      "line_start": 781,
+      "line_end": 864,
       "language_raw": "python",
       "language": "python",
       "category": "skip_warranted",
@@ -4765,8 +4537,8 @@
     },
     {
       "file": "docs/migration/README.md",
-      "line_start": 46,
-      "line_end": 51,
+      "line_start": 48,
+      "line_end": 53,
       "language_raw": "markdown",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4779,9 +4551,48 @@
       "hash_sha1": "ec14e4225077e40662428fd1ffd4d35c351a60b3"
     },
     {
+      "file": "docs/migration/provider-environments.md",
+      "line_start": 9,
+      "line_end": 14,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "d7edec3470bd634f1c9b6e80e4ee2493a14f5e51"
+    },
+    {
+      "file": "docs/migration/provider-environments.md",
+      "line_start": 18,
+      "line_end": 22,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "05dd5aae0edca925c733edf2b594a1acaee5a8fe"
+    },
+    {
+      "file": "docs/migration/provider-environments.md",
+      "line_start": 33,
+      "line_end": 36,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "0af3dcef19eeb7e7f65ff99b969d6dc56b1351d6"
+    },
+    {
       "file": "docs/migration/v1.11-to-v1.12.md",
-      "line_start": 23,
-      "line_end": 35,
+      "line_start": 25,
+      "line_end": 37,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -4793,8 +4604,8 @@
     },
     {
       "file": "docs/migration/v1.11-to-v1.12.md",
-      "line_start": 54,
-      "line_end": 58,
+      "line_start": 56,
+      "line_end": 61,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -4804,12 +4615,12 @@
       "env_dependencies": [
         "/data/piper/"
       ],
-      "hash_sha1": "484b78710be8ecd3297d56d456410e8cc2301232"
+      "hash_sha1": "0902d694cb56575a01c945c1db3fd9fe165896a7"
     },
     {
       "file": "docs/migration/v1.11-to-v1.12.md",
-      "line_start": 112,
-      "line_end": 123,
+      "line_start": 117,
+      "line_end": 128,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4821,8 +4632,8 @@
     },
     {
       "file": "docs/migration/v1.11-to-v1.12.md",
-      "line_start": 129,
-      "line_end": 134,
+      "line_start": 134,
+      "line_end": 139,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4834,8 +4645,8 @@
     },
     {
       "file": "docs/migration/v1.11-to-v1.12.md",
-      "line_start": 150,
-      "line_end": 152,
+      "line_start": 155,
+      "line_end": 157,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4862,23 +4673,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 106,
-      "line_end": 115,
-      "language_raw": "yaml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "669ace77d6445894c1d5d603cd1ca4f15f474fa1"
-    },
-    {
-      "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 133,
-      "line_end": 139,
+      "line_start": 125,
+      "line_end": 131,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4890,8 +4686,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 143,
-      "line_end": 146,
+      "line_start": 135,
+      "line_end": 138,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4905,8 +4701,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 171,
-      "line_end": 173,
+      "line_start": 163,
+      "line_end": 165,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -4920,8 +4716,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 179,
-      "line_end": 181,
+      "line_start": 171,
+      "line_end": 173,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4933,8 +4729,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 187,
-      "line_end": 189,
+      "line_start": 179,
+      "line_end": 181,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -4948,8 +4744,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 195,
-      "line_end": 204,
+      "line_start": 187,
+      "line_end": 196,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4961,8 +4757,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 254,
-      "line_end": 258,
+      "line_start": 246,
+      "line_end": 250,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4974,8 +4770,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 277,
-      "line_end": 280,
+      "line_start": 269,
+      "line_end": 272,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4989,8 +4785,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 290,
-      "line_end": 292,
+      "line_start": 282,
+      "line_end": 284,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5004,8 +4800,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 303,
-      "line_end": 308,
+      "line_start": 295,
+      "line_end": 300,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -5017,8 +4813,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 323,
-      "line_end": 328,
+      "line_start": 315,
+      "line_end": 320,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5032,8 +4828,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 383,
-      "line_end": 387,
+      "line_start": 375,
+      "line_end": 379,
       "language_raw": "sh",
       "language": "bash",
       "category": "needs_placeholder",
@@ -5047,8 +4843,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 393,
-      "line_end": 400,
+      "line_start": 385,
+      "line_end": 392,
       "language_raw": "sh",
       "language": "bash",
       "category": "needs_placeholder",
@@ -5062,8 +4858,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 426,
-      "line_end": 432,
+      "line_start": 418,
+      "line_end": 424,
       "language_raw": "dockerfile",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5077,8 +4873,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 442,
-      "line_end": 447,
+      "line_start": 434,
+      "line_end": 439,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -5090,8 +4886,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 459,
-      "line_end": 462,
+      "line_start": 451,
+      "line_end": 454,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -5103,8 +4899,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 477,
-      "line_end": 482,
+      "line_start": 469,
+      "line_end": 474,
       "language_raw": "diff",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5118,8 +4914,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 490,
-      "line_end": 495,
+      "line_start": 482,
+      "line_end": 487,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -5131,8 +4927,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 501,
-      "line_end": 505,
+      "line_start": 493,
+      "line_end": 497,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -5144,8 +4940,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 511,
-      "line_end": 514,
+      "line_start": 503,
+      "line_end": 506,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -5187,8 +4983,8 @@
     },
     {
       "file": "docs/reference/ios-shared-lib.md",
-      "line_start": 124,
-      "line_end": 163,
+      "line_start": 128,
+      "line_end": 167,
       "language_raw": "yaml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5198,12 +4994,12 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "80d59ee595483874c32a23ca9680e7cbb141882d"
+      "hash_sha1": "c4173c8f702f087361472df6d2d8539fb86d71ee"
     },
     {
       "file": "docs/reference/ios-shared-lib.md",
-      "line_start": 178,
-      "line_end": 182,
+      "line_start": 182,
+      "line_end": 186,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -5215,8 +5011,8 @@
     },
     {
       "file": "docs/reference/ios-shared-lib.md",
-      "line_start": 188,
-      "line_end": 190,
+      "line_start": 192,
+      "line_end": 194,
       "language_raw": "markdown",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5241,7 +5037,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "862f0c6dba53d99738e916c2c568c139ef61e8bc"
+      "hash_sha1": "15f6dfaf4e093149be1e565516c6eac805c0f092"
     },
     {
       "file": "docs/reference/kotlin-g2p-design.md",
@@ -5286,7 +5082,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "0cdc1107305a39a258d4580b52f5bfdd82e2b0b0"
+      "hash_sha1": "ac791c1c1777b669198c91ca8e632830d7294aa2"
     },
     {
       "file": "docs/reference/kotlin-g2p-design.md",
@@ -5455,8 +5251,8 @@
     },
     {
       "file": "docs/reference/model-resolution.md",
-      "line_start": 121,
-      "line_end": 141,
+      "line_start": 144,
+      "line_end": 164,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5470,8 +5266,8 @@
     },
     {
       "file": "docs/reference/model-resolution.md",
-      "line_start": 172,
-      "line_end": 177,
+      "line_start": 195,
+      "line_end": 200,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5485,8 +5281,8 @@
     },
     {
       "file": "docs/reference/model-resolution.md",
-      "line_start": 181,
-      "line_end": 186,
+      "line_start": 204,
+      "line_end": 209,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5509,12 +5305,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "01de963c6792df6d27151bfb1ada917f477c6dc6"
+      "hash_sha1": "5f05089ab6e6988d2e4f36e162ec3e50824ae970"
     },
     {
       "file": "docs/reference/mutation-testing.md",
-      "line_start": 70,
-      "line_end": 89,
+      "line_start": 75,
+      "line_end": 94,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -5526,8 +5322,8 @@
     },
     {
       "file": "docs/reference/mutation-testing.md",
-      "line_start": 93,
-      "line_end": 100,
+      "line_start": 98,
+      "line_end": 105,
       "language_raw": "toml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5541,8 +5337,8 @@
     },
     {
       "file": "docs/reference/mutation-testing.md",
-      "line_start": 115,
-      "line_end": 123,
+      "line_start": 120,
+      "line_end": 128,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -5554,8 +5350,8 @@
     },
     {
       "file": "docs/reference/ort-versions.md",
-      "line_start": 122,
-      "line_end": 127,
+      "line_start": 123,
+      "line_end": 128,
       "language_raw": "toml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5569,8 +5365,8 @@
     },
     {
       "file": "docs/reference/pua-test-matrix.md",
-      "line_start": 127,
-      "line_end": 130,
+      "line_start": 131,
+      "line_end": 134,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -5582,8 +5378,8 @@
     },
     {
       "file": "docs/reference/speaker-encoder-contract.md",
-      "line_start": 89,
-      "line_end": 112,
+      "line_start": 91,
+      "line_end": 114,
       "language_raw": "json",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5597,8 +5393,8 @@
     },
     {
       "file": "docs/reference/speaker-encoder-contract.md",
-      "line_start": 116,
-      "line_end": 125,
+      "line_start": 118,
+      "line_end": 127,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5612,8 +5408,8 @@
     },
     {
       "file": "docs/reference/speaker-encoder-contract.md",
-      "line_start": 183,
-      "line_end": 189,
+      "line_start": 185,
+      "line_end": 191,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -5625,8 +5421,8 @@
     },
     {
       "file": "docs/reference/speaker-encoder-contract.md",
-      "line_start": 199,
-      "line_end": 218,
+      "line_start": 201,
+      "line_end": 220,
       "language_raw": "yaml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5670,8 +5466,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 45,
-      "line_end": 62,
+      "line_start": 56,
+      "line_end": 73,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5685,8 +5481,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 66,
-      "line_end": 72,
+      "line_start": 77,
+      "line_end": 83,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5700,8 +5496,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 76,
-      "line_end": 83,
+      "line_start": 87,
+      "line_end": 94,
       "language_raw": "json",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5715,8 +5511,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 108,
-      "line_end": 145,
+      "line_start": 119,
+      "line_end": 156,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5730,8 +5526,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 176,
-      "line_end": 186,
+      "line_start": 190,
+      "line_end": 200,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5745,8 +5541,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 203,
-      "line_end": 205,
+      "line_start": 217,
+      "line_end": 219,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5760,8 +5556,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 230,
-      "line_end": 240,
+      "line_start": 244,
+      "line_end": 254,
       "language_raw": "c",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5775,8 +5571,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 265,
-      "line_end": 284,
+      "line_start": 279,
+      "line_end": 298,
       "language_raw": "json",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5786,12 +5582,12 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "70117d5770c029209a2306d13f7a21688b6ce74b"
+      "hash_sha1": "44c601ea12058cc5eecd25fd885a5832c93639e2"
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 288,
-      "line_end": 295,
+      "line_start": 302,
+      "line_end": 309,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -5803,8 +5599,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 297,
-      "line_end": 304,
+      "line_start": 311,
+      "line_end": 318,
       "language_raw": "rust",
       "language": "rust",
       "category": "executable",
@@ -5812,12 +5608,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "ea827376948c0a971e083ea5352310a2974763f1"
+      "hash_sha1": "b08f167908372ed012eaf5bd3f9ee7140e410304"
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 308,
-      "line_end": 317,
+      "line_start": 322,
+      "line_end": 331,
       "language_raw": "yaml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5831,8 +5627,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 334,
-      "line_end": 342,
+      "line_start": 348,
+      "line_end": 356,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5846,8 +5642,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 366,
-      "line_end": 379,
+      "line_start": 383,
+      "line_end": 396,
       "language_raw": "yaml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5861,8 +5657,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 403,
-      "line_end": 410,
+      "line_start": 420,
+      "line_end": 427,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5876,8 +5672,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 430,
-      "line_end": 439,
+      "line_start": 447,
+      "line_end": 456,
       "language_raw": "json",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5891,8 +5687,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 468,
-      "line_end": 473,
+      "line_start": 485,
+      "line_end": 490,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -5904,8 +5700,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 488,
-      "line_end": 507,
+      "line_start": 505,
+      "line_end": 524,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -5917,8 +5713,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 557,
-      "line_end": 585,
+      "line_start": 574,
+      "line_end": 602,
       "language_raw": "rust",
       "language": "rust",
       "category": "executable",
@@ -5930,8 +5726,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 613,
-      "line_end": 616,
+      "line_start": 630,
+      "line_end": 633,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -5943,8 +5739,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 618,
-      "line_end": 621,
+      "line_start": 635,
+      "line_end": 638,
       "language_raw": "rust",
       "language": "rust",
       "category": "executable",
@@ -5956,8 +5752,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 623,
-      "line_end": 626,
+      "line_start": 640,
+      "line_end": 643,
       "language_raw": "go",
       "language": "go",
       "category": "executable",
@@ -5969,8 +5765,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 628,
-      "line_end": 631,
+      "line_start": 645,
+      "line_end": 648,
       "language_raw": "csharp",
       "language": "csharp",
       "category": "executable",
@@ -5982,8 +5778,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 633,
-      "line_end": 636,
+      "line_start": 650,
+      "line_end": 653,
       "language_raw": "cpp",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5997,8 +5793,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 638,
-      "line_end": 641,
+      "line_start": 655,
+      "line_end": 658,
       "language_raw": "javascript",
       "language": "wasm",
       "category": "executable",
@@ -6010,8 +5806,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 645,
-      "line_end": 650,
+      "line_start": 662,
+      "line_end": 667,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -6023,8 +5819,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 652,
-      "line_end": 655,
+      "line_start": 669,
+      "line_end": 672,
       "language_raw": "rust",
       "language": "rust",
       "category": "executable",
@@ -6036,8 +5832,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 677,
-      "line_end": 689,
+      "line_start": 694,
+      "line_end": 706,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6051,8 +5847,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 704,
-      "line_end": 736,
+      "line_start": 721,
+      "line_end": 753,
       "language_raw": "yaml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6066,8 +5862,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/cpp.md",
-      "line_start": 54,
-      "line_end": 68,
+      "line_start": 55,
+      "line_end": 69,
       "language_raw": "cmake",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6081,8 +5877,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/cpp.md",
-      "line_start": 70,
-      "line_end": 88,
+      "line_start": 71,
+      "line_end": 89,
       "language_raw": "cpp",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6096,8 +5892,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/cpp.md",
-      "line_start": 111,
-      "line_end": 135,
+      "line_start": 112,
+      "line_end": 136,
       "language_raw": "cmake",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6111,8 +5907,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/cpp.md",
-      "line_start": 174,
-      "line_end": 198,
+      "line_start": 175,
+      "line_end": 199,
       "language_raw": "cpp",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6126,8 +5922,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/cpp.md",
-      "line_start": 208,
-      "line_end": 222,
+      "line_start": 209,
+      "line_end": 223,
       "language_raw": "cpp",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6141,8 +5937,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/cpp.md",
-      "line_start": 248,
-      "line_end": 279,
+      "line_start": 251,
+      "line_end": 282,
       "language_raw": "cpp",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6156,8 +5952,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/cpp.md",
-      "line_start": 301,
-      "line_end": 311,
+      "line_start": 304,
+      "line_end": 314,
       "language_raw": "c",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6171,8 +5967,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/csharp.md",
-      "line_start": 58,
-      "line_end": 63,
+      "line_start": 60,
+      "line_end": 65,
       "language_raw": "xml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6186,8 +5982,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/csharp.md",
-      "line_start": 65,
-      "line_end": 76,
+      "line_start": 67,
+      "line_end": 78,
       "language_raw": "csharp",
       "language": "csharp",
       "category": "executable",
@@ -6199,8 +5995,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/csharp.md",
-      "line_start": 84,
-      "line_end": 95,
+      "line_start": 86,
+      "line_end": 97,
       "language_raw": "csharp",
       "language": "csharp",
       "category": "executable",
@@ -6212,8 +6008,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/csharp.md",
-      "line_start": 101,
-      "line_end": 104,
+      "line_start": 103,
+      "line_end": 106,
       "language_raw": "csharp",
       "language": "csharp",
       "category": "executable",
@@ -6225,8 +6021,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/csharp.md",
-      "line_start": 108,
-      "line_end": 110,
+      "line_start": 110,
+      "line_end": 112,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6296,8 +6092,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/python.md",
-      "line_start": 38,
-      "line_end": 45,
+      "line_start": 44,
+      "line_end": 51,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6311,8 +6107,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/python.md",
-      "line_start": 49,
-      "line_end": 86,
+      "line_start": 55,
+      "line_end": 92,
       "language_raw": "yaml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6322,12 +6118,12 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "1ae2f8c7d713e189e541877f39a5115dfcbc6c5e"
+      "hash_sha1": "bf94e76e5e099bd335b9bc9fbf6a278b558d298a"
     },
     {
       "file": "docs/reference/zh-en-loanword/python.md",
-      "line_start": 90,
-      "line_end": 94,
+      "line_start": 96,
+      "line_end": 100,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -6339,8 +6135,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/python.md",
-      "line_start": 119,
-      "line_end": 127,
+      "line_start": 125,
+      "line_end": 133,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -6352,8 +6148,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/python.md",
-      "line_start": 129,
-      "line_end": 135,
+      "line_start": 135,
+      "line_end": 141,
       "language_raw": "rust",
       "language": "rust",
       "category": "executable",
@@ -6365,8 +6161,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/python.md",
-      "line_start": 137,
-      "line_end": 141,
+      "line_start": 143,
+      "line_end": 147,
       "language_raw": "go",
       "language": "go",
       "category": "executable",
@@ -6378,8 +6174,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/python.md",
-      "line_start": 143,
-      "line_end": 149,
+      "line_start": 149,
+      "line_end": 155,
       "language_raw": "csharp",
       "language": "csharp",
       "category": "executable",
@@ -6391,8 +6187,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/python.md",
-      "line_start": 151,
-      "line_end": 154,
+      "line_start": 157,
+      "line_end": 160,
       "language_raw": "typescript",
       "language": "wasm",
       "category": "executable",
@@ -6404,8 +6200,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/python.md",
-      "line_start": 166,
-      "line_end": 179,
+      "line_start": 172,
+      "line_end": 185,
       "language_raw": "markdown",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6419,8 +6215,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/python.md",
-      "line_start": 198,
-      "line_end": 207,
+      "line_start": 204,
+      "line_end": 214,
       "language_raw": "markdown",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6430,12 +6226,12 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "3fc8ede46bd071cd85e94b9df80ddfa043c17d55"
+      "hash_sha1": "ecd3ef0dce9429046d2e929d31b65d0aadfbc3fa"
     },
     {
       "file": "docs/reference/zh-en-loanword/python.md",
-      "line_start": 211,
-      "line_end": 243,
+      "line_start": 218,
+      "line_end": 250,
       "language_raw": "yaml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6449,8 +6245,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/python.md",
-      "line_start": 265,
-      "line_end": 268,
+      "line_start": 272,
+      "line_end": 275,
       "language_raw": "yaml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6464,8 +6260,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/python.md",
-      "line_start": 270,
-      "line_end": 290,
+      "line_start": 277,
+      "line_end": 297,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -6477,8 +6273,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/rust.md",
-      "line_start": 33,
-      "line_end": 37,
+      "line_start": 34,
+      "line_end": 38,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6492,8 +6288,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/rust.md",
-      "line_start": 41,
-      "line_end": 47,
+      "line_start": 42,
+      "line_end": 48,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6507,8 +6303,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/rust.md",
-      "line_start": 71,
-      "line_end": 76,
+      "line_start": 72,
+      "line_end": 77,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6522,8 +6318,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/rust.md",
-      "line_start": 84,
-      "line_end": 98,
+      "line_start": 85,
+      "line_end": 99,
       "language_raw": "rust",
       "language": "rust",
       "category": "executable",
@@ -6535,8 +6331,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/rust.md",
-      "line_start": 106,
-      "line_end": 108,
+      "line_start": 107,
+      "line_end": 109,
       "language_raw": "rust",
       "language": "rust",
       "category": "executable",
@@ -6548,8 +6344,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/rust.md",
-      "line_start": 112,
-      "line_end": 114,
+      "line_start": 113,
+      "line_end": 115,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6563,8 +6359,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/rust.md",
-      "line_start": 120,
-      "line_end": 127,
+      "line_start": 121,
+      "line_end": 128,
       "language_raw": "rust",
       "language": "rust",
       "category": "executable",
@@ -6572,7 +6368,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "ea827376948c0a971e083ea5352310a2974763f1"
+      "hash_sha1": "b08f167908372ed012eaf5bd3f9ee7140e410304"
     },
     {
       "file": "docs/reference/zh-en-loanword/wasm.md",
@@ -6628,8 +6424,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/wasm.md",
-      "line_start": 126,
-      "line_end": 133,
+      "line_start": 130,
+      "line_end": 137,
       "language_raw": "toml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6643,8 +6439,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/wasm.md",
-      "line_start": 142,
-      "line_end": 145,
+      "line_start": 146,
+      "line_end": 149,
       "language_raw": "toml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6658,8 +6454,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/wasm.md",
-      "line_start": 165,
-      "line_end": 167,
+      "line_start": 169,
+      "line_end": 171,
       "language_raw": "rust",
       "language": "rust",
       "category": "executable",

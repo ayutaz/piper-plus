@@ -5,8 +5,8 @@
 [meta]
 generator = "scripts/build_spec_implementation_map.py"
 forward_compat_policy = "accept_unknown_fields"
-spec_count = 32
-unique_paths = 115
+spec_count = 33
+unique_paths = 123
 
 # Forward index: spec → paths
 
@@ -20,13 +20,15 @@ paths = []
 paths = [
     ".github/workflows/runtime-parity-deep.yml",
     "scripts/audio_parity.py",
-    "src/index.js",
 ]
 
 [spec."cargo-lock-duplicates-baseline.toml"]
 paths = [
     "src/rust/Cargo.lock",
 ]
+
+[spec."checkpoint-compat-contract.toml"]
+paths = []
 
 [spec."chinese-tone-contract.toml"]
 paths = [
@@ -63,7 +65,6 @@ paths = [
     "android/piper-plus-g2p/src/main/assets/zh_en_loanword.json",
     "src/cpp/data/zh_en_loanword.json",
     "src/csharp/PiperPlus.Core/Phonemize/Data/zh_en_loanword.json",
-    "src/go/phonemize/data/cmudict_data.json",
     "src/go/phonemize/data/zh_en_loanword.json",
     "src/python/g2p/piper_plus_g2p/data/pua.json",
     "src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json",
@@ -161,21 +162,32 @@ paths = []
 
 [spec."phoneme-set-version.toml"]
 paths = [
+    "scripts/check_phoneme_set_version.py",
     "scripts/check_pua_consistency.py",
     "src/python/g2p/piper_plus_g2p/data/pua.json",
+    "src/python/g2p/piper_plus_g2p/encode/id_maps.py",
     "tests/fixtures/g2p/phoneme_test_cases.json",
 ]
 
 [spec."phoneme-timing-contract.toml"]
 paths = [
+    "scripts/check_srt_rounding_parity.py",
+    "src/cpp/tests/test_c_api_integration.cpp",
+    "src/cpp/tests/test_phoneme_timing.cpp",
+    "src/cpp/tests/test_phoneme_timing_concat.cpp",
+    "src/cpp/tests/test_phoneme_timing_text_path.cpp",
+    "src/cpp/timing_format.hpp",
+    "src/csharp/PiperPlus.Core.Tests/TimingWriterTests.cs",
     "src/csharp/PiperPlus.Core/Inference/TimingWriter.cs",
     "src/go/piperplus/timing.go",
+    "src/go/piperplus/timing_test.go",
     "src/python_run/piper_plus/timing.py",
     "src/python_run/tests/test_http_timing.py",
     "src/python_run/tests/test_phoneme_timing.py",
     "src/python_run/tests/test_voice_timing.py",
     "src/rust/piper-core/src/timing.rs",
     "src/wasm/openjtalk-web/src/timing.js",
+    "src/wasm/openjtalk-web/test/js/test-phoneme-timing.js",
 ]
 
 [spec."pt-dialect-contract.toml"]
@@ -333,9 +345,19 @@ specs = [
     "pt-dialect-contract.toml",
 ]
 
+[path."scripts/check_phoneme_set_version.py"]
+specs = [
+    "phoneme-set-version.toml",
+]
+
 [path."scripts/check_pua_consistency.py"]
 specs = [
     "phoneme-set-version.toml",
+]
+
+[path."scripts/check_srt_rounding_parity.py"]
+specs = [
+    "phoneme-timing-contract.toml",
 ]
 
 [path."src/cpp/chinese_phonemize.cpp"]
@@ -389,6 +411,31 @@ specs = [
     "loanword-mirrors.toml",
 ]
 
+[path."src/cpp/tests/test_c_api_integration.cpp"]
+specs = [
+    "phoneme-timing-contract.toml",
+]
+
+[path."src/cpp/tests/test_phoneme_timing.cpp"]
+specs = [
+    "phoneme-timing-contract.toml",
+]
+
+[path."src/cpp/tests/test_phoneme_timing_concat.cpp"]
+specs = [
+    "phoneme-timing-contract.toml",
+]
+
+[path."src/cpp/tests/test_phoneme_timing_text_path.cpp"]
+specs = [
+    "phoneme-timing-contract.toml",
+]
+
+[path."src/cpp/timing_format.hpp"]
+specs = [
+    "phoneme-timing-contract.toml",
+]
+
 [path."src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj"]
 specs = [
     "release-versions.toml",
@@ -407,6 +454,11 @@ specs = [
 [path."src/csharp/PiperPlus.Core.Tests/Phonemize/TestData/zh_en_loanword_matrix.json"]
 specs = [
     "loanword-mirrors.toml",
+]
+
+[path."src/csharp/PiperPlus.Core.Tests/TimingWriterTests.cs"]
+specs = [
+    "phoneme-timing-contract.toml",
 ]
 
 [path."src/csharp/PiperPlus.Core/Config/PiperConfig.cs"]
@@ -456,11 +508,6 @@ specs = [
     "lockfile-size-baseline.toml",
 ]
 
-[path."src/go/phonemize/data/cmudict_data.json"]
-specs = [
-    "dictionary-versions.toml",
-]
-
 [path."src/go/phonemize/data/sv_function_words.json"]
 specs = [
     "swedish-lid-mirrors.toml",
@@ -503,9 +550,9 @@ specs = [
     "phoneme-timing-contract.toml",
 ]
 
-[path."src/index.js"]
+[path."src/go/piperplus/timing_test.go"]
 specs = [
-    "audio-parity-contract.toml",
+    "phoneme-timing-contract.toml",
 ]
 
 [path."src/python/g2p/piper_plus_g2p/chinese.py"]
@@ -533,6 +580,7 @@ specs = [
 
 [path."src/python/g2p/piper_plus_g2p/encode/id_maps.py"]
 specs = [
+    "phoneme-set-version.toml",
     "pua-contract.toml",
 ]
 
@@ -819,6 +867,11 @@ specs = [
 ]
 
 [path."src/wasm/openjtalk-web/src/timing.js"]
+specs = [
+    "phoneme-timing-contract.toml",
+]
+
+[path."src/wasm/openjtalk-web/test/js/test-phoneme-timing.js"]
 specs = [
     "phoneme-timing-contract.toml",
 ]

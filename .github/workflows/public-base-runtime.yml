@@ -41,7 +41,7 @@ jobs:
         run: |
           uv venv /tmp/base-env
           uv pip install --python /tmp/base-env/bin/python torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-          uv pip install --python /tmp/base-env/bin/python -e src/python_run soundfile soxr
+          uv pip install --python /tmp/base-env/bin/python -e "src/python_run[cpu]" soundfile soxr
       - name: Prepare pinned public inputs without HF credentials
         run: |
           /tmp/base-env/bin/python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
@@ -86,7 +86,7 @@ jobs:
         if: matrix.runtime == 'python'
         run: |
           uv venv /tmp/runtime-python
-          uv pip install --python /tmp/runtime-python/bin/python -e src/python_run
+          uv pip install --python /tmp/runtime-python/bin/python -e "src/python_run[cpu]"
       - uses: dtolnay/rust-toolchain@stable
         if: matrix.runtime == 'rust'
       - uses: Swatinem/rust-cache@v2

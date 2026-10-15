@@ -231,25 +231,30 @@ def test_canonical_runtime_txt_has_4_line_header(sanitize, runtime: str):
     )
 
 
-@pytest.mark.parametrize("runtime", ["csharp", "cpp"])
-def test_placeholder_runtimes_have_placeholder_marker(runtime: str):
-    """csharp / cpp ship a PLACEHOLDER canonical until their toolchain lands
-    in CI. The drift-check workflow MUST keep skipping these — assert the
-    marker line is present so workflow logic stays in sync with reality."""
+@pytest.mark.parametrize(
+    ("runtime", "required_text"),
+    [
+        ("csharp", "--speaker-embedding <speaker-embedding>"),
+        ("cpp", "--json-input"),
+    ],
+)
+def test_newly_captured_runtimes_have_real_help_body(
+    runtime: str, required_text: str
+):
+    """C# and C++ canonicals contain captured help after toolchain capture."""
     canonical = REPO_ROOT / "docs" / "reference" / "cli-help" / f"{runtime}.txt"
     text = canonical.read_text(encoding="utf-8")
-    assert "# PLACEHOLDER:" in text, (
-        f"{runtime}.txt should be a PLACEHOLDER canonical (its toolchain is "
-        f"not yet wired up in CI). If the toolchain has landed, delete this "
-        f"assertion and replace the canonical with a real --help capture."
+    assert "# PLACEHOLDER:" not in text, (
+        f"{runtime}.txt should contain a real --help capture."
+    )
+    assert required_text in text, (
+        f"{runtime}.txt is missing expected help text {required_text!r}."
     )
 
 
-@pytest.mark.parametrize("runtime", ["python", "go", "rust", "wasm"])
+@pytest.mark.parametrize("runtime", ["python", "go", "rust", "wasm", "csharp", "cpp"])
 def test_real_canonical_runtimes_lack_placeholder_marker(runtime: str):
-    """python / go / rust / wasm ship a real --help canonical. If a future
-    edit accidentally drops the body and leaves a PLACEHOLDER, this gate
-    catches it."""
+    """Every runtime canonical must hold a real --help capture."""
     canonical = REPO_ROOT / "docs" / "reference" / "cli-help" / f"{runtime}.txt"
     text = canonical.read_text(encoding="utf-8")
     assert "# PLACEHOLDER:" not in text, (

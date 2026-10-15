@@ -62,7 +62,7 @@ body:
     attributes:
       label: License information / ライセンス情報
       description: |
-        License of the dataset (if known). See [CONTRIBUTING_MODELS.md](../../CONTRIBUTING_MODELS.md#ライセンスポリシー--license-policy) for allowed licenses.
+        License of the dataset (if known). See [CONTRIBUTING_MODELS.md](https://github.com/ayutaz/piper-plus/blob/dev/CONTRIBUTING_MODELS.md#ライセンスポリシー--license-policy) for allowed licenses.
       placeholder: "e.g., LJSpeech is CC0. Common Voice is CC0."
     validations:
       required: false

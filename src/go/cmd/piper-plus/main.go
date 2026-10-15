@@ -428,6 +428,9 @@ func runBatchMode(ctx context.Context, voice *piperplus.Voice, logger *slog.Logg
 			"duration", result.Duration,
 			"rtf", fmt.Sprintf("%.3f", result.RTF()),
 		)
+		if err := writeTimingFile(result, voice, logger, timingPathForLine(timingOutput, lineNum)); err != nil {
+			return err
+		}
 	}
 	return scanner.Err()
 }
@@ -472,6 +475,9 @@ func runJSONLMode(ctx context.Context, voice *piperplus.Voice, logger *slog.Logg
 			"duration", result.Duration,
 			"rtf", fmt.Sprintf("%.3f", result.RTF()),
 		)
+		if err := writeTimingFile(result, voice, logger, timingPathForLine(timingOutput, lineNum)); err != nil {
+			return err
+		}
 	}
 	return scanner.Err()
 }
@@ -586,8 +592,23 @@ func cleanupPartial(path string, logger *slog.Logger) {
 
 // writeTiming writes phoneme timing data if --output-timing is set and durations are available.
 func writeTiming(result *piperplus.SynthesisResult, voice *piperplus.Voice, logger *slog.Logger) error {
-	if timingOutput == "" || result.Durations == nil {
+	return writeTimingFile(result, voice, logger, timingOutput)
+}
+
+func timingPathForLine(path string, line int) string {
+	if path == "" || path == "-" {
+		return path
+	}
+	ext := filepath.Ext(path)
+	return strings.TrimSuffix(path, ext) + fmt.Sprintf("_%03d", line) + ext
+}
+
+func writeTimingFile(result *piperplus.SynthesisResult, voice *piperplus.Voice, logger *slog.Logger, path string) error {
+	if path == "" {
 		return nil
+	}
+	if result.Durations == nil {
+		return fmt.Errorf("timing requested but no aligned durations are available (model or segmented SSML)")
 	}
 
 	// Resolve phoneme names from the model's phoneme_id_map (issue #656).
@@ -643,15 +664,15 @@ func writeTiming(result *piperplus.SynthesisResult, voice *piperplus.Voice, logg
 		return fmt.Errorf("unknown timing format: %q (expected json, tsv, or srt)", timingFormat)
 	}
 
-	if timingOutput == "-" {
+	if path == "-" {
 		_, err = os.Stdout.Write(data)
 		return err
 	}
 
-	if err := os.WriteFile(timingOutput, data, 0o644); err != nil {
-		return fmt.Errorf("failed to write timing to %s: %w", timingOutput, err)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("failed to write timing to %s: %w", path, err)
 	}
 
-	logger.Info("timing written", "path", timingOutput, "format", timingFormat)
+	logger.Info("timing written", "path", path, "format", timingFormat)
 	return nil
 }

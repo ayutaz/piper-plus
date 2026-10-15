@@ -8,7 +8,7 @@ Cross-platform Python package for text phonemization with bundled espeak-ng, des
 
 - **Cross-platform**: Pre-built wheels for Windows, macOS (Intel/Apple Silicon), and Linux (x64/ARM64)
 - **Python 3.11+ support**: Works with Python 3.11, 3.12, and 3.13
-- **Bundled dependencies**: Includes espeak-ng and ONNX Runtime - no system dependencies required
+- **Bundled dependencies**: Includes espeak-ng data - no system phonemization dependencies required
 - **Easy installation**: Simple pip install with no compilation needed
 - **API compatible**: Drop-in replacement for piper-phonemize
 
@@ -92,10 +92,10 @@ For development, install in editable mode:
 pip install -e .[dev]
 ```
 
-Run tests:
+Run the package smoke check (this legacy package has no checked-in `tests/` directory):
 
 ```bash
-pytest tests/
+python -c "import piper_phonemize; print('Import successful')"
 ```
 
 ## License

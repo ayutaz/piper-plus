@@ -4,16 +4,23 @@ VITS Duration Predictor から音素ごとの開始時刻・終了時刻・継�
 
 ## 対応ランタイム
 
-| ランタイム | 計算 | JSON | TSV | SRT | CLI flag | HTTP API |
+| ランタイム | 計算 | JSON | TSV | SRT | 利用 API / CLI | HTTP API |
 |----------|------|------|-----|-----|----------|----------|
-| Python | ✅ | ✅ | ✅ | ✅ | (`piper_plus.synthesize_with_timing()`) | ✅ `/api/phoneme-timing` |
-| Rust | ✅ | ✅ | ✅ | ✅ | `--output-timing` `--timing-format` | - |
-| Go | ✅ | ✅ | ✅ | ✅ | `--output-timing` `--timing-format` | ✅ |
+| Python | ✅ | ✅ | ✅ | ✅ | `PiperVoice.synthesize_with_timing()` | ✅ `/api/phoneme-timing` |
+| Rust | ✅ | ✅ | ✅ | ✅ | `--timing FORMAT` (stderr 出力) | - |
+| Go | ✅ | ✅ | ✅ | ✅ | `--output-timing` `--timing-format` | - |
 | C++ | ✅ | ✅ | ✅ | ✅ | `--output-timing` `--timing-format` | - |
-| C# | ✅ | ✅ | ✅ | ✅ | (`PhonemeTimingExtractor`) | - |
+| C# | ✅ | ✅ | ✅ | ✅ | `--output-timing` `--timing-format` | - |
 | WASM/JS | ✅ | ✅ | ✅ | ✅ | (`AudioResult.timing`) | N/A (browser) |
 
-すべての実装は **byte-for-byte 互換**: 同じ入力に対して同じ出力を生成します。
+JSON/TSV/SRT 欄はライブラリ formatter を含みます。Python HTTP は JSON/TSV、C# CLI は JSON/TSV/SRT を公開し、Python CLI に timing flag はありません。WASM の
+streaming/SSML 経路は timing を返しません。各 API/CLI の公開範囲を確認してください。
+
+duration 出力を持つ同じ ONNX model と同じ入力を使った実装は、契約で定めた
+timing schema と数値規則に従います。WAV の浮動小数点演算や、duration 出力を
+持たない legacy model の fallback は runtime/model ごとに差があり、全モデルで
+byte-for-byte の timing file を保証するものではありません。C++ は duration 出力が
+ない model では timing file を生成せず警告します。
 
 ## 計算ロジック
 
@@ -99,6 +106,11 @@ if timing:
 
 ### JavaScript / WASM
 
+tsukuyomi is a legacy compatibility alias resolved by the source/next model
+resolver. For a reproducible release example, provide the pinned
+releases/zs-v1/tsukuyomi.onnx and matching config.json URLs (or local files).
+The alias below is retained only to document the legacy API.
+
 ```javascript
 import { PiperPlus, timingToJson, timingToSrt } from 'piper-plus';
 
@@ -118,9 +130,12 @@ if (result.hasTimingInfo) {
 ### Rust CLI
 
 ```bash
-piper-plus -m model.onnx --text "Hello" \
-  --output-timing timing.json --timing-format json
+piper-plus-cli -m model.onnx --text "Hello" -o speech.wav --timing json
 ```
+
+The Rust CLI writes timing JSON to stderr; redirect or capture stderr when
+persisting it. The timing option is --timing FORMAT, not --output-timing or
+--timing-format.
 
 ### Go CLI
 
@@ -198,3 +213,9 @@ with open("output.srt", "w") as f:
 - フィールド名: snake_case (`start_ms`, `end_ms`, `duration_ms`, `total_duration_ms`, `sample_rate`)
 - ID → 音素文字列の逆引き: PUA 文字 (U+E000–U+F8FF) は `U+XXXX` 形式へフォールバック
 - 短文 padding 適用時: original phoneme IDs を保持し timing 計算に使用
+
+## 複数発話と分割合成
+
+このブランチの C# stdin と Go batch／JSONL は `--output-timing timing.json` に対し `timing_001.json`, `timing_002.json` のように発話別に保存します。duration を持たないモデルで明示的に timing を要求すると C#/Go CLI は失敗します。
+
+Rust/Go の SSML 分割合成と Rust の phoneme-silence 分割合成は WAV を連結しますが、単一の aligned duration tensor は返しません。Rust は timing 不在を警告し、Go は timing を要求した場合に失敗します。C# は `--streaming` と `--output-timing` の同時指定を拒否します。

@@ -1,10 +1,14 @@
 # ZH-EN Code-Switching: 全ランタイム展開設計書
 
-**ステータス**: Implemented (Issue #384, PR #399 / dev に merge 済み)
+**ステータス**: Implemented across the current runtime data and fixture mirrors
+(Issue #384, PR #399 / dev に merge 済み)
 **前提 PR**: [#397](https://github.com/ayutaz/piper-plus/pull/397) (Python 学習側 + Python ランタイム側)
 **親 Issue**: [#384](https://github.com/ayutaz/piper-plus/issues/384) (Out of Scope で予告された全ランタイム同期実装)
 
-> **注**: 本書は実装着手前の調査・設計記録。ロードマップ (タスク表 / ブランチ戦略 / Day 1-14 計画) と改訂履歴は実装完了に伴い削除済み (詳細は git log)。残置されているのは設計判断の根拠・運用 SOP・将来拡張の参考として価値あるセクションのみ。
+> **注**: 本書は実装着手前の調査・設計記録を含む。ロードマップ (タスク表 /
+> ブランチ戦略 / Day 1-14 計画) と改訂履歴は実装完了に伴い削除済み (詳細は git log)。
+> 現行実装の事実は上部の runtime/mirror 状態と `docs/spec/loanword-mirrors.toml` を正本とし、
+> 後続の「推奨」「新規 CI」「工数」は将来提案として読む。
 
 ---
 
@@ -17,15 +21,18 @@ PR #397 で **Python (学習側 + ランタイム側)** の ZH-EN code-switching
 - `MultilingualPhonemizer` が `[zh,en,zh] / [zh,en] / [en,zh]` パターンを検出して dispatch
 - 学習側 + Python ランタイム両方で同等動作
 
-しかし、**他 5 ランタイム (Rust / Go / C# / JS-WASM / C++) は未対応**。実プロダクト環境 (iOS / Android / Unity / Web / CLI) は Python 以外を主に使うため、本機能の効果が見えず、機能ギャップが発生している。
+現在は Rust (2 crate)、Go、C#、JS/WASM、C++、Kotlin/Android、Swift の
+runtime data mirror と実装経路が整備されている。Android/Swift の JSON はそれぞれ
+AAR/SPM の配布資産として同期され、実装の正本は各 runtime source と
+`docs/spec/loanword-mirrors.toml` にある。
 
-本書は **5 ランタイム同時展開** (1 ブランチ / 1 PR) のための調査結果と対応計画をまとめる。
+本書の後続設計節は、これらの実装を追加した時点の判断記録と将来拡張案をまとめる。
 
 ---
 
 ## 2. 各ランタイム別設計書
 
-Python (canonical) が main source of truth で、他 5 ランタイムが Python からの byte-for-byte 同期で動作する構造。各ランタイム固有の設計判断・制約は以下を参照:
+Python (canonical) が main source of truth で、各 runtime mirror が Python から byte-for-byte 同期される構造。各ランタイム固有の設計判断・制約は以下を参照:
 
 | ランタイム | ファイル | 概要 |
 |-----------|---------|------|
@@ -35,12 +42,16 @@ Python (canonical) が main source of truth で、他 5 ランタイムが Pytho
 | **C#** | [`csharp.md`](csharp.md) | `DotNetG2P.Chinese` NuGet 制約、独立 pinyin→IPA 実装、`EmbeddedResource` |
 | **JS/WASM** | [`wasm.md`](wasm.md) | 二層 FFI 設計 (JS bundle + Rust 注入)、WASM サイズ最適化 |
 | **C++** | [`cpp.md`](cpp.md) | iOS/Android リソース同梱、xxd 代替、thread safety、テストフレーム拡充 |
+| **Kotlin/Android** | AAR assets / native C++ mirror | `android/piper-plus-g2p/` の配布資産と JNI 経路 |
+| **Swift** | SPM resource mirror | `Sources/PiperPlusG2P/Resources/zh_en_loanword.json` |
 
 ---
 
 ## 3. 共通の実装パターン
 
-全ランタイムで **同一の 4 ステップ**:
+実装時の **共通 4 ステップ**は次のとおりだった。現在の各 runtime の
+公開 API、resource packaging、dispatch toggle には差があるため、これは
+実装手順の記録であり、全 runtime の API が同一という宣言ではない。
 
 ```text
 Step 1. zh_en_loanword.json を各ランタイムに同梱
@@ -92,16 +103,16 @@ Step 4. ユニットテスト + CI 同期ガード
 
 | # | 課題 | 詳細 | 対応方針 |
 |---|------|------|---------|
-| X1 | **Source of truth の JSON 同期** | **7 箇所**に同じ JSON が分散する (Python 学習 / Python ランタイム / Rust 2 crate (`piper-plus-g2p` + `piper-core`) / Go / C# / WASM-data / C++) | CI 同期ガードを各ランタイムで追加、git pre-commit hook 検討 |
+| X1 | **Source of truth の JSON 同期** | canonical 1 ファイル + runtime mirror 9 ファイル (Python runtime / Rust 2 crate / Go / C# / WASM / C++ / Android / Swift) と、fixture canonical + mirror 8 ファイル | `docs/spec/loanword-mirrors.toml` と `scripts/check_loanword_consistency.py` で同期済み |
 | X2 | **PUA mapping の一貫性** | 中国語 PUA codepoint (0xE020-0xE04A) が全ランタイムで同じ tone marker を出すか確認 | 既存の `docs/spec/pua-contract.toml` で担保済み、新規追加なし |
 | X3 | **Schema validation の方針統一** | Python 側の `_load_loanword_data` は厳格 validation (list[str] 型チェック)。各ランタイムで同等のエラーメッセージ形式を出す | `f"{path}: '{section}.{key}' must be list[str]"` 形式を標準化 |
 | X4 | **テストケースの統一** | Issue 例 3 つ + 各 priority/punctuation/digits ケースを全ランタイムでカバー | 統一テストマトリックス (後述) |
-| X5 | **同期 CI ジョブ** | 6 JSON が一致しているかの byte-for-byte 比較 CI | 既存 `python-tests` workflow に拡張 or 新規 `zh-en-loanword-sync` job |
-| X6 | **C++ iOS/Android リソース** | xcframework / aar に JSON を含める手段の確立 | `cmake/PrivacyInfo.xcprivacy` と同パターンで JSON を bundle |
-| X7 | **C# DotNetG2P.Chinese 制約** | NuGet 外部ライブラリは改修不可、独立 pinyin→IPA を C# に実装 | Python の `pinyin_to_ipa` を C# に移植 (~200 行) |
+| X5 | **同期 CI ジョブ** | runtime data と fixture の byte-for-byte 比較 CI | `scripts/check_loanword_consistency.py` が実装済みの gate |
+| X6 | **C++ iOS/Android リソース** | xcframework / AAR に JSON を含める手段 | CMake 生成ヘッダと Android 配布資産で実装済み |
+| X7 | **C# DotNetG2P.Chinese 制約** | NuGet 外部ライブラリは改修不可、独立 pinyin→IPA を C# に実装 | `ChineseEmbeddedEnglish` と `LoanwordDataLoader` が実装済み |
 | X8 | **JS/WASM の二層** | JS 側と Rust 側どちらに loanword ロジックを置くか | **Rust 側に集約**、JS は FFI 薄ラッパに留める |
 
-### 4.2 統一テストマトリックス
+### 4.2 統一テストマトリックス (設計時の提案)
 
 各ランタイムで以下を網羅:
 
@@ -144,9 +155,12 @@ Step 4. ユニットテスト + CI 同期ガード
 - test_json_matches_python_source  (byte-for-byte 比較)
 ```
 
-合計 **20 テスト/ランタイム × 5 ランタイム = 100 テスト**追加。
+Canonical fixture `tests/fixtures/g2p/zh_en_loanword_matrix.json` は現在 **18 ケース**。
+8 mirror fixture (Rust 2 crate、Go、C#、C++、WASM、Android、Swift) と Python の
+runtime tests がこの契約を参照する。以前の「20 ケース × 5 runtime」という数は
+実装前の見積もりである。
 
-### 4.3 Multilingual Dispatcher のエッジケース動作
+### 4.3 Multilingual Dispatcher のエッジケース動作 (仕様記録)
 
 **確定したエッジケース動作テーブル** (Python 現状実装ベース):
 
@@ -187,7 +201,7 @@ ELSE:
 
 **設計上の制約 (明示すべき)**:
 
-> ja-en-zh のように **kana を含む 3 言語 mode** では、kana の存在で CJK 全体が ja 化するため、zh セグメントが生成されず embedded English の dispatch が発動しない。これは現状の `UnicodeLanguageDetector` の仕様に従う動作で、本 PR では **変更しない**。将来的に解決するなら段落単位の kana スキャン or 言語切替トークン (issue A3) が必要。
+> ja-en-zh のように **kana を含む 3 言語 mode** では、kana の存在で CJK 全体が ja 化するため、zh セグメントが生成されず embedded English の dispatch が発動しない。これは現状の `UnicodeLanguageDetector` の仕様に従う動作で、この設計記録では **変更しない**。将来的に解決するなら段落単位の kana スキャン or 言語切替トークン (issue A3) が必要。
 
 **新規必須テスト** (各ランタイムで実装):
 
@@ -196,7 +210,7 @@ ELSE:
 - L: URL は drop されず English path
 - M: 全角英数の挙動
 
-### 4.4 エラーハンドリング統一仕様
+### 4.4 エラーハンドリング統一仕様 (設計時の提案)
 
 **メッセージテンプレート統一**:
 
@@ -249,24 +263,24 @@ PIPER_PLUS_API const char* piper_plus_get_last_error(void);
 | 正常ロード成功 | debug |
 | schema violation | (例外メッセージで十分、log 不要) |
 
-### 4.5 テストデータ統一フォーマット
+### 4.5 テストデータ統一フォーマット (設計時の提案)
 
-**問題**: 5 ランタイム × 20 ケース = **100 テスト**を独立に書くと、メンテ時に整合性ずれが起きる。一元管理したい。
+**問題 (設計時の記録)**: 各 runtime がケースを独立に持つと、メンテ時に整合性ずれが起きる。一元管理したい。
 
 **既存パターン**:
 
 - `tests/fixtures/g2p/phoneme_test_cases.json` — Python/Rust/JS 共有 fixture (15+ ケース実例あり)
-- `docs/spec/pua-contract.toml` — 6 ランタイム PUA mapping spec
+- `docs/spec/pua-contract.toml` — cross-runtime PUA mapping spec
 - `scripts/check_pua_consistency.py` — entry-by-entry 比較
 - `.github/workflows/g2p-cross-platform-ci.yml` — 全ランタイム同時実行
 
-**推奨**: **共有 JSON fixture + 各ランタイム loader (案 B+D ハイブリッド)** — PUA で実証済みのパターンを踏襲
+**推奨 (設計時の提案)**: **共有 JSON fixture + 各ランタイム loader (案 B+D ハイブリッド)** — PUA で実証済みのパターンを踏襲
 
 ```json
-// tests/fixtures/g2p/zh_en_test_matrix.json (新規)
+// tests/fixtures/g2p/zh_en_loanword_matrix.json (現行の canonical fixture)
 {
   "version": 1,
-  "description": "ZH-EN code-switching test matrix: 20 cases × 5 runtimes",
+  "description": "ZH-EN code-switching test matrix: 18 cases × mirror runtimes",
   "test_matrix": [
     {
       "id": "zh_en_001_basic",
@@ -298,7 +312,7 @@ def test_case(case):
 // Rust: piper-plus-g2p/tests/test_zh_en_unified.rs
 #[test]
 fn test_zh_en_matrix() {
-    let matrix: Vec<TestCase> = load_fixture(".../zh_en_test_matrix.json");
+    let matrix: Vec<TestCase> = load_fixture(".../zh_en_loanword_matrix.json");
     for case in matrix { run_case(&case); }
 }
 ```
@@ -318,7 +332,7 @@ zh-en-cross-platform:
 
 **工数見積**: Fixture JSON 4h + 各ランタイム loader (5 × 2h) + CI 統合 3h = **~17h** (一度切り)、将来 case 追加は **+1h/case**
 
-### 4.6 パフォーマンス・ベンチマーク戦略
+### 4.6 パフォーマンス・ベンチマーク戦略 (設計時の提案)
 
 **目標値**:
 
@@ -341,7 +355,10 @@ prosody build                ~5 μs
 Total                        ~37 μs/token  ← 目標 100μs 内
 ```
 
-**各ランタイムのベンチマーク実装**:
+**各ランタイムのベンチマーク実装予定**:
+
+以下は設計時に想定した追加ファイルの一覧であり、現行 checkout にはまだ存在しない。
+ベンチマーク実装後に、実在する path と測定結果へ更新する。
 
 | ランタイム | フレーム | ファイル |
 |-----------|--------|--------|
@@ -380,7 +397,7 @@ jobs:
 
 **工数**: ベンチ実装 ~3-4 日、CI 統合 ~1 日 = **~5 日**
 
-### 4.7 メモリ管理戦略
+### 4.7 メモリ管理戦略 (設計時の提案)
 
 **各ランタイムの推奨パターン**:
 
@@ -411,7 +428,7 @@ LoanwordData (default):
 
 100 インスタンス共有でも default は 1 つだけ → **総メモリ ~20 KB** (Arc 共有の効果)
 
-### 4.8 i18n / 多言語ペア拡張性
+### 4.8 i18n / 多言語ペア拡張性 (将来提案)
 
 **現状**: ZH-EN のみ対応。将来 JA-EN / KO-EN / ES-EN 等に拡張する可能性。
 
@@ -419,11 +436,11 @@ LoanwordData (default):
 
 | Phase | 対象 | ファイル構成 | スキーマ |
 |-------|-----|-----------|---------|
-| **本 PR (現在)** | ZH-EN | `data/zh_en_loanword.json` | v1 (現行) |
+| **Initial implementation** | ZH-EN | `data/zh_en_loanword.json` | v1 (現行) |
 | **6 ヶ月後 (フォローアップ)** | JA-EN 等追加 | `data/loanword/{src}_{tgt}.json` | v1 (構造同一) |
 | **2 年後+ (必要なら)** | 多ペア統合 | `data/loanword.json` (`pairs: { ... }`) | v2 (構造変更) |
 
-**推奨**: **Phase 1 (本 PR) は現状の `zh_en_loanword.json` 維持**、Phase 2 で必要に応じて `data/loanword/` ディレクトリ化
+**推奨 (将来提案)**: **Phase 1 は現状の `zh_en_loanword.json` 維持**、Phase 2 で必要に応じて `data/loanword/` ディレクトリ化
 
 **スキーマに `language_pair` field 追加 (任意、Phase 2 で必須化)**:
 
@@ -448,7 +465,7 @@ LoanwordData (default):
 | 韓国語 (ko) | g2pk2 + Hangul 分解 | 英単語特別処理なし、JA-EN 同様 (将来課題) |
 | ES/PT/FR/SV | 規則ベース | 各言語で同様の loanword 辞書を作る余地あり |
 
-### 4.9 セキュリティ考慮事項
+### 4.9 セキュリティ考慮事項 (設計時の提案)
 
 **脅威モデル**:
 
@@ -508,17 +525,17 @@ def _safe_load_json(
 
 **`custom_dict.py` の既存パターンとの共通化**:
 
-将来 `_safe_load_json` を共通モジュール化検討 (Phase 2)。本 PR では各ランタイムで個別実装。
+将来 `_safe_load_json` を共通モジュール化検討 (Phase 2)。この共通化は未実装の提案である。
 
 **実装優先度**:
 
 | Tier | 項目 | 必須度 |
 |------|------|--------|
-| Tier 1 (本 PR) | サイズ上限、symbolic link 警告、schema validation | **必須** |
-| Tier 2 (本 PR) | エントリ数上限、JSON depth 制限 | **必須** |
+| Tier 1 (将来提案) | サイズ上限、symbolic link 警告、schema validation | **必須** |
+| Tier 2 (将来提案) | エントリ数上限、JSON depth 制限 | **必須** |
 | Tier 3 (フォローアップ) | 共通 `_safe_load_json` モジュール化 | 任意 |
 
-### 4.10 API ドキュメンテーション統一
+### 4.10 API ドキュメンテーション統一 (設計時の提案)
 
 **各ランタイムの既存ドキュメント品質**:
 
@@ -595,7 +612,7 @@ pub fn phonemize_embedded_english(
 | C++ | `doxygen` | **未設定 → 新規追加検討** |
 | Go | godoc (組込) | (組込) |
 
-### 4.11 デバッグ・トレース戦略
+### 4.11 デバッグ・トレース戦略 (設計時の提案)
 
 **統一 log level ガイドライン**:
 
@@ -661,7 +678,7 @@ if os.environ.get("PIPER_PLUS_DEBUG_ZH_EN"):
 - C++: `NDEBUG` macro で compile-time に削除可能
 - WASM: `process.env.NODE_ENV !== 'production'` でガード
 
-### 4.12 テストカバレッジ目標
+### 4.12 テストカバレッジ目標 (設計時の提案)
 
 **カバレッジ目標値**:
 

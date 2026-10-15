@@ -46,7 +46,8 @@ sample_rate = 22050            # piper-plus uses 22.05 kHz mono throughout
 #   - csharp:  src/csharp/PiperPlus.Cli --json-input
 #   - cpp:     src/cpp/main.cpp processLine (phoneme_ids JSON field)
 #   - wasm:    src/wasm/openjtalk-web/bin/piper-cli.js --json-input
-#              (Node bin via onnxruntime-node; browser `src/index.js` is
+#              (Node bin via onnxruntime-node; browser
+#              src/wasm/openjtalk-web/src/index.js is
 #              still fetch/IndexedDB-only and is not the parity surface)
 python  = { id = "python",  cli = "uv run python -m piper_plus", supports_dump_wav = true }
 rust    = { id = "rust",    cli = "piper-plus",             supports_dump_wav = true }
@@ -54,16 +55,17 @@ csharp  = { id = "csharp",  cli = "piper-plus-cli",         supports_dump_wav = 
 go      = { id = "go",      cli = "piper-plus",             supports_dump_wav = true }
 wasm    = { id = "wasm",    cli = "node bin/piper-cli.js",  supports_dump_wav = true }
 cpp     = { id = "cpp",     cli = "piper-plus",             supports_dump_wav = true }
-# iOS Swift / Android Kotlin G2P bindings are excluded; they do not load
-# the ONNX decoder so cross-runtime WAV parity does not apply.
+# Android Kotlin G2P bindings are excluded; they do not load the ONNX decoder.
+# Swift G2P bindings are also outside this WAV parity harness, while the
+# separate Swift PiperPlus synthesis path does load ONNX through the C API/ORT.
 
 [models]
 # Models are looked up by name; the workflow downloads them on demand.
 multilingual_test_medium = { hf = "ayousanz/piper-plus-css10-ja-6lang" }
-tsukuyomi_6lang_v2       = { hf = "ayousanz/piper-plus-tsukuyomi-chan" }
+tsukuyomi_6lang_v2       = { hf = "ayousanz/piper-plus-tsukuyomi-chan", legacy = true, note = "Root-era fixture; retain for historical parity only." }
 # Retained root-era MB-iSTFT base. This entry is historical and is not the
 # public v2 Zero-Shot bundle below.
-mb_istft_base            = { hf = "ayousanz/piper-plus-base" }
+mb_istft_base            = { hf = "ayousanz/piper-plus-base", legacy = true, note = "Root-era fixture; retain for historical parity only." }
 
 # Zero-shot test model entry — pins the `speaker_embedding` input contract
 # so cross-runtime parity for the v7 multi-6lang zero-shot decoder can be
@@ -76,6 +78,16 @@ mb_istft_base            = { hf = "ayousanz/piper-plus-base" }
 hf = "ayousanz/piper-plus-zero-shot-multi-6lang-v7"
 has_speaker_embedding = true
 expected_embedding_dim = 192
+
+# Current public fixed-voice bundle. The explicit nested paths and revision are
+# required because the HF repository also retains mutable legacy root files.
+[models.tsukuyomi_public_zs_v1]
+hf = "ayousanz/piper-plus-tsukuyomi-chan"
+revision = "93c1fb6d67c29accc9ddf52326bb4582b1b52a3d"
+model_file = "releases/zs-v1/tsukuyomi.onnx"
+config_file = "releases/zs-v1/config.json"
+model_sha256 = "5fcef335c2bd69a4d2b5512e46d971427a653bf252097e2fb73618e7a584f331"
+has_speaker_embedding = false
 
 # Public copy of the same experimental v7 epoch32 graph. Keep the private
 # research entry above for research fixtures; this entry pins the public

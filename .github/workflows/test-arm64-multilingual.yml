@@ -35,7 +35,8 @@ jobs:
         uses: docker/setup-qemu-action@v4.0.0
         with:
           platforms: arm64
-          image: tonistiigi/binfmt:latest
+          # Use the same Bullseye-compatible QEMU as _build-linux-arm64.yml.
+          image: tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3.12.0

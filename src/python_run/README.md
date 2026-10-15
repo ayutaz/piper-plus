@@ -22,13 +22,11 @@
 ## インストール
 
 ```bash
-pip install piper-plus
-
-# GPU サポート
-pip install "piper-plus[gpu]"
+# 公開済み v2.0.1 の CPU パッケージ
+pip install "piper-plus==2.0.1"
 ```
 
-Python 3.11+ が必要です。
+Python 3.11+ が必要です。開発版のソースからは、新しい venv で `uv pip install "src/python_run[cpu]"` または `uv pip install "src/python_run[gpu]"` の一方を選びます。公開済み v2.0.1 の GPU extra は CPU ORT も要求するため、この修正を含むソースからの GPU 導入手順は末尾の「開発版の provider 選択」を参照してください。
 
 ## クイックスタート
 
@@ -59,7 +57,7 @@ with wave.open("output.wav", "wb") as wav_file:
 
 ## Phoneme Timing (リップシンク・字幕同期)
 
-piper-plus は VITS Duration Predictor から音素レベルのタイミング情報を抽出できます。リップシンク、字幕同期、カラオケアプリケーションで使用できます。Rust/Go/C++/C# 実装と byte-for-byte 互換です。
+piper-plus は VITS Duration Predictor から音素レベルのタイミング情報を抽出できます。リップシンク、字幕同期、カラオケアプリケーションで使用できます。各 runtime の timing 契約は共通仕様に合わせています。値の互換性はモデル、実装、丸め処理を同じ条件で確認してください。
 
 ### Python API
 
@@ -169,7 +167,7 @@ curl -L "${ZS_URL}/base.ckpt" -o models/zs-v1/base.ckpt
 
 推論は `base.onnx` + `base.onnx.json`、追加学習は `base.ckpt` + 同じ bundle の `config.json` を使ってください。HF リポジトリ root の旧 `config.json` や `model.ckpt` と混在させないでください。公開 bundle の参照音声からの embedding 事前計算例は、[zs-v1 の公開 README](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/README.md) を参照してください。
 
-この bundle の reference-conditioned 推論は PyPI `piper-plus==2.0.0` で確認済みです。他の runtime/platform の同 bundle による推論確認や品質承認を意味しません。`base` / `zero-shot-base-zs-v1` alias は source branch / 次期リリース向けで、公開 2.0.0 / 2.0.1 には収録されていません。
+この bundle の reference-conditioned 推論は PyPI `piper-plus==2.0.0` で確認済みです。加えて、公開 CI run `38189966578` では 6 runtime の推論レポートを、Python で共有した phoneme IDs を入力として取得しています。この CI 範囲には native G2P と listening quality は含まれず、品質承認も行っていません。Python package の確認と runtime CI の範囲は別の証拠です。`base` / `zero-shot-base-zs-v1` alias は source branch / 次期リリース向けで、公開 2.0.0 / 2.0.1 には収録されていません。
 
 ## 対応言語
 
@@ -202,3 +200,7 @@ curl -L "${ZS_URL}/base.ckpt" -o models/zs-v1/base.ckpt
 ## ライセンス
 
 MIT License — 詳細は [LICENSE](https://github.com/ayutaz/piper-plus/blob/dev/LICENSE.md) を参照。
+
+### 開発版の provider 選択
+
+このブランチからビルドするパッケージは CPU/GPU ORT を基底依存にせず、`[cpu]` / `[gpu]` の一方を選びます。既存環境で切り替える場合は新しい venv を使用してください。公開済み v2.0.1 の基底依存は CPU ORT を含むため、この変更の収録後のパッケージとは異なります。ソースから GPU 環境を作る場合は root で `uv sync --locked --no-group cpu --extra inference-gpu` を使用し、実行には `uv run --no-sync` を使用します。

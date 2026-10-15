@@ -18,11 +18,11 @@ For Windows, see [ssamjh's guide using WSL](https://ssamjh.nz/create-custom-pipe
 - [Training a Model](#training-a-model)
 - [Multi-Speaker Fine-Tuning](#multi-speaker-fine-tuning)
 - [Zero-Shot TTS Training](#zero-shot-tts-training)
-- [Multilingual Training (8言語)](#multilingual-training-8言語)
+- [Multilingual Training (6言語ベース)](#multilingual-training-6言語ベース)
 - [Transfer Learning (転移学習)](#transfer-learning-転移学習)
 - [WavLM Discriminator](#wavlm-discriminator)
 - [Testing](#testing)
-- [Multilingual Inference (8言語推論)](#multilingual-inference-8言語推論)
+- [Multilingual Inference (6言語モデル)](#multilingual-inference-6言語モデル)
 - [Tensorboard](#tensorboard)
 - [Exporting a Model](#exporting-a-model)
 - [CLI Options Reference](#cli-options-reference)
@@ -73,13 +73,18 @@ Then install the project dependencies:
 
 ``` sh
 cd piper-plus
-uv pip install ".[train]"
+uv sync
 ```
 
 Run the `build_monotonic_align.sh` script in the `src/python` directory to build the extension.
 
-Install [espeak-ng](https://github.com/espeak-ng/espeak-ng/) (`sudo apt-get install espeak-ng`).
-espeak-ng is **required for preprocessing** all languages except Japanese (`ja`), which uses pyopenjtalk. English preprocessing also requires espeak-ng. Note: at inference time (`infer_onnx`), the Phonemizer registry allows English to use g2p-en (Apache-2.0) without espeak-ng, but the `preprocess` step still depends on it.
+Install [espeak-ng](https://github.com/espeak-ng/espeak-ng/) when using the legacy
+`piper-phonemize` preprocessing path. That optional dependency is published only
+for macOS x86_64 with CPython 3.11/3.12; it has no Linux/Windows/Apple Silicon
+or CPython 3.13 wheel. The current piper-plus G2P path does not require
+`piper-phonemize`. Japanese uses pyopenjtalk, and the multilingual G2P path is
+selected by the language/preprocessing tools. At inference time `g2p-en` can
+phonemize English without espeak-ng.
 
 
 ## Preparing a Dataset
@@ -229,13 +234,14 @@ For most cases, you should fine-tune from [an existing model](https://huggingfac
 Piper supports multi-GPU training using PyTorch Lightning's DDP (Distributed Data Parallel) strategy:
 
 ```sh
+# Use 2 GPUs with DDP; batch-size is per GPU
 NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
 uv run python -m piper_train \
     --dataset-dir /path/to/training_dir/ \
     --accelerator 'gpu' \
-    --devices 2 \                        # Use 2 GPUs
-    --strategy ddp \                     # DDP strategy
-    --batch-size 16 \                    # Per GPU batch size
+    --devices 2 \
+    --strategy ddp \
+    --batch-size 16 \
     --max_epochs 10000
 ```
 
@@ -270,7 +276,7 @@ uv run python -m piper_train \
     --max_epochs 10000 \
     --resume_from_checkpoint /path/to/lessac/epoch=2164-step=1355540.ckpt \
     --checkpoint-epochs 1 \
-    --precision 32 \
+    --precision 32-true \
     --num-workers 48
 ```
 
@@ -281,11 +287,19 @@ The following features are enabled by default and do not need explicit flags:
 
 - **Prosody features** (`--prosody-dim 16`): A1/A2/A3 accent features from OpenJTalk are fed into the Duration Predictor.
 - **EMA weights** (`--ema-decay 0.9995`): Exponential Moving Average is applied to the decoder for smoother convergence.
-- **WavLM Discriminator**: A perceptual quality discriminator that improves MOS by +0.15-0.25. It is used during training only (no impact on inference speed). Adds ~1-2 GB GPU memory; reduce `--batch-size` if needed. Control its weight with `--c-wavlm` (default 0.5). **T4 (VRAM 16GB) では VRAM 制約のため `--no-wavlm` を推奨**。 Ada 6000 (48GB) / RTX 5090 (32GB) では WavLM 有効が canonical。**Zero-Shot TTS 学習や T4/V100 multi-GPU 設定では `--no-wavlm` を推奨** (詳細: [Zero-Shot TTS Training](#zero-shot-tts-training))。
+- **WavLM Discriminator**: training-only perceptual discriminator (no inference
+  graph or inference-speed change). This repository has no controlled MOS study,
+  so the size of any quality change is **unmeasured**. It adds approximately
+  1--2 GB/GPU in the documented configuration; reduce `--batch-size` if needed.
+  Control its weight with `--c-wavlm` (default 0.5). **T4 (16 GB) では
+  `--no-wavlm` を推奨**。Ada 6000/RTX 5090 では WavLM を有効にできますが、
+  品質改善量は測定してください。**Zero-Shot TTS 学習や T4/V100 の
+  multi-GPU 設定では `--no-wavlm` を推奨** (詳細: [Zero-Shot TTS Training](#zero-shot-tts-training))。
 
 追加対応機能を踏まえて学習をする場合は、以下のようになります。学習を再開する際には `--resume_from_checkpoint "${LATEST_CHECKPOINT_PATH}"` をつけて実行します
 
 ```sh
+# Mixed precision training (faster, less memory)
 uv run python -m piper_train \
   --dataset-dir ${PREPROCESSED_MOE_DIR} \
   --accelerator 'gpu' \
@@ -298,10 +312,13 @@ uv run python -m piper_train \
   --validation-split 0.01 \
   --num-test-examples 10 \
   --num-workers 45 \
-  --save-top-k -1 \
+  --save-top-k -1
 ```
 
-> **⚠️ 注意 (Issue #527 / DR-008 後):** v2.0 では Template default が `--precision bf16-mixed` (Ada 6000 / RTX 5090 で BF16 native Tensor Core を活用)。 古い GPU (V100 等) は引退済、 `--precision 32-true` は legacy として残存。 新規学習では `bf16-mixed` 推奨、 V100 互換が必要なら `32-true` を明示指定。
+> **精度の選択:** parser の既定値は `bf16-mixed` です。Ada/Blackwell
+> ではそのまま使えます。T4 では WavLM を無効化し、`16-mixed` または
+> OOM 時の `32-true` を試してください。V100 (sm_70) では `32-true`
+> と `--no-wavlm` を開始点にし、実機で互換性とメモリを確認してください。
 
 Use `--quality high` to train a [larger voice model](https://github.com/rhasspy/piper/blob/master/src/python/piper_train/vits/config.py#L45) (sounds better, but is much slower).
 
@@ -309,7 +326,14 @@ You can adjust the validation split (5% = 0.05) and number of test examples for 
 
 Batch size can be tricky to get right. It depends on the size of your GPU's vRAM, the model's quality/size, and the length of the longest sentence in your dataset. The `--max-phoneme-ids <N>` argument to `piper_train` will drop sentences that have more than `N` phoneme ids. In practice, using `--batch-size 32` and `--max-phoneme-ids 400` will work for 24 GB of vRAM (RTX 3090/4090).
 
-**Note on multilingual models:** The current 6-language model uses 173 symbols (vs 97 for bilingual JA+EN), which increases embedding table size and GPU memory usage. Code supports 8 languages (including Korean and Swedish), which would increase the symbol count further. **新 GPU 環境での VRAM 別推奨 batch_size**: RTX 6000 Ada 48GB → `--batch-size 32-64`、 RTX 5090 32GB → `--batch-size 32-48`、 T4 16GB (推論専用) → 学習非推奨、 旧 V100 16GB (引退済) → `--batch-size 20`。 For fine-tuning a single speaker from a multilingual base, `--batch-size 4-8` works well.
+**Note on multilingual models:** The current public base uses 173 symbols (vs
+97 for bilingual JA+EN), which increases embedding-table and GPU memory use.
+The G2P code supports 8 languages, but the public `zs-v1` base is trained for
+6 (JA/EN/ZH/ES/FR/PT). The following are starting points, not benchmarks:
+RTX 6000 Ada 48 GB `--batch-size 32-64` with `bf16-mixed`; RTX 5090 32 GB
+`--batch-size 32-48` with `bf16-mixed`; T4 16 GB `--no-wavlm` and a reduced
+batch size; V100 16 GB `32-true --no-wavlm` and a reduced batch size. For
+single-speaker fine-tuning, start at `--batch-size 4-8` and measure OOM.
 
 ### Advanced Training Options
 
@@ -321,11 +345,13 @@ uv run python -m piper_train \
   --accelerator 'gpu' \
   --devices 1 \
   --batch-size 32 \
-  --precision 16-mixed \                # Mixed precision training (faster, less memory)
-  --resume_from_checkpoint /path/to/checkpoint.ckpt  # Resume training
+  --precision 16-mixed \
+  --resume_from_checkpoint /path/to/checkpoint.ckpt
 ```
 
-> **⚠️ 注意 (Issue #527 / DR-008 後):** v2.0 では Template default が `--precision bf16-mixed` (Ada 6000 / RTX 5090 で BF16 native Tensor Core を活用)。 古い GPU (V100 等) は引退済、 `--precision 32-true` は legacy として残存。 新規学習では `bf16-mixed` 推奨、 V100 互換が必要なら `32-true` を明示指定。
+> **精度の選択:** parser の既定値は `bf16-mixed` です。Ada/Blackwell
+> ではそのまま使えます。T4 は `--no-wavlm` と `16-mixed` を開始点にし、
+> V100 (sm_70) は `32-true --no-wavlm` を開始点にしてください。
 
 
 ### Multi-Speaker Fine-Tuning
@@ -339,7 +365,9 @@ For multi-speaker models, use `--samples-per-speaker <N>` to activate the `Speak
 
 Zero-Shot TTS allows the model to reproduce a target speaker's voice from a reference audio at inference time, without requiring that speaker to appear in training. This is implemented via CAM++ speaker embeddings (192-dim, ONNX, Apache-2.0).
 
-> For full configuration details, architecture choices, and the latest v5 training command, see **CLAUDE.md** in the project root.
+> For full configuration details and architecture choices, see **CLAUDE.md** in
+> the project root. The command below is a reproducible example; its epoch
+> count is a training setting, not a statement about the public base release.
 
 ### Prerequisites: CAM++ Speaker Encoder
 
@@ -398,7 +426,7 @@ uv run python -m piper_train \
   --lr-scheduler cosine --lr-warmup-epochs 5 --lr-min 1e-5 \
   --c-spk 1.0 \
   --speaker-encoder-path /data/piper/models/campplus.onnx \
-  --default_root_dir /data/piper/output-zero-shot-20speakers-v5
+  --default_root_dir /data/piper/output-zero-shot-20speakers-zs-v1
 ```
 
 Key flags for zero-shot training:
@@ -418,7 +446,7 @@ Key flags for zero-shot training:
 | Parameter | T4 15GB × 4 | V100 16GB × 4 | RTX 6000 Ada 48GB × 1 |
 |-----------|-------------|---------------|----------------------|
 | `--devices` | 4 | 4 | 1 |
-| `--precision` | `16-mixed` | `16-mixed` | `bf16-mixed` |
+| `--precision` | `16-mixed` | `32-true` | `bf16-mixed` |
 | `--batch-size` | 20 | 12 | 160 |
 | `--samples-per-speaker` | 4 | 2 | 8 |
 | `--num-workers` | 4 | 0 | 8 |
@@ -435,9 +463,9 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --export-mode zero-shot \
   /path/to/checkpoint.ckpt /path/to/output_zeroshot.onnx
 
-# Speaker-ID mode (traditional)
+# Auto-detect the model mode for a traditional speaker-ID checkpoint
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-  --export-mode sid \
+  --export-mode auto \
   /path/to/checkpoint.ckpt /path/to/output_sid.onnx
 ```
 
@@ -465,7 +493,7 @@ The `--speaker-embedding` option accepts a `.npy` file (192 × float32) or a raw
 Recommended inference defaults for zero-shot models: `noise_scale=0.4`, `noise_scale_w=0.5`.
 
 
-### Multilingual Training (8言語)
+### Multilingual Training (6言語ベース)
 
 Piper supports multilingual pretraining with up to 8 languages: Japanese (ja), English (en), Chinese (zh), Korean (ko), Spanish (es), French (fr), Portuguese (pt), and Swedish (sv).
 
@@ -505,7 +533,7 @@ uv run python -m piper_train \
 
 | Parameter | Rationale |
 |-----------|-----------|
-| `--max_epochs 75` | 75 epochs with large dataset yields ~282K gradient steps |
+| `--max_epochs 75` | Example setting for a large pretraining run; step count depends on the dataset and batch size |
 | `--batch-size 32` | Ada 6000 48GB / RTX 5090 32GB で快適 (V100 16GB では 20 に絞る) |
 | `--samples-per-speaker 2` | Balances speaker representation across languages |
 | `--precision bf16-mixed` | Ada/Blackwell の BF16 Tensor Core 活用 (Issue #527 / DR-008、 旧 V100 互換は `32-true`) |
@@ -562,7 +590,9 @@ For single-speaker multilingual models, `emb_lang` embeddings are automatically 
 
 ### WavLM Discriminator
 
-WavLM Discriminator is a Microsoft WavLM-based perceptual quality discriminator. It is **enabled by default** and improves MOS (Mean Opinion Score) by approximately +0.15-0.25.
+WavLM Discriminator is a Microsoft WavLM-based perceptual quality discriminator.
+It is **enabled by default**. This repository has no controlled MOS comparison,
+so the size of any quality change is unmeasured.
 
 **Key points:**
 
@@ -648,9 +678,14 @@ uv run python -m piper_train.infer_onnx \
 The input format to `piper_train.infer_onnx` is the same as `dataset.jsonl`: one line of JSON per utterance with `phoneme_ids` and `speaker_id` (multi-speaker only). For direct text-to-speech inference without pre-generating a JSONL file, use the `--text` option shown above. Alternatively, use the built-in `piper-plus-g2p` package to phonemize text programmatically (see `src/python/g2p/piper_plus_g2p/`).
 
 
-### Multilingual Inference (8言語推論)
+### Multilingual Inference (6言語モデル)
 
-For multilingual models, use `--language` to specify the language combination and `--speaker-id` to select a speaker. The `--language` value uses a hyphen-separated list of language codes (order does not matter; it is normalized internally).
+For multilingual models, use `--language` to specify the language combination and
+`--speaker-id` to select a speaker. The hyphen-separated value is valid only when
+the model's `config.json` contains the corresponding language IDs. The public
+`zs-v1` base is a 6-language model (`ja-en-zh-es-fr-pt`); the runtime also has
+code paths for Korean and Swedish, but that does not make them trained model
+languages.
 
 **Japanese (speaker_id=0):**
 
@@ -738,7 +773,10 @@ Check on your model's progress with tensorboard:
 tensorboard --logdir /path/to/training_dir/lightning_logs
 ```
 
-Click on the scalars tab and look at both `loss_disc_all` and `loss_gen_all`. In general, the model is "done" when `loss_disc_all` levels off. We've found that 2000 epochs is usually good for models trained from scratch, and an additional 1000 epochs when fine-tuning.
+Click on the scalars tab and look at both `loss_disc_all` and `loss_gen_all`.
+Treat a plateau as one signal only; epoch counts depend on the dataset and must
+be checked with held-out and human evaluation. The older 2000/1000-epoch values
+were heuristics, not a current quality target.
 
 ### Wandb (Weights & Biases)
 
@@ -747,8 +785,8 @@ Piper supports automatic logging to [Weights & Biases](https://wandb.ai/) for re
 #### Setup
 
 ```sh
-# Install wandb
-uv pip install wandb
+# `wandb` is included by the workspace training dependencies
+uv sync
 
 # Login with your API key
 wandb login
@@ -894,11 +932,13 @@ uv run python -m piper_train.export_onnx_streaming \
 The simplification process:
 
 - Reduces model size through constant folding
-- Improves inference performance by 5-15%
+- May reduce the exported graph size or runtime cost; measure the result for the
+  target model and ONNX Runtime provider before making a performance claim.
 - Validates the simplified model automatically
 - Falls back gracefully if onnxsim-prebuilt is not installed
 
-Note: To use this feature, install `onnxsim-prebuilt` with: `uv pip install onnxsim-prebuilt`
+Note: `onnxsim-prebuilt` is included by the workspace training dependencies;
+run `uv sync` from the repository root before using this feature.
 
 If the export is successful, you can now use your voice with Piper:
 
@@ -956,9 +996,10 @@ Validation頻度とバッチ数を制御することで学習スループット�
 | `--limit-val-batches N` | 50 | Validation時の最大バッチ数 |
 
 ```sh
+# 10エポックごとにValidation
 python3 -m piper_train \
   --dataset-dir /path/to/training_dir/ \
-  --val-every-n-epochs 10 \   # 10エポックごとにValidation
+  --val-every-n-epochs 10 \
   --limit-val-batches 20       # Validationを20バッチに制限
 ```
 

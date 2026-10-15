@@ -46,12 +46,13 @@ MANIFEST = REPO_ROOT / "docs" / "spec" / "model-sha256-manifest.toml"
 # manifest in the same commit — that is exactly what this gate enforces.
 EXPECTED_MODELS = {
     "multilingual-6lang-base",  # [Archived/v1.11]
-    "multilingual-6lang-mb-istft",  # 現行 base
+    "multilingual-6lang-mb-istft",  # legacy compatibility base
     "tsukuyomi-6lang-v2",  # [Archived/v1.11]
-    "tsukuyomi-mb-istft",  # 現行 tsukuyomi
+    "tsukuyomi-mb-istft",  # legacy compatibility fine-tune
     "css10-ja-6lang",  # CSS10 JA 6lang
     "speaker-encoder-ecapa-tdnn",  # voice cloning
     "zero-shot-base-zs-v1",  # public experimental v7 baseline
+    "tsukuyomi-zs-v1",  # public fixed-voice fine-tune of the same generation
 }
 
 # Forward-compat boundary: schema_version values up to and including this
@@ -93,13 +94,23 @@ def _silent_zero_log(*, models: int, artifacts: int) -> None:
         )
 
 
-def _check_artifact(model_name: str, idx: int, artifact: dict) -> list[str]:
+def _check_artifact(
+    model_name: str, idx: int, artifact: dict, *, published: bool = False
+) -> list[str]:
     errors: list[str] = []
     for key in REQUIRED_ARTIFACT_KEYS:
         if key not in artifact:
             errors.append(f"{model_name}.artifacts[{idx}] missing required key '{key}'")
     sha = artifact.get("sha256")
-    if sha and sha != PLACEHOLDER_SHA256:
+    if published and sha in (None, "", PLACEHOLDER_SHA256):
+        errors.append(
+            f"{model_name}.artifacts[{idx}].sha256 must be a real digest for a published model"
+        )
+    if published and (type(artifact.get("bytes")) is not int or artifact["bytes"] <= 0):
+        errors.append(
+            f"{model_name}.artifacts[{idx}].bytes must be a positive integer for a published model"
+        )
+    if sha != PLACEHOLDER_SHA256:
         if not (
             isinstance(sha, str)
             and len(sha) == SHA256_HEX_LEN
@@ -155,7 +166,14 @@ def check_manifest(data: dict) -> list[str]:
             errors.append(f"[[models]] '{name}' has no [[models.artifacts]]")
         for j, artifact in enumerate(artifacts):
             artifact_count += 1
-            errors.extend(_check_artifact(name or f"<idx-{i}>", j, artifact))
+            errors.extend(
+                _check_artifact(
+                    name or f"<idx-{i}>",
+                    j,
+                    artifact,
+                    published=model.get("publish_status") == "published",
+                )
+            )
 
     missing = EXPECTED_MODELS - seen_names
     extra = seen_names - EXPECTED_MODELS

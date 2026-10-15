@@ -85,9 +85,12 @@ piper-plus --model models/zs-v1/base.onnx \
 
 The embedding dimension is declared by the loaded ONNX model. The public
 zs-v1 model uses a 192-dim L2-normalized CAM++ embedding; legacy models may
-use a 256-dim ECAPA-TDNN embedding. The public zs-v1 bundle was functionally
-verified with PyPI `piper-plus==2.0.0` only; this README does not claim
-verification of this .NET runtime with that bundle.
+use a 256-dim ECAPA-TDNN embedding. The published reference-conditioned
+example was functionally verified with PyPI `piper-plus==2.0.0`. CI run
+`38189966578` also reports six-runtime inference from shared Python phoneme
+IDs; native G2P and listening quality were excluded, and quality approval
+remains false. These checks do not establish .NET-specific G2P or listening
+quality approval.
 
 ## Streaming + sentence splitting
 

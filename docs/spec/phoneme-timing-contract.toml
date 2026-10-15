@@ -1,11 +1,11 @@
 # Phoneme Timing Output Contract
 # ===============================
 # This file defines canonical parameter values, calculation logic, and output
-# formats that ALL runtimes (Python, Rust, Go, C++, C#, WASM/JS) must implement
-# identically for phoneme timing extraction.
+# formats that all listed runtimes share for phoneme timing extraction.
 #
-# Cross-runtime byte-for-byte compatibility is maintained by all implementations
-# adhering to this spec.
+# The schema and numeric rules are shared. Total-duration accounting can remain
+# runtime-specific where the implementation owns or embeds the audio stream;
+# this contract does not promise byte-for-byte timing files for every runtime.
 
 [meta]
 spec_version = "1.2"

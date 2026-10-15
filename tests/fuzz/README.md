@@ -23,7 +23,14 @@ These tests are intentionally placed OUTSIDE the per-package `tests/` directorie
 
 ```bash
 pip install hypothesis pytest
-uv run pytest tests/fuzz/ --hypothesis-profile=dev
+uv run pytest tests/fuzz/ -c tests/fuzz/pytest.ini --hypothesis-profile=dev
 ```
 
-CI uses `--hypothesis-profile=ci` (~3-minute total budget across all tests).
+The CI job installs `hypothesis>=6.0` and `pytest>=7.0`, then runs the repository-root command below. It uses the local config so the repository coverage gate is not applied, disables the cache provider, and enforces the workflow's process timeout:
+
+```bash
+timeout 180s pytest tests/fuzz/ \
+  -c tests/fuzz/pytest.ini \
+  --hypothesis-profile=ci \
+  -p no:cacheprovider -v
+```

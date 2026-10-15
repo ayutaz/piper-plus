@@ -7,7 +7,7 @@ allowed-tools: Bash(uv run *) Bash(ls *) Bash(test *) Bash(file *) Bash(stat *) 
 
 # Skill / Hook Health Check
 
-このプロジェクトの自動化資産 (16 skill + 5 hook + 49 pre-commit hook) を meta-level で健全性検証する。
+このプロジェクトの自動化資産 (skills / tracked hook scripts / `.pre-commit-config.yaml` の hook 定義) を実体から数えて meta-level で健全性検証する。
 
 memory `feedback_conservative_changes.md` に従い、 read-only、 検査結果を report として返すのみ。 修正は別 skill / 手動で。
 
@@ -32,8 +32,8 @@ uv run python scripts/check_skill_health.py --verbose
 期待出力例:
 
 ```text
-inspected 16 skills, 5 hooks
-OK skill-health: 16 skill(s), 5 hook(s) inspected
+inspected <N> skills, <M> hooks
+OK skill-health: <N> skill(s), <M> hook(s) inspected
 ```
 
 ### 2. 失敗時の対応
@@ -57,7 +57,7 @@ OK skill-health: 16 skill(s), 5 hook(s) inspected
 ## 注意
 
 - **memory feedback_conservative_changes**: 自動修復しない。 検査結果のみ。
-- **trigger 衝突**: 「コミット前」 のような短い fragment は多数 skill に出現しても問題ないが、 「6 エージェント並列レビュー」 のような特定 skill 専用文言が他に漏れていたら衝突。
+- **trigger 衝突**: 「コミット前」 のような短い fragment は多数 skill に出現しても問題ないが、 「7 エージェント並列レビュー」 のような特定 skill 専用文言が他に漏れていたら衝突。
 - **frontmatter 長さ警告**: description は 80-400 chars が推奨。 800 chars 超は単一文を超えており指針違反。
 
 ## 使用例

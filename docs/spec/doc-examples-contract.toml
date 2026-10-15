@@ -151,7 +151,11 @@ patterns = [
 # `schema_version` requires updating both the schema and any T-010
 # consumer.
 audit_json_path = "tests/fixtures/doc_examples_audit/audit.json"
+# Proposed schema location; this file is not present in the current checkout.
+# The current checker validates audit.json directly. Do not treat this path as
+# an existing fixture until the schema artifact is added.
 schema_path = "tests/fixtures/doc_examples_audit/audit.schema.json"
+schema_status = "proposed_missing"
 schema_version = 1
 # `hash_sha1` of the raw block body is the primary key the execution
 # gate uses to detect "audit went stale". Line numbers shift as docs

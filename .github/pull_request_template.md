@@ -60,7 +60,7 @@ docs/spec/*.toml. Helps reviewers focus on parity drift.
 ## Checklist
 
 - [ ] Tests pass locally
-- [ ] No GPL/LGPL dependencies added ([License Policy](CONTRIBUTING.md#license-policy))
+- [ ] No GPL/LGPL dependencies added ([License Policy](../CONTRIBUTING.md#license-policy))
 - [ ] Documentation updated (if applicable)
 
 ## Related Issues

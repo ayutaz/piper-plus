@@ -70,9 +70,9 @@ drift があれば bump 前に修復するよう警告。
 
 出力例 (markdown):
 
-- Python (`VERSION`): `1.12.0` → `2.0.0`
-- Rust (`src/rust/Cargo.toml` `[workspace.package].version`): `0.4.0` → `0.5.0`
-- npm synth (`src/wasm/openjtalk-web/package.json`): `0.6.0` → `0.7.0`
+- Python (`VERSION`): `<current>` → `<target-version>`
+- Rust (`src/rust/Cargo.toml` `[workspace.package].version`): `<current>` → `<target-version>`
+- npm synth (`src/wasm/openjtalk-web/package.json`): `<current>` → `<target-version>`
 
 `all` の場合は 9 manifest 全てを順次出力する。
 
@@ -177,14 +177,14 @@ target version と一致するまで sleep 30 で polling、 30 分以内に揃�
 ## 使用例
 
 ```text
-# 全 runtime の v2.0.0 リリース bump 案を生成 (dry-run)
-/prepare-release all --target-version 2.0.0
+# 全 runtime の次回リリース bump 案を生成 (dry-run)
+/prepare-release all --target-version <target-version>
 
 # Python だけ確定、 適用
-/prepare-release python --target-version 2.0.0 --apply
+/prepare-release python --target-version <target-version> --apply
 
-# Rust 0.5.0 リリース、 lockfile 再生成手順のみ表示
-/prepare-release rust --target-version 0.5.0
+# Rust の次回リリース、 lockfile 再生成手順のみ表示
+/prepare-release rust --target-version <target-version>
 ```
 
 ## 期待効果

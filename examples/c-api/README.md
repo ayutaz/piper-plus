@@ -17,7 +17,8 @@ tar -xzf piper-plus-shared-linux-x64.tar.gz -C /usr/local
 ```bash
 # Download the canonical reference-free model from HuggingFace
 curl -LO https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx
-curl -LO https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx.json
+curl -L https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json \
+  -o tsukuyomi-chan-6lang-fp16.onnx.json
 ```
 
 This C API example demonstrates reference-free synthesis. C++ reference-audio

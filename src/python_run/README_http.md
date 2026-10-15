@@ -66,15 +66,27 @@ curl -N -X POST -H 'Content-Type: text/plain' \
 
 `streaming` の有効値: `true` / `1` / `yes` / `on` (大文字小文字無視)。
 
-#### クエリパラメータ (両エンドポイント共通)
+#### `/` のクエリパラメータ
 
 | パラメータ | 型 | 説明 |
 |-----------|----|------|
 | `text` | string | 合成対象テキスト (`POST` 時はリクエストボディでも可) |
 | `language` | string | 言語コード (`ja`, `en`, `zh`, `ko`, `es`, `fr`, `pt`, `sv`) |
 | `language_id` | int | 数値の言語 ID (`language` より優先) |
-| `streaming` | bool | `/` のみ。`true` でチャンク転送 (デフォルト: `false`) |
-| `format` | string | `/api/phoneme-timing` のみ。`json` (デフォルト) または `tsv` |
+| `streaming` | bool | `true` でチャンク転送 (デフォルト: `false`) |
+
+`POST /` は `text/plain` の本文をテキストとして受け取ります。JSON body を
+送る場合は、サーバーが受け付ける `text`、`speaker_id`、および
+`speaker_embedding`（モデル互換の float32 配列）のフィールドを使用してください。
+
+#### `/api/phoneme-timing` のクエリパラメータ
+
+| パラメータ | 型 | 説明 |
+|-----------|----|------|
+| `text` | string | 音素化対象テキスト (`POST` 時はリクエストボディでも可) |
+| `language` | string | 言語コード (`ja`, `en`, `zh`, `ko`, `es`, `fr`, `pt`, `sv`) |
+| `language_id` | int | 数値の言語 ID (`language` より優先) |
+| `format` | string | `json` (デフォルト) または `tsv` |
 
 ### `/api/phoneme-timing` — 音素タイミング
 

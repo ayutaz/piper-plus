@@ -368,7 +368,7 @@ Returned by `synthesize()`. Wraps raw PCM audio samples.
 Resolves a model identifier to concrete URLs without downloading.
 
 - `modelNameOrUrl` -- Registry shortcut (`"tsukuyomi"`), HuggingFace repo (`"ayousanz/piper-plus-tsukuyomi-chan"`), or direct URL
-- Returns: `Promise<{ modelUrl: string, configUrl: string, cacheKey: string }>`
+- Returns: `Promise<{ modelUrl: string, configUrl: string, configFallbackUrl: string | null, cacheKey: string }>`
 
 ## Available Models
 
@@ -403,9 +403,12 @@ const zsBaseUrl =
 const tts = await PiperPlus.initialize({ model: zsBaseUrl, ort });
 ```
 
-`zs-v1` is an experimental v7 epoch32 bundle. Reference-conditioned inference
-with the public bundle was verified with PyPI `piper-plus==2.0.0` only; this
-README does not claim verification on the WASM package or other runtimes.
+`zs-v1` is an experimental v7 epoch32 bundle. The published
+reference-conditioned example was verified with PyPI `piper-plus==2.0.0`.
+CI run `38189966578` also reports six-runtime inference from shared Python
+phoneme IDs; native G2P and listening quality were excluded, and quality
+approval remains false. These checks do not establish WASM-specific G2P or
+listening-quality approval.
 
 ### Using a Custom Model URL
 
@@ -418,7 +421,11 @@ const tts = await PiperPlus.initialize({
 });
 ```
 
-The config file is expected at `<model-url>.json` (e.g. `model.onnx.json`).
+The primary config URL is `<model-url>.json` (e.g. `model.onnx.json`). For a
+direct URL, if that sidecar is unavailable the runtime also tries `config.json`
+in the model's directory. Keep the config that matches the ONNX model beside
+the model, and use the returned `configFallbackUrl` to inspect the fallback
+candidate when resolving URLs yourself.
 
 ## Supported Languages
 
@@ -459,9 +466,11 @@ See the [published zs-v1 README](https://huggingface.co/ayousanz/piper-plus-base
 for the canonical reference-audio and embedding-precomputation flow. The
 model's ONNX input metadata determines the embedding dimension; legacy models
 may use 256-dim ECAPA-TDNN while zs-v1 uses CAM++ 192-dim. The public bundle's
-reference-conditioned inference was verified with PyPI `piper-plus==2.0.0`
-only; this README does not claim verification of the WASM package with that
-bundle.
+reference-conditioned example was verified with PyPI `piper-plus==2.0.0`.
+CI run `38189966578` reports six-runtime inference from shared Python phoneme
+IDs; native G2P and listening quality were excluded, and quality approval
+remains false. These are separate checks and do not establish WASM-specific
+G2P or listening-quality approval.
 
 `synthesizeSsml`, `synthesizeFromReferenceAudio`, and the `speakerEmbedding`
 option on `synthesize()` are available from `piper-plus 0.6.0` onwards (PR #478,
@@ -489,19 +498,18 @@ For phonemization without ONNX inference:
 ```javascript
 import { G2P, Encoder } from "piper-plus/phonemizer";
 
-const g2p = await G2P.create({ languages: ['ja', 'en'] });
-
-// Japanese: phonemized via Rust WASM (jpreprocess) with bundled dictionary
-const jaResult = g2p.phonemize("こんにちは", { language: "ja" });
-// jaResult.tokens: string[], jaResult.language: "ja"
+// The compatibility subpath exposes the rule-based JavaScript G2P. Use the
+// high-level PiperPlus initializer for Japanese Rust-WASM phonemization.
+const g2p = await G2P.create({ languages: ['en'] });
 
 // English
 const enResult = g2p.phonemize("Hello world", { language: "en" });
 // enResult.tokens: string[]
 
 // Encode tokens to Piper phoneme IDs for ONNX inference
+const modelConfig = await fetch('/path/to/model.onnx.json').then((r) => r.json());
 const encoder = new Encoder(modelConfig.phoneme_id_map);
-const { phonemeIds } = encoder.encode(jaResult.tokens);
+const { phonemeIds } = encoder.encode(enResult.tokens);
 
 g2p.dispose();
 ```

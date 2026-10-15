@@ -42,7 +42,7 @@ Usage:
     python scripts/check_hf_space_gradio_sync.py
 
 Exit codes:
-    0 -- all three pin sites agree exactly
+    0 -- all four pin sites agree exactly
     1 -- any pair disagrees, or a file is missing / malformed /
          contains an empty pin
 """
@@ -51,7 +51,9 @@ from __future__ import annotations
 
 import re
 import sys
+import tomllib
 from pathlib import Path
+
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 README = REPO_ROOT / "huggingface-space" / "README.md"
@@ -59,6 +61,7 @@ REQUIREMENTS = REPO_ROOT / "huggingface-space" / "requirements.txt"
 # HF Space の build には関与しないが、 security floor の drift を防ぐため
 # 同期対象に含める (上の docstring 参照)。
 WEBUI_REQUIREMENTS = REPO_ROOT / "src" / "python_run" / "requirements_webui.txt"
+WEBUI_PROJECT = REPO_ROOT / "environments" / "webui" / "pyproject.toml"
 
 
 def _extract_frontmatter_sdk_version(readme_path: Path) -> str | None:
@@ -111,6 +114,21 @@ def main() -> int:
     webui_version = _extract_requirements_gradio(WEBUI_REQUIREMENTS)
 
     errors: list[str] = []
+    try:
+        dependencies = tomllib.loads(WEBUI_PROJECT.read_text(encoding="utf-8"))[
+            "project"
+        ]["dependencies"]
+        ui_pins = [
+            item.removeprefix("gradio==")
+            for item in dependencies
+            if item.startswith("gradio==")
+        ]
+        if ui_pins != [sdk_version]:
+            errors.append(
+                "environments/webui/pyproject.toml: gradio exact pin must match HF Space"
+            )
+    except (OSError, KeyError, tomllib.TOMLDecodeError) as exc:
+        errors.append(f"WebUI project pin unreadable: {exc}")
 
     if sdk_version is None:
         errors.append(
@@ -162,14 +180,15 @@ def main() -> int:
         for e in errors:
             print(f"  - {e}")
         print(
-            "\nTo fix: make all three pins agree --\n"
+            "\nTo fix: make all four pins agree --\n"
             "  huggingface-space/README.md          (frontmatter sdk_version)\n"
             "  huggingface-space/requirements.txt   (gradio==)\n"
-            "  src/python_run/requirements_webui.txt (gradio==)"
+            "  src/python_run/requirements_webui.txt (gradio==)\n"
+            "  environments/webui/pyproject.toml (gradio==)"
         )
         return 1
 
-    print(f"OK: all 3 gradio pin sites agree ({sdk_version})")
+    print(f"OK: all 4 gradio pin sites agree ({sdk_version})")
     return 0
 
 

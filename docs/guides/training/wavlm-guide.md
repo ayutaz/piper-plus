@@ -12,13 +12,13 @@
 
 ## 概要
 
-WavLM Discriminator は Microsoft WavLM をベースにした知覚品質判別器です。通常の VITS 判別器に加えて、WavLM の特徴量を用いた追加の判別器として機能し、生成音声の知覚品質を向上させます。
+WavLM Discriminator は Microsoft WavLM をベースにした知覚品質判別器です。通常の VITS 判別器に加えて、WavLM の特徴量を用いた追加の判別器として機能します。品質改善量は、このリポジトリの管理された比較試験では未測定です。
 
 ### 主な特徴
 
 | 項目 | 内容 |
 |------|------|
-| 期待効果 | MOS +0.15-0.25 向上 |
+| 期待効果 | このリポジトリでは比較 MOS を測定していないため未測定 |
 | デフォルト状態 | **有効** (特別な設定は不要)。ただし Zero-Shot TTS 学習では `--no-wavlm` を推奨 |
 | 使用タイミング | 学習時のみ (推論グラフには含まれない) |
 | 推論速度への影響 | なし |
@@ -56,7 +56,10 @@ uv run python -m piper_train \
   --default_root_dir /path/to/output
 ```
 
-> **⚠️ 注意 (Issue #527 / DR-008 後):** v2.0 では Template default が `--precision bf16-mixed` (Ada 6000 / RTX 5090 で BF16 native Tensor Core を活用)。 古い GPU 互換用に `--precision 16-mixed` も残るが、 新規学習では `bf16-mixed` 推奨。 V100 (sm_70) は引退済 (新 GPU lineup へ移行)、 V100 互換が必要な場合は `--precision 32-true` (legacy)。
+> **精度の選択:** parser の既定値は `bf16-mixed` です。Ada/Blackwell
+> ではそのまま使えます。T4 は `--no-wavlm` と `16-mixed` を開始点にし、
+> V100 (sm_70) は `32-true --no-wavlm` を開始点にしてください。GPU ごとの
+> メモリと互換性は実機で確認してください。
 
 WavLM が有効な場合、GPUメモリが約1-2GB増加するため、`--batch-size` を従来より下げる必要がある場合があります（例: 20 → 12）。
 
@@ -82,7 +85,8 @@ uv run python -m piper_train \
 
 ### c_wavlm パラメータの調整
 
-`--c-wavlm` は WavLM 判別器の損失に対する重み係数です。値を変更することで WavLM の影響度を調整できます。
+`--c-wavlm` は WavLM 判別器の損失に対する重み係数です。値を変更することで
+WavLM の損失寄与を調整できます。品質改善を保証する測定値はありません。
 
 | 値 | 用途 |
 |----|------|
@@ -157,13 +161,13 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
   --config /path/to/config.json \
   --output-dir /path/to/output \
   --text "こんにちは、今日は良い天気ですね。" \
-  --speaker-id 0 --noise-scale 0.5
+  --speaker-id 0 --noise-scale 0.4
 ```
 
 ### C++ CLI 推論
 
 ```bash
-echo "こんにちは" | ./piper-plus --model model.onnx --noise-scale 0.5 --output-file out.wav
+echo "こんにちは" | ./piper-plus --model model.onnx --noise-scale 0.4 --output-file out.wav
 ```
 
 ### noise_scale の調整目安
@@ -172,7 +176,7 @@ echo "こんにちは" | ./piper-plus --model model.onnx --noise-scale 0.5 --out
 |----|------|
 | `0.4` (デフォルト・推奨) | zero-shot 最適化済み値。WavLM モデルでも安定した発音 |
 | `0.3` | より安定。さらに変動を抑えたい場合 |
-| `0.3` | より安定。音割れが解消しない場合に試す |
+| `0.2` | より安定。音割れが解消しない場合に試す |
 
 ---
 
@@ -202,7 +206,7 @@ uv run python -m piper_train \
 
 **対処法2: c_wavlm を下げて再学習する**
 
-`--c-wavlm` を 0.5 から 0.2 に下げることで、WavLM の影響を緩和しつつ品質向上の恩恵を受けられます。
+`--c-wavlm` を 0.5 から 0.2 に下げることで、WavLM の損失寄与を緩和できます。
 
 ```bash
 NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
@@ -238,8 +242,9 @@ WavLM は約1-2GB/GPU の追加メモリを必要とします。OOM が発生す
 **対処法1: batch-size を下げる**
 
 ```bash
+# 例: 20 → 12 に削減
 uv run python -m piper_train \
-  --batch-size 12 \   # 例: 20 → 12 に削減
+  --batch-size 12 \
   ...
 ```
 

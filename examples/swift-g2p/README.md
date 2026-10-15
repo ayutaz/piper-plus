@@ -8,10 +8,10 @@ Standalone Swift integration example for **PiperPlusG2P** — the G2P-only Swift
 
 | Path | Purpose |
 |------|---------|
-| `HelloG2P/Package.swift` | Minimal SPM consumer that depends on `https://github.com/ayutaz/piper-plus` (v1.14.0+). |
+| `HelloG2P/Package.swift` | Minimal SPM consumer that depends on `https://github.com/ayutaz/piper-plus` (v2.0.1+). |
 | `HelloG2P/Sources/HelloG2P/main.swift` | CLI demo — phonemizes a built-in sample set or `<lang>:<text>` arguments. |
 
-## Quick Start (after v1.14.0 publishes)
+## Quick Start (with published v2.0.1+)
 
 ```bash
 cd examples/swift-g2p/HelloG2P
@@ -21,14 +21,14 @@ swift run HelloG2P "ja:今日はいい天気です" "fr:bonjour" "ko:안녕하�
 
 Full setup, error handling, App Store checklist: [`docs/guides/platform/swift-g2p-integration.md`](../../docs/guides/platform/swift-g2p-integration.md).
 
-## Local Development (before v1.14.0 is tagged)
+## Local Development (when testing unreleased source changes)
 
-The published `from: "1.14.0"` URL won't resolve until the maintainer pushes the v1.14.0 tag and updates `Package.swift`'s `g2pChecksum`. To exercise the wrapper from the in-tree branch:
+The published `from: "2.0.1"` URL resolves the released xcframework. To exercise wrapper changes from the in-tree branch without relying on a future release asset:
 
 1. **Build the xcframework locally** (one-time per branch). From the piper-plus repo root, mirror the steps in `.github/workflows/swift-g2p-ci.yml`:
 
    ```text
-   cargo build -p piper-plus-g2p --target {aarch64,x86_64}-apple-darwin --release \
+   cargo build --manifest-path src/rust/Cargo.toml -p piper-plus-g2p --target {aarch64,x86_64}-apple-darwin --release \
      --features all-languages,naist-jdic,bundled-dicts,ffi
    # → lipo + cbindgen + xcodebuild -create-xcframework
    ```
@@ -37,12 +37,12 @@ The published `from: "1.14.0"` URL won't resolve until the maintainer pushes the
 
    ```swift
    dependencies: [
-       // .package(url: "https://github.com/ayutaz/piper-plus", from: "1.14.0"),
+       // .package(url: "https://github.com/ayutaz/piper-plus", from: "2.0.1"),
        .package(name: "piper-plus", path: "../../.."),
    ],
    ```
 
-   With `path:`, SwiftPM uses the in-tree `Package.swift` at the piper-plus repo root. That manifest's `binaryTarget` URL still points at the unpublished v1.14.0 asset, so you'll also need to either (a) replace the binaryTarget with `.binaryTarget(name: "PiperPlusG2PBinary", path: "build-mac/piper_plus_g2p.xcframework")` for the duration of testing, or (b) use `Package.ci.swift` (already wired for `path:`-based local resolution — see `swift-g2p-ci.yml` for how CI swaps it in).
+   With `path:`, SwiftPM uses the in-tree `Package.swift` at the piper-plus repo root. For source changes that are not in the published v2.0.1 asset, replace the binaryTarget with `.binaryTarget(name: "PiperPlusG2PBinary", path: "build-mac/piper_plus_g2p.xcframework")` for the duration of testing, or use `Package.ci.swift` (already wired for `path:`-based local resolution — see `swift-g2p-ci.yml` for how CI swaps it in).
 
 3. **Run**:
 
@@ -51,13 +51,13 @@ The published `from: "1.14.0"` URL won't resolve until the maintainer pushes the
    swift run HelloG2P
    ```
 
-> The `path:` workaround is intentionally manual — it should not be committed back. The expected user flow is to wait for v1.14.0 to land and depend on the URL form.
+> The `path:` workaround is intentionally manual — it should not be committed back. For released consumers, depend on the public v2.0.1+ URL form.
 
 ## Why a separate example directory?
 
 The synthesis engine (`PiperPlus`, in [`../swift/`](../swift/)) ships with **iOS-only** binaries and a hard ORT dependency. The G2P product is intentionally lighter:
 
-- **No ORT** — pure Rust + bundled dictionaries. ~3–5 MB xcframework download vs ~30 MB synthesis xcframework + ORT.
+- **No ORT** — pure Rust + bundled dictionaries. 142.6 MiB (v2.0.1: 149,575,363 bytes) xcframework download vs ~30 MB synthesis xcframework + ORT.
 - **iOS + macOS slices** — `swift run` from a Mac CLI works directly (the synthesis engine cannot, because the xcframework lacks a macOS slice).
 - **Different release cadence** — G2P version (`g2pVersion`) bumps independently of synthesis version (`version`). See `Package.swift` at the repo root.
 
@@ -69,3 +69,5 @@ Splitting the examples mirrors that split: this directory is the on-ramp for cal
 - [Swift G2P Specification](../../docs/reference/swift-g2p.md) — design rationale.
 - [piper-plus repo root Package.swift](../../Package.swift) — the canonical SPM manifest.
 - [Issue #387](https://github.com/ayutaz/piper-plus/issues/387) — feature tracker.
+
+> v2.0.1 のサイズは Release API の ZIP metadata（全 slice 合計）。アプリ組み込み後の増分・strip 後サイズは未測定です。

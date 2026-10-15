@@ -53,7 +53,9 @@ curl -X POST http://localhost:8000/v1/audio/speech \
 
 ## GPU 対応
 
-GPU を利用する場合は、`docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d` で起動してください (GPU オーバーライドファイルは今後追加予定)。
+このスタックには GPU 用の Compose オーバーライドは含まれていません。
+GPU 対応が必要な場合は、利用環境に合わせた Compose override を別途用意し、
+`docker-compose.gpu.yml` が同梱されているものとして実行しないでください。
 
 ## 停止
 

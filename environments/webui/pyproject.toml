@@ -1,0 +1,20 @@
+[project]
+name = "piper-plus-webui-environment"
+version = "0.0.0"
+requires-python = ">=3.11"
+dependencies = [
+    "piper-plus[cpu,http]",
+    "gradio==6.26.0",
+    "numpy>=1.26.4,<2.3",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+piper-plus = { path = "../../src/python_run", editable = true }
+
+# This environment intentionally has its own lock: Gradio requires HF Hub 1.x,
+# while the training workspace's Transformers 4.x requires HF Hub <1.
+[tool.uv.workspace]
+members = []

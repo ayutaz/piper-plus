@@ -6,7 +6,7 @@ piper-plus を Home Assistant の TTS プロバイダーとして利用する方
 
 ## 前提条件
 
-- Home Assistant 2024.1 以上 (Wyoming Protocol 統合を標準搭載)
+- Home Assistant 2023.5 以上 (Wyoming Protocol 統合)
 - Docker および Docker Compose がインストール済み (方法 1, 2)
 - piper-plus 用の ONNX モデルと config.json (自動ダウンロードも可能)
   - HuggingFace: `ayousanz/piper-plus-tsukuyomi-chan` (つくよみちゃん 6 言語) または `ayousanz/piper-plus-css10-ja-6lang` (CSS10 6 言語)
@@ -19,7 +19,7 @@ piper-plus を Home Assistant の TTS プロバイダーとして利用する方
 
 ## Wyoming Protocol とは
 
-[Wyoming Protocol](https://github.com/rhasspy/wyoming) は、Home Assistant が音声アシスタントコンポーネント (STT, TTS, Wake Word) と通信するための軽量 TCP プロトコルです。Home Assistant は Wyoming Protocol を標準でサポートしており、piper-plus の Wyoming アダプタを起動するだけで TTS プロバイダーとして自動検出されます。
+[Wyoming Protocol](https://github.com/rhasspy/wyoming) は、Home Assistant が音声アシスタントコンポーネント (STT, TTS, Wake Word) と通信するための軽量 TCP プロトコルです。piper-plus のアダプターは TCP の Wyoming サーバーとして動作します。Home Assistant の Wyoming Protocol 統合は自動検出に対応していますが、piper-plus のアダプター自身は Zeroconf/mDNS 広告を登録しません。そのため、通常は Home Assistant 側でホスト名/IP アドレスとポートを手動登録してください。
 
 **通信フロー:**
 
@@ -121,15 +121,13 @@ Home Assistant が `network_mode: host` で動作している場合、`localhost
 Docker を使用しない場合は、Wyoming サーバーを直接起動できます。
 
 ```bash
-# 依存パッケージのインストール
-# wyoming 1.5.0 は Artifact.version フィールドが無く、本アダプターと非互換。
-# 1.5.1 で追加されたが、HA 公式 (2026.x) と上流 wyoming-piper に揃え 1.7+ を推奨。
-pip install "wyoming>=1.7,<2"
-pip install piper-plus-g2p[all]
-# src/python/ 内の piper_train[inference] もインストール必要
+# リポジトリルートで、推論ランタイム・G2P・Wyoming をインストール
+python -m pip install -e "src/python[inference]"
+python -m pip install -e "src/python_run[cpu]"
+python -m pip install "wyoming>=1.7,<2"
 
 # サーバーの起動
-uv run python -m piper_wyoming \
+PYTHONPATH=src/python python -m piper_wyoming \
   --model tsukuyomi \
   --port 10200 \
   --language ja
@@ -137,7 +135,7 @@ uv run python -m piper_wyoming \
 
 #### systemd サービスとして登録
 
-長期運用する場合は systemd で管理できます:
+長期運用する場合は systemd で管理できます。以下はリポジトリを `/opt/piper-plus` に配置した例です。別の場所に配置した場合は `WorkingDirectory` と `PYTHONPATH` を変更してください。
 
 ```ini
 # /etc/systemd/system/wyoming-piper-plus.service
@@ -149,6 +147,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=piper
+WorkingDirectory=/opt/piper-plus
+Environment=PYTHONPATH=/opt/piper-plus/src/python
 ExecStart=/usr/local/bin/python -m piper_wyoming \
     --model tsukuyomi \
     --port 10200 \
@@ -169,13 +169,13 @@ sudo systemctl enable --now wyoming-piper-plus
 
 ## Home Assistant 設定
 
-### 自動検出 (Zeroconf / mDNS)
+### 自動検出
 
-Wyoming Protocol サーバーが Home Assistant と同じ LAN 上で動作している場合、**通知** セクションに自動検出の提案が表示されることがあります。表示された場合は、そのまま追加してください。
+Home Assistant の Wyoming Protocol 統合は自動検出されたサービスを通知に表示できます。ただし、piper-plus のアダプターは Zeroconf/mDNS のサービス広告を実装していないため、ここに自動検出の提案が出ることは期待できません。表示されない場合は、次の手順で手動追加してください。
 
 ### 手動追加
 
-自動検出されない場合、手動で追加します:
+手動で追加します:
 
 1. **設定** > **デバイスとサービス** を開く
 2. 右下の **統合を追加** をクリック

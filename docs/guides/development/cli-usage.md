@@ -69,8 +69,8 @@ Key options:
 | `--speaker NUM` | Speaker number for multi-speaker models | 0 |
 | `--phoneme-silence PHONEME SEC` | Silence duration for specific phonemes | - |
 | `--raw-phonemes` | Interpret input as phonemes | off |
-| `--output-timing FILE` | Phoneme timing output (JSON/TSV) | - |
-| `--timing-format FORMAT` | Timing output format (`json` or `tsv`) | json |
+| `--output-timing FILE` | Phoneme timing output (JSON/TSV/SRT; requires a model with durations) | - |
+| `--timing-format FORMAT` | Timing output format (`json`, `tsv`, or `srt`) | json |
 | `--custom-dict FILE` | Custom dictionary (comma-separated for multiple) | - |
 | `--json-input` | JSON input mode | off |
 | `--list-models [LANG]` | List available models | - |
@@ -108,7 +108,8 @@ Use `--json-input` flag for JSON input:
 ### Download Models
 
 ```bash
-# Download a model by name (aliases also work)
+# Download a model by name. Resolver aliases are source/next-release features;
+# released piper-plus 2.0.0 and 2.0.1 do not add new model aliases.
 ./bin/piper-plus --download-model tsukuyomi
 ./bin/piper-plus --download-model en_US-lessac-medium
 

@@ -42,6 +42,7 @@
          failure happens, so it is asserted rather than hoped for. Program.cs
          itself cannot be source-linked (its Main would collide with the test
          host's entry point), which is why the method lives in its own file. -->
+    <Compile Include="..\PiperPlus.Cli\TimingOutput.cs" Link="Adapters\TimingOutput.cs" />
     <Compile Include="..\PiperPlus.Cli\FatalDiagnostics.cs" Link="Adapters\FatalDiagnostics.cs" />
   </ItemGroup>
 

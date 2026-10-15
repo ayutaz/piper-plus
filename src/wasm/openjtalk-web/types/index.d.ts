@@ -49,7 +49,13 @@ export interface ModelConfig {
 // Progress types
 // ---------------------------------------------------------------------------
 
-/** Progress information emitted during PiperPlus initialization. */
+/**
+ * Progress information emitted during PiperPlus initialization.
+ *
+ * The implementation currently emits `model`, `phonemizer`, and `ready`.
+ * `init` is retained in the public union for compatibility with older
+ * consumers and is not currently emitted by the implementation.
+ */
 export interface ProgressInfo {
   stage: 'model' | 'phonemizer' | 'ready' | 'init';
   progress: number;
@@ -69,12 +75,16 @@ export interface ModelDownloadProgress {
 
 /** Options for PiperPlus.initialize(). */
 export interface PiperPlusOptions {
-  /** HuggingFace model name or direct URL to an ONNX file. */
+  /** HuggingFace model name, pinned base alias, or direct URL to an ONNX file. */
   model: string;
   /** onnxruntime-web instance. When omitted, globalThis.ort is used. */
   ort?: any;
   /** Progress callback invoked during initialization. */
   onProgress?: (info: ProgressInfo) => void;
+  /** Custom URL for the Rust WASM G2P module. */
+  wasmG2pUrl?: string;
+  /** Async WASM module loader for dependency injection; takes precedence over wasmG2pUrl. */
+  wasmLoader?: () => Promise<unknown>;
 }
 
 /** Options for PiperPlus.synthesize(). */
@@ -445,6 +455,8 @@ export class AudioResult {
 export interface ModelManagerOptions {
   /** IndexedDB database name for caching. Default: 'piper-plus-models'. */
   cachePrefix?: string;
+  /** Recompute a stored SHA-256 hash on cache hits. Default: false. */
+  verifyOnCacheHit?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -461,7 +473,9 @@ export interface SpeakerEncoderOptions {
 
 /**
  * Speaker encoder for voice cloning.
- * Loads an ECAPA-TDNN ONNX model and extracts speaker embeddings from audio.
+ * Loads a compatible ECAPA-TDNN or CAM++ ONNX model and extracts embeddings
+ * from audio. The output dimension comes from the loaded model (192 for the
+ * public zs-v1 CAM++ encoder; legacy exports may use 256-dim ECAPA-TDNN).
  */
 export class SpeakerEncoder {
   private constructor();
@@ -473,7 +487,7 @@ export class SpeakerEncoder {
    * Encode audio into a speaker embedding vector.
    * @param audio - AudioBuffer (first channel, auto-resampled) or Float32Array (mono 16kHz).
    * @param sampleRate - Sample rate when audio is Float32Array (default: 16000).
-   * @returns Speaker embedding (typically 256-d Float32Array).
+   * @returns Speaker embedding whose dimension is declared by the loaded model.
    */
   encode(audio: AudioBuffer | Float32Array, sampleRate?: number): Promise<Float32Array>;
 
@@ -545,6 +559,7 @@ export class ModelManager {
    *
    * Accepted formats:
    *   - Registry shortcut: "css10"
+   *   - Pinned public base alias: "base", "zero-shot-base-zs-v1", or "ayousanz/piper-plus-base"
    *   - HuggingFace repo:  "ayousanz/piper-plus-css10-ja-6lang"
    *   - Direct URL:        "https://example.com/model.onnx"
    *

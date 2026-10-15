@@ -29,9 +29,9 @@ PR #391 → PR #443 の事故パターン:
 | `src/python/piper_train/export_onnx.py` | (ONNX export 自体は Python 専用、ただし出力スキーマを変える場合は下記の loader も更新必要) |
 | `src/python/piper_train/vits/models.py:VitsModel.infer` | `src/python_run/piper_plus/voice.py` (Python runtime) |
 | ONNX グラフ入出力名 (`speaker_embedding` / `prosody_features` / `language_id`) | `src/rust/piper-core/src/engine.rs` (Rust) |
-| 同上 | `src/go/piperplus/synth.go` (Go) |
+| 同上 | `src/go/piperplus/engine.go` / `synthesize.go` (Go) |
 | 同上 | `src/csharp/PiperPlus.Core/Inference/PiperSession.cs` (C#) |
-| 同上 | `src/cpp/piper_plus.cpp` (C++) |
+| 同上 | `src/cpp/piper.cpp` / `main.cpp` (C++) |
 | 同上 | `src/wasm/openjtalk-web/src/index.js` または piper-wasm (WASM) |
 
 ## 実行手順
@@ -50,15 +50,17 @@ fi
 echo "Canonical 変更検出: $CANONICAL_TOUCHED"
 ```
 
-### 2. 他 6 ランタイムの inference path も触られているか確認
+### 2. 他 5 ランタイムの inference path も触られているか確認
 
 ```bash
 RUNTIME_FILES=(
   "src/python_run/piper_plus/voice.py"
   "src/rust/piper-core/src/engine.rs"
-  "src/go/piperplus/synth.go"
+  "src/go/piperplus/engine.go"
+  "src/go/piperplus/synthesize.go"
   "src/csharp/PiperPlus.Core/Inference/PiperSession.cs"
-  "src/cpp/piper_plus.cpp"
+  "src/cpp/piper.cpp"
+  "src/cpp/main.cpp"
   "src/wasm/openjtalk-web/src/index.js"
 )
 
@@ -96,7 +98,7 @@ silent regression を残さない。
 
 - [ ] canonical Python の変更が ONNX 入出力グラフに影響する変更か (形状 / 名前 /
       dtype の変更) を把握
-- [ ] 影響あるなら他 6 ランタイム inference path も同 PR で更新したか
+- [ ] 影響あるなら他 5 ランタイム inference path も同 PR で更新したか
 - [ ] `scripts/check_onnx_inputs.py --strict` が pass
 - [ ] `scripts/check_voice_catalog_parity.py` が pass
 - [ ] `scripts/check_inference_input_contract.py` が pass
@@ -112,6 +114,6 @@ silent regression を残さない。
 
 ## 関連ドキュメント
 
-- [inference-input-contract.toml](docs/spec/inference-input-contract.toml)
-- [model-resolution.md](docs/reference/model-resolution.md)
+- [inference-input-contract.toml](../../../docs/spec/inference-input-contract.toml)
+- [model-resolution.md](../../../docs/reference/model-resolution.md)
 - [PR #391 / #443 の経緯] — silent regression の参考事例

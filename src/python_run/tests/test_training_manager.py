@@ -110,7 +110,9 @@ class TestTrainingManager:
         assert manager.callbacks["test"] == callback
 
     @patch("piper_plus.training_manager.subprocess.Popen")
-    def test_start_training_success(self, mock_popen, manager, test_dataset, tmp_path):
+    def test_start_training_success(
+        self, mock_popen, manager, test_dataset, tmp_path, monkeypatch
+    ):
         """Test successful training start"""
         # Mock the process; use a blocking readline so the monitor thread
         # stays alive during assertions.
@@ -122,6 +124,7 @@ class TestTrainingManager:
         mock_popen.return_value = mock_process
 
         output_dir = tmp_path / "output"
+        monkeypatch.setenv("PIPER_PLUS_TRAINING_PYTHON", "/selected/training/python")
 
         success = manager.start_training(
             dataset_path=str(test_dataset),
@@ -143,6 +146,16 @@ class TestTrainingManager:
         # Check command construction
         mock_popen.assert_called_once()
         cmd = mock_popen.call_args[0][0]
+        assert cmd[0] == "/selected/training/python"
+        assert cmd[cmd.index("--max_epochs") + 1] == "2"
+        assert cmd[cmd.index("--default_root_dir") + 1] == str(output_dir)
+        assert "--base_lr" in cmd
+        assert not {
+            "--epochs",
+            "--learning-rate",
+            "--checkpoint-path",
+            "--num-speakers",
+        } & set(cmd)
         assert "-m" in cmd
         assert "piper_train" in cmd
         assert "--dataset-dir" in cmd

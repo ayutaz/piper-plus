@@ -1,185 +1,23 @@
 # Piper TTS - プロジェクト概要
 
-VITS ベースの高品質ニューラル TTS。**6言語マルチリンガルモデル**を学習済み、**8言語の G2P コード**を全7ランタイム (Python/C#/Rust/Go/JS-WASM/C++/CLI) に実装済み。
+VITS ベースの高品質ニューラル TTS。**6言語マルチリンガルモデル**を学習済み、**8言語の G2P コード**を実装済み。ランタイムと配布物の対応は下記のパッケージ表および各仕様書を参照してください。
 
-**ブランチ**: `dev` (v1.12.0 リリース済み)。v1.12.0 Breaking changes: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)。
+**基準ブランチ**: `dev`。root `VERSION` は `2.0.1`。v1.12 / v2.0 の破壊的変更は [docs/migration/v1.12-to-v2.0.md](docs/migration/v1.12-to-v2.0.md) と [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md) を参照してください。
 
 ---
 
-## 📦 アーカイブ: zero-shot v7 学習成果 (`feat/zero-shot-tts`)
+## Research / archive and publication pointers
 
-> ⚠️ **現在の作業ブランチは `dev`** (上の「ブランチ」欄参照)。このセクションは過去の zero-shot 学習成果と引き継ぎ用情報のアーカイブです。新規作業を `feat/zero-shot-tts` 上で行う必要はありません。
+研究用の v7 zero-shot 学習結果と手順は、重複した agent context ではなく次の文書を正本とします。
 
-`dev` の最新 (`5fceade`、Release v1.12.0) を取り込み、Zero-Shot TTS の累積差分を 1 コミットに集約してリベース完了。`origin/feat/zero-shot-tts` に push 済み。
+- [v7 学習結果・根本原因](docs/design/multi-6lang-zero-shot-v7-training-results.md) — epoch 32、6言語、571話者、研究上の修正と評価。
+- [zero-shot handoff](docs/handoff/zero-shot-tts-handoff-2026-06-20.md) — private/gated 研究保存先、旧 `/data/piper` パス、再現・再開手順。
+- [品質改善計画](docs/design/zero-shot-quality-improvement-plan.md) — historical findings と未完了の改善計画。
+- [公開モデルカタログ](docs/guides/development/pretrained-models.md) — legacy root、public `releases/zs-v1`、private/gated research stores の区別。
+- [public zs-v1 release record](docs/design/zero-shot-base-zs-v1-release-2026-10-10.md) — pinned public base の配布・検証記録。
+- [Tsukuyomi publication record](docs/design/tsukuyomi-publication-ready-2026-10-12.md) — public `releases/zs-v1` の公開記録と品質上の制約。
 
-その後、**multi-6lang zero-shot スクラッチ学習** (v7) を完遂中。リベース時に廃止された
-`Multi-scale FiLM` を `MBiSTFTGenerator` に復活させ、DDP-synced NaN skip / speaker_embedding
-L2 再正規化 / dino_center 汚染防御 を実装。詳細は
-[`docs/design/multi-6lang-zero-shot-v7-training-results.md`](docs/design/multi-6lang-zero-shot-v7-training-results.md) 参照。
-
-> 🚚 **環境を引き継ぐ場合**: [`docs/handoff/zero-shot-tts-handoff-2026-06-20.md`](docs/handoff/zero-shot-tts-handoff-2026-06-20.md) に
-> ゼロからの環境構築・データセット復元・学習再開・FT・評価の全手順をまとめています。
-> モデル本体は HF (**private**) で配布:
-> [`ayousanz/piper-plus-zero-shot-multi-6lang-v7`](https://huggingface.co/ayousanz/piper-plus-zero-shot-multi-6lang-v7) /
-> [`ayousanz/piper-plus-zero-shot-tsukuyomi`](https://huggingface.co/ayousanz/piper-plus-zero-shot-tsukuyomi) /
-> [`ayousanz/campplus-onnx`](https://huggingface.co/ayousanz/campplus-onnx) (CAM++ mirror、引き継ぎ専用)
-
-### 完了済みアセット (v7 multi-6lang スクラッチ + Tsukuyomi FT、2026-05-21 時点)
-
-**v7 学習は epoch 32 で停止**。続けて **Tsukuyomi zero-shot FT 500 epoch 完走** (2026-05-21 00:07〜00:58)。再開コマンドは下方「[新 GPU での学習再開](#新-gpu-での学習再開)」参照。
-
-> 📦 **HF リポジトリ (private)** — 2026-06-20 アップロード:
->
-> - [`ayousanz/piper-plus-zero-shot-multi-6lang-v7`](https://huggingface.co/ayousanz/piper-plus-zero-shot-multi-6lang-v7) — v7 resume ckpt + singlespk ckpt + ONNX (ep32) + 評価再現セット (compute_secs.py + 参照 emb + 合成 wav) + TensorBoard events + 過去 epoch ONNX (ep10/ep20)
-> - [`ayousanz/piper-plus-zero-shot-tsukuyomi`](https://huggingface.co/ayousanz/piper-plus-zero-shot-tsukuyomi) — Tsukuyomi FT ckpt + ONNX + 合成サンプル + 評価再現セット
-> - [`ayousanz/campplus-onnx`](https://huggingface.co/ayousanz/campplus-onnx) — CAM++ Speaker Encoder (Apache-2.0、ModelScope iic ミラー、引き継ぎの簡便化用)
-
-| 項目 | 値 |
-|------|-----|
-| v7 学習済み ckpt (最新、resume 用) | `/data/piper/output-zero-shot-multi-6lang-v7/checkpoints/epoch=32-step=216326.ckpt` (947MB、5/20 16:55) |
-| `last.ckpt` (= epoch=32) | `/data/piper/output-zero-shot-multi-6lang-v7/checkpoints/last.ckpt` (947MB) |
-| `singlespk.ckpt` (FT base 用) | `/data/piper/output-zero-shot-multi-6lang-v7/checkpoints/epoch=32-step=216326.singlespk.ckpt` (947MB、5/21 00:00) |
-| v7 全 epoch ckpt | `epoch=0` ~ `epoch=32` まで保存済み (33 個 × 947MB) |
-| 評価 ONNX (v7 epoch 10) | `/data/piper/eval-v7-epoch10/v7-epoch10-zs.onnx` (38.9MB FP16) |
-| 評価 ONNX (v7 epoch 20) | `/data/piper/eval-v7-epoch20/v7-epoch20-zs.onnx` (38.9MB FP16) |
-| 評価 ONNX (v7 epoch 32) | `/data/piper/eval-v7-epoch32/v7-epoch32-zs.onnx` (38.9MB FP16) |
-| **Tsukuyomi FT ckpt (最新)** | `/data/piper/output-tsukuyomi-zs-finetune/checkpoints/epoch=499-step=22000.ckpt` (927MB、5/21 00:58) |
-| **Tsukuyomi FT ONNX** | `/data/piper/eval-tsukuyomi-zs-ft/tsukuyomi-ft-epoch499-zs.onnx` (38.2MB FP16、single-speaker) |
-| データセット (v7) | `/data/piper/dataset-multilingual-6lang-filtered-new/` (571話者/6lang/497,519発話) |
-| データセット (Tsukuyomi FT) | `/data/piper/dataset-tsukuyomi-finetune-6lang/` (100 発話、per-utterance emb 付き) |
-| per-utterance embedding (v7) | `dataset-.../speaker_embeddings/` (497,519 個、CAM++ 192次元 L2 正規化) |
-| Speaker Encoder | CAM++ ONNX (192次元、Apache-2.0) `/data/piper/models/campplus.onnx` |
-| バックアップ ckpt (古い v5) | `/data/piper/output-zero-shot-20speakers-v5/checkpoints/epoch=99-step=104800.ckpt` (resume 不可) |
-
-### 学習中の安定動作のために実装した 5 つの修正 (重要)
-
-| commit | 修正 | 何を解決した |
-|---|---|---|
-| `5cdfafb` | **MBiSTFTGenerator に Multi-scale FiLM 復活** | 32-true 精度での zero-shot 学習が成立。リベースで廃止された旧 `Generator` の Multi-scale FiLM を MB-iSTFT に移植 |
-| `34ad257` | **DDP-synced NaN skip** | rank ごとに skip がバラつく → NCCL all_reduce mismatch → 30 分後 timeout (= 「CUDA illegal access」の偽装症状) を防止 |
-| `5e700d4` | dino_loss 診断 log | student_emb / teacher_emb / center のどれが NaN 化したか log で特定可能に |
-| `ba71e16` | **speaker_embedding noise 加算後の L2 再正規化** | `norm=1 → sqrt(1+σ²·dim) ≈ 1.22` の magnitude 不一致を解消、`loss_dino` の 0 マスク貼り付きを解消 |
-| `95e74cb` | **dino_center を teacher_emb NaN 汚染から防御** | spk_proj が稀に NaN を出す瞬間に center が永続汚染されるのを防止 |
-
-### リベース後のアーキテクチャ (v7 学習で実証済み)
-
-| コンポーネント | 出所 | 説明 |
-|---------------|------|------|
-| **Decoder** | dev + 復活 FiLM | `MBiSTFTGenerator` (PQMF + iSTFT) + **Input-stage FiLM + 各 upsample 段 FiLM (zero-init)** |
-| **Speaker conditioning** | branch | `spk_proj` 2-layer MLP (192→512, LayerNorm, GELU, 512→512) — emb_g 廃止 |
-| **DINO 自己蒸留** | branch + 強化 | `spk_proj_teacher` (EMA momentum=0.996)、`dino_center` + 汚染防御 |
-| **SCL** | branch | CAM++ ONNX (`speaker_encoder_path` 指定時) + `mel_speaker_consistency_loss` フォールバック |
-| **Forward signature** | branch | `forward(..., speaker_embeddings=...)` (sid は ONNX 互換のため受理のみ) |
-| **Output** | dev | `SynthesizerOutput` NamedTuple (waveform + decoder_subbands) |
-| **Multilingual** | dev | `emb_lang` (n_languages > 1)、6言語対応 |
-| **Sub-band STFT loss** | dev | `MultiResolutionSTFTLoss` (MB-iSTFT) と SCL/DINO が共存 |
-| **WavLM** | dev | `wavlm_every_n_steps` gating (G/D 双方) |
-| **Inference defaults** | branch+dev | `noise_scale=0.4 / noise_scale_w=0.5` |
-| **NaN skip 経路** | new | `training_step` で `_ddp_synced_is_finite` でチェック → 全 rank で skip 整合 |
-| **Removed (廃止)** | branch独自 | 旧 `Generator + Multi-scale FiLM` クラス、`speaker_embedding_mask` テンソル |
-
-### v7 学習・評価実績 (V100 × 4、32 epoch 完走で停止)
-
-- **学習期間**: 2026-05-08 04:45 ~ 2026-05-20 16:55 (約 12.5 日、途中停止/再開 1 回)
-- **1 epoch ≈ 8 時間 53 分** (V100 × 4、batch_size=20、samples_per_speaker=4、precision=32-true)
-- **NCCL timeout: 0 件** (全期間)
-- **dino_center 汚染: 0 件** (全期間)
-- **Non-finite skip 率: 2.5%** (全 step、DDP 同期 skip 機能)
-- **Loss**: loss_disc_all -78%、loss_mel -80%、loss_dino -96%、loss_spk -20%
-- **SECS 推移**:
-  - epoch 10: 既知 0.5612 / 未知 (zero-shot) 0.6622
-  - epoch 20: 既知 0.5943 / 未知 0.6388
-  - **epoch 32: 既知 0.6619 (+0.0676 vs ep20) / 未知 (zero-shot) 0.6879 (+0.0491 vs ep20)** ← 改善継続中
-- 詳細: [`docs/design/multi-6lang-zero-shot-v7-training-results.md`](docs/design/multi-6lang-zero-shot-v7-training-results.md)
-
-### Tsukuyomi zero-shot FT 実績 (2026-05-21 完走、新 GPU で 51 分)
-
-v7 epoch=32 `singlespk.ckpt` をベースに `dataset-tsukuyomi-finetune-6lang` (100 utterances) で
-シングルスピーカー FT を実施。`--resume-from-multispeaker-checkpoint` の自動変換で `emb_g`
-除去 + `freeze_dp` 有効化。エクスポート時に **single-speaker ONNX** (speaker_embedding 入力なし、
-Tsukuyomi 固定) として出力される。
-
-| 指標 | 値 |
-|---|---|
-| 学習時間 | 51 分 (GPU × 1、batch_size=4、samples_per_speaker=4、precision=32-true、22 batches/epoch) |
-| 総 step 数 | 22,000 (500 epoch × 22) |
-| 最終 LR | 1e-5 (cosine warmup 5ep → min 1e-5) |
-| Tsukuyomi 再現性 SECS (CAM++) | **0.7749** (vs v7 ep32 zero-shot baseline 0.6879 から +0.0870) |
-| 既知話者参照 ↔ FT synth (コントロール) | 0.5158 (十分低く、Tsukuyomi 特有声質を獲得) |
-| ONNX サイズ | 38.2MB FP16 (49% reduction from 75.4MB FP32) |
-| 評価ログ | `/data/piper/eval-tsukuyomi-zs-ft/secs.log` |
-
-### 新 GPU での学習再開
-
-`epoch=32-step=216326.ckpt` から resume する完全なコマンド (v7 を更に進める場合)。
-Multi-scale FiLM 復活以降の全 5 修正 (commit `5cdfafb` / `34ad257` / `5e700d4` / `ba71e16` / `95e74cb`) が反映済みコードで動作する前提。
-
-> 現在の GPU: Tesla T4 × 4 (16GB)。V100 時代の `--precision 32-true` ではなく `bf16-mixed` を試す価値あり。
-
-```bash
-# ---- 環境変数 ----
-export WANDB_MODE=disabled              # WANDB 不要なら disabled
-export NCCL_DEBUG=WARN
-export NCCL_P2P_DISABLE=1
-export NCCL_IB_DISABLE=1
-export PYTHONPATH=/data/piper-plus-zero-shot/src/python
-export PIPER_PLUS_FORCE_CPU_ORT=1       # SCL CAM++ ONNX を CPU 強制 (GPU 共有競合回避)
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-
-# ---- ORT に PyTorch 同梱 cuDNN を見せる (CAM++ GPU 化したい場合は PIPER_PLUS_FORCE_CPU_ORT を unset) ----
-CUDNN=/data/piper/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib
-CUBLAS=/data/piper/.venv/lib/python3.12/site-packages/nvidia/cublas/lib
-NVRTC=/data/piper/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib
-CURAND=/data/piper/.venv/lib/python3.12/site-packages/nvidia/curand/lib
-CUFFT=/data/piper/.venv/lib/python3.12/site-packages/nvidia/cufft/lib
-export LD_LIBRARY_PATH="$CUDNN:$CUBLAS:$NVRTC:$CURAND:$CUFFT:$LD_LIBRARY_PATH"
-
-# ---- 学習再開 (V100×4 想定。devices/precision は GPU に応じて調整) ----
-cd /data/piper-plus-zero-shot
-nohup /data/piper/.venv/bin/python -u -m piper_train \
-  --dataset-dir /data/piper/dataset-multilingual-6lang-filtered-new \
-  --prosody-dim 16 \
-  --accelerator gpu --devices 4 --precision 32-true \
-  --max_epochs 200 --batch-size 20 --samples-per-speaker 4 \
-  --checkpoint-epochs 1 --quality medium \
-  --base_lr 2e-4 --disable_auto_lr_scaling \
-  --ema-decay 0.9995 --num-workers 2 --no-pin-memory --no-wavlm \
-  --max-phoneme-ids 400 \
-  --spk-emb-noise-sigma 0.05 \
-  --d-update-interval 1 \
-  --lr-scheduler cosine --lr-warmup-epochs 5 --lr-min 1e-5 \
-  --kl-annealing-epochs 10 \
-  --c-dino 0.5 --c-spk 1.0 \
-  --c-sub-stft 1.0 \
-  --gradient-clip-val 0 \
-  --speaker-encoder-path /data/piper/models/campplus.onnx \
-  --val-every-n-epochs 1 --audio-log-epochs 5 \
-  --resume_from_checkpoint /data/piper/output-zero-shot-multi-6lang-v7/checkpoints/epoch=32-step=216326.ckpt \
-  --default_root_dir /data/piper/output-zero-shot-multi-6lang-v7 \
-  > /data/piper/output-zero-shot-multi-6lang-v7-train.log 2>&1 &
-echo "PID: $!"
-```
-
-**GPU 別の推奨調整** (CLAUDE.md トラブルシューティング + v9-handoff 参照):
-
-| GPU | precision | devices | batch_size | num_workers | 1 epoch 時間目安 |
-|---|---|---|---|---|---|
-| V100-16GB × 4 (実証済) | `32-true` | 4 | 20 | 2 | 8h53m |
-| **T4-16GB × 4 (現在の環境)** | `bf16-mixed` | 4 | 12-16 | 2 | 未測定、要ベンチ |
-| A100-40GB × 1 | `bf16-mixed` | 1 | 80-120 | 4 | 2-3h 見込 |
-| A100-80GB × 1 | `bf16-mixed` | 1 | 160 | 8 | 1.5h 見込 |
-| RTX 6000 Ada-48GB × 1 | `bf16-mixed` | 1 | 100-120 | 4 | 2-3h 見込 |
-
-> ⚠️ V100 で `--precision 16-mixed` は backward 27sec → 32-true で 5.3sec の 5x 高速。
-> ⚠️ A100/RTX/T4 で `--precision 32-true` は遅い、必ず `bf16-mixed` に変更。
-
-### 次にやるべきこと
-
-1. **Tsukuyomi FT 評価** (✅ 完了 2026-05-21): SECS 0.7749 を確認。聴感確認や追加 epoch は要判断
-2. v7 学習再開 (任意): `epoch=32-step=216326.ckpt` から resume → epoch 50 / 75 を狙う
-3. **聴感比較 / MOS** — eval-tsukuyomi-zs-ft/synthesized_tsukuyomi/output.wav vs 旧 tsukuyomi MB-iSTFT FT モデル (`/data/piper/output-tsukuyomi-mb-istft-finetune/`) を聴き比べ
-4. **Tsukuyomi FT ONNX を Hugging Face にアップロード** + 配布 (PR 反映するかは品質判断後)
-5. 必要に応じて Phase 3 改善 (InfoNCE / R1 / データ拡充、[`docs/design/zero-shot-quality-improvement-plan.md`](docs/design/zero-shot-quality-improvement-plan.md)) を別 PR で投入
+> 旧 root `model.ckpt` / `config.json`、`piper-v11-local`、`output/`、private/gated research stores は歴史的・研究用資産として保持します。public `zs-v1` と legacy root の設定・用途を混同しないでください。
 
 ---
 
@@ -187,23 +25,24 @@ echo "PID: $!"
 
 ### 学習済みモデル (6言語マルチリンガル)
 
-> 本表は agent context (ckpt path / 学習状態) を含み CLAUDE.md 内に保持しています。 user / 外部参照向けの HF 配布カタログ (ダウンロードリンク + zero-shot variants 含む) は [`docs/guides/development/pretrained-models.md`](docs/guides/development/pretrained-models.md) を参照してください (single source for the HF model list)。
+> 本表は開発・研究用の状態を示します。user / 外部参照向けの HF 配布カタログ (ダウンロードリンク + zero-shot variants 含む) は [`docs/guides/development/pretrained-models.md`](docs/guides/development/pretrained-models.md) を参照してください。
 
 | モデル | 学習基盤 | 状態 | パス |
 |-------|--------|------|------|
 | **6lang base (HiFi-GAN)** | 75 epoch (v1.11 系) | 完了 (2026-03-16) | `/data/piper/output-multilingual-6lang/` |
 | **6lang base MB-iSTFT** | 75 epoch スクラッチ | 完了 (2026-04-16) | `/data/piper/output-multilingual-6lang-mb-istft/multilingual-6lang-mb-istft-scratch-75epoch.onnx` |
-| **Zero-Shot base zs-v1** | v7 ep32 / step216326 | 実験用基準版を一般公開、PyPI 2.0.0推論・短いFTを確認 (2026-10-10) | [HF releases/zs-v1](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)。品質改善・人手試聴合格とは別 |
+| **Zero-Shot base zs-v1** | v7 ep32 / step216326、6言語・173音素・571話者・CAM++ 192次元 | revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` で一般公開。公開 PyPI 2.0.0 consumer の推論・短いFTを機能確認済み。後続 source 6-runtime public-base CI (run `38189966578`) も成功 | [HF releases/zs-v1](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)。品質改善・人手試聴合格とは別 |
 | **つくよみちゃん 6lang-v2** | 6lang ベースから FT 500 epoch | 完了 (2026-03-16) | `/data/piper/output-tsukuyomi-finetune-6lang-v2/tsukuyomi-6lang-v2-fixed.onnx` |
 | **つくよみちゃん MB-iSTFT** | 6lang MB-iSTFT ベースから FT 500 epoch | 完了 (2026-05-02) | `/data/piper/output-tsukuyomi-mb-istft-finetune/tsukuyomi-mb-istft-500epoch.onnx` |
-| **つくよみちゃん Zero-Shot FT** | v7 ep32 zero-shot ベースから FT 500 epoch | 完了 (2026-05-21) | `/data/piper/eval-tsukuyomi-zs-ft/tsukuyomi-ft-epoch499-zs.onnx` (SECS 0.7749) |
+| **つくよみちゃん Zero-Shot FT** | v7 ep32 zero-shot ベースから FT 500 epoch | public `releases/zs-v1` を機能確認済み。実験公開であり全言語・品質承認ではない (2026-10-15) | `/data/piper/eval-tsukuyomi-zs-ft/tsukuyomi-ft-epoch499-zs.onnx` (研究時 SECS 0.7749)。公開先は [publication record](docs/design/tsukuyomi-publication-ready-2026-10-12.md) |
 | **CSS10 JA 6lang** | 6lang ベースから 50 epoch | 完了 (2026-03-16) | `test/models/multilingual-test-medium.onnx` |
 
 ### データセット
 
 | データセット | 発話数 | 話者数 | シンボル | パス |
 |-------------|-------|-------|---------|------|
-| `dataset-multilingual-6lang-filtered` | **508,187** | 571 | 173 | `/data/piper/dataset-multilingual-6lang-filtered/` |
+| `dataset-multilingual-6lang-filtered` (legacy root) | **508,187** | 571 | 173 | `/data/piper/dataset-multilingual-6lang-filtered/` |
+| `dataset-multilingual-6lang-filtered-new` (v7 research) | **497,519** | 571 | 173 | `/data/piper/dataset-multilingual-6lang-filtered-new/` |
 | `dataset-tsukuyomi-finetune-6lang` | 100 | 1 | 173 | `/data/piper/dataset-tsukuyomi-finetune-6lang/` |
 
 **6lang 内訳:** ja 60,148 (20話者, MOE-Speech) / en 74,912 (310, LibriTTS-R) / zh 63,223 (142, AISHELL-3) / es 168,374 (63, CML-TTS) / fr 107,464 (28, CML-TTS) / pt 34,066 (8, CML-TTS)。言語コード: ja=0, en=1, zh=2, es=3, fr=4, pt=5。
@@ -348,7 +187,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 ### Voice Cloning
 
 - **Speaker Encoder (ECAPA-TDNN)** (`src/python/piper_train/speaker_encoder/`) — 256 次元 L2 正規化 embedding。テスト: `test/test_speaker_encoder.py` (legacy 位置、その他は `src/python/tests/` 配下)。
-- **全ランタイム統合** — Rust/C#/Go/WASM/C++ に Speaker Encoder + speaker_embedding 統合。CLI: `--reference-audio`, `--speaker-embedding`, `--speaker-encoder-model`。C API は `speaker_embedding` テンソル経路のみ動作 (ECAPA-TDNN 推論 API はスタブ、CLI 経路では動作)。
+- **ランタイム別 voice cloning** — Rust/Go/C#/WASM は `--reference-audio` と `--speaker-encoder-model` から embedding を生成でき、各 runtime は `speaker_embedding` 入力にも対応。C++ は pre-computed `--speaker-embedding` の入力のみ実装し、`--reference-audio` / ECAPA-TDNN 推論と C API の speaker encoder は未実装 (stub)。CLI フラグと対応範囲は runtime ごとの help を確認する。
 
 ### G2P (8言語)
 
@@ -388,30 +227,30 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 - **短テキスト合成品質改善 (Strategy A/B/C)** — 全 6 ランタイム (Python/Rust/C#/Go/WASM/C++) 並列実装。A: Silence Padding + Post-trim、B: Dynamic Scales、C: SSML `<break>` 自動挿入 (SSML 実装ランタイムでのみ)。仕様: `docs/spec/short-text-contract.toml`。
 - **ストリーミング文単位分割** — 終止符 `.`/`!`/`?`/`。`/`！`/`？`/`．` で分割し文ごとに音素化・推論・yield。SSML は単一ユニット。Python: `src/python_run/piper_plus/text_splitter.py`、Rust: `piper-core/src/streaming.rs`、他言語: 同等実装。仕様: `docs/spec/text-splitter-contract.toml`。**Breaking (v1.12.0):** Python `PiperVoice.phonemize()` が単一要素から複数要素へ (詳細: マイグレーションガイド)。
 - **SSML 基本サポート** (Python/Rust/C#/Go/WASM/C++ の 6 ランタイム + G2P-only npm 解析 API) — `<speak>`, `<break>`, `<prosody rate>` を W3C サブセットで実装。実装: `g2p/piper_plus_g2p/ssml.py`, `piper-plus-g2p/src/ssml.rs` (Rust canonical), `PiperPlus.Core/Ssml/SsmlParser.cs`, `go/piperplus/ssml/parser.go`, `wasm/g2p/src/ssml.js` (npm `@piper-plus/g2p`), `src/cpp/ssml.{hpp,cpp}` (CLI `--ssml` 経由、C API 非エクスポート)。 piper-core は `piper-plus-g2p::ssml` を re-export (API 互換維持)。 piper-wasm は同パーサーを `isSsml` / `parseSsml` で WASM expose (TTS 統合は openjtalk-web の `synthesizeSsml` 側で iterate して silence 挿入 + length_scale 切替)。
-- **Phoneme Timing 出力** — 全 6 ランタイム (Python/JS-WASM 新規 + Rust/Go/C++/C# 既存) で JSON/TSV/SRT 出力。`(hop_length / sample_rate) × 1000` で byte-for-byte 互換。Python: `piper_plus.timing` モジュール、`PiperVoice.synthesize_with_timing()`、HTTP `/api/phoneme-timing`。WASM: `AudioResult.timing` (deep frozen)。仕様: `docs/spec/phoneme-timing-contract.toml`。
+- **Phoneme Timing 出力** — 仕様 `docs/spec/phoneme-timing-contract.toml` の `(hop_length / sample_rate) × 1000` と fixture parity を各実装が共有する。出力形式と公開面は runtime ごとに異なり、Python HTTP は JSON/TSV、C# CLI は JSON/TSV、Rust/Go/C++ CLI は JSON/TSV/SRT、WASM は `AudioResult.timing` と formatter API を提供する。WASM streaming/SSML、C++ SSML、C# の未配線 formatter には timing 制限がある。Python: `piper_plus.timing`、`PiperVoice.synthesize_with_timing()`、HTTP `/api/phoneme-timing`。WASM: `AudioResult.timing` (deep frozen)。byte parity の範囲と例外は仕様および golden fixture を参照する。
 
 ### ランタイム別パッケージ
 
 | ランタイム | パッケージ | バージョン | テスト | パス |
 |-----------|----------|----------|-------|------|
-| Python (PyPI) | `piper-plus` | 2.0.0 (VERSION 経由 dynamic) | pytest 多数 | `src/python_run/piper_plus/` |
-| C# (NuGet) | `PiperPlus.Core` / `PiperPlus.Cli` | 0.4.0 | ~1000 (xUnit v3) | `src/csharp/PiperPlus.{Core,Cli}/` (TFM `net10.0`) |
-| Rust (crates.io) | `piper-plus` / `piper-plus-cli` | 0.5.0 | 多数 | `src/rust/piper-{core,cli,python,wasm}/` |
-| Go (Go module) | `github.com/ayutaz/piper-plus/src/go` | tag-based | 793 | `src/go/piperplus/`, `src/go/cmd/piper-plus/` |
-| JS/WASM (npm) | `piper-plus` | 0.7.0 | ~1200 + 56 (Rust) | `src/wasm/openjtalk-web/`, `src/rust/piper-wasm/` |
+| Python (PyPI) | `piper-plus` | 2.0.1 (VERSION 経由 dynamic) | pytest 多数 | `src/python_run/piper_plus/` |
+| C# (NuGet) | `PiperPlus.Core` / `PiperPlus.Cli` | 0.5.1 | CI / `dotnet test` 実測 | `src/csharp/PiperPlus.{Core,Cli}/` (TFM `net10.0`) |
+| Rust (crates.io) | `piper-plus` / `piper-plus-cli` | 0.5.2 | 多数 | `src/rust/piper-{core,cli,python,wasm}/` |
+| Go (Go module) | `github.com/ayutaz/piper-plus/src/go` | tag-based | CI / `go test ./...` 実測 | `src/go/piperplus/`, `src/go/cmd/piper-plus/` |
+| JS/WASM (npm) | `piper-plus` | 0.8.1 | CI / `npm run test:npm-package:all` 実測 | `src/wasm/openjtalk-web/`, `src/rust/piper-wasm/` |
 | C API | `libpiper_plus` | shared lib | C/Dart/Godot サンプル | `src/cpp/piper_plus.{h,c_api.cpp}`, `cmake/PiperPlusShared.cmake` |
-| iOS xcframework + SPM | `piper-plus` (Swift Package) | 1.13.0+ (M4) | release-shared-lib CI | `Package.swift`, `Sources/PiperPlus/`, `cmake/PrivacyInfo.xcprivacy` |
-| **Kotlin/Android G2P (Maven Central)** | `io.github.ayutaz:piper-plus-g2p-android` | 1.0.0+ | L1〜L5 (kotlin-g2p-ci.yml) | `android/piper-plus-g2p/` |
-| iOS / macOS Swift G2P (SPM) | `PiperPlusG2P` (Swift product, 別 xcframework `-apple-`) | 1.14.0+ | XCTest (CI) + `examples/swift-g2p/HelloG2P` CLI | `Sources/PiperPlusG2P/`, `Tests/PiperPlusG2PTests/`, `examples/swift-g2p/`, `Package.swift` (Issue #387) |
+| iOS xcframework + SPM | `piper-plus` (Swift Package) | 2.0.1 | release-shared-lib CI | `Package.swift`, `Sources/PiperPlus/`, `cmake/PrivacyInfo.xcprivacy` |
+| **Kotlin/Android G2P (Maven Central)** | `io.github.ayutaz:piper-plus-g2p-android` | 1.0.1 | L1〜L5 (kotlin-g2p-ci.yml) | `android/piper-plus-g2p/` |
+| iOS / macOS Swift G2P (SPM) | `PiperPlusG2P` (Swift product, 別 xcframework `-apple-`) | 2.0.1 | XCTest (CI) + `examples/swift-g2p/HelloG2P` CLI | `Sources/PiperPlusG2P/`, `Tests/PiperPlusG2PTests/`, `examples/swift-g2p/`, `Package.swift` (Issue #387) |
 | 独立 G2P | `piper-plus-g2p` (Py/Rust)、`@piper-plus/g2p` (npm)、`src/go/phonemize` (Go)、`io.github.ayutaz:piper-plus-g2p-android` (Kotlin) | 同上 | — | `src/{python/g2p,rust/piper-plus-g2p,wasm/g2p,go/phonemize}/`、`android/piper-plus-g2p/` |
 
-**主な追加機能 (全ランタイム共通):** モデル名自動解決 (`--model tsukuyomi` でエイリアス + 自動 DL)、カスタム辞書 (JSON v1/v2 / TSV)、`[[ phoneme ]]` インライン音素記法 (C#/Python)、`--sentence-silence` / `--phoneme-silence` 制御、`--list-models` 言語フィルタ。
+**主な追加機能 (ソースブランチの対応):** モデル名自動解決 (`--model tsukuyomi` でエイリアス + 自動 DL)、カスタム辞書 (JSON v1/v2 / TSV)、`[[ phoneme ]]` インライン音素記法 (C#/Python)、`--sentence-silence` / `--phoneme-silence` 制御、`--list-models` 言語フィルタ。公開済み 2.0.0 / 2.0.1 package に `base` / `zero-shot-base-zs-v1` alias が含まれるとは限らないため、公開 package の catalog は [`docs/guides/development/pretrained-models.md`](docs/guides/development/pretrained-models.md) を確認する。
 
 ### サーバー / Docker / 統合
 
 - **OpenAI 互換 TTS API** (`docker/python-inference/inference.py`) — FastAPI ベース、`/v1/audio/speech`、`/v1/models`、`/v1/audio/speech/languages`、`/health`、`/api/phoneme-timing`。テスト: `test_openai_api.py`。
 - **WebUI (Gradio)** (`docker/webui/app.py`) — 6lang モデル対応。CI: `webui-test.yml`。ドキュメント: `docs/features/webui.md`。
-- **Wyoming Docker + HA 統合** (`docker/wyoming/`) — Home Assistant 連携。ガイド: `docs/guides/home-assistant.md`。
+- **Wyoming Docker + HA 統合** (`docker/wyoming/`) — Home Assistant 連携。ガイド: `docs/guides/integration/home-assistant.md`。
 - **MOS ベンチマーク** (`tools/benchmark/`) — サンプル生成、PESQ/STOI 計算、調査フォーム生成。ドキュメント: `docs/benchmark-mos.md`。
 - **iOS/Android ビルド CI** (`release-shared-lib.yml`, `cmake/ios.toolchain.cmake`) — libpiper_plus を iOS arm64 / Android (arm64-v8a/armeabi-v7a/x86_64) でクロスコンパイル。iOS は xcframework (device + simulator universal) として配信、`Package.swift` 経由で SPM 利用可能。Apple-embedded プラットフォーム検出は `PIPER_APPLE_EMBEDDED` 変数で集約 (CMakeLists.txt)、OpenJTalk 関数は `src/cpp/openjtalk_ios_stub.c` で stub 化。詳細: `docs/guides/platform/ios-integration.md`、`docs/reference/ios-shared-lib.md`。
 - **モデル投稿ガイド** — `CONTRIBUTING_MODELS.md` + GitHub Issue テンプレート (`.github/ISSUE_TEMPLATE/model-{request,submission}.yml`)。
@@ -530,7 +369,8 @@ cat test.jsonl | uv run python -m piper_train.infer_onnx --model <model.onnx> --
 |----------|-----|
 | 6lang ベース ckpt (legacy root、v1.12/v1.13 系) | `ayousanz/piper-plus-base/model.ckpt` (HF) |
 | Zero-Shot/FT base `zs-v1` (v2.0 系、実験用) | [`releases/zs-v1/base.ckpt`](https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/base.ckpt) |
-| つくよみちゃん ONNX | `ayousanz/piper-plus-tsukuyomi-chan` (HF) |
+| つくよみちゃん `zs-v1` (public, 実験公開) | [`releases/zs-v1/tsukuyomi.onnx`](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1/tsukuyomi.onnx) + [publication record](docs/design/tsukuyomi-publication-ready-2026-10-12.md) |
+| つくよみちゃん legacy ONNX | `ayousanz/piper-plus-tsukuyomi-chan` (HF root files; package aliases remain legacy) |
 | CSS10 JA ONNX | `ayousanz/piper-plus-css10-ja-6lang` (HF) |
 | 20話者データセット | `ayousanz/moe-speech-20speakers-ljspeech` (HF) |
 | パッケージレジストリ | PyPI / NuGet / crates.io / npm — それぞれ `piper-plus` または `PiperPlus.*` で検索 |

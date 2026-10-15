@@ -1,5 +1,5 @@
 name: Runtime Parity Issue
-description: Report a feature inconsistency between the 7 piper-plus runtimes
+description: Report a feature inconsistency between piper-plus runtimes
 title: "[parity] "
 labels: ["parity", "needs-triage"]
 body:
@@ -7,7 +7,8 @@ body:
     attributes:
       value: |
         Use this template to report when a feature is implemented in some runtimes but missing or inconsistent in others.
-        piper-plus targets 7 runtimes: Python / Rust / C# / Go / WASM (npm) / C++ / Kotlin (Android).
+        piper-plus includes Python / Rust / C# / Go / WASM (npm) / C++ / Swift / Kotlin (Android).
+        Kotlin/Android is G2P-only; report parity within each runtime's supported scope.
         Python is typically the canonical reference implementation.
 
   - type: input
@@ -25,13 +26,14 @@ body:
       label: Canonical implementation
       description: Which runtime is treated as the reference for this feature?
       options:
-        - Python (piper_train / piper-plus-g2p)
+        - Python (piper-plus / piper_train / piper-plus-g2p)
         - Rust (piper-plus / piper-plus-g2p)
         - "C# (PiperPlus.Core)"
         - Go (piperplus / phonemize)
         - npm / WASM (piper-plus / @piper-plus/g2p)
         - C++ (libpiper_plus)
         - Kotlin/Android (piper-plus-g2p-android)
+        - Swift (PiperPlus / PiperPlusG2P)
         - Spec file only (docs/spec/*.toml)
         - Unsure
     validations:
@@ -50,6 +52,7 @@ body:
         - label: npm / WASM
         - label: "C++"
         - label: Kotlin/Android
+        - label: Swift
 
   - type: textarea
     id: impact

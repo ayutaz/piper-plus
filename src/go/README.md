@@ -17,7 +17,7 @@ with ONNX Runtime inference via [yalue/onnxruntime_go](https://github.com/yalue/
 - Session pooling for concurrent synthesis (`VoicePool`)
 - Phoneme timing extraction (JSON / TSV / SRT)
 - **SSML basic profile** — `<speak>`, `<break>`, `<prosody rate>` via `piperplus/ssml` (W3C SSML subset, shared canonical with the Rust `piper-plus-g2p::ssml` mirror)
-- **Voice cloning** — `--reference-audio` + `--speaker-encoder-model` can supply a model-compatible `speaker_embedding`. The embedding dimension is read from the ONNX model; public zs-v1 uses CAM++ 192-dim embeddings, while legacy models may use ECAPA-TDNN 256-dim embeddings. Cross-runtime verification of the public zs-v1 bundle is not claimed here.
+- **Voice cloning** — `--reference-audio` + `--speaker-encoder-model` can supply a model-compatible `speaker_embedding`. The embedding dimension is read from the ONNX model; public zs-v1 uses CAM++ 192-dim embeddings, while legacy models may use ECAPA-TDNN 256-dim embeddings. CI run `38189966578` reports six-runtime inference from shared Python phoneme IDs; native G2P and listening quality were excluded, and quality approval remains false. The published reference-conditioned Python example was separately verified with PyPI `piper-plus==2.0.0`.
 - Short-text strategies A/B/C (silence padding, dynamic scales, SSML `<break>` auto-injection)
 - Warmup + `.opt.onnx` session cache for faster cold start (shared `docs/spec/ort-session-contract.toml`)
 - ZH-EN code-switching loanword dispatch (byte-for-byte in sync with the canonical Python `zh_en_loanword.json` and the 9 other runtime mirrors)
@@ -197,9 +197,11 @@ Load it with `-m models/zs-v1/base.onnx -c models/zs-v1/base.onnx.json`.
 Do not combine it with the legacy root `config.json` or `model.ckpt`. The
 published [zs-v1 README](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/README.md)
 contains the canonical reference-audio embedding precomputation example.
-The public bundle's reference-conditioned inference was verified with PyPI
-`piper-plus==2.0.0` only. The `--download-model` option accepts a URL; no
-public `base` alias is provided by this Go runtime.
+The published reference-conditioned example was verified with PyPI
+`piper-plus==2.0.0`. CI run `38189966578` reports six-runtime inference from
+shared Python phoneme IDs; native G2P and listening quality were excluded, and
+quality approval remains false. The `--download-model` option accepts a URL;
+no public `base` alias is provided by this Go runtime.
 
 ## API Reference / APIリファレンス
 

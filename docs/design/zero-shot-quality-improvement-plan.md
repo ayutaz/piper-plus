@@ -3,7 +3,7 @@
 > **ステータス更新 (2026-06-26)**:
 >
 > - **Tier 1 (未実装機能の修正): ✅ 完了** — v7 multi-6lang スクラッチ学習 (32 epoch 完走) で全 5 修正実装済 (5cdfafb / 34ad257 / 5e700d4 / ba71e16 / 95e74cb)。 SECS (zero-shot) 0.6622 → 0.6879 達成。 Tsukuyomi FT で SECS 0.7749 を確認。 詳細: [`multi-6lang-zero-shot-v7-training-results.md`](multi-6lang-zero-shot-v7-training-results.md)
-> - **Tier 2/3 (学習改善 / アーキ微調整): 🟡 active future work** — InfoNCE / R1 regularizer / データ拡充は引き続き計画段階。 CLAUDE.md L139 + [`docs/handoff/zero-shot-tts-handoff-2026-06-20.md`](../handoff/zero-shot-tts-handoff-2026-06-20.md) から参照中
+> - **Tier 2/3 (学習改善 / アーキ微調整): 🟡 active future work** — InfoNCE / R1 regularizer / データ拡充は引き続き計画段階。CLAUDE.md L139 と、private/research historical handoff [`docs/handoff/zero-shot-tts-handoff-2026-06-20.md`](../handoff/zero-shot-tts-handoff-2026-06-20.md) から参照中。公開済み zs-v1 の functional validation は品質承認を意味しない。
 > - 「1. 重大発見: 未実装/不完全な機能」 セクションの記述は **当初調査時 (2026-03-31) の snapshot** で、 現在は v7 で fix 済の項目を含みます。 historical context として残しています
 
 > 調査日: 2026-03-31 (復元完了: 2026-04-01)
@@ -121,7 +121,7 @@ self.flow = ResidualCouplingBlock(inter_channels, hidden_channels, 5, 2, 4, gin_
 | 5 | ✅ max_epochs=200 | 設定変更 | 高 | **DONE** (v9コマンドで設定済み) |
 | 6 | ✅ spk_proj EMA追跡 | ~20行 | 中 | **DONE** |
 
-**Tier 1は6件中5件完了。残りはDP cond_scale検討のみ。包括レビュー修正（2026-04-12）で追加8件完了。**
+**この表の Tier 1 は5件完了。DP cond_scale、FiLM の活性化形式、TextEncoder の pre-encoder 条件付けは未実装または検討中である。v7 で Multi-scale FiLM の各段適用自体は実装済みで、下記の「FiLM 活性化 1+tanh」提案とは区別する。包括レビュー修正（2026-04-12）で追加8件完了。**
 
 ### Tier 2: 学習改善（モデルサイズ不変）
 
@@ -248,7 +248,7 @@ A の Multi-scale FiLM は本文書 50 行目「**TestGeneratorFiLMConditioning*
 3. Duration Predictor cond_scale (15行) — 意図的に削除されたため要検討
 4. ✅ Flow dilation_rate=2 (1行) — **DONE**
 5. ✅ max_epochs=200 (設定変更) — **DONE** (v9コマンドで設定済み)
-6. FiLM活性化 1+tanh (1行) — 未実施
+6. FiLM活性化 1+tanh (1行) — 未実施（Multi-scale FiLM の各段適用とは別提案）
 7. TextEncoder pre-encoder条件付け (行移動) — 未実施
 
 **包括レビュー修正 (2026-04-12) — 追加完了:**

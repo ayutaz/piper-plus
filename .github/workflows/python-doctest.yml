@@ -75,7 +75,7 @@ jobs:
           # timing.py が属する src/python_run を editable install。
           # phonemize subpackage が pyopenjtalk を要求するので必須。
           cd ../python_run
-          uv pip install --system -e .
+          uv pip install --system -e '.[cpu]'
           # FastAPI 系は voice.py の collection には不要 — skip。
           # nltk corpora は g2p_en (english phonemizer) の import で要求
           # されるので事前ダウンロード。

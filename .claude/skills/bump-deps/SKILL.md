@@ -20,7 +20,7 @@ memory `feedback_conservative_changes.md` に従い、 デフォルト dry-run�
 |------|-----------|---------|----------|
 | ONNX Runtime | `cmake/OnnxRuntime.cmake` (ONNXRUNTIME_VERSION) | 6+ ファイル | check_ort_versions.py / check_ort_version_drift.py |
 | openjtalk | `cmake/ExternalDeps.cmake` (URL 内の version) | 3+ ファイル | check_openjtalk_version_sync.py |
-| ruff | `pyproject.toml` (dev group の最初の出現) | 6 箇所 | check_ruff_version_sync.py |
+| ruff | `pyproject.toml` (dev group の最初の出現) | checker が検出する全 pin site | check_ruff_version_sync.py |
 | (将来) | `cmake/...` (新 dep) | TBD | (新 gate) |
 
 ## 引数
@@ -111,7 +111,7 @@ ORT bump は ABI 変更があり得るため、 以下の dependent check も走
 uv run python -c "import onnxruntime; print(onnxruntime.__version__)"
 
 # Rust load test
-(cd src/rust && cargo check -p piper-core)
+(cd src/rust && cargo check -p piper-plus)
 
 # 各 runtime CI workflow が pass しているか
 gh run list --workflow=ci.yml --limit 5

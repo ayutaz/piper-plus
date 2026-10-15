@@ -1,7 +1,7 @@
 # iOS Shared Library Distribution Specification
 
 > **Version:** 1.1
-> **Status:** Implemented (v1.13.0, [PR #381](https://github.com/ayutaz/piper-plus/pull/381))
+> **Status:** Implemented; v1.13.0 migration history, current consumer baseline v2.0.1 ([PR #381](https://github.com/ayutaz/piper-plus/pull/381))
 > **対象 Issue:** [#377](https://github.com/ayutaz/piper-plus/issues/377)
 > **対象ファイル:** `.github/workflows/release-shared-lib.yml`, `cmake/ios.toolchain.cmake`, `cmake/PiperPlusShared.cmake`, `cmake/PrivacyInfo.xcprivacy`, `Package.swift`
 
@@ -109,9 +109,13 @@ v1.11.0 / v1.12.0 で iOS shared-lib artifact は実際には Releases に上が
 (`build-ios` ジョブの継続失敗により release ジョブが巻き添え停止)。よって厳密な意味の
 「旧形式 `.a` の既存利用者」は観測されておらず、後方互換の対象は存在しない。
 
-ただし `libpiper_plus-ios-arm64-${VERSION}.tar.gz` の **命名そのもの** は v1.13.0 で
-継続使用する (中身は `.framework` 同梱の tar.gz になる、§2.1 ⚠️ 注記参照)。v1.14.0 で
-`xcframework.zip` 命名に集約し、tar.gz 命名は廃止予定。
+`libpiper_plus-ios-arm64-${VERSION}.tar.gz` は v1.13.0 移行期から残る deprecated
+互換 artifact であり、現行の v2.0.1 release にも
+`libpiper_plus-ios-arm64-v2.0.1.tar.gz` として公開されている。新規 consumer の
+推奨経路は引き続き xcframework の zip である。
+現在の Swift Package consumer は v2.0.1 の
+`libpiper_plus-ios-v2.0.1.xcframework.zip` を参照する。旧命名の互換性を必要とする
+consumer は、利用するリリースの資産一覧を確認すること。
 
 ---
 
@@ -143,7 +147,7 @@ build-ios:
           -o ort.zip \
           "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-${ONNXRUNTIME_VERSION}.zip"
         unzip -q ort.zip -d ort
-        # slice に対応する onnxruntime.a + Headers を抽出
+        # slice に対応する onnxruntime.framework + Headers を抽出
     - name: Configure CMake (per slice)
     - name: Build (per slice)
     - name: Upload slice artifact

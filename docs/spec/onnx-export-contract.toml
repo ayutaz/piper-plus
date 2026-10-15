@@ -149,15 +149,16 @@ minimum = 15
 # silently (binding lookup yields None / null) and must be coordinated.
 
 [tensor_names.inputs]
-# All inputs are present on the main TTS model (sid/lang are conditional).
+# input, input_lengths, and scales are the core inputs. sid, lid,
+# speaker_embedding, and prosody_features are graph-conditional.
 # The names below are the canonical strings; loaders MUST not transform
 # (e.g. lowercase, snake-case) before binding.
 input          = "phoneme IDs (int64, shape=[1, T])"
 input_lengths  = "per-batch phoneme length (int64, shape=[1])"
 scales         = "[noise_scale, length_scale, noise_w] (float32, shape=[3])"
-sid            = "speaker ID (int64, shape=[1]) — multi-speaker models only"
-lang           = "language ID (int64, shape=[1]) — multilingual models only"
-prosody_features = "prosody A1/A2/A3 features (float32, shape=[1, T, prosody_dim]) — when present"
+sid            = "speaker ID (int64, shape=[1]) — when declared for multi-speaker models"
+lid            = "language ID (int64, shape=[1]) — when declared for multilingual models"
+prosody_features = "prosody A1/A2/A3 features (int64, shape=[1, T, 3]) — when present"
 speaker_embedding = "Speaker embedding (float32, shape=[1, emb_dim]); emb_dim=256 for legacy ECAPA-TDNN exports and emb_dim=192 for public v2 CAM++ Zero-Shot exports"
 
 [tensor_names.outputs]
@@ -187,9 +188,11 @@ preserve_through_fp16 = true
 # ============================================================================
 # CI validation steps (post-export)
 # ============================================================================
-# Steps that run automatically in CI after every export. These verify the
-# resulting ONNX is loadable and produces matching audio for a fixed set
-# of warmup-style inputs.
+# The exporters call piper_train.onnx_validation on each actual artifact.
+# This validates graph bytes, creates ORT sessions and runs deterministic feeds.
+# Model Quality Gate tests this validator with real tiny ONNX graphs and negative
+# outputs. Normal PR CI does not re-export every published checkpoint. Runtime
+# fixture / public-base jobs provide separate model inference evidence.
 
 [ci_validation]
 # Each entry is a logical step; the CI workflow may bundle them into one job.
@@ -262,4 +265,4 @@ arithmetic-overflow in attention or duration prediction layers.
 # CI validation: roundtrip      ✓           ✓
 # CI validation: ORT creation   ✓           ✓
 # CI validation: warmup         ✓           ✓
-# CI validation: FP16 parity    ✓           N/A
+# FP16 parity (warn-only)       ✓           ✓

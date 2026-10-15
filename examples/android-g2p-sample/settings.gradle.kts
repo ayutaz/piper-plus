@@ -11,8 +11,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // Use the local AAR module while developing in this repo. After the
-        // 1.0.0 release the consumer can drop this and rely on Maven Central.
+        // Use the local AAR module while developing in this repo. External
+        // consumers can use the published 1.0.1 artifact from Maven Central.
         mavenLocal()
     }
 }

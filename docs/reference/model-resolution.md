@@ -48,7 +48,10 @@ function resolve_model(model_str, config=None, cache_dir=None):
 
 ### Step 1: Direct file path
 
-入力がファイルシステム上に存在するファイルを指す場合、そのパスをそのまま使用する。ディレクトリの場合はエラーとする。
+入力がファイルシステム上に存在するファイルを指す場合、そのパスをそのまま使用する。
+catalog/native runtime の共有目標ではディレクトリを明示的な directory error とする。
+Python high-level API は現状ディレクトリを cache candidate として扱い、ONNX が見つから
+なければ通常の `ModelNotFoundError` にフォールバックする。
 
 ### Step 2: Catalog / alias lookup
 
@@ -67,7 +70,11 @@ Voice catalog から以下の優先順位で検索する:
 
 ### Step 4: Local cache scan
 
-Cache directory 内で `{model_str}/*.onnx` または `{model_str}.onnx` を探索する。
+これは共有目標であり、runtime ごとの cache layout を確認する。Python high-level API
+は `cache_dir/{model_str}/*.onnx` の subdirectory layout を読むが、
+`cache_dir/{model_str}.onnx` の flat layout は読まない。Python CLI と native runtime
+には flat layout を使う入口があるため、flat-cache の例を全 runtime の API 契約として
+解釈してはならない。
 
 ### Step 5: Error
 
@@ -94,9 +101,14 @@ Cache directory 内で `{model_str}/*.onnx` または `{model_str}.onnx` を探�
 | `aliases` | array | ショートネームのリスト |
 | `description` | string | 説明文 |
 
-### Alias Registry
+### Alias Registry and catalog key
 
-`test/model_resolution_vectors.json` の `aliases` セクションが正規の alias 定義を保持する。各実装はこの定義と一致しなければならない。
+`test/model_resolution_vectors.json` の `aliases` セクションが user-facing alias の
+canonical registry である。catalog 接続された runtime はこの定義と一致させる。
+高レベル API と download CLI が別の入口を持つ場合は、実装済み alias を runtime 別に
+明記し、未接続の alias を全 runtime の機能として扱わない。`voice_catalog` の `key`
+は alias とは別の完全なカタログ識別子であり、catalog 接続されたランタイムでは直接
+指定できる。
 
 | Alias | Repo ID | ONNX File |
 |-------|---------|-----------|
@@ -106,11 +118,22 @@ Cache directory 内で `{model_str}/*.onnx` または `{model_str}.onnx` を探�
 | `zero-shot-base-zs-v1` | `ayousanz/piper-plus-base` at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` | `releases/zs-v1/base.onnx` |
 | `ayousanz/piper-plus-base` | `ayousanz/piper-plus-base` at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` | `releases/zs-v1/base.onnx` |
 
+The catalog key for this entry is `multilingual-zero-shot-base-zs-v1`. It is
+not an additional user-facing alias; its aliases are the three values above.
+
 > `base` と `zero-shot-base-zs-v1` は、次のリリースで公開する pinned aliases です。
 > いずれも root の legacy `model.ckpt` を指さず、上記 revision の
 > `releases/zs-v1/base.onnx` と対応する `releases/zs-v1/base.onnx.json` を解決します。リリース済み
 > v2.0.0/v2.0.1 の alias 表には遡及して追加しません。`base.onnx` は 192 次元 CAM++
 > `speaker_embedding` を使う実験用 Zero-Shot base で、通常の参照なし音声用 alias ではありません。
+
+#### Runtime-specific alias status
+
+The Python high-level API (`src/python_run/piper_plus/api/_model_resolver.py`) currently
+exposes `base`, `zero-shot-base-zs-v1`, `ayousanz/piper-plus-base`, and `tsukuyomi`.
+It does not expose the CLI/catalog `css10` alias. The Python download CLI and the native
+catalog implementations have separate alias registries; a name present there is not
+automatically available through the high-level API.
 
 ---
 
@@ -205,13 +228,14 @@ function find_config(onnx_path, explicit_config=None):
 
 ### Security Validation
 
-全実装で以下のバリデーションを実施する:
+以下は共有契約として目指す検証項目である。現行実装の挙動はランタイムごとに異なり、
+この表だけでは全実装が同じ検証を行うことを意味しない。
 
-| チェック | 内容 |
-|---------|------|
-| Path traversal | `..` を含む入力を alias/name 解決で拒否 |
-| Repo ID format | `owner/repo` 形式のみ許可 (英数字, `-`, `_`, `.` のみ) |
-| Download protocol | HTTPS のみ許可 (`http://localhost` はテスト用に許可) |
+| チェック | 共有目標 | 現行実装の差異 |
+|---------|------|------|
+| Path traversal | `..` を含む入力を alias/name 解決で拒否 | Python API は入力を明示検証しない。C#/C++/Go の catalog/download 経路には検証があるが、入口が異なる |
+| Repo ID format | `owner/repo` 形式のみ許可 (英数字, `-`, `_`, `.` のみ) | Python API は `/` を含む文字列を Hub repo として渡す。C# catalog は形式検証する。Go CLI は URL/file 情報を扱う repo alias 入口ではない |
+| Download protocol | HTTPS のみ許可 (`http://localhost` はテスト用に許可) | Go は `https://`、`file://`、localhost HTTP を許可する。ブラウザの direct URL は `http://` と `https://` の両方を受け付ける |
 
 ---
 
@@ -242,7 +266,11 @@ function find_config(onnx_path, explicit_config=None):
 
 ## 7. テストベクトル参照
 
-テストベクトルは `test/model_resolution_vectors.json` に定義されている。各実装のテストスイートはこのファイルを読み込み、`test_cases` の各エントリに対して期待動作を検証すること。
+テストベクトルは `test/model_resolution_vectors.json` に定義されている。これは共有目標
+と検証項目の canonical matrix であり、各 runtime のテストは実装済み入口に対応する
+case を読み込んで検証する。runtime-specific な未実装経路（たとえば Python
+high-level API の `css10`、flat cache、directory-specific error）は、実装済みと
+報告せず差異として扱う。
 
 ### テストケース一覧
 
@@ -252,7 +280,7 @@ function find_config(onnx_path, explicit_config=None):
 | `alias_tsukuyomi` | alias | `tsukuyomi` -> repo 解決 |
 | `alias_base` | alias | `base` -> repo 解決 |
 | `alias_css10` | alias | `css10` -> repo 解決 |
-| `catalog_key_exact` | catalog_key | 完全キーマッチ |
+| `catalog_key_exact` | catalog_key | 完全キーマッチ。公開 base では `multilingual-zero-shot-base-zs-v1` |
 | `hf_repo_id` | huggingface | `/` 含む文字列を HF repo として処理 |
 | `nonexistent_alias` | error | 不明な名前でエラー |
 | `empty_input` | error | 空文字列でエラー |

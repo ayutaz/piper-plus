@@ -44,6 +44,7 @@ let (tokens, prosody) = phonemizer
 | `spanish` | **on** | Enable Spanish phonemizer |
 | `french` | **on** | Enable French phonemizer |
 | `portuguese` | **on** | Enable Portuguese phonemizer |
+| `swedish` | **on** | Enable Swedish phonemizer |
 | `japanese` | off | Enable Japanese phonemizer (pulls in `jpreprocess`) |
 | `naist-jdic` | off | Bundle the NAIST-JDIC dictionary for Japanese (implies `japanese`) |
 | `all-languages` | off | Enable all language backends including `japanese` |
@@ -99,7 +100,7 @@ let encoder = PiperEncoder::new(phoneme_id_map, UnknownTokenMode::Strict)?;
 let phoneme_ids = encoder.encode(&tokens)?;
 ```
 
-### Direct IPA input (Rust, next release)
+### Direct IPA input (Rust)
 
 If your application already produces IPA, for example for a constructed language
 in a game, skip the language phonemizer entirely:

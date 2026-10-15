@@ -12,7 +12,7 @@ body:
         piper-plus へのモデル投稿ありがとうございます。
         全ての必須項目と品質チェックリストを記入してください。
 
-        See [CONTRIBUTING_MODELS.md](../../CONTRIBUTING_MODELS.md) for the full submission guide.
+        See [CONTRIBUTING_MODELS.md](https://github.com/ayutaz/piper-plus/blob/dev/CONTRIBUTING_MODELS.md) for the full submission guide.
 
   - type: input
     id: model_name
@@ -54,7 +54,7 @@ body:
     id: license
     attributes:
       label: Model license / モデルライセンス
-      description: "License of the model. See [License Policy](../../CONTRIBUTING_MODELS.md#ライセンスポリシー--license-policy)."
+      description: "License of the model. See [License Policy](https://github.com/ayutaz/piper-plus/blob/dev/CONTRIBUTING_MODELS.md#ライセンスポリシー--license-policy)."
       placeholder: "e.g., CC-BY-4.0, MIT, Apache-2.0"
     validations:
       required: true
@@ -91,7 +91,7 @@ body:
     attributes:
       label: Base checkpoint / ベースチェックポイント
       description: Which base model checkpoint was used for fine-tuning.
-      placeholder: "e.g., ayousanz/piper-plus-base epoch=74-step=504712.ckpt"
+      placeholder: "e.g., ayousanz/piper-plus-base, revision 3620ed788667cb76f08bd6cf2db8152c1f4c8bd1, releases/zs-v1/base.ckpt (v7 epoch 32 / step 216326)"
     validations:
       required: true
 
@@ -117,7 +117,7 @@ body:
     attributes:
       label: voices.json entry / voices.json エントリ
       description: |
-        Paste the proposed entry for `piper_plus_voices.json`. See [Entry template](../../CONTRIBUTING_MODELS.md#voicesjson-エントリ--voicesjson-entry).
+        Paste the proposed entry for `piper_plus_voices.json`. See [Entry template](https://github.com/ayutaz/piper-plus/blob/dev/CONTRIBUTING_MODELS.md#voicesjson-エントリ--voicesjson-entry).
       placeholder: |
         {
             "ja_JP-my-model-medium": {

@@ -2,9 +2,52 @@
 # Source: ./build/piper_plus --help
 # Runtime: cpp
 # Version: <VERSION>
-# PLACEHOLDER: C++ build (CMake + ONNX Runtime) was not configured in the
-# PLACEHOLDER: initial PR's dev env. Run cli-help-extract.yml via
-# PLACEHOLDER: workflow_dispatch on a runner with the C++ toolchain primed
-# PLACEHOLDER: (release-shared-lib.yml prerequisites), then commit the
-# PLACEHOLDER: regenerated body in a follow-up PR. Drift-check skips canonical
-# PLACEHOLDER: files that contain a "# PLACEHOLDER:" marker line.
+usage: ./build/piper_plus [options]
+
+options:
+   -h        --help              show this message and exit
+   -m  FILE  --model       FILE  path to onnx model file
+   -c  FILE  --config      FILE  path to model config file (default: model path + .json, fallback: config.json in model dir)
+   -t  TEXT  --text        TEXT  text to synthesize (no stdin required)
+   -f  FILE  --output_file FILE  path to output WAV file ('-' for stdout)
+   -d  DIR   --output_dir  DIR   path to output directory (default: cwd)
+   --output_raw                  output raw audio to stdout as it becomes available
+   -s  NUM   --speaker     NUM   id of speaker (default: 0)
+   --speaker-embedding     FILE  path to speaker embedding file (192 float32 values, raw binary or .npy)
+   -l  CODE  --language    CODE  language code or id (default: auto)
+   --noise_scale           NUM   generator noise (default: 0.4)
+   --length_scale          NUM   phoneme length (default: 1.0)
+   --noise_w               NUM   phoneme width noise (default: 0.5)
+   --sentence_silence      NUM   seconds of silence after each sentence (default: 0.2)
+   --phoneme_silence <phoneme> <seconds>  Set silence for a specific phoneme
+   --custom-dict       FILE       path to custom dictionary file(s), comma-separated
+
+   Voice cloning:
+   --reference-audio          FILE  reference WAV for voice cloning (requires --speaker-encoder-model; not yet implemented in C++ runtime)
+   --speaker-embedding        FILE  pre-computed speaker embedding (raw float32 little-endian; mutually exclusive with --reference-audio)
+   --speaker-encoder-model    FILE  ECAPA-TDNN speaker encoder ONNX (required when using --reference-audio)
+
+   Phoneme input: Use [[ phonemes ]] notation to specify exact pronunciation
+                  Example: echo "Hello [[ h ə l oʊ ]] world" | piper-plus ...
+
+   --json-input                  stdin input is lines of JSON instead of plain text
+   --use-cuda                    use CUDA execution provider
+   --gpu-device-id         NUM   GPU device ID for CUDA (default: 0)
+   --raw-phonemes                interpret input as raw phonemes (space-separated)
+   --ssml                        interpret input as SSML markup (<speak> / <break> / <prosody rate>)
+   --streaming                   use streaming mode for reduced latency
+   --output-timing         FILE  output phoneme timing to FILE
+   --timing-format         FMT   timing output format: json|tsv|srt (default: json)
+   --list-models      [LANG]     list available voice models
+   --download-model   NAME       download a voice model
+   --model-dir        DIR        directory for downloaded models
+
+   --no-warmup                   skip model warmup (faster startup, slower first inference)
+   --debug                       print DEBUG messages to the console
+   -q       --quiet              disable logging
+
+environment variables:
+   PIPER_PLUS_DEFAULT_MODEL      default model path (if --model not specified)
+   PIPER_PLUS_DEFAULT_CONFIG     default config file path
+   PIPER_PLUS_MODEL_DIR          default model directory (if --model-dir not specified)
+   PIPER_PLUS_GPU_DEVICE_ID      GPU device ID for CUDA

@@ -774,6 +774,25 @@ def main() -> None:
         else:
             simplify_onnx_model(args.output)
 
+    # Validate the exported artifact, not just source-code tokens. Use zero
+    # stochastic scales so FP32/FP16 compare the same synthesis trajectory.
+    from .onnx_validation import check_fp16_parity, validate_export  # noqa: PLC0415
+
+    validation_feeds = dict(
+        zip(
+            input_names,
+            [
+                value.detach().cpu().numpy()
+                for value in dummy_input
+                if value is not None
+            ],
+            strict=True,
+        )
+    )
+    validation_feeds["scales"] = scales.detach().cpu().numpy().copy()
+    validation_feeds["scales"][[0, 2]] = 0
+    fp32_outputs = validate_export(args.output, validation_feeds)
+
     # Apply FP16 conversion (default: enabled)
     # Uses a temporary file for atomic replacement to avoid data corruption
     if not args.no_fp16:
@@ -781,6 +800,8 @@ def main() -> None:
         tmp_fp16 = args.output.with_suffix(".onnx.fp16_tmp")
         try:
             convert_fp16(args.output, tmp_fp16)
+            converted_outputs = validate_export(tmp_fp16, validation_feeds)
+            check_fp16_parity(fp32_outputs, converted_outputs)
             tmp_fp16.replace(args.output)
         except Exception:
             tmp_fp16.unlink(missing_ok=True)

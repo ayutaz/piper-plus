@@ -16,7 +16,9 @@
 
 `OpenJTalkDictionary.fromAssets(context)` を呼ぶ前に、辞書がどこにあるか
 を決めます。`PiperPlusG2p.create(context, dictionary = …)` 時に
-`null` を渡せば日本語以外の 7 言語のみで動作します。
+`null` を渡せば日本語以外の 7 言語のみで動作します。`fromAssets` と
+`fromPath` はパスを遅延検証するため、辞書を渡す場合は
+`dictionary.exists()` を確認してから `create` することを推奨します。
 
 | パターン | API | 配布物のサイズ影響 | F-Droid 互換 | UX |
 |--------|-----|----------------|--------------|----|
@@ -55,7 +57,8 @@ val g2p = PiperPlusG2p.create(context, dict)
 ```
 
 `fromAssets` は `filesDir/open_jtalk_dic/` が空の場合だけ展開を行うので、
-2 回目以降の起動はノーオペで済みます。
+2 回目以降の起動はノーオペで済みます。指定した asset path が APK に
+存在しない場合もハンドル自体は返すため、`exists()` の結果を確認してください。
 
 ---
 
@@ -82,13 +85,23 @@ val g2p  = PiperPlusG2p.create(context, dict)
 
 ## 4. パターン C: 実行時 DL (Hugging Face Hub)
 
-`DictionaryDownloader.downloadFromHuggingFace()` は以下を行います:
+`DictionaryDownloader.downloadFromHuggingFace()` は、デフォルトでは
+`https://huggingface.co/ayousanz/piper-plus-base/resolve/main/` を使い、
+許可済みの `https://huggingface.co` または `https://hf-mirror.com` 以外の
+host を拒否します。これは `suspend` 関数なので coroutine から呼び出します。
+処理は以下のとおりです:
 
 1. `https://huggingface.co/<repo>/resolve/main/open_jtalk_dic.tar.sha256` から SHA-256 sidecar 取得
 2. `https://huggingface.co/<repo>/resolve/main/open_jtalk_dic.tar` を `cacheDir` にダウンロード
 3. SHA-256 を検証 (NFR-SEC-2)
-4. tar を `filesDir/open_jtalk_dic/` へ展開
+4. tar を staging directory に展開し、成功後に `filesDir/open_jtalk_dic/` へ rename
 5. [OpenJTalkDictionary] を返す
+
+アーカイブは `char.bin`、`sys.dic`、`unk.dic` などの辞書ファイルを
+アーカイブ直下に置く形式が、現在の downloader の戻り値パスと一致します。
+tar 内にもう一段 `open_jtalk_dic/` ディレクトリを含めると、返却される
+`filesDir/open_jtalk_dic/` の下に二重ディレクトリができるため使用できません。
+公開アーカイブを利用する前に、`tar -tf open_jtalk_dic.tar` でこの構造を確認してください。
 
 ```kotlin
 lifecycleScope.launch {
@@ -127,11 +140,15 @@ HF Hub repo に配置するファイル名:
 
 | ファイル | 内容 |
 |---------|-----|
-| `open_jtalk_dic.tar` | naist-jdic を tar アーカイブ化したもの (~102MB) |
+| `open_jtalk_dic.tar` | naist-jdic の辞書ファイルをアーカイブ直下に置いた tar (~102MB) |
 | `open_jtalk_dic.tar.sha256` | 1 行の sha256sum 出力形式 (`<sha>  open_jtalk_dic.tar`) |
 
 リリース時は [`tools/build-openjtalk-dict-archive.sh`](../../../tools/build-openjtalk-dict-archive.sh)
-で両ファイルを生成し、HF Hub の repo にアップロードします。
+で両ファイルを生成し、HF Hub の repo にアップロードします。ただし現行スクリプトは
+入力ディレクトリ名を tar の先頭ディレクトリとして保存するため、出力を downloader
+へ直接渡す前に `tar -tf` で上記の直下配置を確認してください。先頭ディレクトリを
+含む出力は、flat archive に再梱包するか downloader 側の展開先を調整するまで
+runtime download 用の成果物として扱わないでください。
 
 ```bash
 # OpenJTalk 辞書 (naist-jdic) を解凍済みディレクトリから tar + sha256 を作る例

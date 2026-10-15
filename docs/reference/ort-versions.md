@@ -44,8 +44,8 @@ exact-match group.
 | Runtime  | ORT Version  | Floor (Issue #372) | Package / Source |
 |----------|-------------|--------------------|------------------|
 | Python (training) | `>=1.26.0` (gpu extra: `onnxruntime-gpu>=1.20.1,<1.26`) | `>=1.20.0` ✓ | `src/python/pyproject.toml` extras (train / inference / inference-gpu) |
-| Python (runtime) | `>=1.26.0` (gpu: `onnxruntime-gpu>=1.20.1,<1.26`) | `>=1.20.0` ✓ | `src/python_run/requirements.txt` + `requirements_gpu.txt` |
-| Rust     | 2.0.0-rc.13 (`ort` crate, wraps ORT 1.28.0) | exempt (no stable upstream) | `ort` (crates.io) |
+| Python (runtime) | `>=1.26.0` (gpu: `onnxruntime-gpu>=1.20.1,<1.26`) | `>=1.20.0` ✓ | `src/python_run/pyproject.toml` (CPU extra) + `requirements_gpu.txt` |
+| Rust     | 2.0.0-rc.13 (`ort` crate, wraps ORT 1.28.0) | exempt (no stable upstream) | `ort` (crates.io; resolved by `src/rust/Cargo.lock`, manifest range starts at rc.12) |
 | C#       | 1.24.3      | `>=1.20.0` ✓ | `Microsoft.ML.OnnxRuntime{,.Managed}` (NuGet) — 5 csproj files |
 | Go       | 1.27.0      | `>=1.20.0` ✓ | `github.com/yalue/onnxruntime_go` |
 | C++ (canonical) | **1.20.0** | — | `cmake/OnnxRuntime.cmake` (source of truth) |
@@ -96,8 +96,9 @@ When bumping the C++ canonical ORT version (e.g. 1.20.0 → 1.22.0):
 
 ## Rust `ort` exemption (Issue #372 follow-up)
 
-The Rust ecosystem currently relies on the `ort` crate at
-`2.0.0-rc.13` (RC). Reasons it is exempt from the floor check:
+The Rust ecosystem currently resolves the `ort` crate at
+`2.0.0-rc.13` (RC); `piper-core/Cargo.toml` declares the compatible minimum
+as `2.0.0-rc.12`. Reasons it is exempt from the floor check:
 
 * `ort`'s 2.x line redesigns the API and has not shipped a stable
   release as of 2026-08. The pre-release (`2.0.0-rc.13`) wraps ORT

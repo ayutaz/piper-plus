@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Consumer paths: use uv's selected interpreter in README examples, separate CPU/GPU ORT distributions and the locked WebUI environment, connect Rust phoneme silence and Rust/Go SSML synthesis, and emit C#/Go timing artifacts for stdin/batch utterances. Document the development package's explicit `[cpu]`/`[gpu]` selection in the [provider environment migration guide](docs/migration/provider-environments.md); published v2.0.1 metadata is unchanged.
+- Model tooling: verify and update nested artifact hashes/sizes, reject incomplete published manifest entries, and run actual ONNX artifact validation from both exporters. Add mandatory CLI artifact and clean Python environment consumer checks.
 - ARM64 consumer checks: detect Docker CLI support for platform-specific image inspection so the same harness runs on Docker Desktop and older GitHub-hosted Docker clients.
 - C++ Linux ARM64: build the release archive against Debian Bullseye (glibc 2.31), preserving other platforms' build environments. Reject newer GLIBC/GLIBCXX/CXXABI requirements before artifact upload and check actual archive startup and Japanese synthesis on emulated Debian Bullseye, Bookworm, and Trixie.
 - Colab: normalize the v2.0.0 preprocessor's null single-language IDs before alignment, use a non-interactive Matplotlib backend for training subprocesses, and find checkpoints in the explicit training output directory as well as legacy Lightning paths.
