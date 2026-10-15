@@ -101,6 +101,7 @@ Linux ARM64 の glibc 2.31 互換修正は `dev` に入り、Debian Bullseye／B
 
 ## Design Documents
 
+- [文書・consumer 経路の第三次監査](design/documentation-consumer-audit-2026-10-15.md) — 2026-10-15 時点の導入・実行・配布・CI の対応漏れ、根拠と修正順序
 - [Zero-Shot base zs-v1 公開記録](design/zero-shot-base-zs-v1-release-2026-10-10.md) — 公開 revision、成果物、検証範囲
 - [つくよみちゃん zs-v1 公開記録](design/tsukuyomi-publication-ready-2026-10-12.md) — 公開済み FT bundle と consumer 検証
 - [Zero-Shot Public Model Release Plan](design/zero-shot-public-model-release-plan-2026-10-10.md) — 完了済み公開工程と将来の品質改善計画を分離した記録
