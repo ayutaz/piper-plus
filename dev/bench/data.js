@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791622531104,
+  "lastUpdate": 1792081280128,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1128,6 +1128,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 211.2,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ba47addee037a8ef2a21bdd7b227fe3caee32d04",
+          "message": "fix: consumer監査の導入・CLI・モデル検証漏れを修正し文書とCIを同期 (#800)\n\n* docs: 全ドキュメントを現行実装と公開成果物に同期\n\n- 公開版とdev、現行zs-v1と旧モデル、各ランタイムの対応範囲を明確化\n- 導入・学習・連携・API・仕様・CLI helpを検証し、重複や完了済みの不要文書4件を削除\n- コード例snapshotとhelp検査を更新し、Markdown・参照・関連テストを確認\n\n* docs: 二次監査で導入手順・API例・モデル仕様の更新漏れを修正\n\n- 8言語README、学習UIの対応範囲、モデル取得と各CLIの実引数を現行実装に同期\n- ONNX入力のdtype/shapeと条件付き入力、公開モデルmanifest、配布互換性の誤記を訂正\n- サンプルconsumerの依存版を同期し、公開つくよみモデルを既存manifest検査に追加\n- 文書・参照・仕様gateと関連pytestを確認し、既存の本体課題と未検証範囲を区別\n\n* docs: 導入・実行・配布・CIの第三次監査結果を記録\n\n* fix: consumer監査の導入・CLI・モデル検査漏れを修正\n\n* fix: CIで判明したbindingとprovider指定の漏れを修正",
+          "timestamp": "2026-10-16T01:15:59+09:00",
+          "tree_id": "ce538fdb99e48739d778adbe8f311e408df5140a",
+          "url": "https://github.com/ayutaz/piper-plus/commit/ba47addee037a8ef2a21bdd7b227fe3caee32d04"
+        },
+        "date": 1792081277828,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.102,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 26,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 26.6,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1133.1,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 210.8,
             "unit": "MB"
           },
           {
