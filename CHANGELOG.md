@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Rust: update the locked `rustls` dependency from 0.23.45 to 0.23.46 to address RUSTSEC-2026-0346, RUSTSEC-2026-0347, RUSTSEC-2026-0348, and RUSTSEC-2026-0349 without adding audit exceptions.
 - Publication verification: allow Hugging Face to append LFS rules only for declared release files with LFS metadata, while rejecting changed existing attributes, unrelated additions, and any legacy payload drift.
 - Link-check CI: retry failed full scans twice with one concurrent request and no cached results to recover from intermittent external 5xx responses; persistent failures still block the job.
 - Rust: update the locked `quinn-proto` dependency to 0.11.18 to address five RustSec advisories in 0.11.15, retaining the existing audit policy.
