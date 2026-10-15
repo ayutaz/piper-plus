@@ -1,5 +1,15 @@
 # ========== BASE STAGE ==========
-FROM debian:trixie AS base
+ARG TARGETARCH
+# Keep existing platforms on trixie. Build ARM64 against Bullseye's glibc
+# 2.31, including the statically linked libstdc++/libgcc and OpenJTalk.
+FROM debian:trixie AS base-default
+FROM base-default AS base-amd64
+FROM base-default AS base-arm
+FROM debian:bullseye AS base-arm64
+# Bullseye security payloads have moved to the Debian archive. Keep apt's
+# signature verification enabled while resolving the original suite packages.
+RUN sed -i 's|deb.debian.org/debian-security|archive.debian.org/debian-security|g' /etc/apt/sources.list
+FROM base-${TARGETARCH} AS base
 ARG TARGETARCH
 ARG TARGETVARIANT
 

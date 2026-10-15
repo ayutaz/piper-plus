@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- C++ Linux ARM64: build the release archive against Debian Bullseye (glibc 2.31), preserving other platforms' build environments. Reject newer GLIBC/GLIBCXX/CXXABI requirements before artifact upload and check actual archive startup and Japanese synthesis on emulated Debian Bullseye, Bookworm, and Trixie.
 - Colab: normalize the v2.0.0 preprocessor's null single-language IDs before alignment, use a non-interactive Matplotlib backend for training subprocesses, and find checkpoints in the explicit training output directory as well as legacy Lightning paths.
 - Rust: update the locked `rustls` dependency from 0.23.45 to 0.23.46 to address RUSTSEC-2026-0346, RUSTSEC-2026-0347, RUSTSEC-2026-0348, and RUSTSEC-2026-0349 without adding audit exceptions.
 - Publication verification: allow Hugging Face to append LFS rules only for declared release files with LFS metadata, while rejecting changed existing attributes, unrelated additions, and any legacy payload drift.
