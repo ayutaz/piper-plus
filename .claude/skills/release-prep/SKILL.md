@@ -59,7 +59,7 @@ grep -A1 "^\[workspace.package\]" src/rust/Cargo.toml | grep "^version" | head -
 |---------|------------------|-----------------|--------|
 | Python  | `<local>`        | `<expected_prefix>` | ✓      |
 | Rust    | `<local>`        | `<expected_prefix>` | ✓      |
-| C# Core | 0.3.0            | 0.3.            | ✓      |
+| C# Core | `<local>`        | `<expected_prefix>` | ✓ / 要確認 |
 | ...     | ...              | ...             | ...    |
 ```
 
@@ -126,7 +126,7 @@ curl -s "https://search.maven.org/solrsearch/select?q=g:io.github.ayutaz+AND+a:p
 |---------|-------|-----------|-------------------|---------|
 | Python  | `<local>` | `<published>` | `<expected_prefix>` | Local ahead → publish required |
 | Rust    | `<local>` | `<published>` | `<expected_prefix>` | In sync |
-| C# Core | 0.3.0 | 0.3.0     | 0.3.              | In sync |
+| C# Core | `<local>` | `<published>` | `<expected_prefix>` | 判定 |
 | ...     | ...   | ...       | ...               | ...     |
 ```
 

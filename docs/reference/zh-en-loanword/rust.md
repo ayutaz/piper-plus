@@ -129,6 +129,8 @@ fn test_zh_en_matrix() {
 
 ## 7. ベンチマーク
 
+以下は設計時に想定した Criterion の追加先であり、現行 checkout にはまだ存在しない。
+
 | フレーム | ファイル |
 |--------|--------|
 | `criterion` | `src/rust/piper-plus-g2p/benches/bench_chinese_embedded.rs` |

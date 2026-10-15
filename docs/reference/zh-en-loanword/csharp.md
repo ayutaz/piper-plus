@@ -10,7 +10,7 @@
 | Embedded English | `src/csharp/PiperPlus.Core/Phonemize/ChineseEmbeddedEnglish.cs` |
 | Engine interface | `IChineseG2PEngine` |
 | Engine 実装 (Cli 側) | `DotNetChineseG2PEngine` (NuGet `DotNetG2P.Chinese 1.8.0` をラップ) |
-| Multilingual | `src/csharp/PiperPlus.Core/MultilingualPhonemizer.cs` (`UnicodeLanguageDetector.SegmentText()` あり) |
+| Multilingual | `src/csharp/PiperPlus.Core/Phonemize/MultilingualPhonemizer.cs` (`UnicodeLanguageDetector.SegmentText()` あり) |
 | 辞書データ | `src/csharp/PiperPlus.Core/Phonemize/Data/zh_en_loanword.json` |
 | テスト | `ChinesePhonemizerTests.cs` (401 行、StubEngine 利用) + `ChinesePhonemizerPuaTests.cs` |
 
@@ -116,6 +116,8 @@ throw new FormatException(
 C# `System.Text.Json` のデフォルト nest 制限は 64。`JsonSerializerOptions.MaxDepth` を明示設定して安全性向上。
 
 ## 7. ベンチマーク
+
+以下は設計時に想定した BenchmarkDotNet の追加先であり、現行 checkout にはまだ存在しない。
 
 | フレーム | ファイル |
 |--------|--------|

@@ -18,7 +18,7 @@ piper-plus の新言語実装を徹底的にレビューするスキルです。
 
 #### Agent 1: Python G2P 品質
 
-- `src/python/piper_train/phonemize/$ARGUMENTS.py` を読み、全G2Pルールの正確性を検証
+- `src/python/g2p/piper_plus_g2p/$ARGUMENTS.py` を読み、全G2Pルールの正確性を検証
 - 代表的な10単語のスポットチェック (言語固有の音韻規則に基づく)
 - 例外語リストの完全性確認
 - IPA シンボルの正確性 (ɡ≠g, ɧ≠ɕ 等)
@@ -28,8 +28,8 @@ piper-plus の新言語実装を徹底的にレビューするスキルです。
 - `src/python/piper_train/preprocess.py` — `--language $ARGUMENTS` が動作するか
 - `src/python/piper_train/infer_onnx.py` — ヘルプテキスト、`_detect_dominant_language`
 - `src/python/piper_train/tools/prepare_multilingual_dataset.py` — LANGUAGE_ID_MAP
-- `src/python/piper_train/phonemize/registry.py` — 登録確認
-- `src/python/piper_train/phonemize/multilingual_id_map.py` — LANGUAGE_PHONEMES
+- `src/python/g2p/piper_plus_g2p/registry.py` — 登録確認
+- `src/python/g2p/piper_plus_g2p/encode/id_maps.py` — shared phoneme ID map
 - config.json 生成パス (phoneme_id_map, language_id_map, num_languages)
 
 #### Agent 3: PUA 整合性 (実装済み全ターゲット + Kotlin/Swift mirror)
@@ -46,7 +46,7 @@ piper-plus の新言語実装を徹底的にレビューするスキルです。
 - `src/rust/piper-core/src/phonemize/$ARGUMENTS.rs` — 全ルール実装
 - `src/rust/piper-core/src/phonemize/mod.rs` — module export
 - `src/rust/piper-core/src/voice.rs` — ケース処理 + default_latin
-- `src/rust/piper-core/src/phonemize/multilingual.rs` — 言語検出
+- `src/rust/piper-plus-g2p/src/multilingual.rs` — 言語検出 (core は re-export)
 - `src/rust/piper-cli/src/main.rs` — SUPPORTED_LANGUAGES
 - TODO/FIXME/unimplemented! の有無
 
@@ -70,7 +70,7 @@ piper-plus の新言語実装を徹底的にレビューするスキルです。
 
 #### Agent 7: JS/WASM 実装確認
 
-- `simple_unified_api.js` — 言語検出ロジック
+- `src/wasm/openjtalk-web/src/index.js` — 言語検出ロジック
   - **セグメントレベルスコアリング** を使用しているか (早期リターンではないか)
   - Python と同じ elif パターンか
   - Latin 文字範囲に × (U+00D7) と ÷ (U+00F7) が含まれていないか
@@ -143,7 +143,7 @@ piper-plus の新言語実装を徹底的にレビューするスキルです。
 
 全修正完了後:
 
-1. `uv run python -m pytest src/python/tests/test_$ARGUMENTS_*.py -x -q` — Python テスト
+1. `cd src/python/g2p && uv run pytest tests/ -x -q` — Python G2P テスト
 2. `cargo test -p piper-plus` — Rust テスト
 3. `dotnet test src/csharp/PiperPlus.sln` — C# テスト
 4. `node --test src/wasm/openjtalk-web/test/js/test-$ARGUMENTS.js` — JS テスト

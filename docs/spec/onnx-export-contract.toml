@@ -149,15 +149,16 @@ minimum = 15
 # silently (binding lookup yields None / null) and must be coordinated.
 
 [tensor_names.inputs]
-# All inputs are present on the main TTS model (sid/lang are conditional).
+# input, input_lengths, and scales are the core inputs. sid, lid,
+# speaker_embedding, and prosody_features are graph-conditional.
 # The names below are the canonical strings; loaders MUST not transform
 # (e.g. lowercase, snake-case) before binding.
 input          = "phoneme IDs (int64, shape=[1, T])"
 input_lengths  = "per-batch phoneme length (int64, shape=[1])"
 scales         = "[noise_scale, length_scale, noise_w] (float32, shape=[3])"
-sid            = "speaker ID (int64, shape=[1]) — multi-speaker models only"
-lang           = "language ID (int64, shape=[1]) — multilingual models only"
-prosody_features = "prosody A1/A2/A3 features (float32, shape=[1, T, prosody_dim]) — when present"
+sid            = "speaker ID (int64, shape=[1]) — when declared for multi-speaker models"
+lid            = "language ID (int64, shape=[1]) — when declared for multilingual models"
+prosody_features = "prosody A1/A2/A3 features (int64, shape=[1, T, 3]) — when present"
 speaker_embedding = "Speaker embedding (float32, shape=[1, emb_dim]); emb_dim=256 for legacy ECAPA-TDNN exports and emb_dim=192 for public v2 CAM++ Zero-Shot exports"
 
 [tensor_names.outputs]

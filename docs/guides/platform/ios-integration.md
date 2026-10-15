@@ -25,7 +25,8 @@ Cross-runtime guide for integrating piper-plus into iOS projects (Dart / Flutter
 
 The current public release v2.0.1 ships the xcframework path described below.
 For historical context, piper-plus v1.13.0 shipped **two iOS artifacts** during
-the migration period:
+the migration period. The v2.0.1 release still publishes the arm64 tarball as a
+deprecated compatibility artifact; new consumers should use the xcframework:
 
 | Your situation | Recommended | Why |
 |----------------|------------|-----|
@@ -33,10 +34,12 @@ the migration period:
 | Godot GDExtension for iOS | **xcframework.zip** | `ios.dependencies` in `.gdextension` expects xcframework |
 | Swift project (SPM-aware) | **xcframework.zip + Package.swift** | M4 ships `Package.swift` at the repo root for `import PiperPlus` |
 | **Swift / G2P-only (no synthesis)** | [**`PiperPlusG2P` SPM product**](swift-g2p-integration.md) | Issue #387: no ORT dependency, ~6 MB xcframework, 8 languages |
-| Existing CMake project (v1.12.0 or earlier) | tar.gz (deprecated) | `libpiper_plus-ios-arm64-${VERSION}.tar.gz`; **removed in v1.14.0** |
+| Existing CMake project (v1.12.0 or earlier) | tar.gz (deprecated compatibility artifact) | `libpiper_plus-ios-arm64-${VERSION}.tar.gz`; published in v2.0.1 for migration compatibility |
 | You want simulator support | **xcframework.zip only** | tar.gz is device-only |
 
-> **Don't know which?** → **xcframework.zip**. The `tar.gz` is kept for v1.13.0 only as a transitional path.
+> **Don't know which?** → **xcframework.zip**. The tar.gz remains a deprecated,
+> device-only compatibility path in the published release assets; no new
+> integration should depend on it.
 
 ## Step 1: Get piper-plus xcframework
 
@@ -331,7 +334,9 @@ If you were using `libpiper_plus-ios-arm64-${VERSION}.tar.gz` (v1.12.0 or earlie
 3. **Update Xcode build settings** — remove explicit linker paths to `libpiper_plus.a`; the xcframework handles slice selection automatically
 4. **For Swift consumers** — switch from C header bridging to `import PiperPlus` via `module.modulemap`
 
-> **The tar.gz is kept in v1.13.0 for the migration period and will be removed in v1.14.0.** Plan migration during the v1.13.0 cycle.
+> The tar.gz remains a deprecated compatibility artifact in v2.0.1. Plan migration
+> to the xcframework for new maintenance; this guide does not assert a future
+> removal release while the release workflow continues to publish the artifact.
 
 ## Further Reading
 

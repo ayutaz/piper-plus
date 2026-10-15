@@ -15,6 +15,18 @@ go get github.com/ayutaz/piper-plus/src/go/phonemize
 ```go
 import "github.com/ayutaz/piper-plus/src/go/phonemize"
 
+// Standalone phonemizers receive their auxiliary dictionaries from the caller.
+// The maps below are deliberately small so this example is self-contained;
+// applications should load full dictionaries from their own asset bundle.
+cmuDict := map[string][]string{
+    "hello": {"HH", "AH0", "L", "OW1"},
+    "world": {"W", "ER1", "L", "D"},
+}
+singleCharPinyin := map[rune]string{
+    '你': "ni3",
+    '好': "hao3",
+}
+
 // Single language
 p := phonemize.NewEnglishPhonemizer(cmuDict)
 result, err := p.PhonemizeWithProsody("Hello, world!")
@@ -22,7 +34,7 @@ result, err := p.PhonemizeWithProsody("Hello, world!")
 // Multilingual (auto-detects language from Unicode)
 phonemizers := map[string]phonemize.Phonemizer{
     "en": phonemize.NewEnglishPhonemizer(cmuDict),
-    "zh": phonemize.NewChinesePhonemizer(),
+    "zh": phonemize.NewChinesePhonemizer(singleCharPinyin, nil),
     "es": phonemize.NewSpanishPhonemizer(),
     "fr": phonemize.NewFrenchPhonemizer(),
     "pt": phonemize.NewPortuguesePhonemizer(),

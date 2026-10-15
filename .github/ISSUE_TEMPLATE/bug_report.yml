@@ -14,13 +14,15 @@ body:
       label: Platform
       description: Which implementation are you using?
       options:
-        - Python (piper_train / piper-plus-g2p)
+        - Python (piper-plus / piper_train / piper-plus-g2p)
         - Rust (piper-plus CLI / piper-plus-g2p)
         - "C# (PiperPlus.Cli / PiperPlus.Core)"
         - Go (piperplus / phonemize)
         - npm (piper-plus / @piper-plus/g2p)
         - C++ (libpiper / libpiper_plus)
         - C API (shared library)
+        - Swift (PiperPlus / PiperPlusG2P)
+        - Kotlin/Android (piper-plus-g2p-android, G2P only)
         - Docker
         - Other
     validations:
@@ -31,7 +33,7 @@ body:
     attributes:
       label: Version
       description: Package version or commit hash
-      placeholder: e.g. 0.2.0, v1.8.0, abc1234
+      placeholder: e.g. Python 2.0.1, Rust 0.5.2, or a commit hash
     validations:
       required: false
 

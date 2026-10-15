@@ -172,6 +172,8 @@ JS/WASM `Error` with `code='SCHEMA_ERROR'`、Rust 側 `JsValue::from_str("SCHEMA
 
 ## 7. ベンチマーク
 
+以下は設計時に想定した `mitata` ベンチマークの追加先であり、現行 checkout にはまだ存在しない。
+
 | フレーム | ファイル |
 |--------|--------|
 | `mitata` | `src/wasm/g2p/bench/bench-zh-en.js` |

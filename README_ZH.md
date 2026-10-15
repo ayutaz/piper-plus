@@ -64,7 +64,7 @@
 
 ### 接口
 
-- **[WebUI (Gradio)](docs/features/webui.md)** — 推理和训练，支持 Docker
+- **[WebUI (Gradio)](docs/features/webui.md)** — 支持推理和 Docker。local Training Tab 仍会发送过时的 CLI 参数；训练请使用[训练指南](docs/guides/training/training-guide.md)。
 - **C++ CLI** — 流式处理、CUDA 推理、**Phoneme Timing 输出 (JSON/TSV/SRT)**、自定义词典
 - **[C API 共享库](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`，FFI 兼容 (Flutter/Godot/Swift 等)，流式 API
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — 完全在浏览器中运行，**Phoneme Timing 输出 (JSON/TSV/SRT)**，无需服务器
@@ -74,12 +74,12 @@
 - **Rust CLI** — piper-plus/piper-plus-cli，流式处理，CUDA/CoreML/DirectML 支持，**Phoneme Timing 输出 (JSON/TSV/SRT)**，词典自动下载
 - **[Go CLI](src/go/README.md)** — HTTP API服务器、会话池、Docker、单一二进制文件、**Phoneme Timing 输出 (JSON/TSV/SRT)**
 - **Voice Cloning (Speaker Encoder + speaker_embedding)** — 6 个运行时 (Python/Rust/C#/Go/WASM/C++) 均支持模型兼容的预计算 `speaker_embedding` 输入（属于运行时能力支持）。C++ CLI/C API 仅接受预计算 embedding；C++ 尚未实现通过 `--reference-audio` 提取 embedding。公开 `zs-v1` 的实际推理仅使用 Python `piper-plus==2.0.0` 完成功能验证。公开 CI run `38189966578` 报告使用 Python 共享 phoneme IDs 的 6 个运行时推理；native G2P 与听感质量不在范围内，尚无质量批准。
-- **SSML 支持** — `<speak>`、`<break>`、`<prosody rate="...">` 在 4 个运行时 (Python/Rust/C#/Go) 中支持
-- **短文本质量改进 (Strategy A/B/C)** — Silence Padding、Dynamic Scales、SSML `<break>` 自动注入在全部 6 个运行时中支持
+- **SSML 支持** — 解析器契约已在 Python/Rust/Go/C#/WASM/C++ 中实现；合成入口为 Python/Rust/Go/WASM/C++。C# Core 包含解析器，但 C# CLI 的 `--text` 路径尚未接入。C++ 通过 CLI `--ssml` 提供（C API 未导出）。
+- **短文本质量改进 (Strategy A/B/C)** — Strategy A/B 已在各运行时行中实现。Strategy C（自动注入 SSML `<break>`）仅适用于推理 Python/Rust/Go/C#；训练 Python、WASM、C++ 不在范围内。详见[短文本契约](docs/spec/short-text-contract.toml)。
 
 ### 各运行时功能支持
 
-6 个运行时 (Python/Rust/C#/Go/JS-WASM/C++) 提供当前训练模型的 6 语言合成，同时提供 8 语言 G2P/音素化。Phoneme Timing、流式处理（含按句分割）、使用模型兼容预计算 embedding 输入的 Voice Cloning、自定义词典属于运行时能力支持。C++ 仅接受预计算 embedding，尚未实现 `--reference-audio`。公开 `zs-v1` 的实际推理已在 Python `piper-plus==2.0.0` 中验证；CI run `38189966578` 另行报告使用 Python 共享 phoneme IDs 的 6 个运行时推理。native G2P 与听感质量不在范围内，尚无质量批准。SSML 在 4 个运行时 (Python/Rust/C#/Go) 中支持，HTTP API 在 2 个运行时 (Python/Go) 中支持。
+6 个运行时 (Python/Rust/C#/Go/JS-WASM/C++) 提供当前训练模型的 6 语言合成，同时提供 8 语言 G2P/音素化。Phoneme Timing、流式处理（含按句分割）、使用模型兼容预计算 embedding 输入的 Voice Cloning、自定义词典属于运行时能力支持。C++ 仅接受预计算 embedding，尚未实现 `--reference-audio`。公开 `zs-v1` 的实际推理已在 Python `piper-plus==2.0.0` 中验证；CI run `38189966578` 另行报告使用 Python 共享 phoneme IDs 的 6 个运行时推理。native G2P 与听感质量不在范围内，尚无质量批准。SSML 合成在 Python/Rust/Go/WASM/C++ 中支持；C# Core 解析器尚未接入 CLI 的 `--text` 路径。HTTP API 在 2 个运行时 (Python/Go) 中支持。
 
 ### 平台
 
@@ -161,7 +161,8 @@ cd piper-plus
 
 ```bash
 # 安装
-uv pip install ".[inference]"
+# 从 source checkout 的仓库根目录执行
+uv sync --extra inference
 
 # 日语推理
 uv run python -m piper_train.infer_onnx \
@@ -265,16 +266,16 @@ docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
 
 ```bash
 # CPU 推理
-uv pip install ".[inference]"
+uv sync --extra inference
 
 # GPU 推理（需要 CUDA 环境）
-uv pip install ".[inference-gpu]"
+uv sync --extra inference-gpu
 
 # 训练
-uv pip install ".[train]"
+uv sync --extra train
 
 # 开发（包含测试和 lint 工具）
-uv pip install ".[dev]"
+uv sync --extra dev
 ```
 
 也可从 PyPI 安装：
@@ -584,7 +585,7 @@ scripts\speak.bat --model models\tsukuyomi.onnx "テスト"
 ### 基本训练
 
 ```bash
-uv pip install ".[train]"
+uv sync --extra train
 
 uv run python -m piper_train \
   --dataset-dir /path/to/dataset \
@@ -663,6 +664,8 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 ### 模型下载
 
 **Tsukuyomi-chan 模型：**
+
+> **Tsukuyomi FT (`zs-v1`，2026-10-15)：** [固定公开版本](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/tree/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1) 来自同一公开 base 世代的微调。请将 `releases/zs-v1/tsukuyomi.onnx` 与 `tsukuyomi.onnx.json` 配套使用；该固定音色不需要参考音频或 CAM++。人工审查已记录，并批准作为实验版本发布；`quality_approval=false`。下面的 `resolve/main` 下载仅作为兼容 legacy root 工件的示例保留。
 
 **Windows (PowerShell):**
 

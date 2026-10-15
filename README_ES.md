@@ -66,7 +66,7 @@ Sistema de texto a voz (TTS) neuronal, rápido y de alta calidad. Basado en la a
 
 ### Interfaces
 
-- **[WebUI (Gradio)](docs/features/webui.md)** — Inferencia y entrenamiento, compatible con Docker
+- **[WebUI (Gradio)](docs/features/webui.md)** — Soporte de inferencia y Docker. La pestaña de entrenamiento local aún envía argumentos CLI obsoletos; use la [guía de entrenamiento](docs/guides/training/training-guide.md) para entrenar.
 - **CLI C++** — Streaming, inferencia CUDA, **salida de Phoneme Timing (JSON/TSV/SRT)**, diccionario personalizado
 - **[C API Biblioteca compartida](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, compatible con FFI (Flutter/Godot/Swift etc.), API de streaming
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Funciona completamente en el navegador, **salida de Phoneme Timing (JSON/TSV/SRT)**, sin servidor
@@ -76,12 +76,12 @@ Sistema de texto a voz (TTS) neuronal, rápido y de alta calidad. Basado en la a
 - **CLI Rust** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML, **salida de Phoneme Timing (JSON/TSV/SRT)**, descarga automática de diccionarios
 - **[CLI Go](src/go/README.md)** — Servidor HTTP API, pooling de sesiones, compatible con Docker, binario único, **salida de Phoneme Timing (JSON/TSV/SRT)**
 - **Voice Cloning (Speaker Encoder + speaker_embedding)** — disponible como capacidad de runtime en los 6 runtimes (Python/Rust/C#/Go/WASM/C++) para entradas `speaker_embedding` precomputadas y compatibles con el modelo. La CLI y la API C++ solo aceptan embeddings precomputados; la extracción mediante `--reference-audio` no está implementada en C++. La inferencia pública de `zs-v1` solo se verificó funcionalmente con Python `piper-plus==2.0.0`. El CI público `38189966578` informa inferencia en seis runtimes usando IDs de fonemas compartidos de Python; G2P nativo y calidad de escucha quedaron fuera del alcance, y no hay aprobación de calidad.
-- **Soporte SSML** — `<speak>`, `<break>`, `<prosody rate="...">` disponibles en 4 runtimes (Python/Rust/C#/Go)
-- **Mejora de calidad para textos cortos (Estrategia A/B/C)** — Silence Padding, Dynamic Scales y SSML `<break>` automático en los 6 runtimes
+- **Soporte SSML** — El contrato del parser está implementado en Python/Rust/Go/C#/WASM/C++; las entradas de síntesis son Python/Rust/Go/WASM/C++. C# Core incluye el parser, pero la ruta `--text` de la CLI C# aún no está conectada. C++ se expone mediante la CLI `--ssml` (no en la API C).
+- **Mejora de calidad para textos cortos (Estrategias A/B/C)** — Las estrategias A/B están implementadas en las filas de runtime. La Estrategia C (inyección automática de SSML `<break>`) se limita a Python de inferencia/Rust/Go/C#; Python de entrenamiento, WASM y C++ están fuera del alcance. Consulte el [contrato de textos cortos](docs/spec/short-text-contract.toml).
 
 ### Soporte de funcionalidades por runtime
 
-Síntesis con modelos entrenados actuales en 6 idiomas a través de 6 runtimes (Python/Rust/C#/Go/JS-WASM/C++), con G2P/fonemización en 8 idiomas. Phoneme Timing, streaming (incluyendo división por oraciones), Voice Cloning mediante entradas `speaker_embedding` precomputadas y compatibles con el modelo, y diccionarios personalizados se ofrecen como capacidades de runtime. C++ solo acepta embeddings precomputados y `--reference-audio` no está implementado. La inferencia pública de `zs-v1` se verificó con Python `piper-plus==2.0.0`; el CI `38189966578` informa por separado inferencia en seis runtimes con IDs de fonemas Python compartidos. G2P nativo y calidad de escucha quedaron fuera del alcance, sin aprobación de calidad. SSML es compatible con 4 runtimes (Python/Rust/C#/Go) y la API HTTP con 2 runtimes (Python/Go).
+Síntesis con modelos entrenados actuales en 6 idiomas a través de 6 runtimes (Python/Rust/C#/Go/JS-WASM/C++), con G2P/fonemización en 8 idiomas. Phoneme Timing, streaming (incluyendo división por oraciones), Voice Cloning mediante entradas `speaker_embedding` precomputadas y compatibles con el modelo, y diccionarios personalizados se ofrecen como capacidades de runtime. C++ solo acepta embeddings precomputados y `--reference-audio` no está implementado. La inferencia pública de `zs-v1` se verificó con Python `piper-plus==2.0.0`; el CI `38189966578` informa por separado inferencia en seis runtimes con IDs de fonemas Python compartidos. G2P nativo y calidad de escucha quedaron fuera del alcance, sin aprobación de calidad. La síntesis SSML es compatible con Python/Rust/Go/WASM/C++; el parser de C# Core no está conectado a la ruta `--text` de la CLI. La API HTTP es compatible con 2 runtimes (Python/Go).
 
 ### Plataformas
 
@@ -163,7 +163,8 @@ cd piper-plus
 
 ```bash
 # Instalacion
-uv pip install ".[inference]"
+# Ejecutar desde la raíz de un source checkout
+uv sync --extra inference
 
 # Inferencia en japones
 uv run python -m piper_train.infer_onnx \
@@ -258,16 +259,16 @@ Se recomienda Python 3.13+ (3.11+ soportado). Se recomienda [uv](https://docs.as
 
 ```bash
 # Inferencia CPU
-uv pip install ".[inference]"
+uv sync --extra inference
 
 # Inferencia GPU (requiere entorno CUDA)
-uv pip install ".[inference-gpu]"
+uv sync --extra inference-gpu
 
 # Entrenamiento
-uv pip install ".[train]"
+uv sync --extra train
 
 # Desarrollo (incluye tests y linters)
-uv pip install ".[dev]"
+uv sync --extra dev
 ```
 
 También disponible en PyPI:
@@ -577,7 +578,7 @@ Para más detalles, consulta la [guía de entrenamiento](docs/guides/training/tr
 ### Básico
 
 ```bash
-uv pip install ".[train]"
+uv sync --extra train
 
 uv run python -m piper_train \
   --dataset-dir /path/to/dataset \
@@ -655,6 +656,8 @@ Publicamos modelos de síntesis de voz para inferencia en Hugging Face.
 ### Descarga de modelos
 
 **Modelo Tsukuyomi-chan:**
+
+> **Tsukuyomi FT (`zs-v1`, 2026-10-15):** La [versión pública fijada](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/tree/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1) usa la misma generación de base pública. Usa `releases/zs-v1/tsukuyomi.onnx` junto con `tsukuyomi.onnx.json`; esta voz fija no requiere audio de referencia ni CAM++. La revisión humana quedó registrada y se aprobó la publicación experimental; `quality_approval=false`. Las descargas siguientes con `resolve/main` se conservan solo como ejemplo de compatibilidad con el artefacto root legacy.
 
 **Windows (PowerShell):**
 

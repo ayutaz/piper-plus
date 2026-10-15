@@ -54,7 +54,7 @@ allowed-tools: Agent Bash(git diff *) Bash(git log *) Bash(git status *) Read Gl
 ### Agent 3: ランタイム別 README 監査
 
 **subagent_type**: `Explore`
-**task**: `src/python_run/README.md`, `src/python_run/README_http.md`, `src/wasm/openjtalk-web/README.md`, `src/wasm/openjtalk-web/README.npm.md`, `src/rust/piper-cli/README.md`, `src/go/README.md` を確認。API 例・CLI フラグ・HTTP エンドポイントが最新か判定。
+**task**: `src/python_run/README.md`, `src/python_run/README_http.md`, `src/wasm/openjtalk-web/README.npm.md`, `src/rust/piper-cli/README.md`, `src/go/README.md` を確認。API 例・CLI フラグ・HTTP エンドポイントが最新か判定。
 
 ### Agent 4: CHANGELOG 監査
 

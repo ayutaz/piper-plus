@@ -40,7 +40,7 @@
 
 [meta]
 spec_version = "1.0"
-last_updated = "2026-10-10"
+last_updated = "2026-10-15"
 canonical_source = "docs/spec/model-sha256-manifest.toml"
 hash_algorithm = "SHA-256"
 hash_encoding = "lowercase hex, 64 chars"
@@ -52,31 +52,33 @@ process violation.
 forward_compat_policy = "strict"
 
 # ============================================================================
-# Required config.json fields
+# Runtime config.json baseline
 # ============================================================================
-# Every official piper-plus model ships with a sibling config.json. The
-# fields below are required by every runtime loader; missing fields are a
-# hard load error (not a warning). Optional fields may be present and are
-# surfaced via the relevant feature contracts (e.g. `short_text` in
-# short-text-contract.toml).
+# Every official piper-plus model ships with a sibling config.json. The fields
+# below are the minimal fields required by the Python runtime
+# loader. Other runtimes supply serde/default values for additional fields,
+# and model families may carry optional metadata. Missing metadata must not
+# be described as a hard error for every loader.
 
 [config_schema]
 required_fields = [
     "audio.sample_rate",         # int (Hz) — typically 22050
-    "espeak.voice",              # str — language code for legacy espeak compat
-    "inference.noise_scale",     # float — default 0.4
-    "inference.length_scale",    # float — default 1.0
-    "inference.noise_w",         # float — default 0.5
+    # espeak.voice is optional legacy metadata; absent in public zs-v1 base
+    # inference scales are optional; runtime fallbacks are documented below
     "phoneme_id_map",            # object — single-codepoint string -> int[]
-    "phoneme_type",              # str — typically "espeak" or "text"
     "num_symbols",               # int — vocabulary size
     "num_speakers",              # int — 1 for single-speaker models
-    "speaker_id_map",            # object — empty {} for single-speaker
-    "language_id_map",           # object — multilingual models; empty {} otherwise
-    "piper_version",             # str — semver of the producing piper-plus
 ]
 
 optional_fields = [
+    "espeak.voice",              # legacy metadata; absent in public zs-v1 base
+    "inference.noise_scale",     # fallback 0.4 when absent; model may override
+    "inference.length_scale",    # fallback 1.0 when absent; model may override
+    "inference.noise_w",         # fallback 0.5 when absent; model may override
+    "phoneme_type",              # loader default is multilingual
+    "speaker_id_map",            # absent/empty for single-speaker models
+    "language_id_map",            # absent/empty for single-language models
+    "piper_version",             # producer metadata; absent in public zs-v1 base
     "short_text",                # see short-text-contract.toml
     "prosody",                   # prosody_dim and related fields
     "version",                   # legacy alias for piper_version (still read)
@@ -297,6 +299,42 @@ filename = "campplus.onnx"
 role = "speaker_encoder"
 sha256 = "a6ac6a63997761ae2997373e2ee1c47040854b4b759ea41ec48e4e42df0f4d73"
 bytes = 28303423
+
+# Public fixed-voice fine-tune, pinned from SHA256SUMS and HF API metadata.
+[[models]]
+name = "tsukuyomi-zs-v1"
+description = "Pinned public fixed-voice companion for the experimental zs-v1 base"
+hf_mirror_repo = "ayousanz/piper-plus-tsukuyomi-chan"
+hf_revision = "93c1fb6d67c29accc9ddf52326bb4582b1b52a3d"
+publish_status = "published"
+quality_approval = false
+trained_languages = ["ja", "en", "zh", "es", "fr", "pt"]
+
+[[models.artifacts]]
+filename = "releases/zs-v1/tsukuyomi.onnx"
+sha256 = "5fcef335c2bd69a4d2b5512e46d971427a653bf252097e2fb73618e7a584f331"
+bytes = 40048610
+api_size_bytes = 40048610
+
+[[models.artifacts]]
+filename = "releases/zs-v1/config.json"
+sha256 = "055a837f6b77294789f8600ec0d0d6183b128e99023dca20f20f7f662b881b8b"
+bytes = 6517
+api_size_bytes = 6517
+role = "config"
+
+[[models.artifacts]]
+filename = "releases/zs-v1/tsukuyomi.onnx.json"
+sha256 = "055a837f6b77294789f8600ec0d0d6183b128e99023dca20f20f7f662b881b8b"
+bytes = 6517
+role = "config"
+
+[[models.artifacts]]
+filename = "releases/zs-v1/tsukuyomi.ckpt"
+sha256 = "7d6a15c4cd9a3c208f71ddf604efb462a023dfc348e266fa5be018f3d9ddba82"
+bytes = 319079115
+api_size_bytes = 319079115
+role = "fine_tuning_checkpoint"
 
 [verification]
 # How the loader behaves when the on-disk artifact's SHA-256 differs from

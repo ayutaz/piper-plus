@@ -1,35 +1,32 @@
 # Piper-Plus WebUI
 
-Gradio-based web interface for piper-plus inference and training.
+Gradio-based web interface for piper-plus inference, with a legacy local training tab.
 
-There are two separate WebUI implementations: a **local development** version with inference and training tabs, and a **Docker** version optimized for standalone inference deployment.
+There are two separate WebUI implementations: a **local development** version with inference and training tabs, and a **Docker** version for standalone inference deployment. The local training tab currently passes obsolete arguments to the training CLI; use the [training guide](../guides/training/training-guide.md) for training.
 
 ## Quick Start (Local)
 
 ### Requirements
 
-- Python 3.13+ recommended (3.11+ supported)
-- piper-plus installed
+- Python 3.11+ and uv
+- A source checkout with the workspace dependencies installed
 - ONNX models downloaded
 
 ### Installation
 
 ```bash
-# Install WebUI dependencies
+# From the repository root, install workspace and WebUI dependencies
+uv sync
 uv pip install -r src/python_run/requirements_webui.txt
-
-# For training functionality (optional)
-uv pip install ".[train]"
 ```
 
 ### Running
 
 ```bash
-cd src/python_run
-python -m piper_plus.webui --data-dir ../../test/models
+uv run --no-sync python -m piper_plus.webui --data-dir test/models
 
 # Or with custom settings
-python -m piper_plus.webui \
+uv run --no-sync python -m piper_plus.webui \
   --data-dir /path/to/models \
   --host 0.0.0.0 \
   --port 8080 \
@@ -52,20 +49,33 @@ python -m piper_plus.webui \
 
 - **Model Selection**: Auto-detects all .onnx models in the data directory
 - **6言語マルチリンガルモデル対応** (ja, en, zh, es, fr, pt)
-- **言語自動検出**: テキスト入力から言語を自動判定
+- **言語指定**: local の `Auto` と明示的な言語選択、Docker の言語選択を使用。実際の出力言語はモデルの学習済み言語・設定に依存
 - **話者選択**: マルチスピーカーモデルでの話者切り替え
 - **Template System**: Language-specific templates (English, Japanese, Chinese, Spanish, French, Portuguese)
 - **Speed Control**: 0.5-2.0x
 - **Noise Parameters**: Expressiveness and phoneme width variation
 - **Audio Output**: Play and download generated speech
 
-### Training Tab (local only)
+### Training Tab (local only, legacy)
 
 - Dataset path validation with structure check
 - Base model selection or new model training
-- Quality selection (low/medium/high)
+- Quality selection (UI labels include low/medium/high)
 - Training parameters (batch size, learning rate, epochs)
 - Start/Stop controls with real-time log display
+
+The UI exists, but `training_manager.py` still sends `--learning-rate`,
+`--epochs`, `--validation-split` and `--checkpoint-path`; the current trainer
+uses `--base_lr`, `--max_epochs` and the documented resume/fine-tuning options,
+and does not accept the UI's `--validation-split`. Its quality choices are
+`x-low`, `medium`, `high`.
+Installing training dependencies does not resolve these argument mismatches.
+Follow the [training guide](../guides/training/training-guide.md) instead.
+
+Neither WebUI exposes a reference-audio/speaker-embedding input for the public
+`zs-v1/base.onnx`. Use a fixed-voice model for these UI examples; use the
+[pretrained-model guide](../guides/development/pretrained-models.md) for
+reference-conditioned Zero-Shot inference.
 
 ## Architecture
 
@@ -79,8 +89,9 @@ There are two independent WebUI implementations:
 src/python_run/piper_plus/
 ├── webui.py              # Local WebUI (inference + training)
 ├── training_manager.py   # Training management backend
-├── sample_texts.py       # Sample text collections
-└── requirements_webui.txt
+└── sample_texts.py       # Sample text collections
+
+src/python_run/requirements_webui.txt  # WebUI dependencies (outside the package)
 
 docker/webui/
 ├── app.py                # Docker WebUI (inference only, standalone)
@@ -108,8 +119,8 @@ docker build -t piper-webui -f docker/webui/Dockerfile .
 # Run
 docker run -p 7860:7860 -v ./models:/models piper-webui
 
-# Or docker-compose
-cd docker/webui && docker-compose up
+# Or Compose (from the repository root)
+docker compose -f docker/webui/docker-compose.yml up --build
 ```
 
 ### Environment Variables

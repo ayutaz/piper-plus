@@ -15,39 +15,57 @@ The phoneme input feature allows users to directly specify phonemes using the `[
 
 Wrap phonemes in double square brackets:
 
+These examples use the C++ CLI and a local piper-plus model with the matching
+language and phoneme inventory. Replace `model.onnx` with your downloaded model
+and keep its companion config. Upstream Piper/eSpeak models such as
+`en_US-lessac-medium.onnx` are not interchangeable with piper-plus models; see
+the [model guide](../guides/development/pretrained-models.md).
+
 ```bash
-echo "Hello [[ h ə l oʊ ]] world" | piper-plus --model en_US-lessac-medium.onnx -f output.wav
+echo "A [[ t ɛ s t ]]" | piper-plus --model model.onnx --language en -f output.wav
 ```
+
+The C++ inline parser maps Japanese multi-character tokens to PUA only in
+OpenJTalk mode. For other phoneme types it decodes UTF-8 codepoints; it does
+not apply the full shared PUA token map to compounds such as `oʊ`, `tɕ` or
+`tone1`. The transcription examples below describe the model vocabulary,
+not ready-to-run C++ commands for these compounds. Use the model's encoded
+PUA symbols/IDs or the [Rust encoder API](#rust-ipa-directly-to-model-ids)
+when a compound must be converted to a single model token.
 
 ### Examples
 
 > **Note:** piper-plus は eSpeak-ng に依存しません。以下の eSpeak 音素形式はレガシー互換のための参考情報です。piper-plus の G2P パイプライン (`piper-plus-g2p`) は独自の IPA ベース音素を使用します。
 
-#### English (eSpeak phonemes)
+#### English (IPA overrides)
 
-```bash
+```text
 # Custom pronunciation for a name
-echo "My name is [[ dʒ ɒ n ]] (John)" | piper-plus --model en_US-lessac-medium.onnx -f john.wav
+My name is [[ dʒ ɒ n ]] (John)
 
 # Technical acronym
-echo "The [[ aɪ diː iː ]] (IDE) is ready" | piper-plus --model en_US-lessac-medium.onnx -f ide.wav
+The [[ aɪ diː iː ]] (IDE) is ready
 ```
 
 #### Japanese (OpenJTalk phonemes)
 
+These commands require an OpenJTalk-mode model/config (`phoneme_type` is
+`openjtalk`). A multilingual config does not enable the C++ parser's
+OpenJTalk-only compound mapping merely by adding `--language ja`.
+
 ```bash
 # Hiragana with custom reading
-echo "今日は [[ ky o o w a ]] いい天気です" | piper-plus --model multilingual-test-medium.onnx -f weather.wav
+echo "今日は [[ ky o o w a ]] いい天気です" | piper-plus --model model.onnx --language ja -f weather.wav
 
 # Foreign name in katakana context
-echo "私は [[ m a i k u r u ]] です" | piper-plus --model multilingual-test-medium.onnx -f michael.wav
+echo "私は [[ m a i k u r u ]] です" | piper-plus --model model.onnx --language ja -f michael.wav
 ```
 
 ### Phoneme Systems
 
 > **Note:** piper-plus は eSpeak-ng に依存しません。以下の eSpeak 音素形式はレガシー互換のための参考情報です。piper-plus の G2P パイプライン (`piper-plus-g2p`) は独自の IPA ベース音素を使用します。
 
-#### eSpeak-ng (Most Languages)
+#### Legacy eSpeak-ng reference
 
 - Uses IPA (International Phonetic Alphabet) symbols
 - Space-separated phonemes
@@ -67,42 +85,42 @@ echo "私は [[ m a i k u r u ]] です" | piper-plus --model multilingual-test-
 
 #### Chinese (pypinyin-based IPA)
 
-```bash
+```text
 # Mandarin with tone markers
-echo "今天 [[ tɕ in tone1 tʰ iaŋ tone1 ]] 很好" | piper-plus --model multilingual-test-medium.onnx -f today.wav
+今天 [[ tɕ in tone1 tʰ iɛn tone1 ]] 很好
 
 # Pinyin "拼音"
-echo "[[ pʰ in tone1 i in tone1 ]]" | piper-plus --model multilingual-test-medium.onnx -f pinyin.wav
+[[ pʰ in tone1 i in tone1 ]]
 ```
 
 #### Spanish (rule-based IPA)
 
-```bash
+```text
 # Standard greeting
-echo "[[ ˈ o l a ]]" | piper-plus --model multilingual-test-medium.onnx -f hola.wav
+[[ ˈ o l a ]]
 
 # Mixed text and phoneme override
-echo "Buenos [[ d i a s ]]" | piper-plus --model multilingual-test-medium.onnx -f buenos_dias.wav
+Buenos [[ d i a s ]]
 ```
 
 #### Portuguese (Brazilian IPA)
 
-```bash
+```text
 # "obrigado" with nasal vowel
-echo "[[ o b ɾ i ɡ a d u ]]" | piper-plus --model multilingual-test-medium.onnx -f obrigado.wav
+[[ o b ɾ i ɡ a d u ]]
 
 # Nasal vowel example: "bom"
-echo "[[ b õ ]]" | piper-plus --model multilingual-test-medium.onnx -f bom.wav
+[[ b õ ]]
 ```
 
 #### French (rule-based IPA)
 
-```bash
+```text
 # "bonjour"
-echo "[[ b ɔ̃ ʒ u ʁ ]]" | piper-plus --model multilingual-test-medium.onnx -f bonjour.wav
+[[ b ɔ̃ ʒ u ʁ ]]
 
 # Nasal vowel example: "vin blanc"
-echo "[[ v ɛ̃ b l ɑ̃ ]]" | piper-plus --model multilingual-test-medium.onnx -f vin_blanc.wav
+[[ v ɛ̃ b l ɑ̃ ]]
 ```
 
 ### Phoneme System Details
@@ -336,18 +354,20 @@ echo "[[ v ɛ̃ b l ɑ̃ ]]" | piper-plus --model multilingual-test-medium.onnx 
 
 #### Mixed Text and Phonemes
 
-```bash
+```text
 # English with specific pronunciation hints
-echo "The word 'read' can be [[ r iː d ]] or [[ r ɛ d ]]" | piper-plus --model en_US-lessac-medium.onnx -f read.wav
+The word 'read' can be [[ r iː d ]] or [[ r ɛ d ]]
+```
 
+```bash
 # Japanese with furigana-like pronunciation
-echo "漢字[[ k a N j i ]]の読み方" | piper-plus --model multilingual-test-medium.onnx -f kanji.wav
+echo "漢字[[ k a N j i ]]の読み方" | piper-plus --model model.onnx --language ja -f kanji.wav
 ```
 
 #### Multiple Phoneme Segments
 
-```bash
-echo "Say [[ h ə l oʊ ]] and [[ g ʊ d b aɪ ]]" | piper-plus --model en_US-lessac-medium.onnx -f greetings.wav
+```text
+Say [[ h ə l oʊ ]] and [[ g ʊ d b aɪ ]]
 ```
 
 ## Implementation Details
@@ -417,7 +437,10 @@ Japanese phonemes like `ky`, `sh`, `ts` are automatically mapped to Private Use 
 
 ### Chinese Multi-Character Phonemes
 
-Chinese phonemes such as aspirated consonants, compound finals, and tone markers are automatically mapped to PUA codepoints:
+The shared G2P encoder maps Chinese aspirated consonants, compound finals and
+tone markers to the PUA codepoints below. This table is not an additional
+mapping implemented by the C++ inline parser; pre-encode these tokens when
+using that parser.
 
 | Phoneme    | PUA Codepoint | Description                    |
 |------------|---------------|--------------------------------|

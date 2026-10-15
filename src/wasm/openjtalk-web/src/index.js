@@ -742,7 +742,9 @@ export class PiperPlus {
    * encoder, computes the embedding once, then synthesises text with it.
    *
    * This mirrors the `--reference-audio` / `--speaker-encoder-model` CLI in
-   * Python / Rust / Go / C# / C++. The reference audio is fed to the
+   * Python / Rust / Go / C# CLI surfaces. The C++ CLI exposes the same flags
+   * but does not implement direct reference-audio extraction; callers there
+   * must provide a pre-computed embedding. The reference audio is fed to the
    * provided `SpeakerEncoder` (which must already be initialised with an ONNX
    * model compatible with the loaded TTS graph). The encoder's output
    * dimension and the TTS graph's declared input must match; the public zs-v1

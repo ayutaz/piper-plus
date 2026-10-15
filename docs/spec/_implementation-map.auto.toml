@@ -6,7 +6,7 @@
 generator = "scripts/build_spec_implementation_map.py"
 forward_compat_policy = "accept_unknown_fields"
 spec_count = 33
-unique_paths = 124
+unique_paths = 123
 
 # Forward index: spec → paths
 
@@ -20,7 +20,6 @@ paths = []
 paths = [
     ".github/workflows/runtime-parity-deep.yml",
     "scripts/audio_parity.py",
-    "src/index.js",
 ]
 
 [spec."cargo-lock-duplicates-baseline.toml"]
@@ -554,11 +553,6 @@ specs = [
 [path."src/go/piperplus/timing_test.go"]
 specs = [
     "phoneme-timing-contract.toml",
-]
-
-[path."src/index.js"]
-specs = [
-    "audio-parity-contract.toml",
 ]
 
 [path."src/python/g2p/piper_plus_g2p/chinese.py"]

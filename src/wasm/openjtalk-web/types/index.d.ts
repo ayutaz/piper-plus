@@ -49,7 +49,13 @@ export interface ModelConfig {
 // Progress types
 // ---------------------------------------------------------------------------
 
-/** Progress information emitted during PiperPlus initialization. */
+/**
+ * Progress information emitted during PiperPlus initialization.
+ *
+ * The implementation currently emits `model`, `phonemizer`, and `ready`.
+ * `init` is retained in the public union for compatibility with older
+ * consumers and is not currently emitted by the implementation.
+ */
 export interface ProgressInfo {
   stage: 'model' | 'phonemizer' | 'ready' | 'init';
   progress: number;

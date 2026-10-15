@@ -66,7 +66,7 @@ Système de synthèse vocale neuronale (TTS) rapide et de haute qualité. Basé 
 
 ### Interfaces
 
-- **[WebUI (Gradio)](docs/features/webui.md)** — Inférence et entraînement, compatible Docker
+- **[WebUI (Gradio)](docs/features/webui.md)** — Inférence et prise en charge de Docker. L’onglet d’entraînement local envoie encore des arguments CLI obsolètes ; utilisez le [guide d’entraînement](docs/guides/training/training-guide.md) pour entraîner.
 - **CLI C++** — Streaming, inférence CUDA, **sortie Phoneme Timing (JSON/TSV/SRT)**, dictionnaire personnalisé
 - **[C API Bibliothèque partagée](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, compatible FFI (Flutter/Godot/Swift etc.), API streaming
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Fonctionne entièrement dans le navigateur, **sortie Phoneme Timing (JSON/TSV/SRT)**, sans serveur
@@ -76,12 +76,12 @@ Système de synthèse vocale neuronale (TTS) rapide et de haute qualité. Basé 
 - **CLI Rust** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML, **sortie Phoneme Timing (JSON/TSV/SRT)**, téléchargement automatique des dictionnaires
 - **[CLI Go](src/go/README.md)** — Serveur API HTTP, pooling de sessions, Docker, binaire unique, **sortie Phoneme Timing (JSON/TSV/SRT)**
 - **Voice Cloning (Speaker Encoder + speaker_embedding)** — pris en charge au niveau des capacités runtime par les 6 runtimes (Python/Rust/C#/Go/WASM/C++) pour des entrées `speaker_embedding` pré-calculées et compatibles avec le modèle. Le CLI et l'API C++ acceptent uniquement les embeddings pré-calculés ; l'extraction via `--reference-audio` n'est pas implémentée en C++. L'inférence publique de `zs-v1` n'a été vérifiée fonctionnellement qu'avec Python `piper-plus==2.0.0`. Le CI public `38189966578` rapporte une inférence dans six runtimes avec des IDs phonémiques Python partagés ; le G2P natif et la qualité d'écoute étaient hors périmètre, sans validation qualité.
-- **Support SSML** — `<speak>`, `<break>`, `<prosody rate="...">` pris en charge par 4 runtimes (Python/Rust/C#/Go)
-- **Amélioration de la qualité des textes courts (Stratégie A/B/C)** — Silence Padding, Dynamic Scales et SSML `<break>` automatique sur l'ensemble des 6 runtimes
+- **Support SSML** — Le contrat du parseur est implémenté en Python/Rust/Go/C#/WASM/C++ ; les points d’entrée de synthèse sont Python/Rust/Go/WASM/C++. C# Core contient le parseur, mais le chemin `--text` de la CLI C# n’y est pas encore relié. C++ est exposé via la CLI `--ssml` (pas par l’API C).
+- **Amélioration des textes courts (stratégies A/B/C)** — Les stratégies A/B sont implémentées dans les lignes de runtime. La stratégie C (injection automatique de SSML `<break>`) est limitée à Python d’inférence/Rust/Go/C# ; Python d’entraînement, WASM et C++ sont hors périmètre. Voir le [contrat des textes courts](docs/spec/short-text-contract.toml).
 
 ### Support des fonctionnalités par runtime
 
-Synthèse avec les modèles entraînés actuels en 6 langues sur 6 runtimes (Python/Rust/C#/Go/JS-WASM/C++), avec G2P/phonémisation en 8 langues. Phoneme Timing, streaming (avec division par phrases), Voice Cloning via des entrées `speaker_embedding` pré-calculées et compatibles avec le modèle, et dictionnaires personnalisés sont pris en charge au niveau runtime. C++ accepte uniquement les embeddings pré-calculés et `--reference-audio` n'est pas implémenté. L'inférence publique de `zs-v1` a été vérifiée avec Python `piper-plus==2.0.0` ; le CI `38189966578` rapporte séparément une inférence dans six runtimes avec des IDs phonémiques Python partagés. Le G2P natif et la qualité d'écoute étaient hors périmètre, sans validation qualité. SSML est pris en charge par les 4 runtimes Python/Rust/C#/Go, et l'API HTTP par les 2 runtimes Python/Go.
+Synthèse avec les modèles entraînés actuels en 6 langues sur 6 runtimes (Python/Rust/C#/Go/JS-WASM/C++), avec G2P/phonémisation en 8 langues. Phoneme Timing, streaming (avec division par phrases), Voice Cloning via des entrées `speaker_embedding` pré-calculées et compatibles avec le modèle, et dictionnaires personnalisés sont pris en charge au niveau runtime. C++ accepte uniquement les embeddings pré-calculés et `--reference-audio` n'est pas implémenté. L'inférence publique de `zs-v1` a été vérifiée avec Python `piper-plus==2.0.0` ; le CI `38189966578` rapporte séparément une inférence dans six runtimes avec des IDs phonémiques Python partagés. Le G2P natif et la qualité d'écoute étaient hors périmètre, sans validation qualité. La synthèse SSML est prise en charge par Python/Rust/Go/WASM/C++ ; le parseur de C# Core n’est pas relié au chemin `--text` de la CLI. L’API HTTP est prise en charge par 2 runtimes (Python/Go).
 
 ### Plateformes
 
@@ -104,7 +104,8 @@ Synthèse avec les modèles entraînés actuels en 6 langues sur 6 runtimes (Pyt
 
 ```bash
 # Installation
-uv pip install ".[inference]"
+# Exécuter depuis la racine d’un source checkout
+uv sync --extra inference
 
 # Inference japonaise
 uv run python -m piper_train.infer_onnx \
@@ -258,16 +259,16 @@ Python 3.13+ recommandé (3.11+ supporté). [uv](https://docs.astral.sh/uv/) est
 
 ```bash
 # Inference CPU
-uv pip install ".[inference]"
+uv sync --extra inference
 
 # Inference GPU (necessite CUDA)
-uv pip install ".[inference-gpu]"
+uv sync --extra inference-gpu
 
 # Entrainement
-uv pip install ".[train]"
+uv sync --extra train
 
 # Developpement (inclut tests et linting)
-uv pip install ".[dev]"
+uv sync --extra dev
 ```
 
 Également disponible sur PyPI :
@@ -568,7 +569,7 @@ Voir le [Guide d'entraînement](docs/guides/training/training-guide.md) pour les
 ### Basique
 
 ```bash
-uv pip install ".[train]"
+uv sync --extra train
 
 uv run python -m piper_train \
   --dataset-dir /path/to/dataset \
@@ -647,6 +648,8 @@ Des modèles de synthèse vocale pour l'inférence et le fine-tuning sont dispon
 ### Téléchargement des modèles
 
 **Modèle Tsukuyomi-chan :**
+
+> **Tsukuyomi FT (`zs-v1`, 2026-10-15) :** La [version publique épinglée](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/tree/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1) utilise la même génération de base publique. Utilisez `releases/zs-v1/tsukuyomi.onnx` avec `tsukuyomi.onnx.json` ; cette voix fixe ne nécessite ni audio de référence ni CAM++. La revue humaine a été enregistrée et la publication expérimentale approuvée ; `quality_approval=false`. Les téléchargements `resolve/main` ci-dessous sont conservés uniquement comme exemple de compatibilité avec l’artefact root legacy.
 
 **Windows (PowerShell) :**
 

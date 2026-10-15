@@ -11,13 +11,13 @@ npm install @piper-plus/g2p
 ## Quick Start
 
 ```js
-import { G2P, DictLoader } from '@piper-plus/g2p';
+import { G2P } from '@piper-plus/g2p';
 
 // Rule-based languages initialise without an external WASM module.
 const g2p = await G2P.create({ languages: ['en'] });
 
 // Convert text to IPA tokens
-const tokens = g2p.phonemize('Hello, world!');
+const { tokens } = g2p.phonemize('Hello, world!', { language: 'en' });
 // => ["h", "ʌ", "l", "oʊ", ",", " ", "w", "ɜː", "l", "d", "!"]
 
 // Encode for Piper TTS inference
@@ -41,7 +41,7 @@ const jaG2P = await G2P.create({
   openjtalkModule,
   jaDict,
 });
-const jaTokens = jaG2P.phonemize('こんにちは');
+const { tokens: jaTokens } = jaG2P.phonemize('こんにちは', { language: 'ja' });
 // => ["k", "o", "N_n", "n", "i", "ch", "i", "h", "a"]
 ```
 
@@ -102,13 +102,16 @@ Creates and initializes a G2P instance.
 - `options.languages` -- Array of language codes to load (default: all)
 - Returns: `Promise<G2P>`
 
-### `g2p.phonemize(text, lang?)`
+### `g2p.phonemize(text, options?)`
 
-Converts text to IPA token array. Language is auto-detected if omitted.
+Converts text to an object containing IPA tokens, prosody placeholders, and the
+resolved language. Pass `{ language: 'en' }` (for example) to select a language;
+omit the options object for Unicode-based language detection.
 
-### `g2p.phonemizeWithProsody(text, lang?)`
+### `g2p.phonemizeWithProsody(text, options?)`
 
-Returns `{ tokens, prosody }` with per-token prosody features (Japanese only).
+Returns `{ tokens, prosody, language }` with per-token prosody features
+(Japanese only). Both methods use the same options object.
 
 ### `Encoder.encode(tokens)`
 
@@ -122,8 +125,10 @@ Also available as:
 - **Rust crate**: `piper-plus-g2p` on crates.io
 - **Go**: `go get github.com/ayutaz/piper-plus/src/go/phonemize`
 
-All implementations share the same PUA mapping (`pua_compat_version: 1`)
-and are validated against a common test fixture.
+The current runtime export uses PUA compatibility version 2 and is validated
+against a common test fixture. The `pua_compat_version` field in this checkout's
+package metadata is still `1`; package metadata must be synchronized before a
+release that relies on that field.
 
 ## Zero Dependencies
 

@@ -149,7 +149,7 @@ skip_if_ssml = true
 #     ...
 #     "short_text": {                      // OPTIONAL — entire section
 #       "enabled": true,                   // OPTIONAL — default: true
-#       "min_phoneme_ids": 40,             // OPTIONAL — default: 40
+#       "min_phoneme_ids": 15,             // OPTIONAL — default: 15
 #       "short_text_chars": 10,            // OPTIONAL — default: 10
 #       "silence_pad_ms": 300,             // OPTIONAL — default: 300
 #       "noise_scale_min_ratio": 0.5,      // OPTIONAL — default: 0.5
@@ -183,7 +183,7 @@ section_key = "short_text"
 
 # Fields and their defaults (all optional):
 #   enabled              bool    true
-#   min_phoneme_ids      int     40
+#   min_phoneme_ids      int     15
 #   short_text_chars     int     10
 #   silence_pad_ms       int     300
 #   noise_scale_min_ratio float  0.5
@@ -195,7 +195,7 @@ section_key = "short_text"
 
 [config_json.defaults]
 enabled = true
-min_phoneme_ids = 40
+min_phoneme_ids = 15
 short_text_chars = 10
 silence_pad_ms = 300
 noise_scale_min_ratio = 0.5

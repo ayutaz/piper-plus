@@ -92,7 +92,7 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 
 ### Interfaces
 
-- **[WebUI (Gradio)](docs/features/webui.md)** — Inference and training, Docker-ready
+- **[WebUI (Gradio)](docs/features/webui.md)** — Inference and Docker support. The local Training Tab still sends obsolete CLI arguments; use the [Training Guide](docs/guides/training/training-guide.md) for training.
 - **C++ CLI** — Streaming, CUDA inference, **phoneme timing output (JSON/TSV/SRT)**, custom dictionary
 - **[C API Shared Library](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, FFI-ready (Flutter/Godot/Swift etc.), streaming API
 - **[iOS xcframework + SPM](docs/guides/platform/ios-integration.md)** — `PiperPlus` Swift Package, synthesis engine shipped as iOS arm64 device + simulator universal xcframework
@@ -104,8 +104,8 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 - **Rust CLI** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML support, **phoneme timing output (JSON/TSV/SRT)**, auto dictionary download
 - **[Go CLI](src/go/README.md)** — HTTP API server, session pooling, Docker, single binary, **phoneme timing output (JSON/TSV/SRT)**
 - **Voice Cloning (Speaker Encoder + speaker_embedding)** — model-compatible precomputed `speaker_embedding` input is supported at the runtime capability level across all 6 runtimes (Python/Rust/C#/Go/WASM/C++). The C++ CLI and C API accept precomputed embeddings only; `--reference-audio` extraction is not implemented in C++. Public `zs-v1` inference was functionally verified only with Python `piper-plus==2.0.0`. Public CI run `38189966578` reports six-runtime inference from shared Python phoneme IDs; native G2P and listening quality are outside its scope, and quality approval remains false.
-- **SSML support** — `<speak>`, `<break>`, `<prosody rate="...">` implemented across 4 runtimes (Python/Rust/C#/Go).
-- **Short-text quality improvements (Strategy A/B/C)** — silence padding, dynamic scales, SSML `<break>` auto-injection deployed across all 6 runtimes (`docs/spec/short-text-contract.toml`).
+- **SSML support** — The parser contract is implemented in Python/Rust/Go/C#/WASM/C++; synthesis entry points are Python/Rust/Go/WASM/C++. C# Core includes the parser, but the C# CLI `--text` path is not connected to it. C++ is exposed through CLI `--ssml` (not exported by the C API).
+- **Short-text quality improvements (Strategy A/B/C)** — Strategies A/B are implemented across the runtime rows. Strategy C (automatic SSML `<break>` injection) is scoped to Python inference/Rust/Go/C#; training Python, WASM, and C++ are out of scope. See the [short-text contract](docs/spec/short-text-contract.toml).
 - Six-language trained-model synthesis across 6 runtimes (Python/Rust/C#/Go/JS-WASM/C++), with 8-language G2P/phonemization. Voice Cloning here means runtime support for model-compatible precomputed embedding input; the C++ path accepts precomputed embeddings only, and `--reference-audio` is unimplemented. Public `zs-v1` inference was verified with Python `piper-plus==2.0.0`; CI run `38189966578` separately reports shared-Python-ID inference across six runtimes, with native G2P and listening quality outside scope and quality approval false.
 
 ---
@@ -116,7 +116,8 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 
 ```bash
 # Install
-uv pip install ".[inference]"
+# Run from the repository root of a source checkout
+uv sync --extra inference
 
 # Japanese inference
 uv run python -m piper_train.infer_onnx \
@@ -268,16 +269,16 @@ Python 3.13+ recommended (3.11+ supported). [uv](https://docs.astral.sh/uv/) is 
 
 ```bash
 # CPU inference
-uv pip install ".[inference]"
+uv sync --extra inference
 
 # GPU inference (requires CUDA)
-uv pip install ".[inference-gpu]"
+uv sync --extra inference-gpu
 
 # Training
-uv pip install ".[train]"
+uv sync --extra train
 
 # Development (includes testing and linting)
-uv pip install ".[dev]"
+uv sync --extra dev
 ```
 
 Also available from PyPI:
@@ -359,7 +360,7 @@ Main models: `tsukuyomi` (Japanese), `zs-v1` (experimental 6-language Zero-Shot/
 
 > **Zero-Shot/FT base (`zs-v1`, 2026-10-10):** The pinned public bundle is the existing v7 epoch32 experimental base (JA/EN/ZH/ES/FR/PT, 571 speakers, 173 phonemes, CAM++ 192-dim embeddings). Zero-Shot inference uses `base.onnx` with a reference embedding extracted by the bundled `campplus.onnx`; fine-tuning uses `base.ckpt` with the bundled `config.json`. The public examples were functionally verified with PyPI `piper-plus==2.0.0`, but this is not quality approval, human listening approval, or a latest/best model claim. The `base` / `zero-shot-base-zs-v1` aliases target the source branch/next release and are not in released 2.0.0 / 2.0.1. The root `model.ckpt` remains a separate legacy model.
 
-> **Tsukuyomi FT (`zs-v1`, 2026-10-15):** The [pinned public release](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/tree/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1) is a fine-tune from the same public base generation. Use `tsukuyomi.onnx` with `tsukuyomi.onnx.json`; inference needs no reference audio or CAM++. The user approved the three Japanese listening samples for experimental publication. Existing `tsukuyomi` aliases still select the legacy root model; download this release through the pinned URLs in the [model guide](docs/guides/development/pretrained-models.md).
+> **Tsukuyomi FT (`zs-v1`, 2026-10-15):** The [pinned public release](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/tree/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1) is a fine-tune from the same public base generation. Use `tsukuyomi.onnx` with `tsukuyomi.onnx.json`; inference needs no reference audio or CAM++. Human review of three Japanese listening samples was recorded and publication as an experimental baseline was approved; `quality_approval=false`, so this is not quality approval. Existing `tsukuyomi` aliases still select the legacy root model; download this release through the pinned URLs in the [model guide](docs/guides/development/pretrained-models.md).
 
 ---
 

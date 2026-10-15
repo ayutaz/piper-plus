@@ -369,7 +369,9 @@ C API `piper_plus_load_custom_dict()` 互換の JSON 辞書を Kotlin から渡�
 g2p.loadCustomDict("/path/to/custom_dict.json")
 ```
 
-JSON v1.0 / v2.0 schema は既存 (`docs/spec/custom-dictionary-schema.toml` 等を参照、技術調査未確定で次フェーズで再確認)。
+JSON v1.0 / v2.0 schema の互換要件は定義する。`docs/spec/custom-dictionary-schema.toml` は
+現行 checkout には存在しないため、参照先として扱わず、schema の正本と実装検証は次フェーズで
+確定する。
 
 ---
 

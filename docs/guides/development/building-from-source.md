@@ -43,6 +43,7 @@ Prerequisites: C++17 compiler, CMake 3.15+
 
 ```bash
 # C# CLI build
+# Run from the repository root.
 dotnet build src/csharp/PiperPlus.sln -c Release
 # Test
 dotnet test src/csharp/PiperPlus.Core.Tests/
@@ -99,7 +100,7 @@ piper-plus-cli --model model.onnx --text "First sentence. Second sentence." --st
 # Custom dictionary
 piper-plus-cli --model model.onnx --text "AI technology" --custom-dict my_dict.json
 
-# GPU inference
+# GPU inference (requires the CUDA feature; without it the runtime falls back to CPU)
 piper-plus-cli --model model.onnx --text "Hello" --device cuda
 
 # Test mode / quiet mode
@@ -115,10 +116,20 @@ piper-plus-cli --model model.onnx --text "hello" --language en --output-raw | ap
 ## Building Rust CLI
 
 ```bash
+# From the repository root, enter the Rust workspace.
+cd src/rust
 # Rust CLI build
 cargo build --release -p piper-plus-cli
 # Test
 cargo test -p piper-plus
+```
+
+For a CUDA-enabled build, use the following **instead of the default build**
+from `src/rust`. The feature belongs to the `piper-plus` dependency. A compatible
+ONNX Runtime CUDA provider and its CUDA libraries must also be available.
+
+```bash
+cargo build --release -p piper-plus-cli --features piper-plus/cuda
 ```
 
 Prerequisites: Rust 1.88+, cargo

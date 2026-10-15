@@ -46,12 +46,13 @@ MANIFEST = REPO_ROOT / "docs" / "spec" / "model-sha256-manifest.toml"
 # manifest in the same commit — that is exactly what this gate enforces.
 EXPECTED_MODELS = {
     "multilingual-6lang-base",  # [Archived/v1.11]
-    "multilingual-6lang-mb-istft",  # 現行 base
+    "multilingual-6lang-mb-istft",  # legacy compatibility base
     "tsukuyomi-6lang-v2",  # [Archived/v1.11]
-    "tsukuyomi-mb-istft",  # 現行 tsukuyomi
+    "tsukuyomi-mb-istft",  # legacy compatibility fine-tune
     "css10-ja-6lang",  # CSS10 JA 6lang
     "speaker-encoder-ecapa-tdnn",  # voice cloning
     "zero-shot-base-zs-v1",  # public experimental v7 baseline
+    "tsukuyomi-zs-v1",  # public fixed-voice fine-tune of the same generation
 }
 
 # Forward-compat boundary: schema_version values up to and including this

@@ -49,15 +49,20 @@ the browser runtime. Run it from this directory:
 python3 test-server.py
 ```
 
-Open the files that actually live under the test demo directory:
+Open the current demo entry page:
 
 - <http://localhost:8080/test/multilingual-demo/index.html>
-- <http://localhost:8080/test/multilingual-demo/simple-multilingual.html>
-- <http://localhost:8080/test/multilingual-demo/multilingual.html>
 
-The demo model is selected by the page (`css10`) and is fetched from the
-Hugging Face registry. A successful page load is a UI smoke check; use the
-Playwright probe for the pinned model, inference, and playback assertions.
+The entry page selects `css10` and fetches it from the Hugging Face registry.
+A successful page load is a UI smoke check; use the Playwright probe for the
+pinned model, inference, and playback assertions.
+
+The other files under `test/multilingual-demo/` are retained diagnostic pages
+from earlier demo iterations. Several still pin ONNX Runtime Web 1.21.0, which
+is below the current npm peer requirement (>=1.22.0) and does not belong to the
+current compatibility check. Do not use those pages to validate the package;
+use the root `index.html` entry page and the automated checks above. Their
+deployment as diagnostic fixtures does not make their runtime pins current.
 
 ## What the browser probe checks
 

@@ -319,6 +319,8 @@ C++ `nlohmann/json` のデフォルト nest 制限は **無制限**。recursion 
 
 ## 10. ベンチマーク
 
+以下は設計時に想定した Google Benchmark の追加先であり、現行 checkout にはまだ存在しない。
+
 | フレーム | ファイル |
 |--------|--------|
 | Google Benchmark | `src/cpp/benchmarks/bench_chinese_embedded.cpp` |

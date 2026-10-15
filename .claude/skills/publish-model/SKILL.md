@@ -73,9 +73,13 @@ ls -la /tmp/sanity/*.wav
 ## フェーズ 4: RTF benchmark (optional)
 
 ```bash
-uv run python tools/benchmark/run_benchmark.py \
-    --model "$OUTPUT_ONNX" --warmup 5 --runs 30 \
-    --output /tmp/rtf_$(basename "$OUTPUT_ONNX" .onnx).json
+uv run python scripts/benchmark_runtime.py \
+    --runtime "$BENCHMARK_RUNTIME" \
+    --cli-cmd "$BENCHMARK_CLI_CMD" \
+    --model "$OUTPUT_ONNX" --config "$OUTPUT_ONNX.json" \
+    --text-file tests/fixtures/benchmark-texts.json --text-key short \
+    --warmup 5 --runs 30 \
+    --output "/tmp/rtf_$(basename "$OUTPUT_ONNX" .onnx).json"
 ```
 
 baseline (README.md の Benchmark 表、 Xeon E5-2650 v4 / 25 phoneme 英文 / 27ms) と比較し、 ±30% 以内なら OK、 大きい drift があれば warning。

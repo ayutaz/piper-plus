@@ -64,7 +64,7 @@
 
 ### 인터페이스
 
-- **[WebUI (Gradio)](docs/features/webui.md)** — 추론 및 학습 지원, Docker 지원
+- **[WebUI (Gradio)](docs/features/webui.md)** — 추론 및 Docker 지원. 로컬 Training Tab은 아직 오래된 CLI 인자를 보내므로 학습에는 [학습 가이드](docs/guides/training/training-guide.md)를 사용하세요.
 - **C++ CLI** — 스트리밍, CUDA 추론, **Phoneme Timing 출력 (JSON/TSV/SRT)**, 커스텀 사전
 - **[C API 공유 라이브러리](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, FFI 호환 (Flutter/Godot/Swift 등), 스트리밍 API
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — 브라우저 내에서 완전 동작, **Phoneme Timing 출력 (JSON/TSV/SRT)**, 서버 불필요
@@ -74,12 +74,12 @@
 - **Rust CLI** — piper-plus/piper-plus-cli, 스트리밍, CUDA/CoreML/DirectML 지원, **Phoneme Timing 출력 (JSON/TSV/SRT)**, 사전 자동 다운로드
 - **[Go CLI](src/go/README.md)** — HTTP API 서버, 세션 풀링, Docker 지원, 단일 바이너리, **Phoneme Timing 출력 (JSON/TSV/SRT)**
 - **Voice Cloning (Speaker Encoder + speaker_embedding)** — 모델 호환 사전 계산 `speaker_embedding` 입력을 런타임 기능 수준에서 6개 런타임 (Python/Rust/C#/Go/WASM/C++) 모두 지원합니다. C++ CLI/C API는 사전 계산 embedding만 받으며, C++의 `--reference-audio` 추출은 구현되지 않았습니다. 공개 `zs-v1` 실제 추론은 Python `piper-plus==2.0.0`에서만 기능 검증되었습니다. 공개 CI run `38189966578`은 Python 공유 phoneme IDs를 사용한 6개 런타임 추론을 보고하며, native G2P와 청취 품질은 범위 밖이고 품질 승인은 없습니다.
-- **SSML 지원** — `<speak>`, `<break>`, `<prosody rate="...">` 4개 런타임 (Python/Rust/C#/Go) 지원
-- **단문 품질 개선 (Strategy A/B/C)** — Silence Padding, Dynamic Scales, SSML `<break>` 자동 삽입을 6개 런타임 모두에서 지원
+- **SSML 지원** — 파서 계약은 Python/Rust/Go/C#/WASM/C++에 구현되어 있으며 합성 진입점은 Python/Rust/Go/WASM/C++입니다. C# Core에는 파서가 있지만 C# CLI의 `--text` 경로에는 아직 연결되지 않았습니다. C++는 CLI `--ssml`로 제공되며 C API에는 노출되지 않습니다.
+- **단문 품질 개선 (Strategy A/B/C)** — Strategy A/B는 런타임 행 전체에 구현되어 있습니다. Strategy C(SSML `<break>` 자동 삽입)는 추론 Python/Rust/Go/C# 범위이며 학습 Python, WASM, C++는 대상이 아닙니다. 자세한 내용은 [단문 계약](docs/spec/short-text-contract.toml)을 참조하세요.
 
 ### 런타임별 기능 지원
 
-6개 런타임 (Python/Rust/C#/Go/JS-WASM/C++)에서 현재 학습된 모델의 6개 언어 합성을 제공하며, 8개 언어 G2P/음소화도 제공합니다. Phoneme Timing, 스트리밍 (문장 단위 분할 포함), 모델 호환 사전 계산 embedding 입력을 사용하는 Voice Cloning, 커스텀 사전은 런타임 기능으로 지원합니다. C++는 사전 계산 embedding만 받고 `--reference-audio`는 구현되지 않았습니다. 공개 `zs-v1` 실제 추론은 Python `piper-plus==2.0.0`에서 검증되었고, CI run `38189966578`은 Python 공유 phoneme IDs를 사용한 6개 런타임 추론을 별도로 보고합니다. native G2P와 청취 품질은 범위 밖이고 품질 승인은 없습니다. SSML은 4개 런타임 (Python/Rust/C#/Go), HTTP API는 2개 런타임 (Python/Go)에서 지원합니다.
+6개 런타임 (Python/Rust/C#/Go/JS-WASM/C++)에서 현재 학습된 모델의 6개 언어 합성을 제공하며, 8개 언어 G2P/음소화도 제공합니다. Phoneme Timing, 스트리밍 (문장 단위 분할 포함), 모델 호환 사전 계산 embedding 입력을 사용하는 Voice Cloning, 커스텀 사전은 런타임 기능으로 지원합니다. C++는 사전 계산 embedding만 받고 `--reference-audio`는 구현되지 않았습니다. 공개 `zs-v1` 실제 추론은 Python `piper-plus==2.0.0`에서 검증되었고, CI run `38189966578`은 Python 공유 phoneme IDs를 사용한 6개 런타임 추론을 별도로 보고합니다. native G2P와 청취 품질은 범위 밖이고 품질 승인은 없습니다. SSML 합성은 Python/Rust/Go/WASM/C++에서 지원하며 C# Core 파서는 CLI `--text` 경로에 연결되지 않았습니다. HTTP API는 2개 런타임 (Python/Go)에서 지원합니다.
 
 ### 플랫폼
 
@@ -161,7 +161,8 @@ cd piper-plus
 
 ```bash
 # 설치
-uv pip install ".[inference]"
+# source checkout의 저장소 루트에서 실행
+uv sync --extra inference
 
 # 일본어 추론
 uv run python -m piper_train.infer_onnx \
@@ -256,16 +257,16 @@ Python 3.13+ 권장 (3.11+ 지원). 의존성 관리에는 [uv](https://docs.ast
 
 ```bash
 # CPU 추론
-uv pip install ".[inference]"
+uv sync --extra inference
 
 # GPU 추론 (CUDA 환경 필요)
-uv pip install ".[inference-gpu]"
+uv sync --extra inference-gpu
 
 # 학습
-uv pip install ".[train]"
+uv sync --extra train
 
 # 개발 (테스트, 린터 포함)
-uv pip install ".[dev]"
+uv sync --extra dev
 ```
 
 PyPI 패키지로도 설치 가능:
@@ -575,7 +576,7 @@ scripts\speak.bat --model models\tsukuyomi.onnx "テスト"
 ### 기본
 
 ```bash
-uv pip install ".[train]"
+uv sync --extra train
 
 uv run python -m piper_train \
   --dataset-dir /path/to/dataset \
@@ -653,6 +654,8 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 ### 모델 다운로드
 
 **츠쿠요미짱 모델:**
+
+> **츠쿠요미 FT (`zs-v1`, 2026-10-15):** [고정 공개 버전](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/tree/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1)은 동일한 공개 base 세대에서 파인튜닝되었습니다. `releases/zs-v1/tsukuyomi.onnx`와 `tsukuyomi.onnx.json`을 함께 사용하며, 이 고정 음성은 참조 오디오나 CAM++가 필요하지 않습니다. 사람의 확인을 기록했고 실험 버전 공개를 승인했지만 `quality_approval=false`입니다. 아래 `resolve/main` 다운로드는 legacy root 아티팩트와의 호환성 예제로만 유지합니다.
 
 **Windows (PowerShell):**
 

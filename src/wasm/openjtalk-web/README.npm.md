@@ -368,7 +368,7 @@ Returned by `synthesize()`. Wraps raw PCM audio samples.
 Resolves a model identifier to concrete URLs without downloading.
 
 - `modelNameOrUrl` -- Registry shortcut (`"tsukuyomi"`), HuggingFace repo (`"ayousanz/piper-plus-tsukuyomi-chan"`), or direct URL
-- Returns: `Promise<{ modelUrl: string, configUrl: string, cacheKey: string }>`
+- Returns: `Promise<{ modelUrl: string, configUrl: string, configFallbackUrl: string | null, cacheKey: string }>`
 
 ## Available Models
 
@@ -421,7 +421,11 @@ const tts = await PiperPlus.initialize({
 });
 ```
 
-The config file is expected at `<model-url>.json` (e.g. `model.onnx.json`).
+The primary config URL is `<model-url>.json` (e.g. `model.onnx.json`). For a
+direct URL, if that sidecar is unavailable the runtime also tries `config.json`
+in the model's directory. Keep the config that matches the ONNX model beside
+the model, and use the returned `configFallbackUrl` to inspect the fallback
+candidate when resolving URLs yourself.
 
 ## Supported Languages
 

@@ -98,7 +98,7 @@ Python / Rust / Go / C# / C++ / WASM の 6 ランタイムを `multilingual-test
 
 ### インターフェース
 
-- **[WebUI (Gradio)](docs/features/webui.md)** — 推論・学習対応、Docker対応
+- **[WebUI (Gradio)](docs/features/webui.md)** — 推論対応、Docker対応。local の Training Tab は旧CLI引数を送るため、学習には [学習ガイド](docs/guides/training/training-guide.md) を使用してください。
 - **C++ CLI** — ストリーミング、CUDA推論、**音素タイミング出力 (JSON/TSV/SRT)**、カスタム辞書
 - **[C API 共有ライブラリ](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`、FFI対応 (Flutter/Godot/Swift等)、ストリーミング API
 - **[iOS xcframework + SPM](docs/guides/platform/ios-integration.md)** — `PiperPlus` (Swift Package)、合成エンジン本体を iOS arm64 device + simulator universal で配信
@@ -110,12 +110,12 @@ Python / Rust / Go / C# / C++ / WASM の 6 ランタイムを `multilingual-test
 - **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応、**音素タイミング出力 (JSON/TSV/SRT)**、辞書自動ダウンロード
 - **[Go CLI](src/go/README.md)** — HTTP APIサーバー、セッションプーリング、Docker対応、シングルバイナリ、**音素タイミング出力 (JSON/TSV/SRT)**
 - **Voice Cloning (Speaker Encoder + speaker_embedding)** — 全 6 ランタイム (Python/Rust/C#/Go/WASM/C++) でモデル互換の事前計算 `speaker_embedding` 入力に対応。C++ CLI/C API は事前計算 embedding のみ受け付け、`--reference-audio` による抽出は未実装。公開 `zs-v1` の実推論確認は Python `piper-plus==2.0.0` のみ。公開 CI run `38189966578` では Python 共有 phoneme IDs を入力に6ランタイム推論を確認済みで、native G2P と人手試聴品質は範囲外、品質承認は未実施です。
-- **SSML サポート** — `<speak>`, `<break>`, `<prosody rate="...">` を Python/Rust/C#/Go/WASM/C++ の 6 ランタイムで実装 (C++ は CLI `--ssml` 経由)
-- **短文品質改善 (Strategy A/B/C)** — Silence Padding、Dynamic Scales、SSML `<break>` 自動注入を全 6 ランタイムで対応 (`docs/spec/short-text-contract.toml`)
+- **SSML サポート** — SSML パーサー契約は Python/Rust/Go/C#/WASM/C++ に実装。合成側は Python/Rust/Go/WASM/C++ が対応し、C# Core にはパーサーがありますが CLI の `--text` には未接続です。C++ は CLI `--ssml` 経由（C API 非エクスポート）。
+- **短文品質改善 (Strategy A/B/C)** — Strategy A/B は各ランタイムで実装。Strategy C（SSML `<break>` 自動注入）は Python 推論/Rust/Go/C# の範囲で、訓練用 Python・WASM・C++ は対象外です。詳細は [短文契約](docs/spec/short-text-contract.toml)。
 
 ### ランタイム別機能サポート
 
-6 ランタイム (Python/Rust/C#/Go/JS-WASM/C++) で現行学習済みモデルの6言語合成を実現し、8言語のG2P/音素化も提供します。音素タイミング・ストリーミング (文単位分割含む)・モデル互換の事前計算 embedding を使う Voice Cloning・カスタム辞書はランタイム機能として対応。C++ は事前計算 embedding のみで `--reference-audio` は未実装。公開 `zs-v1` の実推論確認は Python `piper-plus==2.0.0` のみです。公開 CI run `38189966578` は Python 共有 phoneme IDs による6ランタイム推論を確認しますが、native G2P と人手試聴品質は範囲外で、品質承認は未実施です。SSML は全 6 ランタイム対応 (C++ は CLI `--ssml` 経由、C API 非エクスポート)、HTTP API は Python/Go の 2 ランタイム対応。
+6 ランタイム (Python/Rust/C#/Go/JS-WASM/C++) で現行学習済みモデルの6言語合成を実現し、8言語のG2P/音素化も提供します。音素タイミング・ストリーミング (文単位分割含む)・モデル互換の事前計算 embedding を使う Voice Cloning・カスタム辞書はランタイム機能として対応。C++ は事前計算 embedding のみで `--reference-audio` は未実装。公開 `zs-v1` の実推論確認は Python `piper-plus==2.0.0` のみです。公開 CI run `38189966578` は Python 共有 phoneme IDs による6ランタイム推論を確認しますが、native G2P と人手試聴品質は範囲外で、品質承認は未実施です。SSML の合成側対応は Python/Rust/Go/WASM/C++（C++ は CLI `--ssml` 経由、C API 非エクスポート）。C# Core のパーサーは CLI `--text` に未接続、HTTP API は Python/Go の 2 ランタイム対応。
 
 ---
 
@@ -184,7 +184,8 @@ cd piper-plus
 
 ```bash
 # インストール
-uv pip install ".[inference]"
+# リポジトリルートの source checkout から実行
+uv sync --extra inference
 
 # 日本語推論
 uv run python -m piper_train.infer_onnx \
@@ -279,16 +280,16 @@ Python 3.13+ 推奨 (3.11+ サポート)。依存管理は [uv](https://docs.ast
 
 ```bash
 # CPU推論
-uv pip install ".[inference]"
+uv sync --extra inference
 
 # GPU推論 (CUDA環境が必要)
-uv pip install ".[inference-gpu]"
+uv sync --extra inference-gpu
 
 # 学習
-uv pip install ".[train]"
+uv sync --extra train
 
 # 開発 (テスト・リンター含む)
-uv pip install ".[dev]"
+uv sync --extra dev
 ```
 
 PyPI パッケージからもインストール可能:
@@ -370,7 +371,7 @@ C++ CLI の詳細なコマンドラインオプション、JSON 入力フォー�
 
 > **Zero-Shot/FT ベース (`zs-v1`, 2026-10-10):** 固定公開バンドルは既存の v7 epoch 32 実験基準版（JA/EN/ZH/ES/FR/PT、571 話者、173 音素、CAM++ 192 次元）です。Zero-Shot 推論は `base.onnx` と同梱 `campplus.onnx` から抽出した参照 embedding、追加学習は `base.ckpt` と同梱 `config.json` を使ってください。PyPI `piper-plus==2.0.0` の公開例で機能確認済みですが、品質承認・人手試聴合格・最新/最高品質を意味しません。`base` / `zero-shot-base-zs-v1` alias はソースブランチ/次期リリース向けで、公開済み 2.0.0 / 2.0.1 には未収録です。ルートの `model.ckpt` は旧世代として別扱いです。
 
-> **つくよみちゃんFT (`zs-v1`, 2026-10-15):** 同じ公開base世代を追加学習した[固定公開モデル](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/tree/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1)を公開しました。`tsukuyomi.onnx`と`tsukuyomi.onnx.json`を組み合わせれば、参照音声やCAM++なしで生成できます。日本語3文の試聴承認済みの実験基準版です。既存の`tsukuyomi` aliasは引き続き旧rootモデルを選ぶため、新モデルは[モデルガイド](docs/guides/development/pretrained-models.md)の固定URLから取得してください。
+> **つくよみちゃんFT (`zs-v1`, 2026-10-15):** 同じ公開base世代を追加学習した[固定公開モデル](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/tree/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1)を公開しました。`tsukuyomi.onnx`と`tsukuyomi.onnx.json`を組み合わせれば、参照音声やCAM++なしで生成できます。日本語3文の人手確認を記録し、実験版としての公開を承認済みです（quality_approval=false、品質承認ではありません）。既存の`tsukuyomi` aliasは引き続き旧rootモデルを選ぶため、新モデルは[モデルガイド](docs/guides/development/pretrained-models.md)の固定URLから取得してください。
 
 ---
 

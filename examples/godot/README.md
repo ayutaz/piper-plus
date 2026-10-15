@@ -129,7 +129,7 @@ precomputation, follow the canonical [published zs-v1 README](https://huggingfac
 
 ```gdscript
 var tts = $PiperTTS
-tts.model_path = "res://models/tsukuyomi.onnx"
+tts.model_path = "res://models/tsukuyomi-chan-6lang-fp16.onnx"
 tts.load_model()
 
 # One-shot

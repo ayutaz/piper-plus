@@ -3,11 +3,9 @@
 // CI-only Package manifest for HelloG2P — used by .github/workflows/swift-g2p-ci.yml.
 //
 // The release HelloG2P/Package.swift declares a tag-based dependency
-// (`from: "1.14.0"`) on `https://github.com/ayutaz/piper-plus`. That URL
-// only resolves once v1.14.0 is tagged AND the matching xcframework
-// asset is published in the GitHub Release. Until then, `swift build`
-// inside HelloG2P/ fails with "package at https://...piper-plus has no
-// versions which match the requirement".
+// (`from: "2.0.1"`) on `https://github.com/ayutaz/piper-plus`, using the
+// published release and its xcframework. CI uses the local binary built
+// from the current source instead of downloading that published binary.
 //
 // CI swaps in this file (`cp Package.ci.swift Package.swift`) so the
 // HelloG2P consumer resolves against the in-tree workspace at
@@ -34,7 +32,7 @@ let package = Package(
     platforms: [.macOS(.v13)],
     dependencies: [
         // path: form resolves the in-tree workspace, bypassing the
-        // unpublished v1.14.0 tag entirely. The repo root's
+        // published v2.0.1 binary URL. The repo root's
         // Package.swift in CI is itself the swapped Package.ci.swift,
         // which points PiperPlusG2PBinary at build-mac/piper_plus_g2p.xcframework.
         .package(name: "piper-plus", path: "../../.."),

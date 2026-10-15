@@ -35,7 +35,7 @@ in a source build, continue to resolve the legacy root model below.
 mkdir -p models/tsukuyomi-zs-v1
 curl -fL -o models/tsukuyomi-zs-v1/tsukuyomi.onnx https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1/tsukuyomi.onnx
 curl -fL -o models/tsukuyomi-zs-v1/tsukuyomi.onnx.json https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1/tsukuyomi.onnx.json
-piper-plus --model models/tsukuyomi-zs-v1/tsukuyomi.onnx --config models/tsukuyomi-zs-v1/tsukuyomi.onnx.json --output-file output.wav "こんにちは。今日は良い天気ですね。"
+piper-plus --model models/tsukuyomi-zs-v1/tsukuyomi.onnx --config models/tsukuyomi-zs-v1/tsukuyomi.onnx.json --output-file output.wav --text "こんにちは。今日は良い天気ですね。"
 ```
 
 **Inference Models (ready to use):**

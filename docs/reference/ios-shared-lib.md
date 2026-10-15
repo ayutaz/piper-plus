@@ -109,8 +109,10 @@ v1.11.0 / v1.12.0 で iOS shared-lib artifact は実際には Releases に上が
 (`build-ios` ジョブの継続失敗により release ジョブが巻き添え停止)。よって厳密な意味の
 「旧形式 `.a` の既存利用者」は観測されておらず、後方互換の対象は存在しない。
 
-`libpiper_plus-ios-arm64-${VERSION}.tar.gz` は v1.13.0 移行期の歴史的な命名である。
-現行リリースでは tar.gz 配布を消費者向けの経路とせず、xcframework の zip を使う。
+`libpiper_plus-ios-arm64-${VERSION}.tar.gz` は v1.13.0 移行期から残る deprecated
+互換 artifact であり、現行の v2.0.1 release にも
+`libpiper_plus-ios-arm64-v2.0.1.tar.gz` として公開されている。新規 consumer の
+推奨経路は引き続き xcframework の zip である。
 現在の Swift Package consumer は v2.0.1 の
 `libpiper_plus-ios-v2.0.1.xcframework.zip` を参照する。旧命名の互換性を必要とする
 consumer は、利用するリリースの資産一覧を確認すること。

@@ -46,7 +46,8 @@ sample_rate = 22050            # piper-plus uses 22.05 kHz mono throughout
 #   - csharp:  src/csharp/PiperPlus.Cli --json-input
 #   - cpp:     src/cpp/main.cpp processLine (phoneme_ids JSON field)
 #   - wasm:    src/wasm/openjtalk-web/bin/piper-cli.js --json-input
-#              (Node bin via onnxruntime-node; browser `src/index.js` is
+#              (Node bin via onnxruntime-node; browser
+#              src/wasm/openjtalk-web/src/index.js is
 #              still fetch/IndexedDB-only and is not the parity surface)
 python  = { id = "python",  cli = "uv run python -m piper_plus", supports_dump_wav = true }
 rust    = { id = "rust",    cli = "piper-plus",             supports_dump_wav = true }
@@ -54,8 +55,9 @@ csharp  = { id = "csharp",  cli = "piper-plus-cli",         supports_dump_wav = 
 go      = { id = "go",      cli = "piper-plus",             supports_dump_wav = true }
 wasm    = { id = "wasm",    cli = "node bin/piper-cli.js",  supports_dump_wav = true }
 cpp     = { id = "cpp",     cli = "piper-plus",             supports_dump_wav = true }
-# iOS Swift / Android Kotlin G2P bindings are excluded; they do not load
-# the ONNX decoder so cross-runtime WAV parity does not apply.
+# Android Kotlin G2P bindings are excluded; they do not load the ONNX decoder.
+# Swift G2P bindings are also outside this WAV parity harness, while the
+# separate Swift PiperPlus synthesis path does load ONNX through the C API/ORT.
 
 [models]
 # Models are looked up by name; the workflow downloads them on demand.

@@ -28,7 +28,7 @@ The published `from: "2.0.1"` URL resolves the released xcframework. To exercise
 1. **Build the xcframework locally** (one-time per branch). From the piper-plus repo root, mirror the steps in `.github/workflows/swift-g2p-ci.yml`:
 
    ```text
-   cargo build -p piper-plus-g2p --target {aarch64,x86_64}-apple-darwin --release \
+   cargo build --manifest-path src/rust/Cargo.toml -p piper-plus-g2p --target {aarch64,x86_64}-apple-darwin --release \
      --features all-languages,naist-jdic,bundled-dicts,ffi
    # → lipo + cbindgen + xcodebuild -create-xcframework
    ```

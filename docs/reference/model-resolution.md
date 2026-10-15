@@ -48,7 +48,10 @@ function resolve_model(model_str, config=None, cache_dir=None):
 
 ### Step 1: Direct file path
 
-入力がファイルシステム上に存在するファイルを指す場合、そのパスをそのまま使用する。ディレクトリの場合はエラーとする。
+入力がファイルシステム上に存在するファイルを指す場合、そのパスをそのまま使用する。
+catalog/native runtime の共有目標ではディレクトリを明示的な directory error とする。
+Python high-level API は現状ディレクトリを cache candidate として扱い、ONNX が見つから
+なければ通常の `ModelNotFoundError` にフォールバックする。
 
 ### Step 2: Catalog / alias lookup
 
@@ -67,7 +70,11 @@ Voice catalog から以下の優先順位で検索する:
 
 ### Step 4: Local cache scan
 
-Cache directory 内で `{model_str}/*.onnx` または `{model_str}.onnx` を探索する。
+これは共有目標であり、runtime ごとの cache layout を確認する。Python high-level API
+は `cache_dir/{model_str}/*.onnx` の subdirectory layout を読むが、
+`cache_dir/{model_str}.onnx` の flat layout は読まない。Python CLI と native runtime
+には flat layout を使う入口があるため、flat-cache の例を全 runtime の API 契約として
+解釈してはならない。
 
 ### Step 5: Error
 
@@ -96,8 +103,12 @@ Cache directory 内で `{model_str}/*.onnx` または `{model_str}.onnx` を探�
 
 ### Alias Registry and catalog key
 
-`test/model_resolution_vectors.json` の `aliases` セクションが正規の user-facing alias 定義を保持する。各実装はこの定義と一致しなければならない。`voice_catalog` の
-`key` は alias とは別の完全なカタログ識別子であり、catalog 接続されたランタイムでは直接指定できる。
+`test/model_resolution_vectors.json` の `aliases` セクションが user-facing alias の
+canonical registry である。catalog 接続された runtime はこの定義と一致させる。
+高レベル API と download CLI が別の入口を持つ場合は、実装済み alias を runtime 別に
+明記し、未接続の alias を全 runtime の機能として扱わない。`voice_catalog` の `key`
+は alias とは別の完全なカタログ識別子であり、catalog 接続されたランタイムでは直接
+指定できる。
 
 | Alias | Repo ID | ONNX File |
 |-------|---------|-----------|
@@ -115,6 +126,14 @@ not an additional user-facing alias; its aliases are the three values above.
 > `releases/zs-v1/base.onnx` と対応する `releases/zs-v1/base.onnx.json` を解決します。リリース済み
 > v2.0.0/v2.0.1 の alias 表には遡及して追加しません。`base.onnx` は 192 次元 CAM++
 > `speaker_embedding` を使う実験用 Zero-Shot base で、通常の参照なし音声用 alias ではありません。
+
+#### Runtime-specific alias status
+
+The Python high-level API (`src/python_run/piper_plus/api/_model_resolver.py`) currently
+exposes `base`, `zero-shot-base-zs-v1`, `ayousanz/piper-plus-base`, and `tsukuyomi`.
+It does not expose the CLI/catalog `css10` alias. The Python download CLI and the native
+catalog implementations have separate alias registries; a name present there is not
+automatically available through the high-level API.
 
 ---
 
@@ -247,7 +266,11 @@ function find_config(onnx_path, explicit_config=None):
 
 ## 7. テストベクトル参照
 
-テストベクトルは `test/model_resolution_vectors.json` に定義されている。各実装のテストスイートはこのファイルを読み込み、`test_cases` の各エントリに対して期待動作を検証すること。
+テストベクトルは `test/model_resolution_vectors.json` に定義されている。これは共有目標
+と検証項目の canonical matrix であり、各 runtime のテストは実装済み入口に対応する
+case を読み込んで検証する。runtime-specific な未実装経路（たとえば Python
+high-level API の `css10`、flat cache、directory-specific error）は、実装済みと
+報告せず差異として扱う。
 
 ### テストケース一覧
 

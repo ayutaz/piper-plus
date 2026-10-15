@@ -40,7 +40,7 @@ dependencies {
     // Library under test. Composite build (settings.gradle.kts) wires this
     // to the local module; replace the substitution to consume from Maven
     // Central instead.
-    implementation("io.github.ayutaz:piper-plus-g2p-android:1.0.0")
+    implementation("io.github.ayutaz:piper-plus-g2p-android:1.0.1")
 
     // Compose
     val composeBom = platform("androidx.compose:compose-bom:2024.10.01")

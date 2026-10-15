@@ -23,7 +23,7 @@
 # JSON we maintain (zh_en_loanword.json).
 #
 # Implementations:
-#   Python (training):  src/python/piper_train/phonemize/                 (japanese, english, chinese, korean)
+#   Python (training):  src/python/piper_train/ (consumes the G2P package)
 #   Python (G2P pkg):   src/python/g2p/piper_plus_g2p/                    (canonical 8-language)
 #   Python (runtime):   src/python_run/piper_plus/phonemize/                   (mirrors g2p package)
 #   Rust:               src/rust/piper-plus-g2p/                          (cmudict / pinyin / jpreprocess + naist-jdic)

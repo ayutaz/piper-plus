@@ -13,19 +13,16 @@
 
 ### 1.1 音素インベントリ + PUA 割り当て
 
-**新規作成:** `src/python/piper_train/phonemize/$ARGUMENTS_id_map.py`
+**新規作成:** `src/python/g2p/piper_plus_g2p/$ARGUMENTS.py`
 
 ```python
-from .token_mapper import register
-[LANG]_PHONEMES: list[str] = [
-    # 単一コードポイント (PUA不要)
-    # 多文字トークン (PUA必要) — register() で登録
-]
-for _token in [LANG]_PHONEMES:
-    register(_token)
+from .base import Phonemizer
+# Implement the phonemizer class here. Register it in `registry.py`; the
+# shared ID map is maintained in `encode/id_maps.py` and PUA data in
+# `encode/pua.py` / `data/pua.json`.
 ```
 
-**修正:** `src/python/piper_train/phonemize/token_mapper.py`
+**修正:** `src/python/g2p/piper_plus_g2p/encode/pua.py` と `data/pua.json`
 
 - `FIXED_PUA_MAPPING` に PUA エントリ追加
 - 現在の最終固定 PUA: PT = 0xE064 (`ɔɪ`=0xE062、`œ̃`=0xE063、`ɐ̃`=0xE064)、動的割り当て開始 = 0xE065
@@ -41,7 +38,7 @@ ES/PT: 0xE054-0xE055 (2), FR: 0xE056-0xE058 (3), SV: 0xE059-0xE061 (9)
 
 ### 1.2 G2P エンジン作成
 
-**新規作成:** `src/python/piper_train/phonemize/$ARGUMENTS.py`
+**新規作成:** `src/python/g2p/piper_plus_g2p/$ARGUMENTS.py`
 
 必須クラス:
 
@@ -66,7 +63,7 @@ Prosody: `a1=0, a2=stress(0/1/2), a3=word_phoneme_count`
 
 ### 1.3 レジストリ + 多言語統合
 
-**修正:** `src/python/piper_train/phonemize/registry.py`
+**修正:** `src/python/g2p/piper_plus_g2p/registry.py`
 
 ```python
 try:
@@ -78,17 +75,14 @@ except ImportError:
 
 - ラテン文字言語なら `latin_langs` にも追加
 
-**修正:** `src/python/piper_train/phonemize/multilingual_id_map.py`
+**修正:** `src/python/g2p/piper_plus_g2p/encode/id_maps.py`
 
 ```python
-try:
-    from .$ARGUMENTS_id_map import [LANG]_PHONEMES
-    LANGUAGE_PHONEMES["$ARGUMENTS"] = [LANG]_PHONEMES
-except ImportError:
-    pass
+# Add the language inventory to the shared map and update
+# `get_phoneme_id_map()` in encode/id_maps.py.
 ```
 
-**修正 (ラテン文字言語のみ):** `src/python/piper_train/phonemize/multilingual.py`
+**修正 (ラテン文字言語のみ):** `src/python/g2p/piper_plus_g2p/multilingual.py`
 
 - `_[LANG]_CHARS` 文字セット追加 (言語固有文字)
 - `_[LANG]_FUNCTION_WORDS` 関数語セット追加 (~45語)
@@ -109,7 +103,7 @@ except ImportError:
 
 ### 1.5 Python テスト
 
-**新規作成:** `src/python/tests/test_$ARGUMENTS_phonemizer.py`
+**新規作成:** `src/python/g2p/tests/test_$ARGUMENTS.py` (または既存テストモジュールへの追加)
 
 - 基本母音テスト (10+)
 - 子音ルールテスト (15+)
@@ -120,7 +114,7 @@ except ImportError:
 - 多言語検出テスト (5+)
 - 全テスト `@pytest.mark.unit`
 
-**新規作成:** `src/python/tests/test_$ARGUMENTS_m1_1_m1_2.py`
+**新規作成:** `src/python/g2p/tests/test_$ARGUMENTS_contract.py` (必要な契約テスト)
 
 - 音素インベントリ数チェック
 - PUA 割り当て検証
@@ -128,7 +122,7 @@ except ImportError:
 - 双方向マッピングテスト
 - 7lang → Nlang ID マップテスト
 
-実行: `uv run python -m pytest src/python/tests/test_$ARGUMENTS_*.py -x -q`
+実行: `cd src/python/g2p && uv run pytest tests/ -x -q`
 
 ---
 
@@ -143,8 +137,8 @@ except ImportError:
 
 - `src/rust/piper-core/src/phonemize/mod.rs` — `pub mod $ARGUMENTS;`
 - `src/rust/piper-core/src/voice.rs` — `"$ARGUMENTS"` ケース追加 + default_latin
-- `src/rust/piper-core/src/phonemize/token_map.rs` — PUA エントリ追加
-- `src/rust/piper-core/src/phonemize/multilingual.rs` — 言語検出追加 (ラテン文字)
+- `src/rust/piper-plus-g2p/src/token_map.rs` — PUA エントリ追加 (core はこの module を re-export)
+- `src/rust/piper-plus-g2p/src/multilingual.rs` — 言語検出追加 (ラテン文字; core は re-export)
 - `src/rust/piper-cli/src/main.rs` — `SUPPORTED_LANGUAGES` に追加
 
 テスト: `#[cfg(test)]` セクションに 30+ テスト、`cargo fmt` + `cargo clippy` 実行
@@ -189,7 +183,7 @@ except ImportError:
 
 ## Phase 5: JS/WASM 実装
 
-**修正:** `src/wasm/openjtalk-web/src/simple_unified_api.js`
+**修正:** `src/wasm/openjtalk-web/src/index.js`
 
 - 文字検出セット + 関数語セット追加
 - `_refineLatinSegmentsFor[Lang]()` 追加 (ラテン文字)

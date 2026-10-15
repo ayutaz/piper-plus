@@ -69,8 +69,8 @@ Key options:
 | `--speaker NUM` | Speaker number for multi-speaker models | 0 |
 | `--phoneme-silence PHONEME SEC` | Silence duration for specific phonemes | - |
 | `--raw-phonemes` | Interpret input as phonemes | off |
-| `--output-timing FILE` | Phoneme timing output (JSON/TSV) | - |
-| `--timing-format FORMAT` | Timing output format (`json` or `tsv`) | json |
+| `--output-timing FILE` | Phoneme timing output (JSON/TSV/SRT; requires a model with durations) | - |
+| `--timing-format FORMAT` | Timing output format (`json`, `tsv`, or `srt`) | json |
 | `--custom-dict FILE` | Custom dictionary (comma-separated for multiple) | - |
 | `--json-input` | JSON input mode | off |
 | `--list-models [LANG]` | List available models | - |

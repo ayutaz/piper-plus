@@ -1,7 +1,9 @@
 # Published Checkpoint Compatibility Contract
 # ===========================================
-# Pins the guarantee that every checkpoint piper-plus has published stays
-# loadable by the current model definition.
+# Pins the guarantee for the retained root checkpoint snapshot recorded below.
+# A separately published checkpoint is covered only after its own key/shape
+# snapshot is added; publication and SHA-256 evidence alone do not establish
+# strict load compatibility.
 #
 # Why this file exists
 # --------------------

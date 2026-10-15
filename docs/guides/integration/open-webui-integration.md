@@ -148,8 +148,25 @@ curl -X POST http://localhost:8000/v1/audio/speech \
   -o test.wav
 ```
 
-`PIPER_PLUS_API_KEYS` を設定した場合は、上のリクエストに
-`-H "Authorization: Bearer $PIPER_PLUS_API_KEY"` を追加してください。未設定または空の場合、API は Bearer 認証を行いません。
+上の例は `PIPER_PLUS_API_KEYS` が未設定または空で、Bearer 認証が無効な場合にそのまま
+実行できます。認証を有効にする場合は、サーバー側の `PIPER_PLUS_API_KEYS` に設定した
+トークンのいずれかを、クライアント側の単数形変数 `PIPER_PLUS_API_KEY` に設定します。
+単数形の変数は Open WebUI/client 側で使う説明用の変数であり、server の設定を自動的に
+読み取るものではありません。
+
+```bash
+export PIPER_PLUS_API_KEY=change-me  # server の PIPER_PLUS_API_KEYS の値のいずれか
+
+# 認証有効時は protected endpoint に Bearer header を付ける
+curl http://localhost:8000/v1/audio/speech/languages \
+  -H "Authorization: Bearer ${PIPER_PLUS_API_KEY}"
+
+curl -X POST http://localhost:8000/v1/audio/speech \
+  -H "Authorization: Bearer ${PIPER_PLUS_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"input": "こんにちは", "language": "ja", "response_format": "wav"}' \
+  -o test.wav
+```
 
 ---
 
@@ -165,7 +182,7 @@ Open WebUI の **Settings > Admin > Audio** から以下の設定を行います
 |---------|-----|
 | TTS Engine | `OpenAI` |
 | TTS Base URL | `http://piper-api:8000/v1` |
-| TTS API Key | `PIPER_PLUS_API_KEYS` 未設定時は `dummy`、設定時はその値のいずれか |
+| TTS API Key | server の `PIPER_PLUS_API_KEYS` 未設定時は `dummy`、設定時はその値のいずれか（Open WebUI/client 側では `PIPER_PLUS_API_KEY` として管理してもよい） |
 | TTS Model | `piper-plus` |
 | TTS Voice | `default` |
 

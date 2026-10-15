@@ -187,7 +187,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 ### Voice Cloning
 
 - **Speaker Encoder (ECAPA-TDNN)** (`src/python/piper_train/speaker_encoder/`) — 256 次元 L2 正規化 embedding。テスト: `test/test_speaker_encoder.py` (legacy 位置、その他は `src/python/tests/` 配下)。
-- **全ランタイム統合** — Rust/C#/Go/WASM/C++ に Speaker Encoder + speaker_embedding 統合。CLI: `--reference-audio`, `--speaker-embedding`, `--speaker-encoder-model`。C API は `speaker_embedding` テンソル経路のみ動作 (ECAPA-TDNN 推論 API はスタブ、CLI 経路では動作)。
+- **ランタイム別 voice cloning** — Rust/Go/C#/WASM は `--reference-audio` と `--speaker-encoder-model` から embedding を生成でき、各 runtime は `speaker_embedding` 入力にも対応。C++ は pre-computed `--speaker-embedding` の入力のみ実装し、`--reference-audio` / ECAPA-TDNN 推論と C API の speaker encoder は未実装 (stub)。CLI フラグと対応範囲は runtime ごとの help を確認する。
 
 ### G2P (8言語)
 
@@ -227,17 +227,17 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 - **短テキスト合成品質改善 (Strategy A/B/C)** — 全 6 ランタイム (Python/Rust/C#/Go/WASM/C++) 並列実装。A: Silence Padding + Post-trim、B: Dynamic Scales、C: SSML `<break>` 自動挿入 (SSML 実装ランタイムでのみ)。仕様: `docs/spec/short-text-contract.toml`。
 - **ストリーミング文単位分割** — 終止符 `.`/`!`/`?`/`。`/`！`/`？`/`．` で分割し文ごとに音素化・推論・yield。SSML は単一ユニット。Python: `src/python_run/piper_plus/text_splitter.py`、Rust: `piper-core/src/streaming.rs`、他言語: 同等実装。仕様: `docs/spec/text-splitter-contract.toml`。**Breaking (v1.12.0):** Python `PiperVoice.phonemize()` が単一要素から複数要素へ (詳細: マイグレーションガイド)。
 - **SSML 基本サポート** (Python/Rust/C#/Go/WASM/C++ の 6 ランタイム + G2P-only npm 解析 API) — `<speak>`, `<break>`, `<prosody rate>` を W3C サブセットで実装。実装: `g2p/piper_plus_g2p/ssml.py`, `piper-plus-g2p/src/ssml.rs` (Rust canonical), `PiperPlus.Core/Ssml/SsmlParser.cs`, `go/piperplus/ssml/parser.go`, `wasm/g2p/src/ssml.js` (npm `@piper-plus/g2p`), `src/cpp/ssml.{hpp,cpp}` (CLI `--ssml` 経由、C API 非エクスポート)。 piper-core は `piper-plus-g2p::ssml` を re-export (API 互換維持)。 piper-wasm は同パーサーを `isSsml` / `parseSsml` で WASM expose (TTS 統合は openjtalk-web の `synthesizeSsml` 側で iterate して silence 挿入 + length_scale 切替)。
-- **Phoneme Timing 出力** — 全 6 ランタイム (Python/JS-WASM 新規 + Rust/Go/C++/C# 既存) で JSON/TSV/SRT 出力。`(hop_length / sample_rate) × 1000` で byte-for-byte 互換。Python: `piper_plus.timing` モジュール、`PiperVoice.synthesize_with_timing()`、HTTP `/api/phoneme-timing`。WASM: `AudioResult.timing` (deep frozen)。仕様: `docs/spec/phoneme-timing-contract.toml`。
+- **Phoneme Timing 出力** — 仕様 `docs/spec/phoneme-timing-contract.toml` の `(hop_length / sample_rate) × 1000` と fixture parity を各実装が共有する。出力形式と公開面は runtime ごとに異なり、Python HTTP は JSON/TSV、C# CLI は JSON/TSV、Rust/Go/C++ CLI は JSON/TSV/SRT、WASM は `AudioResult.timing` と formatter API を提供する。WASM streaming/SSML、C++ SSML、C# の未配線 formatter には timing 制限がある。Python: `piper_plus.timing`、`PiperVoice.synthesize_with_timing()`、HTTP `/api/phoneme-timing`。WASM: `AudioResult.timing` (deep frozen)。byte parity の範囲と例外は仕様および golden fixture を参照する。
 
 ### ランタイム別パッケージ
 
 | ランタイム | パッケージ | バージョン | テスト | パス |
 |-----------|----------|----------|-------|------|
 | Python (PyPI) | `piper-plus` | 2.0.1 (VERSION 経由 dynamic) | pytest 多数 | `src/python_run/piper_plus/` |
-| C# (NuGet) | `PiperPlus.Core` / `PiperPlus.Cli` | 0.5.1 | ~1000 (xUnit v3) | `src/csharp/PiperPlus.{Core,Cli}/` (TFM `net10.0`) |
+| C# (NuGet) | `PiperPlus.Core` / `PiperPlus.Cli` | 0.5.1 | CI / `dotnet test` 実測 | `src/csharp/PiperPlus.{Core,Cli}/` (TFM `net10.0`) |
 | Rust (crates.io) | `piper-plus` / `piper-plus-cli` | 0.5.2 | 多数 | `src/rust/piper-{core,cli,python,wasm}/` |
-| Go (Go module) | `github.com/ayutaz/piper-plus/src/go` | tag-based | 793 | `src/go/piperplus/`, `src/go/cmd/piper-plus/` |
-| JS/WASM (npm) | `piper-plus` | 0.8.1 | ~1200 + 56 (Rust) | `src/wasm/openjtalk-web/`, `src/rust/piper-wasm/` |
+| Go (Go module) | `github.com/ayutaz/piper-plus/src/go` | tag-based | CI / `go test ./...` 実測 | `src/go/piperplus/`, `src/go/cmd/piper-plus/` |
+| JS/WASM (npm) | `piper-plus` | 0.8.1 | CI / `npm run test:npm-package:all` 実測 | `src/wasm/openjtalk-web/`, `src/rust/piper-wasm/` |
 | C API | `libpiper_plus` | shared lib | C/Dart/Godot サンプル | `src/cpp/piper_plus.{h,c_api.cpp}`, `cmake/PiperPlusShared.cmake` |
 | iOS xcframework + SPM | `piper-plus` (Swift Package) | 2.0.1 | release-shared-lib CI | `Package.swift`, `Sources/PiperPlus/`, `cmake/PrivacyInfo.xcprivacy` |
 | **Kotlin/Android G2P (Maven Central)** | `io.github.ayutaz:piper-plus-g2p-android` | 1.0.1 | L1〜L5 (kotlin-g2p-ci.yml) | `android/piper-plus-g2p/` |
@@ -250,7 +250,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 
 - **OpenAI 互換 TTS API** (`docker/python-inference/inference.py`) — FastAPI ベース、`/v1/audio/speech`、`/v1/models`、`/v1/audio/speech/languages`、`/health`、`/api/phoneme-timing`。テスト: `test_openai_api.py`。
 - **WebUI (Gradio)** (`docker/webui/app.py`) — 6lang モデル対応。CI: `webui-test.yml`。ドキュメント: `docs/features/webui.md`。
-- **Wyoming Docker + HA 統合** (`docker/wyoming/`) — Home Assistant 連携。ガイド: `docs/guides/home-assistant.md`。
+- **Wyoming Docker + HA 統合** (`docker/wyoming/`) — Home Assistant 連携。ガイド: `docs/guides/integration/home-assistant.md`。
 - **MOS ベンチマーク** (`tools/benchmark/`) — サンプル生成、PESQ/STOI 計算、調査フォーム生成。ドキュメント: `docs/benchmark-mos.md`。
 - **iOS/Android ビルド CI** (`release-shared-lib.yml`, `cmake/ios.toolchain.cmake`) — libpiper_plus を iOS arm64 / Android (arm64-v8a/armeabi-v7a/x86_64) でクロスコンパイル。iOS は xcframework (device + simulator universal) として配信、`Package.swift` 経由で SPM 利用可能。Apple-embedded プラットフォーム検出は `PIPER_APPLE_EMBEDDED` 変数で集約 (CMakeLists.txt)、OpenJTalk 関数は `src/cpp/openjtalk_ios_stub.c` で stub 化。詳細: `docs/guides/platform/ios-integration.md`、`docs/reference/ios-shared-lib.md`。
 - **モデル投稿ガイド** — `CONTRIBUTING_MODELS.md` + GitHub Issue テンプレート (`.github/ISSUE_TEMPLATE/model-{request,submission}.yml`)。

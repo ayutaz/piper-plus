@@ -111,7 +111,7 @@ ORT bump は ABI 変更があり得るため、 以下の dependent check も走
 uv run python -c "import onnxruntime; print(onnxruntime.__version__)"
 
 # Rust load test
-(cd src/rust && cargo check -p piper-core)
+(cd src/rust && cargo check -p piper-plus)
 
 # 各 runtime CI workflow が pass しているか
 gh run list --workflow=ci.yml --limit 5

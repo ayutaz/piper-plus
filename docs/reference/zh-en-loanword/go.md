@@ -141,6 +141,8 @@ package-level `sync.Once` + global var、immutable design で各 instance が参
 
 ## 7. ベンチマーク
 
+以下は設計時に想定した `testing.B` の追加先であり、現行 checkout にはまだ存在しない。
+
 | フレーム | ファイル |
 |--------|--------|
 | `testing.B` | `src/go/phonemize/bench_test.go` |
