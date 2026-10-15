@@ -22,13 +22,11 @@
 ## インストール
 
 ```bash
-pip install piper-plus
-
-# GPU サポート
-pip install "piper-plus[gpu]"
+# 公開済み v2.0.1 の CPU パッケージ
+pip install "piper-plus==2.0.1"
 ```
 
-Python 3.11+ が必要です。
+Python 3.11+ が必要です。開発版のソースからは、新しい venv で `uv pip install "src/python_run[cpu]"` または `uv pip install "src/python_run[gpu]"` の一方を選びます。公開済み v2.0.1 の GPU extra は CPU ORT も要求するため、この修正を含むソースからの GPU 導入手順は末尾の「開発版の provider 選択」を参照してください。
 
 ## クイックスタート
 
@@ -202,3 +200,7 @@ curl -L "${ZS_URL}/base.ckpt" -o models/zs-v1/base.ckpt
 ## ライセンス
 
 MIT License — 詳細は [LICENSE](https://github.com/ayutaz/piper-plus/blob/dev/LICENSE.md) を参照。
+
+### 開発版の provider 選択
+
+このブランチからビルドするパッケージは CPU/GPU ORT を基底依存にせず、`[cpu]` / `[gpu]` の一方を選びます。既存環境で切り替える場合は新しい venv を使用してください。公開済み v2.0.1 の基底依存は CPU ORT を含むため、この変更の収録後のパッケージとは異なります。ソースから GPU 環境を作る場合は root で `uv sync --locked --no-group cpu --extra inference-gpu` を使用し、実行には `uv run --no-sync` を使用します。

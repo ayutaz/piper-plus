@@ -36,6 +36,7 @@ on:
       # Floor-check group (Issue #372)
       - 'src/python/pyproject.toml'
       - 'src/python_run/requirements.txt'
+      - 'src/python_run/pyproject.toml'
       - 'src/python_run/requirements_gpu.txt'
       - 'src/python_run/setup.py'
       - 'src/csharp/**/*.csproj'
@@ -62,6 +63,7 @@ on:
       # Floor-check group (Issue #372)
       - 'src/python/pyproject.toml'
       - 'src/python_run/requirements.txt'
+      - 'src/python_run/pyproject.toml'
       - 'src/python_run/requirements_gpu.txt'
       - 'src/python_run/setup.py'
       - 'src/csharp/**/*.csproj'

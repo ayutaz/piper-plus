@@ -18,7 +18,7 @@ GitHub Releases には 3 種類の CLI バイナリが並んでおり、初め�
 |---|---|---|---|---|
 | **C++ CLI** | C++ | `piper-plus-cpp-*` | 最も成熟・安定。バイナリサイズ最小、起動が軽量。armv7 (32bit ARM) を唯一サポート。OpenJTalk 辞書の自動 DL に対応 | 初めて使う / 組み込み機器 / Raspberry Pi / 本番運用で安定性重視 |
 | **C# .NET CLI** | C# / .NET 10 | `piper-plus-cli-*` | 8 言語マルチリンガル (JA/EN/ZH/KO/ES/FR/PT/SV)、`lid` テンソル対応、ストリーミング文分割、カスタム辞書 (JSON/TSV)、インライン音素 `[[ph]]` 記法、モデル名自動解決。Intel Mac (osx-x64) を唯一サポート | Windows ユーザー / Intel Mac ユーザー / 多言語合成 / .NET 環境との統合 |
-| **Rust CLI** | Rust | `piper-plus-rs-cli-*` | ストリーミング、CUDA / CoreML / DirectML での GPU 推論対応。8 言語対応。`--sentence-silence`, `--phoneme-silence` 等の細かい無音制御。jpreprocess (lindera) と naist-jdic (OpenJTalk) を選択可能 | GPU 推論を使いたい / 最新機能や細かいチューニングを試したい / 開発者 |
+| **Rust CLI** | Rust | `piper-plus-rs-cli-*` | ストリーミング。公開 archive は CPU build。GPU は provider feature を有効にした source build が必要。8 言語対応。`--sentence-silence`, `--phoneme-silence` 等の細かい無音制御。jpreprocess (lindera) と naist-jdic (OpenJTalk) を選択可能 | CPU で Rust CLI を使いたい / source build する開発者 |
 
 各バリアントの実装は `src/cpp/`、`src/csharp/PiperPlus.Cli/`、`src/rust/piper-cli/` にあります。
 
@@ -46,7 +46,7 @@ Intel Mac、Linux armv7、Windows arm64 のいずれかを使う場合は、選�
 2. **Linux arm64 で Debian Bullseye 等の広い glibc 互換性が必要** -> **C++ CLI の修正版**を source/dev build または検証済み CI artifact から取得 (ABI 上限 GLIBC 2.31、確認した成果物は GLIBC 2.29)
 3. **Intel Mac (macOS x64)** -> **C# .NET CLI 一択** (`piper-plus-cli-osx-x64.tar.gz`)
 4. **Windows on ARM** -> **C# .NET CLI 一択** (`piper-plus-cli-win-arm64.zip`)
-5. **GPU 推論 (CUDA / CoreML / DirectML) を使いたい** -> **Rust CLI**
+5. **GPU 推論 (CUDA / CoreML / DirectML) を使いたい** -> **Rust CLI を provider feature 付きで source build**（[手順](../guides/development/building-from-source.md)。公開 `piper-plus-rs-cli-*` は CPU build）
 6. **Windows / 多言語 (中国語・スペイン語など) を使う / .NET と統合したい** -> **C# .NET CLI**
 7. **上記に当てはまらない / とにかく動かしたい / 何を選んでよいか分からない** -> **C++ CLI**
 

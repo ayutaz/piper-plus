@@ -1,0 +1,118 @@
+name: CLI and Python consumer contracts
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/rust/**'
+      - 'src/go/**'
+      - 'src/csharp/**'
+      - 'src/python_run/**'
+      - 'environments/webui/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'scripts/check_cli_consumer_outputs.py'
+      - 'scripts/check_python_provider.py'
+      - 'scripts/check_hf_space_gradio_sync.py'
+      - 'scripts/check_ruff_version_sync.py'
+      - 'tests/fixtures/cli_consumer/**'
+      - '.github/workflows/consumer-contracts.yml'
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: consumer-contracts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cli:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [rust, go, csharp]
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - run: pip install onnx onnxruntime
+      - run: python tests/fixtures/cli_consumer/build_fixture.py /tmp/cli-fixture
+      - uses: dtolnay/rust-toolchain@stable
+        if: matrix.runtime == 'rust'
+      - uses: Swatinem/rust-cache@v2
+        if: matrix.runtime == 'rust'
+        with:
+          workspaces: src/rust -> target
+      - name: Build and test Rust composition
+        if: matrix.runtime == 'rust'
+        run: |
+          cargo test --locked --manifest-path src/rust/Cargo.toml -p piper-plus --features onnx --lib segments::tests
+          cargo test --locked --manifest-path src/rust/Cargo.toml -p piper-plus-cli
+          echo "CLI=$PWD/src/rust/target/debug/piper-plus-cli" >> "$GITHUB_ENV"
+      - uses: actions/setup-go@v5.6.0
+        if: matrix.runtime == 'go'
+        with:
+          go-version-file: src/go/go.mod
+          cache-dependency-path: src/go/go.sum
+      - name: Build and test Go
+        if: matrix.runtime == 'go'
+        working-directory: src/go
+        run: |
+          go test ./...
+          go build -o /tmp/piper-go ./cmd/piper-plus
+          echo 'CLI=/tmp/piper-go' >> "$GITHUB_ENV"
+          python -c "import pathlib,onnxruntime; p=next((pathlib.Path(onnxruntime.__file__).parent/'capi').glob('libonnxruntime.so.*')); print('ONNX_RUNTIME_SHARED_LIBRARY_PATH='+str(p))" >> "$GITHUB_ENV"
+      - uses: actions/setup-dotnet@v5.4.0
+        if: matrix.runtime == 'csharp'
+        with:
+          global-json-file: global.json
+      - name: Build and test C#
+        if: matrix.runtime == 'csharp'
+        run: |
+          dotnet build src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj
+          dotnet run --project src/csharp/PiperPlus.Cli.Tests/PiperPlus.Cli.Tests.csproj
+          echo "CLI=$PWD/src/csharp/PiperPlus.Cli/bin/Debug/net10.0/PiperPlus.Cli.dll" >> "$GITHUB_ENV"
+      - name: Inspect real CLI WAV and timing artifacts
+        run: python scripts/check_cli_consumer_outputs.py --runtime '${{ matrix.runtime }}' --executable "$CLI" --model /tmp/cli-fixture/model.onnx
+
+  python-environments:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GRADIO_ANALYTICS_ENABLED: 'False'
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - run: pip install uv onnx
+      - name: Verify locked provider selections
+        run: |
+          python scripts/check_hf_space_gradio_sync.py
+          uv lock --check
+          uv export --locked --no-group cpu --extra inference-gpu --no-dev --no-hashes --format requirements-txt -o /tmp/gpu.txt
+          grep '^onnxruntime-gpu==' /tmp/gpu.txt
+          if grep '^onnxruntime==' /tmp/gpu.txt; then exit 1; fi
+          uv export --locked --extra inference --no-dev --no-hashes --format requirements-txt -o /tmp/cpu.txt
+          grep '^onnxruntime==' /tmp/cpu.txt
+          if grep '^onnxruntime-gpu==' /tmp/cpu.txt; then exit 1; fi
+          python tests/fixtures/cli_consumer/build_fixture.py /tmp/provider-fixture
+      - name: Verify a clean GPU distribution environment (no GPU hardware required)
+        run: |
+          uv venv --python 3.13 /tmp/gpu-env
+          uv pip install --python /tmp/gpu-env/bin/python 'src/python_run[gpu]'
+          uv pip check --python /tmp/gpu-env/bin/python
+          /tmp/gpu-env/bin/python scripts/check_python_provider.py --expected gpu --model /tmp/provider-fixture/model.onnx
+      - name: Install and exercise isolated WebUI
+        run: |
+          uv sync --project environments/webui --locked
+          uv pip check --python environments/webui/.venv/bin/python
+          uv run --project environments/webui --no-sync python -c "from pathlib import Path; from piper_plus.webui import create_interface; assert create_interface(Path('/tmp/models')) is not None"
+          uv run --project environments/webui --no-sync python -m piper_plus --help
+          uv run --project environments/webui --no-sync python scripts/check_python_provider.py --expected cpu --model /tmp/provider-fixture/model.onnx

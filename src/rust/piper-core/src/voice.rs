@@ -132,6 +132,8 @@ where
 /// > **Note:** 低レベルの音素ID入力には既存の [`SynthesisRequest`] を使用してください。
 #[derive(Debug, Clone)]
 pub struct SynthesisParams {
+    /// Insert silence by splitting synthesis at configured phoneme boundaries.
+    pub phoneme_silence: std::collections::HashMap<String, f32>,
     /// 話者 ID (マルチスピーカーモデル用)
     pub speaker_id: Option<i64>,
     /// 言語オーバーライド (マルチリンガルモデル用、phonemizer の自動検出を上書き)
@@ -149,6 +151,7 @@ pub struct SynthesisParams {
 impl Default for SynthesisParams {
     fn default() -> Self {
         Self {
+            phoneme_silence: std::collections::HashMap::new(),
             speaker_id: None,
             language_override: None,
             noise_scale: 0.4,
@@ -417,6 +420,17 @@ impl PiperVoice {
         text: &str,
         params: &SynthesisParams,
     ) -> Result<SynthesisResult, PiperError> {
+        if crate::ssml::SsmlParser::is_ssml(text) {
+            return crate::segments::synthesize_ssml(
+                text,
+                self.config.audio.sample_rate,
+                |part, rate| {
+                    let mut segment_params = params.clone();
+                    segment_params.length_scale *= rate;
+                    self.synthesize_with_params(part, &segment_params)
+                },
+            );
+        }
         // Strategy C は音声レベルで適用する (下の 7 番)。
         //
         // ここでは `wrap_short_text_ssml(text)` を呼んで、その SSML 文字列を
@@ -487,7 +501,13 @@ impl PiperVoice {
             noise_w: params.noise_w,
         };
 
-        let mut result = self.engine.synthesize(&request)?;
+        let mut result = crate::segments::synthesize_phoneme_silence(
+            &request,
+            &params.phoneme_silence,
+            &self.config.phoneme_id_map,
+            self.config.audio.sample_rate,
+            |phrase| self.engine.synthesize(phrase),
+        )?;
 
         // 7. Strategy C: 短テキストの音声前後に無音を挿入する。
         //    durations / phoneme_ids は合成された音声に対応したままなので、
@@ -1299,6 +1319,7 @@ mod tests {
         let params = SynthesisParams {
             speaker_id: Some(5),
             language_override: Some("en".into()),
+            phoneme_silence: Default::default(),
             noise_scale: 0.333,
             length_scale: 1.5,
             noise_w: 0.5,

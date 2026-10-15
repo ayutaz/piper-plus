@@ -10,7 +10,14 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import onnxruntime
+
+
+try:
+    import onnxruntime
+except ImportError as exc:
+    raise ImportError(
+        'Select an ONNX Runtime provider: install "piper-plus[cpu]" or "piper-plus[gpu]" in a clean environment.'
+    ) from exc
 
 from .config import PhonemeType, PiperConfig
 from .const import BOS, EOS, PAD

@@ -17,16 +17,16 @@ There are two separate WebUI implementations: a **local development** version wi
 ```bash
 # From the repository root, install workspace and WebUI dependencies
 uv sync
-uv pip install -r src/python_run/requirements_webui.txt
+uv sync --project environments/webui --locked
 ```
 
 ### Running
 
 ```bash
-uv run --no-sync python -m piper_plus.webui --data-dir test/models
+uv run --project environments/webui --no-sync python -m piper_plus.webui --data-dir test/models
 
 # Or with custom settings
-uv run --no-sync python -m piper_plus.webui \
+uv run --project environments/webui --no-sync python -m piper_plus.webui \
   --data-dir /path/to/models \
   --host 0.0.0.0 \
   --port 8080 \
@@ -140,6 +140,19 @@ docker compose -f docker/webui/docker-compose.yml up --build
 | Issue | Solution |
 |-------|----------|
 | No models found | Check `--data-dir` path (local) or volume mount (Docker); ensure .onnx and .onnx.json pairs exist |
-| Import errors | `uv pip install -r src/python_run/requirements_webui.txt` |
+| Import errors | `uv sync --project environments/webui --locked` |
 | Port in use | Use `--port 8080` (local) or change the port mapping in docker-compose |
 | Docker issues | Check volume mounts and port availability |
+
+## UI と学習環境の分離
+
+`environments/webui/uv.lock` は Gradio の HF Hub 1.x を固定します。root の Transformers 4.x 学習環境（HF Hub <1）へ `requirements_webui.txt` を直接インストールしないでください。
+
+Training タブから学習を起動する場合は、root で `uv sync --extra train` を実行した後、UI 起動前に `PIPER_PLUS_TRAINING_PYTHON` を root `.venv` の Python の絶対パスへ設定します。PowerShell では次を使用します。
+
+```powershell
+$env:PIPER_PLUS_TRAINING_PYTHON = (Resolve-Path .venv/Scripts/python.exe).Path
+uv run --project environments/webui --no-sync python -m piper_plus.webui
+```
+
+Linux/macOS では `.venv/bin/python` の絶対パスを同じ環境変数へ設定します。

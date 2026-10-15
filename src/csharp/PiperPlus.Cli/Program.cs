@@ -212,7 +212,7 @@ internal static partial class Program
         // --timing-format
         var timingFormatOption = new Option<string>("--timing-format")
         {
-            Description = "Timing format: json or tsv",
+            Description = "Timing format: json, tsv or srt",
             DefaultValueFactory = _ => "json",
         };
 
@@ -877,6 +877,11 @@ internal static partial class Program
                 var piperSession = new PiperSession(model);
 
                 int sampleRate = model.SampleRate;
+                if (!string.IsNullOrEmpty(outputTimingPath) && streaming)
+                {
+                    throw new ArgumentException("--output-timing cannot be combined with --streaming; use ordinary WAV output.");
+                }
+
                 piperSession.SentenceSilenceSeconds = sentenceSilence;
 
                 // Determine output mode
@@ -1064,6 +1069,7 @@ internal static partial class Program
                     }
 
                     // Synthesize (with optional --phoneme_silence splitting)
+                    var timingEntries = new List<TimingWriter.PhonemeTimingEntry>();
                     short[] audio;
                     try
                     {
@@ -1071,7 +1077,7 @@ internal static partial class Program
                             piperSession, phonemeIdsLong, prosodyFlat,
                             speaker, languageId, noiseScale, lengthScale, noiseW,
                             phonemeSilenceMap, config.PhonemeIdMap, sampleRate,
-                            speakerEmbedding);
+                            speakerEmbedding, string.IsNullOrEmpty(outputTimingPath) ? null : timingEntries.AddRange, model.HopSize);
                     }
                     catch (Exception ex)
                     {
@@ -1089,15 +1095,13 @@ internal static partial class Program
                             $"({audio.Length} total samples)");
                     }
 
-                    // --output-timing: warn that timing data is not available
-                    // (VITS model does not expose per-phoneme durations in standard output)
-                    if (!string.IsNullOrEmpty(outputTimingPath))
+                    if (isShortText)
                     {
-                        LogInfo(
-                            quiet,
-                            $"Warning: --output-timing specified but phoneme timing data " +
-                            $"is not available from this model. Skipping timing output.");
+                        float offsetMs = ShortTextProcessor.SilencePadMs;
+                        timingEntries = timingEntries.Select(e => e with { StartMs = e.StartMs + offsetMs, EndMs = e.EndMs + offsetMs }).ToList();
                     }
+
+                    WriteTimingOutput(outputTimingPath, timingFormat, timingEntries, sampleRate);
 
                     // Write output (streaming vs normal)
                     if (streaming)
@@ -1243,6 +1247,7 @@ internal static partial class Program
                                 $"Raw phonemes line {utteranceIndex}: " +
                                 $"{phonemeIdsLong.Length} IDs, speaker={speaker}");
 
+                            var timingEntries = new List<TimingWriter.PhonemeTimingEntry>();
                             short[] audio;
                             try
                             {
@@ -1250,7 +1255,7 @@ internal static partial class Program
                                     piperSession, phonemeIdsLong, null,
                                     speaker, languageId, noiseScale, lengthScale, noiseW,
                                     phonemeSilenceMap, config.PhonemeIdMap, sampleRate,
-                                    speakerEmbedding);
+                                    speakerEmbedding, string.IsNullOrEmpty(outputTimingPath) ? null : timingEntries.AddRange, model.HopSize);
                             }
                             catch (Exception ex)
                             {
@@ -1264,6 +1269,7 @@ internal static partial class Program
                                 outputFile, outputDir, null,
                                 audio, sampleRate, utteranceIndex, quiet);
 
+                            WriteTimingOutput(TimingPathForUtterance(outputTimingPath, utteranceIndex + 1), timingFormat, timingEntries, sampleRate);
                             utteranceIndex++;
                         }
 
@@ -1451,6 +1457,7 @@ internal static partial class Program
                                 $"speaker={uttSpeaker}");
 
                             // Run inference (with optional --phoneme_silence splitting)
+                            var timingEntries = new List<TimingWriter.PhonemeTimingEntry>();
                             short[] audio;
                             try
                             {
@@ -1458,7 +1465,7 @@ internal static partial class Program
                                     piperSession, phonemeIdsLong, prosodyFlat,
                                     uttSpeaker, uttLanguageId, noiseScale, lengthScale, noiseW,
                                     phonemeSilenceMap, config.PhonemeIdMap, sampleRate,
-                                    uttSpeakerEmbedding);
+                                    uttSpeakerEmbedding, string.IsNullOrEmpty(outputTimingPath) ? null : timingEntries.AddRange, model.HopSize);
                             }
                             catch (Exception ex)
                             {
@@ -1481,6 +1488,13 @@ internal static partial class Program
                                 outputFile, outputDir, uttOutputFile,
                                 audio, sampleRate, utteranceIndex, quiet);
 
+                            if (uttIsShortText)
+                            {
+                                float offsetMs = ShortTextProcessor.SilencePadMs;
+                                timingEntries = timingEntries.Select(e => e with { StartMs = e.StartMs + offsetMs, EndMs = e.EndMs + offsetMs }).ToList();
+                            }
+
+                            WriteTimingOutput(TimingPathForUtterance(outputTimingPath, utteranceIndex + 1), timingFormat, timingEntries, sampleRate);
                             utteranceIndex++;
                         }
 
@@ -1489,15 +1503,6 @@ internal static partial class Program
                             LogError("No input received on stdin.");
                             Environment.ExitCode = 1;
                             return Environment.ExitCode;
-                        }
-
-                        // --output-timing: warn once at end if no timing data
-                        if (!string.IsNullOrEmpty(outputTimingPath))
-                        {
-                            LogInfo(
-                                quiet,
-                                $"Warning: --output-timing specified but phoneme timing data " +
-                                $"is not available from this model. Skipping timing output.");
                         }
 
                         LogInfo(quiet, $"Synthesized {utteranceIndex} utterance(s).");
@@ -1544,7 +1549,9 @@ internal static partial class Program
         Dictionary<string, float>? phonemeSilenceMap,
         Dictionary<string, int[]> phonemeIdMap,
         int sampleRate,
-        float[]? speakerEmbedding = null)
+        float[]? speakerEmbedding = null,
+        Action<List<TimingWriter.PhonemeTimingEntry>>? timingSink = null,
+        int hopSize = 256)
     {
         // When a speaker embedding is supplied, the discrete sid is dropped
         // (the two are mutually exclusive — see SynthesisInput.Validate). The
@@ -1567,7 +1574,19 @@ internal static partial class Program
                 LengthScale: lengthScale,
                 NoiseW: noiseW,
                 SpeakerEmbedding: speakerEmbedding);
-            return piperSession.Synthesize(input);
+            if (timingSink is null)
+            {
+                return piperSession.Synthesize(input);
+            }
+
+            var synthesis = piperSession.SynthesizeWithDurations(input);
+            if (synthesis.Durations is null)
+            {
+                throw new InvalidOperationException("Timing requested but model has no durations output.");
+            }
+
+            timingSink(TimingWriter.CalculateTiming(phonemeIdsLong, synthesis.Durations, phonemeIdMap, sampleRate, hopSize));
+            return synthesis.Audio;
         }
 
         // Split at phoneme silence boundaries
@@ -1598,7 +1617,25 @@ internal static partial class Program
                 NoiseW: noiseW,
                 SpeakerEmbedding: speakerEmbedding);
 
-            short[] phraseAudio = piperSession.Synthesize(input);
+            short[] phraseAudio;
+            if (timingSink is null)
+            {
+                phraseAudio = piperSession.Synthesize(input);
+            }
+            else
+            {
+                var synthesis = piperSession.SynthesizeWithDurations(input);
+                if (synthesis.Durations is null)
+                {
+                    throw new InvalidOperationException("Timing requested but model has no durations output.");
+                }
+
+                float offsetMs = (float)totalLength / sampleRate * 1000;
+                var entries = TimingWriter.CalculateTiming(phraseIds, synthesis.Durations, phonemeIdMap, sampleRate, hopSize);
+                timingSink(entries.Select(e => e with { StartMs = e.StartMs + offsetMs, EndMs = e.EndMs + offsetMs }).ToList());
+                phraseAudio = synthesis.Audio;
+            }
+
             segments.Add((phraseAudio, phrase.SilenceSamples));
             totalLength += phraseAudio.Length + phrase.SilenceSamples;
         }

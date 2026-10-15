@@ -101,7 +101,7 @@ jobs:
       - name: Install canonical runtime (piper-plus)
         run: |
           python -m pip install --upgrade pip
-          pip install -e src/python_run
+          pip install -e "src/python_run[cpu]"
 
       - name: Verify fixture is in sync with canonical implementation
         run: |

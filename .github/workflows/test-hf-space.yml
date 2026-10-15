@@ -21,6 +21,7 @@ on:
       # requirements_webui.txt だけを触る変更でゲートが起動せず、
       # 3 サイト照合に拡張した意味が無くなる。
       - 'src/python_run/requirements_webui.txt'
+      - 'environments/webui/pyproject.toml'
       - 'scripts/check_hf_space_gradio_sync.py'
   pull_request:
     paths:
@@ -30,6 +31,7 @@ on:
       - 'src/python/piper_train/ort_utils.py'
       - 'scripts/check_hf_space_frontmatter.py'
       - 'src/python_run/requirements_webui.txt'
+      - 'environments/webui/pyproject.toml'
       - 'scripts/check_hf_space_gradio_sync.py'
       # 自分自身。 push 側には既に入っているが pull_request 側に無く、
       # この workflow の定義だけを変える PR では本 workflow が起動しなかった

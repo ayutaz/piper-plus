@@ -5,6 +5,10 @@ on:
     branches: [dev]
     paths:
       - 'src/python/piper_train/export*.py'
+      - 'src/python/piper_train/onnx_validation.py'
+      - 'tests/scripts/test_onnx_artifact_validation.py'
+      - 'tests/scripts/test_model_artifact_tools.py'
+      - 'tests/scripts/test_check_model_sha256_manifest.py'
       - 'src/python/piper_train/speaker_encoder/export_encoder.py'
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'src/python_run/setup.py'
@@ -67,6 +71,15 @@ jobs:
       - name: Check ONNX export contract
         run: python scripts/check_onnx_export_contract.py
 
+      - name: Model artifact verifier and published manifest regression tests
+        run: pytest tests/scripts/test_model_artifact_tools.py tests/scripts/test_check_model_sha256_manifest.py -q --override-ini="addopts="
+
+      - name: Install actual ONNX artifact validator dependencies
+        run: pip install onnx onnxruntime numpy
+
+      - name: Execute artifact loading, warmup and negative output tests
+        run: pytest tests/scripts/test_onnx_artifact_validation.py -q --override-ini="addopts="
+
       - name: Check phoneme set version contract
         run: python scripts/check_phoneme_set_version.py
 
@@ -94,4 +107,3 @@ jobs:
 
       - name: Verify model checksums (manifest print)
         run: python scripts/verify_model_checksums.py --print-manifest
-        continue-on-error: true

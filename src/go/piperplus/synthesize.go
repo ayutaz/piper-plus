@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ayutaz/piper-plus/src/go/phonemize"
+	"github.com/ayutaz/piper-plus/src/go/piperplus/ssml"
 )
 
 // createPhonemizer builds the appropriate Phonemizer based on VoiceConfig.
@@ -250,6 +251,13 @@ func (v *Voice) Synthesize(ctx context.Context, text string, opts ...SynthesisOp
 	for _, fn := range opts {
 		fn(&so)
 	}
+	if ssml.IsSSML(text) {
+		return synthesizeSSML(ctx, text, v.config.Audio.SampleRate, func(part string, rate float32) (*SynthesisResult, error) {
+			segmentOpts := append([]SynthesisOption(nil), opts...)
+			segmentOpts = append(segmentOpts, WithLengthScale(so.LengthScale*rate))
+			return v.Synthesize(ctx, part, segmentOpts...)
+		})
+	}
 
 	req, needsBreakPad, err := v.prepareSynthesisRequest(text, so)
 	if err != nil {
@@ -264,4 +272,30 @@ func (v *Voice) Synthesize(ctx context.Context, text string, opts ...SynthesisOp
 	applyShortTextPadding(synthResult, needsBreakPad)
 
 	return synthResult, nil
+}
+
+// Segments are synthesized separately so markup never reaches G2P. A joined
+// result has no single model duration tensor; it must not report fabricated
+// phoneme alignment for the inserted breaks.
+func synthesizeSSML(ctx context.Context, text string, sampleRate int, synthesize func(string, float32) (*SynthesisResult, error)) (*SynthesisResult, error) {
+	result := &SynthesisResult{SampleRate: sampleRate}
+	for _, segment := range ssml.Parse(text) {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if segment.Text != "" {
+			part, err := synthesize(segment.Text, segment.Rate)
+			if err != nil {
+				return nil, err
+			}
+			if part.SampleRate != sampleRate {
+				return nil, fmt.Errorf("SSML segment sample rate mismatch")
+			}
+			result.Audio = append(result.Audio, part.Audio...)
+			result.InferTime += part.InferTime
+		}
+		result.Audio = append(result.Audio, make([]int16, segment.BreakMs*sampleRate/1000)...)
+	}
+	result.Duration = time.Duration(float64(len(result.Audio)) / float64(sampleRate) * float64(time.Second))
+	return result, nil
 }

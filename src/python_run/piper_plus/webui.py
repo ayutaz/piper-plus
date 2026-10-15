@@ -4,6 +4,7 @@
 import argparse
 import json
 import logging
+import os
 import sys
 import threading
 import time
@@ -412,6 +413,27 @@ def validate_dataset(dataset_path: str) -> dict:
 
 def check_training_dependencies():
     """Check if training dependencies are installed"""
+    training_python = os.environ.get("PIPER_PLUS_TRAINING_PYTHON")
+    if training_python:
+        import subprocess
+
+        try:
+            result = subprocess.run(
+                [
+                    training_python,
+                    "-c",
+                    "import importlib.util,json; print(json.dumps([name for name in ('torch','pytorch_lightning','piper_train') if importlib.util.find_spec(name) is None]))",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode:
+                return [f"training interpreter failed: {result.stderr.strip()}"]
+            return json.loads(result.stdout)
+        except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
+            return [f"training interpreter check failed: {exc}"]
     missing_deps = []
 
     try:

@@ -126,9 +126,15 @@ def export_speaker_encoder(
     # Verify the ONNX model
     _verify_onnx(output_path, model, dummy_mel)
 
+    from ..onnx_validation import check_fp16_parity, validate_export  # noqa: PLC0415
+
+    validation_feeds = {"mel": dummy_mel.detach().cpu().numpy()}
+    fp32_outputs = validate_export(output_path, validation_feeds)
     # FP16 conversion
     if fp16:
-        _apply_fp16(output_path)
+        _apply_fp16(output_path, validation_feeds)
+        converted_outputs = validate_export(output_path, validation_feeds)
+        check_fp16_parity(fp32_outputs, converted_outputs)
 
     file_size = output_path.stat().st_size
     _LOGGER.info(
@@ -180,7 +186,7 @@ def _verify_onnx(
         )
 
 
-def _apply_fp16(onnx_path: Path) -> None:
+def _apply_fp16(onnx_path: Path, validation_feeds: dict | None = None) -> None:
     """Apply FP16 conversion to the ONNX model.
 
     Uses the project's convert_fp16 utility for VITS-compatible conversion
@@ -196,6 +202,10 @@ def _apply_fp16(onnx_path: Path) -> None:
         from ..tools.convert_fp16 import convert_fp16  # noqa: PLC0415
 
         convert_fp16(onnx_path, tmp_fp16)
+        if validation_feeds is not None:
+            from ..onnx_validation import validate_export  # noqa: PLC0415
+
+            validate_export(tmp_fp16, validation_feeds)
         tmp_fp16.replace(onnx_path)
     except ImportError:
         _LOGGER.warning(

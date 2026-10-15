@@ -68,7 +68,7 @@ jobs:
 
       - name: Install piper (python)
         if: matrix.runtime == 'python'
-        run: pip install -e src/python_run
+        run: pip install -e "src/python_run[cpu]"
         shell: bash
 
       - name: Capture python --help

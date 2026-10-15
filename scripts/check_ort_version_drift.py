@@ -98,7 +98,7 @@ ROW_CHECKS: list[tuple[str, str, str]] = [
         "src/python/pyproject.toml",
         r'"onnxruntime-gpu>=([0-9][0-9.]*)',
     ),
-    ("Python (runtime)", "src/python_run/requirements.txt", r"^onnxruntime>=([0-9][0-9.]*)"),
+    ("Python (runtime)", "src/python_run/pyproject.toml", r'"onnxruntime>=([0-9][0-9.]*)"'),
     (
         "Python (runtime)",
         "src/python_run/requirements_gpu.txt",

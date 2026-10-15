@@ -10,11 +10,10 @@ VITS Duration Predictor から音素ごとの開始時刻・終了時刻・継�
 | Rust | ✅ | ✅ | ✅ | ✅ | `--timing FORMAT` (stderr 出力) | - |
 | Go | ✅ | ✅ | ✅ | ✅ | `--output-timing` `--timing-format` | - |
 | C++ | ✅ | ✅ | ✅ | ✅ | `--output-timing` `--timing-format` | - |
-| C# | ✅ | ✅ | ✅ | ✅ | (`PhonemeTimingExtractor`) | - |
+| C# | ✅ | ✅ | ✅ | ✅ | `--output-timing` `--timing-format` | - |
 | WASM/JS | ✅ | ✅ | ✅ | ✅ | (`AudioResult.timing`) | N/A (browser) |
 
-JSON/TSV/SRT 欄はライブラリ formatter を含みます。Python HTTP と C# CLI は
-JSON/TSV のみを公開し、Python CLI に timing flag はありません。WASM の
+JSON/TSV/SRT 欄はライブラリ formatter を含みます。Python HTTP は JSON/TSV、C# CLI は JSON/TSV/SRT を公開し、Python CLI に timing flag はありません。WASM の
 streaming/SSML 経路は timing を返しません。各 API/CLI の公開範囲を確認してください。
 
 duration 出力を持つ同じ ONNX model と同じ入力を使った実装は、契約で定めた
@@ -214,3 +213,9 @@ with open("output.srt", "w") as f:
 - フィールド名: snake_case (`start_ms`, `end_ms`, `duration_ms`, `total_duration_ms`, `sample_rate`)
 - ID → 音素文字列の逆引き: PUA 文字 (U+E000–U+F8FF) は `U+XXXX` 形式へフォールバック
 - 短文 padding 適用時: original phoneme IDs を保持し timing 計算に使用
+
+## 複数発話と分割合成
+
+このブランチの C# stdin と Go batch／JSONL は `--output-timing timing.json` に対し `timing_001.json`, `timing_002.json` のように発話別に保存します。duration を持たないモデルで明示的に timing を要求すると C#/Go CLI は失敗します。
+
+Rust/Go の SSML 分割合成と Rust の phoneme-silence 分割合成は WAV を連結しますが、単一の aligned duration tensor は返しません。Rust は timing 不在を警告し、Go は timing を要求した場合に失敗します。C# は `--streaming` と `--output-timing` の同時指定を拒否します。

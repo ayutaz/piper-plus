@@ -78,9 +78,16 @@ audio quality.
 
 ## JSONL and batch input
 
-Without `--text`, the CLI reads JSONL from stdin. Each record can contain
-`text`, `speaker`, `language`, and the synthesis parameters accepted by the
-runtime. Use `--batch FILE` for one utterance per line. `--timing FORMAT`
+Without `--text`, the CLI reads JSONL from stdin. Each record requires `phoneme_ids` (an integer array). Optional fields are
+`speaker_id`, `language_id`, `speaker_embedding`, `prosody_features`, and
+`output_file`; `text`, `speaker`, and `language` are not JSONL input fields.
+Use `--text` for direct text input. For example:
+
+```json
+{"phoneme_ids":[1,0,10,0,11,0,2],"speaker_id":0,"language_id":0,"output_file":"sample.wav"}
+```
+
+Choose IDs from the model configuration. Use `--batch FILE` for one utterance per line. `--timing FORMAT`
 adds phoneme timing output when the loaded model exposes duration data.
 
 ## Language and dictionary behavior

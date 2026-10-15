@@ -1,6 +1,5 @@
 # Core dependencies
-# Issue #372: floor must be >= C++ canonical (cmake/OnnxRuntime.cmake)
-onnxruntime>=1.26.0
+# ORT provider is selected via the cpu/gpu extras in pyproject.toml.
 numpy>=1.26.4,<3.0
 
 # Japanese phonemization (cross-platform, no espeak-ng dependency)

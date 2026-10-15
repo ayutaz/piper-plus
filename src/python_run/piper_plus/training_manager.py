@@ -82,7 +82,7 @@ class TrainingManager:
             return False
 
         # Create output directory
-        output_path = Path(output_dir)
+        output_path = Path(output_dir).resolve()
         output_path.mkdir(parents=True, exist_ok=True)
 
         # Find the correct Python path for piper_train
@@ -90,18 +90,18 @@ class TrainingManager:
 
         # Build command
         cmd = [
-            sys.executable,
+            os.environ.get("PIPER_PLUS_TRAINING_PYTHON", sys.executable),
             "-m",
             "piper_train",
             "--dataset-dir",
-            dataset_path,
+            str(Path(dataset_path).resolve()),
             "--quality",
             quality,
             "--batch-size",
             str(batch_size),
-            "--learning-rate",
+            "--base_lr",
             str(learning_rate),
-            "--epochs",
+            "--max_epochs",
             str(num_epochs),
             "--validation-split",
             str(validation_split),
@@ -111,21 +111,25 @@ class TrainingManager:
             accelerator,
             "--devices",
             str(devices),
+            "--default_root_dir",
+            str(output_path),
         ]
 
         # Add environment variables to find piper_train
         env = os.environ.copy()
         if piper_python_path.exists():
-            env["PYTHONPATH"] = str(piper_python_path) + ":" + env.get("PYTHONPATH", "")
+            env["PYTHONPATH"] = (
+                str(piper_python_path) + os.pathsep + env.get("PYTHONPATH", "")
+            )
 
         if num_workers is not None:
             cmd.extend(["--num-workers", str(num_workers)])
 
         if base_model and base_model != "New Model":
-            cmd.extend(["--checkpoint-path", base_model])
+            cmd.extend(["--resume_from_checkpoint", str(Path(base_model).resolve())])
 
-        if num_speakers > 1:
-            cmd.extend(["--num-speakers", str(num_speakers)])
+        # Speaker count is read from the preprocessed config by piper_train;
+        # it has no --num-speakers override.
 
         # Reset status
         self.status = TrainingStatus(

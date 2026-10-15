@@ -188,9 +188,11 @@ preserve_through_fp16 = true
 # ============================================================================
 # CI validation steps (post-export)
 # ============================================================================
-# Steps that run automatically in CI after every export. These verify the
-# resulting ONNX is loadable and produces matching audio for a fixed set
-# of warmup-style inputs.
+# The exporters call piper_train.onnx_validation on each actual artifact.
+# This validates graph bytes, creates ORT sessions and runs deterministic feeds.
+# Model Quality Gate tests this validator with real tiny ONNX graphs and negative
+# outputs. Normal PR CI does not re-export every published checkpoint. Runtime
+# fixture / public-base jobs provide separate model inference evidence.
 
 [ci_validation]
 # Each entry is a logical step; the CI workflow may bundle them into one job.
@@ -263,4 +265,4 @@ arithmetic-overflow in attention or duration prediction layers.
 # CI validation: roundtrip      ✓           ✓
 # CI validation: ORT creation   ✓           ✓
 # CI validation: warmup         ✓           ✓
-# CI validation: FP16 parity    ✓           N/A
+# FP16 parity (warn-only)       ✓           ✓

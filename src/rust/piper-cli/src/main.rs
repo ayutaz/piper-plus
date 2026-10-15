@@ -59,7 +59,7 @@ struct Cli {
     #[arg(short, long)]
     text: Option<String>,
 
-    /// 音素化の言語を指定 [ja, en, zh, ko, es, fr, pt] (デフォルト: 自動検出)
+    /// 音素化の言語を指定 [ja, en, zh, ko, es, fr, pt, sv] (デフォルト: 自動検出)
     #[arg(short, long)]
     language: Option<String>,
 
@@ -165,15 +165,39 @@ fn append_silence(audio: &mut Vec<i16>, sample_rate: u32, silence_seconds: f32) 
 }
 
 /// CLI引数から SynthesisParams を構築する。
-fn build_synthesis_params(cli: &Cli, speaker_emb: Option<Vec<f32>>) -> SynthesisParams {
-    SynthesisParams {
+fn build_synthesis_params(cli: &Cli, speaker_emb: Option<Vec<f32>>) -> Result<SynthesisParams> {
+    Ok(SynthesisParams {
+        phoneme_silence: parse_phoneme_silence(&cli.phoneme_silence)?,
         speaker_id: cli.speaker,
         language_override: cli.language.clone(),
         noise_scale: cli.noise_scale,
         length_scale: cli.length_scale,
         noise_w: cli.noise_w,
         speaker_embedding: speaker_emb,
+    })
+}
+
+fn jsonl_output_path(
+    directory: Option<&std::path::Path>,
+    file: Option<&str>,
+    record: Option<&str>,
+    index: u64,
+) -> PathBuf {
+    if let Some(directory) = directory {
+        return directory.join(
+            record
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("{index}.wav")),
+        );
     }
+    if let Some(file) = file {
+        return PathBuf::from(file);
+    }
+    directory.unwrap_or_else(|| std::path::Path::new(".")).join(
+        record
+            .map(str::to_string)
+            .unwrap_or_else(|| format!("{index}.wav")),
+    )
 }
 
 fn main() -> Result<()> {
@@ -342,20 +366,7 @@ fn main() -> Result<()> {
     }
 
     // --phoneme-silence パース
-    let _phoneme_silence_map = parse_phoneme_silence(&cli.phoneme_silence)?;
-    // TODO: Apply phoneme_silence_map at phoneme boundaries (currently parsed/held
-    // but not applied to silence generation). Other runtimes (Python/C#/Go) already
-    // implement boundary insertion — see src/csharp/PiperPlus.Cli/Program.cs:1051 and
-    // src/go/cmd/piper-plus/main.go:197 for reference. Rust parity is pending;
-    // requires splitting phoneme stream on matched phonemes and inserting zero-padded
-    // audio between adjacent inference calls (similar to --sentence-silence).
-    if !_phoneme_silence_map.is_empty() {
-        tracing::info!(
-            "Phoneme silence: {:?} (parsed but not yet applied to audio)",
-            _phoneme_silence_map
-        );
-    }
-
+    let phoneme_silence_map = parse_phoneme_silence(&cli.phoneme_silence)?;
     if cli.sentence_silence != 0.2 {
         tracing::info!("Sentence silence: {:.3}s", cli.sentence_silence);
     }
@@ -439,7 +450,7 @@ fn main() -> Result<()> {
             batch_path.display()
         );
 
-        let params = build_synthesis_params(&cli, speaker_emb.clone());
+        let params = build_synthesis_params(&cli, speaker_emb.clone())?;
         for (i, line) in lines.iter().enumerate() {
             let idx = i + 1;
             let text_to_synth = if let Some(ref dict) = custom_dict {
@@ -555,7 +566,7 @@ fn main() -> Result<()> {
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("--output-dir is required for --stream mode"))?;
 
-            let params = build_synthesis_params(&cli, speaker_emb.clone());
+            let params = build_synthesis_params(&cli, speaker_emb.clone())?;
             for (i, sentence) in sentences.iter().enumerate() {
                 let idx = i + 1;
                 let text_to_synth = if let Some(ref dict) = custom_dict {
@@ -616,7 +627,7 @@ fn main() -> Result<()> {
                 return Ok(());
             }
 
-            let params = build_synthesis_params(&cli, speaker_emb.clone());
+            let params = build_synthesis_params(&cli, speaker_emb.clone())?;
             let result = voice
                 .synthesize_with_params(&text_to_synth, &params)
                 .context("Failed to synthesize text")?;
@@ -784,9 +795,14 @@ fn main() -> Result<()> {
             }
 
             // 推論実行
-            let synthesis = engine
-                .synthesize(&request)
-                .with_context(|| format!("Inference failed for utterance {}", utt_count))?;
+            let synthesis = piper_plus::segments::synthesize_phoneme_silence(
+                &request,
+                &phoneme_silence_map,
+                &voice_config.phoneme_id_map,
+                voice_config.audio.sample_rate,
+                |phrase| engine.synthesize(phrase),
+            )
+            .with_context(|| format!("Inference failed for utterance {}", utt_count))?;
 
             tracing::info!(
                 "Utterance {}: {:.3}s audio, {:.3}s infer, RTF={:.3}",
@@ -805,14 +821,13 @@ fn main() -> Result<()> {
             if output_to_stdout {
                 audio::write_wav_to_stdout(sample_rate, &audio_data)
                     .context("Failed to write WAV to stdout")?;
-            } else if let Some(ref dir) = cli.output_dir {
-                let filename = output_file.unwrap_or_else(|| format!("{}.wav", utt_count));
-                let output_path = dir.join(&filename);
-                audio::write_wav(&output_path, sample_rate, &audio_data)
-                    .with_context(|| format!("Failed to write {}", output_path.display()))?;
-                tracing::info!("Wrote: {}", output_path.display());
-            } else if let Some(ref file) = cli.output_file {
-                let output_path = PathBuf::from(file);
+            } else {
+                let output_path = jsonl_output_path(
+                    cli.output_dir.as_deref(),
+                    cli.output_file.as_deref(),
+                    output_file.as_deref(),
+                    utt_count,
+                );
                 audio::write_wav(&output_path, sample_rate, &audio_data)
                     .with_context(|| format!("Failed to write {}", output_path.display()))?;
                 tracing::info!("Wrote: {}", output_path.display());
@@ -899,6 +914,22 @@ fn load_speaker_embedding(path: &std::path::Path) -> Result<Vec<f32>> {
 mod tests {
     use super::*;
     use std::io::Write;
+
+    #[test]
+    fn jsonl_default_writes_numbered_files_and_respects_record_name() {
+        assert_eq!(
+            jsonl_output_path(None, None, None, 1),
+            PathBuf::from("./1.wav")
+        );
+        assert_eq!(
+            jsonl_output_path(None, None, Some("named.wav"), 2),
+            PathBuf::from("./named.wav")
+        );
+        assert_eq!(
+            jsonl_output_path(None, Some("explicit.wav"), Some("ignored.wav"), 1),
+            PathBuf::from("explicit.wav")
+        );
+    }
 
     /// Write `count` float32 values as raw little-endian bytes to a temp file,
     /// return the file path (tempfile is kept alive via the returned handle).

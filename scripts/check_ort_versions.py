@@ -29,7 +29,7 @@ Issue #383 follow-up で ORT 1.17.0 → 1.20.0 に上げた際、6 ファイル 
     #372 Option C 方針)。pinned version の場合も canonical 以上を要求。
 
     * ``src/python/pyproject.toml`` (train / inference / inference-gpu extras)
-    * ``src/python_run/requirements.txt`` (runtime CPU)
+    * ``src/python_run/pyproject.toml`` (runtime CPU/GPU extras)
     * ``src/python_run/requirements_gpu.txt`` (runtime GPU)
     * ``src/csharp/PiperPlus.{Core,Cli,Cli.Tests,Core.Tests,Bench}.csproj``
     * ``src/go/go.mod``
@@ -184,7 +184,7 @@ FLOOR_PATTERNS_BY_ECOSYSTEM: dict[str, list[re.Pattern[str]]] = {
 FLOOR_TARGETS: list[tuple[Path, str]] = [
     # Python (training + runtime)
     (Path("src/python/pyproject.toml"), "python"),
-    (Path("src/python_run/requirements.txt"), "python"),
+    (Path("src/python_run/pyproject.toml"), "python"),
     (Path("src/python_run/requirements_gpu.txt"), "python"),
     # NOTE: `src/python_run/setup.py` is deliberately absent. It stopped
     # declaring dependencies in Issue #418 — it now reads requirements.txt

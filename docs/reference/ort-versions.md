@@ -44,7 +44,7 @@ exact-match group.
 | Runtime  | ORT Version  | Floor (Issue #372) | Package / Source |
 |----------|-------------|--------------------|------------------|
 | Python (training) | `>=1.26.0` (gpu extra: `onnxruntime-gpu>=1.20.1,<1.26`) | `>=1.20.0` ✓ | `src/python/pyproject.toml` extras (train / inference / inference-gpu) |
-| Python (runtime) | `>=1.26.0` (gpu: `onnxruntime-gpu>=1.20.1,<1.26`) | `>=1.20.0` ✓ | `src/python_run/requirements.txt` + `requirements_gpu.txt` |
+| Python (runtime) | `>=1.26.0` (gpu: `onnxruntime-gpu>=1.20.1,<1.26`) | `>=1.20.0` ✓ | `src/python_run/pyproject.toml` (CPU extra) + `requirements_gpu.txt` |
 | Rust     | 2.0.0-rc.13 (`ort` crate, wraps ORT 1.28.0) | exempt (no stable upstream) | `ort` (crates.io; resolved by `src/rust/Cargo.lock`, manifest range starts at rc.12) |
 | C#       | 1.24.3      | `>=1.20.0` ✓ | `Microsoft.ML.OnnxRuntime{,.Managed}` (NuGet) — 5 csproj files |
 | Go       | 1.27.0      | `>=1.20.0` ✓ | `github.com/yalue/onnxruntime_go` |

@@ -190,23 +190,22 @@ Opciones principales: `--speaker-id` (ID del hablante), `--device auto|cpu|gpu`,
 
 ```bash
 # Listar modelos
-python -m piper_plus --list-models
-python -m piper_plus --list-models ja
+uv run --no-sync python -m piper_plus --list-models
+uv run --no-sync python -m piper_plus --list-models ja
 
 # Descargar modelos
-python -m piper_plus --download-model tsukuyomi
-python -m piper_plus --download-model ja_JP-tsukuyomi-chan-medium
+uv run --no-sync python -m piper_plus --download-model tsukuyomi
+uv run --no-sync python -m piper_plus --download-model ja_JP-tsukuyomi-chan-medium
 
 # Usar despues de descargar
-python -m piper_plus --model ja_JP-tsukuyomi-chan-medium --text "こんにちは" -f output.wav
+uv run --no-sync python -m piper_plus --model ja_JP-tsukuyomi-chan-medium "こんにちは" -f output.wav
 ```
 
 ### WebUI
 
 ```bash
-uv pip install -r src/python_run/requirements_webui.txt
-cd src/python_run
-python -m piper_plus.webui --data-dir /path/to/models
+uv sync --project environments/webui --locked
+uv run --project environments/webui --no-sync python -m piper_plus.webui --data-dir /path/to/models
 # → http://localhost:7860
 ```
 
@@ -262,7 +261,7 @@ Se recomienda Python 3.13+ (3.11+ soportado). Se recomienda [uv](https://docs.as
 uv sync --extra inference
 
 # Inferencia GPU (requiere entorno CUDA)
-uv sync --extra inference-gpu
+uv sync --no-group cpu --extra inference-gpu
 
 # Entrenamiento
 uv sync --extra train

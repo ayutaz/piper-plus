@@ -22,7 +22,7 @@ iOS / Swift プロジェクトから piper-plus の **G2P (Grapheme-to-Phoneme) 
 | 単語にフリガナ・発音記号を付与したい | `PiperPlusG2P` |
 | 多言語ローカライズのオフライン補助ツール | `PiperPlusG2P` |
 
-`PiperPlusG2P` は **ONNX Runtime に依存しない** ため、Embed & Sign 不要、バイナリサイズも軽量 (~3-5 MB zip)。
+`PiperPlusG2P` は **ONNX Runtime に依存しない** ため、Embed & Sign 不要、バイナリサイズも軽量 (142.6 MiB (v2.0.1: 149,575,363 bytes) zip)。
 
 ---
 
@@ -50,11 +50,10 @@ iOS / Swift プロジェクトから piper-plus の **G2P (Grapheme-to-Phoneme) 
 | ポルトガル語 | `pt` | 規則ベース | なし | <0.1 MB |
 | スウェーデン語 | `sv` | 規則ベース | なし | <0.1 MB |
 
-> ※ **「バイナリ寄与」は埋込辞書ファイルの非圧縮サイズ。** xcframework に最終的に追加されるサイズは debuginfo / 圧縮で前後します。代表値は次の通り (release ビルド、aarch64-apple-ios slice):
+> ※ **「バイナリ寄与」は埋込辞書ファイルの非圧縮サイズ。** xcframework に最終的に追加されるサイズは debuginfo / 圧縮で前後します。現行の確認範囲は次の通り:
 >
-> - **xcframework.zip ダウンロードサイズ**: ~3-5 MB (圧縮後、SwiftPM が GitHub から取得する物理サイズ)
-> - **app への増分**: ~30-35 MB (`bundled-dicts` + jpreprocess + NAIST-JDIC) — App Store の `over-the-air` 制限 (iOS 16 で 200 MB → 制限緩和) には収まるが、App Clip の 10 MB 制約は **超える**
-> - **未 strip staticlib (CI 中間成果物)**: ~84 MB — リリース時に xcodebuild 側で symbol strip され体感サイズが縮む
+> - **xcframework.zip ダウンロードサイズ**: 142.6 MiB (v2.0.1: 149,575,363 bytes) (圧縮後、SwiftPM が GitHub から取得する物理サイズ)
+> - **app への増分 / strip 後の slice サイズ**: 現行 v2.0.1 は未測定。ZIP 全体のサイズからインストール後容量や App Clip の適合性を判断しないでください。
 
 > 配布される xcframework はデフォルトで **全 8 言語有効**。consumer 側で言語の選択無効化はできない (Cargo features がビルド時に固定化されるため)。
 > **学習済み TTS モデルは現状 6 言語 (ja/en/zh/es/fr/pt) のみ** — Swift G2P で `ko` / `sv` の音素列を取得しても、それを ONNX 合成エンジンに食わせるための学習済みモデルが piper-plus 配布物に存在しない点に注意 (`docs/migration/v1.11-to-v1.12.md` の言語表参照)。サイズ制約のあるアプリ向け lite slice の提供は将来検討中 ([spec §6.4](../../reference/swift-g2p.md#64-lite-slice-ja-除外--言語選択ビルド))。
@@ -86,7 +85,7 @@ let package = Package(
 )
 ```
 
-> SwiftPM が `binaryTarget(url:, checksum:)` から `libpiper_plus_g2p-apple-v${VERSION}.xcframework.zip` を取得する。初回 resolve 時にダウンロード ~3-5 MB。
+> SwiftPM が `binaryTarget(url:, checksum:)` から `libpiper_plus_g2p-apple-v${VERSION}.xcframework.zip` を取得する。初回 resolve 時にダウンロード 142.6 MiB (v2.0.1: 149,575,363 bytes)。
 
 ### Xcode プロジェクトの場合 (Package.swift を使わない)
 
@@ -280,3 +279,5 @@ struct PhonemeView: View {
 - [iOS Integration Guide (合成エンジン)](./ios-integration.md) — フル TTS が必要な場合
 - [piper-plus-g2p crate (Rust)](../../../src/rust/piper-plus-g2p/) — 同じロジックの Rust API ドキュメント
 - [Issue #387](https://github.com/ayutaz/piper-plus/issues/387) — 機能リクエスト tracker
+
+> v2.0.1 のサイズは Release API の ZIP metadata（全 slice 合計）。アプリ組み込み後の増分・strip 後サイズは未測定です。

@@ -123,7 +123,7 @@ Docker を使用しない場合は、Wyoming サーバーを直接起動でき�
 ```bash
 # リポジトリルートで、推論ランタイム・G2P・Wyoming をインストール
 python -m pip install -e "src/python[inference]"
-python -m pip install -e src/python_run
+python -m pip install -e "src/python_run[cpu]"
 python -m pip install "wyoming>=1.7,<2"
 
 # サーバーの起動

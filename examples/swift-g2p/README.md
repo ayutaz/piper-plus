@@ -57,7 +57,7 @@ The published `from: "2.0.1"` URL resolves the released xcframework. To exercise
 
 The synthesis engine (`PiperPlus`, in [`../swift/`](../swift/)) ships with **iOS-only** binaries and a hard ORT dependency. The G2P product is intentionally lighter:
 
-- **No ORT** — pure Rust + bundled dictionaries. ~3–5 MB xcframework download vs ~30 MB synthesis xcframework + ORT.
+- **No ORT** — pure Rust + bundled dictionaries. 142.6 MiB (v2.0.1: 149,575,363 bytes) xcframework download vs ~30 MB synthesis xcframework + ORT.
 - **iOS + macOS slices** — `swift run` from a Mac CLI works directly (the synthesis engine cannot, because the xcframework lacks a macOS slice).
 - **Different release cadence** — G2P version (`g2pVersion`) bumps independently of synthesis version (`version`). See `Package.swift` at the repo root.
 
@@ -69,3 +69,5 @@ Splitting the examples mirrors that split: this directory is the on-ramp for cal
 - [Swift G2P Specification](../../docs/reference/swift-g2p.md) — design rationale.
 - [piper-plus repo root Package.swift](../../Package.swift) — the canonical SPM manifest.
 - [Issue #387](https://github.com/ayutaz/piper-plus/issues/387) — feature tracker.
+
+> v2.0.1 のサイズは Release API の ZIP metadata（全 slice 合計）。アプリ組み込み後の増分・strip 後サイズは未測定です。

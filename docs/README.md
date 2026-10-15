@@ -86,6 +86,7 @@ Linux ARM64 の glibc 2.31 互換修正は `dev` に入り、Debian Bullseye／B
 
 ## Migration
 
+- [開発版 Python provider / WebUI 環境](migration/provider-environments.md) — CPU/GPU extra の選択、UI と学習環境の分離
 - [v1.11 → v1.12](migration/v1.11-to-v1.12.md) — HiFi-GAN/Flask/HTS-voice 削除など
 - [v1.12 → v2.0](migration/v1.12-to-v2.0.md) — Python 3.13 + CUDA 12.8 + Ubuntu 24.04 統一、 TF32 / bf16-mixed Template default、 旧 ckpt resume 非サポート
 
@@ -101,6 +102,7 @@ Linux ARM64 の glibc 2.31 互換修正は `dev` に入り、Debian Bullseye／B
 
 ## Design Documents
 
+- [第三次監査の対応記録](design/consumer-audit-remediation-2026-10-15.md) — A01～A16 の修正とローカル検証、CI
 - [文書・consumer 経路の第三次監査](design/documentation-consumer-audit-2026-10-15.md) — 2026-10-15 時点の導入・実行・配布・CI の対応漏れ、根拠と修正順序
 - [Zero-Shot base zs-v1 公開記録](design/zero-shot-base-zs-v1-release-2026-10-10.md) — 公開 revision、成果物、検証範囲
 - [つくよみちゃん zs-v1 公開記録](design/tsukuyomi-publication-ready-2026-10-12.md) — 公開済み FT bundle と consumer 検証

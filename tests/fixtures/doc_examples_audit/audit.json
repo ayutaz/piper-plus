@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-15T08:02:28Z",
+  "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
-    "executable": 218,
+    "executable": 222,
     "needs_placeholder": 7,
-    "skip_warranted": 222,
-    "total": 447
+    "skip_warranted": 233,
+    "total": 462
   },
   "by_language": {
     "bash": {
-      "executable": 158,
+      "executable": 161,
       "needs_placeholder": 7,
       "skip_warranted": 44
     },
@@ -24,7 +24,7 @@
       "skip_warranted": 0
     },
     "python": {
-      "executable": 30,
+      "executable": 31,
       "needs_placeholder": 0,
       "skip_warranted": 1
     },
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 177
+      "skip_warranted": 188
     },
     "wasm": {
       "executable": 10,
@@ -130,6 +130,169 @@
       ],
       "env_dependencies": [],
       "hash_sha1": "2120a3bd7543ea08915070a99717bd1b755f8230"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 57,
+      "line_end": 62,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "85510cc1aed7a7b37cf55b6938d7b083dd5bf297"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 73,
+      "line_end": 80,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "0b5d5ac351ddefddcb009c82a2ca0ea4a11f6aa5"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 91,
+      "line_end": 97,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "5d7525f2744c3b0a099846edfbce8adebf214b86"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 110,
+      "line_end": 114,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "ceb230e4532293075e21caa392e5fbcbb4ca3485"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 123,
+      "line_end": 127,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "eed043ecb426841aa4a2abf740927d4a8661ee10"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 156,
+      "line_end": 160,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "f31fdeeda0a3e7b09f3557531f46a1ed60fa5509"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 196,
+      "line_end": 198,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "6b83f662af8997176db47c8731170a52007fa9fb"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 232,
+      "line_end": 234,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "e2e2fd555033b2a7145dd379f935504dbd72c00c"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 246,
+      "line_end": 249,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "2697355952298fb03dba03225f4929c785ccff72"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 259,
+      "line_end": 261,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "819a9e73a96c7730dba49b464ede7ffba37d67a9"
+    },
+    {
+      "file": "docs/design/documentation-consumer-audit-2026-10-15.md",
+      "line_start": 299,
+      "line_end": 309,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "2c55c0311705757d50b2b884ad4a1130caa79932"
     },
     {
       "file": "docs/design/multi-6lang-zero-shot-v7-training-results.md",
@@ -434,8 +597,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 28,
-      "line_end": 37,
+      "line_start": 27,
+      "line_end": 36,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -449,8 +612,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 50,
-      "line_end": 60,
+      "line_start": 49,
+      "line_end": 59,
       "language_raw": "json",
       "language": "unknown",
       "category": "skip_warranted",
@@ -464,8 +627,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 68,
-      "line_end": 73,
+      "line_start": 67,
+      "line_end": 72,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -479,8 +642,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 79,
-      "line_end": 87,
+      "line_start": 78,
+      "line_end": 86,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -494,8 +657,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 95,
-      "line_end": 106,
+      "line_start": 94,
+      "line_end": 105,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -507,8 +670,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 115,
-      "line_end": 129,
+      "line_start": 114,
+      "line_end": 128,
       "language_raw": "javascript",
       "language": "wasm",
       "category": "executable",
@@ -520,8 +683,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 133,
-      "line_end": 135,
+      "line_start": 132,
+      "line_end": 134,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -533,8 +696,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 143,
-      "line_end": 146,
+      "line_start": 142,
+      "line_end": 145,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -546,8 +709,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 150,
-      "line_end": 153,
+      "line_start": 149,
+      "line_end": 152,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -559,8 +722,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 157,
-      "line_end": 160,
+      "line_start": 156,
+      "line_end": 159,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -572,8 +735,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 168,
-      "line_end": 181,
+      "line_start": 167,
+      "line_end": 180,
       "language_raw": "javascript",
       "language": "wasm",
       "category": "executable",
@@ -585,8 +748,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 187,
-      "line_end": 190,
+      "line_start": 186,
+      "line_end": 189,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -598,8 +761,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 196,
-      "line_end": 200,
+      "line_start": 195,
+      "line_end": 199,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -620,7 +783,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "ccad673feca4050cce9b83d94d1cf59eb9ec5ba1"
+      "hash_sha1": "df15a7ccd6e041c625e94611393f0b3b157e2961"
     },
     {
       "file": "docs/features/webui.md",
@@ -633,7 +796,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "7b67ac25f48ac357d2677560dd346a37fb7b8e0b"
+      "hash_sha1": "2f4992164409530edfdfcf503aacad5bcb3019e3"
     },
     {
       "file": "docs/features/webui.md",
@@ -662,6 +825,21 @@
       "directives_detected": [],
       "env_dependencies": [],
       "hash_sha1": "a2244eb7b7dff36277c9d478af9fd98f601df97c"
+    },
+    {
+      "file": "docs/features/webui.md",
+      "line_start": 153,
+      "line_end": 156,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "73f8270a349ff48c25fb1f78c37d16e41d5e7adb"
     },
     {
       "file": "docs/getting-started/binary-selection.md",
@@ -1915,7 +2093,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "0b82567c1487b493dda84223bd97d4627179d4d4"
+      "hash_sha1": "4a9cd52bd9a459fcdbd36281416a2290818b7d1a"
     },
     {
       "file": "docs/guides/integration/home-assistant.md",
@@ -2981,8 +3159,8 @@
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
-      "line_start": 66,
-      "line_end": 87,
+      "line_start": 65,
+      "line_end": 86,
       "language_raw": "swift",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2996,8 +3174,8 @@
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
-      "line_start": 95,
-      "line_end": 98,
+      "line_start": 94,
+      "line_end": 97,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -3009,8 +3187,8 @@
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
-      "line_start": 110,
-      "line_end": 117,
+      "line_start": 109,
+      "line_end": 116,
       "language_raw": "swift",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3024,8 +3202,8 @@
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
-      "line_start": 121,
-      "line_end": 131,
+      "line_start": 120,
+      "line_end": 130,
       "language_raw": "swift",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3039,8 +3217,8 @@
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
-      "line_start": 135,
-      "line_end": 139,
+      "line_start": 134,
+      "line_end": 138,
       "language_raw": "swift",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3054,8 +3232,8 @@
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
-      "line_start": 143,
-      "line_end": 164,
+      "line_start": 142,
+      "line_end": 163,
       "language_raw": "swift",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3069,8 +3247,8 @@
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
-      "line_start": 177,
-      "line_end": 196,
+      "line_start": 176,
+      "line_end": 195,
       "language_raw": "swift",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3084,8 +3262,8 @@
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
-      "line_start": 234,
-      "line_end": 237,
+      "line_start": 233,
+      "line_end": 236,
       "language_raw": "xml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4371,6 +4549,45 @@
       ],
       "env_dependencies": [],
       "hash_sha1": "ec14e4225077e40662428fd1ffd4d35c351a60b3"
+    },
+    {
+      "file": "docs/migration/provider-environments.md",
+      "line_start": 9,
+      "line_end": 14,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "d7edec3470bd634f1c9b6e80e4ee2493a14f5e51"
+    },
+    {
+      "file": "docs/migration/provider-environments.md",
+      "line_start": 18,
+      "line_end": 22,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "05dd5aae0edca925c733edf2b594a1acaee5a8fe"
+    },
+    {
+      "file": "docs/migration/provider-environments.md",
+      "line_start": 33,
+      "line_end": 36,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "0af3dcef19eeb7e7f65ff99b969d6dc56b1351d6"
     },
     {
       "file": "docs/migration/v1.11-to-v1.12.md",
