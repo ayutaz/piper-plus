@@ -743,9 +743,12 @@ export class PiperPlus {
    *
    * This mirrors the `--reference-audio` / `--speaker-encoder-model` CLI in
    * Python / Rust / Go / C# / C++. The reference audio is fed to the
-   * provided `SpeakerEncoder` (which must already be initialised with an
-   * ECAPA-TDNN ONNX model), and the resulting 256-dim L2-normalised
-   * embedding is passed through to `synthesize()` as `speakerEmbedding`.
+   * provided `SpeakerEncoder` (which must already be initialised with an ONNX
+   * model compatible with the loaded TTS graph). The encoder's output
+   * dimension and the TTS graph's declared input must match; the public zs-v1
+   * pair uses a CAM++ 192-dim L2-normalised embedding, while legacy exports
+   * may use ECAPA-TDNN 256-dim embeddings. The embedding is passed through to
+   * `synthesize()` as `speakerEmbedding`.
    *
    * @param {Object} params
    * @param {string} params.text - Text to synthesise.

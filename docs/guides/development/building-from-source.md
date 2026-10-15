@@ -53,7 +53,8 @@ Prerequisites: .NET 10 SDK or later
 ### C# CLI Usage Examples
 
 ```bash
-# Inference with model name (auto-download supported, defaults to output.wav)
+# Inference with model name (auto-download supported in the source/next resolver;
+# released 2.0.0/2.0.1 do not add new model aliases)
 piper-plus --model tsukuyomi --text "こんにちは" --language ja
 
 # English
@@ -109,7 +110,7 @@ piper-plus-cli --model model.onnx --text "hello" --language en --quiet
 piper-plus-cli --model model.onnx --text "hello" --language en --output-raw | aplay -r 22050 -f S16_LE
 ```
 
-> **Note:** Install C# CLI with `dotnet tool install -g PiperPlus.Cli` and Rust CLI with `cargo install piper-plus-cli`. Both support 8 languages, custom dictionaries, and streaming.
+> **Note:** Install C# CLI with `dotnet tool install -g PiperPlus.Cli` and Rust CLI with `cargo install piper-plus-cli`. Their runtime/G2P surfaces support 8 languages, custom dictionaries, and streaming where enabled. The public `releases/zs-v1` model bundle is a separate 6-language experimental model and does not gain the runtime's full 8-language inventory.
 
 ## Building Rust CLI
 

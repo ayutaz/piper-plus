@@ -29,8 +29,10 @@
   匿名検証: 同directoryの`anonymous-public-verification.json`。
   重み・録音・認証情報をGitHubへ追加しない。
 
-以下は公開時の手順記録。`publish_bundle --apply`は同じ公開先への再実行を拒否するため、
-既に公開済みのbundleを再uploadする手順として実行しない。
+以下は公開時の手順の記録である。公開と匿名 consumer 検証は完了している。
+同じ公開先への `publish_bundle --apply` や再 upload を現在の利用者へ促さない。
+再現が必要な場合は receipt と匿名検証 JSON の hash/path を参照し、公開操作は新しい
+release plan と明示的な承認の下で別途行う。
 
 ## 試聴前に完了させる作業
 
@@ -47,39 +49,19 @@
 
 ## 試聴結果の反映と公開
 
-1. 人手の実回答を確認し、`human-review-template.json`のコピーへ記録する。
+1. 人手の実回答を確認し、`human-review-template.json`のコピーへ記録した。
    必須項目は`reading`、`similarity`、`naturalness`、`noise`、実際のユーザー発言、
    timezone付き記録日時、実験基準版の公開判断、試聴WAV 3件のhash。
    空欄を機械指標から埋めたり、未知の項目を「問題なし」にしない。
    問題があれば原因を調べ、修正した対象を再試聴する。
-2. 次のcommandで結果を反映する。重み・config・sampleは変更しない。
-   モデルカード・検証JSON・manifest・SHA256SUMSをまとめて更新する。
+2. 重み・config・sample を変更せず、モデルカード・検証 JSON・manifest・SHA256SUMS
+   を更新した。結果は `publication-receipt.json` と `anonymous-public-verification.json`
+   に固定している。
+3. 公開先への追加と receipt の revision 固定を完了し、未認証取得・生成・checkpoint
+   読み込み・旧 root と research storage の保持を確認した。完了済み操作の command
+   をこの文書から再実行しない。
 
-   ```powershell
-   uv run --no-sync python -m scripts.tsukuyomi_release.record_review --workspace output/publication-ready-20261012/prepared --review output/publication-ready-20261013/actual-human-review.json
-   ```
-
-3. applyなしで公開前検査を行う。
-
-   ```powershell
-   uv run --no-sync python -m scripts.tsukuyomi_release.publish_bundle --workspace output/publication-ready-20261012/prepared
-   ```
-
-4. 結果・制約・最終hashが揃った後、指定した公開先へ追加する。
-   gateの変更、旧root model/configの置換、削除操作は含まない。
-
-   ```powershell
-   uv run --no-sync python -m scripts.tsukuyomi_release.publish_bundle --workspace output/publication-ready-20261012/prepared --apply
-   ```
-
-5. receiptの公開commitを固定し、未認証の新規取得・生成・checkpoint読み込み・
-   旧rootと研究保存先の保持を確認する。
-
-   ```powershell
-   uv run --no-sync python -m scripts.tsukuyomi_release.consumer --workspace output/publication-ready-20261012/prepared
-   ```
-
-機械検証と人手試聴の記録が全て揃い、公開後検証にも成功した時点で公開完了とする。
+機械検証と人手試聴の記録が全て揃い、公開後検証にも成功したため公開完了とする。
 人手の回答反映後に古い`finalize_bundle.py`を実行しない。
 これはpendingの準備候補を生成する旧helperで、回答を上書きする。
 任意の全文章・全言語の品質承認や、FTによる声質改善をこの工程だけで宣言しない。
@@ -127,6 +109,8 @@ C++はraw IPAの`ɔɪ`/`œ̃`/`ɐ̃`を、それぞれ既知の内部PUA `U+E062
 公開済みmodel/configの変更は不要。GoのconfigテストとC++のparserテストを実モデルCIでも実行する。
 修正後の[Actions run 38189966578](https://github.com/ayutaz/piper-plus/actions/runs/38189966578)で
 全6runtimeが成功した。共通音素IDによる計60音声のhash/長さ/非無音とconditioningを照合済み。
+これは固定 public base の source/runtime CI proof であり、独立 PyPI
+`piper-plus==2.0.0` consumer proof や人手品質承認とは別の証拠である。
 
 ## Colabの確認状況
 

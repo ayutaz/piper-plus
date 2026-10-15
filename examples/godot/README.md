@@ -87,7 +87,8 @@ PKG_CONFIG_PATH=/path/to/piper-plus/lib/pkgconfig scons
 
 ```bash
 curl -LO https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx
-curl -LO https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx.json
+curl -L https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json \
+  -o tsukuyomi-chan-6lang-fp16.onnx.json
 ```
 
 This C API example uses a reference-free voice. C++ reference-audio
@@ -207,7 +208,7 @@ examples/godot/
 | Custom dictionary | Requires source changes | `piper_plus_load_custom_dict()` via C API |
 | Streaming synthesis | Custom implementation | `piper_plus_synth_start/next()` via C API |
 | Thread safety | Varies | Documented: one engine per thread |
-| Platforms | Linux, Windows, macOS | Linux, Windows, macOS, **iOS (xcframework, v1.13.0+)** |
+| Platforms | Linux, Windows, macOS | Linux, Windows, macOS, **iOS (xcframework, v2.0.1+)** |
 
 ## Platform Notes
 
@@ -229,7 +230,7 @@ export DYLD_LIBRARY_PATH=/usr/local/lib:$DYLD_LIBRARY_PATH
 
 Place `piper_plus.dll` and `onnxruntime.dll` in the same directory as the Godot executable or the exported game executable.
 
-### iOS (v1.13.0+)
+### iOS (v2.0.1+)
 
 - **Architecture**: arm64 (device) + arm64/x86_64 (simulator universal)
 - **Status**: Stable
@@ -257,7 +258,7 @@ The `ios.dependencies` entry instructs Godot's iOS exporter to embed `onnxruntim
 ```bash
 # Place inside your Godot project
 mkdir -p addons/piper-plus/ios
-gh release download v1.13.0 -p 'libpiper_plus-ios-*.xcframework.zip' \
+gh release download v2.0.1 -p 'libpiper_plus-ios-*.xcframework.zip' \
   -O addons/piper-plus/ios/libpiper_plus-ios.xcframework.zip
 unzip addons/piper-plus/ios/libpiper_plus-ios.xcframework.zip \
   -d addons/piper-plus/ios/

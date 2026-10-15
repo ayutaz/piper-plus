@@ -1,8 +1,8 @@
 # Audio Output Format Contract
 # =============================
-# This file defines the canonical WAV output format that ALL piper-plus
-# runtimes (Python, Rust, Go, C#, C/C++, WASM/JS, Kotlin/Android, Swift)
-# MUST emit when synthesizing speech. The format is dictated by the
+# This file defines the canonical WAV output format that all inference-capable
+# piper-plus runtimes (Python, Rust, Go, C#, C/C++, WASM/JS, Swift) MUST emit
+# when synthesizing speech. Kotlin/Android is G2P-only and is excluded. The format is dictated by the
 # trained VITS model on the generation side and by the WAV container
 # specification on the bytes-on-the-wire side.
 #
@@ -24,7 +24,7 @@
 #   Rust:               src/rust/piper-core/src/engine.rs        (synth → f32 → i16 → WAV)
 #   Go:                 src/go/piperplus/synthesize.go           (encoding/binary little-endian writes)
 #   C#:                 src/csharp/PiperPlus.Core/Inference/PiperSession.cs  (BinaryWriter)
-#   C/C++:              src/cpp/piper_plus.cpp                   (manual RIFF assembly)
+#   C/C++:              src/cpp/piper.cpp                       (manual RIFF assembly)
 #   WASM/JS:            src/wasm/openjtalk-web/src/index.js      (DataView little-endian writes)
 #   Kotlin/Android:     (G2P-only package; no audio output)
 #   Swift (synthesis):  Sources/PiperPlus/                       (FFI bridge to Rust shared lib)
@@ -53,8 +53,8 @@ forward_compat_policy = "strict"
 
 [format]
 sample_rate = 22050        # Hz; locked by VITS medium-quality 22050Hz training
-                           # All current piper-plus checkpoints (6lang base,
-                           # tsukuyomi FT, CSS10 JA 6lang) emit 22050Hz audio.
+                           # The public zs-v1 and retained legacy checkpoints
+                           # (6lang base, tsukuyomi FT, CSS10 JA 6lang) emit 22050Hz.
 bit_depth = 16             # bits per sample; signed integer PCM
 sample_format = "int16"    # signed 16-bit little-endian PCM
                            # Range: [-32768, 32767]; clipping at boundaries.

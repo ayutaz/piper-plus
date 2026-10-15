@@ -2,12 +2,20 @@
 
 piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕様契約・マイグレーション資料の目次。
 
+## 公開版と開発ブランチ
+
+Python/native の公開版は **v2.0.1** です。Rust・npm・NuGet・Kotlin の版は独立しており、[バージョン契約](spec/release-versions.toml) で管理します。`dev` の機能が既存の配布バイナリやパッケージに収録済みとは限りません。
+
+Linux ARM64 の glibc 2.31 互換修正は `dev` に入り、Debian Bullseye／Bookworm／Trixie の QEMU 検証を実施しました。**v2.0.1 の配布アーカイブには未収録**です。取得方法と制約は [バイナリの選び方](getting-started/binary-selection.md) を参照してください。
+
+公開 Zero-Shot base とつくよみちゃん FT のモデルは、[モデル一覧](guides/development/pretrained-models.md) の pinned `releases/zs-v1` を使用します。base は参照由来の話者埋め込みが必要で、参照なしの固定音声とは入力が異なります。
+
 ## はじめての方へ
 
 ### すぐに使いたい方 (ビルド不要)
 
 1. [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) からプリビルドバイナリをダウンロード
-2. [事前学習済みモデル](https://huggingface.co/ayousanz) をダウンロード
+2. [事前学習済みモデル](guides/development/pretrained-models.md) から用途に合う ONNX と対応設定を取得
 3. 音声を生成 → 詳しくは [README のクイックスタート](../README.md#クイックスタート)
 
 ### 開発者・カスタマイズしたい方
@@ -74,6 +82,7 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 
 - [Spec INDEX](spec/README.md) — `.toml` 契約 (PUA / phoneme-timing / SSML / 推論入力など、CI gate 対応)
 - [Reference INDEX](reference/README.md) — `.md` 設計書 (Kotlin/Swift G2P / iOS shared-lib / ZH-EN ランタイム展開 / Model 解決 等)
+- [ORT Version Matrix](reference/ort-versions.md) — ランタイムごとの ONNX Runtime 依存
 
 ## Migration
 
@@ -82,7 +91,7 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 
 ## Benchmarks
 
-- [MOS benchmark](benchmark-mos.md) — PESQ / STOI / 主観評価フォーム
+- [MOS benchmark](benchmark-mos.md) — 音量・無音区間などの検査、任意の UTMOS、主観 MOS フォーム (PESQ/STOI は未実装)
 - [Multi-runtime RTF (公開)](https://ayutaz.github.io/piper-plus/bench/multi-runtime/)
 
 ## Research
@@ -90,16 +99,14 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 - [Research INDEX](research/README.md) — 先行研究・最新論文を用いた改善調査スナップショット
 - [改善調査 統合レポート 2026-06-15](research/improvement-survey-2026-06-15.md) — VITS2/MB-iSTFT を超える/取り込める先行研究の統合スナップショット (5 軸 31 アクション、 deep-dive companion 付き)
 
-## Spec / Contracts
-
-- [Model Resolution](reference/model-resolution.md) - Model file resolution rules
-- [ORT Version Matrix](reference/ort-versions.md) - ONNX Runtime version compatibility
-
 ## Design Documents
 
-- [Zero-Shot Public Model Release Plan](design/zero-shot-public-model-release-plan-2026-10-10.md) - 一般公開先2repoへのベース・つくよみちゃんFT配布計画、dev統合・品質評価・互換性・公開切替
-- [Zero-Shot Quality Improvement Plan](design/zero-shot-quality-improvement-plan.md) - Improvement roadmap for zero-shot speaker similarity (Phase 1 ✅ shipped via v7 multi-6lang)
+- [Zero-Shot base zs-v1 公開記録](design/zero-shot-base-zs-v1-release-2026-10-10.md) — 公開 revision、成果物、検証範囲
+- [つくよみちゃん zs-v1 公開記録](design/tsukuyomi-publication-ready-2026-10-12.md) — 公開済み FT bundle と consumer 検証
+- [Zero-Shot Public Model Release Plan](design/zero-shot-public-model-release-plan-2026-10-10.md) — 完了済み公開工程と将来の品質改善計画を分離した記録
+- [Zero-Shot Quality Improvement Plan](design/zero-shot-quality-improvement-plan.md) — 実装済み項目と未着手の研究提案
 - [Multi-6lang Zero-Shot v7 Training Results](design/multi-6lang-zero-shot-v7-training-results.md) - Canonical v7 training results + 5 fix commit history
+- [2026-06-20 研究環境引き継ぎ](handoff/zero-shot-tts-handoff-2026-06-20.md) — 過去の private 研究環境の記録。現在の一般公開モデル利用手順はモデル一覧を参照
 
 ## Development
 
@@ -113,7 +120,7 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 
 - **C++ (libpiper)**: メインの推論ライブラリ — [src/cpp/](../src/cpp/)
 - **C# CLI (PiperPlus)**: .NET 10 クロスプラットフォーム CLI — [src/csharp/](../src/csharp/)
-- **Rust 推論エンジン**: piper-plus / piper-plus-cli — [src/rust/](../src/rust/)
+- **Rust 推論エンジン**: piper-plus / piper-plus-cli — [CLI README](../src/rust/piper-cli/README.md)
 - **Go バインディング**: サーバーサイド推論・HTTP API・セッションプーリング — [src/go/](../src/go/) ([README](../src/go/README.md))
 - **WebAssembly**: Browser-based TTS — [src/wasm/openjtalk-web/](../src/wasm/openjtalk-web/)
 - **iOS xcframework + SPM**: [`Package.swift`](../Package.swift) (PiperPlus + PiperPlusG2P)

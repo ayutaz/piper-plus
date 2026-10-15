@@ -1,8 +1,8 @@
 # Swift G2P Integration Guide
 
-> **Status:** Implemented — Swift wrapper, FFI, CI, and Apple xcframework pipeline merged on `dev`. Awaiting v1.14.0 tag for SPM URL resolution.
+> **Status:** Implemented and published in v2.0.1 — Swift wrapper, FFI, CI, and Apple xcframework pipeline are available through the public SPM tag and GitHub Release assets.
 > **Spec:** [docs/reference/swift-g2p.md](../../reference/swift-g2p.md)
-> **対象バージョン:** v1.14.0+
+> **対象バージョン:** v2.0.1+
 > **動作確認サンプル:** [`examples/swift-g2p/HelloG2P/`](../../../examples/swift-g2p/HelloG2P/) (CLI demo, macOS)
 
 iOS / Swift プロジェクトから piper-plus の **G2P (Grapheme-to-Phoneme) を単独で利用する**ための統合ガイド。
@@ -57,7 +57,7 @@ iOS / Swift プロジェクトから piper-plus の **G2P (Grapheme-to-Phoneme) 
 > - **未 strip staticlib (CI 中間成果物)**: ~84 MB — リリース時に xcodebuild 側で symbol strip され体感サイズが縮む
 
 > 配布される xcframework はデフォルトで **全 8 言語有効**。consumer 側で言語の選択無効化はできない (Cargo features がビルド時に固定化されるため)。
-> **学習済み TTS モデルは現状 6 言語 (ja/en/zh/es/fr/pt) のみ** — Swift G2P で `ko` / `sv` の音素列を取得しても、それを ONNX 合成エンジンに食わせるための学習済みモデルが piper-plus 配布物に存在しない点に注意 (`docs/migration/v1.11-to-v1.12.md` の言語表参照)。サイズ制約のあるアプリ向け lite slice の提供は将来検討中 ([spec §7.4](../../reference/swift-g2p.md#74-lite-slice-ja-除外--言語選択ビルド))。
+> **学習済み TTS モデルは現状 6 言語 (ja/en/zh/es/fr/pt) のみ** — Swift G2P で `ko` / `sv` の音素列を取得しても、それを ONNX 合成エンジンに食わせるための学習済みモデルが piper-plus 配布物に存在しない点に注意 (`docs/migration/v1.11-to-v1.12.md` の言語表参照)。サイズ制約のあるアプリ向け lite slice の提供は将来検討中 ([spec §6.4](../../reference/swift-g2p.md#64-lite-slice-ja-除外--言語選択ビルド))。
 
 ---
 
@@ -73,7 +73,7 @@ let package = Package(
     name: "MyApp",
     platforms: [.iOS(.v15)],
     dependencies: [
-        .package(url: "https://github.com/ayutaz/piper-plus", from: "1.14.0"),
+        .package(url: "https://github.com/ayutaz/piper-plus", from: "2.0.1"),
     ],
     targets: [
         .target(
@@ -93,7 +93,7 @@ let package = Package(
 1. **GitHub Releases** から `libpiper_plus_g2p-apple-v${VERSION}.xcframework.zip` をダウンロード
 
    ```bash
-   gh release download v1.14.0 -p 'libpiper_plus_g2p-apple-v*.xcframework.zip' --repo ayutaz/piper-plus
+   gh release download v2.0.1 -p 'libpiper_plus_g2p-apple-v*.xcframework.zip' --repo ayutaz/piper-plus
    unzip libpiper_plus_g2p-apple-v*.xcframework.zip
    ```
 
@@ -216,10 +216,10 @@ struct PhonemeView: View {
 | `Phonemizer(languages:)` が `initializationFailed` を投げる | 内部で全言語の registration が失敗 (極稀) | デバッグ用に `languages: [.english]` のみで試して subset を絞る |
 | `phonemize(_:language:)` が `phonemizeReturnedNull` を投げる | `Phonemizer` 初期化時に渡していない言語を呼んだ、または入力が phonemizer で解釈できない | `init(languages:)` の配列に対象言語を含める。空文字 / 制御文字のみの入力なら正常に空配列を返すため無視してよい |
 | `phonemize(_:language:)` が `decodeFailed` を投げる | Rust 側の JSON envelope が想定外 (基本的に発生しない) | piper-plus crate と xcframework のバージョンを揃える |
-| 中国語の結果が空 | `ChinesePhonemizer` の埋込辞書が読めていない | xcframework のバージョン確認。`v1.14.0+` で埋込辞書サポート |
+| 中国語の結果が空 | `ChinesePhonemizer` の埋込辞書が読めていない | xcframework のバージョン確認。v2.0.1+（v1.14.0 で導入）を使用 |
 | 日本語の結果が文字化け | iOS 側で SourceFile encoding が UTF-8 でない | Xcode → File Inspector → Text Encoding を `Unicode (UTF-8)` に |
 | `_piper_plus_g2p_*` undefined symbol (link time) | xcframework が target に追加されていない | Step 1 を確認。手動追加の場合は **Frameworks, Libraries** で **Do Not Embed** で **Linked** になっているか |
-| Build OK on simulator, crash on device | 単一 slice のみ取得 (古い tar.gz など) | v1.14.0+ の xcframework.zip を使用 (両 slice 同梱) |
+| Build OK on simulator, crash on device | 単一 slice のみ取得 (古い tar.gz など) | v2.0.1+ の xcframework.zip を使用 (両 slice 同梱) |
 
 ---
 
@@ -245,9 +245,9 @@ struct PhonemeView: View {
 | Item | Status | Notes |
 |------|--------|-------|
 | iOS device + simulator | ✓ | `ios-arm64` + `ios-arm64_x86_64-simulator` |
-| **macOS (arm64 + x86_64)** | **✓ (v1.14.0+)** | `macos-arm64_x86_64` slice 同梱。`swift run` / macOS CLI からの利用を想定 |
+| **macOS (arm64 + x86_64)** | **✓ (v2.0.1+, v1.14.0 で導入)** | `macos-arm64_x86_64` slice 同梱。`swift run` / macOS CLI からの利用を想定 |
 | Swift `import PiperPlusG2P` | ✓ | `module.modulemap` 同梱、iOS / macOS 共通 |
-| visionOS / Mac Catalyst | ✗ | 別 slice として将来追加予定 ([spec §7.1](../../reference/swift-g2p.md#71-macos--visionos-slice-追加)) |
+| visionOS / Mac Catalyst | ✗ | 別 slice として将来追加予定 ([spec §6.1](../../reference/swift-g2p.md#61-visionos--mac-catalyst-slice)) |
 | App Extension / App Clip | ⚠ | サイズ次第で可能 (5 言語規則ベースのみなら ~2 MB)、JA/ZH 含めると 10MB を超え App Clip 不可 |
 | Privacy Manifest | ✓ (informational) | xcframework root に空の `PrivacyInfo.xcprivacy` を同梱 (Required Reason API 利用なし) |
 | iOS 14 以下 / macOS 12 以下 | ✗ | iOS 15+ / macOS 13+ のみ (`Package.swift` の platforms 制約) |

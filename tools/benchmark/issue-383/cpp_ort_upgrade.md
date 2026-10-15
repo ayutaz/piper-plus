@@ -57,8 +57,8 @@ ratio チェックの一例: `IteratorAlwaysProcessSamplesBeforeCheckingDone` �
 14592 個落ちている。Iterator が DONE chunk を見て早期終了する前に
 sample を吸い切れていない可能性。
 
-これは Issue #383 Phase 1 の bug であり、ORT バージョンとは無関係。別コミット
-で修正する。
+これは Issue #383 Phase 1 の bug であり、ORT バージョンとは無関係だった。
+後続の `a8e776d9` で修正済みであり、本レポートは修正前の検出記録として保持する。
 
 ## 教訓
 

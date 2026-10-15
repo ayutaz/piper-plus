@@ -19,9 +19,9 @@
 
 > **🔑 唯一采用 MIT 许可证的 Piper 分支** — 原版 [rhasspy/piper](https://github.com/rhasspy/piper) 已于 2025 年 10 月归档，[OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) 已转为 GPL-3.0。piper-plus 是唯一不依赖 espeak-ng 的 MIT 兼容分支。自研 G2P 支持 8 种语言 (JA/EN/ZH/KO/ES/FR/PT/SV)，适合商用和嵌入式场景。
 
-> **📢 v2.0.0 重大变更：** Docker 镜像使用 CUDA 12.8 + Ubuntu 24.04 + Python 3.13（宿主机 NVIDIA 驱动需 **R570+**）。训练使用 torch **2.11.0** + CUDA 12.8，默认开启 TF32 + bf16-mixed；不支持恢复 torch 2.2 检查点。Python import / CLI 已改为 `piper_plus` / `piper-plus`。从 1.13.0 更新：`pip install --upgrade "piper-plus==2.0.0"`。参阅[迁移指南](docs/migration/v1.12-to-v2.0.md)。
+> **📢 v2.0.0 重大变更：** Docker 镜像使用 CUDA 12.8 + Ubuntu 24.04 + Python 3.13（宿主机 NVIDIA 驱动需 **R570+**）。训练使用 torch **2.11.0** + CUDA 12.8，默认开启 TF32 + bf16-mixed；不支持恢复 torch 2.2 检查点。Python import / CLI 已改为 `piper_plus` / `piper-plus`。从 1.13.0 更新到当前公开版本：`pip install --upgrade "piper-plus==2.0.1"`。参阅[迁移指南](docs/migration/v1.12-to-v2.0.md)。
 
-快速、高质量的神经网络文本转语音 (TTS) 系统。基于 [VITS](https://github.com/jaywalnut310/vits/) 架构，支持8种语言（日语、英语、普通话、韩语、西班牙语、法语、葡萄牙语、瑞典语）的多说话人语音合成。本项目是 [Piper](https://github.com/rhasspy/piper) 的分支，大幅增强了日语支持、音质和训练功能。
+快速、高质量的神经网络文本转语音 (TTS) 系统。基于 [VITS](https://github.com/jaywalnut310/vits/) 架构，提供8语言 G2P/音素化，以及当前训练模型覆盖6种语言（日语、英语、普通话、西班牙语、法语、葡萄牙语）的多说话人语音合成。本项目是 [Piper](https://github.com/rhasspy/piper) 的分支，大幅增强了日语支持、音质和训练功能。
 
 **[Hugging Face 演示](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** | **[WebAssembly 演示](https://ayutaz.github.io/piper-plus/)** (浏览器运行，无需服务器)
 
@@ -45,7 +45,7 @@
 
 ### 语音合成
 
-- **8语言支持** — 日语、英语、普通话、西班牙语、法语、葡萄牙语、瑞典语、韩语 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) *训练模型覆盖6种语言 (JA/EN/ZH/ES/FR/PT)*
+- **8语言 G2P/音素化** — 日语、英语、普通话、西班牙语、法语、葡萄牙语、瑞典语、韩语 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7)。当前训练模型覆盖6种语言 (JA/EN/ZH/ES/FR/PT)
 - **日语 TTS** — OpenJTalk 集成、韵律特征 (A1/A2/A3)、疑问标记 (#204)、上下文相关「ん」变体 (#207)
 - **英语 TTS** — 无 GPL 依赖的 G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0)，无需 espeak-ng
 - **多说话人** — 实验性 Zero-Shot/FT bundle `zs-v1` 包含571位说话人，SpeakerBalancedBatchSampler，语言均衡采样自动启用
@@ -69,25 +69,25 @@
 - **[C API 共享库](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`，FFI 兼容 (Flutter/Godot/Swift 等)，流式 API
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — 完全在浏览器中运行，**Phoneme Timing 输出 (JSON/TSV/SRT)**，无需服务器
 - **[Docker](docker/README.md)** — 提供推理、训练、WebUI、C++ 共 5 个镜像
-- **PyPI** — `pip install piper-plus`，8语言多语言支持，**Phoneme Timing 输出 (JSON/TSV/SRT)**，流式处理，**基于 FastAPI 的 HTTP API**
-- **C# CLI** — .NET 10 跨平台，8语言多语言支持，ONNX 推理，**Phoneme Timing 输出 (JSON/TSV/SRT)**
+- **PyPI** — `pip install piper-plus`，8语言 G2P/音素化（当前训练模型覆盖6种语言），**Phoneme Timing 输出 (JSON/TSV/SRT)**，流式处理，**基于 FastAPI 的 HTTP API**
+- **C# CLI** — .NET 10 跨平台，8语言 G2P/音素化（当前训练模型覆盖6种语言），ONNX 推理，**Phoneme Timing 输出 (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli，流式处理，CUDA/CoreML/DirectML 支持，**Phoneme Timing 输出 (JSON/TSV/SRT)**，词典自动下载
 - **[Go CLI](src/go/README.md)** — HTTP API服务器、会话池、Docker、单一二进制文件、**Phoneme Timing 输出 (JSON/TSV/SRT)**
-- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 6 个运行时 (Python/Rust/C#/Go/WASM/C++) 均支持模型兼容的预计算 `speaker_embedding` 输入（属于运行时能力支持）。C++ CLI/C API 仅接受预计算 embedding；C++ 尚未实现通过 `--reference-audio` 提取 embedding。公开 `zs-v1` 的实际推理仅使用 Python `piper-plus==2.0.0` 完成功能验证。
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 6 个运行时 (Python/Rust/C#/Go/WASM/C++) 均支持模型兼容的预计算 `speaker_embedding` 输入（属于运行时能力支持）。C++ CLI/C API 仅接受预计算 embedding；C++ 尚未实现通过 `--reference-audio` 提取 embedding。公开 `zs-v1` 的实际推理仅使用 Python `piper-plus==2.0.0` 完成功能验证。公开 CI run `38189966578` 报告使用 Python 共享 phoneme IDs 的 6 个运行时推理；native G2P 与听感质量不在范围内，尚无质量批准。
 - **SSML 支持** — `<speak>`、`<break>`、`<prosody rate="...">` 在 4 个运行时 (Python/Rust/C#/Go) 中支持
 - **短文本质量改进 (Strategy A/B/C)** — Silence Padding、Dynamic Scales、SSML `<break>` 自动注入在全部 6 个运行时中支持
 
 ### 各运行时功能支持
 
-6 个运行时 (Python/Rust/C#/Go/JS-WASM/C++) 提供等效的 8 语言多语言合成。Phoneme Timing、流式处理（含按句分割）、使用模型兼容预计算 embedding 输入的 Voice Cloning、自定义词典属于运行时能力支持。C++ 仅接受预计算 embedding，尚未实现 `--reference-audio`。公开 `zs-v1` 的实际推理仅在 Python `piper-plus==2.0.0` 中验证；这不表示已在其他运行时验证该 bundle。SSML 在 4 个运行时 (Python/Rust/C#/Go) 中支持，HTTP API 在 2 个运行时 (Python/Go) 中支持。
+6 个运行时 (Python/Rust/C#/Go/JS-WASM/C++) 提供当前训练模型的 6 语言合成，同时提供 8 语言 G2P/音素化。Phoneme Timing、流式处理（含按句分割）、使用模型兼容预计算 embedding 输入的 Voice Cloning、自定义词典属于运行时能力支持。C++ 仅接受预计算 embedding，尚未实现 `--reference-audio`。公开 `zs-v1` 的实际推理已在 Python `piper-plus==2.0.0` 中验证；CI run `38189966578` 另行报告使用 Python 共享 phoneme IDs 的 6 个运行时推理。native G2P 与听感质量不在范围内，尚无质量批准。SSML 在 4 个运行时 (Python/Rust/C#/Go) 中支持，HTTP API 在 2 个运行时 (Python/Go) 中支持。
 
 ### 平台
 
 | 平台 | 架构 | 备注 |
 |---|---|---|
-| Linux | x86_64 / ARM64 / ARMv7 | 完整支持 |
+| Linux | x86_64 / ARM64 / ARMv7 | 提供 v2.0.1 C++ 构建；ARM64 需要 glibc 2.38。兼容 glibc 2.31 的修复位于 dev/source |
 | macOS | ARM64 (Apple Silicon) 仅限 | M1/M2/M3+ |
-| Windows | x64 | 完整支持 |
+| Windows | x64 | C++ 构建为 x64；C# CLI 另提供 x64 / arm64 |
 | C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | 共享库, Android AAR |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 10，Linux/macOS/Windows |
@@ -133,7 +133,7 @@ cd piper-plus
 
 **Linux (ARM64，树莓派 4/5):**
 
-**尚未发布的 ARM64 修复：** 构建以 glibc 2.31 及以上为目标，已在 QEMU 下的 Debian Bullseye / Bookworm / Trixie（64 位）中验证启动和日语语音生成。尚未验证 Raspberry Pi 实机及 Raspberry Pi OS 本身。v2.0.1 发布归档不包含此修复。
+**ARM64 兼容性：** v2.0.1 Linux ARM64 C++ 构建需要 glibc 2.38 或更高版本。兼容 glibc 2.31 的修复位于 dev/source，已在 QEMU 下的 Debian Bullseye / Bookworm / Trixie（64 位）中验证启动和日语语音生成。尚未验证 Raspberry Pi 实机及 Raspberry Pi OS 本身。需要更广泛 glibc 兼容性时请构建 dev/source。
 
 ```bash
 curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
@@ -209,7 +209,7 @@ python -m piper_plus.webui --data-dir /path/to/models
 
 ### C++ 二进制
 
-从 [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) 下载 (amd64 / arm64)。
+从 [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) 下载（C++ 提供 amd64 / ARM64 / ARMv7；v2.0.1 的 Linux ARM64 构建需要 glibc 2.38）。
 
 ```sh
 echo 'Welcome to the world of speech synthesis!' | \
@@ -319,7 +319,7 @@ dotnet add package PiperPlus.Core
 
 ```toml
 [dependencies]
-piper-plus = "0.4"
+piper-plus = "0.5"
 ```
 
 ### 从源码构建 (C++)
@@ -408,7 +408,7 @@ piper-plus-cli --model model.onnx --text "hello" --language en --quiet
 piper-plus-cli --model model.onnx --text "hello" --language en --output-raw | aplay -r 22050 -f S16_LE
 ```
 
-> **注意：** C# CLI 可通过 `dotnet tool install -g PiperPlus.Cli` 安装，Rust CLI 可通过 `cargo install piper-plus-cli` 安装。两者均支持8语言、自定义词典和流式处理。
+> **注意：** C# CLI 可通过 `dotnet tool install -g PiperPlus.Cli` 安装，Rust CLI 可通过 `cargo install piper-plus-cli` 安装。两者均提供8语言 G2P/音素化；当前训练模型覆盖6种语言，同时支持自定义词典和流式处理。
 
 ### 从源码构建 (Rust)
 
@@ -724,7 +724,7 @@ xattr -cr piper/
 
 ### Windows
 
-支持 x64 / arm64。OpenJTalk 词典在首次启动时自动下载。详情请参阅 [Windows 设置指南](docs/getting-started/windows-setup.md)。
+C++ 发布构建为 x64；C# CLI 另提供 x64 / arm64。OpenJTalk 词典在首次启动时自动下载。详情请参阅 [Windows 设置指南](docs/getting-started/windows-setup.md)。
 
 ```cmd
 piper-plus.exe --model en_US-lessac-medium.onnx -f output.wav

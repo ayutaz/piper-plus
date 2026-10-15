@@ -1,6 +1,6 @@
 ---
 name: publish-model
-description: 学習済み Lightning checkpoint (.ckpt) を ONNX export → sanity check → RTF benchmark → HuggingFace upload まで連鎖実行する read-mostly skill。 export 仕様 (FP16 / EMA / emb_lang unify / opset 15) を `docs/spec/onnx-export-contract.toml` から取得し、 全 7 ランタイムでの load 可否を gate する。
+description: 学習済み Lightning checkpoint (.ckpt) を ONNX export → sanity check → RTF benchmark → HuggingFace upload まで連鎖実行する read-mostly skill。 export 仕様 (FP16 / EMA / emb_lang unify / opset 15) を `docs/spec/onnx-export-contract.toml` から取得し、Python/Rust の load smoke と、対応可能な追加 runtime の検証を行う。
 argument-hint: "<ckpt-path> [--output <onnx-path>] [--repo <hf-repo>] [--skip-benchmark]"
 disable-model-invocation: true
 allowed-tools: Bash(uv run *) Bash(ls *) Bash(stat *) Bash(sha256sum *) Bash(file *) Bash(git diff *) Bash(git status *) Read Edit Grep
@@ -93,9 +93,9 @@ uv run python scripts/upload_model_to_hf.py \
 
 upload 後、 `docs/spec/model-sha256-manifest.toml` に新 entry を追加するための diff 提案 (sha256sum 値含む)。
 
-## フェーズ 6: 7-runtime load 確認 (optional / 軽量検証)
+## フェーズ 6: runtime load 確認 (optional / 軽量検証)
 
-各 runtime で「model を load できるか」 だけ確認 (full inference は時間がかかる):
+Python/Rust で「model を load できるか」を確認し、追加 runtime は対象モデル・実装が対応している場合だけ確認する (full inference は時間がかかる)。公開 `zs-v1` の検証範囲は、独立 PyPI 2.0.0 consumer と source 6-runtime CI の記録を分けて扱う:
 
 ```bash
 # Python
@@ -104,7 +104,7 @@ uv run python -c "from piper import PiperVoice; v = PiperVoice.load('$OUTPUT_ONN
 # Rust
 (cd src/rust && cargo run --release --bin piper-plus -- --model $OUTPUT_ONNX --text 'test' --output-file /tmp/r.wav 2>&1 | tail -3)
 
-# Go / C# / C++ / WASM はオプション
+# Go / C# / C++ / WASM / Swift / Kotlin はオプション
 ```
 
 ## 注意

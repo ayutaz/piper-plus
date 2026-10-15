@@ -33,7 +33,7 @@ piper-plus は G2P コードで 8 言語に対応しています。学習済み�
 
 ## C# Tests (PiperPlus.Core.Tests)
 
-The C# implementation has 958 tests using xUnit v3 in the `PiperPlus.Core.Tests` project. These tests cover:
+The C# implementation uses xUnit v3 in the `PiperPlus.Core.Tests` project. The test set is discovered by the project and should be treated as dynamic. These tests cover:
 
 - All 8 language phonemizers (Japanese, English, Chinese, Korean, Spanish, Portuguese, French, Swedish)
   - Note: The current trained model covers 6 languages (JA, EN, ZH, ES, FR, PT). Swedish (sv) and Korean (ko) are code-ready but not yet included in the trained model.
@@ -46,7 +46,7 @@ The C# implementation has 958 tests using xUnit v3 in the `PiperPlus.Core.Tests`
 ### Running C# Tests Locally
 
 ```bash
-dotnet test src/csharp/PiperPlus.Core.Tests/
+dotnet test src/csharp/PiperPlus.Core.Tests/PiperPlus.Core.Tests.csproj
 ```
 
 To run in Release mode with code coverage (matching CI):
@@ -71,7 +71,7 @@ This gives a 3 OS x 1 .NET version matrix (3 combinations).
 
 ## Rust Tests (piper-plus)
 
-The Rust `piper-plus` crate has 26 integration test files covering:
+The Rust `piper-plus` crate has integration tests covering:
 
 - Multilingual phonemization (`test_multilingual.rs`, `test_romance_languages.rs`)
 - Per-language phonemizers (`test_japanese_phonemize.rs`, `test_english.rs`, `test_chinese.rs`, `test_korean.rs`)
@@ -84,13 +84,13 @@ The Rust `piper-plus` crate has 26 integration test files covering:
 ### Running Rust Tests Locally
 
 ```bash
-cargo test -p piper-plus
+cd src/rust && cargo test -p piper-plus
 ```
 
 To run with verbose output and no failure short-circuit:
 
 ```bash
-cargo test -p piper-plus --no-fail-fast -- --nocapture
+cd src/rust && cargo test -p piper-plus --no-fail-fast -- --nocapture
 ```
 
 ### Rust CI Configuration
@@ -105,12 +105,12 @@ The workflow also includes `cargo check`, `cargo fmt`, and `cargo clippy` jobs o
 
 ## Go Tests (piperplus)
 
-The Go `piperplus` package has 793 unit tests and 10 integration tests covering:
+The Go `piperplus` package separates ordinary package tests from tests tagged `integration`. Test counts are discovered at runtime and are intentionally not pinned in this guide. The tests cover:
 
 - All 8 language phonemizers (Japanese, English, Chinese, Korean, Spanish, Portuguese, French, Swedish)
   - Note: Swedish (sv) and Korean (ko) are code-ready but not yet included in the current 6-language trained model.
 - Unicode language detection and text segmentation
-- PUA (Private Use Area) bidirectional mapping (96 entries)
+- PUA (Private Use Area) bidirectional mapping (the canonical mapping is checked by `scripts/check_pua_consistency.py`)
 - Config parsing, WAV output, error types
 - ONNX inference engine, end-to-end synthesis (integration)
 - HTTP API server handlers (/synthesize, /health, /info)
@@ -119,17 +119,20 @@ The Go `piperplus` package has 793 unit tests and 10 integration tests covering:
 
 ### Running Go Tests Locally
 
-Unit tests (no ONNX Runtime required):
+The CI unit job runs the default package tests and the phonemizer package tests. The `integration` build tag is excluded, but compiling the `piperplus` package still requires a working Go/CGo toolchain because its production code imports the ONNX Runtime binding; it does not load the shared library for ordinary tests. For a G2P-only run that does not compile the inference package:
 
 ```bash
-cd src/go && go test -v -race -count=1 ./...
+cd src/go && go test -v -race -count=1 ./phonemize/...
+
+# Match the Go CI unit job (default tests; integration-tagged tests excluded)
+cd src/go && go test -v -race -count=1 ./... ./phonemize/...
 ```
 
 Integration tests (requires ONNX Runtime and test model):
 
 ```bash
 cd src/go && ONNX_RUNTIME_SHARED_LIBRARY_PATH=/path/to/libonnxruntime.so \
-  PIPER_PLUS_TEST_MODEL=/path/to/multilingual-test-medium.onnx \
+  PIPER_PLUS_TEST_MODEL=../../test/models/multilingual-test-medium.onnx \
   go test -v -race -count=1 -tags integration ./...
 ```
 
@@ -146,7 +149,7 @@ CI is defined in `.github/workflows/go-ci.yml` and runs:
 
 ## 6-Language Multilingual Model Testing
 
-Piper Plus ships a 6-language multilingual model (571 speakers, 173 symbols) trained on JA, EN, ZH, ES, FR, PT. The G2P code supports 8 languages (including Swedish/sv and Korean/ko), but the current model was trained on 6. Use the following sample texts to verify all model languages work correctly.
+The retained `test/models/multilingual-test-medium.onnx` fixture is a 6-language model trained on JA, EN, ZH, ES, FR, and PT. Its speaker and symbol metadata are defined by the sidecar JSON; do not copy counts into scripts or documentation. The G2P code supports 8 languages (including Swedish/sv and Korean/ko), but this fixture covers 6.
 
 ### Sample Texts by Language
 
@@ -166,48 +169,48 @@ Test a specific language against the 6-language model:
 ```bash
 # Japanese (speaker_id=0, JA speaker)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
-  --model /path/to/multilingual-6lang.onnx \
-  --config /path/to/config.json \
+  --model test/models/multilingual-test-medium.onnx \
+  --config test/models/multilingual-test-medium.onnx.json \
   --output-dir ./test-output \
   --text "こんにちは、今日は良い天気ですね。" \
   --language ja-en-zh-es-fr-pt --speaker-id 0 --noise-scale 0.4
 
 # English (speaker_id=20, EN speaker)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
-  --model /path/to/multilingual-6lang.onnx \
-  --config /path/to/config.json \
+  --model test/models/multilingual-test-medium.onnx \
+  --config test/models/multilingual-test-medium.onnx.json \
   --output-dir ./test-output \
   --text "Hello, how are you today?" \
   --language ja-en-zh-es-fr-pt --speaker-id 20 --noise-scale 0.4
 
 # Chinese
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
-  --model /path/to/multilingual-6lang.onnx \
-  --config /path/to/config.json \
+  --model test/models/multilingual-test-medium.onnx \
+  --config test/models/multilingual-test-medium.onnx.json \
   --output-dir ./test-output \
   --text "你好，今天天气很好。" \
   --language ja-en-zh-es-fr-pt --speaker-id 162 --noise-scale 0.4
 
 # Spanish
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
-  --model /path/to/multilingual-6lang.onnx \
-  --config /path/to/config.json \
+  --model test/models/multilingual-test-medium.onnx \
+  --config test/models/multilingual-test-medium.onnx.json \
   --output-dir ./test-output \
   --text "Hola, como estas hoy?" \
   --language ja-en-zh-es-fr-pt --speaker-id 472 --noise-scale 0.4
 
 # French
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
-  --model /path/to/multilingual-6lang.onnx \
-  --config /path/to/config.json \
+  --model test/models/multilingual-test-medium.onnx \
+  --config test/models/multilingual-test-medium.onnx.json \
   --output-dir ./test-output \
   --text "Bonjour, comment allez-vous?" \
   --language ja-en-zh-es-fr-pt --speaker-id 535 --noise-scale 0.4
 
 # Portuguese
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
-  --model /path/to/multilingual-6lang.onnx \
-  --config /path/to/config.json \
+  --model test/models/multilingual-test-medium.onnx \
+  --config test/models/multilingual-test-medium.onnx.json \
   --output-dir ./test-output \
   --text "Ola, como voce esta hoje?" \
   --language ja-en-zh-es-fr-pt --speaker-id 563 --noise-scale 0.4
@@ -239,6 +242,6 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
 
 ## Related Documentation
 
-- [Main README](../../README.md)
+- [Main README](../../../README.md)
 - [piper-plus Models on HuggingFace](https://huggingface.co/ayousanz/piper-plus-base)
 - [Training Guide](../training/training-guide.md)

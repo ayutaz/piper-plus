@@ -28,8 +28,8 @@ for _token in [LANG]_PHONEMES:
 **修正:** `src/python/piper_train/phonemize/token_mapper.py`
 
 - `FIXED_PUA_MAPPING` に PUA エントリ追加
-- 現在の最終 PUA: SV = 0xE061、予約 = 0xE062-0xE063
-- 新言語は **0xE064 以降** に割り当て
+- 現在の最終固定 PUA: PT = 0xE064 (`ɔɪ`=0xE062、`œ̃`=0xE063、`ɐ̃`=0xE064)、動的割り当て開始 = 0xE065
+- 新言語は **0xE065 以降** に割り当て
 - `_PUA_START` を新言語の最終 PUA + 3 に更新 (将来拡張用)
 
 **衝突チェック:**

@@ -27,7 +27,8 @@ tar -xzf piper-plus-shared-macos-arm64.tar.gz -C /usr/local
 
 ```bash
 curl -LO https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx
-curl -LO https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx.json
+curl -L https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json \
+  -o tsukuyomi-chan-6lang-fp16.onnx.json
 ```
 
 This FFI example demonstrates reference-free synthesis. The C++ speaker
@@ -144,19 +145,19 @@ tts.dispose();
 - **iOS Deployment Target** 15.0+
 - **Apple Silicon Mac** for development (Intel Macs work via the simulator universal slice)
 
-### Distribution selection (v1.13.0)
+### Distribution selection (v2.0.1)
 
 | Your situation | Recommended artifact | Why |
 |----------------|---------------------|-----|
 | Flutter / Dart FFI for iOS | **`libpiper_plus-ios-v${VERSION}.xcframework.zip`** | Xcode treats xcframework as first-class, supports both device and simulator |
-| Existing CMake project (v1.12.0 or earlier) | `libpiper_plus-ios-arm64-${VERSION}.tar.gz` (device-only, deprecated) | v1.13.0 transitional; **will be removed in v1.14.0** |
+| Existing CMake project | Use the matching archived release only if you must preserve that integration | The current supported iOS artifact is the xcframework; no new device-only tarball is documented |
 
 > **Don't know which?** Choose the **xcframework.zip** — it's the supported path going forward.
 
 ### Step 1: Download piper-plus xcframework
 
 ```bash
-gh release download v1.13.0 -p 'libpiper_plus-ios-*.xcframework.zip'
+gh release download v2.0.1 -p 'libpiper_plus-ios-*.xcframework.zip'
 unzip libpiper_plus-ios-*.xcframework.zip
 # Result: piper_plus.xcframework/
 #   ├── Info.plist
@@ -236,7 +237,7 @@ On iOS, the static archive in the xcframework gets linked into the consumer app,
 | `dyld: Library not loaded: @rpath/onnxruntime.framework/onnxruntime` (runtime) | ORT framework not embedded | Step 3 — set onnxruntime.xcframework to **Embed & Sign** |
 | `_OrtCreateEnv` undefined symbol (link time) | ORT framework not added to the target / wrong slice picked | Confirm onnxruntime.xcframework is in **Frameworks, Libraries, and Embedded Content**, and that the slice (`ios-arm64` for device, `ios-arm64_x86_64-simulator` for simulator) matches your build target |
 | `_piper_plus_*` undefined symbol (link time) | piper_plus.xcframework not added to the target | Step 3 — drag piper_plus.xcframework into Frameworks (Embed = "Do Not Embed" is correct, but it must still be **linked**) |
-| Simulator crash on Apple Silicon Mac | Old xcframework without simulator slice | Use v1.13.0+ xcframework.zip (M2 includes simulator slice) |
+| Simulator crash on Apple Silicon Mac | Old xcframework without simulator slice | Use v2.0.1+ xcframework.zip (the release includes the simulator slice) |
 | App Store Connect rejects build | Missing Privacy Manifest for ORT | Add your own `PrivacyInfo.xcprivacy` covering Microsoft's ORT (piper-plus side already includes empty Manifest) |
 
 ### Note: Privacy Manifest (iOS 17+)

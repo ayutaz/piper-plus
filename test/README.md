@@ -5,7 +5,7 @@
 ## ディレクトリ構成
 
 - `models/` - テスト用の音声合成モデル
-  - `multilingual-test-medium.onnx` - 日本語テストモデル（カスタム辞書対応）
+  - `multilingual-test-medium.onnx` - 保持されている CSS10 日本語 fine-tune の多言語テストモデル（カスタム辞書対応）
   - `multilingual-test-medium.onnx.json` - モデルの設定ファイル
 
 - `configs/` - テスト用の設定ファイル
@@ -21,7 +21,7 @@ GitHub Actionsのビルドパイプラインで、各プラットフォーム（
 
 1. ビルドされたPiperバイナリが正常に動作すること
 2. 日本語テキストからの音声合成が可能であること
-3. 生成される音声ファイルが適切なサイズ（100KB以上）であること
+3. 生成される WAV が空でなく、各テストの検証条件を満たすこと
 
 を確認します。
 
@@ -29,8 +29,6 @@ GitHub Actionsのビルドパイプラインで、各プラットフォーム（
 
 ### multilingual-test-medium.onnx
 
-- 学習データ: CSS10日本語コーパス（6,841音声ファイル）
-- モデルサイズ: 約60MB
-- エポック数: 50（6言語ベースモデルからファインチューニング）
-- 特徴: カスタム辞書による正確な日本語発音、EMA適用による安定した音質
-- 音質: 高品質（複合語の正確な発音を実現）
+- 学習データ: CSS10 日本語コーパス（6言語ベースからの fine-tune）。詳細は [`docs/spec/model-sha256-manifest.toml`](../docs/spec/model-sha256-manifest.toml) の保持テストフィクスチャ記録を参照
+- 用途: クロスランタイム、辞書、CLI の回帰テスト用。公開品質の評価や現行の zero-shot 公開モデルを表すものではない
+- 設定: 同名の `.onnx.json` sidecar を必ず併用する

@@ -2,7 +2,7 @@
 
 GitHub Releases には 3 種類の CLI バイナリが並んでおり、初めて使うときはどれを選べばよいか迷いがちです。このドキュメントは、用途・OS・アーキテクチャから最適なバイナリを選ぶための判断材料をまとめたものです。
 
-**迷ったら C++ CLI (`piper-plus-cpp-*`) を選んでください。** 最も多くのプラットフォームで動作し、Quick Start のサンプルとも整合しています。
+**迷ったら C++ CLI (`piper-plus-cpp-*`) を選んでください。** 最も多くのプラットフォームで動作し、Quick Start のサンプルとも整合しています。Linux arm64 だけは、現行 v2.0.1 asset の glibc 要件に注意してください（下記参照）。
 
 ## 目次
 
@@ -29,7 +29,7 @@ GitHub Releases には 3 種類の CLI バイナリが並んでおり、初め�
 | OS / アーキテクチャ | C++ (`piper-plus-cpp-*`) | C# (`piper-plus-cli-*`) | Rust (`piper-plus-rs-cli-*`) |
 |---|:---:|:---:|:---:|
 | Linux x64 | o | o | o |
-| Linux arm64 (Raspberry Pi 5 等) | o | o | - |
+| Linux arm64 (Raspberry Pi 5 等) | o* | o | - |
 | Linux armv7 (Raspberry Pi 4 32bit 等) | o | - | - |
 | macOS arm64 (Apple Silicon) | o | o | o |
 | macOS x64 (Intel Mac) | - | o | - |
@@ -38,25 +38,29 @@ GitHub Releases には 3 種類の CLI バイナリが並んでおり、初め�
 
 Intel Mac、Linux armv7、Windows arm64 のいずれかを使う場合は、選択肢が一意に決まる点に注意してください。
 
+`*` v2.0.1 の `piper-plus-cpp-linux-arm64.tar.gz` は配布されていますが、実行ファイルが GLIBC 2.38 を要求するため Debian Bullseye では起動しません。開発用の修正版は GLIBC 2.29 の ABI report と QEMU の Bullseye / Bookworm / Trixie 3 suite の synthesis 成功記録がありますが、まだ v2.0.1 の公開 asset ではありません。Raspberry Pi 実機・性能はこの QEMU 記録の対象外です。CI の ABI 上限は GLIBC 2.31 です。Bullseye で使う場合は修正版の source/dev build または検証済み CI artifact を使用してください。C# ARM64 配布物の Bullseye 動作はこの検証の対象外です。
+
 ## 判断フロー
 
 1. **Raspberry Pi 4 (32bit) などの armv7 環境** -> **C++ CLI 一択** (`piper-plus-cpp-linux-armv7.tar.gz`)
-2. **Intel Mac (macOS x64)** -> **C# .NET CLI 一択** (`piper-plus-cli-osx-x64.tar.gz`)
-3. **Windows on ARM** -> **C# .NET CLI 一択** (`piper-plus-cli-win-arm64.zip`)
-4. **GPU 推論 (CUDA / CoreML / DirectML) を使いたい** -> **Rust CLI**
-5. **Windows / 多言語 (中国語・スペイン語など) を使う / .NET と統合したい** -> **C# .NET CLI**
-6. **上記に当てはまらない / とにかく動かしたい / 何を選んでよいか分からない** -> **C++ CLI**
+2. **Linux arm64 で Debian Bullseye 等の広い glibc 互換性が必要** -> **C++ CLI の修正版**を source/dev build または検証済み CI artifact から取得 (ABI 上限 GLIBC 2.31、確認した成果物は GLIBC 2.29)
+3. **Intel Mac (macOS x64)** -> **C# .NET CLI 一択** (`piper-plus-cli-osx-x64.tar.gz`)
+4. **Windows on ARM** -> **C# .NET CLI 一択** (`piper-plus-cli-win-arm64.zip`)
+5. **GPU 推論 (CUDA / CoreML / DirectML) を使いたい** -> **Rust CLI**
+6. **Windows / 多言語 (中国語・スペイン語など) を使う / .NET と統合したい** -> **C# .NET CLI**
+7. **上記に当てはまらない / とにかく動かしたい / 何を選んでよいか分からない** -> **C++ CLI**
 
 Apple Silicon Mac で `piper-plus-cpp-macos-arm64.tar.gz` (C++) と `piper-plus-cli-osx-arm64.tar.gz` (C#) で迷った場合、まずは C++ を試し、多言語合成や `lid` テンソル対応モデルを使う場面で C# を検討するのがおすすめです。
 
 ## ダウンロード方法
 
-最新リリースは <https://github.com/ayutaz/piper-plus/releases/latest> にあります。以下は代表的なコマンド例です (ファイル名のバージョン部分は実際のリリースに合わせてください)。
+現行の確認済み公開版は [v2.0.1](https://github.com/ayutaz/piper-plus/releases/tag/v2.0.1) です。再現可能な取得には tag を固定してください。`latest` を使う場合は、asset 名と互換性をリリースページで再確認してください。
 
 ### C++ CLI (macOS arm64)
 
 ```bash
-curl -LO https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-macos-arm64.tar.gz
+VERSION=v2.0.1
+curl -LO https://github.com/ayutaz/piper-plus/releases/download/${VERSION}/piper-plus-cpp-macos-arm64.tar.gz
 tar -xzf piper-plus-cpp-macos-arm64.tar.gz
 cd piper-plus
 ./bin/piper-plus --help
@@ -65,7 +69,8 @@ cd piper-plus
 ### C# .NET CLI (Linux x64)
 
 ```bash
-curl -LO https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cli-linux-x64.tar.gz
+VERSION=v2.0.1
+curl -LO https://github.com/ayutaz/piper-plus/releases/download/${VERSION}/piper-plus-cli-linux-x64.tar.gz
 tar -xzf piper-plus-cli-linux-x64.tar.gz
 ./PiperPlus.Cli --help
 ```
@@ -75,7 +80,8 @@ tar -xzf piper-plus-cli-linux-x64.tar.gz
 PowerShell:
 
 ```powershell
-Invoke-WebRequest -Uri https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-rs-cli-win-x64.zip -OutFile piper-plus-rs-cli.zip
+$version = "v2.0.1"
+Invoke-WebRequest -Uri "https://github.com/ayutaz/piper-plus/releases/download/$version/piper-plus-rs-cli-win-x64.zip" -OutFile piper-plus-rs-cli.zip
 Expand-Archive piper-plus-rs-cli.zip -DestinationPath piper-plus-rs-cli
 .\piper-plus-rs-cli\piper-plus-cli.exe --help
 ```

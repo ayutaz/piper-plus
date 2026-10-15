@@ -1,6 +1,6 @@
 # Multi-6lang Zero-Shot TTS スクラッチ学習 (v7) — 実施結果と根本原因の解析
 
-> **このドキュメントは v7 学習の report-card / 根本原因 analysis** です。 環境再構築 / 学習再開 / FT / 評価の手順は [`docs/handoff/zero-shot-tts-handoff-2026-06-20.md`](../handoff/zero-shot-tts-handoff-2026-06-20.md) (canonical handoff) を参照してください。 5-fix commit 表 / dataset 表 / ckpt 表 / GPU 推奨など overlap する内容がありますが、 本書は **何が起き何を学んだか**、 handoff は **どう手を動かすか** という棲み分けです。
+> **このドキュメントは v7 学習の historical report-card / 根本原因 analysis** です。環境再構築 / 学習再開 / FT の旧手順は [`docs/handoff/zero-shot-tts-handoff-2026-06-20.md`](../handoff/zero-shot-tts-handoff-2026-06-20.md) に保存した private/research handoff であり、現行 public guide ではありません。公開 bundle と匿名 consumer 検証は [`zero-shot-base-zs-v1-release-2026-10-10.md`](zero-shot-base-zs-v1-release-2026-10-10.md) と [`tsukuyomi-publication-ready-2026-10-12.md`](tsukuyomi-publication-ready-2026-10-12.md) を参照してください。本書は **何が起き何を学んだか**を記録します。
 
 **期間**: 2026-05-08 ~ 2026-05-16 (8 日連続)
 **ブランチ**: `feat/zero-shot-tts` (commit `95e74cb` 時点)
@@ -12,7 +12,7 @@
 ## 1. 概要
 
 `dev` リベース後の Zero-Shot TTS を multi-6lang データセットでスクラッチ学習する試行。
-複数の障害を順に解消し、最終的に v7 として安定動作 + epoch 20 まで完走 + 評価成功。
+複数の障害を順に解消し、v7 の interim epoch 20 snapshot で安定動作と評価を確認した。その後、公開 zs-v1 base は epoch 32 / step 216326 の別の公開検証記録に固定されている。本書の epoch 20 の数値を公開 bundle の品質承認に読み替えない。
 
 ---
 
@@ -196,7 +196,7 @@ CLAUDE.md の基準値 (out-of-domain 0.55-0.70 = 良好) との比較で、
 
 1. **区別性 (4 ペアの SECS が 0.59-0.64 に集中)**: 話者個性の表現がまだ不十分。
    - 推測される要因: epoch 不足 (dev base は 75 epoch でようやく成熟)
-   - epoch 20 → epoch 50 / 75 で改善見込み
+   - epoch 20 → epoch 50 / 75 は当時の research hypothesis。公開 zs-v1 は epoch 32 の experimental bundle であり、この見込みは品質承認ではない
 2. **V100 で 75 epoch 完走に 28 日**: 計算リソース制約。A100 移行で大幅短縮可能
 3. **`student_emb` の稀な NaN (率 0.6%)**: spk_proj 内部の数値不安定。LayerNorm eps 調整等で改善余地
 

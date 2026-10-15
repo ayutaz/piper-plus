@@ -1,7 +1,10 @@
 # Issue #383 Phase 1 C# ランタイム実機ベンチ結果
 
-> **重要**: 本ベンチで Phase 1 C# 実装 (`af308fd4`) に **2 つの致命的な問題** を
-> 発見した。**現状の `SentenceParallelEncoder` 経路は本番投入できない**。詳細は
+> このレポートは修正前・修正後の実機計測を含む歴史的記録です。冒頭の「本番投入できない」は
+> `af308fd4` の修正前経路に対する判定であり、後半の `ThreadLocal<G2PEngine>` 修正後結果と分けて読んでください。
+
+> **重要（修正前 snapshot）**: 本ベンチで Phase 1 C# 実装 (`af308fd4`) に **2 つの致命的な問題** を
+> 発見した。**修正前の `SentenceParallelEncoder` 経路は本番投入できない**。詳細は
 > 末尾「問題と推奨修正」を参照。
 
 ## 計測環境
@@ -211,7 +214,7 @@ dotnet run --project PiperPlus.Bench/PiperPlus.Bench.csproj -c Release --no-buil
 
 1. Bench ハーネスで warmup を 2~3 に増やし、parallel 構成の MeCab
    engine を全 worker thread で事前構築 → N=20 の +19% 解消が見込める。
-2. `JapanesePhonemizer` 経路を「concurrent から呼んでもクラッシュしない」
-   ことを保証するスモークテストを `PiperPlus.Core.Tests` 系列に追加
-   (現状は `IJapaneseG2PEngine` の stub をテストしているだけで、実装が
-   thread-safe であることを定量的に検証できていない)。
+2. 当時は `JapanesePhonemizer` 経路を「concurrent から呼んでもクラッシュしない」
+   ことを保証する実装経路のスモークテストが不足していた。これはこの fork 時点の残課題であり、
+   現行ツリーでは `PiperPlus.Cli.Tests/DotNetG2PEngineConcurrencyTests.cs` に JA の
+   concurrent/mixed-language regression tests が追加されている。

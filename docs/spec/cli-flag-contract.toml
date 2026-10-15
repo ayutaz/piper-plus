@@ -116,14 +116,9 @@ reason = "voice-runtime-only — C# CLI does not expose it"
 [[skips]]
 runtime = "cpp"
 flag = "reference-audio"
-reason = "Voice cloning not yet wired into C++ CLI"
-
-[[skips]]
-runtime = "cpp"
-flag = "speaker-embedding"
-reason = "Voice cloning not yet wired into C++ CLI"
+reason = "C++ runtime rejects --reference-audio as not implemented; use a precomputed raw float32 embedding instead."
 
 [[skips]]
 runtime = "cpp"
 flag = "speaker-encoder-model"
-reason = "Voice cloning not yet wired into C++ CLI"
+reason = "Only needed by the unsupported C++ --reference-audio path; --speaker-embedding is accepted directly."

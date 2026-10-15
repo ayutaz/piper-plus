@@ -88,11 +88,12 @@ response = client.audio.speech.create(
     model="piper-plus",
     voice="default",
     input="こんにちは、今日は良い天気ですね。",
+    response_format="wav",
 )
 response.stream_to_file("hello.wav")
 ```
 
-piper-plus は API キーを検証しないため、`api_key` には任意の文字列を指定してください。
+piper-plus の Bearer 認証は `PIPER_PLUS_API_KEYS` の設定によって切り替わります。環境変数が未設定または空の場合は認証を行わないため、上の例では `api_key="dummy"` を使えます。1 つ以上のキーをカンマ区切りで設定した場合は認証が有効になり、保護対象の TTS/モデル API に `api_key` として設定済みキーのいずれかを指定してください。サーバーは保護対象ルートに `Authorization: Bearer <key>` を要求します。`/health` と `/api/phoneme-timing` は認証不要です。OpenAI の SDK/API の `response_format` 既定値は `mp3` ですが、piper-plus は `wav` のみ受け付けるため、各 SDK 例で `response_format="wav"` を明示しています。
 
 ### 言語を指定する場合
 
@@ -103,6 +104,7 @@ response = client.audio.speech.create(
     model="piper-plus",
     voice="default",
     input="Hello, how are you today?",
+    response_format="wav",
     extra_body={"language": "en"},
 )
 response.stream_to_file("hello_en.wav")
@@ -124,7 +126,7 @@ response.stream_to_file("hello_en.wav")
 |---------|-----|
 | Provider | `OpenAI Compatible` (バージョンにより `OpenAI` の場合あり) |
 | API Base URL | `http://localhost:8000/v1` |
-| API Key | `dummy` |
+| API Key | 認証無効時は `dummy`、`PIPER_PLUS_API_KEYS` 設定時はそのキー |
 | Model | `piper-plus` |
 | Voice | `default` |
 
@@ -158,6 +160,7 @@ def text_to_speech(text: str, language: str = "ja") -> str:
         model="piper-plus",
         voice="default",
         input=text,
+        response_format="wav",
         extra_body={"language": language},
     )
     output_path = "output.wav"
@@ -218,6 +221,7 @@ speech = tts_client.audio.speech.create(
     model="piper-plus",
     voice="default",
     input=generated_text,
+    response_format="wav",
 )
 speech.stream_to_file("response.wav")
 print("音声を response.wav に保存しました")

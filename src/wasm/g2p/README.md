@@ -11,23 +11,43 @@ npm install @piper-plus/g2p
 ## Quick Start
 
 ```js
-import { G2P } from '@piper-plus/g2p';
+import { G2P, DictLoader } from '@piper-plus/g2p';
 
-// Initialize with desired languages
-const g2p = await G2P.create({ languages: ['ja', 'en'] });
+// Rule-based languages initialise without an external WASM module.
+const g2p = await G2P.create({ languages: ['en'] });
 
 // Convert text to IPA tokens
 const tokens = g2p.phonemize('Hello, world!');
 // => ["h", "ʌ", "l", "oʊ", ",", " ", "w", "ɜː", "l", "d", "!"]
 
-const jaTokens = g2p.phonemize('こんにちは');
-// => ["k", "o", "N_n", "n", "i", "ch", "i", "h", "a"]
-
 // Encode for Piper TTS inference
 import { Encoder } from '@piper-plus/g2p/encode';
-const encoder = new Encoder(config);
+const config = await fetch('/path/to/model.onnx.json').then((r) => r.json());
+const encoder = new Encoder(config.phoneme_id_map);
 const ids = encoder.encode(tokens);
 ```
+
+Japanese additionally requires an OpenJTalk WASM module supplied by the
+application and the dictionary data loaded by `DictLoader`:
+
+```js
+import { DictLoader } from '@piper-plus/g2p';
+
+const loader = new DictLoader();
+const jaDict = await loader.loadJaDict();
+const openjtalkModule = await loadOpenJTalkWasmModuleFromYourApp();
+const jaG2P = await G2P.create({
+  languages: ['ja'],
+  openjtalkModule,
+  jaDict,
+});
+const jaTokens = jaG2P.phonemize('こんにちは');
+// => ["k", "o", "N_n", "n", "i", "ch", "i", "h", "a"]
+```
+
+`loadOpenJTalkWasmModuleFromYourApp()` represents the generated OpenJTalk
+WASM loader chosen by the application; `@piper-plus/g2p` provides the G2P
+adapter and dictionary loader, not a universal Emscripten module loader.
 
 ## Per-Language Imports
 
@@ -44,7 +64,7 @@ import { SwedishG2P } from '@piper-plus/g2p/sv';
 
 | Language   | Code | Method              | External Dependencies |
 |------------|------|---------------------|-----------------------|
-| Japanese   | ja   | OpenJTalk WASM      | NAIST-jdic (auto-download) |
+| Japanese   | ja   | OpenJTalk WASM      | DictLoader dictionary asset |
 | English    | en   | Rule-based          | None |
 | Chinese    | zh   | Pinyin-based        | None |
 | Spanish    | es   | Rule-based          | None |

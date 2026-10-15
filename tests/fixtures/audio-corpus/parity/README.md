@@ -2,16 +2,16 @@
 
 ## phoneme_ids.jsonl
 
-`docs/spec/audio-parity-contract.toml` の cross-runtime byte parity gate
+`docs/spec/audio-parity-contract.toml` の cross-runtime audio parity gate
 (`scripts/audio_parity.py` + `.github/workflows/runtime-parity-deep.yml`) で
-6 runtime (現状 Phase 1 = Python / Rust / Go / C#) に同一の入力を渡すための
+6 runtime (Python / Rust / Go / C# / C++ / WASM) に同一の入力を渡すための
 canonical fixture。 G2P をバイパスして phoneme IDs を直接渡すので、 G2P
 実装差 (loanword / SSML / 短文戦略 etc.) の影響を切り離して decoder /
 後処理側の差分だけを計測できる。
 
 1 行 1 utterance の JSONL。 各 field は `JsonlUtterance` 契約
-(`src/rust/piper-core/src/input.rs` を canonical とし、 Go / C# / Python
-runtime CLI もこれに揃える):
+(`src/rust/piper-core/src/input.rs` を canonical とし、各 parity runtime CLI
+もこれに揃える):
 
 | field | 型 | 役割 |
 |-------|-----|------|
@@ -29,9 +29,11 @@ runtime CLI もこれに揃える):
 
 ## zero_shot_phoneme_ids.jsonl + test_speaker.npy
 
-Zero-shot TTS (v7 multi-6lang) の cross-runtime parity 用 fixture。
-`speaker_id` の代わりに `speaker_embedding` (192-dim float32、L2 正規化済み)
-を渡すと各 runtime が同じ声質で合成できることを保証する gate の入力。
+Zero-shot TTS (v7 multi-6lang) の speaker-embedding 入力契約を検証する
+fixture。`speaker_id` の代わりに `speaker_embedding` (192-dim float32、L2
+正規化済み) を渡す形式を Python 側の parity fixture test が検証する。
+`runtime-parity-deep.yml` の現行音声比較ジョブは `phoneme_ids.jsonl` を使用し、
+この zero-shot fixture を全 runtime に配布するジョブではない。
 
 | field | 型 | 役割 |
 |-------|-----|------|
@@ -41,6 +43,8 @@ Zero-shot TTS (v7 multi-6lang) の cross-runtime parity 用 fixture。
 
 `test_speaker.npy` は決定論的 (`np.random.default_rng(seed=42)` → L2 正規化) で
 生成された 192-dim float32 ベクトル。 実モデルに対する音声品質は保証せず、
-あくまで「全 runtime が同じ tensor を decoder に流し込めるか」を検査する
-shape / dtype canonical fixture。 `scripts/audio_parity.py --speaker-embedding`
-が読み込んで各 runtime CLI に転送する。
+あくまで decoder 入力に同じ tensor 形状を渡せるかを検査する shape / dtype
+canonical fixture。`src/python_run/tests/test_zero_shot_parity_fixture.py` が
+`test/models/zero-shot-test.onnx` と組み合わせて読み込み、
+`scripts/audio_parity.py` の `--speaker-embedding` オプションは別途 contract
+validation に使える。

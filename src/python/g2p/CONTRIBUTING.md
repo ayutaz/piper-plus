@@ -44,9 +44,11 @@ The registry discovers these at import time via `importlib.metadata.entry_points
 ## Testing
 
 - Framework: **pytest**
-- Skip markers: `requires_ja`, `requires_en`, `requires_zh`, `requires_ko`
-  (defined in `tests/conftest.py`) for tests that need optional dependencies.
-- CI runs on 3 OS (Linux, macOS, Windows) x 2 Python versions.
+- Skip markers: `requires_ja`, `requires_en`, `requires_zh`, `requires_ko`, and
+  `requires_piper_train` (defined in `tests/conftest.py`) for tests that need
+  optional dependencies.
+- The package test matrix runs on 3 OS (Linux, macOS, Windows) x 3 Python
+  versions (3.11, 3.12, and 3.13) in `.github/workflows/python-tests.yml`.
 
 ## Pull Requests
 

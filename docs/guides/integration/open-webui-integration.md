@@ -61,6 +61,8 @@ services:
       - ./models:/app/models:ro
     environment:
       - PYTHONUNBUFFERED=1
+      # 任意: 設定するとカンマ区切りの Bearer キーを要求します
+      # - PIPER_PLUS_API_KEYS=change-me
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -92,6 +94,9 @@ services:
       - "3000:8080"
     volumes:
       - open-webui:/app/backend/data
+    # Open WebUI の OpenAI TTS リクエストを piper-plus の WAV に固定する場合:
+    # environment:
+    #   - AUDIO_TTS_OPENAI_PARAMS={"response_format":"wav"}
     # ... 既存の設定 ...
 
   piper-api:
@@ -103,6 +108,8 @@ services:
       - ./models:/app/models:ro
     environment:
       - PYTHONUNBUFFERED=1
+      # 任意: 設定するとカンマ区切りの Bearer キーを要求します
+      # - PIPER_PLUS_API_KEYS=change-me
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -137,15 +144,18 @@ curl http://localhost:8000/v1/audio/speech/languages
 # 音声合成テスト
 curl -X POST http://localhost:8000/v1/audio/speech \
   -H "Content-Type: application/json" \
-  -d '{"input": "こんにちは", "language": "ja"}' \
+  -d '{"input": "こんにちは", "language": "ja", "response_format": "wav"}' \
   -o test.wav
 ```
+
+`PIPER_PLUS_API_KEYS` を設定した場合は、上のリクエストに
+`-H "Authorization: Bearer $PIPER_PLUS_API_KEY"` を追加してください。未設定または空の場合、API は Bearer 認証を行いません。
 
 ---
 
 ## Step 2: Open WebUI の TTS 設定
 
-Open WebUI の管理画面から以下の設定を行います。
+Open WebUI の **Settings > Admin > Audio** から以下の設定を行います。[公式の OpenAI TTS ガイド](https://docs.openwebui.com/features/chat-conversations/audio/text-to-speech/openai-tts-integration/) でも同じ設定画面と API Base URL/API Key の項目が案内されています。
 
 1. **Settings** (管理者設定) を開く
 2. **Audio** セクションに移動
@@ -155,7 +165,7 @@ Open WebUI の管理画面から以下の設定を行います。
 |---------|-----|
 | TTS Engine | `OpenAI` |
 | TTS Base URL | `http://piper-api:8000/v1` |
-| TTS API Key | `dummy` (任意の文字列。piper-plus は API キーを検証しません) |
+| TTS API Key | `PIPER_PLUS_API_KEYS` 未設定時は `dummy`、設定時はその値のいずれか |
 | TTS Model | `piper-plus` |
 | TTS Voice | `default` |
 
@@ -166,6 +176,10 @@ Open WebUI の管理画面から以下の設定を行います。
 - Open WebUI が別の Docker ネットワークにある場合: `http://host.docker.internal:8000/v1` (Docker Desktop) または ホストの実 IP を指定
 
 1. **Save** をクリック
+
+Open WebUI のバージョンによって追加パラメータの入力場所が異なるため、UI から `response_format` を指定できない場合は、Open WebUI コンテナに `AUDIO_TTS_OPENAI_PARAMS={"response_format":"wav"}` を設定してください。これは Open WebUI の [環境変数リファレンス](https://docs.openwebui.com/reference/env-configuration/) にある OpenAI 互換 TTS の追加パラメータ設定です。
+
+認証の動作は piper-plus の `PIPER_PLUS_API_KEYS` に依存します。未設定または空の場合は認証無効です。1 つ以上のキーをカンマ区切りで設定すると、Open WebUI の API Key に設定済みキーを入力し、保護対象の TTS/モデル API が要求する `Authorization: Bearer <key>` と一致させる必要があります。`/health` と `/api/phoneme-timing` は認証不要です。
 
 ---
 

@@ -57,8 +57,8 @@ grep -A1 "^\[workspace.package\]" src/rust/Cargo.toml | grep "^version" | head -
 ```text
 | Runtime | Manifest version | expected_prefix | Status |
 |---------|------------------|-----------------|--------|
-| Python  | 1.12.0           | 1.12.           | ✓      |
-| Rust    | 0.4.0            | 0.4.            | ✓      |
+| Python  | `<local>`        | `<expected_prefix>` | ✓      |
+| Rust    | `<local>`        | `<expected_prefix>` | ✓      |
 | C# Core | 0.3.0            | 0.3.            | ✓      |
 | ...     | ...              | ...             | ...    |
 ```
@@ -124,8 +124,8 @@ curl -s "https://search.maven.org/solrsearch/select?q=g:io.github.ayutaz+AND+a:p
 
 | Runtime | Local | Published | Canonical (.toml) | Verdict |
 |---------|-------|-----------|-------------------|---------|
-| Python  | 1.12.1 | 1.12.0   | 1.12.             | Local ahead → publish required |
-| Rust    | 0.4.0 | 0.4.0     | 0.4.              | In sync |
+| Python  | `<local>` | `<published>` | `<expected_prefix>` | Local ahead → publish required |
+| Rust    | `<local>` | `<published>` | `<expected_prefix>` | In sync |
 | C# Core | 0.3.0 | 0.3.0     | 0.3.              | In sync |
 | ...     | ...   | ...       | ...               | ...     |
 ```
@@ -165,11 +165,11 @@ verdict に応じて推奨 next action を表示:
 # Python だけに絞って詳細表示
 /release-prep python
 
-# 2.0.0 リリース予定での CHANGELOG 移行案を生成
-/release-prep --target-version 2.0.0
+# 次回リリース予定での CHANGELOG 移行案を生成
+/release-prep --target-version <target-version>
 
 # Rust だけ + target version
-/release-prep rust --target-version 0.5.0
+/release-prep rust --target-version <target-version>
 ```
 
 ## 期待効果

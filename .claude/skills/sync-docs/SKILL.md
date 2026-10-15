@@ -76,9 +76,9 @@ allowed-tools: Agent Bash(git diff *) Bash(git log *) Bash(git status *) Read Gl
 **subagent_type**: `Explore`
 **task**: 以下の 3 段階で version-drift を検出する。
 
-1. **Canonical 抽出**: `docs/spec/release-versions.toml` を読み、各ランタイム (`python`, `rust`, `dotnet.core`, `dotnet.cli`, `npm.synthesis`, `npm.g2p`, `swift.synthesis`, `swift.g2p`, `kotlin.android_g2p`) の `expected_prefix` を取得 (例: `"1.12."`, `"0.4."`)。これを canonical truth とする。
+1. **Canonical 抽出**: `docs/spec/release-versions.toml` を読み、各ランタイム (`python`, `rust`, `dotnet.core`, `dotnet.cli`, `npm.synthesis`, `npm.g2p`, `swift.synthesis`, `swift.g2p`, `kotlin.android_g2p`) の `expected_prefix` を取得。これを canonical truth とする。
 
-2. **CLAUDE.md ランタイム別パッケージ表との照合**: CLAUDE.md の「ランタイム別パッケージ」表 (現在 L177-186 付近、 `| ランタイム | パッケージ | バージョン |` を含む table) を grep で抽出し、各ランタイムの記載バージョンが `expected_prefix` で始まるかを確認。不一致なら drift 報告。
+2. **CLAUDE.md ランタイム別パッケージ表との照合**: CLAUDE.md の「ランタイム別パッケージ」表 (見出し `| ランタイム | パッケージ | バージョン |` を含む table) を抽出し、各ランタイムの記載バージョンが `expected_prefix` で始まるかを確認。不一致なら drift 報告。
 
 3. **`docs/spec/*.toml` 内 version comment 監査**: 全 `docs/spec/*.toml` を grep で `# v1\.|# v0\.` 等の version reference comment を抽出し、`release-versions.toml` の expected_prefix とずれていないか確認 (例: `audio-format-contract.toml` の `# v1.12.0 で HiFi-GAN は削除` が canonical と矛盾していないか)。
 
@@ -96,7 +96,7 @@ allowed-tools: Agent Bash(git diff *) Bash(git log *) Bash(git status *) Read Gl
 
 ## フェーズ 3: 更新提案の統合
 
-6 エージェントの結果を収集し、以下の形式で **統合レポート** を作成:
+7 エージェントの結果を収集し、以下の形式で **統合レポート** を作成:
 
 ```text
 ## ドキュメント監査結果

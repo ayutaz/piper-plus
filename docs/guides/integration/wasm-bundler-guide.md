@@ -39,10 +39,11 @@ cp node_modules/onnxruntime-web/dist/*.wasm public/
 
 ```js
 import { PiperPlus } from "piper-plus";
+import * as ort from "onnxruntime-web";
 
-const piper = await PiperPlus.initialize("tsukuyomi");
+const piper = await PiperPlus.initialize({ model: "tsukuyomi", ort });
 const audio = await piper.synthesize("こんにちは");
-audio.play();
+await audio.play();
 ```
 
 ## webpack

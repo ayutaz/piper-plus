@@ -1,6 +1,6 @@
 # Swift G2P 配布仕様
 
-> **Status:** Implemented (v1.14.0+)
+> **Status:** Implemented and published (current package pointer v2.0.1; initial Apple-slice release v1.14.0)
 > **対象 Issue:** [#387](https://github.com/ayutaz/piper-plus/issues/387)
 > **対象ファイル:**
 > [`src/rust/piper-plus-g2p/`](../../src/rust/piper-plus-g2p/),
@@ -109,7 +109,7 @@
 | 配布物 | 中身 | サイズ目安 | 用途 |
 |--------|------|-----------|------|
 | `libpiper_plus-ios-v${VERSION}.xcframework.zip` (既存) | C++ 合成 + 内部 G2P + ORT 必須 | ~15 MB (zip) | 合成エンジン |
-| **`libpiper_plus_g2p-apple-v${VERSION}.xcframework.zip` (v1.14.0+)** | **Rust G2P のみ、ORT 不要** | **~3-5 MB (zip, 言語デフォルト構成)** | **G2P 単独** |
+| **`libpiper_plus_g2p-apple-v${VERSION}.xcframework.zip` (introduced v1.14.0; current public pointer v2.0.1)** | **Rust G2P のみ、ORT 不要** | **~3-5 MB (zip, 言語デフォルト構成)** | **G2P 単独** |
 
 > **artifact 名**: G2P xcframework は v1.14.0 で macOS slice を加えた際 `-ios-` から `-apple-` に rename。旧 `-ios-` 名は維持しない。
 
@@ -131,7 +131,7 @@
 |-------|--------------|------|
 | `ios-arm64` | arm64 (device) | 実機 (iPhone / iPad) |
 | `ios-arm64_x86_64-simulator` | arm64 + x86_64 (universal) | シミュレータ (Apple Silicon Mac / Intel Mac) |
-| `macos-arm64_x86_64` (v1.14.0+) | arm64 + x86_64 (universal) | macOS host (`swift run` / CLI tooling) |
+| `macos-arm64_x86_64` (introduced v1.14.0; present in current v2.0.1) | arm64 + x86_64 (universal) | macOS host (`swift run` / CLI tooling) |
 
 > 合成エンジンの `libpiper_plus.xcframework` には macOS slice は無い (ORT が独自に macOS 配布チャンネルを持つため)。G2P は pure Rust でこの制約がない。
 

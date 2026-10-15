@@ -2,7 +2,7 @@
 
 > Index: [`README.md`](README.md)
 
-Python は ZH-EN code-switching の **canonical source of truth**。学習側 (`src/python/g2p/piper_plus_g2p/`) とランタイム側 (`src/python_run/piper_plus/phonemize/`) 両方で実装済 (PR #397)。他 5 ランタイムは Python から byte-for-byte 同期。
+Python は ZH-EN code-switching の **canonical source of truth**。学習側 (`src/python/g2p/piper_plus_g2p/`) とランタイム側 (`src/python_run/piper_plus/phonemize/`) 両方で実装済 (PR #397)。Rust 2 crate、Go、C#、WASM、C++、Android、Swift の mirror も `docs/spec/loanword-mirrors.toml` で byte-for-byte 同期する。
 
 ## 1. 実装ファイル
 
@@ -16,9 +16,11 @@ Python は ZH-EN code-switching の **canonical source of truth**。学習側 (`
 
 ## 2. JSON 同期 CI 戦略
 
-**問題**: **7 箇所** (Python 学習側 / Python ランタイム側 / Rust 2 crate (`piper-plus-g2p` + `piper-core`) / Go / C# / WASM / C++) に同じ JSON が分散する。
+**問題 (設計時の記録)**: 同じ JSON が複数ランタイムへ分散する。現在の正確な
+mirror 数とパスは `docs/spec/loanword-mirrors.toml` を参照する。
 
-> 注: 実際の mirror は 10 箇所まで拡大済 (Kotlin/Android + Swift G2P 追加)。最新は `docs/spec/loanword-mirrors.toml` を参照。
+> 注: 現在は Kotlin/Android と Swift G2P を含む runtime mirror 群と共有 fixture 群を
+> checker が検証する。数を本文に重複させない。
 
 **既存パターン**: `pua.json` の同期は `check_pua_consistency.py` + `/check-pua` skill + pre-commit hook で実現済み (commit `3a38a61f`, `96138922`, `90ff6390`)。これを踏襲する。
 
@@ -31,7 +33,11 @@ Python は ZH-EN code-switching の **canonical source of truth**。学習側 (`
 | **C** | 自動 sync スクリプト + pre-commit hook | ★★★ | ベスト | △ (CRLF 注意) |
 | **D** | symlink で single source 化 | ★ | ベスト | ✗ (Windows 非対応) |
 
-**推奨**: **案 A + B のハイブリッド** — 既存 PUA 同期戦略を踏襲しつつ、CI で hash 比較を最終ガード
+以下の案比較と段階構成は Issue #384 着手時の設計記録である。現在は
+`scripts/check_loanword_consistency.py` と `docs/spec/loanword-mirrors.toml`
+が同期ガードの実体であり、以下は将来の運用改善案として扱う。
+
+**推奨 (設計時の提案)**: **案 A + B のハイブリッド** — 既存 PUA 同期戦略を踏襲しつつ、CI で hash 比較を最終ガード
 
 **段階構成**:
 
@@ -82,7 +88,7 @@ jobs:
               exit 1
             }
           done
-          echo "All 7 copies match $SOURCE"
+          echo "All declared runtime mirrors match $SOURCE"
 ```
 
 **新規 helper script (PUA パターン踏襲)**:
@@ -200,7 +206,8 @@ MultilingualPhonemizer で中国語に隣接する英単語を自動検出し、
 
 - [ ] 新規エントリは **標準 Mandarin pinyin** + tone marker (1-5) で記述
 - [ ] 参考辞書を PR description に明記 (MDBG / Pleco / 新华字典 等)
-- [ ] **7 箇所すべて** (Rust 2 crate 含む) で同期 (CI `zh-en-loanword-sync` で自動検証)
+- [ ] `docs/spec/loanword-mirrors.toml` に宣言された全 runtime mirror と fixture
+      を同期 (CI `scripts/check_loanword_consistency.py` で自動検証)
 - [ ] テスト追加 (`test_zh_en_loanword.py` の TestSchemaValidation pattern)
 - [ ] 既存エントリとの重複検証 (CI で自動)
 - [ ] エントリ数 sanity check 通過 (acronyms ≥ 50, loanwords ≥ 30)

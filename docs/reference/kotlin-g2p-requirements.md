@@ -511,8 +511,8 @@ JSON v1.0 / v2.0 schema は既存 (`docs/spec/custom-dictionary-schema.toml` 等
 | 観点 | 仕様 |
 |------|-----|
 | Maven coordinates | `io.github.ayutaz:piper-plus-g2p-android:VERSION` |
-| Gradle DSL | `implementation("io.github.ayutaz:piper-plus-g2p-android:1.0.0")` |
-| Git tag | `kotlin-g2p-v{semver}` (例: `kotlin-g2p-v1.0.0`) |
+| Gradle DSL | `implementation("io.github.ayutaz:piper-plus-g2p-android:1.0.1")` |
+| Git tag | `kotlin-g2p-v{semver}` (例: `kotlin-g2p-v1.0.1`) |
 | GitHub Actions trigger | `on: push: tags: ['kotlin-g2p-v*']` |
 | 必要 GitHub Actions secrets | `MAVEN_CENTRAL_USERNAME`, `MAVEN_CENTRAL_PASSWORD`, `SIGNING_IN_MEMORY_KEY`, `SIGNING_IN_MEMORY_KEY_PASSWORD` |
 | ビルド成果物パス (CI) | `android/piper-plus-g2p/build/outputs/aar/piper-plus-g2p-release.aar` |

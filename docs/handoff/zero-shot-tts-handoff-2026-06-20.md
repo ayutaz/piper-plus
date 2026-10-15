@@ -1,5 +1,16 @@
 # Zero-Shot TTS — 環境引き継ぎドキュメント (2026-06-20)
 
+> **Historical/private research handoff.** This document records the June 2026
+> `feat/zero-shot-tts` environment, private dataset paths, old checkpoints, and
+> research commands. It is not the current public download or inference guide.
+> For the public experimental bundle, use
+> [`docs/guides/development/pretrained-models.md`](../guides/development/pretrained-models.md)
+> and the pinned release records [`zero-shot-base-zs-v1-release-2026-10-10.md`](../design/zero-shot-base-zs-v1-release-2026-10-10.md)
+> / [`tsukuyomi-publication-ready-2026-10-12.md`](../design/tsukuyomi-publication-ready-2026-10-12.md).
+> The old private research repositories are not public download sources. Do not
+> rerun publication or paid-compute commands from this historical handoff as a
+> current release procedure.
+
 **目的**: 学習環境が切り替わる際、ゼロから本ブランチの zero-shot TTS 学習・FT・評価を再現できるよう、必要なものすべてをまとめた手順書。
 **ブランチ**: `feat/zero-shot-tts` (HEAD `cb2a095`、`origin/dev` から 16 コミット先行 + 本ドキュメント追加分)
 **前回作業日**: 2026-05-21 (Tsukuyomi zero-shot FT 完走)

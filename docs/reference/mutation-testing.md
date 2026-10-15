@@ -41,19 +41,24 @@
 
 ```bash
 # install (dev group に pin 済み — uv sync 済みなら不要)
-pip install 'mutmut>=2.4,<3'   # or: uvx mutmut --version
+pip install 'mutmut>=2.4,<3'   # or: uvx --from 'mutmut>=2.4,<3' mutmut --version
 
 # 全 module を実行 (manual; 数十分 - 1 時間オーダー)
-uvx mutmut run
+uvx --from 'mutmut>=2.4,<3' mutmut run
 
 # 特定 file のみ
-uvx mutmut run --paths-to-mutate src/python_run/piper_plus/text_splitter.py
+uvx --from 'mutmut>=2.4,<3' mutmut run --paths-to-mutate src/python_run/piper_plus/text_splitter.py
 
 # 結果確認
-uvx mutmut results        # survived/killed の summary
-uvx mutmut html           # html/index.html を生成 (CI artifact 化)
-uvx mutmut show '<id>'    # 個別 mutant の diff (id を実値に置換)
+uvx --from 'mutmut>=2.4,<3' mutmut results        # survived/killed の summary
+uvx --from 'mutmut>=2.4,<3' mutmut html           # html/index.html を生成 (CI artifact 化)
+uvx --from 'mutmut>=2.4,<3' mutmut show '<id>'    # 個別 mutant の diff (id を実値に置換)
 ```
+
+`pyproject.toml` の dev group と CI のインストール指定は `mutmut>=2.4,<3`
+です。`uvx` は指定しないと最新リリースを解決するため、この章の実行例では
+同じ上限を明示しています。CI workflow に残る裸の `uvx mutmut` 呼び出しも
+この pin に揃えることが、再現可能な CI 結果には必要です。
 
 ### Rust (`cargo-mutants`)
 
@@ -151,6 +156,10 @@ break として昇格する。
 | `compile_error` | mutant が compile に失敗 | tool が自動除外 |
 
 kill rate = `killed / (killed + survived)` (timeout を分子に含める実装もある)。
+
+この `high` / `low` / `break` 表と昇格手順は提案ポリシーです。現在の
+workflow は全 runtime で `continue-on-error: true` の warn-only 運用を実施し、
+下記の baseline は未確立です。
 
 ## CI cadence
 

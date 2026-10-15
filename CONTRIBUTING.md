@@ -12,17 +12,17 @@ This project uses [Ruff](https://github.com/astral-sh/ruff) for Python linting a
 
 #### Installing Development Dependencies
 
-Dependencies are managed via [uv](https://docs.astral.sh/uv/) and defined as optional-dependencies in `pyproject.toml`:
+Dependencies are managed by the [uv](https://docs.astral.sh/uv/) workspace. Run from the repository root; the root project is workspace metadata, not the installable PyPI package:
 
 ```bash
 # Development tools (linting, formatting, type checking)
-uv pip install ".[dev]"
+uv sync --extra dev
 
 # Test dependencies only
-uv pip install ".[test]"
+uv sync --extra test
 
-# For src/python_run
-uv pip install -r src/python_run/requirements_dev.txt
+# Runtime metadata: src/python_run/pyproject.toml
+# uv sync installs the local workspace members.
 ```
 
 #### Running Ruff
@@ -54,7 +54,7 @@ pre-commit install
 The hooks include:
 
 - **Ruff** (`ruff` + `ruff format`) on every Python file change.
-- **PUA cross-runtime consistency** when any of the 6 runtime PUA tables
+- **PUA cross-runtime consistency** when any configured runtime PUA table
   or `pua.json` change. Mirrors the CI gate that prevents the
   multi-codepoint regression class (see `docs/spec/pua-contract.toml`).
 - **Test fixture drift** when `pua.json` or
@@ -86,7 +86,7 @@ pre-commit run --all-files
 
 ### C\#
 
-- Follow existing code style (no editorconfig enforced yet)
+- Follow `.editorconfig` and the existing C# style; validate with `dotnet format`.
 
 ### Go
 
@@ -215,7 +215,7 @@ piper-plus supports multiple languages via rule-based G2P (grapheme-to-phoneme) 
 
 ### Implementation Checklist
 
-At minimum, provide a **Python** implementation. Ideally, implement across all four platforms:
+At minimum, provide a **Python** implementation. Ideally, implement across all listed runtimes:
 
 | Platform | Location | Notes |
 |----------|----------|-------|
@@ -265,19 +265,19 @@ Look for issues labeled [`good first issue`](https://github.com/ayutaz/piper-plu
 
 ## Package Versioning Policy
 
-piper-plus ships **as several independent packages**, each released and versioned on its own schedule. There is **no single project-wide version number** — the value displayed in the README header (e.g. "v1.12.0") tracks the **PyPI** package only.
+piper-plus ships as several packages. `VERSION` tracks the Python/native release line (currently 2.0.1); Rust, npm, NuGet and Kotlin use independent versions. The canonical current version families and manifest paths are in [release-versions.toml](docs/spec/release-versions.toml).
 
 | Package | Registry | Source | Tag prefix | Versioning |
 |---|---|---|---|---|
-| `piper-plus` (Python TTS) | PyPI | `src/python/`, `src/python_run/` | `v<X.Y.Z>` (e.g. `v1.12.0`) | SemVer |
+| `piper-plus` (Python TTS) | PyPI | `src/python_run/` | `v<X.Y.Z>` | SemVer |
 | `piper-plus-g2p` (Python G2P) | PyPI | `src/python/g2p/` | `g2p-py-v<X.Y.Z>` | SemVer |
 | `piper-plus-cli` / `piper-plus` (Rust crate) | crates.io | `src/rust/` | `rust-v<X.Y.Z>` | SemVer |
 | `PiperPlus.Core` / `PiperPlus.Cli` (NuGet) | NuGet | `src/csharp/` | `csharp-v<X.Y.Z>` | SemVer |
-| `piper-plus` (npm) | npm | `src/wasm/openjtalk-web/` | `npm-v<X.Y.Z>` (e.g. `npm-v0.5.0`) | SemVer |
-| `@piper-plus/g2p` (npm) | npm | `src/wasm/g2p/` | `wasm-g2p-v<X.Y.Z>` (e.g. `wasm-g2p-v0.4.0`) | SemVer |
+| `piper-plus` (npm) | npm | `src/wasm/openjtalk-web/` | `npm-v<X.Y.Z>` | SemVer |
+| `@piper-plus/g2p` (npm) | npm | `src/wasm/g2p/` | `wasm-g2p-v<X.Y.Z>` | SemVer |
 | `github.com/ayutaz/piper-plus/src/go` | Go module | `src/go/` | (none — uses commit SHA via `go get`) | Go module versioning |
 | C API shared library (`libpiper_plus`) | GitHub Releases | `src/cpp/` | `shared-lib-v<X.Y.Z>` | SemVer |
-| `io.github.ayutaz:piper-plus-g2p-android` (Kotlin G2P) | Maven Central | `android/piper-plus-g2p/` | `kotlin-g2p-v<X.Y.Z>` (e.g. `kotlin-g2p-v1.0.0`) | SemVer |
+| `io.github.ayutaz:piper-plus-g2p-android` (Kotlin G2P) | Maven Central | `android/piper-plus-g2p/` | `kotlin-g2p-v<X.Y.Z>` | SemVer |
 
 ### Why independent versioning
 
@@ -308,16 +308,16 @@ Some packages depend on others published to the **same registry**. Publishing th
 
 ```bash
 # 1. Publish @piper-plus/g2p first (triggered by g2p-wasm-ci.yml)
-git tag wasm-g2p-v0.4.0 <COMMIT>
-git push origin wasm-g2p-v0.4.0
+git tag wasm-g2p-v<NEW_G2P_VERSION> <COMMIT>
+git push origin wasm-g2p-v<NEW_G2P_VERSION>
 
 # 2. Wait for g2p-wasm-ci to finish publishing to npm
 # 3. Then publish piper-plus (triggered by npm-publish.yml)
-git tag npm-v0.6.0 <COMMIT>
-git push origin npm-v0.6.0
+git tag npm-v<NEW_SYNTHESIS_VERSION> <COMMIT>
+git push origin npm-v<NEW_SYNTHESIS_VERSION>
 ```
 
-Skipping step 1 will cause `npm install piper-plus@0.6.0` to fail with `notarget No matching version found for @piper-plus/g2p@^0.4.0`.
+Replace the placeholders with new, unpublished versions and the intended commit. If synthesis depends on a G2P version that is not yet published, a fresh npm install fails with `notarget`; wait for G2P publication to finish first.
 
 ### `v<X.Y.Z>` tag push の注意点 (Swift checksum / Docker / GitHub Release)
 
@@ -349,7 +349,7 @@ piper-plus は 18+ contract gate (PUA / loanword / ORT 等) を持ちますが�
 - `Required Status Check Gate` (cancelled / skipped baseline run の検出) pass
 - maintainer の review 通過
 
-contract gate の知識 (PUA fixture / loanword JSON / ruff 6 箇所同期 等) は初回 PR では学習対象外で、 warning として記録されます。 詳細: `.github/workflows/first-pr-fast-lane.yml` / `scripts/first_pr_fast_lane.py`。
+contract gate の知識 (PUA fixture / loanword JSON / Ruff pin 同期 等) は初回 PR では学習対象外で、 warning として記録されます。 詳細: `.github/workflows/first-pr-fast-lane.yml` / `scripts/first_pr_fast_lane.py`。
 
 ### Maintainer 向け: `run-full-gate` label
 

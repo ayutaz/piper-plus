@@ -108,7 +108,8 @@ Use `--json-input` flag for JSON input:
 ### Download Models
 
 ```bash
-# Download a model by name (aliases also work)
+# Download a model by name. Resolver aliases are source/next-release features;
+# released piper-plus 2.0.0 and 2.0.1 do not add new model aliases.
 ./bin/piper-plus --download-model tsukuyomi
 ./bin/piper-plus --download-model en_US-lessac-medium
 

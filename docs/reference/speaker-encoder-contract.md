@@ -34,15 +34,17 @@ This spec governs **two** layers of cross-runtime parity:
 
 1. **Mel parity** — every runtime computes the *same* mel spectrogram from
    the *same* WAV samples (deterministic, reproducible without an ONNX model).
-2. **E2E cosine gate** — every runtime, given the same mel + the same ONNX
-   encoder, produces a 256-dim embedding within `cosine ≥ 0.999` of the
-   Python reference (allows for ORT EP / float-precision drift, but rules out
-   shape / axis / scaling bugs).
+2. **E2E cosine gate for the legacy encoder** — every runtime, given the same
+   mel + the same legacy ECAPA-TDNN ONNX encoder, produces a 256-dim embedding
+   within `cosine ≥ 0.999` of the Python reference (allows for ORT EP /
+   float-precision drift, but rules out shape / axis / scaling bugs).
 
 Byte-equality at layer 2 is **explicitly out of scope** because ONNX Runtime
 execution providers introduce tiny float32 differences that vary by host
 (CUDA EP vs CPU EP, AVX-512 vs ARM NEON, FP16 vs FP32, …). Cosine ≥ 0.999 is
 the canonical cross-EP gate used by SpeechBrain and other ECAPA-TDNN consumers.
+This fixture does not claim a CAM++/192-dimensional v2 E2E gate; the public v2
+bundle is described separately at the top of this document.
 
 ## Layer 1 — Mel parity (canonical)
 

@@ -11,18 +11,19 @@
 | 辞書データ | `src/cpp/data/zh_en_loanword.json` |
 | Multilingual | `src/cpp/language_detector.cpp` で言語セグメント分割、`piper.cpp:2589-2597` で dispatch |
 | C API | `src/cpp/piper_plus.h` / `piper_plus_c_api.cpp` (中国語用 C API は **未エクスポート**) |
-| テスト | `src/cpp/tests/test_multilingual_g2p.cpp` (中国語 2 ケースのみ — 拡充が必要) |
+| テスト | `src/cpp/tests/test_zh_en_loanword.cpp` (共有 fixture + loader/lookup tests) |
 
 ## 2. 現状調査
 
 | 項目 | 状態 |
 |------|------|
 | pinyin → IPA | 完全実装、PUA 0xE020-0xE04A 使用 |
-| データロード | `nlohmann/json` + `std::ifstream`、リソース埋め込みなし |
-| ZH-EN dispatch | **❌ 未実装** |
-| iOS/Android | xcframework / Android 用リソース同梱パターン要確認 |
+| データロード | `nlohmann/json`。デスクトップは `std::ifstream`、Apple/Android は CMake 生成ヘッダへ埋め込み |
+| ZH-EN dispatch | **実装済み** (`language_detector.cpp` の分割 + multilingual dispatch) |
+| iOS/Android | `cmake/PiperCommon.cmake` の `piper_embed_json_as_header()` で埋め込み済み |
 
-**追加 LOC 見込み**: ~500 行 + iOS/Android リソース対応
+以下の「追加 LOC 見込み」「実装スケッチ」「推奨」は Issue #384 着手時の
+設計記録であり、現行実装の未完了作業を表さない。
 
 **特殊な難所**:
 
@@ -223,7 +224,9 @@ TEST(ZhEnLoanwordTest, ConcurrentAccess) {
 
 ## 6. テストフレーム拡充戦略
 
-**問題**: 中国語テストが現状 `test_multilingual_g2p.cpp` で 2 ケースしかない (`NiHao` / `SentenceWithPunctuation`)。設計書の統一テストマトリックス 20 ケースを追加する必要がある。
+**問題 (設計時の記録)**: 初期調査では中国語テストが `test_multilingual_g2p.cpp`
+の 2 ケースだけだった。現在は `test_zh_en_loanword.cpp` が共有 fixture と
+loader/lookup を検証するため、以下の 20 ケース追加案は将来の拡張提案として扱う。
 
 **既存テスト構造**:
 
@@ -322,7 +325,7 @@ C++ `nlohmann/json` のデフォルト nest 制限は **無制限**。recursion 
 
 ## 11. カバレッジ
 
-`gcov` + `lcov` で計測 (CI 新規追加が必要、Phase 3)。
+`gcov` + `lcov` で計測する将来の CI 拡張案 (Phase 3)。
 
 ## 12. API ドキュメント
 

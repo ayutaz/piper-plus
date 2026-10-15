@@ -19,8 +19,10 @@ multi-codepoint keys in the distributed `tsukuyomi` config).
 
 ### L1 — Static cross-runtime consistency
 
-The 6 runtime PUA tables (Python runtime, Python G2P, Rust, Go, JS, C#) must all
-match the canonical `pua.json` byte-for-byte.
+The 7 runtime PUA tables checked by `scripts/check_pua_consistency.py` (Python
+runtime, Python G2P, Rust, Go, JS/WASM, C#, and Swift) must all match the
+canonical `pua.json` byte-for-byte. The C++ Japanese subset remains a separate
+deferred check because the script does not parse that table.
 
 | ID | Test | Where | Status |
 |----|------|-------|--------|
@@ -30,8 +32,9 @@ match the canonical `pua.json` byte-for-byte.
 | L1.4 | pua.json ↔ Go `fixedPUA` entry-by-entry | `scripts/check_pua_consistency.py` | ✅ |
 | L1.5 | pua.json ↔ JS `PUA_MAP` entry-by-entry | `scripts/check_pua_consistency.py` | ✅ |
 | L1.6 | pua.json ↔ C# `TokenToChar` entry-by-entry | `scripts/check_pua_consistency.py` | ✅ |
-| L1.7 | All `PUA_COMPAT_VERSION` constants match pua.json `version` | `scripts/check_pua_consistency.py --check-version` | ✅ |
-| L1.8 | C++ `phoneme_parser.cpp:japanesePhonemePUA` covers JA range subset | future (M5+) | ⚠ deferred |
+| L1.7 | pua.json ↔ Swift `PUAMap.swift` entry-by-entry | `scripts/check_pua_consistency.py` | ✅ |
+| L1.8 | All `PUA_COMPAT_VERSION` constants match pua.json `version` | `scripts/check_pua_consistency.py --check-version` | ✅ |
+| L1.9 | C++ `phoneme_parser.cpp:japanesePhonemePUA` covers JA range subset | future (M5+; separate manual/static check) | ⚠ deferred |
 
 ### L2 — pua.json schema invariants
 
@@ -92,12 +95,12 @@ these guards refuse to ship a config with multi-codepoint keys.
 | L6.2 | All 7 runtimes produce identical phoneme IDs for the same input text | `g2p-cross-platform-ci.yml` (existing) | ✅ partial |
 | L6.3 | All 7 runtimes synthesize a short sample WAV (golden test) | future | ⚠ deferred |
 
-### L7 — Release pipeline gates
+### L7 — Repository and release pipeline gates
 
 | ID | Test | Where | Status |
 |----|------|-------|--------|
 | L7.1 | HuggingFace push pre-flight: `update_model_config --validate-only` on every config | release workflow (recommended) | ⚠ deferred |
-| L7.2 | Release tag triggers full L1+L2+L3+L4+L5 suite | `pua-consistency.yml` runs on push to dev/main | ✅ |
+| L7.2 | Path-filtered PR/push to `dev`/`main`, weekly schedule, and manual dispatch run the full L1–L5 suite; release tags are not a trigger | `pua-consistency.yml` | ✅ |
 
 ---
 
@@ -109,17 +112,18 @@ language's nasal vowel), follow this checklist to keep all gates green:
 1. **Update `pua.json`** with the new entry (next free codepoint, e.g. U+E065).
 2. **Bump `version`** in pua.json (and `PUA_COMPAT_VERSION` constants in
    `pua.py`, `token_map.rs`, `pua-map.js`).
-3. **Sync all 6 runtime tables** with the same `(token, codepoint)`:
+3. **Sync all 7 checked runtime tables** with the same `(token, codepoint)`:
    - `src/python_run/piper_plus/phonemize/token_mapper.py`
    - `src/rust/piper-plus-g2p/src/token_map.rs`
    - `src/go/phonemize/pua.go`
    - `src/wasm/g2p/src/pua-map.js`
    - `src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs`
+   - `Sources/PiperPlusG2P/PUAMap.swift`
    - (`src/python/g2p/piper_plus_g2p/encode/pua.py` reads pua.json — no change needed)
 4. **Add to inventory** in `src/python/g2p/piper_plus_g2p/encode/id_maps.py`
    if the new phoneme is part of a language inventory.
 5. **Update test counts:**
-   - `src/wasm/g2p/test/test-pua-map.js` (search for `96`)
+   - `src/wasm/g2p/test/test-pua-map.js` (search for the current `99`-entry count)
    - `src/go/phonemize/pua_test.go` (`allFixedPUA` table + `want` constants)
    - `src/rust/piper-plus-g2p/src/token_map.rs::test_fixed_pua_count`
 6. **Run the gate locally:**

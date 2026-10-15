@@ -1,8 +1,8 @@
 # Inference Input Contract
 # ========================
 # This file defines the canonical input shape, range, and validation rules
-# that ALL piper-plus runtimes (Python, Rust, Go, C#, C/C++, WASM/JS,
-# Kotlin, Swift) MUST agree on for synthesis-time inputs to the VITS
+# that all inference-capable piper-plus runtimes (Python, Rust, Go, C#, C/C++,
+# WASM/JS, Swift) MUST agree on for synthesis-time inputs to the VITS
 # inference graph and the surrounding API surface.
 #
 # These constraints come from three sources:
@@ -28,7 +28,7 @@
 # Implementations:
 #   Python (runtime):   src/python_run/piper_plus/voice.py            (PiperVoice.synthesize / phonemize)
 #                       src/python_run/piper_plus/http_server.py      (MAX_TEXT_BYTES, validation)
-#                       src/python_run/piper_plus/cli.py              (CLI argument parsing)
+#                       src/python_run/piper_plus/__main__.py         (CLI argument parsing)
 #   Python (training):  src/python/piper_train/infer_onnx.py     (--noise-scale / --length-scale defaults)
 #   Rust:               src/rust/piper-core/src/engine.rs        (PiperEngine::synthesize)
 #                       src/rust/piper-core/src/config.rs        (config validation)
@@ -36,9 +36,9 @@
 #                       src/go/piperplus/config.go               (config parsing)
 #   C#:                 src/csharp/PiperPlus.Core/Inference/PiperSession.cs
 #                       src/csharp/PiperPlus.Core/Config/PiperConfig.cs
-#   C/C++:              src/cpp/piper_plus.cpp                   (synthesize / load_voice)
+#   C/C++:              src/cpp/piper.cpp                       (synthesize / load_voice)
 #   WASM/JS:            src/wasm/openjtalk-web/src/index.js      (synthesize entry)
-#   Kotlin/Android:     android/piper-plus-g2p/                  (G2P-only; no synthesis)
+#   Kotlin/Android:     android/piper-plus-g2p/                  (G2P-only; no synthesis; excluded)
 #   Swift:              Sources/PiperPlus/                       (FFI bridge to Rust core)
 
 [meta]
@@ -308,9 +308,9 @@ description = "Legacy back-compat for pre-v2 voice-cloning exports (6lang base +
 
 [speaker_embedding.export_modes.zero_shot_cam_plus]
 emb_dim = 192               # CAM++ architecture (PR #222, v2 zero-shot canonical)
-                            # (src/python/piper_train/speaker_encoder/cam_plus.py)
+                            # external public artifact: HF releases/zs-v1/campplus.onnx
 encoder_kind = "cam-plus"
-description = "v2 zero-shot canonical. New v2 exports use this dim."
+description = "v2 zero-shot canonical. New v2 exports use this dim; the encoder is a bundled external ONNX artifact, not a local cam_plus.py implementation."
 
 [speaker_embedding.error_codes]
 prefix = "piper-plus: speaker_embedding: "

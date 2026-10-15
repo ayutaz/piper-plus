@@ -94,9 +94,18 @@ cd piper-plus/huggingface-space
 # Install requirements
 uv pip install -r requirements.txt
 
+# The app expects models/multilingual-test-medium.onnx and its .json config.
+# The deployment workflow copies the checked-in test fixture before launch.
+# If that fixture is absent locally, download_models.py creates a dummy model
+# so the UI can start; that fallback is only a smoke test and is not a speech
+# quality or model-inference demonstration.
+
 # Run the app
 python app.py
 ```
+
+The model setup runs at application startup. Check the console for whether a
+real fixture was found or a dummy fallback was created before evaluating audio.
 
 ## Credits
 
@@ -110,4 +119,4 @@ python app.py
 This project is licensed under the MIT License. See the original [Piper repository](https://github.com/rhasspy/piper) for more details.
 
 ---
-_Last updated: 2026-03-18 - 6-language multilingual support (ja/en/zh/es/fr/pt)_
+_Last updated: 2026-10-15 - 6-language multilingual support (ja/en/zh/es/fr/pt)_

@@ -6,7 +6,8 @@
 
 | 用途 | パス |
 |------|------|
-| Phonemizer (Core 薄ラッパ) | `src/csharp/PiperPlus.Core/ChinesePhonemizer.cs` (113 行) |
+| Phonemizer (Core 薄ラッパ) | `src/csharp/PiperPlus.Core/Phonemize/ChinesePhonemizer.cs` |
+| Embedded English | `src/csharp/PiperPlus.Core/Phonemize/ChineseEmbeddedEnglish.cs` |
 | Engine interface | `IChineseG2PEngine` |
 | Engine 実装 (Cli 側) | `DotNetChineseG2PEngine` (NuGet `DotNetG2P.Chinese 1.8.0` をラップ) |
 | Multilingual | `src/csharp/PiperPlus.Core/MultilingualPhonemizer.cs` (`UnicodeLanguageDetector.SegmentText()` あり) |
@@ -18,17 +19,18 @@
 | 項目 | 状態 |
 |------|------|
 | pinyin → IPA | NuGet 内部、`ToPuaPhonemes()` / `ToIpaWithProsody()` |
-| データロード | csproj に `<EmbeddedResource>` 設定なし (新規追加が必要) |
-| ZH-EN dispatch | **❌ 未実装** (line 220 付近に追加余地あり) |
-| Engine 拡張 | **NuGet 改修不可なので Core/Cli 側で独立実装が必要** |
+| データロード | `PiperPlus.Core.csproj` の `<EmbeddedResource>` + `LoanwordDataLoader` で実装済み |
+| ZH-EN dispatch | **実装済み** (`MultilingualPhonemizer` → `IChineseG2PEngine.ConvertEmbeddedEnglish`) |
+| Engine 拡張 | NuGet の変更なしで Core の `ChineseEmbeddedEnglish` が実装済み |
 
-**追加 LOC 見込み**: ~400 行 (Engine 経由でなく独立した embedded English 経路を Core 側に実装)
+以下の追加 LOC 見積もりと独立実装方針は実装前の設計記録である。
 
-**特殊な制約**: `DotNetG2P.Chinese` (NuGet) は外部ライブラリでビルド不可。**ZH-EN 用の pinyin → IPA を C# 側に独立実装する必要あり** (一部のロジックは Python から移植)。
+**特殊な制約 (設計時の前提)**: `DotNetG2P.Chinese` (NuGet) は外部ライブラリのため、
+ZH-EN 用の pinyin → IPA 経路は Core 側に独立実装する方針を採用した。
 
 ## 3. 独立実装方針
 
-**問題**: `DotNetG2P.Chinese 1.8.0` (NuGet) は外部ライブラリで改修不可。Python 側の `_pinyin_to_ipa()` 相当を C# 側に独立実装する必要がある。
+**問題 (設計時の記録)**: `DotNetG2P.Chinese 1.8.0` (NuGet) は外部ライブラリで改修不可だったため、Python 側の `_pinyin_to_ipa()` 相当を C# Core 側に独立実装した。
 
 **Python 移植量見積**:
 

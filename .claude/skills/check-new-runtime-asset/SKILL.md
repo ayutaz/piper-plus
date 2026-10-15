@@ -95,6 +95,6 @@ cp scripts/check_dictionary_consistency.py scripts/check_<topic>_consistency.py
 ## 関連ドキュメント
 
 - [feedback_data_asset_distribution.md] (memory)
-- [loanword sync](.claude/skills/check-loanword/SKILL.md)
-- [dictionary sync](scripts/check_dictionary_consistency.py)
-- [PUA sync](.claude/skills/check-pua/SKILL.md)
+- [loanword sync](../check-loanword/SKILL.md)
+- [dictionary sync](../../../scripts/check_dictionary_consistency.py)
+- [PUA sync](../check-pua/SKILL.md)

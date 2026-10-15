@@ -6,22 +6,22 @@
 
 | 用途 | パス |
 |------|------|
-| JS 中国語実装 | `src/wasm/g2p/src/zh/index.js` (140 行、character pass-through のみ) |
-| Rust WASM | `src/rust/piper-wasm/src/lib.rs` (`setChineseDictionary()` FFI 公開) |
+| JS 中国語実装 | `src/wasm/g2p/src/zh/index.js` |
+| Rust WASM | `src/rust/piper-wasm/src/lib.rs` (`set_zh_en_dispatch()` FFI 公開) |
 | pinyin → IPA | Rust 側 (`piper-plus-g2p/src/chinese.rs`) で実装、JS 経由で呼出 |
 | 辞書データ | `src/wasm/g2p/data/zh_en_loanword.json` |
 | Multilingual | `src/wasm/g2p/src/detect.js` (294 行、`segmentText` 完備) |
-| テスト | `src/wasm/g2p/test/test-chinese.js` (463 行、mock 中心) |
+| テスト | `src/wasm/g2p/test/test-chinese-zh-en.js` (共有 fixture + bundled data) |
 
 ## 2. 現状調査
 
 | 項目 | 状態 |
 |------|------|
 | データロード | Rust 側で JSON load、JS は薄い |
-| ZH-EN dispatch | **❌ 未実装** |
-| 二層問題 | **JS と Rust の両方を更新する必要があるか判断必要** |
+| ZH-EN dispatch | **実装済み**。Rust `MultilingualPhonemizer` の bundled data 経路を FFI toggle で公開 |
+| 二層問題 | JS API は Rust FFI の薄い呼び出し、辞書は sync gate 管理 |
 
-**追加 LOC 見込み**: ~250 行 (Rust 完了が前提、JS 側は薄ラッパ + テスト追加で済む)
+以下の追加 LOC 見込みと FFI 案は実装前の設計記録である。
 
 **実装場所判断**: Rust 側で `phonemize_embedded_english()` を実装すれば、WASM ビルドだけで JS 側にも自動的に展開される。JS 側は新 FFI (`setChineseLoanwordData()`) の薄ラッパとテストのみ。
 
@@ -100,7 +100,11 @@ class ChineseG2P {
 
 **テストフレーム**: 既存の `node:test` (`src/wasm/g2p/test/test-chinese.js` 463 行で使用) を継続。新規ケース ~120 行追加。
 
-## 4. WASM サイズ最適化
+## 4. WASM サイズ最適化 (設計時の提案)
+
+この節以下のサイズ見積もり、feature gate 案、ベンチマーク/coverage の
+「新規追加」記述は Issue #384 の設計時提案である。現行の ZH-EN 経路は
+Rust 側の bundled dictionary と `setZhEnDispatch` FFI を使用する。
 
 **現状サイズ**:
 
@@ -174,7 +178,7 @@ JS/WASM `Error` with `code='SCHEMA_ERROR'`、Rust 側 `JsValue::from_str("SCHEMA
 
 ## 8. カバレッジ
 
-`vitest --coverage` (c8) で計測 (CI 新規追加が必要)。
+`vitest --coverage` (c8) で計測する将来の CI 拡張案。
 
 ## 9. JSON parser 安全性
 

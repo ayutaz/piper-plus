@@ -94,9 +94,10 @@ Cache directory 内で `{model_str}/*.onnx` または `{model_str}.onnx` を探�
 | `aliases` | array | ショートネームのリスト |
 | `description` | string | 説明文 |
 
-### Alias Registry
+### Alias Registry and catalog key
 
-`test/model_resolution_vectors.json` の `aliases` セクションが正規の alias 定義を保持する。各実装はこの定義と一致しなければならない。
+`test/model_resolution_vectors.json` の `aliases` セクションが正規の user-facing alias 定義を保持する。各実装はこの定義と一致しなければならない。`voice_catalog` の
+`key` は alias とは別の完全なカタログ識別子であり、catalog 接続されたランタイムでは直接指定できる。
 
 | Alias | Repo ID | ONNX File |
 |-------|---------|-----------|
@@ -105,6 +106,9 @@ Cache directory 内で `{model_str}/*.onnx` または `{model_str}.onnx` を探�
 | `base` | `ayousanz/piper-plus-base` at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` | `releases/zs-v1/base.onnx` |
 | `zero-shot-base-zs-v1` | `ayousanz/piper-plus-base` at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` | `releases/zs-v1/base.onnx` |
 | `ayousanz/piper-plus-base` | `ayousanz/piper-plus-base` at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` | `releases/zs-v1/base.onnx` |
+
+The catalog key for this entry is `multilingual-zero-shot-base-zs-v1`. It is
+not an additional user-facing alias; its aliases are the three values above.
 
 > `base` と `zero-shot-base-zs-v1` は、次のリリースで公開する pinned aliases です。
 > いずれも root の legacy `model.ckpt` を指さず、上記 revision の
@@ -205,13 +209,14 @@ function find_config(onnx_path, explicit_config=None):
 
 ### Security Validation
 
-全実装で以下のバリデーションを実施する:
+以下は共有契約として目指す検証項目である。現行実装の挙動はランタイムごとに異なり、
+この表だけでは全実装が同じ検証を行うことを意味しない。
 
-| チェック | 内容 |
-|---------|------|
-| Path traversal | `..` を含む入力を alias/name 解決で拒否 |
-| Repo ID format | `owner/repo` 形式のみ許可 (英数字, `-`, `_`, `.` のみ) |
-| Download protocol | HTTPS のみ許可 (`http://localhost` はテスト用に許可) |
+| チェック | 共有目標 | 現行実装の差異 |
+|---------|------|------|
+| Path traversal | `..` を含む入力を alias/name 解決で拒否 | Python API は入力を明示検証しない。C#/C++/Go の catalog/download 経路には検証があるが、入口が異なる |
+| Repo ID format | `owner/repo` 形式のみ許可 (英数字, `-`, `_`, `.` のみ) | Python API は `/` を含む文字列を Hub repo として渡す。C# catalog は形式検証する。Go CLI は URL/file 情報を扱う repo alias 入口ではない |
+| Download protocol | HTTPS のみ許可 (`http://localhost` はテスト用に許可) | Go は `https://`、`file://`、localhost HTTP を許可する。ブラウザの direct URL は `http://` と `https://` の両方を受け付ける |
 
 ---
 
@@ -252,7 +257,7 @@ function find_config(onnx_path, explicit_config=None):
 | `alias_tsukuyomi` | alias | `tsukuyomi` -> repo 解決 |
 | `alias_base` | alias | `base` -> repo 解決 |
 | `alias_css10` | alias | `css10` -> repo 解決 |
-| `catalog_key_exact` | catalog_key | 完全キーマッチ |
+| `catalog_key_exact` | catalog_key | 完全キーマッチ。公開 base では `multilingual-zero-shot-base-zs-v1` |
 | `hf_repo_id` | huggingface | `/` 含む文字列を HF repo として処理 |
 | `nonexistent_alias` | error | 不明な名前でエラー |
 | `empty_input` | error | 空文字列でエラー |

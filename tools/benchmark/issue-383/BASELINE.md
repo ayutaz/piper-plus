@@ -1,5 +1,8 @@
 # Issue #383 ベースライン計測 — Python ランタイム
 
+> 本ファイルと各ランタイム結果は Issue #383 の実装ブランチに対する歴史的な
+> 計測記録です。数値は当時の環境・commitに固定され、現行 release の性能保証ではありません。
+
 > **目的:** G2P-推論パイプライン並列化前の現状値を取得し、並列化効果の理論最大値と
 > 並列化対象の選定根拠を残す。
 >
@@ -372,5 +375,5 @@ follow-up 修正: `c567f5be` `37c7c72a` `734aa5c6` `a8e776d9` `76bbc9fa` `f12952
 1. ✅ 5 ランタイムに Phase 1 + Python に Phase 2
 2. ✅ 4 件の bug を発見・修正
 3. ✅ 5 ランタイム + CI に回帰防止テスト追加
-4. PR 作成 (`feat/383-g2p-inference-pipeline` → `dev`)
+4. ✅ PR #403 作成・dev への merge (`feat/383-g2p-inference-pipeline` → `dev`, 2026-05-09)
 5. (将来 / 別 PR) C++ 実機ベンチを in-process 計測に切り替え (out-of-process は spawn コストでノイズが支配)

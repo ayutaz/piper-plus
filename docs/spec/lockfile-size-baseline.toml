@@ -35,6 +35,9 @@ bytes = 73145
 description = "WASM npm package (openjtalk-web)"
 
 [lockfiles."src/wasm/g2p/package-lock.json"]
+# This optional entry is retained as a historical baseline slot. The file is
+# absent from the current checkout and must not be described as a verified
+# lockfile until the WASM package materialises it.
 bytes = 0   # baseline不明 (initial state まちまち) — 初回 reset
 description = "WASM npm package (@piper-plus/g2p) — baseline未設定、 初回更新後 fill"
 optional = true

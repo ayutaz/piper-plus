@@ -1,9 +1,17 @@
 # piper → piper_plus モジュール改名 (v2.0 / Issue #590)
 
-**ステータス**: Design (レビュー待ち)
-**対象バージョン**: v2.0.0 (未リリース。VERSION=2.0.0、git tag は v1.13.0 が最新)
+**ステータス**: Completed / as-built architecture record (2026-10-15 review)
+**対象バージョン**: v2.0.x (`v2.0.0` and `v2.0.1` are released)
 **関連 Issue**: [#590](https://github.com/ayutaz/piper-plus/issues/590) — Allow to install piper and piper-plus to the same environment
-**ブランチ**: `feat/piper-plus-module-rename`
+**実装状態**: Python runtime is under `src/python_run/piper_plus/`; the published
+entry point is `piper-plus`. This document retains the original design decisions and
+historical migration scope; it is no longer an approval queue.
+
+> **Current-state note (2026-10-15):** Sections describing the pre-v2 layout,
+> implementation phases, risks, and acceptance checklist are retained as a design
+> record. They describe the migration that produced v2.0.x, not work still waiting
+> for review. For current paths and supported behavior, use the source tree and the
+> v1.12-to-v2.0 migration guide.
 **作成日**: 2026-07-10
 
 ---
@@ -12,16 +20,16 @@
 
 piper-plus は rhasspy/piper の唯一の MIT フォークだが、**Python ランタイムと C++ プリビルドバイナリだけが本家と同じ `piper` という名前**（`import piper` / `piper` コマンド / `./bin/piper`）を維持している。一方、モデルも CLI スイッチも本家と非互換であるため、「名前は同じだが中身は非互換」という状態が Issue #590 の根本原因になっている。
 
-本設計は、v2.0 のメジャー境界で **`piper` → `piper_plus` / `piper-plus` へフル改名し、互換 shim を一切残さない (クリーンブレーク)** ことで、本家 `piper-tts` との pip / CLI 完全共存を成立させる。加えて、周辺の install-layout (共有辞書 dir・キャッシュ dir・環境変数 prefix) も cross-runtime で `piper-plus` に統一し、命名の一貫性を全ランタイムで揃える。
+本設計は、v2.0 のメジャー境界で **`piper` → `piper_plus` / `piper-plus` へフル改名し、互換 shim を一切残さない (クリーンブレーク)** ことで、本家 `piper-tts` との pip / CLI 完全共存を成立させる。加えて、周辺の install-layout (共有辞書 dir・キャッシュ dir・環境変数 prefix) も cross-runtime で `piper-plus` に統一し、命名の一貫性を全ランタイムで揃える。これは本ドキュメント作成時の設計目標だったが、v2.0.x tree では runtime/package rename と entry point が実装済みである。
 
 ---
 
-## 2. 背景: 現状の命名非対称
+## 2. 背景: v2 移行前の命名非対称 (historical snapshot)
 
 | ランタイム | 配布名 | 実体名 (import/コマンド/バイナリ) | 本家 piper と衝突 |
 |---|---|---|---|
-| **Python (PyPI)** | `piper-plus` | `import piper` + コマンド `piper` | ⚠️ する |
-| **C++ プリビルド** | release zip | `./bin/piper` | ⚠️ する |
+| **Python (PyPI)** | `piper-plus` | `import piper_plus` + コマンド `piper-plus` | しない |
+| **C++ プリビルド** | release zip | `./bin/piper-plus` | しない |
 | Rust | `piper-plus-cli` | `piper-plus-cli` | しない |
 | Go | `piper-plus` | `piper-plus` | しない |
 | C# | `PiperPlus.Cli` | 別名 | しない |
@@ -36,10 +44,10 @@ piper-plus は rhasspy/piper の唯一の MIT フォークだが、**Python ラ�
 | 決定事項 | 内容 | 根拠 |
 |---|---|---|
 | **改名の深さ** | フル改名: `import piper`→`import piper_plus` / コマンド `piper`→`piper-plus` / C++ バイナリ `piper`→`piper-plus` | 全ランタイムと一貫。issue #590 を根本解決 |
-| **後方互換** | クリーンブレーク: piper-plus 本体は `piper_plus/` のみ配置。`piper/` モジュールも `piper` コマンドも一切残さない (shim なし) | shim を残すと本家との pip 共存が破綻する (自己矛盾) |
+| **後方互換** | 公開 runtime の canonical surface は `piper_plus/` と `piper-plus`。公開 package に旧 `piper` surface を復活させない | shim を残すと本家との pip 共存が破綻する (自己矛盾) |
 | **名前空間衝突 (Phase 0)** | 高レベル API `src/python/piper_plus/` を runtime パッケージの `piper_plus.api` サブモジュールに**物理統合** | 1 パッケージに集約、import が直感的 |
 | **改名スコープ** | 周辺 dir / env prefix も含めた**全面統一** (アグレッシブ) | v2 メジャー境界で clean 切替 |
-| **タイミング** | 未リリースの v2.0.0 に含める | 追加の破壊的リリースを起こさずに済む |
+| **タイミング** | v2.0.0 のメジャー境界で実施済み | 追加の破壊的リリースを起こさずに済んだ |
 | **配布名** | PyPI `piper-plus` / crates `piper-plus` 等の**配布名は不変**。変わるのは import 名・コマンド名・バイナリ名・layout のみ | PEP 503 で dash↔underscore、配布名変更は不要 |
 
 ---
@@ -49,7 +57,7 @@ piper-plus は rhasspy/piper の唯一の MIT フォークだが、**Python ラ�
 ultracode 調査 (12 エージェント / 152 findings) で判明した最大のブロッカー:
 
 - **`src/python/piper_plus/`** = 高レベル API `PiperPlus` (独自 ONNX 推論エンジン `engine.py`)。**PyPI 非配布** (pyproject なし)。Wyoming Docker が `COPY src/python/piper_plus/ /app/piper_plus/` して `import piper_plus` で使う。consumer は `src/python/piper_wyoming/__main__.py:15` の 1 行 + tests 4 ファイルのみ。
-- **改名先 runtime `src/python_run/piper/`→`piper_plus/`** = PyPI `piper-plus` 本体 `PiperVoice`。
+- **改名前の runtime `src/python_run/piper/`→`piper_plus/`** = PyPI `piper-plus` 本体 `PiperVoice`。旧 path はこの historical snapshot の説明であり、現行 path は `src/python_run/piper_plus/`。
 
 両者が top-level `piper_plus` を奪い合う。現状は runtime が `piper` 名なので衝突していないが、改名すると同一環境で衝突する。
 
@@ -65,7 +73,7 @@ src/python_run/piper_plus/
        └─ ...
 ```
 
-**要追加検討 (未決点 OQ-1)**: 高レベル API `api/engine.py` (独自 ONNX 推論) と runtime `voice.py` (`PiperVoice`) は**2 つの独立した ONNX 推論実装**である。統合パッケージ内に二重実装が同居することになる。本改名では「物理的に同居させ import パスを整える」ところまでを scope とし、**推論実装の一本化は別 issue に切り出す** (改名と実装統合を混ぜると巨大化・危険)。
+**Historical OQ-1**: 高レベル API `api/engine.py` (独自 ONNX 推論) と runtime `voice.py` (`PiperVoice`) は**2 つの独立した ONNX 推論実装**である。改名 scope は import/layout の統合までで、推論実装の一本化は別 issue のまま扱う。
 
 ---
 
@@ -82,7 +90,7 @@ src/python_run/piper_plus/
 | C++ バイナリ | `./bin/piper` / `piper.exe` → `piper-plus` |
 | packaging | pyproject scripts / package-data キー / MANIFEST.in / pytest.ini / mypy files |
 | tests | import 文 + 文字列ベース mock (`patch("piper.X")` / sys.modules / caplog logger) |
-| CI/CD | 17 workflow の `src/python_run/piper/**` path filter + module 実行 + C++ バイナリ参照 |
+| CI/CD | 17 workflow の `src/python_run/piper_plus/**` path filter + module 実行 + C++ バイナリ参照 |
 | docs/README | `./bin/piper` / `python -m piper` / `import piper` の全参照 (9 言語 README + docs) |
 | 共有辞書 dir | `share/piper/` → `share/piper-plus/` (cmake 6 + Rust 4 + Go 2 箇所) |
 | キャッシュ/データ dir | `~/.local/share/piper` 等 → `piper-plus` (C#/Rust/C++ の bare piper を統一) |
@@ -100,18 +108,18 @@ src/python_run/piper_plus/
 
 ---
 
-## 6. 実装フェーズ (単一ブランチ・単一 PR)
+## 6. 実装フェーズ (単一ブランチ・単一 PR; completed historical plan)
 
-**ユーザー方針**: 全対応を本ブランチ `feat/piper-plus-module-rename` の**単一 PR** で実施する。単一 PR のため、path filter の silent stop 問題 (dir 改名と filter 更新の間に CI が空回りする期間) は「全変更が atomic」なので**自然に回避**される。以下は PR 分割ではなく、依存順の**実装フェーズ (コミット単位)** を示す。
+**ユーザー方針 (historical)**: 全対応を本ブランチ `feat/piper-plus-module-rename` の**単一 PR** で実施する。単一 PR のため、path filter の silent stop 問題 (dir 改名と filter 更新の間に CI が空回りする期間) は「全変更が atomic」なので**自然に回避**される。以下は PR 分割ではなく、依存順の**実装フェーズ (コミット単位)** を示す。v2.0.x ではこの移行の結果として `src/python_run/piper_plus/` が現行 path になっている。
 
 | フェーズ | 内容 (ultracode Phase) | 依存 | breaking |
 |---|---|---|---|
 | **F1 基盤** | dir 改名 `git mv src/python_run/piper → piper_plus` + 高レベル API 統合 (`src/python/piper_plus/`→`piper_plus/api/`) + runtime 内部絶対 import 修正 (Phase 0/1) | なし | ⚠️ import |
 | **F2 packaging** | pyproject scripts (`piper-plus=piper_plus.__main__:main`) / package-data キー / MANIFEST.in / pytest.ini / setup.py / script/ (Phase 2) | F1 | ⚠️ コマンド |
 | **F3 tests** | import 文 + 文字列ベース mock (`patch("piper.X")` / sys.modules setitem / caplog logger) + subprocess `-m piper` (Phase 3) | F1,F2 | — |
-| **F4 CI/CD** | 17 workflow の `src/python_run/piper/**` path filter + `python -m piper` + C++ バイナリ参照 (Phase 5) | F1,F5 | — |
+| **F4 CI/CD** | 17 workflow の `src/python_run/piper_plus/**` path filter + `python -m piper_plus` + C++ バイナリ参照 (Phase 5) | F1,F5 | — |
 | **F5 C++** | cmake `OUTPUT_NAME "piper-plus"` + docker cpp-inference (entrypoint/Dockerfile/distroless/test.sh) lockstep (Phase 4) | なし | ⚠️ バイナリ |
-| **F6 docs** | README 9 言語 + docs/ の `./bin/piper`/`python -m piper`/`import piper` + v2.0 移行ガイド新設 (Phase 6) | F1-F5 | doc |
+| **F6 docs** | README 9 言語 + docs/ の `./bin/piper-plus`/`python -m piper_plus`/`import piper_plus` + v2.0 移行ガイド新設 (Phase 6) | F1-F5 | doc |
 | **F7 周辺 layout** | 共有辞書 dir / キャッシュ dir / env prefix `PIPER_*→PIPER_PLUS_*` (cross-runtime) + リリースアセット名 (Phase 7 拡張) | F1,F5 | ⚠️ layout/資産 |
 | **F8 stub+検証** | stub README 注記 + 本家 `piper-tts` co-install e2e + 全ランタイム parity 回帰 (Phase 7/8) | 全て | stub |
 
@@ -186,7 +194,9 @@ src/python_run/piper_plus/
 
 ---
 
-## 12. 未決点 (Open Questions)
+## 12. 未決点 (Open Questions; historical review record)
+
+以下は設計時点の open questions であり、v2.0.x の未完了作業リストではない。
 
 | ID | 内容 | 暫定方針 |
 |---|---|---|
@@ -199,7 +209,7 @@ src/python_run/piper_plus/
 
 ---
 
-## 13. 検証の受け入れ条件 (Definition of Done)
+## 13. 検証の受け入れ条件 (Definition of Done; historical checklist)
 
 - [ ] `pip install piper-tts`(本家) + piper-plus v2.0 wheel を同一 venv に co-install して相互汚染なし。
 - [ ] `which piper` が本家 or 無し、`which piper-plus` が当 fork。site-packages に当 wheel 由来の `piper/` が存在しない。

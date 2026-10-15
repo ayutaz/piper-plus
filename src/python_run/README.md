@@ -59,7 +59,7 @@ with wave.open("output.wav", "wb") as wav_file:
 
 ## Phoneme Timing (リップシンク・字幕同期)
 
-piper-plus は VITS Duration Predictor から音素レベルのタイミング情報を抽出できます。リップシンク、字幕同期、カラオケアプリケーションで使用できます。Rust/Go/C++/C# 実装と byte-for-byte 互換です。
+piper-plus は VITS Duration Predictor から音素レベルのタイミング情報を抽出できます。リップシンク、字幕同期、カラオケアプリケーションで使用できます。各 runtime の timing 契約は共通仕様に合わせています。値の互換性はモデル、実装、丸め処理を同じ条件で確認してください。
 
 ### Python API
 
@@ -169,7 +169,7 @@ curl -L "${ZS_URL}/base.ckpt" -o models/zs-v1/base.ckpt
 
 推論は `base.onnx` + `base.onnx.json`、追加学習は `base.ckpt` + 同じ bundle の `config.json` を使ってください。HF リポジトリ root の旧 `config.json` や `model.ckpt` と混在させないでください。公開 bundle の参照音声からの embedding 事前計算例は、[zs-v1 の公開 README](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/README.md) を参照してください。
 
-この bundle の reference-conditioned 推論は PyPI `piper-plus==2.0.0` で確認済みです。他の runtime/platform の同 bundle による推論確認や品質承認を意味しません。`base` / `zero-shot-base-zs-v1` alias は source branch / 次期リリース向けで、公開 2.0.0 / 2.0.1 には収録されていません。
+この bundle の reference-conditioned 推論は PyPI `piper-plus==2.0.0` で確認済みです。加えて、公開 CI run `38189966578` では 6 runtime の推論レポートを、Python で共有した phoneme IDs を入力として取得しています。この CI 範囲には native G2P と listening quality は含まれず、品質承認も行っていません。Python package の確認と runtime CI の範囲は別の証拠です。`base` / `zero-shot-base-zs-v1` alias は source branch / 次期リリース向けで、公開 2.0.0 / 2.0.1 には収録されていません。
 
 ## 対応言語
 

@@ -27,11 +27,14 @@ Community contributions are welcome.
 
 piper-plus は 6 言語 (JA/EN/ZH/ES/FR/PT) に対応するマルチリンガル TTS モデルを提供しています。
 コミュニティメンバーは、6 言語ベースモデルからファインチューニングしたモデルを投稿できます。
-投稿されたモデルは `piper_plus_voices.json` に登録され、全ての piper-plus 実装 (Python / Rust / C# / Go / npm) から `--model <name>` で利用可能になります。
+投稿されたモデルはレビュー後に `piper_plus_voices.json` へ登録されます。
+各 runtime の catalog/release 同期が完了した runtime で `--model <name>`
+を利用できます。登録だけで全 runtime への公開が完了するわけではありません。
 
 piper-plus provides multilingual TTS models supporting 6 languages (JA/EN/ZH/ES/FR/PT).
 Community members can submit models fine-tuned from the 6-language base model.
-Accepted models are registered in `piper_plus_voices.json` and become available across all piper-plus implementations via `--model <name>`.
+Accepted models are registered in `piper_plus_voices.json`; each runtime must
+sync its catalog/release before `--model <name>` is available there.
 
 ---
 
@@ -41,11 +44,17 @@ Accepted models are registered in `piper_plus_voices.json` and become available 
 
 | 条件 | 詳細 |
 |------|------|
-| ベースモデル | piper-plus 6 言語ベースモデル ([ayousanz/piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base)) からファインチューニングしたもの |
+| ベースモデル | 公開 `zs-v1` bundle ([revision `3620ed78`](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)) の `base.ckpt` 等からファインチューニングしたもの。これは機能確認済みの実験 bundle で、品質承認済みモデルを意味しません |
 | エクスポート形式 | ONNX (FP16) — `export_onnx.py` でエクスポート済み |
 | 品質チェック | 全 6 言語で推論テスト済み |
 | ライセンス | MIT 互換のライセンス (後述) |
 | HuggingFace | モデルを HuggingFace にアップロード済み |
+
+公開 `zs-v1` のファイルを直接指定する最小の Python 動作確認は、公開
+`piper-plus` 2.0.0 で実施済みです。これはダウンロードした ONNX/config を
+使えることを示すだけで、公開済み 2.0.0/2.0.1 に新しい model alias が
+存在することを示しません。alias の追加は source の catalog 更新と次回
+release の対象として扱い、リリース後に各 runtime を同期してください。
 
 ---
 
@@ -137,6 +146,10 @@ piper-plus は MIT ライセンスです。投稿モデルには以下のライ�
 - [ ] **Model Card (README.md) 作成済み** -- HuggingFace リポジトリに配置
 - [ ] **md5_digest 計算済み** -- ONNX ファイルと config.json の MD5 ハッシュを計算
 
+`md5_digest` はこの repository の voices catalog の現行フィールドです。
+公開 `zs-v1` bundle 自体は revision 固定と `SHA256SUMS` を使うため、Model
+Card には使用した bundle revision と hash も記録してください。
+
 ### md5_digest の計算方法
 
 ```bash
@@ -153,15 +166,42 @@ md5sum config.json
 
 ## ファインチューニング手順 / Fine-tuning Steps
 
-piper-plus の 6 言語ベースモデル (571 話者, 75 epoch) からのシングルスピーカーファインチューニング手順です。
+piper-plus 公開 `zs-v1` bundle の `base.ckpt` (v7 epoch 32 / step
+216326、571 話者、6 言語、173 symbols) からのシングルスピーカー
+ファインチューニング手順です。bundle は機能確認済みの実験版であり、
+品質承認済みという意味ではありません。別の checkpoint を使う場合は
+revision、config、音素・言語 ID を Model Card に記録してください。
 
 ### 1. データセット準備
 
 ```bash
-# 前処理ツールでデータセットを作成
-uv run python -m piper_train.tools.prepare_multilingual_dataset \
-  --input-dir /path/to/your/wavs \
+# LJSpeech形式を前処理（シングルスピーカーの基本経路）
+uv run python -m piper_train.preprocess \
+  --language ja \
+  --input-dir /path/to/your/ljspeech \
+  --output-dir /path/to/preprocessed \
+  --dataset-format ljspeech \
+  --single-speaker \
+  --sample-rate 22050
+
+# 公開 base の phoneme/language ID に合わせる
+uv run python scripts/prepare_single_speaker_finetune.py \
+  --input-dir /path/to/preprocessed \
+  --base-config /path/to/zs-v1/config.json \
   --output-dir /path/to/dataset
+```
+
+複数言語を統合する場合は `prepare_multilingual_dataset` の必須引数を
+明示します。`--input-dir` はこのツールの引数ではありません。
+
+```bash
+uv run python -m piper_train.tools.prepare_multilingual_dataset \
+  --ja-en-dataset /path/to/ja-en/dataset.jsonl \
+  --zh-aishell3 /path/to/zh/dataset \
+  --es-cml-tts /path/to/es/dataset \
+  --fr-cml-tts /path/to/fr/dataset \
+  --pt-cml-tts /path/to/pt/dataset \
+  --output-dir /path/to/multilingual-dataset
 ```
 
 ### 2. ファインチューニング実行
@@ -184,7 +224,9 @@ uv run python -m piper_train \
   --default_root_dir /path/to/output
 ```
 
-> **legacy GPU 用 fallback (V100 等 sm_70):** v2.0 では V100 を公式サポートしないが、 動かす場合は `--precision 32-true --no-wavlm` を併用 (V100 で FP16 mixed は backward pass が遅延、 WavLM は VRAM 制約のため無効化推奨)。 旧 ckpt (torch 2.2 製) からの resume は v1.12 Docker image で実施。
+> **GPU fallback (V100 等 sm_70):** `--precision 32-true --no-wavlm` を
+> 開始点にし、実機で互換性と VRAM を確認してください。旧 checkpoint の
+> 再開は、その checkpoint が作成された PyTorch/依存関係を再現してから行います。
 
 ### パラメータガイド
 
@@ -194,8 +236,8 @@ uv run python -m piper_train \
 | `--max_epochs` | 500 | 100 発話なら 500 epoch で ~12,500 gradient steps |
 | `--batch-size` | 4 | 小データセット向け |
 | `--resume-from-multispeaker-checkpoint` | (必須) | emb_g 除去 + emb_lang 補正 + freeze-dp を自動実行 |
-| `--precision bf16-mixed` | (推奨、 Ada 6000 / RTX 5090) | BF16 native Tensor Core を活用、 numerical stable |
-| `--no-wavlm` | (T4 のみ) | T4 (VRAM 16GB) で VRAM 節約のため WavLM 無効化 |
+| `--precision bf16-mixed` | (Ada/Blackwell の開始点) | BF16 を使う。品質・速度の保証ではない |
+| `--no-wavlm` | (T4/V100 の開始点) | WavLM の読み込みを無効化し、VRAM を節約 |
 
 ### 3. 学習の確認
 
@@ -350,7 +392,7 @@ CI 経由で投稿する場合は GitHub Actions の `Release Model Config to HF
 
 HuggingFace リポジトリの README.md に以下の情報を含めてください。
 
-```markdown
+````markdown
 ---
 language:
   - ja
@@ -372,7 +414,7 @@ tags:
 (モデルの説明)
 
 ## Training
-- Base model: piper-plus 6-language base (ayousanz/piper-plus-base)
+- Base model: piper-plus `zs-v1` (`ayousanz/piper-plus-base`, revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1`, `releases/zs-v1/base.ckpt`)
 - Dataset: (データセット名, 発話数)
 - Epochs: (エポック数)
 - Fine-tuning parameters: (主要パラメータ)
@@ -391,7 +433,7 @@ piper-plus --model <model-name> --text "こんにちは"
 piper-plus --model <model-name> --text "こんにちは"
 ```
 
-```text
+````
 
 ### Step 3: GitHub Issue で投稿
 
@@ -407,7 +449,7 @@ piper-plus --model <model-name> --text "こんにちは"
    - config.json の整合性
    - HuggingFace リポジトリの構成
 2. 承認後、メンテナーが `piper_plus_voices.json` を更新する PR を作成
-3. PR マージ後、全 piper-plus 実装から `--model <name>` で利用可能に
+3. PR マージ後、各 runtime の catalog/release 同期が完了した環境で `--model <name>` が利用可能になる
 
 ---
 

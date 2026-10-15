@@ -5,7 +5,7 @@ Cross-runtime guide for integrating piper-plus into iOS projects (Dart / Flutter
 > **Quick links:**
 >
 > - [Dart / Flutter quick reference](../../../examples/dart/README.md#ios-integration)
-> - [Godot iOS notes](../../../examples/godot/README.md#ios-v1130)
+> - [Godot iOS notes](../../../examples/godot/README.md#ios-v201)
 > - [Swift example (manual drag-and-drop, SPM via Package.swift)](../../../examples/swift/README.md)
 > - [**Swift G2P-only integration** (no synthesis engine)](swift-g2p-integration.md) — Issue #387
 > - [Specification](../../reference/ios-shared-lib.md) (design rationale)
@@ -23,7 +23,9 @@ Cross-runtime guide for integrating piper-plus into iOS projects (Dart / Flutter
 
 ## Distribution Selection
 
-piper-plus v1.13.0 ships **two iOS artifacts** during the migration period:
+The current public release v2.0.1 ships the xcframework path described below.
+For historical context, piper-plus v1.13.0 shipped **two iOS artifacts** during
+the migration period:
 
 | Your situation | Recommended | Why |
 |----------------|------------|-----|
@@ -39,7 +41,7 @@ piper-plus v1.13.0 ships **two iOS artifacts** during the migration period:
 ## Step 1: Get piper-plus xcframework
 
 ```bash
-gh release download v1.13.0 -p 'libpiper_plus-ios-*.xcframework.zip'
+gh release download v2.0.1 -p 'libpiper_plus-ios-*.xcframework.zip'
 unzip libpiper_plus-ios-*.xcframework.zip
 ```
 
@@ -113,7 +115,7 @@ In Xcode for your iOS app target:
 
 > **The most common iOS integration failure is leaving the ORT framework as "Do Not Embed"** — that triggers `dyld: Library not loaded: @rpath/onnxruntime.framework/onnxruntime` at app launch. Always Embed & Sign the ORT framework.
 
-> **Godot users**: Step 3 is automated by `ios.dependencies` in your `.gdextension` — no manual Embed & Sign required. See [`examples/godot/README.md` § iOS](../../../examples/godot/README.md#ios-v1130).
+> **Godot users**: Step 3 is automated by `ios.dependencies` in your `.gdextension` — no manual Embed & Sign required. See [`examples/godot/README.md` § iOS](../../../examples/godot/README.md#ios-v201).
 
 ## Step 4 (Japanese TTS only): Bundle the OpenJTalk Dictionary
 
@@ -217,8 +219,8 @@ tts.speak("こんにちは。")
 | Code Signing failed (Embed Frameworks phase) | Provisioning profile mismatch on bundled ORT framework | In Xcode → target → Signing & Capabilities, match the team identifier; use automatic signing for development |
 | Embedded Binary not found (`onnxruntime.framework`) | Drag added to Frameworks but not Embed Frameworks build phase | Open Build Phases → Embed Frameworks → ensure `onnxruntime.xcframework` is listed and "Code Sign On Copy" is checked |
 | `module.modulemap` not found in Swift import | xcframework's `Headers/` not on `HEADER_SEARCH_PATHS` | Don't override `HEADER_SEARCH_PATHS` in build settings — let Xcode's xcframework integration handle paths automatically |
-| Build OK on simulator, crash on device (or vice versa) | Used a single-slice (device-only) artifact | Use the v1.13.0+ xcframework.zip (contains both slices) |
-| `import PiperPlus` fails to compile in Swift | Old xcframework without modulemap | Use v1.13.0+ xcframework.zip (M2 includes modulemap) |
+| Build OK on simulator, crash on device (or vice versa) | Used a single-slice (device-only) artifact | Use the v2.0.1+ xcframework.zip (contains both slices) |
+| `import PiperPlus` fails to compile in Swift | Old xcframework without modulemap | Use the v2.0.1+ xcframework.zip (includes the modulemap) |
 | App Store Connect rejects build for missing Privacy Manifest | Your app uses Required Reason APIs that ORT doesn't declare | Add a consolidated `PrivacyInfo.xcprivacy` to your app target covering ORT's API usage |
 | Build size complaint | Single binary >2 GB unsigned per slice | Not a piper-plus issue — see [Apple's iOS app size limits](https://developer.apple.com/help/app-store-connect/reference/maximum-build-file-sizes) |
 

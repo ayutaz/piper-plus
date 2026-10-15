@@ -27,10 +27,12 @@ Reads a `models.yaml` definition file and synthesises one WAV per
 `{samples_dir}/{model_name}/{lang}/{text_id}.wav`.
 
 - Supports two model types:
-  - `piper-plus`: in-process ONNX inference using
-    `piper_train.ort_utils.create_session_with_cache` plus the standard
-    warmup, falling back to a default `onnxruntime.InferenceSession` if the
-    training package is unavailable.
+  - `piper-plus`: in-process ONNX inference. When `piper_train.ort_utils` is
+    importable, the generator calls `create_session_with_cache` and the
+    standard warmup; standalone benchmark installs fall back to a default
+    `onnxruntime.InferenceSession`. The fallback is intentional, so a run
+    must not be described as using the training cache unless the optional
+    import was available.
   - `external`: arbitrary TTS systems invoked as a subprocess via a
     `command` template (e.g. `edge-tts --voice {voice} --text '{text}'
     --write-media {output}`, `gtts-cli '{text}' -l {lang} -o {output}`).
@@ -76,6 +78,27 @@ CDN, server, or network access.
   rating, comment`) or JSON, with the evaluator's chosen ID baked into the
   filename.
 
+## Model scope
+
+The checked-in `models.yaml` fixtures are legacy reproducibility targets. The
+`piper-plus-6lang-base` entry points at the 75-epoch, 571-speaker ONNX model
+and the Tsukuyomi entry points at its legacy fixed voice/config. They preserve
+the current benchmark's `input`, `input_lengths`, `scales`, and optional
+`sid`/`lid`/`prosody_features` feed contract.
+
+The public `ayousanz/piper-plus-base/releases/zs-v1/base.onnx` is a different
+experimental conditioning contract: it requires a 192-dimensional CAM++
+speaker embedding and the companion `campplus.onnx` plus reference-audio
+embedding extraction. The current generator does not extract or feed
+`speaker_embedding`, so `base.onnx` is not a drop-in benchmark target and must
+not be substituted into the legacy entry. If a fixed `releases/zs-v1/tsukuyomi.onnx`
+voice is benchmarked separately, add an explicit model entry, inspect its
+declared ONNX inputs, and record the exact config and revision.
+
+The objective outputs remain RMS, peak, silence ratio, sample-rate sanity,
+and RTF, with optional UTMOS. They are useful machine metrics; human MOS
+still comes only from the listening survey.
+
 ## Usage
 
 The default fixtures cover **6 languages x 10 sentences each** under
@@ -89,7 +112,7 @@ models:
     path: "${MODELS_DIR}/multilingual-6lang-75epoch.onnx"
     config: "${MODELS_DIR}/config.json"
     type: piper-plus
-    description: "6-language base model (75 epoch, 571 speakers)"
+    description: "legacy 6-language base model (75 epoch, 571 speakers)"
     speaker_ids:
       ja: 0
       en: 20

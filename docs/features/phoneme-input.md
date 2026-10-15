@@ -354,8 +354,8 @@ echo "Say [[ h ə l oʊ ]] and [[ g ʊ d b aɪ ]]" | piper-plus --model en_US-le
 
 ### Rust: IPA directly to model IDs
 
-The Rust `piper-plus-g2p` crate provides `PiperEncoder::encode_ipa` (next release)
-for applications that already have an IPA transcription. It does not require
+The Rust `piper-plus-g2p` crate provides `PiperEncoder::encode_ipa` for the
+current Rust runtime for applications that already have an IPA transcription. It does not require
 a natural-language phonemizer or language registration. Load `phoneme_id_map`
 from the target model's config, create a `PiperEncoder`, and call
 `encoder.encode_ipa("ka")` to obtain IDs with BOS/EOS/PAD inserted.
@@ -368,7 +368,7 @@ the target model contains their encoded keys. Explicit token arrays remain
 available via `PiperEncoder::encode` when segmentation is ambiguous.
 
 This Rust API does not extend the CLI's `[[ ... ]]` parser or the C FFI. See the
-[Rust crate README](../../src/rust/piper-plus-g2p/README.md#direct-ipa-input-rust-next-release)
+[Rust crate README](../../src/rust/piper-plus-g2p/README.md)
 for examples, Unicode/notation restrictions, and constructed-language limits.
 
 ### Text Processing Flow

@@ -1,125 +1,73 @@
-# Testing Guide for Multilingual TTS
+# Testing the browser runtime
 
-## Overview
+This directory contains the npm package, the multilingual demo, unit tests,
+and the Playwright browser probe. The current browser path uses the Rust WASM
+phonemizer and `onnxruntime-web`; the old Emscripten/OpenJTalk pages are not
+part of the active test path.
 
-This guide explains how to test the multilingual Text-to-Speech (TTS) implementation that supports both Japanese (OpenJTalk) and English (Simple Phonemizer).
+## Install
 
-## Quick Start
+Use Node.js 24 or newer, matching `package.json`:
 
-1. **Start the test server:**
+```bash
+cd src/wasm/openjtalk-web
+npm ci --ignore-scripts --no-audit --no-fund
+```
 
-   ```bash
-   python3 test-server.py
-   ```
+## Automated checks
 
-   Or use Python's built-in server:
+The package scripts are the source of truth for test coverage:
 
-   ```bash
-   python3 -m http.server 8080
-   ```
+```bash
+npm test                         # focused package and npm-distribution tests
+npm run test:npm-package:all     # complete JS package suite
+npm run check:types              # generated type constants are current
+npm run test:browser-runtime     # README/demo ORT URL matches package.json
+npm run test:importmap           # demo import maps resolve
+npm run test:wasm-g2p            # Rust WASM adapter tests
+```
 
-2. **Open test pages in your browser:**
-   - Simple Multilingual Demo: <http://localhost:8080/test/multilingual-demo/simple-multilingual.html>
-   - Japanese Demo: <http://localhost:8080/test/multilingual-demo/index.html>
+The real browser probe downloads the pinned CSS10 and Tsukuyomi fixtures,
+starts the local test server, and checks synthesis, decoded WAV data, and
+playback:
 
-## Test Scenarios
+```bash
+npm run test:browser
+```
 
-### 1. Basic Functionality Test
+This command requires Playwright Chromium. The fixtures are downloaded by
+`test/browser/prepare-models.mjs` and verified against the SHA-256 values in
+`test/browser/models.json`. The live deployment probe uses the same test with
+`PIPER_PLUS_DEMO_URL` set by the deployment workflow.
 
-**Japanese:**
+## Manual demo
 
-- Input: "こんにちは、世界！"
-- Expected: Clear Japanese speech output
-- Phonemes should show Japanese phonemes (e.g., k, o, n, n, i, ch, i, w, a)
+The supplied server adds the CORS and cross-origin-isolation headers needed by
+the browser runtime. Run it from this directory:
 
-**English:**
+```bash
+python3 test-server.py
+```
 
-- Input: "Hello world!"
-- Expected: English speech output (may sound robotic with simple phonemizer)
-- Phonemes should show IPA symbols (e.g., h, ɛ, l, oʊ)
+Open the files that actually live under the test demo directory:
 
-### 2. Language Switching Test
+- <http://localhost:8080/test/multilingual-demo/index.html>
+- <http://localhost:8080/test/multilingual-demo/simple-multilingual.html>
+- <http://localhost:8080/test/multilingual-demo/multilingual.html>
 
-1. Start with Japanese text
-2. Generate audio
-3. Switch to English
-4. Enter English text
-5. Generate audio
-6. Verify model switches correctly
+The demo model is selected by the page (`css10`) and is fetched from the
+Hugging Face registry. A successful page load is a UI smoke check; use the
+Playwright probe for the pinned model, inference, and playback assertions.
 
-### 3. Edge Cases
+## What the browser probe checks
 
-**Mixed Language:**
+- The CSS10 demo synthesizes Japanese, English, Chinese, Spanish, French, and
+  Portuguese text and decodes non-zero WAV output.
+- The README import-map and basic-usage pages initialize Tsukuyomi and start
+  real audio playback.
+- Browser errors are collected and fail the test.
+- ORT URLs are pinned to the exact `onnxruntime-web` version in
+  `package.json` (currently `1.30.0`).
 
-- Input: "Hello 世界" (Mixed English/Japanese)
-- System should detect primary language
-
-**Unknown Words (English):**
-
-- Input: "Supercalifragilisticexpialidocious"
-- Should fall back to letter-by-letter phonemization
-
-**Special Characters:**
-
-- Input: "Hello! How are you?"
-- Punctuation should be handled gracefully
-
-## Implementation Status
-
-### Completed ✅
-
-- Japanese TTS using OpenJTalk
-- Simple English phonemizer (dictionary-based)
-- Language switching UI
-- Basic ONNX model integration
-- Test pages and demos
-
-### In Progress 🚧
-
-- Full eSpeak-ng WebAssembly integration
-- Comprehensive English pronunciation dictionary
-- Performance optimization
-
-### Limitations
-
-- English pronunciation is simplified (no eSpeak-ng yet)
-- Limited English word dictionary (~60 common words)
-- Unknown English words use basic letter-to-sound rules
-
-## Troubleshooting
-
-### Common Issues
-
-1. **"CORS policy" errors:**
-   - Use the provided test server, not file:// URLs
-   - Ensure you're accessing via <http://localhost:8080>
-
-2. **Model loading fails:**
-   - Check that .onnx files exist in models/ directory
-   - Verify model config JSON files are valid
-
-3. **No audio output:**
-   - Check browser console for errors
-   - Ensure audio is not muted
-   - Try a different browser
-
-4. **Phonemes show as "undefined":**
-   - Check phoneme_id_map in model config
-   - Verify phoneme extraction logic
-
-## Development Notes
-
-### Model Configuration
-
-The multilingual model accepts phonemes from all supported languages. Current implementation maps:
-
-- Simple phonemes / IPA symbols → Model IDs
-
-See `models/multilingual-test-medium.onnx.json` for phoneme mappings.
-
-## Next Steps
-
-1. Complete eSpeak-ng WebAssembly integration for better English
-2. Add more languages
-3. Implement streaming synthesis
-4. Add voice selection UI
+Keep historical migration and changelog examples unchanged; this file
+documents only the current commands and active test paths.

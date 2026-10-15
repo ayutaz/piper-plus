@@ -3,6 +3,10 @@
 学習直後のマルチスピーカー `last.ckpt` (~938 MB) を、HuggingFace に公開できる
 ファインチューニング用の軽量 ckpt (~316 MB) に変換するスクリプト。
 
+これは公開準備時の変換ヘルパーです。現在の公開 `zs-v1` bundle は
+`ayousanz/piper-plus-base` の固定 revision 下に保持されているため、既存の
+root model や公開済み bundle を上書きする用途には使わないでください。
+
 ## 何をしているか
 
 | 処理 | 削減量 (典型) |
@@ -33,7 +37,7 @@
 ```bash
 uv run python scripts/convert_multi_to_single_speaker.py \
   --input-checkpoint  /data/piper/output-multilingual-6lang-mb-istft/checkpoints/epoch=74-step=500034.ckpt \
-  --output-checkpoint /data/piper/hf_upload/piper-plus-base/model.ckpt
+  --output-checkpoint /data/piper/hf_upload/piper-plus-base/releases/zs-v1/base.ckpt
 ```
 
 環境変数経由でも可:
@@ -46,7 +50,8 @@ uv run python scripts/convert_multi_to_single_speaker.py
 
 ## config.json も合わせて更新
 
-公開時には `num_speakers=0` に揃えた config.json も同時にアップロードする:
+FT用の派生 bundle を作る場合は、対応する `config.json` も同じ bundle
+directory に生成する。公開済み base の revision/root config を直接書き換えない:
 
 ```python
 import json
@@ -54,7 +59,7 @@ with open("dataset.../config.json") as f:
     cfg = json.load(f)
 cfg["num_speakers"] = 0
 cfg.pop("speaker_id_map", None)
-with open("hf_upload/.../config.json", "w") as f:
+with open("hf_upload/.../releases/zs-v1/config.json", "w") as f:
     json.dump(cfg, f, ensure_ascii=False, indent=2)
 ```
 

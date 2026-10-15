@@ -14,7 +14,8 @@
 │   ├── guard-bash.sh               # PreToolUse: 危険コマンドブロック
 │   ├── prompt-guard.sh             # UserPromptSubmit: キーワード検出 → リマインダー
 │   ├── stop-warn-uncommitted.sh    # Stop: 未コミット変更を警告
-│   └── session-env.sh              # SessionStart: env 変数 + ブランチ情報注入
+│   ├── session-env.sh              # SessionStart: env 変数 + ブランチ情報注入
+│   └── test-guard-bash.sh          # 手動テスト helper (settings.json の hook ではない)
 ├── skills/                         # ユーザー起動 skills (`/<name>` で実行)
 │   ├── precheck/SKILL.md           # /precheck — lint + format + test 一括
 │   ├── check-pr-ready/SKILL.md     # /check-pr-ready — PR 作成前の最終チェック
@@ -80,7 +81,7 @@ CLAUDE.md のコミットルール (`--no-verify` 禁止、HEREDOC、適切な p
 
 ### `/sync-docs [commit-range]`
 
-**エージェントチームで全ドキュメントを監査・更新**。コード変更に対して CLAUDE.md / README / CHANGELOG / docs/features / docstring の整合性を 6 エージェント並列で監査し、必要な更新を提案・適用します。
+**エージェントチームで全ドキュメントを監査・更新**。コード変更に対して CLAUDE.md / README / CHANGELOG / docs/features / docstring / version drift の整合性を 7 エージェント並列で監査し、必要な更新を提案・適用します。
 
 **推奨フロー**:
 
@@ -97,6 +98,7 @@ CLAUDE.md のコミットルール (`--no-verify` 禁止、HEREDOC、適切な p
 - Agent 4: CHANGELOG (Unreleased セクション)
 - Agent 5: docs/features / docs/spec
 - Agent 6: docstring / JSDoc 整合性
+- Agent 7: version drift (`docs/spec/release-versions.toml` canonical)
 
 PR #349 で発生した「ドキュメント更新を一括で後付けする」パターンをコミット単位で防止します。
 

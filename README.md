@@ -19,9 +19,9 @@
 
 > **🔑 唯一の MIT ライセンス Piper フォーク** — オリジナルの [rhasspy/piper](https://github.com/rhasspy/piper) は 2025年10月にアーカイブ済み。[OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) は GPL-3.0 に移行。piper-plus は espeak-ng に依存しない唯一の MIT 互換フォークです。独自実装の G2P で8言語 (JA/EN/ZH/KO/ES/FR/PT/SV) に対応し、商用利用・組込み利用に適しています。
 
-> **📢 v2.0.0 Breaking changes:** Docker 既定イメージは CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (host NVIDIA driver **R570+** 必須)。学習は torch **2.11.0** + CUDA 12.8、TF32 + bf16-mixed が既定です。torch 2.2 製 checkpoint の resume は非対応です。Python の import / CLI は `piper_plus` / `piper-plus` に変更されました。1.13.0 から更新する場合は `pip install --upgrade "piper-plus==2.0.0"` を実行してください。詳細: [移行ガイド](docs/migration/v1.12-to-v2.0.md)。
+> **📢 v2.0.0 Breaking changes:** Docker 既定イメージは CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (host NVIDIA driver **R570+** 必須)。学習は torch **2.11.0** + CUDA 12.8、TF32 + bf16-mixed が既定です。torch 2.2 製 checkpoint の resume は非対応です。Python の import / CLI は `piper_plus` / `piper-plus` に変更されました。1.13.0 から現在の公開版へ更新する場合は `pip install --upgrade "piper-plus==2.0.1"` を実行してください。詳細: [移行ガイド](docs/migration/v1.12-to-v2.0.md)。
 
-高速・高品質なニューラルテキスト音声合成 (TTS) システム。[VITS](https://github.com/jaywalnut310/vits/) アーキテクチャを採用し、日本語・英語・中国語・韓国語・スペイン語・フランス語・ポルトガル語・スウェーデン語の8言語マルチスピーカー音声合成に対応。[Piper](https://github.com/rhasspy/piper) のフォークで、日本語対応・音質向上・学習機能を大幅に強化しています。
+高速・高品質なニューラルテキスト音声合成 (TTS) システム。[VITS](https://github.com/jaywalnut310/vits/) アーキテクチャを採用し、8言語のG2P/音素化と、現在6言語の学習済みモデルによるマルチスピーカー音声合成に対応。[Piper](https://github.com/rhasspy/piper) のフォークで、日本語対応・音質向上・学習機能を大幅に強化しています。
 
 **[Hugging Face デモ](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** | **[WebAssembly デモ](https://ayutaz.github.io/piper-plus/)** (ブラウザで動作、サーバー不要)
 
@@ -79,7 +79,7 @@ Python / Rust / Go / C# / C++ / WASM の 6 ランタイムを `multilingual-test
 
 ### 音声合成
 
-- **8言語対応** — 日本語・英語・中国語・スペイン語・フランス語・ポルトガル語・スウェーデン語・韓国語 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) ※学習済みモデルは6言語 (JA/EN/ZH/ES/FR/PT)
+- **8言語G2P/音素化対応** — 日本語・英語・中国語・スペイン語・フランス語・ポルトガル語・スウェーデン語・韓国語 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7)。現行の学習済みモデルは6言語 (JA/EN/ZH/ES/FR/PT)
 - **日本語 TTS** — OpenJTalk統合、韻律情報 (A1/A2/A3)、疑問詞マーカー (#204)、文脈依存「ん」バリアント (#207)
 - **英語 TTS** — GPL-free G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0)、espeak-ng 不要
 - **マルチスピーカー** — 571話者対応 (学習用ベースモデル)、SpeakerBalancedBatchSampler、言語グループ均等サンプリング
@@ -105,17 +105,17 @@ Python / Rust / Go / C# / C++ / WASM の 6 ランタイムを `multilingual-test
 - **[iOS Swift G2P (SPM)](docs/guides/platform/swift-g2p-integration.md)** — `PiperPlusG2P` 単独ライブラリ、8言語の G2P を ONNX Runtime 非依存で iOS 上で利用可能 (Issue #387)
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — ブラウザ内で完全動作、**音素タイミング出力 (JSON/TSV/SRT)**、サーバー不要
 - **[Docker](docker/README.md)** — 推論・学習・WebUI・C++の5イメージ提供
-- **PyPI** — `pip install piper-plus` で簡単インストール、8言語マルチリンガル、**音素タイミング出力 (JSON/TSV/SRT)**、ストリーミング、HTTP API
-- **C# CLI** — .NET 10 クロスプラットフォーム、8言語マルチリンガル、ONNX推論、**音素タイミング出力 (JSON/TSV/SRT)**
+- **PyPI** — `pip install piper-plus` で簡単インストール、8言語G2P/音素化 (現行の学習済みモデルは6言語)、**音素タイミング出力 (JSON/TSV/SRT)**、ストリーミング、HTTP API
+- **C# CLI** — .NET 10 クロスプラットフォーム、8言語G2P/音素化 (現行の学習済みモデルは6言語)、ONNX推論、**音素タイミング出力 (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応、**音素タイミング出力 (JSON/TSV/SRT)**、辞書自動ダウンロード
 - **[Go CLI](src/go/README.md)** — HTTP APIサーバー、セッションプーリング、Docker対応、シングルバイナリ、**音素タイミング出力 (JSON/TSV/SRT)**
-- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 全 6 ランタイム (Python/Rust/C#/Go/WASM/C++) でモデル互換の事前計算 `speaker_embedding` 入力に対応。C++ CLI/C API は事前計算 embedding のみ受け付け、`--reference-audio` による抽出は未実装。公開 `zs-v1` の実推論確認は Python `piper-plus==2.0.0` のみ。
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 全 6 ランタイム (Python/Rust/C#/Go/WASM/C++) でモデル互換の事前計算 `speaker_embedding` 入力に対応。C++ CLI/C API は事前計算 embedding のみ受け付け、`--reference-audio` による抽出は未実装。公開 `zs-v1` の実推論確認は Python `piper-plus==2.0.0` のみ。公開 CI run `38189966578` では Python 共有 phoneme IDs を入力に6ランタイム推論を確認済みで、native G2P と人手試聴品質は範囲外、品質承認は未実施です。
 - **SSML サポート** — `<speak>`, `<break>`, `<prosody rate="...">` を Python/Rust/C#/Go/WASM/C++ の 6 ランタイムで実装 (C++ は CLI `--ssml` 経由)
 - **短文品質改善 (Strategy A/B/C)** — Silence Padding、Dynamic Scales、SSML `<break>` 自動注入を全 6 ランタイムで対応 (`docs/spec/short-text-contract.toml`)
 
 ### ランタイム別機能サポート
 
-6 ランタイム (Python/Rust/C#/Go/JS-WASM/C++) で同等の8言語マルチリンガル合成を実現。音素タイミング・ストリーミング (文単位分割含む)・モデル互換の事前計算 embedding を使う Voice Cloning・カスタム辞書はランタイム機能として対応。C++ は事前計算 embedding のみで `--reference-audio` は未実装。公開 `zs-v1` の実推論確認は Python `piper-plus==2.0.0` のみで、他ランタイムの同バンドル検証を示すものではありません。SSML は全 6 ランタイム対応 (C++ は CLI `--ssml` 経由、C API 非エクスポート)、HTTP API は Python/Go の 2 ランタイム対応。
+6 ランタイム (Python/Rust/C#/Go/JS-WASM/C++) で現行学習済みモデルの6言語合成を実現し、8言語のG2P/音素化も提供します。音素タイミング・ストリーミング (文単位分割含む)・モデル互換の事前計算 embedding を使う Voice Cloning・カスタム辞書はランタイム機能として対応。C++ は事前計算 embedding のみで `--reference-audio` は未実装。公開 `zs-v1` の実推論確認は Python `piper-plus==2.0.0` のみです。公開 CI run `38189966578` は Python 共有 phoneme IDs による6ランタイム推論を確認しますが、native G2P と人手試聴品質は範囲外で、品質承認は未実施です。SSML は全 6 ランタイム対応 (C++ は CLI `--ssml` 経由、C API 非エクスポート)、HTTP API は Python/Go の 2 ランタイム対応。
 
 ---
 
@@ -156,7 +156,7 @@ cd piper-plus
 
 **Linux (ARM64, Raspberry Pi 4/5):**
 
-**未リリースの ARM64 修正:** glibc 2.31 以上を対象とし、Debian Bullseye / Bookworm / Trixie（64bit）での起動と日本語音声生成を QEMU で確認済みです。Raspberry Pi 実機と Raspberry Pi OS 自体は未検証です。v2.0.1 の配布アーカイブには、この修正は含まれません。
+**ARM64 の互換性:** v2.0.1 の Linux ARM64 C++ 配布物は glibc 2.38 以上を必要とします。glibc 2.31 以上を対象にする修正は dev/source 側で、Debian Bullseye / Bookworm / Trixie（64bit）を QEMU で確認済みです。Raspberry Pi 実機と Raspberry Pi OS 自体は未検証です。幅広い glibc 互換性が必要な場合は dev/source をビルドしてください。
 
 ```bash
 curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
@@ -333,7 +333,7 @@ dotnet add package PiperPlus.Core
 
 ```toml
 [dependencies]
-piper-plus = "0.4"
+piper-plus = "0.5"
 ```
 
 ### ソースからビルド
@@ -377,7 +377,7 @@ C++ CLI の詳細なコマンドラインオプション、JSON 入力フォー�
 ## プラットフォーム
 
 - **macOS**: Apple Silicon (arm64) ネイティブ対応。詳細は [macOS セットアップ](docs/getting-started/binary-selection.md#macos-開発元を確認できないため開けません) 参照
-- **Windows**: x64 / arm64 対応。OpenJTalk セットアップは [Windows セットアップガイド](docs/getting-started/windows-setup.md)
+- **Windows**: C++ 配布物は x64、C# CLI は x64 / arm64。OpenJTalk セットアップは [Windows セットアップガイド](docs/getting-started/windows-setup.md)
 - **WebAssembly**: ブラウザで完全オフライン実行。[デモ](https://ayutaz.github.io/piper-plus/) | [npm パッケージ](https://www.npmjs.com/package/piper-plus)
 
 ---
@@ -412,7 +412,7 @@ piper-plus 専用モデル: [zs-v1 Zero-Shot/FT ベース](https://huggingface.c
 - **Rust**: `cargo add piper-plus-g2p` — [ソースコード](src/rust/piper-plus-g2p/)
 - **Go**: `go get github.com/ayutaz/piper-plus/src/go/phonemize` — [ソースコード](src/go/phonemize/)
 - **JavaScript/WASM**: `npm install @piper-plus/g2p` — [ソースコード](src/wasm/g2p/)
-- **Kotlin/Android**: `implementation("io.github.ayutaz:piper-plus-g2p-android:1.0.0")` — [ソースコード](android/piper-plus-g2p/) · [辞書配布ガイド](docs/guides/platform/android-g2p-dictionary.md)
+- **Kotlin/Android**: `implementation("io.github.ayutaz:piper-plus-g2p-android:1.0.1")` — [ソースコード](android/piper-plus-g2p/) · [辞書配布ガイド](docs/guides/platform/android-g2p-dictionary.md)
 
 ### People using Piper
 

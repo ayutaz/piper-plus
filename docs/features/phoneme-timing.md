@@ -6,14 +6,18 @@ VITS Duration Predictor から音素ごとの開始時刻・終了時刻・継�
 
 | ランタイム | 計算 | JSON | TSV | SRT | CLI flag | HTTP API |
 |----------|------|------|-----|-----|----------|----------|
-| Python | ✅ | ✅ | ✅ | ✅ | (`piper_plus.synthesize_with_timing()`) | ✅ `/api/phoneme-timing` |
+| Python | ✅ | ✅ | ✅ | ✅ | `PiperVoice.synthesize_with_timing()` | ✅ `/api/phoneme-timing` |
 | Rust | ✅ | ✅ | ✅ | ✅ | `--output-timing` `--timing-format` | - |
 | Go | ✅ | ✅ | ✅ | ✅ | `--output-timing` `--timing-format` | ✅ |
 | C++ | ✅ | ✅ | ✅ | ✅ | `--output-timing` `--timing-format` | - |
 | C# | ✅ | ✅ | ✅ | ✅ | (`PhonemeTimingExtractor`) | - |
 | WASM/JS | ✅ | ✅ | ✅ | ✅ | (`AudioResult.timing`) | N/A (browser) |
 
-すべての実装は **byte-for-byte 互換**: 同じ入力に対して同じ出力を生成します。
+duration 出力を持つ同じ ONNX model と同じ入力を使った実装は、契約で定めた
+timing schema と数値規則に従います。WAV の浮動小数点演算や、duration 出力を
+持たない legacy model の fallback は runtime/model ごとに差があり、全モデルで
+byte-for-byte の timing file を保証するものではありません。C++ は duration 出力が
+ない model では timing file を生成せず警告します。
 
 ## 計算ロジック
 

@@ -1,6 +1,6 @@
 ---
 name: check-cross-runtime
-description: Python canonical (`src/python_run/piper_plus/`, `src/python/piper_train/`, `src/python/g2p/piper_plus_g2p/`) を変更した PR で、 ONNX I/O 以外の追随漏れ (phonemizer / config schema / CLI flag / data 形式 / API 変更) を 7 ランタイム + 2 docker image 範囲で fail-fast 検出する。PR #443 (Python のみ修正 → 4 runtime + 2 docker で同バグ) / PR #391 (Python のみ修正 → 5 runtime 古いまま) の silent regression パターンへの対策。`/check-runtime-parity` (ONNX グラフ I/O 限定) と `/check-new-runtime-asset` (新規アセット配布) を補完する 3 つ目の sibling skill。
+description: Python canonical (`src/python_run/piper_plus/`, `src/python/piper_train/`, `src/python/g2p/piper_plus_g2p/`) を変更した PR で、 ONNX I/O 以外の追随漏れ (phonemizer / config schema / CLI flag / data 形式 / API 変更) を `RUNTIME_PATHS` に列挙した全 target と 2 docker image の範囲で fail-fast 検出する。PR #443 / #391 の silent regression パターンへの対策。`/check-runtime-parity` (ONNX グラフ I/O 限定) と `/check-new-runtime-asset` (新規アセット配布) を補完する sibling skill。
 disable-model-invocation: true
 allowed-tools: Bash(git diff *) Bash(git status *) Bash(grep *) Bash(ls *) Bash(python *) Bash(uv run *)
 ---
@@ -10,7 +10,7 @@ allowed-tools: Bash(git diff *) Bash(git status *) Bash(grep *) Bash(ls *) Bash(
 # Python 変更 → N ランタイム追随漏れチェック
 
 `src/python_run/piper_plus/*.py`、 `src/python/piper_train/*.py`、 または
-`src/python/g2p/piper_plus_g2p/*.py` を変更した PR で、 他 7 ランタイム
+`src/python/g2p/piper_plus_g2p/*.py` を変更した PR で、 `RUNTIME_PATHS` に列挙した他の runtime targets
 (C# / Rust × 2 crate / Go / JS-WASM / C API / iOS SPM / Kotlin-Android /
 Swift G2P) + 2 docker image (python-inference / webui) が **同じ振る舞いに
 追随しているか** を PR 提出前に確認する。
@@ -23,7 +23,7 @@ Swift G2P) + 2 docker image (python-inference / webui) が **同じ振る舞い�
 | `/check-new-runtime-asset` | **新規データファイル** (JSON/TOML/TSV) の 7 箇所 metadata 配布 | wheel/sdist 同梱漏れだけ |
 | **`/check-cross-runtime` (本 skill)** | **それ以外の Python 変更** = phonemizer ロジック / config field / CLI flag / data file 形式変更 / API 変更 / docker recipe | 既存 2 skill の網からこぼれる広い領域 |
 
-3 skill を組み合わせると、 Python canonical の変更が 7 ランタイム + 2 docker
+3 skill を組み合わせると、 Python canonical の変更が `RUNTIME_PATHS` の全 target + 2 docker
 全部に伝播しているかを 1 PR ごとにチェックできる。
 
 ## 過去事故サマリ
@@ -67,7 +67,7 @@ Swift G2P) + 2 docker image (python-inference / webui) が **同じ振る舞い�
 |---|---|---|
 | **軽微 (Low)** | 内部リファクタ・docstring・型注釈・テスト追加 | 他 runtime touch 不要、 PR description に明記して skip |
 | **中 (Medium)** | 新規 phonemizer 関数追加 / 既存関数の挙動拡張 / 新規 CLI flag / 公開 API への field 追加 | **Rust + Go + C# を同 PR で実装**、 WASM/C++/iOS/Kotlin/Swift は follow-up issue 化 |
-| **重大 (High)** | config schema 変更 / data file 形式変更 / model schema 変更 / 互換性破壊 | **全 7 runtime + 2 docker 同 PR が望ましい**。 不可なら release blocker issue を立ててから merge |
+| **重大 (High)** | config schema 変更 / data file 形式変更 / model schema 変更 / 互換性破壊 | **`RUNTIME_PATHS` の全 target + 2 docker を同 PR が望ましい**。 不可なら release blocker issue を立ててから merge |
 
 判定の目安:
 
@@ -107,7 +107,7 @@ if [ -n "$ONNX_IO_CHANGE" ]; then
 fi
 ```
 
-### 3. 7 ランタイム + 2 docker の touch 状況を一覧表示
+### 3. `RUNTIME_PATHS` の全 target + 2 docker の touch 状況を一覧表示
 
 ```bash
 declare -A RUNTIME_PATHS=(
@@ -132,7 +132,7 @@ declare -A RUNTIME_PATHS=(
 )
 
 echo ""
-echo "=== 7 runtime + 2 docker の touch 状況 ==="
+echo "=== configured runtime targets + 2 docker の touch 状況 ==="
 CHANGED_FILES=$(git diff --name-only origin/dev...HEAD)
 for label in "${!RUNTIME_PATHS[@]}"; do
   path="${RUNTIME_PATHS[$label]}"
@@ -171,7 +171,7 @@ G2P_FILES=$(git diff --name-only origin/dev...HEAD | \
   xargs -I{} basename {} .py)
 
 for lang in $G2P_FILES; do
-  echo "=== $lang phonemizer の 8 runtime 同期確認 ==="
+  echo "=== $lang phonemizer の configured runtime target 同期確認 ==="
   echo "  Python:    src/python/g2p/piper_plus_g2p/${lang}.py  [canonical]"
   ls -la "src/rust/piper-plus-g2p/src/${lang}.rs"           2>/dev/null && echo "  Rust:      OK" || echo "  Rust:      MISSING"
   ls -la "src/go/phonemize/${lang}.go"                       2>/dev/null && echo "  Go:        OK" || echo "  Go:        MISSING"
@@ -283,7 +283,7 @@ PR 提出前にメンタルチェック:
 - [ ] 影響度 (Low / Medium / High) を判定した
 - [ ] Low 以外なら他 runtime の touch 状況を `git diff --name-only` で確認した
 - [ ] Medium なら Rust / Go / C# を同 PR で更新 (or follow-up issue 化)
-- [ ] High なら全 7 runtime + 2 docker を同 PR で更新 (or release blocker 立て)
+- [ ] High なら `RUNTIME_PATHS` の全 target + 2 docker を同 PR で更新 (or release blocker 立て)
 - [ ] 該当する `scripts/check_*.py` sync gate を local で pass
 - [ ] `docs/spec/*.toml` の version bump が必要か検討した
 - [ ] PR description に 「Python canonical + N 他ランタイム追随」 を明記
@@ -310,12 +310,12 @@ PR description に以下を明記:
 ```bash
 # follow-up issue を作る例
 gh issue create --title "[follow-up] <feature> を WASM/C++/iOS/Kotlin/Swift に追随" \
-  --body "PR #XXX で Python + Rust + Go + C# に実装済み。 残り 5 runtime に追随必要。"
+  --body "PR #XXX で Python + Rust + Go + C# に実装済み。残りの configured runtime targets に追随必要。"
 ```
 
 ### High (config schema / data 形式 / 互換性破壊)
 
-1. **全 7 runtime + 2 docker を同 PR** が原則
+1. **`RUNTIME_PATHS` の全 target + 2 docker を同 PR** が原則
 2. 不可なら release blocker label を付けて release から外す
 3. `docs/spec/*.toml` の version bump
 4. `docs/migration/` にマイグレーションガイド追加
@@ -335,7 +335,7 @@ gh issue create --title "[follow-up] <feature> を WASM/C++/iOS/Kotlin/Swift に
 
 - 姉妹 skill: [`/check-runtime-parity`](../check-runtime-parity/SKILL.md) — ONNX グラフ I/O 限定
 - 姉妹 skill: [`/check-new-runtime-asset`](../check-new-runtime-asset/SKILL.md) — 新規データファイル 7 箇所配布
-- 姉妹 skill: [`/check-loanword`](../check-loanword/SKILL.md) — ZH-EN loanword 7 mirror 同期
+- 姉妹 skill: [`/check-loanword`](../check-loanword/SKILL.md) — ZH-EN loanword 10 runtime mirror + 8 fixture mirror 同期
 - 姉妹 skill: [`/check-pua`](../check-pua/SKILL.md) — PUA テーブル / fixture / config 整合
 - 仕様: `docs/spec/inference-input-contract.toml`
 - 仕様: `docs/spec/short-text-contract.toml`

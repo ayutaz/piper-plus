@@ -18,13 +18,14 @@
 |------|------|
 | pinyin → IPA 関数 | `split_pinyin()` / `pinyin_to_ipa()` / `normalize_pinyin()` / `apply_tone_sandhi()` |
 | 公開構造体 | `ChinesePhonemizer { dict: ZhDictRef }` |
-| データロード | `serde_json::from_str` / `OnceLock` キャッシュ、`include_str!` 未使用 (実行時ファイル読込) |
-| ZH-EN dispatch | **❌ 未実装 (本 PR で実装)** |
-| `phonemize_embedded_english` | **❌ 未実装** |
-| `_load_loanword_data` | **❌ 未実装** |
-| `zh_en_loanword.json` | **❌ 未同梱** |
+| データロード | `include_str!` + `serde_json` / `OnceLock` cache (両 crate に同梱) |
+| ZH-EN dispatch | **実装済み** (`MultilingualPhonemizer` の隣接セグメント dispatch) |
+| `phonemize_embedded_english` | **実装済み** (lookup priority + prosody 経路) |
+| `_load_loanword_data` 相当 | **実装済み** (`load_default_loanword_data`) |
+| `zh_en_loanword.json` | **同梱済み**。canonical との byte-for-byte gate あり |
 
-**追加 LOC 見込み**: ~400 行 (`phonemize_embedded_english` 実装 + LoanwordData struct + multilingual dispatch)
+以下の工数見積もりと実装手順は Issue #384 着手時の設計記録であり、
+現行実装の未完了作業を表さない。
 
 ## 3. crate 重複問題と実装場所決定
 
@@ -56,7 +57,7 @@ piper-plus-g2p  → 独立 (crates.io 公開)
 | 利用元 | piper-wasm のみ | piper-cli / piper-python / piper-wasm 全て |
 | コールドスタート最適化 (#302) | 未適用 | 適用済 |
 
-**結論**: **両方に実装する必要がある**
+**実装結果**: **両 crate に同等経路を実装済み**。この結論は設計時の記録である。
 
 - **`piper-core/src/phonemize/chinese.rs`**: デスクトップ用 CLI / Python binding が使う、`ProsodyInfo` 統合済 → **ここで主実装**
 - **`piper-plus-g2p/src/chinese.rs`**: WASM ビルド時の経路 → **同等実装をミラー** (将来 v0.5.0 で統合予定だが本 PR では並列維持)
@@ -66,7 +67,7 @@ piper-plus-g2p  → 独立 (crates.io 公開)
 - 実装の core ロジック (lookup priority、token tokenize 等) を 1 つの module 化検討 (例: `piper-plus-g2p::chinese::loanword` を `piper-core` から re-export)
 - ただし `ProsodyInfo` の差で完全 re-export 困難なら、コミット内で同期確認テストを追加
 
-**推奨アプローチ**:
+**採用した実装方針 (設計時の記録)**:
 
 ```text
 1. piper-core/src/phonemize/chinese.rs に embedded_english_phonemize() を主実装
@@ -121,7 +122,7 @@ Err(G2pError::LoanwordSchema { path, section, key })
 // Rust: piper-plus-g2p/tests/test_zh_en_unified.rs
 #[test]
 fn test_zh_en_matrix() {
-    let matrix: Vec<TestCase> = load_fixture(".../zh_en_test_matrix.json");
+    let matrix: Vec<TestCase> = load_fixture(".../zh_en_loanword_matrix.json");
     for case in matrix { run_case(&case); }
 }
 ```

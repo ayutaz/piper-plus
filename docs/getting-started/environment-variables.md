@@ -1,6 +1,6 @@
 # Piper-Plus Environment Variables Reference
 
-This document lists all environment variables that can be used to configure piper-plus's behavior.
+This document covers user-facing dictionary, model, and inference settings. Variables are runtime-specific: setting a variable does not enable a feature in a runtime that does not read it. Docker server and training settings are listed separately below.
 
 ## OpenJTalk Configuration
 
@@ -8,7 +8,7 @@ This document lists all environment variables that can be used to configure pipe
 
 - **Description**: Path to OpenJTalk dictionary directory
 - **Used by**: C++, C#, Go, Rust (dictionary download manager)
-- **Default**: Auto-downloaded to user data directory
+- **Default**: Searched in runtime-specific locations; C++, C# and Rust can auto-download it, while Go requires a local dictionary.
 - **Platform defaults**:
   - Windows: `%APPDATA%\piper-plus\open_jtalk_dic_utf_8-1.11`
   - Linux: `~/.local/share/piper-plus/open_jtalk_dic_utf_8-1.11`
@@ -26,7 +26,7 @@ This document lists all environment variables that can be used to configure pipe
 ### OPENJTALK_DATA_DIR
 
 - **Description**: Override the base directory for OpenJTalk data files
-- **Used by**: C++, C#, Rust (dictionary download manager)
+- **Used by**: C++, Rust (dictionary download manager). C# uses its platform data directory and does not read this override.
 - **Default**: Platform-specific user data directory
 - **Example**:
 
@@ -42,7 +42,7 @@ This document lists all environment variables that can be used to configure pipe
 
 ### PIPER_PLUS_DICTIONARIES_PATH
 
-- **Description**: Path to a directory containing custom dictionary files (JSON v1.0/v2.0 format). Used as a fallback search location when dictionaries are not found next to the model or executable.
+- **Description**: Directory containing G2P data files such as `cmudict_data.json` and Pinyin dictionaries. This is a fallback when phonemization data is not found next to the model or executable; it does not select the JSON v1/v2 custom text-replacement dictionary passed through `--custom-dict`.
 - **Used by**: C++, Go
 - **Search order**: model directory -> executable-relative directory -> `PIPER_PLUS_DICTIONARIES_PATH`
 - **Example**:
@@ -50,6 +50,11 @@ This document lists all environment variables that can be used to configure pipe
   ```bash
   export PIPER_PLUS_DICTIONARIES_PATH=/opt/piper/dictionaries
   ```
+
+### PIPER_PLUS_CUSTOM_DICT_PATH
+
+- **Description**: Directory of custom text-replacement JSON dictionaries, searched after model-relative and executable-relative locations.
+- **Used by**: Go custom dictionary discovery. This is distinct from `PIPER_PLUS_DICTIONARIES_PATH`, which supplies G2P data files such as CMU/Pinyin dictionaries.
 
 ### JPREPROCESS_DICT
 
@@ -102,7 +107,7 @@ This document lists all environment variables that can be used to configure pipe
 
 ### PIPER_PLUS_AUTO_DOWNLOAD_DICT
 
-- **Description**: Control automatic download of OpenJTalk dictionary files
+- **Description**: Control automatic download of OpenJTalk dictionary files in C++, C#, and Rust. Go requires a locally available dictionary.
 - **Values**:
   - `1` (default): Enable automatic download
   - `0`: Disable automatic download
@@ -115,10 +120,10 @@ This document lists all environment variables that can be used to configure pipe
 
 ### PIPER_PLUS_OFFLINE_MODE
 
-- **Description**: Enable offline mode (no network access)
+- **Description**: Disable automatic OpenJTalk dictionary downloads in C++, C#, and Rust. This is not a process-wide network sandbox; model download commands and other components have separate behavior.
 - **Values**:
   - `0` (default): Allow network access
-  - `1`: Offline mode - prevent all downloads
+  - `1`: Prevent automatic dictionary downloads
 - **Example**:
 
   ```bash
@@ -131,7 +136,7 @@ This document lists all environment variables that can be used to configure pipe
 ### PIPER_PLUS_DEFAULT_MODEL
 
 - **Description**: Default ONNX model path, used when `--model` is not specified on the command line
-- **Used by**: Rust, C#
+- **Used by**: C++ CLI, Rust CLI, C# CLI, Go CLI
 - **Default**: None (must be specified via CLI or this variable)
 - **Example**:
 
@@ -146,7 +151,7 @@ This document lists all environment variables that can be used to configure pipe
 ### PIPER_PLUS_DEFAULT_CONFIG
 
 - **Description**: Default model configuration file path (JSON), used when `--config` is not specified on the command line
-- **Used by**: Rust, C#
+- **Used by**: C++ CLI, Rust CLI, C# CLI, Go config resolver
 - **Default**: None (auto-detected from model path if not set)
 - **Example**:
 
@@ -161,11 +166,11 @@ This document lists all environment variables that can be used to configure pipe
 ### PIPER_PLUS_MODEL_DIR
 
 - **Description**: Directory where models are downloaded to, used when `--model-dir` is not specified on the command line
-- **Used by**: Rust, C#
+- **Used by**: C++, Rust, C#, Go model managers and Python training tools. Docker WebUI also uses it for its mounted model directory (default `/models`).
 - **Default**: Platform-specific user data directory
   - Windows: `%APPDATA%\piper-plus\models`
   - Linux: `~/.local/share/piper-plus/models`
-  - macOS: `~/.local/share/piper-plus/models`
+  - macOS: `~/Library/Application Support/piper-plus/models`
 - **Example**:
 
   ```bash
@@ -187,6 +192,7 @@ This document lists all environment variables that can be used to configure pipe
 ### PIPER_PLUS_GPU_DEVICE_ID
 
 - **Description**: GPU device ID to use for CUDA inference
+- **Used by**: C++ CLI and C# CLI/session factory. It selects a device after a compatible provider is enabled; it does not install or activate CUDA.
 - **Default**: `0` (first GPU)
 - **Example**:
 
@@ -198,7 +204,7 @@ This document lists all environment variables that can be used to configure pipe
 ### PIPER_PLUS_DISABLE_WARMUP
 
 - **Description**: Disable ONNX Runtime warmup (dummy inference runs). Accepts `1`, `true`, or `yes` to disable. Default is enabled (warmup runs on startup).
-- **Used by**: Python inference scripts (`infer_onnx.py`, `voice.py`, Docker inference, WebUI)
+- **Used by**: Python inference (`infer_onnx.py`, `voice.py`, Docker inference, WebUI) and C# `SessionFactory`
 - **Use cases**: Reducing startup time in embedded environments, debugging
 - **Example**:
 
@@ -209,7 +215,7 @@ This document lists all environment variables that can be used to configure pipe
 ### PIPER_PLUS_DISABLE_CACHE
 
 - **Description**: Disable ONNX Runtime optimized model cache (`.opt.onnx` files). Accepts `1`, `true`, or `yes` to disable. Default is enabled (cache files are generated).
-- **Used by**: Python inference scripts
+- **Used by**: Python inference scripts and C# `SessionFactory`
 - **Use cases**: Read-only file systems, CI environments, debugging
 - **Example**:
 
@@ -219,13 +225,22 @@ This document lists all environment variables that can be used to configure pipe
 
 ### PIPER_PLUS_INTRA_THREADS
 
-- **Description**: Explicitly set the number of ONNX Runtime intra-op threads. When not set, defaults to `min(logical_cores / 2, 4)`.
-- **Used by**: Python inference scripts
+- **Description**: Explicitly set the number of ONNX Runtime intra-op threads (clamped to 1–4). When not set, uses `min(max(logical_cores // 2, 1), 4)`, respecting process CPU affinity where available.
+- **Used by**: Python inference scripts/API and C# `SessionFactory`
 - **Use cases**: Tuning performance with Docker `--cpus` constraints, manual thread control
 - **Example**:
 
   ```bash
   export PIPER_PLUS_INTRA_THREADS=2
+  ```
+
+### PIPER_PLUS_G2P_PARALLELISM
+
+- **Description**: Control sentence-level G2P workers. `1` forces serial processing; an integer greater than 1 selects that many workers, capped at the number of sentences. Unset or invalid values use automatic CPU-based selection.
+- **Used by**: Python `PiperVoice`, Rust `PiperVoice`, C# `SentenceParallelEncoder`, Go's parallel phonemization helper, and the C++ C API streaming path. This does not control ONNX inference threads.
+
+  ```bash
+  export PIPER_PLUS_G2P_PARALLELISM=1
   ```
 
 ### ONNX_RUNTIME_SHARED_LIBRARY_PATH
@@ -291,10 +306,10 @@ export OPENJTALK_DICTIONARY_PATH=/opt/my-dictionary
 echo "テスト" | piper-plus --model ja_JP-model.onnx --output_file test.wav
 ```
 
-### Offline mode (no downloads)
+### Offline dictionary use
 
 ```bash
-# Must have dictionary files already installed
+# Dictionary and model files must already be installed locally
 export PIPER_PLUS_OFFLINE_MODE=1
 export OPENJTALK_DICTIONARY_PATH=/path/to/existing/dictionary
 echo "オフライン" | piper-plus --model ja_JP-model.onnx --output_file offline.wav
@@ -302,11 +317,18 @@ echo "オフライン" | piper-plus --model ja_JP-model.onnx --output_file offli
 
 ## Precedence Order
 
-Environment variables are checked in the following order:
+Dictionary lookup depends on the runtime. Explicit paths are considered before automatic download, but executable-relative paths, model-relative paths and system locations differ. See the runtime README for its full search order. The general deployment sequence is:
 
-1. User-specified paths (OPENJTALK_DICTIONARY_PATH, etc.)
-2. System-installed locations (/usr/share/*, /usr/local/share/*)
-3. Auto-download to user data directory (if enabled)
+1. Supply a valid explicit dictionary path where supported.
+2. Otherwise let the runtime search its bundled/model/system locations.
+3. C++, C# and Rust can download a missing dictionary when enabled; Go does not automatically download it.
+
+## Server and training settings
+
+- Docker FastAPI server: `PIPER_PLUS_API_KEYS` enables Bearer authentication for the documented synthesis/model routes when set to a comma-separated key list (`/health` and `/api/phoneme-timing` are outside that dependency); rate-limit settings are `PIPER_PLUS_RATE_LIMIT_ENABLED`, `PIPER_PLUS_RATE_LIMIT_SPEECH` and `PIPER_PLUS_RATE_LIMIT_LIGHT`. See [Docker usage](../../docker/README.md) and [Open WebUI integration](../guides/integration/open-webui-integration.md).
+- Docker WebUI: `PIPER_PLUS_MODEL`, `PIPER_PLUS_MODEL_DIR` and `PIPER_PLUS_OUTPUT_DIR` select the model and mounted directories. See [WebUI](../features/webui.md).
+- Training: `PIPER_PLUS_FORCE_CPU_ORT` controls the speaker-encoder ONNX provider and `PIPER_PLUS_DISABLE_SUPER_MAS` disables the optional Super-MAS path. See [training](../guides/training/training-guide.md).
+- `ORT_USE_CUDA` and `ORT_USE_DML` are not piper-plus runtime switches. Select a supported execution provider through the relevant CLI/API and install the matching ONNX Runtime build.
 
 ## Troubleshooting
 

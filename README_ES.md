@@ -9,7 +9,7 @@
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)
 [![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
 
-> **📢 v2.0.0 Cambios incompatibles:** Las imágenes Docker usan CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (driver NVIDIA **R570+** requerido). Entrenamiento: torch **2.11.0** + CUDA 12.8, TF32 + bf16-mixed por defecto; no se admite reanudar checkpoints de torch 2.2. El import de Python / CLI pasa a `piper_plus` / `piper-plus`. Para actualizar desde 1.13.0: `pip install --upgrade "piper-plus==2.0.0"`. Consulte la [guía de migración](docs/migration/v1.12-to-v2.0.md).
+> **📢 v2.0.0 Cambios incompatibles:** Las imágenes Docker usan CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (driver NVIDIA **R570+** requerido). Entrenamiento: torch **2.11.0** + CUDA 12.8, TF32 + bf16-mixed por defecto; no se admite reanudar checkpoints de torch 2.2. El import de Python / CLI pasa a `piper_plus` / `piper-plus`. Para actualizar desde 1.13.0 a la versión pública actual: `pip install --upgrade "piper-plus==2.0.1"`. Consulte la [guía de migración](docs/migration/v1.12-to-v2.0.md).
 
 **Paquetes:**
 
@@ -23,7 +23,7 @@
 
 > **📢 v1.12.0 Cambios incompatibles (2026-05):** Decodificador HiFi-GAN eliminado (unificado a MB-iSTFT, opción `--mb-istft` descontinuada) / Flask → servidor HTTP FastAPI / Dependencia HTS-voice eliminada (solo runtime de Python) / Unity UPM trasladado a repositorio separado (`ayutaz/uPiper`) / todos los proyectos .NET actualizados a `net10.0` LTS. Detalles: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
 
-Sistema de texto a voz (TTS) neuronal, rápido y de alta calidad. Basado en la arquitectura [VITS](https://github.com/jaywalnut310/vits/), soporta síntesis de voz multilingüe y multihablante en 8 idiomas: japonés, inglés, chino, coreano, español, francés, portugués y sueco. Es un fork de [Piper](https://github.com/rhasspy/piper) con mejoras significativas en soporte para japonés, calidad de audio y funcionalidades de entrenamiento.
+Sistema de texto a voz (TTS) neuronal, rápido y de alta calidad. Basado en la arquitectura [VITS](https://github.com/jaywalnut310/vits/), ofrece G2P/fonemización en 8 idiomas y síntesis multihablante con los modelos entrenados actuales en 6 idiomas (japonés, inglés, chino, español, francés y portugués). Es un fork de [Piper](https://github.com/rhasspy/piper) con mejoras significativas en soporte para japonés, calidad de audio y funcionalidades de entrenamiento.
 
 **[Demo en Hugging Face](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** | **[Demo WebAssembly](https://ayutaz.github.io/piper-plus/)** (funciona en el navegador, sin servidor)
 
@@ -47,7 +47,7 @@ Sistema de texto a voz (TTS) neuronal, rápido y de alta calidad. Basado en la a
 
 ### Síntesis de voz
 
-- **8 idiomas** — Japonés, inglés, chino, español, francés, portugués, sueco y coreano (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) *El modelo entrenado cubre 6 idiomas (JA/EN/ZH/ES/FR/PT)*
+- **G2P/fonemización en 8 idiomas** — Japonés, inglés, chino, español, francés, portugués, sueco y coreano (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7). Los modelos entrenados actuales cubren 6 idiomas (JA/EN/ZH/ES/FR/PT)
 - **TTS en japonés** — Integración con OpenJTalk, información prosódica (A1/A2/A3), marcadores de interrogación (#204), variantes contextuales de "n" (#207)
 - **TTS en inglés** — G2P libre de GPL ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), sin necesidad de espeak-ng
 - **Multihablante** — 571 hablantes en el paquete experimental Zero-Shot/FT `zs-v1`, SpeakerBalancedBatchSampler, muestreo equilibrado por grupo de idioma
@@ -71,25 +71,25 @@ Sistema de texto a voz (TTS) neuronal, rápido y de alta calidad. Basado en la a
 - **[C API Biblioteca compartida](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, compatible con FFI (Flutter/Godot/Swift etc.), API de streaming
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Funciona completamente en el navegador, **salida de Phoneme Timing (JSON/TSV/SRT)**, sin servidor
 - **[Docker](docker/README.md)** — 5 imágenes disponibles para inferencia, entrenamiento, WebUI y C++
-- **PyPI** — `pip install piper-plus`, 8 idiomas multilingüe, **salida de Phoneme Timing (JSON/TSV/SRT)**, streaming, **HTTP API basada en FastAPI**
-- **CLI C#** — .NET 10 multiplataforma, 8 idiomas multilingüe, inferencia ONNX, **salida de Phoneme Timing (JSON/TSV/SRT)**
+- **PyPI** — `pip install piper-plus`, G2P/fonemización en 8 idiomas (modelos entrenados actuales: 6 idiomas), **salida de Phoneme Timing (JSON/TSV/SRT)**, streaming, **HTTP API basada en FastAPI**
+- **CLI C#** — .NET 10 multiplataforma, G2P/fonemización en 8 idiomas (modelos entrenados actuales: 6 idiomas), inferencia ONNX, **salida de Phoneme Timing (JSON/TSV/SRT)**
 - **CLI Rust** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML, **salida de Phoneme Timing (JSON/TSV/SRT)**, descarga automática de diccionarios
 - **[CLI Go](src/go/README.md)** — Servidor HTTP API, pooling de sesiones, compatible con Docker, binario único, **salida de Phoneme Timing (JSON/TSV/SRT)**
-- **Voice Cloning (Speaker Encoder + speaker_embedding)** — disponible como capacidad de runtime en los 6 runtimes (Python/Rust/C#/Go/WASM/C++) para entradas `speaker_embedding` precomputadas y compatibles con el modelo. La CLI y la API C++ solo aceptan embeddings precomputados; la extracción mediante `--reference-audio` no está implementada en C++. La inferencia pública de `zs-v1` solo se verificó funcionalmente con Python `piper-plus==2.0.0`.
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — disponible como capacidad de runtime en los 6 runtimes (Python/Rust/C#/Go/WASM/C++) para entradas `speaker_embedding` precomputadas y compatibles con el modelo. La CLI y la API C++ solo aceptan embeddings precomputados; la extracción mediante `--reference-audio` no está implementada en C++. La inferencia pública de `zs-v1` solo se verificó funcionalmente con Python `piper-plus==2.0.0`. El CI público `38189966578` informa inferencia en seis runtimes usando IDs de fonemas compartidos de Python; G2P nativo y calidad de escucha quedaron fuera del alcance, y no hay aprobación de calidad.
 - **Soporte SSML** — `<speak>`, `<break>`, `<prosody rate="...">` disponibles en 4 runtimes (Python/Rust/C#/Go)
 - **Mejora de calidad para textos cortos (Estrategia A/B/C)** — Silence Padding, Dynamic Scales y SSML `<break>` automático en los 6 runtimes
 
 ### Soporte de funcionalidades por runtime
 
-Síntesis multilingüe equivalente en 8 idiomas a través de 6 runtimes (Python/Rust/C#/Go/JS-WASM/C++). Phoneme Timing, streaming (incluyendo división por oraciones), Voice Cloning mediante entradas `speaker_embedding` precomputadas y compatibles con el modelo, y diccionarios personalizados se ofrecen como capacidades de runtime. C++ solo acepta embeddings precomputados y `--reference-audio` no está implementado. La inferencia pública de `zs-v1` solo se verificó con Python `piper-plus==2.0.0`; esto no afirma una verificación en otros runtimes. SSML es compatible con 4 runtimes (Python/Rust/C#/Go) y la API HTTP con 2 runtimes (Python/Go).
+Síntesis con modelos entrenados actuales en 6 idiomas a través de 6 runtimes (Python/Rust/C#/Go/JS-WASM/C++), con G2P/fonemización en 8 idiomas. Phoneme Timing, streaming (incluyendo división por oraciones), Voice Cloning mediante entradas `speaker_embedding` precomputadas y compatibles con el modelo, y diccionarios personalizados se ofrecen como capacidades de runtime. C++ solo acepta embeddings precomputados y `--reference-audio` no está implementado. La inferencia pública de `zs-v1` se verificó con Python `piper-plus==2.0.0`; el CI `38189966578` informa por separado inferencia en seis runtimes con IDs de fonemas Python compartidos. G2P nativo y calidad de escucha quedaron fuera del alcance, sin aprobación de calidad. SSML es compatible con 4 runtimes (Python/Rust/C#/Go) y la API HTTP con 2 runtimes (Python/Go).
 
 ### Plataformas
 
 | Plataforma | Arquitectura | Notas |
 |---|---|---|
-| Linux | x86_64 / ARM64 / ARMv7 | Soporte completo |
+| Linux | x86_64 / ARM64 / ARMv7 | Artefactos C++ v2.0.1 disponibles; ARM64 requiere glibc 2.38. La corrección compatible con glibc 2.31 está en dev/source |
 | macOS | ARM64 (Apple Silicon) únicamente | M1/M2/M3+ |
-| Windows | x64 | Soporte completo |
+| Windows | x64 | Artefactos C++ x64; CLI C# también x64 / arm64 |
 | C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | Biblioteca compartida, Android AAR |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 10, Linux/macOS/Windows |
@@ -135,7 +135,7 @@ cd piper-plus
 
 **Linux (ARM64, Raspberry Pi 4/5):**
 
-**Corrección ARM64 aún no publicada:** las compilaciones requieren glibc 2.31 o posterior. El inicio y la síntesis en japonés se verificaron bajo QEMU con Debian Bullseye / Bookworm / Trixie de 64 bits. El hardware Raspberry Pi y Raspberry Pi OS siguen sin probarse. El archivo de la versión v2.0.1 no incluye esta corrección.
+**Compatibilidad ARM64:** el artefacto C++ Linux ARM64 de v2.0.1 requiere glibc 2.38 o posterior. La corrección compatible con glibc 2.31 está en dev/source; el inicio y la síntesis en japonés se verificaron bajo QEMU con Debian Bullseye / Bookworm / Trixie de 64 bits. El hardware Raspberry Pi y Raspberry Pi OS siguen sin probarse. Compile dev/source si necesita compatibilidad glibc más amplia.
 
 ```bash
 curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
@@ -312,7 +312,7 @@ dotnet add package PiperPlus.Core
 
 ```toml
 [dependencies]
-piper-plus = "0.4"
+piper-plus = "0.5"
 ```
 
 ### Compilar desde fuente (C++)
@@ -401,7 +401,7 @@ piper-plus-cli --model model.onnx --text "hello" --language en --quiet
 piper-plus-cli --model model.onnx --text "hello" --language en --output-raw | aplay -r 22050 -f S16_LE
 ```
 
-> **Nota:** El CLI C# se instala con `dotnet tool install -g PiperPlus.Cli` y el CLI Rust con `cargo install piper-plus-cli`. Ambos soportan 8 idiomas, diccionarios personalizados y streaming.
+> **Nota:** El CLI C# se instala con `dotnet tool install -g PiperPlus.Cli` y el CLI Rust con `cargo install piper-plus-cli`. Ambos ofrecen G2P/fonemización en 8 idiomas; los modelos entrenados actuales cubren 6 idiomas, además de diccionarios personalizados y streaming.
 
 ### Compilar desde fuente (Rust)
 
@@ -714,7 +714,7 @@ xattr -cr piper/
 
 ### Windows
 
-Se admiten x64 y arm64. El diccionario de OpenJTalk se descarga automáticamente en el primer arranque. Consulta la [guía de configuración de Windows](docs/getting-started/windows-setup.md) para más detalles.
+Los artefactos C++ publicados son x64; la CLI C# también ofrece x64 / arm64. El diccionario de OpenJTalk se descarga automáticamente en el primer arranque. Consulta la [guía de configuración de Windows](docs/getting-started/windows-setup.md) para más detalles.
 
 ```cmd
 piper-plus.exe --model en_US-lessac-medium.onnx -f output.wav

@@ -6,7 +6,7 @@ piper-plus の新言語実装を徹底的にレビューするスキルです。
 
 - Python テストは `uv run python -m pytest` で実行
 - 10エージェント並列でレビュー実施
-- 全プラットフォーム (Python/Rust/C++/C#/JS) を検証
+- 実装済みの全ターゲット (Python/Rust/C++/C#/JS-WASM) を検証し、Kotlin/Swift G2P の mirror が存在する場合は併せて確認
 
 ---
 
@@ -32,7 +32,7 @@ piper-plus の新言語実装を徹底的にレビューするスキルです。
 - `src/python/piper_train/phonemize/multilingual_id_map.py` — LANGUAGE_PHONEMES
 - config.json 生成パス (phoneme_id_map, language_id_map, num_languages)
 
-#### Agent 3: PUA 整合性 (全5プラットフォーム)
+#### Agent 3: PUA 整合性 (実装済み全ターゲット + Kotlin/Swift mirror)
 
 - Python `token_mapper.py` — FIXED_PUA_MAPPING、_PUA_START
 - Rust `token_map.rs` — FIXED_PUA_MAP、PUA カウントテスト

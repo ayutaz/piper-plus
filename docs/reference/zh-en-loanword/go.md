@@ -9,8 +9,8 @@
 | Phonemizer | `src/go/phonemize/chinese.go` (662 行) |
 | Multilingual | `src/go/phonemize/multilingual.go` + `unicode_detect.go` |
 | 辞書データ | `src/go/phonemize/data/zh_en_loanword.json` |
-| Loanword 実装 | `src/go/phonemize/loanword.go` (新規) |
-| テスト | `src/go/phonemize/chinese_test.go` (25+ 関数、500+ ケース、golden test あり) |
+| Loanword 実装 | `src/go/phonemize/chinese_loanword.go` (bundled `embed.FS` + loader) |
+| テスト | `src/go/phonemize/chinese_loanword_test.go` + `testdata/zh_en_loanword_matrix.json` |
 
 ## 2. 現状調査
 
@@ -18,12 +18,12 @@
 |------|------|
 | pinyin → IPA 関数 | `zhSplitPinyin()` / `zhPinyinToIPA()` / `zhNormalizePinyin()` / `zhApplyToneSandhi()` |
 | 公開関数 | `NewChinesePhonemizer(...)`, `PhonemizeWithProsody(...)` |
-| データロード | embed なし、`map[rune]string` をプログラム的に注入 |
+| データロード | `//go:embed data/zh_en_loanword.json` + `sync.Once` cache |
 | Multilingual | `SegmentText` 完備 |
-| ZH-EN dispatch | **❌ 未実装 (本 PR で実装)** |
-| 関連実装 | **❌ 全て未実装** |
+| ZH-EN dispatch | **実装済み** (`MultilingualPhonemizer` の隣接セグメント dispatch) |
+| 関連実装 | **実装済み**。共有 fixture と schema/lookup tests を含む |
 
-**追加 LOC 見込み**: ~300 行 (新規 `chinese_loanword.go` + `multilingual.go` 拡張)
+以下の `//go:embed` スケッチと設計表は実装時の記録であり、追加作業の要求ではない。
 
 ## 3. `//go:embed` + JSON tag 戦略
 
@@ -147,4 +147,4 @@ package-level `sync.Once` + global var、immutable design で各 instance が参
 
 ## 8. カバレッジ
 
-`go test -coverprofile` 経由で 80%+ 目標 (CI 新規追加が必要)。
+`go test -coverprofile` 経由で 80%+ を目標にする将来の CI 拡張案。
