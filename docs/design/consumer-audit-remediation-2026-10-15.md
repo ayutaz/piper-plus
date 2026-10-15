@@ -55,3 +55,22 @@ Go の公開 base SSML 試験は辞書不足による letter-by-letter fallback 
 Rust の公開 base native Spanish 試験は外部辞書不足により H の音素解決で失敗したため、成功例には数えていない。日本語の bundled G2P で SSML→WAV を確認した。監査で範囲外とした全言語 native G2P の品質承認へ拡張したものではない。
 
 ローカルの追加成果物と probe は ignored directory `output/consumer-audit-fixed/` に保存した。公開モデルや研究データの上書き・削除はしていない。
+
+## 2026-10-16: PR #800 のマージ前確認
+
+上記は初回 push 前の検証記録である。PR の実 CI では Rust Python binding の
+`SynthesisParams` 初期化 2 箇所に追加フィールドの追随漏れがあり、workspace の check /
+test / wheel build が失敗した。両箇所を `..Default::default()` で補完した。
+doctest workflow も CPU provider の明示インストールへ更新した。
+ARM64 multilingual workflow の `binfmt:latest` では Bullseye の libc-bin 設定中に
+QEMU が signal 11 で停止したため、既存の 3 OS compatibility workflow と同じ
+QEMU image digest に固定した。変更後のリモート CI 成功は別途確認が必要である。
+
+依存ライセンス検査では新しい WebUI lock の `g2p-en -> distance==0.1.3` が検出された。
+この依存は既存の root lock / runtime requirements にも存在するが、
+[Distance 0.1.3 の PyPI metadata](https://pypi.org/project/Distance/0.1.3/) は GPL と明示しており、
+`CONTRIBUTING.md` の runtime 依存ポリシーと一致しない。
+実際の依存を除去・置換する対応が必要であり、許可リストへの追加で検査を通していない。
+同じ検査には audioop-lts / protobuf / regex のライセンス式に対する指摘もある。
+外部 corpus URL の timeout による link-check 失敗は再実行して切り分ける。
+この時点で PR はマージ可能な確認を完了していない。
