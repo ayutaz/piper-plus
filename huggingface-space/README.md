@@ -31,7 +31,7 @@ A web-based demo for [piper-plus](https://github.com/ayutaz/piper-plus), featuri
 | Code | Language | Script | Phonemizer | In demo model |
 |------|----------|--------|------------|---------------|
 | `ja` | Japanese | Hiragana/Katakana/Kanji | pyopenjtalk | ✅ |
-| `en` | English | Latin | g2p-en | ✅ |
+| `en` | English | Latin | Bundled `g2p-en` 2.1.0 source | ✅ |
 | `zh` | Chinese (Mandarin) | Simplified Chinese | pypinyin | ✅ |
 | `ko` | Korean | Hangul | g2pk2 | ❌ (G2P only — model not trained yet) |
 | `es` | Spanish | Latin | Rule-based | ✅ |
@@ -77,7 +77,7 @@ The multilingual model supports code-switching within a single utterance. The la
 - **Framework**: ONNX Runtime (CPU inference)
 - **Phonemization**:
   - Japanese: pyopenjtalk (OpenJTalk-based)
-  - English: g2p-en (Apache-2.0, espeak-ng compatible)
+  - English: bundled `g2p-en` 2.1.0 source (Apache-2.0 + Tacotron MIT; no external `g2p-en` or `Distance` package)
   - Chinese: pypinyin (MIT)
   - Spanish / French / Portuguese: Rule-based (no external dependency)
 - **Language Detection**: Unicode range-based automatic detection
@@ -112,7 +112,7 @@ real fixture was found or a dummy fallback was created before evaluating audio.
 - Piper TTS by [Rhasspy](https://github.com/rhasspy/piper)
 - Multilingual (6-language) enhancements by [ayutaz](https://github.com/ayutaz/piper-plus)
 - Chinese phonemization: [pypinyin](https://github.com/mozillazg/python-pinyin) (MIT)
-- English G2P: [g2p-en](https://github.com/Kyubyong/g2p) (Apache-2.0)
+- English G2P source: [g2p-en](https://github.com/Kyubyong/g2p) 2.1.0, bundled under a private namespace with Apache-2.0 and Tacotron MIT notices
 
 ## License
 

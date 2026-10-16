@@ -48,7 +48,7 @@ Système de synthèse vocale neuronale (TTS) rapide et de haute qualité. Basé 
 ### Synthèse vocale
 
 - **TTS japonais** — Intégration OpenJTalk, caractéristiques prosodiques (A1/A2/A3), marqueurs interrogatifs (#204), variantes contextuelles du "N" (#207)
-- **TTS anglais** — G2P sans GPL ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), pas de dépendance à espeak-ng
+- **TTS anglais** — Cet arbre de développement/source inclut un G2P basé sur [g2p-en](https://github.com/Kyubyong/g2p), avec le code d’inférence Apache-2.0 et la notice MIT de Tacotron ; à l’exécution, aucune dépendance externe à `g2p-en`/`Distance` ni à espeak-ng. Le wheel public PyPI 2.0.1 reste inchangé et utilise toujours l’ancienne dépendance externe ; voir le [guide de migration](docs/migration/python-g2p-license.md)
 - **G2P/phonémisation en 8 langues** — Japonais, anglais, chinois mandarin, espagnol, français, portugais, suédois, coréen (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7). Les modèles entraînés actuels couvrent 6 langues (JA/EN/ZH/ES/FR/PT)
 - **Multi-locuteurs** — 571 locuteurs dans le bundle expérimental Zero-Shot/FT `zs-v1`, SpeakerBalancedBatchSampler
 - **Dictionnaire personnalisé** — 200+ termes techniques intégrés

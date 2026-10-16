@@ -353,7 +353,7 @@ docker run -d --gpus all \
 | 対応言語 | モデル依存 | 6 言語 (ja, en, zh, es, fr, pt) |
 | 言語指定 | テキストから自動検出 (モデル依存) | `language` パラメータで明示指定 |
 | voice マッピング | 設定ファイルで voice 名 -> モデルをマッピング | `voice` フィールドは無視 (`speaker_id` で話者を指定) |
-| バックエンド | piper (espeak-ng依存), Coqui TTS 等 | piper-plus (espeak-ng 不使用、GPL-free) |
+| バックエンド | piper (espeak-ng依存), Coqui TTS 等 | piper-plus (英語G2Pを同梱、外部 `g2p-en` / `Distance` 不要) |
 | ライセンス | AGPL-3.0 | MIT |
 | 状態 | アーカイブ済み | 活発に開発中 |
 

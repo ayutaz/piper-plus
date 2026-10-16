@@ -47,7 +47,7 @@
 
 - **8语言 G2P/音素化** — 日语、英语、普通话、西班牙语、法语、葡萄牙语、瑞典语、韩语 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7)。当前训练模型覆盖6种语言 (JA/EN/ZH/ES/FR/PT)
 - **日语 TTS** — OpenJTalk 集成、韵律特征 (A1/A2/A3)、疑问标记 (#204)、上下文相关「ん」变体 (#207)
-- **英语 TTS** — 无 GPL 依赖的 G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0)，无需 espeak-ng
+- **英语 TTS** — 此开发/源代码树内置基于 [g2p-en](https://github.com/Kyubyong/g2p) 的 G2P，包含 Apache-2.0 推理代码及 Tacotron MIT 许可声明；运行时不需要外部 `g2p-en`/`Distance` 或 espeak-ng。当前公开的 PyPI 2.0.1 wheel 未改变，仍使用原有外部依赖；请参阅[迁移指南](docs/migration/python-g2p-license.md)
 - **多说话人** — 实验性 Zero-Shot/FT bundle `zs-v1` 包含571位说话人，SpeakerBalancedBatchSampler，语言均衡采样自动启用
 - **自定义词典** — 内置 200+ 技术术语发音词典
 - **音素输入** — 使用 `[[ phonemes ]]` 标记直接指定音素 — [指南](docs/features/phoneme-input.md)

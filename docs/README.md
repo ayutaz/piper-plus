@@ -86,7 +86,7 @@ Linux ARM64 の glibc 2.31 互換修正は `dev` に入り、Debian Bullseye／B
 
 ## Migration
 
-- [Python 英語G2Pのライセンス対応](migration/python-g2p-license.md) — Distance依存を除去したソース版への移行、既存配布物との差
+- [Python 英語G2Pのライセンス対応](migration/python-g2p-license.md) — Distance依存を除去したソース版への移行、学習側のローカルG2P導入境界、既存配布物との差
 - [開発版 Python provider / WebUI 環境](migration/provider-environments.md) — CPU/GPU extra の選択、UI と学習環境の分離
 - [v1.11 → v1.12](migration/v1.11-to-v1.12.md) — HiFi-GAN/Flask/HTS-voice 削除など
 - [v1.12 → v2.0](migration/v1.12-to-v2.0.md) — Python 3.13 + CUDA 12.8 + Ubuntu 24.04 統一、 TF32 / bf16-mixed Template default、 旧 ckpt resume 非サポート

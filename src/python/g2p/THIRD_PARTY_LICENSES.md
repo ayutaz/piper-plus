@@ -6,7 +6,8 @@ dependencies, grouped by optionality.
 ## Core (no external dependencies)
 
 piper-plus-g2p core has zero required runtime dependencies. Languages ES, FR,
-PT, SV, and KO are fully rule-based and need no external packages.
+PT, and SV are fully rule-based and need no external packages. Korean support
+is optional and uses `g2pk2` when that extra is installed.
 
 ## Optional: Japanese (`pip install piper-plus-g2p[ja]`)
 
@@ -28,7 +29,9 @@ PT, SV, and KO are fully rule-based and need no external packages.
 
 The upstream `g2p-en` PyPI distribution declares unused GPL `Distance`.
 This source bundles only the reviewed inference files, with original
-Apache-2.0 and MIT notices, and does not install either distribution.
+Apache-2.0 and MIT notices, and does not install either the external `g2p-en`
+or `Distance` distribution. The vendored code is private implementation detail;
+use `get_phonemizer("en")` rather than importing it directly.
 The original wheel hash, per-file hashes and the raw-regex-literal patch are
 recorded in `_vendor/g2p_en/provenance.json` / `NOTICE.txt` and verified by
 `scripts/check_bundled_english.py` in the repository. NLTK `cmudict` and tagger

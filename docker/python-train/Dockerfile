@@ -87,7 +87,8 @@ RUN uv pip install \
 COPY src/python /tmp/src/python
 COPY VERSION /tmp/VERSION
 
-# Install piper_plus_g2p (standalone G2P package, not on PyPI)
+# Install the G2P package from this checkout before piper-train so the
+# training image uses its bundled English backend rather than an older wheel.
 RUN uv pip install "/tmp/src/python/g2p"
 
 # Install piper_train with training extras
@@ -150,7 +151,7 @@ RUN mkdir -p /workspace/datasets /workspace/checkpoints /workspace/logs
 # Expose ports for tensorboard and jupyter
 EXPOSE 6006 8888
 
-# Download NLTK data required by g2p-en (English phonemizer)
+# Download NLTK data required by the bundled English phonemizer
 # Use a shared path so data is accessible after USER switch to non-root
 ENV NLTK_DATA=/usr/share/nltk_data
 RUN python -c "import nltk; nltk.download('averaged_perceptron_tagger', download_dir='/usr/share/nltk_data'); nltk.download('averaged_perceptron_tagger_eng', download_dir='/usr/share/nltk_data'); nltk.download('cmudict', download_dir='/usr/share/nltk_data')"

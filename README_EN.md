@@ -75,7 +75,7 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 
 - **8-Language G2P/phonemization** — Japanese, English, Mandarin Chinese, Spanish, French, Portuguese, Swedish, Korean (language codes: ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7). Current trained models cover 6 languages (JA/EN/ZH/ES/FR/PT)
 - **Japanese TTS** — OpenJTalk integration, prosody features (A1/A2/A3), question markers (#204), context-dependent "N" variants (#207)
-- **English TTS** — GPL-free G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), no espeak-ng dependency
+- **English TTS** — This dev/source tree bundles English G2P based on [g2p-en](https://github.com/Kyubyong/g2p), with the upstream Apache-2.0 inference code and Tacotron MIT notice; its runtime has no external `g2p-en`/`Distance` or espeak-ng dependency. The current public PyPI 2.0.1 wheel is unchanged and still uses the previous external dependency; see the [migration guide](docs/migration/python-g2p-license.md)
 - **Multi-speaker** — 571 speakers in 6-language base model (code supports 8 languages including Swedish and Korean), SpeakerBalancedBatchSampler with language-balanced sampling
 - **Custom Dictionary** — 200+ built-in technical term pronunciations
 - **Phoneme Input** — Direct phoneme specification with `[[ phonemes ]]` notation — [Guide](docs/features/phoneme-input.md)

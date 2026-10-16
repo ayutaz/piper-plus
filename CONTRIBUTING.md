@@ -197,6 +197,12 @@ inference does not use it. Verify source/data hashes with
 with `scripts/check_python_licenses.py`. The cross-platform wheel consumer CI
 builds wheels from sdists and checks their installed dependency closure.
 
+When vendoring a permissively licensed implementation, keep the upstream
+copyright and license text beside the copied code, record the source revision
+and file hashes, and restrict the bundle to the files that are actually used.
+Do not expose the private vendor namespace as a supported API. Update the
+corresponding third-party notice and provenance check in the same change.
+
 Package-specific scanner corrections for `audioop-lts` (PSF-2.0), `protobuf`
 (BSD-3-Clause) and `regex` (Apache-2.0 AND CNRI-Python) are documented in the
 [archive review](docs/design/python-g2p-license-2026-10-16.md). They do not

@@ -28,7 +28,7 @@ piper-plus の Docker 環境一式です。Python 推論 (CUDA / CPU)・学習�
 全てのビルドコマンドは **プロジェクトルートディレクトリ** から実行してください。
 
 ```bash
-# Python 推論 (CPU, GPL-free)
+# Python 推論 (GPU/CPU)
 docker build -t piper-inference -f docker/python-inference/Dockerfile .
 
 # Python 学習 (GPU)
@@ -150,7 +150,10 @@ response.stream_to_file("output.wav")
 
 ## Python 学習
 
-NVIDIA GPU を使用してモデルを学習するためのイメージです。`src/python/pyproject.toml` の `[train]` extras でインストールされます。Multi-stage ビルドによりランタイムイメージのサイズを削減しています。
+NVIDIA GPU を使用してモデルを学習するためのイメージです。ビルド時に
+`piper-plus-g2p` をソースから導入し、その後 `src/python/pyproject.toml` の
+`[train]` extras で `piper_train` をインストールします。Multi-stage ビルドに
+よりランタイムイメージのサイズを削減しています。
 
 ### ビルド
 

@@ -81,7 +81,7 @@ Python / Rust / Go / C# / C++ / WASM の 6 ランタイムを `multilingual-test
 
 - **8言語G2P/音素化対応** — 日本語・英語・中国語・スペイン語・フランス語・ポルトガル語・スウェーデン語・韓国語 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7)。現行の学習済みモデルは6言語 (JA/EN/ZH/ES/FR/PT)
 - **日本語 TTS** — OpenJTalk統合、韻律情報 (A1/A2/A3)、疑問詞マーカー (#204)、文脈依存「ん」バリアント (#207)
-- **英語 TTS** — GPL-free G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0)、espeak-ng 不要
+- **英語 TTS** — この dev/source には [g2p-en](https://github.com/Kyubyong/g2p) を元にした G2P を Apache-2.0 の推論コードと Tacotron の MIT 許諾表示付きで同梱しています。実行時に外部の `g2p-en` / `Distance` や espeak-ng は不要です。現在公開中の PyPI 2.0.1 wheel は変更されず、従来の外部依存を使用します。詳細は[移行ガイド](docs/migration/python-g2p-license.md)を参照してください
 - **マルチスピーカー** — 571話者対応 (学習用ベースモデル)、SpeakerBalancedBatchSampler、言語グループ均等サンプリング
 - **カスタム辞書** — 200+技術用語の発音辞書内蔵
 - **音素入力** — `[[ phonemes ]]` 記法による直接指定 — [ガイド](docs/features/phoneme-input.md)

@@ -71,7 +71,27 @@ python scripts/check_bundled_english.py
 
 runtime requirements、G2P `en` / `all` extra、root / training pyproject、
 root / WebUI / 独立G2Pのlockfile、CIの直接install、HF Spaceを更新します。
-必要なNumPy・NLTK・joblib・inflectは明示依存として残します。
+対応するlockfileは `uv.lock`、`environments/webui/uv.lock`、
+`src/python/g2p/uv.lock` の3つです。必要なNumPy・NLTK・joblib・inflectは明示依存として残します。
+
+学習パッケージのメタデータは依存名として `piper-plus-g2p` を宣言します。
+チェックアウト外で `pip install src/python` だけを実行すると、pipはuv workspaceの
+ローカル参照を使わず、公開済みPyPI版の `piper-plus-g2p` を解決する可能性があります。
+ソース版の修正を含めるには、チェックアウトのルートで下記のworkspaceコマンドを使うか、
+2つのローカルwheelを同じ環境へ導入してください。runtimeの `piper-plus` は独自の
+vendor backendを持つため、G2P wheelとの同時導入は必要ありません。
+
+```bash
+# checkout root
+uv sync --locked --package piper-train --extra train
+
+# pip/uvでworkspaceを使わない場合は、G2Pとtrainingのwheelを同じ成果物から入れる
+uv build --package piper-plus-g2p --out-dir dist/local
+uv build --package piper-train --out-dir dist/local
+uv pip install dist/local/piper_plus_g2p-*.whl dist/local/piper_train-*.whl
+# 導入済みのローカルwheelにextraを追加する（--upgradeは付けない）
+uv pip install "piper-plus-g2p[all]" "piper-train[train]"
+```
 
 別途、既存のライセンスCIで次のscanner判定が見つかりました。
 対象版のPyPIソースアーカイブと許諾文を確認し、既存の方針に合わせて
@@ -107,6 +127,8 @@ wheel再ビルド時に0.0.0へ変わる問題も確認しました。`setup.py`
 
 新しい `python-license.yml` はLinux・Windows・macOS、Python 3.11/3.13の
 6環境で導入・依存監査・28例の比較を行い、Linux/Python 3.13で実モデル検査を行います。
+既存の `g2p-python-ci.yml` はLinux・macOS・WindowsとPython 3.11/3.12/3.13の
+9環境でG2Pテストを実行し、別ジョブでlint・mypy・配布物ビルドとextras smoke testを行います。
 GPUとWebUIは `consumer-contracts.yml` の専用環境で依存監査を行います。
 新規の推移依存にも監査を適用し、宣言されたGPL/LGPL/AGPL、ライセンス情報欠落、
 依存不足、旧 `g2p-en` / `Distance` の残存を失敗にします。

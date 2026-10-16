@@ -453,11 +453,14 @@ jobs:
       - name: English phonemizer test
         run: |
           docker run --rm piper-python-train:test python -c "
-          from piper_plus._vendor.g2p_en import G2p
+          import importlib.metadata
+          from piper_plus_g2p._vendor.g2p_en import G2p
+          installed = {d.metadata['Name'].lower().replace('_', '-') for d in importlib.metadata.distributions()}
+          assert not installed.intersection({'distance', 'g2p-en'}), 'Old English dependencies are installed'
           g2p = G2p()
           result = g2p('Hello world')
-          assert result, 'g2p-en returned empty result'
-          print(f'g2p-en output: {result}')
+          assert result == ['HH', 'AH0', 'L', 'OW1', ' ', 'W', 'ER1', 'L', 'D'], result
+          print(f'Bundled English G2P output: {result}')
           print('English phonemizer test passed')
           "
 

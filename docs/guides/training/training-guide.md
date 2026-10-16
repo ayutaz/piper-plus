@@ -76,6 +76,14 @@ cd piper-plus
 uv sync
 ```
 
+The `docker/python-train` image installs the local `src/python/g2p` package
+before installing `src/python[train]`, so training-side G2P utilities use the
+bundled English backend from the same checkout. The default English
+preprocessing path remains espeak-ng based, as described below. This image provides the
+`piper_train` training tools; it does not install the separate `piper_plus`
+runtime package. Use the runtime package instructions when running inference
+outside the training image.
+
 Run the `build_monotonic_align.sh` script in the `src/python` directory to build the extension.
 
 Install [espeak-ng](https://github.com/espeak-ng/espeak-ng/) when using the legacy
@@ -83,8 +91,12 @@ Install [espeak-ng](https://github.com/espeak-ng/espeak-ng/) when using the lega
 for macOS x86_64 with CPython 3.11/3.12; it has no Linux/Windows/Apple Silicon
 or CPython 3.13 wheel. The current piper-plus G2P path does not require
 `piper-phonemize`. Japanese uses pyopenjtalk, and the multilingual G2P path is
-selected by the language/preprocessing tools. At inference time `g2p-en` can
-phonemize English without espeak-ng.
+selected by the language/preprocessing tools. At inference time the bundled
+English G2P backend (the `g2p-en` 2.1.0 source, with its Apache-2.0 and
+Tacotron MIT notices) can phonemize English without espeak-ng. This development
+checkout does not install the external `g2p-en` or `Distance` packages; existing
+PyPI releases retain their old metadata. See the
+[migration guide](../../migration/python-g2p-license.md).
 
 
 ## Preparing a Dataset
@@ -178,7 +190,7 @@ uv run python -m piper_train.preprocess \
   --sample-rate 22050
 ```
 
-The `--language` argument refers to an [espeak-ng voice](https://github.com/espeak-ng/espeak-ng/) for preprocessing (e.g. `en-us` for English, `de` for German). Japanese (`ja`) is special-cased to use pyopenjtalk instead of espeak-ng. Note: the GPL-free g2p-en backend is available at inference time (`infer_onnx --language en`) but is not yet integrated into the preprocessing pipeline.
+For the single-language legacy example above, `--language` refers to an [espeak-ng voice](https://github.com/espeak-ng/espeak-ng/) (e.g. `en-us` for English, `de` for German). Japanese (`ja`) is special-cased to use pyopenjtalk. The bundled English backend is used at inference time (`infer_onnx --language en`) and in bilingual/multilingual preprocessing such as `--language ja-en` or `--language ja-en-zh`; it does not replace the espeak-ng backend in the legacy example.
 
 To pre-process a multi-speaker dataset, remove the `--single-speaker` flag and ensure that your dataset has the 3 columns: `id|speaker|text`
 Verify the number of speakers in the generated `config.json` file before proceeding.
@@ -502,7 +514,7 @@ Piper supports multilingual pretraining with up to 8 languages: Japanese (ja), E
 | Language | Code | Phonemizer | Dependency |
 |----------|------|------------|------------|
 | Japanese | ja | JapanesePhonemizer | pyopenjtalk |
-| English | en | EnglishPhonemizer | g2p-en (Apache-2.0) |
+| English | en | EnglishPhonemizer | Bundled `g2p-en` 2.1.0 source (Apache-2.0 + Tacotron MIT; no external `g2p-en`/`Distance`) |
 | Chinese | zh | ChinesePhonemizer | pypinyin (MIT) |
 | Spanish | es | SpanishPhonemizer | Rule-based (no dependency) |
 | French | fr | FrenchPhonemizer | Rule-based (no dependency) |

@@ -47,7 +47,7 @@ Sistema neural de texto para fala (TTS) de alta velocidade e alta qualidade. Uti
 
 - **G2P/fonemização em 8 idiomas** — Japonês, inglês, chinês, espanhol, francês, português, sueco e coreano (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7). Os modelos treinados atuais cobrem 6 idiomas (JA/EN/ZH/ES/FR/PT)
 - **TTS em japonês** — Integração com OpenJTalk, informações prosódicas (A1/A2/A3), marcadores de interrogação (#204), variantes contextuais de "ん" (#207)
-- **TTS em inglês** — G2P livre de GPL ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), sem necessidade de espeak-ng
+- **TTS em inglês** — Esta árvore de desenvolvimento/fonte inclui um G2P baseado em [g2p-en](https://github.com/Kyubyong/g2p), com o código de inferência Apache-2.0 e o aviso MIT do Tacotron; em execução não requer `g2p-en`/`Distance` externos nem espeak-ng. O wheel público atual do PyPI 2.0.1 permanece inalterado e continua usando a dependência externa anterior; consulte o [guia de migração](docs/migration/python-g2p-license.md)
 - **Multi-falante** — 571 falantes no bundle experimental Zero-Shot/FT `zs-v1`, SpeakerBalancedBatchSampler, amostragem balanceada por grupo linguístico
 - **Dicionário personalizado** — Dicionário de pronúncia integrado com mais de 200 termos técnicos
 - **Entrada de fonemas** — Especificação direta com notação `[[ fonemas ]]` — [Guia](docs/features/phoneme-input.md)
