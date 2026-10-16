@@ -6,6 +6,7 @@ import argparse
 import os
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 
@@ -33,6 +34,22 @@ def main() -> None:
         run("uv", "build", "--package", package, "--out-dir", wheels)
     runtime = next(wheels.glob("piper_plus-*.whl"))
     g2p = next(wheels.glob("piper_plus_g2p-*.whl"))
+    g2p_version = tomllib.loads(
+        (ROOT / "src/python/g2p/pyproject.toml").read_text(encoding="utf-8")
+    )["project"]["version"]
+    for wheel, name, version in (
+        (runtime, "piper-plus", (ROOT / "VERSION").read_text().strip()),
+        (g2p, "piper-plus-g2p", g2p_version),
+    ):
+        run(
+            sys.executable,
+            ROOT / "scripts/check_python_release_wheel.py",
+            "--name",
+            name,
+            "--version",
+            version,
+            wheel,
+        )
     run("uv", "venv", "--python", sys.executable, env)
     python = env / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     run(

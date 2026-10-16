@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The Python/native release line is prepared as **2.0.2**, and the independent
+Python G2P package as **0.3.1**. These versions have not been published.
+See the [Python release checklist](docs/guides/development/python-release-2.0.2.md).
+
 ### Added
 
 - Add a single-speaker fine-tuning dataset preparation helper that preserves the base model's phoneme and language IDs, validates cache paths, and rejects unsupported tokens and existing output directories.

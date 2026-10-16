@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-05-19T00:00:00Z",
+  "generated_at": "2026-10-16T04:15:13Z",
   "totals": {
-    "executable": 227,
+    "executable": 228,
     "needs_placeholder": 7,
     "skip_warranted": 233,
-    "total": 467
+    "total": 468
   },
   "by_language": {
     "bash": {
-      "executable": 166,
+      "executable": 167,
       "needs_placeholder": 7,
       "skip_warranted": 44
     },
@@ -2023,6 +2023,19 @@
       "directives_detected": [],
       "env_dependencies": [],
       "hash_sha1": "bcf77d6f031132a1a1f7c434339e9449f279f2d4"
+    },
+    {
+      "file": "docs/guides/development/python-release-2.0.2.md",
+      "line_start": 31,
+      "line_end": 36,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "88077034134ba6059bafb3d02909f1ef903f795d"
     },
     {
       "file": "docs/guides/integration/home-assistant.md",
@@ -4617,8 +4630,8 @@
     },
     {
       "file": "docs/migration/python-g2p-license.md",
-      "line_start": 26,
-      "line_end": 37,
+      "line_start": 28,
+      "line_end": 39,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -4630,8 +4643,8 @@
     },
     {
       "file": "docs/migration/python-g2p-license.md",
-      "line_start": 50,
-      "line_end": 56,
+      "line_start": 52,
+      "line_end": 58,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -4643,8 +4656,8 @@
     },
     {
       "file": "docs/migration/python-g2p-license.md",
-      "line_start": 67,
-      "line_end": 71,
+      "line_start": 69,
+      "line_end": 73,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",

@@ -10,6 +10,9 @@ on:
       - 'huggingface-space/requirements.txt'
       - 'pyproject.toml'
       - 'uv.lock'
+      - 'VERSION'
+      - 'scripts/check_python_release_wheel.py'
+      - 'tests/scripts/test_python_release_wheels.py'
       - '.pre-commit-config.yaml'
       - 'scripts/check_bundled_english.py'
       - 'scripts/check_python_licenses.py'
@@ -24,12 +27,13 @@ on:
   push:
     branches: [dev, main]
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: python-license-${{ github.head_ref || github.ref }}
+  group: python-license-${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -41,9 +45,9 @@ jobs:
       - uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.13'
-      - run: pip install pytest packaging
+      - run: pip install pytest packaging pyyaml
       - run: python scripts/check_bundled_english.py
-      - run: python -m pytest tests/scripts/test_check_bundled_english.py tests/scripts/test_check_python_licenses.py -q --override-ini='addopts='
+      - run: python -m pytest tests/scripts/test_check_bundled_english.py tests/scripts/test_check_python_licenses.py tests/scripts/test_python_release_wheels.py -q --override-ini='addopts='
 
   wheel-consumer:
     name: Wheels (${{ matrix.os }}, Python ${{ matrix.python }})

@@ -205,13 +205,19 @@ jobs:
       contents: write
       packages: read
 
+  # Re-run the installed-wheel license/pronunciation/model gates for the
+  # selected release source; a previously green branch is not sufficient.
+  release-license:
+    uses: ./.github/workflows/python-license.yml
+
   # Publish to PyPI
   publish_pypi:
     name: Publish to PyPI
-    needs: [build_all]
+    needs: [build_all, release-license]
     if: |
       always() &&
-      needs.build_all.result == 'success'
+      needs.build_all.result == 'success' &&
+      needs.release-license.result == 'success'
     runs-on: ubuntu-24.04
     # Trusted Publishing (PEP 740): PyPI verifies the OIDC token issued to
     # this job instead of accepting a long-lived API token. This requires
@@ -246,6 +252,7 @@ jobs:
       - name: Check wheels
         run: |
           ls -la dist/
+          python scripts/check_bundled_english.py
           python scripts/check_python_release_wheel.py --name piper-plus --version "$(cat VERSION)" dist/*.whl
           if ls dist/*.whl 1> /dev/null 2>&1; then
             twine check dist/*.whl
@@ -500,12 +507,13 @@ jobs:
   release_summary:
     name: Release Summary
     runs-on: ubuntu-24.04
-    needs: [create_release, build_all, publish_pypi, publish_nuget, publish_crates, csharp-cli, rust-cli]
+    needs: [create_release, build_all, release-license, publish_pypi, publish_nuget, publish_crates, csharp-cli, rust-cli]
     if: always()
     steps:
       - name: Summary
         run: |
           set -euo pipefail
+          test "${{ needs.release-license.result }}" = "success"
           for result in "${{ needs.create_release.result }}" "${{ needs.build_all.result }}" "${{ needs.publish_pypi.result }}" "${{ needs.publish_nuget.result }}" "${{ needs.publish_crates.result }}" "${{ needs.csharp-cli.result }}" "${{ needs.rust-cli.result }}"; do
             if [ "$result" != "success" ]; then
               echo "::error::Release is incomplete: $result"

@@ -285,12 +285,12 @@ Look for issues labeled [`good first issue`](https://github.com/ayutaz/piper-plu
 
 ## Package Versioning Policy
 
-piper-plus ships as several packages. `VERSION` tracks the Python/native release line (currently 2.0.1); Rust, npm, NuGet and Kotlin use independent versions. The canonical current version families and manifest paths are in [release-versions.toml](docs/spec/release-versions.toml).
+piper-plus ships as several packages. `VERSION` tracks the Python/native release line (2.0.2 in preparation; the published release is 2.0.1); Rust, npm, NuGet and Kotlin use independent versions. The canonical current version families and manifest paths are in [release-versions.toml](docs/spec/release-versions.toml). See the [Python release checklist](docs/guides/development/python-release-2.0.2.md) for the pending Python/G2P releases.
 
 | Package | Registry | Source | Tag prefix | Versioning |
 |---|---|---|---|---|
 | `piper-plus` (Python TTS) | PyPI | `src/python_run/` | `v<X.Y.Z>` | SemVer |
-| `piper-plus-g2p` (Python G2P) | PyPI | `src/python/g2p/` | `g2p-py-v<X.Y.Z>` | SemVer |
+| `piper-plus-g2p` (Python G2P) | PyPI | `src/python/g2p/` | `python-g2p-v<X.Y.Z>` | SemVer |
 | `piper-plus-cli` / `piper-plus` (Rust crate) | crates.io | `src/rust/` | `rust-v<X.Y.Z>` | SemVer |
 | `PiperPlus.Core` / `PiperPlus.Cli` (NuGet) | NuGet | `src/csharp/` | `csharp-v<X.Y.Z>` | SemVer |
 | `piper-plus` (npm) | npm | `src/wasm/openjtalk-web/` | `npm-v<X.Y.Z>` | SemVer |
@@ -319,12 +319,12 @@ Some packages depend on others published to the **same registry**. Publishing th
 | Registry | Required publish order | Reason |
 |---|---|---|
 | npm | `@piper-plus/g2p` → `piper-plus` | `piper-plus/package.json` lists `@piper-plus/g2p` as a runtime dependency, so the g2p version must already exist on npm. |
-| crates.io | `piper-plus-g2p` → `piper-plus` (core) → `piper-plus-cli` | `piper-plus` depends on `piper-plus-g2p`; `piper-plus-cli` depends on `piper-plus`. The `dev-create-release.yml` automation already handles this with `sleep 30` between steps. |
-| PyPI | `piper-plus-g2p` → `piper-plus` → `piper-tts-plus` (stub) | Same dependency chain. Manual Release workflow chains `publish_pypi` → `publish_pypi_stub`. |
+| crates.io | `piper-plus-g2p` → `piper-plus` (core) → `piper-plus-cli` | Publish through the independent Rust workflows; root Manual Release verifies the existing packages without republishing. |
+| PyPI | Python runtime and G2P are independent | Runtime bundles its own English backend. G2P uses `g2p-python-ci.yml`; runtime uses Manual Release. There is no stub publication job. |
 | NuGet | `PiperPlus.Core` → `PiperPlus.Cli` | CLI references Core. |
 | Maven Central | `io.github.ayutaz:piper-plus-g2p-android` (standalone) | No internal dependents — publish via `kotlin-g2p-v<X.Y.Z>` tag triggers `release-kotlin-g2p.yml`. |
 
-**Manual operation needed for npm:** the GitHub Actions Manual Release workflow handles PyPI / NuGet / crates.io automatically, but **npm publishes are gated by separate tag triggers**: `g2p-wasm-ci.yml` listens on `wasm-g2p-v*` tags (publishes `@piper-plus/g2p`), and `npm-publish.yml` listens on `npm-v*` tags (publishes `piper-plus`). To publish a coordinated npm release:
+**Manual operation needed for npm:** the GitHub Actions Manual Release workflow publishes the Python runtime and verifies existing NuGet/crates.io packages. **npm publishes use separate tag triggers**: `g2p-wasm-ci.yml` listens on `wasm-g2p-v*` tags (publishes `@piper-plus/g2p`), and `npm-publish.yml` listens on `npm-v*` tags (publishes `piper-plus`). To publish a coordinated npm release:
 
 ```bash
 # 1. Publish @piper-plus/g2p first (triggered by g2p-wasm-ci.yml)
@@ -341,7 +341,7 @@ Replace the placeholders with new, unpublished versions and the intended commit.
 
 ### `v<X.Y.Z>` tag push の注意点 (Swift checksum / Docker / GitHub Release)
 
-PyPI / NuGet / crates.io の publish は `dev-create-release.yml` の **workflow_dispatch** (version 入力) が担当し **tag 駆動ではない**。一方 **`v<X.Y.Z>` tag の push は複数 workflow を同時発火**させるため、以下を順守する:
+Python runtimeのPyPI公開は、準備済みタグを選択した `dev-create-release.yml` の **workflow_dispatch** (version入力) が担当します。NuGet / crates.io は独立したタグで公開し、このworkflowでは既存パッケージを検証します。**`v<X.Y.Z>` tag のpushは複数workflowを同時発火**させるため、以下を順守する:
 
 1. **`v<X.Y.Z>` tag は `release-shared-lib.yml` と `docker-build.yml` を同時にトリガする。** 前者は C API shared lib + iOS/Android xcframework を、後者は Docker image を `type=semver` で `<X.Y.Z>` + `latest` として ghcr.io / Docker Hub に publish する (`latest` がこのリリースを指すようになる)。
 
@@ -359,7 +359,7 @@ PyPI / NuGet / crates.io の publish は `dev-create-release.yml` の **workflow
 
 3. **GitHub Release は 2 workflow から作られる。** `dev-create-release.yml` が `--draft` + 自動 note を、`release-shared-lib.yml` が同 tag に `generate_release_notes: true` で asset を添付する。**どちらも CHANGELOG `[X.Y.Z]` 本文を使わない**ため、draft の本文を CHANGELOG `[X.Y.Z]` で手動置換してから publish する。
 
-推奨順序: PR merge → (g2p/npm tag) → `dev-create-release.yml` dispatch → Package.swift checksum commit → `v<X.Y.Z>` tag push。既公開の `wasm-g2p-v*` / `kotlin-g2p-v*` は再 tag 不要。
+推奨順序: 必要な独立パッケージを公開 → タグなしでnative/Apple成果物を生成・検証 → Package.swiftの版番号・URL・checksumをPRで更新 → PR mergeとCI確認 → 検証済みコミットに `v<X.Y.Z>` tagをpush → 同じタグから `dev-create-release.yml` をdispatch。既公開の `wasm-g2p-v*` / `kotlin-g2p-v*` は再tag不要です。
 
 ## First-PR fast lane (新規 contributor 向け)
 
