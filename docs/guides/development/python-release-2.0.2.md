@@ -2,7 +2,7 @@
 
 この文書は公開前のチェックリストです。`piper-plus==2.0.2` と
 `piper-plus-g2p==0.3.1` は準備中で、版番号の更新やPRのマージだけでは公開されません。
-既存のPyPI wheelや公開済みDockerタグは置き換えません。
+既存のPyPI wheelや公開済みのバージョン付きDockerタグは置き換えません。
 
 ## 対象
 
@@ -37,6 +37,21 @@ uv run --no-sync python scripts/run_python_license_consumer.py \
 
 CIはLinux・Windows・macOSのPython 3.11/3.13で実施し、
 Linux/Python 3.13で実モデル音声生成を行います。音質の追加承認や性能測定ではありません。
+
+## rootリリースのApple成果物
+
+`Package.swift` の両製品も2.0.2向けに準備します。タグなしの
+[Release Shared Library run 38849923612](https://github.com/ayutaz/piper-plus/actions/runs/38849923612)
+で、ソースコミット `4a47f5a7430fb3d3fa971071a6a33e85c291a68a` から生成した
+xcframeworkのSHA-256をmanifestへ反映します。これは公開済みURLの確認ではありません。
+
+| 成果物 | SHA-256 |
+|---|---|
+| `libpiper_plus-ios.xcframework.zip` | `7b026f9f0af5b6b6ca56cddf56f75f398a0f3e0c9fc45c3848b8aa470dd30dff` |
+| `libpiper_plus_g2p-apple.xcframework.zip` | `64fdf30ed1a4805e9b8dfae114cd4736469b808d4742e6000b5f458955b76f70` |
+
+この後nativeソース・辞書・ビルド設定を変更する場合は、タグ前に再生成し、
+checksumを取り直します。タグ時にも既存CIが再ビルド成果物と照合します。
 
 ## 公開時に別途行うこと
 
