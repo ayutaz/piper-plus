@@ -19,7 +19,7 @@
 
 > **🔑 唯一采用 MIT 许可证的 Piper 分支** — 原版 [rhasspy/piper](https://github.com/rhasspy/piper) 已于 2025 年 10 月归档，[OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) 已转为 GPL-3.0。piper-plus 是唯一不依赖 espeak-ng 的 MIT 兼容分支。自研 G2P 支持 8 种语言 (JA/EN/ZH/KO/ES/FR/PT/SV)，适合商用和嵌入式场景。
 
-> **📢 v2.0.0 重大变更：** Docker 镜像使用 CUDA 12.8 + Ubuntu 24.04 + Python 3.13（宿主机 NVIDIA 驱动需 **R570+**）。训练使用 torch **2.11.0** + CUDA 12.8，默认开启 TF32 + bf16-mixed；不支持恢复 torch 2.2 检查点。Python import / CLI 已改为 `piper_plus` / `piper-plus`。从 1.13.0 更新到当前公开版本：`pip install --upgrade "piper-plus==2.0.1"`。参阅[迁移指南](docs/migration/v1.12-to-v2.0.md)。
+> **📢 v2.0.0 重大变更：** Docker 镜像使用 CUDA 12.8 + Ubuntu 24.04 + Python 3.13（宿主机 NVIDIA 驱动需 **R570+**）。训练使用 torch **2.11.0** + CUDA 12.8，默认开启 TF32 + bf16-mixed；不支持恢复 torch 2.2 检查点。Python import / CLI 已改为 `piper_plus` / `piper-plus`。从 1.13.0 更新到当前公开版本：`pip install --upgrade "piper-plus[cpu]==2.0.2"`。参阅[迁移指南](docs/migration/v1.12-to-v2.0.md)。
 
 快速、高质量的神经网络文本转语音 (TTS) 系统。基于 [VITS](https://github.com/jaywalnut310/vits/) 架构，提供8语言 G2P/音素化，以及当前训练模型覆盖6种语言（日语、英语、普通话、西班牙语、法语、葡萄牙语）的多说话人语音合成。本项目是 [Piper](https://github.com/rhasspy/piper) 的分支，大幅增强了日语支持、音质和训练功能。
 
@@ -47,7 +47,7 @@
 
 - **8语言 G2P/音素化** — 日语、英语、普通话、西班牙语、法语、葡萄牙语、瑞典语、韩语 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7)。当前训练模型覆盖6种语言 (JA/EN/ZH/ES/FR/PT)
 - **日语 TTS** — OpenJTalk 集成、韵律特征 (A1/A2/A3)、疑问标记 (#204)、上下文相关「ん」变体 (#207)
-- **英语 TTS** — 此开发/源代码树内置基于 [g2p-en](https://github.com/Kyubyong/g2p) 的 G2P，包含 Apache-2.0 推理代码及 Tacotron MIT 许可声明；运行时不需要外部 `g2p-en`/`Distance` 或 espeak-ng。当前公开的 PyPI 2.0.1 wheel 未改变，仍使用原有外部依赖；请参阅[迁移指南](docs/migration/python-g2p-license.md)
+- **英语 TTS** — v2.0.2 内置基于 [g2p-en](https://github.com/Kyubyong/g2p) 的 G2P，包含 Apache-2.0 推理代码及 Tacotron MIT 许可声明。无需外部 `g2p-en`/`Distance` 或 espeak-ng。旧 PyPI 2.0.1 元数据不变；参阅[迁移指南](docs/migration/python-g2p-license.md)
 - **多说话人** — 实验性 Zero-Shot/FT bundle `zs-v1` 包含571位说话人，SpeakerBalancedBatchSampler，语言均衡采样自动启用
 - **自定义词典** — 内置 200+ 技术术语发音词典
 - **音素输入** — 使用 `[[ phonemes ]]` 标记直接指定音素 — [指南](docs/features/phoneme-input.md)
@@ -85,7 +85,7 @@
 
 | 平台 | 架构 | 备注 |
 |---|---|---|
-| Linux | x86_64 / ARM64 / ARMv7 | 提供 v2.0.1 C++ 构建；ARM64 需要 glibc 2.38。兼容 glibc 2.31 的修复位于 dev/source |
+| Linux | x86_64 / ARM64 / ARMv7 | v2.0.2 C++ 构建；ARM64 的 ABI 检查上限为 glibc 2.31 |
 | macOS | ARM64 (Apple Silicon) 仅限 | M1/M2/M3+ |
 | Windows | x64 | C++ 构建为 x64；C# CLI 另提供 x64 / arm64 |
 | C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | 共享库, Android AAR |
@@ -133,7 +133,7 @@ cd piper-plus
 
 **Linux (ARM64，树莓派 4/5):**
 
-**ARM64 兼容性：** v2.0.1 Linux ARM64 C++ 构建需要 glibc 2.38 或更高版本。兼容 glibc 2.31 的修复位于 dev/source，已在 QEMU 下的 Debian Bullseye / Bookworm / Trixie（64 位）中验证启动和日语语音生成。尚未验证 Raspberry Pi 实机及 Raspberry Pi OS 本身。需要更广泛 glibc 兼容性时请构建 dev/source。
+**ARM64 兼容性：** v2.0.2 Linux ARM64 C++ 构建以 glibc 2.31 为 ABI 检查上限。CI 在 QEMU 下的 Debian Bullseye / Bookworm / Trixie（64 位）中验证启动和日语合成。Raspberry Pi 实机和 Raspberry Pi OS 本身尚未验证。请使用 v2.0.2；旧 v2.0.1 构建需要 glibc 2.38。
 
 ```bash
 curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
@@ -209,7 +209,7 @@ uv run --project environments/webui --no-sync python -m piper_plus.webui --data-
 
 ### C++ 二进制
 
-从 [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) 下载（C++ 提供 amd64 / ARM64 / ARMv7；v2.0.1 的 Linux ARM64 构建需要 glibc 2.38）。
+从 [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) 下载（C++ 提供 amd64 / ARM64 / ARMv7；v2.0.2 的 Linux ARM64 构建以 glibc 2.31 为 ABI 检查上限）。
 
 ```sh
 echo 'Welcome to the world of speech synthesis!' | \
@@ -658,7 +658,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 |---|---|---|---|---|
 | `zs-v1` Zero-Shot/FT 基础模型 | JA/EN/ZH/ES/FR/PT | 571 | v7 epoch32 实验模型，173个音素，192维 CAM++ 说话人 embedding | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) |
 
-> Zero-Shot 推理使用 `base.onnx`，并需要通过 `campplus.onnx` 提取参考 embedding；微调使用 `base.ckpt` 和随附的 `config.json`。公开示例已通过 PyPI `piper-plus==2.0.0` 完成功能验证。该模型仍为实验模型，存在噪声和声音迁移限制；这不代表质量批准或人工试听通过。`base` 和 `zero-shot-base-zs-v1` alias 面向源码分支/下一版本，尚未包含在公开的 2.0.0/2.0.1 中。根目录 `model.ckpt` 仍是独立的 legacy 文件。
+> Zero-Shot 推理使用 `base.onnx`，并需要通过 `campplus.onnx` 提取参考 embedding；微调使用 `base.ckpt` 和随附的 `config.json`。公开示例已通过 PyPI `piper-plus==2.0.0` 完成功能验证。该模型仍为实验模型，存在噪声和声音迁移限制；这不代表质量批准或人工试听通过。`base` 和 `zero-shot-base-zs-v1` alias 已包含在 v2.0.2 中（2.0.0/2.0.1 不包含）。根目录 `model.ckpt` 仍是独立的 legacy 文件。
 
 ### 模型下载
 

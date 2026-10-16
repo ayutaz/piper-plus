@@ -1,7 +1,7 @@
-# Python 2.0.2 / G2P 0.3.1 リリース準備
+# Python 2.0.2 / G2P 0.3.1 リリースチェックリスト
 
-この文書は公開前のチェックリストです。`piper-plus==2.0.2` と
-`piper-plus-g2p==0.3.1` は準備中で、版番号の更新やPRのマージだけでは公開されません。
+この文書は `piper-plus==2.0.2` / `piper-plus-g2p==0.3.1` の公開手順です。
+版番号の更新やPRのマージだけでは公開されません。公開状況は GitHub Release と PyPI を確認してください。
 既存のPyPI wheelや公開済みのバージョン付きDockerタグは置き換えません。
 
 ## 対象
@@ -63,8 +63,10 @@ PyPI側の設定はリポジトリのCI成功だけでは確認できません�
 
 - 独立G2Pは `python-g2p-v0.3.1` を使います。公開完了後、PyPIから新規導入して
   依存閉包を再検査します。タグを付け直して既存版を上書きしません。
+- Docker は同じ検証済みコミットに `docker-v2.0.2` をpushし、公開・署名と
+  `release-docker-consumer.yml` の実際の日本語合成を確認します。rootタグでは再ビルドしません。
 - runtimeは既存のネイティブ配布と同じ `v2.0.2` を使います。このタグのpushは
-  Docker・shared library等も起動するため、rootリリースの全前提を満たしてから行います。
+  shared library等も起動するため、rootリリースの全前提を満たしてから行います。
   `Package.swift` の版番号・URL・checksum、ネイティブ成果物、署名と公開後検査も
   対象です。PythonだけのCI成功をrootリリース全体の承認として扱いません。
 - `dev-create-release.yml` は準備済みタグと同じref、入力 `version=2.0.2` で

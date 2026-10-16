@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-16T04:33:29Z",
+  "generated_at": "2026-10-16T09:55:39Z",
   "totals": {
-    "executable": 228,
+    "executable": 229,
     "needs_placeholder": 7,
     "skip_warranted": 233,
-    "total": 468
+    "total": 469
   },
   "by_language": {
     "bash": {
-      "executable": 167,
+      "executable": 168,
       "needs_placeholder": 7,
       "skip_warranted": 44
     },
@@ -880,7 +880,7 @@
       ],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "1781ebcec93564cc25b8165263f9c3f465bdc15f"
+      "hash_sha1": "186b0eae9f9836e54027d4afba8c8df2771493e2"
     },
     {
       "file": "docs/getting-started/binary-selection.md",
@@ -895,7 +895,7 @@
       ],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "f2a8a31433a4d29abcf5815a32475165e52c99ff"
+      "hash_sha1": "c6b45926c098ee54508a8203919d98f5696a017d"
     },
     {
       "file": "docs/getting-started/binary-selection.md",
@@ -910,7 +910,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "8a9a808aa5dbe26cf66f078a1f4574470b0e7754"
+      "hash_sha1": "14f022a83d3df170d2211f620bdc6ac132c9989a"
     },
     {
       "file": "docs/getting-started/binary-selection.md",
@@ -1448,8 +1448,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 240,
-      "line_end": 246,
+      "line_start": 239,
+      "line_end": 245,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1461,8 +1461,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 254,
-      "line_end": 257,
+      "line_start": 253,
+      "line_end": 256,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1474,8 +1474,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 265,
-      "line_end": 267,
+      "line_start": 264,
+      "line_end": 266,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1487,8 +1487,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 271,
-      "line_end": 280,
+      "line_start": 270,
+      "line_end": 279,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1500,8 +1500,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 314,
-      "line_end": 316,
+      "line_start": 313,
+      "line_end": 315,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1513,8 +1513,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 384,
-      "line_end": 386,
+      "line_start": 383,
+      "line_end": 385,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1526,8 +1526,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 390,
-      "line_end": 392,
+      "line_start": 389,
+      "line_end": 391,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1539,8 +1539,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 396,
-      "line_end": 398,
+      "line_start": 395,
+      "line_end": 397,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1552,8 +1552,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 410,
-      "line_end": 412,
+      "line_start": 409,
+      "line_end": 411,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1565,8 +1565,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 424,
-      "line_end": 427,
+      "line_start": 423,
+      "line_end": 426,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -1580,8 +1580,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 431,
-      "line_end": 434,
+      "line_start": 430,
+      "line_end": 433,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -1595,8 +1595,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 452,
-      "line_end": 454,
+      "line_start": 451,
+      "line_end": 453,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1985,8 +1985,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 34,
-      "line_end": 39,
+      "line_start": 35,
+      "line_end": 40,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1998,8 +1998,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 93,
-      "line_end": 97,
+      "line_start": 94,
+      "line_end": 98,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2013,8 +2013,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 101,
-      "line_end": 105,
+      "line_start": 102,
+      "line_end": 106,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -4600,7 +4600,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "d7edec3470bd634f1c9b6e80e4ee2493a14f5e51"
+      "hash_sha1": "1255af18809087cf4462eaaf1a227f4af3ccb840"
     },
     {
       "file": "docs/migration/provider-environments.md",
@@ -4630,8 +4630,21 @@
     },
     {
       "file": "docs/migration/python-g2p-license.md",
-      "line_start": 28,
-      "line_end": 39,
+      "line_start": 10,
+      "line_end": 13,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "d2f1767b43e7afaec12b33da2d149b7c322c017d"
+    },
+    {
+      "file": "docs/migration/python-g2p-license.md",
+      "line_start": 33,
+      "line_end": 44,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -4643,8 +4656,8 @@
     },
     {
       "file": "docs/migration/python-g2p-license.md",
-      "line_start": 52,
-      "line_end": 58,
+      "line_start": 57,
+      "line_end": 63,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -4656,8 +4669,8 @@
     },
     {
       "file": "docs/migration/python-g2p-license.md",
-      "line_start": 69,
-      "line_end": 73,
+      "line_start": 73,
+      "line_end": 77,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",

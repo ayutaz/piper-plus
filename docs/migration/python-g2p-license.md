@@ -1,11 +1,16 @@
 # Python 英語G2Pのライセンス対応
 
-この変更はソース版のPython推論・G2P・学習・WebUIに適用されます。
-修正を含む配布版は `piper-plus==2.0.2` / `piper-plus-g2p==0.3.1` として
-準備中です。公開前の手順は[リリースチェックリスト](../guides/development/python-release-2.0.2.md)を参照してください。
+修正は `piper-plus==2.0.2` / `piper-plus-g2p==0.3.1` に含まれます。
+ソースのPython推論・G2P・学習・WebUIにも適用されます。
+公開手順と検証項目は[リリースチェックリスト](../guides/development/python-release-2.0.2.md)を参照してください。
 公開済み `piper-plus==2.0.0` / `2.0.1` と `piper-plus-g2p==0.3.0` の
-wheel、既存のDockerイメージは更新されません。新しい版を公開するまでは、
-この修正を含むコミットからビルドしてください。版番号だけでは修正の有無を判別できません。
+wheel、旧バージョンのDockerイメージは更新されません。
+専用の新しい環境へ修正版を導入してください。
+
+```bash
+uv venv
+uv pip install "piper-plus[cpu,http]==2.0.2" "piper-plus-g2p[all]==0.3.1"
+```
 
 ## 変更点
 
@@ -44,8 +49,8 @@ NLTKの `cmudict` / 品詞タグ用データは従来どおり別途ダウンロ
 ダウンロードデータの許諾表示も確認してください。
 
 `piper-train` をチェックアウト外で `pip install src/python` だけで導入すると、
-pipはuv workspaceのローカル参照を知らないため、公開済みPyPI版の
-`piper-plus-g2p` を選ぶ可能性があります。今回の同梱backendを学習側にも確実に
+pipはuv workspaceのローカル参照を知らないため、PyPI版の
+`piper-plus-g2p` を選びます。旧環境では 0.3.0 が残る可能性があります。今回の同梱backendを学習側にも確実に
 使うには、上記のルートからの `uv sync` を使うか、G2Pとtrainingのwheelを同じ
 成果物ディレクトリから同時に導入します。
 
@@ -57,8 +62,7 @@ uv pip install dist/local/piper_plus_g2p-*.whl dist/local/piper_train-*.whl
 uv pip install "piper-plus-g2p[all]" "piper-train[train]"
 ```
 
-G2P wheelだけをPyPIから取得する運用では、今回の修正を含む版が公開されるまで
-旧版の依存関係が残ります。runtimeの `piper-plus` は独自のvendor backendを含むため、
+G2P wheelをPyPIから取得する場合は `piper-plus-g2p[all]==0.3.1` を指定してください。runtimeの `piper-plus` は独自のvendor backendを含むため、
 この学習用G2P wheelの同時導入は必要ありません。
 
 ## 配布物の確認

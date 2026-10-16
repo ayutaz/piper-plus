@@ -4,9 +4,9 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 
 ## 公開版と開発ブランチ
 
-Python/native の公開版は **v2.0.1** です。Rust・npm・NuGet・Kotlin の版は独立しており、[バージョン契約](spec/release-versions.toml) で管理します。`dev` の機能が既存の配布バイナリやパッケージに収録済みとは限りません。
+Python/native のリリースは **v2.0.2** です。Rust・npm・NuGet・Kotlin の版は独立しており、[バージョン契約](spec/release-versions.toml) で管理します。`dev` の機能が既存の配布バイナリやパッケージに収録済みとは限りません。
 
-Linux ARM64 の glibc 2.31 互換修正は `dev` に入り、Debian Bullseye／Bookworm／Trixie の QEMU 検証を実施しました。**v2.0.1 の配布アーカイブには未収録**です。取得方法と制約は [バイナリの選び方](getting-started/binary-selection.md) を参照してください。
+Linux ARM64 の glibc 2.31 互換修正は **v2.0.2** に収録されています。CI は Debian Bullseye／Bookworm／Trixie の QEMU 起動・日本語合成を検証します。Raspberry Pi 実機は未検証です。取得方法と制約は [バイナリの選び方](getting-started/binary-selection.md) を参照してください。
 
 公開 Zero-Shot base とつくよみちゃん FT のモデルは、[モデル一覧](guides/development/pretrained-models.md) の pinned `releases/zs-v1` を使用します。base は参照由来の話者埋め込みが必要で、参照なしの固定音声とは入力が異なります。
 
@@ -88,7 +88,7 @@ Linux ARM64 の glibc 2.31 互換修正は `dev` に入り、Debian Bullseye／B
 
 - [Python 英語G2Pのライセンス対応](migration/python-g2p-license.md) — Distance依存を除去したソース版への移行、学習側のローカルG2P導入境界、既存配布物との差
 - [Python 2.0.2 / G2P 0.3.1 リリース準備](guides/development/python-release-2.0.2.md) — 版番号、公開前の必須CI、公開操作との境界
-- [開発版 Python provider / WebUI 環境](migration/provider-environments.md) — CPU/GPU extra の選択、UI と学習環境の分離
+- [Python 2.0.2 provider / WebUI 環境](migration/provider-environments.md) — CPU/GPU extra の選択、UI と学習環境の分離
 - [v1.11 → v1.12](migration/v1.11-to-v1.12.md) — HiFi-GAN/Flask/HTS-voice 削除など
 - [v1.12 → v2.0](migration/v1.12-to-v2.0.md) — Python 3.13 + CUDA 12.8 + Ubuntu 24.04 統一、 TF32 / bf16-mixed Template default、 旧 ckpt resume 非サポート
 

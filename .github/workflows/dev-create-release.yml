@@ -119,7 +119,7 @@ jobs:
           echo "### 📦 Installation" >> $GITHUB_OUTPUT
           echo "\`\`\`bash" >> $GITHUB_OUTPUT
           echo "# Python" >> $GITHUB_OUTPUT
-          echo "pip install piper-plus==${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          echo "pip install 'piper-plus[cpu]==${{ github.event.inputs.version }}'" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
           # C#/Rust/npm パッケージは独立バージョン管理 — 各 manifest から動的取得
           CS_VERSION=$(grep -oPm1 '(?<=<Version>)[^<]+' src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj)

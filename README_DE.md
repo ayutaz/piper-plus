@@ -9,7 +9,7 @@
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)
 [![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
 
-> **📢 v2.0.0 Breaking Changes:** Docker-Images verwenden CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (NVIDIA-Hosttreiber **R570+** erforderlich). Training: torch **2.11.0** + CUDA 12.8, standardmäßig TF32 + bf16-mixed; torch-2.2-Checkpoints können nicht fortgesetzt werden. Python-Import / CLI heißen nun `piper_plus` / `piper-plus`. Für das Update von 1.13.0 auf die aktuelle öffentliche Version: `pip install --upgrade "piper-plus==2.0.1"`. Siehe [Migrationsleitfaden](docs/migration/v1.12-to-v2.0.md).
+> **📢 v2.0.0 Breaking Changes:** Docker-Images verwenden CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (NVIDIA-Hosttreiber **R570+** erforderlich). Training: torch **2.11.0** + CUDA 12.8, standardmäßig TF32 + bf16-mixed; torch-2.2-Checkpoints können nicht fortgesetzt werden. Python-Import / CLI heißen nun `piper_plus` / `piper-plus`. Für das Update von 1.13.0 auf die aktuelle öffentliche Version: `pip install --upgrade "piper-plus[cpu]==2.0.2"`. Siehe [Migrationsleitfaden](docs/migration/v1.12-to-v2.0.md).
 
 **Pakete:**
 
@@ -49,7 +49,7 @@ Ein schnelles und hochwertiges neuronales Text-to-Speech-System (TTS). Basierend
 
 - **8-Sprachen-G2P/Phonemisierung** — Japanisch, Englisch, Chinesisch, Spanisch, Französisch, Portugiesisch, Schwedisch und Koreanisch (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7). Die aktuellen trainierten Modelle umfassen 6 Sprachen (JA/EN/ZH/ES/FR/PT)
 - **Japanisches TTS** — OpenJTalk-Integration, Prosodieinformationen (A1/A2/A3), Fragemarkierungen (#204), kontextabhängige "N"-Varianten (#207)
-- **Englisches TTS** — Dieser Dev/Source-Baum enthält ein G2P auf Basis von [g2p-en](https://github.com/Kyubyong/g2p) mit dem Apache-2.0-lizenzierten Inferenzcode und dem MIT-Hinweis für die Tacotron-Normalisierung; zur Laufzeit sind weder externes `g2p-en`/`Distance` noch espeak-ng erforderlich. Das aktuell öffentliche PyPI-Wheel 2.0.1 bleibt unverändert und verwendet weiterhin die bisherige externe Abhängigkeit; siehe den [Migrationsleitfaden](docs/migration/python-g2p-license.md)
+- **Englisches TTS** — v2.0.2 bündelt G2P auf Basis von [g2p-en](https://github.com/Kyubyong/g2p), mit Apache-2.0-Inferenzcode und MIT-Hinweis für Tacotron. Externes `g2p-en`/`Distance` und espeak-ng sind nicht erforderlich. Die alten PyPI-2.0.1-Metadaten bleiben unverändert; siehe [Migrationsleitfaden](docs/migration/python-g2p-license.md)
 - **Multi-Speaker** — 571 Sprecher im experimentellen Zero-Shot/FT-Bundle `zs-v1`, SpeakerBalancedBatchSampler, ausgewogene Sprachgruppen-Abtastung
 - **Benutzerdefinierte Wörterbücher** — Integriertes Aussprachwörterbuch mit über 200 Fachbegriffen
 - **Phoneingabe** — Direkte Eingabe über `[[ Phoneme ]]`-Notation — [Anleitung](docs/features/phoneme-input.md)
@@ -87,7 +87,7 @@ Synthese mit aktuellen trainierten Modellen in 6 Sprachen über 6 Runtimes (Pyth
 
 | Plattform | Architektur | Hinweise |
 |---|---|---|
-| Linux | x86_64 / ARM64 / ARMv7 | v2.0.1-C++-Artefakte verfügbar; ARM64 benötigt glibc 2.38. Die glibc-2.31-kompatible Korrektur liegt in dev/source |
+| Linux | x86_64 / ARM64 / ARMv7 | v2.0.2-C++-Archive; ARM64-ABI-Obergrenze glibc 2.31 |
 | macOS | ARM64 (Apple Silicon) nur | M1/M2/M3+ |
 | Windows | x64 | C++-Artefakte x64; C# CLI zusätzlich x64 / arm64 |
 | C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | Shared Library, Android AAR |
@@ -135,7 +135,7 @@ cd piper-plus
 
 **Linux (ARM64, Raspberry Pi 4/5):**
 
-**ARM64-Kompatibilität:** Das Linux-ARM64-C++-Artefakt v2.0.1 benötigt glibc 2.38 oder neuer. Die glibc-2.31-kompatible Korrektur liegt in dev/source; Start und japanische Sprachsynthese wurden unter QEMU mit Debian Bullseye / Bookworm / Trixie (64 Bit) geprüft. Raspberry-Pi-Hardware und Raspberry Pi OS selbst sind noch nicht getestet. Für breitere glibc-Kompatibilität dev/source bauen.
+**ARM64-Kompatibilität:** Das Linux-ARM64-C++-Archiv v2.0.2 wird gegen eine glibc-2.31-ABI-Obergrenze geprüft. CI prüft Start und japanische Synthese unter QEMU mit Debian Bullseye / Bookworm / Trixie (64 Bit). Raspberry-Pi-Hardware und Raspberry Pi OS selbst bleiben ungetestet. Verwenden Sie v2.0.2; das alte v2.0.1-Archiv benötigt glibc 2.38.
 
 ```bash
 curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
@@ -650,7 +650,7 @@ Vortrainierte Sprachsynthesemodelle stehen auf Hugging Face zur Verfügung.
 |---|---|---|---|---|
 | `zs-v1` Zero-Shot/FT-Basis | JA/EN/ZH/ES/FR/PT | 571 | v7 epoch32 experimentell, 173 Phoneme, CAM++ Speaker-Embedding 192-dimensional | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) |
 
-> `base.onnx` benötigt für Zero-Shot ein Referenz-Embedding aus `campplus.onnx`; `base.ckpt` ist für Fine-Tuning und muss mit der mitgelieferten `config.json` verwendet werden. Die öffentlichen Beispiele wurden mit PyPI `piper-plus==2.0.0` funktional geprüft. Das Modell ist experimentell: Rauschen und Grenzen bei der Stimmübertragung bleiben bestehen; dies ist keine Qualitäts- oder Hörfreigabe. Die Aliase `base` und `zero-shot-base-zs-v1` gehören zum Source-Branch bzw. nächsten Release und sind in 2.0.0/2.0.1 noch nicht enthalten. Das Root-`model.ckpt` bleibt Legacy.
+> `base.onnx` benötigt für Zero-Shot ein Referenz-Embedding aus `campplus.onnx`; `base.ckpt` ist für Fine-Tuning und muss mit der mitgelieferten `config.json` verwendet werden. Die öffentlichen Beispiele wurden mit PyPI `piper-plus==2.0.0` funktional geprüft. Das Modell ist experimentell: Rauschen und Grenzen bei der Stimmübertragung bleiben bestehen; dies ist keine Qualitäts- oder Hörfreigabe. Die Aliase `base` und `zero-shot-base-zs-v1` sind in v2.0.2 enthalten (nicht in 2.0.0/2.0.1). Das Root-`model.ckpt` bleibt Legacy.
 
 ### Modelle herunterladen
 

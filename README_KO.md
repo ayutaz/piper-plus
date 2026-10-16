@@ -19,7 +19,7 @@
 
 > **🔑 유일한 MIT 라이선스 Piper 포크** — 원본 [rhasspy/piper](https://github.com/rhasspy/piper)는 2025년 10월에 아카이브되었으며, [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl)은 GPL-3.0으로 전환되었습니다. piper-plus는 espeak-ng에 의존하지 않는 유일한 MIT 호환 포크입니다. 자체 구현 G2P로 8개 언어 (JA/EN/ZH/KO/ES/FR/PT/SV)를 지원하며, 상용 및 임베디드 용도에 적합합니다.
 
-> **📢 v2.0.0 주요 변경사항:** Docker 이미지는 CUDA 12.8 + Ubuntu 24.04 + Python 3.13을 사용합니다(호스트 NVIDIA 드라이버 **R570+** 필요). 학습은 torch **2.11.0** + CUDA 12.8이며 TF32 + bf16-mixed가 기본값입니다. torch 2.2 체크포인트의 학습 재개는 지원하지 않습니다. Python import / CLI는 `piper_plus` / `piper-plus`로 변경되었습니다. 1.13.0에서 현재 공개 버전으로 업데이트: `pip install --upgrade "piper-plus==2.0.1"`. [마이그레이션 가이드](docs/migration/v1.12-to-v2.0.md)를 확인하세요.
+> **📢 v2.0.0 주요 변경사항:** Docker 이미지는 CUDA 12.8 + Ubuntu 24.04 + Python 3.13을 사용합니다(호스트 NVIDIA 드라이버 **R570+** 필요). 학습은 torch **2.11.0** + CUDA 12.8이며 TF32 + bf16-mixed가 기본값입니다. torch 2.2 체크포인트의 학습 재개는 지원하지 않습니다. Python import / CLI는 `piper_plus` / `piper-plus`로 변경되었습니다. 1.13.0에서 현재 공개 버전으로 업데이트: `pip install --upgrade "piper-plus[cpu]==2.0.2"`. [마이그레이션 가이드](docs/migration/v1.12-to-v2.0.md)를 확인하세요.
 
 빠르고 고품질의 뉴럴 텍스트 음성 합성 (TTS) 시스템. [VITS](https://github.com/jaywalnut310/vits/) 아키텍처를 채택하여 8개 언어 G2P/음소화와 현재 학습된 6개 언어(일본어, 영어, 중국어, 스페인어, 프랑스어, 포르투갈어)의 다중 화자 합성을 지원합니다. [Piper](https://github.com/rhasspy/piper)의 포크로, 일본어 지원, 음질 향상, 학습 기능을 대폭 강화했습니다.
 
@@ -47,7 +47,7 @@
 
 - **8개 언어 G2P/음소화** — 일본어, 영어, 중국어, 스페인어, 프랑스어, 포르투갈어, 스웨덴어, 한국어 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7). 현재 학습된 모델은 6개 언어 (JA/EN/ZH/ES/FR/PT)를 지원합니다
 - **일본어 TTS** — OpenJTalk 통합, 운율 정보 (A1/A2/A3), 의문사 마커 (#204), 문맥 의존 'ん' 변이형 (#207)
-- **영어 TTS** — 이 dev/source 트리에는 Apache-2.0 추론 코드와 Tacotron MIT 고지를 함께 포함한 [g2p-en](https://github.com/Kyubyong/g2p) 기반 G2P가 들어 있으며, 실행 시 외부 `g2p-en`/`Distance`와 espeak-ng가 필요하지 않습니다. 현재 공개된 PyPI 2.0.1 wheel은 변경되지 않아 이전 외부 의존성을 계속 사용합니다. 자세한 내용은 [마이그레이션 가이드](docs/migration/python-g2p-license.md)를 참조하세요
+- **영어 TTS** — v2.0.2에는 [g2p-en](https://github.com/Kyubyong/g2p) 기반 G2P와 Apache-2.0 추론 코드 및 Tacotron MIT 고지가 포함됩니다. 외부 `g2p-en`/`Distance`와 espeak-ng는 필요하지 않습니다. 이전 PyPI 2.0.1 메타데이터는 변경되지 않습니다. [마이그레이션 가이드](docs/migration/python-g2p-license.md)를 참조하세요
 - **다중 화자** — 실험용 Zero-Shot/FT 번들 `zs-v1`의 571 화자, SpeakerBalancedBatchSampler, 언어 그룹 균등 샘플링
 - **커스텀 사전** — 200개 이상의 기술 용어 발음 사전 내장
 - **음소 입력** — `[[ phonemes ]]` 표기법으로 직접 지정 — [가이드](docs/features/phoneme-input.md)
@@ -85,7 +85,7 @@
 
 | 플랫폼 | 아키텍처 | 비고 |
 |---|---|---|
-| Linux | x86_64 / ARM64 / ARMv7 | v2.0.1 C++ 배포물 제공; ARM64는 glibc 2.38 필요. glibc 2.31 호환 수정은 dev/source |
+| Linux | x86_64 / ARM64 / ARMv7 | v2.0.2 C++ 배포물; ARM64 ABI 검사 상한 glibc 2.31 |
 | macOS | ARM64 (Apple Silicon) 전용 | M1/M2/M3+ |
 | Windows | x64 | C++ 배포물은 x64, C# CLI는 x64 / arm64 |
 | C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | 공유 라이브러리, Android AAR |
@@ -133,7 +133,7 @@ cd piper-plus
 
 **Linux (ARM64, 라즈베리 파이 4/5):**
 
-**ARM64 호환성:** v2.0.1 Linux ARM64 C++ 배포물은 glibc 2.38 이상이 필요합니다. glibc 2.31 호환 수정은 dev/source에 있으며 QEMU의 Debian Bullseye / Bookworm / Trixie(64비트)에서 실행과 일본어 음성 생성을 확인했습니다. Raspberry Pi 실기기와 Raspberry Pi OS 자체는 아직 검증하지 않았습니다. 더 넓은 glibc 호환성이 필요하면 dev/source를 빌드하세요.
+**ARM64 호환성:** v2.0.2 Linux ARM64 C++ 배포물은 glibc 2.31을 ABI 검사 상한으로 사용합니다. CI는 QEMU의 Debian Bullseye / Bookworm / Trixie(64비트)에서 실행과 일본어 합성을 검증합니다. Raspberry Pi 실기기와 Raspberry Pi OS 자체는 아직 검증하지 않았습니다. glibc 2.38이 필요한 이전 v2.0.1 대신 v2.0.2를 사용하세요.
 
 ```bash
 curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
@@ -648,7 +648,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 |---|---|---|---|---|
 | `zs-v1` Zero-Shot/FT 기본 모델 | JA/EN/ZH/ES/FR/PT | 571 | v7 epoch32 실험 모델, 173 음소, 192차원 CAM++ 화자 임베딩 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) |
 
-> Zero-Shot에는 `campplus.onnx`로 추출한 참조 embedding과 `base.onnx`가 필요합니다. 파인튜닝은 `base.ckpt`와 함께 제공된 `config.json`을 사용합니다. 공개 예제는 PyPI `piper-plus==2.0.0`에서 기능만 확인했습니다. 이 모델은 실험용이며 노이즈와 음성 전이 한계가 남아 있고, 품질 승인이나 사람의 청취 승인을 의미하지 않습니다. `base` 및 `zero-shot-base-zs-v1` alias는 소스 브랜치/다음 릴리스용이며 공개된 2.0.0/2.0.1에는 아직 없습니다. 루트 `model.ckpt`는 별도의 legacy 파일입니다.
+> Zero-Shot에는 `campplus.onnx`로 추출한 참조 embedding과 `base.onnx`가 필요합니다. 파인튜닝은 `base.ckpt`와 함께 제공된 `config.json`을 사용합니다. 공개 예제는 PyPI `piper-plus==2.0.0`에서 기능만 확인했습니다. 이 모델은 실험용이며 노이즈와 음성 전이 한계가 남아 있고, 품질 승인이나 사람의 청취 승인을 의미하지 않습니다. `base` 및 `zero-shot-base-zs-v1` alias는 v2.0.2에 포함됩니다(2.0.0/2.0.1에는 없음). 루트 `model.ckpt`는 별도의 legacy 파일입니다.
 
 ### 모델 다운로드
 

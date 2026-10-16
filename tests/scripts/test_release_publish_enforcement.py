@@ -128,6 +128,49 @@ def test_pypi_install_failure_fails(tmp_path):
     assert result.returncode != 0, result.stdout + result.stderr
 
 
+def test_pypi_smoke_selects_cpu_provider(tmp_path):
+    """A clean 2.0.2 install needs an explicit ORT provider to import the CLI."""
+    bin_dir = tmp_path / "verify-venv/bin"
+    bin_dir.mkdir(parents=True)
+    pip = bin_dir / "pip"
+    pip.write_text(
+        '#!/bin/sh\nif [ "$1" = install ]; then\n'
+        '  case "$2" in "piper-plus[cpu]=="*) touch provider-installed ;;\n'
+        "  *) exit 1 ;; esac\nfi\n",
+        encoding="utf-8",
+    )
+    python = bin_dir / "python"
+    python.write_text("#!/bin/sh\ntest -f provider-installed\n", encoding="utf-8")
+    pip.chmod(0o755)
+    python.chmod(0o755)
+    script = step(
+        "release-verify.yml", "verify-pypi", "Verify pip can install (smoke)"
+    )["run"]
+    result = shell(tmp_path, script, {"python3": "exit 0"})
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_release_wheel_smoke_selects_cpu_provider(tmp_path):
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "piper_plus-2.0.2-py3-none-any.whl").touch()
+    script = step(
+        "dev-build-all.yml", "test_python_wheels", "Install wheel and dependencies"
+    )["run"]
+    result = shell(
+        tmp_path,
+        script,
+        {
+            "pip": 'for arg in "$@"; do\n'
+            'case "$arg" in *.whl\\[cpu\\]) touch provider-installed ;;\n'
+            "*.whl) exit 1 ;; esac\ndone\n",
+            "python": 'if [ "$1" = -c ]; then test -f provider-installed; fi',
+        },
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (tmp_path / "provider-installed").exists()
+
+
 def test_bad_npm_attestation_fails(tmp_path):
     script = step(
         "release-verify.yml", "verify-npm", "Verify SLSA attestation via gh CLI"

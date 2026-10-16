@@ -26,10 +26,11 @@ Use its `tsukuyomi.onnx` and `tsukuyomi.onnx.json` together; no reference WAV, s
 The user approved the three Japanese samples for experimental publication. This does not establish improved quality
 or approval for every language and text. A weights-only initializer, `tsukuyomi.ckpt`, is included for further fine-tuning.
 See the [publication record](../../design/tsukuyomi-publication-ready-2026-10-12.md).
-The public `releases/zs-v1` files above are the current explicit download path. Resolver
-aliases for these names are a source/next-release change; released `2.0.0` and `2.0.1`
-do not retroactively gain those aliases. Existing legacy package aliases, where present
-in a source build, continue to resolve the legacy root model below.
+The public `releases/zs-v1` files above are the current explicit download path.
+Python 2.0.2 includes the `base` / `zero-shot-base-zs-v1` aliases for the public base;
+released `2.0.0` and `2.0.1` do not retroactively gain those aliases.
+The `tsukuyomi` alias continues to resolve the legacy root model below; download
+the public Tsukuyomi zs-v1 fine-tune using the explicit URLs above.
 
 ```bash
 mkdir -p models/tsukuyomi-zs-v1

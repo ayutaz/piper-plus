@@ -9,7 +9,7 @@
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)
 [![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
 
-> **📢 v2.0.0 Cambios incompatibles:** Las imágenes Docker usan CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (driver NVIDIA **R570+** requerido). Entrenamiento: torch **2.11.0** + CUDA 12.8, TF32 + bf16-mixed por defecto; no se admite reanudar checkpoints de torch 2.2. El import de Python / CLI pasa a `piper_plus` / `piper-plus`. Para actualizar desde 1.13.0 a la versión pública actual: `pip install --upgrade "piper-plus==2.0.1"`. Consulte la [guía de migración](docs/migration/v1.12-to-v2.0.md).
+> **📢 v2.0.0 Cambios incompatibles:** Las imágenes Docker usan CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (driver NVIDIA **R570+** requerido). Entrenamiento: torch **2.11.0** + CUDA 12.8, TF32 + bf16-mixed por defecto; no se admite reanudar checkpoints de torch 2.2. El import de Python / CLI pasa a `piper_plus` / `piper-plus`. Para actualizar desde 1.13.0 a la versión pública actual: `pip install --upgrade "piper-plus[cpu]==2.0.2"`. Consulte la [guía de migración](docs/migration/v1.12-to-v2.0.md).
 
 **Paquetes:**
 
@@ -49,7 +49,7 @@ Sistema de texto a voz (TTS) neuronal, rápido y de alta calidad. Basado en la a
 
 - **G2P/fonemización en 8 idiomas** — Japonés, inglés, chino, español, francés, portugués, sueco y coreano (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7). Los modelos entrenados actuales cubren 6 idiomas (JA/EN/ZH/ES/FR/PT)
 - **TTS en japonés** — Integración con OpenJTalk, información prosódica (A1/A2/A3), marcadores de interrogación (#204), variantes contextuales de "n" (#207)
-- **TTS en inglés** — Este árbol de desarrollo/fuente incluye un G2P basado en [g2p-en](https://github.com/Kyubyong/g2p), con el código de inferencia Apache-2.0 y el aviso MIT de Tacotron; en tiempo de ejecución no requiere `g2p-en`/`Distance` externos ni espeak-ng. El wheel público actual de PyPI 2.0.1 no cambia y sigue usando la dependencia externa anterior; consulte la [guía de migración](docs/migration/python-g2p-license.md)
+- **TTS en inglés** — v2.0.2 incluye G2P basado en [g2p-en](https://github.com/Kyubyong/g2p), con código de inferencia Apache-2.0 y aviso MIT de Tacotron. No requiere `g2p-en`/`Distance` externos ni espeak-ng. Los metadatos anteriores de PyPI 2.0.1 no cambian; consulte la [guía de migración](docs/migration/python-g2p-license.md)
 - **Multihablante** — 571 hablantes en el paquete experimental Zero-Shot/FT `zs-v1`, SpeakerBalancedBatchSampler, muestreo equilibrado por grupo de idioma
 - **Diccionario personalizado** — Diccionario de pronunciación integrado con más de 200 términos técnicos
 - **Entrada de fonemas** — Especificación directa mediante la notación `[[ fonemas ]]` — [Guía](docs/features/phoneme-input.md)
@@ -87,7 +87,7 @@ Síntesis con modelos entrenados actuales en 6 idiomas a través de 6 runtimes (
 
 | Plataforma | Arquitectura | Notas |
 |---|---|---|
-| Linux | x86_64 / ARM64 / ARMv7 | Artefactos C++ v2.0.1 disponibles; ARM64 requiere glibc 2.38. La corrección compatible con glibc 2.31 está en dev/source |
+| Linux | x86_64 / ARM64 / ARMv7 | Archivos C++ v2.0.2; límite ABI de ARM64: glibc 2.31 |
 | macOS | ARM64 (Apple Silicon) únicamente | M1/M2/M3+ |
 | Windows | x64 | Artefactos C++ x64; CLI C# también x64 / arm64 |
 | C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | Biblioteca compartida, Android AAR |
@@ -135,7 +135,7 @@ cd piper-plus
 
 **Linux (ARM64, Raspberry Pi 4/5):**
 
-**Compatibilidad ARM64:** el artefacto C++ Linux ARM64 de v2.0.1 requiere glibc 2.38 o posterior. La corrección compatible con glibc 2.31 está en dev/source; el inicio y la síntesis en japonés se verificaron bajo QEMU con Debian Bullseye / Bookworm / Trixie de 64 bits. El hardware Raspberry Pi y Raspberry Pi OS siguen sin probarse. Compile dev/source si necesita compatibilidad glibc más amplia.
+**Compatibilidad ARM64:** el archivo C++ Linux ARM64 de v2.0.2 se comprueba con un límite ABI de glibc 2.31. CI valida el inicio y la síntesis japonesa bajo QEMU con Debian Bullseye / Bookworm / Trixie de 64 bits. El hardware Raspberry Pi y Raspberry Pi OS siguen sin probarse. Use v2.0.2; el archivo anterior v2.0.1 requiere glibc 2.38.
 
 ```bash
 curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
@@ -650,7 +650,7 @@ Publicamos modelos de síntesis de voz para inferencia en Hugging Face.
 |---|---|---|---|---|
 | Base `zs-v1` Zero-Shot/FT | JA/EN/ZH/ES/FR/PT | 571 | Experimental, v7 epoch32, 173 fonemas, embedding de hablante CAM++ de 192 dimensiones | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) |
 
-> `base.onnx` requiere un embedding de referencia extraído con `campplus.onnx` para Zero-Shot; `base.ckpt` es para fine-tuning y debe usarse con el `config.json` incluido. Los ejemplos públicos se verificaron funcionalmente con PyPI `piper-plus==2.0.0`. El modelo es experimental: mantiene límites de ruido y transferencia de voz; esto no constituye aprobación de calidad ni de escucha humana. Los alias `base` y `zero-shot-base-zs-v1` pertenecen a la rama fuente o al próximo lanzamiento y aún no están en 2.0.0/2.0.1. El `model.ckpt` raíz sigue siendo legacy.
+> `base.onnx` requiere un embedding de referencia extraído con `campplus.onnx` para Zero-Shot; `base.ckpt` es para fine-tuning y debe usarse con el `config.json` incluido. Los ejemplos públicos se verificaron funcionalmente con PyPI `piper-plus==2.0.0`. El modelo es experimental: mantiene límites de ruido y transferencia de voz; esto no constituye aprobación de calidad ni de escucha humana. Los alias `base` y `zero-shot-base-zs-v1` están incluidos en v2.0.2 (no en 2.0.0/2.0.1). El `model.ckpt` raíz sigue siendo legacy.
 
 ### Descarga de modelos
 

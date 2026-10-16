@@ -285,7 +285,7 @@ Look for issues labeled [`good first issue`](https://github.com/ayutaz/piper-plu
 
 ## Package Versioning Policy
 
-piper-plus ships as several packages. `VERSION` tracks the Python/native release line (2.0.2 in preparation; the published release is 2.0.1); Rust, npm, NuGet and Kotlin use independent versions. The canonical current version families and manifest paths are in [release-versions.toml](docs/spec/release-versions.toml). See the [Python release checklist](docs/guides/development/python-release-2.0.2.md) for the pending Python/G2P releases.
+piper-plus ships as several packages. `VERSION` tracks the Python/native release line (2.0.2); Rust, npm, NuGet and Kotlin use independent versions. The canonical current version families and manifest paths are in [release-versions.toml](docs/spec/release-versions.toml). See the [Python release checklist](docs/guides/development/python-release-2.0.2.md) for Python 2.0.2 / G2P 0.3.1.
 
 | Package | Registry | Source | Tag prefix | Versioning |
 |---|---|---|---|---|
@@ -341,9 +341,9 @@ Replace the placeholders with new, unpublished versions and the intended commit.
 
 ### `v<X.Y.Z>` tag push の注意点 (Swift checksum / Docker / GitHub Release)
 
-Python runtimeのPyPI公開は、準備済みタグを選択した `dev-create-release.yml` の **workflow_dispatch** (version入力) が担当します。NuGet / crates.io は独立したタグで公開し、このworkflowでは既存パッケージを検証します。**`v<X.Y.Z>` tag のpushは複数workflowを同時発火**させるため、以下を順守する:
+Python runtimeのPyPI公開は、準備済みタグを選択した `dev-create-release.yml` の **workflow_dispatch** (version入力) が担当します。NuGet / crates.io は独立したタグで公開し、このworkflowでは既存パッケージを検証します。**root と Docker の公開タグは別**です。以下を順守します:
 
-1. **`v<X.Y.Z>` tag は `release-shared-lib.yml` と `docker-build.yml` を同時にトリガする。** 前者は C API shared lib + iOS/Android xcframework を、後者は Docker image を `type=semver` で `<X.Y.Z>` + `latest` として ghcr.io / Docker Hub に publish する (`latest` がこのリリースを指すようになる)。
+1. **`v<X.Y.Z>` は `release-shared-lib.yml`、`docker-v<X.Y.Z>` は `docker-build.yml` をトリガする。** 同じ検証済みコミットを使い、Docker は独立タグで一度だけビルド・署名・公開する。root タグだけでは Docker は公開されない。Docker 公開後は `<X.Y.Z>` + `latest` が新しいイメージを指す。
 
 2. **Swift checksum は tag の「前」に更新する (最頻出 footgun)。** `Package.swift` の `let checksum` (synthesis) / `let g2pChecksum` (PiperPlusG2P) は **tag commit に存在必須** (SwiftPM は tag の git ref の manifest を解決)。placeholder (全ゼロ) や不一致のまま tag を push すると `release-shared-lib.yml` の release job が hard-fail し、**post-tag の後追い PR では救済不能**。手順:
 
@@ -359,7 +359,7 @@ Python runtimeのPyPI公開は、準備済みタグを選択した `dev-create-r
 
 3. **GitHub Release は 2 workflow から作られる。** `dev-create-release.yml` が `--draft` + 自動 note を、`release-shared-lib.yml` が同 tag に `generate_release_notes: true` で asset を添付する。**どちらも CHANGELOG `[X.Y.Z]` 本文を使わない**ため、draft の本文を CHANGELOG `[X.Y.Z]` で手動置換してから publish する。
 
-推奨順序: 必要な独立パッケージを公開 → タグなしでnative/Apple成果物を生成・検証 → Package.swiftの版番号・URL・checksumをPRで更新 → PR mergeとCI確認 → 検証済みコミットに `v<X.Y.Z>` tagをpush → 同じタグから `dev-create-release.yml` をdispatch。既公開の `wasm-g2p-v*` / `kotlin-g2p-v*` は再tag不要です。
+推奨順序: タグなしでnative/Apple成果物を生成・検証 → Package.swiftの版番号・URL・checksumをPRで更新 → PR mergeとCI確認 → 必要な独立パッケージを公開 → 同じ検証済みコミットに `docker-v<X.Y.Z>` をpushしてDocker公開・署名・consumer検証 → 同じコミットに `v<X.Y.Z>` tagをpush → 同じタグから `dev-create-release.yml` をdispatch。既公開の `wasm-g2p-v*` / `kotlin-g2p-v*` は再tag不要です。
 
 ## First-PR fast lane (新規 contributor 向け)
 
