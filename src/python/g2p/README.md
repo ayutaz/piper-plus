@@ -71,7 +71,7 @@ multi = get_phonemizer("ja-en-zh")
 tokens = multi.phonemize("こんにちは Hello 你好")
 ```
 
-The development source bundles the reviewed English backend under a private
+Version 0.3.1 bundles the reviewed English backend under a private
 namespace; the `en` extra installs NumPy, NLTK, joblib and inflect, without
 installing the external `g2p-en` distribution or its unused GPL `Distance`
 dependency. The vendored namespace is an implementation detail, not a public
