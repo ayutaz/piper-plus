@@ -150,6 +150,27 @@ def test_pypi_smoke_selects_cpu_provider(tmp_path):
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_release_wheel_smoke_selects_cpu_provider(tmp_path):
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "piper_plus-2.0.2-py3-none-any.whl").touch()
+    script = step(
+        "dev-build-all.yml", "test_python_wheels", "Install wheel and dependencies"
+    )["run"]
+    result = shell(
+        tmp_path,
+        script,
+        {
+            "pip": 'for arg in "$@"; do\n'
+            'case "$arg" in *.whl\\[cpu\\]) touch provider-installed ;;\n'
+            "*.whl) exit 1 ;; esac\ndone\n",
+            "python": 'if [ "$1" = -c ]; then test -f provider-installed; fi',
+        },
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (tmp_path / "provider-installed").exists()
+
+
 def test_bad_npm_attestation_fails(tmp_path):
     script = step(
         "release-verify.yml", "verify-npm", "Verify SLSA attestation via gh CLI"
