@@ -7,6 +7,8 @@ on:
       - 'src/python/g2p/**'
       - '.github/workflows/g2p-python-ci.yml'
       - 'scripts/check_python_release_wheel.py'
+      - 'scripts/check_bundled_english.py'
+      - '.github/workflows/python-license.yml'
     tags:
       - 'python-g2p-v*'
   pull_request:
@@ -14,10 +16,12 @@ on:
       - 'src/python/g2p/**'
       - '.github/workflows/g2p-python-ci.yml'
       - 'scripts/check_python_release_wheel.py'
+      - 'scripts/check_bundled_english.py'
+      - '.github/workflows/python-license.yml'
   workflow_dispatch:
     inputs:
       release_tag:
-        description: '既存の公開用タグ（例: python-g2p-v0.3.0）。パッケージ内容が一致する場合だけ公開します'
+        description: '既存の公開用タグ（例: python-g2p-v0.3.1）。パッケージ内容が一致する場合だけ公開します'
         required: true
         type: string
 
@@ -204,10 +208,15 @@ jobs:
       - run: |
           "${RUNNER_TEMP}/venv-extras/bin/python" -c "from piper_plus_g2p import get_phonemizer; p = get_phonemizer('${{ matrix.extra }}'); print(p.phonemize('test'))"
 
+  release-license:
+    if: startsWith(github.ref, 'refs/tags/python-g2p-v') || github.event_name == 'workflow_dispatch'
+    needs: validate-release
+    uses: ./.github/workflows/python-license.yml
+
   publish:
     name: publish
     runs-on: ubuntu-latest
-    needs: [validate-release, build, test-extras]
+    needs: [validate-release, build, test-extras, release-license]
     if: startsWith(github.ref, 'refs/tags/python-g2p-v') || github.event_name == 'workflow_dispatch'
     timeout-minutes: 10
     environment: pypi
@@ -238,6 +247,12 @@ jobs:
         with:
           name: dist
           path: src/python/g2p/dist/
+
+      - name: Recheck exact upload wheel and bundled licenses
+        run: |
+          python scripts/check_bundled_english.py
+          VERSION=$(python -c 'import tomllib; print(tomllib.load(open("src/python/g2p/pyproject.toml", "rb"))["project"]["version"])')
+          python scripts/check_python_release_wheel.py --name piper-plus-g2p --version "$VERSION" src/python/g2p/dist/*.whl
 
       - name: Generate build provenance
         uses: actions/attest-build-provenance@v3.2.0

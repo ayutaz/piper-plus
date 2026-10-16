@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import email
+import re
 import zipfile
 from pathlib import Path
 
@@ -37,6 +38,10 @@ def verify_wheel(path: Path, name: str, version: str) -> None:
             raise ValueError(
                 f"Wheel name/version mismatch: {message['Name']}@{message['Version']}, expected {name}@{version}"
             )
+        for requirement in message.get_all("Requires-Dist", []):
+            dependency = re.split(r"[\s\[<>=!~;(]", requirement, maxsplit=1)[0]
+            if re.sub(r"[-_.]+", "-", dependency).lower() in {"distance", "g2p-en"}:
+                raise ValueError(f"Forbidden English dependency: {requirement}")
         if name == "piper-plus" and any(f.startswith("piper/") for f in files):
             raise ValueError("Wheel contains the legacy piper module")
         missing = set(modules[name]) - files
@@ -44,6 +49,19 @@ def verify_wheel(path: Path, name: str, version: str) -> None:
             missing.add("license notice")
         if missing:
             raise ValueError(f"Wheel missing required files: {sorted(missing)}")
+        package = "piper_plus" if name == "piper-plus" else "piper_plus_g2p"
+        source = "src/python_run" if name == "piper-plus" else "src/python/g2p"
+        vendor = f"{package}/_vendor/g2p_en/"
+        reference = Path(__file__).resolve().parents[1] / source / vendor
+        # Source provenance is pinned by check_bundled_english.py. Compare the
+        # actual upload payload, including notices, rather than its filename.
+        for asset in reference.iterdir():
+            if asset.is_file():
+                member = vendor + asset.name
+                if member not in files or archive.read(member) != asset.read_bytes():
+                    raise ValueError(
+                        f"Bundled English asset missing or changed: {member}"
+                    )
     print(f"Verified {path.name}: {name}@{version}, {len(files)} files")
 
 

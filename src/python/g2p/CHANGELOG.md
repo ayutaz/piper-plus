@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Prepared for **0.3.1**; not yet published.
+
+### Fixed
+
+- Replace the external g2p-en/Distance dependency with the reviewed private
+  English backend, retaining the Apache-2.0/MIT notices and pronunciation.
+- Require installed-wheel license, frozen pronunciation and public-model
+  synthesis gates before publication; recheck the exact upload wheel's
+  version, dependencies, bundled weights and notices.
+
 ## [0.3.0] - 2026-10-06
 
 ### Added
