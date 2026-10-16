@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792081280128,
+  "lastUpdate": 1792112133596,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1182,6 +1182,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 210.8,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3903ecac9dd43951cd9bda4b6363f2ef47a4b6f8",
+          "message": "fix(python): 英語G2PのDistance依存を除去し配布wheelのライセンス検証をCI化 (#801)\n\n* fix(python): remove Distance dependency with licensed bundled English G2P\n\n* test(docs): sync executable example audit after license guide additions\n\n* fix(ci): validate training G2P and synchronize license documentation",
+          "timestamp": "2026-10-16T09:54:05+09:00",
+          "tree_id": "588165ca61a4b81bbfca5e90b1bdc8ae2683ec10",
+          "url": "https://github.com/ayutaz/piper-plus/commit/3903ecac9dd43951cd9bda4b6363f2ef47a4b6f8"
+        },
+        "date": 1792112131056,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0995,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 25.4,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 25.7,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1204.7,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 210.7,
             "unit": "MB"
           },
           {
