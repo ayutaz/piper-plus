@@ -227,10 +227,9 @@ xattr -cr /path/to/piper/
 
 The published v2.0.1 `piper-plus-cpp-linux-arm64.tar.gz` requires glibc
 2.38 and does not start on Debian Bullseye (2.31) or Bookworm (2.36).
-The fix on `dev` builds ARM64 on Bullseye and validates the archive on
-Bullseye, Bookworm and Trixie under QEMU; it is not part of the existing
-v2.0.1 release archive. Use the corrected source/CI artifact or wait for
-a release containing it. See [binary selection](binary-selection.md).
+Use the v2.0.2 archive, built on Bullseye with a glibc 2.31 ABI ceiling.
+CI checks startup and Japanese synthesis on Bullseye, Bookworm and Trixie
+under QEMU. Raspberry Pi hardware and Raspberry Pi OS remain untested. See [binary selection](binary-selection.md).
 Do not replace an operating system's libc with a copied shared library.
 
 #### Permission Denied

@@ -7,9 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-The Python/native release line is prepared as **2.0.2**, and the independent
-Python G2P package as **0.3.1**. These versions have not been published.
-See the [Python release checklist](docs/guides/development/python-release-2.0.2.md).
+## [2.0.2] - 2026-10-16
+
+Python/native **2.0.2** and independent Python G2P **0.3.1**.
+See the [release checklist](docs/guides/development/python-release-2.0.2.md).
 
 ### Added
 
@@ -22,7 +23,7 @@ See the [Python release checklist](docs/guides/development/python-release-2.0.2.
 ### Fixed
 
 - Python English G2P: bundle the pinned upstream inference code and weights in both `piper-plus` and `piper-plus-g2p`, with Apache-2.0/MIT notices, removing the unused transitive GPL `Distance` dependency while preserving pronunciation. Add installed-wheel license/compatibility CI and preserve runtime versions when rebuilding wheels from sdists. Existing PyPI releases remain unchanged; see the [migration guide](docs/migration/python-g2p-license.md).
-- Consumer paths: use uv's selected interpreter in README examples, separate CPU/GPU ORT distributions and the locked WebUI environment, connect Rust phoneme silence and Rust/Go SSML synthesis, and emit C#/Go timing artifacts for stdin/batch utterances. Document the development package's explicit `[cpu]`/`[gpu]` selection in the [provider environment migration guide](docs/migration/provider-environments.md); published v2.0.1 metadata is unchanged.
+- Consumer paths: use uv's selected interpreter in README examples, separate CPU/GPU ORT distributions and the locked WebUI environment, connect Rust phoneme silence and Rust/Go SSML synthesis, and emit C#/Go timing artifacts for stdin/batch utterances. Document the development package's explicit `[cpu]`/`[gpu]` selection in the [provider environment migration guide](docs/migration/provider-environments.md); v2.0.2 requires an explicit `[cpu]` or `[gpu]` extra; older v2.0.1 metadata is unchanged.
 - Model tooling: verify and update nested artifact hashes/sizes, reject incomplete published manifest entries, and run actual ONNX artifact validation from both exporters. Add mandatory CLI artifact and clean Python environment consumer checks.
 - ARM64 consumer checks: detect Docker CLI support for platform-specific image inspection so the same harness runs on Docker Desktop and older GitHub-hosted Docker clients.
 - C++ Linux ARM64: build the release archive against Debian Bullseye (glibc 2.31), preserving other platforms' build environments. Reject newer GLIBC/GLIBCXX/CXXABI requirements before artifact upload and check actual archive startup and Japanese synthesis on emulated Debian Bullseye, Bookworm, and Trixie.

@@ -22,9 +22,9 @@ Multilingual G2P (Grapheme-to-Phoneme) for TTS. eSpeak-ng free. MIT licensed. 8 
 ## Installation
 
 ```bash
-pip install piper-plus-g2p               # Rule-based languages (ES, FR, PT, SV)
-pip install piper-plus-g2p[ja,en]        # Japanese + English
-pip install piper-plus-g2p[all]          # All 8 languages
+pip install "piper-plus-g2p==0.3.1"       # Rule-based languages (ES, FR, PT, SV)
+pip install "piper-plus-g2p[ja,en]==0.3.1" # Japanese + English
+pip install "piper-plus-g2p[all]==0.3.1"   # All 8 languages
 ```
 
 > **Note:** The `ja` extra requires `pyopenjtalk-plus`, which provides pre-built wheels for Linux, macOS, and Windows. See [pyopenjtalk-plus](https://pypi.org/project/pyopenjtalk-plus/) for platform details.

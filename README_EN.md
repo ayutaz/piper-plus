@@ -19,7 +19,7 @@ English | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_F
 
 > **🔑 The only MIT-licensed Piper fork** — The original [rhasspy/piper](https://github.com/rhasspy/piper) was archived in October 2025. [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) has moved to GPL-3.0. piper-plus is the only MIT-compatible fork with no espeak-ng dependency. Custom G2P covers 8 languages (JA/EN/ZH/KO/ES/FR/PT/SV), suitable for commercial and embedded use.
 
-> **📢 v2.0.0 Breaking changes:** Default Docker images use CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (host NVIDIA driver **R570+** required). Training uses torch **2.11.0** + CUDA 12.8, with TF32 + bf16-mixed enabled by default. Resuming torch 2.2 checkpoints is unsupported. Python imports and CLI are now `piper_plus` and `piper-plus`. To upgrade from 1.13.0 to the current public release, run `pip install --upgrade "piper-plus==2.0.1"`. See the [migration guide](docs/migration/v1.12-to-v2.0.md).
+> **📢 v2.0.0 Breaking changes:** Default Docker images use CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (host NVIDIA driver **R570+** required). Training uses torch **2.11.0** + CUDA 12.8, with TF32 + bf16-mixed enabled by default. Resuming torch 2.2 checkpoints is unsupported. Python imports and CLI are now `piper_plus` and `piper-plus`. To upgrade from 1.13.0 to the current public release, run `pip install --upgrade "piper-plus[cpu]==2.0.2"`. See the [migration guide](docs/migration/v1.12-to-v2.0.md).
 
 A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](https://github.com/jaywalnut310/vits/) architecture with 8-language G2P/phonemization and multi-speaker synthesis from current trained models in 6 languages (Japanese, English, Mandarin Chinese, Spanish, French, Portuguese). A fork of [Piper](https://github.com/rhasspy/piper) with significantly enhanced Japanese support, improved voice quality, and advanced training features.
 
@@ -75,7 +75,7 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 
 - **8-Language G2P/phonemization** — Japanese, English, Mandarin Chinese, Spanish, French, Portuguese, Swedish, Korean (language codes: ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7). Current trained models cover 6 languages (JA/EN/ZH/ES/FR/PT)
 - **Japanese TTS** — OpenJTalk integration, prosody features (A1/A2/A3), question markers (#204), context-dependent "N" variants (#207)
-- **English TTS** — This dev/source tree bundles English G2P based on [g2p-en](https://github.com/Kyubyong/g2p), with the upstream Apache-2.0 inference code and Tacotron MIT notice; its runtime has no external `g2p-en`/`Distance` or espeak-ng dependency. The current public PyPI 2.0.1 wheel is unchanged and still uses the previous external dependency; see the [migration guide](docs/migration/python-g2p-license.md)
+- **English TTS** — v2.0.2 bundles G2P based on [g2p-en](https://github.com/Kyubyong/g2p), with Apache-2.0 inference code and the Tacotron MIT notice. No external `g2p-en`/`Distance` or espeak-ng is needed. Older PyPI 2.0.1 metadata is unchanged; see the [migration guide](docs/migration/python-g2p-license.md)
 - **Multi-speaker** — 571 speakers in 6-language base model (code supports 8 languages including Swedish and Korean), SpeakerBalancedBatchSampler with language-balanced sampling
 - **Custom Dictionary** — 200+ built-in technical term pronunciations
 - **Phoneme Input** — Direct phoneme specification with `[[ phonemes ]]` notation — [Guide](docs/features/phoneme-input.md)
@@ -195,7 +195,7 @@ cd piper-plus
 
 **Linux (ARM64, Raspberry Pi 4/5):**
 
-**ARM64 compatibility:** The v2.0.1 Linux ARM64 C++ asset requires glibc 2.38 or later. The glibc 2.31-compatible fix is on dev/source and has been verified for startup and Japanese synthesis in 64-bit Debian Bullseye / Bookworm / Trixie containers under QEMU. Raspberry Pi hardware and Raspberry Pi OS itself remain untested. Build dev/source when broader glibc compatibility is required.
+**ARM64 compatibility:** The v2.0.2 Linux ARM64 C++ archive is checked against a glibc 2.31 ABI ceiling. CI validates startup and Japanese synthesis in 64-bit Debian Bullseye / Bookworm / Trixie containers under QEMU. Raspberry Pi hardware and Raspberry Pi OS itself remain untested. Use v2.0.2; the older v2.0.1 archive requires glibc 2.38.
 
 ```bash
 curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
@@ -357,7 +357,7 @@ For the list of available piper-plus models, download instructions, 6-language b
 
 Main models: `tsukuyomi` (Japanese), `zs-v1` (experimental 6-language Zero-Shot/FT base), `bilingual-ja-en-v4` (Japanese-English) — see the pinned HuggingFace [zs-v1 bundle](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) and [ayousanz/piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan).
 
-> **Zero-Shot/FT base (`zs-v1`, 2026-10-10):** The pinned public bundle is the existing v7 epoch32 experimental base (JA/EN/ZH/ES/FR/PT, 571 speakers, 173 phonemes, CAM++ 192-dim embeddings). Zero-Shot inference uses `base.onnx` with a reference embedding extracted by the bundled `campplus.onnx`; fine-tuning uses `base.ckpt` with the bundled `config.json`. The public examples were functionally verified with PyPI `piper-plus==2.0.0`, but this is not quality approval, human listening approval, or a latest/best model claim. The `base` / `zero-shot-base-zs-v1` aliases target the source branch/next release and are not in released 2.0.0 / 2.0.1. The root `model.ckpt` remains a separate legacy model.
+> **Zero-Shot/FT base (`zs-v1`, 2026-10-10):** The pinned public bundle is the existing v7 epoch32 experimental base (JA/EN/ZH/ES/FR/PT, 571 speakers, 173 phonemes, CAM++ 192-dim embeddings). Zero-Shot inference uses `base.onnx` with a reference embedding extracted by the bundled `campplus.onnx`; fine-tuning uses `base.ckpt` with the bundled `config.json`. The public examples were functionally verified with PyPI `piper-plus==2.0.0`, but this is not quality approval, human listening approval, or a latest/best model claim. The `base` / `zero-shot-base-zs-v1` aliases are included in v2.0.2 (absent from 2.0.0 / 2.0.1). The root `model.ckpt` remains a separate legacy model.
 
 > **Tsukuyomi FT (`zs-v1`, 2026-10-15):** The [pinned public release](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/tree/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1) is a fine-tune from the same public base generation. Use `tsukuyomi.onnx` with `tsukuyomi.onnx.json`; inference needs no reference audio or CAM++. Human review of three Japanese listening samples was recorded and publication as an experimental baseline was approved; `quality_approval=false`, so this is not quality approval. Existing `tsukuyomi` aliases still select the legacy root model; download this release through the pinned URLs in the [model guide](docs/guides/development/pretrained-models.md).
 

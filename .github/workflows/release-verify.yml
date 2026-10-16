@@ -331,8 +331,8 @@ jobs:
           VERSION="${{ needs.gate.outputs.version }}"
           # Resolve the real published dependencies in a clean environment.
           python3 -m venv /tmp/verify-venv
-          /tmp/verify-venv/bin/pip install "piper-plus==${VERSION}" || {
-            echo "::error::pip install piper-plus==${VERSION} failed"
+          /tmp/verify-venv/bin/pip install "piper-plus[cpu]==${VERSION}" || {
+            echo "::error::pip install piper-plus[cpu]==${VERSION} failed"
             exit 1
           }
           /tmp/verify-venv/bin/pip show piper-plus

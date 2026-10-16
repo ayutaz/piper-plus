@@ -19,7 +19,7 @@
 
 > **🔑 O único fork do Piper sob licença MIT** — O projeto original [rhasspy/piper](https://github.com/rhasspy/piper) foi arquivado em outubro de 2025 e o [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) migrou para a licença GPL-3.0. O piper-plus é o único fork compatível com MIT sem dependência do espeak-ng. Seu G2P próprio oferece suporte a 8 idiomas (JA/EN/ZH/KO/ES/FR/PT/SV), tornando-o adequado para uso comercial e embarcado.
 
-> **📢 v2.0.0 Mudanças incompatíveis:** As imagens Docker usam CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (driver NVIDIA **R570+** obrigatório). Treinamento: torch **2.11.0** + CUDA 12.8, TF32 + bf16-mixed por padrão; não há suporte para retomar checkpoints de torch 2.2. O import Python / CLI passa a `piper_plus` / `piper-plus`. Para atualizar da 1.13.0 para a versão pública atual: `pip install --upgrade "piper-plus==2.0.1"`. Veja o [guia de migração](docs/migration/v1.12-to-v2.0.md).
+> **📢 v2.0.0 Mudanças incompatíveis:** As imagens Docker usam CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (driver NVIDIA **R570+** obrigatório). Treinamento: torch **2.11.0** + CUDA 12.8, TF32 + bf16-mixed por padrão; não há suporte para retomar checkpoints de torch 2.2. O import Python / CLI passa a `piper_plus` / `piper-plus`. Para atualizar da 1.13.0 para a versão pública atual: `pip install --upgrade "piper-plus[cpu]==2.0.2"`. Veja o [guia de migração](docs/migration/v1.12-to-v2.0.md).
 
 Sistema neural de texto para fala (TTS) de alta velocidade e alta qualidade. Utiliza a arquitetura [VITS](https://github.com/jaywalnut310/vits/) e oferece G2P/fonemização em 8 idiomas e síntese com vários falantes nos modelos treinados atuais em 6 idiomas (japonês, inglês, chinês, espanhol, francês e português). Fork do [Piper](https://github.com/rhasspy/piper), com melhorias significativas no suporte ao japonês, qualidade de voz e funcionalidades de treinamento.
 
@@ -47,7 +47,7 @@ Sistema neural de texto para fala (TTS) de alta velocidade e alta qualidade. Uti
 
 - **G2P/fonemização em 8 idiomas** — Japonês, inglês, chinês, espanhol, francês, português, sueco e coreano (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7). Os modelos treinados atuais cobrem 6 idiomas (JA/EN/ZH/ES/FR/PT)
 - **TTS em japonês** — Integração com OpenJTalk, informações prosódicas (A1/A2/A3), marcadores de interrogação (#204), variantes contextuais de "ん" (#207)
-- **TTS em inglês** — Esta árvore de desenvolvimento/fonte inclui um G2P baseado em [g2p-en](https://github.com/Kyubyong/g2p), com o código de inferência Apache-2.0 e o aviso MIT do Tacotron; em execução não requer `g2p-en`/`Distance` externos nem espeak-ng. O wheel público atual do PyPI 2.0.1 permanece inalterado e continua usando a dependência externa anterior; consulte o [guia de migração](docs/migration/python-g2p-license.md)
+- **TTS em inglês** — v2.0.2 inclui G2P baseado em [g2p-en](https://github.com/Kyubyong/g2p), com código de inferência Apache-2.0 e aviso MIT do Tacotron. Não exige `g2p-en`/`Distance` externos nem espeak-ng. Os metadados antigos do PyPI 2.0.1 permanecem inalterados; consulte o [guia de migração](docs/migration/python-g2p-license.md)
 - **Multi-falante** — 571 falantes no bundle experimental Zero-Shot/FT `zs-v1`, SpeakerBalancedBatchSampler, amostragem balanceada por grupo linguístico
 - **Dicionário personalizado** — Dicionário de pronúncia integrado com mais de 200 termos técnicos
 - **Entrada de fonemas** — Especificação direta com notação `[[ fonemas ]]` — [Guia](docs/features/phoneme-input.md)
@@ -85,7 +85,7 @@ Síntese com modelos treinados atuais em 6 idiomas em 6 runtimes (Python/Rust/C#
 
 | Plataforma | Arquitetura | Observações |
 |---|---|---|
-| Linux | x86_64 / ARM64 / ARMv7 | Artefatos C++ v2.0.1 disponíveis; ARM64 requer glibc 2.38. A correção compatível com glibc 2.31 está em dev/source |
+| Linux | x86_64 / ARM64 / ARMv7 | Arquivos C++ v2.0.2; limite ABI ARM64: glibc 2.31 |
 | macOS | ARM64 (Apple Silicon) apenas | M1/M2/M3+ |
 | Windows | x64 | Artefatos C++ x64; CLI C# também x64 / arm64 |
 | C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | Biblioteca compartilhada, Android AAR |
@@ -133,7 +133,7 @@ cd piper-plus
 
 **Linux (ARM64, Raspberry Pi 4/5):**
 
-**Compatibilidade ARM64:** o artefato C++ Linux ARM64 da v2.0.1 exige glibc 2.38 ou posterior. A correção compatível com glibc 2.31 está em dev/source; a inicialização e a síntese em japonês foram verificadas sob QEMU com Debian Bullseye / Bookworm / Trixie de 64 bits. O hardware Raspberry Pi e o próprio Raspberry Pi OS ainda não foram testados. Compile dev/source se precisar de compatibilidade glibc mais ampla.
+**Compatibilidade ARM64:** o arquivo C++ Linux ARM64 da v2.0.2 é verificado com um limite ABI de glibc 2.31. A CI valida inicialização e síntese japonesa sob QEMU com Debian Bullseye / Bookworm / Trixie de 64 bits. O hardware Raspberry Pi e o Raspberry Pi OS permanecem não testados. Use v2.0.2; o arquivo antigo v2.0.1 exige glibc 2.38.
 
 ```bash
 curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
@@ -651,7 +651,7 @@ Modelos de síntese de voz para inferência estão disponíveis no Hugging Face.
 |---|---|---|---|---|
 | Base `zs-v1` Zero-Shot/FT | JA/EN/ZH/ES/FR/PT | 571 | Experimental, v7 epoch32, 173 fonemas, embedding de falante CAM++ de 192 dimensões | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) |
 
-> `base.onnx` requer um embedding de referência extraído com `campplus.onnx` para Zero-Shot; `base.ckpt` é usado para fine-tuning com o `config.json` incluído. Os exemplos públicos foram verificados funcionalmente com PyPI `piper-plus==2.0.0`. O modelo é experimental: ainda há limites de ruído e transferência de voz; isso não representa aprovação de qualidade ou de escuta humana. Os aliases `base` e `zero-shot-base-zs-v1` pertencem à branch fonte/próximo lançamento e ainda não estão em 2.0.0/2.0.1. O `model.ckpt` raiz continua sendo um arquivo legacy separado.
+> `base.onnx` requer um embedding de referência extraído com `campplus.onnx` para Zero-Shot; `base.ckpt` é usado para fine-tuning com o `config.json` incluído. Os exemplos públicos foram verificados funcionalmente com PyPI `piper-plus==2.0.0`. O modelo é experimental: ainda há limites de ruído e transferência de voz; isso não representa aprovação de qualidade ou de escuta humana. Os aliases `base` e `zero-shot-base-zs-v1` estão incluídos na v2.0.2 (ausentes de 2.0.0/2.0.1). O `model.ckpt` raiz continua sendo um arquivo legacy separado.
 
 ### Download de modelos
 

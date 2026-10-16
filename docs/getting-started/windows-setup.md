@@ -34,7 +34,7 @@ $OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($f
 
 通常のビルドに管理者権限は不要です。Visual Studio の Developer PowerShell、または CMake と Git が利用できる PowerShell で実行します。
 
-以下は未リリースの変更を含む `dev` のビルド手順です。公開版の再現が目的なら `--branch dev` を `--branch v2.0.1` に置き換えてください。
+以下は未リリースの変更を含む `dev` のビルド手順です。公開版の再現が目的なら `--branch dev` を `--branch v2.0.2` に置き換えてください。
 
 ```powershell
 git clone --branch dev https://github.com/ayutaz/piper-plus.git

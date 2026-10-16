@@ -1,16 +1,16 @@
-# 開発版の Python provider と WebUI 環境
+# Python 2.0.2 の provider と WebUI 環境
 
-この変更は開発ブランチ用です。公開済み v2.0.1 の依存 metadata を変更するものではありません。
+v2.0.2 から CPU/GPU の provider を明示的に選択します。旧 v2.0.1 の依存 metadata は変更されません。
 
 ## CPU / GPU の選択
 
-次のソースビルドから `piper-plus` の基底依存は ORT を含みません。CPU/GPU wheel は同じ `onnxruntime` module を提供するため、**どちらか一方**を選びます。既存環境を変更する場合は新しい venv を使用してください。
+v2.0.2 から `piper-plus` の基底依存は ORT を含みません。CPU/GPU wheel は同じ `onnxruntime` module を提供するため、**どちらか一方**を選びます。既存環境を変更する場合は新しい venv を使用してください。
 
 ```bash
-# ソースパッケージから CPU 用環境へ
-uv pip install "src/python_run[cpu]"
+# CPU 用の新しい環境へ
+uv pip install "piper-plus[cpu]==2.0.2"
 # または別の新しい環境へ GPU 用を導入（CUDA 12 / cuDNN の要件は別途必要）
-uv pip install "src/python_run[gpu]"
+uv pip install "piper-plus[gpu]==2.0.2"
 ```
 
 root workspace は `cpu` dependency group を既定で有効にし、従来の CPU / training 開発用構成を維持します。GPU のときは既定 CPU group を除きます。
@@ -24,7 +24,7 @@ uv run --no-sync python -m piper_plus --help
 root の `inference` / `train` / `cpu` group と `inference-gpu` は排他です。provider を切り替えた後は、通常の `uv sync` で別構成に戻さず、実行に `uv run --no-sync` を使います。
 uv の group 選択は [公式の依存管理ドキュメント](https://docs.astral.sh/uv/concepts/projects/dependencies/#default-groups) に従います。
 
-公開済み v2.0.1 の `piper-plus[gpu]` は CPU ORT も要求します。ここでの GPU 手順は、この修正を含むソースからの導入を対象としています。
+公開済み v2.0.1 の `piper-plus[gpu]` は CPU ORT も要求します。GPU を使う場合は v2.0.2 の `[gpu]` を新規環境へ導入してください。
 
 ## WebUI
 

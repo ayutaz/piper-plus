@@ -19,7 +19,7 @@
 
 > **🔑 唯一の MIT ライセンス Piper フォーク** — オリジナルの [rhasspy/piper](https://github.com/rhasspy/piper) は 2025年10月にアーカイブ済み。[OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) は GPL-3.0 に移行。piper-plus は espeak-ng に依存しない唯一の MIT 互換フォークです。独自実装の G2P で8言語 (JA/EN/ZH/KO/ES/FR/PT/SV) に対応し、商用利用・組込み利用に適しています。
 
-> **📢 v2.0.0 Breaking changes:** Docker 既定イメージは CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (host NVIDIA driver **R570+** 必須)。学習は torch **2.11.0** + CUDA 12.8、TF32 + bf16-mixed が既定です。torch 2.2 製 checkpoint の resume は非対応です。Python の import / CLI は `piper_plus` / `piper-plus` に変更されました。1.13.0 から現在の公開版へ更新する場合は `pip install --upgrade "piper-plus==2.0.1"` を実行してください。詳細: [移行ガイド](docs/migration/v1.12-to-v2.0.md)。
+> **📢 v2.0.0 Breaking changes:** Docker 既定イメージは CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (host NVIDIA driver **R570+** 必須)。学習は torch **2.11.0** + CUDA 12.8、TF32 + bf16-mixed が既定です。torch 2.2 製 checkpoint の resume は非対応です。Python の import / CLI は `piper_plus` / `piper-plus` に変更されました。1.13.0 から現在の公開版へ更新する場合は `pip install --upgrade "piper-plus[cpu]==2.0.2"` を実行してください。詳細: [移行ガイド](docs/migration/v1.12-to-v2.0.md)。
 
 高速・高品質なニューラルテキスト音声合成 (TTS) システム。[VITS](https://github.com/jaywalnut310/vits/) アーキテクチャを採用し、8言語のG2P/音素化と、現在6言語の学習済みモデルによるマルチスピーカー音声合成に対応。[Piper](https://github.com/rhasspy/piper) のフォークで、日本語対応・音質向上・学習機能を大幅に強化しています。
 
@@ -81,7 +81,7 @@ Python / Rust / Go / C# / C++ / WASM の 6 ランタイムを `multilingual-test
 
 - **8言語G2P/音素化対応** — 日本語・英語・中国語・スペイン語・フランス語・ポルトガル語・スウェーデン語・韓国語 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7)。現行の学習済みモデルは6言語 (JA/EN/ZH/ES/FR/PT)
 - **日本語 TTS** — OpenJTalk統合、韻律情報 (A1/A2/A3)、疑問詞マーカー (#204)、文脈依存「ん」バリアント (#207)
-- **英語 TTS** — この dev/source には [g2p-en](https://github.com/Kyubyong/g2p) を元にした G2P を Apache-2.0 の推論コードと Tacotron の MIT 許諾表示付きで同梱しています。実行時に外部の `g2p-en` / `Distance` や espeak-ng は不要です。現在公開中の PyPI 2.0.1 wheel は変更されず、従来の外部依存を使用します。詳細は[移行ガイド](docs/migration/python-g2p-license.md)を参照してください
+- **英語 TTS** — v2.0.2 では [g2p-en](https://github.com/Kyubyong/g2p) 由来の G2P を Apache-2.0 の推論コードと Tacotron の MIT 許諾表示付きで同梱しています。外部の `g2p-en` / `Distance` や espeak-ng は不要です。旧 PyPI 2.0.1 の依存定義は変更されません。[移行ガイド](docs/migration/python-g2p-license.md)を参照してください
 - **マルチスピーカー** — 571話者対応 (学習用ベースモデル)、SpeakerBalancedBatchSampler、言語グループ均等サンプリング
 - **カスタム辞書** — 200+技術用語の発音辞書内蔵
 - **音素入力** — `[[ phonemes ]]` 記法による直接指定 — [ガイド](docs/features/phoneme-input.md)
@@ -156,7 +156,7 @@ cd piper-plus
 
 **Linux (ARM64, Raspberry Pi 4/5):**
 
-**ARM64 の互換性:** v2.0.1 の Linux ARM64 C++ 配布物は glibc 2.38 以上を必要とします。glibc 2.31 以上を対象にする修正は dev/source 側で、Debian Bullseye / Bookworm / Trixie（64bit）を QEMU で確認済みです。Raspberry Pi 実機と Raspberry Pi OS 自体は未検証です。幅広い glibc 互換性が必要な場合は dev/source をビルドしてください。
+**ARM64 の互換性:** v2.0.2 の Linux ARM64 C++ 配布物は glibc 2.31 を ABI 上限として検査します。Debian Bullseye / Bookworm / Trixie（64bit）での起動と日本語合成を QEMU で検証します。Raspberry Pi 実機と Raspberry Pi OS 自体は未検証です。旧 v2.0.1 配布物は glibc 2.38 以上を必要とするため、v2.0.2 を使用してください。
 
 ```bash
 curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
@@ -368,7 +368,7 @@ C++ CLI の詳細なコマンドラインオプション、JSON 入力フォー�
 
 主要モデル: `tsukuyomi` (日本語), `zs-v1` (6 言語 Zero-Shot/FT 実験ベース), `bilingual-ja-en-v4` (日英 2 言語) — 詳細は HuggingFace の [固定公開 zs-v1 バンドル](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) や [ayousanz/piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) を参照してください。
 
-> **Zero-Shot/FT ベース (`zs-v1`, 2026-10-10):** 固定公開バンドルは既存の v7 epoch 32 実験基準版（JA/EN/ZH/ES/FR/PT、571 話者、173 音素、CAM++ 192 次元）です。Zero-Shot 推論は `base.onnx` と同梱 `campplus.onnx` から抽出した参照 embedding、追加学習は `base.ckpt` と同梱 `config.json` を使ってください。PyPI `piper-plus==2.0.0` の公開例で機能確認済みですが、品質承認・人手試聴合格・最新/最高品質を意味しません。`base` / `zero-shot-base-zs-v1` alias はソースブランチ/次期リリース向けで、公開済み 2.0.0 / 2.0.1 には未収録です。ルートの `model.ckpt` は旧世代として別扱いです。
+> **Zero-Shot/FT ベース (`zs-v1`, 2026-10-10):** 固定公開バンドルは既存の v7 epoch 32 実験基準版（JA/EN/ZH/ES/FR/PT、571 話者、173 音素、CAM++ 192 次元）です。Zero-Shot 推論は `base.onnx` と同梱 `campplus.onnx` から抽出した参照 embedding、追加学習は `base.ckpt` と同梱 `config.json` を使ってください。PyPI `piper-plus==2.0.0` の公開例で機能確認済みですが、品質承認・人手試聴合格・最新/最高品質を意味しません。`base` / `zero-shot-base-zs-v1` alias は v2.0.2 に収録されています（2.0.0 / 2.0.1 には未収録）。ルートの `model.ckpt` は旧世代として別扱いです。
 
 > **つくよみちゃんFT (`zs-v1`, 2026-10-15):** 同じ公開base世代を追加学習した[固定公開モデル](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/tree/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1)を公開しました。`tsukuyomi.onnx`と`tsukuyomi.onnx.json`を組み合わせれば、参照音声やCAM++なしで生成できます。日本語3文の人手確認を記録し、実験版としての公開を承認済みです（quality_approval=false、品質承認ではありません）。既存の`tsukuyomi` aliasは引き続き旧rootモデルを選ぶため、新モデルは[モデルガイド](docs/guides/development/pretrained-models.md)の固定URLから取得してください。
 

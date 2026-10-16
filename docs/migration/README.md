@@ -2,7 +2,7 @@
 
 `piper-plus` の version-to-version migration guide はすべてこのディレクトリに置きます。 ユーザー視点で **既存コードがそのままでは動かなくなる変更** (= breaking change) を解説するのが目的です。 内部リファクタや非互換ではない API 追加はここではなく `CHANGELOG.md` の `### Added` / `### Changed` 節で扱います。
 
-> v1.11 → v1.12 と v1.12 → v2.0 は移行時点の履歴アンカーを保った資料です。現行の新規導入は [v2.0.1 release](https://github.com/ayutaz/piper-plus/releases/tag/v2.0.1) とリポジトリの Quick Start を起点にし、履歴資料にある旧コマンドや旧資産を現行公開物の互換性保証と解釈しないでください。
+> v1.11 → v1.12 と v1.12 → v2.0 は移行時点の履歴アンカーを保った資料です。現行の新規導入は [v2.0.2 release](https://github.com/ayutaz/piper-plus/releases) とリポジトリの Quick Start を起点にし、履歴資料にある旧コマンドや旧資産を現行公開物の互換性保証と解釈しないでください。
 
 ## ファイル命名規則
 
