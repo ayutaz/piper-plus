@@ -127,7 +127,7 @@ swift = "Sources/PiperPlusG2P/ (Swift package; loads the Rust shared lib via FFI
 # ===========================================================================
 # English G2P uses the CMU Pronouncing Dictionary (cmudict.0.7b), an
 # ARPABET-format word→phoneme lookup, plus a neural fallback for OOV
-# words (via g2p-en's bundled BiLSTM model on the Python side; rule-based
+# words (via g2p-en's bundled GRU model on the Python side; rule-based
 # fallback on the Rust/Go/C#/JS side).
 
 [english.cmudict]
@@ -140,15 +140,16 @@ license = "BSD-style (CMU Pronouncing Dictionary License)"
 format = "ARPABET (e.g. CAT → K AE1 T)"
 
 [english.g2p_en]
-# Python wrapper that bundles cmudict 0.7b + a BiLSTM OOV model.
+# Vendored Apache-2.0 upstream backend. Not an installed PyPI dependency.
 package = "g2p-en"
 version = "2.1.0"
-pypi_constraint = ">=2.1.0,<3"
-license = "Apache-2.0"
+distribution = "private namespace in piper-plus and piper-plus-g2p"
+provenance = "src/python_run/piper_plus/_vendor/g2p_en/provenance.json"
+license = "Apache-2.0 AND MIT"
 includes = [
-    "checkpoint20.npz (BiLSTM OOV model weights)",
+    "checkpoint20.npz (GRU OOV model weights)",
     "homographs.en (homograph disambiguation table)",
-    "embedded cmudict (within g2p_en/)",
+    "NLTK cmudict (downloaded separately; not in this wheel)",
 ]
 canonical_for = ["python-train", "python-runtime"]
 

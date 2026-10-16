@@ -49,7 +49,7 @@ Ein schnelles und hochwertiges neuronales Text-to-Speech-System (TTS). Basierend
 
 - **8-Sprachen-G2P/Phonemisierung** — Japanisch, Englisch, Chinesisch, Spanisch, Französisch, Portugiesisch, Schwedisch und Koreanisch (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7). Die aktuellen trainierten Modelle umfassen 6 Sprachen (JA/EN/ZH/ES/FR/PT)
 - **Japanisches TTS** — OpenJTalk-Integration, Prosodieinformationen (A1/A2/A3), Fragemarkierungen (#204), kontextabhängige "N"-Varianten (#207)
-- **Englisches TTS** — GPL-freies G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), kein espeak-ng erforderlich
+- **Englisches TTS** — Dieser Dev/Source-Baum enthält ein G2P auf Basis von [g2p-en](https://github.com/Kyubyong/g2p) mit dem Apache-2.0-lizenzierten Inferenzcode und dem MIT-Hinweis für die Tacotron-Normalisierung; zur Laufzeit sind weder externes `g2p-en`/`Distance` noch espeak-ng erforderlich. Das aktuell öffentliche PyPI-Wheel 2.0.1 bleibt unverändert und verwendet weiterhin die bisherige externe Abhängigkeit; siehe den [Migrationsleitfaden](docs/migration/python-g2p-license.md)
 - **Multi-Speaker** — 571 Sprecher im experimentellen Zero-Shot/FT-Bundle `zs-v1`, SpeakerBalancedBatchSampler, ausgewogene Sprachgruppen-Abtastung
 - **Benutzerdefinierte Wörterbücher** — Integriertes Aussprachwörterbuch mit über 200 Fachbegriffen
 - **Phoneingabe** — Direkte Eingabe über `[[ Phoneme ]]`-Notation — [Anleitung](docs/features/phoneme-input.md)

@@ -29,7 +29,7 @@ readme = "README.md"
 
 [project.optional-dependencies]
 ja = ["pyopenjtalk-plus>=0.3,<1"]
-en = ["g2p-en>=2.1.0,<3"]
+en = ["numpy>=1.26.4", "nltk>=3.10.0", "joblib>=1.5.0", "inflect>=0.3.1"]
 zh = ["pypinyin>=0.55.0,<1"]
 ko = ["g2pk2>=0.0.3,<1"]
 es = []
@@ -38,7 +38,10 @@ pt = []
 sv = []
 all = [
     "pyopenjtalk-plus>=0.3,<1",
-    "g2p-en>=2.1.0,<3",
+    "numpy>=1.26.4",
+    "nltk>=3.10.0",
+    "joblib>=1.5.0",
+    "inflect>=0.3.1",
     "pypinyin>=0.55.0,<1",
     "g2pk2>=0.0.3,<1",
 ]
@@ -71,6 +74,7 @@ packages = ["piper_plus_g2p"]
 "THIRD_PARTY_LICENSES.md" = "piper_plus_g2p/THIRD_PARTY_LICENSES.md"
 
 [tool.ruff]
+extend-exclude = ["piper_plus_g2p/_vendor"]
 target-version = "py311"
 line-length = 88
 
@@ -172,6 +176,7 @@ asyncio_mode = "auto"
 branch = true
 source = ["piper_plus_g2p"]
 omit = [
+    "*/_vendor/*",
     # Test files (never measured)
     "*/tests/*",
     "*/test_*.py",
@@ -195,3 +200,7 @@ exclude_lines = [
     "@overload",
     "\\.\\.\\.",
 ]
+
+[[tool.mypy.overrides]]
+module = "piper_plus_g2p._vendor.*"
+ignore_errors = true

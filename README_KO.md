@@ -47,7 +47,7 @@
 
 - **8개 언어 G2P/음소화** — 일본어, 영어, 중국어, 스페인어, 프랑스어, 포르투갈어, 스웨덴어, 한국어 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7). 현재 학습된 모델은 6개 언어 (JA/EN/ZH/ES/FR/PT)를 지원합니다
 - **일본어 TTS** — OpenJTalk 통합, 운율 정보 (A1/A2/A3), 의문사 마커 (#204), 문맥 의존 'ん' 변이형 (#207)
-- **영어 TTS** — GPL-free G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), espeak-ng 불필요
+- **영어 TTS** — 이 dev/source 트리에는 Apache-2.0 추론 코드와 Tacotron MIT 고지를 함께 포함한 [g2p-en](https://github.com/Kyubyong/g2p) 기반 G2P가 들어 있으며, 실행 시 외부 `g2p-en`/`Distance`와 espeak-ng가 필요하지 않습니다. 현재 공개된 PyPI 2.0.1 wheel은 변경되지 않아 이전 외부 의존성을 계속 사용합니다. 자세한 내용은 [마이그레이션 가이드](docs/migration/python-g2p-license.md)를 참조하세요
 - **다중 화자** — 실험용 Zero-Shot/FT 번들 `zs-v1`의 571 화자, SpeakerBalancedBatchSampler, 언어 그룹 균등 샘플링
 - **커스텀 사전** — 200개 이상의 기술 용어 발음 사전 내장
 - **음소 입력** — `[[ phonemes ]]` 표기법으로 직접 지정 — [가이드](docs/features/phoneme-input.md)

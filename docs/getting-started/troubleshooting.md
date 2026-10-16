@@ -97,7 +97,7 @@ Model config doesn't exist
 
 2. **Using wrong model type**
    - Ensure you're using a Japanese model (ja_JP-*.onnx)
-   - For Python inference (`infer_onnx`), the Phonemizer registry selects the G2P backend via `--language` (ja→pyopenjtalk, en→g2p-en)
+   - For Python inference (`infer_onnx`), the Phonemizer registry selects the G2P backend via `--language` (ja→pyopenjtalk, en→the bundled `g2p-en` backend)
    - For the C++ CLI and preprocessing, `phoneme_type` in `config.json` is still used to choose how text is phonemized
    - Ensure config.json has the correct `"phoneme_type"`: `"openjtalk"` for Japanese models, `"multilingual"` for multilingual models
 
@@ -343,7 +343,9 @@ If issues persist:
 `Security Audit / pip-audit (Python)` job fails on a `push` to `dev` / `main`
 (it is `continue-on-error` on pull requests, so PRs only warn), reporting a
 CVE / PYSEC advisory against a package that is **not** listed directly in
-`requirements.txt` — e.g. a `g2p-en` → `nltk` → `joblib` transitive dependency.
+`requirements.txt` — for example, the historical `g2p-en` → `nltk` → `joblib`
+transitive dependency that was present before the English backend was bundled.
+Current source packages do not install external `g2p-en` or `Distance`.
 The *same commit* may pass in a later `schedule` run.
 
 > The sibling `Audit root requirements` step never fails the job on any event —

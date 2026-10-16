@@ -6,7 +6,8 @@ dependencies, grouped by optionality.
 ## Core (no external dependencies)
 
 piper-plus-g2p core has zero required runtime dependencies. Languages ES, FR,
-PT, SV, and KO are fully rule-based and need no external packages.
+PT, and SV are fully rule-based and need no external packages. Korean support
+is optional and uses `g2pk2` when that extra is installed.
 
 ## Optional: Japanese (`pip install piper-plus-g2p[ja]`)
 
@@ -19,8 +20,22 @@ PT, SV, and KO are fully rule-based and need no external packages.
 
 | Package | License | Purpose |
 |---------|---------|---------|
-| g2p-en | Apache-2.0 | CMU Pronouncing Dictionary + neural G2P |
+| Bundled g2p-en 2.1.0 | Apache-2.0 | Neural G2P weights/code and homograph table; private `_vendor/g2p_en` namespace |
+| Bundled Tacotron normalizer | MIT | Number expansion in `expand.py`; original Keith Ito grant in `TACOTRON-LICENSE.txt` |
 | numpy | BSD-3-Clause | Neural network inference |
+| nltk | Apache-2.0 | POS tagging and CMU dictionary access; downloaded data has its own notices |
+| joblib | BSD-3-Clause | NLTK support |
+| inflect | MIT | Number expansion |
+
+The upstream `g2p-en` PyPI distribution declares unused GPL `Distance`.
+This source bundles only the reviewed inference files, with original
+Apache-2.0 and MIT notices, and does not install either the external `g2p-en`
+or `Distance` distribution. The vendored code is private implementation detail;
+use `get_phonemizer("en")` rather than importing it directly.
+The original wheel hash, per-file hashes and the raw-regex-literal patch are
+recorded in `_vendor/g2p_en/provenance.json` / `NOTICE.txt` and verified by
+`scripts/check_bundled_english.py` in the repository. NLTK `cmudict` and tagger
+data are downloaded separately; neither is in the bundled checkpoint.
 
 ## Optional: Chinese (`pip install piper-plus-g2p[zh]`)
 
@@ -34,8 +49,9 @@ PT, SV, and KO are fully rule-based and need no external packages.
 |---------|---------|---------|
 | g2pk2 | Apache-2.0 | Korean G2P with neural disambiguation |
 
-> **Note:** g2pk2 may pull in heavy transitive dependencies (torch or
-> tensorflow). Consider whether Korean support is needed before installing.
+`g2pk2==0.0.3` declares jamo (Apache-2.0), NLTK and anyascii (ISC).
+The optional Korean wrapper can use the repository's rule-based fallback
+when the backend is unavailable.
 
 ## Development
 
@@ -45,7 +61,15 @@ PT, SV, and KO are fully rule-based and need no external packages.
 | ruff | MIT | Linter/formatter |
 | mypy | MIT | Type checker |
 
-## No copyleft licenses
+## Scope of the dependency check
 
-All runtime dependencies are MIT, Apache-2.0, or BSD-3-Clause.
-No GPL, LGPL, or AGPL licenses are present.
+The source wheel consumer CI checks installed runtime / English / all-language
+dependency closures for declared GPL, LGPL and AGPL licenses and rejects any
+installed `Distance` or external `g2p-en` distribution. It also fails on missing
+dependencies or absent license metadata. It does not replace a review of each
+archive or licenses attached to separately downloaded data.
+
+Already published `piper-plus-g2p==0.3.0` wheels retain their original dependency
+metadata, including `g2p-en → Distance` for the `en` / `all` extras. See the
+[migration guide](../../../docs/migration/python-g2p-license.md) and the
+[source/archive audit](../../../docs/design/python-g2p-license-2026-10-16.md).

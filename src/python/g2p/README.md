@@ -48,7 +48,7 @@ en.phonemize("Hello world")
 | Language | Code | Extra | Backend | Notes |
 |---|---|---|---|---|
 | Japanese | `ja` | `piper-plus-g2p[ja]` | pyopenjtalk-plus | Context-dependent N variants, prosody info |
-| English | `en` | `piper-plus-g2p[en]` | g2p-en | CMU-dict + neural fallback |
+| English | `en` | `piper-plus-g2p[en]` | Bundled `g2p-en` 2.1.0 source | CMU-dict + neural fallback; Apache-2.0 / MIT notices included |
 | Chinese | `zh` | `piper-plus-g2p[zh]` | pypinyin | Pinyin-to-IPA, ZH-EN code-switching (loanword pinyinisation) |
 | Korean | `ko` | `piper-plus-g2p[ko]` | g2pk2 | Optional dependency |
 | Spanish | `es` | -- | Rule-based | No external dependency |
@@ -71,6 +71,15 @@ multi = get_phonemizer("ja-en-zh")
 tokens = multi.phonemize("こんにちは Hello 你好")
 ```
 
+The development source bundles the reviewed English backend under a private
+namespace; the `en` extra installs NumPy, NLTK, joblib and inflect, without
+installing the external `g2p-en` distribution or its unused GPL `Distance`
+dependency. The vendored namespace is an implementation detail, not a public
+import path. The already published `piper-plus-g2p==0.3.0` wheel still has the
+old dependency metadata. See the
+[migration guide](../../../docs/migration/python-g2p-license.md) and
+[third-party notices](THIRD_PARTY_LICENSES.md).
+
 ### ZH-EN Code-Switching (English Inside Chinese Context)
 
 When an English token (acronym, brand, technical term) appears next
@@ -85,7 +94,7 @@ from piper_plus_g2p import get_phonemizer
 multi = get_phonemizer("zh-en")
 multi.phonemize("请打开 GPS")          # GPS -> ji4-pi4-ai1-si4 (pinyin)
 multi.phonemize("我喜欢用 Python 写代码")  # Python -> pai4-sen1
-multi.phonemize("Hello world")        # No zh context -> g2p-en (unchanged)
+multi.phonemize("Hello world")        # No zh context -> bundled English backend
 ```
 
 Custom overrides (acronym/loanword/letter_fallback) are loaded from a

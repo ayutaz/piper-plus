@@ -8,11 +8,13 @@ on:
       - 'src/go/**'
       - 'src/csharp/**'
       - 'src/python_run/**'
+      - 'src/python/g2p/**'
       - 'environments/webui/**'
       - 'pyproject.toml'
       - 'uv.lock'
       - 'scripts/check_cli_consumer_outputs.py'
       - 'scripts/check_python_provider.py'
+      - 'scripts/check_python_licenses.py'
       - 'scripts/check_hf_space_gradio_sync.py'
       - 'scripts/check_ruff_version_sync.py'
       - 'tests/fixtures/cli_consumer/**'
@@ -108,11 +110,13 @@ jobs:
           uv venv --python 3.13 /tmp/gpu-env
           uv pip install --python /tmp/gpu-env/bin/python 'src/python_run[gpu]'
           uv pip check --python /tmp/gpu-env/bin/python
+          /tmp/gpu-env/bin/python -I scripts/check_python_licenses.py --root 'piper-plus[gpu]' --report /tmp/gpu-licenses.json
           /tmp/gpu-env/bin/python scripts/check_python_provider.py --expected gpu --model /tmp/provider-fixture/model.onnx
       - name: Install and exercise isolated WebUI
         run: |
           uv sync --project environments/webui --locked
           uv pip check --python environments/webui/.venv/bin/python
+          uv run --project environments/webui --no-sync python scripts/check_python_licenses.py --root 'piper-plus[cpu,http]' --root gradio --report /tmp/webui-licenses.json
           uv run --project environments/webui --no-sync python -c "from pathlib import Path; from piper_plus.webui import create_interface; assert create_interface(Path('/tmp/models')) is not None"
           uv run --project environments/webui --no-sync python -m piper_plus --help
           uv run --project environments/webui --no-sync python scripts/check_python_provider.py --expected cpu --model /tmp/provider-fixture/model.onnx

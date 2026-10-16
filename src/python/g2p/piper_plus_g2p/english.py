@@ -45,7 +45,7 @@ def _get_g2p():
             return None
         if _g2p_instance is None:
             try:
-                from g2p_en import G2p  # noqa: PLC0415
+                from ._vendor.g2p_en import G2p  # noqa: PLC0415
 
                 _g2p_instance = G2p()
             except ImportError as exc:
@@ -222,7 +222,7 @@ def _g2p_en_to_arpabet_tokens(text: str) -> list[list[str]]:
     if g2p is None:
         raise ImportError(
             "g2p_en is required for English phonemization. "
-            "Install it with: pip install g2p-en"
+            "Install the English extra: pip install piper-plus-g2p[en]"
         )
     raw = g2p(text)
 

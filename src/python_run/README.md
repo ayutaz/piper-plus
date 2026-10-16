@@ -13,7 +13,7 @@
 
 - **8言語対応** — 日本語・英語・中国語・韓国語・スペイン語・フランス語・ポルトガル語・スウェーデン語
 - **日本語 TTS** — OpenJTalk統合、韻律情報 (A1/A2/A3)、文脈依存音素バリアント
-- **英語 TTS** — GPL-free G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0)、espeak-ng 不要
+- **英語 TTS** — [g2p-en](https://github.com/Kyubyong/g2p) 2.1.0由来のコードを同梱したG2P（Apache-2.0、一部MIT）、espeak-ng 不要
 - **マルチスピーカー** — ベースモデル571話者、言語グループ均等サンプリング
 - **カスタム辞書** — 200+技術用語の発音辞書内蔵
 - **音素入力** — `[[ phonemes ]]` 記法による直接指定
@@ -174,7 +174,7 @@ curl -L "${ZS_URL}/base.ckpt" -o models/zs-v1/base.ckpt
 | 言語 | コード | Phonemizer | 依存 |
 |------|--------|------------|------|
 | 日本語 | ja | OpenJTalk | pyopenjtalk-plus |
-| 英語 | en | g2p-en | g2p-en (Apache-2.0) |
+| 英語 | en | 同梱 `g2p-en` 2.1.0由来のバックエンド | NumPy / NLTK / joblib / inflect |
 | 中国語 | zh | pypinyin | pypinyin |
 | 韓国語 | ko | g2pk2 | g2pk2 (Apache-2.0, optional) |
 | スペイン語 | es | 規則ベース | なし |
@@ -200,6 +200,12 @@ curl -L "${ZS_URL}/base.ckpt" -o models/zs-v1/base.ckpt
 ## ライセンス
 
 MIT License — 詳細は [LICENSE](https://github.com/ayutaz/piper-plus/blob/dev/LICENSE.md) を参照。
+
+英語バックエンドのソース・重み・同綴異音語表はprivate namespaceへ同梱し、
+Apache-2.0および数値正規化コードのMIT許諾文を含めています。
+この開発版では外部の `g2p-en` と、その未使用のGPL依存 `Distance` を導入しません。
+公開済み `piper-plus==2.0.0` / `2.0.1` の依存定義は変更されません。
+[移行手順](../../docs/migration/python-g2p-license.md)を参照してください。
 
 ### 開発版の provider 選択
 

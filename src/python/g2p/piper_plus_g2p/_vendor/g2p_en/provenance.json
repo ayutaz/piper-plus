@@ -1,0 +1,25 @@
+{
+  "upstream": "g2p-en",
+  "version": "2.1.0",
+  "license": "Apache-2.0",
+  "wheel_sha256": "2a7aabf1fc7f270fcc3349881407988c9245173c2413debbe5432f4a4f31319f",
+  "wheel_url": "https://files.pythonhosted.org/packages/d7/d9/b77dc634a7a0c0c97716ba97dd0a28cbfa6267c96f359c4f27ed71cbd284/g2p_en-2.1.0-py3-none-any.whl",
+  "additional_license_url": "https://raw.githubusercontent.com/keithito/tacotron/d26c763342518d4e432e9c4036a1aff3b4fdaa1e/LICENSE",
+  "upstream_files": {
+    "__init__.py": "36ffae3e8f2cad9d285131c78963f690327f5046b5273dfecc52707659be949d",
+    "g2p.py": "fc2548b855e102f774506a6afe4f4bc88424229b69701ab6040aa16710ddff3a",
+    "expand.py": "b31f9f2173280f4479de1272d57540382d64496662ef127cf4d05af5a49d70db",
+    "checkpoint20.npz": "b8af35e4596d8dd5836dfd3fe9b2ba4f97b9c311efe8879544cbcfcbd566d8c6",
+    "homographs.en": "0403edcc6aefe8945f8987be398279fd98bf6b767e54b741331d3bc99a307071",
+    "LICENSE.txt": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+  },
+  "files": {
+    "__init__.py": "36ffae3e8f2cad9d285131c78963f690327f5046b5273dfecc52707659be949d",
+    "g2p.py": "429862b36b7d6d1068257250aa40ff92d97fd68324af03e9bf12eb05edc60509",
+    "expand.py": "b31f9f2173280f4479de1272d57540382d64496662ef127cf4d05af5a49d70db",
+    "checkpoint20.npz": "b8af35e4596d8dd5836dfd3fe9b2ba4f97b9c311efe8879544cbcfcbd566d8c6",
+    "homographs.en": "0403edcc6aefe8945f8987be398279fd98bf6b767e54b741331d3bc99a307071",
+    "LICENSE.txt": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+    "TACOTRON-LICENSE.txt": "f89accd9d66f6a011f19997d7a21cf71a35ffe2e2d0911b5460cbd0cab52a581"
+  }
+}

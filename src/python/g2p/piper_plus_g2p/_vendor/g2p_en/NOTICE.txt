@@ -1,0 +1,14 @@
+Bundled g2p-en 2.1.0 (Kyubyong Park and Jongseok Kim).
+Upstream: https://github.com/Kyubyong/g2p
+License: Apache-2.0; see LICENSE.txt.
+
+piper-plus bundles the original inference source, checkpoint and homograph
+table under private package namespaces. Data and license are byte-identical
+to the pinned PyPI wheel. g2p.py uses a raw regex literal to avoid Python's
+invalid-escape SyntaxWarning; its regex value and pronunciation are unchanged.
+Distance and its GPL code are not included. The
+upstream distribution's unused Distance requirement is not adopted.
+NumPy, NLTK and inflect remain explicit dependencies. NLTK corpus data is
+not bundled here; its existing installation and licensing still apply.
+expand.py derives from Keith Ito's MIT-licensed Tacotron number normalizer.
+Its original copyright/permission notice is retained in TACOTRON-LICENSE.txt.

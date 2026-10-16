@@ -49,7 +49,7 @@ Sistema de texto a voz (TTS) neuronal, rápido y de alta calidad. Basado en la a
 
 - **G2P/fonemización en 8 idiomas** — Japonés, inglés, chino, español, francés, portugués, sueco y coreano (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7). Los modelos entrenados actuales cubren 6 idiomas (JA/EN/ZH/ES/FR/PT)
 - **TTS en japonés** — Integración con OpenJTalk, información prosódica (A1/A2/A3), marcadores de interrogación (#204), variantes contextuales de "n" (#207)
-- **TTS en inglés** — G2P libre de GPL ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), sin necesidad de espeak-ng
+- **TTS en inglés** — Este árbol de desarrollo/fuente incluye un G2P basado en [g2p-en](https://github.com/Kyubyong/g2p), con el código de inferencia Apache-2.0 y el aviso MIT de Tacotron; en tiempo de ejecución no requiere `g2p-en`/`Distance` externos ni espeak-ng. El wheel público actual de PyPI 2.0.1 no cambia y sigue usando la dependencia externa anterior; consulte la [guía de migración](docs/migration/python-g2p-license.md)
 - **Multihablante** — 571 hablantes en el paquete experimental Zero-Shot/FT `zs-v1`, SpeakerBalancedBatchSampler, muestreo equilibrado por grupo de idioma
 - **Diccionario personalizado** — Diccionario de pronunciación integrado con más de 200 términos técnicos
 - **Entrada de fonemas** — Especificación directa mediante la notación `[[ fonemas ]]` — [Guía](docs/features/phoneme-input.md)

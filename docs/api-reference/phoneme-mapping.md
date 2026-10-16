@@ -317,7 +317,7 @@ Piper Plus の音素体系と ID マッピングのリファレンス。
 ## 英語音素体系
 
 **ソース**: `piper_plus_g2p/english.py`
-**G2P エンジン**: g2p-en (Apache-2.0) — espeak-ng (GPL) 不要
+**G2P エンジン**: `g2p-en` 2.1.0 の同梱ソース (Apache-2.0 + Tacotron MIT) — 外部 `g2p-en` / `Distance` および espeak-ng (GPL) 不要
 
 ### ARPAbet → IPA 変換表
 

@@ -31,7 +31,11 @@ description = "A fast, high-quality neural text-to-speech system supporting 8 la
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
-license-files = ["LICENSE.md"]
+license-files = [
+    "LICENSE.md",
+    "piper_plus/_vendor/g2p_en/LICENSE.txt",
+    "piper_plus/_vendor/g2p_en/TACOTRON-LICENSE.txt",
+]
 authors = [
     {name = "yousan", email = "rabbitcats77@gmail.com"},
 ]
@@ -104,6 +108,10 @@ exclude = ["tests*", "build*"]
 [tool.setuptools.package-data]
 piper_plus = [
     "voices.json",
+    "_vendor/g2p_en/*.npz",
+    "_vendor/g2p_en/*.en",
+    "_vendor/g2p_en/*.txt",
+    "_vendor/g2p_en/*.json",
     "phonemize/data/zh_en_loanword.json",
     "phonemize/data/sv_function_words.json",
 ]
@@ -135,8 +143,8 @@ module = "pyopenjtalk.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = "g2p_en.*"
-ignore_missing_imports = true
+module = "piper_plus._vendor.*"
+ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = "pypinyin.*"

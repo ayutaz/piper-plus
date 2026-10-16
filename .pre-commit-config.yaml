@@ -56,8 +56,10 @@ repos:
     rev: v0.15.15
     hooks:
       - id: ruff
+        exclude: ^(src/python/g2p/piper_plus_g2p|src/python_run/piper_plus)/_vendor/
         args: [--fix]
       - id: ruff-format
+        exclude: ^(src/python/g2p/piper_plus_g2p|src/python_run/piper_plus)/_vendor/
 
   # ---------------------------------------------------------------------------
   # Standard whitespace / syntax hooks (cross-language drift catchers).
@@ -68,9 +70,11 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        exclude: ^(src/python/g2p/piper_plus_g2p|src/python_run/piper_plus)/_vendor/
         # Markdown intentional double-space-newline = forced line break.
         args: [--markdown-linebreak-ext=md]
       - id: end-of-file-fixer
+        exclude: ^(src/python/g2p/piper_plus_g2p|src/python_run/piper_plus)/_vendor/
       - id: check-merge-conflict
       - id: check-yaml
         # Some workflows use GitHub Actions extensions (`!reference`) that
@@ -94,6 +98,9 @@ repos:
         # Block accidental large model checkpoint commits. Use git LFS or
         # external storage instead.
         args: [--maxkb=2048]
+        # Reviewed 3.3 MB Apache-2.0 G2P inference asset. Its pinned upstream
+        # hash and the two shipping copies are verified by bundled-english.
+        exclude: ^(src/python/g2p/piper_plus_g2p|src/python_run/piper_plus)/_vendor/g2p_en/checkpoint20\.npz$
       # ----- Standard hygiene additions (2026-05) -----
       - id: check-toml
         # Cargo.toml / pyproject.toml syntax check. Drift = local-clean /
@@ -217,6 +224,13 @@ repos:
   # set actually change, so the typical `git commit` is unaffected.
   - repo: local
     hooks:
+      - id: bundled-english
+        name: Bundled English source, model, licenses and mirrors
+        entry: uv run --no-sync python scripts/check_bundled_english.py
+        language: system
+        files: ^((src/python/g2p/piper_plus_g2p|src/python_run/piper_plus)/_vendor/.*|scripts/check_bundled_english\.py|tests/scripts/test_check_bundled_english\.py)$
+        pass_filenames: false
+
       - id: pua-cross-runtime-consistency
         name: PUA cross-runtime consistency (6 runtime tables vs pua.json)
         entry: uv run --no-sync python scripts/check_pua_consistency.py --check-version

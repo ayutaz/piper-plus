@@ -21,6 +21,7 @@ on:
       # merge され、 その push で初めて dev が赤くなる。
       - 'src/python/pyproject.toml'
       - 'src/python_run/requirements.txt'
+      - 'src/python_run/piper_plus/_vendor/g2p_en/provenance.json'
       - 'src/python_run/requirements_gpu.txt'
       - 'src/go/go.mod'
       - 'src/csharp/PiperPlus.Core/PiperPlus.Core.csproj'

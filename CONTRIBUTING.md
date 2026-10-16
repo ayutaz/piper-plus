@@ -189,6 +189,26 @@ piper-plus is designed for commercial and embedded use. GPL dependencies would i
 
 ### Checking Dependencies
 
+Python English inference uses a private, pinned copy of the Apache-2.0
+`g2p-en` backend with the original MIT number-normalizer notice. Do not restore
+the upstream PyPI dependency: its metadata pulls in GPL `Distance` even though
+inference does not use it. Verify source/data hashes with
+`python scripts/check_bundled_english.py` and audit installed runtime extras
+with `scripts/check_python_licenses.py`. The cross-platform wheel consumer CI
+builds wheels from sdists and checks their installed dependency closure.
+
+When vendoring a permissively licensed implementation, keep the upstream
+copyright and license text beside the copied code, record the source revision
+and file hashes, and restrict the bundle to the files that are actually used.
+Do not expose the private vendor namespace as a supported API. Update the
+corresponding third-party notice and provenance check in the same change.
+
+Package-specific scanner corrections for `audioop-lts` (PSF-2.0), `protobuf`
+(BSD-3-Clause) and `regex` (Apache-2.0 AND CNRI-Python) are documented in the
+[archive review](docs/design/python-g2p-license-2026-10-16.md). They do not
+authorize GPL dependencies. NLTK's Apache-2.0 code and downloaded corpus data
+have separate notices; the English backend does not bundle NLTK data.
+
 Before adding a new dependency, verify its license:
 
 ```bash

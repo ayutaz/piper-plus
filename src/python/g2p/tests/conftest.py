@@ -35,7 +35,7 @@ def _has_pyopenjtalk():
 
 def _has_g2p_en():
     try:
-        from g2p_en import G2p  # noqa: F401
+        from piper_plus_g2p._vendor.g2p_en import G2p  # noqa: F401
 
         return True
     except ImportError:
