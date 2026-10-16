@@ -203,7 +203,9 @@ jobs:
           retention-days: 30
 
   # ----------------------------------------------------------------
-  # 7) Aggregate + attach to release
+  # 7) Attest and preserve release SBOMs separately from the binary inventory.
+  # Root release payloads/checksums/signatures are managed by the release
+  # publisher. This read-only workflow must not create/publish that release.
   # ----------------------------------------------------------------
   aggregate:
     needs: [syft-repo, cyclonedx-python, cyclonedx-rust, cyclonedx-go, cyclonedx-dotnet, cyclonedx-npm]
@@ -219,8 +221,9 @@ jobs:
         with:
           subject-path: ./sbom-artifacts/**/*.json
 
-      - name: Attach to GitHub Release
-        uses: softprops/action-gh-release@v2.6.2
+      - name: Preserve attested release SBOMs
+        uses: actions/upload-artifact@v7.0.0
         with:
-          files: ./sbom-artifacts/**/*.json
-          fail_on_unmatched_files: false
+          name: release-sbom-${{ github.ref_name }}
+          path: ./sbom-artifacts/**/*.json
+          if-no-files-found: error

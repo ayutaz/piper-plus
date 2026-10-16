@@ -17,6 +17,30 @@ def workflow(name):
     return yaml.safe_load((ROOT / ".github/workflows" / name).read_text("utf-8"))
 
 
+def test_release_sboms_preserve_attested_json_without_mutating_binary_inventory():
+    config = workflow("sbom.yml")
+    job = config["jobs"]["aggregate"]
+    assert job["if"] == "startsWith(github.ref, 'refs/tags/v')"
+    assert config["permissions"]["contents"] == "read"
+    attest = next(
+        s
+        for s in job["steps"]
+        if s.get("uses", "").startswith("actions/attest-build-provenance@")
+    )
+    preserved = next(
+        s
+        for s in job["steps"]
+        if s.get("uses", "").startswith("actions/upload-artifact@")
+    )
+    assert preserved["with"]["path"] == attest["with"]["subject-path"]
+    assert preserved["with"]["if-no-files-found"] == "error"
+    assert not preserved.get("continue-on-error", False)
+    assert not any(
+        "action-gh-release" in s.get("uses", "") or "gh release" in s.get("run", "")
+        for s in job["steps"]
+    )
+
+
 def test_required_rust_ci_runs_actual_onnx_cache_regressions():
     jobs = workflow("ci.yml")["jobs"]
     steps = jobs["rust-tests"]["steps"]
