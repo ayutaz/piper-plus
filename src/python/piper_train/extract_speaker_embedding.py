@@ -683,7 +683,7 @@ def extract_per_utterance(
         }
         # 192 側の cache key にも含め、stats の来歴違いで 192 も再抽出して整合させる
         settings["campp_stats"] = campp_provenance
-        if not dry_run:
+        if not dry_run and not finalize_only:
             campp_model = _load_campplus_stats_model(campp_torch_weights)
 
     # Load all entries
@@ -874,6 +874,7 @@ def extract_per_utterance(
 
     def publish(index, key, values, whole=None):
         nonlocal success, fail
+        stats_manifest = None
         try:
             path = emb_dir / (key + ".npy")
             if campp_model is not None:
@@ -885,15 +886,19 @@ def extract_per_utterance(
                     )
                 stats_path = emb_dir / (key + CAMPP_STATS_SUFFIX + ".npy")
                 _save_campp_stats(stats_path, stats, campp_provenance)
-                entries[index]["campp_stats_path"] = _manifest_path(
-                    stats_path, dataset_dir
-                )
+                stats_manifest = _manifest_path(stats_path, dataset_dir)
             save_verified(path, values, metadata_by_index[index])
             entries[index]["speaker_embedding_path"] = _manifest_path(path, dataset_dir)
+            if stats_manifest is not None:
+                # 192 次元の保存成功後にだけ manifest へ載せる
+                entries[index]["campp_stats_path"] = stats_manifest
             success += 1
         except (ValueError, OSError) as exc:
             fail += 1
             _LOGGER.warning("Invalid embedding for entry %d: %s", index, exc)
+        except Exception as exc:  # noqa: BLE001 — stats モデルの RuntimeError 等 (短い発話)
+            fail += 1
+            _LOGGER.warning("Embedding/stats failed for entry %d: %s", index, exc)
 
     total_batches = len(loader)
 
