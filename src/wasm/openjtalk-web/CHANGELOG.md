@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Route English to the JS G2P even when the Rust WASM bundle loads for Japanese or Chinese. The WASM bundle has no English dictionary and spelled words out letter by letter.
 - Regenerate the bundled `pinyin_single.json` / `pinyin_phrases.json` with numeric tones (`ni3`). The previous files carried tone marks (`nǐ`), which the WASM parser read as tone 5 with a broken final.
 - Add `SpeakerEncoder.initialize({ frontEnd: "kaldi-fbank" })`, which computes the zs-v1 CAM++ embedding the same way as the Python recipe (torchaudio Kaiser resampling to 16 kHz, 80-bin `kaldi.fbank`, mean subtraction, L2 normalization). Checked against torchaudio with a golden fixture. `initialize` also accepts `modelData` in place of `modelUrl`. The default `"mel"` front end is unchanged.
-- Add `PiperPlus.findDroppedSymbols(text, { language })`, which lists the symbols the phonemizer produced but the model's phoneme table lacks. Encoding still drops them silently; this lets an app warn before synthesis.
+- Add `PiperPlus.findDroppedSymbols(text, { language })`, which lists the symbols the phonemizer produced but the model's phoneme table lacks. Encoding still drops them silently; this lets an app warn before synthesis. It also works with `@piper-plus/g2p` 0.4.2, whose `encode()` does not report them.
 - The GitHub Pages multilingual demo gains a zero-shot section: upload or record a reference clip, compute the embedding in the browser, and read text in six languages with the public zs-v1 base.
 
 ### Fixed
