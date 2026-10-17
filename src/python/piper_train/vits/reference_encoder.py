@@ -21,6 +21,12 @@ from torch import nn
 from ..reference_frontend import in_graph_capture, masked_time_mean_fp32
 
 
+# 参照条件付けで SynthesizerTrn に生える属性名 ("ref_spec" → reference_encoder、
+# "capacity" → capacity_control)。EMA 追跡・optimizer の param group・
+# weights-only 移行の許可 prefix がこの 1 表を共有する (片方だけ更新される事故の防止)
+REFERENCE_MODULE_NAMES: tuple[str, ...] = ("reference_encoder", "capacity_control")
+
+
 # 線形振幅の log 圧縮の下限 (``log(clamp(x, 1e-5))``、HiFi-GAN 系の慣例)
 _LOG_FLOOR = 1e-5
 

@@ -12,13 +12,17 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.strategies import DDPStrategy
 
-from .checkpoint_io import load_checkpoint
+from .checkpoint_io import (
+    key_has_module_prefix,
+    load_checkpoint,
+    load_state_with_allowed_missing,
+)
 from .vits.commons import (
     normalize_checkpoint_state_dict,
     remap_weight_norm_keys,
 )
 from .vits.ema import EMA_SCOPES, EXTENDED_EMA_MODULES, EMACallback
-from .vits.lightning import VitsModel
+from .vits.lightning import REFERENCE_PARAM_PREFIXES, VitsModel
 from .vits.mb_istft import PQMF, PQMF_DESIGN
 from .vits.models import MRD_HIRES_RESOLUTIONS, REFERENCE_CONDITIONING_MODES
 
@@ -875,6 +879,28 @@ def create_parser():
         "reference_encoder.* / capacity_control.* parameters.",
     )
     parser.add_argument(
+        "--reference-lr-scale",
+        type=float,
+        default=1.0,
+        help="Reference conditioning (plan §8 Task 6R): the reference_encoder / "
+        "capacity_control parameters form their own generator param group "
+        "with lr = base lr x this scale (requires_grad is never changed). The "
+        "epoch LR scheduler applies to the group as usual; under cosine the "
+        "scaled lr must not be below --lr-min. Default 1.0. Requires "
+        "--reference-conditioning ref_spec or capacity.",
+    )
+    parser.add_argument(
+        "--reference-warmup-steps",
+        type=int,
+        default=0,
+        help="Reference conditioning (plan §8 Task 6R): linearly ramp the "
+        "reference group's effective lr by min(1, k / N), k = successful "
+        "generator updates before the step (the first update uses 0; from "
+        "update N on the factor is 1). Applied only around the optimizer step, "
+        "so the scheduler's trajectory is unchanged. Default 0 (no warmup). "
+        "Requires --reference-conditioning ref_spec or capacity.",
+    )
+    parser.add_argument(
         "--no-snac-stats",
         action="store_true",
         default=False,
@@ -1313,6 +1339,15 @@ def reinit_pqmf_bank(model) -> None:
     )
 
 
+def _involves_reference_modules(model_state: dict, checkpoint_state: dict) -> bool:
+    """モデルか checkpoint のどちらかに参照条件付けの key があるか。"""
+    return any(
+        key_has_module_prefix(k, REFERENCE_PARAM_PREFIXES)
+        for keys in (model_state, checkpoint_state)
+        for k in keys
+    )
+
+
 def load_weights_only_checkpoint(checkpoint_path: str, model) -> tuple[list, list]:
     """checkpoint から model weights のみを strict=False でロードする (warm restart)。
 
@@ -1322,6 +1357,12 @@ def load_weights_only_checkpoint(checkpoint_path: str, model) -> tuple[list, lis
     典型的な用途: 学習済み ckpt に対して WavLM discriminator を後から有効化する
     継続学習 (v8.1)。ckpt に存在しないキー (model_d_wavlm.* 等) は fresh-init の
     まま残り、ckpt にしか無いキーは捨てられる。
+
+    参照条件付け (``reference_encoder`` / ``capacity_control``) がモデルか
+    ckpt のどちらかにある場合だけは厳格に読む
+    (:func:`~piper_train.checkpoint_io.load_state_with_allowed_missing`):
+    欠落してよいのは参照モジュールの key だけで、それ以外の欠落・余剰・
+    shape 差は ``ValueError``。
 
     Returns:
         (missing_keys, unexpected_keys) — ログ済みだが呼び出し側の検証用に返す。
@@ -1335,7 +1376,16 @@ def load_weights_only_checkpoint(checkpoint_path: str, model) -> tuple[list, lis
     normalized_sd, _ = normalize_checkpoint_state_dict(
         state_dict, model.state_dict(), checkpoint_path=checkpoint_path
     )
-    missing, unexpected = model.load_state_dict(normalized_sd, strict=False)
+    if _involves_reference_modules(model.state_dict(), normalized_sd):
+        # 参照条件付け (plan §8 Task 6R): 欠落してよいのは参照モジュールだけ
+        # (zero-init のまま)。それ以外の欠落・余剰 (参照付き ckpt → none
+        # モデルを含む)・shape 差は黙って捨てずに ValueError。
+        result = load_state_with_allowed_missing(
+            model, normalized_sd, REFERENCE_PARAM_PREFIXES
+        )
+        missing, unexpected = result["missing"], result["unexpected"]
+    else:
+        missing, unexpected = model.load_state_dict(normalized_sd, strict=False)
     reset_progress = getattr(model, "_reset_training_progress", None)
     if callable(reset_progress):
         reset_progress()
@@ -1380,6 +1430,20 @@ def load_multispeaker_checkpoint(checkpoint_path: str, model: VitsModel) -> None
     normalized_sd, _ = normalize_checkpoint_state_dict(
         checkpoint["state_dict"], model.state_dict(), checkpoint_path=checkpoint_path
     )
+    # single-speaker の FT 先は参照モジュールを持てない (spk_proj が必要)。
+    # 参照付き ckpt の参照重みを黙って捨てずに止める (plan §8 Task 6R)。
+    model_keys = model.state_dict()
+    stray_reference = [
+        k
+        for k in normalized_sd
+        if k not in model_keys and key_has_module_prefix(k, REFERENCE_PARAM_PREFIXES)
+    ]
+    if stray_reference:
+        raise ValueError(
+            "checkpoint has reference-conditioning weights the target model "
+            f"does not have (unexpected keys: {stray_reference[:5]}"
+            f"{' ...' if len(stray_reference) > 5 else ''}); refusing to drop them."
+        )
     missing, unexpected = model.load_state_dict(normalized_sd, strict=False)
     _LOGGER.info(
         "Weights loaded (strict=False). Missing keys: %s. Unexpected keys: %s.",
