@@ -155,3 +155,68 @@ def test_pairwise_separability_counts_pairs_and_auc():
     assert standardized["normalization"].startswith("per-dimension z-score")
     with pytest.raises(ValueError):
         pairwise_separability(vectors[:2], ["a", "a"])
+
+
+def _probe_data(extra):
+    rng = np.random.default_rng(3)
+    speakers = [f"s{i:02d}" for i in range(24)]
+    means = rng.standard_normal((24, 3))
+    extra_means = rng.standard_normal(24)
+    rows_a, rows_b, labels = [], [], []
+    for index, speaker in enumerate(speakers):
+        for _ in range(6):
+            a = means[index] + 1.5 * rng.standard_normal(3)
+            if extra == "informative":
+                b = np.concatenate(
+                    [a, [extra_means[index] + 0.2 * rng.standard_normal()]]
+                )
+            else:
+                b = np.concatenate([a, rng.standard_normal(10)])
+            rows_a.append(a)
+            rows_b.append(b)
+            labels.append(speaker)
+    return np.array(rows_a), np.array(rows_b), labels
+
+
+def test_lda_probe_passes_when_b_adds_an_informative_dimension():
+    pytest.importorskip("sklearn")
+    from piper_train.tools.cpu_reference_comparison import lda_speaker_probe
+
+    result = lda_speaker_probe(*_probe_data("informative"))
+    assert len(result["splits"]) == 10
+    for split in result["splits"]:
+        assert len(split["train_speakers"]) == 12
+        assert len(split["test_speakers"]) == 12
+        assert not set(split["train_speakers"]) & set(split["test_speakers"])
+    assert result["wins"] >= 7
+    assert result["mean_diff"] >= 0.005
+    assert result["passes"] is True
+
+
+def test_lda_probe_fails_when_b_adds_only_noise():
+    pytest.importorskip("sklearn")
+    from piper_train.tools.cpu_reference_comparison import lda_speaker_probe
+
+    result = lda_speaker_probe(*_probe_data("noise"))
+    assert result["passes"] is False
+    assert result["mean_diff"] < 0.005 or result["wins"] < 7
+
+
+def test_lda_probe_counts_a_failing_split_against_b(monkeypatch):
+    pytest.importorskip("sklearn")
+    import sklearn.discriminant_analysis as lda_module
+
+    from piper_train.tools.cpu_reference_comparison import lda_speaker_probe
+
+    original = lda_module.LinearDiscriminantAnalysis.fit
+
+    def fit(self, x, y):
+        if x.shape[1] > 3:
+            raise np.linalg.LinAlgError("forced")
+        return original(self, x, y)
+
+    monkeypatch.setattr(lda_module.LinearDiscriminantAnalysis, "fit", fit)
+    result = lda_speaker_probe(*_probe_data("informative"))
+    assert all(split["error"] for split in result["splits"])
+    assert result["wins"] == 0
+    assert result["passes"] is False
