@@ -69,6 +69,8 @@ jobs:
               - 'uv.lock'
             rust:
               - 'src/rust/**'
+              - 'test/models/pinyin_*.json'
+              - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
             csharp:
               - 'src/csharp/**'
             cpp:

@@ -9,6 +9,9 @@ on:
     branches: [dev]
     paths:
       - 'src/go/**'
+      # Shipped pinyin dictionaries + Python golden read by phonemize's zh golden test.
+      - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
+      - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
       - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
       - 'tests/fixtures/phoneme_timing/**'
@@ -20,6 +23,9 @@ on:
     branches: [dev]
     paths:
       - 'src/go/**'
+      # Shipped pinyin dictionaries + Python golden read by phonemize's zh golden test.
+      - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
+      - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
       - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
       - 'tests/fixtures/phoneme_timing/**'
