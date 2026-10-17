@@ -30,7 +30,7 @@ resolve できるように依存側を拡張済 (soundfile が両フォーマッ
 Usage:
   python -m piper_train.tools.export_libritts_r_from_parquet \
       --parquet-dir /data/downloads/libritts-r-parquet/data \
-      --output-dir /data/piper/libritts-r-ljspeech-v8 \
+      --output-dir /path/to/libritts-r-ljspeech-v8 \
       --max-utterances-per-speaker 50 --min-utterances-per-speaker 20
 """
 

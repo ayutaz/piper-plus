@@ -21,6 +21,8 @@ from pathlib import Path
 import torch
 from tqdm import tqdm
 
+from piper_train.norm_audio import load_audio_norm_tensor
+
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +34,6 @@ PAD_SIZE = N_FFT // 2  # reflect pad size
 
 def _load_pt(path_str: str) -> tuple[str, torch.Tensor | None]:
     """Load an audio_norm cache (.npy or legacy .pt), return (path, 1-D tensor) or (path, None)."""
-    from piper_train.norm_audio import load_audio_norm_tensor
-
     try:
         t = load_audio_norm_tensor(Path(path_str))
         # Flatten to 1-D waveform

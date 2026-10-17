@@ -49,7 +49,8 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 > **EMA の適用判断 (v11 実測、2026-08-25)**: EMA は**収束済み run でのみ**
 > default 適用する。早期打ち切り・未収束 ckpt では EMA shadow が raw weights
 > より大幅に劣化する (v11 ep9 torch A/B: raw 14.9dB vs EMA 6.2dB — decay lag
-> + 崩壊汚染)。打ち切り ckpt や途中 epoch を export する場合は **`--no-ema`
+>
+> - 崩壊汚染)。打ち切り ckpt や途中 epoch を export する場合は **`--no-ema`
 > を付け、迷ったら EMA 有無の両方を export して フェーズ 3.5 の帯域検査 +
 > comb-HNR で良い方を採る**。
 
@@ -106,7 +107,7 @@ ls -la /tmp/sanity/*.wav
    測定は `piper_train.tools.eval_zs_secs` を **`--require-encoder2`** (第 2 encoder
    必須 gate、未指定 exit 2) + **`--baseline-json <前回 eval JSON>`** (encoder Δ から
    goodhart_flag 自動判定) 付きで実行する (契約: `docs/spec/zs-eval-contract.md`)。
-5. **ユーザーに聴感確認を依頼** (自動指標のみで publish 判断しない)
+6. **ユーザーに聴感確認を依頼** (自動指標のみで publish 判断しない)
 
 判定に迷う場合は `--skip` せず停止してユーザー判断を仰ぐ。
 

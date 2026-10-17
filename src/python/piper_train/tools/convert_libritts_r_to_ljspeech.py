@@ -19,7 +19,7 @@ Usage:
       --input-dir /data/downloads/LibriTTS_R/train-clean-100 \
       --input-dir /data/downloads/LibriTTS_R/train-clean-360 \
       --input-dir /data/downloads/LibriTTS_R/train-other-500 \
-      --output-dir /data/piper/libritts-r-ljspeech-v8 \
+      --output-dir /path/to/libritts-r-ljspeech-v8 \
       --max-utterances-per-speaker 50 --min-utterances-per-speaker 20
 """
 
@@ -32,6 +32,7 @@ import shutil
 import wave
 from collections import defaultdict
 from pathlib import Path
+
 
 _LOGGER = logging.getLogger("convert_libritts_r_to_ljspeech")
 
@@ -84,9 +85,7 @@ def stable_sample(items: list, cap: int) -> list:
     """ファイル名 sha1 順の決定的疑似シャッフルで cap 件選ぶ (章の偏り回避)。"""
     if len(items) <= cap:
         return items
-    keyed = sorted(
-        items, key=lambda it: hashlib.sha1(it[0].name.encode()).hexdigest()
-    )
+    keyed = sorted(items, key=lambda it: hashlib.sha1(it[0].name.encode()).hexdigest())
     return keyed[:cap]
 
 
@@ -121,18 +120,14 @@ def main() -> None:
     wav_dir = args.output_dir / "wavs"
     wav_dir.mkdir(parents=True, exist_ok=True)
     n_speakers = n_utts = 0
-    with open(
-        args.output_dir / "metadata.csv", "w", encoding="utf-8", newline=""
-    ) as f:
+    with open(args.output_dir / "metadata.csv", "w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f, delimiter="|", quoting=csv.QUOTE_NONE, escapechar="\\")
         for speaker in sorted(by_speaker):
             utts = by_speaker[speaker]
             if len(utts) < args.min_utterances_per_speaker:
                 continue
             n_speakers += 1
-            for wav_path, text in stable_sample(
-                utts, args.max_utterances_per_speaker
-            ):
+            for wav_path, text in stable_sample(utts, args.max_utterances_per_speaker):
                 link_or_copy(wav_path, wav_dir / wav_path.name)
                 writer.writerow((wav_path.stem, speaker, text))
                 n_utts += 1

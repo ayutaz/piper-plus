@@ -478,9 +478,7 @@ from-scratch のコスト上、複数レバーを束ねざるを得ない。以�
 | CV ko | 補助のみ | CC0 だが validated 2.2h | — |
 | KSS/MSSS 系 | 未確認 (調査打ち切り — ko は Emilia-YODAS で充足見込) | — | — |
 
-**v10b データ構成案**: 現行 300,443 utts / 6 lang + **Emilia-YODAS ja (話者多様性)
-+ Emilia-YODAS ko (7 lang 復活、pt と同オーダーの ≥30k utts を必須条件に cap 設計)
-+ CV ja (CC0 属性補完)**。投入時の必須ゲート 3 点:
+**v10b データ構成案**: 現行 300,443 utts / 6 lang + **Emilia-YODAS ja (話者多様性) + Emilia-YODAS ko (7 lang 復活、pt と同オーダーの ≥30k utts を必須条件に cap 設計) + CV ja (CC0 属性補完)**。投入時の必須ゲート 3 点:
 
 1. **案 Z ゲートを新データへ同一適用** (YODAS は低ビットレート AAC の 11-12kHz
    遮断が 22.05kHz Nyquist と接する — fmax999/hi_ratio を投入前に必ず測定)

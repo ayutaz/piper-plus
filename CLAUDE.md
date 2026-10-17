@@ -61,6 +61,7 @@ VITS ベースの高品質ニューラル TTS。**6言語マルチリンガル�
 > KsponSpeech (AI-Hub research-only) は除外確定し、 v8 は public + 商用利用可の open-model として公開する方針 (過去の piper-plus 事前学習モデル同様)。 7-lang 規模: ~3,790 speakers / ~346k utts。 詳細は下記「2026-08-02 更新」。
 
 **進捗 (2026-07-09 セッション終了時点)**:
+
 - ✅ **v8 dataset 完成 (6-lang スナップショット)**: 321,391 utts / 3,578 speakers / 6 lang (`/data/piper/dataset-multilingual-6lang-v8/`)
 - ✅ **韓国語 (ko) 拡張 ランディング**: parser 3 種 (Zeroth / KsponSpeech / CV ko) + `export_common_voice_ko.py` + `LANGUAGE_ID_MAP` を 8-lang extended (ko=7) に切替 (commit `963c4c49`)。 G2P/contract/id_maps は既に 7 ランタイム全てで 8-lang extended 版で pin 済のため、 コード側は data pipeline のみで完遂。 7-lang 目標: ~420k utts / ~5,100 speakers (→ 2026-08-02 KsponSpeech 除外確定で **~346k utts / ~3,790 speakers** に縮小)
 - ✅ **scratch NaN blocker 解消**: bf16 cuFFT bug fix (`3dcabd57`) + KL 発散防止 3 段 (`1a86aa55` + `563f8361` + `1f625a42`)
@@ -70,12 +71,14 @@ VITS ベースの高品質ニューラル TTS。**6言語マルチリンガル�
 - ⏸ **本走待ち**: 4x A100 SXM4 DDP + batch=128 で 6-lang 9-11 日 / ~$672-1,120、 7-lang 12-15 日 / ~$1,050-1,530 見込 (§3.10) (→ 2026-08-02 KsponSpeech 除外 + 40GB 案で **7-9 日 / ~$600-750** に更新、 下記)
 
 **次セッションでの起動**:
+
 - 全手順: [`docs/handoff/zero-shot-v8-2026-07-09.md`](docs/handoff/zero-shot-v8-2026-07-09.md)
 - CLI 最終版: [design doc §3.7](docs/design/zero-shot-v8-dataset-scaling-plan.md#37-全-smoke-test-完了--最終見積-2026-07-09-セッション終了時点)
 - ko 追加コスト分析: [design doc §3.10](docs/design/zero-shot-v8-dataset-scaling-plan.md#310-v8-に韓国語-ko-追加--追加コスト見積-2026-07-09)
 - ko 追加後の前処理: `prepare_multilingual_dataset.py --ko-zeroth ... --ko-cv ...` (§6.5。 `--ko-ksponspeech` は除外確定により使わない。 CV ko の UTMOS フィルタは `piper_train.tools.score_utmos` の per-clip tsv を `export_common_voice_ko --utmos-tsv` に渡す — 渡さないと黙って無効化される)
 
 **2026-08-02 更新 (dev v2.0 リベース + 本走方針確定)**:
+
 - ✅ **公開方針確定**: v8 は public + 商用利用可の open-model として公開 (KsponSpeech 除外により全データソースのライセンスが両立)。 ko は Zeroth-Korean (CC BY 4.0、 openslr.org/40、 ~181 spk / ~22.2k utts) + Common Voice ko (CC0、 UTMOS≥2.5 + ≥20clips + cap60 で ~30-50 spk / ~3k utts) のみ
 - ✅ **UTMOS スコアラ追加**: `piper_train.tools.score_utmos` (SpeechMOS utmos22_strong、 commit `1eb2a3d0`)
 - ✅ **インスタンス承認済**: 4x A100 SXM4 40GB $3.43/hr (storage 1.7TB 込、 vast.ai。 オファーは流動的でレンタル時に再検索)。 batch=32/GPU の VRAM 40GB は未検証 → smoke を VRAM gate とし、 溢れたら batch=24 に下げるか 80GB ($7.68/hr) に乗換
@@ -85,6 +88,7 @@ VITS ベースの高品質ニューラル TTS。**6言語マルチリンガル�
 - 🔜 **残 TODO (本走前)**: onstart 自動レジューム script + HF ckpt epoch ごと自動 upload script が未作成 / ko データパイプラインは実データ未検証 (synthetic unit test のみ) → instance で小規模先行検証 / 評価用話者 holdout はコード機構なし → dataset.jsonl 構築後に post-filter (ja: moe-speech-plus 学習除外 ~10 名・男性含む、 ko: Zeroth 学習除外 5-10 名)
 
 **実測で不採用が確定した施策**:
+
 - `--compile`: torch 2.11 + triton の kernel compile crash
 - `--precomputed-mel`: 学習は GPU-bound で -6.5% 遅い
 - `--enable-length-bucketing`: +34% 逆効果

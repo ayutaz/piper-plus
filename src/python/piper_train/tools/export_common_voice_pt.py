@@ -31,6 +31,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+
 _LOGGER = logging.getLogger("export_common_voice_pt")
 
 # CV の validated.tsv は 128KB 超のフィールドを含むことがある (csv 既定上限で落ちる)
@@ -54,7 +55,9 @@ def load_durations(tsv: Path) -> dict[str, float]:
 def select_speakers(args, durations: dict[str, float]) -> dict[str, list[dict]]:
     """validated.tsv から話者 -> 採用 clip rows。"""
     by_speaker: dict[str, list[dict]] = defaultdict(list)
-    with open(args.cv_dir / "transcript" / "pt" / "validated.tsv", encoding="utf-8") as f:
+    with open(
+        args.cv_dir / "transcript" / "pt" / "validated.tsv", encoding="utf-8"
+    ) as f:
         reader = csv.DictReader(f, delimiter="\t")
         for row in reader:
             clip = row.get("path", "")
@@ -90,10 +93,23 @@ def mp3_bytes_to_wav(raw: bytes, dst: Path) -> bool:
         return True
     dst.parent.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run(
-        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", "pipe:0",
-         "-ar", "24000", "-ac", "1", "-y", str(dst)],
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            "pipe:0",
+            "-ar",
+            "24000",
+            "-ac",
+            "1",
+            "-y",
+            str(dst),
+        ],
         input=raw,
         capture_output=True,
+        check=False,
     )
     return proc.returncode == 0 and dst.exists()
 
@@ -122,9 +138,10 @@ def export(args, selected: dict[str, list[dict]]) -> None:
 
     n = 0
     csv_path = args.output_dir / "cv.csv"
-    with open(csv_path, "w", encoding="utf-8") as csv_f, ThreadPoolExecutor(
-        max_workers=args.ffmpeg_workers
-    ) as pool:
+    with (
+        open(csv_path, "w", encoding="utf-8") as csv_f,
+        ThreadPoolExecutor(max_workers=args.ffmpeg_workers) as pool,
+    ):
         csv_f.write(
             "wav_filename|wav_filesize|transcript|transcript_wav2vec|"
             "levenshtein|duration|num_words|client_id\n"
@@ -175,9 +192,7 @@ def main() -> None:
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    durations = load_durations(
-        args.cv_dir / "transcript" / "pt" / "clip_durations.tsv"
-    )
+    durations = load_durations(args.cv_dir / "transcript" / "pt" / "clip_durations.tsv")
     _LOGGER.info("clip_durations: %d clips", len(durations))
     selected = select_speakers(args, durations)
     args.output_dir.mkdir(parents=True, exist_ok=True)

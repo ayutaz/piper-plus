@@ -217,7 +217,7 @@ class CAMDenseTDNNBlock(nn.ModuleList):
                 config_str=config_str,
                 memory_efficient=memory_efficient,
             )
-            self.add_module("tdnnd%d" % (i + 1), layer)
+            self.add_module(f"tdnnd{i + 1}", layer)
 
     def forward(self, x):
         for layer in self:
@@ -226,7 +226,9 @@ class CAMDenseTDNNBlock(nn.ModuleList):
 
 
 class TransitLayer(nn.Module):
-    def __init__(self, in_channels, out_channels, bias=True, config_str="batchnorm-relu"):
+    def __init__(
+        self, in_channels, out_channels, bias=True, config_str="batchnorm-relu"
+    ):
         super().__init__()
         self.nonlinear = get_nonlinear(config_str, in_channels)
         self.linear = nn.Conv1d(in_channels, out_channels, 1, bias=bias)
@@ -238,7 +240,9 @@ class TransitLayer(nn.Module):
 
 
 class DenseLayer(nn.Module):
-    def __init__(self, in_channels, out_channels, bias=False, config_str="batchnorm-relu"):
+    def __init__(
+        self, in_channels, out_channels, bias=False, config_str="batchnorm-relu"
+    ):
         super().__init__()
         self.linear = nn.Conv1d(in_channels, out_channels, 1, bias=bias)
         self.nonlinear = get_nonlinear(config_str, out_channels)
@@ -261,7 +265,9 @@ class BasicResBlock(nn.Module):
             in_planes, planes, kernel_size=3, stride=(stride, 1), padding=1, bias=False
         )
         self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv2 = nn.Conv2d(
+            planes, planes, kernel_size=3, stride=1, padding=1, bias=False
+        )
         self.bn2 = nn.BatchNorm2d(planes)
 
         self.shortcut = nn.Sequential()
@@ -286,10 +292,14 @@ class BasicResBlock(nn.Module):
 
 
 class FCM(nn.Module):
-    def __init__(self, block=BasicResBlock, num_blocks=(2, 2), m_channels=32, feat_dim=80):
+    def __init__(
+        self, block=BasicResBlock, num_blocks=(2, 2), m_channels=32, feat_dim=80
+    ):
         super().__init__()
         self.in_planes = m_channels
-        self.conv1 = nn.Conv2d(1, m_channels, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv1 = nn.Conv2d(
+            1, m_channels, kernel_size=3, stride=1, padding=1, bias=False
+        )
         self.bn1 = nn.BatchNorm2d(m_channels)
 
         self.layer1 = self._make_layer(block, m_channels, num_blocks[0], stride=2)
@@ -369,11 +379,13 @@ class CAMPPlus(nn.Module):
                 config_str=config_str,
                 memory_efficient=memory_efficient,
             )
-            self.xvector.add_module("block%d" % (i + 1), block)
+            self.xvector.add_module(f"block{i + 1}", block)
             channels = channels + num_layers * growth_rate
             self.xvector.add_module(
-                "transit%d" % (i + 1),
-                TransitLayer(channels, channels // 2, bias=False, config_str=config_str),
+                f"transit{i + 1}",
+                TransitLayer(
+                    channels, channels // 2, bias=False, config_str=config_str
+                ),
             )
             channels //= 2
 
@@ -445,12 +457,16 @@ class DifferentiableCamPPEncoder(nn.Module):
         return super().train(False)
 
     def forward(self, audio: torch.Tensor) -> torch.Tensor:
-        import torchaudio
+        import torchaudio  # noqa: PLC0415 - load the audio backend only during inference.
 
         if audio.dim() != 2:
-            raise ValueError(f"expected [B, T] waveform, got shape {tuple(audio.shape)}")
+            raise ValueError(
+                f"expected [B, T] waveform, got shape {tuple(audio.shape)}"
+            )
         if self.source_sr != self.target_sr:
-            audio = torchaudio.functional.resample(audio, self.source_sr, self.target_sr)
+            audio = torchaudio.functional.resample(
+                audio, self.source_sr, self.target_sr
+            )
         fbanks = []
         for i in range(audio.size(0)):
             fb = torchaudio.compliance.kaldi.fbank(

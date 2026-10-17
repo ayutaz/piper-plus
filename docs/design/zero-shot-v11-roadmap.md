@@ -5,6 +5,7 @@
 > 実用は学習量不足で不成立。次は v11b from-scratch)。
 >
 > 子 doc (詳細はそちらが正):
+>
 > - [`zero-shot-v10b-residual-noise-diagnosis.md`](zero-shot-v10b-residual-noise-diagnosis.md)
 >   — 診断 canonical (3 層構造 + deep-research 検証 §6 + recon 修正 §8)
 > - [`zero-shot-v11-harmonic-head-design.md`](zero-shot-v11-harmonic-head-design.md)
@@ -174,12 +175,13 @@ v10b と同じ 2-arm 方式 + 事前登録 gate (harmonic-head §7):
   22min/epoch 実測ベース)。ep19 warm 継続 (~$73) は v9 Phase 0/1 の
   「warm restart は転写能力を回収できない」前例があり非推奨。レシピ =
   v11 と同一 + 次の 3 変更を事前登録:
-  - **敵対 ramp 凍結**: c_adv_spk の ramp を ep15 相当で頭打ち (ep15 谷 →
+
+- **敵対 ramp 凍結**: c_adv_spk の ramp を ep15 相当で頭打ち (ep15 谷 →
     ep19 回復 → ep19 以降崩壊の経過から ramp 進行が崩壊駆動の第一容疑)
-  - **CER gate**: ep 節目評価に eval_cer を追加、**CER median ≤ 0.30**
+- **CER gate**: ep 節目評価に eval_cer を追加、**CER median ≤ 0.30**
     (whisper-small、つくよみ参照合成 ≥3 文) を実用判定 gate に。
     早期 ep は未成熟で当然 fail するため、abort 条件ではなく
     **ep40 以降の昇格 gate** として扱う
-  - **R3 継続** (held-out ECAPA 急落 abort、v11 で 2 回正しく発動) +
+- **R3 継続** (held-out ECAPA 急落 abort、v11 で 2 回正しく発動) +
     export は完走 ckpt でも EMA/raw 両方を眺めて良い方を採る
     (早期打ち切り時は --no-ema 必須)

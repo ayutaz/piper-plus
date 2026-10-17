@@ -149,7 +149,7 @@ goodhart_flag と above_ceiling_flag の値を明記する。
 - hook `guard-bash.sh`: `--encoder2` なしの eval_zs_secs 実行を block
 - pre-commit `zs-prevention-gate`: 防止テスト群と評価ガード面の削除・改名を検出
 - pre-commit `zs-metric-isolation-gate`: 学習コードからの評価メトリクス import
-  + メトリクスモジュールの torch import を block (教訓①の機械的強制)
+  - メトリクスモジュールの torch import を block (教訓①の機械的強制)
 - `/publish-model` フェーズ 3.5: 公開前の帯域 + cross-utt SECS gate
 - 単体テスト: `test_eval_zs_secs.py` (goodhart_flag 判定ロジック含む) +
   `test_measure_comb_artifacts.py` / `test_measure_prosody.py` /
