@@ -124,6 +124,10 @@ android {
         minSdk    = 24
         targetSdk = 34
         consumerProguardFiles("consumer-rules.pro")
+        // Without this the legacy default runner finds none of the JUnit4
+        // (@RunWith(AndroidJUnit4::class)) tests, and L3 reported
+        // "Starting 0 tests" while passing.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         externalNativeBuild {
             cmake {
