@@ -148,6 +148,27 @@ impl PiperEncoder {
         }
     }
 
+    /// Symbols of `tokens` missing from the model's phoneme ID map, i.e. what
+    /// [`UnknownTokenMode::Skip`] drops (and `Strict` rejects), each listed
+    /// once in first-seen order. Lookup is the same as in encoding: a token
+    /// with a PUA mapping is checked as its PUA codepoint, others char by char.
+    pub fn dropped_symbols(&self, tokens: &[String]) -> Vec<String> {
+        let mut dropped: Vec<String> = Vec::new();
+        for token in tokens {
+            let mapped: String = match token_to_pua(token) {
+                Some(pua_char) => pua_char.to_string(),
+                None => token.clone(),
+            };
+            for ch in mapped.chars() {
+                let ch_str = ch.to_string();
+                if !self.id_map.contains_key(&ch_str) && !dropped.contains(&ch_str) {
+                    dropped.push(ch_str);
+                }
+            }
+        }
+        dropped
+    }
+
     /// Encode IPA tokens to phoneme IDs with BOS/EOS/PAD insertion.
     pub fn encode(&self, tokens: &[String]) -> Result<Vec<i64>, G2pError> {
         self.encode_with_eos(tokens, None)
@@ -365,6 +386,27 @@ mod tests {
         let encoder = PiperEncoder::new(map, UnknownTokenMode::Strict).unwrap();
         let tokens: Vec<String> = vec!["a", "Z"].into_iter().map(String::from).collect();
         assert!(encoder.encode(&tokens).is_err());
+    }
+
+    #[test]
+    fn test_dropped_symbols_lists_what_skip_mode_drops() {
+        let map = make_map(&[
+            ("^", &[1]),
+            ("_", &[0]),
+            ("$", &[2]),
+            ("a", &[15]),
+            ("\u{E00E}", &[40]),
+        ]);
+        let encoder = PiperEncoder::new(map, UnknownTokenMode::Skip).unwrap();
+        // "ch" resolves through its PUA codepoint; " " and "Z" are dropped,
+        // each listed once in first-seen order.
+        let tokens: Vec<String> = vec!["a", "Z", " ", "ch", "Z"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        assert_eq!(encoder.dropped_symbols(&tokens), vec!["Z", " "]);
+        let known: Vec<String> = vec!["a", "ch"].into_iter().map(String::from).collect();
+        assert!(encoder.dropped_symbols(&known).is_empty());
     }
 
     #[test]

@@ -284,6 +284,13 @@ export class PiperPlus {
    */
   synthesizeFromReferenceAudio(params: SynthesizeFromReferenceAudioParams): Promise<AudioResult>;
 
+  /**
+   * Symbols the phonemizer produces for `text` that the loaded model's
+   * phoneme ID map lacks (synthesize() leaves them out silently). Includes
+   * unmapped whitespace and punctuation. Each symbol once, first-seen order.
+   */
+  findDroppedSymbols(text: string, options?: { language?: string }): Promise<string[]>;
+
   /** Streaming synthesis -- splits text into sentences and invokes onChunk for each chunk. */
   synthesizeStreaming(text: string, options?: StreamingSynthesizeOptions): Promise<void>;
 

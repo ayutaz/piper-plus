@@ -77,11 +77,15 @@ export class Encoder {
    * The output format is:
    *   BOS + token0_ids + PAD + token1_ids + PAD + ... + tokenN_ids + PAD + EOS
    *
+   * Tokens missing from the map are skipped (or throw in strict mode) and
+   * listed once each, in first-seen order, in `droppedSymbols`.
+   *
    * @param {string[]} tokens - Array of IPA phoneme tokens (no BOS/EOS)
-   * @returns {{ phonemeIds: number[] }}
+   * @returns {{ phonemeIds: number[], droppedSymbols: string[] }}
    */
   encode(tokens) {
     const ids = [this._bos];
+    const dropped = new Set();
 
     for (let i = 0; i < tokens.length; i++) {
       const tokenIds = this._lookupToken(tokens[i]);
@@ -89,6 +93,8 @@ export class Encoder {
         ids.push(...tokenIds);
       } else if (this._strict) {
         throw new Error(`Unknown phoneme symbol "${tokens[i]}" not in phonemeIdMap`);
+      } else {
+        dropped.add(tokens[i]);
       }
       // Insert PAD between tokens and after the last token
       ids.push(this._pad);
@@ -96,7 +102,7 @@ export class Encoder {
 
     ids.push(this._eos);
 
-    return { phonemeIds: ids };
+    return { phonemeIds: ids, droppedSymbols: [...dropped] };
   }
 
   /**
@@ -114,12 +120,12 @@ export class Encoder {
    * @param {Array<{a1: number, a2: number, a3: number}|null>|null} prosody
    *   Per-token prosody info. Must have same length as tokens, or be null.
    *   Null entries or a null array result in [0,0,0] for all positions.
-   * @returns {{ phonemeIds: number[], prosodyFlat: number[]|null }}
+   * @returns {{ phonemeIds: number[], prosodyFlat: number[]|null, droppedSymbols: string[] }}
    */
   encodeWithProsody(tokens, prosody) {
     if (!prosody) {
       const result = this.encode(tokens);
-      return { phonemeIds: result.phonemeIds, prosodyFlat: null };
+      return { ...result, prosodyFlat: null };
     }
 
     if (prosody.length !== tokens.length) {
@@ -130,6 +136,7 @@ export class Encoder {
 
     const ids = [];
     const flat = [];
+    const dropped = new Set();
 
     // BOS
     ids.push(this._bos);
@@ -149,6 +156,8 @@ export class Encoder {
         }
       } else if (this._strict) {
         throw new Error(`Unknown phoneme symbol "${tokens[i]}" not in phonemeIdMap`);
+      } else {
+        dropped.add(tokens[i]);
       }
 
       // PAD after each token
@@ -160,6 +169,6 @@ export class Encoder {
     ids.push(this._eos);
     flat.push(0, 0, 0);
 
-    return { phonemeIds: ids, prosodyFlat: flat };
+    return { phonemeIds: ids, prosodyFlat: flat, droppedSymbols: [...dropped] };
   }
 }

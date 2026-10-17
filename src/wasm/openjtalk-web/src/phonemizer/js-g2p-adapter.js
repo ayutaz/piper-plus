@@ -38,7 +38,9 @@ export class JsG2pAdapter {
    * Encode text into phoneme IDs and optional prosody features.
    * @param {string} text
    * @param {string} language
-   * @returns {{ phonemeIds: number[], prosodyFeatures: number[][]|null }}
+   * `droppedSymbols` lists tokens missing from the model's phoneme ID map
+   * (null when the installed @piper-plus/g2p predates it).
+   * @returns {{ phonemeIds: number[], prosodyFeatures: number[][]|null, droppedSymbols: string[]|null }}
    */
   encode(text, language) {
     const result = this._g2p.encode(text, this._phonemeIdMap, { language });
@@ -52,7 +54,11 @@ export class JsG2pAdapter {
       }
     }
 
-    return { phonemeIds: result.phonemeIds, prosodyFeatures };
+    return {
+      phonemeIds: result.phonemeIds,
+      prosodyFeatures,
+      droppedSymbols: result.droppedSymbols ?? null,
+    };
   }
 
   /**
