@@ -67,6 +67,8 @@ jobs:
               - 'src/python_run/**'
               - 'pyproject.toml'
               - 'uv.lock'
+              - 'scripts/run_zero_shot_cpu_evaluation.py'
+              - 'tests/scripts/test_zero_shot_cpu_hash_cache.py'
             rust:
               - 'src/rust/**'
             csharp:

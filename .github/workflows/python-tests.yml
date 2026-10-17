@@ -25,6 +25,8 @@ on:
       - '.github/workflows/python-tests.yml'
 
       - 'scripts/check_python_run_test_coverage.py'
+      - 'scripts/run_zero_shot_cpu_evaluation.py'
+      - 'tests/scripts/test_zero_shot_cpu_hash_cache.py'
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
@@ -153,6 +155,28 @@ jobs:
       run: |
         cd src/python
         pytest tests/ -v --tb=short -m "training and unit" --no-cov
+
+    - name: Run Zero-Shot CPU preparation regressions (Unix)
+      # These new offline tests are deliberately explicit: unmarked tests are
+      # omitted by the marker-filtered suites above, and tests/scripts is
+      # outside pytest.ini testpaths. No private models, GPU or ASR download.
+      if: runner.os != 'Windows'
+      env:
+        CUDA_VISIBLE_DEVICES: '-1'
+        OMP_NUM_THREADS: '1'
+        MKL_NUM_THREADS: '1'
+      run: |
+        python -m pytest \
+          src/python/tests/test_checkpoint_io.py \
+          src/python/tests/test_cpu_reference_comparison.py \
+          src/python/tests/test_eval_multiple_references.py \
+          src/python/tests/test_strict_zero_shot.py \
+          src/python/tests/test_zero_shot_audit.py \
+          src/python/tests/test_zs_metric_isolation_gate.py \
+          src/python/tests/test_batch_pin_memory.py \
+          src/python/tests/test_dataset_f0.py \
+          tests/scripts/test_zero_shot_cpu_hash_cache.py \
+          -q --no-cov
 
     # ---------------------------------------------------------------
     # Runtime package tests (src/python_run — PyPI piper-plus)

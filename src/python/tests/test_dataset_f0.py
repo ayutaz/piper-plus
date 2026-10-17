@@ -55,9 +55,7 @@ def _write_utterance(tmp_path, name: str, n_frames: int, with_f0: bool):
 
 def _dataset_jsonl(tmp_path, records) -> str:
     path = tmp_path / "dataset.jsonl"
-    path.write_text(
-        "\n".join(json.dumps(r) for r in records), encoding="utf-8"
-    )
+    path.write_text("\n".join(json.dumps(r) for r in records), encoding="utf-8")
     return str(path)
 
 
@@ -180,7 +178,11 @@ def test_collate_zero_fills_utterances_that_lack_f0():
     assert float(batch.f0[1].abs().sum()) == 0.0
 
 
-def test_pin_memory_carries_the_new_fields():
+def test_pin_memory_carries_the_new_fields(monkeypatch):
+    if not torch.cuda.is_available():
+        # This test checks field forwarding. Actual host page-locking is tested
+        # separately when the CUDA allocator is available.
+        monkeypatch.setattr(torch.Tensor, "pin_memory", lambda tensor: tensor)
     batch = Batch(
         phoneme_ids=torch.zeros(1, 3, dtype=torch.long),
         phoneme_lengths=torch.zeros(1, dtype=torch.long),
