@@ -77,6 +77,10 @@ jobs:
               - 'src/cpp/**'
               - 'CMakeLists.txt'
               - 'cmake/**'
+              # Data and golden read by ChineseGoldenTest (test_multilingual_g2p).
+              - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
+              - 'src/python/g2p/piper_plus_g2p/data/pua.json'
+              - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
             wasm:
               - 'src/wasm/**'
               - 'src/rust/piper-wasm/**'
@@ -84,6 +88,8 @@ jobs:
               - 'test/fixtures/zs_campplus_golden.json'
               - 'test/fixtures/kaldi_fbank_golden.json'
               - 'test/generate_zs_campplus_golden.py'
+              # Python golden compared in the browser G2P parity test.
+              - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
             go:
               - 'src/go/**'
             docker:

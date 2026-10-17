@@ -11,9 +11,13 @@
 #include <gtest/gtest.h>
 
 #include "dictionary_search.hpp"
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
+#include <sstream>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -260,6 +264,102 @@ TEST_F(ChineseG2PTest, SentenceWithPunctuation) {
         }
     }
     EXPECT_TRUE(hasPunct) << "Expected ASCII period '.' (mapped from U+3002) in output";
+}
+
+// =========================================================================
+// 3b. Chinese output vs the Python golden, with the shipped dictionaries
+// =========================================================================
+// The tests above use a hand-made 6-entry dictionary and only check that the
+// output is non-empty, so they passed while the shipped pinyin JSON (tone
+// marks instead of numeric tones) turned every syllable into tone 5 with its
+// final dropped. This one loads the files the runtime installs
+// (src/rust/piper-plus-g2p/data, see cmake/Install.cmake) and compares
+// exactly with pypinyin (tests/fixtures/g2p/phoneme_test_cases_golden.json).
+
+namespace {
+
+std::string repoPath(const std::string &relative) {
+    return std::string(PIPER_PLUS_REPO_ROOT) + "/" + relative;
+}
+
+nlohmann::json readJsonFile(const std::string &path) {
+    std::ifstream ifs(path);
+    if (!ifs.is_open()) {
+        throw std::runtime_error("cannot open " + path);
+    }
+    nlohmann::json json;
+    ifs >> json;
+    return json;
+}
+
+bool hasAsciiAlnum(const std::string &text) {
+    return std::any_of(text.begin(), text.end(), [](unsigned char ch) {
+        return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z') ||
+               (ch >= 'A' && ch <= 'Z');
+    });
+}
+
+}  // namespace
+
+TEST(ChineseGoldenTest, MatchesPythonWithShippedDictionaries) {
+    std::unordered_map<int, std::string> singleCharDict;
+    std::unordered_map<std::string, std::string> phraseDict;
+    ASSERT_TRUE(loadPinyinDicts(
+        repoPath("src/rust/piper-plus-g2p/data/pinyin_single.json"),
+        repoPath("src/rust/piper-plus-g2p/data/pinyin_phrases.json"),
+        singleCharDict, phraseDict));
+
+    // Multi-codepoint tokens ("tone3", "ai") are compared as their PUA
+    // codepoints from the shared table.
+    // Kept in a variable: a range-for over a member of a temporary dangles
+    // before C++23.
+    const auto pua = readJsonFile(repoPath("src/python/g2p/piper_plus_g2p/data/pua.json"));
+    std::unordered_map<std::string, Phoneme> tokenToPua;
+    for (const auto &entry : pua.at("entries")) {
+        tokenToPua[entry.at("token").get<std::string>()] = static_cast<Phoneme>(
+            std::stoul(entry.at("codepoint").get<std::string>(), nullptr, 16));
+    }
+    // Python's MultilingualPhonemizer drops the sentence punctuation that
+    // phonemize_chinese keeps; compare the spoken tokens only.
+    const std::u32string skipped = U" .,!?;:";
+
+    const auto golden =
+        readJsonFile(repoPath("tests/fixtures/g2p/phoneme_test_cases_golden.json"));
+    int checked = 0;
+    for (const auto &c : golden.at("test_cases")) {
+        const std::string input = c.at("input").get<std::string>();
+        // Latin letters and digits go through the ZH-EN / number handling.
+        if (c.at("language").get<std::string>() != "zh" || hasAsciiAlnum(input)) {
+            continue;
+        }
+        std::vector<Phoneme> expected;
+        std::istringstream tokens(c.at("expected_phonemes").get<std::string>());
+        for (std::string token; tokens >> token;) {
+            const auto it = tokenToPua.find(token);
+            if (it != tokenToPua.end()) {
+                expected.push_back(it->second);
+                continue;
+            }
+            std::u32string codepoints;
+            utf8::utf8to32(token.begin(), token.end(), std::back_inserter(codepoints));
+            ASSERT_EQ(codepoints.size(), 1u) << "token without a PUA entry: " << token;
+            expected.push_back(codepoints[0]);
+        }
+
+        std::vector<std::vector<Phoneme>> sentences;
+        phonemize_chinese(input, sentences, singleCharDict, phraseDict);
+        std::vector<Phoneme> actual;
+        for (const auto &sentence : sentences) {
+            for (const Phoneme ph : sentence) {
+                if (skipped.find(ph) == std::u32string::npos) {
+                    actual.push_back(ph);
+                }
+            }
+        }
+        EXPECT_EQ(actual, expected) << "zh mismatch for " << input;
+        checked++;
+    }
+    EXPECT_GE(checked, 40) << "too few zh cases in the golden fixture";
 }
 
 // =========================================================================

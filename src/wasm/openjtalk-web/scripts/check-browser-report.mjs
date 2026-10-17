@@ -5,6 +5,7 @@ for (const name of [
   "README importmap",
   "README Basic Usage",
   "Zero-shot demo",
+  "G2P parity",
 ]) {
   if (!xml.includes(`<testcase name="${name}`)) {
     throw new Error(`Mandatory browser case missing: ${name}`);

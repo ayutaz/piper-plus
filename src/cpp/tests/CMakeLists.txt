@@ -835,6 +835,11 @@ foreach(test_source ${TEST_SOURCES})
                 $<TARGET_FILE_DIR:${test_name}>/data/sv_function_words.json
             COMMENT "Staging sv_function_words.json next to ${test_name}"
         )
+        # ChineseGoldenTest reads the shipped pinyin dictionaries, the PUA
+        # table and the Python golden from the source tree.
+        target_compile_definitions(${test_name} PRIVATE
+            PIPER_PLUS_REPO_ROOT="${CMAKE_SOURCE_DIR}"
+        )
     endif()
 
     # Link additional dependencies for Swedish phonemize test
