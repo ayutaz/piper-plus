@@ -133,4 +133,4 @@ def native_ecapa_embedding(classifier, path):
         audio = soxr.resample(audio, rate, 16000, quality="HQ")
     with torch.inference_mode():
         vector = classifier.encode_batch(torch.from_numpy(audio).unsqueeze(0))
-    return validate_embedding(vector.detach().cpu().numpy())
+    return validate_embedding(vector.detach().cpu().numpy().squeeze())
