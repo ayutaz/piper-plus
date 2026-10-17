@@ -1,0 +1,368 @@
+# Zero-Shot 参照融合 (GPT-SoVITS v2Pro型) 実験・実装計画
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+作成日: 2026-10-17。状態: **計画。コード変更・レンタル・学習は未実施**。
+作成時のPiperソース: `638b18f5558d4421c6614de7531b0c8cb4cc4be8` (`feat/zero-shot-v8-dataset-scaling`)。
+
+**Goal:** GPT-SoVITS v2Proと同じ「話者照合モデルのpooling前特徴を既存global条件へ加算する」経路をPiperに実装し、未知話者の声の再現性が上がるかを、容量対照付きで$1000以内に判定する。
+
+**Architecture:** CAM++の192次元に加え、同じCAM++のpooling前統計 (平均+標準偏差、1024次元) を事前抽出し、zero-initの小型MLPで`spk_proj`出力へ加算する。融合後のgは従来どおりenc_p・DP・flow・decoder・enc_qへ入るため、ONNXでは入力が1本増えるだけになる。GPUの前に、既存モデルのまま推論側の参照処理 (無音trim、複数参照の平均位置) をCPUで確かめる。
+
+**Tech Stack:** PyTorch / Lightning、`piper_train.speaker_encoder.campplus_torch.CAMPPlus` (凍結)、ONNX Runtime、`uv run`、pytest。
+
+**Spec:** 本書が上位計画 [zero-shot-gpt-sovits-adoption-plan-2026-10-17.md](zero-shot-gpt-sovits-adoption-plan-2026-10-17.md) (以下「元計画」) の §3〜§9 を改訂する。根拠は同日の上流精読・コード照合 (§1)。元計画の §1.2用語、§5.2評価集合、§9.1指標、§10運用は変更せず引き継ぐ。
+
+## Global Constraints
+
+- Python実行は `uv run`、依存追加は `uv add`。テストは `uv run --no-sync pytest <path> --no-cov`。
+- Torch処理はGPUを使えるときGPU、ONNX検証はCPU (`CUDA_VISIBLE_DEVICES=""`)。
+- 新機能はすべてopt-in。既定値で旧checkpoint・旧ONNX・旧CLIの出力を変えない。
+- 既存schema FP16 TTS 40MB、生成CPU p50 +10%以内を維持。新schemaの追加入力で事後に緩和しない。
+- テスト閾値を実測に合わせて緩めない。緩める場合は `# threshold-relaxed: <根拠>` を付ける (pre-commit gate)。
+- SECSはcross-utteranceのみ、CAM++とnative ECAPAの両方で測る。`goodhart_flag`/`above_ceiling_flag`がtrueなら改善と呼ばない。
+- 新経路にCAM++/ECAPA由来の追加損失を足さない (固定encoderのスコアを目標にした崩壊が過去2回)。
+- `git commit --no-verify` 禁止。コミットはfeatureブランチに都度行い、devへ直接コミットしない。
+- 公開・既定モデル差し替え・リリースは本計画の完了条件に含めない。
+
+## Review Focus
+
+1. 全区間が無音・極短の参照WAV → trim後に音声が残らない場合は黙って未trim音声へ戻さず、理由付きで拒否する (Task 2)。
+2. 長い参照 (数十秒) のFP16集計 → 平均がoverflowして0/Infにならず、fp32で有限値を返す (Task 3)。上流v2Proで無音出力事故あり。
+3. 融合付きcheckpointを融合なしの旧コードやstreaming exportへ渡す → 黙って融合を落とさず明示エラー (Task 6, Task 9)。
+4. referenceとtargetが同一音声 (別path・別cropの同一hashを含む) → 学習を始めない (Task 7)。
+5. 新schemaのONNXを未対応runtimeに渡す → `reference_features`を無視して合成せず、明示エラー (Task 10)。
+
+---
+
+## 1. 調査で確定した前提と、元計画からの変更
+
+### 1.1 上流 (GPT-SoVITS main `1b47ca07`) の事実
+
+| 事実 | 根拠 | 計画への意味 |
+|---|---|---|
+| SoVITS (v1/v2/v2Pro) の参照条件は時間平均したglobal `ge` 1本。enc_p (MRTE後)・flow・decoder・enc_qへ入る | `GPT_SoVITS/module/models.py` L911-944, L957-962 | 参照token列 (元計画R2) に上流の前例はない |
+| v2Proは話者照合モデルERes2NetV2の**pooling前**特徴を時間平均した20480次元を`Linear`で写像し`ge`へ加算→PReLU | `models.py` L928-944、`eres2net/ERes2NetV2.py` L240-251 | CAM++のpooling前統計で同型の経路を作れる |
+| 学習時の参照は生成対象と同じ発話。話者損失なし | `module/data_utils.py` L109-134、`s2_train.py` L445-450 | 自己参照でも動くが、AR段の補助がないPiperでは別発話の方が安全 |
+| v2Proで長い参照のFP16時間平均がoverflowし無音出力、修正で学習が発散し再修正 | `module/modules.py` L716-726、commit 8056efe4→ed89a023 | 集計はfp32で行う |
+| 参照encoder入力を約11kHz以下 (32kHzの704 bin) に制限 | `models.py` L912-915 | Piperは22.05kHz (上限11.025kHz)、CAM++は16kHzのため**既に同等以下**。追加作業なし |
+| 自己申告SIM: v2 .549 → v2Pro .709 → ProPlus .737。複数変更が同時に入っており分離不能。英語の第三者評価は低い | wiki、CosyVoice2論文 | 上流の数値を目標値にしない |
+
+### 1.2 Piperのコードで確定した事実
+
+| 事実 | 場所 |
+|---|---|
+| 学習用CAM++はVAD trim済みの`audio_norm`から抽出。推論の参照WAVはtrimせずにfbank化しCMVN平均へ無音が混入 | `extract_speaker_embedding.py` L102-136 (学習) / L65-99 (推論)、`norm_audio/__init__.py` L208-238, L275-279 |
+| Gへは生成対象と同じ発話の埋め込み。G・SCL・swap・Latent Fillingが1つの`speaker_embeddings`を共有 | `vits/lightning.py` L1963, L2059, L2283, L2418 |
+| `spk_proj`はLinear(192→512)→LN→GELU→Linear。gは`[B,512,1]` | `vits/models.py` L1459-1490 |
+| 話者情報損失の78%がdecoder段。prior/flowを完璧にしても上限は+0.04 (recon bound 0.714)。融合後のgはdecoderのFiLMにも入るが、decoderの描画歪みを直す保証はない | [zero-shot-v11-conditioning-design.md §10.1](zero-shot-v11-conditioning-design.md#101-チェーン会計--話者情報はどこで死ぬか実測) |
+| CAM++のpooling直前は512ch (`out_nonlinear`出力)。`StatsPool`で平均+標準偏差1024次元 | `speaker_encoder/campplus_torch.py` L334-410 |
+| 再開失敗時に`strict=False`のweights-only読込へ自動で切り替わる | `__main__.py` L1962-1989 |
+| streaming exportは非対応構造を`check_streaming_export_supported`で拒否する仕組みがある | `export_onnx_streaming.py` L71-95 |
+| 研究ブランチはdevより169 commit先行、devに未収録 | `git rev-list origin/dev..HEAD` |
+
+### 1.3 元計画からの変更点
+
+| 元計画 | 本計画 | 理由 |
+|---|---|---|
+| 主候補R1 (pooled) / R2 (K=8 token) を**prior直前**に注入 | 主候補は**F-stats**: CAM++ pooling前統計をzero-init MLPで`spk_proj`出力へ加算。gの全注入先へ届く | 上流v2Proの忠実な類似物。prior単独は上限+0.04。ONNX変更が入力1本で済む |
+| 新規の小型mel encoderを学習 | 第2段階へ延期 (F-mel)。F-statsのpilotで経路の価値を確認してから | 凍結・事前抽出で済むF-statsの方が安く、mel encoderは参照specの追加読込が必要 |
+| R2 token / 2参照mask | 保留 | 上流に前例がなく、漏れの経路が太い |
+| 帯域制限入力の比較 | 削除 | Piperの22.05kHz・CAM++の16kHzで既に上流と同等以下 |
+| GPU前にPython/C++の参照WAV実生成まで実装 | GPU前は**ONNX export・ORT一致・未対応runtimeの拒否**まで。参照WAV入力のruntime実装は採用判断後 | 採否未定の経路にruntime実装を先行させない |
+| 凍結→解除による慣らし | `requires_grad`凍結を使わず、param groupのLR倍率で慣らす | 凍結中のパラメータはEMA shadowとoptimizerに入らない (`ema.py` L58-62、`lightning.py` L2907) |
+| 新しい実装ブランチをdevから作る | 現在の`feat/zero-shot-v8-dataset-scaling` (devから分岐済み) でそのまま実装する (2026-10-17 ユーザー決定) | 必要な研究commitがこのブランチにある。devへの統合は採用判断後の別作業 |
+| 段階0なし | **段階0: 既存v10b ep79でのCPU検証**を追加 (§2) | trim・平均位置・特徴の有用性をGPUなしで先に確かめる |
+
+## 2. 段階と判定ゲート
+
+| 段階 | 内容 | GPU | 判定ゲート (次へ進む条件) |
+|---|---|---|---|
+| S0 CPU検証 | Task 1〜4: 再開の厳格化、参照trim、fp32集計、CAM++統計抽出。既存v10b ep79で (a) 参照trim有無、(b) 複数参照の平均を埋め込み側/g側、(c) CAM++統計の話者分離度を測る | 不要 | G0: (a)(b)の採否と、学習・推論で使うfrontendを1つに固定。(c)で統計特徴の話者分離度が192次元以上と確認 (下回れば§6の分岐) |
+| S1 実装 | Task 5〜10: 融合module、Ccap、参照ペア、EMA・移行、ONNX、runtime拒否 | 不要 | G1: 全テスト成功、旧経路の出力不変、Torch/ORT一致 |
+| S2 データ | 元計画§5.1の復元・監査。CAM++ 192と統計1024を、G0で固定したfrontendで**同じpassで**再抽出し来歴を記録。参照ペアmanifest作成 | 不要 | G2: 選んだ学習集合が監査通過、自己参照fallback 0 |
+| S3 smoke | RTX 5090×1、bf16。各群100 batch warm start + 100 batch strict再開 | 要 | G3: 非有限値0、融合MLPの重みが変化、保存・再開が連続、回収成功 |
+| S4 pilot | 4群を同じ露出量で短期比較 (§3) | 要 | G4: F-statsがCcapとC0を開発群で上回るか判定。上回らなければS5へ進まず報告 |
+| S5 本比較 | C0とG4の選択候補を同露出で比較。新run 40epoch相当を初期案 | 要 | G5: 元計画§9.1の選抜条件 |
+| S6 最終判定 | 最終評価群、AB試聴、ONNX/CPU計測 | 一部 | 改善/非改善/判定不能を根拠付きで区別 |
+
+S2はS0・S1と並行できる。S3はG0〜G2がそろってから。
+
+## 3. 比較群
+
+| 群 | Gへの参照 | 追加module | 判別すること |
+|---|---|---|---|
+| E0 | (学習なし) v10b ep79 | なし | 現在のモデル |
+| C0-self | 生成対象と同じ発話 | なし | v10b学習条件の継続。warm startの影響の基準 |
+| C0 | 同話者の別発話 | なし | 別発話参照だけの効果 |
+| Ccap | 同話者の別発話 | 192次元入力のMLP (F-statsと追加パラメータ数±5%) | 容量増の効果 |
+| F-stats | 同話者の別発話 | CAM++統計1024→MLP→`spk_proj`出力へ加算 | pooling前統計の効果 |
+
+- C0/Ccap/F-statsは参照発話・初期重み・データ順・損失・評価集合を共通にする。
+- SCLの正例とGへの参照は別フィールドで管理し、SCLは従来どおり (Task 7)。
+- C0-selfはpilotのみ。本比較はC0と選択候補。
+- 初期重みはv10b ep79 raw。optimizer・EMA・epochは継承しない。warm restartが転写能力を回復しなかった前例 (v9) があるため、新moduleに十分な露出量を確保し、短期pilotで完成と判断しない。
+
+## 4. 予算 ($1000、CloudRift RTX 5090 $0.65/時)
+
+本表で元計画§8.2と`output/cloudrift-readonly-audit-20261017/assessment.json`の`budget_caps`を置き換える。
+
+| 用途 | 上限 |
+|---|---:|
+| 環境構築・S3 smoke | $30 |
+| warm速度計測・露出量の見積もり | $50 |
+| S4 pilot (4群) | $200 |
+| S5 本比較 (2群) | $430 |
+| 再試行・最終export・回収 | $120 |
+| 予備 | $170 |
+| **合計** | **$1000** |
+
+速度は同一processで300 batch以後の窓で測る。残額でS5とS6を完了できない見積もりなら、S5を始めず集合・群数を再設計する。
+
+## 5. 実装タスク (S0〜S1)
+
+作業ブランチ: 現在の`feat/zero-shot-v8-dataset-scaling`。タスクごとにコミットしてpushする。元計画ファイルと`docs/research/README.md`の未コミット変更は、ユーザーが扱いを決めるまで触らない。
+
+### Task 1: 再開の厳格化
+
+**Files:**
+- Modify: `src/python/piper_train/__main__.py:1957-1990`
+- Test: `src/python/tests/test_resume_strict.py` (新規)
+
+**Interfaces:**
+- Produces: `run_strict_resume(trainer, model, ckpt_path: str) -> None` (`__main__.py`内)。失敗時は`SystemExit`。weights-only読込は`--resume-weights-only`だけが行う。
+
+- [ ] **Step 1: 失敗するテストを書く**
+
+```python
+def test_strict_resume_failure_does_not_fall_back(monkeypatch, tmp_path):
+    trainer = FakeTrainer(raises=RuntimeError("size mismatch"))
+    model = FakeModel()
+    with pytest.raises(SystemExit, match="--resume-weights-only"):
+        run_strict_resume(trainer, model, str(tmp_path / "x.ckpt"))
+    assert model.load_state_dict_calls == []  # strict=False 読込が起きない
+```
+
+- [ ] **Step 2: 失敗を確認** — `uv run --no-sync pytest src/python/tests/test_resume_strict.py --no-cov` → FAIL (`run_strict_resume`未定義)
+- [ ] **Step 3: 実装** — 既存の`try/except`ブロックを`run_strict_resume`へ移し、except節は元の例外を連鎖させた`SystemExit`に置き換える。メッセージに「weights-onlyで始めるなら `--resume-weights-only` を明示」を含める。
+- [ ] **Step 4: 成功を確認** — 同コマンドPASS、`test_resume_weights_only.py`もPASS
+- [ ] **Step 5: Commit** — `git add src/python/piper_train/__main__.py src/python/tests/test_resume_strict.py && git commit -m "fix(python): strict再開の失敗時にweights-onlyへ黙って切り替えない"`
+
+### Task 2: 参照音声のtrim (学習と同じenergy VAD)
+
+**Files:**
+- Create: `src/python/piper_train/reference_frontend.py`
+- Modify: `src/python/piper_train/extract_speaker_embedding.py:65-99` (`preprocess_audio`に`trim: bool = False`)、`src/python/piper_train/infer_onnx.py` (`--reference-trim {none,energy-vad}`、既定`none`)
+- Test: `src/python/tests/test_reference_frontend.py` (新規)
+
+**Interfaces:**
+- Produces: `trim_reference_audio(audio: np.ndarray, sample_rate: int) -> tuple[np.ndarray, dict]`。16kHzへsoxr HQで写した複写に`energy_vad_numpy(chunk_size=480, threshold=0.02, keep_before=2, keep_after=2)`を適用し、元のsample rateの音声を切る。dictは`offset_sec`, `duration_sec`, `method="energy_vad_numpy@16k"`。有声区間がなければ`ValueError`。
+
+- [ ] **Step 1: テストを書く**
+
+```python
+def test_trim_matches_training_vad_bounds():
+    audio = np.concatenate([np.zeros(22050), tone(22050, 0.3), np.zeros(22050)])
+    out, info = trim_reference_audio(audio, 22050)
+    assert 0.9 < info["offset_sec"] < 1.0
+    assert len(out) < len(audio)
+
+def test_trim_rejects_all_silence():
+    with pytest.raises(ValueError, match="no voiced"):
+        trim_reference_audio(np.zeros(44100, dtype=np.float32), 22050)
+
+def test_preprocess_audio_trim_default_off_is_unchanged(wav_with_silence):
+    assert np.array_equal(preprocess_audio(wav_with_silence), preprocess_audio(wav_with_silence, trim=False))
+```
+
+- [ ] **Step 2: 失敗を確認** — `uv run --no-sync pytest src/python/tests/test_reference_frontend.py --no-cov` → FAIL
+- [ ] **Step 3: 実装** — `reference_frontend.py`に`trim_reference_audio`、`preprocess_audio`はtrim時にfbank化前へ適用、`infer_onnx`のCAM++抽出経路にフラグを配線。
+- [ ] **Step 4: 成功を確認** — 同コマンドPASS、`test_extract_speaker_embedding.py`と`test_infer_onnx_speaker_embedding_integration.py`もPASS
+- [ ] **Step 5: Commit** — 変更3ファイル+テストを`git add`し`feat(python): 参照音声に学習時と同じenergy VAD trimを任意適用`
+
+### Task 3: fp32の時間平均とCAM++統計抽出
+
+**Files:**
+- Modify: `src/python/piper_train/reference_frontend.py`
+- Modify: `src/python/piper_train/extract_speaker_embedding.py` (`--per-utterance`に`--also-campp-stats`。出力は`<utt>.campp_stats.npy`とmanifestの`campp_stats_path`、来歴に`feature="campp_stats_v1"`, `dim=1024`, `frontend`, `weights_sha256`)
+- Test: `src/python/tests/test_reference_frontend.py`
+
+**Interfaces:**
+- Produces: `masked_time_mean_fp32(x: Tensor[B,C,T], mask: Tensor[B,1,T]) -> Tensor[B,C]` (float32。`x/len`を先に計算してから和をとる。全mask0の行は`ValueError`)。
+- Produces: `campplus_stats(model: CAMPPlus, fbank: Tensor[B,T,80]) -> Tensor[B,1024]` (`head`→`xvector`の`out_nonlinear`までを実行し、`statistics_pooling`と同じ定義の平均+標準偏差をfp32で返す。`dense`は通さない)。
+
+- [ ] **Step 1: テストを書く**
+
+```python
+def test_masked_mean_fp16_long_input_is_finite():
+    x = torch.full((1, 4, 200_000), 60000.0, dtype=torch.float16)
+    out = masked_time_mean_fp32(x, torch.ones(1, 1, 200_000))
+    assert out.dtype == torch.float32 and torch.isfinite(out).all()
+    assert torch.allclose(out, torch.full((1, 4), 60000.0), rtol=1e-3)
+
+def test_campplus_stats_matches_internal_statspool(campplus_random):
+    fbank = torch.randn(2, 300, 80)
+    stats = campplus_stats(campplus_random, fbank)
+    assert stats.shape == (2, 1024)
+    assert torch.allclose(stats, reference_statspool_via_hook(campplus_random, fbank), atol=1e-5)
+```
+
+- [ ] **Step 2: 失敗を確認** → FAIL
+- [ ] **Step 3: 実装** — 2関数と抽出CLIのオプション。統計抽出は192次元と同じfbank入力から同じpassで行う。
+- [ ] **Step 4: 成功を確認** — `test_reference_frontend.py`と`test_extract_speaker_embedding.py`がPASS
+- [ ] **Step 5: Commit** — `feat(python): CAM++のpooling前統計をfp32で抽出`
+
+### Task 4: S0のCPU検証を実行し、G0を記録
+
+**Files:**
+- Modify: `src/python/piper_train/tools/cpu_reference_comparison.py` (`reference_embedding`に`trim: bool = False`、新関数`projected_average(model, embeddings: np.ndarray) -> torch.Tensor`= 各埋め込みを`spk_proj`へ通してからg側で平均)
+- Create: `docs/research/zero-shot-reference-fusion-s0-2026-10.md` (結果記録)
+- Test: `src/python/tests/test_cpu_reference_comparison.py`
+
+**Interfaces:**
+- Consumes: Task 2 `trim_reference_audio`、Task 3 `campplus_stats`
+- Produces: G0の判定 (`frontend`: trimの有無、複数参照の平均位置、統計特徴の採否)。S2の再抽出とTask 5〜10の既定値はこれに従う。
+
+- [ ] **Step 1: テストを書く** — `test_projected_average_equals_single_when_one_reference` (1参照なら`spk_proj(e)`と一致)、`test_reference_embedding_trim_changes_only_with_silence` (無音なしWAVではtrimの有無で同値)
+- [ ] **Step 2〜4:** FAIL確認 → 実装 → PASS (`uv run --no-sync pytest src/python/tests/test_cpu_reference_comparison.py --no-cov`)
+- [ ] **Step 5: 測定** — `scripts/run_zero_shot_cpu_evaluation.py`の既存manifest (v10b ep79、raw/EMA/ONNX) で次の3条件を別出力に測る: (a) 参照trim なし/あり、(b) 2参照の埋め込み平均/g平均 (Torchのみ)、(c) 評価集合でCAM++ 192とCAM++統計1024のcross-utt同話者/別話者cosineの分離度 (AUC)。固定3文の旧結果は上書きしない。
+- [ ] **Step 6: 判定と記録** — 結果記録に数値・manifest hash・G0の採否を書く。trimの採否は「CAM++/ECAPA crossがともに非退行、CER非退行」で決め、片方だけの改善は採らない。
+- [ ] **Step 7: Commit** — ツール・テスト・結果記録を`git add`し`docs: 参照処理のCPU検証とG0判定を記録`
+
+### Task 5: 融合moduleと容量対照
+
+**Files:**
+- Create: `src/python/piper_train/vits/reference_fusion.py`
+- Modify: `src/python/piper_train/vits/models.py:1459-1543` (`SynthesizerTrn.__init__`に`reference_fusion: str = "none"`、`reference_feature_dim: int = 1024`。`_get_speaker_condition(speaker_embeddings=None, reference_features=None)`、`_get_global_conditioning(..., reference_features=None)`、`forward`/`infer`へ`reference_features`を通す)
+- Modify: `src/python/piper_train/__main__.py` (`--reference-fusion {none,campp_stats,capacity}`、既定`none`)
+- Test: `src/python/tests/test_reference_fusion.py` (新規)
+
+**Interfaces:**
+- Produces: `ReferenceFusion(in_dim: int, gin_channels: int)`: `Linear(in_dim, gin)` → `PReLU(gin)` → `Linear(gin, gin)` (最後のLinearの重みとbiasをzero-init)。`forward(features: Tensor[B,in_dim]) -> Tensor[B,gin,1]`。
+- Produces: `CapacityControl(gin_channels: int, target_params: int)`: 入力は192次元のCAM++埋め込み、同じ3層構成で隠れ幅を`target_params`の±5%に合わせて決める。最後のLinearはzero-init。
+- Produces: `g_spk = spk_proj(e) + fusion(...)`。`reference_fusion="campp_stats"`で`reference_features`がNoneなら`ValueError`。lang成分には足さない。
+
+- [ ] **Step 1: テストを書く**
+
+```python
+def test_fusion_none_matches_legacy_output(tiny_model_pair):
+    legacy, fused = tiny_model_pair("none"), tiny_model_pair("campp_stats")
+    fused.load_state_dict(legacy.state_dict(), strict=False)
+    assert torch.equal(infer(legacy, seed=0), infer(fused, seed=0, reference_features=torch.randn(1, 1024)))
+
+def test_fusion_receives_gradient_after_steps(tiny_fused_model):
+    before = tiny_fused_model.reference_fusion.net[0].weight.clone()
+    train_steps(tiny_fused_model, n=3)
+    assert not torch.equal(before, tiny_fused_model.reference_fusion.net[0].weight)
+
+def test_capacity_control_param_count_within_5pct():
+    f, c = ReferenceFusion(1024, 512), CapacityControl(512, target_params=n_params(ReferenceFusion(1024, 512)))
+    assert abs(n_params(c) - n_params(f)) / n_params(f) <= 0.05
+
+def test_missing_reference_features_raises(tiny_fused_model):
+    with pytest.raises(ValueError, match="reference_features"):
+        tiny_fused_model.infer(*tiny_inputs(), speaker_embeddings=torch.randn(1, 192))
+```
+
+- [ ] **Step 2: 失敗を確認** — `uv run --no-sync pytest src/python/tests/test_reference_fusion.py --no-cov` → FAIL
+- [ ] **Step 3: 実装** — module、モデル配線、CLI。`spk_proj`を直接呼ぶ箇所 (`vits/lightning.py` L2459 DINO、`models.py` L1900/L1950/L2091、`vits/telemetry.py` L101) は`_get_speaker_condition`経由に揃え、融合有効時に`reference_features`を渡す。
+- [ ] **Step 4: 成功を確認** — 新テストと`test_speaker_embedding.py`、`test_adaln_encp.py`、`test_snac_stats_flag.py`がPASS
+- [ ] **Step 5: Commit** — `feat(python): CAM++統計を話者条件へ加算する融合moduleと容量対照を追加`
+
+### Task 6: EMA・LR慣らし・重み移行
+
+**Files:**
+- Modify: `src/python/piper_train/vits/ema.py:18-20` (両scopeに`reference_fusion`と`capacity_control`を追加)
+- Modify: `src/python/piper_train/vits/lightning.py` (`configure_optimizers`で新moduleを別param groupにし、`--reference-fusion-lr-scale` (既定1.0) と`--reference-fusion-warmup-steps` (既定0) を適用。`requires_grad`は変更しない)
+- Modify: `src/python/piper_train/checkpoint_io.py`
+- Test: `src/python/tests/test_reference_fusion.py`、`src/python/tests/test_checkpoint_io.py`、`src/python/tests/test_ema_scope_extended.py`
+
+**Interfaces:**
+- Produces: `load_state_with_allowed_missing(model, state_dict: dict, allowed_prefixes: tuple[str, ...]) -> dict` (返り値は`{"missing": [...], "unexpected": [...]}`。許可prefix以外のmissing、unexpected、shape差は`ValueError`)。`--resume-weights-only`は融合有効時にこれを`allowed_prefixes=("reference_fusion.", "capacity_control.")`で使う。
+- Produces: 融合付きcheckpointを`reference_fusion="none"`のモデルへ読むと`ValueError` (unexpected keys)。
+
+- [ ] **Step 1: テストを書く** — `test_ema_tracks_reference_fusion_in_legacy_and_extended`、`test_fusion_param_group_lr_scale`、`test_allowed_missing_accepts_only_fusion_keys`、`test_fused_checkpoint_into_legacy_model_raises`
+- [ ] **Step 2〜4:** FAIL確認 → 実装 → PASS (`uv run --no-sync pytest src/python/tests/test_reference_fusion.py src/python/tests/test_checkpoint_io.py src/python/tests/test_ema_scope_extended.py src/python/tests/test_resume_weights_only.py --no-cov`)
+- [ ] **Step 5: Commit** — `feat(python): 融合moduleのEMA登録・LR慣らし・許可key付き移行`
+
+### Task 7: 学習時の参照ペア (SCLとの分離)
+
+**Files:**
+- Modify: `src/python/piper_train/vits/dataset.py:238-323, 618-691` (jsonlの`reference_utterance_id`・`reference_embedding_path`・`reference_feature_path`を読み、Batchに`reference_embeddings: Tensor[B,192] | None`、`reference_features: Tensor[B,1024] | None`、`reference_utterance_ids: list[str] | None`を追加)
+- Modify: `src/python/piper_train/vits/lightning.py:1963-2060` (Gには`reference_embeddings`があればそれを、なければ従来の`speaker_embeddings`を渡す。SCL・swap・Latent Fillingは`speaker_embeddings`のまま)
+- Modify: `src/python/piper_train/zero_shot_requirements.py`
+- Create: `src/python/piper_train/tools/build_reference_pairs.py`
+- Test: `src/python/tests/test_reference_pairs.py` (新規)
+
+**Interfaces:**
+- Produces: `validate_reference_pairs(utterance_ids, reference_utterance_ids, speaker_ids, splits, audio_sha256) -> None` (参照=target、別話者、別split、同一音声hashのいずれかで`ValueError`)。`--strict-zero-shot`はbatchごとに呼ぶ。
+- Produces: `build_reference_pairs(entries: list[dict], seed: int) -> tuple[list[dict], dict]` (各targetに同話者・同split・別hashの参照を1つ割り当てる。候補がないtargetは除外し、除外数と理由を返す)。
+- Produces: `--latent-filling-tau`または`--c-swap-spk`と融合を同時指定すると`SystemExit` (192次元のみを補間・交換するため)。
+
+- [ ] **Step 1: テストを書く** — `test_pairs_never_self_reference`、`test_pairs_reject_same_hash_different_path`、`test_pairs_keep_split`、`test_generator_uses_reference_embeddings_while_scl_uses_target`、`test_fusion_with_latent_filling_is_rejected`
+- [ ] **Step 2〜4:** FAIL確認 → 実装 → PASS (`uv run --no-sync pytest src/python/tests/test_reference_pairs.py src/python/tests/test_strict_zero_shot.py --no-cov`)
+- [ ] **Step 5: Commit** — `feat(python): 学習時のG参照を別発話にしSCL入力と分離`
+
+### Task 8: ONNX export
+
+**Files:**
+- Modify: `src/python/piper_train/export_onnx.py:33-81, 684-715` (融合有効時に入力`reference_features` `[B,1024]` float32を追加。configへ`"reference_conditioning": {"schema": "campp_stats_v1", "dim": 1024, "frontend": <G0の値>}`を記録)
+- Modify: `src/python/piper_train/export_onnx_streaming.py:71-95` (`check_streaming_export_supported`で融合モデルを`NotImplementedError`)
+- Test: `src/python/tests/test_export_reference_fusion.py` (新規)
+
+**Interfaces:**
+- Produces: ONNX入力名`reference_features`。融合なしモデルの入力名リストは従来と完全一致。
+
+- [ ] **Step 1: テストを書く** — `test_legacy_export_input_names_unchanged`、`test_fused_export_has_reference_features_input`、`test_torch_ort_parity_with_reference_features` (`--no-stochastic`、FP32、atol 1e-4)、`test_streaming_export_rejects_fusion`
+- [ ] **Step 2〜4:** FAIL確認 → 実装 → PASS (`CUDA_VISIBLE_DEVICES="" uv run --no-sync pytest src/python/tests/test_export_reference_fusion.py src/python/tests/test_export_onnx.py --no-cov`)
+- [ ] **Step 5: Commit** — `feat(python): 参照融合モデルのONNX exportとstreaming拒否`
+
+### Task 9: 評価経路の接続
+
+**Files:**
+- Modify: `src/python/piper_train/tools/generate_eval_audio.py:181-231` (manifestの参照WAVから、G0のfrontendでCAM++ 192と統計1024を作りfeedする。manifestへfrontend・特徴hashを記録)
+- Modify: `src/python/piper_train/evaluation_manifest.py:246-261`
+- Test: `src/python/tests/test_zs_eval_integration.py`
+
+**Interfaces:**
+- Consumes: Task 3 `campplus_stats`、Task 8 の入力名
+- Produces: 融合モデルの評価で`reference_features`が欠けると例外。旧モデルの評価出力は不変。
+
+- [ ] **Step 1〜4:** `test_eval_feeds_reference_features_for_fused_model`、`test_eval_legacy_model_unchanged`、`test_eval_manifest_records_frontend_and_feature_hash` をFAIL→実装→PASS
+- [ ] **Step 5: Commit** — `feat(python): zero-shot評価に参照特徴のfeedと来歴を追加`
+
+### Task 10: 未対応runtimeでの拒否
+
+**Files:**
+- Modify: `src/python_run/piper_plus/voice.py:1076-1125`、`src/python_run/piper_plus/api/engine.py:168-196`
+- Modify: `src/cpp/piper.cpp:512-562`
+- Test: `src/python_run/tests/test_reference_schema_rejection.py` (新規)、`src/cpp/tests/` の入力検出テスト
+
+**Interfaces:**
+- Produces: ONNX入力に`reference_features`があるとき、Python・C++とも読み込み時に「このモデルは参照特徴入力が必要で、このruntimeは未対応」と明示エラー。旧モデルは不変。
+
+- [ ] **Step 1〜4:** `test_python_runtime_rejects_reference_features_model`、`test_python_runtime_legacy_model_loads`、C++の同等テストをFAIL→実装→PASS (`uv run --no-sync pytest src/python_run/tests/test_reference_schema_rejection.py --no-cov`、`ctest --test-dir build`)
+- [ ] **Step 5: Commit** — `fix: 参照特徴入力付きONNXを未対応runtimeで明示拒否`
+
+### S1の完了確認
+
+- [ ] `uv run --no-sync pytest src/python/tests src/python_run/tests --no-cov` 全件PASS、`.github/workflows/python-tests.yml`へ新テストを追加
+- [ ] tiny fixtureでCPU計測: 融合ありのTTS FP16容量差と生成p50差を記録 (40MB / +10%の範囲内)
+
+## 6. 停止・分岐
+
+| 状態 | 対応 |
+|---|---|
+| G0でCAM++統計の話者分離度が192次元を上回らない | F-statsを主候補から外し、F-mel (小型mel encoderを`spk_proj`出力へ加算) の設計に戻る。GPUは借りない |
+| G0でtrimがCAM++/ECAPAのどちらかを退行させる | trimを採らず、frontendは現状維持で固定 |
+| smokeで融合MLPの重みが変化しない・非有限値・再開失敗 | runを止めて実装へ戻る |
+| pilotでF-statsがCcapを上回らない | 参照統計の利得は未確認として報告。容量増の効果と区別する |
+| F-statsが類似度を上げるがCERが悪化 | 参照からの内容漏れを疑い、参照ペア・統計の時間平均・注入量を診断。長期学習で自動解決とみなさない |
+| 費用上限 | 定期保存から回収し、起動したinstanceだけを終了。対照未完了なら比較未完了と報告 |
+
+## 7. 採用後に別計画で行うこと
+
+- runtime (Python・C++、続いてRust/Go/C#/WASM) の参照WAV → CAM++ 192+統計1024の抽出。現状のRust/Go/C#/WASMは学習とは別のfbank・resample実装で、frontend差が既にある。
+- CAM++ ONNXの統計出力追加とgolden比較。
+- F-mel、参照token (R2)、長文chunk文脈。
+- devへの統合範囲の決定。
