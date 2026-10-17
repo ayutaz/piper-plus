@@ -1,8 +1,9 @@
 # 参照融合計画 S0: 参照処理のCPU検証とG0判定
 
 日付: 2026-10-17 (JST)。対象branch: `feat/zero-shot-v8-dataset-scaling`。
-測定コードの固定点: `eca569d39211c414cf5eb0c936656cfb6ed12380`
-（分離度集合のラベル修正 `2020ad26` 後に分離度のみ再計算）。
+測定コードの固定点: (a)(b)は`eca569d39211c414cf5eb0c936656cfb6ed12380`。
+(c)の分離度とR6のLDAプローブは`71f81026bcbd504df9519fbc10ed7eb87f9394ae`
+（発話sha256とsource revisionを固定。tracked sourceの未コミット変更なし）。
 [CPU準備記録](zero-shot-cpu-preparation-2026-10-17.md)の基準評価を読み取り専用で再利用した。
 GPU、学習、公開、既定モデルの差し替えは実施していない。
 
@@ -12,8 +13,8 @@ GPUを借りる前に、既存のv10b ep79をCPUで使い、次の3点を決め�
 
 - (a) 推論時の参照音声に、学習時と同じenergy VAD trimをかけるか。
 - (b) 複数参照の平均を、埋め込み側とg側（`spk_proj`の出力）のどちらで取るか。
-- (c) CAM++のpooling前統計（平均+標準偏差、1024次元）が、192次元のCAM++埋め込みと
-  同程度以上に話者を分けるか。
+- (c) CAM++のpooling前統計（平均+標準偏差、1024次元）が、192次元のCAM++埋め込みに
+  話者情報を上積みするか（判定はcontroller ruling R6の話者分割LDAプローブ）。
 
 後続タスクは、G0で決めたfrontend文字列を既定値として記録する。
 
@@ -46,14 +47,24 @@ ceiling/floorはCAM++ 0.880298 / 0.736056、ECAPA 0.808135 / 0.528286（基準�
 | b-multi-embedding-average | `e8308b25d89d48ac72c41e9ca8b6916725dd78dc95b563b09e2650500084d2df` | `2165ec5ac1cf716a19db1a28d952a08d7f632ad641d1eec8cdc6652fa0220c2d` |
 | b-multi-g-average | `e7b58bfbb5e501e847e053a838e28d7932f8c3de1c8980a0b94dca2d2485530c` | `27f38bd66cdc9f9d889cb309d30915875cd040c08d0c3e5ce2d22035eafc33ba` |
 
-集計ファイル: `references.json` `191197247d9f36f255c9c27eaf3d9f437d96a279bc05ab75f20b5ea13ce043e3`、
-`separability.json` `a69ef606cf73a879c5adafd4838064896c9e39206fb8c5a3e3ab9d816cff685b`、
-`summary.json` `f93f4b9e5f81410bb1f9adb448e78c405a28bb4dd255cb25f2103ddd242dc985`。
+集計ファイル:
+
+| ファイル | SHA256 |
+|---|---|
+| `references.json` | `191197247d9f36f255c9c27eaf3d9f437d96a279bc05ab75f20b5ea13ce043e3` |
+| `separability-pinned.json`（303発話のsha256・revision付き） | `7af5b4f8c5e02f46032000d1768016ed2f3e20ba00962abbc4d655af96f88004` |
+| `separability-features.npz`（192・1024特徴、trimなし/あり） | `bea4ad7bd8c295bdcdd563cd6853519bb2de24c727c700d924b1440e65c6993c` |
+| `lda-probe.json`（R6） | `10f20fc882db3ff9a2fbdb102a4470cc35920c1a786426b933b5246266c44415` |
+| `summary.json` | `b0f9751ee0945444d788ee473c04dff705dcb879297c5137a677d7b393f3fb11` |
+
+初回の`separability.json`（発話hashなし）と旧`summary.json`は、
+`separability-unpinned-superseded.json` / `summary-superseded-cosine.json`として残した。
+固定版は同じAUCを再現した。分離度・プローブのstageは既存結果を上書きしない。
 
 ## 3. 方法
 
 runnerは`scripts/run_reference_fusion_s0.py`（stageはprepare → generate → evaluate →
-separability → summary）。evaluateは基準と同じmetrics環境
+separability → probe → summary）。evaluateは基準と同じmetrics環境
 （`metrics-env`、SpeechBrain 1.0.3）で、基準と同じ評価関数を使った。
 評価側のfrontend（CAM++はtrimなしwhole、ECAPAはnative波形）は変えていない。
 変えたのは生成に渡す参照埋め込みだけである。
@@ -63,6 +74,7 @@ O=output/zero-shot-reference-fusion-s0-20261017
 uv run --no-sync python scripts/run_reference_fusion_s0.py --output $O --stage prepare
 uv run --no-sync python scripts/run_reference_fusion_s0.py --output $O --stage generate
 HF_HUB_OFFLINE=1 uv run --no-sync python scripts/run_reference_fusion_s0.py --output $O --stage separability
+uv run --no-sync python scripts/run_reference_fusion_s0.py --output $O --stage probe
 PYTHONPATH="src/python;src/python_run;src/python/g2p" HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
   output/zero-shot-cpu-preparation-20261017/metrics-env/Scripts/python.exe \
   scripts/run_reference_fusion_s0.py --output $O --stage evaluate   # summaryも同じ環境
@@ -83,9 +95,22 @@ PYTHONPATH="src/python;src/python_run;src/python/g2p" HF_HUB_OFFLINE=1 TRANSFORM
   この標準化は評価集合そのもので計算した（transductive）。raw cosineも併記する。
   frontendは`preprocess_audio`（soxr HQ 16k、kaldi fbank80、CMN、発話全体）。
   trimなし/ありの両方を計算した。
+  この教師なしcosineは診断として残すが、判定には使わない（§4.3、ruling R6）。
+- (c) R6の判定（LDAプローブ、`lda_speaker_probe`）: 上の拡張24話者・213発話
+  （話者ごとにsha256順で先頭10発話。既に10発話以下なので全件）を使う。
+  G0 frontend（trim=none）の特徴でAを192次元、Bを192次元と1024次元統計の連結とする。
+  seed 0〜9の各回で、ソート済み話者IDを`default_rng(seed).permutation`で並べ、
+  12話者を学習、12話者を評価に分けた。A・Bそれぞれ学習話者の発話で標準化し、
+  `LinearDiscriminantAnalysis(solver="eigen", shrinkage="auto")`を学習話者で当てた。
+  評価話者の発話を射影し、同話者対と別話者対のcosineでAUCを求めた。
+  事前登録した合格条件は、AUC_B − AUC_Aの平均が+0.005以上、かつ10回中7回以上でAUC_B > AUC_A。
+  LDAが例外を出した回は差0・Bの負けとして数える（今回は例外なし）。
 
-判定規則は測定前に`trim_decision` / `averaging_decision` / `stats_decision`として
-実装・テストした（`tests/scripts/test_reference_fusion_s0.py`）。
+判定規則は測定前に`trim_decision` / `averaging_decision` / `stats_decision`、
+R6の規則は`lda_speaker_probe`として実装・テストした
+（`tests/scripts/test_reference_fusion_s0.py`、`src/python/tests/test_cpu_reference_comparison.py`）。
+`stats_decision`はruling R1に合わせ、10話者未満では弱い証拠として合格扱いにする
+（初版は不合格を返していたため`71f81026`で修正）。
 
 ## 4. 結果
 
@@ -141,6 +166,32 @@ ECAPAは上がったが、CAM++は上がらず、CERは両backendで悪化した
 
 ### 4.3 (c) CAM++統計1024と192の分離度
 
+#### R6 LDAプローブ（判定に使う）
+
+| seed | AUC_A（192） | AUC_B（192+1024） | B − A |
+|---:|---:|---:|---:|
+| 0 | 0.8953 | 0.8851 | -0.0101 |
+| 1 | 0.8556 | 0.8158 | -0.0398 |
+| 2 | 0.8995 | 0.9047 | +0.0052 |
+| 3 | 0.8585 | 0.8681 | +0.0096 |
+| 4 | 0.9073 | 0.8944 | -0.0128 |
+| 5 | 0.8838 | 0.9191 | +0.0353 |
+| 6 | 0.8871 | 0.8674 | -0.0197 |
+| 7 | 0.8535 | 0.8162 | -0.0373 |
+| 8 | 0.8325 | 0.8223 | -0.0103 |
+| 9 | 0.8997 | 0.8971 | -0.0027 |
+
+B − Aの平均は**-0.0083**、Bが上回ったのは**10回中3回**。合格条件（平均+0.005以上かつ7回以上）を満たさず、**不合格**。
+LDAの例外はなかった。sklearnは単発話話者（3話者）が学習側に入る回で
+「Only one sample available」の警告を出したが、計算は完了している。
+学習話者の線形射影を許しても、統計1024を足して未知話者の分離が上がるとは言えない。
+
+#### 教師なしcosine（診断。判定はR6に置き換え）
+
+CAM++の192次元埋め込みは、この1024次元統計をLinearと推論時のBNで写したアフィン射影である。
+そのため、統計のcosineが学習済み射影より分離しないのは予想どおりで、
+統計を捨てる根拠にならない（ruling R6）。以下は記録として残す。
+
 集合は次の2つ。話者数と発話数を示す。
 
 - R1（指示の範囲）: つくよみちゃん100発話、基準のfloor候補2話者（各1発話）、
@@ -163,7 +214,9 @@ ECAPAは上がったが、CAM++は上がらず、CERは両backendで悪化した
 同じ標準化どうしで比べると、差は0.080（0.972 vs 0.893）とさらに広がる。
 1024のraw cosineは全対が0.97前後に集まり、gapは0.012しかない。
 R1の標準化値は、100発話がつくよみちゃんのため、標準化がほぼその話者の中心化になり、
-192でも0.55まで落ちる。R1の標準化値は分離度の指標として使えない。R1は4話者で弱い根拠である。
+192でも0.55まで落ちる。R1の標準化値は分離度の指標として使えない。
+旧規則では拡張集合が不合格（AUC差0.034）、R1は4話者のため弱い証拠として合格扱いとなる。
+初版の本書はR1も不合格と書いたが、ruling R1の読み違いで、修正した。
 
 ## 5. G0判定
 
@@ -171,7 +224,7 @@ R1の標準化値は、100発話がつくよみちゃんのため、標準化が
 |---|---|---|
 | (a) 参照trim | **採用しない（trim=none）** | 採用条件はCAM++・ECAPA cross・CER中央値がすべてのbackendで非退行であること。WAV001では3 backendすべて、雑音付きでも3 backendすべて（CER）が退行した |
 | (b) 平均位置 | **埋め込み側平均を維持** | g側は両encoderで改善しなかった（CAM++は-0.0003/-0.00004）。CERはraw・EMAとも悪化した。g側を採るにはONNX入力の変更も要る |
-| (c) 統計特徴 | **不合格（192次元以上に分離しない）** | 拡張24話者で標準化1024のAUCが192 rawより0.034低い。R1（4話者、弱い根拠）も規則上は不合格だが、標準化の偏りが大きく判断材料にしない |
+| (c) 統計特徴 | **不合格（R6）** | 24話者・10分割のLDAプローブで、192+1024は192に対し平均-0.0083、勝ちは3/10。旧cosine判定（拡張は不合格、R1は弱い証拠で合格）は判定から外した |
 
 後続タスクが記録するfrontend文字列:
 
@@ -181,10 +234,10 @@ kaldi-fbank80-cmn@16k;trim=none
 
 同じ文字列を`.superpowers/sdd/zero-shot-reference-fusion-plan-2026-10-17/g0.txt`の1行目に置いた。
 
-(c)の不合格は「1024次元統計をそのままcosineで比べると、192次元埋め込みより話者を分けない」
-という意味である。計画の融合経路は、zero-init MLPで統計を`spk_proj`出力へ加える。
-その場合は学習で重み付けされるため、この判定は融合経路の効果の予測ではない。
-統計を192次元の代わりに話者条件として使う根拠はない。融合経路を続けるかは計画側で判断する。
+(c)の不合格は、「線形判別（LDA）で学習話者から重みを付けても、統計1024の追加で
+未知話者の分離は192次元単独より上がらなかった」という意味である。
+計画の融合経路はzero-init MLP（非線形・TTS損失で学習）なので、この結果は効果の上限を示さない。
+ただし、CPU段階でF-statsの上積みを支持する根拠は得られなかった。融合経路を続けるかは計画側で判断する。
 
 ## 6. 制約と注意
 
@@ -199,14 +252,16 @@ kaldi-fbank80-cmn@16k;trim=none
 - (c)の拡張集合は学習で使われた日本語20話者を含む。測っているのは事前学習済みCAM++の性質で、
   TTSの学習とは独立だが、日本語の女性声が多く、言語・性別の幅は狭い。
   floor候補の2話者がMOE-Speech 20話者と同一人物でないことは確認できていない。
-  標準化は評価集合で計算したもので、別集合への一般化は保証しない。
+  旧cosine診断の標準化は評価集合で計算したもので、別集合への一般化は保証しない。
+  R6プローブは学習話者だけで標準化・LDAを当てたが、評価話者は各回12話者・最大120発話と少なく、
+  分割ごとのAUCの揺れ（B − Aが-0.040〜+0.035）は大きい。
 - 人手による試聴・品質合格の判定はしていない。
 
 ## 7. 変更したファイル
 
 | ファイル | 目的 |
 |---|---|
-| `src/python/piper_train/tools/cpu_reference_comparison.py` | `reference_embedding(..., trim=False)`、`projected_average`、`pairwise_separability` |
-| `src/python/tests/test_cpu_reference_comparison.py` | trim同値、1参照のg平均一致、AUC計数のテスト |
-| `scripts/run_reference_fusion_s0.py`、`tests/scripts/test_reference_fusion_s0.py` | S0測定runnerとG0判定規則のテスト |
+| `src/python/piper_train/tools/cpu_reference_comparison.py` | `reference_embedding(..., trim=False)`、`projected_average`、`pairwise_separability`、`lda_speaker_probe` |
+| `src/python/tests/test_cpu_reference_comparison.py` | trim同値、1参照のg平均一致、AUC計数、LDAプローブ（情報次元で合格・雑音で不合格・例外は負け扱い）のテスト |
+| `scripts/run_reference_fusion_s0.py`、`tests/scripts/test_reference_fusion_s0.py` | S0測定runner（分離度の入力固定、probe stage）とG0判定規則のテスト |
 | 本書 | 結果とG0判定 |
