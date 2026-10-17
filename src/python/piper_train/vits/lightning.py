@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader, Dataset, random_split
 
 from piper_plus.embedding import validate_embedding
 
+from ..checkpoint_io import key_has_module_prefix
 from ..inference_eval import isolated_inference
 from ..zero_shot_requirements import validate_recipe, validate_training_batch
 from .commons import (
@@ -55,6 +56,7 @@ from .models import (
     SynthesizerTrn,
     WavLMDiscriminator,
 )
+from .reference_encoder import REFERENCE_MODULE_NAMES
 from .stft_loss import HighBandSTFTLoss, MultiResolutionSTFTLoss
 
 
@@ -86,6 +88,56 @@ _KL_CAP = 1e4
 # 80-epoch run while non_finite_skip=0% looked healthy).
 _KL_CAP_ABORT_DEFAULT = 300
 _TRAINING_SCHEDULE_VERSION = 1
+
+# 参照条件付け (reference-fusion plan §8 Task 6R): reference_encoder /
+# capacity_control は生成器 optimizer の別 param group (この名前を "name" に
+# 持つ) に入れ、lr = learning_rate × reference_lr_scale、実効 lr にだけ
+# 慣らし係数 (_reference_lr_factor) を掛ける。
+REFERENCE_PARAM_GROUP = "reference_conditioning"
+REFERENCE_PARAM_PREFIXES: tuple[str, ...] = tuple(
+    f"{name}." for name in REFERENCE_MODULE_NAMES
+)
+
+
+def _validate_reference_lr(mode: str, scale, warmup_steps) -> None:
+    """``--reference-lr-scale`` / ``--reference-warmup-steps`` の検査。
+
+    none で既定以外を指定すると黙って無効になるため明示エラーにする
+    (``--no-snac-stats`` と同じ方針)。
+    """
+    if isinstance(scale, bool) or not isinstance(scale, (int, float)):
+        raise TypeError(
+            f"reference_lr_scale must be a positive finite number, got {scale!r}"
+        )
+    if not math.isfinite(scale) or scale <= 0:
+        raise ValueError(
+            f"reference_lr_scale must be a positive finite number, got {scale!r}"
+        )
+    if isinstance(warmup_steps, bool) or not isinstance(warmup_steps, int):
+        raise TypeError(
+            f"reference_warmup_steps must be a non-negative int, got {warmup_steps!r}"
+        )
+    if warmup_steps < 0:
+        raise ValueError(
+            f"reference_warmup_steps must be a non-negative int, got {warmup_steps!r}"
+        )
+    if mode == "none" and (scale != 1.0 or warmup_steps != 0):
+        raise ValueError(
+            "--reference-lr-scale / --reference-warmup-steps only apply to the "
+            "reference_encoder / capacity_control parameter group; they require "
+            "--reference-conditioning ref_spec or capacity (got none)."
+        )
+
+
+def _split_reference_params(named_params) -> tuple[list, list]:
+    """``(name, param)`` を (主 group, 参照 group) に分ける (相対順は保つ)。"""
+    main, reference = [], []
+    for name, param in named_params:
+        if key_has_module_prefix(name, REFERENCE_PARAM_PREFIXES):
+            reference.append((name, param))
+        else:
+            main.append((name, param))
+    return main, reference
 
 
 def _kl_cap_abort_steps_from_env() -> int:
@@ -488,11 +540,18 @@ class VitsModel(pl.LightningModule):
         # default "none" = 旧モデルと bit 互換 (旧 ckpt の hparams にキーが
         # なくても none で再構築される)
         reference_conditioning: str = "none",
+        # 参照モジュールの param group の LR 倍率と慣らし step 数 (Task 6R)。
+        # 既定 (1.0 / 0) は旧 ckpt の hparams にキーがなくても同じ値になる
+        reference_lr_scale: float = 1.0,
+        reference_warmup_steps: int = 0,
         **kwargs,
     ):
         super().__init__()
         self.automatic_optimization = (
             False  # Multiple optimizers require manual optimization
+        )
+        _validate_reference_lr(
+            reference_conditioning, reference_lr_scale, reference_warmup_steps
         )
 
         # Fix gin_channels BEFORE save_hyperparameters() so the correct value is saved
@@ -1198,11 +1257,49 @@ class VitsModel(pl.LightningModule):
         from hparams instead of read off the live flags.
         """
         freeze_dp = bool(getattr(self.hparams, "freeze_dp", False))
-        return [
+        main, reference = _split_reference_params(
             (f"model_g.{name}", param)
             for name, param in self.model_g.named_parameters()
             if param.requires_grad and not (freeze_dp and name.startswith("dp."))
-        ]
+        )
+        # 参照モジュールは configure_optimizers で後ろの param group に入る
+        return main + reference
+
+    def _reference_lr_factor(self) -> float:
+        """参照 param group の慣らし係数 ``min(1, k / W)``。
+
+        ``k`` = この step より前に成功した生成器更新の回数
+        (``generator_updates``)、``W`` = ``reference_warmup_steps``。
+        ``W = 0`` は 1 (慣らしなし)。最初の更新 (k=0) は 0、k ≥ W で 1。
+        """
+        warmup = getattr(self.hparams, "reference_warmup_steps", 0)
+        if warmup <= 0:
+            return 1.0
+        return min(1.0, self.generator_updates / warmup)
+
+    @contextlib.contextmanager
+    def _reference_lr_warmup(self, optimizer):
+        """optimizer.step() の間だけ参照 group の lr に慣らし係数を掛ける。
+
+        group の ``lr`` は epoch 単位の scheduler (ExponentialLR / cosine) が
+        連鎖的に更新する値なので、step が終われば必ず元に戻す。こうすると
+        実効 lr = scheduler の lr × 係数 となり、scheduler の軌跡は慣らしの
+        有無に依存しない。
+        """
+        factor = self._reference_lr_factor()
+        raw = getattr(optimizer, "optimizer", optimizer)
+        groups = [g for g in raw.param_groups if g.get("name") == REFERENCE_PARAM_GROUP]
+        if factor == 1.0 or not groups:
+            yield
+            return
+        saved = [g["lr"] for g in groups]
+        for group in groups:
+            group["lr"] = group["lr"] * factor
+        try:
+            yield
+        finally:
+            for group, lr in zip(groups, saved, strict=True):
+                group["lr"] = lr
 
     def on_train_epoch_end(self):
         """Step LR schedulers at the end of each epoch.
@@ -1747,7 +1844,9 @@ class VitsModel(pl.LightningModule):
             self.manual_backward(loss_g)
             if grad_clip is not None:
                 torch.nn.utils.clip_grad_norm_(self.model_g.parameters(), grad_clip)
-            if self._step_optimizer(opt_g):
+            with self._reference_lr_warmup(opt_g):
+                stepped = self._step_optimizer(opt_g)
+            if stepped:
                 self.generator_updates += 1
                 self.generator_updated_this_batch = True
                 self._log_with_batch_info(
@@ -2917,7 +3016,39 @@ class VitsModel(pl.LightningModule):
             )
 
         # Collect generator parameters (exclude frozen params)
-        g_params = [p for p in self.model_g.parameters() if p.requires_grad]
+        main_named, reference_named = _split_reference_params(
+            (name, p) for name, p in self.model_g.named_parameters() if p.requires_grad
+        )
+        g_params = [p for _, p in main_named]
+        reference_lr = None
+        if reference_named:
+            # 参照条件付け (Task 6R): 別 group で lr = learning_rate × scale。
+            # requires_grad は変えない (慣らしは _reference_lr_warmup が実効
+            # lr に係数を掛けて行う)。参照モジュールがなければ従来どおり
+            # 単一 group (param の並びも同一)。
+            reference_lr = self.hparams.learning_rate * getattr(
+                self.hparams, "reference_lr_scale", 1.0
+            )
+            g_params = [
+                group
+                for group in (
+                    {"params": g_params},
+                    {
+                        "params": [p for _, p in reference_named],
+                        "lr": reference_lr,
+                        "name": REFERENCE_PARAM_GROUP,
+                    },
+                )
+                if group["params"]
+            ]
+            _LOGGER.info(
+                "Reference conditioning param group: %d tensors, lr=%.3e "
+                "(scale=%s), warmup=%d generator updates",
+                len(reference_named),
+                reference_lr,
+                getattr(self.hparams, "reference_lr_scale", 1.0),
+                getattr(self.hparams, "reference_warmup_steps", 0),
+            )
 
         # Collect discriminator parameters (including WavLM / MRD / adversarial
         # speaker classifier if enabled). The classifier belongs to the D
@@ -2964,6 +3095,22 @@ class VitsModel(pl.LightningModule):
         eta_min = getattr(self.hparams, "lr_min", 1e-5)
 
         lr_scheduler_type = getattr(self.hparams, "lr_scheduler", "cosine")
+
+        # cosine は全 group を同じ絶対値 eta_min へ寄せる (torch の
+        # CosineAnnealingLR は group 別の eta_min を持たない)。参照 group の
+        # 初期 lr が eta_min 未満だと学習中に lr が増えるので明示エラーにする。
+        if (
+            reference_lr is not None
+            and lr_scheduler_type != "exponential"
+            and reference_lr < eta_min
+        ):
+            raise ValueError(
+                f"--reference-lr-scale gives a reference-group lr of "
+                f"{reference_lr:.3e}, below the cosine eta_min (--lr-min) "
+                f"{eta_min:.3e}; the cosine schedule would raise it during "
+                "training. Increase --reference-lr-scale, lower --lr-min, or "
+                "use --lr-scheduler exponential."
+            )
 
         schedulers = []
         if lr_scheduler_type == "exponential":
