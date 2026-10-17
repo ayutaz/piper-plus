@@ -3,6 +3,8 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 作成日: 2026-10-17。状態: **計画。コード変更・レンタル・学習は未実施**。
+
+> **改訂1 (2026-10-18):** S0のG0でCAM++統計 (F-stats) が不合格 (話者分割LDAプローブ平均 −0.0083、3/10 split勝ち。[S0記録](../research/zero-shot-reference-fusion-s0-2026-10.md))。§6の分岐に従い主候補をF-mel (参照スペクトログラムの小型encoder) へ切り替えた。Task 5〜10は§8で置き換える。§5のTask 5〜10本文はF-stats版の記録として残す。
 作成時のPiperソース: `638b18f5558d4421c6614de7531b0c8cb4cc4be8` (`feat/zero-shot-v8-dataset-scaling`)。
 
 **Goal:** GPT-SoVITS v2Proと同じ「話者照合モデルのpooling前特徴を既存global条件へ加算する」経路をPiperに実装し、未知話者の声の再現性が上がるかを、容量対照付きで$1000以内に判定する。
@@ -229,6 +231,8 @@ def test_campplus_stats_matches_internal_statspool(campplus_random):
 - [ ] **Step 6: 判定と記録** — 結果記録に数値・manifest hash・G0の採否を書く。trimの採否は「CAM++/ECAPA crossがともに非退行、CER非退行」で決め、片方だけの改善は採らない。
 - [ ] **Step 7: Commit** — ツール・テスト・結果記録を`git add`し`docs: 参照処理のCPU検証とG0判定を記録`
 
+> **注:** 以下のTask 5〜10はF-stats版 (改訂1で廃止)。実装は§8のTask 5R〜10Rに従う。
+
 ### Task 5: 融合moduleと容量対照
 
 **Files:**
@@ -353,7 +357,7 @@ def test_missing_reference_features_raises(tiny_fused_model):
 
 | 状態 | 対応 |
 |---|---|
-| G0でCAM++統計の話者分離度が192次元を上回らない | F-statsを主候補から外し、F-mel (小型mel encoderを`spk_proj`出力へ加算) の設計に戻る。GPUは借りない |
+| G0でCAM++統計の話者分離度が192次元を上回らない | F-statsを主候補から外し、F-mel (小型mel encoderを`spk_proj`出力へ加算) の設計に戻る。GPUは借りない (2026-10-18 発生 → §8) |
 | G0でtrimがCAM++/ECAPAのどちらかを退行させる | trimを採らず、frontendは現状維持で固定 |
 | smokeで融合MLPの重みが変化しない・非有限値・再開失敗 | runを止めて実装へ戻る |
 | pilotでF-statsがCcapを上回らない | 参照統計の利得は未確認として報告。容量増の効果と区別する |
@@ -366,3 +370,121 @@ def test_missing_reference_features_raises(tiny_fused_model):
 - CAM++ ONNXの統計出力追加とgolden比較。
 - F-mel、参照token (R2)、長文chunk文脈。
 - devへの統合範囲の決定。
+
+## 8. 改訂1 (2026-10-18): F-melへの再設計
+
+### 8.1 判断の根拠
+
+- G0 (c): CAM++のpooling前統計1024次元を192次元に足しても、未知話者の分離は良くならなかった (LDAプローブ平均 −0.0083、3/10 split勝ち)。CAM++の192次元は同じ統計のaffine射影なので、CAM++内部の情報を増やしても上積みが少ない。
+- F-melは**CAM++を通らない別の情報源**として、参照音声の線形スペクトログラムを学習可能なencoderで読む。上流GPT-SoVITSのSoVITSでも、参照条件の本体は線形スペクトログラムから作る`ref_enc` (MelStyleEncoder) の時間平均`ge`である (v2Proの話者照合特徴はその上への加算)。
+- CPUではF-melの利得を測れない (encoderの学習が要る)。そのため、S1の実装とテストまでをCPUで行い、利得の判定はS4 pilotのCcap対照で行う。GPUの使用は従来どおりユーザーの明示許可後。
+
+### 8.2 設計
+
+| 項目 | 内容 |
+|---|---|
+| 入力 | 参照発話の線形振幅スペクトログラム `[B, 513, T_ref]` (`filter_length // 2 + 1`)。学習cacheの`.spec.pt`と同じ`spectrogram_torch(n_fft=1024, hop=256, win=1024, center=False)`。長さ`[B]` int64 |
+| encoder | `ReferenceSpecEncoder`: log圧縮 (`log(clamp(x, 1e-5))`) → spectral Linear×2 (Mish) → Conv1dGLU×2 (k=5、mask付き) → multi-head self-attention (2 head、key padding mask) → **fp32のmasked時間平均** (Task 3の`masked_time_mean_fp32`を再利用) → Linear(hidden→gin、**重み・bias zero-init**) |
+| 合流 | `g_spk = spk_proj(e_ref) + reference_encoder(spec_ref)`。lang成分には足さない。初期状態では旧モデルと出力が同じ |
+| 192次元の参照 | 学習時のGへのCAM++ 192次元も参照発話のもの (Task 7R)。SCL・swap・Latent Fillingは従来どおり生成対象の埋め込み |
+| 対照Ccap | 192次元を入力とするMLP (Linear→PReLU→Linear、最後をzero-init) を`spk_proj`出力へ加算。追加パラメータ数をF-melの±5%に合わせる |
+| 学習時の切り出し | 参照specをランダムに最大`--reference-max-frames` (既定512 frame ≈ 5.9秒) へ切り出す。検証時は先頭から固定長 |
+| 推論frontend | 学習cacheと同じ手順: 16kHzでenergy VAD → 元srで切り出し → soxr HQでモデルsrへ → `spectrogram_torch`。CAM++ 192次元はG0どおりtrimなし (Ruling R7) |
+| 損失 | 追加しない。再構成・adversarial等の既存損失のみで学習する (CAM++/ECAPA由来の損失は足さない) |
+
+### 8.3 比較群の置き換え
+
+§3のF-statsをF-melに置き換える。Ccapの`target_params`はF-melのencoderのパラメータ数にする。他の群 (E0・C0-self・C0) と予算 (§4) は変えない。S2ではCAM++統計の再抽出をやめ、参照ペアmanifestと参照発話のspec cache存在確認を行う (spec cacheは学習用に既存)。
+
+### 8.4 テストの方針 (2026-10-18 ユーザー指示)
+
+全タスクをTDDで実装する。各タスクで次を守る。
+
+- 実装前にテストを書き、**失敗を実行して確認**してから実装する。失敗の確認結果 (失敗したテスト名と理由) を報告に残す。
+- 正常系だけでなく、境界値 (長さ0・1、最大長、batch 1と複数、padding有無)、異常系 (欠落・形状違い・dtype違い・NaN/Inf入力で明示エラー)、後方互換 (既定値で旧checkpoint・旧ONNX・旧CLIの出力がbit一致) を必ず含める。
+- 数値の一致は、意味のある許容誤差を根拠付きで決める。実測に合わせて緩めない。
+- 1つの性質を1つのテストで確かめる。モックで実装の中身を置き換えて「呼ばれたこと」だけを見るテストにしない。tiny modelを実際に動かす。
+- 回帰の確認として、触ったモジュールの既存テストも全件実行する。
+- 新しいテストファイルは`.github/workflows/python-tests.yml`の実行対象に入っていることを確認する。
+
+### 8.5 実装タスク (S1、Task 5R〜10R)
+
+Ruling R3を置き換える: module属性名は`reference_encoder`と`capacity_control`。
+
+#### Task 5R: 参照spec encoderと容量対照
+
+**Files:**
+- Create: `src/python/piper_train/vits/reference_encoder.py`
+- Modify: `src/python/piper_train/vits/models.py` (`SynthesizerTrn.__init__`に`reference_conditioning: str = "none"` (`none` / `ref_spec` / `capacity`)、`reference_spec_channels: int = 513`。`_get_speaker_condition(speaker_embeddings=None, reference_spec=None, reference_spec_lengths=None)`、`_get_global_conditioning`、`forward`、`infer`へ通す)
+- Modify: `src/python/piper_train/__main__.py` (`--reference-conditioning {none,ref_spec,capacity}`、既定`none`)
+- Test: `src/python/tests/test_reference_encoder.py` (新規)
+
+**Interfaces:**
+- Produces: `ReferenceSpecEncoder(spec_channels: int, gin_channels: int, hidden_channels: int = 128, kernel_size: int = 5, n_heads: int = 2)`、`forward(spec: Tensor[B,F,T], spec_lengths: LongTensor[B]) -> Tensor[B,gin,1]`。長さ0の行は`ValueError`。
+- Produces: `CapacityControl(in_dim: int, gin_channels: int, target_params: int)`、`forward(e: Tensor[B,in_dim]) -> Tensor[B,gin,1]`。
+- Produces: `reference_conditioning="ref_spec"`で`reference_spec`か長さがNoneなら`ValueError`。`none`のとき参照specが渡されたら`ValueError` (黙って落とさない)。
+
+- [ ] **Step 1: テストを書く** — 少なくとも: `test_none_matches_legacy_output` (同じ重みで旧モデルと出力一致)、`test_zero_init_ref_spec_matches_legacy_output` (初期状態は`spk_proj`のみと一致)、`test_padding_does_not_change_output` (末尾padの長さを変えても出力不変)、`test_batch_rows_independent` (batch内の他行の参照が出力に影響しない)、`test_long_fp16_reference_is_finite` (8000 frame、fp16入力で有限)、`test_length_one_reference`、`test_zero_length_reference_raises`、`test_shape_and_dtype_errors`、`test_encoder_receives_gradient_after_steps`、`test_spk_proj_gradient_unchanged_at_init`、`test_capacity_control_param_count_within_5pct`、`test_missing_reference_spec_raises`、`test_reference_spec_on_legacy_model_raises`
+- [ ] **Step 2: 失敗を確認** — `uv run --no-sync pytest src/python/tests/test_reference_encoder.py --no-cov` → FAIL
+- [ ] **Step 3: 実装** — `spk_proj`を直接呼ぶ箇所 (`vits/lightning.py`のDINO、`models.py`内の直接呼び出し、`vits/telemetry.py`) を`_get_speaker_condition`経由に揃える
+- [ ] **Step 4: 成功を確認** — 新テストと`test_speaker_embedding.py`、`test_adaln_encp.py`、`test_snac_stats_flag.py`がPASS
+- [ ] **Step 5: Commit** — `feat(python): 参照スペクトログラムを話者条件へ加算するencoderと容量対照を追加`
+
+#### Task 6R: EMA・LR慣らし・重み移行
+
+§5 Task 6と同じ。置き換え: EMAの両scopeと許可prefixは`reference_encoder.` / `capacity_control.`、CLIは`--reference-lr-scale` (既定1.0) と`--reference-warmup-steps` (既定0)。`load_state_with_allowed_missing`のinterfaceは同じ。
+
+- [ ] テスト: `test_ema_tracks_reference_encoder_in_legacy_and_extended`、`test_reference_param_group_lr_scale`、`test_reference_warmup_ramps_lr`、`test_default_optimizer_groups_unchanged`、`test_allowed_missing_accepts_only_reference_keys`、`test_allowed_missing_rejects_shape_mismatch`、`test_reference_checkpoint_into_legacy_model_raises`
+- [ ] Commit — `feat(python): 参照encoderのEMA登録・LR慣らし・許可key付き移行`
+
+#### Task 7R: 学習時の参照ペア (SCLとの分離)
+
+**Files:**
+- Modify: `src/python/piper_train/vits/dataset.py` (jsonlの`reference_utterance_id`・`reference_audio_spec_path`・`reference_speaker_embedding_path`を読む。Batchに`reference_embeddings: Tensor[B,192] | None`、`reference_specs: Tensor[B,513,T_ref] | None`、`reference_spec_lengths: LongTensor[B] | None`、`reference_utterance_ids: list[str] | None`を追加。学習時はランダム切り出し、検証時は先頭固定)
+- Modify: `src/python/piper_train/vits/lightning.py` (`--generator-reference {self,cross_utt}` 既定`self`。`cross_utt`ではGへ`reference_embeddings` (と`ref_spec`時は`reference_specs`) を渡す。SCL・swap・Latent Fillingは`speaker_embeddings`のまま。validation・audio loggingのforwardにも同じ参照を渡す)
+- Modify: `src/python/piper_train/zero_shot_requirements.py`
+- Create: `src/python/piper_train/tools/build_reference_pairs.py`
+- Test: `src/python/tests/test_reference_pairs.py` (新規)
+
+**Interfaces:**
+- Produces: `validate_reference_pairs(utterance_ids, reference_utterance_ids, speaker_ids, splits, audio_sha256) -> None` (参照=target、別話者、別split、同一音声hashのどれかで`ValueError`)。`--strict-zero-shot`はbatchごとに呼ぶ。
+- Produces: `build_reference_pairs(entries: list[dict], seed: int) -> tuple[list[dict], dict]` (各targetに同話者・同split・別hashの参照を1つ割り当て、上の3フィールドを書く。候補がないtargetは除外し、除外数と理由を返す)。
+- Produces: `--generator-reference cross_utt`で参照フィールドが欠ける発話は読み込み時に`ValueError` (自己参照へ黙って戻さない)。`--reference-conditioning`が`none`以外なら`cross_utt`必須 (違えば`SystemExit`)。`--latent-filling-tau`または`--c-swap-spk`との同時指定も`SystemExit`。
+
+- [ ] テスト: `test_pairs_never_self_reference`、`test_pairs_reject_same_hash_different_path`、`test_pairs_keep_split`、`test_pairs_same_speaker`、`test_pairs_deterministic_by_seed`、`test_single_utterance_speaker_excluded_with_reason`、`test_generator_uses_reference_while_scl_uses_target`、`test_self_mode_batch_unchanged`、`test_missing_reference_fields_raise`、`test_reference_crop_bounds`、`test_validation_crop_deterministic`、`test_reference_conditioning_requires_cross_utt`、`test_reference_conditioning_with_latent_filling_is_rejected`
+- [ ] PASS: `uv run --no-sync pytest src/python/tests/test_reference_pairs.py src/python/tests/test_strict_zero_shot.py --no-cov`
+- [ ] Commit — `feat(python): 学習時のG参照を別発話にしSCL入力と分離`
+
+#### Task 8R: ONNX export
+
+**Files:**
+- Modify: `src/python/piper_train/export_onnx.py` (`ref_spec`時に入力`reference_spec` `[B,513,T_ref]` float32と`reference_spec_lengths` `[B]` int64を追加。configへ`"reference_conditioning": {"schema": "ref_spec_v1", "spec_channels": 513, "filter_length", "hop_length", "win_length", "sample_rate", "center": false, "frontend": "energy-vad@16k;soxr-hq"}`を記録。`capacity`は入力を増やさない)
+- Modify: `src/python/piper_train/export_onnx_streaming.py` (`check_streaming_export_supported`で`reference_conditioning != "none"`を`NotImplementedError`)
+- Test: `src/python/tests/test_export_reference_encoder.py` (新規)
+
+- [ ] テスト: `test_legacy_export_input_names_unchanged`、`test_ref_spec_export_has_reference_inputs`、`test_torch_ort_parity_with_reference_spec` (`--no-stochastic`、FP32、atol 1e-4、参照長2種)、`test_fp16_export_long_reference_finite`、`test_capacity_export_input_names_unchanged`、`test_config_records_reference_conditioning`、`test_streaming_export_rejects_reference_conditioning`
+- [ ] PASS: `CUDA_VISIBLE_DEVICES="" uv run --no-sync pytest src/python/tests/test_export_reference_encoder.py src/python/tests/test_export_onnx.py --no-cov`
+- [ ] Commit — `feat(python): 参照spec入力付きONNX exportとstreaming拒否`
+
+#### Task 9R: 評価経路の接続
+
+**Files:**
+- Modify: `src/python/piper_train/reference_frontend.py` (`reference_spec_from_audio(audio, sample_rate, *, target_sample_rate, filter_length, hop_length, win_length, trim=True) -> (Tensor[513,T], dict)`。`cache_norm_audio_fast`と同じ手順)
+- Modify: `src/python/piper_train/tools/generate_eval_audio.py`、`src/python/piper_train/evaluation_manifest.py`
+- Test: `src/python/tests/test_reference_frontend.py`、`src/python/tests/test_zs_eval_integration.py`
+
+- [ ] テスト: `test_reference_spec_matches_cache_norm_audio_fast` (同じWAVで学習cacheのspecと一致。Task 2の残課題も兼ねる)、`test_reference_spec_resamples_16k_and_44k`、`test_reference_spec_silent_audio_raises`、`test_eval_feeds_reference_spec_for_ref_spec_model`、`test_eval_legacy_model_unchanged`、`test_eval_manifest_records_frontend_and_spec_hash`
+- [ ] Commit — `feat(python): zero-shot評価に参照specのfeedと来歴を追加`
+
+#### Task 10R: 未対応runtimeでの拒否
+
+§5 Task 10と同じ。検出する入力名を`reference_spec`に置き換える。
+
+- [ ] テスト: `test_python_runtime_rejects_reference_spec_model`、`test_python_runtime_legacy_model_loads`、`test_http_engine_rejects_reference_spec_model`、C++の同等テスト
+- [ ] Commit — `fix: 参照spec入力付きONNXを未対応runtimeで明示拒否`
+
+### 8.6 判断の記録
+
+- **Ruling R7 (frontend):** CAM++ 192次元はG0どおりtrimなし。F-melのspecは学習cache (VAD trim済み`audio_norm`由来) と同じ手順でtrimする。G0 (a) は既存モデルのCAM++経路での測定で、未学習のencoderには当てはまらないため。外れた場合の費用: S6でtrim有無をCPUで比べ直す。
+- **Ruling R8 (入力形式):** encoderの入力はmelではなく線形スペクトログラム。学習cacheをそのまま使え、runtimeはenc_qと同じSTFT 1回で作れるため。log圧縮はencoder内で行う。
+- **未解決 (S4で確認):** 参照encoderが話者以外 (録音条件・内容) を拾い、CERが悪化する可能性。§6の「類似度は上がるがCERが悪化」の行で扱う。
