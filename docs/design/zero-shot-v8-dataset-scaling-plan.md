@@ -151,7 +151,7 @@ KsponSpeech は自然発話でノイズ含み → MOS フィルタは話者多�
 Template A (CLAUDE.md) ベース + zero-shot 系フラグは v7 再開コマンド準拠。 v7 (V100×4、`32-true`) から
 A100 単一 GPU への移行に伴う **P0 最適化フラグ** をまとめて反映 (詳細は §3.2)。 主な差分:
 
-```
+```text
 --accelerator gpu --devices 1 --precision bf16-mixed
 --batch-size 128 --samples-per-speaker 4        # 80GB、要 OOM 手前調整
 --max_epochs 80 --checkpoint-epochs 2 --save-top-k 5   # 全 keep は 75GB で disk full → rolling
@@ -182,6 +182,7 @@ A100 単一 GPU への移行に伴う **P0 最適化フラグ** をまとめて�
 テーブルサイズが 7 次元化 (§6.5)。 学習 CLI 自体は 6-lang と同一。
 
 **削除したフラグ (v7 コマンドから)**:
+
 - `--no-pin-memory` — v7 は V100×4 で CPU RAM 節約用。 単一 A100 では pageable copy が
   DMA を使えず 2-3x 遅くなるため **削除必須**
 - `--precision 32-true` → `--precision bf16-mixed` — A100 は BF16 native Tensor Core
@@ -192,7 +193,7 @@ A100 単一 GPU への移行に伴う **P0 最適化フラグ** をまとめて�
 ### 3.2 P0 最適化の根拠と期待効果
 
 2026-07-07 実施の高速化監査 (v7 CLI そのまま A100 実行 → 6-8h/epoch と想定)、 コード修正 2 件
-+ CLI 変更で 3-4h/epoch へ短縮の見込み。 コード修正は既に main に commit 済み:
+CLI 変更で 3-4h/epoch へ短縮の見込み。 コード修正は既に main に commit 済み:
 
 | 最適化 | 変更点 | 期待効果 | 反映方法 |
 |---|---|---|---|
@@ -235,7 +236,7 @@ A100 単一 GPU への移行に伴う **P0 最適化フラグ** をまとめて�
 
 **Plan A の CLI 推奨組み合わせ** (§3.1 の学習コマンド末尾に反映済み):
 
-```
+```text
 --enable-length-bucketing        # 3/4: sampler 側の length bucketing 有効化
 --compile                        # 4/4: torch.compile を有効化
 --compile-mode reduce-overhead   # 4/4: default (安全側)。 shape が bucketing で完全固定なら max-autotune も可
@@ -276,12 +277,14 @@ end-to-end で **~5-6 日 / ~$194** の見込み (§4.3 更新表参照)。
 Plan A 反映後の初 GPU 実行で 2 つのバグを発見し、 修正済 (両方 feature branch にコミット):
 
 **Bug #1: cuFFT が BFloat16 で失敗** (commit [`3dcabd57`](https://github.com/ayutaz/piper-plus/commit/3dcabd57))
+
 - `mel_spectrogram_torch` / `spectrogram_torch` の `torch.stft` が bf16-mixed autocast 下で
   `RuntimeError: cuFFT doesn't support tensor of type: BFloat16` を吐く。 v7 の `32-true`
   では発生せず、 A100 bf16-mixed 化で顕在化
 - 修正: STFT 前に bf16/fp16 を fp32 に defensive upcast。 出力 dtype は L1 loss と揃う fp32
 
 **Bug #2: scratch 初期化から KL loss = inf → 100% 全 batch skip** (commit [`1a86aa55`](https://github.com/ayutaz/piper-plus/commit/1a86aa55) + [`563f8361`](https://github.com/ayutaz/piper-plus/commit/563f8361))
+
 - 診断: `_PIPER_DEBUG_LOSS` env-gated print で `loss_kl=inf` を特定。 さらに
   `_PIPER_KL_DEBUG` で `logs_p_min=-431.9 logs_p_max=521.9` (clamp 対象範囲を大きく超える)、
   `exp(-2 * logs_p)` が `((z_p - m_p) ** 2)` と積で fp32 max (3.4e38) を超えて inf 化
@@ -294,7 +297,7 @@ Plan A 反映後の初 GPU 実行で 2 つのバグを発見し、 修正済 (�
 - 修正後: **Non-finite skip 0 件 / 40 batches** (それ以前は 40/40 で 100% skip)
 - 副次: `loss_kl` の初期絶対値は依然 ~1e14 (KL divergence の理論値どおり scratch では大きい)、
   gradient_clip_val=1.0 でクリップされ optimizer step は健全。 v7 と同様 数 epoch で収束見込み
-- 収束後は `|logs_p| < 5` が普通なので clamp は no-op、 model の表現力を損なわない
+- 収束後は `abs(logs_p) < 5` が普通なので clamp は no-op、 model の表現力を損なわない
 
 **bucketing A/B の実測** (--precision 32-true / 40 batches / batch_size=32、 KL fix 後):
 
@@ -384,12 +387,14 @@ bucketing 有害と判明) を基準に、 各要素を分離して見積もる:
 | H100 SXM 80GB × 2 (batch=128) | 1.7 hr | 5.7 日 | ~$598 |
 
 **§3.3 の "Plan A 3.3-4.0 日" は達成不可を実測で確定**:
+
 - 主因: bucketing が -30-40% ではなく +34% (逆効果)
 - 単一 A100 で 18 日は現実的でない → **Plan B (4x A100 DDP) を v8 本走の推奨構成に更新**
 - H100 x 2 は最安だが v7 で検証済みの 4x A100 DDP パスに比べて未検証項目 (H100 native BF16、
   Multi-scale FiLM 数値安定) が多く、 v8 では避けて Plan C (別 PR) で検討
 
 **§3.1 学習コマンドの更新**:
+
 - `--enable-length-bucketing` を **削除**
 - `--no-compile-dynamic` も削除 (bucketing 前提だったため意味なし)
 - multi-GPU (`--devices 4`) で `--precision bf16-mixed` を継続
@@ -412,7 +417,7 @@ length_bucket を per-batch 単一 bin 抽出に再設計する **Fix B**
 | P1 | I/O (dataset load) | [`5102404`](https://github.com/ayutaz/piper-plus/commit/51024040) | `piper_train.tools.precompute_mel` を新設 (fp16 `.npy` を pre-materialise、 atomic replace)、 `PiperDataset` に `precomputed_mel_dir` opt-in、 CLI `--precomputed-mel` | `torch.load(.spec.pt)` の pickle 経路を numpy path (`np.load → torch.from_numpy`) に置換で **DataLoader step 2-3x**、 80 epoch で **8-12h の I/O 節約** |
 | P2 | I/O (preprocess) | [`d5960b2`](https://github.com/ayutaz/piper-plus/commit/d5960b2a) | `norm_audio.default_num_processes()` を新設 (`min(cpu_count//2, 32)`)、 `cache_audio` / `prepare_multilingual_dataset` / `prepare_bilingual_dataset` の worker 数 default を統一 + tqdm 進捗バー追加 | 64 vCPU host で `cpu_count()` fan-out すると soxr/torch per-worker state と NFS IOPS で thrash (実効 throughput -30%)。 default 30 worker 相当に固定して **前処理 wall-clock 短縮 + 進捗可視化** |
 | — | bucketing 再設計 (Fix B) | [`a5fa6f2`](https://github.com/ayutaz/piper-plus/commit/a5fa6f2b) | `SpeakerBalancedBatchSampler` の length_bucket を per-batch 単一 bin 抽出に変更 (4 quantile bin、 language_group_balance / samples_per_speaker=4 contract 保持) | §3.5 で `+34%` 逆効果だった実装を廃案 → バッチ間 shape 差を bin 幅に閉じ込め cudnn.benchmark cache を再利用可能に。 opt-in default OFF は継続、 v8 本走前に再 A/B |
-| — | KL 発散防止 | [`1f625a4`](https://github.com/ayutaz/piper-plus/commit/1f625a42) | `logs_p` / `logs_q` clamp を `[-15,15]` → `[-8,8]`、 `m_p` clamp を `[-1000,1000]` → `[-100,100]`、 loss_kl 出力を `1e4` で cap (`SynthesizerTrn.forward` / `infer` / `lightning.py` 3 箇所) | §3.4 の scratch KL inf fix でも 300 batch smoke で batch 31 以降に 100% (262/300) Non-finite skip 再発 → worst case `(z_p-m_p)^2 * exp(-2*logs_p) = 4e17` が fp32 overflow していたため。 clamp 5 桁 down + 出力 cap で **grad direction 安定化**、 `kl_weight=0.1` と `grad_clip=1.0` と多層防御。 収束後は `|logs_p| < 5` で cap は no-op、 表現力を損なわない |
+| — | KL 発散防止 | [`1f625a4`](https://github.com/ayutaz/piper-plus/commit/1f625a42) | `logs_p` / `logs_q` clamp を `[-15,15]` → `[-8,8]`、 `m_p` clamp を `[-1000,1000]` → `[-100,100]`、 loss_kl 出力を `1e4` で cap (`SynthesizerTrn.forward` / `infer` / `lightning.py` 3 箇所) | §3.4 の scratch KL inf fix でも 300 batch smoke で batch 31 以降に 100% (262/300) Non-finite skip 再発 → worst case `(z_p-m_p)^2 * exp(-2*logs_p) = 4e17` が fp32 overflow していたため。 clamp 5 桁 down + 出力 cap で **grad direction 安定化**、 `kl_weight=0.1` と `grad_clip=1.0` と多層防御。 収束後は `abs(logs_p) < 5` で cap は no-op、 表現力を損なわない |
 
 **累積効果 (Test 1 14.0 sec/step 起点で分解、 batch=64 real config)**:
 
@@ -460,6 +465,7 @@ PR で必須で入れる。
 | smoke3b | 上記 + `--precomputed-mel` (no `--compile`) | 3439 sec | 11.46 | 6/300 (2%) | ❌ GPU-bound で -6.5% 遅い |
 
 **Test 1 (§3.5、 KL v1 with bucketing ON、 100 batches) との比較**:
+
 - Test 1: 14.0 sec/step (100% successful)
 - smoke2: 10.74 sec/step (98% successful)
 - **→ 実効 -23% throughput improvement**
@@ -496,6 +502,7 @@ PR で必須で入れる。
 | **256** | — | crash | — | ❌ **OOM (segfault)** |
 
 **意外な発見**: **batch を上げても utt/sec は改善せず** (むしろ悪化)。
+
 - batch=64 が最高 5.96 utts/sec、 batch=224 は 5.15 utts/sec (-14%)
 - 原因推測: attention の O(T²) スケール、 padding waste、 memory allocator 負荷、 cache pressure
 - **VITS + zero-shot 学習は compute-bound、 batch を上げても forward/backward per-utt が増える**
@@ -685,6 +692,7 @@ GPU $1.313/hr + disk 1.5TB × $0.20/GB/月 = +$0.417/hr → **$1.73/hr**)。帯�
 DL 600GB + UL 500GB で ~$4 と無視できる。
 
 **§3.5 (300 batch A/B 実測) + §3.6 (immediate 5 施策) 反映後の見込み**:
+
 - **前処理**: P2 (`cache_audio` / `prepare_multilingual_dataset` の worker default 統一) + P1
   (precomputed_mel の pre-run 追加) で **~32h → ~8-10h** に短縮 (soxr/torch worker thrash
   解消 + mel を fp16 `.npy` に pre-materialise、 §3.6)

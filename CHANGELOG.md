@@ -7,68 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.0.2] - 2026-10-16
-
-Python/native **2.0.2** and independent Python G2P **0.3.1**.
-See the [release checklist](docs/guides/development/python-release-2.0.2.md).
-
-### Added
-
-- Add a single-speaker fine-tuning dataset preparation helper that preserves the base model's phoneme and language IDs, validates cache paths, and rejects unsupported tokens and existing output directories.
-- Document the public experimental Zero-Shot base at Hugging Face revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` under `ayousanz/piper-plus-base/releases/zs-v1`, including the paired `base.onnx`/`base.onnx.json`, fine-tuning checkpoint, CAM++ encoder, hashes, runnable examples, and the published `piper-plus==2.0.0` consumer check. Preserve the legacy root files; this interim artifact is not a quality approval or a cross-runtime validation claim.
-- Add `base` and `zero-shot-base-zs-v1` aliases to the model catalogs and API/browser resolvers. Resolve the revision-pinned nested ONNX/config pair and isolate cache entries by revision and artifact path; published `piper-plus` 2.0.0 and 2.0.1 packages remain without these aliases.
-- Add maintainer tools to prepare the Tsukuyomi release bundle, record actual listening results, validate publication prerequisites, and verify anonymous retrieval after publication. The experimental Tsukuyomi zs-v1 fine-tune is public at revision `93c1fb6d67c29accc9ddf52326bb4582b1b52a3d` after approval of three Japanese listening samples; existing model aliases retain the legacy root files.
-- Add revision- and hash-pinned public base inference checks for Python, Rust, Go, C#, C++, and actual ONNX Runtime Web WASM, including repeatability and speaker embedding conditioning checks.
-
-### Fixed
-
-- Python English G2P: bundle the pinned upstream inference code and weights in both `piper-plus` and `piper-plus-g2p`, with Apache-2.0/MIT notices, removing the unused transitive GPL `Distance` dependency while preserving pronunciation. Add installed-wheel license/compatibility CI and preserve runtime versions when rebuilding wheels from sdists. Existing PyPI releases remain unchanged; see the [migration guide](docs/migration/python-g2p-license.md).
-- Consumer paths: use uv's selected interpreter in README examples, separate CPU/GPU ORT distributions and the locked WebUI environment, connect Rust phoneme silence and Rust/Go SSML synthesis, and emit C#/Go timing artifacts for stdin/batch utterances. Document the development package's explicit `[cpu]`/`[gpu]` selection in the [provider environment migration guide](docs/migration/provider-environments.md); v2.0.2 requires an explicit `[cpu]` or `[gpu]` extra; older v2.0.1 metadata is unchanged.
-- Model tooling: verify and update nested artifact hashes/sizes, reject incomplete published manifest entries, and run actual ONNX artifact validation from both exporters. Add mandatory CLI artifact and clean Python environment consumer checks.
-- ARM64 consumer checks: detect Docker CLI support for platform-specific image inspection so the same harness runs on Docker Desktop and older GitHub-hosted Docker clients.
-- C++ Linux ARM64: build the release archive against Debian Bullseye (glibc 2.31), preserving other platforms' build environments. Reject newer GLIBC/GLIBCXX/CXXABI requirements before artifact upload and check actual archive startup and Japanese synthesis on emulated Debian Bullseye, Bookworm, and Trixie.
-- Colab: normalize the v2.0.0 preprocessor's null single-language IDs before alignment, use a non-interactive Matplotlib backend for training subprocesses, and find checkpoints in the explicit training output directory as well as legacy Lightning paths.
-- Rust: update the locked `rustls` dependency from 0.23.45 to 0.23.46 to address RUSTSEC-2026-0346, RUSTSEC-2026-0347, RUSTSEC-2026-0348, and RUSTSEC-2026-0349 without adding audit exceptions.
-- Publication verification: allow Hugging Face to append LFS rules only for declared release files with LFS metadata, while rejecting changed existing attributes, unrelated additions, and any legacy payload drift.
-- Link-check CI: retry failed full scans twice with one concurrent request and no cached results to recover from intermittent external 5xx responses; persistent failures still block the job.
-- Rust: update the locked `quinn-proto` dependency to 0.11.18 to address five RustSec advisories in 0.11.15, retaining the existing audit policy.
-- Go: allow omitted speaker display names when loading models that use numeric speaker IDs or retain a zero-shot base's training speaker count. Detect inference inputs from the ONNX graph.
-- C++: load the known raw IPA aliases `ɔɪ`, `œ̃`, and `ɐ̃` using their canonical internal PUA codepoints while preserving model IDs; reject unknown tokens and conflicting aliases.
-- Colab: download the public base's fine-tuning helper from `examples/` without an authentication token and reject hash mismatches explicitly.
-
-## [2.0.1] - 2026-10-08
-
-### Fixed
-
-- SwiftPM: pin the official ONNX Runtime 1.20.0 package and verify the published 2.0.1 consumer without an application-side SDK override.
-- Docker: bound independent build-cache operations, mirror the exact GHCR digest to Docker Hub, and verify signatures against the identical digest pulled for actual public-image synthesis.
-- Browser/npm 0.8.1: synchronize the demo and installation examples with the ONNX Runtime Web 1.30.0 validation pin. Check drift in PR CI and pre-commit.
-- C#: add a deleted-parent-working-directory CLI reproducer, including enforced RED/GREEN checks on Linux CI for the existing launcher fix (Issue #735).
-- Documentation: update the 2.0 migration examples and give the strict external-link check explicit concurrency, retry, and timeout limits.
-
-- Sign all seven published Docker images for both project and Docker-specific release tags. Allow signature repair only from an immutable signing tag after every public image's digest, version, source revision, and expected platform set has been verified.
-- Rust 0.5.2 and C# 0.5.1: continue inference from the original ONNX model when its directory cannot store an optimized cache. Check the writer's temporary path before asking ONNX Runtime to save; exercise read-only storage, normal cache creation/reload, and invalid models in PR CI.
-- Rust 0.5.1: use the ONNX model's declared speaker embedding dimension instead of forcing 192 values. Supports both 192- and 256-dimensional models; rejects mismatched explicit embeddings instead of silently truncating them.
-- Run actual embedding dimension inference on every Rust PR CI matrix, and allow up to 20 minutes for NuGet.org propagation before verifying repository-signed downloads.
-
-### Changed
-
-- Update the PyO3 0.29.3 lockfile, the Python workspace dependency lockfile, and pinned Rust/SBOM CI actions. Keep torch and torchaudio at 2.11.0, including the existing CUDA local version.
-
-<!--
-  Breaking changes must be listed under `### Breaking` and each entry must
-  include at least one `[label](docs/migration/v<X>-to-v<Y>.md#anchor)`
-  link. See `docs/migration/README.md` for the anchor slug rules.
-  `scripts/check_migration_xref.py` (workflow `Migration Guide Lint`)
-  enforces this automatically.
--->
-
-## [2.0.0] - 2026-10-06
-
-### Security
-
-- CI: `Required Status Check Gate` (`.github/workflows/required_status_check_gate.yml`) に script injection があったのを修正。 `workflow_run` イベント経路で fork 側の branch 名 (`github.event.workflow_run.head_branch`) を `run:` ブロックへ直接展開しており、 git の ref 名は `$( )` や backtick を含められるため任意コマンドが実行可能だった。 `workflow_run` は fork PR 由来でも base repo の write context で発火し、 当 job は `pull-requests: write` を持つ。 さらに直前の `actions/checkout` が `persist-credentials: false` を指定していなかったため、 注入されたコマンドから `.git/config` 経由で `GITHUB_TOKEN` を回収できる状態だった (pwn-request パターン)。 同 repo 内の `pr-title-check.yml` / `pr-body-validate.yml` が既に採っている `env:` 経由で shell 変数として参照する形に統一し、 併せて checkout に `persist-credentials: false` を追加して多層防御とした (`check_required_gate.py` は stdlib `urllib` のみで `GITHUB_TOKEN` env から認証しており git credential helper を使わないことを確認済み)。 `.github/workflows/*.yml` の `run:` ブロック全件を走査し、 外部から制御可能な `github.event.*` フィールドを展開している箇所が他に無いことを確認済み
-
 ### Added
 
 - **Zero-shotの固定推論評価**: `piper_train.tools.generate_eval_audio`で参照・text・
@@ -350,6 +288,35 @@ See the [release checklist](docs/guides/development/python-release-2.0.2.md).
   `--spk-emb-noise-sigma 0.05` to restore the previous default. The
   Latent Filling path (`--latent-filling-tau`) is the intended
   replacement regularizer.
+
+## [2.0.2] - 2026-10-16
+
+Python/native **2.0.2** and independent Python G2P **0.3.1**.
+See the [release checklist](docs/guides/development/python-release-2.0.2.md).
+
+### Added
+
+- Add a single-speaker fine-tuning dataset preparation helper that preserves the base model's phoneme and language IDs, validates cache paths, and rejects unsupported tokens and existing output directories.
+- Document the public experimental Zero-Shot base at Hugging Face revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` under `ayousanz/piper-plus-base/releases/zs-v1`, including the paired `base.onnx`/`base.onnx.json`, fine-tuning checkpoint, CAM++ encoder, hashes, runnable examples, and the published `piper-plus==2.0.0` consumer check. Preserve the legacy root files; this interim artifact is not a quality approval or a cross-runtime validation claim.
+- Add `base` and `zero-shot-base-zs-v1` aliases to the model catalogs and API/browser resolvers. Resolve the revision-pinned nested ONNX/config pair and isolate cache entries by revision and artifact path; published `piper-plus` 2.0.0 and 2.0.1 packages remain without these aliases.
+- Add maintainer tools to prepare the Tsukuyomi release bundle, record actual listening results, validate publication prerequisites, and verify anonymous retrieval after publication. The experimental Tsukuyomi zs-v1 fine-tune is public at revision `93c1fb6d67c29accc9ddf52326bb4582b1b52a3d` after approval of three Japanese listening samples; existing model aliases retain the legacy root files.
+- Add revision- and hash-pinned public base inference checks for Python, Rust, Go, C#, C++, and actual ONNX Runtime Web WASM, including repeatability and speaker embedding conditioning checks.
+
+### Fixed
+
+- Python English G2P: bundle the pinned upstream inference code and weights in both `piper-plus` and `piper-plus-g2p`, with Apache-2.0/MIT notices, removing the unused transitive GPL `Distance` dependency while preserving pronunciation. Add installed-wheel license/compatibility CI and preserve runtime versions when rebuilding wheels from sdists. Existing PyPI releases remain unchanged; see the [migration guide](docs/migration/python-g2p-license.md).
+- Consumer paths: use uv's selected interpreter in README examples, separate CPU/GPU ORT distributions and the locked WebUI environment, connect Rust phoneme silence and Rust/Go SSML synthesis, and emit C#/Go timing artifacts for stdin/batch utterances. Document the development package's explicit `[cpu]`/`[gpu]` selection in the [provider environment migration guide](docs/migration/provider-environments.md); v2.0.2 requires an explicit `[cpu]` or `[gpu]` extra; older v2.0.1 metadata is unchanged.
+- Model tooling: verify and update nested artifact hashes/sizes, reject incomplete published manifest entries, and run actual ONNX artifact validation from both exporters. Add mandatory CLI artifact and clean Python environment consumer checks.
+- ARM64 consumer checks: detect Docker CLI support for platform-specific image inspection so the same harness runs on Docker Desktop and older GitHub-hosted Docker clients.
+- C++ Linux ARM64: build the release archive against Debian Bullseye (glibc 2.31), preserving other platforms' build environments. Reject newer GLIBC/GLIBCXX/CXXABI requirements before artifact upload and check actual archive startup and Japanese synthesis on emulated Debian Bullseye, Bookworm, and Trixie.
+- Colab: normalize the v2.0.0 preprocessor's null single-language IDs before alignment, use a non-interactive Matplotlib backend for training subprocesses, and find checkpoints in the explicit training output directory as well as legacy Lightning paths.
+- Rust: update the locked `rustls` dependency from 0.23.45 to 0.23.46 to address RUSTSEC-2026-0346, RUSTSEC-2026-0347, RUSTSEC-2026-0348, and RUSTSEC-2026-0349 without adding audit exceptions.
+- Publication verification: allow Hugging Face to append LFS rules only for declared release files with LFS metadata, while rejecting changed existing attributes, unrelated additions, and any legacy payload drift.
+- Link-check CI: retry failed full scans twice with one concurrent request and no cached results to recover from intermittent external 5xx responses; persistent failures still block the job.
+- Rust: update the locked `quinn-proto` dependency to 0.11.18 to address five RustSec advisories in 0.11.15, retaining the existing audit policy.
+- Go: allow omitted speaker display names when loading models that use numeric speaker IDs or retain a zero-shot base's training speaker count. Detect inference inputs from the ONNX graph.
+- C++: load the known raw IPA aliases `ɔɪ`, `œ̃`, and `ɐ̃` using their canonical internal PUA codepoints while preserving model IDs; reject unknown tokens and conflicting aliases.
+- Colab: download the public base's fine-tuning helper from `examples/` without an authentication token and reject hash mismatches explicitly.
 
 ## [2.0.1] - 2026-10-08
 

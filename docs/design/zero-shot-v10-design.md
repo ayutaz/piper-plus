@@ -62,7 +62,7 @@ ASCL (arXiv:2210.05979、APSIPA 2022、**VITS 上で実証**: SMOS +0.30/+0.41) 
 学習中に batch 内の別話者 embedding g_q で flow を逆走させて生成し、そこに
 speaker loss を当てる:
 
-```
+```text
 z_p    = flow(z, g_s)              # posterior z を話者 s の統計で非依存化 (既存 forward)
 z_swap = flow⁻¹(z_p, g_q)          # 別話者 q の統計で再注入
 y_swap = dec(slice(z_swap), g_q)   # 既存 slice indices を流用

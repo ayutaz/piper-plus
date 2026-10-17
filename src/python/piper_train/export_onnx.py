@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 import torch
 
 from .tools.convert_fp16 import convert_fp16
-from .vits import commons
 from .vits.commons import (
     migrate_prefilm_decoder_cond,
     normalize_checkpoint_state_dict,

@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-16T09:55:39Z",
+  "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
-    "executable": 229,
-    "needs_placeholder": 7,
-    "skip_warranted": 233,
-    "total": 469
+    "executable": 231,
+    "needs_placeholder": 8,
+    "skip_warranted": 264,
+    "total": 503
   },
   "by_language": {
     "bash": {
-      "executable": 168,
-      "needs_placeholder": 7,
-      "skip_warranted": 44
+      "executable": 169,
+      "needs_placeholder": 8,
+      "skip_warranted": 47
     },
     "csharp": {
       "executable": 5,
@@ -24,7 +24,7 @@
       "skip_warranted": 0
     },
     "python": {
-      "executable": 31,
+      "executable": 32,
       "needs_placeholder": 0,
       "skip_warranted": 1
     },
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 188
+      "skip_warranted": 216
     },
     "wasm": {
       "executable": 10,
@@ -381,9 +381,22 @@
       "hash_sha1": "a3daeca983b96e3ce49f3887acf6009dfd3b92dd"
     },
     {
+      "file": "docs/design/zero-shot-noise-root-cause-pqmf.md",
+      "line_start": 31,
+      "line_end": 36,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "f6da230af747dfb3fdee94d5dbb50825e51d41e8"
+    },
+    {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 51,
-      "line_end": 63,
+      "line_start": 52,
+      "line_end": 64,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -395,8 +408,8 @@
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 86,
-      "line_end": 93,
+      "line_start": 87,
+      "line_end": 94,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -408,8 +421,8 @@
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 101,
-      "line_end": 105,
+      "line_start": 102,
+      "line_end": 106,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -421,8 +434,8 @@
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 241,
-      "line_end": 244,
+      "line_start": 242,
+      "line_end": 245,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -436,8 +449,8 @@
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 267,
-      "line_end": 270,
+      "line_start": 268,
+      "line_end": 271,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -451,8 +464,8 @@
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 280,
-      "line_end": 283,
+      "line_start": 281,
+      "line_end": 284,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -463,6 +476,261 @@
       ],
       "env_dependencies": [],
       "hash_sha1": "cf5f25de4edfe5c249c86ef7286ae3bb3094a9f3"
+    },
+    {
+      "file": "docs/design/zero-shot-v10-design.md",
+      "line_start": 65,
+      "line_end": 70,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "11426e61bf0ce954ca7a48587a0e18bddcf14fc9"
+    },
+    {
+      "file": "docs/design/zero-shot-v10b-s2-f0-design.md",
+      "line_start": 93,
+      "line_end": 98,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "78bee94b6d0517d83d467051ed9958d50adf3a29"
+    },
+    {
+      "file": "docs/design/zero-shot-v10b-s2-f0-design.md",
+      "line_start": 116,
+      "line_end": 120,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "9ef654ce024532708ac31c4c83b30272e8b0e082"
+    },
+    {
+      "file": "docs/design/zero-shot-v10b-s2-f0-design.md",
+      "line_start": 137,
+      "line_end": 153,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "31c8514d5e9d203d82c9634bd41bdaa1af08580d"
+    },
+    {
+      "file": "docs/design/zero-shot-v10b-s2-f0-design.md",
+      "line_start": 296,
+      "line_end": 308,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "5969da8dea4889c0e76dfa70223effcec05c02fc"
+    },
+    {
+      "file": "docs/design/zero-shot-v10b-s2-f0-design.md",
+      "line_start": 343,
+      "line_end": 346,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "a7b34b17bea1d0107bb31bb8c4afd6b82bb64b28"
+    },
+    {
+      "file": "docs/design/zero-shot-v10b-s2-f0-design.md",
+      "line_start": 392,
+      "line_end": 395,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "f4e89ae06d06dfdbf64bf887761aa885133c08d7"
+    },
+    {
+      "file": "docs/design/zero-shot-v11-conditioning-design.md",
+      "line_start": 505,
+      "line_end": 512,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "9482d9dafa94f6a046baf247f4f330bd6ce8a406"
+    },
+    {
+      "file": "docs/design/zero-shot-v11-conditioning-design.md",
+      "line_start": 516,
+      "line_end": 519,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "11d965557d4773c2c7323507e9e1640d282dbcc3"
+    },
+    {
+      "file": "docs/design/zero-shot-v11-harmonic-head-design.md",
+      "line_start": 87,
+      "line_end": 93,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "cf9704b992c5f1204b6f044ae5369461ab6ec29c"
+    },
+    {
+      "file": "docs/design/zero-shot-v11-harmonic-head-design.md",
+      "line_start": 112,
+      "line_end": 117,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "cc46d0f173894d972a800b49f19b189f36e2b56b"
+    },
+    {
+      "file": "docs/design/zero-shot-v11-harmonic-head-design.md",
+      "line_start": 192,
+      "line_end": 211,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "df68e026907376fa362c27d975d850321c363939"
+    },
+    {
+      "file": "docs/design/zero-shot-v11-harmonic-head-design.md",
+      "line_start": 236,
+      "line_end": 240,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "06d4a0f23a9cd9aafd20f2c8e60086452ff5fc2b"
+    },
+    {
+      "file": "docs/design/zero-shot-v11-harmonic-head-design.md",
+      "line_start": 343,
+      "line_end": 348,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "c2659456cf4caf36e9fc9d6dbe38f6cae431af20"
+    },
+    {
+      "file": "docs/design/zero-shot-v8-dataset-scaling-plan.md",
+      "line_start": 154,
+      "line_end": 173,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "db0c9bfe99bd25c241022121c3bf1c6970f23593"
+    },
+    {
+      "file": "docs/design/zero-shot-v8-dataset-scaling-plan.md",
+      "line_start": 239,
+      "line_end": 244,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "b0ada3fe097a4186166e5b5059ff45dcdee1efa3"
+    },
+    {
+      "file": "docs/design/zero-shot-v8-dataset-scaling-plan.md",
+      "line_start": 528,
+      "line_end": 552,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "skip_warranted",
+      "suggested_action": "sandbox_cannot_satisfy_env_dep",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [
+        "/data/piper/"
+      ],
+      "hash_sha1": "f529027194cb33f23c78a0d4f2666a2ae68bda35"
     },
     {
       "file": "docs/features/phoneme-input.md",
@@ -4575,6 +4843,66 @@
       "hash_sha1": "308576a6928119043ae8951b610fe4571dd9d1dd"
     },
     {
+      "file": "docs/handoff/zero-shot-v8-2026-07-09.md",
+      "line_start": 181,
+      "line_end": 187,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "needs_placeholder",
+      "suggested_action": "wrap_with_doctest_skip_until_t011",
+      "placeholders_detected": [
+        "<ID>"
+      ],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "c6218e3be9489ec8c1f7a93f6cca552e1451e4b3"
+    },
+    {
+      "file": "docs/handoff/zero-shot-v8-2026-07-09.md",
+      "line_start": 196,
+      "line_end": 214,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "skip_warranted",
+      "suggested_action": "sandbox_cannot_satisfy_env_dep",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [
+        "/data/piper/"
+      ],
+      "hash_sha1": "4d54ea552a7292bd76d9a08ea4774b8f90ce60c7"
+    },
+    {
+      "file": "docs/handoff/zero-shot-v8-2026-07-09.md",
+      "line_start": 242,
+      "line_end": 249,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "d8dd5ca4b7ed5c749ea4eff4cefa67e5964e9641"
+    },
+    {
+      "file": "docs/handoff/zero-shot-v8-2026-07-09.md",
+      "line_start": 262,
+      "line_end": 267,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "skip_warranted",
+      "suggested_action": "sandbox_cannot_satisfy_env_dep",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [
+        "/data/piper/"
+      ],
+      "hash_sha1": "1fb3571a720b4946b00575d70e7bc42c8a350117"
+    },
+    {
       "file": "docs/migration/README.md",
       "line_start": 48,
       "line_end": 53,
@@ -6598,6 +6926,21 @@
       "hash_sha1": "df9d64a0fb6e2c7c20a68c9d0a48818c77b65dd4"
     },
     {
+      "file": "docs/research/gpt-sovits-zero-shot-2026-10-09.md",
+      "line_start": 76,
+      "line_end": 94,
+      "language_raw": "mermaid",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "28456f72f0cd8d25e233dd2f90e9159721dd3ec3"
+    },
+    {
       "file": "docs/research/improvement-survey-2026-06-15.md",
       "line_start": 489,
       "line_end": 497,
@@ -6626,6 +6969,169 @@
       ],
       "env_dependencies": [],
       "hash_sha1": "f3f450f7d39e90322eaba777574de6071e983519"
+    },
+    {
+      "file": "docs/research/zero-shot-implementation-audit-2026-10-09.md",
+      "line_start": 50,
+      "line_end": 56,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "45f51475a24e2393b56c0ee1b1d9a615c2651612"
+    },
+    {
+      "file": "docs/research/zero-shot-implementation-audit-2026-10-09.md",
+      "line_start": 94,
+      "line_end": 98,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "d3f25476aed352e81cab68cb62c64033d3fb660a"
+    },
+    {
+      "file": "docs/research/zero-shot-implementation-audit-2026-10-09.md",
+      "line_start": 200,
+      "line_end": 206,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "1607de8915ad67f2c72b839e93e28c88920de350"
+    },
+    {
+      "file": "docs/research/zero-shot-implementation-audit-2026-10-09.md",
+      "line_start": 234,
+      "line_end": 237,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "3813c53ec13410329e0276104b5694eb1cabca62"
+    },
+    {
+      "file": "docs/research/zero-shot-implementation-audit-2026-10-09.md",
+      "line_start": 350,
+      "line_end": 384,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "bca1a0a56455309fcff2b4e54e0c5517466de8d0"
+    },
+    {
+      "file": "docs/spec/training-batch-schedule.md",
+      "line_start": 83,
+      "line_end": 93,
+      "language_raw": "json",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "55f772beda9362d7570e90a8e38011b6b5988ac9"
+    },
+    {
+      "file": "docs/spec/zero-shot-inference-evaluation.md",
+      "line_start": 36,
+      "line_end": 38,
+      "language_raw": "json",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "fc9f07500549dc4880d2ddf920a36201f8d12366"
+    },
+    {
+      "file": "docs/spec/zero-shot-inference-evaluation.md",
+      "line_start": 77,
+      "line_end": 90,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "28fc8787d5773d1096e6885d6c44e0e03b1c920e"
+    },
+    {
+      "file": "docs/spec/zero-shot-inference-evaluation.md",
+      "line_start": 128,
+      "line_end": 131,
+      "language_raw": "powershell",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "a526645e947d6e425ee9810d3dc8b0339b9238c0"
+    },
+    {
+      "file": "docs/spec/zs-eval-contract.md",
+      "line_start": 118,
+      "line_end": 187,
+      "language_raw": "jsonc",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "11332e4766cf6b392164f070868ef8860d030e78"
+    },
+    {
+      "file": "docs/spec/zs-eval-contract.md",
+      "line_start": 191,
+      "line_end": 200,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "9ee257eaad829a34e3e708883a3294538a55955e"
     }
   ]
 }

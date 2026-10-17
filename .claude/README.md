@@ -102,7 +102,7 @@ zero-shot 学習事故由来の再発防止 gate。後者の主なもの:
 
 | gate | trigger | 何を防ぐか |
 |------|---------|-----------|
-| `guard-bash-behaviour` | `.claude/hooks/(guard|test-guard)-bash.sh` | guard-bash 判定ロジックの回帰 (`test-guard-bash.sh` を実行。shellcheck では検出不能な振る舞いを pin) |
+| `guard-bash-behaviour` | `.claude/hooks/(guard\|test-guard)-bash.sh` | guard-bash 判定ロジックの回帰 (`test-guard-bash.sh` を実行。shellcheck では検出不能な振る舞いを pin) |
 | `test-threshold-relaxation` | テストの数値閾値の緩和 diff | 根拠 (`# threshold-relaxed: <根拠>`) なしの受け入れ基準緩和 (PQMF -90dB→5dB goalpost moving の再発防止) |
 | `zs-prevention-gate` | 評価ガード面 + guard-bash.sh | zero-shot 防止テスト群・評価ガードの削除・改名 |
 | `zs-metric-isolation-gate` | 学習コード / メトリクスモジュール | 学習コードからの評価メトリクス import (メトリクスの loss 流用は恒久禁止) |

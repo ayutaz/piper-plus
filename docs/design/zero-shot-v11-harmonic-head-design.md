@@ -84,7 +84,7 @@ F0 の倍音間隔を分解できない。担体化はこの構造認識の帰�
 
 band0 (0-2756.25Hz) の subband 信号を直接次で置換する:
 
-```
+```text
 band0[n] = s_h[n] + s_n[n]                                     (SR/4 = 5512.5Hz)
 s_h[n]   = Σ_{m=1..M} ā_m[n]·cos(2πmΦ[n]) + b̄_m[n]·sin(2πmΦ[n])
            Φ = cumsum(f0_up / 5512.5)  (float64、S-2c と同じ)
@@ -109,7 +109,7 @@ head の band0 用出力は mag 9ch + phase 9ch → **log σ 9ch のみ**に減�
 倍音 f_m = m·F0 を、**PQMF 解析フィルタの複素周波数応答を固定重みとして
 band0 と band1 の両方に描画**する:
 
-```
+```text
 s_k[n] = Σ_m (a_m·ReH_k(f_m) − b_m·ImH_k(f_m))·cos(2πmΦ[n])
        + (a_m·ImH_k(f_m) + b_m·ReH_k(f_m))·sin(2πmΦ[n])        (k = 0, 1)
 
@@ -189,7 +189,7 @@ S-2 スパイクの c_full (+18〜30%) の帯域限定版 (励振を ≤3kHz に
 
 ### 3.1 全体データフロー
 
-```
+```text
 enc_p → (MAS 展開) → F0Predictor (S-2p、実装済み) → log f0, vuv
                           │ (detach、teacher forcing は §7)
 z_slice [B,192,T] ─┬─ concat f0_feat(log f0, uv) ── conv_pre ─ FiLM ─→ x_frame [B,256,T]
@@ -233,7 +233,7 @@ M = 40 (f_max 3000Hz を F0 ≥ 75Hz で被覆)。trim: 32 (F0≥94)、24 (F0≥
 
 ### 3.3 noise 枝 — 「拘束付き自由度」の設計
 
-```
+```text
 σ[k,t] = exp(clamp(head 出力 9ch, −9, 6))        (bin 幅 344.5Hz、head 格子)
 X_n[k,t] = σ[k,t]·(n_r[k,t] + j·n_i[k,t])/√2     n ~ N(0,1) i.i.d.
 s_n = OnnxISTFT(X_n)                              (既存基底をそのまま使用)
@@ -340,7 +340,7 @@ uSFGAN (arXiv:2104.04668) の source 正則化は「**自由な** source-network
 残る唯一のレベル系リスク (§4.1 #7: 推論時 σ 氾濫) に対しては、**default off の
 hinge 正則化を事前登録**しておく (Phase D で監視指標が発火した場合のみ arm):
 
-```
+```text
 L_src = λ_src · mean_{voiced frames}( ReLU( log E_n[t] − log E_h[t] − τ ) )
   E_h[t] = Σ_band0,1 s_k^2 の frame 内エネルギー (担体枝、graph 内で直読)
   E_n[t] = 同 noise 枝
@@ -574,7 +574,7 @@ v10b plan §4.3 の流儀 (測ってから基準をいじらない) に従い先
 - **タスクからの逸脱 3**: レイテンシは「S-2 実測 +2-10% への増分」に収まらず、
   素朴実装で +61〜72% を検出 → **MatMul 融合を実装形として指定**して M=40
   +18% / M=24 +13% (decoder 単体) まで回収。gate 成立は e2e 測定 (Phase B)
-  + trim 順序に委ねる — S-2 と同じ「gate 境界」着地
+  - trim 順序に委ねる — S-2 と同じ「gate 境界」着地
 - **タスクへの追加知見**: comb-HNR gate は GT/予測 F0 格子で測ると ±20cent で
   崩壊する (§5.3) — Phase D の測定プロトコルに「出力自身の F0 トラック」を明記
 - **未検証 (学習が要る)**: (i) 実データでの枝分業 (ρ が GT 域に収束するか)、
@@ -630,7 +630,7 @@ arm H 初回 smoke が担体 gate で不合格 (comb-HNR 2.27dB / 追従率 0.0)
   carrier off は bit 不変 / 固定・学習不能 = §3.2 ゲイン平滑と同じ構造保証)。
   実測 2.67→14.17dB (E2E、predictor 級ノイズ較正)【実測】
 - 副発見: 追従率 0.0 は **f0_shift_ablation が pyin 欠測時に 0.0 を捏造**して
-  いた測定バグ (実際は平滑後 ±2st に対し出力 197.99/249.45Hz = 追従 ~1.0)。
+  いた測定バグ (実際は平滑後 ±2 st に対し出力 197.99/249.45Hz = 追従 ~1.0)。
   欠測は `insufficient_data` として顕在化するよう修正 (verdict は保守側維持)
 - 教訓: 構造保証の検証には**入力の動的な汚さ (時間微分)** も敵対条件に含める。
   新テスト `test_carrier_f0_stability.py` が predictor 級ノイズの E2E を恒久 pin

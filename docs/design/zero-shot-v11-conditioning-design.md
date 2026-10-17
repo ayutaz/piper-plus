@@ -502,7 +502,7 @@ ablation)。0.70 必達は約束できず、**D 診断で主ボトルネック�
 
 20 択 seen 話者識別 (raw top-1) の段別追跡:
 
-```
+```text
 CAM++ emb 98.5% → (spk_proj) → g_spk 98.5%     [D-1: 落ち 0]
   → (enc_p / MAS) → m_p 99% → z_p 97%           [D-8: 落ち 0、ただし振幅は微小 (sep 0.034)]
   → (flow⁻¹ SNAC) → z 78% (centered 93%)        [D-8: 情報破壊なし]
@@ -513,7 +513,7 @@ CAM++ emb 98.5% → (spk_proj) → g_spk 98.5%     [D-1: 落ち 0]
 
 SECS 会計 (D-5 lite、つくよみ OOD、cross-utt 中央値):
 
-```
+```text
 GT 実音声 0.859 → teacher-forced recon (enc_q z + 現行 decoder) 0.714   [decoder 段 −0.145 = 78%]
   → TTS フルパス 0.673                                                   [prior/flow/duration 上流 −0.041 = 22%]
 ```
