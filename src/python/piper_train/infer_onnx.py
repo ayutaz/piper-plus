@@ -385,12 +385,14 @@ def _detect_dominant_language(text: str, language_id_map: dict[str, int]) -> int
 def _extract_speaker_embedding_from_audio(
     audio_path: str | Path,
     encoder_path: str | Path,
+    reference_trim: str = "none",
 ) -> np.ndarray:
     """Extract speaker embedding from reference audio using CAM++ ONNX encoder.
 
     Args:
         audio_path: Path to reference WAV file.
         encoder_path: Path to CAM++ ONNX model.
+        reference_trim: "none" (default) or "energy-vad" (学習時と同じ VAD で trim).
 
     Returns:
         Speaker embedding, shape [192], float32, L2-normalized.
@@ -406,7 +408,7 @@ def _extract_speaker_embedding_from_audio(
         str(encoder_path),
         providers=["CPUExecutionProvider"],
     )
-    fbank = preprocess_audio(audio_path)
+    fbank = preprocess_audio(audio_path, trim=(reference_trim == "energy-vad"))
     embedding = extract_embedding(encoder_session, fbank)
     _LOGGER.info(
         "Extracted speaker embedding from %s (norm=%.4f)",
@@ -448,6 +450,7 @@ def _resolve_speaker_embedding(
     model_path: Path,
     dataset_dir: Path | None,
     embedding_dim: int = _SPK_EMBED_DIM,
+    reference_trim: str = "none",
 ) -> np.ndarray | None:
     """Resolve speaker embedding from the various input sources.
 
@@ -486,8 +489,13 @@ def _resolve_speaker_embedding(
                 "Specify --speaker-encoder or place campplus.onnx near the model."
             )
             sys.exit(1)
+        extract_kwargs = (
+            {"reference_trim": reference_trim} if reference_trim != "none" else {}
+        )
         return validate_embedding(
-            _extract_speaker_embedding_from_audio(audio_path, encoder_path),
+            _extract_speaker_embedding_from_audio(
+                audio_path, encoder_path, **extract_kwargs
+            ),
             embedding_dim,
         )
 
@@ -799,6 +807,14 @@ def main():
         help="Path to the speaker encoder ONNX model "
         "(required with --reference-audio).",
     )
+    parser.add_argument(
+        "--reference-trim",
+        choices=["none", "energy-vad"],
+        default="none",
+        help="Trim leading/trailing silence of the reference audio before "
+        "speaker embedding extraction, using the same energy VAD as training "
+        "(default: none).",
+    )
     args = parser.parse_args()
 
     # Emit deprecation warnings for old option names
@@ -924,6 +940,7 @@ def main():
             model_path=model_path,
             dataset_dir=dataset_dir,
             embedding_dim=spk_embedding_dim,
+            reference_trim=args.reference_trim,
         )
         if resolved_spk_emb is None and (
             args.speaker_audio is not None or args.speaker_embedding is not None
