@@ -20,6 +20,7 @@ on:
       - 'tests/fixtures/g2p/english_no_drop_words.json'
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'test/fixtures/speaker_encoder_golden.json'
+      - 'test/fixtures/kaldi_fbank_golden.json'
       - '.github/workflows/test-webassembly.yml'
   pull_request:
     branches: [ dev ]
@@ -36,6 +37,7 @@ on:
       - 'tests/fixtures/g2p/english_no_drop_words.json'
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'test/fixtures/speaker_encoder_golden.json'
+      - 'test/fixtures/kaldi_fbank_golden.json'
       - '.github/workflows/test-webassembly.yml'
 
 env:
@@ -208,6 +210,13 @@ jobs:
           test/js/test-short-text-contract.js \
           test/js/test-speaker-encoder-parity.js \
           test/js/test-ort-session-contract.js
+
+    - name: Run zero-shot speaker front-end tests (Kaldi fbank parity with torchaudio)
+      working-directory: src/wasm/openjtalk-web
+      run: |
+        node --test \
+          test/js/test-kaldi-fbank-golden.js \
+          test/js/test-speaker-encoder-front-end.js
 
 
     - name: Check file sizes
