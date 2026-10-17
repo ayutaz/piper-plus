@@ -31,7 +31,7 @@ FILE_SHA256 = {
     "campplus.onnx": "a6ac6a63997761ae2997373e2ee1c47040854b4b759ea41ec48e4e42df0f4d73",
 }
 DOWNLOADED_FILES = ("base.onnx", "campplus.onnx")
-CONFIG_PATH = Path(__file__).parent / "models" / "zs-v1" / "base.onnx.json"
+CONFIG_PATH = Path(__file__).parent / "zs-v1" / "base.onnx.json"
 
 LANGUAGES = ("ja", "en", "zh", "es", "fr", "pt")
 LATIN_LANGUAGES = frozenset({"en", "es", "fr", "pt"})
@@ -129,6 +129,16 @@ def phoneme_ids_for_base(text: str, language: str, voice: PiperVoice) -> list[in
     return voice.phonemes_to_ids(phones)
 
 
+def config_sha256(path: Path) -> str:
+    """SHA256 of the config as published upstream (CRLF line endings).
+
+    The repository stores it with LF (.gitattributes ``*.json eol=lf``), so the
+    pinned digest is checked against the CRLF form.
+    """
+    data = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+    return hashlib.sha256(data).hexdigest()
+
+
 def _verify(path: Path, expected: str) -> None:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -172,7 +182,8 @@ class ZeroShotEngine:
         with self._lock:
             if self._loaded:
                 return
-            _verify(CONFIG_PATH, FILE_SHA256["base.onnx.json"])
+            if config_sha256(CONFIG_PATH) != FILE_SHA256["base.onnx.json"]:
+                raise RuntimeError(f"SHA256 mismatch for {CONFIG_PATH.name}")
             paths = {name: self._download(name) for name in DOWNLOADED_FILES}
             for name, path in paths.items():
                 _verify(path, FILE_SHA256[name])

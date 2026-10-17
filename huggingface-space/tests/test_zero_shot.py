@@ -1,26 +1,20 @@
 """Tests for the zero-shot (reference audio) path of the HF Space."""
 
-import hashlib
 import json
 import wave
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 import numpy as np
 import pytest
-
 import zero_shot
+
 from piper_plus.config import PiperConfig
 from piper_plus.phonemize.multilingual import MultilingualPhonemizer
 from piper_plus.voice import PiperVoice
 from scripts import public_base_runtime as pbr
 
 
-CONFIG_PATH = Path(zero_shot.__file__).parent / "models" / "zs-v1" / "base.onnx.json"
-
-
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+CONFIG_PATH = zero_shot.CONFIG_PATH
 
 
 class FakeEncoder:
@@ -68,8 +62,18 @@ def _expected_ids(text, language, voice):
     return voice.phonemes_to_ids(phones)
 
 
-def test_bundled_config_matches_pinned_sha():
-    assert _sha256(CONFIG_PATH) == zero_shot.FILE_SHA256["base.onnx.json"]
+def test_bundled_config_is_lf_and_matches_pinned_sha():
+    # Upstream is CRLF; the repository stores LF (.gitattributes, pre-commit).
+    assert b"\r" not in CONFIG_PATH.read_bytes()
+    assert (
+        zero_shot.config_sha256(CONFIG_PATH) == zero_shot.FILE_SHA256["base.onnx.json"]
+    )
+
+
+def test_config_digest_accepts_crlf_copy(tmp_path):
+    crlf = tmp_path / "base.onnx.json"
+    crlf.write_bytes(CONFIG_PATH.read_bytes().replace(b"\n", b"\r\n"))
+    assert zero_shot.config_sha256(crlf) == zero_shot.FILE_SHA256["base.onnx.json"]
 
 
 def test_pins_match_ci_verifier():
@@ -102,7 +106,7 @@ def test_embedding_is_unit_norm_and_uses_16k_fbank(fake_encoder):
 
 def test_rejects_short_reference(fake_encoder):
     audio = np.full(800, 0.1, dtype=np.float32)  # 0.05 s
-    with pytest.raises(zero_shot.ZeroShotInputError, match="0.1"):
+    with pytest.raises(zero_shot.ZeroShotInputError, match=r"0.1"):
         zero_shot.extract_speaker_embedding(16000, audio, fake_encoder)
 
 
@@ -128,7 +132,7 @@ def test_phoneme_ids_match_ci_recipe(base_voice, key, language, text):
 
 def test_untrained_phonemes_raise(base_voice):
     # The current pt G2P emits "ã", which the 173-symbol zs-v1 map lacks.
-    with pytest.raises(zero_shot.ZeroShotInputError, match="untrained.*ã"):
+    with pytest.raises(zero_shot.ZeroShotInputError, match=r"untrained.*ã"):
         zero_shot.phoneme_ids_for_base("Não sei.", "pt", base_voice)
 
 
@@ -144,10 +148,8 @@ def test_unknown_language_raises(base_voice):
 
 
 def _fake_sessions(monkeypatch):
-    monkeypatch.setattr(zero_shot, "_verify", lambda path, expected: None)
-    monkeypatch.setattr(
-        zero_shot.ZeroShotEngine, "_open_sessions", lambda self, paths: None
-    )
+    monkeypatch.setattr(zero_shot, "_verify", lambda *_: None)
+    monkeypatch.setattr(zero_shot.ZeroShotEngine, "_open_sessions", lambda *_: None)
 
 
 def test_assets_loaded_once_under_concurrency(tmp_path, monkeypatch):

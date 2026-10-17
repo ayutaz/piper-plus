@@ -37,13 +37,13 @@
 | ファイル | 責務 |
 |---|---|
 | Create `huggingface-space/zero_shot.py` | 固定値、資産の取得と検証、話者ベクトル抽出、音素化、合成。gradio を import しない |
-| Create `huggingface-space/models/zs-v1/base.onnx.json` | zs-v1 config (6,417 B) をリポジトリに同梱。オフラインのテストと実行で使う |
+| Create `huggingface-space/zs-v1/base.onnx.json` | zs-v1 config (6,417 B) をリポジトリに同梱。オフラインのテストと実行で使う |
 | Create `huggingface-space/tests/test_zero_shot.py` | `zero_shot.py` の単体テスト (偽 CAM++ セッション使用、ネットワーク不要) と `integration` マークの実モデルテスト |
 | Create `huggingface-space/tests/test_app_zero_shot.py` | UI ハンドラのエラー変換と `create_interface()` 構築 |
 | Modify `huggingface-space/app.py` | `gr.Tabs` 化と zero-shot タブ、ハンドラ `synthesize_zero_shot_ui` |
 | Modify `huggingface-space/requirements.txt` | torch/torchaudio CPU wheel、soxr、huggingface_hub |
 | Modify `huggingface-space/README.md` | frontmatter `python_version`、zero-shot の説明、CAM++ と zs-v1 の帰属表示 |
-| Modify `huggingface-space/.gitignore` | `!models/zs-v1/base.onnx.json` は ignore 対象外 (onnx のみ ignore) を確認、`models/zs-v1/*.onnx` を ignore |
+| (変更なし) `.gitignore` | ONNX は HF キャッシュに置きリポジトリには入れないため不要。config はルート `.gitignore` の `models/` を避けて `huggingface-space/zs-v1/` に置く |
 | Modify `.github/workflows/deploy-huggingface.yml` | コピー対象・paths・import 検証の追加 |
 | Modify `.github/workflows/test-hf-space.yml` | 同上 + pytest 実行 layer + 実モデル smoke layer |
 | Modify `tests/scripts/test_check_python_licenses.py` | requirements の `--extra-index-url` 行を Requirement 解析から除外 |
@@ -55,7 +55,7 @@
 
 **Files:**
 - Create: `huggingface-space/zero_shot.py`
-- Create: `huggingface-space/models/zs-v1/base.onnx.json` (pinned revision から取得し SHA を照合して配置)
+- Create: `huggingface-space/zs-v1/base.onnx.json` (pinned revision から取得し SHA を照合して配置)
 - Test: `huggingface-space/tests/test_zero_shot.py`
 
 **Interfaces:**
@@ -70,7 +70,7 @@
 
 - [ ] **Step 1: config を同梱する**
 
-`https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/base.onnx.json` を `huggingface-space/models/zs-v1/base.onnx.json` に保存し、`sha256sum` が `d085681e…dafc0` であることを確認する。
+`https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/base.onnx.json` を `huggingface-space/zs-v1/base.onnx.json` に保存し、`sha256sum` が `d085681e…dafc0` であることを確認する。
 
 - [ ] **Step 2: 失敗するテストを書く** (`huggingface-space/tests/test_zero_shot.py`)
 
@@ -170,7 +170,7 @@ Expected: PASS。生成音声を `huggingface-space/tests/` 外 (scratchpad) に
 - [ ] **Step 7: Commit**
 
 ```bash
-git add huggingface-space/zero_shot.py huggingface-space/models/zs-v1/base.onnx.json huggingface-space/tests/test_zero_shot.py
+git add huggingface-space/zero_shot.py huggingface-space/zs-v1/base.onnx.json huggingface-space/tests/test_zero_shot.py
 git commit -m "feat(hf-space): zs-v1 の zero-shot 推論モジュールを追加 (#790)"
 ```
 
@@ -248,13 +248,13 @@ git commit -m "feat(hf-space): zero-shot タブを追加 (#790)"
 ### Task 3: 依存・README・デプロイ / CI
 
 **Files:**
-- Modify: `huggingface-space/requirements.txt`、`huggingface-space/README.md`、`huggingface-space/.gitignore`
+- Modify: `huggingface-space/requirements.txt`、`huggingface-space/README.md`
 - Modify: `.github/workflows/deploy-huggingface.yml`、`.github/workflows/test-hf-space.yml`
 - Modify: `tests/scripts/test_check_python_licenses.py:49-57`
 
 **Interfaces:**
 - Consumes: Task 1/2 のファイル一式
-- Produces: deploy bundle `hf-space-deploy/` に `zero_shot.py`、`models/zs-v1/base.onnx.json`、`piper_plus/` (`src/python_run/piper_plus` のコピー) が入ること
+- Produces: deploy bundle `hf-space-deploy/` に `zero_shot.py`、`zs-v1/base.onnx.json`、`piper_plus/` (`src/python_run/piper_plus` のコピー) が入ること
 
 - [ ] **Step 1: license テストを先に直す (失敗の確認)**
 
@@ -282,14 +282,14 @@ Expected (修正後): PASS
 Run: `python scripts/check_hf_space_frontmatter.py; python scripts/check_hf_space_gradio_sync.py`
 Expected: 両方 OK
 
-- [ ] **Step 3: `.gitignore`**
+- [ ] **Step 3: (不要) `.gitignore`**
 
-`models/zs-v1/*.onnx` を追加し、`git check-ignore huggingface-space/models/zs-v1/base.onnx.json` が何も返さないこと (= 追跡される) を確認。
+ONNX は `hf_hub_download` の HF キャッシュに保存されるため変更不要。`huggingface-space/zs-v1/base.onnx.json` が ignore されず追跡されていることだけ確認する。
 
 - [ ] **Step 4: `deploy-huggingface.yml`**
 
-- `on.push.paths` に `src/python_run/piper_plus/**` と `huggingface-space/models/zs-v1/**` は `huggingface-space/**` に含まれるので前者だけ追加。
-- Prepare: `cp huggingface-space/zero_shot.py`、`mkdir -p hf-space-deploy/models/zs-v1 && cp huggingface-space/models/zs-v1/base.onnx.json ...`、`cp -r src/python_run/piper_plus hf-space-deploy/` (`__pycache__` 除外)。`huggingface-space/tests/` はコピーしない。
+- `on.push.paths` に `src/python_run/piper_plus/**` と `huggingface-space/zs-v1/**` は `huggingface-space/**` に含まれるので前者だけ追加。
+- Prepare: `cp huggingface-space/zero_shot.py`、`cp -r huggingface-space/zs-v1 hf-space-deploy/`、`cp -r src/python_run/piper_plus hf-space-deploy/` (`__pycache__` 除外)。`huggingface-space/tests/` はコピーしない。
 - import 検証リストに `("zero_shot", "ZeroShotEngine")`、`("piper_plus.voice", "PiperVoice")`、`("piper_plus.phonemize.multilingual", "MultilingualPhonemizer")` を追加 (検証 step の `pip install` に `soxr huggingface_hub` を追加。torch は関数内 import なので不要)。
 
 - [ ] **Step 5: `test-hf-space.yml`**
@@ -307,7 +307,7 @@ deploy workflow の Prepare と同じコピーを scratchpad の一時ディレ�
 - [ ] **Step 7: Commit**
 
 ```bash
-git add huggingface-space/requirements.txt huggingface-space/README.md huggingface-space/.gitignore .github/workflows/deploy-huggingface.yml .github/workflows/test-hf-space.yml tests/scripts/test_check_python_licenses.py
+git add huggingface-space/requirements.txt huggingface-space/README.md .github/workflows/deploy-huggingface.yml .github/workflows/test-hf-space.yml tests/scripts/test_check_python_licenses.py
 git commit -m "ci(hf-space): zero-shot の依存とデプロイ・テスト経路を追加 (#790)"
 ```
 
