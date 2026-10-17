@@ -384,6 +384,8 @@ def cer_arguments(manifest_path, directory):
 def evaluate(spec, root, references):
     from .eval_cer import _evaluate_strict  # noqa: PLC0415
     from .eval_zs_secs import (  # noqa: PLC0415
+        acoustics_baseline_delta,
+        compare_with_baseline,
         compute_acoustics_blocks,
         compute_secs_report,
     )
@@ -486,6 +488,32 @@ def evaluate(spec, root, references):
         write_json(result_path, record)
         groups.append(record)
         gc.collect()
+    comparisons = []
+    for group in groups:
+        base = next(
+            item
+            for item in groups
+            if item["model"]
+            == (
+                spec["reference_comparison_model"]
+                if group["variant"] != "single-whole"
+                else "v10b-ep79"
+            )
+            and item["variant"] == "single-whole"
+            and item["backend"] == group["backend"]
+        )
+        comparisons.append(
+            {
+                "group": [group[k] for k in ("model", "variant", "backend")],
+                "baseline": [base[k] for k in ("model", "variant", "backend")],
+                "speaker": compare_with_baseline(group, base, secondary="ecapa-native"),
+                "acoustics": acoustics_baseline_delta(group, base),
+                "above_ceiling": {
+                    name: score["cross_exceeds_ceiling"]
+                    for name, score in group["encoders"].items()
+                },
+            }
+        )
     write_json(
         root / "baseline.json",
         {
@@ -493,6 +521,7 @@ def evaluate(spec, root, references):
             "spec": pin(root / "experiment.json"),
             "references": pin(root / "references.json"),
             "groups": groups,
+            "comparisons": comparisons,
             "source_revision": spec["source_revision"],
             "cpu_only": True,
             "comparison_policy": "same texts/reference/scales/seed for baselines; epoch/model deliberately differ; ONNX uses EMA; independent Torch/ORT RNG streams are not waveform-identical",
