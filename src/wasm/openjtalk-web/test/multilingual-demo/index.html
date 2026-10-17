@@ -217,6 +217,37 @@
             color: #555;
             font-size: 14px;
         }
+        .zero-shot {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #f0f0f0;
+        }
+        .notice {
+            background: #fff8e1;
+            border: 1px solid #ffe082;
+            border-radius: 6px;
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #5d4037;
+        }
+        .notice p {
+            margin: 0 0 8px;
+        }
+        .notice ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .reference-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .reference-controls input[type="file"] {
+            max-width: 100%;
+        }
     </style>
 </head>
 <body>
@@ -282,6 +313,50 @@
             </div>
 
         </div>
+
+        <section class="zero-shot" id="zeroShot">
+            <h2 id="zsTitle">Zero-shot (experimental)</h2>
+            <div class="notice">
+                <p id="zsIntro"></p>
+                <ul id="zsNotes"><li></li><li></li><li></li><li></li></ul>
+            </div>
+            <div id="zsStatus" class="status info"></div>
+            <div class="button-group">
+                <button id="zsLoadBtn">Load zero-shot model</button>
+            </div>
+            <div id="zsControls" style="display: none;">
+                <div class="voice-group">
+                    <label id="zsReferenceLabel">Reference audio (3-30 seconds)</label>
+                    <div class="reference-controls">
+                        <input type="file" id="zsFile" accept="audio/*">
+                        <button id="zsRecordBtn" class="secondary">Record</button>
+                    </div>
+                    <audio id="zsReferencePlayer" controls style="width: 100%; display: none;"></audio>
+                </div>
+                <div class="voice-group">
+                    <label for="zsLanguage" id="zsLanguageLabel">Language</label>
+                    <select id="zsLanguage">
+                        <option value="ja">ja</option>
+                        <option value="en">en</option>
+                        <option value="zh">zh</option>
+                        <option value="es">es</option>
+                        <option value="fr">fr</option>
+                        <option value="pt">pt</option>
+                    </select>
+                </div>
+                <div class="voice-group">
+                    <label for="zsText" id="zsTextLabel">Text</label>
+                    <textarea id="zsText"></textarea>
+                </div>
+                <div class="button-group">
+                    <button id="zsSynthesizeBtn" disabled>Synthesize</button>
+                </div>
+                <div class="voice-group" id="zsOutput" style="display: none;">
+                    <label id="zsOutputLabel">Audio:</label>
+                    <audio id="zsAudio" controls style="width: 100%;"></audio>
+                </div>
+            </div>
+        </section>
     </div>
 
     <script type="importmap">
@@ -293,7 +368,9 @@
     </script>
 
     <script type="module">
-        import { PiperPlus } from '../../src/index.js';
+        import { PiperPlus, SpeakerEncoder } from '../../src/index.js';
+
+        const ORT_URL = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/ort.min.js';
 
         let piper = null;
         let currentLanguage = 'ja';
@@ -330,6 +407,46 @@
                 synthesizing: '音声を合成中...',
                 done: '完了',
                 error: '初期化エラー',
+                zs: {
+                    title: 'ゼロショット (実験的)',
+                    intro: '参照音声の声で読み上げます。公開 zs-v1 base と CAM++ 話者エンコーダをブラウザ内で動かします。品質は承認前で、学習にない話者の声は一部しか再現されません。',
+                    notes: [
+                        '本人の同意がある声だけを使ってください。',
+                        '参照音声はブラウザの外に送信されません。',
+                        'モデルに学習されていない音素 (ポルトガル語の鼻母音「ã」、フランス語 nuit の「ɥ」など) や 6 言語以外の文字を含む文章は、黙って省かずにエラーにします。',
+                        '初回は約 70MB (base 40.8MB + CAM++ 28.3MB) をダウンロードします。',
+                    ],
+                    load: 'ゼロショットモデルを読み込む',
+                    reference: '参照音声 (3〜30 秒)',
+                    record: '録音',
+                    stopRecording: '録音停止',
+                    language: '言語',
+                    text: '読み上げる文章',
+                    synthesize: '音声合成',
+                    audio: '音声:',
+                    idle: 'ボタンを押すとモデルを読み込みます。',
+                    loadingEncoder: 'CAM++ 話者エンコーダをダウンロード中...',
+                    loadingBase: 'zs-v1 base を初期化中...',
+                    needReference: '参照音声をアップロードするか録音してください。',
+                    encoding: '参照音声から話者の特徴を計算中...',
+                    referenceReady: '参照音声を読み込みました。文章を入力して音声合成を押してください。',
+                    recording: '録音中... (最長 30 秒)',
+                    synthesizing: '音声を合成中...',
+                    done: '完了',
+                    errors: {
+                        hash: 'CAM++ 話者エンコーダのハッシュが一致しません。',
+                        noCrypto: 'このページでは SHA-256 検証が使えません (HTTPS で開いてください)。',
+                        tooShort: (s) => `参照音声は ${s} 秒以上必要です。`,
+                        silent: '参照音声が無音か、読み込めない形式です。',
+                        decode: '参照音声を読み込めませんでした',
+                        mic: 'マイクを使えません',
+                        empty: '文章を入力してください。',
+                        letters: (c) => `6 言語以外の文字が含まれています: ${c}`,
+                        phonemes: (c) => `ゼロショットモデルが学習していない音素が含まれています: ${c}`,
+                        load: 'ゼロショットモデルの読み込みに失敗しました',
+                        synth: '音声合成に失敗しました',
+                    },
+                },
             },
             'en': {
                 title: 'piper-plus',
@@ -361,6 +478,46 @@
                 synthesizing: 'Synthesizing...',
                 done: 'Done',
                 error: 'Initialization error',
+                zs: {
+                    title: 'Zero-shot (experimental)',
+                    intro: 'Speaks in the voice of a reference clip, running the public zs-v1 base and the CAM++ speaker encoder in your browser. Its quality is not approved, and an unseen speaker is reproduced only partially.',
+                    notes: [
+                        "Only use voices you have the speaker's consent to use.",
+                        'The reference clip never leaves your browser.',
+                        'Text whose phonemes the model never learned (for example the Portuguese nasal vowel "ã" or the French "ɥ" in "nuit"), or with letters outside the six languages, is rejected instead of being dropped.',
+                        'The first load downloads about 70 MB (base 40.8 MB + CAM++ 28.3 MB).',
+                    ],
+                    load: 'Load zero-shot model',
+                    reference: 'Reference audio (3-30 seconds)',
+                    record: 'Record',
+                    stopRecording: 'Stop recording',
+                    language: 'Language',
+                    text: 'Text to synthesize',
+                    synthesize: 'Synthesize',
+                    audio: 'Audio:',
+                    idle: 'Press the button to load the model.',
+                    loadingEncoder: 'Downloading the CAM++ speaker encoder...',
+                    loadingBase: 'Initializing the zs-v1 base...',
+                    needReference: 'Upload or record a reference clip.',
+                    encoding: 'Computing the speaker embedding from the reference...',
+                    referenceReady: 'Reference loaded. Enter text and press Synthesize.',
+                    recording: 'Recording... (up to 30 seconds)',
+                    synthesizing: 'Synthesizing...',
+                    done: 'Done',
+                    errors: {
+                        hash: 'The CAM++ speaker encoder failed its SHA-256 check.',
+                        noCrypto: 'SHA-256 verification is unavailable on this page (open it over HTTPS).',
+                        tooShort: (s) => `The reference must be at least ${s} seconds long.`,
+                        silent: 'The reference is silent or could not be decoded.',
+                        decode: 'Could not decode the reference audio',
+                        mic: 'Microphone unavailable',
+                        empty: 'Please enter text.',
+                        letters: (c) => `Text contains characters outside the six languages: ${c}`,
+                        phonemes: (c) => `Text contains phonemes the zero-shot model never learned: ${c}`,
+                        load: 'Loading the zero-shot model failed',
+                        synth: 'Synthesis failed',
+                    },
+                },
             }
         };
 
@@ -390,6 +547,22 @@
             document.documentElement.lang = browserLang === 'ja' ? 'ja' : 'en';
             document.getElementById('status').textContent = ui.initializing;
             document.getElementById('inputText').placeholder = ui.textInput;
+
+            const zs = ui.zs;
+            document.getElementById('zsTitle').textContent = zs.title;
+            document.getElementById('zsIntro').textContent = zs.intro;
+            document.querySelectorAll('#zsNotes li').forEach((li, i) => { li.textContent = zs.notes[i]; });
+            document.getElementById('zsLoadBtn').textContent = zs.load;
+            document.getElementById('zsReferenceLabel').textContent = zs.reference;
+            document.getElementById('zsRecordBtn').textContent = zs.record;
+            document.getElementById('zsLanguageLabel').textContent = zs.language;
+            document.querySelectorAll('#zsLanguage option').forEach(opt => {
+                opt.textContent = ui.langNames[opt.value];
+            });
+            document.getElementById('zsTextLabel').textContent = zs.text;
+            document.getElementById('zsSynthesizeBtn').textContent = zs.synthesize;
+            document.getElementById('zsOutputLabel').textContent = zs.audio;
+            document.getElementById('zsStatus').textContent = zs.idle;
         }
         applyUiStrings();
 
@@ -478,13 +651,20 @@
             });
         }
 
+        // Shared by the main demo and the zero-shot section.
+        let ortPromise = null;
+        function ensureOrt() {
+            ortPromise ??= loadScript(ORT_URL);
+            return ortPromise;
+        }
+
         // Initialize
         async function init() {
             try {
                 updateStatus(ui.loadingOrt);
 
                 // Load onnxruntime-web from CDN
-                await loadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/ort.min.js');
+                await ensureOrt();
 
                 updateStatus(ui.loadingModel);
 
@@ -653,6 +833,224 @@
             statusEl.className = `status ${type}`;
             statusEl.textContent = message;
         }
+
+        // ------------------------------------------------------------------
+        // Zero-shot: the public zs-v1 base conditioned on a reference clip.
+        // Mirrors the Hugging Face Space (zero_shot.py): CAM++ embedding via
+        // the Kaldi fbank front end, 0.1-30 s references, and text with
+        // untrained phonemes or other scripts rejected instead of dropped.
+        // ------------------------------------------------------------------
+        const ZS_REVISION = '3620ed788667cb76f08bd6cf2db8152c1f4c8bd1';
+        const ZS_ENCODER_URL =
+            `https://huggingface.co/ayousanz/piper-plus-base/resolve/${ZS_REVISION}/releases/zs-v1/campplus.onnx`;
+        const ZS_ENCODER_SHA256 = 'a6ac6a63997761ae2997373e2ee1c47040854b4b759ea41ec48e4e42df0f4d73';
+        const ZS_MIN_SECONDS = 0.1;
+        const ZS_MAX_SECONDS = 30;
+        const ZS_SILENCE_PEAK = 1e-4;
+        // CI-verified texts (scripts/public_base_runtime.py); every phoneme is
+        // in the zs-v1 map.
+        const ZS_SAMPLE_TEXTS = {
+            ja: 'こんにちは。今日は良い天気ですね。',
+            en: 'Hello, today is a beautiful day.',
+            zh: '你好，今天天气很好。',
+            es: 'Hola, hoy hace buen tiempo.',
+            fr: 'Bonjour, le soleil brille.',
+            pt: 'Olá, hoje está um belo dia.',
+        };
+        // Letters of other scripts never reach the model, so reject them.
+        const ZS_SUPPORTED_LETTER = /[\p{scx=Latin}\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}]/u;
+        // The zs-v1 map has almost no whitespace or punctuation; dropping
+        // those is harmless, unlike dropping a phoneme.
+        const ZS_IGNORABLE = /^[\s\p{P}]+$/u;
+
+        const zsEl = (id) => document.getElementById(id);
+        let zsPiper = null;
+        let zsEncoder = null;
+        let zsEmbedding = null;
+        let zsRecorder = null;
+
+        function zsStatus(message, type = 'info') {
+            const el = zsEl('zsStatus');
+            el.className = `status ${type}`;
+            el.textContent = message;
+        }
+
+        async function sha256Hex(buffer) {
+            if (!globalThis.crypto?.subtle) {
+                throw new Error(ui.zs.errors.noCrypto);
+            }
+            const digest = await crypto.subtle.digest('SHA-256', buffer);
+            return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function zsLoad() {
+            zsEl('zsLoadBtn').disabled = true;
+            try {
+                await ensureOrt();
+                zsStatus(ui.zs.loadingEncoder);
+                const response = await fetch(ZS_ENCODER_URL);
+                if (!response.ok) {
+                    throw new Error(`${response.status} ${response.statusText}`);
+                }
+                const encoderBytes = await response.arrayBuffer();
+                if ((await sha256Hex(encoderBytes)) !== ZS_ENCODER_SHA256) {
+                    throw new Error(ui.zs.errors.hash);
+                }
+                zsEncoder = await SpeakerEncoder.initialize({
+                    modelData: new Uint8Array(encoderBytes),
+                    ort: globalThis.ort,
+                    frontEnd: 'kaldi-fbank',
+                });
+                zsStatus(ui.zs.loadingBase);
+                zsPiper = await PiperPlus.initialize({
+                    model: 'base',
+                    ort: globalThis.ort,
+                    onProgress: ({ stage, progress, message }) => {
+                        zsStatus(`[${stage}] ${message} (${Math.round(progress * 100)}%)`);
+                    },
+                });
+                zsEl('zsLoadBtn').parentElement.style.display = 'none';
+                zsEl('zsControls').style.display = 'block';
+                zsEl('zsText').value = ZS_SAMPLE_TEXTS[zsEl('zsLanguage').value];
+                zsStatus(ui.zs.needReference);
+            } catch (error) {
+                console.error('Zero-shot load failed:', error);
+                zsStatus(`${ui.zs.errors.load}: ${error.message}`, 'error');
+                zsEl('zsLoadBtn').disabled = false;
+            }
+        }
+
+        // Decode a clip to mono at its own rate; SpeakerEncoder resamples.
+        async function zsDecode(blob) {
+            const context = new AudioContext();
+            try {
+                const buffer = await context.decodeAudioData(await blob.arrayBuffer());
+                const length = Math.min(buffer.length, Math.floor(ZS_MAX_SECONDS * buffer.sampleRate));
+                const mono = new Float32Array(length);
+                for (let c = 0; c < buffer.numberOfChannels; c++) {
+                    const data = buffer.getChannelData(c);
+                    for (let i = 0; i < length; i++) {
+                        mono[i] += data[i] / buffer.numberOfChannels;
+                    }
+                }
+                return { samples: mono, sampleRate: buffer.sampleRate };
+            } finally {
+                context.close();
+            }
+        }
+
+        async function zsSetReference(blob) {
+            zsEmbedding = null;
+            zsEl('zsSynthesizeBtn').disabled = true;
+            const player = zsEl('zsReferencePlayer');
+            player.src = URL.createObjectURL(blob);
+            player.style.display = 'block';
+            try {
+                zsStatus(ui.zs.encoding);
+                let decoded;
+                try {
+                    decoded = await zsDecode(blob);
+                } catch (error) {
+                    throw new Error(`${ui.zs.errors.decode}: ${error.message}`);
+                }
+                const { samples, sampleRate } = decoded;
+                if (samples.length < ZS_MIN_SECONDS * sampleRate) {
+                    throw new Error(ui.zs.errors.tooShort(ZS_MIN_SECONDS));
+                }
+                let peak = 0;
+                for (const v of samples) {
+                    peak = Math.max(peak, Math.abs(v));
+                }
+                if (!Number.isFinite(peak) || peak < ZS_SILENCE_PEAK) {
+                    throw new Error(ui.zs.errors.silent);
+                }
+                zsEmbedding = await zsEncoder.encode(samples, sampleRate);
+                zsEl('zsSynthesizeBtn').disabled = false;
+                zsStatus(ui.zs.referenceReady, 'success');
+            } catch (error) {
+                console.error('Reference failed:', error);
+                zsStatus(error.message, 'error');
+            }
+        }
+
+        async function zsToggleRecording() {
+            const button = zsEl('zsRecordBtn');
+            if (zsRecorder) {
+                zsRecorder.stop();
+                return;
+            }
+            let stream;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch (error) {
+                zsStatus(`${ui.zs.errors.mic}: ${error.message}`, 'error');
+                return;
+            }
+            const chunks = [];
+            const recorder = new MediaRecorder(stream);
+            const timer = setTimeout(() => recorder.stop(), ZS_MAX_SECONDS * 1000);
+            recorder.ondataavailable = (event) => chunks.push(event.data);
+            recorder.onstop = () => {
+                clearTimeout(timer);
+                stream.getTracks().forEach(track => track.stop());
+                zsRecorder = null;
+                button.textContent = ui.zs.record;
+                zsSetReference(new Blob(chunks, { type: recorder.mimeType }));
+            };
+            zsRecorder = recorder;
+            recorder.start();
+            button.textContent = ui.zs.stopRecording;
+            zsStatus(ui.zs.recording);
+        }
+
+        async function zsSynthesize() {
+            const text = zsEl('zsText').value.trim();
+            const language = zsEl('zsLanguage').value;
+            if (!text) {
+                zsStatus(ui.zs.errors.empty, 'error');
+                return;
+            }
+            const letters = [...new Set(
+                [...text].filter(c => /\p{L}/u.test(c) && !ZS_SUPPORTED_LETTER.test(c))
+            )];
+            if (letters.length > 0) {
+                zsStatus(ui.zs.errors.letters(letters.join(' ')), 'error');
+                return;
+            }
+            const button = zsEl('zsSynthesizeBtn');
+            button.disabled = true;
+            try {
+                const dropped = (await zsPiper.findDroppedSymbols(text, { language }))
+                    .filter(symbol => !ZS_IGNORABLE.test(symbol));
+                if (dropped.length > 0) {
+                    zsStatus(ui.zs.errors.phonemes(dropped.join(' ')), 'error');
+                    return;
+                }
+                zsStatus(ui.zs.synthesizing);
+                const audio = await zsPiper.synthesize(text, { language, speakerEmbedding: zsEmbedding });
+                zsEl('zsAudio').src = URL.createObjectURL(audio.toBlob());
+                zsEl('zsOutput').style.display = 'block';
+                zsStatus(ui.zs.done, 'success');
+            } catch (error) {
+                console.error('Zero-shot synthesis failed:', error);
+                zsStatus(`${ui.zs.errors.synth}: ${error.message}`, 'error');
+            } finally {
+                button.disabled = zsEmbedding === null;
+            }
+        }
+
+        zsEl('zsLoadBtn').addEventListener('click', zsLoad);
+        zsEl('zsRecordBtn').addEventListener('click', zsToggleRecording);
+        zsEl('zsFile').addEventListener('change', (event) => {
+            const [file] = event.target.files;
+            if (file) {
+                zsSetReference(file);
+            }
+        });
+        zsEl('zsLanguage').addEventListener('change', (event) => {
+            zsEl('zsText').value = ZS_SAMPLE_TEXTS[event.target.value];
+        });
+        zsEl('zsSynthesizeBtn').addEventListener('click', zsSynthesize);
 
         // Initialize on load
         init();

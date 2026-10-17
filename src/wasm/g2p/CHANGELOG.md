@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `encode()` and `encodeWithProsody()` return `droppedSymbols`: the tokens that had no entry in the phoneme ID map and were skipped, each listed once in first-seen order.
+
 ## [0.4.2] - 2026-08-28
 
 ### Fixed
