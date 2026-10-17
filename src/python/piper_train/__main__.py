@@ -1984,47 +1984,29 @@ def main():
         _LOGGER.debug(
             "Loading weights from checkpoint: %s", args.resume_from_checkpoint
         )
-        try:
-            # まずは通常のResumeを試みる
-            trainer.fit(model, ckpt_path=args.resume_from_checkpoint)
-        except (RuntimeError, KeyError, NotImplementedError, UnpicklingError) as e:
-            # RuntimeError (size mismatchなど) や KeyError (optimizer stateなし) が発生した場合
-            _LOGGER.warning("Graceful resume failed with error: %s", e)
-            _LOGGER.info("Attempting to load weights only (strict=False)...")
-
-            # モデルの重みだけをロードする (不一致は許容)
-            # Trusted checkpoints only (weights_only=False). checkpoint_io maps
-            # the PosixPath / WindowsPath in hparams to pathlib.Path: a ckpt
-            # saved on the other OS cannot be unpickled by a plain torch.load.
-            checkpoint = load_checkpoint(args.resume_from_checkpoint, mmap=False)
-            normalized_sd, _ = normalize_checkpoint_state_dict(
-                checkpoint["state_dict"],
-                model.state_dict(),
-                checkpoint_path=args.resume_from_checkpoint,
-            )
-            model.load_state_dict(normalized_sd, strict=False)
-            model._reset_training_progress()
-
-            _LOGGER.warning(
-                "Weights were loaded with strict=False, but optimizer state and "
-                "epoch counter are NOT restored: training restarts from epoch 0. "
-                "If this checkpoint was meant to continue a run, stop here and "
-                "investigate the error above instead of letting it retrain."
-            )
-
-            # argsからresume_from_checkpointを削除
-            args_dict = vars(args)
-            if "resume_from_checkpoint" in args_dict:
-                del args_dict["resume_from_checkpoint"]
-
-            # 新しいTrainerインスタンスを作成（ckpt_pathをクリアするため）
-            trainer = _build_trainer(args, loggers, num_gpus, num_speakers)
-
-            # 新しいTrainerで学習を開始
-            trainer.fit(model)
+        run_strict_resume(trainer, model, args.resume_from_checkpoint)
     else:
         # チェックポイントが指定されていない場合は、通常通り学習を開始
         trainer.fit(model)
+
+
+def run_strict_resume(trainer, model, ckpt_path: str) -> None:
+    """strict resume で学習を再開する。失敗時に weights-only へ黙って切り替えない。
+
+    以前は RuntimeError 等で strict=False の weights-only 読込 + epoch 0 再開へ
+    フォールバックしていたが、継続のつもりが再学習になる事故の元だった。
+    weights-only で始めたい場合は ``--resume-weights-only`` を明示する。
+    """
+    try:
+        trainer.fit(model, ckpt_path=ckpt_path)
+    except (RuntimeError, KeyError, NotImplementedError, UnpicklingError) as e:
+        msg = (
+            f"strict resume に失敗しました ({type(e).__name__}: {e})。"
+            "weights-only へは自動で切り替えません。checkpoint と設定の不一致を"
+            "調べてください。weights のみで epoch 0 から始める場合は "
+            "--resume-weights-only を明示してください。"
+        )
+        raise SystemExit(msg) from e
 
 
 def load_state_dict(model, saved_state_dict):
