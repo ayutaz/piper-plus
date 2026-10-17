@@ -3,7 +3,12 @@
 from types import SimpleNamespace
 
 import pytest
-import torch
+
+
+torch = pytest.importorskip(
+    "torch",
+    reason="Strict training preflight needs the train extra; lightweight Windows CI omits it.",
+)
 
 
 def test_strict_recipe_requires_existing_differentiable_encoder(tmp_path):
