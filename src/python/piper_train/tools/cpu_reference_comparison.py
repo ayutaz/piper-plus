@@ -175,6 +175,84 @@ def pairwise_separability(vectors, labels, *, standardize=False):
     }
 
 
+def lda_speaker_probe(
+    features_a,
+    features_b,
+    labels,
+    *,
+    seeds=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
+    n_train=12,
+    min_mean_diff=0.005,
+    min_wins=7,
+):
+    """Supervised linear probe: does feature set B separate unseen speakers better?
+
+    Per seed, ``default_rng(seed).permutation`` of the sorted speaker IDs gives
+    ``n_train`` train speakers and the rest as test speakers. Each feature set
+    is standardized with train-utterance mean/std, an LDA (eigen, shrinkage
+    auto) is fit on train speakers, and test utterances are scored by cosine
+    verification AUC (``pairwise_separability``). Pre-registered verdict: B
+    passes iff mean(AUC_B - AUC_A) >= ``min_mean_diff`` and AUC_B > AUC_A in at
+    least ``min_wins`` splits. A split whose LDA raises is recorded and counts
+    as AUC_B <= AUC_A with diff 0 (never silently skipped).
+    """
+    from sklearn.discriminant_analysis import (  # noqa: PLC0415
+        LinearDiscriminantAnalysis,
+    )
+
+    sets = {
+        "A": np.asarray(features_a, dtype=np.float64),
+        "B": np.asarray(features_b, dtype=np.float64),
+    }
+    names = np.asarray(list(labels), dtype=object)
+    if any(v.ndim != 2 or len(v) != len(names) for v in sets.values()):
+        raise ValueError("features must be [N, D] with one label per row")
+    speakers = sorted(set(names.tolist()))
+    if len(speakers) <= n_train:
+        raise ValueError("need more speakers than n_train")
+    splits = []
+    for seed in seeds:
+        order = np.random.default_rng(seed).permutation(speakers).tolist()
+        train, test = sorted(order[:n_train]), sorted(order[n_train:])
+        train_mask = np.isin(names, train)
+        test_mask = np.isin(names, test)
+        split = {
+            "seed": int(seed),
+            "train_speakers": train,
+            "test_speakers": test,
+            "auc": {},
+            "error": None,
+        }
+        try:
+            for key, values in sets.items():
+                mean = values[train_mask].mean(axis=0)
+                std = values[train_mask].std(axis=0)
+                scaled = (values - mean) / np.where(std > 0, std, 1.0)
+                lda = LinearDiscriminantAnalysis(solver="eigen", shrinkage="auto")
+                lda.fit(scaled[train_mask], names[train_mask].tolist())
+                projected = lda.transform(scaled[test_mask])
+                split["auc"][key] = pairwise_separability(
+                    projected, names[test_mask].tolist()
+                )["auc"]
+            split["diff"] = split["auc"]["B"] - split["auc"]["A"]
+            split["b_wins"] = split["diff"] > 0
+        except Exception as exc:  # noqa: BLE001 — recorded, counted against B
+            split["error"] = f"{type(exc).__name__}: {exc}"
+            split["diff"] = 0.0
+            split["b_wins"] = False
+        splits.append(split)
+    mean_diff = float(np.mean([s["diff"] for s in splits]))
+    wins = sum(s["b_wins"] for s in splits)
+    return {
+        "splits": splits,
+        "mean_diff": mean_diff,
+        "wins": wins,
+        "n_splits": len(splits),
+        "passes": bool(mean_diff >= min_mean_diff and wins >= min_wins),
+        "rule": f"mean(AUC_B-AUC_A) >= {min_mean_diff} and AUC_B > AUC_A in >= {min_wins} splits",
+    }
+
+
 def load_native_ecapa(source):
     """Load trusted pinned SpeechBrain config/weights, exclusively for evaluation.
 
