@@ -10,6 +10,9 @@ on:
     paths:
       - 'huggingface-space/**'
       - 'src/python/g2p/**'
+      - 'src/python_run/piper_plus/**'
+      - 'scripts/public_base_runtime.py'
+      - 'tests/scripts/test_check_python_licenses.py'
       - 'src/python/piper_train/infer_onnx.py'
       - 'src/python/piper_train/ort_utils.py'
       - 'src/python/piper_train/vits/utils.py'
@@ -27,6 +30,9 @@ on:
     paths:
       - 'huggingface-space/**'
       - 'src/python/g2p/**'
+      - 'src/python_run/piper_plus/**'
+      - 'scripts/public_base_runtime.py'
+      - 'tests/scripts/test_check_python_licenses.py'
       - 'src/python/piper_train/infer_onnx.py'
       - 'src/python/piper_train/ort_utils.py'
       - 'scripts/check_hf_space_frontmatter.py'
@@ -80,6 +86,9 @@ jobs:
           cp huggingface-space/app_imports.py hf-space-deploy/
           cp huggingface-space/download_models.py hf-space-deploy/
           cp huggingface-space/requirements.txt hf-space-deploy/
+          cp huggingface-space/zero_shot.py hf-space-deploy/
+          cp -r huggingface-space/zs-v1 hf-space-deploy/
+          cp -r src/python_run/piper_plus hf-space-deploy/
 
           # Copy piper_train module (same as deploy-huggingface.yml)
           mkdir -p hf-space-deploy/piper_train/vits
@@ -252,6 +261,25 @@ jobs:
           assert iface is not None, 'create_interface() returned None'
           print('OK app.py imports + create_interface() runs cleanly')
           "
+
+      - name: "Layer 6: Zero-shot unit tests (fake CAM++, no network)"
+        # The tests import the Space modules and repository sources via
+        # huggingface-space/tests/conftest.py. -c /dev/null skips the repo
+        # pytest.ini (its addopts require pytest-cov). Running from
+        # hf-space-deploy keeps download_models() writing into the bundle.
+        working-directory: hf-space-deploy
+        run: |
+          pip install pytest
+          python -m pytest ../huggingface-space/tests -m "not integration" -q -p no:cacheprovider -c /dev/null --rootdir ../huggingface-space
+
+      - name: "Layer 7: Zero-shot real-model smoke (pinned zs-v1 download)"
+        # Downloads the revision-pinned base.onnx / campplus.onnx and checks
+        # that the reference embedding conditions the output. Functional
+        # check only, not a quality judgement.
+        working-directory: hf-space-deploy
+        timeout-minutes: 15
+        run: |
+          python -m pytest ../huggingface-space/tests -m integration -q -p no:cacheprovider -c /dev/null --rootdir ../huggingface-space
 
       - name: Summary
         if: always()

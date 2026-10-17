@@ -6,6 +6,7 @@ colorTo: purple
 sdk: gradio
 sdk_version: 6.26.0
 app_file: app.py
+python_version: "3.13"
 pinned: false
 license: mit
 ---
@@ -25,6 +26,7 @@ A web-based demo for [piper-plus](https://github.com/ayutaz/piper-plus), featuri
 - 🚀 **Fast Inference**: ONNX Runtime for efficient CPU-based inference
 - 🎛️ **Adjustable Parameters**: Control speech speed, expressiveness, and phoneme duration
 - 🌐 **Web Interface**: Easy-to-use Gradio interface
+- 🧪 **Zero-shot (experimental)**: Speak in the voice of an uploaded or recorded reference clip
 
 ## Supported Languages
 
@@ -44,6 +46,19 @@ A web-based demo for [piper-plus](https://github.com/ayutaz/piper-plus), featuri
 This demo uses a multilingual model trained on 6 languages with 571 speakers and 508,187 utterances:
 
 - **Multilingual 6-lang (Medium)**: Supports Japanese, English, Chinese, Spanish, French, and Portuguese with a unified 173-symbol model
+
+## Zero-shot (experimental)
+
+The **Zero-shot (experimental)** tab synthesizes speech in the voice of a reference clip.
+
+1. Choose the language and enter text.
+2. Upload a reference clip or record one with the microphone (3-30 seconds; longer clips are cut to the first 30 seconds).
+3. Click "Generate Speech".
+
+- **Model**: the public [zs-v1 base](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) (revision-pinned, SHA256-verified, downloaded on first use) with the CAM++ speaker encoder (192-dim embedding).
+- **Quality**: experimental and not approved; an unseen speaker is reproduced only partially.
+- **Phonemes**: zs-v1 uses the older 173-symbol table. Text containing phonemes the model never learned (for example the Portuguese nasal vowel "ã" in "não" or the French "ɥ" in "nuit"), or letters outside the six languages (for example Hangul or Cyrillic), is rejected with an error instead of being silently dropped. Selecting a language loads a sample text that the model can speak.
+- **Privacy and consent**: the reference clip is used only for the request and is not stored. Only use voices you have the speaker's consent to use.
 
 ## Usage
 
@@ -112,6 +127,8 @@ real fixture was found or a dummy fallback was created before evaluating audio.
 - Piper TTS by [Rhasspy](https://github.com/rhasspy/piper)
 - Multilingual (6-language) enhancements by [ayutaz](https://github.com/ayutaz/piper-plus)
 - Chinese phonemization: [pypinyin](https://github.com/mozillazg/python-pinyin) (MIT)
+- Zero-shot base: [zs-v1](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) (MIT); see its [NOTICE](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/NOTICE.md)
+- Speaker encoder: CAM++ ([Apache-2.0](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/licenses/CAMPP-APACHE-2.0.txt))
 - English G2P source: [g2p-en](https://github.com/Kyubyong/g2p) 2.1.0, bundled under a private namespace with Apache-2.0 and Tacotron MIT notices
 
 ## License
@@ -119,4 +136,4 @@ real fixture was found or a dummy fallback was created before evaluating audio.
 This project is licensed under the MIT License. See the original [Piper repository](https://github.com/rhasspy/piper) for more details.
 
 ---
-_Last updated: 2026-10-15 - 6-language multilingual support (ja/en/zh/es/fr/pt)_
+_Last updated: 2026-10-17 - Experimental zero-shot tab (zs-v1)_

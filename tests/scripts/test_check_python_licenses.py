@@ -50,10 +50,12 @@ def test_no_supported_extra_or_space_restores_old_english_dependency():
         "src/python_run/requirements.txt",
         "huggingface-space/requirements.txt",
     ):
+        # Lines starting with "-" are pip options (e.g. --extra-index-url).
         declarations.extend(
             line.split("#", 1)[0].strip()
             for line in (root / relative).read_text(encoding="utf-8").splitlines()
             if line.split("#", 1)[0].strip()
+            and not line.lstrip().startswith("-")
         )
     for declaration in declarations:
         assert (
