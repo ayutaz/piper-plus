@@ -180,6 +180,7 @@ def classify_role(rel_posix: str) -> str | None:
     if rel_posix in (
         "src/python/piper_train/__main__.py",
         "src/python/piper_train/inference_eval.py",
+        "src/python/piper_train/zero_shot_requirements.py",
     ):
         return "train"
     if rel_posix.startswith("src/python/piper_train/vits/") and rel_posix.endswith(

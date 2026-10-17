@@ -15,6 +15,7 @@ from torch.utils.data import DataLoader, Dataset, random_split
 from piper_plus.embedding import validate_embedding
 
 from ..inference_eval import isolated_inference
+from ..zero_shot_requirements import validate_recipe, validate_training_batch
 from .commons import (
     migrate_prefilm_decoder_cond,
     migrate_prefilm_optimizer_states,
@@ -286,6 +287,7 @@ class VitsModel(pl.LightningModule):
         # SupCon 形式。same-utt 一致の Goodhart 経路を遮断し話者転写に直接の
         # 勾配を与える。samples_per_speaker > 1 が前提)
         spk_loss_positives: str = "same_utt",
+        strict_zero_shot: bool = False,
         # B-3 (v10 roadmap): SCL 専用に posterior z を detach した decoder
         # forward を追加 (opt-in)。SCL 勾配を g (spk_proj) + decoder のみに
         # 制限し、「decoder が GT 由来の z から音色を読む」posterior leak を
@@ -503,6 +505,15 @@ class VitsModel(pl.LightningModule):
             )
 
         self.save_hyperparameters()
+
+        if strict_zero_shot:
+            validate_recipe(
+                use_zero_shot=use_zero_shot,
+                c_spk=c_spk,
+                spk_loss_type=spk_loss_type,
+                spk_loss_positives=spk_loss_positives,
+                speaker_encoder_torch_path=speaker_encoder_torch_path,
+            )
 
         # Set up models
         self.model_g = SynthesizerTrn(
@@ -1647,6 +1658,12 @@ class VitsModel(pl.LightningModule):
             )
 
     def training_step(self, batch: Batch, batch_idx: int):
+        if getattr(self.hparams, "strict_zero_shot", False):
+            checked = validate_training_batch(
+                batch, gather=getattr(self.hparams, "spk_loss_gather", False)
+            )
+            for key, value in checked.items():
+                self._log_with_batch_info(f"strict_scl_{key}", value, batch)
         # Count every received training batch, including non-finite/LF skips.
         # Keep this index unchanged across both optimizer steps in this batch.
         self._training_batch_index = self.training_batches_seen
