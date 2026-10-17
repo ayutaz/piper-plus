@@ -18,7 +18,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from ..reference_frontend import masked_time_mean_fp32
+from ..reference_frontend import in_graph_capture, masked_time_mean_fp32
 
 
 # 線形振幅の log 圧縮の下限 (``log(clamp(x, 1e-5))``、HiFi-GAN 系の慣例)
@@ -131,13 +131,6 @@ class ReferenceSpecEncoder(nn.Module):
     def _validate(self, spec: torch.Tensor, spec_lengths: torch.Tensor) -> None:
         if not torch.is_floating_point(spec):
             raise TypeError(f"spec must be a floating tensor, got {spec.dtype}")
-        if spec.dim() != 3:
-            raise ValueError(f"spec must be 3-D [B, F, T], got {tuple(spec.shape)}")
-        if spec.shape[1] != self.spec_channels:
-            raise ValueError(
-                f"spec has {spec.shape[1]} channels, expected {self.spec_channels} "
-                "(filter_length // 2 + 1 linear-magnitude bins)"
-            )
         if (
             not isinstance(spec_lengths, torch.Tensor)
             or spec_lengths.dtype != torch.long
@@ -146,30 +139,53 @@ class ReferenceSpecEncoder(nn.Module):
                 "spec_lengths must be an int64 tensor, got "
                 f"{getattr(spec_lengths, 'dtype', type(spec_lengths))}"
             )
+        if in_graph_capture():
+            # 以下は形状・値に依存する検査。graph 取得中に走らせると trace 時の
+            # 入力で分岐が定数として焼き込まれるため省略する (eager では必ず検査)
+            return
+        if spec.dim() != 3:
+            raise ValueError(f"spec must be 3-D [B, F, T], got {tuple(spec.shape)}")
+        if spec.shape[1] != self.spec_channels:
+            raise ValueError(
+                f"spec has {spec.shape[1]} channels, expected {self.spec_channels} "
+                "(filter_length // 2 + 1 linear-magnitude bins)"
+            )
         if spec_lengths.dim() != 1 or spec_lengths.shape[0] != spec.shape[0]:
             raise ValueError(
                 f"spec_lengths must be 1-D [B={spec.shape[0]}], got "
                 f"{tuple(spec_lengths.shape)}"
             )
-        if bool((spec_lengths <= 0).any()):
+        lengths = spec_lengths.to(spec.device)
+        # 4 つの判定を 1 つの tensor にまとめ、host 同期を 1 回にする
+        too_short, too_long, non_finite, negative = torch.stack(
+            [
+                (lengths <= 0).any(),
+                (lengths > spec.shape[-1]).any(),
+                ~torch.isfinite(spec).all(),
+                (spec < 0).any(),
+            ]
+        ).tolist()
+        if too_short:
             raise ValueError(
                 f"reference length must be >= 1, got {spec_lengths.tolist()}"
             )
-        if bool((spec_lengths > spec.shape[-1]).any()):
+        if too_long:
             raise ValueError(
                 f"reference length exceeds spec frames ({spec.shape[-1]}): "
                 f"{spec_lengths.tolist()}"
             )
-        if not bool(torch.isfinite(spec).all()):
+        if non_finite:
             raise ValueError("spec must be finite (NaN/Inf found)")
-        if bool((spec < 0).any()):
+        if negative:
             raise ValueError(
                 "spec must be a non-negative linear magnitude spectrogram "
                 "(negative values found; was a log spectrogram passed?)"
             )
 
-    def forward(self, spec: torch.Tensor, spec_lengths: torch.Tensor) -> torch.Tensor:
-        """``spec [B, F, T]`` (線形振幅) と ``spec_lengths [B]`` → ``[B, gin, 1]``。"""
+    def pooled_features(
+        self, spec: torch.Tensor, spec_lengths: torch.Tensor
+    ) -> torch.Tensor:
+        """出力層の直前、fp32 で時間平均した特徴 ``[B, hidden]`` (float32)。"""
         self._validate(spec, spec_lengths)
         param_dtype = self.out.weight.dtype
         t = spec.shape[-1]
@@ -186,8 +202,13 @@ class ReferenceSpecEncoder(nn.Module):
         for block in self.temporal:
             x = block(x, mask_x)
         x = self.attention(x, mask_x)
-        pooled = masked_time_mean_fp32(x, mask)  # [B, H] fp32
-        return self.out(pooled.to(param_dtype)).unsqueeze(-1)
+        # 長さ >= 1 は _validate で検査済み (host 同期を増やさない)
+        return masked_time_mean_fp32(x, mask, check=False)  # [B, H] fp32
+
+    def forward(self, spec: torch.Tensor, spec_lengths: torch.Tensor) -> torch.Tensor:
+        """``spec [B, F, T]`` (線形振幅) と ``spec_lengths [B]`` → ``[B, gin, 1]``。"""
+        pooled = self.pooled_features(spec, spec_lengths)
+        return self.out(pooled.to(self.out.weight.dtype)).unsqueeze(-1)
 
 
 def reference_spec_encoder_param_count(
@@ -238,6 +259,6 @@ class CapacityControl(nn.Module):
             raise ValueError(f"embedding must be 2-D [B, D], got {tuple(e.shape)}")
         if e.shape[1] != self.in_dim:
             raise ValueError(f"embedding dim must be {self.in_dim}, got {e.shape[1]}")
-        if not bool(torch.isfinite(e).all()):
+        if not in_graph_capture() and not bool(torch.isfinite(e).all()):
             raise ValueError("embedding must be finite (NaN/Inf found)")
         return self.out(self.act(self.inp(e))).unsqueeze(-1)

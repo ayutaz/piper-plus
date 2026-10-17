@@ -20,7 +20,7 @@ from .vits.commons import (
 from .vits.ema import EMA_SCOPES, EXTENDED_EMA_MODULES, EMACallback
 from .vits.lightning import VitsModel
 from .vits.mb_istft import PQMF, PQMF_DESIGN
-from .vits.models import MRD_HIRES_RESOLUTIONS
+from .vits.models import MRD_HIRES_RESOLUTIONS, REFERENCE_CONDITIONING_MODES
 
 
 # NOTE: the pathlib safe-globals registration and the Windows PosixPath
@@ -863,7 +863,7 @@ def create_parser():
     )
     parser.add_argument(
         "--reference-conditioning",
-        choices=("none", "ref_spec", "capacity"),
+        choices=REFERENCE_CONDITIONING_MODES,
         default="none",
         help="Reference conditioning (reference-fusion plan §8.2): 'ref_spec' "
         "adds a small trainable encoder over the reference utterance's linear "
