@@ -465,8 +465,16 @@ export interface ModelManagerOptions {
 
 /** Options for SpeakerEncoder.initialize(). */
 export interface SpeakerEncoderOptions {
-  /** URL to the speaker encoder ONNX model. */
-  modelUrl: string;
+  /** URL to the speaker encoder ONNX model. Required unless modelData is given. */
+  modelUrl?: string;
+  /** Model bytes, used instead of modelUrl (e.g. after verifying a download's hash). */
+  modelData?: ArrayBuffer | Uint8Array;
+  /**
+   * Feature front end (default "mel", shared with the Rust/Go/C# runtimes).
+   * "kaldi-fbank" reproduces the public zs-v1 base's CAM++ recipe (kaiser_best
+   * resample, Kaldi fbank, mean subtraction) and L2-normalizes the embedding.
+   */
+  frontEnd?: "mel" | "kaldi-fbank";
   /** onnxruntime-web instance (defaults to globalThis.ort). */
   ort?: any;
 }

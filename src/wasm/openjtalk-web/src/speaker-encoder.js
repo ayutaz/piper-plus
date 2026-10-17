@@ -11,7 +11,13 @@
  *   fmin=20, fmax=7600. Layout is frame-major (CAM++ expects [batch, T, 80]).
  *   Per-band CMVN (mean subtraction) is applied after log-mel.
  *
- * Mirrors:
+ * `frontEnd: "kaldi-fbank"` instead reproduces the recipe the public zs-v1
+ * base was verified with (scripts/public_base_runtime.py): kaiser_best
+ * resample -> torchaudio Kaldi fbank -> mean subtraction -> CAM++ -> L2
+ * normalization (see ./kaldi-fbank.js). The default front end does not match
+ * that recipe, so use this option for the zs-v1 base.
+ *
+ * Mirrors (default front end):
  *   - Python: src/python/piper_train/speaker_encoder/audio_utils.py
  *   - Rust:   src/rust/piper-core/src/speaker_encoder.rs
  *   - Go:     src/go/piperplus/speaker_encoder.go
@@ -20,6 +26,8 @@
  * @module speaker-encoder
  */
 
+import { kaldiFbank, resampleKaiserBest } from "./kaldi-fbank.js";
+
 const MEL_SAMPLE_RATE = 16000;
 const MEL_N_FFT = 400; // Kaldi frame_length=25ms at 16kHz = 400 samples
 const MEL_HOP_LENGTH = 160;
@@ -27,18 +35,26 @@ const MEL_N_MELS = 80;
 const MEL_FMIN = 20;
 const MEL_FMAX = 7600;
 
+const FRONT_ENDS = new Set(["mel", "kaldi-fbank"]);
+
 export class SpeakerEncoder {
   /** @private */
   constructor() {
     this._session = null;
     this._ort = null;
+    this._frontEnd = "mel";
   }
 
   /**
    * Initialize the speaker encoder with an ONNX model.
    *
    * @param {Object} options
-   * @param {string} options.modelUrl - URL to the speaker encoder ONNX model.
+   * @param {string} [options.modelUrl] - URL to the speaker encoder ONNX model.
+   * @param {ArrayBuffer|Uint8Array} [options.modelData] - Model bytes, used
+   *   instead of modelUrl (e.g. after verifying a download's hash).
+   * @param {"mel"|"kaldi-fbank"} [options.frontEnd="mel"] - Feature front
+   *   end. "kaldi-fbank" matches the public zs-v1 base's CAM++ recipe and
+   *   returns L2-normalized embeddings.
    * @param {Object} [options.ort] - onnxruntime-web instance (defaults to globalThis.ort).
    * @returns {Promise<SpeakerEncoder>}
    */
@@ -50,11 +66,18 @@ export class SpeakerEncoder {
     }
     instance._ort = ort;
 
-    if (!options.modelUrl) {
-      throw new Error("options.modelUrl is required for SpeakerEncoder");
+    const frontEnd = options.frontEnd ?? "mel";
+    if (!FRONT_ENDS.has(frontEnd)) {
+      throw new Error(`options.frontEnd must be "mel" or "kaldi-fbank", got ${frontEnd}`);
+    }
+    instance._frontEnd = frontEnd;
+
+    const model = options.modelData ?? options.modelUrl;
+    if (!model) {
+      throw new Error("options.modelUrl or options.modelData is required for SpeakerEncoder");
     }
 
-    instance._session = await ort.InferenceSession.create(options.modelUrl, {
+    instance._session = await ort.InferenceSession.create(model, {
       executionProviders: ["wasm"],
       graphOptimizationLevel: "all",
     });
@@ -94,12 +117,17 @@ export class SpeakerEncoder {
       throw new Error("Audio samples cannot be empty");
     }
 
+    const kaldi = this._frontEnd === "kaldi-fbank";
     // Resample to 16kHz if needed
-    const resampled =
-      rate !== MEL_SAMPLE_RATE ? resampleLinear(samples, rate, MEL_SAMPLE_RATE) : samples;
+    let resampled = samples;
+    if (rate !== MEL_SAMPLE_RATE) {
+      resampled = kaldi
+        ? resampleKaiserBest(samples, rate, MEL_SAMPLE_RATE)
+        : resampleLinear(samples, rate, MEL_SAMPLE_RATE);
+    }
 
-    // Compute mel spectrogram (frame-major layout: [n_frames * n_mels])
-    const mel = computeMelSpectrogram(resampled);
+    // Compute features (frame-major layout: [n_frames * n_mels])
+    const mel = kaldi ? subtractBandMeans(kaldiFbank(resampled)) : computeMelSpectrogram(resampled);
     const nFrames = mel.length / MEL_N_MELS;
 
     if (nFrames === 0) {
@@ -112,13 +140,13 @@ export class SpeakerEncoder {
     const melTensor = new ort.Tensor("float32", mel, [1, nFrames, MEL_N_MELS]);
 
     // Read first input/output name dynamically (CAM++ uses "feats", not "input")
-    const inputName =
-      (this._session.inputNames && this._session.inputNames[0]) || "feats";
+    const inputName = (this._session.inputNames && this._session.inputNames[0]) || "feats";
 
     const results = await this._session.run({ [inputName]: melTensor });
     const outputTensor = results.output || results[Object.keys(results)[0]];
+    const embedding = new Float32Array(outputTensor.data);
 
-    return new Float32Array(outputTensor.data);
+    return kaldi ? l2Normalize(embedding) : embedding;
   }
 
   /**
@@ -138,6 +166,34 @@ export class SpeakerEncoder {
 // ---------------------------------------------------------------------------
 // Audio processing helpers (internal)
 // ---------------------------------------------------------------------------
+
+// features -= features.mean(dim=0) on a frame-major [frames * 80] array.
+function subtractBandMeans(feats) {
+  const frames = feats.length / MEL_N_MELS;
+  for (let m = 0; m < MEL_N_MELS; m++) {
+    let sum = 0;
+    for (let f = 0; f < frames; f++) {
+      sum += feats[f * MEL_N_MELS + m];
+    }
+    const mean = sum / frames;
+    for (let f = 0; f < frames; f++) {
+      feats[f * MEL_N_MELS + m] -= mean;
+    }
+  }
+  return feats;
+}
+
+function l2Normalize(embedding) {
+  let sumSquares = 0;
+  for (const v of embedding) {
+    sumSquares += v * v;
+  }
+  const norm = Math.sqrt(sumSquares);
+  if (!Number.isFinite(norm) || norm === 0) {
+    throw new Error("Speaker encoder returned a zero or non-finite embedding");
+  }
+  return embedding.map((v) => v / norm);
+}
 
 /**
  * Resample audio via linear interpolation.
