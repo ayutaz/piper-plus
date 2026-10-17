@@ -74,6 +74,17 @@ def _cuda_pin_supported() -> bool:
 CUDA_PIN_SUPPORTED = _cuda_pin_supported()
 
 
+@pytest.fixture(autouse=True)
+def cpu_only_pin_api(monkeypatch):
+    """Test Batch structure without requiring the CUDA host allocator.
+
+    Actual page-locking remains covered by the separately guarded GPU assertion.
+    PyTorch itself raises on a CPU-only host; Batch intentionally delegates to it.
+    """
+    if not CUDA_PIN_SUPPORTED:
+        monkeypatch.setattr(torch.Tensor, "pin_memory", lambda tensor: tensor)
+
+
 @pytest.mark.unit
 def test_pin_memory_returns_new_batch_instance():
     """pin_memory() must return a fresh Batch (Tensor.pin_memory semantics)."""

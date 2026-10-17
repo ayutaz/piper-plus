@@ -3,7 +3,12 @@
 import pathlib
 
 import pytest
-import torch
+
+
+torch = pytest.importorskip(
+    "torch",
+    reason="Checkpoint preparation needs the train extra; lightweight Windows CI omits it.",
+)
 
 
 class SavedPosixPath:

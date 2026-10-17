@@ -5,7 +5,13 @@ import json
 import numpy as np
 import pytest
 
-from piper_train.tools import eval_zs_secs
+
+pytest.importorskip(
+    "torch",
+    reason="The evaluation frontend needs the train extra; lightweight Windows CI omits it.",
+)
+
+from piper_train.tools import eval_zs_secs  # noqa: E402
 
 
 @pytest.fixture
