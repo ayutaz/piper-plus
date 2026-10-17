@@ -71,6 +71,9 @@ jobs:
               - 'src/rust/**'
             csharp:
               - 'src/csharp/**'
+              # Embedded by PiperPlus.Cli / read by ChineseGoldenTests.
+              - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
+              - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
             cpp:
               - 'src/cpp/**'
               - 'CMakeLists.txt'

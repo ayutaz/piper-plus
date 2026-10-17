@@ -28,6 +28,13 @@
     <ProjectReference Include="..\PiperPlus.Core\PiperPlus.Core.csproj" />
   </ItemGroup>
 
+  <!-- Shared numeric-tone pinyin dictionaries for BundledChineseG2PEngine,
+       linked from the canonical copy (docs/spec/dictionary-mirrors.toml). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\rust\piper-plus-g2p\data\pinyin_single.json" LogicalName="PiperPlus.Cli.pinyin_single.json" Link="Data\pinyin_single.json" />
+    <EmbeddedResource Include="..\..\rust\piper-plus-g2p\data\pinyin_phrases.json" LogicalName="PiperPlus.Cli.pinyin_phrases.json" Link="Data\pinyin_phrases.json" />
+  </ItemGroup>
+
   <!-- Source-link the CLI's per-language engine adapters so the test process
        exercises the exact same JA/EN engine wiring the CLI uses. The
        DotNetG2PEngine class is internal to PiperPlus.Cli (not transitively
@@ -37,6 +44,7 @@
   <ItemGroup>
     <Compile Include="..\PiperPlus.Cli\DotNetG2PEngine.cs" Link="Adapters\DotNetG2PEngine.cs" />
     <Compile Include="..\PiperPlus.Cli\DotNetEnglishG2PEngine.cs" Link="Adapters\DotNetEnglishG2PEngine.cs" />
+    <Compile Include="..\PiperPlus.Cli\BundledChineseG2PEngine.cs" Link="Adapters\BundledChineseG2PEngine.cs" />
     <!-- Program.WriteFatalDiagnostics: the format of the CLI's fatal-error
          output is what issue #735 depends on the next time its intermittent
          failure happens, so it is asserted rather than hoped for. Program.cs
