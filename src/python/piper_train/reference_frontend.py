@@ -58,7 +58,22 @@ def trim_reference_audio(
     return trimmed, info
 
 
-def masked_time_mean_fp32(x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+def in_graph_capture() -> bool:
+    """ONNX export / jit trace / torch.compile の graph 取得中なら True。
+
+    データ依存の検査 (``bool(tensor)``) はこの間に走らせると trace 時の入力で
+    分岐が定数として焼き込まれる (または graph break になる) ため飛ばす。
+    """
+    return (
+        torch.onnx.is_in_onnx_export()
+        or torch.jit.is_tracing()
+        or torch.compiler.is_compiling()
+    )
+
+
+def masked_time_mean_fp32(
+    x: torch.Tensor, mask: torch.Tensor, *, check: bool = True
+) -> torch.Tensor:
     """mask 付き時間平均を float32 で計算する。
 
     fp16 入力でも overflow しないよう、float32 へ上げて ``x / length`` を先に
@@ -67,16 +82,18 @@ def masked_time_mean_fp32(x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
     Args:
         x: ``[B, C, T]``。
         mask: ``[B, 1, T]`` (1=有効, 0=無効)。
+        check: 有効フレーム 0 の行を検査する (host 同期 1 回)。呼び出し側で
+            長さを検査済みなら False。graph 取得中は常に省略する。
 
     Returns:
         ``[B, C]`` float32。
 
     Raises:
-        ValueError: いずれかの行で mask の有効フレームが 0 の場合。
+        ValueError: ``check`` 時、いずれかの行で mask の有効フレームが 0 の場合。
     """
     mask32 = mask.to(torch.float32)
     length = mask32.sum(dim=-1)  # [B, 1]
-    if bool((length <= 0).any()):
+    if check and not in_graph_capture() and bool((length <= 0).any()):
         raise ValueError("mask has a row with no valid frames")
     weighted = x.to(torch.float32) * mask32 / length.unsqueeze(-1)
     return weighted.sum(dim=-1)
