@@ -247,6 +247,11 @@ def on_model_change(model_name: str) -> str:
     return SAMPLE_TEXTS.get(language, "")
 
 
+def on_zero_shot_language_change(language: str) -> str:
+    """Return a sample text the zero-shot model can speak in ``language``."""
+    return zero_shot.SAMPLE_TEXTS.get(language, "")
+
+
 def _build_zero_shot_tab() -> None:
     """Zero-shot tab: synthesize in the voice of a reference clip."""
     gr.Markdown("""
@@ -258,7 +263,9 @@ def _build_zero_shot_tab() -> None:
         - Only use voices you have the speaker's consent to use.
         - The reference clip is used for this request only and is not stored.
         - Text whose phonemes the model never learned (for example the
-          Portuguese nasal vowel "ã") is rejected instead of being dropped.
+          Portuguese nasal vowel "ã" or the French "ɥ" in "nuit"), or with
+          letters outside the six languages, is rejected instead of being
+          dropped.
         """)
 
     with gr.Row():
@@ -271,7 +278,7 @@ def _build_zero_shot_tab() -> None:
             text_input = gr.Textbox(
                 label="Text to synthesize",
                 placeholder="Enter text here...",
-                value=SAMPLE_TEXTS["ja"],
+                value=zero_shot.SAMPLE_TEXTS["ja"],
                 lines=3,
             )
             reference = gr.Audio(
@@ -306,7 +313,7 @@ def _build_zero_shot_tab() -> None:
             audio_output = gr.Audio(label="Generated Speech", type="numpy")
 
     language.change(
-        fn=lambda lang: SAMPLE_TEXTS.get(lang, ""),
+        fn=on_zero_shot_language_change,
         inputs=[language],
         outputs=[text_input],
     )

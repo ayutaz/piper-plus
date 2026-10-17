@@ -61,6 +61,13 @@ def test_ui_passes_settings_to_engine(monkeypatch):
     assert kwargs == {"length_scale": 1.2, "noise_scale": 0.5, "noise_w": 0.6}
 
 
+@pytest.mark.parametrize("language", zero_shot.LANGUAGES)
+def test_zero_shot_tab_uses_model_verified_sample_texts(language):
+    assert (
+        app.on_zero_shot_language_change(language) == zero_shot.SAMPLE_TEXTS[language]
+    )
+
+
 def test_interface_builds_with_zero_shot_tab():
     assert len(app.MODELS) == 6
     assert app.create_interface() is not None

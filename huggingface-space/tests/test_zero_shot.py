@@ -124,6 +124,20 @@ def test_long_reference_is_truncated(fake_encoder):
     assert fake_encoder.last_input_shape[1] <= 30 * 100
 
 
+def test_long_reference_is_cut_before_float_conversion(fake_encoder, monkeypatch):
+    seen = []
+    original = zero_shot.to_mono_float
+
+    def spy(sample_rate, audio):
+        seen.append(len(audio))
+        return original(sample_rate, audio)
+
+    monkeypatch.setattr(zero_shot, "to_mono_float", spy)
+    audio = np.full((48000 * 120, 2), 1000, dtype=np.int16)
+    zero_shot.extract_speaker_embedding(48000, audio, fake_encoder)
+    assert seen == [48000 * 30]
+
+
 @pytest.mark.parametrize(("key", "language", "text"), pbr.TEXTS)
 def test_phoneme_ids_match_ci_recipe(base_voice, key, language, text):
     ids = zero_shot.phoneme_ids_for_base(text, language, base_voice)
@@ -137,14 +151,41 @@ def test_untrained_phonemes_raise(base_voice):
 
 
 def test_text_without_phonemes_raises(base_voice):
-    # Hangul is outside the six languages, so nothing is phonemized.
     with pytest.raises(zero_shot.ZeroShotInputError, match="no phonemes"):
-        zero_shot.phoneme_ids_for_base("안녕하세요", "ja", base_voice)
+        zero_shot.phoneme_ids_for_base("。、！？", "ja", base_voice)
 
 
 def test_unknown_language_raises(base_voice):
     with pytest.raises(zero_shot.ZeroShotInputError):
         zero_shot.phoneme_ids_for_base("hej", "sv", base_voice)
+
+
+@pytest.mark.parametrize(
+    ("text", "dropped"),
+    [
+        ("こんにちは안녕하세요", "안"),
+        ("Привет こんにちは", "П"),
+        ("Hello Ελλάδα", "Ε"),
+    ],
+)
+def test_unsupported_script_in_mixed_text_raises(base_voice, text, dropped):
+    with pytest.raises(zero_shot.ZeroShotInputError, match=dropped):
+        zero_shot.phoneme_ids_for_base(text, "ja", base_voice)
+
+
+@pytest.mark.parametrize("text", ["今日は々ーヴァ。ＡＢＣ", "Ça va? Ñandú, ação"])
+def test_supported_scripts_are_accepted(base_voice, text):
+    # Kana marks, iteration mark, fullwidth Latin and accented Latin are
+    # handled by the phonemizer; they must not be mistaken for other scripts.
+    assert zero_shot.unsupported_characters(text) == []
+
+
+@pytest.mark.parametrize("language", zero_shot.LANGUAGES)
+def test_sample_texts_are_accepted_by_the_model(base_voice, language):
+    ids = zero_shot.phoneme_ids_for_base(
+        zero_shot.SAMPLE_TEXTS[language], language, base_voice
+    )
+    assert ids
 
 
 def _fake_sessions(monkeypatch):

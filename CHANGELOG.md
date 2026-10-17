@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Browser (`piper-plus` npm): route English to the JS G2P even when the Rust WASM bundle loads for Japanese or Chinese. The WASM bundle has no English dictionary and spelled words out letter by letter.
 ### Added
 
-- HF Space demo: add an experimental Zero-shot tab that speaks in the voice of an uploaded or recorded reference clip (#790). It uses the revision-pinned public `zs-v1` base and CAM++ encoder with the CI-verified embedding recipe, rejects text containing phonemes the model never learned instead of dropping them, and is a functional demo, not a quality approval.
+- HF Space demo: add an experimental Zero-shot tab that speaks in the voice of an uploaded or recorded reference clip (#790). It uses the revision-pinned public `zs-v1` base and CAM++ encoder with the CI-verified embedding recipe, rejects text containing phonemes the model never learned or letters outside the six languages instead of dropping them, and is a functional demo, not a quality approval.
 
 ## [2.0.2] - 2026-10-16
 

@@ -57,7 +57,7 @@ The **Zero-shot (experimental)** tab synthesizes speech in the voice of a refere
 
 - **Model**: the public [zs-v1 base](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) (revision-pinned, SHA256-verified, downloaded on first use) with the CAM++ speaker encoder (192-dim embedding).
 - **Quality**: experimental and not approved; an unseen speaker is reproduced only partially.
-- **Phonemes**: zs-v1 uses the older 173-symbol table. Text containing phonemes the model never learned (for example the Portuguese nasal vowel "ã" in "não") is rejected with an error instead of being silently dropped.
+- **Phonemes**: zs-v1 uses the older 173-symbol table. Text containing phonemes the model never learned (for example the Portuguese nasal vowel "ã" in "não" or the French "ɥ" in "nuit"), or letters outside the six languages (for example Hangul or Cyrillic), is rejected with an error instead of being silently dropped. Selecting a language loads a sample text that the model can speak.
 - **Privacy and consent**: the reference clip is used only for the request and is not stored. Only use voices you have the speaker's consent to use.
 
 ## Usage

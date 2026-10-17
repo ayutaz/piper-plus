@@ -10,6 +10,7 @@ rejected instead of dropped. This module does not import gradio.
 import hashlib
 import logging
 import threading
+import unicodedata
 from collections.abc import Callable
 from pathlib import Path
 
@@ -35,6 +36,28 @@ CONFIG_PATH = Path(__file__).parent / "zs-v1" / "base.onnx.json"
 
 LANGUAGES = ("ja", "en", "zh", "es", "fr", "pt")
 LATIN_LANGUAGES = frozenset({"en", "es", "fr", "pt"})
+# Default texts for the zero-shot tab, from the CI-verified cases in
+# scripts/public_base_runtime.py (TEXTS). Every phoneme is in the zs-v1 map.
+SAMPLE_TEXTS = {
+    "ja": "こんにちは。今日は良い天気ですね。",
+    "en": "Hello, today is a beautiful day.",
+    "zh": "你好，今天天气很好。",
+    "es": "Hola, hoy hace buen tiempo.",  # codespell:ignore hace
+    "fr": "Bonjour, le soleil brille.",
+    "pt": "Olá, hoje está um belo dia.",
+}
+# Letters from any other script are dropped by MultilingualPhonemizer, so
+# they are rejected up front (matched against Unicode character names).
+SUPPORTED_LETTER_PREFIXES = (
+    "LATIN",
+    "FULLWIDTH LATIN",
+    "HIRAGANA",
+    "KATAKANA",
+    "HALFWIDTH KATAKANA",
+    "CJK UNIFIED IDEOGRAPH",
+    "CJK COMPATIBILITY IDEOGRAPH",
+    "IDEOGRAPHIC",
+)
 # Spaces and punctuation are absent from the zs-v1 (173-symbol) phoneme map.
 DROPPED_PUNCTUATION = frozenset(",.;:!¡¿…—–-«»")
 
@@ -74,8 +97,9 @@ def extract_speaker_embedding(
     import torch
     import torchaudio
 
+    # Cut before converting so a long upload is never copied in full.
+    audio = np.asarray(audio)[: int(MAX_REFERENCE_SECONDS * sample_rate)]
     sample_rate, audio = to_mono_float(sample_rate, audio)
-    audio = audio[: int(MAX_REFERENCE_SECONDS * sample_rate)]
     if audio.size < MIN_REFERENCE_SECONDS * sample_rate:
         raise ZeroShotInputError(
             f"Reference audio must be at least {MIN_REFERENCE_SECONDS} seconds long."
@@ -105,10 +129,28 @@ def extract_speaker_embedding(
     return (embedding / norm).astype(np.float32)
 
 
+def unsupported_characters(text: str) -> list[str]:
+    """Letters outside the scripts of the six supported languages."""
+    return sorted(
+        {
+            c
+            for c in text
+            if unicodedata.category(c).startswith("L")
+            and not unicodedata.name(c, "").startswith(SUPPORTED_LETTER_PREFIXES)
+        }
+    )
+
+
 def phoneme_ids_for_base(text: str, language: str, voice: PiperVoice) -> list[int]:
     """Phonemize ``text`` for the zs-v1 base, rejecting untrained phonemes."""
     if language not in LANGUAGES:
         raise ZeroShotInputError(f"Unsupported language: {language}")
+    unsupported = unsupported_characters(text)
+    if unsupported:
+        raise ZeroShotInputError(
+            "Text contains characters outside the supported languages: "
+            + " ".join(unsupported)
+        )
     phonemizer = MultilingualPhonemizer(
         languages=list(LANGUAGES),
         default_latin_language=language if language in LATIN_LANGUAGES else "en",
