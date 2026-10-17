@@ -6,6 +6,9 @@ Stages (run in order, each resumable; never writes under the baseline dir):
   evaluate      strict CER + CAM++/native ECAPA cross-utt + acoustics
                 (metrics overlay env, same evaluator as the baseline)
   separability  CAM++ 192 vs CAM++ pre-pooling stats 1024 same/other AUC
+                (unsupervised cosine; superseded diagnostic, ruling R6)
+  probe         R6 decisive check: LDA probe on held-out speakers,
+                192 vs concat[192, stats 1024]
   summary       deltas and the mechanical G0 decisions
 
 (a) trim:   v10b ep79 raw/EMA/ONNX; WAV001 as-is and WAV001 with 1 s of
@@ -50,6 +53,26 @@ MOE_SPEECH = Path(
     )
 )
 PER_SPEAKER = 10
+SEPARABILITY_NAME = "separability-pinned.json"
+FEATURES_NAME = "separability-features.npz"
+PROBE_NAME = "lda-probe.json"
+
+
+def _source_state():
+    revision = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+    ).strip()
+    dirty = subprocess.run(
+        ["git", "diff", "--quiet", "HEAD", "--", "src", "scripts"],
+        cwd=ROOT,
+        check=False,
+    ).returncode
+    return {"source_revision": revision, "tracked_source_dirty": bool(dirty)}
+
+
+def _refuse_existing(path):
+    if Path(path).exists():
+        raise ValueError(f"result already exists (never overwritten): {path}")
 
 
 def conditions():
@@ -115,10 +138,13 @@ def stats_decision(stats, baseline, *, margin=STATS_AUC_MARGIN):
         reasons.append(f"AUC lower by more than {margin}")
     if stats["gap"] < baseline["gap"]:
         reasons.append("same/other cosine gap smaller")
+    weak = stats["n_speakers"] < 10
+    # Ruling R1: with fewer than 10 speakers the evidence is weak and recorded
+    # as a pass (reasons are kept for the record).
     return {
-        "passes": not reasons,
+        "passes": not reasons or weak,
         "reasons": reasons,
-        "weak_evidence": stats["n_speakers"] < 10,
+        "weak_evidence": weak,
     }
 
 
@@ -488,13 +514,13 @@ def stage_evaluate(root):
 
 
 def _separability_set():
-    """(path, speaker, corpus) for every locally available real speaker."""
+    """(path, speaker, corpus, sha256) for every locally available real speaker."""
     spec = _load_json(BASELINE / "experiment.json")
     from piper_train.embedding_cache import file_sha256  # noqa: PLC0415
 
     rows = []
     tsukuyomi = sorted(Path(spec["reference_sources"][0]).parent.glob("*.wav"))
-    rows += [(p, "tsukuyomi", "tsukuyomi-raw") for p in tsukuyomi]
+    rows += [(p, "tsukuyomi", "tsukuyomi-raw", file_sha256(p)) for p in tsukuyomi]
     singles = sorted(
         (ROOT.parent / "piper-v8-dataset-backup").glob(
             "*_listen_samples/*/reference_original.wav"
@@ -509,7 +535,7 @@ def _separability_set():
         digest = file_sha256(path)
         if digest not in seen:
             seen.add(digest)
-            rows.append((path, path.parent.name, "v8-listen-reference"))
+            rows.append((path, path.parent.name, "v8-listen-reference", digest))
     metadata = MOE_SPEECH / "metadata.csv"
     if metadata.is_file():
         by_speaker = {}
@@ -521,7 +547,9 @@ def _separability_set():
             picks = np.linspace(0, len(utterances) - 1, PER_SPEAKER).round().astype(int)
             for index in picks:
                 path = MOE_SPEECH / "wavs_extracted/wavs" / f"{utterances[index]}.wav"
-                rows.append((path, f"moe-{speaker}", "moe-speech-20speakers"))
+                rows.append(
+                    (path, f"moe-{speaker}", "moe-speech-20speakers", file_sha256(path))
+                )
     return rows
 
 
@@ -540,6 +568,8 @@ def stage_separability(root):
 
     torch.set_num_threads(4)
     prepare = _prepare_module()
+    _refuse_existing(root / SEPARABILITY_NAME)
+    _refuse_existing(root / FEATURES_NAME)
     spec = _load_json(BASELINE / "experiment.json")
     encoder = prepare.session(spec["campplus"])
     model = _load_campplus_stats_model(TORCH_CAMPPLUS)
@@ -547,7 +577,7 @@ def stage_separability(root):
     features = {}
     for trim in (False, True):
         emb, stats = [], []
-        for path, _, _ in rows:
+        for path, *_ in rows:
             fbank = preprocess_audio(path, trim=trim)
             emb.append(extract_embedding(encoder, fbank))
             with torch.inference_mode():
@@ -575,14 +605,29 @@ def stage_separability(root):
             if r[1] != "tsukuyomi" or i in capped_tsukuyomi
         ],
     }
+    np.savez(
+        root / FEATURES_NAME,
+        sha256=np.asarray([r[3] for r in rows]),
+        speaker=np.asarray([r[1] for r in rows]),
+        emb192_trim_none=features[False][0],
+        stats1024_trim_none=features[False][1],
+        emb192_trim_vad=features[True][0],
+        stats1024_trim_vad=features[True][1],
+    )
     result = {
-        "version": 1,
+        "version": 2,
+        **_source_state(),
+        "features": prepare.pin(root / FEATURES_NAME),
+        "subset_indices": subsets,
         "encoder_onnx": prepare.pin(spec["campplus"]),
         "encoder_torch": prepare.pin(TORCH_CAMPPLUS),
         "moe_speech_snapshot": str(MOE_SPEECH),
         "frontend": "preprocess_audio (soxr HQ 16k, kaldi fbank80, CMN); whole utterance",
         "stats": "campplus_stats: fp32 mean + unbiased std of out_nonlinear (1024-d)",
-        "utterances": [{"path": str(p), "speaker": s, "corpus": c} for p, s, c in rows],
+        "utterances": [
+            {"path": str(p), "speaker": s, "corpus": c, "sha256": h}
+            for p, s, c, h in rows
+        ],
         "subsets": {},
     }
     for subset, indices in subsets.items():
@@ -604,7 +649,7 @@ def stage_separability(root):
                 block[key]["stats1024_standardized"], block[key]["campplus192_raw"]
             )
         result["subsets"][subset] = block
-    prepare.write_json(root / "separability.json", result)
+    prepare.write_json(root / SEPARABILITY_NAME, result)
     print(
         json.dumps(
             {
@@ -618,6 +663,69 @@ def stage_separability(root):
         )
     )
     print("S0_SEPARABILITY_COMPLETE", flush=True)
+
+
+def stage_probe(root):
+    """Ruling R6: supervised LDA probe on the extended 24-speaker set."""
+    from piper_train.embedding_cache import file_sha256  # noqa: PLC0415
+    from piper_train.tools.cpu_reference_comparison import (  # noqa: PLC0415
+        lda_speaker_probe,
+    )
+
+    prepare = _prepare_module()
+    _refuse_existing(root / PROBE_NAME)
+    separability = _load_json(root / SEPARABILITY_NAME)
+    prepare.verify_pin(separability["features"])
+    data = np.load(separability["features"]["path"], allow_pickle=False)
+    utterances = separability["utterances"]
+    if data["sha256"].tolist() != [u["sha256"] for u in utterances]:
+        raise ValueError("feature rows do not match pinned utterances")
+    for item in utterances:
+        if file_sha256(Path(item["path"])) != item["sha256"]:
+            raise ValueError(f"utterance changed: {item['path']}")
+    by_speaker = {}
+    for index in separability["subset_indices"]["extended-capped"]:
+        by_speaker.setdefault(utterances[index]["speaker"], []).append(index)
+    selected = sorted(
+        index
+        for indices in by_speaker.values()
+        for index in sorted(indices, key=lambda i: utterances[i]["sha256"])[
+            :PER_SPEAKER
+        ]
+    )
+    labels = [utterances[i]["speaker"] for i in selected]
+    # G0 frontend (trim=none) features of the same rows as (c).
+    emb = data["emb192_trim_none"][selected]
+    stats = data["stats1024_trim_none"][selected]
+    result = lda_speaker_probe(emb, np.concatenate([emb, stats], axis=1), labels)
+    record = {
+        "version": 1,
+        **_source_state(),
+        "ruling": "R6",
+        "separability": prepare.pin(root / SEPARABILITY_NAME),
+        "frontend": "kaldi-fbank80-cmn@16k;trim=none",
+        "features": {"A": "CAM++ 192 (ONNX)", "B": "concat[CAM++ 192, stats 1024]"},
+        "method": (
+            "10 speaker splits (default_rng(seed).permutation of sorted ids, "
+            "seeds 0-9), 12 train / 12 test; per-set standardization on train "
+            "utterances; LDA(solver=eigen, shrinkage=auto) on train speakers; "
+            "cosine verification AUC on test same/other pairs"
+        ),
+        "cap": f"first {PER_SPEAKER} per speaker by sorted sha256",
+        "n_speakers": len(by_speaker),
+        "n_utterances": len(selected),
+        "utterance_sha256": [utterances[i]["sha256"] for i in selected],
+        **result,
+    }
+    prepare.write_json(root / PROBE_NAME, record)
+    for split in result["splits"]:
+        print(split["seed"], split["auc"], split.get("diff"), split["error"])
+    print(
+        json.dumps(
+            {k: result[k] for k in ("mean_diff", "wins", "passes", "rule")}, indent=1
+        )
+    )
+    print("S0_PROBE_COMPLETE", flush=True)
 
 
 def _cell(groups, name, base, backend):
@@ -669,7 +777,8 @@ def stage_summary(root):
         cell["flags"]["goodhart"] = bool(speaker.get("goodhart_flag"))
         average_cells.append(cell)
         comparisons.append({"cell": cell["cell"], "speaker": speaker})
-    separability = _load_json(root / "separability.json")
+    separability = _load_json(root / SEPARABILITY_NAME)
+    probe = _load_json(root / PROBE_NAME)
     trim = trim_decision(trim_cells)
     frontend = "kaldi-fbank80-cmn@16k;trim=" + (
         "energy-vad" if trim["adopt_trim"] else "none"
@@ -692,7 +801,8 @@ def stage_summary(root):
     summary = {
         "version": 1,
         "references": prepare.pin(root / "references.json"),
-        "separability": prepare.pin(root / "separability.json"),
+        "separability": prepare.pin(root / SEPARABILITY_NAME),
+        "probe": prepare.pin(root / PROBE_NAME),
         "groups": table,
         "trim_cells": trim_cells,
         "average_cells": average_cells,
@@ -701,8 +811,16 @@ def stage_summary(root):
             "trim": trim,
             "averaging": averaging_decision(average_cells),
             "stats": {
-                subset: block[trim_key]["decision"]
-                for subset, block in separability["subsets"].items()
+                "decision_basis": "ruling R6 LDA probe (held-out speakers)",
+                "passes": probe["passes"],
+                "mean_diff": probe["mean_diff"],
+                "wins": probe["wins"],
+                "n_splits": probe["n_splits"],
+                "rule": probe["rule"],
+                "superseded_cosine_diagnostic": {
+                    subset: block[trim_key]["decision"]
+                    for subset, block in separability["subsets"].items()
+                },
             },
             "frontend": frontend,
         },
@@ -720,7 +838,14 @@ def main(argv=None):
     parser.add_argument(
         "--stage",
         required=True,
-        choices=("prepare", "generate", "evaluate", "separability", "summary"),
+        choices=(
+            "prepare",
+            "generate",
+            "evaluate",
+            "separability",
+            "probe",
+            "summary",
+        ),
     )
     args = parser.parse_args(argv)
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -733,6 +858,7 @@ def main(argv=None):
         "generate": stage_generate,
         "evaluate": stage_evaluate,
         "separability": stage_separability,
+        "probe": stage_probe,
         "summary": stage_summary,
     }[args.stage](root)
     return 0

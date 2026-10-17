@@ -53,3 +53,11 @@ def test_stats_fail_only_when_clearly_worse_and_flag_weak_evidence():
     assert _MODULE.stats_decision({"auc": 0.95, "gap": 0.3, "n_speakers": 4}, base)[
         "weak_evidence"
     ]
+
+
+def test_stats_worse_with_fewer_than_ten_speakers_is_a_weak_pass():
+    base = {"auc": 0.95, "gap": 0.30, "n_speakers": 4}
+    result = _MODULE.stats_decision({"auc": 0.50, "gap": 0.01, "n_speakers": 4}, base)
+    assert result["passes"] is True
+    assert result["weak_evidence"] is True
+    assert result["reasons"]
