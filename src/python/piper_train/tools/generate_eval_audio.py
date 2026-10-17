@@ -11,6 +11,7 @@ import numpy as np
 
 from piper_plus.embedding import embedding_dimension
 
+from ..checkpoint_io import load_checkpoint
 from ..embedding_cache import atomic_write, file_sha256
 from ..evaluation_manifest import (
     BACKENDS,
@@ -32,13 +33,14 @@ def load_torch_generator(path, *, device="auto"):
     target_device = torch.device(device)
     if target_device.type == "cuda" and not torch.cuda.is_available():
         raise ValueError("CUDA requested but no CUDA GPU is available")
-    checkpoint = torch.load(path, map_location="cpu", weights_only=False)
+    checkpoint = load_checkpoint(path)
     parameters = {
         **checkpoint["hyper_parameters"],
         "dataset": None,
         "use_wavlm_discriminator": False,
         "speaker_encoder_path": None,
         "speaker_encoder_torch_path": None,
+        "strict_zero_shot": False,
         "c_swap_spk": 0.0,
     }
     with isolated_inference(torch.nn.Module()):

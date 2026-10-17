@@ -63,6 +63,7 @@ def gate():
 @pytest.mark.unit
 class TestClassifyRole:
     def test_shared_inference_context_and_cer_are_in_scope(self, gate):
+        assert gate.classify_role("src/python/piper_train/zero_shot_requirements.py") == "train"
         assert gate.classify_role("src/python/piper_train/inference_eval.py") == "train"
         assert (
             gate.classify_role("src/python/piper_train/tools/eval_cer.py") == "metric"

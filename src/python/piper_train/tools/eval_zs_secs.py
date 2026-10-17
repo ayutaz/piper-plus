@@ -732,9 +732,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--exclude-ref",
+        action="append",
         help=(
             "条件付けに使った発話 wav。path 一致または sha256 (内容) 一致で "
-            "cross 集合から除外し、same-utt SECS の参照として使用"
+            "cross 集合から除外し、same-utt SECS の参照として使用。複数参照では繰り返し指定"
         ),
     )
     parser.add_argument(
@@ -805,13 +806,14 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"no wav files in --synth-dir: {args.synth_dir}")
 
     speaker_files = collect_wavs(args.speaker_utts)
-    ref_path: Path | None = None
-    ref_sha: str | None = None
-    if args.exclude_ref:
-        ref_path = Path(args.exclude_ref).resolve()
-        if not ref_path.is_file():
-            raise SystemExit(f"--exclude-ref not found: {ref_path}")
-        ref_sha = _sha256_file(ref_path)
+    reference_paths = list(
+        dict.fromkeys(Path(p).resolve() for p in args.exclude_ref or [])
+    )
+    for reference in reference_paths:
+        if not reference.is_file():
+            raise SystemExit(f"--exclude-ref not found: {reference}")
+    reference_hashes = _hash_all(reference_paths)
+    reference_digests = set(reference_hashes.values())
 
     floor_files = collect_wavs(args.floor_refs) if args.floor_refs else []
     if args.floor_refs and not floor_files:
@@ -823,7 +825,7 @@ def main(argv: list[str] | None = None) -> int:
     excluded = [
         p
         for p in speaker_files
-        if p == ref_path or (ref_sha is not None and speaker_hashes[p] == ref_sha)
+        if p in reference_hashes or speaker_hashes[p] in reference_digests
     ]
     cross_files = [p for p in speaker_files if p not in excluded]
     for p in excluded:
@@ -886,8 +888,12 @@ def main(argv: list[str] | None = None) -> int:
         synth_embs = _extract_embs(session, synth_files, fbank_cache)
         speaker_embs = _extract_embs(session, cross_files, fbank_cache)
         ref_emb = (
-            _extract_embs(session, [ref_path], fbank_cache)[0]
-            if ref_path is not None
+            _l2_normalize(
+                _extract_embs(session, reference_paths, fbank_cache).mean(
+                    axis=0, keepdims=True
+                )
+            )[0]
+            if reference_paths
             else None
         )
         floor_embs = (
@@ -940,8 +946,14 @@ def main(argv: list[str] | None = None) -> int:
         ),
         "floor_selection_note": args.floor_selection_note,
         "exclude_ref": (
-            {"file": ref_path.name, "sha256": ref_sha} if ref_path is not None else None
+            {
+                "file": reference_paths[0].name,
+                "sha256": reference_hashes[reference_paths[0]],
+            }
+            if len(reference_paths) == 1
+            else None
         ),
+        "conditioning_references": _file_entries(reference_paths, reference_hashes),
         "encoders": {
             "campplus": _encoder_manifest(args.encoder),
             "encoder2": _encoder_manifest(args.encoder2) if args.encoder2 else None,

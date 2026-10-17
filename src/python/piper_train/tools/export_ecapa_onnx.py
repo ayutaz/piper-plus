@@ -153,6 +153,7 @@ def export_ecapa_onnx(
             "embedding": {0: "batch"},
         },
         opset_version=opset,
+        dynamo=False,
     )
     _LOGGER.info("exported: %s (%.1f MB)", output, output.stat().st_size / 1e6)
     return wrapper

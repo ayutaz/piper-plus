@@ -72,6 +72,7 @@ class UtteranceTensors:
     text: str | None = None
     prosody_features: LongTensor | None = None  # Shape: (num_phonemes, 3) for A1/A2/A3
     speaker_embedding: FloatTensor | None = None
+    utterance_id: str | None = None
     # v10b S-2: GT F0 (Hz, 無声 0.0) — spectrogram と同一フレーム格子の 1-D
     f0: FloatTensor | None = None
 
@@ -92,6 +93,7 @@ class Batch:
     language_ids: LongTensor | None = None
     prosody_features: LongTensor | None = None  # Shape: (batch, max_phonemes, 3)
     speaker_embeddings: FloatTensor | None = None
+    utterance_ids: list[str] | None = None
     # v10b S-2: GT F0 と有声フラグ。どちらも ``[batch, 1, max_spec_length]``
     # (audios と同じ [B, 1, T] レイアウト)。F0 キャッシュを 1 つも持たない
     # dataset では両方 None のままで、S-2 は自動的に無効になる (後方互換)。
@@ -132,6 +134,7 @@ class Batch:
             language_ids=_pin(self.language_ids),
             prosody_features=_pin(self.prosody_features),
             speaker_embeddings=_pin(self.speaker_embeddings),
+            utterance_ids=self.utterance_ids,
             f0=_pin(self.f0),
             vuv=_pin(self.vuv),
         )
@@ -315,6 +318,7 @@ class PiperDataset(Dataset):
             text=utt.text,
             prosody_features=prosody_tensor,
             speaker_embedding=speaker_embedding_tensor,
+            utterance_id=str(utt.audio_norm_path.resolve()),
             f0=f0_tensor,
         )
 
@@ -682,6 +686,9 @@ class UtteranceCollate:
             language_ids=language_ids,
             prosody_features=prosody_padded,
             speaker_embeddings=speaker_embeddings,
+            utterance_ids=[utt.utterance_id for utt in sorted_utterances]
+            if all(utt.utterance_id is not None for utt in sorted_utterances)
+            else None,
             f0=f0_padded,
             vuv=vuv_padded,
         )
