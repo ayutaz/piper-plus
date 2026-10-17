@@ -19,3 +19,10 @@ for path in (
     SPACE_DIR,
 ):
     sys.path.insert(0, str(path))
+
+
+def pytest_configure(config):
+    # CI runs these tests with -c /dev/null, which skips the repo pytest.ini.
+    config.addinivalue_line(
+        "markers", "integration: downloads the pinned zs-v1 model from the HF Hub"
+    )

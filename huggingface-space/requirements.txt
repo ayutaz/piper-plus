@@ -10,4 +10,10 @@ pypinyin>=0.50
 inflect>=0.3.1  # Bundled English backend numeral normalization
 nltk>=3.10.0
 joblib>=1.5.0
+# Zero-shot tab (CAM++ speaker embedding from reference audio)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.11.0+cpu  # Kaldi fbank front end (BSD-3-Clause)
+torchaudio==2.11.0+cpu  # torchaudio.compliance.kaldi.fbank (BSD-2-Clause)
+soxr>=1.0  # Reference audio resampling to 16 kHz (LGPL-2.1-or-later)
+huggingface_hub>=0.30  # Revision-pinned zs-v1 download (Apache-2.0)
 # g2pk2>=0.0.3  # Optional: Korean phonemization (KoreanPhonemizer)
