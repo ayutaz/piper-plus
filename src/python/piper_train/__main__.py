@@ -678,6 +678,11 @@ def create_parser():
         "gradient).",
     )
     parser.add_argument(
+        "--strict-zero-shot",
+        action="store_true",
+        help="Require differentiable cross-utterance SCL and valid unique utterances/positives in every training batch.",
+    )
+    parser.add_argument(
         "--spk-loss-type",
         type=str,
         choices=["cosine", "infonce"],

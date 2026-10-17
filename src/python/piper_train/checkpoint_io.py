@@ -11,15 +11,11 @@ import sys
 import torch
 
 
-# Python 3.13 pickles the concrete classes under ``pathlib._local``.
-_PATHLIB_MODULES = frozenset({"pathlib", "pathlib._local"})
-
-
 class Unpickler(pickle.Unpickler):
     """Translate concrete pathlib metadata without changing global classes."""
 
     def find_class(self, module, name):
-        if module in _PATHLIB_MODULES and name in {"PosixPath", "WindowsPath"}:
+        if module == "pathlib" and name in {"PosixPath", "WindowsPath"}:
             return pathlib.Path
         return super().find_class(module, name)
 

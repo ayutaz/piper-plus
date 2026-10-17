@@ -11,6 +11,7 @@
 
 ## レポート一覧
 
+- [GPT-SoVITS参照候補・学習準備の再監査 2026-10-17](gpt-sovits-readiness-audit-2026-10-17.md) — 最新SHAの再確認、既存/修正済み/未実装の候補台帳、学習前に残る条件。
 - [zero-shot不具合修正・品質改善計画 2026-10-09](../design/zero-shot-recovery-and-improvement-plan-2026-10-09.md) — 調査・監査を受けた実行計画。更新周期/データ/評価の修正、既存再評価、単一要因学習、v12参照系列入力の順と完了条件を定義。
 - [zero-shot既存実装の不具合監査 2026-10-09](zero-shot-implementation-audit-2026-10-09.md) — 実LightningによるCPU再現でG/D更新周期とWavLM discriminator無更新を確認。v11保存ログの裏付け、固定音声/F0/runtime検証の欠落、設計事項との切り分けを収載。
 - [GPT-SoVITS最新版からのzero-shot改善調査 2026-10-09](gpt-sovits-zero-shot-2026-10-09.md) — V2Pro正式releaseとV5開発版を区別した公式コード調査、現zero-shot実装の改善候補、v11保存ログの再解析。参照系列入力のv12案と、既存契約内の入力/cache/評価/EMA改修を分離。v11の敵対rampはep15で上限到達済みであり、従来の凍結案を再検討する根拠も収載。
