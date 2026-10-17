@@ -482,6 +482,12 @@ class VitsModel(pl.LightningModule):
         f0_teacher_forcing_epochs: int = 10,
         f0_teacher_forcing_ramp: int = 10,
         f0_pred_prob_max: float = 0.5,
+        # 参照条件付け (docs/design/zero-shot-reference-fusion-plan-2026-10-17.md
+        # §8.2)。"ref_spec" = 参照 spec encoder (F-mel) を g_spk に加算、
+        # "capacity" = 埋め込み MLP の容量対照 (Ccap)。どちらも zero-init。
+        # default "none" = 旧モデルと bit 互換 (旧 ckpt の hparams にキーが
+        # なくても none で再構築される)
+        reference_conditioning: str = "none",
         **kwargs,
     ):
         super().__init__()
@@ -562,6 +568,8 @@ class VitsModel(pl.LightningModule):
             use_adain_decoder=self.hparams.use_adain_decoder,
             sample_rate=self.hparams.sample_rate,
             hop_length=self.hparams.hop_length,
+            reference_conditioning=self.hparams.reference_conditioning,
+            reference_spec_channels=self.hparams.filter_length // 2 + 1,
         )
         # v11 P0 (--film-free-scale): forward 時の scale 式だけを切り替える
         # 挙動 flag (パラメータ・初期化・state_dict は不変) なので、
@@ -2468,6 +2476,11 @@ class VitsModel(pl.LightningModule):
                 and speaker_embeddings is not None
                 and self.spk_proj_teacher is not None
             ):
+                # DINO は spk_proj 本体と EMA teacher (spk_proj の deepcopy) の
+                # 比較。_get_speaker_condition を通すと参照項 (reference_encoder /
+                # capacity_control) が student 側だけに入り、新経路へ teacher
+                # 由来の追加損失を掛けることになるため、意図的に spk_proj を
+                # 直接呼ぶ (参照融合計画 §8.2「損失は追加しない」)。
                 student_emb = self.model_g.spk_proj(speaker_embeddings)
                 with torch.no_grad():
                     teacher_emb = self.spk_proj_teacher(speaker_embeddings)

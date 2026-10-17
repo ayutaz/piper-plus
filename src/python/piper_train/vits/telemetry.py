@@ -78,6 +78,8 @@ def collect_modulation_telemetry(
     speaker_embeddings: torch.Tensor,
     lid: torch.Tensor | None = None,
     speaker_ids: torch.Tensor | None = None,
+    reference_spec: torch.Tensor | None = None,
+    reference_spec_lengths: torch.Tensor | None = None,
 ) -> dict[str, float]:
     """全注入点の変調統計を 1 dict にまとめる (キーはそのまま TB へ log)。
 
@@ -96,10 +98,18 @@ def collect_modulation_telemetry(
 
     各注入点は存在する場合のみ集計する (opt-in flag off の構成では
     キーが出ない)。speaker_ids が None の場合は spk_var_ratio を省略する。
+    ``reference_conditioning="ref_spec"`` のモデルでは学習 forward と同じ
+    参照 spec (``reference_spec`` / ``reference_spec_lengths``) を渡す
+    (g_spk に参照項が入った状態を計測する)。
     """
     metrics: dict[str, float] = {}
     g, g_spk, g_lang = model_g._get_global_conditioning(
-        None, lid, speaker_embeddings=speaker_embeddings, return_components=True
+        None,
+        lid,
+        speaker_embeddings=speaker_embeddings,
+        return_components=True,
+        reference_spec=reference_spec,
+        reference_spec_lengths=reference_spec_lengths,
     )
     if g_spk is None:
         return metrics
