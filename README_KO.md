@@ -785,3 +785,7 @@ piper-plus 모델: [`zs-v1` Zero-Shot/FT 기본 모델](https://huggingface.co/a
 ## Changelog
 
 [CHANGELOG.md](CHANGELOG.md)를 참조하세요.
+
+## 감사의 말
+
+piper-plus 실험에 사용하는 GPU 컴퓨팅은 [CloudRift](https://www.cloudrift.ai/)의 AI Builder Grant 지원을 받고 있습니다.

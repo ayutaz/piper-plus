@@ -439,3 +439,7 @@ piper-plus 専用モデル: [zs-v1 Zero-Shot/FT ベース](https://huggingface.c
 ## Changelog
 
 [CHANGELOG.md](CHANGELOG.md) を参照。
+
+## 謝辞
+
+piper-plus の GPU を使う実験は、[CloudRift](https://www.cloudrift.ai/) の AI Builder Grant（GPU クレジット）の支援を受けています。

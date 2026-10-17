@@ -427,3 +427,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
+
+## Acknowledgements
+
+GPU compute for piper-plus experiments is supported by an AI Builder Grant from [CloudRift](https://www.cloudrift.ai/).
