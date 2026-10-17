@@ -135,17 +135,25 @@ is_in_skill() {
   tpath=$(extract_field "transcript_path")
   [ -n "$tpath" ] && [ -r "$tpath" ] || return 1
   # 最後の skill activation marker の line 番号
+  local marker_re='<command-name>/[A-Za-z0-9._/:-]+</command-name>|"name":"Skill","input":\{"skill":"[^"]+"'
   local marker_line
-  marker_line=$(grep -nE '<command-name>/[a-z-]+</command-name>|"name":"Skill","input":\{"skill":"[^"]+"' "$tpath" 2>/dev/null \
+  marker_line=$(grep -nE "$marker_re" "$tpath" 2>/dev/null \
     | tail -n 1 \
     | cut -d: -f1)
   [ -n "$marker_line" ] || return 1
   # marker line の中身から skill 名を抽出
   local marker_skill
   marker_skill=$(awk -v ln="$marker_line" 'NR == ln' "$tpath" \
-    | grep -oE '<command-name>/[a-z-]+</command-name>|"name":"Skill","input":\{"skill":"[^"]+"' \
+    | grep -oE "$marker_re" \
     | tail -n 1 \
-    | sed -nE 's|.*<command-name>/([a-z-]+)</command-name>.*|\1|p; s|.*"skill":"([^"]+)".*|\1|p')
+    | sed -nE 's|.*<command-name>/([^<]+)</command-name>.*|\1|p; s|.*"skill":"([^"]+)".*|\1|p')
+  # git worktree 内では project skill が directory-scoped 名
+  # (`.worktrees/feat-x:create-pr`) で呼ばれるため path 接頭辞を外して比較する。
+  # `/` を含まない接頭辞 (`some-plugin:create-pr`) は plugin の同名 skill なので
+  # 外さない (= 不一致で deny)。
+  case "$marker_skill" in
+    */*:*) marker_skill="${marker_skill##*:}" ;;
+  esac
   [ "$marker_skill" = "$skill_name" ] || return 1
   # marker 以降に user の new prompt があれば skill flow から抜けた → deny。
   # ただし harness が生成する user-type メッセージは user 入力ではないので除外する:
