@@ -7,7 +7,7 @@ namespace PiperPlus.Core.Tests;
 /// through the <see cref="ChinesePhonemizer"/> + stub
 /// <see cref="IChineseG2PEngine"/> pipeline.
 /// <para>
-/// These tests simulate what <c>DotNetChineseG2PEngine</c> produces
+/// These tests simulate what a Chinese G2P engine produces
 /// (PUA-mapped initials/finals + tone PUA markers + per-token prosody)
 /// and verify that <see cref="ChinesePhonemizer"/> correctly passes
 /// through and aligns the data.
@@ -16,7 +16,7 @@ namespace PiperPlus.Core.Tests;
 public sealed class ChinesePhonemizerPuaTests
 {
     // ================================================================
-    // PUA constants matching DotNetChineseG2PEngine
+    // PUA constants used by the Chinese G2P engines
     // ================================================================
 
     // Tone marker PUA characters (U+E046-U+E04A)
@@ -39,7 +39,7 @@ public sealed class ChinesePhonemizerPuaTests
 
     /// <summary>
     /// Stub that returns pre-built <see cref="ChineseG2PResult"/>
-    /// mimicking the output of <c>DotNetChineseG2PEngine</c>
+    /// mimicking the output of a Chinese G2P engine
     /// (PUA phonemes + tone markers + aligned prosody).
     /// </summary>
     private sealed class ToneStubEngine : IChineseG2PEngine

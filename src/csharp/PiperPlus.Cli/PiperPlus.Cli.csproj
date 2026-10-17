@@ -37,7 +37,6 @@
     <PackageReference Include="DotNetG2P" Version="1.8.0" />
     <PackageReference Include="DotNetG2P.MeCab" Version="1.8.0" />
     <PackageReference Include="DotNetG2P.English" Version="1.8.0" />
-    <PackageReference Include="DotNetG2P.Chinese" Version="1.8.0" />
     <PackageReference Include="DotNetG2P.Spanish" Version="1.8.0" />
     <PackageReference Include="DotNetG2P.French" Version="1.8.0" />
     <PackageReference Include="DotNetG2P.Portuguese" Version="1.8.0" />
@@ -45,6 +44,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PiperPlus.Core\PiperPlus.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Shared numeric-tone pinyin dictionaries for BundledChineseG2PEngine,
+       linked from the canonical copy (docs/spec/dictionary-mirrors.toml). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\rust\piper-plus-g2p\data\pinyin_single.json" LogicalName="PiperPlus.Cli.pinyin_single.json" Link="Data\pinyin_single.json" />
+    <EmbeddedResource Include="..\..\rust\piper-plus-g2p\data\pinyin_phrases.json" LogicalName="PiperPlus.Cli.pinyin_phrases.json" Link="Data\pinyin_phrases.json" />
   </ItemGroup>
 
   <!-- Banned API analyzer: shares src/csharp/BannedSymbols.txt with

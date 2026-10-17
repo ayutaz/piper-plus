@@ -15,7 +15,7 @@ Use this package when you want to embed Piper Plus directly in a .NET applicatio
 dotnet add package PiperPlus.Core
 ```
 
-You also need to register a G2P engine for each language you intend to phonemize (e.g. [`DotNetG2P`](https://www.nuget.org/packages/DotNetG2P/), [`DotNetG2P.MeCab`](https://www.nuget.org/packages/DotNetG2P.MeCab/), [`DotNetG2P.English`](https://www.nuget.org/packages/DotNetG2P.English/), `DotNetG2P.Chinese / Spanish / French / Portuguese`, all at v1.8.0). The CLI project shows a complete example of wiring them up.
+You also need to register a G2P engine for each language you intend to phonemize (e.g. [`DotNetG2P`](https://www.nuget.org/packages/DotNetG2P/), [`DotNetG2P.MeCab`](https://www.nuget.org/packages/DotNetG2P.MeCab/), [`DotNetG2P.English`](https://www.nuget.org/packages/DotNetG2P.English/), `DotNetG2P.Spanish / French / Portuguese`, all at v1.8.0). For Chinese, `PinyinDictionaryChineseG2PEngine.FromJson` takes the shared `pinyin_single.json` / `pinyin_phrases.json` (from `src/rust/piper-plus-g2p/data`) and matches the Python output. The CLI project shows a complete example of wiring them up.
 
 ## Quick start
 
