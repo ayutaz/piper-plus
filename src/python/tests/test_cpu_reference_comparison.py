@@ -43,3 +43,21 @@ def test_exclusion_never_accepts_empty_source_list(tmp_path):
 
     with pytest.raises(ValueError, match="sources"):
         independent_reals([tmp_path / "anything.wav"], [])
+
+
+def test_native_speechbrain_singleton_output_is_a_unit_vector(tmp_path):
+    import soundfile as sf
+    import torch
+
+    from piper_train.tools.cpu_reference_comparison import native_ecapa_embedding
+
+    class Classifier:
+        def encode_batch(self, waveform):
+            assert waveform.shape == (1, 16000)
+            return torch.ones(1, 1, 192)
+
+    wav = tmp_path / "real.wav"
+    sf.write(wav, np.ones(16000, dtype=np.float32) * 0.1, 16000)
+    vector = native_ecapa_embedding(Classifier(), wav)
+    assert vector.shape == (192,)
+    assert np.linalg.norm(vector) == pytest.approx(1.0)
