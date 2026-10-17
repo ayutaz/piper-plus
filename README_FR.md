@@ -779,3 +779,7 @@ Voir [CONTRIBUTING.md](CONTRIBUTING.md) pour les directives.
 ## Journal des modifications
 
 Voir [CHANGELOG.md](CHANGELOG.md) pour l'historique des versions.
+
+## Remerciements
+
+La puissance de calcul GPU utilisée pour les expériences de piper-plus est soutenue par une AI Builder Grant de [CloudRift](https://www.cloudrift.ai/).

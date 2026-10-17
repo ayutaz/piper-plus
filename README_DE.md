@@ -787,3 +787,7 @@ Siehe [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changelog
 
 Siehe [CHANGELOG.md](CHANGELOG.md).
+
+## Danksagung
+
+Die GPU-Rechenleistung für Experimente mit piper-plus wird durch einen AI Builder Grant von [CloudRift](https://www.cloudrift.ai/) unterstützt.

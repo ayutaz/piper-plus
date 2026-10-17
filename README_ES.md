@@ -787,3 +787,7 @@ Consulta [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Changelog
 
 Consulta [CHANGELOG.md](CHANGELOG.md).
+
+## Agradecimientos
+
+La computación en GPU para los experimentos de piper-plus cuenta con el apoyo de un AI Builder Grant de [CloudRift](https://www.cloudrift.ai/).

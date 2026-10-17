@@ -797,3 +797,7 @@ piper-plus 模型：[`zs-v1` Zero-Shot/FT 基础模型](https://huggingface.co/a
 ## 更新日志
 
 请参阅 [CHANGELOG.md](CHANGELOG.md)。
+
+## 致谢
+
+piper-plus 实验所用的 GPU 算力由 [CloudRift](https://www.cloudrift.ai/) 的 AI Builder Grant 提供支持。
