@@ -337,6 +337,18 @@ jobs:
           gradle :piper-plus-g2p:pixel6api34DebugAndroidTest \
             --no-daemon --stacktrace -Pandroid.testInstrumentationRunnerArguments.notAnnotation=androidx.test.filters.LargeTest
 
+      # Gradle reports success when the runner finds no tests at all, which
+      # hid a missing testInstrumentationRunner: every L3 run executed 0 tests.
+      - name: Fail when no instrumented test ran
+        run: |
+          results=android/piper-plus-g2p/build/outputs/androidTest-results/managedDevice
+          count=$(find "$results" -name '*.xml' -exec grep -o '<testcase ' {} + 2>/dev/null | wc -l)
+          echo "Instrumented test cases reported: $count"
+          if [ "$count" -eq 0 ]; then
+            echo "::error::No instrumented test ran on the managed device (see $results)."
+            exit 1
+          fi
+
       - name: Upload instrumented test reports
         if: always()
         uses: actions/upload-artifact@v4.6.2
