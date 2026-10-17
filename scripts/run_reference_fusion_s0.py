@@ -502,6 +502,10 @@ def _separability_set():
     )
     seen = set()
     for path in singles:
+        # tsukuyomi_* listen references are the tsukuyomi speaker (not a new
+        # speaker label) and may be derived copies of tsukuyomi-raw utterances.
+        if path.parent.name.startswith("tsukuyomi"):
+            continue
         digest = file_sha256(path)
         if digest not in seen:
             seen.add(digest)
