@@ -570,3 +570,123 @@ class TestDefaultFastPath:
         # 落ちずに完了することを確認 (legacy per-utt 経路)
         emb_dir = ds / "speaker_embeddings"
         assert len(list(emb_dir.glob("*.npy"))) == 2
+
+
+# ---------------------------------------------------------------------------
+# --also-campp-stats: CAM++ pre-pooling statistics extraction
+# ---------------------------------------------------------------------------
+
+
+class TestCamppStatsExtraction:
+    def _weights(self, tmp_path):
+        import torch as _torch  # noqa: PLC0415
+
+        from piper_train.speaker_encoder.campplus_torch import CAMPPlus  # noqa: PLC0415
+
+        _torch.manual_seed(0)
+        model = CAMPPlus(feat_dim=80, embedding_size=192)
+        path = tmp_path / "campplus_random.bin"
+        _torch.save(model.state_dict(), path)
+        return path
+
+    def _run(self, tmp_path, weights, **kwargs):
+        helper = TestDefaultFastPath()
+        ds = helper._make_dataset_with_pt(tmp_path, n_utts=3)
+        session = helper._make_fake_session()
+        ese.extract_per_utterance(
+            session=session,
+            dataset_dir=ds,
+            source_sr=22050,
+            batch_size=4,
+            num_workers=0,
+            campp_torch_weights=weights,
+            **kwargs,
+        )
+        return ds
+
+    def test_writes_stats_files_manifest_and_provenance(self, tmp_path):
+        import hashlib  # noqa: PLC0415
+
+        import numpy as _np  # noqa: PLC0415
+
+        weights = self._weights(tmp_path)
+        ds = self._run(tmp_path, weights)
+        with open(ds / "dataset.jsonl", encoding="utf-8") as f:
+            entries = [json.loads(line) for line in f]
+        sha = hashlib.sha256(weights.read_bytes()).hexdigest()
+        for e in entries:
+            stats = _np.load(ds / e["campp_stats_path"])
+            assert stats.shape == (1024,) and stats.dtype == _np.float32
+            assert _np.isfinite(stats).all()
+            assert e["campp_stats_path"].endswith(".campp_stats.npy")
+            sidecar = json.loads(
+                (ds / e["campp_stats_path"]).with_suffix(".json").read_text()
+            )
+            prov = sidecar["provenance"]
+            assert prov["feature"] == "campp_stats_v1" and prov["dim"] == 1024
+            assert prov["pooling"] == "whole-utterance-statspool"
+            assert prov["weights_sha256"] == sha
+            assert prov["frontend"] == "kaldi-80-25ms-10ms-cmvn-v1@16000Hz"
+            assert (ds / e["speaker_embedding_path"]).exists()
+
+    def test_stats_equal_direct_whole_utterance_computation(self, tmp_path):
+        import numpy as _np  # noqa: PLC0415
+        import torch as _torch  # noqa: PLC0415
+
+        from piper_train.norm_audio import load_audio_norm_tensor  # noqa: PLC0415
+        from piper_train.reference_frontend import campplus_stats  # noqa: PLC0415
+        from piper_train.speaker_encoder.campplus_torch import CAMPPlus  # noqa: PLC0415
+
+        weights = self._weights(tmp_path)
+        ds = self._run(tmp_path, weights)
+        entries = [
+            json.loads(line)
+            for line in (ds / "dataset.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+        model = CAMPPlus(feat_dim=80, embedding_size=192).eval()
+        model.load_state_dict(_torch.load(weights, weights_only=True))
+        e = entries[0]
+        audio = load_audio_norm_tensor(Path(e["audio_norm_path"])).unsqueeze(0)
+        fb = ese.torchaudio.compliance.kaldi.fbank(
+            ese._get_resampler(22050, 16000)(audio),
+            num_mel_bins=80,
+            frame_length=25.0,
+            frame_shift=10.0,
+            sample_frequency=16000,
+        )
+        fb = fb - fb.mean(dim=0, keepdim=True)
+        with _torch.no_grad():
+            expected = campplus_stats(model, fb.unsqueeze(0))[0].numpy()
+        _np.testing.assert_allclose(
+            _np.load(ds / e["campp_stats_path"]), expected, atol=1e-5
+        )
+
+    def test_default_off_writes_no_stats(self, tmp_path):
+        helper = TestDefaultFastPath()
+        ds = helper._make_dataset_with_pt(tmp_path, n_utts=2)
+        ese.extract_per_utterance(
+            session=helper._make_fake_session(),
+            dataset_dir=ds,
+            batch_size=4,
+            num_workers=0,
+        )
+        assert not list((ds / "speaker_embeddings").glob("*campp_stats*"))
+        for line in (ds / "dataset.jsonl").read_text(encoding="utf-8").splitlines():
+            assert "campp_stats_path" not in json.loads(line)
+
+    def test_cli_requires_weights_with_flag(self, monkeypatch, tmp_path, capsys):
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "x",
+                "--encoder",
+                "e.onnx",
+                "--dataset-dir",
+                str(tmp_path),
+                "--per-utterance",
+                "--also-campp-stats",
+            ],
+        )
+        with pytest.raises(SystemExit):
+            ese.main()
+        assert "requires --campp-torch-weights" in capsys.readouterr().err

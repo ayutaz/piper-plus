@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import numpy as np
+import torch
 
 
 VAD_METHOD = "energy_vad_numpy@16k"
@@ -55,3 +56,54 @@ def trim_reference_audio(
         "method": VAD_METHOD,
     }
     return trimmed, info
+
+
+def masked_time_mean_fp32(x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    """mask 付き時間平均を float32 で計算する。
+
+    fp16 入力でも overflow しないよう、float32 へ上げて ``x / length`` を先に
+    計算してから時間方向に和をとる。
+
+    Args:
+        x: ``[B, C, T]``。
+        mask: ``[B, 1, T]`` (1=有効, 0=無効)。
+
+    Returns:
+        ``[B, C]`` float32。
+
+    Raises:
+        ValueError: いずれかの行で mask の有効フレームが 0 の場合。
+    """
+    mask32 = mask.to(torch.float32)
+    length = mask32.sum(dim=-1)  # [B, 1]
+    if bool((length <= 0).any()):
+        raise ValueError("mask has a row with no valid frames")
+    weighted = x.to(torch.float32) * mask32 / length.unsqueeze(-1)
+    return weighted.sum(dim=-1)
+
+
+def campplus_stats(model, fbank: torch.Tensor) -> torch.Tensor:
+    """CAM++ の statistics pooling 直前 (``out_nonlinear`` 出力) の平均+標準偏差。
+
+    ``head`` と ``xvector`` の ``stats`` / ``dense`` を除く全モジュールを通し、
+    時間方向の平均と不偏標準偏差 (``statistics_pooling`` と同じ定義) を float32
+    で計算する (reduction 前に float32 へ upcast)。fbank は 1 batch 内で同一長
+    を前提とし、padding mask は扱わない。
+
+    Args:
+        model: ``CAMPPlus``。
+        fbank: ``[B, T, 80]``。
+
+    Returns:
+        ``[B, 1024]`` float32 (``cat(mean, std)``)。``dense`` は通さない。
+    """
+    x = fbank.permute(0, 2, 1)  # (B,T,F) => (B,F,T)
+    x = model.head(x)
+    for name, module in model.xvector.named_children():
+        if name in ("stats", "dense"):
+            break
+        x = module(x)
+    x = x.to(torch.float32)
+    mean = x.mean(dim=-1)
+    std = x.std(dim=-1, unbiased=True)
+    return torch.cat([mean, std], dim=-1)
