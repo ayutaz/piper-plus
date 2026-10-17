@@ -211,12 +211,13 @@ jobs:
           test/js/test-speaker-encoder-parity.js \
           test/js/test-ort-session-contract.js
 
-    - name: Run zero-shot speaker front-end tests (Kaldi fbank parity with torchaudio)
+    - name: Run speaker encoder front-end tests (Kaldi fbank and mel parity with Python)
       working-directory: src/wasm/openjtalk-web
       run: |
         node --test \
           test/js/test-kaldi-fbank-golden.js \
-          test/js/test-speaker-encoder-front-end.js
+          test/js/test-speaker-encoder-front-end.js \
+          test/js/test-speaker-encoder-golden.js
 
 
     - name: Check file sizes

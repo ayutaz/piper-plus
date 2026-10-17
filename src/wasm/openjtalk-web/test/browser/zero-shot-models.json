@@ -1,0 +1,22 @@
+{
+  "key": "zs-v1",
+  "repo": "ayousanz/piper-plus-base",
+  "revision": "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1",
+  "files": [
+    {
+      "remote": "releases/zs-v1/base.onnx",
+      "local": "base.onnx",
+      "sha256": "e9860701a941db02149c7cfbe19cfb578c235c5e25020f1f592131d9b3b30f84"
+    },
+    {
+      "remote": "releases/zs-v1/base.onnx.json",
+      "local": "base.onnx.json",
+      "sha256": "d085681edaa5029c54ea8329f3f23ed347ba46ca15cd80e766de9a6a643dafc0"
+    },
+    {
+      "remote": "releases/zs-v1/campplus.onnx",
+      "local": "campplus.onnx",
+      "sha256": "a6ac6a63997761ae2997373e2ee1c47040854b4b759ea41ec48e4e42df0f4d73"
+    }
+  ]
+}

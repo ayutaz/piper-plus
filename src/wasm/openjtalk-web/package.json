@@ -78,6 +78,7 @@
     "test:distribution": "node scripts/npm-distribution.mjs",
     "check:cdn": "node scripts/check-cdn-delivery.mjs",
     "test:real-cdn": "node scripts/run-real-cdn-check.mjs",
+    "test:zero-shot-parity": "node test/browser/prepare-models.mjs && node --test test/js/test-zs-campplus-parity.js",
     "probe:demo": "playwright test --grep \"CSS10 official demo\""
   },
   "dependencies": {

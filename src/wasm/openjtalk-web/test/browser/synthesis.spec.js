@@ -3,20 +3,11 @@ import { writeFile } from "node:fs/promises";
 import {
   MIN_PINNED_SECONDS,
   PINNED_TEXT,
+  localDistribution,
   observeErrors,
   observeFailedResponses,
-  routeCdnToLocal,
-  routeModelsToLocal,
   synthesizeWithReadmeImportmap,
 } from "./fixtures.mjs";
-
-async function localDistribution(page) {
-  if (process.env.PIPER_PLUS_DEMO_URL) {
-    return;
-  }
-  await routeCdnToLocal(page);
-  await routeModelsToLocal(page);
-}
 
 test("CSS10 official demo synthesizes and plays all six languages", async ({ page }, info) => {
   const errors = observeErrors(page);
