@@ -686,3 +686,88 @@ class TestCamppStatsExtraction:
         with pytest.raises(SystemExit):
             ese.main()
         assert "requires --campp-torch-weights" in capsys.readouterr().err
+
+    def test_stats_model_error_counts_as_failure(self, tmp_path, monkeypatch):
+        weights = self._weights(tmp_path)
+        helper = TestDefaultFastPath()
+        ds = helper._make_dataset_with_pt(tmp_path, n_utts=2)
+        real = ese.campplus_stats
+        calls = {"n": 0}
+
+        def flaky(model, fbank):
+            calls["n"] += 1
+            if calls["n"] == 1:  # 短い発話での conv/pooling RuntimeError を模擬
+                raise RuntimeError("kernel size can't be greater than input size")
+            return real(model, fbank)
+
+        monkeypatch.setattr(ese, "campplus_stats", flaky)
+        result = ese.extract_per_utterance(
+            session=helper._make_fake_session(),
+            dataset_dir=ds,
+            batch_size=4,
+            num_workers=0,
+            campp_torch_weights=weights,
+        )
+        assert result["failed"] >= 1 and result["success"] >= 1
+        entries = [
+            json.loads(line) for line in (ds / "dataset.jsonl").read_text().splitlines()
+        ]
+        for e in entries:
+            assert ("campp_stats_path" in e) == ("speaker_embedding_path" in e)
+
+    def test_stats_path_not_set_when_192_save_fails(self, tmp_path, monkeypatch):
+        weights = self._weights(tmp_path)
+        helper = TestDefaultFastPath()
+        ds = helper._make_dataset_with_pt(tmp_path, n_utts=2)
+
+        def boom(*_a, **_k):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(ese, "save_verified", boom)
+        with pytest.raises(RuntimeError):  # 全滅は従来通り abort
+            ese.extract_per_utterance(
+                session=helper._make_fake_session(),
+                dataset_dir=ds,
+                batch_size=4,
+                num_workers=0,
+                campp_torch_weights=weights,
+            )
+        for line in (ds / "dataset.jsonl").read_text().splitlines():
+            assert "campp_stats_path" not in json.loads(line)
+
+    def test_sharded_extract_then_finalize(self, tmp_path):
+        import numpy as _np  # noqa: PLC0415
+
+        weights = self._weights(tmp_path)
+        helper = TestDefaultFastPath()
+        ds = helper._make_dataset_with_pt(tmp_path, n_utts=3)
+        # fake session には model path が無く cache 再利用不可のため、実ファイルを与える
+        enc = tmp_path / "enc.onnx"
+        enc.write_bytes(b"fake-encoder")
+        for shard in range(2):
+            ese.extract_per_utterance(
+                session=helper._make_fake_session(),
+                dataset_dir=ds,
+                batch_size=4,
+                num_workers=0,
+                shard=shard,
+                num_shards=2,
+                update_jsonl=False,
+                encoder_path=enc,
+                campp_torch_weights=weights,
+            )
+        assert len(list((ds / "speaker_embeddings").glob("*.campp_stats.npy"))) == 3
+        ese.extract_per_utterance(
+            session=None,
+            dataset_dir=ds,
+            batch_size=4,  # settings (cache key) は shard 実行時と一致させる
+            encoder_path=enc,
+            finalize_only=True,
+            campp_torch_weights=weights,
+        )
+        entries = [
+            json.loads(line) for line in (ds / "dataset.jsonl").read_text().splitlines()
+        ]
+        for e in entries:
+            assert _np.load(ds / e["campp_stats_path"]).shape == (1024,)
+            assert (ds / e["speaker_embedding_path"]).exists()
