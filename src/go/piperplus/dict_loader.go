@@ -131,16 +131,17 @@ func loadCmuDict(path string) (map[string][]string, error) {
 // # pinyin_single.json format
 //
 // Keys are Unicode codepoints as decimal strings; values are pinyin with
-// tone diacritics or numbers, possibly comma-separated alternatives:
+// numeric tones (scripts/build_pinyin_dicts.py), possibly comma-separated
+// alternatives. Tone diacritics are not parsed: "yī" reads as tone 5.
 //
-//	{"19968": "yī", "19981": "bù,fǒu"}
+//	{"19968": "yi1", "19981": "bu4,fou3"}
 //
 // # pinyin_phrases.json format
 //
 // Keys are Chinese phrases; values are arrays of arrays where each inner
 // array contains one pinyin string:
 //
-//	{"一丁不识": [["yī"], ["dīng"], ["bù"], ["shí"]]}
+//	{"一丁不识": [["yi1"], ["ding1"], ["bu4"], ["shi2"]]}
 //
 // Both [][]string and []string formats are accepted for the value arrays.
 func loadPinyinDicts(singlePath, phrasePath string) (map[rune]string, map[string]string, error) {
