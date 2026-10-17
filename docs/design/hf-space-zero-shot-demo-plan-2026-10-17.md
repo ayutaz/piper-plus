@@ -6,7 +6,7 @@
 
 **Architecture:** 既存の多言語 TTS タブは変更せず、`gr.Tabs` で zero-shot タブを並べる。zero-shot の処理は gradio に依存しない `huggingface-space/zero_shot.py` に閉じ込め、公開済み zs-v1 (`base.onnx` + `campplus.onnx`) を revision 固定 + SHA256 照合で遅延ダウンロードする。話者ベクトル抽出と音素化は、CI (`scripts/public_base_runtime.py`) と zs-v1 同梱 `examples/` で検証済みの手順 (torchaudio Kaldi fbank → 平均減算 → CAM++ → L2 正規化、`piper_plus` の `MultilingualPhonemizer` + `PiperVoice`) をそのまま使う。
 
-**Tech Stack:** Python 3.13 / Gradio 6.26.0 / onnxruntime / torch + torchaudio 2.11.0 (CPU wheel) / soxr / huggingface_hub / `src/python_run/piper_plus` (deploy 時にコピー)
+**Tech Stack:** Python 3.13 / Gradio 6.26.0 / onnxruntime / torch + torchaudio 2.11.0 (CPU wheel) / huggingface_hub / `src/python_run/piper_plus` (deploy 時にコピー)
 
 **Spec:** Issue #790 「デモに zero shot を試せる機能を入れる」と、本計画の前段調査 (2026-10-17 セッション)。正本の手順: `scripts/public_base_runtime.py:82-191`、`docs/design/zero-shot-base-zs-v1-release-2026-10-10.md`、`docs/reference/speaker-encoder-contract.md`。
 
@@ -18,7 +18,7 @@
 - 推論既定値は base config の `inference` (noise_scale 0.667 / length_scale 1.0 / noise_w 0.8)。
 - 既存タブの `MODELS` (6 件) と挙動は変更しない (`test-hf-space.yml` の `len(app.MODELS) == 6` を維持)。
 - gradio の pin は 4 箇所同期 (`check_hf_space_gradio_sync.py`)。今回は gradio を上げない。
-- 依存追加で license の変わるものは入れない。torch/torchaudio (BSD)、soxr (LGPL-2.1+ だが既に学習側で使用)、huggingface_hub (Apache-2.0)。
+- 依存追加で license の変わるものは入れない。torch/torchaudio (BSD)、huggingface_hub (Apache-2.0)。CONTRIBUTING の License Policy により配布物に GPL/LGPL は入れない (CI 手順の soxr HQ は LGPL のため、リサンプルは torchaudio の kaiser_best 相当で代替。soxr との CAM++ cosine 0.9992 を実測)。
 - UI 文言: 「実験版・品質未承認」「本人の同意のない声を使わないこと」を zero-shot タブ上部に必ず表示する。
 - Python 実行は `uv run`。ローカルテストは `uv run --no-sync pytest <path> --no-cov`。
 
@@ -41,7 +41,7 @@
 | Create `huggingface-space/tests/test_zero_shot.py` | `zero_shot.py` の単体テスト (偽 CAM++ セッション使用、ネットワーク不要) と `integration` マークの実モデルテスト |
 | Create `huggingface-space/tests/test_app_zero_shot.py` | UI ハンドラのエラー変換と `create_interface()` 構築 |
 | Modify `huggingface-space/app.py` | `gr.Tabs` 化と zero-shot タブ、ハンドラ `synthesize_zero_shot_ui` |
-| Modify `huggingface-space/requirements.txt` | torch/torchaudio CPU wheel、soxr、huggingface_hub |
+| Modify `huggingface-space/requirements.txt` | torch/torchaudio CPU wheel、huggingface_hub |
 | Modify `huggingface-space/README.md` | frontmatter `python_version`、zero-shot の説明、CAM++ と zs-v1 の帰属表示 |
 | (変更なし) `.gitignore` | ONNX は HF キャッシュに置きリポジトリには入れないため不要。config はルート `.gitignore` の `models/` を避けて `huggingface-space/zs-v1/` に置く |
 | Modify `.github/workflows/deploy-huggingface.yml` | コピー対象・paths・import 検証の追加 |
@@ -152,7 +152,7 @@ Expected: `ModuleNotFoundError: No module named 'zero_shot'`
 
 - 取得: 既定 downloader は `huggingface_hub.hf_hub_download(repo_id=BASE_REPO, revision=BASE_REVISION, filename=f"releases/zs-v1/{name}", cache_dir=...)`。`base.onnx` と `campplus.onnx` だけ取得し、config は同梱ファイルを使う。取得後に全 3 ファイルを SHA256 照合 (`hashlib.sha256` を 1 MiB ずつ。`hashlib.file_digest` は使わない)。
 - `load()` は `threading.Lock` で二重実行を防ぎ、`PiperVoice.load(base.onnx, config_path=同梱 config)` と CAM++ 用 `onnxruntime.InferenceSession(providers=["CPUExecutionProvider"])` を作る。`speaker_embedding` 入力があり `sid` がないことを確認する (`public_base_runtime.py:137-140` と同じ)。
-- `extract_speaker_embedding`: `to_mono_float` → 先頭 `MAX_REFERENCE_SECONDS` 秒に切る → 0.1 秒未満 / ピーク振幅 < 1e-4 なら `ZeroShotInputError` → `soxr.resample(..., quality="HQ")` で 16 kHz → Global Constraints の fbank → 平均減算 → CAM++ → 有限・非ゼロを確認して L2 正規化。torch / torchaudio / soxr は関数内で import する (ruff の `PLC0415` は `huggingface-space/*.py` で許可済み)。
+- `extract_speaker_embedding`: `to_mono_float` → 先頭 `MAX_REFERENCE_SECONDS` 秒に切る → 0.1 秒未満 / ピーク振幅 < 1e-4 なら `ZeroShotInputError` → `torchaudio.functional.resample` (kaiser_best 相当) で 16 kHz → Global Constraints の fbank → 平均減算 → CAM++ → 有限・非ゼロを確認して L2 正規化。torch / torchaudio は関数内で import する (ruff の `PLC0415` は `huggingface-space/*.py` で許可済み)。
 - `phoneme_ids_for_base`: `LANGUAGES` 外は `ZeroShotInputError`。Global Constraints の音素化 → 未学習音素があれば `sorted(missing)` を含む `ZeroShotInputError` → `voice.phonemes_to_ids(phones)`。
 - `synthesize`: `load()` → 話者ベクトル → ID → `voice.synthesize_ids_to_raw(ids, language_id=voice.config.language_id_map[language], speaker_embedding=emb, length_scale=..., noise_scale=..., noise_w=...)` → `np.frombuffer(..., dtype=np.int16)`、sample_rate は `voice.config.sample_rate`。
 - 話者ベクトルのキャッシュは入れない (YAGNI。1 回の抽出は CPU で 1 秒未満の見込み)。
@@ -266,7 +266,6 @@ requirements.txt に追加する行:
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.11.0+cpu         # zero-shot: CAM++ 前処理の Kaldi fbank (BSD-3-Clause)
 torchaudio==2.11.0+cpu    # torchaudio.compliance.kaldi.fbank (BSD-2-Clause)
-soxr>=1.0                 # 参照音声の 16 kHz リサンプル (LGPL-2.1-or-later)
 huggingface_hub>=0.30     # zs-v1 の revision 固定ダウンロード (Apache-2.0)
 ```
 
@@ -290,7 +289,7 @@ ONNX は `hf_hub_download` の HF キャッシュに保存されるため変更�
 
 - `on.push.paths` に `src/python_run/piper_plus/**` と `huggingface-space/zs-v1/**` は `huggingface-space/**` に含まれるので前者だけ追加。
 - Prepare: `cp huggingface-space/zero_shot.py`、`cp -r huggingface-space/zs-v1 hf-space-deploy/`、`cp -r src/python_run/piper_plus hf-space-deploy/` (`__pycache__` 除外)。`huggingface-space/tests/` はコピーしない。
-- import 検証リストに `("zero_shot", "ZeroShotEngine")`、`("piper_plus.voice", "PiperVoice")`、`("piper_plus.phonemize.multilingual", "MultilingualPhonemizer")` を追加 (検証 step の `pip install` に `soxr huggingface_hub` を追加。torch は関数内 import なので不要)。
+- import 検証リストに `("zero_shot", "ZeroShotEngine")`、`("piper_plus.voice", "PiperVoice")`、`("piper_plus.phonemize.multilingual", "MultilingualPhonemizer")` を追加 (検証 step の `pip install` に `huggingface_hub` を追加。torch は関数内 import なので不要)。
 
 - [ ] **Step 5: `test-hf-space.yml`**
 

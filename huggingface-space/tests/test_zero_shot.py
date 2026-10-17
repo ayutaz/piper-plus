@@ -1,6 +1,7 @@
 """Tests for the zero-shot (reference audio) path of the HF Space."""
 
 import json
+import sys
 import wave
 from concurrent.futures import ThreadPoolExecutor
 
@@ -122,6 +123,15 @@ def test_long_reference_is_truncated(fake_encoder):
     audio = (0.1 * rng.standard_normal(16000 * 120)).astype(np.float32)
     zero_shot.extract_speaker_embedding(16000, audio, fake_encoder)
     assert fake_encoder.last_input_shape[1] <= 30 * 100
+
+
+def test_embedding_does_not_need_soxr(fake_encoder, monkeypatch):
+    # soxr is LGPL; the Space must stay free of copyleft dependencies.
+    monkeypatch.setitem(sys.modules, "soxr", None)
+    audio = np.full(44100, 0.1, dtype=np.float32)
+    audio[::2] = -0.1
+    emb = zero_shot.extract_speaker_embedding(44100, audio, fake_encoder)
+    assert emb.shape == (192,)
 
 
 def test_long_reference_is_cut_before_float_conversion(fake_encoder, monkeypatch):

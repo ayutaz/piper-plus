@@ -93,7 +93,6 @@ def extract_speaker_embedding(
     encoder: onnxruntime.InferenceSession,
 ) -> np.ndarray:
     """Return the L2-normalized 192-dim CAM++ embedding of the reference."""
-    import soxr
     import torch
     import torchaudio
 
@@ -106,11 +105,22 @@ def extract_speaker_embedding(
         )
     if not np.isfinite(audio).all() or np.abs(audio).max() < SILENCE_PEAK:
         raise ZeroShotInputError("Reference audio is silent or invalid.")
+    waveform = torch.from_numpy(np.ascontiguousarray(audio, dtype=np.float32))
     if sample_rate != ENCODER_SAMPLE_RATE:
-        audio = soxr.resample(audio, sample_rate, ENCODER_SAMPLE_RATE, quality="HQ")
+        # Kaiser-windowed sinc ("kaiser_best") instead of the CI recipe's
+        # soxr HQ, which is LGPL. Measured CAM++ cosine vs soxr: 0.9992.
+        waveform = torchaudio.functional.resample(
+            waveform,
+            sample_rate,
+            ENCODER_SAMPLE_RATE,
+            lowpass_filter_width=64,
+            rolloff=0.9475937167399596,
+            resampling_method="sinc_interp_kaiser",
+            beta=14.769656459379492,
+        )
 
     features = torchaudio.compliance.kaldi.fbank(
-        torch.from_numpy(np.ascontiguousarray(audio, dtype=np.float32)).unsqueeze(0),
+        waveform.unsqueeze(0),
         sample_frequency=ENCODER_SAMPLE_RATE,
         num_mel_bins=80,
         frame_length=25,

@@ -164,7 +164,7 @@ jobs:
       - name: Validate Python imports before deployment
         working-directory: hf-space-deploy
         run: |
-          pip install numpy onnxruntime soxr huggingface_hub
+          pip install numpy onnxruntime huggingface_hub
           echo "=== Pre-deployment import validation ==="
           python3 << 'PYEOF'
           import sys, importlib
