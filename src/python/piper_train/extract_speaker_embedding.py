@@ -62,12 +62,17 @@ def _get_resampler(source_sr: int, target_sr: int) -> torchaudio.transforms.Resa
     return _RESAMPLER_CACHE[key]
 
 
-def preprocess_audio(wav_path: str | Path, target_sr: int = 16000) -> np.ndarray:
+def preprocess_audio(
+    wav_path: str | Path, target_sr: int = 16000, *, trim: bool = False
+) -> np.ndarray:
     """WAVファイルを読み込み、Fbank特徴量に変換する。
 
     Args:
         wav_path: Path to WAV file.
         target_sr: Target sample rate.
+        trim: True なら学習時と同じ energy VAD で前後無音を除去してから
+            fbank 化する (``reference_frontend.trim_reference_audio``)。
+            既定 False は従来出力と完全一致。
 
     Returns:
         fbank: np.ndarray, shape [T, 80], float32
@@ -75,6 +80,11 @@ def preprocess_audio(wav_path: str | Path, target_sr: int = 16000) -> np.ndarray
     audio_data, sr = sf.read(str(wav_path), dtype="float32", always_2d=False)
     if audio_data.ndim > 1:
         audio_data = audio_data.mean(axis=1)
+
+    if trim:
+        from .reference_frontend import trim_reference_audio  # noqa: PLC0415
+
+        audio_data, _ = trim_reference_audio(audio_data, sr)
 
     # Resample to target_sr
     if sr != target_sr:
