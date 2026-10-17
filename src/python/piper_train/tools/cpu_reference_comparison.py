@@ -59,8 +59,13 @@ def independent_reals(candidates, sources):
     return result
 
 
-def reference_embedding(session, paths, *, chunk_frames=0):
-    """Hold the runtime frontend fixed; vary only pooling (whole vs training chunks)."""
+def reference_embedding(session, paths, *, chunk_frames=0, trim=False):
+    """Hold the runtime frontend fixed; vary only pooling (whole vs training chunks).
+
+    ``trim=True`` applies the training-identical energy VAD
+    (``reference_frontend.trim_reference_audio``) before fbank; the default
+    keeps the previous frontend output unchanged.
+    """
     import torch  # noqa: PLC0415
 
     from piper_plus.embedding import validate_embedding  # noqa: PLC0415
@@ -74,7 +79,7 @@ def reference_embedding(session, paths, *, chunk_frames=0):
     vectors = []
     chunk_counts = []
     for path in paths:
-        fbank = preprocess_audio(path)
+        fbank = preprocess_audio(path, trim=trim)
         if chunk_frames:
             dataset = _FbankDataset([], source_sr=16000, fixed_frames=chunk_frames)
             chunks = dataset._to_chunks(torch.from_numpy(fbank)).numpy()
@@ -86,6 +91,88 @@ def reference_embedding(session, paths, *, chunk_frames=0):
     if not vectors:
         raise ValueError("reference list must not be empty")
     return validate_embedding(np.mean(vectors, axis=0)), chunk_counts
+
+
+def projected_average(model, embeddings):
+    """Average multiple references on the g side: mean_i spk_proj(e_i).
+
+    Diagnostic only (Torch). Embedding-side averaging projects
+    ``L2(mean_i e_i)`` once; this keeps each reference's projection separate.
+    Uses the model's current ``spk_proj`` weights (raw or EMA as loaded).
+
+    Returns:
+        ``[1, gin_channels]`` tensor on the ``spk_proj`` device/dtype.
+    """
+    import torch  # noqa: PLC0415
+
+    values = np.asarray(embeddings, dtype=np.float32)
+    if values.ndim != 2 or values.shape[0] < 1 or not np.isfinite(values).all():
+        raise ValueError("embeddings must be a finite non-empty [N, D] array")
+    parameter = next(model.spk_proj.parameters())
+    projected = model.spk_proj(
+        torch.from_numpy(values).to(parameter.device, parameter.dtype)
+    )
+    return projected.mean(dim=0, keepdim=True)
+
+
+def pairwise_separability(vectors, labels, *, standardize=False):
+    """Same- vs other-speaker cosine separation over all utterance pairs.
+
+    AUC is the Mann-Whitney probability that a random same-speaker pair has a
+    higher cosine than a random other-speaker pair (ties count 0.5).
+    ``standardize=True`` z-scores each dimension on this same pooled set
+    (transductive; mean 0 / unit variance) before cosine.
+    """
+    values = np.asarray(vectors, dtype=np.float64)
+    labels = list(labels)
+    if values.ndim != 2 or len(labels) != len(values) or not np.isfinite(values).all():
+        raise ValueError("vectors must be finite [N, D] with one label per row")
+    normalization = "none (raw cosine)"
+    if standardize:
+        std = values.std(axis=0)
+        values = (values - values.mean(axis=0)) / np.where(std > 0, std, 1.0)
+        normalization = (
+            "per-dimension z-score on the pooled evaluation set, then cosine"
+        )
+    norms = np.linalg.norm(values, axis=1, keepdims=True)
+    if (norms == 0).any():
+        raise ValueError("zero vector cannot define cosine")
+    unit = values / norms
+    rows, cols = np.triu_indices(len(values), k=1)
+    cosine = np.sum(unit[rows] * unit[cols], axis=1)
+    names = np.asarray(labels, dtype=object)
+    same_mask = names[rows] == names[cols]
+    same, other = cosine[same_mask], cosine[~same_mask]
+    if not len(same) or not len(other):
+        raise ValueError("need both same-speaker and other-speaker pairs")
+    # Mann-Whitney U via average ranks (ties share the mean rank).
+    order = np.concatenate([same, other])
+    ranks = np.empty(len(order))
+    sorter = np.argsort(order, kind="mergesort")
+    sorted_values = order[sorter]
+    start = 0
+    while start < len(sorted_values):
+        end = start
+        while (
+            end + 1 < len(sorted_values)
+            and sorted_values[end + 1] == sorted_values[start]
+        ):
+            end += 1
+        ranks[sorter[start : end + 1]] = (start + end) / 2 + 1
+        start = end + 1
+    rank_sum = ranks[: len(same)].sum()
+    auc = (rank_sum - len(same) * (len(same) + 1) / 2) / (len(same) * len(other))
+    return {
+        "auc": float(auc),
+        "same_mean": float(same.mean()),
+        "other_mean": float(other.mean()),
+        "gap": float(same.mean() - other.mean()),
+        "n_speakers": len(set(labels)),
+        "n_utterances": len(labels),
+        "n_same_pairs": len(same),
+        "n_other_pairs": len(other),
+        "normalization": normalization,
+    }
 
 
 def load_native_ecapa(source):
