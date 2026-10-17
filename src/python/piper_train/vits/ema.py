@@ -5,6 +5,7 @@ from pytorch_lightning.callbacks import Callback
 from torch import nn
 
 from .commons import migrate_prefilm_decoder_cond
+from .reference_encoder import REFERENCE_MODULE_NAMES
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -16,6 +17,15 @@ _LOGGER = logging.getLogger(__name__)
 # 背景: 現行 EMA は dec + spk_proj のみで、v10a の崩壊経路そのものだった
 # flow (SNAC スケールの単調成長) が対象外だった (v10-design §10 所見 5)。
 EXTENDED_EMA_MODULES: tuple[str, ...] = ("flow", "enc_p", "spk_proj_dp")
+
+# 参照条件付け (reference-fusion plan §8 Task 6R): spk_proj の出力に加算される
+# モジュールなので scope に関係なく (legacy でも) spk_proj と一緒に追跡する。
+# spk_proj だけ EMA にすると validation / EMA export が「EMA の spk_proj +
+# raw の参照項」という学習中に存在しない組み合わせになる。存在するものだけ
+# 追跡するので、参照条件付けのないモデルの EMA は変わらない。shadow は
+# ``ema_extended`` / ckpt の ``ema_extended_state`` に同居させる (export の
+# ``apply_ema_scope_from_checkpoint`` が属性名で自動適用する)。
+REFERENCE_EMA_MODULES: tuple[str, ...] = REFERENCE_MODULE_NAMES
 
 EMA_SCOPES: tuple[str, ...] = ("legacy", "extended")
 
@@ -121,6 +131,9 @@ class EMACallback(Callback):
     - ``"extended"``: 加えて :data:`EXTENDED_EMA_MODULES` (flow / enc_p /
       spk_proj_dp) を追跡する。SNAC flow (v10 M1) 導入後の必須整備で、
       ckpt に ``ema_scope`` を記録するため export 側が自動判別できる
+
+    どちらの scope でも、:data:`REFERENCE_EMA_MODULES` (参照条件付け) が
+    モデルにあればそれも追跡する (ないモデルの挙動は不変)。
     """
 
     def __init__(
@@ -156,10 +169,16 @@ class EMACallback(Callback):
         yield from self.ema_extended.values()
 
     def _init_extended(self, model):
-        """scope="extended" の対象サブモジュールに EMA を張る (存在するものだけ)。"""
-        if self.scope != "extended":
-            return
-        for name in EXTENDED_EMA_MODULES:
+        """追加の対象サブモジュールに EMA を張る (存在するものだけ)。
+
+        参照条件付けモジュールは scope に関係なく、:data:`EXTENDED_EMA_MODULES`
+        は scope="extended" のときだけ。ckpt から復元済みの shadow は
+        上書きしない (復元されなかったものだけ live 重みから作る)。
+        """
+        names = REFERENCE_EMA_MODULES
+        if self.scope == "extended":
+            names = EXTENDED_EMA_MODULES + REFERENCE_EMA_MODULES
+        for name in names:
             if name in self.ema_extended:
                 continue
             module = getattr(model.model_g, name, None)
@@ -168,7 +187,8 @@ class EMACallback(Callback):
             self.ema_extended[name] = ExponentialMovingAverage(module, decay=self.decay)
         if self.ema_extended:
             _LOGGER.info(
-                "EMA scope=extended: tracking %s in addition to dec / spk_proj",
+                "EMA scope=%s: tracking %s in addition to dec / spk_proj",
+                self.scope,
                 ", ".join(sorted(self.ema_extended)),
             )
 
@@ -281,7 +301,9 @@ class EMACallback(Callback):
         # shadow は validation で適用されるのに更新されず陳腐化する (静かに悪化)。
         # ckpt に記録された scope を採用して更新を継続させる。
         extended_state = checkpoint.get("ema_extended_state") or {}
-        if extended_state:
+        # 参照モジュールの shadow は legacy scope の ckpt にも載るので、scope
+        # 採用の判断には使わない (拡張 shadow がある場合だけ ckpt の scope に従う)
+        if any(name not in REFERENCE_EMA_MODULES for name in extended_state):
             ckpt_scope = checkpoint.get("ema_scope", "extended")
             if ckpt_scope != self.scope:
                 _LOGGER.warning(
@@ -292,20 +314,20 @@ class EMACallback(Callback):
                     self.scope,
                 )
                 self.scope = ckpt_scope
-            for name, state in extended_state.items():
-                module = getattr(model.model_g, name, None)
-                if module is None:
-                    _LOGGER.warning(
-                        "Checkpoint carries EMA shadows for model_g.%s but this "
-                        "model has no such submodule — skipping.",
-                        name,
-                    )
-                    continue
-                if name not in self.ema_extended:
-                    self.ema_extended[name] = ExponentialMovingAverage(
-                        module, decay=self.decay
-                    )
-                self.ema_extended[name].load_state_dict(state)
+        for name, state in extended_state.items():
+            module = getattr(model.model_g, name, None)
+            if module is None:
+                _LOGGER.warning(
+                    "Checkpoint carries EMA shadows for model_g.%s but this "
+                    "model has no such submodule — skipping.",
+                    name,
+                )
+                continue
+            if name not in self.ema_extended:
+                self.ema_extended[name] = ExponentialMovingAverage(
+                    module, decay=self.decay
+                )
+            self.ema_extended[name].load_state_dict(state)
 
         # Mark that shadow params may be on CPU and need to be moved to GPU
         self._needs_device_sync = True

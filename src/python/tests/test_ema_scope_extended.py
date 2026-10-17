@@ -292,6 +292,219 @@ class TestExportAppliesExtendedShadows:
 
 
 # ===========================================================================
+# 3b. 参照条件付けモジュール (reference-fusion plan §8 Task 6R)
+#
+# reference_encoder / capacity_control は spk_proj の出力に加算される。
+# spk_proj だけ EMA にして参照項を raw のまま混ぜると、validation と EMA
+# export で「EMA の spk_proj + raw の参照項」という学習中に一度も存在しない
+# 組み合わせになる。そのため scope に関係なく (legacy でも) 追跡する。
+# ===========================================================================
+
+
+class _ReferenceGenerator(_DummyGenerator):
+    """``reference_conditioning`` 付き model_g の EMA 対象構成。"""
+
+    def __init__(self, names=("reference_encoder",), with_dp_head=False):
+        super().__init__(with_dp_head=with_dp_head)
+        for name in names:
+            block = _Block(0.0)  # 実モジュールと同じく出力層は zero-init
+            setattr(self, name, block)
+
+
+class _ReferenceLightningModule(nn.Module):
+    def __init__(self, names=("reference_encoder",)):
+        super().__init__()
+        self.model_g = _ReferenceGenerator(names=names)
+
+
+def _reference_names():
+    from piper_train.vits import ema
+
+    names = getattr(ema, "REFERENCE_EMA_MODULES", None)
+    if names is None:
+        pytest.fail(
+            "piper_train.vits.ema.REFERENCE_EMA_MODULES が未実装 "
+            "(Task 6R: 参照モジュールの EMA 追跡表)"
+        )
+    return names
+
+
+def _saved_from(cb, model) -> dict:
+    ckpt: dict = {}
+    cb.on_save_checkpoint(_DummyTrainer(), model, ckpt)
+    return ckpt
+
+
+class TestReferenceModuleEma:
+    def test_reference_module_list(self):
+        assert tuple(_reference_names()) == ("reference_encoder", "capacity_control")
+
+    @pytest.mark.parametrize("scope", ["legacy", "extended"])
+    @pytest.mark.parametrize("name", ["reference_encoder", "capacity_control"])
+    def test_ema_tracks_reference_encoder_in_legacy_and_extended(self, scope, name):
+        cb = EMACallback(decay=0.5, scope=scope)
+        cb.on_fit_start(_DummyTrainer(), _ReferenceLightningModule(names=(name,)))
+        assert name in cb.ema_extended
+
+    def test_legacy_scope_adds_only_reference_modules(self):
+        cb = EMACallback(decay=0.5)
+        cb.on_fit_start(_DummyTrainer(), _ReferenceLightningModule())
+        assert set(cb.ema_extended) == {"reference_encoder"}, (
+            "legacy scope で flow / enc_p まで追跡し始めている"
+        )
+
+    def test_extended_scope_tracks_reference_and_extended_modules(self):
+        cb = EMACallback(decay=0.5, scope="extended")
+        cb.on_fit_start(
+            _DummyTrainer(),
+            _ReferenceLightningModule(names=("reference_encoder", "capacity_control")),
+        )
+        assert set(cb.ema_extended) == {
+            "flow",
+            "enc_p",
+            "reference_encoder",
+            "capacity_control",
+        }
+
+    def test_reference_shadow_starts_from_live_zero_init_weights(self):
+        cb = EMACallback(decay=0.5)
+        model = _ReferenceLightningModule()
+        cb.on_fit_start(_DummyTrainer(), model)
+        shadow = cb.ema_extended["reference_encoder"].shadow_params
+        live = dict(model.model_g.reference_encoder.named_parameters())
+        assert set(shadow) == set(live)
+        for key, value in live.items():
+            assert torch.equal(shadow[key], value)
+
+    def test_reference_shadow_is_updated_on_train_batch_end(self):
+        cb = EMACallback(decay=0.5)
+        model = _ReferenceLightningModule()
+        cb.on_fit_start(_DummyTrainer(), model)
+        with torch.no_grad():
+            model.model_g.reference_encoder.linear.weight.fill_(2.0)
+        cb.on_train_batch_end(_DummyTrainer(global_step=0), model, None, None, 0)
+        ema = cb.ema_extended["reference_encoder"]
+        # num_updates=1 → decay = min(0.5, 2/11) = 2/11、shadow = 0·d + 2·(1-d)
+        expected = 2.0 * (1.0 - 2.0 / 11.0)
+        assert ema.num_updates == 1
+        assert ema.shadow_params["linear.weight"][0, 0].item() == pytest.approx(
+            expected, rel=1e-6
+        )
+
+    def test_reference_shadow_applied_together_with_spk_proj_in_validation(self):
+        cb = EMACallback(decay=0.5)
+        model = _ReferenceLightningModule()
+        cb.on_fit_start(_DummyTrainer(), model)
+        with torch.no_grad():
+            cb.ema_spk_proj.shadow_params["linear.weight"].fill_(8.0)
+            cb.ema_extended["reference_encoder"].shadow_params["linear.weight"].fill_(
+                9.0
+            )
+        raw = model.model_g.reference_encoder.linear.weight.clone()
+
+        cb.on_validation_epoch_start(_DummyTrainer(), model)
+        assert torch.all(model.model_g.spk_proj.linear.weight == 8.0)
+        assert torch.all(model.model_g.reference_encoder.linear.weight == 9.0)
+        cb.on_validation_epoch_end(_DummyTrainer(), model)
+        assert torch.equal(model.model_g.reference_encoder.linear.weight, raw)
+
+    @pytest.mark.parametrize("scope", ["legacy", "extended"])
+    def test_reference_shadow_round_trips_through_checkpoint(self, scope):
+        cb = EMACallback(decay=0.9, scope=scope)
+        model = _ReferenceLightningModule()
+        cb.on_fit_start(_DummyTrainer(), model)
+        with torch.no_grad():
+            cb.ema_extended["reference_encoder"].shadow_params["linear.weight"].fill_(
+                3.0
+            )
+        ckpt = _saved_from(cb, model)
+        assert ckpt["ema_scope"] == scope
+        assert "reference_encoder" in ckpt["ema_extended_state"]
+
+        restored = EMACallback(decay=0.9, scope=scope)
+        resumed_model = _ReferenceLightningModule()
+        restored.on_load_checkpoint(_DummyTrainer(), resumed_model, ckpt)
+        restored.on_fit_start(_DummyTrainer(), resumed_model)
+        shadow = restored.ema_extended["reference_encoder"].shadow_params
+        assert torch.all(shadow["linear.weight"] == 3.0), (
+            "on_fit_start が復元済み shadow を live 重みで上書きしている"
+        )
+
+    def test_reference_shadow_does_not_flip_requested_scope(self):
+        """legacy ckpt の参照 shadow を理由に、extended 指定の run を legacy に
+        戻さない (scope 採用は flow / enc_p 等の拡張 shadow だけで判断する)。"""
+        cb_old = EMACallback(decay=0.9)
+        model = _ReferenceLightningModule()
+        cb_old.on_fit_start(_DummyTrainer(), model)
+        ckpt = _saved_from(cb_old, model)
+        assert set(ckpt["ema_extended_state"]) == {"reference_encoder"}
+
+        cb = EMACallback(decay=0.9, scope="extended")
+        resumed_model = _ReferenceLightningModule()
+        cb.on_load_checkpoint(_DummyTrainer(), resumed_model, ckpt)
+        cb.on_fit_start(_DummyTrainer(), resumed_model)
+        assert cb.scope == "extended"
+        assert set(cb.ema_extended) == {"flow", "enc_p", "reference_encoder"}
+
+    def test_extended_checkpoint_scope_is_still_adopted(self):
+        cb_old = EMACallback(decay=0.9, scope="extended")
+        model = _ReferenceLightningModule()
+        cb_old.on_fit_start(_DummyTrainer(), model)
+        ckpt = _saved_from(cb_old, model)
+
+        cb = EMACallback(decay=0.9)  # legacy で起動 (resume 時の取り違え)
+        cb.on_load_checkpoint(_DummyTrainer(), _ReferenceLightningModule(), ckpt)
+        assert cb.scope == "extended"
+
+    @pytest.mark.parametrize("scope", ["legacy", "extended"])
+    def test_resume_from_none_checkpoint_initialises_reference_shadow(self, scope):
+        """参照モジュールのない ckpt の EMA を参照付きモデルで読むと、参照
+        shadow は live (zero-init) 重みから作られ、以後更新される。既存
+        shadow は ckpt の値のまま。"""
+        cb_old = EMACallback(decay=0.9, scope=scope)
+        old_model = _DummyLightningModule()
+        cb_old.on_fit_start(_DummyTrainer(), old_model)
+        with torch.no_grad():
+            cb_old.ema_generator.shadow_params["linear.weight"].fill_(6.0)
+        ckpt = _saved_from(cb_old, old_model)
+        assert "reference_encoder" not in (ckpt["ema_extended_state"] or {})
+
+        cb = EMACallback(decay=0.9, scope=scope)
+        model = _ReferenceLightningModule()
+        cb.on_load_checkpoint(_DummyTrainer(), model, ckpt)
+        cb.on_fit_start(_DummyTrainer(), model)
+
+        ema = cb.ema_extended["reference_encoder"]
+        assert ema.num_updates == 0
+        assert torch.count_nonzero(ema.shadow_params["linear.weight"]) == 0
+        assert torch.all(cb.ema_generator.shadow_params["linear.weight"] == 6.0)
+
+        with torch.no_grad():
+            model.model_g.reference_encoder.linear.weight.fill_(1.0)
+        cb.on_train_batch_end(_DummyTrainer(global_step=0), model, None, None, 0)
+        assert ema.num_updates == 1
+        assert torch.all(ema.shadow_params["linear.weight"] > 0)
+
+    def test_export_applies_reference_shadow_from_callback_checkpoint(self):
+        """callback が保存した ckpt を export 側が参照モジュールへ適用する。"""
+        from piper_train.export_onnx import apply_ema_scope_from_checkpoint
+
+        cb = EMACallback(decay=0.9)
+        model = _ReferenceLightningModule()
+        cb.on_fit_start(_DummyTrainer(), model)
+        with torch.no_grad():
+            cb.ema_extended["reference_encoder"].shadow_params["linear.weight"].fill_(
+                4.0
+            )
+        ckpt = _saved_from(cb, model)
+
+        export_g = _ReferenceGenerator()
+        report = apply_ema_scope_from_checkpoint(export_g, ckpt)
+        assert report["reference_encoder"] == (2, 0)
+        assert torch.all(export_g.reference_encoder.linear.weight == 4.0)
+
+
+# ===========================================================================
 # 4. CLI
 # ===========================================================================
 
