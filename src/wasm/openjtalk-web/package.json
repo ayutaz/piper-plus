@@ -75,6 +75,7 @@
     "test:onnx-inputs": "node scripts/run-onnx-input-tests.mjs test/js/test-onnx-input-contract.js test/js/test-piper-plus-onnx-inputs.js",
     "test:browser": "node test/browser/prepare-models.mjs && playwright test && node scripts/check-browser-report.mjs",
     "test:distribution": "node scripts/npm-distribution.mjs",
+    "test:zero-shot-parity": "node test/browser/prepare-models.mjs && node --test test/js/test-zs-campplus-parity.js",
     "probe:demo": "playwright test --grep \"CSS10 official demo\""
   },
   "dependencies": {
