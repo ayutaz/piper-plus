@@ -47,6 +47,7 @@ from piper_train.embedding_cache import (
     save_verified,
 )
 from piper_train.norm_audio import load_audio_norm_tensor
+from piper_train.reference_frontend import campplus_stats
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -288,7 +289,9 @@ class _FbankDataset(torch.utils.data.Dataset):
         target_sr: int = 16000,
         fixed_frames: int = 0,
         chunk_hop_ratio: float = 0.5,
+        keep_whole: bool = False,
     ):
+        self.keep_whole = keep_whole
         self.items = items
         self.source_sr = source_sr
         self.target_sr = target_sr
@@ -372,8 +375,11 @@ class _FbankDataset(torch.utils.data.Dataset):
                 sample_frequency=self.target_sr,
             )
             fbank = fbank - fbank.mean(dim=0, keepdim=True)
+            whole = fbank
             if self.fixed_frames > 0:
                 fbank = self._to_chunks(fbank)  # [n_chunks, target, mel]
+            if self.keep_whole:
+                return (entry_idx, fbank, stem, True, whole)
             return (entry_idx, fbank, stem, True)
         except Exception as e:
             _LOGGER.warning("Worker failed to load %s: %s", pt_path, e)
@@ -381,6 +387,8 @@ class _FbankDataset(torch.utils.data.Dataset):
                 zero = torch.zeros(1, self.fixed_frames, 80)
             else:
                 zero = torch.zeros(1, 80)
+            if self.keep_whole:
+                return (entry_idx, zero, stem, False, torch.zeros(1, 80))
             return (entry_idx, zero, stem, False)
 
 
@@ -480,6 +488,70 @@ def _write_updated_jsonl(dataset_dir: Path, entries: list[dict]) -> None:
     )
 
 
+class _BatchWithWhole(tuple):
+    """通常の collate 結果 (tuple) に utterance 全体の fbank list を添える。"""
+
+    whole: list
+
+
+def _with_whole(collate):
+    """5 要素目の全体 fbank を collate 対象から外し、``.whole`` として添える。"""
+
+    def wrapped(batch):
+        out = _BatchWithWhole(collate([b[:4] for b in batch]))
+        out.whole = [b[4] for b in batch]
+        return out
+
+    return wrapped
+
+
+CAMPP_STATS_FEATURE = "campp_stats_v1"
+CAMPP_STATS_DIM = 1024
+CAMPP_STATS_POOLING = "whole-utterance-statspool"
+CAMPP_STATS_SUFFIX = ".campp_stats"
+
+
+def _load_campplus_stats_model(weights_path: Path):
+    from piper_train.speaker_encoder.campplus_torch import CAMPPlus  # noqa: PLC0415
+
+    model = CAMPPlus(feat_dim=80, embedding_size=192, memory_efficient=False)
+    state_dict = torch.load(weights_path, map_location="cpu", weights_only=True)
+    if isinstance(state_dict, dict) and "state_dict" in state_dict:
+        state_dict = state_dict["state_dict"]
+    model.load_state_dict(state_dict, strict=True)
+    for p in model.parameters():
+        p.requires_grad_(False)
+    return model.eval()
+
+
+def _read_campp_stats(path: Path, provenance: dict) -> np.ndarray | None:
+    """来歴が一致し sha が合う既存 stats だけを再利用する。"""
+    try:
+        sidecar = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
+        if sidecar.get("provenance") != provenance:
+            return None
+        if sidecar.get("stats_sha256") != file_sha256(path):
+            return None
+        stats = np.load(path, allow_pickle=False)
+        if stats.shape != (CAMPP_STATS_DIM,) or not np.isfinite(stats).all():
+            return None
+        return stats
+    except (OSError, ValueError, TypeError, KeyError, EOFError):
+        return None
+
+
+def _save_campp_stats(path: Path, stats: np.ndarray, provenance: dict) -> None:
+    stats = np.asarray(stats, dtype=np.float32)
+    if stats.shape != (CAMPP_STATS_DIM,) or not np.isfinite(stats).all():
+        raise ValueError(f"invalid campp stats: shape={stats.shape}")
+    atomic_write(path, lambda target: np.save(target, stats, allow_pickle=False))
+    sidecar = {"provenance": provenance, "stats_sha256": file_sha256(path)}
+    atomic_write(
+        path.with_suffix(".json"),
+        lambda target: target.write(json.dumps(sidecar, sort_keys=True).encode()),
+    )
+
+
 def extract_per_utterance(
     session: onnxruntime.InferenceSession,
     dataset_dir: str | Path,
@@ -497,6 +569,7 @@ def extract_per_utterance(
     encoder_path: str | Path | None = None,
     dry_run: bool = False,
     finalize_only: bool = False,
+    campp_torch_weights: str | Path | None = None,
 ) -> dict:
     """dataset.jsonl の各発話ごとにembeddingを抽出し、dataset.jsonlを更新する。
 
@@ -534,6 +607,10 @@ def extract_per_utterance(
         use_batch_infer: Force legacy padded batch inference (only when fixed_frames=0).
         use_length_sort: Force length-based bucket sorting. None=auto (True if
             ``fixed_frames > 0`` or ``use_batch_infer=True``).
+        campp_torch_weights: 指定時は 192 次元 embedding と同じ pass で、torch CAMPPlus の
+            statistics pooling 直前統計 (平均+標準偏差, 1024 次元, 発話全体の fbank・
+            chunk 分割なし) を ``<key>.campp_stats.npy`` に保存し、manifest に
+            ``campp_stats_path`` を追加する。None なら従来出力と完全一致。
     """
     dataset_dir = Path(dataset_dir).resolve()
     jsonl_path = dataset_dir / "dataset.jsonl"
@@ -589,6 +666,26 @@ def extract_per_utterance(
         else "whole-utterance",
     }
 
+    campp_model = None
+    campp_provenance = None
+    if campp_torch_weights is not None:
+        campp_torch_weights = Path(campp_torch_weights)
+        if not campp_torch_weights.is_file():
+            raise FileNotFoundError(
+                f"CAM++ torch weights not found: {campp_torch_weights}"
+            )
+        campp_provenance = {
+            "feature": CAMPP_STATS_FEATURE,
+            "dim": CAMPP_STATS_DIM,
+            "frontend": f"{settings['fbank_version']}@{settings['target_sr']}Hz",
+            "pooling": CAMPP_STATS_POOLING,
+            "weights_sha256": file_sha256(campp_torch_weights),
+        }
+        # 192 側の cache key にも含め、stats の来歴違いで 192 も再抽出して整合させる
+        settings["campp_stats"] = campp_provenance
+        if not dry_run:
+            campp_model = _load_campplus_stats_model(campp_torch_weights)
+
     # Load all entries
     entries: list[dict] = []
     with open(jsonl_path, encoding="utf-8") as f:
@@ -609,6 +706,8 @@ def extract_per_utterance(
         if i % num_shards != shard:
             continue
         utt.pop("speaker_embedding_path", None)
+        if campp_provenance is not None:
+            utt.pop("campp_stats_path", None)
         audio_norm_path = utt.get("audio_norm_path")
         if not audio_norm_path:
             fail += 1
@@ -633,10 +732,16 @@ def extract_per_utterance(
         path = emb_dir / (key + ".npy")
         legacy = (emb_dir / (pt_path.stem + ".npy")).exists()
         report["legacy"] += int(legacy)
-        if read_verified(path, metadata) is not None:
+        stats_path = emb_dir / (key + CAMPP_STATS_SUFFIX + ".npy")
+        if read_verified(path, metadata) is not None and (
+            campp_provenance is None
+            or _read_campp_stats(stats_path, campp_provenance) is not None
+        ):
             skipped += 1
             report["reuse"] += 1
             utt["speaker_embedding_path"] = _manifest_path(path, dataset_dir)
+            if campp_provenance is not None:
+                utt["campp_stats_path"] = _manifest_path(stats_path, dataset_dir)
             status = "reuse"
         else:
             report["reextract"] += 1
@@ -702,7 +807,10 @@ def extract_per_utterance(
 
     # Create dataset and dataloader
     dataset = _FbankDataset(
-        items_to_extract, source_sr=source_sr, fixed_frames=fixed_frames
+        items_to_extract,
+        source_sr=source_sr,
+        fixed_frames=fixed_frames,
+        keep_whole=campp_model is not None,
     )
     # 固定長 A'案 (fixed_frames > 0): chunk 分割済みなので chunked collate
     # batch_infer のみ: padded collate (zero pad で pool 破損リスクあり)
@@ -713,6 +821,8 @@ def extract_per_utterance(
         _collate_choice = _collate_fbanks_padded
     else:
         _collate_choice = _collate_fbanks
+    if campp_model is not None:
+        _collate_choice = _with_whole(_collate_choice)
     loader_kwargs: dict = {
         "batch_size": batch_size,
         "num_workers": num_workers,
@@ -762,10 +872,22 @@ def extract_per_utterance(
             )
             return np.full((features.shape[0], 192), np.nan, dtype=np.float32)
 
-    def publish(index, key, values):
+    def publish(index, key, values, whole=None):
         nonlocal success, fail
         try:
             path = emb_dir / (key + ".npy")
+            if campp_model is not None:
+                with torch.no_grad():
+                    stats = (
+                        campplus_stats(campp_model, whole.unsqueeze(0).float())[0]
+                        .cpu()
+                        .numpy()
+                    )
+                stats_path = emb_dir / (key + CAMPP_STATS_SUFFIX + ".npy")
+                _save_campp_stats(stats_path, stats, campp_provenance)
+                entries[index]["campp_stats_path"] = _manifest_path(
+                    stats_path, dataset_dir
+                )
             save_verified(path, values, metadata_by_index[index])
             entries[index]["speaker_embedding_path"] = _manifest_path(path, dataset_dir)
             success += 1
@@ -790,9 +912,9 @@ def extract_per_utterance(
 
     if fixed_frames > 0:
         # A'案: chunk 分割済み。全 chunks を batch 化して推論、utt 単位で L2 正規化平均
-        for batch_idx, (indices, flat, chunks_per_utt, stems, valids) in enumerate(
-            loader
-        ):
+        for batch_idx, batch in enumerate(loader):
+            indices, flat, chunks_per_utt, stems, valids = batch
+            wholes = getattr(batch, "whole", None) or [None] * len(stems)
             if flat.shape[0] == 0:
                 fail += sum(1 for v in valids if not v)
                 continue
@@ -820,7 +942,7 @@ def extract_per_utterance(
                     fail += 1
                     _LOGGER.warning("Invalid chunk embedding: %s", exc)
                     continue
-                publish(indices[j], stems[j], utt_emb)
+                publish(indices[j], stems[j], utt_emb, wholes[j])
             if (batch_idx + 1) % 50 == 0:
                 _LOGGER.info(
                     "Batch %d/%d (success=%d, fail=%d)",
@@ -830,7 +952,9 @@ def extract_per_utterance(
                     fail,
                 )
     elif use_batch_infer:
-        for batch_idx, (indices, padded, _lengths, stems, valids) in enumerate(loader):
+        for batch_idx, batch in enumerate(loader):
+            indices, padded, _lengths, stems, valids = batch
+            wholes = getattr(batch, "whole", None) or [None] * len(stems)
             valid_mask = np.array(valids, dtype=bool)
             if not valid_mask.any():
                 fail += int((~valid_mask).sum())
@@ -840,7 +964,7 @@ def extract_per_utterance(
                 if not valids[j]:
                     fail += 1
                     continue
-                publish(indices[j], stems[j], embeddings[j])
+                publish(indices[j], stems[j], embeddings[j], wholes[j])
             if (batch_idx + 1) % 50 == 0:
                 _LOGGER.info(
                     "Batch %d/%d (success=%d, fail=%d)",
@@ -857,7 +981,9 @@ def extract_per_utterance(
         output_name = session.get_outputs()[0].name
         io_binding = session.io_binding() if use_gpu else None
 
-        for batch_idx, (indices, fbank_list, stems, valids) in enumerate(loader):
+        for batch_idx, batch in enumerate(loader):
+            indices, fbank_list, stems, valids = batch
+            wholes = getattr(batch, "whole", None) or [None] * len(stems)
             for _j, (_entry_idx, fbank, stem, valid) in enumerate(
                 zip(indices, fbank_list, stems, valids, strict=False)
             ):
@@ -867,7 +993,7 @@ def extract_per_utterance(
 
                 fbank_input = np.expand_dims(fbank, axis=0)
                 embedding = infer(fbank_input, io_binding, output_name)
-                publish(_entry_idx, stem, embedding)
+                publish(_entry_idx, stem, embedding, wholes[_j])
 
             if (batch_idx + 1) % 50 == 0:
                 _LOGGER.info(
@@ -898,6 +1024,13 @@ def extract_per_utterance(
     else:
         _LOGGER.info("Skipping dataset.jsonl update (--no-update-jsonl)")
     return {**report, "success": success, "failed": fail}
+
+
+def _campp_kwargs(args) -> dict:
+    """既定 (フラグなし) では従来の呼び出しと完全に同じ引数にする。"""
+    if args.also_campp_stats:
+        return {"campp_torch_weights": args.campp_torch_weights}
+    return {}
 
 
 def main() -> None:
@@ -1014,12 +1147,32 @@ def main() -> None:
         help="Audit per-utterance cache provenance without extraction or file changes",
     )
     parser.add_argument(
+        "--also-campp-stats",
+        action="store_true",
+        help=(
+            "With --per-utterance: also save CAM++ pre-pooling statistics "
+            "(mean+std, 1024-d) as <key>.campp_stats.npy and campp_stats_path in the "
+            "manifest. Requires --campp-torch-weights."
+        ),
+    )
+    parser.add_argument(
+        "--campp-torch-weights",
+        help="Path to torch CAMPPlus weights (campplus_cn_common.bin) for --also-campp-stats",
+    )
+    parser.add_argument(
         "--finalize-manifest",
         action="store_true",
         help="Verify all per-utterance shard results and publish manifest without extraction",
     )
 
     args = parser.parse_args()
+
+    if args.also_campp_stats and not args.campp_torch_weights:
+        parser.error("--also-campp-stats requires --campp-torch-weights")
+    if args.campp_torch_weights and not args.also_campp_stats:
+        parser.error("--campp-torch-weights requires --also-campp-stats")
+    if args.also_campp_stats and not args.per_utterance:
+        parser.error("--also-campp-stats requires --per-utterance")
 
     # Validate arguments
     modes = sum(
@@ -1066,6 +1219,7 @@ def main() -> None:
             encoder_path=args.encoder,
             dry_run=args.dry_run_cache,
             finalize_only=args.finalize_manifest,
+            **_campp_kwargs(args),
         )
         print(json.dumps(report, ensure_ascii=False))
         return
@@ -1153,6 +1307,7 @@ def main() -> None:
                 use_batch_infer=args.batch_infer_padded,
                 use_length_sort=True if args.length_sort else None,
                 encoder_path=args.encoder,
+                **_campp_kwargs(args),
             )
         else:
             extract_from_dataset(
