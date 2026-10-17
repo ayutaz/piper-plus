@@ -54,11 +54,13 @@
 ### Task 1: `zero_shot.py` — 資産取得・話者ベクトル・音素化・合成
 
 **Files:**
+
 - Create: `huggingface-space/zero_shot.py`
 - Create: `huggingface-space/zs-v1/base.onnx.json` (pinned revision から取得し SHA を照合して配置)
 - Test: `huggingface-space/tests/test_zero_shot.py`
 
 **Interfaces:**
+
 - Produces:
   - 定数 `BASE_REPO: str`、`BASE_REVISION: str`、`FILE_SHA256: dict[str, str]` (3 ファイル)、`LANGUAGES: tuple[str, ...] = ("ja","en","zh","es","fr","pt")`、`MIN_REFERENCE_SECONDS = 0.1`、`MAX_REFERENCE_SECONDS = 30.0`、`ENCODER_SAMPLE_RATE = 16000`
   - `class ZeroShotInputError(ValueError)` — 利用者の入力が原因のエラー (UI で gr.Error に変換)
@@ -179,10 +181,12 @@ git commit -m "feat(hf-space): zs-v1 の zero-shot 推論モジュールを追�
 ### Task 2: `app.py` — zero-shot タブ
 
 **Files:**
+
 - Modify: `huggingface-space/app.py:214-341` (`create_interface`)
 - Test: `huggingface-space/tests/test_app_zero_shot.py`
 
 **Interfaces:**
+
 - Consumes: `zero_shot.get_engine()`、`ZeroShotEngine.synthesize(...)`、`zero_shot.ZeroShotInputError`、`zero_shot.LANGUAGES`
 - Produces: `def synthesize_zero_shot_ui(text: str, language: str, reference: tuple[int, np.ndarray] | None, length_scale: float, noise_scale: float, noise_w: float) -> tuple[int, np.ndarray]`
 
@@ -248,11 +252,13 @@ git commit -m "feat(hf-space): zero-shot タブを追加 (#790)"
 ### Task 3: 依存・README・デプロイ / CI
 
 **Files:**
+
 - Modify: `huggingface-space/requirements.txt`、`huggingface-space/README.md`
 - Modify: `.github/workflows/deploy-huggingface.yml`、`.github/workflows/test-hf-space.yml`
 - Modify: `tests/scripts/test_check_python_licenses.py:49-57`
 
 **Interfaces:**
+
 - Consumes: Task 1/2 のファイル一式
 - Produces: deploy bundle `hf-space-deploy/` に `zero_shot.py`、`zs-v1/base.onnx.json`、`piper_plus/` (`src/python_run/piper_plus` のコピー) が入ること
 
@@ -315,6 +321,7 @@ git commit -m "ci(hf-space): zero-shot の依存とデプロイ・テスト経�
 ### Task 4: ドキュメントと PR
 
 **Files:**
+
 - Modify: `docs/features/webui.md:75-78`、`CHANGELOG.md` (Unreleased)
 
 - [ ] **Step 1: ドキュメント更新**

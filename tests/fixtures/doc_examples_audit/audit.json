@@ -2,14 +2,14 @@
   "schema_version": 1,
   "generated_at": "2026-10-16T09:55:39Z",
   "totals": {
-    "executable": 229,
+    "executable": 234,
     "needs_placeholder": 7,
-    "skip_warranted": 233,
-    "total": 469
+    "skip_warranted": 234,
+    "total": 475
   },
   "by_language": {
     "bash": {
-      "executable": 168,
+      "executable": 171,
       "needs_placeholder": 7,
       "skip_warranted": 44
     },
@@ -24,7 +24,7 @@
       "skip_warranted": 0
     },
     "python": {
-      "executable": 31,
+      "executable": 33,
       "needs_placeholder": 0,
       "skip_warranted": 1
     },
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 188
+      "skip_warranted": 189
     },
     "wasm": {
       "executable": 10,
@@ -293,6 +293,86 @@
       ],
       "env_dependencies": [],
       "hash_sha1": "2c55c0311705757d50b2b884ad4a1130caa79932"
+    },
+    {
+      "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
+      "line_start": 81,
+      "line_end": 142,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "52a01a3e07eb824a0965571398ac5d2232bc0b4e"
+    },
+    {
+      "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
+      "line_start": 174,
+      "line_end": 177,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "b9666a46e66fa8d6512fe471f365a50bfb590e92"
+    },
+    {
+      "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
+      "line_start": 197,
+      "line_end": 219,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "398f74e104b458ea7726e24a28ced39262dbf89d"
+    },
+    {
+      "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
+      "line_start": 245,
+      "line_end": 248,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "b918bab9c8f2e27913a86d5349978b94b40c7615"
+    },
+    {
+      "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
+      "line_start": 271,
+      "line_end": 276,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "125ff18c4ad021c86e261e9f946bca7e0b05e0a8"
+    },
+    {
+      "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
+      "line_start": 314,
+      "line_end": 317,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "cfdf160c85f97bd3ed68b27b7deb5accabdd786e"
     },
     {
       "file": "docs/design/multi-6lang-zero-shot-v7-training-results.md",
@@ -826,8 +906,8 @@
     },
     {
       "file": "docs/features/webui.md",
-      "line_start": 88,
-      "line_end": 102,
+      "line_start": 91,
+      "line_end": 105,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -841,8 +921,8 @@
     },
     {
       "file": "docs/features/webui.md",
-      "line_start": 115,
-      "line_end": 124,
+      "line_start": 118,
+      "line_end": 127,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -854,8 +934,8 @@
     },
     {
       "file": "docs/features/webui.md",
-      "line_start": 153,
-      "line_end": 156,
+      "line_start": 156,
+      "line_end": 159,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
