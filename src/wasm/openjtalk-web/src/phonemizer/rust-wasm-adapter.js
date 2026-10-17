@@ -117,7 +117,9 @@ export class RustWasmAdapter {
    * Encode text into phoneme IDs and optional prosody features.
    * @param {string} text
    * @param {string} language
-   * @returns {{ phonemeIds: number[], prosodyFeatures: number[][]|null }}
+   * `droppedSymbols` lists symbols missing from the model's phoneme ID map
+   * (null when the WASM build predates the getter).
+   * @returns {{ phonemeIds: number[], prosodyFeatures: number[][]|null, droppedSymbols: string[]|null }}
    */
   encode(text, language) {
     const result = this._wasm.phonemize(text, language);
@@ -133,7 +135,10 @@ export class RustWasmAdapter {
         }
       }
 
-      return { phonemeIds, prosodyFeatures };
+      const dropped = result.droppedSymbols;
+      const droppedSymbols = dropped === undefined ? null : Array.from(dropped);
+
+      return { phonemeIds, prosodyFeatures, droppedSymbols };
     } finally {
       result.free();
     }

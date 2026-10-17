@@ -89,6 +89,11 @@ export interface EncodeResult {
      * null when the source PhonemizeResult has no prosody data.
      */
     prosodyFlat: number[] | null;
+    /**
+     * Tokens missing from the phoneme ID map, left out of phonemeIds (each
+     * listed once, in first-seen order). Empty in strict mode, which throws.
+     */
+    droppedSymbols: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -741,7 +746,7 @@ export class Encoder {
      * @param tokens - IPA phoneme token array from a phonemize() call.
      * @returns Object containing the phoneme ID sequence.
      */
-    encode(tokens: string[]): { phonemeIds: number[] };
+    encode(tokens: string[]): { phonemeIds: number[]; droppedSymbols: string[] };
 
     /**
      * Encode IPA tokens to phoneme IDs with aligned prosody features.

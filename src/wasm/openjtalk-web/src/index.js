@@ -782,6 +782,34 @@ export class PiperPlus {
   }
 
   /**
+   * List the symbols the phonemizer produces for `text` that the loaded
+   * model's phoneme ID map lacks. synthesize() leaves them out of the input
+   * silently, so callers can check first (e.g. the zs-v1 base, which was
+   * trained on a fixed 173-symbol set, misses some Portuguese and French
+   * phonemes). Whitespace and punctuation the model does not map are
+   * included; filter them if they do not matter to you.
+   *
+   * @param {string} text
+   * @param {Object} [options]
+   * @param {string} [options.language] - Same as synthesize(); detected when omitted.
+   * @returns {Promise<string[]>} Each symbol once, in first-seen order.
+   */
+  async findDroppedSymbols(text, options = {}) {
+    this._assertReady();
+    if (!text) {
+      throw new Error("text is required");
+    }
+    const language = options.language || this._detectLanguage(text);
+    const { droppedSymbols } = await this._textToPhonemeIds(text, language);
+    if (!Array.isArray(droppedSymbols)) {
+      throw new Error(
+        `The ${language} phonemizer does not report dropped symbols (outdated WASM or G2P build).`
+      );
+    }
+    return droppedSymbols;
+  }
+
+  /**
    * Streaming synthesis — splits text into sentences and invokes
    * `options.onChunk` for each generated audio chunk.
    *
