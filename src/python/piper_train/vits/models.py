@@ -9,6 +9,15 @@ from torch.nn.utils import spectral_norm, weight_norm
 from . import attentions, commons, modules, monotonic_align
 from .commons import get_padding
 from .mb_istft import MBiSTFTGenerator
+from .reference_encoder import (
+    CapacityControl,
+    ReferenceSpecEncoder,
+    reference_spec_encoder_param_count,
+)
+
+
+# 参照条件付け (docs/design/zero-shot-reference-fusion-plan-2026-10-17.md §8.2)
+REFERENCE_CONDITIONING_MODES = ("none", "ref_spec", "capacity")
 
 
 # v10b S-2: 予測 log F0 を Hz に戻す前のクランプ域。学習初期の外れ値が
@@ -1283,8 +1292,19 @@ class SynthesizerTrn(nn.Module):
         # 位相格子の計算に必要な音響パラメータ
         sample_rate: int = 22050,
         hop_length: int = 256,
+        # --- 参照条件付け (default "none" = 旧モデルと bit 互換。
+        # docs/design/zero-shot-reference-fusion-plan-2026-10-17.md §8.2) ---
+        # "ref_spec": g_spk に ReferenceSpecEncoder(参照 spec) を加算 (F-mel)
+        # "capacity": g_spk に CapacityControl(埋め込み) を加算 (容量対照 Ccap)
+        reference_conditioning: str = "none",
+        reference_spec_channels: int = 513,
     ):
         super().__init__()
+        if reference_conditioning not in REFERENCE_CONDITIONING_MODES:
+            raise ValueError(
+                f"reference_conditioning must be one of "
+                f"{REFERENCE_CONDITIONING_MODES}, got {reference_conditioning!r}"
+            )
         self.n_vocab = n_vocab
         self.spec_channels = spec_channels
         self.inter_channels = inter_channels
@@ -1468,29 +1488,104 @@ class SynthesizerTrn(nn.Module):
         if n_languages > 1:
             self.emb_lang = nn.Embedding(n_languages, gin_channels)
 
-    def _get_speaker_condition(self, speaker_embeddings=None):
+        # 参照条件付け。既存モジュールの初期化 (RNG 消費順) を変えないよう
+        # 必ず最後に作る。"none" では何も作らない (旧 ckpt strict load 互換)。
+        self.reference_conditioning = reference_conditioning
+        if reference_conditioning != "none":
+            if not hasattr(self, "spk_proj"):
+                raise ValueError(
+                    f"reference_conditioning={reference_conditioning!r} adds to "
+                    "the spk_proj output and requires a multi-speaker model "
+                    "(n_speakers > 1, gin_channels > 0)"
+                )
+            if reference_conditioning == "ref_spec":
+                self.reference_encoder = ReferenceSpecEncoder(
+                    reference_spec_channels, gin_channels
+                )
+            else:
+                self.capacity_control = CapacityControl(
+                    192,
+                    gin_channels,
+                    target_params=reference_spec_encoder_param_count(
+                        reference_spec_channels, gin_channels
+                    ),
+                )
+
+    def _get_speaker_condition(
+        self, speaker_embeddings=None, reference_spec=None, reference_spec_lengths=None
+    ):
         """Project speaker embeddings through spk_proj MLP.
+
+        ``reference_conditioning`` が ``"ref_spec"`` なら参照 spec の encoder
+        出力を、``"capacity"`` なら埋め込みの容量対照 MLP 出力を加算する。
+        どちらも最終層 zero-init なので初期状態は spk_proj のみと一致する。
 
         Parameters
         ----------
         speaker_embeddings : torch.Tensor or None
             Raw speaker embeddings from CAM++ [batch, 192]
+        reference_spec : torch.Tensor or None
+            参照発話の線形振幅 spec [batch, reference_spec_channels, T_ref]
+            (``"ref_spec"`` でのみ必須、それ以外で渡すと ValueError)
+        reference_spec_lengths : torch.LongTensor or None
+            参照 spec の有効 frame 数 [batch]
 
         Returns
         -------
         torch.Tensor or None
             Projected speaker conditioning [batch, gin_channels, 1]
         """
+        mode = getattr(self, "reference_conditioning", "none")
+        has_reference = reference_spec is not None or reference_spec_lengths is not None
+        if mode != "ref_spec" and has_reference:
+            # 黙って捨てると「参照を効かせたつもり」の評価を生む
+            raise ValueError(
+                f"reference_spec was given but reference_conditioning={mode!r} "
+                "does not consume it"
+            )
+        if mode == "ref_spec":
+            if reference_spec is None:
+                raise ValueError(
+                    "reference_conditioning='ref_spec' requires reference_spec"
+                )
+            if reference_spec_lengths is None:
+                raise ValueError(
+                    "reference_conditioning='ref_spec' requires reference_spec_lengths"
+                )
+            if speaker_embeddings is None:
+                raise ValueError(
+                    "reference_conditioning='ref_spec' requires speaker_embeddings "
+                    "(g_spk = spk_proj(e) + reference_encoder(spec))"
+                )
+            if (
+                reference_spec.dim() >= 1
+                and reference_spec.shape[0] != (speaker_embeddings.shape[0])
+            ):
+                raise ValueError(
+                    f"reference_spec batch ({reference_spec.shape[0]}) must match "
+                    f"speaker_embeddings batch ({speaker_embeddings.shape[0]})"
+                )
         if speaker_embeddings is None:
             return None
         if not hasattr(self, "spk_proj"):
             return None
         # spk_proj: Linear(192, gin_channels) -> LayerNorm -> GELU -> Linear(gin_channels, gin_channels)
-        g = self.spk_proj(speaker_embeddings)  # [b, gin_channels]
-        return g.unsqueeze(-1)  # [b, gin_channels, 1]
+        g = self.spk_proj(speaker_embeddings).unsqueeze(-1)  # [b, gin_channels, 1]
+        if mode == "ref_spec":
+            delta = self.reference_encoder(reference_spec, reference_spec_lengths)
+            g = g + delta.to(g.dtype)
+        elif mode == "capacity":
+            g = g + self.capacity_control(speaker_embeddings).to(g.dtype)
+        return g
 
     def _get_global_conditioning(
-        self, sid=None, lid=None, speaker_embeddings=None, return_components=False
+        self,
+        sid=None,
+        lid=None,
+        speaker_embeddings=None,
+        return_components=False,
+        reference_spec=None,
+        reference_spec_lengths=None,
     ):
         """Compute global conditioning vector from speaker and language embeddings.
 
@@ -1516,6 +1611,8 @@ class SynthesizerTrn(nn.Module):
             lid 未指定なら None)。SNAC flow の SN/SDN 統計 (話者のみ) と WN
             条件付け (lang のみ) の分離に使う。default False は従来どおり
             単一 tensor (既存呼び出しの互換維持)。
+        reference_spec / reference_spec_lengths
+            ``_get_speaker_condition`` へ渡す参照 spec (話者成分にのみ加算)。
 
         Returns
         -------
@@ -1523,7 +1620,11 @@ class SynthesizerTrn(nn.Module):
             Global conditioning [batch, gin_channels, 1]
             (return_components=True 時は上記 3-tuple)
         """
-        g_spk = self._get_speaker_condition(speaker_embeddings)
+        g_spk = self._get_speaker_condition(
+            speaker_embeddings,
+            reference_spec=reference_spec,
+            reference_spec_lengths=reference_spec_lengths,
+        )
         g_lang = None
         if self.n_languages > 1 and lid is not None:
             # Defend against the lid=-1 mixed-language sentinel used in
@@ -1749,9 +1850,16 @@ class SynthesizerTrn(nn.Module):
         speaker_embeddings=None,
         f0=None,
         f0_pred_prob: float = 0.0,
+        reference_spec=None,
+        reference_spec_lengths=None,
     ):
         g, g_spk, g_lang = self._get_global_conditioning(
-            sid, lid, speaker_embeddings=speaker_embeddings, return_components=True
+            sid,
+            lid,
+            speaker_embeddings=speaker_embeddings,
+            return_components=True,
+            reference_spec=reference_spec,
+            reference_spec_lengths=reference_spec_lengths,
         )
         # v11 P2: g_spk は AdaLN 用 (use_adaln_encp off なら enc_p 側で無視)
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g, g_spk=g_spk)
@@ -1868,7 +1976,15 @@ class SynthesizerTrn(nn.Module):
         )
 
     def scl_waveform_detached_z(
-        self, z, ids_slice, speaker_embeddings=None, sid=None, lid=None, f0=None
+        self,
+        z,
+        ids_slice,
+        speaker_embeddings=None,
+        sid=None,
+        lid=None,
+        f0=None,
+        reference_spec=None,
+        reference_spec_lengths=None,
     ):
         """SCL 専用の decoder re-forward (v10 roadmap B-3)。
 
@@ -1890,6 +2006,8 @@ class SynthesizerTrn(nn.Module):
         f0 : torch.Tensor or None
             v10b S-2: ``forward`` が decoder に渡した F0 スライス
             (``SynthesizerOutput.f0_decoder``)。主経路と同一の位相参照を使う。
+        reference_spec / reference_spec_lengths
+            ``forward`` に渡したものと同じ参照 spec (``"ref_spec"`` のみ)
 
         Returns
         -------
@@ -1898,7 +2016,11 @@ class SynthesizerTrn(nn.Module):
         """
         z_slice = commons.slice_segments(z, ids_slice, self.segment_size).detach()
         g = self._get_global_conditioning(
-            sid, lid, speaker_embeddings=speaker_embeddings
+            sid,
+            lid,
+            speaker_embeddings=speaker_embeddings,
+            reference_spec=reference_spec,
+            reference_spec_lengths=reference_spec_lengths,
         )
         o, _ = self.dec(z_slice, g=g, f0=f0)
         return o
@@ -1912,6 +2034,8 @@ class SynthesizerTrn(nn.Module):
         sid=None,
         lid=None,
         f0=None,
+        reference_spec=None,
+        reference_spec_lengths=None,
     ):
         """swap-SCL 用の flow 逆走 + decoder forward (v10 S1、ASCL 型)。
 
@@ -1940,6 +2064,8 @@ class SynthesizerTrn(nn.Module):
         speaker_embeddings / sid / lid
             swap 先話者 q の条件付け入力 (lid はテキストの言語のまま —
             変えるのは話者のみ)
+        reference_spec / reference_spec_lengths
+            swap 先話者 q の参照 spec (``"ref_spec"`` のみ)
 
         Returns
         -------
@@ -1948,7 +2074,12 @@ class SynthesizerTrn(nn.Module):
         """
         z_p = z_p.detach()  # ASCL stop-gradient: enc_q / enc_p / 順方向 flow を遮断
         g, g_spk, g_lang = self._get_global_conditioning(
-            sid, lid, speaker_embeddings=speaker_embeddings, return_components=True
+            sid,
+            lid,
+            speaker_embeddings=speaker_embeddings,
+            return_components=True,
+            reference_spec=reference_spec,
+            reference_spec_lengths=reference_spec_lengths,
         )
         if self.use_snac_flow:
             # v10 M1+E2: reverse でも SN/SDN 統計は話者成分のみ、WN は lang のみ
@@ -1972,6 +2103,8 @@ class SynthesizerTrn(nn.Module):
         prosody_features=None,
         speaker_embeddings=None,
         f0_scale: float = 1.0,
+        reference_spec=None,
+        reference_spec_lengths=None,
     ) -> "InferOutput":
         """Run inference to synthesize audio from phoneme IDs.
 
@@ -1996,7 +2129,12 @@ class SynthesizerTrn(nn.Module):
                 f"speaker_embeddings dim must be 192, got {speaker_embeddings.shape[-1]}"
             )
         g, g_spk, g_lang = self._get_global_conditioning(
-            sid, lid, speaker_embeddings=speaker_embeddings, return_components=True
+            sid,
+            lid,
+            speaker_embeddings=speaker_embeddings,
+            return_components=True,
+            reference_spec=reference_spec,
+            reference_spec_lengths=reference_spec_lengths,
         )
         # v11 P2: g_spk は AdaLN 用 (use_adaln_encp off なら enc_p 側で無視)
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g, g_spk=g_spk)

@@ -856,6 +856,19 @@ def create_parser():
         "parameters, so from-scratch runs only.",
     )
     parser.add_argument(
+        "--reference-conditioning",
+        choices=("none", "ref_spec", "capacity"),
+        default="none",
+        help="Reference conditioning (reference-fusion plan §8.2): 'ref_spec' "
+        "adds a small trainable encoder over the reference utterance's linear "
+        "magnitude spectrogram onto the spk_proj output (speaker component "
+        "only); 'capacity' adds an MLP of the 192-d speaker embedding with the "
+        "same parameter budget (capacity control). Both output layers are "
+        "zero-initialised, so step-0 output equals the plain model. 'none' "
+        "(default) = existing models/CLI bit-compatible; the other modes add "
+        "reference_encoder.* / capacity_control.* parameters.",
+    )
+    parser.add_argument(
         "--no-snac-stats",
         action="store_true",
         default=False,
@@ -1708,6 +1721,12 @@ def main():
             "AdaLN-Zero conditioned on g_spk only (g_lang excluded, P0-4). "
             "Zero-init heads = plain LN at step 0. Adds adaln_* parameters — "
             "from-scratch runs only."
+        )
+    if getattr(args, "reference_conditioning", "none") != "none":
+        _LOGGER.info(
+            "Reference conditioning enabled (--reference-conditioning=%s): "
+            "zero-init term added to the speaker condition (spk_proj output).",
+            args.reference_conditioning,
         )
     if getattr(args, "no_snac_stats", False):
         _LOGGER.info(
