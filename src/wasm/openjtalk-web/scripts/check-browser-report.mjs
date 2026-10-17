@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 const xml = readFileSync("test-results/browser.xml", "utf8");
-for (const name of ["CSS10 official demo", "README importmap", "README Basic Usage"]) {
+for (const name of [
+  "CSS10 official demo",
+  "README importmap",
+  "README Basic Usage",
+  "Zero-shot demo",
+]) {
   if (!xml.includes(`<testcase name="${name}`)) {
     throw new Error(`Mandatory browser case missing: ${name}`);
   }

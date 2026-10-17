@@ -78,6 +78,10 @@ jobs:
             wasm:
               - 'src/wasm/**'
               - 'src/rust/piper-wasm/**'
+              # Golden data read by the npm-package-tests zero-shot checks.
+              - 'test/fixtures/zs_campplus_golden.json'
+              - 'test/fixtures/kaldi_fbank_golden.json'
+              - 'test/generate_zs_campplus_golden.py'
             go:
               - 'src/go/**'
             docker:
@@ -502,7 +506,10 @@ jobs:
         uses: actions/cache@v4.3.0
         with:
           path: src/wasm/openjtalk-web/test/browser/models
-          key: browser-tts-models-${{ hashFiles('src/wasm/openjtalk-web/test/browser/models.json') }}
+          key: browser-tts-models-${{ hashFiles('src/wasm/openjtalk-web/test/browser/models.json', 'src/wasm/openjtalk-web/test/browser/zero-shot-models.json') }}
+
+      - name: Test zero-shot CAM++ embedding parity with the Python recipe
+        run: npm run test:zero-shot-parity
 
       - name: Test browser synthesis with public models
         run: npm run test:browser

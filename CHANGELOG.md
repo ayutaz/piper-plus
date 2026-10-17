@@ -10,11 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - HF Space demo: add an experimental Zero-shot tab that speaks in the voice of an uploaded or recorded reference clip (#790). It uses the revision-pinned public `zs-v1` base and CAM++ encoder with the CI-verified embedding recipe, rejects text containing phonemes the model never learned or letters outside the six languages instead of dropping them, and is a functional demo, not a quality approval.
+- GitHub Pages demo: zero-shot section that computes a CAM++ embedding from an uploaded or recorded clip in the browser and reads text in six languages with the public zs-v1 base (Issue #790).
+- Browser (`piper-plus` npm): `SpeakerEncoder` option `frontEnd: "kaldi-fbank"` that matches the zs-v1 Python embedding recipe (torchaudio Kaiser resampling + 80-bin `kaldi.fbank`), checked against a torchaudio golden fixture. The default front end is unchanged.
+- Browser (`piper-plus` npm) and Rust WASM: `findDroppedSymbols()` / `droppedSymbols` report the phonemes a model's table lacks, which encoding skips silently (for zs-v1: French `ɥ`, Portuguese `ã`, and most punctuation).
 
 ### Fixed
 
 - Chinese G2P outside Python: regenerate the shared `pinyin_single.json` / `pinyin_phrases.json` from pypinyin 0.55.0 with numeric tones (`ni3`), matching the Python canonical output. The previous files carried tone marks (`nǐ`), which the Rust, Go, C++, WASM, Swift, and Android parsers read as tone 5 with a broken final (你好 became `n tone5 x o tone5`). Add `scripts/build_pinyin_dicts.py`, mirror gates for the copies, and a Rust test that compares against the Python golden fixture.
 - Browser (`piper-plus` npm): route English to the JS G2P even when the Rust WASM bundle loads for Japanese or Chinese. The WASM bundle has no English dictionary and spelled words out letter by letter.
+- Browser (`piper-plus` npm): `model: "base"` verifies the downloaded zs-v1 `base.onnx` against its pinned SHA-256.
 
 ## [2.0.2] - 2026-10-16
 

@@ -453,6 +453,59 @@ describe("PiperPlus WASM G2P integration", { skip: skip ? "Import failed" : fals
     });
   });
 
+  describe("findDroppedSymbols", () => {
+    // WASM module whose phonemize() results report `droppedSymbols`, or omit
+    // it like a WASM build that predates the getter.
+    function createReportingWasmModule(droppedSymbols) {
+      const mod = createMockWasmModule();
+      const Base = mod.WasmPhonemizer;
+      mod.WasmPhonemizer = class extends Base {
+        constructor(configJson) {
+          super(configJson);
+          const phonemize = this.phonemize;
+          this.phonemize = (text, lang) => {
+            const result = phonemize(text, lang);
+            return droppedSymbols === undefined ? result : { ...result, droppedSymbols };
+          };
+        }
+      };
+      return mod;
+    }
+
+    async function initWith(wasmDropped, jsDropped) {
+      setMockConfig(CONFIG_WITH_JA);
+      restoreG2PCreate();
+      G2P.create = async () => ({
+        ...createMockG2PInstance(),
+        encode: () => ({ phonemeIds: [1, 7, 2], prosodyFlat: null, droppedSymbols: jsDropped }),
+      });
+      return PiperPlus.initialize({
+        model: "test",
+        ort: globalThis.ort,
+        wasmLoader: async () => createReportingWasmModule(wasmDropped),
+      });
+    }
+
+    it("returns the symbols each phonemizer path left out", async () => {
+      const piper = await initWith(["ã"], [" "]);
+      try {
+        assert.deepEqual(await piper.findDroppedSymbols("Olá, irmã", { language: "pt" }), ["ã"]);
+        assert.deepEqual(await piper.findDroppedSymbols("Hello there", { language: "en" }), [" "]);
+      } finally {
+        piper.dispose();
+      }
+    });
+
+    it("throws when the phonemizer does not report dropped symbols", async () => {
+      const piper = await initWith(undefined, []);
+      try {
+        await assert.rejects(piper.findDroppedSymbols("Olá", { language: "pt" }), /dropped symbols/);
+      } finally {
+        piper.dispose();
+      }
+    });
+  });
+
   // -------------------------------------------------------------------------
   // M2-2: _textToPhonemeIds branch tests
   // -------------------------------------------------------------------------
