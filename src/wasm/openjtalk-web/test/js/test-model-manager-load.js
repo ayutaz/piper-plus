@@ -766,3 +766,27 @@ describe("ModelManager.loadModel() 成功ケース", { skip }, () => {
     );
   });
 });
+
+describe("ModelManager.loadModel() pinned zero-shot base", { skip }, () => {
+  const originalFetch = globalThis.fetch;
+  const originalIndexedDB = globalThis.indexedDB;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    globalThis.indexedDB = originalIndexedDB;
+  });
+
+  it("rejects a download that is not the published base.onnx", async () => {
+    installIndexedDBMock(createMockIndexedDB());
+    const prefix =
+      "https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/";
+    // The published config carries no sha256, so the pinned digest must
+    // come from the alias itself.
+    const { fetch: mockFetch } = createMockFetch(
+      createDirectUrlRoutes(prefix + "base.onnx", { config: { ...SAMPLE_CONFIG } })
+    );
+    globalThis.fetch = mockFetch;
+
+    await assert.rejects(new ModelManager().loadModel("base"), /SHA-256 mismatch/);
+  });
+});
