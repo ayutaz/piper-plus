@@ -212,13 +212,10 @@ fn test_zh_golden() {
         .join("test")
         .join("models")
         .join("pinyin_phrases.json");
-    let p = match piper_plus_g2p::chinese::ChinesePhonemizer::new(&single_path, &phrase_path) {
-        Ok(p) => p,
-        Err(_) => {
-            eprintln!("SKIP: pinyin dictionary not found — skipping ZH golden test");
-            return;
-        }
-    };
+    // The dictionaries are checked into the repository, so a load failure is a
+    // real regression, not a reason to skip.
+    let p = piper_plus_g2p::chinese::ChinesePhonemizer::new(&single_path, &phrase_path)
+        .expect("test/models pinyin dictionaries must load");
     for case in cases_for(&fixture, "zh") {
         let (tokens, _) = p.phonemize_with_prosody(&case.input).unwrap();
         // ZH: structural checks (tone markers)
@@ -237,6 +234,74 @@ fn test_zh_golden() {
             );
         }
         assert_case(&tokens, case);
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct PythonGoldenFixture {
+    test_cases: Vec<PythonGoldenCase>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PythonGoldenCase {
+    language: String,
+    input: String,
+    expected_phonemes: String,
+}
+
+/// Exact match against the Python (pypinyin) output, using the real shipped
+/// dictionaries. The structural checks above accept any tone marker, so they
+/// passed while every syllable came out as tone 5 with its final dropped.
+#[test]
+fn test_zh_matches_python_golden() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .to_path_buf();
+    let models = repo_root.join("test").join("models");
+    let p = piper_plus_g2p::chinese::ChinesePhonemizer::new(
+        &models.join("pinyin_single.json"),
+        &models.join("pinyin_phrases.json"),
+    )
+    .expect("test/models pinyin dictionaries must load");
+    let golden_path = repo_root
+        .join("tests")
+        .join("fixtures")
+        .join("g2p")
+        .join("phoneme_test_cases_golden.json");
+    let golden: PythonGoldenFixture =
+        serde_json::from_str(&std::fs::read_to_string(&golden_path).unwrap()).unwrap();
+    // Latin letters and digits ("Hello你好", "123") go through the
+    // multilingual ZH-EN / number handling, not ChinesePhonemizer alone.
+    let cases: Vec<_> = golden
+        .test_cases
+        .iter()
+        .filter(|c| c.language == "zh" && !c.input.chars().any(|ch| ch.is_ascii_alphanumeric()))
+        .collect();
+    assert!(!cases.is_empty(), "no zh cases in {golden_path:?}");
+    for case in cases {
+        let expected: Vec<String> = case
+            .expected_phonemes
+            .split_whitespace()
+            .map(|t| {
+                piper_plus_g2p::token_map::token_to_pua(t)
+                    .map(|c| c.to_string())
+                    .unwrap_or_else(|| t.to_string())
+            })
+            .collect();
+        let (tokens, _) = p.phonemize_with_prosody(&case.input).unwrap();
+        // The golden comes from Python's MultilingualPhonemizer, which drops
+        // sentence punctuation; Python's ChinesePhonemizer keeps it as ".",
+        // like this one. Compare the spoken tokens only.
+        let tokens: Vec<String> = tokens
+            .into_iter()
+            .filter(|t| !matches!(t.as_str(), " " | "." | "," | "!" | "?" | ";" | ":"))
+            .collect();
+        assert_eq!(tokens, expected, "zh mismatch for {:?}", case.input);
     }
 }
 

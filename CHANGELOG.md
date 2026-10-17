@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Chinese G2P outside Python: regenerate the shared `pinyin_single.json` / `pinyin_phrases.json` from pypinyin 0.55.0 with numeric tones (`ni3`), matching the Python canonical output. The previous files carried tone marks (`nǐ`), which the Rust, Go, C++, WASM, Swift, and Android parsers read as tone 5 with a broken final (你好 became `n tone5 x o tone5`). Add `scripts/build_pinyin_dicts.py`, mirror gates for the copies, and a Rust test that compares against the Python golden fixture.
+- Browser (`piper-plus` npm): route English to the JS G2P even when the Rust WASM bundle loads for Japanese or Chinese. The WASM bundle has no English dictionary and spelled words out letter by letter.
+
 ## [2.0.2] - 2026-10-16
 
 Python/native **2.0.2** and independent Python G2P **0.3.1**.

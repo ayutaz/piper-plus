@@ -420,6 +420,37 @@ describe("PiperPlus WASM G2P integration", { skip: skip ? "Import failed" : fals
 
       piper.dispose();
     });
+
+    // The Rust WASM bundle has no English G2P: it reports "en" as supported
+    // but phonemizes it with PassthroughPhonemizer (one token per letter, see
+    // src/rust/piper-wasm/src/lib.rs). Once WASM loads, English must still
+    // be routed to the JS G2P, or "Hello" is spoken as its spelling.
+    it("routes en to JS G2P even when WASM loads and reports en", async () => {
+      setMockConfig(CONFIG_WITH_JA);
+
+      let capturedOptions = null;
+      restoreG2PCreate();
+      G2P.create = async (opts) => {
+        capturedOptions = opts;
+        return createMockG2PInstance();
+      };
+
+      const piper = await PiperPlus.initialize({
+        model: "test",
+        ort: globalThis.ort,
+        wasmLoader: async () => createMockWasmModule(),
+      });
+
+      try {
+        assert.deepEqual(capturedOptions?.languages, ["en"]);
+        const en = await piper._phonemizer.encode("Hello", "en");
+        assert.deepEqual(en.phonemeIds, [1, 7, 2], "en must come from JS G2P");
+        const ja = await piper._phonemizer.encode("こんにちは", "ja");
+        assert.deepEqual(ja.phonemeIds, [1, 0, 8, 15, 22, 0, 2], "ja stays on WASM");
+      } finally {
+        piper.dispose();
+      }
+    });
   });
 
   // -------------------------------------------------------------------------
