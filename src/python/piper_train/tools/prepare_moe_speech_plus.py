@@ -17,7 +17,7 @@ LJSpeech 形式 (<output>/wavs/*.wav + metadata.csv 3 列 `filename|speaker|text
 Usage:
   python -m piper_train.tools.prepare_moe_speech_plus \
       --input-dir /data/downloads/moe-speech-plus \
-      --output-dir /data/piper/moe-speech-plus-selected \
+      --output-dir /path/to/moe-speech-plus-selected \
       --stats-only            # まず分布レポートのみ
 
   # 並列展開 (2026-07-09、v8 dataset prep 高速化、default ON)

@@ -34,6 +34,7 @@ import tarfile
 from collections.abc import Iterator
 from pathlib import Path
 
+
 _LOGGER = logging.getLogger("score_utmos")
 
 # CV の validated.tsv は 128KB 超のフィールドを含むことがある (csv 既定上限で落ちる)
@@ -99,7 +100,7 @@ def iter_dir_audio(clips_dir: Path) -> Iterator[tuple[str, bytes]]:
 
 def _load_predictor(device: str):
     """torch.hub 経由で utmos22_strong をロード (テストでは monkeypatch 差替)。"""
-    import torch
+    import torch  # noqa: PLC0415 - keep dataset inspection independent of the ML backend.
 
     predictor = torch.hub.load(
         "tarepan/SpeechMOS:v1.2.0", "utmos22_strong", trust_repo=True
@@ -116,8 +117,8 @@ def score_stream(
     flush_every: int = 50,
 ) -> tuple[int, int]:
     """audio bytes を逐次スコアし tsv に追記。(scored, failed) を返す。"""
-    import soundfile as sf
-    import torch
+    import soundfile as sf  # noqa: PLC0415 - load the audio backend only when scoring.
+    import torch  # noqa: PLC0415 - keep dataset inspection independent of the ML backend.
 
     write_header = not output.exists() or output.stat().st_size == 0
     scored = failed = 0
@@ -174,7 +175,7 @@ def main() -> None:
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    import torch
+    import torch  # noqa: PLC0415 - parse --help before loading the ML backend.
 
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     _LOGGER.info("device: %s", device)

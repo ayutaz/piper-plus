@@ -3,19 +3,21 @@
 > **Status**: v10 で制定 (2026-08-14)、Phase A (v10b) で音響メトリクスへ拡張
 > (2026-08-16)。zero-shot 話者類似度・音質の評価は本契約に従う。
 > ツール実装: `src/python/piper_train/tools/eval_zs_secs.py` (schema `zs-eval-v3`)
+>
 > + `measure_comb_artifacts.py` / `measure_band_noise.py` / `measure_prosody.py` /
 > `acoustic_frames.py` (いずれも EVAL-ONLY)。
 >
 > **根拠**:
-> - [`docs/design/zero-shot-warm-restart-diagnostics-phase0-1.md`](../design/zero-shot-warm-restart-diagnostics-phase0-1.md)
+>
+> + [`docs/design/zero-shot-warm-restart-diagnostics-phase0-1.md`](../design/zero-shot-warm-restart-diagnostics-phase0-1.md)
 >   — Phase 0 Arm B が「SCL same-utt 正例 = Goodhart」の直接の実験的証拠
 >   (CAM++ +0.023 / held-out ECAPA +0.002 / gap 拡大)
-> - [`docs/design/zero-shot-v10-design.md`](../design/zero-shot-v10-design.md) §1 F9
+> + [`docs/design/zero-shot-v10-design.md`](../design/zero-shot-v10-design.md) §1 F9
 >   — SNAC 論文自身が「YourTTS の高 SECS は SCL 直接最適化の結果」と指摘
 >   (SECS 単独ゲート禁止の文献的裏付け)
-> - [`docs/design/zero-shot-speaker-similarity-root-cause.md`](../design/zero-shot-speaker-similarity-root-cause.md)
+> + [`docs/design/zero-shot-speaker-similarity-root-cause.md`](../design/zero-shot-speaker-similarity-root-cause.md)
 >   — same-utt SECS 0.775 誤報事故 (cross-utt では 0.73 = floor すれすれ)
-> - [`docs/design/zero-shot-v10b-quality-plan.md`](../design/zero-shot-v10b-quality-plan.md)
+> + [`docs/design/zero-shot-v10b-quality-plan.md`](../design/zero-shot-v10b-quality-plan.md)
 >   — §1 実測解剖 (フレーム格子トーンコム = ざらつき / F0 std が GT の 6 割 =
 >   平板さ) と §2 評価アップグレード E-1〜E-8、§4.3 事前登録判定基準
 
@@ -104,6 +106,7 @@ baseline なしなら null) は v2 から**不変更** — 2 本は独立の fie
 SECS と人間の類似判定の相関上限は utterance-level LCC≈0.75-0.78
 (VoxSim arXiv:2407.18505 / Deja et al. arXiv:2207.00344)。**±0.03 未満の SECS 差は
 人間類似の判定材料にしない** (encoder ノイズと区別できない)。判定には正規化転写率
+
 + 聴感 (ABX) を併用する。
 
 ## 4. JSON schema (`zs-eval-v3`)
@@ -196,18 +199,18 @@ python -m piper_train.tools.eval_zs_secs \
     --json-out report.json
 ```
 
-- `--require-encoder2`: encoder2 未指定なら exit 2 (ゲートを素通りさせない)。
++ `--require-encoder2`: encoder2 未指定なら exit 2 (ゲートを素通りさせない)。
   encoder2 未指定かつ本フラグなしの場合も「Goodhart 検知不能」警告を stderr に出す
-- `--baseline-json`: 前回リリース/前 epoch の eval JSON。goodhart_flag が `true`
++ `--baseline-json`: 前回リリース/前 epoch の eval JSON。goodhart_flag が `true`
   なら SECS 上昇を改善と報告してはならない (聴感 + 帯域 + ECAPA で再検証)
-- `--meta-json`: 合成条件 (noise_scale / noise_scale_w / seed / texts) を
++ `--meta-json`: 合成条件 (noise_scale / noise_scale_w / seed / texts) を
   manifest に verbatim 記録。**§6 の事前登録判定は manifest に pin した合成条件・
   ファイル集合で行う** (eval-time knob で必達を満たす穴を塞ぐ)
-- `--exclude-ref` は path 一致に加え **sha256 (内容) 一致**でも cross 集合から
++ `--exclude-ref` は path 一致に加え **sha256 (内容) 一致**でも cross 集合から
   除外される。synth と実音声 (speaker/floor) の sha256 一致は取り違えとして
   SystemExit (eval 無効)
-- `--skip-acoustics`: SECS だけ欲しい高速 run 用 (band/comb/prosody は null)
-- テスト: `src/python/tests/test_eval_zs_secs.py` が本契約の数値定義
++ `--skip-acoustics`: SECS だけ欲しい高速 run 用 (band/comb/prosody は null)
++ テスト: `src/python/tests/test_eval_zs_secs.py` が本契約の数値定義
   (閾値・null 明示・exit code) を pin する
 
 ## 6. 音響メトリクスの事前登録値 (v10b、事後緩和禁止)
@@ -228,14 +231,14 @@ python -m piper_train.tools.eval_zs_secs \
 
 運用規則:
 
-- **測定は raw decoder 出力** (§2 禁止事項 5)。gate は **manifest に pin した
++ **測定は raw decoder 出力** (§2 禁止事項 5)。gate は **manifest に pin した
   synth セットの median** (band 棚は group-mean delta の bin max) に適用する。
-- **GT / real anchor は文脈表示のみ** — gate は synth 側にのみ適用する
++ **GT / real anchor は文脈表示のみ** — gate は synth 側にのみ適用する
   (GT の per-file autocorr は 0.13 まで出る実測があるため、GT に gate を当てると
   偽陽性になる)。
-- 判定 baseline は **v10a-r2 ep69** に固定。baseline 測定 (ep69) の manifest JSON
++ 判定 baseline は **v10a-r2 ep69** に固定。baseline 測定 (ep69) の manifest JSON
   への pin が Phase A の完了条件 (plan §4.3)。
-- 比較の定義変更 (帯域・正規化基準・格子定義) は事前登録を無効化する — 変更する
++ 比較の定義変更 (帯域・正規化基準・格子定義) は事前登録を無効化する — 変更する
   場合は新指標として別名で登録し直すこと (goalpost moving の禁止、
   pre-commit `test-threshold-relaxation` gate と同思想)。
 
@@ -245,14 +248,14 @@ python -m piper_train.tools.eval_zs_secs \
 を測らない。v11 ep9/19 は指標上は良好 (comb-HNR 14.6dB = GT 超え) だが
 日本語として聞き取れなかった (ユーザー聴感確認、学習量不足)。
 
-- **ツール**: `piper_train.tools.eval_cer` (ASR = transformers
++ **ツール**: `piper_train.tools.eval_cer` (ASR = transformers
   `openai/whisper-small`、追加依存なし)。CER = NFKC 正規化 +
   句読点/空白除去後の文字編集距離 / 参照長
-- **統計は median** — whisper は不明瞭音声で幻覚繰り返しを起こし
++ **統計は median** — whisper は不明瞭音声で幻覚繰り返しを起こし
   mean が桁で膨張する (較正実測: v11 ep9 の mean 7.3 vs median 1.4)
-- **較正 anchor (whisper-small、つくよみ参照合成 3 文、median)**:
++ **較正 anchor (whisper-small、つくよみ参照合成 3 文、median)**:
   明瞭 (v10b ep79) **0.095** / 不明瞭 (v11 ep9/ep19) **1.43 / 1.26**
-- **gate (v11b)**: **CER median ≤ 0.30** (参照合成 ≥3 文、文セットは
++ **gate (v11b)**: **CER median ≤ 0.30** (参照合成 ≥3 文、文セットは
   manifest に pin)。早期 epoch は未成熟で当然 fail するため abort 条件では
   なく **ep40 以降の昇格 gate**。ASR モデル・文セット・正規化規則の変更は
   事前登録を無効化する (§6 と同じ goalpost moving 禁止)

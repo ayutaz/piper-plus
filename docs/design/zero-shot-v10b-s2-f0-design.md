@@ -90,7 +90,7 @@ Period VITS をそのまま移植できない理由は plan §3.2 が指摘済�
 
 ### 2.1 (a) frame 格子への F0/harmonic 特徴 concat
 
-```
+```text
 f0 [B,1,T]  ──> [log f0 / V-UV] ──> Conv1d(2→d,1) ──┐
                                                      ├─> concat ─> conv_pre(192+d → 256)
 z_slice [B,192,T] ───────────────────────────────────┘
@@ -113,7 +113,7 @@ z_slice [B,192,T] ────────────────────�
 plan の記述どおり「sine source を PQMF 解析して 4-band に分解し、**iSTFT 出力に
 加算**」する形:
 
-```
+```text
 f0 ─> sine源 e[n] (SR) ─> PQMF.analysis ─> e_sub [B,4,T·64]
                                                    │
 head ─> iSTFT ─> sub_wav [B,4,T·64] ──────────────(+)──> PQMF.synthesis ─> y
@@ -134,7 +134,7 @@ head ─> iSTFT ─> sub_wav [B,4,T·64] ─────────────
 
 ### 2.3 (c) iSTFT head 入力への harmonic 位相特徴付与 ← **選定**
 
-```
+```text
 f0 [B,1,T] ─(linear ×16)─> f0 [B,1,T·16]   (head 格子 1378.125 Hz)
    │
    ├─> Φ[t] = cumsum(f0 / 1378.125)   (float64、cycles 単位)
@@ -293,7 +293,7 @@ fp32 で位相を累積すると **torch と ORT で cumsum の加算順序が�
 
 **MAS 展開後の frame 格子**に置く (Period VITS の frame prior network 相当)【文献】。
 
-```
+```text
 enc_p ─> x [B,192,T_phone]      m_p, logs_p
             │                       │
          (attn 展開)  ←── MAS ──────┘         学習時: attn は MAS
@@ -340,7 +340,7 @@ FiLM か加算かは、既存 decoder の FiLM (`_apply_film`: `sigmoid(scale)+0
 
 ### 4.3 Loss
 
-```
+```text
 L_f0  = λ_f0 · L1( log f0_pred , log f0_gt )   over voiced frames
 L_vuv = λ_vuv · BCE( vuv_logit , vuv_gt )
 ```
@@ -389,7 +389,7 @@ decoder 注入だけでは、推論時に z (prior+flow 由来) が持つ音高�
 
 対策は FastPitch 型の最小介入:
 
-```
+```text
 m_p ← m_p + Conv1d(2 → 192, k=1)( [log f0_pred.detach(), vuv_pred.detach()] )
                     ↑ zero-init
 ```

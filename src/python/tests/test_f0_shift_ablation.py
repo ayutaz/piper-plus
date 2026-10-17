@@ -25,24 +25,24 @@ import pytest
 
 torch = pytest.importorskip("torch", reason="torch required")
 
-from piper_train.tools import f0_shift_ablation as abl  # noqa: E402
+from piper_train.tools import f0_shift_ablation as ablation  # noqa: E402
 
 
 def test_semitone_to_scale():
-    assert abl.semitone_to_scale(0.0) == pytest.approx(1.0)
-    assert abl.semitone_to_scale(12.0) == pytest.approx(2.0)
-    assert abl.semitone_to_scale(-12.0) == pytest.approx(0.5)
-    assert abl.semitone_to_scale(2.0) == pytest.approx(1.122462, rel=1e-5)
+    assert ablation.semitone_to_scale(0.0) == pytest.approx(1.0)
+    assert ablation.semitone_to_scale(12.0) == pytest.approx(2.0)
+    assert ablation.semitone_to_scale(-12.0) == pytest.approx(0.5)
+    assert ablation.semitone_to_scale(2.0) == pytest.approx(1.122462, rel=1e-5)
 
 
 def test_follow_ratio_is_one_for_perfect_tracking():
     base = 200.0
     measured = {
-        -2.0: base * abl.semitone_to_scale(-2.0),
+        -2.0: base * ablation.semitone_to_scale(-2.0),
         0.0: base,
-        2.0: base * abl.semitone_to_scale(2.0),
+        2.0: base * ablation.semitone_to_scale(2.0),
     }
-    ratios = abl.follow_ratio(measured)
+    ratios = ablation.follow_ratio(measured)
     assert ratios[2.0] == pytest.approx(1.0, abs=1e-6)
     assert ratios[-2.0] == pytest.approx(1.0, abs=1e-6)
 
@@ -50,33 +50,33 @@ def test_follow_ratio_is_one_for_perfect_tracking():
 def test_follow_ratio_is_zero_when_the_decoder_ignores_f0():
     """S-2 の失敗機序 (R1): 指令を変えても出力 F0 が動かない。"""
     measured = {-2.0: 200.0, 0.0: 200.0, 2.0: 200.0}
-    ratios = abl.follow_ratio(measured)
+    ratios = ablation.follow_ratio(measured)
     assert ratios[2.0] == pytest.approx(0.0)
     assert ratios[-2.0] == pytest.approx(0.0)
 
 
 def test_follow_ratio_handles_partial_tracking():
     base = 200.0
-    measured = {0.0: base, 2.0: base * abl.semitone_to_scale(1.0)}
-    assert abl.follow_ratio(measured)[2.0] == pytest.approx(0.5, abs=1e-6)
+    measured = {0.0: base, 2.0: base * ablation.semitone_to_scale(1.0)}
+    assert ablation.follow_ratio(measured)[2.0] == pytest.approx(0.5, abs=1e-6)
 
 
 def test_follow_ratio_without_a_usable_reference_returns_empty():
-    assert abl.follow_ratio({2.0: 220.0}) == {}
-    assert abl.follow_ratio({0.0: 0.0, 2.0: 220.0}) == {}
+    assert ablation.follow_ratio({2.0: 220.0}) == {}
+    assert ablation.follow_ratio({0.0: 0.0, 2.0: 220.0}) == {}
 
 
 def test_summarize_applies_the_preregistered_go_threshold():
-    assert abl.summarize({2.0: 0.9, -2.0: 0.85})["verdict"] == "go"
-    assert abl.summarize({2.0: 0.05, -2.0: 0.02})["verdict"] == "no-go"
+    assert ablation.summarize({2.0: 0.9, -2.0: 0.85})["verdict"] == "go"
+    assert ablation.summarize({2.0: 0.05, -2.0: 0.02})["verdict"] == "no-go"
     # 境界値ちょうどは go (>= 判定)
-    assert abl.summarize({2.0: 0.8})["verdict"] == "go"
-    assert abl.summarize({})["verdict"] == "no-go"
+    assert ablation.summarize({2.0: 0.8})["verdict"] == "go"
+    assert ablation.summarize({})["verdict"] == "no-go"
 
 
 def test_go_threshold_matches_the_design_document():
     """事前登録値 0.8 (設計 doc §6.4 検証 3) から動いていないこと。"""
-    assert abl.GO_THRESHOLD == 0.8
+    assert ablation.GO_THRESHOLD == 0.8
 
 
 def test_summarize_does_not_fabricate_a_zero_ratio_from_missing_data():
@@ -88,25 +88,25 @@ def test_summarize_does_not_fabricate_a_zero_ratio_from_missing_data():
     追従率ほぼ 1.0)。欠測は median_follow_ratio=None + insufficient_data=True
     で報告し、verdict は保守側 (no-go) を維持する — gate は緩めない。
     """
-    out = abl.summarize({})
+    out = ablation.summarize({})
     assert out["verdict"] == "no-go"
     assert out["median_follow_ratio"] is None
     assert out["insufficient_data"] is True
 
 
 def test_summarize_with_measurements_is_not_flagged_insufficient():
-    out = abl.summarize({2.0: 0.9, -2.0: 0.85})
+    out = ablation.summarize({2.0: 0.9, -2.0: 0.85})
     assert out["insufficient_data"] is False
     assert out["median_follow_ratio"] == pytest.approx(0.875)
 
 
 def test_measurement_runs_measure_prosody_in_a_subprocess():
     """評価器は subprocess 越し (torch を積んだプロセスに引き込まない)。"""
-    source = inspect.getsource(abl.measure_group_f0_median)
+    source = inspect.getsource(ablation.measure_group_f0_median)
     assert "subprocess.run" in source
     assert "piper_train.tools.measure_prosody" in source
     # module import による直結が無いこと
-    module_source = inspect.getsource(abl)
+    module_source = inspect.getsource(ablation)
     assert "from piper_train.tools.measure_prosody import" not in module_source
 
 
@@ -123,7 +123,7 @@ def test_cli_help_is_printable_on_a_cp932_console():
     from piper_train.tools import extract_f0
 
     help_re = re.compile(r'help=\s*((?:"[^"]*"\s*|\'[^\']*\'\s*)+)')
-    for module in (abl, extract_f0):
+    for module in (ablation, extract_f0):
         source = inspect.getsource(module)
         for match in help_re.finditer(source):
             for ch in match.group(1):
@@ -141,7 +141,7 @@ def test_write_wav_roundtrip(tmp_path):
 
     audio = np.sin(np.linspace(0, 20 * np.pi, 2000)).astype(np.float32) * 0.5
     path = tmp_path / "a.wav"
-    abl.write_wav(path, audio, 22050)
+    ablation.write_wav(path, audio, 22050)
     with wave.open(str(path)) as wf:
         assert wf.getframerate() == 22050
         assert wf.getnchannels() == 1
@@ -179,12 +179,12 @@ def test_synthesize_shifted_writes_one_wav_per_utterance(tmp_path):
     emb = np.random.default_rng(0).normal(size=192).astype(np.float32)
     emb /= np.linalg.norm(emb)
 
-    abl.synthesize_shifted(
+    ablation.synthesize_shifted(
         model,
         [[1, 2, 3, 4, 5], [6, 7, 8]],
         emb,
         tmp_path / "shift",
-        f0_scale=abl.semitone_to_scale(2.0),
+        f0_scale=ablation.semitone_to_scale(2.0),
         sample_rate=22050,
     )
     assert len(list((tmp_path / "shift").glob("*.wav"))) == 2

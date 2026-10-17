@@ -69,9 +69,11 @@ vastai create instance <id> --image nvidia/cuda:12.8.1-devel-ubuntu24.04 --disk 
 ## 3. スクリプト規約 (無言死の根絶)
 
 - 冒頭に `set -euo pipefail` + **ERR trap 必須**:
+
   ```bash
   trap 'mark "<RUN>_FAILED: line $LINENO: $BASH_COMMAND (exit $?)"' ERR
   ```
+
   これが無いと `set -u` の未定義変数や途中コマンドの失敗が **marker を残さず
   無言死**し、監視が「まだ走っている」と誤認する
 - 失敗 marker (`*_FAILED`) は必ず log の**新しい行**として出す (監視の grep 対象)
@@ -89,11 +91,13 @@ vastai create instance <id> --image nvidia/cuda:12.8.1-devel-ubuntu24.04 --disk 
 
 - **重要な完了待ち (smoke 判定 / bootstrap 完了 / 本走完走) は背景 Bash の
   until ループ**で待つ — 完了時に必ず 1 回のタスク完了通知が届く:
+
   ```bash
   # run_in_background: true で実行
   until ssh ... 'tail -20 <log> | grep -qE "DONE|FAILED"' </dev/null; do sleep 120; done
   ssh ... 'tail -10 <log>'
   ```
+
 - Monitor ツールは補助 (定期進捗の可視化) に留める — **通知不達が 3 回実測**
   されており、単独では费用事故を防げない
 - 判定条件は「アンカー行 (最新 launch マーカー) 以降のみ」を対象にする —
@@ -124,7 +128,7 @@ vastai create instance <id> --image nvidia/cuda:12.8.1-devel-ubuntu24.04 --disk 
    放置された queued start は幽霊起動 (#6) と同じ課金リスク
 6. destroy は `echo y | vastai destroy instance <id>` (確認プロンプトあり)。
    実行後に `vastai show instances` で一覧から消えたことを確認
-4. 作業の節目 (フェーズ完了・失敗で停止した時) には**全 instance の一覧**を
+7. 作業の節目 (フェーズ完了・失敗で停止した時) には**全 instance の一覧**を
    確認する — 自分のセッション外の instance には触らない
 
 ## 6. resume の前提
