@@ -19,6 +19,8 @@ import onnxruntime
 nltk.download("averaged_perceptron_tagger_eng", quiet=True)
 nltk.download("cmudict", quiet=True)
 
+import zero_shot  # noqa: E402
+
 # Download models if not present
 from download_models import download_models  # noqa: E402
 
@@ -204,11 +206,115 @@ def synthesize_speech(
         raise gr.Error(f"Failed to generate speech: {e!s}") from e
 
 
+def synthesize_zero_shot_ui(
+    text: str,
+    language: str,
+    reference: tuple[int, np.ndarray] | None,
+    length_scale: float,
+    noise_scale: float,
+    noise_w: float,
+) -> tuple[int, np.ndarray]:
+    """Generate speech in the voice of the uploaded or recorded reference."""
+
+    if not text.strip():
+        raise gr.Error("Please enter some text")
+    if reference is None:
+        raise gr.Error("Please upload or record a reference audio clip")
+
+    try:
+        return zero_shot.get_engine().synthesize(
+            text,
+            language,
+            reference,
+            length_scale=length_scale,
+            noise_scale=noise_scale,
+            noise_w=noise_w,
+        )
+    except zero_shot.ZeroShotInputError as e:
+        raise gr.Error(str(e)) from e
+    except Exception as e:
+        logger.exception("Zero-shot synthesis failed")
+        raise gr.Error(
+            "Loading the zero-shot model or generating speech failed. "
+            "Please try again later."
+        ) from e
+
+
 def on_model_change(model_name: str) -> str:
     """Return sample text for the selected model's language."""
     model_info = MODELS.get(model_name, {})
     language = model_info.get("language", "ja")
     return SAMPLE_TEXTS.get(language, "")
+
+
+def _build_zero_shot_tab() -> None:
+    """Zero-shot tab: synthesize in the voice of a reference clip."""
+    gr.Markdown("""
+        **Experimental.** Uses the public
+        [zs-v1 base](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)
+        with the CAM++ speaker encoder. Its quality is not approved, and an
+        unseen speaker is reproduced only partially.
+
+        - Only use voices you have the speaker's consent to use.
+        - The reference clip is used for this request only and is not stored.
+        - Text whose phonemes the model never learned (for example the
+          Portuguese nasal vowel "ã") is rejected instead of being dropped.
+        """)
+
+    with gr.Row():
+        with gr.Column(scale=2):
+            language = gr.Dropdown(
+                choices=list(zero_shot.LANGUAGES),
+                label="Language",
+                value="ja",
+            )
+            text_input = gr.Textbox(
+                label="Text to synthesize",
+                placeholder="Enter text here...",
+                value=SAMPLE_TEXTS["ja"],
+                lines=3,
+            )
+            reference = gr.Audio(
+                label="Reference audio (3-30 seconds)",
+                sources=["upload", "microphone"],
+                type="numpy",
+            )
+            length_scale = gr.Slider(
+                label="Speed (Lower = faster speech)",
+                minimum=0.5,
+                maximum=2.0,
+                value=1.0,
+                step=0.1,
+            )
+            noise_scale = gr.Slider(
+                label="Expressiveness",
+                minimum=0.0,
+                maximum=1.0,
+                value=0.667,
+                step=0.01,
+            )
+            noise_w = gr.Slider(
+                label="Phoneme Duration Variance",
+                minimum=0.0,
+                maximum=1.0,
+                value=0.8,
+                step=0.01,
+            )
+            synthesize_btn = gr.Button("Generate Speech", variant="primary")
+
+        with gr.Column(scale=2):
+            audio_output = gr.Audio(label="Generated Speech", type="numpy")
+
+    language.change(
+        fn=lambda lang: SAMPLE_TEXTS.get(lang, ""),
+        inputs=[language],
+        outputs=[text_input],
+    )
+    synthesize_btn.click(
+        fn=synthesize_zero_shot_ui,
+        inputs=[text_input, language, reference, length_scale, noise_scale, noise_w],
+        outputs=audio_output,
+    )
 
 
 def create_interface():
@@ -221,122 +327,137 @@ def create_interface():
             Chinese, Spanish, French, and Portuguese.
 
             This demo uses a single multilingual ONNX model for fast CPU inference.
+            The **Zero-shot (experimental)** tab speaks in the voice of a reference clip.
             """)
 
-        with gr.Row():
-            with gr.Column(scale=2):
-                model_dropdown = gr.Dropdown(
-                    choices=list(MODELS.keys()),
-                    label="Select Model",
-                    value=next(iter(MODELS.keys())),
+        with gr.Tabs():
+            with gr.Tab("Multilingual TTS"):
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        model_dropdown = gr.Dropdown(
+                            choices=list(MODELS.keys()),
+                            label="Select Model",
+                            value=next(iter(MODELS.keys())),
+                        )
+
+                        text_input = gr.Textbox(
+                            label="Text to synthesize",
+                            placeholder="Enter text here...",
+                            value=SAMPLE_TEXTS["ja"],
+                            lines=3,
+                        )
+
+                        # Advanced Settings without Accordion (flattened)
+                        gr.Markdown("### Advanced Settings")
+
+                        speaker_id = gr.Number(
+                            label="Speaker ID (for multi-speaker models)",
+                            value=0,
+                            precision=0,
+                            minimum=0,
+                            maximum=10,
+                        )
+
+                        length_scale = gr.Slider(
+                            label="Speed (Lower = faster speech)",
+                            minimum=0.5,
+                            maximum=2.0,
+                            value=1.0,
+                            step=0.1,
+                        )
+
+                        noise_scale = gr.Slider(
+                            label="Expressiveness",
+                            minimum=0.0,
+                            maximum=1.0,
+                            value=0.4,
+                            step=0.01,
+                        )
+
+                        noise_w = gr.Slider(
+                            label="Phoneme Duration Variance",
+                            minimum=0.0,
+                            maximum=1.0,
+                            value=0.5,
+                            step=0.01,
+                        )
+
+                    synthesize_btn = gr.Button("Generate Speech", variant="primary")
+
+                with gr.Column(scale=2):
+                    audio_output = gr.Audio(
+                        label="Generated Speech",
+                        type="numpy",
+                        autoplay=True,
+                    )
+
+                    gr.Markdown("""
+                        ### Tips:
+                        - Select the language matching your input text
+                        - All modes use the same multilingual ONNX model
+                        - Adjust speed for faster/slower speech
+                        - Higher expressiveness = more natural variation
+                        - Chinese, Spanish, French, Portuguese require piper_train installed
+                        """)
+
+                # Examples
+                gr.Examples(
+                    examples=[
+                        [
+                            "こんにちは、世界！今日はいい天気ですね。",
+                            "Multilingual (Japanese)",
+                        ],
+                        [
+                            "おはようございます。本日の会議は午後3時から始まります。",
+                            "Multilingual (Japanese)",
+                        ],
+                        [
+                            "Hello world! This is a text to speech demo.",
+                            "Multilingual (English)",
+                        ],
+                        [
+                            "Welcome to piper-plus. Enjoy high quality speech synthesis.",
+                            "Multilingual (English)",
+                        ],
+                        ["你好，世界！今天天气很好。", "Multilingual (Chinese)"],
+                        [
+                            "¡Hola, mundo! Bienvenido a piper-plus.",
+                            "Multilingual (Spanish)",
+                        ],
+                        [
+                            "Bonjour le monde! Bienvenue sur piper-plus.",
+                            "Multilingual (French)",
+                        ],
+                        [
+                            "Olá, mundo! Bem-vindo ao piper-plus.",
+                            "Multilingual (Portuguese)",
+                        ],
+                    ],
+                    inputs=[text_input, model_dropdown],
                 )
 
-                text_input = gr.Textbox(
-                    label="Text to synthesize",
-                    placeholder="Enter text here...",
-                    value=SAMPLE_TEXTS["ja"],
-                    lines=3,
+                # Event handlers
+                model_dropdown.change(
+                    fn=on_model_change,
+                    inputs=[model_dropdown],
+                    outputs=[text_input],
                 )
 
-                # Advanced Settings without Accordion (flattened)
-                gr.Markdown("### Advanced Settings")
-
-                speaker_id = gr.Number(
-                    label="Speaker ID (for multi-speaker models)",
-                    value=0,
-                    precision=0,
-                    minimum=0,
-                    maximum=10,
+                synthesize_btn.click(
+                    fn=synthesize_speech,
+                    inputs=[
+                        text_input,
+                        model_dropdown,
+                        speaker_id,
+                        length_scale,
+                        noise_scale,
+                        noise_w,
+                    ],
+                    outputs=audio_output,
                 )
 
-                length_scale = gr.Slider(
-                    label="Speed (Lower = faster speech)",
-                    minimum=0.5,
-                    maximum=2.0,
-                    value=1.0,
-                    step=0.1,
-                )
-
-                noise_scale = gr.Slider(
-                    label="Expressiveness",
-                    minimum=0.0,
-                    maximum=1.0,
-                    value=0.4,
-                    step=0.01,
-                )
-
-                noise_w = gr.Slider(
-                    label="Phoneme Duration Variance",
-                    minimum=0.0,
-                    maximum=1.0,
-                    value=0.5,
-                    step=0.01,
-                )
-
-            synthesize_btn = gr.Button("Generate Speech", variant="primary")
-
-        with gr.Column(scale=2):
-            audio_output = gr.Audio(
-                label="Generated Speech",
-                type="numpy",
-                autoplay=True,
-            )
-
-            gr.Markdown("""
-                ### Tips:
-                - Select the language matching your input text
-                - All modes use the same multilingual ONNX model
-                - Adjust speed for faster/slower speech
-                - Higher expressiveness = more natural variation
-                - Chinese, Spanish, French, Portuguese require piper_train installed
-                """)
-
-        # Examples
-        gr.Examples(
-            examples=[
-                ["こんにちは、世界！今日はいい天気ですね。", "Multilingual (Japanese)"],
-                [
-                    "おはようございます。本日の会議は午後3時から始まります。",
-                    "Multilingual (Japanese)",
-                ],
-                [
-                    "Hello world! This is a text to speech demo.",
-                    "Multilingual (English)",
-                ],
-                [
-                    "Welcome to piper-plus. Enjoy high quality speech synthesis.",
-                    "Multilingual (English)",
-                ],
-                ["你好，世界！今天天气很好。", "Multilingual (Chinese)"],
-                ["¡Hola, mundo! Bienvenido a piper-plus.", "Multilingual (Spanish)"],
-                [
-                    "Bonjour le monde! Bienvenue sur piper-plus.",
-                    "Multilingual (French)",
-                ],
-                ["Olá, mundo! Bem-vindo ao piper-plus.", "Multilingual (Portuguese)"],
-            ],
-            inputs=[text_input, model_dropdown],
-        )
-
-        # Event handlers
-        model_dropdown.change(
-            fn=on_model_change,
-            inputs=[model_dropdown],
-            outputs=[text_input],
-        )
-
-        synthesize_btn.click(
-            fn=synthesize_speech,
-            inputs=[
-                text_input,
-                model_dropdown,
-                speaker_id,
-                length_scale,
-                noise_scale,
-                noise_w,
-            ],
-            outputs=audio_output,
-        )
+            with gr.Tab("Zero-shot (experimental)"):
+                _build_zero_shot_tab()
 
     return interface
 
