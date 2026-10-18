@@ -24,6 +24,7 @@ from ..zero_shot_requirements import (
     reference_spec_frontend_conflict,
     reference_training_conflict,
     validate_recipe,
+    validate_strict_resume_reference_hparams,
     validate_training_batch,
 )
 from .commons import (
@@ -971,12 +972,15 @@ class VitsModel(pl.LightningModule):
             "kl_cap_consecutive": self._kl_cap_consecutive,
         }
 
+    def _fitting(self) -> bool:
+        """Trainer の fit 中か (strict resume の restore は fit 中に起きる)。"""
+        fn = getattr(getattr(self._trainer, "state", None), "fn", None)
+        return getattr(fn, "value", fn) == "fit"
+
     def _restore_training_progress(self, checkpoint: dict) -> None:
         state = checkpoint.get("training_schedule_state")
         if state is None:
-            trainer = self._trainer
-            fn = getattr(getattr(trainer, "state", None), "fn", None)
-            if getattr(fn, "value", fn) == "fit":
+            if self._fitting():
                 # ValueError is intentional: the CLI's graceful-resume fallback
                 # must not silently turn an unknowable schedule into a resume.
                 raise ValueError(
@@ -1487,7 +1491,15 @@ class VitsModel(pl.LightningModule):
 
         Handles checkpoints predating the Multi-scale FiLM decoder (issue
         #616), plus the ``torch.compile`` and DDP weight-norm key formats.
+
+        A strict resume (``trainer.fit(ckpt_path=...)``) first checks that this
+        run keeps the checkpoint's reference-conditioning contract (Ruling
+        R16); ``load_from_checkpoint`` (export / evaluation) is not checked.
         """
+        if self._fitting():
+            validate_strict_resume_reference_hparams(
+                checkpoint.get("hyper_parameters"), self.hparams
+            )
         self._restore_training_progress(checkpoint)
         model_sd = self.state_dict()
 
