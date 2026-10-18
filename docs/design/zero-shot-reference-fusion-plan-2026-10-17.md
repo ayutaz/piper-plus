@@ -556,9 +556,9 @@ S1 (Task 5R〜11R) の実装とCPUテストは`feat/zero-shot-v8-dataset-scaling
 
 - 既存の失敗テスト (今回の変更より前から失敗している):
   - `test_speaker_encoder_golden` の8件 (n_fft 400と512の食い違い)
-  - `test_decoder_upsample_mode` のresize modeのexport
   - `test_carrier_head` (実行するdirectoryによって結果が変わる)
   - `test_piper_proc_exec` (ctestの下で実行したとき)
+- 以前ここに挙げていた`test_decoder_upsample_mode`のresize modeのexportは、既存の失敗ではなかった。c44ebeb9でexportの引数の並びが変わったのにテストが追従していなかったもので、PR #812のCIで見つけてテストを直した。
 - 範囲外のbug: `piper_plus/api/engine.py`の`_fill_speaker_embedding_inputs`が`speaker_embedding_mask`を常に渡す。
 - Rust・Go・C#・WASMのruntimeは、参照spec入力付きのモデルをまだ拒否しない (拒否はPython runtimeとC++のみ)。
 - 学習側の`piper_train.infer_onnx`も、参照spec入力付きのモデルを明示的に拒否せず、対応もしていない (ORTの入力欠落エラーで止まる)。
