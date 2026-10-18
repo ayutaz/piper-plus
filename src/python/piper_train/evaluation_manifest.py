@@ -169,6 +169,15 @@ def load_reference_spec(clip: dict, settings: dict) -> np.ndarray:
     return np.ascontiguousarray(spec)
 
 
+def _stored_spec_matches(path: Path, spec_sha256: str) -> bool:
+    """``path`` に hash ``spec_sha256`` の float32 spec が既にあるか。"""
+    try:
+        stored = np.load(path, allow_pickle=False)
+    except (OSError, ValueError):
+        return False
+    return stored.dtype == np.float32 and spec_array_sha256(stored) == spec_sha256
+
+
 def _validate_reference_spec_records(manifest: dict, *, verify_files: bool) -> None:
     settings = manifest.get("reference_spec")
     records = [clip.get("reference_spec") for clip in manifest["clips"]]
@@ -427,7 +436,9 @@ def create_manifest(
     ``reference_spec`` (opt-in、``{"frontend": <必須>, ...STFT の上書き}``) を
     渡すと、各 clip のただ 1 本の参照 WAV から名前付き frontend (学習 cache
     builder の写し) で参照 spec を作り、manifest の隣の
-    ``<manifest stem>.reference_spec/<clip id>.npy`` に float32 で保存する。
+    ``<manifest stem>.reference_spec/<clip id>.<spec hash の先頭 16 桁>.npy`` に
+    float32 で保存する (内容で名前が決まるので、やり直しの失敗が前の manifest の
+    spec を壊さない)。
     manifest には frontend・STFT・参照音声 hash・spec hash (float32 bytes)・
     T_ref・保存先を記録する (ref_spec モデルの評価に必須。generate はこの
     保存 bytes を feed する)。既定 None の manifest は変更前と同じ schema。
@@ -495,7 +506,10 @@ def create_manifest(
                 spec, record = compute_reference_spec(path, settings, sample_rate)
             except ValueError as exc:
                 raise ValueError(f"{exc} (clip {clip['id']}: {path})") from exc
-            spec_path = spec_dir / f"{clip['id']}.npy"
+            # 内容で名前を決める (spec hash の先頭 16 桁)。同じ output への prepare
+            # のやり直しが別 frontend で失敗しても、前の manifest が pin する
+            # 別 bytes の file を上書きしない
+            spec_path = spec_dir / f"{clip['id']}.{record['spec_sha256'][:16]}.npy"
             clip["reference_spec"] = {**record, "spec_path": str(spec_path)}
             specs[spec_path] = spec.detach().cpu().numpy()
     manifest = {
@@ -528,12 +542,16 @@ def create_manifest(
         manifest["reference_spec"] = settings
     manifest["conditions_sha256"] = conditions_sha256(manifest)
     # 参照 spec は全 clip の計算が成功してから書く。manifest の検証・書き込みが
-    # 失敗したら、今回書いた spec も消す (manifest の無い spec を残さない)
+    # 失敗したら、今回書いた spec だけを消す (manifest の無い spec を残さない)。
+    # 同名で同じ hash の file が既にあれば、前の manifest が pin している同じ
+    # bytes なので書き直さず、失敗しても消さない。
     # schema の誤りは spec を 1 つも書かないうちに止める
     validate_manifest(manifest, verify_files=False)
     written = []
     try:
         for spec_path, array in specs.items():
+            if _stored_spec_matches(spec_path, spec_array_sha256(array)):
+                continue
             atomic_write(
                 spec_path,
                 lambda target, array=array: np.save(target, array, allow_pickle=False),

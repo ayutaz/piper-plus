@@ -167,8 +167,13 @@ lid            = "language ID (int64, shape=[1]) — when declared for multiling
 prosody_features = "prosody A1/A2/A3 features (int64, shape=[1, T, 3]) — when present"
 speaker_embedding = "Speaker embedding (float32, shape=[1, emb_dim]); emb_dim=256 for legacy ECAPA-TDNN exports and emb_dim=192 for public v2 CAM++ Zero-Shot exports"
 # Declared only by reference_conditioning="ref_spec" exports (reference-fusion
-# plan §8 Task 8R). The frontend that produces reference_spec is recorded in the
-# exported <model>.onnx.json under "reference_conditioning" (schema ref_spec_v1).
+# plan §8 Task 8R / 11R). The frontend that produces reference_spec is recorded
+# in the exported <model>.onnx.json under "reference_conditioning" (schema
+# ref_spec_v1, fields: schema, spec_channels, filter_length, hop_length,
+# win_length, sample_rate, center, frontend, max_frames). "frontend" is the
+# checkpoint's training cache builder (hparam reference_spec_frontend) and
+# "max_frames" its reference_max_frames: training never sees longer references,
+# so feeders head-crop reference_spec to at most max_frames frames.
 reference_spec = "reference utterance LINEAR magnitude spectrogram (float32, shape=[B, spec_channels, T_ref]; spectrogram_torch with the config's filter/hop/win length, center=false) — ref_spec exports only"
 reference_spec_lengths = "valid reference frames per batch item (int64, shape=[B]) — ref_spec exports only"
 

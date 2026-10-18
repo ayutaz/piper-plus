@@ -424,6 +424,7 @@ def _block(**overrides):
         "sample_rate": SR,
         "center": False,
         "frontend": VAD,
+        "max_frames": 512,
         **overrides,
     }
 
@@ -662,6 +663,95 @@ class TestReferenceSpecManifest:
         with pytest.raises(ValueError):
             _prepare(options, _dummy_onnx(source), reference_spec=_params())
         assert not list(source.parent.glob("*.reference_spec/*.npy"))
+
+    @staticmethod
+    def _fail_manifest_write(monkeypatch, output_path):
+        """spec を書いた後、manifest 本体の書き込みだけを I/O 障害で落とす。"""
+        from piper_train import evaluation_manifest
+
+        real = evaluation_manifest.atomic_write
+
+        def failing(path, writer):
+            if Path(path) == Path(output_path):
+                raise OSError("injected manifest write failure")
+            return real(path, writer)
+
+        monkeypatch.setattr(evaluation_manifest, "atomic_write", failing)
+
+    @pytest.mark.parametrize("frontend", [VAD, NO_VAD_MQ])
+    def test_failed_reprepare_keeps_previous_manifest_loadable(
+        self, ref_eval_inputs, monkeypatch, frontend
+    ):
+        # 同じ output への prepare のやり直しが失敗しても、前の manifest が
+        # pin する spec (同じ frontend なら同じ bytes) を消さない
+        from piper_train.evaluation_manifest import load_manifest
+
+        source, _rows, options = ref_eval_inputs
+        models = _dummy_onnx(source)
+        _prepare(options, models, reference_spec=_params(VAD))
+        self._fail_manifest_write(monkeypatch, options["output_path"])
+        with pytest.raises(OSError, match="injected"):
+            _prepare(options, models, reference_spec=_params(frontend))
+        load_manifest(options["output_path"])  # spec の hash 照合を含む
+
+    @pytest.mark.parametrize("frontend", [VAD, NO_VAD_MQ])
+    def test_failed_reprepare_keeps_previous_spec_bytes(
+        self, ref_eval_inputs, monkeypatch, frontend
+    ):
+        source, _rows, options = ref_eval_inputs
+        models = _dummy_onnx(source)
+        previous = _prepare(options, models, reference_spec=_params(VAD))
+        paths = [Path(c["reference_spec"]["spec_path"]) for c in previous["clips"]]
+        before = [path.read_bytes() for path in paths]
+        self._fail_manifest_write(monkeypatch, options["output_path"])
+        with pytest.raises(OSError, match="injected"):
+            _prepare(options, models, reference_spec=_params(frontend))
+        assert [path.read_bytes() for path in paths] == before
+
+    def test_failed_reprepare_removes_only_its_new_spec_files(
+        self, ref_eval_inputs, monkeypatch
+    ):
+        # 失敗したやり直しが新しく書いた spec (別 frontend = 別 bytes) は残さない
+        source, _rows, options = ref_eval_inputs
+        models = _dummy_onnx(source)
+        previous = _prepare(options, models, reference_spec=_params(VAD))
+        spec_dir = Path(previous["clips"][0]["reference_spec"]["spec_path"]).parent
+        before = sorted(p.name for p in spec_dir.iterdir())
+        self._fail_manifest_write(monkeypatch, options["output_path"])
+        with pytest.raises(OSError, match="injected"):
+            _prepare(options, models, reference_spec=_params(NO_VAD_MQ))
+        assert sorted(p.name for p in spec_dir.iterdir()) == before
+
+    def test_successful_reprepare_points_to_new_spec_bytes(self, ref_eval_inputs):
+        # 同じ output への別 frontend でのやり直しが成功したら、新しい manifest は
+        # 新しい bytes を指し、hash 照合を通る
+        from piper_train.evaluation_manifest import load_manifest
+
+        source, _rows, options = ref_eval_inputs
+        models = _dummy_onnx(source)
+        old = _prepare(options, models, reference_spec=_params(VAD))
+        new = _prepare(options, models, reference_spec=_params(NO_VAD_MQ))
+        loaded = load_manifest(options["output_path"])
+        assert loaded["reference_spec"]["frontend"] == NO_VAD_MQ
+        for old_clip, new_clip in zip(old["clips"], new["clips"], strict=True):
+            assert (
+                old_clip["reference_spec"]["spec_path"]
+                != new_clip["reference_spec"]["spec_path"]
+            )
+
+    def test_reprepare_rewrites_tampered_spec_file(self, ref_eval_inputs):
+        # 同名でも hash の合わない (壊れた) 保存 spec は、やり直しで書き直す
+        from piper_train.evaluation_manifest import load_manifest
+
+        source, _rows, options = ref_eval_inputs
+        models = _dummy_onnx(source)
+        manifest = _prepare(options, models, reference_spec=_params())
+        path = Path(manifest["clips"][0]["reference_spec"]["spec_path"])
+        stored = np.load(path, allow_pickle=False)
+        stored[0, 0] = np.nextafter(stored[0, 0], np.float32(np.inf))
+        np.save(path, stored)
+        _prepare(options, models, reference_spec=_params())
+        load_manifest(options["output_path"])  # hash 照合を通る
 
     @pytest.mark.parametrize(
         "field,value",
@@ -1062,11 +1152,12 @@ class TestReferenceSpecTorchEval:
             "source": "checkpoint hyper_parameters",
             **_settings(),
             "sample_rate": SR,
-            "frontend_verified": True,
+            "max_frames": 512,
         }
         for clip, expected in zip(report["clips"], manifest["clips"], strict=True):
             record = dict(clip["reference_spec"])
             record.pop("drift")
+            record.pop("fed_frames")
             assert record == expected["reference_spec"]
         saved = json.loads(
             (source.parent / "out" / "generation.json").read_text(encoding="utf-8")
@@ -1184,11 +1275,11 @@ class TestReferenceSpecTorchEval:
                 options["output_path"], "torch-raw", source.parent / "o", device="cpu"
             )
 
-    def test_eval_ref_spec_records_unverified_frontend_without_hparam(
+    def test_eval_ref_spec_refuses_checkpoint_without_frontend_hparam(
         self, ref_eval_inputs, monkeypatch
     ):
-        # 学習側の reference_spec_frontend hparam (後続で追加) が無い旧 ckpt は
-        # frontend を照合できない。拒否せず、未照合であることを report に残す
+        # 学習 frontend を宣言していない ref_spec ckpt は manifest の frontend と
+        # 照合できないので評価しない (照合なしの評価を許さない)
         from piper_train.tools import generate_eval_audio as generation
 
         source, _rows, options = ref_eval_inputs
@@ -1196,12 +1287,165 @@ class TestReferenceSpecTorchEval:
             monkeypatch, source.parent / "model.ckpt", frontend=None
         )
         _prepare(options, {"torch-raw": ckpt}, reference_spec=_params())
+        output = source.parent / "o"
+        with pytest.raises(ValueError, match="reference_spec_frontend"):
+            generation.generate_audio(
+                options["output_path"], "torch-raw", output, device="cpu"
+            )
+        assert not (output / "generation.json").exists()
+
+    def test_eval_ref_spec_refuses_checkpoint_with_unknown_frontend(
+        self, ref_eval_inputs, monkeypatch
+    ):
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, _rows, options = ref_eval_inputs
+        ckpt = _ref_spec_checkpoint(monkeypatch, source.parent / "model.ckpt")
+        monkeypatch.setattr(
+            generation,
+            "load_torch_generator",
+            _loader_with_hparam(
+                generation.load_torch_generator, "reference_spec_frontend", "silero"
+            ),
+        )
+        _prepare(options, {"torch-raw": ckpt}, reference_spec=_params())
+        with pytest.raises(ValueError, match="frontend"):
+            generation.generate_audio(
+                options["output_path"], "torch-raw", source.parent / "o", device="cpu"
+            )
+
+    @pytest.mark.parametrize("value", [0, -1, True, 1.5, "512"])
+    def test_eval_ref_spec_refuses_invalid_max_frames_hparam(
+        self, ref_eval_inputs, monkeypatch, value
+    ):
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, _rows, options = ref_eval_inputs
+        ckpt = _ref_spec_checkpoint(monkeypatch, source.parent / "model.ckpt")
+        monkeypatch.setattr(
+            generation,
+            "load_torch_generator",
+            _loader_with_hparam(
+                generation.load_torch_generator, "reference_max_frames", value
+            ),
+        )
+        _prepare(options, {"torch-raw": ckpt}, reference_spec=_params())
+        with pytest.raises(ValueError, match="max_frames"):
+            generation.generate_audio(
+                options["output_path"], "torch-raw", source.parent / "o", device="cpu"
+            )
+
+    def test_eval_torch_head_crops_reference_to_max_frames(
+        self, ref_eval_inputs, monkeypatch
+    ):
+        # Ruling R15: 学習の検証と同じく先頭から reference_max_frames に切って
+        # feed する (direct infer に先頭 40 frame を渡したものと bit 一致)
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, rows, options = ref_eval_inputs
+        ckpt = _ref_spec_checkpoint(
+            monkeypatch,
+            source.parent / "model.ckpt",
+            hparams={"reference_max_frames": 40},
+        )
+        manifest = _prepare(options, {"torch-raw": ckpt}, reference_spec=_params())
+        output = source.parent / "out"
+        generation.generate_audio(
+            options["output_path"], "torch-raw", output, device="cpu"
+        )
+        loaded, _checkpoint, _rate = generation.load_torch_generator(ckpt, device="cpu")
+        for ordinal, (row, clip) in enumerate(
+            zip(rows, manifest["clips"], strict=True)
+        ):
+            full = _pinned_spec(clip)
+            assert full.shape[-1] > 40  # 切り出しが効く長さの参照で確かめる
+            np.testing.assert_array_equal(
+                _read_wav(output / f"{row['id']}.wav"),
+                _direct_infer(
+                    loaded, row, 42 + ordinal, reference_spec=full[:, :40].clone()
+                ),
+            )
+
+    def test_eval_torch_crop_changes_output(self, ref_eval_inputs, monkeypatch):
+        # 切り出しが実際に feed を変えている (全長を渡した場合と出力が違う)
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, rows, options = ref_eval_inputs
+        ckpt = _ref_spec_checkpoint(
+            monkeypatch,
+            source.parent / "model.ckpt",
+            hparams={"reference_max_frames": 40},
+        )
+        manifest = _prepare(options, {"torch-raw": ckpt}, reference_spec=_params())
+        output = source.parent / "out"
+        generation.generate_audio(
+            options["output_path"], "torch-raw", output, device="cpu"
+        )
+        loaded, _checkpoint, _rate = generation.load_torch_generator(ckpt, device="cpu")
+        uncropped = _direct_infer(
+            loaded, rows[0], 42, reference_spec=_pinned_spec(manifest["clips"][0])
+        )
+        wav = _read_wav(output / f"{rows[0]['id']}.wav")
+        assert wav.shape != uncropped.shape or not np.array_equal(wav, uncropped)
+
+    def test_eval_report_records_original_and_fed_frames(
+        self, ref_eval_inputs, monkeypatch
+    ):
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, _rows, options = ref_eval_inputs
+        ckpt = _ref_spec_checkpoint(
+            monkeypatch,
+            source.parent / "model.ckpt",
+            hparams={"reference_max_frames": 40},
+        )
+        manifest = _prepare(options, {"torch-raw": ckpt}, reference_spec=_params())
         report = generation.generate_audio(
             options["output_path"], "torch-raw", source.parent / "o", device="cpu"
         )
-        contract = report["reference_spec"]["model_contract"]
-        assert contract["frontend"] is None
-        assert contract["frontend_verified"] is False
+        assert report["reference_spec"]["model_contract"]["max_frames"] == 40
+        for clip, pinned in zip(report["clips"], manifest["clips"], strict=True):
+            assert (
+                clip["reference_spec"]["frames"] == pinned["reference_spec"]["frames"]
+            )
+            assert clip["reference_spec"]["fed_frames"] == 40
+
+    def test_eval_report_fed_frames_equal_frames_when_shorter(
+        self, ref_eval_inputs, monkeypatch
+    ):
+        # max_frames 以下の参照は全長のまま (学習の crop と同じ)
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, _rows, options = ref_eval_inputs
+        ckpt = _ref_spec_checkpoint(monkeypatch, source.parent / "model.ckpt")
+        _prepare(options, {"torch-raw": ckpt}, reference_spec=_params())
+        report = generation.generate_audio(
+            options["output_path"], "torch-raw", source.parent / "o", device="cpu"
+        )
+        for clip in report["clips"]:
+            record = clip["reference_spec"]
+            assert record["fed_frames"] == record["frames"]
+
+    def test_eval_crop_keeps_stored_spec_full_length(
+        self, ref_eval_inputs, monkeypatch
+    ):
+        # 切り出しは feed 時だけ。manifest の保存 bytes は全長のまま
+        from piper_train.evaluation_manifest import load_manifest
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, _rows, options = ref_eval_inputs
+        ckpt = _ref_spec_checkpoint(
+            monkeypatch,
+            source.parent / "model.ckpt",
+            hparams={"reference_max_frames": 40},
+        )
+        _prepare(options, {"torch-raw": ckpt}, reference_spec=_params())
+        generation.generate_audio(
+            options["output_path"], "torch-raw", source.parent / "o", device="cpu"
+        )
+        for clip in load_manifest(options["output_path"])["clips"]:
+            stored = np.load(clip["reference_spec"]["spec_path"], allow_pickle=False)
+            assert stored.shape[-1] == clip["reference_spec"]["frames"] > 40
 
     @pytest.mark.parametrize("mode", ["none", "capacity"])
     def test_eval_legacy_model_unchanged(self, ref_eval_inputs, monkeypatch, mode):
@@ -1270,6 +1514,17 @@ def _loader_dropping_hparam(loader, key):
     return load
 
 
+def _loader_with_hparam(loader, key, value):
+    """実 loader で読んだ後、返す checkpoint の hparams の ``key`` を ``value`` に。"""
+
+    def load(path, **kwargs):
+        generator, checkpoint, rate = loader(path, **kwargs)
+        hyper = {**checkpoint["hyper_parameters"], key: value}
+        return generator, {**checkpoint, "hyper_parameters": hyper}, rate
+
+    return load
+
+
 def _loader_ignoring_hparams(loader):
     """filter_length を書き換えた hparams でも 513 bin の encoder で組み直す。"""
 
@@ -1318,14 +1573,13 @@ class TestReferenceSpecOnnxEval:
             assert echoed[0] == spec.shape[-1]
             np.testing.assert_array_equal(echoed[1:], spec.numpy().reshape(-1))
 
-    def test_eval_onnx_uses_sibling_config_json(self, ref_eval_inputs):
-        # runtime と同じ探索順: <model>.onnx.json が無ければ同じ dir の config.json
+    def test_eval_onnx_records_config_provenance(self, ref_eval_inputs):
         from piper_train.embedding_cache import file_sha256
         from piper_train.tools import generate_eval_audio as generation
 
         source, _rows, options = ref_eval_inputs
-        onnx_path = _echo_onnx(source.parent / "echo.onnx", block="skip")
-        config = _write_config(onnx_path, _block(), sibling=True)
+        onnx_path = _echo_onnx(source.parent / "echo.onnx")
+        config = onnx_path.with_name(onnx_path.name + ".json")
         _prepare(options, {"onnx": onnx_path}, reference_spec=_params())
         report = generation.generate_audio(
             options["output_path"], "onnx", source.parent / "out"
@@ -1333,6 +1587,39 @@ class TestReferenceSpecOnnxEval:
         contract = report["reference_spec"]["model_contract"]
         assert contract["source"] == str(config.resolve())
         assert contract["config_sha256"] == file_sha256(config)
+
+    def test_eval_onnx_ref_spec_ignores_sibling_config_json(self, ref_eval_inputs):
+        # export (8R) は <model>.onnx.json だけを書く。同じ dir の config.json
+        # (別モデルのものかもしれない) を契約として読まない
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, _rows, options = ref_eval_inputs
+        onnx_path = _echo_onnx(source.parent / "echo.onnx", block="skip")
+        _write_config(onnx_path, _block(), sibling=True)
+        _prepare(options, {"onnx": onnx_path}, reference_spec=_params())
+        output = source.parent / "out"
+        with pytest.raises(ValueError, match=r"echo\.onnx\.json"):
+            generation.generate_audio(options["output_path"], "onnx", output)
+        assert not (output / "generation.json").exists()
+
+    def test_eval_onnx_head_crops_reference_to_config_max_frames(self, ref_eval_inputs):
+        # Ruling R15: config の max_frames で先頭から切って feed (echo で確認)
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, rows, options = ref_eval_inputs
+        onnx_path = _echo_onnx(source.parent / "echo.onnx", block=_block(max_frames=40))
+        manifest = _prepare(options, {"onnx": onnx_path}, reference_spec=_params())
+        output = source.parent / "out"
+        report = generation.generate_audio(options["output_path"], "onnx", output)
+        for row, clip, entry in zip(
+            rows, manifest["clips"], report["clips"], strict=True
+        ):
+            spec = _pinned_spec(clip).numpy()
+            assert spec.shape[-1] > 40
+            echoed = _read_wav(output / f"{row['id']}.wav")
+            assert echoed[0] == 40
+            np.testing.assert_array_equal(echoed[1:], spec[:, :40].reshape(-1))
+            assert entry["reference_spec"]["fed_frames"] == 40
 
     def test_eval_onnx_ref_spec_creates_one_session_per_clip(
         self, ref_eval_inputs, monkeypatch
@@ -1423,6 +1710,11 @@ class TestReferenceSpecOnnxEval:
             ("center", True),
             ("spec_channels", 257),
             ("schema", "capacity_v1"),
+            ("max_frames", 0),
+            ("max_frames", -1),
+            ("max_frames", True),
+            ("max_frames", 1.5),
+            ("max_frames", "512"),
         ],
     )
     def test_eval_onnx_ref_spec_rejects_config_mismatch(
@@ -1451,6 +1743,7 @@ class TestReferenceSpecOnnxEval:
             "sample_rate",
             "center",
             "spec_channels",
+            "max_frames",
         ],
     )
     def test_eval_onnx_ref_spec_rejects_config_missing_field(
@@ -1464,6 +1757,20 @@ class TestReferenceSpecOnnxEval:
         onnx_path = _echo_onnx(source.parent / "echo.onnx", block=block)
         _prepare(options, {"onnx": onnx_path}, reference_spec=_params())
         with pytest.raises(ValueError, match=field):
+            generation.generate_audio(
+                options["output_path"], "onnx", source.parent / "o"
+            )
+
+    def test_eval_onnx_ref_spec_rejects_unknown_config_field(self, ref_eval_inputs):
+        # 契約にない field (将来の項目や書き間違い) を照合しないまま通さない
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, _rows, options = ref_eval_inputs
+        onnx_path = _echo_onnx(
+            source.parent / "echo.onnx", block=_block(trim_silence=True)
+        )
+        _prepare(options, {"onnx": onnx_path}, reference_spec=_params())
+        with pytest.raises(ValueError, match="trim_silence"):
             generation.generate_audio(
                 options["output_path"], "onnx", source.parent / "o"
             )

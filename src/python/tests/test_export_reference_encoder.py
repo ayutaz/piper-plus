@@ -45,6 +45,10 @@ LEGACY_INPUTS = [
     "prosody_features",
 ]
 REFERENCE_INPUTS = ["reference_spec", "reference_spec_lengths"]
+# ref_spec の tiny model が学習 hparam で宣言する frontend。export の既定の
+# 定数 (旧 "energy-vad@16k;soxr-hq") と違う名前にして、config の frontend が
+# hparam から来ることを全 export で確かめる
+TRAINING_FRONTEND = "no-vad;soxr-mq"
 
 # FP32 graph の torch ↔ ORT 一致の許容誤差。両者は同じ fp32 演算を別 kernel
 # (畳み込みの加算順・GEMM の blocking・erf/exp の近似) で実行するため、
@@ -64,6 +68,8 @@ PARITY_ATOL = 1e-4
 def _tiny_vits(mode: str, **overrides):
     from piper_train.vits.lightning import VitsModel
 
+    if mode == "ref_spec":
+        overrides.setdefault("reference_spec_frontend", TRAINING_FRONTEND)
     torch.manual_seed(0)
     model = VitsModel(
         num_symbols=N_SYMBOLS,
@@ -406,6 +412,36 @@ class TestInputContract:
         err = _cli_error(capsys, ckpt, tmp_path / "ref.onnx", "--no-stochastic")
         assert "reference_conditioning='ref_spec' models require --config" in err
 
+    def test_ref_spec_export_without_frontend_hparam_refused(self, tmp_path, capsys):
+        model = _tiny_vits("ref_spec", reference_spec_frontend=None)
+        ckpt = _save_ckpt(model, tmp_path / "ref.ckpt")
+        source = _write_source_config(tmp_path / "config.json")
+        err = _cli_error(
+            capsys,
+            ckpt,
+            tmp_path / "ref.onnx",
+            "--no-stochastic",
+            "--config",
+            str(source),
+        )
+        assert "reference_spec_frontend" in err
+
+    def test_ref_spec_export_without_frontend_hparam_writes_nothing(
+        self, tmp_path, capsys
+    ):
+        model = _tiny_vits("ref_spec", reference_spec_frontend=None)
+        ckpt = _save_ckpt(model, tmp_path / "ref.ckpt")
+        source = _write_source_config(tmp_path / "config.json")
+        _cli_error(
+            capsys,
+            ckpt,
+            tmp_path / "ref.onnx",
+            "--no-stochastic",
+            "--config",
+            str(source),
+        )
+        assert sorted(p.name for p in tmp_path.iterdir()) == ["config.json", "ref.ckpt"]
+
     def test_ref_spec_export_without_config_writes_nothing(
         self, tmp_path, capsys, ref_spec_model
     ):
@@ -617,7 +653,8 @@ def _expected_ref_spec_config() -> dict:
         "win_length": 1024,
         "sample_rate": SAMPLE_RATE,
         "center": False,
-        "frontend": "energy-vad@16k;soxr-hq",
+        "frontend": TRAINING_FRONTEND,
+        "max_frames": 512,
     }
 
 
@@ -772,6 +809,66 @@ class TestReferenceConditioningConfig:
             reference_conditioning_config(model.model_g, model.hparams)
             == _expected_ref_spec_config()
         )
+
+    @pytest.mark.parametrize(
+        "frontend", ["energy-vad@16k;soxr-hq", "no-vad;soxr-mq", "no-vad;soxr-hq"]
+    )
+    def test_ref_spec_frontend_comes_from_hparam(self, frontend):
+        from piper_train.export_onnx import reference_conditioning_config
+
+        model = _tiny_vits("ref_spec", reference_spec_frontend=frontend)
+        config = reference_conditioning_config(model.model_g, model.hparams)
+        assert config["frontend"] == frontend
+
+    def test_ref_spec_max_frames_comes_from_hparam(self):
+        from piper_train.export_onnx import reference_conditioning_config
+
+        model = _tiny_vits("ref_spec", reference_max_frames=37)
+        config = reference_conditioning_config(model.model_g, model.hparams)
+        assert config["max_frames"] == 37
+
+    def test_ref_spec_without_frontend_raises(self):
+        """frontend を宣言していない ref_spec ckpt は契約を書けない (推測しない)。"""
+        from piper_train.export_onnx import reference_conditioning_config
+
+        model = _tiny_vits("ref_spec", reference_spec_frontend=None)
+        with pytest.raises(ValueError, match="reference_spec_frontend"):
+            reference_conditioning_config(model.model_g, model.hparams)
+
+    def test_ref_spec_without_frontend_key_raises(self):
+        from piper_train.export_onnx import reference_conditioning_config
+
+        model = _tiny_vits("ref_spec")
+        hparams = dict(model.hparams)
+        hparams.pop("reference_spec_frontend")
+        with pytest.raises(ValueError, match="reference_spec_frontend"):
+            reference_conditioning_config(model.model_g, hparams)
+
+    def test_ref_spec_unknown_frontend_raises(self):
+        from piper_train.export_onnx import reference_conditioning_config
+
+        model = _tiny_vits("ref_spec")
+        hparams = {**dict(model.hparams), "reference_spec_frontend": "silero-vad"}
+        with pytest.raises(ValueError, match="frontend"):
+            reference_conditioning_config(model.model_g, hparams)
+
+    @pytest.mark.parametrize("value", [0, -1, True, 1.5, "512"])
+    def test_ref_spec_invalid_max_frames_raises(self, value):
+        from piper_train.export_onnx import reference_conditioning_config
+
+        model = _tiny_vits("ref_spec")
+        hparams = {**dict(model.hparams), "reference_max_frames": value}
+        with pytest.raises(ValueError, match="reference_max_frames"):
+            reference_conditioning_config(model.model_g, hparams)
+
+    def test_schema_and_frontends_come_from_contract_module(self):
+        """export は frontend・schema の文字列を自前で持たない (重複によるずれ防止)。"""
+        from piper_train import export_onnx, reference_spec_contract
+
+        assert not hasattr(export_onnx, "REFERENCE_SPEC_FRONTEND")
+        model = _tiny_vits("ref_spec")
+        config = export_onnx.reference_conditioning_config(model.model_g, model.hparams)
+        assert config["schema"] == reference_spec_contract.REFERENCE_SPEC_SCHEMA
 
     def test_spec_channel_mismatch_raises(self):
         """encoder の入力 bin 数と filter_length が食い違う ckpt は記録しない。"""
