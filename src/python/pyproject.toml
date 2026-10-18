@@ -265,5 +265,11 @@ exclude_lines = [
     "\\.\\.\\.",
 ]
 
-[tool.uv.sources]
-piper-plus = { workspace = true }
+# NOTE: `[tool.uv.sources]` を本ファイルに置かない。 `piper-plus` /
+# `piper-plus-g2p` の workspace source は root pyproject.toml が全 member に
+# 適用する。 ここで `{ workspace = true }` を宣言すると、 workspace root /
+# src/python_run を持たない Docker build context で `uv pip install
+# src/python[...]` が "Failed to parse entry: `piper-plus`" で失敗する。
+# Docker 側は src/python_run を同じ uv コマンドで明示 install して
+# in-repo の piper_plus.embedding を供給する
+# (tests/scripts/test_docker_python_install_context.py が検査)。

@@ -89,12 +89,15 @@ WORKDIR /build
 COPY VERSION /build/VERSION
 COPY pyproject.toml /build/pyproject.toml
 COPY src/python/ /build/src/python/
+# piper_train imports piper_plus.embedding from this checkout's runtime
+# package (the PyPI piper-plus lacks it), so install it from the context too.
+COPY src/python_run/ /build/src/python_run/
 COPY src/python_run/requirements_webui.txt /build/requirements_webui.txt
 
 # Install into the system Python so the layout under
 # /usr/local/lib/python3.13/site-packages is self-contained and copy-able
 # into the final stage.
-RUN uv pip install --system "/build/src/python/g2p[all]"
+#
 # onnxruntime is capped below 1.29 *for this image only*.
 #
 # ORT 1.29 runs a device-discovery pass at import time (`device_discovery.cc`,
@@ -124,7 +127,14 @@ RUN uv pip install --system "/build/src/python/g2p[all]"
 # getting ORT updates. Lift it once upstream stops crashing on a minimal /sys
 # (or once the discovery pass can be disabled), and re-run this workflow to
 # confirm before doing so.
-RUN uv pip install --system "/build/src/python[inference]" "onnxruntime<1.29"
+#
+# `--no-sources` keeps every in-repo package a real (non-editable) install
+# from the local paths on this command: the root workspace sources would
+# otherwise fail on absent members or leave editable links into /build,
+# which the final stage does not copy.
+RUN uv pip install --system --no-sources \
+    "/build/src/python/g2p[all]" "/build/src/python_run" \
+    "/build/src/python[inference]" "onnxruntime<1.29"
 RUN uv pip install --system -r /build/requirements_webui.txt
 
 # Pre-download NLTK data for g2p-en. The download dir is shared so the
