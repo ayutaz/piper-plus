@@ -172,6 +172,7 @@ jobs:
           src/python/tests/test_checkpoint_io.py \
           src/python/tests/test_cpu_reference_comparison.py \
           src/python/tests/test_eval_multiple_references.py \
+          src/python/tests/test_reference_frontend.py \
           src/python/tests/test_strict_zero_shot.py \
           src/python/tests/test_zero_shot_audit.py \
           src/python/tests/test_zs_metric_isolation_gate.py \

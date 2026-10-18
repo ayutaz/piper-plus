@@ -15,7 +15,9 @@ from ..checkpoint_io import load_checkpoint
 from ..embedding_cache import atomic_write, file_sha256
 from ..evaluation_manifest import (
     BACKENDS,
+    REFERENCE_SPEC_DEFAULTS,
     clip_embedding,
+    compute_reference_spec,
     create_manifest,
     load_manifest,
 )
@@ -87,6 +89,68 @@ def _prosody(clip):
     )[None, :, :]
 
 
+def _require_reference_spec_conditions(manifest: dict) -> dict:
+    """ref_spec モデルの評価に必要な参照音声と spec 来歴が manifest にあるか検査する。"""
+    for clip in manifest["clips"]:
+        if not clip["reference_audio"]:
+            raise ValueError(
+                "reference_conditioning='ref_spec' model requires reference audio "
+                f"for every clip (missing for {clip['id']})"
+            )
+    settings = manifest.get("reference_spec")
+    if settings is None:
+        raise ValueError(
+            "reference_conditioning='ref_spec' model requires a manifest prepared "
+            "with --reference-spec (frontend, reference spec hash and T_ref pinned)"
+        )
+    return settings
+
+
+def _check_reference_stft(settings: dict, spec_channels, hparams: dict) -> None:
+    """モデルの参照 spec 契約 (bin 数・学習 STFT 設定) と manifest の設定を照合する。"""
+    expected = settings["filter_length"] // 2 + 1
+    if isinstance(spec_channels, int) and spec_channels != expected:
+        raise ValueError(
+            f"Model expects {spec_channels}-bin reference_spec but manifest "
+            f"filter_length={settings['filter_length']} gives {expected} bins"
+        )
+    for key in ("filter_length", "hop_length", "win_length"):
+        if key in hparams and hparams[key] != settings[key]:
+            raise ValueError(
+                f"Checkpoint {key}={hparams[key]} does not match manifest "
+                f"reference_spec {key}={settings[key]}"
+            )
+
+
+def _reference_spec_for_clip(manifest: dict, clip: dict):
+    """学習 cache と同じ frontend で参照 spec を作り、manifest の来歴と照合する。
+
+    Returns:
+        (spec ``[filter_length // 2 + 1, T_ref]`` float32, 来歴の記録)。
+    """
+    record = clip.get("reference_spec")
+    if record is None:
+        raise ValueError(f"Missing reference_spec record for {clip['id']}")
+    spec, actual = compute_reference_spec(
+        clip["reference_audio"][0]["path"],
+        manifest["reference_spec"],
+        manifest["sample_rate"],
+    )
+    if actual["audio_sha256"] != record["audio_sha256"]:
+        raise ValueError(f"reference audio hash mismatch for {clip['id']}")
+    if actual["frames"] != record["frames"]:
+        raise ValueError(
+            f"reference spec T_ref mismatch for {clip['id']}: "
+            f"{actual['frames']} frames vs pinned {record['frames']}"
+        )
+    if actual["spec_sha256"] != record["spec_sha256"]:
+        raise ValueError(
+            f"reference spec hash mismatch for {clip['id']}: the frontend output "
+            "differs from the pinned manifest (re-run prepare --reference-spec)"
+        )
+    return spec, actual
+
+
 def generate_audio(
     manifest_path: Path, backend: str, output_dir: Path, *, device="auto"
 ) -> dict:
@@ -105,6 +169,9 @@ def generate_audio(
     generator = None
     restored_weights = None
     ema_report = {}
+    # 参照 spec (F-mel) を feed するモデルか。torch は読み込み時、ONNX は
+    # 入力名 (reference_spec) で判定する。旧モデル (none / capacity) は False
+    uses_reference_spec = False
     if backend in ("torch-raw", "torch-ema"):
         generator, checkpoint, sample_rate = load_torch_generator(
             model_spec["path"], device=device
@@ -112,6 +179,13 @@ def generate_audio(
         if not hasattr(generator, "spk_proj"):
             raise ValueError(
                 "Checkpoint does not support speaker_embedding conditioning"
+            )
+        if getattr(generator, "reference_conditioning", "none") == "ref_spec":
+            uses_reference_spec = True
+            _check_reference_stft(
+                _require_reference_spec_conditions(manifest),
+                generator.reference_encoder.spec_channels,
+                checkpoint.get("hyper_parameters") or {},
             )
         if (
             manifest.get("training_epoch") is not None
@@ -159,6 +233,8 @@ def generate_audio(
         "audio_encoding": "float32-raw",
         "clips": [],
     }
+    if uses_reference_spec:
+        result["reference_spec"] = manifest["reference_spec"]
     try:
         for ordinal, clip in enumerate(manifest["clips"]):
             seed = manifest["seed"] + ordinal
@@ -166,6 +242,12 @@ def generate_audio(
             text = np.asarray(clip["phoneme_ids"], dtype=np.int64)[None, :]
             lengths = np.asarray([text.shape[1]], dtype=np.int64)
             prosody = _prosody(clip)
+            reference_spec = reference_record = None
+            if uses_reference_spec and generator is not None:
+                # ONNX は session の入力名を見てから下で作る
+                reference_spec, reference_record = _reference_spec_for_clip(
+                    manifest, clip
+                )
             if generator is not None:
                 import torch  # noqa: PLC0415
 
@@ -188,6 +270,11 @@ def generate_audio(
                     if prosody is not None:
                         kwargs["prosody_features"] = torch.from_numpy(prosody).to(
                             device
+                        )
+                    if reference_spec is not None:
+                        kwargs["reference_spec"] = reference_spec[None].to(device)
+                        kwargs["reference_spec_lengths"] = torch.tensor(
+                            [reference_spec.shape[-1]], dtype=torch.long, device=device
                         )
                     audio = (
                         generator.infer(
@@ -241,6 +328,33 @@ def generate_audio(
                         raise ValueError(
                             "Reference prosody requires ONNX prosody_features input"
                         )
+                    if "reference_spec" in names:
+                        if "reference_spec_lengths" not in names:
+                            raise ValueError(
+                                "ONNX reference_spec input requires the "
+                                "reference_spec_lengths input"
+                            )
+                        spec_input = next(
+                            item for item in inputs if item.name == "reference_spec"
+                        )
+                        _check_reference_stft(
+                            _require_reference_spec_conditions(manifest),
+                            list(spec_input.shape)[1]
+                            if len(spec_input.shape) == 3
+                            else None,
+                            {},
+                        )
+                        uses_reference_spec = True
+                        result["reference_spec"] = manifest["reference_spec"]
+                        reference_spec, reference_record = _reference_spec_for_clip(
+                            manifest, clip
+                        )
+                        feeds["reference_spec"] = np.ascontiguousarray(
+                            reference_spec.numpy()[None], dtype=np.float32
+                        )
+                        feeds["reference_spec_lengths"] = np.asarray(
+                            [reference_spec.shape[-1]], dtype=np.int64
+                        )
                     audio = session.run(["output"], feeds)[0]
             audio = np.asarray(audio, dtype=np.float32)
             if (
@@ -257,16 +371,18 @@ def generate_audio(
                     target, manifest["sample_rate"], audio.reshape(-1)
                 ),
             )
-            result["clips"].append(
-                {
-                    "id": clip["id"],
-                    "text_sha256": clip["text_sha256"],
-                    "speaker_embedding_sha256": clip["speaker_embedding_sha256"],
-                    "reference_audio": clip["reference_audio"],
-                    "seed": seed,
-                    "wav_sha256": file_sha256(path),
-                }
-            )
+            entry = {
+                "id": clip["id"],
+                "text_sha256": clip["text_sha256"],
+                "speaker_embedding_sha256": clip["speaker_embedding_sha256"],
+                "reference_audio": clip["reference_audio"],
+                "seed": seed,
+                "wav_sha256": file_sha256(path),
+            }
+            if reference_record is not None:
+                # 実際に feed した spec の来歴 (manifest の記録と照合済み)
+                entry["reference_spec"] = reference_record
+            result["clips"].append(entry)
         atomic_write(
             output_dir / "generation.json",
             lambda target: target.write(
@@ -299,6 +415,22 @@ def main() -> int:
         help="Pinned checkpoint/export epoch; unknown epochs cannot pass the promotion gate",
     )
     prepare.add_argument("--scales", type=float, nargs=3, default=[0.4, 1.0, 0.5])
+    prepare.add_argument(
+        "--reference-spec",
+        action="store_true",
+        help=(
+            "Pin the reference spectrogram (training-cache frontend, spec hash, "
+            "T_ref) of each clip's first reference audio; required to evaluate "
+            "reference_conditioning='ref_spec' models"
+        ),
+    )
+    for key, value in REFERENCE_SPEC_DEFAULTS.items():
+        prepare.add_argument(
+            "--reference-" + key.replace("_", "-"),
+            type=int,
+            default=value,
+            help=f"STFT {key} of the reference spectrogram (with --reference-spec)",
+        )
     generate = sub.add_parser("generate")
     generate.add_argument("--manifest", required=True, type=Path)
     generate.add_argument("--backend", required=True, choices=BACKENDS)
@@ -326,6 +458,12 @@ def main() -> int:
             models.update({"torch-raw": args.checkpoint, "torch-ema": args.checkpoint})
         if args.onnx:
             models["onnx"] = args.onnx
+        extra = {}
+        if args.reference_spec:
+            extra["reference_spec"] = {
+                key: getattr(args, "reference_" + key)
+                for key in REFERENCE_SPEC_DEFAULTS
+            }
         create_manifest(
             source_path=args.test_jsonl,
             output_path=args.output,
@@ -338,6 +476,7 @@ def main() -> int:
             seed=args.seed,
             scales=args.scales,
             training_epoch=args.epoch,
+            **extra,
         )
     else:
         generate_audio(args.manifest, args.backend, args.output_dir, device=args.device)
