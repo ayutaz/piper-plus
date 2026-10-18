@@ -362,6 +362,12 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_create(
         *out_engine = engine.release();  // Transfer ownership to caller
         return PIPER_PLUS_OK;
 
+    } catch (const piper::UnsupportedModelInputError &e) {
+        // Model declares inputs this runtime cannot build (ref_spec_v1).
+        // Classified by type, not by message text: the message embeds the
+        // model path, which may itself contain "onnxruntime" / "ORT ".
+        set_error(std::string("Model error: ") + e.what());
+        return PIPER_PLUS_ERR_MODEL;
     } catch (const std::exception &e) {
         std::string msg = e.what();
 

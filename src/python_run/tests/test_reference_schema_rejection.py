@@ -118,12 +118,24 @@ def test_rejection_message_says_reference_spectrogram_unsupported(
     assert "does not support" in message
 
 
-def test_rejection_message_names_the_declared_inputs(model_dir: Path) -> None:
+# message の括弧内は「model が宣言した参照入力だけ」を固定順で並べる。
+# "reference_spec" は "reference_spec_lengths" の部分文字列なので、区切り
+# (",", ";") まで含めて照合し、片方だけ宣言した model で余計な名前が
+# 出ないことも確かめる (C++ test と同じ基準)。
+DECLARED_REFERENCE_INPUTS = {
+    "ref_spec": "(reference_spec, reference_spec_lengths;",
+    "ref_spec_without_lengths": "(reference_spec;",
+    "ref_spec_lengths_only": "(reference_spec_lengths;",
+}
+
+
+@pytest.mark.parametrize("name", sorted(DECLARED_REFERENCE_INPUTS))
+def test_rejection_message_lists_exactly_the_declared_inputs(
+    model_dir: Path, name: str
+) -> None:
     with pytest.raises(RuntimeError) as excinfo:
-        _load_voice(model_dir, "ref_spec")
-    message = str(excinfo.value)
-    assert "reference_spec" in message
-    assert "reference_spec_lengths" in message
+        _load_voice(model_dir, name)
+    assert DECLARED_REFERENCE_INPUTS[name] in str(excinfo.value)
 
 
 def test_rejection_message_includes_model_path(model_dir: Path) -> None:
@@ -133,30 +145,32 @@ def test_rejection_message_includes_model_path(model_dir: Path) -> None:
     assert str(model_path) in str(excinfo.value)
 
 
-def test_rejects_model_declaring_reference_spec_without_lengths(
-    model_dir: Path,
-) -> None:
-    with pytest.raises(RuntimeError, match="reference_spec"):
-        _load_voice(model_dir, "ref_spec_without_lengths")
-
-
-def test_rejects_model_declaring_only_reference_spec_lengths(
-    model_dir: Path,
-) -> None:
-    with pytest.raises(RuntimeError, match="reference_spec_lengths"):
-        _load_voice(model_dir, "ref_spec_lengths_only")
+def _warmup_failure_records(caplog: pytest.LogCaptureFixture) -> list:
+    return [r for r in caplog.records if "Warmup failed" in r.getMessage()]
 
 
 def test_rejection_happens_before_warmup(
     model_dir: Path, caplog: pytest.LogCaptureFixture, monkeypatch
 ) -> None:
-    # warmup が走ると必須入力欠落で "Warmup failed" を warning に残して握り潰す。
-    # 読み込み時の拒否は warmup より前に起きなければならない。
+    # warmup が走ると必須入力欠落で ORT run が失敗し、"Warmup failed" を warning
+    # に残して握り潰す。読み込み時の拒否は warmup (ORT run) より前に起きる。
     monkeypatch.delenv("PIPER_PLUS_DISABLE_WARMUP", raising=False)
     with caplog.at_level(logging.WARNING):
         with pytest.raises(RuntimeError):
             _load_voice(model_dir, "ref_spec")
-    assert not [r for r in caplog.records if "Warmup failed" in r.getMessage()]
+    assert not _warmup_failure_records(caplog)
+
+
+def test_rejection_happens_before_warmup_on_inline_path(
+    model_dir: Path, caplog: pytest.LogCaptureFixture, monkeypatch
+) -> None:
+    # piper_train の無い配布環境の inline 経路 (_warmup_session) でも同じ順序。
+    monkeypatch.delenv("PIPER_PLUS_DISABLE_WARMUP", raising=False)
+    monkeypatch.setattr(voice_module, "_HAS_SHARED_ORT_UTILS", False)
+    with caplog.at_level(logging.WARNING):
+        with pytest.raises(RuntimeError):
+            _load_voice(model_dir, "ref_spec")
+    assert not _warmup_failure_records(caplog)
 
 
 def test_rejects_on_standalone_inline_session_path(
@@ -222,8 +236,9 @@ def test_http_engine_rejection_message_includes_model_path(model_dir: Path) -> N
 def test_http_engine_rejects_reference_spec_lengths_only_model(
     model_dir: Path,
 ) -> None:
-    with pytest.raises(RuntimeError, match="reference-spectrogram input"):
+    with pytest.raises(RuntimeError) as excinfo:
         create_ort_session(model_dir / "ref_spec_lengths_only.onnx", device="cpu")
+    assert DECLARED_REFERENCE_INPUTS["ref_spec_lengths_only"] in str(excinfo.value)
 
 
 def test_http_engine_legacy_model_loads(model_dir: Path) -> None:
@@ -284,6 +299,47 @@ def test_http_server_create_app_rejects_reference_spec_voice(model_dir: Path) ->
         create_app(voice, {})
 
 
+def test_http_server_create_app_message_uses_explicit_model_path(
+    model_dir: Path,
+) -> None:
+    pytest.importorskip("fastapi")
+    from piper_plus.http_server import create_app
+
+    model_path = model_dir / "ref_spec.onnx"
+    voice = PiperVoice(session=_cpu_session(model_path), config=_fixture_config())
+    with pytest.raises(RuntimeError) as excinfo:
+        create_app(voice, {}, model_path=model_path)
+    assert str(model_path) in str(excinfo.value)
+
+
+def test_http_server_create_app_without_model_path_uses_placeholder(
+    model_dir: Path,
+) -> None:
+    # path は呼び出し側が明示的に渡す。ORT の private 属性 (session._model_path、
+    # cache 経路では .opt.onnx を指しうる) には依存しない。
+    pytest.importorskip("fastapi")
+    from piper_plus.http_server import create_app
+
+    voice = PiperVoice(
+        session=_cpu_session(model_dir / "ref_spec.onnx"), config=_fixture_config()
+    )
+    with pytest.raises(RuntimeError) as excinfo:
+        create_app(voice, {})
+    assert "Model (model path not provided) requires" in str(excinfo.value)
+
+
+def test_http_server_create_app_accepts_legacy_voice_with_model_path(
+    model_dir: Path,
+) -> None:
+    pytest.importorskip("fastapi")
+    from piper_plus.http_server import create_app
+
+    model_path = model_dir / "legacy_full.onnx"
+    voice = PiperVoice(session=_cpu_session(model_path), config=_fixture_config())
+    app = create_app(voice, {}, model_path=model_path)
+    assert app.title == "Piper TTS HTTP Server"
+
+
 def test_http_server_create_app_accepts_legacy_voice(model_dir: Path) -> None:
     pytest.importorskip("fastapi")
     from piper_plus.http_server import create_app
@@ -294,6 +350,59 @@ def test_http_server_create_app_accepts_legacy_voice(model_dir: Path) -> None:
     )
     app = create_app(voice, {})
     assert app.title == "Piper TTS HTTP Server"
+
+
+# ---------------------------------------------------------------------------
+# reject_reference_spec_inputs (入力名の集合だけを見る判定) の境界
+# ---------------------------------------------------------------------------
+
+
+def test_reference_input_check_accepts_empty_input_list() -> None:
+    from piper_plus.model_inputs import reject_reference_spec_inputs
+
+    assert reject_reference_spec_inputs([], "m.onnx") is None
+
+
+def test_reference_input_check_accepts_legacy_input_names() -> None:
+    from piper_plus.model_inputs import reject_reference_spec_inputs
+
+    names = [*LEGACY_FULL_INPUTS, "sid", "speaker_embedding_mask"]
+    assert reject_reference_spec_inputs(names, "m.onnx") is None
+
+
+@pytest.mark.parametrize(
+    "near_miss",
+    ["reference_spec_x", "reference_specs", "Reference_Spec", "reference_spec "],
+)
+def test_reference_input_check_matches_exact_names_only(near_miss: str) -> None:
+    # 判定は完全一致。似た名前の入力 (将来の別 schema 等) は拒否理由にしない。
+    from piper_plus.model_inputs import reject_reference_spec_inputs
+
+    assert reject_reference_spec_inputs(["input", near_miss], "m.onnx") is None
+
+
+def test_reference_input_check_lists_names_in_fixed_order() -> None:
+    # graph 上の宣言順に依らず message は固定順 (C++ と同じ文面になる)。
+    from piper_plus.model_inputs import (
+        UnsupportedModelInputError,
+        reject_reference_spec_inputs,
+    )
+
+    with pytest.raises(UnsupportedModelInputError) as excinfo:
+        reject_reference_spec_inputs(
+            ["reference_spec_lengths", "input", "reference_spec"], "m.onnx"
+        )
+    assert DECLARED_REFERENCE_INPUTS["ref_spec"] in str(excinfo.value)
+
+
+def test_reference_input_check_accepts_single_pass_iterable() -> None:
+    # session.get_inputs() を generator で渡しても判定できる (1 回だけ走査する)。
+    from piper_plus.model_inputs import reject_reference_spec_inputs
+
+    names = iter(["input", "reference_spec_lengths"])
+    with pytest.raises(RuntimeError) as excinfo:
+        reject_reference_spec_inputs(names, "m.onnx")
+    assert DECLARED_REFERENCE_INPUTS["ref_spec_lengths_only"] in str(excinfo.value)
 
 
 # ---------------------------------------------------------------------------

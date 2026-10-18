@@ -499,9 +499,9 @@ void loadModel(std::string modelPath, ModelSession &session,
   // never builds those tensors, so the first synthesis would fail with ORT's
   // "Missing Input". Reject at load time with an explicit message instead.
   // Same input names and message as the Python runtime
-  // (src/python_run/piper_plus/model_inputs.py). The message deliberately
-  // avoids the ORT markers the C API uses for PIPER_PLUS_ERR_ORT, so
-  // piper_plus_create() reports PIPER_PLUS_ERR_MODEL.
+  // (src/python_run/piper_plus/model_inputs.py). The dedicated exception type
+  // lets piper_plus_create() report PIPER_PLUS_ERR_MODEL without inspecting
+  // the message, which embeds the (arbitrary) model path.
   {
     std::vector<std::string> declaredInputs;
     for (size_t i = 0; i < session.onnx.GetInputCount(); i++) {
@@ -521,7 +521,7 @@ void loadModel(std::string modelPath, ModelSession &session,
     }
     if (!found.empty()) {
       session.onnx = Ort::Session(nullptr);
-      throw std::runtime_error(
+      throw UnsupportedModelInputError(
           "Model " + modelPath + " requires reference-spectrogram input (" +
           found +
           "; reference_conditioning schema ref_spec_v1), which this runtime "
