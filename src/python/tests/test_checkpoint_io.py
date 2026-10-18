@@ -247,6 +247,20 @@ def test_allowed_missing_rejects_shape_mismatch_inside_allowed_prefix():
         )
 
 
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float64])
+def test_allowed_missing_rejects_dtype_mismatch(dtype):
+    """``load_state_dict`` は dtype 差を黙って cast するので先に拒否する。"""
+    from piper_train.checkpoint_io import load_state_with_allowed_missing
+
+    legacy_state = _source_state(_legacy_generator())
+    legacy_state["dec.weight"] = legacy_state["dec.weight"].to(dtype)
+    target = _reference_generator()
+    before = _snapshot(target)
+    with pytest.raises(ValueError, match=r"dtype.*dec\.weight"):
+        load_state_with_allowed_missing(target, legacy_state, REFERENCE_PREFIXES)
+    _assert_unchanged(target, before)
+
+
 def test_allowed_missing_rejects_non_tensor_value():
     from piper_train.checkpoint_io import load_state_with_allowed_missing
 
