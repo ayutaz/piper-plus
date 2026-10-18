@@ -29,6 +29,7 @@ from .vits.models import MRD_HIRES_RESOLUTIONS, REFERENCE_CONDITIONING_MODES
 from .zero_shot_requirements import (
     validate_reference_spec_frontend_args,
     validate_reference_training_args,
+    validate_warm_start_reference_hparams,
 )
 
 
@@ -1408,6 +1409,13 @@ def load_weights_only_checkpoint(checkpoint_path: str, model) -> tuple[list, lis
     # NOTE: weights_only=False is required to handle PosixPath objects in checkpoints
     # This poses a security risk - only load trusted checkpoints
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    # Ruling R16: 参照 hparam の照合は重みを書き換える前に
+    validate_warm_start_reference_hparams(
+        checkpoint.get("hyper_parameters"),
+        getattr(model, "hparams", None),
+        source_flag="--resume-weights-only",
+        logger=_LOGGER,
+    )
     state_dict = checkpoint["state_dict"]
     # Rejects HiFi-GAN checkpoints and migrates pre-FiLM decoders (issue #616).
     normalized_sd, _ = normalize_checkpoint_state_dict(
@@ -1517,6 +1525,13 @@ def load_multispeaker_checkpoint(checkpoint_path: str, model: VitsModel) -> None
     # PosixPath / WindowsPath in hparams to pathlib.Path: a ckpt saved on the
     # other OS cannot be unpickled by a plain torch.load.
     checkpoint = load_checkpoint(checkpoint_path, mmap=False)
+    # Ruling R16: 参照 hparam の照合は重みを書き換える前に
+    validate_warm_start_reference_hparams(
+        checkpoint.get("hyper_parameters"),
+        getattr(model, "hparams", None),
+        source_flag="--resume-from-multispeaker-checkpoint",
+        logger=_LOGGER,
+    )
     # Rejects HiFi-GAN checkpoints and migrates pre-FiLM decoders (issue #616).
     normalized_sd, _ = normalize_checkpoint_state_dict(
         checkpoint["state_dict"], model.state_dict(), checkpoint_path=checkpoint_path
