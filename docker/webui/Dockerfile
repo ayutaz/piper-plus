@@ -34,11 +34,17 @@ WORKDIR /app
 COPY VERSION /app/VERSION
 COPY pyproject.toml /app/pyproject.toml
 COPY src/python /app/src/python
+# piper_train imports piper_plus.embedding from this checkout's runtime
+# package (the PyPI piper-plus lacks it), so install it from the context too.
+COPY src/python_run /app/src/python_run
 COPY src/python_run/requirements_webui.txt /app/requirements_webui.txt
 COPY src/python_run/overrides_webui.txt /app/overrides_webui.txt
 
-# Install piper_train with inference extras + gradio + multilingual
-RUN uv pip install --system "/app/src/python[inference]" && \
+# Install piper_train with inference extras + gradio + multilingual.
+# `--no-sources`: in-repo deps come from the local paths on the same command,
+# not from the root workspace sources (absent members / editable links).
+RUN uv pip install --system --no-sources \
+    "/app/src/python/g2p[all]" "/app/src/python_run" "/app/src/python[inference]" && \
     uv pip install --system -r /app/requirements_webui.txt --override /app/overrides_webui.txt
 
 # Download NLTK data required by g2p-en (English phonemizer)

@@ -46,6 +46,9 @@ WORKDIR /build
 COPY VERSION /build/VERSION
 COPY pyproject.toml /build/pyproject.toml
 COPY src/python/ /build/src/python/
+# piper_train imports piper_plus.embedding from this checkout's runtime
+# package (the PyPI piper-plus lacks it), so build its wheel from the context.
+COPY src/python_run/ /build/src/python_run/
 
 # Build wheels first to guarantee non-editable installs.
 # `uv pip install /path[extras]` can resolve to .pth-style editable links when uv
@@ -56,13 +59,17 @@ COPY src/python/ /build/src/python/
 # Building wheels first sidesteps this entirely (archive_info instead of dir_info
 # in dist-info/direct_url.json).
 RUN uv build /build/src/python/g2p --wheel --out-dir /tmp/wheels/ \
+    && uv build /build/src/python_run  --wheel --out-dir /tmp/wheels/ \
     && uv build /build/src/python      --wheel --out-dir /tmp/wheels/
 
-# Install piper_plus_g2p (standalone G2P -- all languages)
-RUN uv pip install --system "$(ls /tmp/wheels/piper_plus_g2p-*.whl)[all]"
-
-# Install piper_train with inference extras (onnxruntime CPU, soundfile, etc.)
-RUN uv pip install --system "$(ls /tmp/wheels/piper_train-*.whl)[inference]"
+# Install piper_plus_g2p (standalone G2P -- all languages) and piper_train
+# with inference extras (onnxruntime CPU, soundfile, etc.) together with the
+# in-repo runtime wheel, so the piper-plus dependency is not resolved to an
+# older PyPI release.
+RUN uv pip install --system --no-sources \
+    "$(ls /tmp/wheels/piper_plus_g2p-*.whl)[all]" \
+    "$(ls /tmp/wheels/piper_plus-[0-9]*.whl)" \
+    "$(ls /tmp/wheels/piper_train-*.whl)[inference]"
 
 # Install wyoming protocol library.
 # >=1.5.1 added Artifact.version field; 1.5.0 raises TypeError on

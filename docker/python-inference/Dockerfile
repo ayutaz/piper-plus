@@ -96,8 +96,17 @@ WORKDIR /app
 COPY VERSION /app/VERSION
 COPY pyproject.toml /app/pyproject.toml
 COPY src/python/ /app/src/python/
+# piper_train imports piper_plus.embedding from this checkout's runtime
+# package (the PyPI piper-plus lacks it), so install it from the context too.
+COPY src/python_run/ /app/src/python_run/
 
 # Install piper_plus_g2p (standalone G2P package) and piper_train
+#
+# piper_train の install では `--no-sources` を付け、 in-repo 依存
+# (piper-plus / piper-plus-g2p) を同じコマンドの local path で与える。
+# root pyproject.toml の `[tool.uv.sources]` (workspace + editable) を uv が
+# 適用すると、 member 不在で "Failed to parse entry" になるか、 build context
+# を指す editable install になるため。
 #
 # `--no-cache` で uv のキャッシュをイメージに残さない。 uv は既定で展開済み
 # wheel を `/root/.cache/uv/archive-v*/` に置き、 これは実行時に一切使われない
@@ -108,8 +117,8 @@ COPY src/python/ /app/src/python/
 # msgpack 1.1.2 の対策では **ない** (`--no-cache` を入れても結果は変わらな
 # かった)。 その出どころは pip が同梱する SBOM (`pip/_vendor/bom.cdx.json`)
 # で、 後段の `pip uninstall` の手順で pip ごと取り除く (#748)。
-RUN uv pip install --system --no-cache "/app/src/python/g2p"
-RUN uv pip install --system --no-cache "/app/src/python[inference-gpu]"
+RUN uv pip install --system --no-cache --no-sources \
+    "/app/src/python/g2p" "/app/src/python_run" "/app/src/python[inference-gpu]"
 
 # Install Gradio WebUI requirements
 COPY src/python_run/requirements_webui.txt /app/requirements_webui.txt
