@@ -5,6 +5,7 @@
 #include <functional>
 #include <map>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -18,6 +19,16 @@
 #include "json.hpp"
 
 namespace piper {
+
+// Thrown by loadModel()/loadVoice() when the ONNX model declares inputs this
+// runtime cannot build (reference-conditioned ref_spec_v1 models with
+// reference_spec / reference_spec_lengths). The C API maps this type to
+// PIPER_PLUS_ERR_MODEL directly, so the classification never depends on the
+// message text (which contains the model path).
+class UnsupportedModelInputError : public std::runtime_error {
+public:
+  using std::runtime_error::runtime_error;
+};
 
 typedef int64_t SpeakerId;
 typedef int64_t LanguageId;

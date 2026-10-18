@@ -133,19 +133,20 @@ TEST_F(ReferenceSpecRejectionTest, RejectsReferenceSpecLengthsOnly) {
         << *message;
 }
 
-// C API (piper_plus_create) は例外 message の "model" を見て
-// PIPER_PLUS_ERR_MODEL に分類する。ORT 起因 (PIPER_PLUS_ERR_ORT) と誤分類
-// されないよう、message は ORT の分類語を含まない。
-TEST_F(ReferenceSpecRejectionTest, MessageIsClassifiedAsModelErrorByCApi) {
-    auto message = loadErrorMessage("ref_spec");
-    ASSERT_TRUE(message.has_value());
-    for (const char* ortMarker : {"onnxruntime", "OrtException", "ORT ",
-                                  "InferenceSession", "SessionOptions"}) {
-        EXPECT_EQ(message->find(ortMarker), std::string::npos)
-            << "marker '" << ortMarker << "' in: " << *message;
-    }
-    EXPECT_NE(message->find("model"), std::string::npos) << *message;
+// 専用型で投げる: C API は message の文字列 (path を含む) ではなく型で
+// PIPER_PLUS_ERR_MODEL に分類する。std::runtime_error 派生なので既存の
+// catch (const std::runtime_error&) もそのまま受けられる。
+TEST_F(ReferenceSpecRejectionTest, ThrowsUnsupportedModelInputError) {
+    piper::PiperConfig config;
+    piper::Voice voice;
+    std::optional<piper::SpeakerId> speakerId;
+    EXPECT_THROW(piper::loadVoice(config, modelPath("ref_spec"), configPath(),
+                                  voice, speakerId, "cpu"),
+                 piper::UnsupportedModelInputError);
 }
+
+// C API の error code 分類 (PIPER_PLUS_ERR_MODEL) は test_c_api.cpp の
+// CApiReferenceSpecModel が piper_plus_create を実際に呼んで検査する。
 
 // ----------------------------------------------------------------------------
 // 旧モデルは不変

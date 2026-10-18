@@ -255,14 +255,25 @@ def _error_response(status_code: int, message: str) -> JSONResponse:
     return JSONResponse(status_code=status_code, content={"error": message})
 
 
-def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
-    """Build a FastAPI app wired to the loaded voice."""
+def create_app(
+    voice: Any,
+    synthesize_args: dict[str, Any],
+    *,
+    model_path: str | Path | None = None,
+) -> FastAPI:
+    """Build a FastAPI app wired to the loaded voice.
+
+    ``model_path`` is only used in the error message when the voice's model
+    declares inputs this server cannot feed (reference-spectrogram input).
+    """
     session = getattr(voice, "session", None)
     if session is not None:
         # PiperVoice.load 以外で組んだ voice も受けるため、ここでも参照spec入力
-        # (ref_spec_v1) を拒否する。ORT session は読み込み元 path を持つ。
+        # (ref_spec_v1) を拒否する。path は呼び出し側が渡す (ORT の private
+        # 属性には依存しない)。
         reject_unsupported_session_inputs(
-            session, getattr(session, "_model_path", None) or "(loaded session)"
+            session,
+            model_path if model_path is not None else "(model path not provided)",
         )
     embedding_dim = (
         embedding_dimension(session.get_inputs())
@@ -531,7 +542,7 @@ def main() -> None:
         "sentence_silence": args.sentence_silence,
     }
 
-    app = create_app(voice, synthesize_args)
+    app = create_app(voice, synthesize_args, model_path=args.model)
     uvicorn.run(app, host=args.host, port=args.port)
 
 

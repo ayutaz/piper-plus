@@ -177,6 +177,100 @@ TEST(CApiErrorMessage, ErrorAvailableAfterFailure) {
     EXPECT_NE(err, nullptr);
 }
 
+// ===== Reference-spec (ref_spec_v1) model rejection =====
+//
+// reference_spec / reference_spec_lengths を宣言した ONNX は loadModel が
+// 読み込み時に拒否する (test_reference_spec_rejection.cpp)。C API はそれを
+// PIPER_PLUS_ERR_MODEL として返し、ORT の失敗 (PIPER_PLUS_ERR_ORT) とは
+// 区別する。分類は message 中の path の文字列に左右されない。
+// Fixture: tests/fixtures/reference_spec_inputs/ (commit 済み tiny ONNX)。
+
+namespace {
+
+namespace fs = std::filesystem;
+
+fs::path referenceSpecFixtureDir() {
+    return fs::path(PIPER_PLUS_REFERENCE_SPEC_FIXTURE_DIR);
+}
+
+struct CreateOutcome {
+    PiperPlusStatus status;
+    bool engineCreated;
+    std::string lastError;
+};
+
+CreateOutcome createEngine(const fs::path& model, const fs::path& configFile) {
+    const std::string modelStr = model.string();
+    const std::string configStr = configFile.string();
+    PiperPlusConfig config;
+    memset(&config, 0, sizeof(config));
+    config.model_path = modelStr.c_str();
+    config.config_path = configStr.c_str();
+    PiperPlusEngine* engine = nullptr;
+    PiperPlusStatus rc = piper_plus_create(&config, &engine);
+    const char* err = piper_plus_get_last_error();
+    CreateOutcome outcome{rc, engine != nullptr, err ? err : ""};
+    if (engine) {
+        piper_plus_free(engine);
+    }
+    return outcome;
+}
+
+}  // namespace
+
+TEST(CApiReferenceSpecModel, CreateReturnsModelError) {
+    const fs::path dir = referenceSpecFixtureDir();
+    ASSERT_TRUE(fs::exists(dir / "ref_spec.onnx")) << dir.string();
+    auto outcome = createEngine(dir / "ref_spec.onnx", dir / "config.json");
+    EXPECT_EQ(outcome.status, PIPER_PLUS_ERR_MODEL) << outcome.lastError;
+    EXPECT_FALSE(outcome.engineCreated);
+}
+
+TEST(CApiReferenceSpecModel, LastErrorSaysReferenceSpectrogramUnsupported) {
+    const fs::path dir = referenceSpecFixtureDir();
+    auto outcome = createEngine(dir / "ref_spec.onnx", dir / "config.json");
+    EXPECT_NE(outcome.lastError.find("reference-spectrogram input"),
+              std::string::npos) << outcome.lastError;
+    EXPECT_NE(outcome.lastError.find("does not support"), std::string::npos)
+        << outcome.lastError;
+}
+
+TEST(CApiReferenceSpecModel, LastErrorIncludesModelPath) {
+    const fs::path dir = referenceSpecFixtureDir();
+    const fs::path model = dir / "ref_spec.onnx";
+    auto outcome = createEngine(model, dir / "config.json");
+    EXPECT_NE(outcome.lastError.find(model.string()), std::string::npos)
+        << outcome.lastError;
+}
+
+// path に C API の ORT 判定語 ("onnxruntime" / "ORT ") が含まれても
+// PIPER_PLUS_ERR_ORT に化けない。
+TEST(CApiReferenceSpecModel, OrtMarkersInModelPathDoNotChangeErrorCode) {
+    const fs::path src = referenceSpecFixtureDir();
+    const fs::path dir =
+        fs::temp_directory_path() / "piper_plus onnxruntime ORT models";
+    fs::create_directories(dir);
+    fs::copy_file(src / "ref_spec.onnx", dir / "ref_spec.onnx",
+                  fs::copy_options::overwrite_existing);
+    fs::copy_file(src / "config.json", dir / "config.json",
+                  fs::copy_options::overwrite_existing);
+
+    auto outcome = createEngine(dir / "ref_spec.onnx", dir / "config.json");
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+
+    EXPECT_EQ(outcome.status, PIPER_PLUS_ERR_MODEL) << outcome.lastError;
+    EXPECT_NE(outcome.lastError.find("reference-spectrogram input"),
+              std::string::npos) << outcome.lastError;
+}
+
+TEST(CApiReferenceSpecModel, LegacyModelStillCreates) {
+    const fs::path dir = referenceSpecFixtureDir();
+    auto outcome = createEngine(dir / "legacy_minimal.onnx", dir / "config.json");
+    EXPECT_EQ(outcome.status, PIPER_PLUS_OK) << outcome.lastError;
+    EXPECT_TRUE(outcome.engineCreated);
+}
+
 // ===== Status code sanity =====
 
 TEST(CApiStatusCodes, ValuesAreDefined) {

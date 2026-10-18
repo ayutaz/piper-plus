@@ -1110,6 +1110,10 @@ target_link_libraries(test_c_api PRIVATE
 target_compile_definitions(test_c_api PRIVATE
     PIPER_PLUS_BUILDING_DLL
     _PIPER_VERSION=${piper_version}
+    # ref_spec_v1 model rejection cases (CApiReferenceSpecModel) read the
+    # committed tiny ONNX fixtures by absolute path (test_c_api has no
+    # WORKING_DIRECTORY).
+    PIPER_PLUS_REFERENCE_SPEC_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/reference_spec_inputs"
 )
 
 # Include directories: piper_plus.h lives in src/cpp/
