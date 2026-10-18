@@ -4,6 +4,7 @@ import dataclasses
 import logging
 import math
 import os
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -37,6 +38,7 @@ from .dataset import (
     UtteranceCollate,
     _load_tensor,
     crop_reference_specs,
+    reference_noise_seed,
 )
 from .losses import (
     adv_speaker_classifier_loss_d,
@@ -1244,6 +1246,52 @@ class VitsModel(pl.LightningModule):
                 generator=split_generator,
             )
 
+        if load_references:
+            self._record_reference_subset_overlap(full_dataset)
+
+    def _record_reference_subset_overlap(self, full_dataset: PiperDataset) -> None:
+        """R13: 参照が実行時の random_split の別 subset にある target を数える。
+
+        jsonl の ``split`` (pairs tool と strict の「同 split」検査の対象) は
+        実行時の train / val / test 分割 (``random_split``) とは無関係なので、
+        val の発話が train target の参照になる (逆も) ことは防げない。学習は
+        止めず、件数を ``"<target subset>-><reference subset>"`` (参照が length
+        filter 等で target として読まれていなければ ``"unloaded"``) ごとに数え、
+        1 回だけ WARNING に出して hparams ``reference_subset_overlap`` に残す。
+        """
+        subset_of: dict[str, str] = {}
+        members: list[tuple[str, int]] = []
+        for name in ("train", "val", "test"):
+            indices = getattr(getattr(self, f"_{name}_dataset", None), "indices", None)
+            for index in indices if indices is not None else ():
+                utt = full_dataset.utterances[index]
+                subset_of[utt.utterance_id] = name
+                members.append((name, index))
+        counts: Counter = Counter()
+        for name, index in members:
+            reference = full_dataset.utterances[index].reference_utterance_id
+            reference_subset = subset_of.get(reference, "unloaded")
+            if reference_subset != name:
+                counts[f"{name}->{reference_subset}"] += 1
+        overlap = dict(sorted(counts.items()))
+        self.hparams["reference_subset_overlap"] = overlap
+        if overlap:
+            _LOGGER.warning(
+                "generator_reference='cross_utt': %d of %d targets have their "
+                "reference outside their own subset of the in-run random_split "
+                "(%s). The pairs tool / --strict-zero-shot same-split check only "
+                "covers the jsonl split field; held-out evaluation should use a "
+                "separate manifest.",
+                sum(overlap.values()),
+                len(members),
+                ", ".join(f"{key}={count}" for key, count in overlap.items()),
+            )
+        else:
+            _LOGGER.info(
+                "generator_reference='cross_utt': every reference lies in the same "
+                "in-run random_split subset as its target"
+            )
+
     def forward(
         self, text, text_lengths, scales, sid=None, lid=None, prosody_features=None
     ):
@@ -1317,15 +1365,30 @@ class VitsModel(pl.LightningModule):
                 "piper_train.tools.build_reference_pairs)"
             )
         if self.training:
-            sigma = getattr(self.hparams, "spk_emb_noise_sigma", 0.0)
-            g_ref = torch.Generator()
-            g_ref.manual_seed(
-                (self._training_batch_index * 2654435761 + 0x2545F491) % (2**63)
-            )
-            noise = torch.randn(reference.shape, generator=g_ref).to(
-                device=reference.device, dtype=reference.dtype
-            )
-            reference = F.normalize(reference + noise * sigma, p=2, dim=-1)
+            sigma = float(getattr(self.hparams, "spk_emb_noise_sigma", 0.0))
+            if sigma > 0:
+                keys = getattr(batch, "utterance_ids", None)
+                if keys is None or len(keys) != reference.size(0):
+                    raise ValueError(
+                        "reference embedding noise requires batch.utterance_ids "
+                        "for every row"
+                    )
+                # 行ごとに (step, target 発話) の専用 generator: rank 間で独立、
+                # 位置によらず再現でき、global RNG の乱数列を変えない
+                noise = torch.stack(
+                    [
+                        torch.randn(
+                            reference.size(1),
+                            generator=torch.Generator().manual_seed(
+                                reference_noise_seed(self._training_batch_index, key)
+                            ),
+                        )
+                        for key in keys
+                    ]
+                ).to(device=reference.device, dtype=reference.dtype)
+                reference = reference + noise * sigma
+            # target と同じく L2 再正規化 (σ=0 では noise を作らない)
+            reference = F.normalize(reference, p=2, dim=-1)
         reference_spec = reference_spec_lengths = None
         if conditioning == "ref_spec":
             reference_spec = getattr(batch, "reference_specs", None)
@@ -3508,7 +3571,11 @@ class VitsModel(pl.LightningModule):
             "written by piper_train.tools.build_reference_pairs); utterances "
             "missing them fail at load time. SCL positives, swap-SCL, Latent "
             "Filling and DINO keep the target embedding. Required when "
-            "--reference-conditioning is not 'none'.",
+            "--reference-conditioning is not 'none'. The same-split check of "
+            "build_reference_pairs and --strict-zero-shot uses only the jsonl "
+            "split field; it does not see the in-run random train/val split, so "
+            "references that cross that split are counted and logged as a "
+            "WARNING at load time (hparam reference_subset_overlap).",
         )
         parser.add_argument(
             "--reference-max-frames",

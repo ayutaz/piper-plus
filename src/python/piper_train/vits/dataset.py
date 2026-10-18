@@ -173,12 +173,17 @@ class Batch:
         )
 
 
-class MissingReferenceError(ValueError):
-    """cross_utt で参照フィールドが欠けた発話 (読み込み時に必ず送出する)。
+class ReferenceManifestError(ValueError):
+    """cross_utt の参照 manifest の誤り (読み込み時に必ず送出する)。
 
-    ``load_dataset`` は行単位の例外を log して読み飛ばすが、この例外だけは
-    再送出する — 参照の欠落を自己参照や読み飛ばしで黙って埋めない。
+    ``load_dataset`` は行単位の例外を log して読み飛ばすが、この系統の例外は
+    再送出する — 参照の欠落・型の誤りを自己参照や読み飛ばし (target が黙って
+    減る) で埋めない。
     """
+
+
+class MissingReferenceError(ReferenceManifestError):
+    """cross_utt で参照フィールドが欠けた発話。"""
 
 
 _REFERENCE_JSON_FIELDS = (
@@ -279,9 +284,32 @@ class PiperDataset(Dataset):
 
         if validate_cache:
             before = len(self.utterances)
-            self.utterances = [
-                utt for utt in self.utterances if self._validate_cache_files(utt)
-            ]
+            kept: list[Utterance] = []
+            missing_reference: list[Utterance] = []
+            for utt in self.utterances:
+                if self._validate_cache_files(utt):
+                    kept.append(utt)
+                elif (
+                    utt.audio_norm_path.exists()
+                    and utt.audio_spec_path.exists()
+                    and self._missing_reference_files(utt)
+                ):
+                    # target 自身の cache は揃っていて参照だけが無い = pairs
+                    # manifest と cache の食い違いの可能性が高い。理由を分けて出す
+                    missing_reference.append(utt)
+            self.utterances = kept
+            if missing_reference:
+                _LOGGER.warning(
+                    "validate_cache: dropped %d target(s) whose reference file "
+                    "is missing (generator_reference='cross_utt'; is the pairs "
+                    "manifest out of date with the cache?). First: %s -> %s",
+                    len(missing_reference),
+                    missing_reference[0].audio_norm_path,
+                    ", ".join(
+                        str(p)
+                        for p in self._missing_reference_files(missing_reference[0])
+                    ),
+                )
             removed = before - len(self.utterances)
             if removed:
                 _LOGGER.warning(
@@ -465,14 +493,22 @@ class PiperDataset(Dataset):
         if not utt.audio_spec_path.exists():
             _LOGGER.debug("Missing audio_spec: %s", utt.audio_spec_path)
             return False
-        for path in (
-            utt.reference_audio_spec_path,
-            utt.reference_speaker_embedding_path,
-        ):
-            if path is not None and not path.exists():
-                _LOGGER.debug("Missing reference file: %s", path)
-                return False
-        return True
+        return not PiperDataset._missing_reference_files(utt)
+
+    @staticmethod
+    def _missing_reference_files(utt: Utterance) -> list[Path]:
+        """Task 7R: target の参照発話のファイルのうち disk に無いもの。"""
+        missing = [
+            path
+            for path in (
+                utt.reference_audio_spec_path,
+                utt.reference_speaker_embedding_path,
+            )
+            if path is not None and not path.exists()
+        ]
+        for path in missing:
+            _LOGGER.debug("Missing reference file: %s", path)
+        return missing
 
     @staticmethod
     def _prosody_features_to_tensor(
@@ -542,7 +578,11 @@ class PiperDataset(Dataset):
                         line_number=line_idx + 1,
                     )
                     if reference_index is not None:
-                        reference_index[str(utt.audio_norm_path.resolve())] = (
+                        # identity は __getitem__ の utterance_id と同じ規約。
+                        # 1 回だけ resolve して Utterance に残す (subset 跨ぎの
+                        # 集計で全発話を resolve し直さない)
+                        utt.utterance_id = str(utt.audio_norm_path.resolve())
+                        reference_index[utt.utterance_id] = (
                             utt.speaker_id,
                             utt.split,
                             utt.audio_sha256,
@@ -602,8 +642,8 @@ class PiperDataset(Dataset):
                             continue
 
                     yield utt
-                except MissingReferenceError:
-                    # cross_utt の参照欠落は読み飛ばさず起動時に落とす
+                except ReferenceManifestError:
+                    # cross_utt の参照の欠落・型の誤りは読み飛ばさず起動時に落とす
                     raise
                 except Exception:
                     _LOGGER.exception(
@@ -687,20 +727,27 @@ class PiperDataset(Dataset):
         reference = {}
         if require_reference:
             audio_norm_path = _resolve(utt_dict["audio_norm_path"])
+            where = f" (line {line_number})" if line_number is not None else ""
             missing = [k for k in _REFERENCE_JSON_FIELDS if not utt_dict.get(k)]
             if missing:
-                where = f" (line {line_number})" if line_number is not None else ""
                 raise MissingReferenceError(
                     f"generator_reference='cross_utt' requires "
                     f"{', '.join(missing)} for {audio_norm_path}{where}; build "
                     "the pairs with piper_train.tools.build_reference_pairs "
                     "(no silent fallback to a self reference)"
                 )
+            for key in _REFERENCE_JSON_FIELDS:
+                if not isinstance(utt_dict[key], str):
+                    raise ReferenceManifestError(
+                        f"{key} must be a path string for {audio_norm_path}"
+                        f"{where}, got {utt_dict[key]!r}"
+                    )
             for key in ("split", "audio_sha256", "reference_audio_sha256"):
                 value = utt_dict.get(key)
                 if value is not None and not isinstance(value, str):
-                    raise ValueError(
-                        f"{key} must be a string for {audio_norm_path}, got {value!r}"
+                    raise ReferenceManifestError(
+                        f"{key} must be a string for {audio_norm_path}{where}, "
+                        f"got {value!r}"
                     )
             reference = {
                 # target の utterance_id と同じ規約に正規化する
@@ -1001,18 +1048,45 @@ def crop_reference_specs(
         raise ValueError("random reference crop requires keys for every row")
 
     new_lengths = [min(length, max_frames) for length in lengths]
-    out = reference_specs.new_zeros(n, channels, max(new_lengths))
+    # DataLoader の pin_memory で pin 済みの入力 (Batch.pin_memory) からは pin 済み
+    # の出力を作る: 切り出し後の tensor も他の batch tensor と同じく非同期 H2D
+    # (non_blocking) で転送できるようにする
+    pinned = reference_specs.device.type == "cpu" and reference_specs.is_pinned()
+    out = torch.zeros(
+        (n, channels, max(new_lengths)),
+        dtype=reference_specs.dtype,
+        device=reference_specs.device,
+        pin_memory=pinned,
+    )
     for row, (length, new_length) in enumerate(zip(lengths, new_lengths, strict=True)):
         start = 0
         if mode == "random" and length > max_frames:
             rng = random.Random(reference_crop_seed(epoch, keys[row]))
             start = rng.randrange(length - max_frames + 1)
         out[row, :, :new_length] = reference_specs[row, :, start : start + new_length]
+    lengths_pinned = (
+        reference_spec_lengths.device.type == "cpu"
+        and reference_spec_lengths.is_pinned()
+    )
     return out, torch.tensor(
         new_lengths,
         dtype=reference_spec_lengths.dtype,
         device=reference_spec_lengths.device,
+        pin_memory=lengths_pinned,
     )
+
+
+def reference_noise_seed(step: int, key: str) -> int:
+    """学習時の参照埋め込み noise の seed (step, target 発話 identity)。
+
+    crop (``reference_crop_seed``) と同じく target 発話で鍵を作るので、DDP の
+    rank 間 (target が違う) では noise が独立になり、同じ step・同じ target なら
+    batch 内の位置によらず同じ noise になる。crop とは domain を分ける。
+    """
+    digest = hashlib.blake2b(
+        f"reference-noise\0{int(step)}\0{key}".encode(), digest_size=8
+    ).digest()
+    return int.from_bytes(digest, "little")
 
 
 class SpeakerBalancedBatchSampler:
