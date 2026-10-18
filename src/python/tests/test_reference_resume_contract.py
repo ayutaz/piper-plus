@@ -14,9 +14,12 @@
   (``--resume-from-multispeaker-checkpoint``): ``reference_spec_frontend`` の
   食い違いは ``SystemExit`` (参照 spec の分布が変わる)。``generator_reference`` /
   ``reference_max_frames`` は key 名と両方の値を WARNING に出して続ける。
-* 比べるのは checkpoint と今回の両方が同じ参照条件付き (none 以外) のとき
-  だけ。checkpoint に key がない、または値が None (宣言なし) なら黙って
-  受け入れる。none の checkpoint / none のモデルは従来どおり (照合しない)。
+* ``reference_spec_frontend`` / ``reference_max_frames`` を比べるのは
+  checkpoint と今回の両方が同じ参照条件付き (none 以外) のときだけ。
+  ``generator_reference`` は none を含むすべての mode で比べる (Ruling R16a:
+  C0 = none + cross_utt は S5 の主な比較群)。どの key も checkpoint に key が
+  ない、または値が None (宣言なし) なら黙って受け入れる (旧 none ckpt は従来
+  どおり)。
 * ``reference_conditioning`` 自体の食い違いは state_dict の key 差で止まる
   (strict は ``SystemExit``)。この照合では扱わない。
 """
@@ -123,16 +126,25 @@ def _save_real_checkpoint(root, model):
 
 @pytest.fixture(scope="module")
 def saved_ckpts(tmp_path_factory):
-    """seed 1 で作った ref_spec / none の checkpoint (各 test は複製して使う)。"""
+    """seed 1 で作った ref_spec / none / C0 の checkpoint (各 test は複製して使う)。
+
+    C0 = none + ``generator_reference="cross_utt"`` (参照モジュールなし)。
+    """
     root = tmp_path_factory.mktemp("saved")
     ref = _model(seed=1, **SAVED_REF)
-    (root / "ref").mkdir()
-    (root / "none").mkdir()
+    for kind in ("ref", "none", "c0"):
+        (root / kind).mkdir()
     return {
         "ref": (_save_real_checkpoint(root / "ref", ref), ref.state_dict()),
         "none": (
             _save_real_checkpoint(root / "none", _model(seed=1)),
             _model(seed=1).state_dict(),
+        ),
+        "c0": (
+            _save_real_checkpoint(
+                root / "c0", _model(seed=1, generator_reference="cross_utt")
+            ),
+            _model(seed=1, generator_reference="cross_utt").state_dict(),
         ),
     }
 
@@ -293,10 +305,9 @@ class TestStrictResume:
         )
         assert _same(_ref_weights(model), _saved_ref_weights(saved_ckpts))
 
-    @pytest.mark.parametrize("key", WARN_KEYS)
-    def test_none_mode_is_not_compared(self, tmp_path, saved_ckpts, key):
-        """none の checkpoint → none のモデルは従来どおり (C0 の値も照合しない)。"""
-        model = _model(seed=2, **{key: CHANGED[key]})
+    def test_none_mode_max_frames_is_not_compared(self, tmp_path, saved_ckpts):
+        """none では reference_max_frames を照合しない (参照 spec を使わない)。"""
+        model = _model(seed=2, reference_max_frames=256)
         _strict(tmp_path, model, _ckpt(tmp_path, saved_ckpts, "none"))
         _, state = saved_ckpts["none"]
         assert torch.equal(
@@ -446,17 +457,20 @@ class TestWarmStartNoneMode:
     def test_none_checkpoint_into_reference_model_is_not_compared(
         self, tmp_path, saved_ckpts, caplog
     ):
-        """none の ckpt (self / 512 / None) から ref_spec を warm start (S3 の想定)。"""
+        """C0 の ckpt (cross_utt / 512 / None) から ref_spec を warm start する。
+
+        frontend・max_frames は none の ckpt と比べない (generator_reference は
+        一致させて、この性質だけを見る)。
+        """
         model = _current(reference_spec_frontend=HQ, reference_max_frames=256)
         with caplog.at_level(logging.WARNING, logger="piper_train"):
-            _weights_only(model, _ckpt(tmp_path, saved_ckpts, "none"))
+            _weights_only(model, _ckpt(tmp_path, saved_ckpts, "c0"))
         assert _hparam_warnings(caplog) == []
 
-    @pytest.mark.parametrize("key", WARN_KEYS)
-    def test_none_to_none_weights_only_is_not_compared(
-        self, tmp_path, saved_ckpts, caplog, key
+    def test_none_to_none_weights_only_max_frames_is_not_compared(
+        self, tmp_path, saved_ckpts, caplog
     ):
-        model = _model(seed=2, **{key: CHANGED[key]})
+        model = _model(seed=2, reference_max_frames=256)
         with caplog.at_level(logging.WARNING, logger="piper_train"):
             _weights_only(model, _ckpt(tmp_path, saved_ckpts, "none"))
         assert _hparam_warnings(caplog) == []
@@ -464,11 +478,116 @@ class TestWarmStartNoneMode:
     def test_reference_checkpoint_into_single_speaker_finetune_is_not_compared(
         self, tmp_path, saved_ckpts, caplog
     ):
-        """single-speaker の FT 先 (none) は参照 weights を捨てる従来の経路 (R9)。"""
-        model = _model(seed=2, num_speakers=1)
+        """single-speaker の FT 先 (none) は参照 weights を捨てる従来の経路 (R9)。
+
+        frontend・max_frames は none の FT 先と比べない (generator_reference は
+        一致させて、この性質だけを見る)。
+        """
+        model = _model(seed=2, num_speakers=1, generator_reference="cross_utt")
         with caplog.at_level(logging.WARNING, logger="piper_train"):
             _finetune(model, _ckpt(tmp_path, saved_ckpts))
         assert _hparam_warnings(caplog) == []
         assert any(
             "reference-conditioning weights" in r.getMessage() for r in caplog.records
         )
+
+
+# ---------------------------------------------------------------------------
+# generator_reference は none を含むすべての mode で比べる (Ruling R16a)
+# ---------------------------------------------------------------------------
+
+
+def _shared_weight(model, saved_ckpts, kind):
+    """single-speaker FT 先とも共有する text encoder の重みが ckpt と同じか。"""
+    _, state = saved_ckpts[kind]
+    key = "model_g.enc_p.emb.weight"
+    return torch.equal(model.state_dict()[key], state[key])
+
+
+def _warm_target(path, **overrides):
+    # FT 先は single-speaker (CLI の --resume-from-multispeaker-checkpoint と同じ)
+    speakers = {"num_speakers": 1} if path == "finetune" else {}
+    return _model(seed=2, **speakers, **overrides)
+
+
+class TestGeneratorReferenceStrictResume:
+    def test_c0_checkpoint_resumed_as_self_exits(self, tmp_path, saved_ckpts):
+        with pytest.raises(SystemExit):
+            _strict(tmp_path, _model(seed=2), _ckpt(tmp_path, saved_ckpts, "c0"))
+
+    def test_c0_mismatch_message_names_key_values_and_weights_only(
+        self, tmp_path, saved_ckpts
+    ):
+        with pytest.raises(SystemExit) as excinfo:
+            _strict(tmp_path, _model(seed=2), _ckpt(tmp_path, saved_ckpts, "c0"))
+        message = str(excinfo.value)
+        assert "generator_reference" in message
+        assert "'cross_utt'" in message and "'self'" in message
+        assert "--generator-reference cross_utt" in message
+        assert "--resume-weights-only" in message
+
+    def test_c0_mismatch_does_not_load_weights(self, tmp_path, saved_ckpts):
+        model = _model(seed=2)
+        with pytest.raises(SystemExit):
+            _strict(tmp_path, model, _ckpt(tmp_path, saved_ckpts, "c0"))
+        assert not _shared_weight(model, saved_ckpts, "c0")
+
+    def test_self_checkpoint_resumed_as_cross_utt_exits(self, tmp_path, saved_ckpts):
+        model = _model(seed=2, generator_reference="cross_utt")
+        with pytest.raises(SystemExit, match="generator_reference"):
+            _strict(tmp_path, model, _ckpt(tmp_path, saved_ckpts, "none"))
+
+    @pytest.mark.parametrize(("kind", "mode"), [("none", "self"), ("c0", "cross_utt")])
+    def test_matching_none_mode_resumes(self, tmp_path, saved_ckpts, kind, mode):
+        model = _model(seed=2, generator_reference=mode)
+        _strict(tmp_path, model, _ckpt(tmp_path, saved_ckpts, kind))
+        assert _shared_weight(model, saved_ckpts, kind)
+
+
+@pytest.mark.parametrize("path", sorted(WARM_STARTS))
+class TestGeneratorReferenceWarmStart:
+    def test_none_mismatch_warns_once(self, tmp_path, saved_ckpts, caplog, path):
+        with caplog.at_level(logging.WARNING, logger="piper_train"):
+            WARM_STARTS[path](_warm_target(path), _ckpt(tmp_path, saved_ckpts, "c0"))
+        assert len(_hparam_warnings(caplog)) == 1
+
+    def test_none_mismatch_warning_names_key_values_and_path(
+        self, tmp_path, saved_ckpts, caplog, path
+    ):
+        with caplog.at_level(logging.WARNING, logger="piper_train"):
+            WARM_STARTS[path](_warm_target(path), _ckpt(tmp_path, saved_ckpts, "c0"))
+        (message,) = _hparam_warnings(caplog)
+        assert "generator_reference" in message
+        assert "'cross_utt'" in message and "'self'" in message
+        assert WARM_FLAGS[path] in message
+
+    def test_none_mismatch_still_loads_weights(self, tmp_path, saved_ckpts, path):
+        model = _warm_target(path)
+        WARM_STARTS[path](model, _ckpt(tmp_path, saved_ckpts, "c0"))
+        assert _shared_weight(model, saved_ckpts, "c0")
+
+    def test_matching_none_mode_loads_without_warning(
+        self, tmp_path, saved_ckpts, caplog, path
+    ):
+        with caplog.at_level(logging.WARNING, logger="piper_train"):
+            WARM_STARTS[path](_warm_target(path), _ckpt(tmp_path, saved_ckpts, "none"))
+        assert _hparam_warnings(caplog) == []
+
+
+class TestLegacyNoneCheckpointWithoutKey:
+    """generator_reference を持たない旧 none ckpt は、どの経路でも黙って読む。"""
+
+    def test_strict_resume(self, tmp_path, saved_ckpts):
+        model = _model(seed=2, generator_reference="cross_utt")
+        ckpt = _ckpt(tmp_path, saved_ckpts, "none", pop=("generator_reference",))
+        _strict(tmp_path, model, ckpt)
+        assert _shared_weight(model, saved_ckpts, "none")
+
+    @pytest.mark.parametrize("path", sorted(WARM_STARTS))
+    def test_warm_start(self, tmp_path, saved_ckpts, caplog, path):
+        model = _warm_target(path, generator_reference="cross_utt")
+        ckpt = _ckpt(tmp_path, saved_ckpts, "none", pop=("generator_reference",))
+        with caplog.at_level(logging.WARNING, logger="piper_train"):
+            WARM_STARTS[path](model, ckpt)
+        assert _hparam_warnings(caplog) == []
+        assert _shared_weight(model, saved_ckpts, "none")
