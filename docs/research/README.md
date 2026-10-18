@@ -11,6 +11,7 @@
 
 ## レポート一覧
 
+- [GPT-SoVITS知見の取り込み・比較学習計画 2026-10-17](../design/zero-shot-gpt-sovits-adoption-plan-2026-10-17.md) — 参照音響経路の実装をGPU本学習より先に置く詳細計画。比較群、重み移行、データ復元、CPU/ONNX、CloudRift最大$1000の予算と停止条件。
 - [Zero-Shot CPU準備・実測記録 2026-10-17](zero-shot-cpu-preparation-2026-10-17.md) — 入力/cache監査、必須guard、参照処理比較、実モデルCPU基準評価とGPU引き渡し。
 - [GPT-SoVITS参照候補・学習準備の再監査 2026-10-17](gpt-sovits-readiness-audit-2026-10-17.md) — 最新SHAの再確認、既存/修正済み/未実装の候補台帳、学習前に残る条件。
 - [zero-shot不具合修正・品質改善計画 2026-10-09](../design/zero-shot-recovery-and-improvement-plan-2026-10-09.md) — 調査・監査を受けた実行計画。更新周期/データ/評価の修正、既存再評価、単一要因学習、v12参照系列入力の順と完了条件を定義。
