@@ -22,6 +22,7 @@ except ImportError as exc:
 from .config import PhonemeType, PiperConfig
 from .const import BOS, EOS, PAD
 from .embedding import embedding_dimension, validate_embedding
+from .model_inputs import reject_unsupported_session_inputs
 from .phonemize.token_mapper import FIXED_PUA_MAPPING
 from .timing import (
     SPECIAL_PHONEME_IDS as _SPECIAL_PHONEME_IDS,
@@ -624,12 +625,16 @@ class PiperVoice:
         if _HAS_SHARED_ORT_UTILS and not use_cuda:
             # CPU: use shared ORT utilities (avoids code duplication)
             session = _shared_create_session_with_cache(model_path, device="cpu")
+            # 参照spec入力 (ref_spec_v1) は未対応。warmup が欠落入力を
+            # warning で握り潰す前に明示拒否する。
+            reject_unsupported_session_inputs(session, model_path)
             _shared_warmup(session)
         else:
             # CUDA or standalone: use inline implementation
             # (preserves cudnn_conv_algo_search=HEURISTIC for CUDA EP)
             # Keep in sync with piper_train.ort_utils
             session = _load_session_inline(model_path, use_cuda=use_cuda)
+            reject_unsupported_session_inputs(session, model_path)
             _warmup_session(session)
 
         return PiperVoice(

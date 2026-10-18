@@ -36,6 +36,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from . import PiperVoice
 from .download import ensure_voice_exists, find_voice, get_voices
 from .embedding import embedding_dimension, validate_embedding
+from .model_inputs import reject_unsupported_session_inputs
 from .timing import timing_to_json, timing_to_tsv
 
 
@@ -257,6 +258,12 @@ def _error_response(status_code: int, message: str) -> JSONResponse:
 def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
     """Build a FastAPI app wired to the loaded voice."""
     session = getattr(voice, "session", None)
+    if session is not None:
+        # PiperVoice.load 以外で組んだ voice も受けるため、ここでも参照spec入力
+        # (ref_spec_v1) を拒否する。ORT session は読み込み元 path を持つ。
+        reject_unsupported_session_inputs(
+            session, getattr(session, "_model_path", None) or "(loaded session)"
+        )
     embedding_dim = (
         embedding_dimension(session.get_inputs())
         if session is not None

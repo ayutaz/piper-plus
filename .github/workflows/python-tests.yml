@@ -32,6 +32,8 @@ on:
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
+      # test_reference_schema_rejection.py が読む C++ 共用 fixture (+ drift test)
+      - 'src/cpp/tests/fixtures/reference_spec_inputs/**'
       - 'docs/spec/phoneme-timing-contract.toml'
       - 'docs/spec/short-text-contract.toml'
       - 'docs/spec/ort-session-contract.toml'
