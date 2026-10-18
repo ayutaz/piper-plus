@@ -31,6 +31,8 @@ from piper_train.vits.losses import (  # noqa: E402
 )
 from piper_train.vits.models import F0Predictor  # noqa: E402
 
+pytestmark = pytest.mark.unit
+
 
 def _mask(lengths, max_len):
     ar = torch.arange(max_len).unsqueeze(0)

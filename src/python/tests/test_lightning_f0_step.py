@@ -22,6 +22,8 @@ torch = pytest.importorskip("torch", reason="torch required")
 from piper_train.vits.dataset import Batch  # noqa: E402
 from piper_train.vits.lightning import VitsModel  # noqa: E402
 
+pytestmark = [pytest.mark.unit, pytest.mark.training]
+
 
 N_FRAMES = 48
 N_PHONEMES = 10

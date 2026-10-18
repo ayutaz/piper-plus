@@ -10,6 +10,8 @@ torch = pytest.importorskip(
     reason="Strict training preflight needs the train extra; lightweight Windows CI omits it.",
 )
 
+pytestmark = pytest.mark.unit
+
 
 def test_strict_recipe_requires_existing_differentiable_encoder(tmp_path):
     from piper_train.zero_shot_requirements import validate_recipe

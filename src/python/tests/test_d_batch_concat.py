@@ -20,6 +20,8 @@ import torch  # noqa: E402
 
 from piper_train.vits.models import MultiPeriodDiscriminator  # noqa: E402
 
+pytestmark = pytest.mark.unit
+
 
 def _old_forward(mpd: MultiPeriodDiscriminator, y: torch.Tensor, y_hat: torch.Tensor):
     """旧実装 (batch-concat 前) を再現。"""

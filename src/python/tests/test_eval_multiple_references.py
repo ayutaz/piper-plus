@@ -13,6 +13,8 @@ pytest.importorskip(
 
 from piper_train.tools import eval_zs_secs  # noqa: E402
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.fixture
 def inputs(tmp_path, monkeypatch):

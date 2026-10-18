@@ -162,9 +162,12 @@ jobs:
         pytest tests/ -v --tb=short -m "training and unit" --no-cov
 
     - name: Run Zero-Shot CPU preparation regressions (Unix)
-      # These new offline tests are deliberately explicit: unmarked tests are
+      # These offline tests are deliberately explicit: unmarked tests are
       # omitted by the marker-filtered suites above, and tests/scripts is
       # outside pytest.ini testpaths. No private models, GPU or ASR download.
+      # Zero-shot tests that carry `unit` / `training` markers run in the
+      # marker-filtered steps (the `unit` ones count toward the coverage gate),
+      # so they are not repeated here.
       if: runner.os != 'Windows'
       env:
         CUDA_VISIBLE_DEVICES: '-1'
@@ -172,16 +175,6 @@ jobs:
         MKL_NUM_THREADS: '1'
       run: |
         python -m pytest \
-          src/python/tests/test_checkpoint_io.py \
-          src/python/tests/test_cpu_reference_comparison.py \
-          src/python/tests/test_eval_multiple_references.py \
-          src/python/tests/test_reference_frontend.py \
-          src/python/tests/test_strict_zero_shot.py \
-          src/python/tests/test_zero_shot_audit.py \
-          src/python/tests/test_zs_metric_isolation_gate.py \
-          src/python/tests/test_batch_pin_memory.py \
-          src/python/tests/test_dataset_f0.py \
-          src/python/tests/test_resume_strict.py \
           src/python/tests/test_extract_speaker_embedding.py \
           src/python/tests/test_check_onnx_inputs.py \
           tests/scripts/test_zero_shot_cpu_hash_cache.py \

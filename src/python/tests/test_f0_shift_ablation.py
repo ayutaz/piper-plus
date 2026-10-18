@@ -27,6 +27,8 @@ torch = pytest.importorskip("torch", reason="torch required")
 
 from piper_train.tools import f0_shift_ablation as ablation  # noqa: E402
 
+pytestmark = pytest.mark.unit
+
 
 def test_semitone_to_scale():
     assert ablation.semitone_to_scale(0.0) == pytest.approx(1.0)
