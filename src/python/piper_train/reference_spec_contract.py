@@ -55,6 +55,11 @@ REFERENCE_SPEC_FRONTENDS: dict[str, dict] = {
     },
 }
 
+# 学習時の参照 spec の最大 frame 数の既定 (hparam ``reference_max_frames``、
+# 512 frame ≈ 5.9 s @22.05kHz / hop 256)。学習はランダム窓、検証・評価は先頭から
+# この長さに切り出す (Ruling R15)
+REFERENCE_MAX_FRAMES_DEFAULT = 512
+
 # T_ref の上限 (秒)。学習は参照 spec を最大 512 frame (~5.9 s) に切り出す。
 # 30 s は長い参照を誤って丸ごと渡す事故 (self-attention は O(T^2)) を止める
 # ための余裕を持った上限で、正常な参照発話を弾かない

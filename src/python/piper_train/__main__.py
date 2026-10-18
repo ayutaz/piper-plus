@@ -13,6 +13,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.strategies import DDPStrategy
 
 from .checkpoint_io import key_has_module_prefix, load_state_with_allowed_missing
+from .reference_spec_contract import REFERENCE_SPEC_FRONTENDS
 from .vits.commons import (
     normalize_checkpoint_state_dict,
     remap_weight_norm_keys,
@@ -21,7 +22,10 @@ from .vits.ema import EMA_SCOPES, EXTENDED_EMA_MODULES, EMACallback
 from .vits.lightning import REFERENCE_PARAM_PREFIXES, VitsModel
 from .vits.mb_istft import PQMF, PQMF_DESIGN
 from .vits.models import MRD_HIRES_RESOLUTIONS, REFERENCE_CONDITIONING_MODES
-from .zero_shot_requirements import validate_reference_training_args
+from .zero_shot_requirements import (
+    validate_reference_spec_frontend_args,
+    validate_reference_training_args,
+)
 
 
 # NOTE: the pathlib safe-globals registration and the Windows PosixPath
@@ -871,6 +875,19 @@ def create_parser():
         "reference_encoder.* / capacity_control.* parameters.",
     )
     parser.add_argument(
+        "--reference-spec-frontend",
+        choices=sorted(REFERENCE_SPEC_FRONTENDS),
+        default=None,
+        help="Reference conditioning (plan §8 Task 11R): the cache builder that "
+        "produced the dataset's .spec.pt files, recorded in the checkpoint so "
+        "that ONNX export and evaluation build the reference spectrogram the "
+        "same way ('energy-vad@16k;soxr-hq' = cache_norm_audio_fast, "
+        "'no-vad;soxr-mq' / 'no-vad;soxr-hq' = cache_norm_audio_no_vad, the "
+        "prepare_multilingual_dataset CPU path, MQ by default). Required with "
+        "--reference-conditioning ref_spec (no default: determine it in the S2 "
+        "data audit); rejected with other modes.",
+    )
+    parser.add_argument(
         "--reference-lr-scale",
         type=float,
         default=1.0,
@@ -1602,6 +1619,12 @@ def main():
         generator_reference=args.generator_reference,
         latent_filling_tau=args.latent_filling_tau,
         c_swap_spk=args.c_swap_spk,
+    )
+    # Task 11R: ref_spec は学習 cache の frontend 名を必須にする (同じく
+    # dataset を読む前に SystemExit)
+    validate_reference_spec_frontend_args(
+        reference_conditioning=args.reference_conditioning,
+        reference_spec_frontend=args.reference_spec_frontend,
     )
 
     # v10b: --use-jcu-mrd / --mrd-hires-resolution は MRD 本体が前提。

@@ -22,7 +22,12 @@ from ..evaluation_manifest import (
     load_manifest,
     load_reference_spec,
 )
-from ..reference_spec_contract import REFERENCE_SPEC_FRONTENDS, REFERENCE_SPEC_SCHEMA
+from ..reference_spec_contract import (
+    REFERENCE_MAX_FRAMES_DEFAULT,
+    REFERENCE_SPEC_FRONTENDS,
+    REFERENCE_SPEC_SCHEMA,
+    frontend_steps,
+)
 
 
 def load_torch_generator(path, *, device="auto"):
@@ -118,15 +123,26 @@ _CONTRACT_FIELDS = (
     "center",
     "spec_channels",
 )
-_ONNX_BLOCK_FIELDS = ("schema", *_CONTRACT_FIELDS, "sample_rate")
+# export (Task 8R / 11R) が書く config の reference_conditioning (ref_spec_v1)
+# の field 全部。max_frames (学習の reference_max_frames) は manifest と照合
+# せず、feed 時の先頭切り出しの長さに使う (Ruling R15)
+_ONNX_BLOCK_FIELDS = ("schema", *_CONTRACT_FIELDS, "sample_rate", "max_frames")
+
+
+def _max_frames(value, source: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(
+            f"{source}: reference max_frames must be a positive int, got {value!r}"
+        )
+    return value
 
 
 def _torch_reference_contract(generator, checkpoint: dict) -> dict:
-    """checkpoint hparams (STFT・sample rate・学習 frontend) と encoder の bin 数。
+    """checkpoint hparams (STFT・sample rate・学習 frontend・最大 frame 数) と bin 数。
 
-    学習 frontend は hparams ``reference_spec_frontend`` (学習側で後から追加)
-    から読む。無い旧 checkpoint は frontend を照合できないので、拒否せず
-    ``frontend_verified: False`` として report に残す。
+    学習 frontend (hparams ``reference_spec_frontend``) を宣言していない ref_spec
+    checkpoint は manifest の frontend と照合できないので拒否する。最大 frame 数
+    は学習と同じ読み方 (``reference_max_frames``、無ければ学習の既定値)。
     """
     hparams = checkpoint.get("hyper_parameters") or {}
     for key in ("filter_length", "hop_length", "win_length", "sample_rate"):
@@ -136,6 +152,13 @@ def _torch_reference_contract(generator, checkpoint: dict) -> dict:
                 "the reference spec contract against the manifest"
             )
     frontend = hparams.get("reference_spec_frontend")
+    if frontend is None:
+        raise ValueError(
+            "ref_spec checkpoint hyper_parameters lack reference_spec_frontend "
+            "(the training spec cache builder); the manifest's reference frontend "
+            "cannot be verified, so the model is not evaluated"
+        )
+    frontend_steps(frontend)  # 閉じた集合の外は ValueError
     return {
         "source": "checkpoint hyper_parameters",
         "frontend": frontend,
@@ -145,28 +168,28 @@ def _torch_reference_contract(generator, checkpoint: dict) -> dict:
         "center": False,  # 学習 cache の spectrogram_torch は center=False 固定
         "spec_channels": generator.reference_encoder.spec_channels,
         "sample_rate": hparams["sample_rate"],
-        "frontend_verified": frontend is not None,
+        "max_frames": _max_frames(
+            hparams.get("reference_max_frames", REFERENCE_MAX_FRAMES_DEFAULT),
+            "checkpoint hyper_parameters",
+        ),
     }
 
 
 def _onnx_config_path(model_path: Path) -> Path:
-    """runtime と同じ探索順: ``<model>.onnx.json``、無ければ同じ dir の config.json。"""
+    """export が書く ``<model>.onnx.json`` (同じ dir の別名 config は読まない)。"""
     model_path = Path(model_path)
-    for candidate in (
-        model_path.with_name(model_path.name + ".json"),
-        model_path.parent / "config.json",
-    ):
-        if candidate.is_file():
-            return candidate
+    candidate = model_path.with_name(model_path.name + ".json")
+    if candidate.is_file():
+        return candidate
     raise ValueError(
-        "ONNX ref_spec model requires its config "
-        f"({model_path.name}.json or config.json next to it) with a "
-        f"reference_conditioning block; none found for {model_path}"
+        f"ONNX ref_spec model requires {candidate.name} (written by "
+        "piper_train.export_onnx --config) with a reference_conditioning block; "
+        f"not found for {model_path}"
     )
 
 
 def _onnx_reference_contract(model_path: Path, spec_input) -> dict:
-    """ONNX の config.json の ``reference_conditioning`` (8R 契約) を読み検査する。"""
+    """``<model>.onnx.json`` の ``reference_conditioning`` (8R/11R 契約) を読み検査する。"""
     config_path = _onnx_config_path(model_path)
     try:
         config = json.loads(config_path.read_text(encoding="utf-8"))
@@ -181,6 +204,12 @@ def _onnx_reference_contract(model_path: Path, spec_input) -> dict:
     for field in _ONNX_BLOCK_FIELDS:
         if field not in block:
             raise ValueError(f"reference_conditioning in {config_path} lacks {field}")
+    unknown = sorted(set(block) - set(_ONNX_BLOCK_FIELDS))
+    if unknown:
+        raise ValueError(
+            f"reference_conditioning in {config_path} has fields outside the "
+            f"{REFERENCE_SPEC_SCHEMA} contract: {unknown}"
+        )
     if block["schema"] != REFERENCE_SPEC_SCHEMA:
         raise ValueError(
             f"reference_spec schema mismatch: model declares {block['schema']!r}, "
@@ -198,7 +227,7 @@ def _onnx_reference_contract(model_path: Path, spec_input) -> dict:
         "config_sha256": file_sha256(config_path),
         **{field: block[field] for field in _CONTRACT_FIELDS},
         "sample_rate": block["sample_rate"],
-        "frontend_verified": True,
+        "max_frames": _max_frames(block["max_frames"], str(config_path)),
     }
 
 
@@ -213,8 +242,6 @@ def _check_reference_contract(manifest: dict, contract: dict) -> None:
     pairs = [(field, contract[field], settings[field]) for field in _CONTRACT_FIELDS]
     pairs.append(("sample_rate", contract["sample_rate"], manifest["sample_rate"]))
     for field, declared, pinned in pairs:
-        if field == "frontend" and declared is None:
-            continue  # 学習 frontend を宣言しない旧 checkpoint (report に未照合と残す)
         if not _same(declared, pinned):
             raise ValueError(
                 f"reference_spec {field} mismatch: model declares {declared!r}, "
@@ -223,15 +250,33 @@ def _check_reference_contract(manifest: dict, contract: dict) -> None:
             )
 
 
-def _reference_spec_for_clip(manifest: dict, clip: dict):
-    """prepare で保存した参照 spec を読み (feed する bytes)、再計算との差を記録する。
+def _head_crop(spec: np.ndarray, max_frames: int) -> np.ndarray:
+    """学習の検証と同じ先頭固定の切り出し (``crop_reference_specs`` mode="head")。"""
+    import torch  # noqa: PLC0415
+
+    from ..vits.dataset import crop_reference_specs  # noqa: PLC0415
+
+    cropped, _lengths = crop_reference_specs(
+        torch.from_numpy(spec)[None],
+        torch.tensor([spec.shape[-1]], dtype=torch.long),
+        max_frames,
+        mode="head",
+    )
+    return np.ascontiguousarray(cropped[0].numpy())
+
+
+def _reference_spec_for_clip(manifest: dict, clip: dict, max_frames: int):
+    """prepare で保存した参照 spec を読み、先頭から ``max_frames`` に切って返す。
 
     再計算は drift の記録だけに使う (別 machine の FFT・soxr の差で結果が
     変わっても評価条件は保存 bytes で固定される)。参照 WAV 自体が変わって
-    いたら拒否する。
+    いたら拒否する。切り出しは feed 時だけで、保存 bytes は全長のまま (学習も
+    全長の spec から検証時に先頭を切る、Ruling R15)。
 
     Returns:
-        (spec ``[spec_channels, T_ref]`` float32 ndarray, 来歴の記録 + drift)。
+        (feed する spec ``[spec_channels, min(T_ref, max_frames)]`` float32
+        ndarray, 来歴の記録 (``frames`` = 保存 spec の T_ref、``fed_frames`` =
+        feed した frame 数) + drift)。
     """
     settings = manifest["reference_spec"]
     record = clip["reference_spec"]
@@ -258,7 +303,8 @@ def _reference_spec_for_clip(manifest: dict, clip: dict):
             drift["max_abs_diff"] = float(
                 np.max(np.abs(recomputed.detach().cpu().numpy() - stored))
             )
-    return stored, {**record, "drift": drift}
+    fed = _head_crop(stored, max_frames)
+    return fed, {**record, "fed_frames": int(fed.shape[-1]), "drift": drift}
 
 
 def generate_audio(
@@ -280,7 +326,7 @@ def generate_audio(
     restored_weights = None
     ema_report = {}
     # 参照 spec (F-mel) を feed するモデルなら、モデルが宣言する参照 spec 契約
-    # (torch: checkpoint hparams、ONNX: config.json の reference_conditioning)。
+    # (torch: checkpoint hparams、ONNX: <model>.onnx.json の reference_conditioning)。
     # 判定は loop の前に 1 回 (torch は読み込み時、ONNX は先頭 clip の session の
     # 入力名)。旧モデル (none / capacity) は None で、評価出力は変更前と同じ
     reference_contract = None
@@ -373,7 +419,7 @@ def generate_audio(
             if reference_contract is not None:
                 # prepare で保存した bytes (hash 照合・有限性検査済み) を feed する
                 reference_spec, reference_record = _reference_spec_for_clip(
-                    manifest, clip
+                    manifest, clip, reference_contract["max_frames"]
                 )
             if generator is not None:
                 import torch  # noqa: PLC0415

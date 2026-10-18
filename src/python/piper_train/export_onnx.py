@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from .reference_spec_contract import REFERENCE_SPEC_SCHEMA, frontend_steps
 from .tools.convert_fp16 import convert_fp16
 from .vits.commons import (
     migrate_prefilm_decoder_cond,
@@ -450,11 +451,12 @@ def simplify_onnx_model(onnx_path: Path, check_n: int = 3) -> bool:
         return False
 
 
-# 参照 spec のフロントエンド契約 (reference-fusion plan §8 Task 8R)。runtime は
-# 参照 WAV を学習時 audio_norm と同じ前処理 (16 kHz soxr HQ → energy VAD trim)
-# に通してから spectrogram_torch (center=False) と同じ線形振幅 spec を作る
-REFERENCE_SPEC_SCHEMA = "ref_spec_v1"
-REFERENCE_SPEC_FRONTEND = "energy-vad@16k;soxr-hq"
+# 参照 spec のフロントエンド契約 (reference-fusion plan §8 Task 8R / 11R)。
+# schema と frontend 名は reference_spec_contract が正本。frontend は学習 dataset
+# の .spec.pt を作った cache builder の名前で、checkpoint hparam
+# reference_spec_frontend から写す (Ruling R14)。runtime・評価はその手順で
+# spectrogram_torch (center=False) と同じ線形振幅 spec を作り、先頭から
+# max_frames (学習の reference_max_frames) に切ってから渡す (Ruling R15)
 CAPACITY_SCHEMA = "capacity_v1"
 REFERENCE_INPUT_NAMES = ("reference_spec", "reference_spec_lengths")
 
@@ -463,17 +465,26 @@ def _hparam(hparams, name: str):
     return hparams[name] if isinstance(hparams, dict) else getattr(hparams, name)
 
 
+def _optional_hparam(hparams, name: str):
+    if isinstance(hparams, dict):
+        return hparams.get(name)
+    return getattr(hparams, name, None)
+
+
 def reference_conditioning_config(model_g, hparams) -> dict | None:
     """``config.json`` に記録する ``reference_conditioning`` の値。
 
     ``"none"`` のモデルは ``None`` (key を書かない)。``"ref_spec"`` は runtime が
-    参照 spec を学習時と同じ定義で作るための STFT 設定とフロントエンド、
-    ``"capacity"`` は入力を増やさないので schema のみ。
+    参照 spec を学習時と同じ定義で作るための STFT 設定・フロントエンド
+    (hparam ``reference_spec_frontend``) と、学習で見た最大 frame 数
+    (``max_frames`` = hparam ``reference_max_frames``)。``"capacity"`` は入力を
+    増やさないので schema のみ。
 
     Raises:
         ValueError: reference_encoder の入力 bin 数が ``filter_length // 2 + 1``
-            と一致しない (記録した STFT 設定で作った spec が入らない)、または
-            未知の mode。
+            と一致しない (記録した STFT 設定で作った spec が入らない)、
+            ``reference_spec_frontend`` が無い・閉じた集合の外、
+            ``reference_max_frames`` が正の int でない、または未知の mode。
     """
     mode = getattr(model_g, "reference_conditioning", "none")
     if mode == "none":
@@ -489,6 +500,23 @@ def reference_conditioning_config(model_g, hparams) -> dict | None:
             f"reference_encoder spec_channels ({spec_channels}) does not match "
             f"filter_length // 2 + 1 ({filter_length // 2 + 1})"
         )
+    frontend = _optional_hparam(hparams, "reference_spec_frontend")
+    if frontend is None:
+        raise ValueError(
+            "ref_spec checkpoint does not declare reference_spec_frontend (the "
+            "cache builder of its training spec); retrain with "
+            "--reference-spec-frontend instead of guessing the reference frontend"
+        )
+    frontend_steps(frontend)  # 閉じた集合の外は ValueError
+    max_frames = _hparam(hparams, "reference_max_frames")
+    if (
+        isinstance(max_frames, bool)
+        or not isinstance(max_frames, int)
+        or max_frames < 1
+    ):
+        raise ValueError(
+            f"reference_max_frames must be a positive int, got {max_frames!r}"
+        )
     return {
         "schema": REFERENCE_SPEC_SCHEMA,
         "spec_channels": spec_channels,
@@ -497,7 +525,8 @@ def reference_conditioning_config(model_g, hparams) -> dict | None:
         "win_length": int(_hparam(hparams, "win_length")),
         "sample_rate": int(_hparam(hparams, "sample_rate")),
         "center": False,
-        "frontend": REFERENCE_SPEC_FRONTEND,
+        "frontend": frontend,
+        "max_frames": max_frames,
     }
 
 
@@ -611,8 +640,9 @@ def main() -> None:
         "--config",
         default=None,
         help="Training config.json to copy next to the ONNX as <output>.json. "
-        "Records the 'reference_conditioning' contract (spec STFT settings and "
-        "frontend) for --reference-conditioning ref_spec / capacity models, for "
+        "Records the 'reference_conditioning' contract (spec STFT settings, "
+        "the checkpoint's reference_spec_frontend and reference_max_frames) for "
+        "--reference-conditioning ref_spec / capacity models, for "
         "which it is required (every reference-conditioned ONNX carries its "
         "schema marker). Without it no config is written (legacy).",
     )

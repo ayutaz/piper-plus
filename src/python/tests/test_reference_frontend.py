@@ -450,16 +450,66 @@ def test_reference_spec_shortest_voiced_audio_gives_one_frame():
     assert info["frames"] == 1
 
 
-def test_reference_spec_shorter_than_one_vad_chunk_raises():
-    # 479 sample (< 1 chunk) は有声判定ができないので有声区間なしとして拒否する
+def test_reference_spec_vad_shorter_than_one_vad_chunk_raises():
+    # VAD frontend: 479 sample (< 1 chunk) は有声判定ができないので、有声区間
+    # なしとして拒否する
     with pytest.raises(ValueError, match="no voiced"):
         reference_spec_from_audio(
             np.full(479, 0.1, dtype=np.float32),
             16000,
             target_sample_rate=16000,
-            frontend=NO_VAD_HQ,
+            frontend=VAD,
             **_SPEC_KW,
         )
+
+
+@pytest.mark.parametrize("frontend", [NO_VAD_MQ, NO_VAD_HQ])
+def test_reference_spec_no_vad_accepts_audio_shorter_than_one_vad_chunk(frontend):
+    # VAD なしの builder (cache_norm_audio_no_vad) は VAD chunk の長さを問わない。
+    # STFT 1 frame 分あれば受け付ける: (479 + 768 - 1024) // 256 + 1 = 1 frame
+    spec, info = reference_spec_from_audio(
+        np.full(479, 0.1, dtype=np.float32),
+        16000,
+        target_sample_rate=16000,
+        frontend=frontend,
+        **_SPEC_KW,
+    )
+    assert spec.shape == (513, 1)
+    assert info["frames"] == 1
+
+
+@pytest.mark.parametrize("frontend", [NO_VAD_MQ, NO_VAD_HQ])
+def test_reference_spec_no_vad_quiet_audio_matches_builder(tmp_path, frontend):
+    # 全 chunk が VAD 閾値 (RMS 0.02) 未満の小音量録音も、VAD なしの builder は
+    # 学習 cache に入れる。frontend も拒否せず、builder と bit 一致させる
+    sr = 44100
+    audio = tone(sr, 0.005, sr)  # RMS ≈ 0.0035
+    path = write_wav(tmp_path / "quiet.wav", audio, sr)
+    ours, _info = frontend_spec(path, 22050, frontend)
+    assert_cache_parity(ours, builder_spec(frontend, path, tmp_path / "cache", 22050))
+
+
+def test_reference_spec_vad_quiet_audio_raises():
+    # VAD frontend は有声区間なしとして拒否する (従来どおり)
+    with pytest.raises(ValueError, match="no voiced"):
+        reference_spec_from_audio(
+            tone(44100, 0.005, 44100),
+            44100,
+            target_sample_rate=22050,
+            frontend=VAD,
+            **_SPEC_KW,
+        )
+
+
+@pytest.mark.parametrize("frontend", [NO_VAD_MQ, NO_VAD_HQ])
+def test_reference_spec_no_vad_single_nonzero_sample_accepted(frontend):
+    # デジタル無音 (全 sample が厳密に 0) でなければ受け付ける
+    audio = np.zeros(22050, dtype=np.float32)
+    audio[100] = 1e-4
+    spec, _info = reference_spec_from_audio(
+        audio, 22050, target_sample_rate=22050, frontend=frontend, **_SPEC_KW
+    )
+    assert spec.shape[-1] == (22050 + 768 - 1024) // 256 + 1
 
 
 _LONG_FFT = {"filter_length": 8192, "hop_length": 256, "win_length": 8192}
@@ -519,13 +569,36 @@ def test_reference_spec_above_max_frames_raises():
         )
 
 
-@pytest.mark.parametrize("frontend", ALL_FRONTENDS)
-def test_reference_spec_silent_audio_raises(frontend):
-    # VAD なしの frontend でも、有声区間の無い参照は評価に使えないので拒否する
-    # (spec は trim しない。検出は energy VAD を有声判定にだけ使う)
+def test_reference_spec_vad_silent_audio_raises():
     with pytest.raises(ValueError, match="no voiced"):
         reference_spec_from_audio(
             np.zeros(44100, dtype=np.float32),
+            22050,
+            target_sample_rate=22050,
+            frontend=VAD,
+            **_SPEC_KW,
+        )
+
+
+@pytest.mark.parametrize("frontend", [NO_VAD_MQ, NO_VAD_HQ])
+def test_reference_spec_no_vad_digital_silence_raises(frontend):
+    # VAD なしの frontend は、デジタル無音 (全 sample が厳密に 0) だけを
+    # 話者情報のない参照として拒否する (小音量・短い録音は builder どおり通す)
+    with pytest.raises(ValueError, match="digitally silent"):
+        reference_spec_from_audio(
+            np.zeros(44100, dtype=np.float32),
+            22050,
+            target_sample_rate=22050,
+            frontend=frontend,
+            **_SPEC_KW,
+        )
+
+
+@pytest.mark.parametrize("frontend", [NO_VAD_MQ, NO_VAD_HQ])
+def test_reference_spec_no_vad_digital_silence_stereo_raises(frontend):
+    with pytest.raises(ValueError, match="digitally silent"):
+        reference_spec_from_audio(
+            np.zeros((44100, 2), dtype=np.float32),
             22050,
             target_sample_rate=22050,
             frontend=frontend,

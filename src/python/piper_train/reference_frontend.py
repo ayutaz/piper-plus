@@ -65,9 +65,10 @@ def reference_spec_from_audio(
     Raises:
         TypeError: 浮動小数点でない音声 (int PCM の取り違え)。
         ValueError: 未知の frontend・空・形状違い・非有限値 (入力または spec)・
-            sample rate が正でない・有声区間なし (全 frontend。VAD なしの frontend
-            でも energy VAD を有声判定にだけ使い、spec は trim しない)・
-            STFT 1 frame に満たない長さ・T_ref が上限 (30 s 相当) を超える。
+            sample rate が正でない・有声区間なし (VAD frontend) またはデジタル
+            無音 = 全 sample が 0 (VAD なしの frontend。builder が受け付ける
+            小音量・短い録音は拒否しない)・STFT 1 frame に満たない長さ・
+            T_ref が上限 (30 s 相当) を超える。
     """
     import soxr  # noqa: PLC0415 — lazy import (optional runtime dependency)
 
@@ -101,13 +102,19 @@ def reference_spec_from_audio(
     if audio.ndim == 2:
         audio = audio.mean(axis=1)  # stereo → mono (cache と同じ)
 
-    # 有声判定 (全 frontend) と VAD trim。極端な振幅で RMS の二乗が overflow
-    # しても判定結果 (inf >= 閾値) は変わらないので警告だけ抑える
-    with np.errstate(over="ignore", invalid="ignore"):
-        trimmed, vad = trim_reference_audio(audio, int(sample_rate))
     if steps["vad"]:
+        # VAD trim (有声区間なしは拒否)。極端な振幅で RMS の二乗が overflow
+        # しても判定結果 (inf >= 閾値) は変わらないので警告だけ抑える
+        with np.errstate(over="ignore", invalid="ignore"):
+            trimmed, vad = trim_reference_audio(audio, int(sample_rate))
         offset_sec, duration_sec = vad["offset_sec"], vad["duration_sec"]
     else:
+        # VAD なしの builder は長さ・音量を問わず受け付けるので、拒否するのは
+        # 話者情報が全くないデジタル無音だけ (STFT 1 frame 未満は下で拒否)
+        if not np.any(audio):
+            raise ValueError(
+                "reference audio is digitally silent (all samples are exactly 0)"
+            )
         trimmed, offset_sec, duration_sec = audio, 0.0, len(audio) / sample_rate
     audio_rs = (
         soxr.resample(

@@ -18,8 +18,10 @@ from piper_plus.embedding import validate_embedding
 
 from ..checkpoint_io import key_has_module_prefix
 from ..inference_eval import isolated_inference
+from ..reference_spec_contract import REFERENCE_MAX_FRAMES_DEFAULT
 from ..zero_shot_requirements import (
     GENERATOR_REFERENCE_MODES,
+    reference_spec_frontend_conflict,
     reference_training_conflict,
     validate_recipe,
     validate_training_batch,
@@ -567,7 +569,13 @@ class VitsModel(pl.LightningModule):
         generator_reference: str = "self",
         # cross_utt の参照 spec の最大 frame 数 (512 frame ≈ 5.9 s @22.05kHz)。
         # 学習時は (epoch, 発話) から決まるランダム窓、検証時は先頭固定。
-        reference_max_frames: int = 512,
+        reference_max_frames: int = REFERENCE_MAX_FRAMES_DEFAULT,
+        # ref_spec の参照 spec を作る frontend 名 (Task 11R、Ruling R14)。学習
+        # dataset の .spec.pt を作った cache builder の名前 (reference_spec_contract
+        # の閉じた集合)。export・評価はこの宣言に合わせて参照 spec を作る。
+        # 既定 None = 宣言なし (none / capacity と旧 ckpt。ref_spec の CLI 学習では
+        # 必須)
+        reference_spec_frontend: str | None = None,
         **kwargs,
     ):
         super().__init__()
@@ -591,6 +599,15 @@ class VitsModel(pl.LightningModule):
                 f"reference_max_frames must be a positive int, got "
                 f"{reference_max_frames!r}"
             )
+        # frontend を宣言したときだけ検査する (宣言のない ref_spec の直接構築は
+        # 推論・export 用に許し、export・評価の側で拒否する)
+        if reference_spec_frontend is not None:
+            conflict = reference_spec_frontend_conflict(
+                reference_conditioning=reference_conditioning,
+                reference_spec_frontend=reference_spec_frontend,
+            )
+            if conflict is not None:
+                raise ValueError(conflict)
         # 参照条件付き + Latent Filling / swap-SCL は G の条件を参照発話のない
         # 埋め込みに差し替えるので、直接構築でも拒否する (CLI は SystemExit)。
         # 「ref_spec / capacity は cross_utt 必須」は training_step_g が検査する
@@ -1328,7 +1345,7 @@ class VitsModel(pl.LightningModule):
         specs, lengths = crop_reference_specs(
             batch.reference_specs,
             batch.reference_spec_lengths,
-            int(self.hparams.get("reference_max_frames", 512)),
+            int(self.hparams.get("reference_max_frames", REFERENCE_MAX_FRAMES_DEFAULT)),
             mode="random" if self.training else "head",
             epoch=self.current_epoch,
             keys=batch.utterance_ids,
@@ -1449,7 +1466,7 @@ class VitsModel(pl.LightningModule):
         ref_spec, ref_len = crop_reference_specs(
             spec.unsqueeze(0),
             torch.tensor([spec.size(1)], dtype=torch.long),
-            int(self.hparams.get("reference_max_frames", 512)),
+            int(self.hparams.get("reference_max_frames", REFERENCE_MAX_FRAMES_DEFAULT)),
             mode="head",
         )
         return (
@@ -3568,7 +3585,7 @@ class VitsModel(pl.LightningModule):
         parser.add_argument(
             "--reference-max-frames",
             type=int,
-            default=512,
+            default=REFERENCE_MAX_FRAMES_DEFAULT,
             help="Maximum reference spectrogram frames for --generator-reference "
             "cross_utt (default 512 = ~5.9 s at 22.05 kHz / hop 256). Training "
             "takes a window chosen from (epoch, utterance); validation and "
