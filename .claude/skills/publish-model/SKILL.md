@@ -46,6 +46,12 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
     "$CKPT_PATH" "$OUTPUT_ONNX"
 ```
 
+> **参照条件付きモデル (`--reference-conditioning ref_spec` / `capacity`)**: 学習時の
+> `config.json` を `--config <training config.json>` で必ず渡す (無いと export は
+> 止まる)。`"$OUTPUT_ONNX.json"` に `reference_conditioning` の契約 (ref_spec は
+> checkpoint の frontend と `max_frames` も) が書かれる。既に `"$OUTPUT_ONNX.json"`
+> がある場合は、置き換えてよいときだけ `--overwrite-config` を付ける。
+
 > **EMA の適用判断 (v11 実測、2026-08-25)**: EMA は**収束済み run でのみ**
 > default 適用する。早期打ち切り・未収束 ckpt では EMA shadow が raw weights
 > より大幅に劣化する (v11 ep9 torch A/B: raw 14.9dB vs EMA 6.2dB — decay lag

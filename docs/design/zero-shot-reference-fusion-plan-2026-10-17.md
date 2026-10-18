@@ -54,7 +54,7 @@
 
 | 事実 | 場所 |
 |---|---|
-| 学習用CAM++はVAD trim済みの`audio_norm`から抽出。推論の参照WAVはtrimせずにfbank化しCMVN平均へ無音が混入 | `extract_speaker_embedding.py` L102-136 (学習) / L65-99 (推論)、`norm_audio/__init__.py` L208-238, L275-279 |
+| 学習用CAM++は`audio_norm`から抽出。推論の参照WAVはtrimせずにfbank化する。**訂正 (2026-10-18、Ruling R14):** multilingual datasetのcacheは既定でVADなし + soxr MQ (`prepare_multilingual_dataset` → `norm_audio.cache_norm_audio_no_vad(resample_quality="MQ")`) で、`audio_norm`はVAD trim済みとは限らない。VAD trim (16kHz上のenergy VAD + soxr HQ) をするのは別のbuilder `norm_audio.cache_norm_audio_fast`。v10bの実データがどちらで作られたかはS2のdata auditで確定する | `extract_speaker_embedding.py` L102-136 (学習) / L65-99 (推論)、`norm_audio/__init__.py` (`cache_norm_audio_fast` / `cache_norm_audio_no_vad`)、`tools/prepare_multilingual_dataset.py` (`resample_quality="MQ"`) |
 | Gへは生成対象と同じ発話の埋め込み。G・SCL・swap・Latent Fillingが1つの`speaker_embeddings`を共有 | `vits/lightning.py` L1963, L2059, L2283, L2418 |
 | `spk_proj`はLinear(192→512)→LN→GELU→Linear。gは`[B,512,1]` | `vits/models.py` L1459-1490 |
 | 話者情報損失の78%がdecoder段。prior/flowを完璧にしても上限は+0.04 (recon bound 0.714)。融合後のgはdecoderのFiLMにも入るが、decoderの描画歪みを直す保証はない | [zero-shot-v11-conditioning-design.md §10.1](zero-shot-v11-conditioning-design.md#101-チェーン会計--話者情報はどこで死ぬか実測) |
@@ -389,7 +389,7 @@ def test_missing_reference_features_raises(tiny_fused_model):
 | 192次元の参照 | 学習時のGへのCAM++ 192次元も参照発話のもの (Task 7R)。SCL・swap・Latent Fillingは従来どおり生成対象の埋め込み |
 | 対照Ccap | 192次元を入力とするMLP (Linear→PReLU→Linear、最後をzero-init) を`spk_proj`出力へ加算。追加パラメータ数をF-melの±5%に合わせる |
 | 学習時の切り出し | 参照specをランダムに最大`--reference-max-frames` (既定512 frame ≈ 5.9秒) へ切り出す。検証時は先頭から固定長 |
-| 推論frontend | 学習cacheと同じ手順: 16kHzでenergy VAD → 元srで切り出し → soxr HQでモデルsrへ → `spectrogram_torch`。CAM++ 192次元はG0どおりtrimなし (Ruling R7) |
+| 推論frontend | 学習cacheを作ったbuilderと同じ手順。名前の閉じた集合 (`reference_spec_contract.py`) から選ぶ: `energy-vad@16k;soxr-hq` (`cache_norm_audio_fast`: 16kHzでenergy VAD → 元srで切り出し → soxr HQでモデルsrへ → `spectrogram_torch`)、`no-vad;soxr-mq` / `no-vad;soxr-hq` (`cache_norm_audio_no_vad`: soxrでモデルsrへ → `spectrogram_torch`)。既定値はなく、学習の`--reference-spec-frontend`でcheckpointに残し、export・評価がそれに合わせる (Ruling R14)。評価・推論は参照specを先頭から`reference_max_frames`に切ってから渡す (Ruling R15)。CAM++ 192次元はG0どおりtrimなし |
 | 損失 | 追加しない。再構成・adversarial等の既存損失のみで学習する (CAM++/ECAPA由来の損失は足さない) |
 
 ### 8.3 比較群の置き換え
@@ -485,6 +485,43 @@ Ruling R3を置き換える: module属性名は`reference_encoder`と`capacity_c
 
 ### 8.6 判断の記録
 
-- **Ruling R7 (frontend):** CAM++ 192次元はG0どおりtrimなし。F-melのspecは学習cache (VAD trim済み`audio_norm`由来) と同じ手順でtrimする。G0 (a) は既存モデルのCAM++経路での測定で、未学習のencoderには当てはまらないため。外れた場合の費用: S6でtrim有無をCPUで比べ直す。
+- **Ruling R7 (frontend):** ~~CAM++ 192次元はG0どおりtrimなし。F-melのspecは学習cache (VAD trim済み`audio_norm`由来) と同じ手順でtrimする。G0 (a) は既存モデルのCAM++経路での測定で、未学習のencoderには当てはまらないため。外れた場合の費用: S6でtrim有無をCPUで比べ直す。~~ **specの部分はRuling R14で置き換え** (学習cacheはVAD trim済みとは限らなかった)。CAM++ 192次元をtrimしない部分はそのまま。
 - **Ruling R8 (入力形式):** encoderの入力はmelではなく線形スペクトログラム。学習cacheをそのまま使え、runtimeはenc_qと同じSTFT 1回で作れるため。log圧縮はencoder内で行う。
+- **Ruling R14 (frontend、R7のspec部分を置き換え):** 参照specのfrontendは、実在するcache builderを写した名前の閉じた集合 (`energy-vad@16k;soxr-hq` / `no-vad;soxr-mq` / `no-vad;soxr-hq`) から明示的に選ぶ。学習は`--reference-spec-frontend`でcheckpointに残し、export・評価はそれとmanifestを照合する。v10bの実データのbuilderはS2のdata auditで確定する。理由: §1.2の前提 (学習cacheはVAD trim済み) がmultilingual cacheでは誤りだった。費用: hparam 1つと受け渡し。
+- **Ruling R15 (評価時の参照長):** 評価は参照specを、モデルの`reference_max_frames`まで先頭から切ってから渡す (学習の検証時と同じ切り方)。ONNXのconfigには`max_frames`を追加する。理由: 学習は512 frameより長い参照を見ないので、評価も学習と同じ分布の参照を渡す。費用: config 1項目。
 - **未解決 (S4で確認):** 参照encoderが話者以外 (録音条件・内容) を拾い、CERが悪化する可能性。§6の「類似度は上がるがCERが悪化」の行で扱う。
+
+### 8.7 実装結果 (S1)
+
+S1 (Task 5R〜11R) の実装とCPUテストは`feat/zero-shot-v8-dataset-scaling`で完了した。GPUでの学習・評価はまだ行っていない。
+
+| Task | 内容 | commit |
+|---|---|---|
+| 5R | 参照spec encoderと容量対照 | `4d46cb99`、`b7b1aed4` |
+| 6R | EMA・LR慣らし・重み移行 | `8e7edfe9`、`8b8b9678`、`6904ef0e` |
+| 7R | 学習時の参照ペア (SCLとの分離) | `81f579bf`、`65af279e` |
+| 8R | ONNX export | `2c14802d`、`d8a7b866` |
+| 9R | 評価経路の接続 | `bc0ca41e`、`b84bd92d` |
+| 10R | 未対応runtimeでの拒否 | `65c0faec`、`a68f9088` |
+| 11R | 7R・8R・9Rの契約の突き合わせ (学習hparam `reference_spec_frontend`、exportのfrontend・`max_frames`、評価の先頭切り出し、通し試験) | `ed94919c` と、この節を含むdocsのcommit |
+
+実装中の判断 (1行ずつ):
+
+- **R9:** 参照付きbaseから参照moduleの無いモデルへFTするときは、参照の重みを警告付きで捨てる (`spk_proj`と同じ扱い)。
+- **R10:** weights-onlyの読込では、学習専用の補助module (WavLM判別器など) の有無の差を警告付きで許す。生成器と主判別器は厳密に照合する。
+- **R11:** 並列worktreeのテストは、mainの`.venv`のpythonに`PYTHONPATH`でworktreeの`src`を先に入れて実行する。
+- **R12:** ONNX graphの中では参照spec長をclampしない。入力の検査はruntimeと評価が行い、ONNX export契約に記録する。
+- **R13:** jsonlのsplitと学習時のランダムなtrain/val分割は一致しない。跨いだ参照は止めずに数えて警告する。
+- **R14:** 参照specのfrontendは名前の閉じた集合から明示的に選び、モデルの宣言とmanifestを照合する (§8.6)。
+- **R15:** 評価は参照specをモデルの`reference_max_frames`まで先頭から切って渡す (§8.6)。
+
+残っていること:
+
+- 既存の失敗テスト (今回の変更より前から失敗している):
+  - `test_speaker_encoder_golden` の8件 (n_fft 400と512の食い違い)
+  - `test_decoder_upsample_mode` のresize modeのexport
+  - `test_carrier_head` (実行するdirectoryによって結果が変わる)
+  - `test_piper_proc_exec` (ctestの下で実行したとき)
+- 範囲外のbug: `piper_plus/api/engine.py`の`_fill_speaker_embedding_inputs`が`speaker_embedding_mask`を常に渡す。
+- Rust・Go・C#・WASMのruntimeは、参照spec入力付きのモデルをまだ拒否しない (拒否はPython runtimeとC++のみ)。
+- v10bの実データの学習cacheがどのbuilderで作られたか (frontend名) はS2のdata auditで確定する。
