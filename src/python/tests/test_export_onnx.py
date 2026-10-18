@@ -813,6 +813,9 @@ _KNOWN_OPTIONAL_INPUTS = frozenset(
         "prosody_features",
         "speaker_embedding",
         "speaker_embedding_mask",
+        # ref_spec exports only (scripts/check_onnx_inputs.py と同期)
+        "reference_spec",
+        "reference_spec_lengths",
     }
 )
 

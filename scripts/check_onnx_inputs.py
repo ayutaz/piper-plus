@@ -55,6 +55,11 @@ KNOWN_OPTIONAL_INPUTS = {
     "prosody_features",  # OpenJTalk A1/A2/A3 features
     "speaker_embedding",  # PR #320 — zero+mask=0 fallback via emb_g(sid)
     "speaker_embedding_mask",
+    # reference_conditioning="ref_spec" exports only (reference-fusion plan §8
+    # Task 8R). Runtimes must validate them before session.run — see
+    # [tensor_names.reference_spec_preconditions] in onnx-export-contract.toml.
+    "reference_spec",
+    "reference_spec_lengths",
 }
 
 # Retained for the deprecated --allow-voice-cloning flag so existing CI
