@@ -139,23 +139,33 @@ REFERENCE_CONTRACT_HPARAMS = {
 def reference_hparam_mismatches(saved_hparams, current_hparams):
     """checkpoint と今回の参照 hparam の食い違いを ``(key, saved, current)`` で返す。
 
-    比べるのは両方が同じ参照条件付き (none 以外) のときだけ。
+    ``generator_reference`` は none を含むすべての mode で、今回の値があれば
+    比べる (Ruling R16a: C0 = none + cross_utt は主な比較群)。
+    ``reference_spec_frontend`` / ``reference_max_frames`` は両方が同じ参照
+    条件付き (none 以外) のときだけ比べる (none は参照 spec を使わない)。
     ``reference_conditioning`` 自体の食い違いは state_dict の key 差で止まる
     (strict resume / weights-only) か、single-speaker FT では参照 weights を
-    捨てる (R9) ので、ここでは扱わない。none の checkpoint・モデルは照合しない
-    (旧 ckpt と none の挙動を変えない)。checkpoint に key がない、または値が
-    None (宣言なし) の key も比べない。
+    捨てる (R9) ので、ここでは扱わない。checkpoint に key がない、または値が
+    None (宣言なし) の key は比べない (旧 ckpt の挙動を変えない)。
     """
     saved_hparams = saved_hparams or {}
     current_hparams = current_hparams or {}
     mode = saved_hparams.get("reference_conditioning", "none")
-    if mode == "none" or current_hparams.get("reference_conditioning", "none") != mode:
-        return []
+    same_reference_mode = mode != "none" and mode == current_hparams.get(
+        "reference_conditioning", "none"
+    )
+
+    def compared(key):
+        if saved_hparams.get(key) is None:
+            return False
+        if key == "generator_reference":
+            return current_hparams.get(key) is not None
+        return same_reference_mode
+
     return [
         (key, saved_hparams[key], current_hparams.get(key))
         for key in REFERENCE_CONTRACT_HPARAMS
-        if saved_hparams.get(key) is not None
-        and saved_hparams[key] != current_hparams.get(key)
+        if compared(key) and saved_hparams[key] != current_hparams.get(key)
     ]
 
 
