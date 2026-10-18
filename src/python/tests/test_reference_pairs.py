@@ -1874,6 +1874,18 @@ def _golden_model(**overrides):
         "swap_spk_start_epoch": 0,
         "swap_spk_ramp_epochs": 0,
         "spk_emb_noise_sigma": 0.05,
+        # sub-band STFT loss は計算するが重み 0 にする (勾配は厳密に 0 倍)。
+        # LogSTFTMagnitudeLoss の勾配は bin ごとに (X/|X|) / (|X| + 1e-7)
+        # (大きさ ~1/|X|、向きは X そのもの)。ランダム初期化の o_mb には
+        # |X| ≈ 1e-6 の STFT bin が統計的にほぼ必ず数個ある (center=True の
+        # reflect pad で端 frame の bin がほぼ実数になり、|X| の分布が 0 近傍で
+        # 線形になる)。fp32 の縮約順序の差 (o_mb で絶対 ~1e-8) がその bin の X を
+        # 相対 ~1e-2 動かし、勾配も同じ相対量で動く。実測: thread 数 12→1 で
+        # sub_stft 由来の勾配 abs 和が相対 2.5e-2、Windows→Linux で 1.5e-1 動き、
+        # 他の全 loss 成分は 6e-7 以下だった。この項の勾配はコードではなく
+        # 丸め誤差が決めるため、変更前との一致を見る golden から外す
+        # (loss 経路自体は c 倍の前まで毎回通る)。
+        "c_sub_stft": 0.0,
         "batch_size": 4,
     }
     hparams.update(overrides)
@@ -1941,8 +1953,16 @@ def _self_mode_step_summary(root):
 # ``git archive 6904ef0e pytest.ini pyproject.toml src test tools`` を scratch に
 # 展開し、その ``src/python`` / ``src/python_run`` / ``src/python/g2p`` を sys.path
 # 先頭に置いて本ファイルを読み込み、``_self_mode_step_summary(<tmp>)`` を実行した
-# 値 (Windows 11, torch 2.11.0+cu128, CPU)。生成環境では本変更後のコードも同じ
-# 値を bit 一致で返した。
+# 値 (Windows 11, torch 2.11.0+cu128, CPU, 12 thread)。
+#
+# プラットフォーム非依存性の確認 (golden 再生成時、``c_sub_stft=0`` の構成):
+# - 同じ環境・同じ thread 数では、本変更後のコードも同じ値を bit 一致で返す
+#   (Windows 12 thread / Linux 2 thread の両方で確認)。
+# - Linux (Docker python:3.12-slim, torch 2.11.0+cpu, 1/2/4 thread) と Windows
+#   1 thread の値は、変更前・変更後のコードとも上の値から相対 3.5e-7 以内
+#   (最大は main_grads.sq_sum)。RNG の hash・勾配 tensor 数・hook は全環境で一致。
+# 旧 golden (sub-band STFT 込み) は Linux CI で main_grads.abs_sum が相対 8.7e-4
+# ずれて落ちた。原因は ``_golden_model`` の ``c_sub_stft`` の注釈を参照。
 _SELF_MODE_GOLDEN = {
     "hook_identity": True,
     "lf_grads": {
@@ -1955,44 +1975,77 @@ _SELF_MODE_GOLDEN = {
         "6dd35cc3db12a0f86e837d7ee877137355994dc73a91e5159945b50f9afa7f1e"
     ),
     "main_grads": {
-        "abs_sum": 57371.982538050404,
+        "abs_sum": 55775.65552449414,
         "count": 794,
-        "sq_sum": 71684.60289740111,
+        "sq_sum": 66453.83724960452,
     },
-    "main_loss": 51.81105422973633,
+    "main_loss": 49.673377990722656,
     "main_rng_sha256": (
         "6dd35cc3db12a0f86e837d7ee877137355994dc73a91e5159945b50f9afa7f1e"
     ),
     "spk_cond_abs_sum": 43.53158425033325,
-    "val_loss": 60.02931594848633,
+    "val_loss": 57.876007080078125,
 }
-# 許容誤差: CPU fp32 の縮約順序は ISA / BLAS でプラットフォーム間に相対 ~1e-6
-# 程度ずれる。self 経路の退行はそれより桁で大きく動く。golden 作成時の実測:
-# spk_emb_noise_sigma を 0.05→0.0 にすると main_loss は相対 2.8e-3、global seed を
-# 42→43 にすると相対 1.4e-2 動いた (下の確認テストが前者を固定する)。rtol 1e-4 は
-# プラットフォーム差の ~100 倍、最小の退行例の 1/28 で両者を分離する。
+# 許容誤差: 縮約順序 (thread 数・ISA・BLAS) の違いによる差は、上の実測で相対
+# 3.5e-7 以下。self 経路の退行はそれより桁で大きく動く。実測:
+# spk_emb_noise_sigma を 0.05→0.0 にすると main_loss は相対 2.9e-3、global seed
+# を 42→43 にすると相対 1.5e-2 動いた (下の確認テストが前者を固定する)。rtol 1e-4
+# は縮約順序差の ~290 倍、最小の退行例の 1/29 で両者を分離する。
+# 縮約順序差が golden に入り込まないことは、thread 数を変えた再計算との比較
+# (``test_golden_quantities_are_insensitive_to_reduction_order``) が毎回確かめる。
 # global RNG の状態 (Mersenne Twister の整数状態) と勾配 tensor 数は厳密一致
 # (乱数消費の増減は値の近さに関係なく検出する)。
 _SELF_MODE_GOLDEN_RTOL = 1e-4
+# 縮約順序だけを変えたときに golden の各値が動いてよい幅。golden を別環境で
+# 比べる余裕として rtol の 1/10 以下を要求する (実測は thread 12→1 で最大
+# 相対 2.5e-7 = この幅の 1/40)。
+_REDUCTION_ORDER_RTOL = _SELF_MODE_GOLDEN_RTOL / 10
+
+
+def _assert_summary_close(got, expected, rtol):
+    assert set(got) == set(expected)
+    for key, golden in expected.items():
+        value = got[key]
+        if isinstance(golden, dict):
+            assert value["count"] == golden["count"], key
+            for sub in ("abs_sum", "sq_sum"):
+                assert value[sub] == pytest.approx(golden[sub], rel=rtol), (key, sub)
+        elif isinstance(golden, float):
+            assert value == pytest.approx(golden, rel=rtol), key
+        else:
+            assert value == golden, key
 
 
 class TestSelfModePreChangeGolden:
-    def test_self_mode_step_matches_the_pre_change_golden(self, tmp_path):
+    @pytest.fixture(scope="class")
+    def self_mode_summary(self, tmp_path_factory):
+        return _self_mode_step_summary(tmp_path_factory.mktemp("self_mode_golden"))
+
+    def test_self_mode_step_matches_the_pre_change_golden(self, self_mode_summary):
         assert _SELF_MODE_GOLDEN is not None, "golden not generated"
-        got = _self_mode_step_summary(tmp_path)
-        assert set(got) == set(_SELF_MODE_GOLDEN)
-        for key, golden in _SELF_MODE_GOLDEN.items():
-            value = got[key]
-            if isinstance(golden, dict):
-                assert value["count"] == golden["count"], key
-                for sub in ("abs_sum", "sq_sum"):
-                    assert value[sub] == pytest.approx(
-                        golden[sub], rel=_SELF_MODE_GOLDEN_RTOL
-                    ), (key, sub)
-            elif isinstance(golden, float):
-                assert value == pytest.approx(golden, rel=_SELF_MODE_GOLDEN_RTOL), key
-            else:
-                assert value == golden, key
+        _assert_summary_close(
+            self_mode_summary, _SELF_MODE_GOLDEN, _SELF_MODE_GOLDEN_RTOL
+        )
+
+    def test_golden_quantities_are_insensitive_to_reduction_order(
+        self, self_mode_summary, tmp_path
+    ):
+        """golden に比べる値は縮約順序 (環境差の主因) でほぼ動かない。
+
+        intra-op thread 数を変えると CPU kernel の部分和の分け方が変わり、
+        プラットフォーム間の ISA / BLAS 差と同種の丸め誤差が入る。golden の
+        各値がこれで ``_REDUCTION_ORDER_RTOL`` 以上動くなら、その値は丸め誤差に
+        敏感で、別環境では golden と比べられない (旧構成の sub-band STFT 勾配が
+        thread 12→1 で相対 2.9e-4 動いて Linux CI で落ちた事例)。
+        """
+        default_threads = torch.get_num_threads()
+        other_threads = 1 if default_threads > 1 else 4
+        torch.set_num_threads(other_threads)
+        try:
+            reordered = _self_mode_step_summary(tmp_path)
+        finally:
+            torch.set_num_threads(default_threads)
+        _assert_summary_close(reordered, self_mode_summary, _REDUCTION_ORDER_RTOL)
 
     def test_golden_tolerance_separates_a_changed_conditioning(self, tmp_path):
         """許容誤差の根拠: noise σ を変えるだけで main_loss が rtol を超えて動く。"""
