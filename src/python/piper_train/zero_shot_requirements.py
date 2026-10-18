@@ -5,6 +5,8 @@ from pathlib import Path
 
 import torch
 
+from .reference_spec_contract import REFERENCE_SPEC_FRONTENDS
+
 
 def validate_recipe(
     *,
@@ -71,6 +73,53 @@ def validate_reference_training_args(
         generator_reference=generator_reference,
         latent_filling_tau=latent_filling_tau,
         c_swap_spk=c_swap_spk,
+    )
+    if message is not None:
+        raise SystemExit(message)
+
+
+def reference_spec_frontend_conflict(
+    *, reference_conditioning, reference_spec_frontend
+):
+    """``reference_spec_frontend`` の誤りを文で返す (問題なければ None)。
+
+    参照融合計画 §8 Task 11R (Ruling R14): 推論・評価で作る参照 spec は、学習
+    dataset の ``.spec.pt`` を作った cache builder と同じ手順でなければならない。
+    どの builder で作ったかは dataset から読み取れないので、ref_spec の学習では
+    閉じた集合 (``reference_spec_contract``) の名前を明示させて hparam に残す。
+    ref_spec 以外での指定は効果がないので拒否する (黙って無視しない)。
+    """
+    choices = ", ".join(sorted(REFERENCE_SPEC_FRONTENDS))
+    if reference_conditioning == "ref_spec":
+        if reference_spec_frontend is None:
+            return (
+                "--reference-conditioning ref_spec requires --reference-spec-frontend "
+                f"(one of: {choices}): name the cache builder that produced the "
+                "dataset's .spec.pt files, so that inference/evaluation builds the "
+                "reference spec the same way. Determine it in the S2 data audit "
+                "(reference-fusion plan §8) before training."
+            )
+        if reference_spec_frontend not in REFERENCE_SPEC_FRONTENDS:
+            return (
+                f"Unknown reference spec frontend {reference_spec_frontend!r}; "
+                f"expected one of: {choices}"
+            )
+        return None
+    if reference_spec_frontend is not None:
+        return (
+            "--reference-spec-frontend only applies to --reference-conditioning "
+            f"ref_spec (got {reference_conditioning})"
+        )
+    return None
+
+
+def validate_reference_spec_frontend_args(
+    *, reference_conditioning, reference_spec_frontend
+):
+    """CLI 起動時の ``--reference-spec-frontend`` 検査。誤りは ``SystemExit``。"""
+    message = reference_spec_frontend_conflict(
+        reference_conditioning=reference_conditioning,
+        reference_spec_frontend=reference_spec_frontend,
     )
     if message is not None:
         raise SystemExit(message)
