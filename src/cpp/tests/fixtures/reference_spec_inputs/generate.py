@@ -10,7 +10,8 @@
 
 全入力が出力に寄与する (ORT が未使用入力を落とさないことに依存しない)。
 出力は ``output[0, 0, t] = input[0, t] * 0.001`` + (他入力の総和 × 0)。
-IR/opset は最低対応 ORT (1.22) でも読める値に固定する。
+IR/opset (IR 8 / opset 13) は、これを読む runtime のうち最も古い ORT
+(C++ build が cmake/OnnxRuntime.cmake で取得する 1.20.0) でも読める値に固定する。
 
 再生成: ``uv run python src/cpp/tests/fixtures/reference_spec_inputs/generate.py``
 """

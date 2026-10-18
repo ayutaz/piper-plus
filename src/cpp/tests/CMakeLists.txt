@@ -1161,6 +1161,10 @@ target_compile_definitions(test_c_api PRIVATE
     # test_cjk_punctuation_contract.cpp reads the CJK punctuation fixture
     # (Issue #823).
     PIPER_PLUS_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+    # ref_spec_v1 model rejection cases (CApiReferenceSpecModel) read the
+    # committed tiny ONNX fixtures by absolute path (test_c_api has no
+    # WORKING_DIRECTORY).
+    PIPER_PLUS_REFERENCE_SPEC_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/reference_spec_inputs"
 )
 
 # Include directories: piper_plus.h lives in src/cpp/
