@@ -3,6 +3,15 @@
 import json
 
 import numpy as np
+import pytest
+
+
+pytest.importorskip(
+    "torch",
+    reason="Dataset audit loads PiperDataset from the train extra; lightweight Windows CI omits it.",
+)
+
+pytestmark = pytest.mark.unit
 
 
 def test_missing_and_invalid_artifacts_never_become_verified(tmp_path):

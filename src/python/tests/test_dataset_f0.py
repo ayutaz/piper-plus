@@ -31,6 +31,8 @@ from piper_train.vits.dataset import (  # noqa: E402
     UtteranceTensors,
 )
 
+pytestmark = pytest.mark.unit
+
 
 def _write_utterance(tmp_path, name: str, n_frames: int, with_f0: bool):
     spec = torch.randn(513, n_frames).abs()

@@ -15,6 +15,8 @@ pytest.importorskip("soxr", reason="reference frontend tests require soxr")
 from piper_train.extract_speaker_embedding import preprocess_audio  # noqa: E402
 from piper_train.reference_frontend import trim_reference_audio  # noqa: E402
 
+pytestmark = pytest.mark.unit
+
 
 def tone(n: int, amp: float, sr: int = 22050, freq: float = 220.0) -> np.ndarray:
     t = np.arange(n) / sr

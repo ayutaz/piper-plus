@@ -30,6 +30,8 @@ pyworld = pytest.importorskip(
     "pyworld", reason="pyworld required for F0 extraction tests"
 )
 
+pytestmark = pytest.mark.unit
+
 SR = 22050
 HOP = 256
 

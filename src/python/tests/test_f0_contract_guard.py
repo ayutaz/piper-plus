@@ -31,6 +31,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = [pytest.mark.unit, pytest.mark.training]
+
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VITS_DIR = REPO_ROOT / "src" / "python" / "piper_train" / "vits"
