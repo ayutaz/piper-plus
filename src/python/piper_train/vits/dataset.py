@@ -1,3 +1,5 @@
+import dataclasses
+import hashlib
 import json
 import logging
 import os
@@ -60,6 +62,19 @@ class Utterance:
     # Fixed inference monitoring references (no target audio/F0 required).
     speaker_embedding: FloatTensor | None = None
     utterance_id: str | None = None
+    # 参照融合計画 §8 Task 7R: G の参照発話 (``generator_reference="cross_utt"``
+    # のときだけ読む)。``reference_utterance_id`` は target の ``utterance_id``
+    # と同じ規約 ``str(audio_norm_path.resolve())`` に正規化済みの identity。
+    reference_utterance_id: str | None = None
+    reference_audio_spec_path: Path | None = None
+    reference_speaker_embedding_path: Path | None = None
+    # strict 検査用の pair metadata。split / hash は jsonl の値、参照の話者と
+    # split は dataset 全体の index から読み込み時に解決する。
+    split: str | None = None
+    audio_sha256: str | None = None
+    reference_audio_sha256: str | None = None
+    reference_speaker_id: int | None = None
+    reference_split: str | None = None
 
 
 @dataclass
@@ -75,6 +90,17 @@ class UtteranceTensors:
     utterance_id: str | None = None
     # v10b S-2: GT F0 (Hz, 無声 0.0) — spectrogram と同一フレーム格子の 1-D
     f0: FloatTensor | None = None
+    # Task 7R: 参照発話 (cross_utt のときだけ非 None)。reference_spec は
+    # 切り出し前の全長 [spec_channels, T_ref]。切り出しは学習ループ側
+    # (``crop_reference_specs``) が epoch と train/eval を見て行う。
+    reference_embedding: FloatTensor | None = None
+    reference_spec: FloatTensor | None = None
+    reference_utterance_id: str | None = None
+    split: str | None = None
+    audio_sha256: str | None = None
+    reference_speaker_id: int | None = None
+    reference_split: str | None = None
+    reference_audio_sha256: str | None = None
 
     @property
     def spec_length(self) -> int:
@@ -99,6 +125,20 @@ class Batch:
     # dataset では両方 None のままで、S-2 は自動的に無効になる (後方互換)。
     f0: FloatTensor | None = None
     vuv: FloatTensor | None = None
+    # 参照融合計画 §8 Task 7R: G の参照発話。``generator_reference="cross_utt"``
+    # の dataset でだけ埋まり、既定 (self) では全て None のまま (batch は従来と
+    # bit 一致)。reference_specs は collate 時点では batch 最大長へ 0 padding
+    # した全長で、学習ループが ``crop_reference_specs`` で切り出す。
+    reference_embeddings: FloatTensor | None = None  # [B, 192]
+    reference_specs: FloatTensor | None = None  # [B, spec_channels, T_ref]
+    reference_spec_lengths: LongTensor | None = None  # [B]
+    reference_utterance_ids: list[str] | None = None
+    # strict 検査 (validate_reference_pairs) 用の行ごとの pair metadata
+    reference_speaker_ids: list[int | None] | None = None
+    splits: list[str | None] | None = None
+    reference_splits: list[str | None] | None = None
+    audio_sha256s: list[str | None] | None = None
+    reference_audio_sha256s: list[str | None] | None = None
 
     def pin_memory(self) -> "Batch":
         """Pin all tensor fields into page-locked memory.
@@ -123,21 +163,29 @@ class Batch:
         def _pin(t):
             return t.pin_memory() if isinstance(t, torch.Tensor) else t
 
+        # 全 field を列挙する (新 field の pin 漏れを構造的に防ぐ)。tensor
+        # 以外 (list / None) はそのまま渡す。
         return Batch(
-            phoneme_ids=_pin(self.phoneme_ids),
-            phoneme_lengths=_pin(self.phoneme_lengths),
-            spectrograms=_pin(self.spectrograms),
-            spectrogram_lengths=_pin(self.spectrogram_lengths),
-            audios=_pin(self.audios),
-            audio_lengths=_pin(self.audio_lengths),
-            speaker_ids=_pin(self.speaker_ids),
-            language_ids=_pin(self.language_ids),
-            prosody_features=_pin(self.prosody_features),
-            speaker_embeddings=_pin(self.speaker_embeddings),
-            utterance_ids=self.utterance_ids,
-            f0=_pin(self.f0),
-            vuv=_pin(self.vuv),
+            **{
+                field.name: _pin(getattr(self, field.name))
+                for field in dataclasses.fields(self)
+            }
         )
+
+
+class MissingReferenceError(ValueError):
+    """cross_utt で参照フィールドが欠けた発話 (読み込み時に必ず送出する)。
+
+    ``load_dataset`` は行単位の例外を log して読み飛ばすが、この例外だけは
+    再送出する — 参照の欠落を自己参照や読み飛ばしで黙って埋めない。
+    """
+
+
+_REFERENCE_JSON_FIELDS = (
+    "reference_utterance_id",
+    "reference_audio_spec_path",
+    "reference_speaker_embedding_path",
+)
 
 
 class PiperDataset(Dataset):
@@ -162,11 +210,20 @@ class PiperDataset(Dataset):
         precomputed_mel_dir: Path | str | None = None,
         f0_dir: Path | str | None = None,
         speaker_embedding_dim: int = 192,
+        load_references: bool = False,
     ):
         self.utterances: list[Utterance] = []
         if speaker_embedding_dim < 1:
             raise ValueError("speaker_embedding_dim must be positive")
         self.speaker_embedding_dim = speaker_embedding_dim
+        # Task 7R: True (generator_reference="cross_utt") のときだけ jsonl の
+        # 参照フィールドを読む。欠けた発話は読み込み時に ValueError。False
+        # (既定) では参照フィールドがあっても無視し、item / batch は従来どおり。
+        self.load_references = bool(load_references)
+        # 参照の話者 / split / hash を引く index。length / phoneme filter の
+        # **前** に全行を登録する (filter で target から外れた発話も参照には
+        # なれる)。identity は utterance_id と同じ str(audio_norm_path.resolve())
+        reference_index: dict[str, tuple] | None = {} if self.load_references else None
 
         # Resolve the precomputed spectrogram cache directory once. When the
         # directory does not exist we treat it as absent (falls back to
@@ -213,8 +270,12 @@ class PiperDataset(Dataset):
                     filter_length=filter_length,
                     precomputed_mel_dir=self.precomputed_mel_dir,
                     f0_dir=self.f0_dir,
+                    reference_index=reference_index,
                 )
             )
+
+        if reference_index is not None:
+            self._resolve_reference_metadata(reference_index)
 
         if validate_cache:
             before = len(self.utterances)
@@ -259,20 +320,13 @@ class PiperDataset(Dataset):
         # Load speaker embedding from .npy file if available
         speaker_embedding_tensor = None
         if utt.speaker_embedding_path is not None:
-            expected_dim = getattr(self, "speaker_embedding_dim", 192)
-            try:
-                spk_emb = np.load(utt.speaker_embedding_path, allow_pickle=False)
-                if spk_emb.ndim != 1:
-                    raise ValueError(
-                        f"speaker_embedding must be 1-D, got shape {spk_emb.shape}"
-                    )
-                speaker_embedding_tensor = torch.from_numpy(
-                    validate_embedding(spk_emb, expected_dim)
-                )
-            except (ValueError, OSError) as exc:
-                raise ValueError(
-                    f"speaker_embedding: {exc} from {utt.speaker_embedding_path}"
-                ) from exc
+            speaker_embedding_tensor = self._load_embedding(
+                utt.speaker_embedding_path, "speaker_embedding"
+            )
+
+        reference = {}
+        if getattr(self, "load_references", False):
+            reference = self._load_reference(utt, spectrogram.size(0))
 
         # v10b S-2: GT F0 (fp16 cache → fp32)。spectrogram とのフレーム数差は
         # 2 段階で扱う:
@@ -320,7 +374,87 @@ class PiperDataset(Dataset):
             speaker_embedding=speaker_embedding_tensor,
             utterance_id=str(utt.audio_norm_path.resolve()),
             f0=f0_tensor,
+            **reference,
         )
+
+    def _load_embedding(self, path: Path, label: str) -> FloatTensor:
+        """1-D の .npy 話者埋め込みを検証して L2 正規化済み float32 で返す。"""
+        expected_dim = getattr(self, "speaker_embedding_dim", 192)
+        try:
+            emb = np.load(path, allow_pickle=False)
+            if emb.ndim != 1:
+                raise ValueError(f"{label} must be 1-D, got shape {emb.shape}")
+            return torch.from_numpy(validate_embedding(emb, expected_dim))
+        except (ValueError, OSError) as exc:
+            raise ValueError(f"{label}: {exc} from {path}") from exc
+
+    def _load_reference(self, utt: Utterance, spec_channels: int) -> dict:
+        """Task 7R: 参照発話の spec (全長) と埋め込みを読む。
+
+        spec は学習 cache の ``.spec.pt`` と同じ線形振幅 [spec_channels, T]。
+        形状違い・0 frame・NaN/Inf は黙って通さず ValueError。
+        """
+        spec_path = utt.reference_audio_spec_path
+        spec = _load_tensor(spec_path)
+        if spec.dtype == torch.float16:
+            spec = spec.float()
+        if spec.dim() != 2:
+            raise ValueError(
+                f"reference spec must be 2-D [channels, frames], got shape "
+                f"{tuple(spec.shape)} from {spec_path}"
+            )
+        if spec.size(0) != spec_channels:
+            raise ValueError(
+                f"reference spec has {spec.size(0)} channels but the target "
+                f"spectrogram has {spec_channels} ({spec_path})"
+            )
+        if spec.size(1) < 1:
+            raise ValueError(f"reference spec has 0 frames ({spec_path})")
+        if not bool(torch.isfinite(spec).all()):
+            raise ValueError(f"reference spec must be finite ({spec_path})")
+        return {
+            "reference_spec": spec,
+            "reference_embedding": self._load_embedding(
+                utt.reference_speaker_embedding_path,
+                "reference_speaker_embedding",
+            ),
+            "reference_utterance_id": utt.reference_utterance_id,
+            "split": utt.split,
+            "audio_sha256": utt.audio_sha256,
+            "reference_speaker_id": utt.reference_speaker_id,
+            "reference_split": utt.reference_split,
+            "reference_audio_sha256": utt.reference_audio_sha256,
+        }
+
+    def _resolve_reference_metadata(self, reference_index: dict) -> None:
+        """参照の話者 / split / hash を dataset 全体の index から埋める。
+
+        参照が dataset に無い、または jsonl の ``reference_audio_sha256`` が
+        参照発話自身の ``audio_sha256`` と食い違う manifest は読み込み時に
+        ValueError (学習の途中で落とさない)。
+        """
+        for utt in self.utterances:
+            meta = reference_index.get(utt.reference_utterance_id)
+            if meta is None:
+                raise ValueError(
+                    f"reference {utt.reference_utterance_id} of "
+                    f"{utt.audio_norm_path} is not an utterance of the dataset"
+                )
+            speaker_id, split, audio_sha256 = meta
+            if (
+                utt.reference_audio_sha256 is not None
+                and audio_sha256 is not None
+                and utt.reference_audio_sha256 != audio_sha256
+            ):
+                raise ValueError(
+                    f"reference_audio_sha256 of {utt.audio_norm_path} "
+                    f"({utt.reference_audio_sha256}) does not match the "
+                    f"audio_sha256 of {utt.reference_utterance_id} ({audio_sha256})"
+                )
+            utt.reference_speaker_id = speaker_id
+            utt.reference_split = split
+            if utt.reference_audio_sha256 is None:
+                utt.reference_audio_sha256 = audio_sha256
 
     @staticmethod
     def _validate_cache_files(utt: Utterance) -> bool:
@@ -331,6 +465,13 @@ class PiperDataset(Dataset):
         if not utt.audio_spec_path.exists():
             _LOGGER.debug("Missing audio_spec: %s", utt.audio_spec_path)
             return False
+        for path in (
+            utt.reference_audio_spec_path,
+            utt.reference_speaker_embedding_path,
+        ):
+            if path is not None and not path.exists():
+                _LOGGER.debug("Missing reference file: %s", path)
+                return False
         return True
 
     @staticmethod
@@ -366,7 +507,11 @@ class PiperDataset(Dataset):
         filter_length: int = 1024,
         precomputed_mel_dir: Path | None = None,
         f0_dir: Path | None = None,
+        reference_index: dict | None = None,
     ) -> Iterable[Utterance]:
+        """jsonl を読む。``reference_index`` (dict) を渡すと cross_utt として
+        参照フィールドを必須にし、filter 前の全行を index に登録する。"""
+        require_reference = reference_index is not None
         num_skipped_phoneme = 0
         num_skipped_spec = 0
 
@@ -390,7 +535,18 @@ class PiperDataset(Dataset):
                     continue
 
                 try:
-                    utt = PiperDataset.load_utterance(line, dataset_dir)
+                    utt = PiperDataset.load_utterance(
+                        line,
+                        dataset_dir,
+                        require_reference=require_reference,
+                        line_number=line_idx + 1,
+                    )
+                    if reference_index is not None:
+                        reference_index[str(utt.audio_norm_path.resolve())] = (
+                            utt.speaker_id,
+                            utt.split,
+                            utt.audio_sha256,
+                        )
 
                     # Resolve the precomputed spectrogram sibling if a cache
                     # dir was supplied. We only record the path when the file
@@ -446,6 +602,9 @@ class PiperDataset(Dataset):
                             continue
 
                     yield utt
+                except MissingReferenceError:
+                    # cross_utt の参照欠落は読み飛ばさず起動時に落とす
+                    raise
                 except Exception:
                     _LOGGER.exception(
                         "Error on line %s of %s: %s",
@@ -507,7 +666,13 @@ class PiperDataset(Dataset):
         return f0_dir / f"{cache_id}.f0.npy"
 
     @staticmethod
-    def load_utterance(line: str, dataset_dir: Path | None = None) -> Utterance:
+    def load_utterance(
+        line: str,
+        dataset_dir: Path | None = None,
+        *,
+        require_reference: bool = False,
+        line_number: int | None = None,
+    ) -> Utterance:
         utt_dict = json.loads(line)
 
         def _resolve(p: str) -> Path:
@@ -519,6 +684,39 @@ class PiperDataset(Dataset):
 
         spk_emb_path = utt_dict.get("speaker_embedding_path")
         f0_path = utt_dict.get("f0_path")
+        reference = {}
+        if require_reference:
+            audio_norm_path = _resolve(utt_dict["audio_norm_path"])
+            missing = [k for k in _REFERENCE_JSON_FIELDS if not utt_dict.get(k)]
+            if missing:
+                where = f" (line {line_number})" if line_number is not None else ""
+                raise MissingReferenceError(
+                    f"generator_reference='cross_utt' requires "
+                    f"{', '.join(missing)} for {audio_norm_path}{where}; build "
+                    "the pairs with piper_train.tools.build_reference_pairs "
+                    "(no silent fallback to a self reference)"
+                )
+            for key in ("split", "audio_sha256", "reference_audio_sha256"):
+                value = utt_dict.get(key)
+                if value is not None and not isinstance(value, str):
+                    raise ValueError(
+                        f"{key} must be a string for {audio_norm_path}, got {value!r}"
+                    )
+            reference = {
+                # target の utterance_id と同じ規約に正規化する
+                "reference_utterance_id": str(
+                    _resolve(utt_dict["reference_utterance_id"]).resolve()
+                ),
+                "reference_audio_spec_path": _resolve(
+                    utt_dict["reference_audio_spec_path"]
+                ),
+                "reference_speaker_embedding_path": _resolve(
+                    utt_dict["reference_speaker_embedding_path"]
+                ),
+                "split": utt_dict.get("split"),
+                "audio_sha256": utt_dict.get("audio_sha256"),
+                "reference_audio_sha256": utt_dict.get("reference_audio_sha256"),
+            }
         return Utterance(
             phoneme_ids=utt_dict["phoneme_ids"],
             audio_norm_path=_resolve(utt_dict["audio_norm_path"]),
@@ -529,6 +727,7 @@ class PiperDataset(Dataset):
             prosody_features=utt_dict.get("prosody_features"),
             speaker_embedding_path=_resolve(spk_emb_path) if spk_emb_path else None,
             f0_path=_resolve(f0_path) if f0_path else None,
+            **reference,
         )
 
 
@@ -675,6 +874,8 @@ class UtteranceCollate:
         if f0_padded is not None:
             vuv_padded = (f0_padded > 0).to(f0_padded.dtype)
 
+        reference_fields = self._collate_references(sorted_utterances)
+
         return Batch(
             phoneme_ids=phonemes_padded,
             phoneme_lengths=phoneme_lengths,
@@ -691,7 +892,127 @@ class UtteranceCollate:
             else None,
             f0=f0_padded,
             vuv=vuv_padded,
+            **reference_fields,
         )
+
+    @staticmethod
+    def _collate_references(sorted_utterances: Sequence[UtteranceTensors]) -> dict:
+        """Task 7R: 参照 spec を batch 最大長へ 0 padding し長さを返す。
+
+        参照を 1 つも持たない batch (既定 self) では空 dict = Batch の参照
+        field は全て None。一部の発話だけが参照を持つ batch は dataset 構成の
+        誤りなので ValueError。
+        """
+        present = [utt.reference_spec is not None for utt in sorted_utterances]
+        if not any(present):
+            return {}
+        if not all(present):
+            missing = next(
+                utt.utterance_id
+                for utt in sorted_utterances
+                if utt.reference_spec is None
+            )
+            raise ValueError(
+                f"batch mixes utterances with and without a reference ({missing})"
+            )
+        n = len(sorted_utterances)
+        channels = sorted_utterances[0].reference_spec.size(0)
+        lengths = LongTensor([utt.reference_spec.size(1) for utt in sorted_utterances])
+        specs = FloatTensor(n, channels, int(lengths.max()))
+        specs.zero_()
+        for row, utt in enumerate(sorted_utterances):
+            specs[row, :, : utt.reference_spec.size(1)] = utt.reference_spec
+        return {
+            "reference_embeddings": torch.stack(
+                [utt.reference_embedding for utt in sorted_utterances]
+            ),
+            "reference_specs": specs,
+            "reference_spec_lengths": lengths,
+            "reference_utterance_ids": [
+                utt.reference_utterance_id for utt in sorted_utterances
+            ],
+            "reference_speaker_ids": [
+                utt.reference_speaker_id for utt in sorted_utterances
+            ],
+            "splits": [utt.split for utt in sorted_utterances],
+            "reference_splits": [utt.reference_split for utt in sorted_utterances],
+            "audio_sha256s": [utt.audio_sha256 for utt in sorted_utterances],
+            "reference_audio_sha256s": [
+                utt.reference_audio_sha256 for utt in sorted_utterances
+            ],
+        }
+
+
+REFERENCE_CROP_MODES = ("random", "head")
+
+
+def reference_crop_seed(epoch: int, key: str) -> int:
+    """(epoch, 発話 identity) から決まる 64-bit seed (Python の hash() 非依存)。"""
+    digest = hashlib.blake2b(f"{int(epoch)}\0{key}".encode(), digest_size=8).digest()
+    return int.from_bytes(digest, "little")
+
+
+def crop_reference_specs(
+    reference_specs: torch.Tensor,
+    reference_spec_lengths: torch.Tensor,
+    max_frames: int,
+    *,
+    mode: str,
+    epoch: int = 0,
+    keys: Sequence[str] | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """参照 spec を最大 ``max_frames`` frame へ切り出す (参照融合計画 §8.2)。
+
+    * ``mode="random"`` (学習): 長さが ``max_frames`` を超える行は、
+      ``reference_crop_seed(epoch, keys[row])`` で初期化した専用の
+      ``random.Random`` で窓の開始位置を選ぶ。global な torch / numpy / random
+      の乱数列は消費しない。同じ (epoch, 発話) なら batch の組成や DDP rank
+      によらず同じ窓になる。
+    * ``mode="head"`` (検証・評価): 先頭から ``max_frames`` frame。
+
+    ``max_frames`` 以下の行はそのまま残す。出力は新しい tensor (入力は変更
+    しない) で、時間長は切り出し後の最大長、各行の有効長より後ろは 0。
+    """
+    if (
+        isinstance(max_frames, bool)
+        or not isinstance(max_frames, int)
+        or max_frames < 1
+    ):
+        raise ValueError(f"max_frames must be a positive int, got {max_frames!r}")
+    if mode not in REFERENCE_CROP_MODES:
+        raise ValueError(f"mode must be one of {REFERENCE_CROP_MODES}, got {mode!r}")
+    if reference_specs.dim() != 3:
+        raise ValueError(
+            f"reference_specs must be [B, channels, T], got {tuple(reference_specs.shape)}"
+        )
+    n, channels, t_max = reference_specs.shape
+    if reference_spec_lengths.dim() != 1 or reference_spec_lengths.numel() != n:
+        raise ValueError(
+            f"reference_spec_lengths length must be [B={n}], got "
+            f"{tuple(reference_spec_lengths.shape)}"
+        )
+    lengths = [int(x) for x in reference_spec_lengths.tolist()]
+    if any(length < 1 or length > t_max for length in lengths):
+        raise ValueError(
+            f"reference_spec_lengths length values must lie in [1, {t_max}], "
+            f"got {lengths}"
+        )
+    if mode == "random" and (keys is None or len(keys) != n):
+        raise ValueError("random reference crop requires keys for every row")
+
+    new_lengths = [min(length, max_frames) for length in lengths]
+    out = reference_specs.new_zeros(n, channels, max(new_lengths))
+    for row, (length, new_length) in enumerate(zip(lengths, new_lengths, strict=True)):
+        start = 0
+        if mode == "random" and length > max_frames:
+            rng = random.Random(reference_crop_seed(epoch, keys[row]))
+            start = rng.randrange(length - max_frames + 1)
+        out[row, :, :new_length] = reference_specs[row, :, start : start + new_length]
+    return out, torch.tensor(
+        new_lengths,
+        dtype=reference_spec_lengths.dtype,
+        device=reference_spec_lengths.device,
+    )
 
 
 class SpeakerBalancedBatchSampler:
