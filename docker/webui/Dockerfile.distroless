@@ -76,12 +76,18 @@ WORKDIR /build
 COPY VERSION /build/VERSION
 COPY pyproject.toml /build/pyproject.toml
 COPY src/python /build/src/python
+# piper_train imports piper_plus.embedding from this checkout's runtime
+# package (the PyPI piper-plus lacks it), so install it from the context too.
+COPY src/python_run /build/src/python_run
 COPY src/python_run/requirements_webui.txt /build/requirements_webui.txt
 COPY src/python_run/overrides_webui.txt /build/overrides_webui.txt
 
 # Install into system Python so /usr/local/lib/python3.13/site-packages
 # becomes a self-contained tree we can COPY into the distroless final.
-RUN uv pip install --system "/build/src/python[inference]"
+# `--no-sources` keeps the in-repo packages non-editable (the final stage
+# does not copy /build) and avoids the root workspace sources entirely.
+RUN uv pip install --system --no-sources \
+    "/build/src/python/g2p[all]" "/build/src/python_run" "/build/src/python[inference]"
 RUN uv pip install --system -r /build/requirements_webui.txt --override /build/overrides_webui.txt
 
 ENV NLTK_DATA=/usr/share/nltk_data

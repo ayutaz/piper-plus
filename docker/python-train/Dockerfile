@@ -85,14 +85,18 @@ RUN uv pip install \
 # Copy source code for piper-train installation
 # setup.py reads ../../VERSION relative to src/python/
 COPY src/python /tmp/src/python
+# piper_train imports piper_plus.embedding from this checkout's runtime
+# package (the PyPI piper-plus lacks it), so install it from the context too.
+COPY src/python_run /tmp/src/python_run
 COPY VERSION /tmp/VERSION
 
-# Install the G2P package from this checkout before piper-train so the
-# training image uses its bundled English backend rather than an older wheel.
-RUN uv pip install "/tmp/src/python/g2p"
-
-# Install piper_train with training extras
-RUN uv pip install "/tmp/src/python[train]"
+# Install piper_train with training extras. The G2P and runtime packages come
+# from this checkout on the same command (not older PyPI wheels), so the image
+# uses the bundled English backend and the in-repo piper_plus.embedding.
+# `--no-sources` ignores `[tool.uv.sources]` (workspace sources need the
+# workspace root, which this context does not copy).
+RUN uv pip install --no-sources \
+    "/tmp/src/python/g2p" "/tmp/src/python_run" "/tmp/src/python[train]"
 
 # Install optional Super-MAS Triton-GPU MAS accelerator (arXiv:2409.07704).
 # Training-only, CUDA-only kernel that reports 19-72x speedup vs Cython MAS.
@@ -101,7 +105,8 @@ RUN uv pip install "/tmp/src/python[train]"
 # the dispatcher in `piper_train/vits/monotonic_align/__init__.py` falls back
 # to Cython whenever tensors are not CUDA. Disable at runtime with
 # `PIPER_PLUS_DISABLE_SUPER_MAS=1`.
-RUN uv pip install "/tmp/src/python[super-mas]"
+RUN uv pip install --no-sources \
+    "/tmp/src/python/g2p" "/tmp/src/python_run" "/tmp/src/python[super-mas]"
 
 # Runtime stage
 # Base: CUDA 12.8.1 + cuDNN 9 + Ubuntu 24.04 (matches builder stage、

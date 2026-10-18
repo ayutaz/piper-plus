@@ -74,11 +74,17 @@ WORKDIR /app
 COPY VERSION /app/VERSION
 COPY pyproject.toml /app/pyproject.toml
 COPY src/python/ /app/src/python/
+# piper_train imports piper_plus.embedding from this checkout's runtime
+# package (the PyPI piper-plus lacks it), so install it from the context too.
+COPY src/python_run/ /app/src/python_run/
 
 # Install piper_plus_g2p (standalone G2P package) and piper_train with the
 # CPU [inference] extras (onnxruntime CPU + soundfile + fastapi + uvicorn).
-RUN uv pip install --system "/app/src/python/g2p[all]"
-RUN uv pip install --system "/app/src/python[inference]"
+# `--no-sources`: in-repo deps come from the local paths on the same command,
+# not from the root workspace sources (which would fail on absent members or
+# install editable links into the build context).
+RUN uv pip install --system --no-sources \
+    "/app/src/python/g2p[all]" "/app/src/python_run" "/app/src/python[inference]"
 
 # Install Gradio WebUI requirements (parity with the CUDA Dockerfile so
 # `--webui` mode works on arm64 as well).
