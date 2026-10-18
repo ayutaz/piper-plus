@@ -209,7 +209,7 @@ def validate_strict_resume_reference_hparams(saved_hparams, current_hparams):
             "run (new output directory) without resuming from this checkpoint."
         )
     raise SystemExit(
-        "Strict resume would silently re-declare the reference-conditioning "
+        "Strict resume would silently redeclare the reference-conditioning "
         "contract of this checkpoint (export and evaluation follow the latest "
         f"declaration):\n{lines}\n{how}"
     )
