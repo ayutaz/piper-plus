@@ -1301,10 +1301,14 @@ class VitsModel(pl.LightningModule):
             optimizers = [optimizers]
         if not optimizers:
             return
+        groups = self._reference_param_groups(optimizers[0])
+        if not groups:
+            # 参照 group が無い run は hparams を読まない (既定経路は無変更)
+            return
         requested = self.hparams.learning_rate * getattr(
             self.hparams, "reference_lr_scale", 1.0
         )
-        for group in self._reference_param_groups(optimizers[0]):
+        for group in groups:
             saved = group.get("initial_lr", group["lr"])
             if not math.isclose(saved, requested, rel_tol=1e-9):
                 _PKG_LOGGER.warning(
