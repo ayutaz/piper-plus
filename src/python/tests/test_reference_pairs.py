@@ -1469,3 +1469,638 @@ class TestStrictReferencePairs:
         batch.reference_utterance_ids = ["t0", "r1", "r2", "r3"]
         with pytest.raises(ValueError, match="itself"):
             model.training_step(batch, 0)
+
+
+# ===========================================================================
+# Fix round 1 (task-7R-review.md の minor 1-8、controller ruling R13)
+# ===========================================================================
+
+
+def _write_rows(tmp_path, rows, overrides=None):
+    """``_write_dataset`` の行に ``{name: {field: value}}`` を上書きして書く。"""
+    path = _write_dataset(tmp_path, rows=rows)
+    lines = [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines()]
+    for line in lines:
+        name = line["audio_norm_path"].split("/")[-1].removesuffix(".pt")
+        line.update((overrides or {}).get(name, {}))
+    path.write_text("\n".join(json.dumps(x) for x in lines) + "\n", "utf-8")
+    return path
+
+
+# 4 人目までの話者で循環参照 (a->b->c->d->a, e->f->g->h->e)
+_CYCLE_ROWS = [
+    ("a", 0, 20, "b"),
+    ("b", 0, 21, "c"),
+    ("c", 0, 22, "d"),
+    ("d", 0, 23, "a"),
+    ("e", 1, 24, "f"),
+    ("f", 1, 25, "g"),
+    ("g", 1, 26, "h"),
+    ("h", 1, 27, "e"),
+]
+
+
+def _subset_names(model):
+    """発話 identity -> 'train' / 'val' / 'test' (実際の random_split の結果)。"""
+    full = model._train_dataset.dataset
+    names = {}
+    for name in ("train", "val", "test"):
+        subset = getattr(model, f"_{name}_dataset", None)
+        for index in getattr(subset, "indices", []):
+            names[str(full.utterances[index].audio_norm_path.resolve())] = name
+    return full, names
+
+
+class TestReferenceSubsetOverlap:
+    """R13: jsonl の split と実行時 random_split は別物。跨ぎを数えて警告する。"""
+
+    def _model(self, tmp_path, **kwargs):
+        path = _write_dataset(tmp_path, rows=_CYCLE_ROWS)
+        return _model(
+            generator_reference="cross_utt",
+            dataset=[path],
+            dataset_dir=tmp_path,
+            num_test_examples=0,
+            validation_split=0.5,
+            **kwargs,
+        )
+
+    def test_cross_subset_references_are_counted_and_warned(self, tmp_path, caplog):
+        with caplog.at_level("WARNING"):
+            model = self._model(tmp_path)
+        full, names = _subset_names(model)
+        expected = {}
+        for utt in full.utterances:
+            target = names[str(utt.audio_norm_path.resolve())]
+            reference = names.get(utt.reference_utterance_id, "unloaded")
+            if reference != target:
+                key = f"{target}->{reference}"
+                expected[key] = expected.get(key, 0) + 1
+        # 4 + 4 発話の 50% split で循環参照なら必ず跨ぎがある (前提の確認)
+        assert sum(expected.values()) > 0
+        assert model.hparams["reference_subset_overlap"] == expected
+        messages = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+        overlap = [m for m in messages if "random_split" in m]
+        assert len(overlap) == 1, messages
+        for key, count in expected.items():
+            assert f"{key}={count}" in overlap[0]
+
+    def test_length_filtered_references_are_counted_as_unloaded(self, tmp_path):
+        # phoneme 長は 2,3,4,2,3,4,2,3 → max 3 で c (i=2) と f (i=5) が target から
+        # 外れる。それを参照する b と e の 2 件が "->unloaded"
+        model = self._model(tmp_path, max_phoneme_ids=3)
+        overlap = model.hparams["reference_subset_overlap"]
+        unloaded = sum(n for k, n in overlap.items() if k.endswith("->unloaded"))
+        assert unloaded == 2
+
+    def test_self_mode_records_nothing(self, tmp_path, caplog):
+        path = _write_dataset(tmp_path, rows=_CYCLE_ROWS)
+        with caplog.at_level("WARNING"):
+            model = _model(
+                dataset=[path],
+                dataset_dir=tmp_path,
+                num_test_examples=0,
+                validation_split=0.5,
+            )
+        assert "reference_subset_overlap" not in model.hparams
+        assert not any("random_split" in r.getMessage() for r in caplog.records)
+
+    def test_generator_reference_help_states_the_split_scope(self):
+        from piper_train.__main__ import create_parser
+
+        text = " ".join(create_parser().format_help().split())
+        assert "jsonl split field" in text
+        assert "random train/val split" in text
+
+    def test_pairs_summary_states_the_split_scope(self):
+        _, summary = build_reference_pairs([_entry("a", 1), _entry("b", 1)], seed=0)
+        assert "jsonl" in summary["split_check"]
+        assert "random train/val split" in summary["split_check"]
+
+    def test_validate_reference_pairs_docstring_states_the_split_scope(self):
+        doc = " ".join(requirements.validate_reference_pairs.__doc__.split())
+        assert "jsonl" in doc and "random_split" in doc
+
+
+class TestReferenceNoiseSeeding:
+    """参照埋め込みの noise は (step, target 発話) で決まり、rank 間で独立。"""
+
+    def _condition(self, model, batch, step):
+        model._training_batch_index = step
+        emb, _, _ = model._generator_condition(batch, batch.speaker_embeddings)
+        return emb
+
+    def _same_reference_batch(self, prefix):
+        batch = _batch()
+        batch.utterance_ids = [f"{prefix}{i}" for i in range(BATCH)]
+        batch.reference_embeddings = _unit(torch.ones(BATCH, 192))
+        return batch
+
+    def test_ranks_with_different_targets_get_different_noise(self):
+        model = _model(generator_reference="cross_utt", spk_emb_noise_sigma=0.05)
+        # 2 rank を模す: 同じ step・同じ行位置・同じ参照埋め込み、target だけ違う
+        rank0 = self._condition(model, self._same_reference_batch("rank0-"), 7)
+        rank1 = self._condition(model, self._same_reference_batch("rank1-"), 7)
+        for row in range(BATCH):
+            assert not torch.allclose(rank0[row], rank1[row], atol=1e-4)
+
+    def test_noise_follows_the_target_not_the_row_position(self):
+        model = _model(generator_reference="cross_utt", spk_emb_noise_sigma=0.05)
+        batch = self._same_reference_batch("t")
+        out = self._condition(model, batch, 3)
+        flipped = self._same_reference_batch("t")
+        flipped.utterance_ids = list(reversed(batch.utterance_ids))
+        out_flipped = self._condition(model, flipped, 3)
+        assert torch.equal(out_flipped, out.flip(0))
+
+    def test_noise_is_deterministic_per_step_and_changes_between_steps(self):
+        model = _model(generator_reference="cross_utt", spk_emb_noise_sigma=0.05)
+        batch = self._same_reference_batch("t")
+        first = self._condition(model, batch, 11)
+        assert torch.equal(first, self._condition(model, batch, 11))
+        assert not torch.allclose(first, self._condition(model, batch, 12), atol=1e-4)
+
+    def test_zero_sigma_draws_no_noise(self, monkeypatch):
+        model = _model(generator_reference="cross_utt", spk_emb_noise_sigma=0.0)
+        batch = _batch()
+        calls = []
+        original = torch.randn
+
+        def counting_randn(*args, **kwargs):
+            calls.append(args)
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(torch, "randn", counting_randn)
+        out = self._condition(model, batch, 5)
+        monkeypatch.undo()
+        assert calls == []
+        expected = torch.nn.functional.normalize(batch.reference_embeddings, dim=-1)
+        assert torch.equal(out, expected)
+
+    def test_eval_adds_no_noise(self):
+        model = _model(generator_reference="cross_utt", spk_emb_noise_sigma=0.05)
+        model.eval()
+        batch = _batch()
+        out = self._condition(model, batch, 5)
+        assert out is batch.reference_embeddings
+
+
+REFERENCE_MODES_FOR_PIN = ("random", "head")
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="pinned memory needs CUDA")
+class TestReferenceCropPinning:
+    def test_crop_of_pinned_inputs_is_pinned(self):
+        specs = torch.rand(2, SPEC_CHANNELS, 30).pin_memory()
+        lengths = torch.tensor([30, 12]).pin_memory()
+        for mode in REFERENCE_MODES_FOR_PIN:
+            out, out_lengths = crop_reference_specs(
+                specs, lengths, 8, mode=mode, keys=["a", "b"]
+            )
+            assert out.is_pinned() and out_lengths.is_pinned()
+
+    def test_crop_of_unpinned_inputs_stays_unpinned(self):
+        out, out_lengths = crop_reference_specs(
+            torch.rand(2, SPEC_CHANNELS, 30), torch.tensor([30, 12]), 8, mode="head"
+        )
+        assert not out.is_pinned() and not out_lengths.is_pinned()
+
+    def test_batch_transfer_hook_keeps_a_pinned_batch_pinned(self):
+        model = _model(generator_reference="cross_utt", reference_max_frames=8)
+        batch = _batch(ref_frames=(30, 12, 30, 5)).pin_memory()
+        out = model.on_before_batch_transfer(batch, 0)
+        assert out.reference_specs.is_pinned()
+        assert out.reference_spec_lengths.is_pinned()
+
+
+# 参照 manifest の誤りは、型の誤りでも読み飛ばさず起動時に落とす (minor 6)
+_UNREFERENCED_C_ROWS = [
+    ("a", 0, 20, "b"),
+    ("b", 0, 30, "a"),
+    ("c", 0, 25, "a"),  # c は誰の参照でもない → 読み飛ばすと target が黙って減る
+    ("d", 1, 40, "e"),
+    ("e", 1, 22, "d"),
+]
+
+
+class TestReferenceManifestTypes:
+    @pytest.mark.parametrize(
+        "field,value",
+        [
+            ("split", 1),
+            ("audio_sha256", 5),
+            ("reference_audio_sha256", ["x"]),
+            ("reference_utterance_id", 7),
+            ("reference_audio_spec_path", {"p": 1}),
+            ("reference_speaker_embedding_path", 3.5),
+        ],
+    )
+    def test_bad_type_fails_at_load_with_the_line(self, tmp_path, field, value):
+        path = _write_rows(tmp_path, _UNREFERENCED_C_ROWS, {"c": {field: value}})
+        with pytest.raises(ValueError, match=r"c\.pt") as info:
+            PiperDataset([path], load_references=True)
+        assert field in str(info.value)
+        assert "line 3" in str(info.value)
+
+    def test_self_mode_ignores_bad_reference_types(self, tmp_path):
+        path = _write_rows(
+            tmp_path, _UNREFERENCED_C_ROWS, {"c": {"reference_utterance_id": 7}}
+        )
+        assert len(PiperDataset([path])) == len(_UNREFERENCED_C_ROWS)
+
+
+class TestValidateCacheReferenceFiles:
+    def test_missing_reference_files_are_warned_separately(self, tmp_path, caplog):
+        path = _write_dataset(tmp_path)
+        (tmp_path / "emb" / "b.npy").unlink()  # a の参照埋め込み
+        with caplog.at_level("WARNING"):
+            ds = PiperDataset([path], load_references=True, validate_cache=True)
+        assert sorted(u.audio_norm_path.name for u in ds.utterances) == [
+            "b.pt",
+            "c.pt",
+            "d.pt",
+        ]
+        messages = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+        reference = [m for m in messages if "reference file" in m]
+        assert len(reference) == 1, messages
+        assert "1 target" in reference[0]
+
+    def test_no_reference_warning_when_reference_files_exist(self, tmp_path, caplog):
+        path = _write_dataset(tmp_path)
+        with caplog.at_level("WARNING"):
+            PiperDataset([path], load_references=True, validate_cache=True)
+        assert not any("reference file" in r.getMessage() for r in caplog.records)
+
+
+class TestBuildReferencePairsRobustness:
+    @pytest.mark.parametrize("field", ["audio_spec_path", "audio_norm_path"])
+    def test_missing_cache_path_is_excluded_with_reason(self, field):
+        entries = [_entry("a", 1), _entry("b", 1), _entry("c", 1)]
+        del entries[2][field]
+        paired, summary = build_reference_pairs(entries, seed=0)
+        assert len(paired) == 2
+        assert summary["excluded_by_reason"] == {f"missing_{field}": 1}
+        for row in paired:
+            assert row["reference_utterance_id"] != "cache/c.pt"
+
+    def test_cli_names_the_file_for_any_unreadable_cache(self, tmp_path):
+        jsonl = _write_cli_dataset(
+            tmp_path, [("a", 1, [0.1, 0.2]), ("b", 1, [0.3, 0.4])]
+        )
+        # 中身が tensor でない cache (AttributeError 系) でもファイル名付きで止める
+        torch.save({"not": "a tensor"}, tmp_path / "cache" / "b.pt")
+        with pytest.raises(SystemExit, match=r"b\.pt"):
+            pairs_main([str(jsonl), str(tmp_path / "pairs.jsonl")])
+
+    def test_cli_skips_hashing_rows_without_audio_norm_path(self, tmp_path):
+        jsonl = _write_cli_dataset(
+            tmp_path,
+            [("a", 1, [0.1, 0.2]), ("b", 1, [0.3, 0.4]), ("c", 1, [0.5, 0.6])],
+        )
+        rows = [json.loads(x) for x in jsonl.read_text(encoding="utf-8").splitlines()]
+        del rows[2]["audio_norm_path"]
+        jsonl.write_text("\n".join(json.dumps(r) for r in rows) + "\n", "utf-8")
+        out = tmp_path / "pairs.jsonl"
+        assert pairs_main([str(jsonl), str(out)]) == 0
+        summary = json.loads((tmp_path / "pairs.jsonl.summary.json").read_text("utf-8"))
+        assert summary["excluded_by_reason"] == {"missing_audio_norm_path": 1}
+
+    def test_failed_summary_write_leaves_no_output(self, tmp_path):
+        jsonl = _write_cli_dataset(
+            tmp_path, [("a", 1, [0.1, 0.2]), ("b", 1, [0.3, 0.4])]
+        )
+        out = tmp_path / "pairs.jsonl"
+        summary = tmp_path / "summary-is-a-directory"
+        summary.mkdir()
+        with pytest.raises((SystemExit, OSError)):
+            pairs_main([str(jsonl), str(out), "--summary", str(summary), "--overwrite"])
+        assert not out.exists()
+        leftovers = sorted(
+            p.name for p in tmp_path.iterdir() if p.name not in {"cache", "emb"}
+        )
+        assert leftovers == ["dataset.jsonl", "summary-is-a-directory"]
+
+    def test_existing_output_survives_a_failed_rewrite(self, tmp_path):
+        jsonl = _write_cli_dataset(
+            tmp_path, [("a", 1, [0.1, 0.2]), ("b", 1, [0.3, 0.4])]
+        )
+        out = tmp_path / "pairs.jsonl"
+        out.write_text("previous\n", encoding="utf-8")
+        summary = tmp_path / "summary-is-a-directory"
+        summary.mkdir()
+        with pytest.raises((SystemExit, OSError)):
+            pairs_main([str(jsonl), str(out), "--summary", str(summary), "--overwrite"])
+        assert out.read_text(encoding="utf-8") == "previous\n"
+
+
+# ---------------------------------------------------------------------------
+# self 既定の後方互換: 変更前 commit (6904ef0e) の golden (minor 4)
+# ---------------------------------------------------------------------------
+
+
+def _write_golden_dataset(root):
+    """golden 専用の固定データ (他のテスト helper の変更に影響されない)。"""
+    (root / "cache").mkdir(parents=True, exist_ok=True)
+    (root / "emb").mkdir(exist_ok=True)
+    rows = [("a", 0, 48, "b"), ("b", 0, 52, "a"), ("c", 1, 40, "d"), ("d", 1, 60, "c")]
+    lines = []
+    for i, (name, speaker, frames, ref) in enumerate(rows):
+        g = torch.Generator().manual_seed(i)
+        torch.save(
+            torch.randn(1, frames * 256, generator=g) * 0.1,
+            root / "cache" / f"{name}.pt",
+        )
+        torch.save(
+            torch.randn(513, frames, generator=g).abs(),
+            root / "cache" / f"{name}.spec.pt",
+        )
+        np.save(root / "emb" / f"{name}.npy", torch.randn(192, generator=g).numpy())
+        lines.append(
+            json.dumps(
+                {
+                    "phoneme_ids": list(range(1, 11)),
+                    "audio_norm_path": f"cache/{name}.pt",
+                    "audio_spec_path": f"cache/{name}.spec.pt",
+                    "speaker_id": speaker,
+                    "speaker_embedding_path": f"emb/{name}.npy",
+                    # self 既定では読まれない参照フィールド (入っていても不変)
+                    "audio_sha256": f"h{name}",
+                    "reference_utterance_id": f"cache/{ref}.pt",
+                    "reference_audio_spec_path": f"cache/{ref}.spec.pt",
+                    "reference_speaker_embedding_path": f"emb/{ref}.npy",
+                    "reference_audio_sha256": f"h{ref}",
+                }
+            )
+        )
+    path = root / "dataset.jsonl"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+class _GoldenSpeakerEncoder(torch.nn.Module):
+    def forward(self, wav):
+        pooled = torch.nn.functional.adaptive_avg_pool1d(wav.unsqueeze(1), 192)
+        return torch.nn.functional.normalize(pooled.squeeze(1) + 1e-3, dim=-1)
+
+
+def _golden_model(**overrides):
+    from piper_train.vits.lightning import VitsModel
+
+    torch.manual_seed(0)
+    hparams = {
+        "num_symbols": 40,
+        "num_speakers": 4,
+        "num_languages": 2,
+        "dataset": None,
+        "upsample_rates": (4, 4),
+        "upsample_kernel_sizes": (16, 16),
+        "upsample_initial_channel": 64,
+        "hidden_channels": 64,
+        "inter_channels": 64,
+        "filter_channels": 128,
+        "n_layers": 2,
+        "prosody_dim": 0,
+        "gin_channels": 64,
+        "use_wavlm_discriminator": False,
+        "c_dino": 0.5,
+        "c_spk": 1.0,
+        "spk_loss_type": "infonce",
+        "spk_loss_positives": "cross_utt",
+        "scl_detach_z": True,
+        "use_mrd": True,
+        "use_jcu_mrd": True,
+        "telemetry_every": 1,
+        "c_swap_spk": 1.0,
+        "swap_spk_start_epoch": 0,
+        "swap_spk_ramp_epochs": 0,
+        "spk_emb_noise_sigma": 0.05,
+        "batch_size": 4,
+    }
+    hparams.update(overrides)
+    model = VitsModel(**hparams)
+    model.scl_encoder = _GoldenSpeakerEncoder()
+    model._log_with_batch_info = lambda *a, **k: None
+    model.log = lambda *a, **k: None
+    model._grad_probe_due = lambda: False
+    return model
+
+
+def _grad_summary(model):
+    grads = [
+        (name, p.grad.double())
+        for name, p in sorted(model.named_parameters())
+        if p.grad is not None
+    ]
+    return {
+        "count": len(grads),
+        "abs_sum": float(sum(g.abs().sum() for _, g in grads)),
+        "sq_sum": float(sum((g * g).sum() for _, g in grads)),
+    }
+
+
+def _self_mode_step_summary(root):
+    """self 既定の 1 step (主経路 + LF + validation) の要約。
+
+    旧 commit のコードでも同じ関数を実行できるよう、7R 以前からある API だけを使う
+    (``PiperDataset`` / ``UtteranceCollate`` / ``training_step_g`` /
+    ``validation_step`` / ``on_before_batch_transfer``)。
+    """
+    path = _write_golden_dataset(root)
+    dataset = PiperDataset([path])
+    batch = UtteranceCollate(is_multispeaker=True, segment_size=8192)(
+        [dataset[i] for i in range(len(dataset))]
+    )
+    batch.language_ids = torch.tensor([0, 1, 0, 1])
+    summary = {}
+    for tag, overrides in (
+        ("main", {}),
+        ("lf", {"latent_filling_tau": 1.0, "c_swap_spk": 0.0}),
+    ):
+        model = _golden_model(**overrides)
+        model.train()
+        torch.manual_seed(42)
+        loss = model.training_step_g(batch)
+        loss.backward()
+        summary[f"{tag}_loss"] = float(loss)
+        summary[f"{tag}_grads"] = _grad_summary(model)
+        summary[f"{tag}_rng_sha256"] = hashlib.sha256(
+            torch.get_rng_state().numpy().tobytes()
+        ).hexdigest()
+        if tag == "main":
+            summary["spk_cond_abs_sum"] = float(model._spk_cond.double().abs().sum())
+            model.zero_grad()
+            model.eval()
+            torch.manual_seed(7)
+            with torch.no_grad():
+                summary["val_loss"] = float(model.validation_step(batch, 0))
+            summary["hook_identity"] = model.on_before_batch_transfer(batch, 0) is batch
+    return summary
+
+
+# 変更前 commit 6904ef0e (Task 7R 導入前) の値。生成手順:
+# ``git archive 6904ef0e pytest.ini pyproject.toml src test tools`` を scratch に
+# 展開し、その ``src/python`` / ``src/python_run`` / ``src/python/g2p`` を sys.path
+# 先頭に置いて本ファイルを読み込み、``_self_mode_step_summary(<tmp>)`` を実行した
+# 値 (Windows 11, torch 2.11.0+cu128, CPU)。生成環境では本変更後のコードも同じ
+# 値を bit 一致で返した。
+_SELF_MODE_GOLDEN = {
+    "hook_identity": True,
+    "lf_grads": {
+        "abs_sum": 745.0750663102907,
+        "count": 163,
+        "sq_sum": 11.851346881818838,
+    },
+    "lf_loss": 1.0139615535736084,
+    "lf_rng_sha256": (
+        "6dd35cc3db12a0f86e837d7ee877137355994dc73a91e5159945b50f9afa7f1e"
+    ),
+    "main_grads": {
+        "abs_sum": 57371.982538050404,
+        "count": 794,
+        "sq_sum": 71684.60289740111,
+    },
+    "main_loss": 51.81105422973633,
+    "main_rng_sha256": (
+        "6dd35cc3db12a0f86e837d7ee877137355994dc73a91e5159945b50f9afa7f1e"
+    ),
+    "spk_cond_abs_sum": 43.53158425033325,
+    "val_loss": 60.02931594848633,
+}
+# 許容誤差: CPU fp32 の縮約順序は ISA / BLAS でプラットフォーム間に相対 ~1e-6
+# 程度ずれる。self 経路の退行はそれより桁で大きく動く。golden 作成時の実測:
+# spk_emb_noise_sigma を 0.05→0.0 にすると main_loss は相対 2.8e-3、global seed を
+# 42→43 にすると相対 1.4e-2 動いた (下の確認テストが前者を固定する)。rtol 1e-4 は
+# プラットフォーム差の ~100 倍、最小の退行例の 1/28 で両者を分離する。
+# global RNG の状態 (Mersenne Twister の整数状態) と勾配 tensor 数は厳密一致
+# (乱数消費の増減は値の近さに関係なく検出する)。
+_SELF_MODE_GOLDEN_RTOL = 1e-4
+
+
+class TestSelfModePreChangeGolden:
+    def test_self_mode_step_matches_the_pre_change_golden(self, tmp_path):
+        assert _SELF_MODE_GOLDEN is not None, "golden not generated"
+        got = _self_mode_step_summary(tmp_path)
+        assert set(got) == set(_SELF_MODE_GOLDEN)
+        for key, golden in _SELF_MODE_GOLDEN.items():
+            value = got[key]
+            if isinstance(golden, dict):
+                assert value["count"] == golden["count"], key
+                for sub in ("abs_sum", "sq_sum"):
+                    assert value[sub] == pytest.approx(
+                        golden[sub], rel=_SELF_MODE_GOLDEN_RTOL
+                    ), (key, sub)
+            elif isinstance(golden, float):
+                assert value == pytest.approx(golden, rel=_SELF_MODE_GOLDEN_RTOL), key
+            else:
+                assert value == golden, key
+
+    def test_golden_tolerance_separates_a_changed_conditioning(self, tmp_path):
+        """許容誤差の根拠: noise σ を変えるだけで main_loss が rtol を超えて動く。"""
+        assert _SELF_MODE_GOLDEN is not None, "golden not generated"
+        path = _write_golden_dataset(tmp_path)
+        dataset = PiperDataset([path])
+        batch = UtteranceCollate(is_multispeaker=True, segment_size=8192)(
+            [dataset[i] for i in range(len(dataset))]
+        )
+        batch.language_ids = torch.tensor([0, 1, 0, 1])
+        model = _golden_model(spk_emb_noise_sigma=0.0)
+        model.train()
+        torch.manual_seed(42)
+        loss = float(model.training_step_g(batch))
+        assert loss != pytest.approx(
+            _SELF_MODE_GOLDEN["main_loss"], rel=_SELF_MODE_GOLDEN_RTOL
+        )
+
+
+# ---------------------------------------------------------------------------
+# strict の失敗伝播を実 2 rank の CPU Gloo で確かめる (minor 5)
+# ---------------------------------------------------------------------------
+
+
+def _strict_reference_gloo_worker(rank, store_path, output_dir):
+    """rank 1 だけ自己参照の batch。両 rank が同じ呼び出しで落ちることを記録する。"""
+    from datetime import timedelta
+    from pathlib import Path
+
+    torch.set_num_threads(1)
+    dist = torch.distributed
+    dist.init_process_group(
+        "gloo",
+        store=dist.FileStore(store_path, 2),
+        rank=rank,
+        world_size=2,
+        timeout=timedelta(seconds=30),
+    )
+    results = []
+    try:
+        for phase in ("invalid_peer", "valid"):
+            batch = _batch()
+            batch.utterance_ids = [f"rank{rank}-t{i}" for i in range(BATCH)]
+            batch.reference_utterance_ids = [f"rank{rank}-r{i}" for i in range(BATCH)]
+            if phase == "invalid_peer" and rank == 1:
+                batch.reference_utterance_ids[0] = batch.utterance_ids[0]
+            try:
+                validate_training_batch(batch, require_reference_pairs=True)
+                results.append([phase, "ok"])
+            except ValueError as exc:
+                results.append([phase, str(exc)])
+        (Path(output_dir) / f"rank-{rank}.json").write_text(
+            json.dumps(results), encoding="utf-8"
+        )
+    finally:
+        dist.destroy_process_group()
+
+
+@pytest.mark.skipif(
+    not torch.distributed.is_gloo_available(), reason="CPU Gloo backend unavailable"
+)
+def test_strict_reference_error_fails_every_gloo_rank(tmp_path):
+    import os
+    import subprocess
+    from pathlib import Path
+
+    # test_training_batch_schedule.py と同じく、Gloo の初期化は単一 thread の
+    # 別 process で行う (広い pytest process での Windows access violation 回避)
+    code = """
+import sys
+import torch
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, sys.argv[2])
+import test_reference_pairs as pairs
+if __name__ == '__main__':
+    torch.multiprocessing.spawn(pairs._strict_reference_gloo_worker,
+        args=(sys.argv[3], sys.argv[4]), nprocs=2, join=True)
+"""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            code,
+            str(Path(__file__).parents[1]),
+            str(Path(__file__).parent),
+            str(tmp_path / "store"),
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+        env={
+            **os.environ,
+            "PYTHONFAULTHANDLER": "1",
+            "OMP_NUM_THREADS": "1",
+            "MKL_NUM_THREADS": "1",
+        },
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    results = [
+        json.loads((tmp_path / f"rank-{rank}.json").read_text(encoding="utf-8"))
+        for rank in range(2)
+    ]
+    for rank_results in results:
+        (phase0, message0), (phase1, message1) = rank_results
+        # rank 0 の batch は正しいが、peer (rank 1) の誤りで同じ呼び出しが落ちる
+        assert phase0 == "invalid_peer" and "itself" in message0
+        assert "rank1-t0" in message0
+        # 失敗後も collective はずれず、次の正しい batch は両 rank で通る
+        assert phase1 == "valid" and message1 == "ok"

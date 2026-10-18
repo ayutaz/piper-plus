@@ -27,17 +27,23 @@ endian、平坦化) の sha256**。ファイルの byte ではなく中身の sa
 候補がない target は自己参照に戻さず **除外** し、理由ごとの件数を summary
 JSON (既定 ``<output>.summary.json``) に書く:
 
-* ``missing_speaker_id`` / ``missing_split`` / ``missing_speaker_embedding_path``
+* ``missing_audio_norm_path`` / ``missing_audio_spec_path`` /
+  ``missing_speaker_id`` / ``missing_split`` / ``missing_speaker_embedding_path``
   / ``missing_audio_sha256`` — 必要なフィールドがない
 * ``no_other_utterance`` — 同じ話者・split に他の発話がない
 * ``only_identical_audio`` — 他の発話はあるが全て同一音声
 
 split フィールド (``split``) が dataset に 1 つもなければ全体を 1 つの split と
-して扱い、summary の ``split_field_present`` を false にする。
+して扱い、summary の ``split_field_present`` を false にする。ここでの「同 split」
+は **jsonl の ``split`` フィールドだけ** を指し、学習が実行時に行う random な
+train/val 分割とは無関係 (summary の ``split_check`` に明記する。跨ぎは学習側が
+読み込み時に数えて WARNING を出す)。
 
 割り当ては ``(seed, target の audio_norm_path)`` から決まる乱数で選ぶので、
 同じ seed なら入力の並びに依存せず同じ結果になる。入力 jsonl は上書きしない。
-出力が既にあれば ``--overwrite`` なしでは拒否する。
+出力が既にあれば ``--overwrite`` なしでは拒否する。出力 jsonl と summary は
+一時ファイルに書いてから rename し (summary が先、jsonl が最後)、途中で失敗
+しても中途半端な出力や既存出力の破損を残さない。
 """
 
 from __future__ import annotations
@@ -46,6 +52,7 @@ import argparse
 import copy
 import hashlib
 import json
+import os
 import random
 import sys
 from collections import Counter, defaultdict
@@ -54,6 +61,11 @@ from pathlib import Path
 
 SCHEMA = "reference_pairs_v1"
 AUDIO_HASH = "sha256(float32-le samples of audio_norm)"
+SPLIT_CHECK = (
+    "same split = same value of the jsonl 'split' field only; independent of "
+    "the training run's random train/val split (references crossing it are "
+    "counted and logged at load time)"
+)
 
 
 def audio_sha256_of(path: Path | str) -> str:
@@ -69,6 +81,10 @@ def audio_sha256_of(path: Path | str) -> str:
 
 def _eligibility(entry: dict, split_present: bool) -> str | None:
     """target / 参照になれない理由 (なれるなら None)。"""
+    if not entry.get("audio_norm_path"):
+        return "missing_audio_norm_path"
+    if not entry.get("audio_spec_path"):
+        return "missing_audio_spec_path"
     if entry.get("speaker_id") is None:
         return "missing_speaker_id"
     if split_present and entry.get("split") is None:
@@ -138,6 +154,7 @@ def build_reference_pairs(entries: list[dict], seed: int) -> tuple[list[dict], d
         "num_excluded": len(entries) - len(paired),
         "excluded_by_reason": dict(sorted(excluded.items())),
         "split_field_present": split_present,
+        "split_check": SPLIT_CHECK,
         "num_speakers_paired": len(
             {(row.get("split"), row["speaker_id"]) for row in paired}
         ),
@@ -204,13 +221,17 @@ def main(argv: list[str] | None = None) -> int:
 
     dataset_dir = input_path.resolve().parent
     for entry in entries:
+        if not entry.get("audio_norm_path"):
+            continue  # build_reference_pairs が missing_audio_norm_path で除外する
         audio = Path(entry["audio_norm_path"])
         if not audio.is_absolute():
             audio = dataset_dir / audio
         try:
             entry["audio_sha256"] = audio_sha256_of(audio)
-        except (OSError, ValueError, RuntimeError) as exc:
-            raise SystemExit(f"cannot hash audio_norm {audio}: {exc}") from exc
+        except Exception as exc:  # noqa: BLE001 - 壊れた cache は種類を問わず名前付きで止める
+            raise SystemExit(
+                f"cannot hash audio_norm {audio}: {type(exc).__name__}: {exc}"
+            ) from exc
 
     paired, summary = build_reference_pairs(entries, args.seed)
     summary.update(
@@ -221,15 +242,41 @@ def main(argv: list[str] | None = None) -> int:
             "audio_hash": AUDIO_HASH,
         }
     )
-    output_path.write_text(
-        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in paired),
-        encoding="utf-8",
-    )
-    summary_path.write_text(
-        json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    _write_atomically(
+        [
+            # summary を先に置き、出力 jsonl は最後に置く: 出力があれば必ず
+            # 対応する summary もある
+            (summary_path, json.dumps(summary, ensure_ascii=False, indent=2) + "\n"),
+            (
+                output_path,
+                "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in paired),
+            ),
+        ]
     )
     print(json.dumps(summary, ensure_ascii=False), file=sys.stderr)
     return 0
+
+
+def _write_atomically(files: list[tuple[Path, str]]) -> None:
+    """全ファイルを同じ directory の一時ファイルに書いてから順に rename する。
+
+    書き込みや rename に失敗したら一時ファイルを消して SystemExit。既存の
+    出力は rename されるまで元のまま残る。
+    """
+    staged: list[tuple[Path, Path]] = []
+    try:
+        for path, text in files:
+            tmp = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+            staged.append((tmp, path))
+            tmp.write_text(text, encoding="utf-8")
+        for tmp, path in staged:
+            os.replace(tmp, path)
+    except OSError as exc:
+        raise SystemExit(f"cannot write {exc.filename or 'output'}: {exc}") from exc
+    finally:
+        for tmp, _ in staged:
+            if tmp.exists():
+                tmp.unlink()
 
 
 if __name__ == "__main__":
