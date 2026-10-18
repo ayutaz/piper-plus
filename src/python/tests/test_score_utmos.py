@@ -15,10 +15,20 @@ from pathlib import Path
 import numpy as np
 import pytest
 import soundfile as sf
-import torch
 
 from piper_train.tools import score_utmos as su
 from piper_train.tools.export_common_voice_ko import load_utmos
+
+
+# score_utmos は torch を関数内で遅延 import するため、validated.tsv / tar の
+# 走査は torch なしで検証できる。スコアリング経路のテストだけを、torch を
+# 入れない Windows CI job で skip する。
+try:
+    import torch
+except ImportError:
+    torch = None
+
+requires_torch = pytest.mark.skipif(torch is None, reason="torch not installed")
 
 
 def _wav_bytes(sr: int = 16000, secs: float = 0.2) -> bytes:
@@ -33,6 +43,7 @@ def _fake_predictor(wave, sr):
 
 
 @pytest.mark.unit
+@requires_torch
 class TestScoreStream:
     def test_output_readable_by_consumer(self, tmp_path: Path):
         """出力 tsv が export_common_voice_ko.load_utmos で読めること。"""
@@ -108,6 +119,7 @@ class TestCvDirMode:
         names = [name for name, _ in su.iter_cv_tar_audio(cv, "ko", wanted)]
         assert sorted(names) == ["clip_a.mp3", "clip_b.mp3"]
 
+    @requires_torch
     def test_main_end_to_end(self, tmp_path: Path, monkeypatch):
         cv = self._make_cv_dir(tmp_path)
         out = tmp_path / "utmos.tsv"

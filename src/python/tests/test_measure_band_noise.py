@@ -10,12 +10,23 @@ FT (がびがび無し) -15.5dB vs v8/v8.1 (がびがび有り) -9dB 台で 6dB 
 
 from __future__ import annotations
 
+import importlib.util
+
 import numpy as np
 import pytest
 
 from piper_train.tools.measure_band_noise import (
     _yin_f0_track,
     voiced_high_band_excess,
+)
+
+
+# librosa (と依存の scipy) は train extra。torch / train extras を入れない
+# Windows CI job では librosa に到達するテストだけを skip し、純 numpy の
+# 経路は引き続き検証する。
+requires_librosa = pytest.mark.skipif(
+    importlib.util.find_spec("librosa") is None,
+    reason="librosa not installed (train extra)",
 )
 
 
@@ -179,6 +190,7 @@ class TestBandProfile:
         )
         np.testing.assert_allclose(vec_gain, vec, atol=1e-9)
 
+    @requires_librosa
     def test_band_profile_detects_injected_band_only(self):
         """6.1-6.9kHz だけ持ち上げた合成信号 → 1kHz ベクトルの band 6 のみ検出。
 
@@ -216,6 +228,7 @@ class TestBandProfile:
         others = np.delete(vec, 6)
         assert np.all(np.abs(others) < 1.0), f"false detection: {np.round(vec, 2)}"
 
+    @requires_librosa
     def test_voiced_unvoiced_shelf_separation(self):
         """無声部にのみ 5.5-8.5kHz 過剰 → unvoiced shelf だけが検出する。
 
@@ -286,6 +299,7 @@ class TestBandProfile:
 
         assert tuple(DEFAULT_HI_BAND) == (4000.0, 9000.0)
 
+    @requires_librosa
     def test_band_profile_deterministic(self):
         """同一入力 2 回 → 同一出力 (manifest への数値 pin の前提条件)。"""
         from piper_train.tools.acoustic_frames import analyze_frames

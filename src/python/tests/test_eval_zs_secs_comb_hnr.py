@@ -20,7 +20,13 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from piper_train.tools import eval_zs_secs
+
+# テスト自体は encoder を fake に差し替えるが、対象モジュールが
+# piper_train.extract_speaker_embedding 経由で torch を import する。
+# torch を入れない Windows CI job では collection error にせず skip する。
+pytest.importorskip("torch")
+
+from piper_train.tools import eval_zs_secs  # noqa: E402
 
 
 # --- test_eval_zs_secs.py と同型の fake encoder (最小コピー、stem がキー) ---

@@ -1,5 +1,6 @@
 """Strict CER CLI tests use ASR stubs only to verify the gate protocol."""
 
+import importlib.util
 import json
 import sys
 from types import ModuleType
@@ -18,6 +19,14 @@ from piper_train.vits.wavfile import write
 
 
 pytestmark = pytest.mark.unit
+
+# strict 経路は生成 WAV を scipy.io.wavfile (train extra) で読み直す。scipy を
+# 入れない Windows CI job では、その読み直しに到達するテストだけを skip する。
+# skip しないと scipy 欠落の例外で gate が落ち、波形検査を検証せずに通ってしまう。
+requires_scipy = pytest.mark.skipif(
+    importlib.util.find_spec("scipy") is None,
+    reason="scipy not installed (train extra)",
+)
 
 
 def test_whisper_initialization_passes_cuda_without_download(monkeypatch):
@@ -114,6 +123,7 @@ def strict_case(tmp_path, monkeypatch):
     return clips, manifest_path, result_path, arguments, calls, generation
 
 
+@requires_scipy
 def test_strict_cli_pins_asr_and_passes_complete_three_clip_gate(strict_case):
     _clips, manifest_path, result_path, _args, calls, _generation = strict_case
     assert eval_cer.main() == 0
@@ -124,6 +134,7 @@ def test_strict_cli_pins_asr_and_passes_complete_three_clip_gate(strict_case):
     assert calls == [("openai/whisper-small", "ja", "a" * 40, "cuda")]
 
 
+@requires_scipy
 @pytest.mark.parametrize("damage", ["wrong-sample-rate", "int16", "nonfinite"])
 def test_strict_cli_checks_actual_waveform_before_asr(strict_case, damage):
     clips, _manifest, result_path, _args, calls, generation = strict_case
@@ -239,6 +250,7 @@ def test_strict_cli_rejects_invalid_sets_before_asr(strict_case, damage):
     assert json.loads(result_path.read_text(encoding="utf-8"))["gate_passed"] is False
 
 
+@requires_scipy
 @pytest.mark.parametrize(
     "outcome",
     ["high-cer", "asr-failure", "bad-transcript", "early-epoch", "unknown-epoch"],
@@ -280,6 +292,7 @@ def test_strict_cli_never_promotes_partial_or_ineligible_results(
         assert result["cer_median"] == 0 and result["eligible_for_promotion"] is False
 
 
+@requires_scipy
 def test_strict_asr_initialization_failure_records_every_failed_clip(
     strict_case, monkeypatch
 ):
