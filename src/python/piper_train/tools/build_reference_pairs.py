@@ -17,6 +17,9 @@
 * ``reference_audio_spec_path`` / ``reference_speaker_embedding_path`` —
   参照発話の ``audio_spec_path`` / ``speaker_embedding_path`` (表記のまま)
 * ``reference_audio_sha256`` — 参照の音声 hash
+* ``reference_audio_path`` — 参照の元音声 ``audio_path`` (表記のまま)。dataset に
+  ``audio_path`` があるときだけ書く。``build_reference_spec_cache`` が参照 spec を
+  名前付き frontend で作り直すのに使う (Ruling R17)
 
 音声 hash は **``audio_norm`` cache を読み込んだ float32 sample (little
 endian、平坦化) の sha256**。ファイルの byte ではなく中身の sample を見るので、
@@ -144,6 +147,10 @@ def build_reference_pairs(entries: list[dict], seed: int) -> tuple[list[dict], d
         row["reference_audio_spec_path"] = reference["audio_spec_path"]
         row["reference_speaker_embedding_path"] = reference["speaker_embedding_path"]
         row["reference_audio_sha256"] = reference["audio_sha256"]
+        if reference.get("audio_path"):
+            # 参照専用 spec cache (build_reference_spec_cache、Ruling R17) が
+            # 参照の元音声から spec を作り直すために運ぶ
+            row["reference_audio_path"] = reference["audio_path"]
         paired.append(row)
 
     summary = {
