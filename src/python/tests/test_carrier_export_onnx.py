@@ -31,6 +31,8 @@ pytest.importorskip("onnxscript", reason="onnxscript required for export")
 from piper_train.export_onnx import build_infer_forward, set_export_mode  # noqa: E402
 from piper_train.vits.models import SynthesizerTrn  # noqa: E402
 
+pytestmark = [pytest.mark.unit, pytest.mark.inference]
+
 
 OPSET = 15
 N_VOCAB = 60

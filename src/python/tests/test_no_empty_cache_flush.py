@@ -28,6 +28,8 @@ import torch  # noqa: E402
 
 from piper_train.vits.lightning import VitsModel  # noqa: E402
 
+pytestmark = [pytest.mark.unit, pytest.mark.training]
+
 
 # ---------------------------------------------------------------------------
 # Fake-self harness (mirrors test_ddp_synced_finite._make_fake_model)

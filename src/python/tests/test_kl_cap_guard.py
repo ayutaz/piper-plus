@@ -25,6 +25,8 @@ pytest.importorskip("torch", reason="torch required for lightning import")
 from piper_train.vits import lightning as vits_lightning  # noqa: E402
 from piper_train.vits.lightning import VitsModel  # noqa: E402
 
+pytestmark = [pytest.mark.unit, pytest.mark.training]
+
 
 def _make_stub(abort_steps: int = 300, consecutive: int = 0) -> SimpleNamespace:
     return SimpleNamespace(

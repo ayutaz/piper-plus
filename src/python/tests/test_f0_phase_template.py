@@ -32,6 +32,8 @@ torch = pytest.importorskip("torch", reason="torch required")
 
 from piper_train.vits.mb_istft import HarmonicPhaseTemplate  # noqa: E402
 
+pytestmark = pytest.mark.unit
+
 
 SR = 22050
 MEL_HOP = 256

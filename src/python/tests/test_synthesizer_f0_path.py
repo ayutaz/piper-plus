@@ -26,6 +26,8 @@ torch = pytest.importorskip("torch", reason="torch required")
 
 from piper_train.vits.models import SynthesizerTrn  # noqa: E402
 
+pytestmark = pytest.mark.unit
+
 
 SEGMENT_FRAMES = 32
 HOP = 256

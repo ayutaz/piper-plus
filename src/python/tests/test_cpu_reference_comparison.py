@@ -4,6 +4,14 @@ import numpy as np
 import pytest
 
 
+pytest.importorskip(
+    "torch",
+    reason="Reference embedding helpers need the train extra; lightweight Windows CI omits it.",
+)
+
+pytestmark = pytest.mark.unit
+
+
 def test_crop_matches_active_frames_without_removing_internal_pauses():
     from piper_train.tools.cpu_reference_comparison import crop_active_frames
 

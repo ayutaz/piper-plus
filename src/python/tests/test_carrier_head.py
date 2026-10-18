@@ -42,6 +42,8 @@ from piper_train.vits.mb_istft import (  # noqa: E402
 )
 from piper_train.vits.models import SynthesizerTrn  # noqa: E402
 
+pytestmark = pytest.mark.unit
+
 
 SR = 22050
 HOP = 256  # frame 格子 hop → 86.133 Hz

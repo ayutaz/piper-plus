@@ -31,6 +31,8 @@ from unittest import mock
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PYPROJECT_PATH = REPO_ROOT / "src" / "python" / "pyproject.toml"

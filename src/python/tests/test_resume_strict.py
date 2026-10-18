@@ -12,6 +12,8 @@ pytest.importorskip("torch")
 
 from piper_train.__main__ import run_strict_resume  # noqa: E402
 
+pytestmark = [pytest.mark.unit, pytest.mark.training]
+
 
 class FakeTrainer:
     def __init__(self, raises=None):

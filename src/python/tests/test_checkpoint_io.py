@@ -10,6 +10,8 @@ torch = pytest.importorskip(
     reason="Checkpoint preparation needs the train extra; lightweight Windows CI omits it.",
 )
 
+pytestmark = pytest.mark.unit
+
 
 class SavedPosixPath:
     def __reduce__(self):

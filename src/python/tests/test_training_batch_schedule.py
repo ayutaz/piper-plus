@@ -33,6 +33,8 @@ from piper_train.vits.ema import EMACallback  # noqa: E402
 from piper_train.vits.lightning import VitsModel  # noqa: E402
 from piper_train.vits.losses import feature_loss, generator_loss  # noqa: E402
 
+pytestmark = [pytest.mark.unit, pytest.mark.training]
+
 
 def _g_expression(target):
     tree = ast.parse(textwrap.dedent(inspect.getsource(VitsModel.training_step_g)))
