@@ -80,6 +80,14 @@ class TestKnownOptionalInputs:
     def test_optional_inputs_in_known_set(self):
         assert {"sid", "lid", "prosody_features"} <= check_mod.KNOWN_OPTIONAL_INPUTS
 
+    def test_reference_inputs_in_known_set(self):
+        """reference_conditioning="ref_spec" export の参照入力 (reference-fusion
+        plan §8 Task 8R)。runtime 側の検査前提は onnx-export-contract.toml。"""
+        assert {
+            "reference_spec",
+            "reference_spec_lengths",
+        } <= check_mod.KNOWN_OPTIONAL_INPUTS
+
 
 class TestCheck:
     """End-to-end behaviour of the check() function."""

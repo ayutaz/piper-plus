@@ -166,6 +166,26 @@ sid            = "speaker ID (int64, shape=[1]) — when declared for multi-spea
 lid            = "language ID (int64, shape=[1]) — when declared for multilingual models"
 prosody_features = "prosody A1/A2/A3 features (int64, shape=[1, T, 3]) — when present"
 speaker_embedding = "Speaker embedding (float32, shape=[1, emb_dim]); emb_dim=256 for legacy ECAPA-TDNN exports and emb_dim=192 for public v2 CAM++ Zero-Shot exports"
+# Declared only by reference_conditioning="ref_spec" exports (reference-fusion
+# plan §8 Task 8R). The frontend that produces reference_spec is recorded in the
+# exported <model>.onnx.json under "reference_conditioning" (schema ref_spec_v1).
+reference_spec = "reference utterance LINEAR magnitude spectrogram (float32, shape=[B, spec_channels, T_ref]; spectrogram_torch with the config's filter/hop/win length, center=false) — ref_spec exports only"
+reference_spec_lengths = "valid reference frames per batch item (int64, shape=[B]) — ref_spec exports only"
+
+[tensor_names.reference_spec_preconditions]
+# The exported graph does NOT validate the reference inputs: the data-dependent
+# checks of ReferenceSpecEncoder are skipped while tracing (in_graph_capture()),
+# and no in-graph clamp is added (a clamp would turn an invalid request into
+# plausible audio). Invalid inputs yield NaN or silently wrong conditioning
+# (length 0 divides the masked mean by zero; length > T_ref saturates; a
+# negative spec is clipped to the log floor). Runtimes MUST reject a request
+# before session.run unless all of the following hold.
+validated_in_graph = false
+lengths_min = 1
+lengths_max = "reference_spec.shape[2]"
+spec_finite = true
+spec_non_negative = true
+spec_channels = "config.json reference_conditioning.spec_channels"
 
 [tensor_names.outputs]
 output         = "audio waveform (float32, shape=[1, 1, T_samples])"

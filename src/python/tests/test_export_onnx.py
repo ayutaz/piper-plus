@@ -809,6 +809,9 @@ _KNOWN_OPTIONAL_INPUTS = frozenset(
         "prosody_features",
         "speaker_embedding",
         "speaker_embedding_mask",
+        # ref_spec exports only (scripts/check_onnx_inputs.py と同期)
+        "reference_spec",
+        "reference_spec_lengths",
     }
 )
 
@@ -1054,9 +1057,7 @@ def _zero_shot_onnx_export(tmp_path_factory):
     _infer = build_infer_forward(model, stochastic=False)
 
     def fwd(text, text_lengths, scales_t, spk_emb):
-        return _infer(
-            text, text_lengths, scales_t, speaker_embedding=spk_emb
-        )
+        return _infer(text, text_lengths, scales_t, speaker_embedding=spk_emb)
 
     _orig_forward = model.forward
     model.forward = fwd

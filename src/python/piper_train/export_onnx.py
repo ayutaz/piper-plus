@@ -457,10 +457,6 @@ REFERENCE_SPEC_SCHEMA = "ref_spec_v1"
 REFERENCE_SPEC_FRONTEND = "energy-vad@16k;soxr-hq"
 CAPACITY_SCHEMA = "capacity_v1"
 REFERENCE_INPUT_NAMES = ("reference_spec", "reference_spec_lengths")
-# FP16 変換 (convert_fp16) は initializer だけを fp16 に落とし、計算は fp32 の
-# まま行う。参照 encoder の log 下限 1e-5 (fp16 では subnormal) は Clip の
-# Constant node として出力され変換対象外なので fp32 のまま残る
-# (tests/test_export_reference_encoder.py::TestFp16 が pin)。
 
 
 def _hparam(hparams, name: str):
@@ -617,9 +613,19 @@ def main() -> None:
         help="Training config.json to copy next to the ONNX as <output>.json. "
         "Records the 'reference_conditioning' contract (spec STFT settings and "
         "frontend) for --reference-conditioning ref_spec / capacity models, for "
-        "which it is required. Without it no config is written (legacy).",
+        "which it is required (every reference-conditioned ONNX carries its "
+        "schema marker). Without it no config is written (legacy).",
+    )
+    parser.add_argument(
+        "--overwrite-config",
+        action="store_true",
+        help="Allow --config to replace an existing <output>.json "
+        "(default: refuse, so a hand-edited config is never lost silently).",
     )
     args = parser.parse_args()
+
+    if args.overwrite_config and args.config is None:
+        parser.error("--overwrite-config requires --config")
 
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
@@ -686,18 +692,28 @@ def main() -> None:
 
     # 参照条件付け (reference-fusion plan §8 Task 8R)。参照入力付き ONNX は
     # フロントエンド契約 (spec の STFT 設定) を config に記録しないと runtime が
-    # 正しい spec を作れないので、--config なしでは export 前に止める
+    # 正しい spec を作れないので、--config なしでは export 前に止める。capacity
+    # (入力は旧来のまま) も、参照条件付き ONNX は必ず schema marker を持つ方針で
+    # 同じく必須にする
     reference_mode = getattr(model_g, "reference_conditioning", "none")
     include_reference = reference_mode == "ref_spec"
-    export_config: dict | None = None
     try:
         reference_config = reference_conditioning_config(model_g, model.hparams)
-        if args.config is not None:
+    except (AttributeError, KeyError, ValueError) as e:
+        parser.error(f"checkpoint: cannot build reference_conditioning config: {e}")
+    export_config: dict | None = None
+    if args.config is not None:
+        try:
             export_config = build_export_config(
                 Path(args.config), reference_config, model.hparams.sample_rate
             )
-    except (OSError, ValueError) as e:
-        parser.error(f"--config: {e}")
+        except (OSError, ValueError) as e:
+            parser.error(f"--config: {e}")
+        config_path = export_config_path(args.output)
+        if config_path.exists() and not args.overwrite_config:
+            parser.error(
+                f"{config_path} already exists; pass --overwrite-config to replace it"
+            )
     if reference_config is not None and export_config is None:
         parser.error(
             f"reference_conditioning={reference_mode!r} models require --config "
@@ -955,6 +971,12 @@ def main() -> None:
     if not args.no_fp16:
         fp32_size = args.output.stat().st_size
         tmp_fp16 = args.output.with_suffix(".onnx.fp16_tmp")
+        # convert_fp16 は initializer だけを fp16 で保存し、使う直前に fp32 へ
+        # Cast する (計算は fp32 のまま)。参照 encoder の log 下限 1e-5 は、
+        # 学習時と同じ入力領域 (それ未満の bin を同一視する境界) を保つための
+        # 契約値なので、変換後も float32 の 1e-5 であることを
+        # tests/test_export_reference_encoder.py::TestFp16 が出力で確かめる
+        # (将来 converter / exporter が変わってもこの値が動かないことの保証)。
         try:
             convert_fp16(args.output, tmp_fp16)
             converted_outputs = validate_export(tmp_fp16, validation_feeds)
@@ -976,7 +998,7 @@ def main() -> None:
 
     # 検証を通った ONNX にだけ config を添える (失敗した export に config を残さない)
     if export_config is not None:
-        config_path = export_config_path(args.output)
+        # 既存ファイルの扱いは export 前に検査済み (--overwrite-config なしなら拒否)
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(export_config, f, ensure_ascii=True, indent=4)
         _LOGGER.info("Wrote config to %s", config_path)
