@@ -24,6 +24,7 @@ from ..zero_shot_requirements import (
     reference_spec_frontend_conflict,
     reference_training_conflict,
     validate_recipe,
+    validate_reference_spec_cache,
     validate_strict_resume_reference_hparams,
     validate_training_batch,
 )
@@ -1267,8 +1268,40 @@ class VitsModel(pl.LightningModule):
                 generator=split_generator,
             )
 
+        if self.hparams.get("reference_conditioning", "none") == "ref_spec":
+            self._validate_reference_spec_cache(full_dataset)
         if load_references:
             self._record_reference_subset_overlap(full_dataset)
+
+    def _validate_reference_spec_cache(self, full_dataset: PiperDataset) -> None:
+        """Ruling R17: ref_spec の G が読む参照 spec を参照専用 spec cache と照合する。
+
+        学習 dataset (cross_utt の参照) と固定 test set (監視音声の参照) の
+        ``reference_audio_spec_path`` を集め、sidecar の frontend・STFT 設定が
+        モデルの宣言と一致し、全部が sidecar に載っていることを確かめる。誤りは
+        ``SystemExit`` (学習を始めない)。none / capacity では呼ばない。
+        """
+        paths = [
+            utt.reference_audio_spec_path
+            for utt in full_dataset.utterances
+            if utt.reference_audio_spec_path is not None
+        ]
+        if isinstance(self._test_dataset, list):
+            paths.extend(
+                utt.reference_audio_spec_path
+                for utt in self._test_dataset
+                if utt.reference_audio_spec_path is not None
+            )
+        if not paths:
+            return
+        validate_reference_spec_cache(
+            paths,
+            frontend=self.hparams.get("reference_spec_frontend"),
+            sample_rate=int(self.hparams.sample_rate),
+            filter_length=int(self.hparams.filter_length),
+            hop_length=int(self.hparams.hop_length),
+            win_length=int(self.hparams.win_length),
+        )
 
     def _record_reference_subset_overlap(self, full_dataset: PiperDataset) -> None:
         """R13: 参照が実行時の random_split の別 subset にある target を数える。

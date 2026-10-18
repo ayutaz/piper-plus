@@ -60,6 +60,20 @@ REFERENCE_SPEC_FRONTENDS: dict[str, dict] = {
 # この長さに切り出す (Ruling R15)
 REFERENCE_MAX_FRAMES_DEFAULT = 512
 
+# 参照専用 spec cache (Ruling R17)。``tools.build_reference_spec_cache`` が元音声から
+# 名前付き frontend で作り直した参照 spec を置く dir の来歴 sidecar の schema と
+# ファイル名。学習 (ref_spec) はこの sidecar の frontend・STFT 設定をモデルと照合し、
+# sidecar に載っていない参照 spec を拒否する (``zero_shot_requirements``)
+REFERENCE_SPEC_CACHE_SCHEMA = "reference_spec_cache_v1"
+REFERENCE_SPEC_CACHE_SIDECAR = "reference_spec_cache.json"
+# sidecar がモデルと照合される STFT 設定 (frontend と合わせて「作り方」を決める)
+REFERENCE_SPEC_CACHE_STFT_KEYS = (
+    "sample_rate",
+    "filter_length",
+    "hop_length",
+    "win_length",
+)
+
 # T_ref の上限 (秒)。学習は参照 spec を最大 512 frame (~5.9 s) に切り出す。
 # 30 s は長い参照を誤って丸ごと渡す事故 (self-attention は O(T^2)) を止める
 # ための余裕を持った上限で、正常な参照発話を弾かない
