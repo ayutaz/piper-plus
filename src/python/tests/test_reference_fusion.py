@@ -22,6 +22,7 @@ docs/design/zero-shot-reference-fusion-plan-2026-10-17.md §8 (Task 6R):
 
 from __future__ import annotations
 
+import logging
 from contextlib import nullcontext
 
 import pytest
@@ -412,7 +413,16 @@ def _tiny_model_class():
         """数値 forward だけ差し替え、optimizer / scheduler / training_step /
         on_train_epoch_end / checkpoint hook は本番実装をそのまま使う。"""
 
-        def __init__(self, *, warmup, scale, scheduler, d_interval=1):
+        def __init__(
+            self,
+            *,
+            warmup,
+            scale,
+            scheduler,
+            d_interval=1,
+            with_reference=True,
+            g_nan=(),
+        ):
             pl.LightningModule.__init__(self)
             self.automatic_optimization = False
             hp = {
@@ -430,15 +440,17 @@ def _tiny_model_class():
             }
             hp.update(scheduler)
             self.save_hyperparameters(hp)
-            self.model_g = _TinyGenerator(with_reference=True)
+            self.model_g = _TinyGenerator(with_reference=with_reference)
             self.model_d = _TinyDiscriminator()
             self.model_d_wavlm = self.model_d_mrd = self.model_c_spk = None
             self._grad_probe_losses = None
             self._lf_step_active = False
             self._kl_cap_abort_steps = 300
             self._reset_training_progress()
+            self.g_nan = set(g_nan)  # 非有限 loss にする batch 番号 (値 = batch id)
             self.effective = []  # G step 時の [main lr, reference lr]
             self.scheduled = []  # 各 batch 後の [main lr, reference lr]
+            self.logged = []  # _log_with_batch_info の (key, value)
 
         def configure_optimizers(self):
             optimizers, schedulers = super().configure_optimizers()
@@ -456,13 +468,16 @@ def _tiny_model_class():
         def training_step_g(self, batch):
             self._y = torch.ones_like(batch[0])
             self._y_hat = self.model_g(self._y)
-            return self._y_hat.square().mean()
+            loss = self._y_hat.square().mean()
+            if int(batch[0][0, 0]) in self.g_nan:
+                loss = loss * float("nan")
+            return loss
 
         def _disc_autocast_ctx(self):
             return nullcontext()
 
-        def _log_with_batch_info(self, *_args, **_kwargs):
-            pass
+        def _log_with_batch_info(self, key, value, *_args, **_kwargs):
+            self.logged.append((key, value))
 
         def on_train_batch_end(self, outputs, batch, batch_idx):
             self.scheduled.append([g["lr"] for g in self.opt_g.param_groups])
@@ -612,6 +627,43 @@ class TestWarmupInTraining:
         assert model.effective == []
         assert model.scheduled == [[1e-3, 5e-4]] * 3
 
+    def test_nonfinite_skip_does_not_advance_warmup_clock(self, tmp_path):
+        """非有限 loss で G 更新を skip した batch では k が進まない。"""
+        model = _tiny_model_class()(
+            warmup=4,
+            scale=1.0,
+            scheduler={"lr_scheduler": "exponential", "lr_decay": 1.0},
+            g_nan=(0, 2),
+        )
+        _trainer(tmp_path, epochs=1).fit(model, _loader(4))
+        assert model.generator_updates == 2
+        assert [k for k, _ in model.effective] == [0, 1]
+        assert [ref for _, (_, ref) in model.effective] == pytest.approx(
+            [0.0, 2.5e-4], rel=LR_REL
+        )
+
+    def test_reference_lr_factor_is_logged_each_generator_step(self, tmp_path):
+        model = _tiny_model_class()(
+            warmup=4,
+            scale=1.0,
+            scheduler={"lr_scheduler": "exponential", "lr_decay": 1.0},
+        )
+        _trainer(tmp_path, epochs=1).fit(model, _loader(6))
+        factors = [v for key, v in model.logged if key == "reference_lr_factor"]
+        assert factors == [0.0, 0.25, 0.5, 0.75, 1.0, 1.0]
+
+    def test_reference_lr_factor_is_not_logged_without_reference_group(self, tmp_path):
+        model = _tiny_model_class()(
+            warmup=0,
+            scale=1.0,
+            scheduler={"lr_scheduler": "exponential", "lr_decay": 1.0},
+            with_reference=False,
+        )
+        _trainer(tmp_path, epochs=1).fit(model, _loader(3))
+        assert len(model.opt_g.param_groups) == 1
+        assert "reference_lr_factor" not in [key for key, _ in model.logged]
+        assert model.generator_updates == 3
+
     def test_strict_resume_continues_warmup(self, tmp_path):
         """strict resume 後も係数は保存された generator_updates から続く。"""
         scheduler = {"lr_scheduler": "exponential", "lr_decay": 0.5}
@@ -643,6 +695,74 @@ class TestWarmupInTraining:
         _trainer(tmp_path, epochs=1).fit(model, _loader(1))
         assert torch.equal(model.model_g.reference_encoder.weight, before)
         assert not torch.equal(model.model_g.dec.weight, dec_before)
+
+
+_EXP = {"lr_scheduler": "exponential", "lr_decay": 1.0}
+
+
+def _first_epoch_checkpoint(tmp_path, scale):
+    model = _tiny_model_class()(warmup=0, scale=scale, scheduler=_EXP)
+    trainer = _trainer(tmp_path / "first", epochs=1)
+    trainer.fit(model, _loader(2))
+    path = tmp_path / "epoch0.ckpt"
+    trainer.save_checkpoint(path)
+    return str(path)
+
+
+def _scale_warnings(caplog):
+    return [
+        r.getMessage()
+        for r in caplog.records
+        if r.levelno == logging.WARNING and "reference-lr-scale" in r.getMessage()
+    ]
+
+
+class TestStrictResumeScaleChange:
+    """strict resume は optimizer state の lr / initial_lr を復元するので、
+    ``--reference-lr-scale`` を変えても保存値が使われる。黙らずに WARNING。"""
+
+    def test_changed_scale_warns(self, tmp_path, caplog):
+        ckpt = _first_epoch_checkpoint(tmp_path, scale=0.25)
+        resumed = _tiny_model_class()(warmup=0, scale=0.5, scheduler=_EXP)
+        with caplog.at_level(logging.WARNING, logger="piper_train"):
+            _trainer(tmp_path / "resumed", epochs=2).fit(
+                resumed, _loader(2), ckpt_path=ckpt
+            )
+        messages = _scale_warnings(caplog)
+        assert len(messages) == 1
+        assert "--resume-weights-only" in messages[0]
+        assert "2.500e-04" in messages[0] and "5.000e-04" in messages[0]
+
+    def test_changed_scale_keeps_saved_lr(self, tmp_path):
+        ckpt = _first_epoch_checkpoint(tmp_path, scale=0.25)
+        resumed = _tiny_model_class()(warmup=0, scale=0.5, scheduler=_EXP)
+        _trainer(tmp_path / "resumed", epochs=2).fit(
+            resumed, _loader(2), ckpt_path=ckpt
+        )
+        assert [ref for _, (_, ref) in resumed.effective] == [2.5e-4, 2.5e-4]
+
+    def test_same_scale_does_not_warn(self, tmp_path, caplog):
+        ckpt = _first_epoch_checkpoint(tmp_path, scale=0.25)
+        resumed = _tiny_model_class()(warmup=0, scale=0.25, scheduler=_EXP)
+        with caplog.at_level(logging.WARNING, logger="piper_train"):
+            _trainer(tmp_path / "resumed", epochs=2).fit(
+                resumed, _loader(2), ckpt_path=ckpt
+            )
+        assert _scale_warnings(caplog) == []
+
+    def test_fresh_fit_does_not_warn(self, tmp_path, caplog):
+        model = _tiny_model_class()(warmup=0, scale=0.5, scheduler=_EXP)
+        with caplog.at_level(logging.WARNING, logger="piper_train"):
+            _trainer(tmp_path, epochs=1).fit(model, _loader(2))
+        assert _scale_warnings(caplog) == []
+
+    def test_cli_help_documents_strict_resume_behaviour(self):
+        from piper_train.__main__ import create_parser
+
+        action = next(
+            a for a in create_parser()._actions if a.dest == "reference_lr_scale"
+        )
+        assert "--resume-weights-only" in action.help
 
 
 # ---------------------------------------------------------------------------
@@ -782,43 +902,287 @@ class TestWeightsOnlyMigration:
                 str(path), _vits_model(reference_conditioning="ref_spec")
             )
 
-    def test_extra_key_raises_for_reference_model(self, tmp_path):
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "model_d_mrd.extra.weight",  # 補助ではない識別器
+            "model_d.extra.weight",  # 主識別器
+            "model_g.extra.weight",  # 生成器
+            "model_d_wavlm_x.weight",  # 補助 prefix と module 境界で一致しない
+            "dino_center_x",
+        ],
+    )
+    def test_extra_non_auxiliary_key_raises_for_reference_model(
+        self, legacy_state, reference_model, tmp_path, key
+    ):
         from piper_train.__main__ import load_weights_only_checkpoint
 
-        state = _vits_model().state_dict()
-        state["model_d_wavlm.extra.weight"] = torch.zeros(1)
+        state = dict(legacy_state)
+        state[key] = torch.zeros(1)
         path = tmp_path / "extra.ckpt"
         torch.save({"state_dict": state}, path)
-        with pytest.raises(ValueError, match="model_d_wavlm"):
-            load_weights_only_checkpoint(
-                str(path), _vits_model(reference_conditioning="ref_spec")
-            )
+        with pytest.raises(ValueError, match=key.replace(".", r"\.")):
+            load_weights_only_checkpoint(str(path), reference_model)
+
+    def test_main_discriminator_missing_key_raises_for_reference_model(
+        self, legacy_state, reference_model, tmp_path
+    ):
+        from piper_train.__main__ import load_weights_only_checkpoint
+
+        state = dict(legacy_state)
+        key = next(k for k in state if k.startswith("model_d."))
+        del state[key]
+        path = tmp_path / "partial.ckpt"
+        torch.save({"state_dict": state}, path)
+        with pytest.raises(ValueError, match=key.replace(".", r"\.")):
+            load_weights_only_checkpoint(str(path), reference_model)
 
     def test_legacy_to_legacy_keeps_lenient_behaviour(self, tmp_path):
         """参照モジュールが関わらない移行は従来どおり strict=False (余剰を捨てる)。"""
         from piper_train.__main__ import load_weights_only_checkpoint
 
         state = _vits_model().state_dict()
-        state["model_d_wavlm.extra.weight"] = torch.zeros(1)
+        state["model_d_mrd.extra.weight"] = torch.zeros(1)
         path = tmp_path / "extra.ckpt"
         torch.save({"state_dict": state}, path)
         missing, unexpected = load_weights_only_checkpoint(str(path), _vits_model())
         assert missing == []
-        assert unexpected == ["model_d_wavlm.extra.weight"]
+        assert unexpected == ["model_d_mrd.extra.weight"]
+
+
+# 学習専用の補助モジュール (VitsModel の属性名)。ckpt とモデルで有無が
+# 食い違ってよい。実モジュールは pretrained (WavLM / CAM++) が要るので、
+# 同じ属性名に小さな実 Module / buffer を付けて key 経路だけを再現する。
+_AUXILIARY_KEYS = {
+    "model_d_wavlm": "model_d_wavlm.weight",
+    "model_c_spk": "model_c_spk.weight",
+    "scl_encoder": "scl_encoder.weight",
+    "spk_proj_teacher": "spk_proj_teacher.weight",
+    "dino_center": "dino_center",
+}
+
+
+def _attach_auxiliary(model, name):
+    if name == "dino_center":
+        model.register_buffer("dino_center", torch.full((4,), 3.0))
+    else:
+        layer = nn.Linear(2, 2, bias=False)
+        with torch.no_grad():
+            layer.weight.fill_(3.0)
+        setattr(model, name, layer)
+    return model
+
+
+def _detach_auxiliary(model, name):
+    """補助モジュールを使わない設定のモデル (state_dict に key がない) にする。"""
+    if name in model._buffers:
+        delattr(model, name)
+    else:
+        setattr(model, name, None)
+    return model
+
+
+def _aux_keys(keys, name):
+    return sorted(k for k in keys if k == name or k.startswith(f"{name}."))
+
+
+@pytest.fixture(scope="module")
+def legacy_state(legacy_checkpoint):
+    return legacy_checkpoint[1]
+
+
+@pytest.fixture
+def reference_model():
+    # weight_norm を含むので deepcopy できない。テストごとに作る
+    return _vits_model(reference_conditioning="ref_spec")
+
+
+def _warnings(caplog):
+    return [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+
+
+class TestWeightsOnlyAuxiliaryModules:
+    def test_auxiliary_sets_are_explicit_constants(self):
+        from piper_train import __main__ as main
+
+        assert main.WARM_START_AUXILIARY_PREFIXES == (
+            "model_d_wavlm.",
+            "model_c_spk.",
+            "scl_encoder.",
+            "spk_proj_teacher.",
+        )
+        assert main.WARM_START_AUXILIARY_KEYS == ("dino_center",)
+
+    @pytest.mark.parametrize("name", list(_AUXILIARY_KEYS))
+    def test_auxiliary_names_exist_on_vits_model(self, name):
+        """定数の名前が VitsModel の実属性名と一致する (取り違えの防止)。"""
+        assert hasattr(_vits_model(), name)
+
+    @pytest.mark.parametrize("name", list(_AUXILIARY_KEYS))
+    def test_checkpoint_only_auxiliary_is_dropped_with_warning(
+        self, legacy_state, reference_model, tmp_path, caplog, name
+    ):
+        from piper_train.__main__ import load_weights_only_checkpoint
+
+        model = _detach_auxiliary(reference_model, name)
+        state = dict(legacy_state)
+        if not _aux_keys(state, name):
+            state[_AUXILIARY_KEYS[name]] = torch.zeros(2, 2)
+        expected = _aux_keys(state, name)
+        path = tmp_path / "aux.ckpt"
+        torch.save({"state_dict": state}, path)
+        with caplog.at_level(logging.WARNING, logger="piper_train"):
+            missing, unexpected = load_weights_only_checkpoint(str(path), model)
+        assert sorted(unexpected) == expected
+        assert all(k.startswith("model_g.reference_encoder.") for k in missing)
+        assert _aux_keys(model.state_dict(), name) == []
+        assert any("dropped" in m and expected[0] in m for m in _warnings(caplog))
+
+    @pytest.mark.parametrize("name", list(_AUXILIARY_KEYS))
+    def test_model_only_auxiliary_keeps_fresh_init_with_warning(
+        self, legacy_state, reference_model, tmp_path, caplog, name
+    ):
+        from piper_train.__main__ import load_weights_only_checkpoint
+
+        model = reference_model
+        if not _aux_keys(model.state_dict(), name):
+            _attach_auxiliary(model, name)
+        expected = _aux_keys(model.state_dict(), name)
+        before = {k: model.state_dict()[k].clone() for k in expected}
+        state = {k: v for k, v in legacy_state.items() if k not in expected}
+        path = tmp_path / "no_aux.ckpt"
+        torch.save({"state_dict": state}, path)
+        with caplog.at_level(logging.WARNING, logger="piper_train"):
+            missing, unexpected = load_weights_only_checkpoint(str(path), model)
+        assert unexpected == []
+        assert _aux_keys(missing, name) == expected
+        for key, value in before.items():
+            assert torch.equal(model.state_dict()[key], value), (
+                "fresh init が上書きされた"
+            )
+        assert any("fresh" in m and expected[0] in m for m in _warnings(caplog))
+
+    def test_auxiliary_shape_mismatch_still_raises(
+        self, legacy_state, reference_model, tmp_path
+    ):
+        """両方にある補助モジュールの shape 差は捨てずにエラー。"""
+        from piper_train.__main__ import load_weights_only_checkpoint
+
+        model = _attach_auxiliary(reference_model, "model_c_spk")
+        state = dict(legacy_state)
+        state["model_c_spk.weight"] = torch.zeros(3, 3)
+        path = tmp_path / "aux.ckpt"
+        torch.save({"state_dict": state}, path)
+        with pytest.raises(ValueError, match=r"model_c_spk\.weight"):
+            load_weights_only_checkpoint(str(path), model)
+
+    def test_generator_key_still_raises_alongside_auxiliary(
+        self, legacy_state, reference_model, tmp_path
+    ):
+        from piper_train.__main__ import load_weights_only_checkpoint
+
+        state = dict(legacy_state)
+        state["model_d_wavlm.weight"] = torch.zeros(2, 2)
+        del state["model_g.spk_proj.0.weight"]
+        path = tmp_path / "aux.ckpt"
+        torch.save({"state_dict": state}, path)
+        with pytest.raises(ValueError, match=r"spk_proj\.0\.weight"):
+            load_weights_only_checkpoint(str(path), reference_model)
+
+
+class TestWeightsOnlyLogWording:
+    def test_strict_path_log_does_not_claim_strict_false(
+        self, legacy_checkpoint, reference_model, caplog
+    ):
+        from piper_train.__main__ import load_weights_only_checkpoint
+
+        with caplog.at_level(logging.INFO, logger="piper_train"):
+            load_weights_only_checkpoint(legacy_checkpoint[0], reference_model)
+        loaded = [m for m in caplog.messages if "Warm-restart weights loaded" in m]
+        assert len(loaded) == 1
+        assert "strict=False" not in loaded[0]
+        assert "reference" in loaded[0]
+
+    def test_lenient_path_log_keeps_strict_false_wording(
+        self, legacy_checkpoint, caplog
+    ):
+        from piper_train.__main__ import load_weights_only_checkpoint
+
+        with caplog.at_level(logging.INFO, logger="piper_train"):
+            load_weights_only_checkpoint(legacy_checkpoint[0], _vits_model())
+        loaded = [m for m in caplog.messages if "Warm-restart weights loaded" in m]
+        assert len(loaded) == 1
+        assert "strict=False" in loaded[0]
+
+
+class TestWarmStartResetsWarmupClock:
+    def test_weights_only_resets_generator_updates(self, legacy_checkpoint):
+        from piper_train.__main__ import load_weights_only_checkpoint
+
+        model = _vits_model(reference_conditioning="ref_spec", reference_warmup_steps=4)
+        model.generator_updates = 7
+        assert model._reference_lr_factor() == 1.0
+        load_weights_only_checkpoint(legacy_checkpoint[0], model)
+        assert model.generator_updates == 0
+        assert model._reference_lr_factor() == 0.0
 
 
 class TestMultispeakerMigration:
-    def test_reference_checkpoint_into_single_speaker_model_raises(self, tmp_path):
-        """single-speaker FT 先は参照モジュールを持てない。参照重みを黙って
-        捨てずにエラーにする。"""
+    @pytest.mark.parametrize(
+        ("mode", "prefix"),
+        [("capacity", "capacity_control."), ("ref_spec", "reference_encoder.")],
+    )
+    def test_reference_checkpoint_into_single_speaker_drops_with_warning(
+        self, tmp_path, caplog, mode, prefix
+    ):
+        """single-speaker FT 先は参照モジュールを持てない (spk_proj が必要)。
+        spk_proj と同じく捨てるが、prefix と件数を WARNING で必ず出す。"""
         from piper_train.__main__ import load_multispeaker_checkpoint
 
-        path = _save(
-            tmp_path, _vits_model(reference_conditioning="capacity"), "cap.ckpt"
-        )
+        source = _vits_model(reference_conditioning=mode)
+        path = _save(tmp_path, source, "ref.ckpt")
+        count = sum(1 for k in source.state_dict() if k.startswith(f"model_g.{prefix}"))
         target = _vits_model(num_speakers=1)
-        with pytest.raises(ValueError, match="capacity_control"):
+        with caplog.at_level(logging.WARNING, logger="piper_train"):
             load_multispeaker_checkpoint(path, target)
+        messages = [m for m in _warnings(caplog) if prefix in m]
+        assert len(messages) == 1
+        assert f"{count} " in messages[0]
+        assert torch.equal(
+            target.state_dict()["model_g.dec.conv_pre.bias"],
+            source.state_dict()["model_g.dec.conv_pre.bias"],
+        )
+
+    def test_reference_checkpoint_into_model_with_same_module_loads_it(
+        self, tmp_path, caplog
+    ):
+        """FT 先が同じ参照モジュールを持つなら捨てずに読む (警告なし)。"""
+        from piper_train.__main__ import load_multispeaker_checkpoint
+
+        source = _vits_model(reference_conditioning="ref_spec")
+        with torch.no_grad():
+            source.model_g.reference_encoder.out.weight.fill_(0.5)
+        path = _save(tmp_path, source, "ref.ckpt")
+        target = _vits_model(reference_conditioning="ref_spec")
+        with caplog.at_level(logging.WARNING, logger="piper_train"):
+            load_multispeaker_checkpoint(path, target)
+        assert torch.all(target.model_g.reference_encoder.out.weight == 0.5)
+        assert not [m for m in _warnings(caplog) if "reference_encoder." in m]
+
+    def test_legacy_checkpoint_into_single_speaker_has_no_reference_warning(
+        self, legacy_checkpoint, caplog
+    ):
+        from piper_train.__main__ import load_multispeaker_checkpoint
+
+        with caplog.at_level(logging.WARNING, logger="piper_train"):
+            load_multispeaker_checkpoint(
+                legacy_checkpoint[0], _vits_model(num_speakers=1)
+            )
+        assert not [
+            m
+            for m in _warnings(caplog)
+            if "reference_encoder." in m or "capacity_control." in m
+        ]
 
     def test_none_checkpoint_into_single_speaker_model_still_loads(
         self, legacy_checkpoint

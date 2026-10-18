@@ -89,7 +89,7 @@ def load_state_with_allowed_missing(
 
     * 許可 prefix 以外の欠落 (persistent buffer も含む)
     * checkpoint 側の余剰 key (許可 prefix 配下でも捨てない)
-    * shape 差、tensor でない値
+    * shape 差、dtype 差、tensor でない値
 
     Returns:
         ``{"missing": [...], "unexpected": [...]}`` — missing はモデルの
@@ -103,6 +103,7 @@ def load_state_with_allowed_missing(
     disallowed_missing = [k for k in missing if not key_has_module_prefix(k, allowed)]
     not_tensor = []
     mismatched = []
+    wrong_dtype = []
     for key, target in model_state.items():
         if key not in state_dict:
             continue
@@ -112,6 +113,11 @@ def load_state_with_allowed_missing(
         elif value.shape != target.shape:
             mismatched.append(
                 f"{key}: checkpoint {tuple(value.shape)} vs model {tuple(target.shape)}"
+            )
+        elif value.dtype != target.dtype:
+            # load_state_dict は黙って cast する (精度の取り違えを見逃す)
+            wrong_dtype.append(
+                f"{key}: checkpoint {value.dtype} vs model {target.dtype}"
             )
 
     problems = []
@@ -123,6 +129,8 @@ def load_state_with_allowed_missing(
         problems.append(f"unexpected keys (not in model): {_listed(unexpected)}")
     if mismatched:
         problems.append(f"shape mismatch: {_listed(mismatched)}")
+    if wrong_dtype:
+        problems.append(f"dtype mismatch: {_listed(wrong_dtype)}")
     if not_tensor:
         problems.append(f"non-tensor values: {_listed(not_tensor)}")
     if problems:

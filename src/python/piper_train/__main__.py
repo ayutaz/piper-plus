@@ -886,8 +886,11 @@ def create_parser():
         "capacity_control parameters form their own generator param group "
         "with lr = base lr x this scale (requires_grad is never changed). The "
         "epoch LR scheduler applies to the group as usual; under cosine the "
-        "scaled lr must not be below --lr-min. Default 1.0. Requires "
-        "--reference-conditioning ref_spec or capacity.",
+        "scaled lr must not be below --lr-min. A strict resume "
+        "(--resume_from_checkpoint) restores the saved optimizer lr, so "
+        "changing this flag then has no effect (a WARNING is logged); use "
+        "--resume-weights-only to start with a new scale. Default 1.0. "
+        "Requires --reference-conditioning ref_spec or capacity.",
     )
     parser.add_argument(
         "--reference-warmup-steps",
@@ -1339,6 +1342,20 @@ def reinit_pqmf_bank(model) -> None:
     )
 
 
+# 参照条件付きの weights-only warm start で、ckpt とモデルの間で有無が
+# 食い違ってよい学習専用の補助モジュール (VitsModel の属性名、推論には
+# 使わない)。WavLM 識別器・敵対的話者分類器・SCL 用 CAM++・DINO の teacher と
+# center。設定 (--no-wavlm、adversarial classifier・SCL・DINO の on/off) で
+# 有無が変わる。主生成器・主識別器 (model_d)・MRD はここに含めない (厳格)。
+WARM_START_AUXILIARY_PREFIXES: tuple[str, ...] = (
+    "model_d_wavlm.",
+    "model_c_spk.",
+    "scl_encoder.",
+    "spk_proj_teacher.",
+)
+WARM_START_AUXILIARY_KEYS: tuple[str, ...] = ("dino_center",)
+
+
 def _involves_reference_modules(model_state: dict, checkpoint_state: dict) -> bool:
     """モデルか checkpoint のどちらかに参照条件付けの key があるか。"""
     return any(
@@ -1362,7 +1379,9 @@ def load_weights_only_checkpoint(checkpoint_path: str, model) -> tuple[list, lis
     ckpt のどちらかにある場合だけは厳格に読む
     (:func:`~piper_train.checkpoint_io.load_state_with_allowed_missing`):
     欠落してよいのは参照モジュールの key だけで、それ以外の欠落・余剰・
-    shape 差は ``ValueError``。
+    shape / dtype 差は ``ValueError``。ただし学習専用の補助モジュール
+    (:data:`WARM_START_AUXILIARY_PREFIXES` / :data:`WARM_START_AUXILIARY_KEYS`)
+    の有無の食い違いは WARNING を出して許す。
 
     Returns:
         (missing_keys, unexpected_keys) — ログ済みだが呼び出し側の検証用に返す。
@@ -1377,29 +1396,83 @@ def load_weights_only_checkpoint(checkpoint_path: str, model) -> tuple[list, lis
         state_dict, model.state_dict(), checkpoint_path=checkpoint_path
     )
     if _involves_reference_modules(model.state_dict(), normalized_sd):
-        # 参照条件付け (plan §8 Task 6R): 欠落してよいのは参照モジュールだけ
-        # (zero-init のまま)。それ以外の欠落・余剰 (参照付き ckpt → none
-        # モデルを含む)・shape 差は黙って捨てずに ValueError。
-        result = load_state_with_allowed_missing(
-            model, normalized_sd, REFERENCE_PARAM_PREFIXES
-        )
-        missing, unexpected = result["missing"], result["unexpected"]
+        # 参照条件付け (plan §8 Task 6R): 欠落してよいのは参照モジュールと
+        # 学習専用の補助モジュールだけ。それ以外の欠落・余剰 (参照付き ckpt →
+        # none モデルを含む)・shape / dtype 差は黙って捨てずに ValueError。
+        missing, unexpected = _load_reference_warm_start(model, normalized_sd)
+        strict_path = True
     else:
         missing, unexpected = model.load_state_dict(normalized_sd, strict=False)
+        strict_path = False
     reset_progress = getattr(model, "_reset_training_progress", None)
     if callable(reset_progress):
         reset_progress()
-    _LOGGER.info(
-        "Warm-restart weights loaded (strict=False): missing=%d (fresh-init kept), "
-        "unexpected=%d (dropped)",
-        len(missing),
-        len(unexpected),
-    )
+    if strict_path:
+        _LOGGER.info(
+            "Warm-restart weights loaded (reference-conditioning checked load): "
+            "missing=%d (reference / auxiliary modules, fresh-init kept), "
+            "unexpected=%d (auxiliary modules only, dropped)",
+            len(missing),
+            len(unexpected),
+        )
+    else:
+        _LOGGER.info(
+            "Warm-restart weights loaded (strict=False): missing=%d (fresh-init "
+            "kept), unexpected=%d (dropped)",
+            len(missing),
+            len(unexpected),
+        )
     if missing:
         _LOGGER.info("Fresh-initialized keys (not in checkpoint): %s", missing)
     if unexpected:
         _LOGGER.info("Dropped checkpoint keys (not in model): %s", unexpected)
     return missing, unexpected
+
+
+def _is_warm_start_auxiliary(key: str) -> bool:
+    return key in WARM_START_AUXILIARY_KEYS or key.startswith(
+        WARM_START_AUXILIARY_PREFIXES
+    )
+
+
+def _load_reference_warm_start(model, state_dict: dict) -> tuple[list, list]:
+    """参照条件付きの weights-only 読み込み (controller 裁定 R10)。
+
+    学習専用の補助モジュール (:data:`WARM_START_AUXILIARY_PREFIXES` /
+    :data:`WARM_START_AUXILIARY_KEYS`) は設定によって有無が変わるので、
+    ckpt 側だけにあるものは WARNING を出して捨て、モデル側だけにあるものは
+    WARNING を出して初期値のまま残す。両方にあるものは通常どおり shape /
+    dtype まで検査する。それ以外は
+    :func:`~piper_train.checkpoint_io.load_state_with_allowed_missing` で
+    厳格に読む (参照モジュールの欠落だけを許す)。
+    """
+    model_state = model.state_dict()
+    dropped = [
+        k for k in state_dict if k not in model_state and _is_warm_start_auxiliary(k)
+    ]
+    kept_fresh = [
+        k for k in model_state if k not in state_dict and _is_warm_start_auxiliary(k)
+    ]
+    filtered = {k: v for k, v in state_dict.items() if k not in dropped}
+    # モデル側だけの補助 key は現在値 (初期値) を渡し、検査対象から外す
+    filtered.update({k: model_state[k] for k in kept_fresh})
+    result = load_state_with_allowed_missing(model, filtered, REFERENCE_PARAM_PREFIXES)
+    if dropped:
+        _LOGGER.warning(
+            "Warm start: dropped %d checkpoint keys of training-only auxiliary "
+            "modules that this run does not build: %s",
+            len(dropped),
+            dropped,
+        )
+    if kept_fresh:
+        _LOGGER.warning(
+            "Warm start: %d keys of training-only auxiliary modules are not in "
+            "the checkpoint and keep their fresh initialisation: %s",
+            len(kept_fresh),
+            kept_fresh,
+        )
+    missing = [k for k in model_state if k in kept_fresh or k in result["missing"]]
+    return missing, result["unexpected"] + dropped
 
 
 def load_multispeaker_checkpoint(checkpoint_path: str, model: VitsModel) -> None:
@@ -1431,18 +1504,23 @@ def load_multispeaker_checkpoint(checkpoint_path: str, model: VitsModel) -> None
         checkpoint["state_dict"], model.state_dict(), checkpoint_path=checkpoint_path
     )
     # single-speaker の FT 先は参照モジュールを持てない (spk_proj が必要)。
-    # 参照付き ckpt の参照重みを黙って捨てずに止める (plan §8 Task 6R)。
+    # spk_proj と同じく捨てるが、黙らずに prefix と件数を WARNING で出す
+    # (plan §8 Task 6R、controller 裁定 R9)。FT 先が同じ参照モジュールを
+    # 持つ場合は下の load_state_dict でそのまま読まれる。
     model_keys = model.state_dict()
-    stray_reference = [
-        k
-        for k in normalized_sd
-        if k not in model_keys and key_has_module_prefix(k, REFERENCE_PARAM_PREFIXES)
-    ]
-    if stray_reference:
-        raise ValueError(
-            "checkpoint has reference-conditioning weights the target model "
-            f"does not have (unexpected keys: {stray_reference[:5]}"
-            f"{' ...' if len(stray_reference) > 5 else ''}); refusing to drop them."
+    dropped_counts: dict[str, int] = {}
+    for key in normalized_sd:
+        if key in model_keys:
+            continue
+        for prefix in REFERENCE_PARAM_PREFIXES:
+            if key_has_module_prefix(key, (prefix,)):
+                dropped_counts[prefix] = dropped_counts.get(prefix, 0) + 1
+    if dropped_counts:
+        _LOGGER.warning(
+            "Dropping reference-conditioning weights that the fine-tuning target "
+            "has no module for (like spk_proj, they are not used by a "
+            "single-speaker model): %s",
+            ", ".join(f"{p} ({n} keys)" for p, n in dropped_counts.items()),
         )
     missing, unexpected = model.load_state_dict(normalized_sd, strict=False)
     _LOGGER.info(
