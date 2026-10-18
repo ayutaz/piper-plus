@@ -359,14 +359,18 @@ def test_resize_mode_exports_through_production_infer_path():
     set_export_mode(model, True)
     model.forward = build_infer_forward(model, stochastic=False)
 
+    import onnxruntime as ort
+
     n_phonemes = 10
-    dummy = (
-        torch.randint(0, 97, (1, n_phonemes), dtype=torch.long),
-        torch.LongTensor([n_phonemes]),
-        torch.FloatTensor([0.4, 1.0, 0.5]),
-        torch.LongTensor([0]),
-        torch.LongTensor([0]),
-    )
+    text = torch.randint(0, 97, (1, n_phonemes), dtype=torch.long)
+    lengths = torch.LongTensor([n_phonemes])
+    scales = torch.FloatTensor([0.4, 1.0, 0.5])
+    lid = torch.LongTensor([0])
+    # infer_forward の位置引数は (text, lengths, scales, speaker_embedding, lid, ...)
+    # で sid は受けない (c44ebeb9 以降の契約)。単話者・多言語モデルでは
+    # export_onnx.main と同じく speaker_embedding 枠を None で埋め、lid を
+    # 5 番目に束縛する (sid を 4 番目に渡すと speaker_embedding に入ってしまう)。
+    dummy = (text, lengths, scales, None, lid)
 
     with tempfile.NamedTemporaryFile(suffix=".onnx", delete=False) as f:
         onnx_path = Path(f.name)
@@ -376,18 +380,35 @@ def test_resize_mode_exports_through_production_infer_path():
             dummy,
             str(onnx_path),
             opset_version=15,
-            input_names=["input", "input_lengths", "scales", "sid", "lid"],
+            input_names=["input", "input_lengths", "scales", "lid"],
             output_names=["output", "durations"],
             dynamic_axes={
                 "input": {0: "batch_size", 1: "phonemes"},
                 "input_lengths": {0: "batch_size"},
-                "sid": {0: "batch_size"},
                 "lid": {0: "batch_size"},
                 "output": {0: "batch_size", 2: "time"},
                 "durations": {0: "batch_size", 1: "phonemes"},
             },
             dynamo=False,
         )
-        assert onnx_path.stat().st_size > 0
+        sess = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
+        assert [i.name for i in sess.get_inputs()] == [
+            "input",
+            "input_lengths",
+            "scales",
+            "lid",
+        ]
+        audio, durations = sess.run(
+            None,
+            {
+                "input": text.numpy(),
+                "input_lengths": lengths.numpy(),
+                "scales": scales.numpy(),
+                "lid": lid.numpy(),
+            },
+        )
+        assert audio.ndim == 3 and audio.shape[:2] == (1, 1) and audio.shape[2] > 0
+        assert durations.shape == (1, n_phonemes)
+        assert np.isfinite(audio).all()
     finally:
         onnx_path.unlink(missing_ok=True)
