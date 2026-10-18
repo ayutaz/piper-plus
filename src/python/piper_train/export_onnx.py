@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import warnings
 from pathlib import Path
@@ -60,14 +61,17 @@ def build_infer_forward(
         A forward function with signature::
 
             infer_forward(text, text_lengths, scales,
-                speaker_embedding=None, lid=None, prosody_features=None)
+                speaker_embedding=None, lid=None, prosody_features=None,
+                reference_spec=None, reference_spec_lengths=None)
             -> (audio: Tensor, durations: Tensor)
 
         Positional order matches the ONNX export input order
         (``input, input_lengths, scales, speaker_embedding, lid,
-        prosody_features``) so that ``torch.onnx.export`` の args tuple が
-        そのまま束縛できる。``sid`` は受けない (zero-shot export は
-        speaker_embedding 経路のみ。v1.12 以降の契約)。
+        prosody_features, reference_spec, reference_spec_lengths``) so that
+        ``torch.onnx.export`` の args tuple がそのまま束縛できる。``sid`` は
+        受けない (zero-shot export は speaker_embedding 経路のみ。v1.12 以降の
+        契約)。``reference_spec*`` は ``reference_conditioning="ref_spec"`` の
+        モデルだけが使う (末尾に足したので旧モデルの束縛は変わらない)。
     """
     # Configure stochastic/deterministic mode ONCE at build time
     # (not inside forward, to avoid "state_dict changed during tracing" errors).
@@ -85,6 +89,8 @@ def build_infer_forward(
         speaker_embedding=None,
         lid=None,
         prosody_features=None,
+        reference_spec=None,
+        reference_spec_lengths=None,
     ):
         noise_scale = scales[0]
         length_scale = scales[1]
@@ -108,6 +114,8 @@ def build_infer_forward(
             noise_scale_w=noise_scale_w,
             prosody_features=prosody_features,
             speaker_embeddings=speaker_embedding,
+            reference_spec=reference_spec,
+            reference_spec_lengths=reference_spec_lengths,
         )
 
         return audio, durations
@@ -442,6 +450,99 @@ def simplify_onnx_model(onnx_path: Path, check_n: int = 3) -> bool:
         return False
 
 
+# 参照 spec のフロントエンド契約 (reference-fusion plan §8 Task 8R)。runtime は
+# 参照 WAV を学習時 audio_norm と同じ前処理 (16 kHz soxr HQ → energy VAD trim)
+# に通してから spectrogram_torch (center=False) と同じ線形振幅 spec を作る
+REFERENCE_SPEC_SCHEMA = "ref_spec_v1"
+REFERENCE_SPEC_FRONTEND = "energy-vad@16k;soxr-hq"
+CAPACITY_SCHEMA = "capacity_v1"
+REFERENCE_INPUT_NAMES = ("reference_spec", "reference_spec_lengths")
+# FP16 変換 (convert_fp16) は initializer だけを fp16 に落とし、計算は fp32 の
+# まま行う。参照 encoder の log 下限 1e-5 (fp16 では subnormal) は Clip の
+# Constant node として出力され変換対象外なので fp32 のまま残る
+# (tests/test_export_reference_encoder.py::TestFp16 が pin)。
+
+
+def _hparam(hparams, name: str):
+    return hparams[name] if isinstance(hparams, dict) else getattr(hparams, name)
+
+
+def reference_conditioning_config(model_g, hparams) -> dict | None:
+    """``config.json`` に記録する ``reference_conditioning`` の値。
+
+    ``"none"`` のモデルは ``None`` (key を書かない)。``"ref_spec"`` は runtime が
+    参照 spec を学習時と同じ定義で作るための STFT 設定とフロントエンド、
+    ``"capacity"`` は入力を増やさないので schema のみ。
+
+    Raises:
+        ValueError: reference_encoder の入力 bin 数が ``filter_length // 2 + 1``
+            と一致しない (記録した STFT 設定で作った spec が入らない)、または
+            未知の mode。
+    """
+    mode = getattr(model_g, "reference_conditioning", "none")
+    if mode == "none":
+        return None
+    if mode == "capacity":
+        return {"schema": CAPACITY_SCHEMA}
+    if mode != "ref_spec":
+        raise ValueError(f"unknown reference_conditioning: {mode!r}")
+    filter_length = int(_hparam(hparams, "filter_length"))
+    spec_channels = int(model_g.reference_encoder.spec_channels)
+    if spec_channels != filter_length // 2 + 1:
+        raise ValueError(
+            f"reference_encoder spec_channels ({spec_channels}) does not match "
+            f"filter_length // 2 + 1 ({filter_length // 2 + 1})"
+        )
+    return {
+        "schema": REFERENCE_SPEC_SCHEMA,
+        "spec_channels": spec_channels,
+        "filter_length": filter_length,
+        "hop_length": int(_hparam(hparams, "hop_length")),
+        "win_length": int(_hparam(hparams, "win_length")),
+        "sample_rate": int(_hparam(hparams, "sample_rate")),
+        "center": False,
+        "frontend": REFERENCE_SPEC_FRONTEND,
+    }
+
+
+def build_export_config(
+    source_config_path: Path,
+    reference_config: dict | None,
+    sample_rate: int,
+) -> dict:
+    """学習 config.json を読み、export する ONNX 用の config を作る (書き込まない)。
+
+    ``reference_config`` が ``None`` なら ``reference_conditioning`` key を除く
+    (古い key が残っていると runtime が参照入力のない graph に spec を渡す)。
+
+    Raises:
+        ValueError: config の ``audio.sample_rate`` がモデルと食い違う。
+    """
+    with open(source_config_path, encoding="utf-8") as f:
+        config = json.load(f)
+    config_sr = (config.get("audio") or {}).get("sample_rate")
+    if config_sr is not None and int(config_sr) != int(sample_rate):
+        raise ValueError(
+            f"config audio.sample_rate ({config_sr}) does not match the "
+            f"checkpoint sample_rate ({sample_rate})"
+        )
+    if reference_config is None:
+        if config.pop("reference_conditioning", None) is not None:
+            _LOGGER.warning(
+                "Dropping stale 'reference_conditioning' from %s: this model "
+                "has no reference conditioning",
+                source_config_path,
+            )
+    else:
+        config["reference_conditioning"] = reference_config
+    return config
+
+
+def export_config_path(onnx_path: Path) -> Path:
+    """``model.onnx`` → ``model.onnx.json`` (runtime が最初に探す名前)。"""
+    return onnx_path.with_name(onnx_path.name + ".json")
+
+
 def set_export_mode(model: torch.nn.Module, mode: bool = True) -> None:
     """Set onnx_export_mode on all submodules that support it."""
     for m in model.modules():
@@ -510,6 +611,14 @@ def main() -> None:
         "'sid': DEPRECATED, falls back to zero-shot with warning. "
         "Default: auto.",
     )
+    parser.add_argument(
+        "--config",
+        default=None,
+        help="Training config.json to copy next to the ONNX as <output>.json. "
+        "Records the 'reference_conditioning' contract (spec STFT settings and "
+        "frontend) for --reference-conditioning ref_spec / capacity models, for "
+        "which it is required. Without it no config is written (legacy).",
+    )
     args = parser.parse_args()
 
     if args.debug:
@@ -574,6 +683,27 @@ def main() -> None:
     num_symbols = model_g.n_vocab
     num_speakers = model_g.n_speakers
     num_languages = getattr(model_g, "n_languages", 1)
+
+    # 参照条件付け (reference-fusion plan §8 Task 8R)。参照入力付き ONNX は
+    # フロントエンド契約 (spec の STFT 設定) を config に記録しないと runtime が
+    # 正しい spec を作れないので、--config なしでは export 前に止める
+    reference_mode = getattr(model_g, "reference_conditioning", "none")
+    include_reference = reference_mode == "ref_spec"
+    export_config: dict | None = None
+    try:
+        reference_config = reference_conditioning_config(model_g, model.hparams)
+        if args.config is not None:
+            export_config = build_export_config(
+                Path(args.config), reference_config, model.hparams.sample_rate
+            )
+    except (OSError, ValueError) as e:
+        parser.error(f"--config: {e}")
+    if reference_config is not None and export_config is None:
+        parser.error(
+            f"reference_conditioning={reference_mode!r} models require --config "
+            "<training config.json> so that <output>.json records the "
+            "'reference_conditioning' contract"
+        )
 
     # Determine if model has spk_proj (zero-shot capable)
     has_spk_proj = hasattr(model_g, "spk_proj")
@@ -690,32 +820,55 @@ def main() -> None:
         "durations": {0: "batch_size", 1: "phonemes"},
     }
 
-    if include_speaker_embedding:
-        dummy_input_list.append(speaker_embedding)
-        input_names.append("speaker_embedding")
-        dynamic_axes["speaker_embedding"] = {0: "batch_size"}
-    elif has_prosody or include_lid:
-        # Placeholder for skipped speaker_embedding so that lid/prosody_features
-        # are not bound to the wrong positional parameter in infer_forward.
-        # torch.onnx.export ignores None entries in the args tuple.
-        dummy_input_list.append(None)
+    # 参照 spec [batch, F, frames] (線形振幅 = 非負) と有効 frame 数 [batch]。
+    # ref_spec モデルでのみ作る (旧モデルの乱数消費・入力は変えない)
+    reference_spec: torch.Tensor | None = None
+    reference_spec_lengths: torch.LongTensor | None = None
+    if include_reference:
+        dummy_reference_frames = 64
+        reference_spec = torch.rand(
+            1,
+            model_g.reference_encoder.spec_channels,
+            dummy_reference_frames,
+            dtype=torch.float32,
+        )
+        reference_spec_lengths = torch.LongTensor([dummy_reference_frames])
 
-    if include_lid:
-        dummy_input_list.append(lid)
-        input_names.append("lid")
-        dynamic_axes["lid"] = {0: "batch_size"}
-    elif has_prosody:
-        # Placeholder for skipped lid so that prosody_features is not bound to
-        # the lid positional parameter in infer_forward.
-        dummy_input_list.append(None)
+    # Optional inputs in infer_forward's positional order. A skipped slot that
+    # precedes a present one gets a None placeholder so that later inputs are
+    # not bound to the wrong positional parameter (torch.onnx.export ignores
+    # None entries in the args tuple); trailing skipped slots are omitted.
+    optional_inputs = [
+        ("speaker_embedding", speaker_embedding, {0: "batch_size"}),
+        ("lid", lid, {0: "batch_size"}),
+        ("prosody_features", prosody_features, {0: "batch_size", 1: "phonemes"}),
+        (
+            REFERENCE_INPUT_NAMES[0],
+            reference_spec,
+            {0: "batch_size", 2: "reference_frames"},
+        ),
+        (REFERENCE_INPUT_NAMES[1], reference_spec_lengths, {0: "batch_size"}),
+    ]
+    n_bound = max(
+        (i + 1 for i, (_, value, _) in enumerate(optional_inputs) if value is not None),
+        default=0,
+    )
+    for name, value, axes in optional_inputs[:n_bound]:
+        dummy_input_list.append(value)
+        if value is not None:
+            input_names.append(name)
+            dynamic_axes[name] = axes
 
     if has_prosody:
-        dummy_input_list.append(prosody_features)
-        input_names.append("prosody_features")
-        dynamic_axes["prosody_features"] = {0: "batch_size", 1: "phonemes"}
         _LOGGER.info(
             "Exporting model with prosody features support (prosody_dim=%d)",
             model_g.prosody_dim,
+        )
+    if include_reference:
+        _LOGGER.info(
+            "Exporting model with reference spec inputs %s (spec_channels=%d)",
+            REFERENCE_INPUT_NAMES,
+            model_g.reference_encoder.spec_channels,
         )
 
     dummy_input = tuple(dummy_input_list)
@@ -820,6 +973,13 @@ def main() -> None:
             fp16_size / (1024 * 1024),
             reduction_pct,
         )
+
+    # 検証を通った ONNX にだけ config を添える (失敗した export に config を残さない)
+    if export_config is not None:
+        config_path = export_config_path(args.output)
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(export_config, f, ensure_ascii=True, indent=4)
+        _LOGGER.info("Wrote config to %s", config_path)
 
 
 # -----------------------------------------------------------------------------
