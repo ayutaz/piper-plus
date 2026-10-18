@@ -1485,6 +1485,46 @@ def _load_reference_warm_start(model, state_dict: dict) -> tuple[list, list]:
     return missing, result["unexpected"] + dropped
 
 
+def load_single_speaker_checkpoint(checkpoint_path: str, model: VitsModel) -> None:
+    """single-speaker checkpoint の重みを multi-speaker モデルへ転移する。
+
+    ``--resume_from_single_speaker_checkpoint`` の本体。checkpoint にある key は
+    そのまま上書きし、ない key (multi-speaker 側の emb_g 等) は初期値のまま
+    残す。optimizer 等は復元しない。
+
+    参照 hparam は weights-only / multispeaker FT と同じ規則で照合する
+    (Ruling R16 / R16a、Task 13R)。照合には checkpoint に保存された
+    ``hyper_parameters`` そのものを使う: ``load_from_checkpoint`` で作った
+    モデルの hparams は保存されていない key を既定値で埋めるので、旧 ckpt
+    (key なし) を黙って受け入れる規則が守れない。
+    """
+    # Load single-speaker checkpoint
+    _LOGGER.debug("Resuming from single-speaker checkpoint: %s", checkpoint_path)
+    # NOTE: weights_only=False is required to handle PosixPath objects in checkpoints
+    # This poses a security risk - only load trusted checkpoints
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    # Ruling R16: 参照 hparam の照合は重みを書き換える前に
+    validate_warm_start_reference_hparams(
+        checkpoint.get("hyper_parameters"),
+        getattr(model, "hparams", None),
+        source_flag="--resume_from_single_speaker_checkpoint",
+        logger=_LOGGER,
+    )
+    del checkpoint
+    model_single = VitsModel.load_from_checkpoint(checkpoint_path, dataset=None)
+    g_dict = model_single.model_g.state_dict()
+    # NOTE: cond 層 (dec.cond, dp.cond, enc.cond_layer 等) は
+    # single/multi-speaker どちらも gin_channels=512 で形状が同一のため
+    # 除外不要。全重みを転移してよい。
+
+    # Copy over the single-speaker weights; keys missing in g_dict
+    # (e.g. emb_g of the multi-speaker target) will keep their
+    # randomly-initialized values.
+    load_state_dict(model.model_g, g_dict)
+    load_state_dict(model.model_d, model_single.model_d.state_dict())
+    _LOGGER.info("Successfully converted single-speaker checkpoint to multi-speaker")
+
+
 def load_multispeaker_checkpoint(checkpoint_path: str, model: VitsModel) -> None:
     """Load a multispeaker checkpoint for single-speaker fine-tuning.
 
@@ -2103,27 +2143,8 @@ def main():
             "--resume_from_single_speaker_checkpoint is only for multi-speaker models. Use --resume_from_checkpoint for single-speaker models."
         )  # noqa: E501
 
-        # Load single-speaker checkpoint
-        _LOGGER.debug(
-            "Resuming from single-speaker checkpoint: %s",
-            args.resume_from_single_speaker_checkpoint,
-        )
-        model_single = VitsModel.load_from_checkpoint(
-            args.resume_from_single_speaker_checkpoint,
-            dataset=None,
-        )
-        g_dict = model_single.model_g.state_dict()
-        # NOTE: cond 層 (dec.cond, dp.cond, enc.cond_layer 等) は
-        # single/multi-speaker どちらも gin_channels=512 で形状が同一のため
-        # 除外不要。全重みを転移してよい。
-
-        # Copy over the single-speaker weights; keys missing in g_dict
-        # (e.g. emb_g of the multi-speaker target) will keep their
-        # randomly-initialized values.
-        load_state_dict(model.model_g, g_dict)
-        load_state_dict(model.model_d, model_single.model_d.state_dict())
-        _LOGGER.info(
-            "Successfully converted single-speaker checkpoint to multi-speaker"
+        load_single_speaker_checkpoint(
+            args.resume_from_single_speaker_checkpoint, model
         )
 
     if args.resume_from_multispeaker_checkpoint:
