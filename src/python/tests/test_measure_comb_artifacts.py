@@ -19,10 +19,21 @@ SR=22050、seed 固定。
 
 from __future__ import annotations
 
+import importlib.util
+
 import numpy as np
 import pytest
 
 from piper_train.tools.measure_comb_artifacts import comb_metrics
+
+
+# librosa (と依存の scipy) は train extra。torch / train extras を入れない
+# Windows CI job では librosa に到達するテストだけを skip し、純 numpy の
+# 経路は引き続き検証する。
+requires_librosa = pytest.mark.skipif(
+    importlib.util.find_spec("librosa") is None,
+    reason="librosa not installed (train extra)",
+)
 
 
 SR = 22050
@@ -115,6 +126,7 @@ def _assert_tree_equal(a, b, path: str = "$") -> None:
 
 
 @pytest.mark.unit
+@requires_librosa
 class TestCombMetrics:
     """SR/128 格子コム超過 + >4kHz 残差 autocorr (がびがびのゲーム不能量)。"""
 
@@ -216,6 +228,7 @@ class TestCombContract:
         assert tuple(MODULE_BINS) == tuple(range(384, 785, 16))
         assert len(MODULE_BINS) == 26
 
+    @requires_librosa
     def test_scale_invariance(self):
         """同一信号 ×0.1 / ×10 → 全 field 一致 (RMS 正規化の pin)。"""
         wav = _grid_tones(duration=2.0)
@@ -227,6 +240,7 @@ class TestCombContract:
             for key, value in base.items():
                 assert m[key] == pytest.approx(value, abs=1e-9), key
 
+    @requires_librosa
     def test_too_short_returns_none(self):
         """0.5 秒未満 → None (仕様 §1.2 の最短長)。"""
         assert comb_metrics(_white_noise(duration=0.3), SR) is None
@@ -236,6 +250,7 @@ class TestCombContract:
         with pytest.raises(ValueError, match="22050"):
             comb_metrics(_white_noise(duration=1.0), 16000)
 
+    @requires_librosa
     def test_comb_metrics_deterministic(self):
         """同一入力 2 回 → 同一出力 (manifest への数値 pin の前提条件)。"""
         wav = _grid_tones(duration=2.0)

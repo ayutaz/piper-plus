@@ -17,8 +17,14 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from piper_train.tools import eval_zs_secs
-from piper_train.tools.eval_zs_secs import collect_wavs, compute_secs_report
+
+# テスト自体は encoder を fake に差し替えるが、対象モジュールが
+# piper_train.extract_speaker_embedding 経由で torch を import する。
+# torch を入れない Windows CI job では collection error にせず skip する。
+pytest.importorskip("torch")
+
+from piper_train.tools import eval_zs_secs  # noqa: E402
+from piper_train.tools.eval_zs_secs import collect_wavs, compute_secs_report  # noqa: E402
 
 
 SQRT2_INV = 1.0 / np.sqrt(2.0)

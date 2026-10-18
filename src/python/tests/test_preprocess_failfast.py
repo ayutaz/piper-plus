@@ -22,9 +22,13 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-import torch
 
-from piper_train.tools import (
+
+# 対象の前処理モジュールは piper_train.norm_audio 経由で torch を import する。
+# torch を入れない Windows CI job では collection error にせず skip する。
+torch = pytest.importorskip("torch")
+
+from piper_train.tools import (  # noqa: E402
     prepare_bilingual_dataset as pbd,
     prepare_multilingual_dataset as pmd,
 )
