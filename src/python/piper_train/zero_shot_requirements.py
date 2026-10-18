@@ -182,8 +182,22 @@ def validate_strict_resume_reference_hparams(saved_hparams, current_hparams):
     if not mismatches:
         return
     lines = "\n".join(f"  - {_mismatch_line(*m)}" for m in mismatches)
+    saved_mode = (saved_hparams or {}).get("reference_conditioning", "none")
+    current_mode = (current_hparams or {}).get("reference_conditioning", "none")
+    if saved_mode not in ("none", current_mode):
+        # 参照モジュールを持つ ckpt を別の mode で読むと、weights-only も参照
+        # モジュールの余剰 key を ValueError で拒否する (R16 review Minor 2)。
+        # none ckpt → 参照付き run は weights-only で始められる (S3) ので下へ
+        how = (
+            f"This checkpoint was trained with reference_conditioning="
+            f"{saved_mode!r} but this run uses {current_mode!r}; neither a "
+            "strict resume nor a weights-only warm start can drop or swap its "
+            "reference modules. To continue it, pass --reference-conditioning "
+            f"{shlex.quote(str(saved_mode))} with the values above; otherwise "
+            "start a new run (new output directory) without this checkpoint."
+        )
     # frontend は weights-only でも変えられない (validate_warm_start_... が拒否)
-    if all(key != "reference_spec_frontend" for key, _, _ in mismatches):
+    elif all(key != "reference_spec_frontend" for key, _, _ in mismatches):
         how = (
             "To change it, start a new run from these weights with "
             "--resume-weights-only instead of --resume_from_checkpoint."

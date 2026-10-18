@@ -10,8 +10,10 @@
 * strict resume (``--resume_from_checkpoint``、``VitsModel.on_load_checkpoint``
   で fit 中だけ): どの key の食い違いも ``SystemExit``。key 名・両方の値・
   続け方を書く。重みは読み込まない。
-* weights-only (``--resume-weights-only``) と multispeaker FT
-  (``--resume-from-multispeaker-checkpoint``): ``reference_spec_frontend`` の
+* weights-only (``--resume-weights-only``)・multispeaker FT
+  (``--resume-from-multispeaker-checkpoint``)・single-speaker → multi-speaker
+  転移 (``--resume_from_single_speaker_checkpoint``、Task 13R):
+  ``reference_spec_frontend`` の
   食い違いは ``SystemExit`` (参照 spec の分布が変わる)。``generator_reference`` /
   ``reference_max_frames`` は key 名と両方の値を WARNING に出して続ける。
 * ``reference_spec_frontend`` / ``reference_max_frames`` を比べるのは
@@ -21,7 +23,10 @@
   ない、または値が None (宣言なし) なら黙って受け入れる (旧 none ckpt は従来
   どおり)。
 * ``reference_conditioning`` 自体の食い違いは state_dict の key 差で止まる
-  (strict は ``SystemExit``)。この照合では扱わない。
+  (strict は ``SystemExit``)。この照合では扱わない。ただし strict resume の
+  案内は、参照付き checkpoint を別の mode で読もうとしたときは
+  ``--resume-weights-only`` (同じく失敗する) ではなく checkpoint の mode を
+  指定する方法を書く (R16 review Minor 2)。
 """
 
 from __future__ import annotations
@@ -132,7 +137,7 @@ def saved_ckpts(tmp_path_factory):
     """
     root = tmp_path_factory.mktemp("saved")
     ref = _model(seed=1, **SAVED_REF)
-    for kind in ("ref", "none", "c0"):
+    for kind in ("ref", "none", "c0", "single"):
         (root / kind).mkdir()
     return {
         "ref": (_save_real_checkpoint(root / "ref", ref), ref.state_dict()),
@@ -145,6 +150,11 @@ def saved_ckpts(tmp_path_factory):
                 root / "c0", _model(seed=1, generator_reference="cross_utt")
             ),
             _model(seed=1, generator_reference="cross_utt").state_dict(),
+        ),
+        # 本物の single-speaker (none / self) checkpoint
+        "single": (
+            _save_real_checkpoint(root / "single", _model(seed=1, num_speakers=1)),
+            _model(seed=1, num_speakers=1).state_dict(),
         ),
     }
 
@@ -210,6 +220,12 @@ def _finetune(model, ckpt):
     from piper_train.__main__ import load_multispeaker_checkpoint
 
     load_multispeaker_checkpoint(ckpt, model)
+
+
+def _single_to_multi(model, ckpt):
+    from piper_train.__main__ import load_single_speaker_checkpoint
+
+    load_single_speaker_checkpoint(ckpt, model)
 
 
 # ---------------------------------------------------------------------------
@@ -325,6 +341,41 @@ class TestStrictResume:
         with pytest.raises(SystemExit, match="strict resume"):
             _strict(tmp_path, model, _ckpt(tmp_path, saved_ckpts))
 
+    @pytest.mark.parametrize("mode", ["none", "capacity"])
+    def test_reference_checkpoint_in_other_mode_does_not_point_to_weights_only(
+        self, tmp_path, saved_ckpts, mode
+    ):
+        """参照付き ckpt を別の mode で読むと weights-only も失敗するので案内しない。
+
+        generator_reference の食い違い (R16a) で止まるが、weights-only は参照
+        モジュールの余剰 key を ``ValueError`` で拒否する (R16 review Minor 2)。
+        """
+        model = _model(seed=2, reference_conditioning=mode, generator_reference="self")
+        with pytest.raises(SystemExit) as excinfo:
+            _strict(tmp_path, model, _ckpt(tmp_path, saved_ckpts))
+        assert "--resume-weights-only" not in str(excinfo.value)
+
+    @pytest.mark.parametrize("mode", ["none", "capacity"])
+    def test_reference_checkpoint_in_other_mode_points_to_checkpoint_mode(
+        self, tmp_path, saved_ckpts, mode
+    ):
+        model = _model(seed=2, reference_conditioning=mode, generator_reference="self")
+        with pytest.raises(SystemExit) as excinfo:
+            _strict(tmp_path, model, _ckpt(tmp_path, saved_ckpts))
+        message = str(excinfo.value)
+        assert "--reference-conditioning ref_spec" in message
+        assert "--generator-reference cross_utt" in message
+
+    def test_none_checkpoint_into_reference_run_still_points_to_weights_only(
+        self, tmp_path, saved_ckpts
+    ):
+        """none ckpt → ref_spec は weights-only で始められる (S3) ので案内を残す。"""
+        with pytest.raises(SystemExit) as excinfo:
+            _strict(tmp_path, _current(), _ckpt(tmp_path, saved_ckpts, "none"))
+        message = str(excinfo.value)
+        assert "generator_reference" in message
+        assert "--resume-weights-only" in message
+
     def test_load_from_checkpoint_with_override_is_not_checked(
         self, tmp_path, saved_ckpts
     ):
@@ -341,11 +392,22 @@ class TestStrictResume:
 # weights-only (--resume-weights-only) / multispeaker FT
 # ---------------------------------------------------------------------------
 
-WARM_STARTS = {"weights_only": _weights_only, "finetune": _finetune}
+WARM_STARTS = {
+    "weights_only": _weights_only,
+    "finetune": _finetune,
+    # --resume_from_single_speaker_checkpoint は checkpoint の話者数を見ずに
+    # VitsModel.load_from_checkpoint で読む。single-speaker は参照モジュールを
+    # 持てない (spk_proj が必要) ので、参照 hparam の照合は multi-speaker の
+    # ref_spec checkpoint を渡したときに効く (Task 13R)
+    "single_to_multi": _single_to_multi,
+}
 WARM_FLAGS = {
     "weights_only": "--resume-weights-only",
     "finetune": "--resume-from-multispeaker-checkpoint",
+    "single_to_multi": "--resume_from_single_speaker_checkpoint",
 }
+# state_dict だけを読む経路 (load_from_checkpoint は hyper_parameters が必要)
+STATE_DICT_WARM_STARTS = ["finetune", "weights_only"]
 
 
 @pytest.mark.parametrize("path", sorted(WARM_STARTS))
@@ -442,6 +504,10 @@ class TestWarmStart:
         self, tmp_path, saved_ckpts, caplog, path
     ):
         """hyper_parameters 自体のない checkpoint (手で作った ckpt 等)。"""
+        if path not in STATE_DICT_WARM_STARTS:
+            pytest.skip(
+                "load_from_checkpoint needs hyper_parameters to build the model"
+            )
         src = _ckpt(tmp_path, saved_ckpts)
         checkpoint = torch.load(src, map_location="cpu", weights_only=False)
         del checkpoint["hyper_parameters"]
@@ -572,6 +638,74 @@ class TestGeneratorReferenceWarmStart:
         with caplog.at_level(logging.WARNING, logger="piper_train"):
             WARM_STARTS[path](_warm_target(path), _ckpt(tmp_path, saved_ckpts, "none"))
         assert _hparam_warnings(caplog) == []
+
+
+class TestS3NoneCheckpointIntoRefSpec:
+    """S3: self を記録した none ckpt から ref_spec (cross_utt) を warm start。
+
+    frontend・max_frames は none と比べないので、WARNING は generator_reference
+    の 1 件だけ (R16 review Minor 3、運用で想定しておく WARNING)。
+    """
+
+    def test_warns_only_about_generator_reference(self, tmp_path, saved_ckpts, caplog):
+        with caplog.at_level(logging.WARNING, logger="piper_train"):
+            _weights_only(_current(), _ckpt(tmp_path, saved_ckpts, "none"))
+        (message,) = _hparam_warnings(caplog)
+        assert "generator_reference" in message
+
+    def test_still_loads_shared_weights(self, tmp_path, saved_ckpts):
+        model = _current()
+        _weights_only(model, _ckpt(tmp_path, saved_ckpts, "none"))
+        assert _shared_weight(model, saved_ckpts, "none")
+
+
+class TestRealSingleSpeakerCheckpoint:
+    """本物の single-speaker (none / self) ckpt → multi-speaker (Task 13R)。"""
+
+    def test_matching_loads_without_warning(self, tmp_path, saved_ckpts, caplog):
+        with caplog.at_level(logging.WARNING, logger="piper_train"):
+            _single_to_multi(_model(seed=2), _ckpt(tmp_path, saved_ckpts, "single"))
+        assert _hparam_warnings(caplog) == []
+
+    def test_matching_copies_shared_weights(self, tmp_path, saved_ckpts):
+        model = _model(seed=2)
+        _single_to_multi(model, _ckpt(tmp_path, saved_ckpts, "single"))
+        assert _shared_weight(model, saved_ckpts, "single")
+
+    def test_generator_reference_mismatch_warns_once(
+        self, tmp_path, saved_ckpts, caplog
+    ):
+        model = _model(seed=2, generator_reference="cross_utt")
+        with caplog.at_level(logging.WARNING, logger="piper_train"):
+            _single_to_multi(model, _ckpt(tmp_path, saved_ckpts, "single"))
+        (message,) = _hparam_warnings(caplog)
+        assert "generator_reference" in message
+        assert "'self'" in message and "'cross_utt'" in message
+        assert "--resume_from_single_speaker_checkpoint" in message
+
+    def test_generator_reference_mismatch_still_copies_weights(
+        self, tmp_path, saved_ckpts
+    ):
+        model = _model(seed=2, generator_reference="cross_utt")
+        _single_to_multi(model, _ckpt(tmp_path, saved_ckpts, "single"))
+        assert _shared_weight(model, saved_ckpts, "single")
+        assert model.hparams.generator_reference == "cross_utt"
+
+    def test_none_mode_max_frames_is_not_compared(self, tmp_path, saved_ckpts, caplog):
+        model = _model(seed=2, reference_max_frames=256)
+        with caplog.at_level(logging.WARNING, logger="piper_train"):
+            _single_to_multi(model, _ckpt(tmp_path, saved_ckpts, "single"))
+        assert _hparam_warnings(caplog) == []
+
+    def test_legacy_checkpoint_without_key_loads_silently(
+        self, tmp_path, saved_ckpts, caplog
+    ):
+        model = _model(seed=2, generator_reference="cross_utt")
+        ckpt = _ckpt(tmp_path, saved_ckpts, "single", pop=("generator_reference",))
+        with caplog.at_level(logging.WARNING, logger="piper_train"):
+            _single_to_multi(model, ckpt)
+        assert _hparam_warnings(caplog) == []
+        assert _shared_weight(model, saved_ckpts, "single")
 
 
 class TestLegacyNoneCheckpointWithoutKey:
