@@ -102,6 +102,10 @@ if(TARGET piper_common)
     # `piper.hpp` + exercises parsePhonemizeConfig() / isSingleCodepoint() from
     # piper.cpp, so it links the full library like test_speaker_embedding_inference.
     list(APPEND TEST_SOURCES test_phonemize_config.cpp)
+    # ref_spec_v1 (reference_spec / reference_spec_lengths 入力) の ONNX を
+    # loadModel が明示拒否し、旧モデルは不変であることを、commit 済みの
+    # tiny ONNX fixture (fixtures/reference_spec_inputs/) で検査する。
+    list(APPEND TEST_SOURCES test_reference_spec_rejection.cpp)
 endif()
 
 # Create test executables
@@ -394,6 +398,7 @@ foreach(test_source ${TEST_SOURCES})
     # in-tree fixture model.
     if(${test_name} STREQUAL "test_speaker_embedding_inference" OR
         ${test_name} STREQUAL "test_phonemize_config" OR
+        ${test_name} STREQUAL "test_reference_spec_rejection" OR
         ${test_name} STREQUAL "test_phoneme_timing_text_path" OR
         ${test_name} STREQUAL "test_synthesize_append_scope" OR
         ${test_name} STREQUAL "test_ssml_synth" OR
