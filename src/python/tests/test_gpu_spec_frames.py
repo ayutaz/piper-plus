@@ -10,10 +10,13 @@ _compute_specs_gpu_batch はバッチ 0 埋め + 一括 STFT 後に per-sample �
 from pathlib import Path
 
 import pytest
-import torch
 
-from piper_train.tools import prepare_multilingual_dataset as pmd
-from piper_train.vits.mel_processing import spectrogram_torch
+
+# torch を入れない Windows CI job では collection error にせず skip する。
+torch = pytest.importorskip("torch")
+
+from piper_train.tools import prepare_multilingual_dataset as pmd  # noqa: E402
+from piper_train.vits.mel_processing import spectrogram_torch  # noqa: E402
 
 
 @pytest.mark.unit

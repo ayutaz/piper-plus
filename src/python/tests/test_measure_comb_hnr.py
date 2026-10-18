@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+import importlib.util
+
 import numpy as np
 import pytest
 
@@ -21,6 +23,15 @@ from piper_train.tools.measure_comb_hnr import (
     comb_hnr_at_reference,
     comb_hnr_frames,
     detect_octave_down,
+)
+
+
+# librosa (と依存の scipy) は train extra。torch / train extras を入れない
+# Windows CI job では librosa に到達するテストだけを skip し、純 numpy の
+# 経路は引き続き検証する。
+requires_librosa = pytest.mark.skipif(
+    importlib.util.find_spec("librosa") is None,
+    reason="librosa not installed (train extra)",
 )
 
 
@@ -54,6 +65,7 @@ def _harmonic_signal(
 class TestFirstPrinciples:
     """合成信号での第一原理一致 (dB スケールの絶対保証)。"""
 
+    @requires_librosa
     def test_harmonic_signal_first_principles(self):
         """ノイズパワー ×10 で comb-HNR がちょうど -10dB 動く (比の定義の検証)。
 
@@ -69,6 +81,7 @@ class TestFirstPrinciples:
         # ノイズ床が薄いほど高い (単調性)
         assert base > noisy
 
+    @requires_librosa
     def test_white_noise_near_zero_db(self):
         """白色雑音は調波 bin と中間 bin のパワーが同じ → ~0dB (ゼロ点校正)。
 
@@ -107,6 +120,7 @@ class TestFirstPrinciples:
 
 
 @pytest.mark.unit
+@requires_librosa
 class TestSelfTrackProtocol:
     """±20 cent 罠の再発防止 (v11 head 設計 §5.3 deviation 4)。"""
 
@@ -141,6 +155,7 @@ class TestSelfTrackProtocol:
 
 
 @pytest.mark.unit
+@requires_librosa
 class TestOctaveDownDetection:
     """サブハーモニック挿入 (oct↓ エラー、period-doubling) の検出関数。"""
 
@@ -173,6 +188,7 @@ class TestOctaveDownDetection:
 
 
 @pytest.mark.unit
+@requires_librosa
 class TestExactTrackFallback:
     """pyin voicing 全滅時の測定不能穴 (v11 smoke arm H 2 回目の誤 die の再発防止)。
 

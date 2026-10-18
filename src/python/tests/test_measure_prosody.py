@@ -17,6 +17,8 @@ pyin fmin=70/fmax=600/frame=2048/hop=256)。v10b plan §1 の実測 baseline
 
 from __future__ import annotations
 
+import importlib.util
+
 import numpy as np
 import pytest
 
@@ -25,6 +27,15 @@ from piper_train.tools.measure_prosody import (
     prosody_delta,
     prosody_group_summary,
     prosody_stats,
+)
+
+
+# librosa (と依存の scipy) は train extra。torch / train extras を入れない
+# Windows CI job では librosa に到達するテストだけを skip し、純 numpy の
+# 経路は引き続き検証する。
+requires_librosa = pytest.mark.skipif(
+    importlib.util.find_spec("librosa") is None,
+    reason="librosa not installed (train extra)",
 )
 
 
@@ -112,6 +123,7 @@ def _assert_tree_equal(a, b, path: str = "$") -> None:
 
 @pytest.mark.unit
 class TestProsodyStats:
+    @requires_librosa
     def test_vibrato_f0_std_matches_first_principles(self):
         """既知 F0 カーブ (vibrato 330±60Hz @1Hz) で統計が解析値と一致する。
 
@@ -134,6 +146,7 @@ class TestProsodyStats:
         )
         assert stats["f0_median_hz"] == pytest.approx(330.0, abs=8.0)
 
+    @requires_librosa
     def test_chirp_glide_range_matches_first_principles(self):
         """線形 chirp (250→450Hz) で range/std が一様分布の解析値と一致する。
 
@@ -150,6 +163,7 @@ class TestProsodyStats:
         assert stats["f0_range_p5_p95_hz"] == pytest.approx(180.0, abs=20.0)
         assert stats["f0_std_hz"] == pytest.approx(200.0 / np.sqrt(12.0), abs=6.0)
 
+    @requires_librosa
     def test_flat_f0_near_zero_std(self):
         """定常 f0=330Hz → std ~0 (平板韻律の検出 = 指標のゼロ点)。
 
@@ -201,6 +215,7 @@ class TestProsodyStats:
         assert summary["f0_median_hz"] == pytest.approx(205.0)  # None は除外
         assert summary["n_clips"] == 3
 
+    @requires_librosa
     def test_unvoiced_only_input_graceful_none(self):
         """有声フレームゼロ (白色雑音) → 例外を出さず None (graceful degradation)。
 
@@ -211,6 +226,7 @@ class TestProsodyStats:
         assert fa is not None  # 1s ≥ 0.5s なので解析自体は成立
         assert prosody_stats(fa) is None
 
+    @requires_librosa
     def test_prosody_stats_deterministic(self):
         """同一入力 2 回 → 同一出力 (manifest への数値 pin の前提条件)。"""
         wav = _vibrato_voice(duration=2.0)
