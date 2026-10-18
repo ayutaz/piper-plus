@@ -1,5 +1,6 @@
 import contextlib
 import copy
+import dataclasses
 import logging
 import math
 import os
@@ -16,7 +17,12 @@ from piper_plus.embedding import validate_embedding
 
 from ..checkpoint_io import key_has_module_prefix
 from ..inference_eval import isolated_inference
-from ..zero_shot_requirements import validate_recipe, validate_training_batch
+from ..zero_shot_requirements import (
+    GENERATOR_REFERENCE_MODES,
+    reference_training_conflict,
+    validate_recipe,
+    validate_training_batch,
+)
 from .commons import (
     migrate_prefilm_decoder_cond,
     migrate_prefilm_optimizer_states,
@@ -24,7 +30,14 @@ from .commons import (
     optimizer_states_need_migration,
     slice_segments,
 )
-from .dataset import Batch, PiperDataset, SpeakerBalancedBatchSampler, UtteranceCollate
+from .dataset import (
+    Batch,
+    PiperDataset,
+    SpeakerBalancedBatchSampler,
+    UtteranceCollate,
+    _load_tensor,
+    crop_reference_specs,
+)
 from .losses import (
     adv_speaker_classifier_loss_d,
     adv_speaker_classifier_loss_g,
@@ -544,6 +557,15 @@ class VitsModel(pl.LightningModule):
         # 既定 (1.0 / 0) は旧 ckpt の hparams にキーがなくても同じ値になる
         reference_lr_scale: float = 1.0,
         reference_warmup_steps: int = 0,
+        # 学習時の G の参照 (Task 7R)。"self" (既定) = 従来どおり target 自身の
+        # 埋め込みで G を条件付ける (旧 ckpt の hparams にキーがなくても self)。
+        # "cross_utt" = jsonl の参照フィールド (build_reference_pairs) が指す
+        # 同話者の別発話で G を条件付け、SCL / swap / Latent Filling / DINO は
+        # target の埋め込みのまま。
+        generator_reference: str = "self",
+        # cross_utt の参照 spec の最大 frame 数 (512 frame ≈ 5.9 s @22.05kHz)。
+        # 学習時は (epoch, 発話) から決まるランダム窓、検証時は先頭固定。
+        reference_max_frames: int = 512,
         **kwargs,
     ):
         super().__init__()
@@ -553,6 +575,33 @@ class VitsModel(pl.LightningModule):
         _validate_reference_lr(
             reference_conditioning, reference_lr_scale, reference_warmup_steps
         )
+        if generator_reference not in GENERATOR_REFERENCE_MODES:
+            raise ValueError(
+                f"generator_reference must be one of {GENERATOR_REFERENCE_MODES}, "
+                f"got {generator_reference!r}"
+            )
+        if (
+            isinstance(reference_max_frames, bool)
+            or not isinstance(reference_max_frames, int)
+            or reference_max_frames < 1
+        ):
+            raise ValueError(
+                f"reference_max_frames must be a positive int, got "
+                f"{reference_max_frames!r}"
+            )
+        # 参照条件付き + Latent Filling / swap-SCL は G の条件を参照発話のない
+        # 埋め込みに差し替えるので、直接構築でも拒否する (CLI は SystemExit)。
+        # 「ref_spec / capacity は cross_utt 必須」は training_step_g が検査する
+        # (推論・export 用の構築を妨げない)。
+        if reference_conditioning != "none":
+            conflict = reference_training_conflict(
+                reference_conditioning=reference_conditioning,
+                generator_reference="cross_utt",
+                latent_filling_tau=latent_filling_tau,
+                c_swap_spk=c_swap_spk,
+            )
+            if conflict is not None:
+                raise ValueError(conflict)
 
         # Fix gin_channels BEFORE save_hyperparameters() so the correct value is saved
         # This fixes the bug where gin_channels=0 was saved for multi-speaker models
@@ -1029,6 +1078,26 @@ class VitsModel(pl.LightningModule):
                         f"speaker_embedding for {data.get('id', data.get('text'))}: {exc}"
                     ) from exc
 
+                # Task 7R: ref_spec モデルの監視音声は参照発話の spec が要る
+                # (speaker_embedding と同じ参照発話の .spec.pt)。欠落は
+                # audio logging の途中ではなく読み込み時に落とす。他の mode
+                # ではフィールドを読まない (従来どおり)。
+                reference_spec_path = None
+                if self.hparams.get("reference_conditioning", "none") == "ref_spec":
+                    raw_ref = data.get("reference_audio_spec_path")
+                    if not raw_ref:
+                        raise ValueError(
+                            "reference_conditioning='ref_spec' requires "
+                            "reference_audio_spec_path for test utterance "
+                            f"{data.get('id', data.get('text'))} in "
+                            f"{test_utterances_path}"
+                        )
+                    reference_spec_path = Path(raw_ref)
+                    if not reference_spec_path.is_absolute():
+                        reference_spec_path = (
+                            test_utterances_path.parent / reference_spec_path
+                        )
+
                 # Mixed sentences (language_id == -1) need phonemization
                 if data.get("language_id", 0) == -1:
                     from piper_plus_g2p import get_phonemizer
@@ -1087,6 +1156,7 @@ class VitsModel(pl.LightningModule):
                     speaker_embedding=embedding,
                     speaker_embedding_path=embedding_path,
                     utterance_id=data.get("id"),
+                    reference_audio_spec_path=reference_spec_path,
                 )
                 utterances.append(utt)
 
@@ -1125,6 +1195,9 @@ class VitsModel(pl.LightningModule):
             )
             _LOGGER.info("v10b S-2: F0 target cache = %s", f0_dir)
 
+        # Task 7R: cross_utt のときだけ参照フィールドを読む (欠落は ValueError)
+        load_references = self.hparams.get("generator_reference", "self") == "cross_utt"
+
         # Try to load fixed test dataset first
         test_utterances_path = self.hparams.dataset_dir / "test_utterances.jsonl"
         if test_utterances_path.exists():
@@ -1137,6 +1210,7 @@ class VitsModel(pl.LightningModule):
                 precomputed_mel_dir=precomputed_mel_dir,
                 f0_dir=f0_dir,
                 speaker_embedding_dim=self.hparams.get("spk_embed_dim", 192),
+                load_references=load_references,
             )
             valid_set_size = int(len(full_dataset) * validation_split)
             train_set_size = len(full_dataset) - valid_set_size
@@ -1158,6 +1232,7 @@ class VitsModel(pl.LightningModule):
                 precomputed_mel_dir=precomputed_mel_dir,
                 f0_dir=f0_dir,
                 speaker_embedding_dim=self.hparams.get("spk_embed_dim", 192),
+                load_references=load_references,
             )
             valid_set_size = int(len(full_dataset) * validation_split)
             train_set_size = len(full_dataset) - valid_set_size - num_test_examples
@@ -1187,6 +1262,138 @@ class VitsModel(pl.LightningModule):
         )
 
         return audio
+
+    # ------------------------------------------------------------------
+    # Task 7R: 学習時の G 参照 (参照融合計画 §8)
+    # ------------------------------------------------------------------
+
+    def on_before_batch_transfer(self, batch, dataloader_idx):
+        """cross_utt の参照 spec を最大 ``reference_max_frames`` へ切り出す。
+
+        学習 (``self.training``) は (epoch, target 発話) から決まるランダム窓、
+        検証は先頭固定 (``crop_reference_specs``)。main process で device 転送
+        前に走るので、epoch を正しく読め、DataLoader worker や global RNG には
+        依存しない。参照を持たない batch (既定 self) はそのまま返す。
+        """
+        if not isinstance(batch, Batch) or batch.reference_specs is None:
+            return batch
+        specs, lengths = crop_reference_specs(
+            batch.reference_specs,
+            batch.reference_spec_lengths,
+            int(self.hparams.get("reference_max_frames", 512)),
+            mode="random" if self.training else "head",
+            epoch=self.current_epoch,
+            keys=batch.utterance_ids,
+        )
+        return dataclasses.replace(
+            batch, reference_specs=specs, reference_spec_lengths=lengths
+        )
+
+    def _generator_condition(self, batch: Batch, speaker_embeddings):
+        """G の条件付けに使う ``(埋め込み, 参照 spec, 参照 spec 長)``。
+
+        * ``generator_reference="self"`` (既定): target の ``speaker_embeddings``
+          をそのまま返す (従来と同一 object = bit 一致)。参照条件付き
+          (ref_spec / capacity) は self では学習しない (ValueError)。
+        * ``"cross_utt"``: batch の参照発話の埋め込み (と ref_spec なら参照
+          spec)。学習時の ``--spk-emb-noise-sigma`` は target と同じ処理
+          (noise 加算 → L2 再正規化) を、batch index 由来 seed の専用
+          generator で行う (global RNG の乱数列を変えない)。
+        """
+        conditioning = self.hparams.get("reference_conditioning", "none")
+        if self.hparams.get("generator_reference", "self") != "cross_utt":
+            if conditioning != "none":
+                raise ValueError(
+                    f"reference_conditioning={conditioning!r} trains only with "
+                    "generator_reference='cross_utt' (a self reference lets the "
+                    "reference module read the target utterance itself)"
+                )
+            return speaker_embeddings, None, None
+        reference = getattr(batch, "reference_embeddings", None)
+        if reference is None:
+            raise ValueError(
+                "generator_reference='cross_utt' requires batch.reference_embeddings "
+                "(load the dataset with reference fields from "
+                "piper_train.tools.build_reference_pairs)"
+            )
+        if self.training:
+            sigma = getattr(self.hparams, "spk_emb_noise_sigma", 0.0)
+            g_ref = torch.Generator()
+            g_ref.manual_seed(
+                (self._training_batch_index * 2654435761 + 0x2545F491) % (2**63)
+            )
+            noise = torch.randn(reference.shape, generator=g_ref).to(
+                device=reference.device, dtype=reference.dtype
+            )
+            reference = F.normalize(reference + noise * sigma, p=2, dim=-1)
+        reference_spec = reference_spec_lengths = None
+        if conditioning == "ref_spec":
+            reference_spec = getattr(batch, "reference_specs", None)
+            reference_spec_lengths = getattr(batch, "reference_spec_lengths", None)
+            if reference_spec is None or reference_spec_lengths is None:
+                raise ValueError(
+                    "reference_conditioning='ref_spec' requires batch.reference_specs "
+                    "and batch.reference_spec_lengths"
+                )
+        return reference, reference_spec, reference_spec_lengths
+
+    def _test_example_condition(self, test_utt):
+        """audio logging の 1 例の ``(埋め込み [1,192], 参照 spec, 長さ)``。
+
+        cross_utt で dataset 由来の例 (``UtteranceTensors``) は参照発話の
+        埋め込みを使う。固定 test 例 (test_utterances.jsonl) の
+        ``speaker_embedding`` はもともと参照発話のものなのでそのまま。
+        ref_spec では参照 spec を検証と同じ先頭固定で切り出す。
+        """
+        spk_emb = None
+        if self.hparams.get("use_zero_shot", True) and hasattr(
+            self.model_g, "spk_proj"
+        ):
+            reference_embedding = getattr(test_utt, "reference_embedding", None)
+            speaker_embedding = getattr(test_utt, "speaker_embedding", None)
+            if (
+                self.hparams.get("generator_reference", "self") == "cross_utt"
+                and reference_embedding is not None
+            ):
+                spk_emb = reference_embedding.unsqueeze(0).to(
+                    self.device, non_blocking=True
+                )
+            elif speaker_embedding is not None:
+                spk_emb = speaker_embedding.unsqueeze(0).to(
+                    self.device, non_blocking=True
+                )
+            else:
+                spk_emb = torch.zeros(
+                    1, self.hparams.get("spk_embed_dim", 192), device=self.device
+                )
+        if self.hparams.get("reference_conditioning", "none") != "ref_spec":
+            return spk_emb, None, None
+        spec = getattr(test_utt, "reference_spec", None)
+        if spec is None:
+            path = getattr(test_utt, "reference_audio_spec_path", None)
+            if path is None:
+                raise ValueError(
+                    "reference_conditioning='ref_spec' requires a reference spec "
+                    f"for test example {getattr(test_utt, 'utterance_id', None)}"
+                )
+            spec = _load_tensor(path)
+        spec = spec.float()
+        if spec.dim() != 2 or spec.size(1) < 1:
+            raise ValueError(
+                f"test example reference spec must be [channels, frames>0], got "
+                f"{tuple(spec.shape)}"
+            )
+        ref_spec, ref_len = crop_reference_specs(
+            spec.unsqueeze(0),
+            torch.tensor([spec.size(1)], dtype=torch.long),
+            int(self.hparams.get("reference_max_frames", 512)),
+            mode="head",
+        )
+        return (
+            spk_emb,
+            ref_spec.to(self.device, non_blocking=True),
+            ref_len.to(self.device, non_blocking=True),
+        )
 
     def on_load_checkpoint(self, checkpoint: dict) -> None:
         """Normalise older checkpoints in place before Lightning loads them.
@@ -1770,7 +1977,12 @@ class VitsModel(pl.LightningModule):
         return self._training_batch_index % every == 0
 
     def _log_modulation_telemetry(
-        self, batch: Batch, speaker_embeddings, language_ids
+        self,
+        batch: Batch,
+        speaker_embeddings,
+        language_ids,
+        reference_spec=None,
+        reference_spec_lengths=None,
     ) -> None:
         """各注入点の変調統計 (話者依存分散比ほか) を logger に記録する。
 
@@ -1786,6 +1998,8 @@ class VitsModel(pl.LightningModule):
                 speaker_embeddings,
                 lid=language_ids,
                 speaker_ids=batch.speaker_ids,
+                reference_spec=reference_spec,
+                reference_spec_lengths=reference_spec_lengths,
             )
         except RuntimeError:
             _LOGGER.exception(
@@ -1806,7 +2020,11 @@ class VitsModel(pl.LightningModule):
     def training_step(self, batch: Batch, batch_idx: int):
         if getattr(self.hparams, "strict_zero_shot", False):
             checked = validate_training_batch(
-                batch, gather=getattr(self.hparams, "spk_loss_gather", False)
+                batch,
+                gather=getattr(self.hparams, "spk_loss_gather", False),
+                # Task 7R: cross_utt では G の参照ペアも batch ごとに検査する
+                require_reference_pairs=self.hparams.get("generator_reference", "self")
+                == "cross_utt",
             )
             for key, value in checked.items():
                 self._log_with_batch_info(f"strict_scl_{key}", value, batch)
@@ -2142,12 +2360,27 @@ class VitsModel(pl.LightningModule):
                 speaker_embeddings, p=2, dim=-1
             )
 
+        # Task 7R: G の条件付け。self (既定) では speaker_embeddings と同一
+        # object。cross_utt では参照発話の埋め込み (+ ref_spec の参照 spec)。
+        # 以降、G の forward (主経路 / SCL 用 re-forward) / JCU 条件 /
+        # テレメトリはこちらを、SCL の正例・swap-SCL・Latent Filling・DINO は
+        # target の speaker_embeddings を使う。
+        cond_embeddings, cond_spec, cond_spec_lengths = self._generator_condition(
+            batch, speaker_embeddings
+        )
+
         # v11 D-2: 変調統計テレメトリ (--telemetry-every、default 500 step 毎)。
         # forward に依存しない (g からの発話単位 1x1 conv のみ) ので LF 分岐の
         # 前に置き、due step では必ず記録する。noise 加算「後」の embedding =
         # 実際に conditioning に使う値で測る。
-        if speaker_embeddings is not None and self._telemetry_due():
-            self._log_modulation_telemetry(batch, speaker_embeddings, language_ids)
+        if cond_embeddings is not None and self._telemetry_due():
+            self._log_modulation_telemetry(
+                batch,
+                cond_embeddings,
+                language_ids,
+                reference_spec=cond_spec,
+                reference_spec_lengths=cond_spec_lengths,
+            )
 
         # --- Latent Filling step (v10 §3.3、arXiv:2310.03538 準拠) ---
         # 確率 τ の step で条件 embedding を s̃ (同一言語補間 or 微小 noise) に
@@ -2208,9 +2441,11 @@ class VitsModel(pl.LightningModule):
             None,  # sid=None: emb_g disabled, spk_proj is the sole speaker conditioning path
             lid=language_ids,
             prosody_features=prosody_features,
-            speaker_embeddings=speaker_embeddings,
+            speaker_embeddings=cond_embeddings,
             f0=f0_gt,
             f0_pred_prob=f0_pred_prob,
+            reference_spec=cond_spec,
+            reference_spec_lengths=cond_spec_lengths,
         )
         y_hat = g_output.waveform
         l_length = g_output.duration_loss
@@ -2259,8 +2494,9 @@ class VitsModel(pl.LightningModule):
         # Save for training_step_d
         self._y = y
         # v10b S-1a: JCU MRD の条件は **noise 加算後** の embedding
-        # (conditioning に使ったものと同一) を D 更新でも使う
-        self._spk_cond = speaker_embeddings
+        # (conditioning に使ったものと同一) を D 更新でも使う。cross_utt では
+        # G の参照埋め込み (同話者) が条件になる
+        self._spk_cond = cond_embeddings
 
         # T6: Discriminator forward runs under _disc_autocast_ctx (nullcontext by
         # default; bf16 or fp32 override when disc_precision != "inherit").
@@ -2412,12 +2648,17 @@ class VitsModel(pl.LightningModule):
                 and speaker_embeddings is not None
                 and self.scl_encoder is not None
             ):
+                # 主経路の y_hat を z detach で作り直す re-forward なので、G の
+                # 条件は主経路と同じ (cross_utt では参照)。SCL の正例は下で
+                # target の speaker_embeddings を使う。
                 scl_wave = self.model_g.scl_waveform_detached_z(
                     g_output.latents[0],
                     ids_slice,
-                    speaker_embeddings=speaker_embeddings,
+                    speaker_embeddings=cond_embeddings,
                     lid=language_ids,
                     f0=g_output.f0_decoder,
+                    reference_spec=cond_spec,
+                    reference_spec_lengths=cond_spec_lengths,
                 )
 
             # T6: SCL is explicitly wrapped in _scl_autocast_ctx (= autocast
@@ -2701,7 +2942,7 @@ class VitsModel(pl.LightningModule):
             # noise 加算後の embedding。conditioning に使ったものと同一)
             if self.model_d_mrd is not None:
                 loss_gen_mrd, loss_fm_mrd, loss_gen_mrd_cond = (
-                    self._mrd_generator_losses(y, y_hat, speaker_embeddings)
+                    self._mrd_generator_losses(y, y_hat, cond_embeddings)
                 )
                 loss_mrd = (loss_gen_mrd + loss_fm_mrd) * self.hparams.c_mrd
                 loss_gen_all = loss_gen_all + loss_mrd
@@ -2890,23 +3131,10 @@ class VitsModel(pl.LightningModule):
                             scales = [0.4, 1.0, 0.5]
 
                             # Resolve speaker embedding for zero-shot
-                            spk_emb = None
-                            if self.hparams.get("use_zero_shot", True) and hasattr(
-                                self.model_g, "spk_proj"
-                            ):
-                                if (
-                                    hasattr(test_utt, "speaker_embedding")
-                                    and test_utt.speaker_embedding is not None
-                                ):
-                                    spk_emb = test_utt.speaker_embedding.unsqueeze(
-                                        0
-                                    ).to(self.device, non_blocking=True)
-                                else:
-                                    spk_emb = torch.zeros(
-                                        1,
-                                        self.hparams.get("spk_embed_dim", 192),
-                                        device=self.device,
-                                    )
+                            # (Task 7R: cross_utt / ref_spec の参照を含む)
+                            spk_emb, ref_spec, ref_spec_lengths = (
+                                self._test_example_condition(test_utt)
+                            )
 
                             # language_id may be int or Tensor
                             # (Subset from random_split wraps them as LongTensor)
@@ -2945,6 +3173,8 @@ class VitsModel(pl.LightningModule):
                                 noise_scale_w=noise_scale_w,
                                 speaker_embeddings=spk_emb,
                                 prosody_features=prosody,
+                                reference_spec=ref_spec,
+                                reference_spec_lengths=ref_spec_lengths,
                             )
                             test_audio = test_audio.detach()
                             test_audio = test_audio * (
@@ -2992,6 +3222,7 @@ class VitsModel(pl.LightningModule):
 
                             # Aggressive per-sample GPU memory cleanup
                             del test_audio, text, text_lengths, spk_emb, lid
+                            del ref_spec, ref_spec_lengths
                             if torch.cuda.is_available():
                                 torch.cuda.synchronize()
                                 torch.cuda.empty_cache()
@@ -3251,5 +3482,29 @@ class VitsModel(pl.LightningModule):
             default=1.0,
             help="Weight for mel speaker consistency loss (default: 1.0). "
             "Active only for multi-speaker models. Set to 0 to disable.",
+        )
+        parser.add_argument(
+            "--generator-reference",
+            choices=GENERATOR_REFERENCE_MODES,
+            default="self",
+            help="Reference fed to the generator during training (reference-"
+            "fusion plan section 8, Task 7R). 'self' (default) conditions G on "
+            "the target utterance's own speaker embedding (unchanged behaviour). "
+            "'cross_utt' conditions G on a different utterance of the same "
+            "speaker read from the dataset jsonl (reference_utterance_id / "
+            "reference_audio_spec_path / reference_speaker_embedding_path, "
+            "written by piper_train.tools.build_reference_pairs); utterances "
+            "missing them fail at load time. SCL positives, swap-SCL, Latent "
+            "Filling and DINO keep the target embedding. Required when "
+            "--reference-conditioning is not 'none'.",
+        )
+        parser.add_argument(
+            "--reference-max-frames",
+            type=int,
+            default=512,
+            help="Maximum reference spectrogram frames for --generator-reference "
+            "cross_utt (default 512 = ~5.9 s at 22.05 kHz / hop 256). Training "
+            "takes a window chosen from (epoch, utterance); validation and "
+            "audio logging take the head. Shorter references are kept whole.",
         )
         return parent_parser

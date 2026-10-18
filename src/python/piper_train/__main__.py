@@ -21,6 +21,7 @@ from .vits.ema import EMA_SCOPES, EXTENDED_EMA_MODULES, EMACallback
 from .vits.lightning import REFERENCE_PARAM_PREFIXES, VitsModel
 from .vits.mb_istft import PQMF, PQMF_DESIGN
 from .vits.models import MRD_HIRES_RESOLUTIONS, REFERENCE_CONDITIONING_MODES
+from .zero_shot_requirements import validate_reference_training_args
 
 
 # NOTE: the pathlib safe-globals registration and the Windows PosixPath
@@ -1594,6 +1595,14 @@ def main():
     _LOGGER.debug(args)
 
     check_resume_flags_exclusive(args)
+    # 参照融合計画 §8 Task 7R: 参照条件付きは cross_utt 必須、LF / swap-SCL と
+    # 併用不可 (dataset を読む前に SystemExit)
+    validate_reference_training_args(
+        reference_conditioning=args.reference_conditioning,
+        generator_reference=args.generator_reference,
+        latent_filling_tau=args.latent_filling_tau,
+        c_swap_spk=args.c_swap_spk,
+    )
 
     # v10b: --use-jcu-mrd / --mrd-hires-resolution は MRD 本体が前提。
     # 効かない組み合わせは黙って通さない
