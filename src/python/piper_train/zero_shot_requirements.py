@@ -107,6 +107,10 @@ def validate_reference_pairs(
     ``audio_norm`` の float32 sample の sha256 (別 path の同一音声を検出する)。
     split は ``None`` 同士を「split なし = 1 つの split」とみなす。
 
+    ここでの split は **jsonl の ``split`` フィールドだけ** を指す。学習が実行時に
+    行う train / val の ``random_split`` とは無関係で、その subset を跨ぐ参照は
+    ここでは検出しない (``VitsModel`` が読み込み時に数えて WARNING を出す)。
+
     参照 = target、別話者、別 split、同一音声 hash、値の欠落のどれかで
     ``ValueError``。
     """
