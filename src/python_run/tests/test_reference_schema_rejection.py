@@ -423,7 +423,9 @@ def _load_generator():
 
 @pytest.mark.parametrize("name", FIXTURE_NAMES)
 def test_committed_fixture_matches_generator(name: str) -> None:
-    import onnx
+    # onnx は runtime の依存ではない (Windows の python_run job には入らない)。
+    # _load_generator の importorskip より先に import すると skip でなく失敗する。
+    onnx = pytest.importorskip("onnx")
 
     generator = _load_generator()
     committed = onnx.load(str(FIXTURE_DIR / f"{name}.onnx"))
