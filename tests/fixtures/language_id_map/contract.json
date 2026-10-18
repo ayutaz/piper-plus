@@ -70,14 +70,14 @@
       "path": "src/python/piper_train/tools/prepare_multilingual_dataset.py",
       "kind": "python_dict_literal",
       "symbol": "LANGUAGE_ID_MAP",
-      "expected": "language_id_map"
+      "expected": "extended_language_id_map"
     },
     {
       "runtime": "python_train",
       "path": "src/python/piper_train/tools/prepare_multilingual_dataset.py",
       "kind": "python_list_literal",
       "symbol": "ALL_LANGUAGES",
-      "expected": "all_languages"
+      "expected": "extended_languages"
     },
     {
       "runtime": "python_runtime",

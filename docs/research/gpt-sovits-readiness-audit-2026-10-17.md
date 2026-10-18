@@ -46,7 +46,7 @@ GPT-SoVITSのコードを直接移植したという意味ではない。
 | 実参照の音響系列・melによる条件付け | 上流`models_v5.py`の`reference_features` / `reference_mel` | Piperのv12候補。小型参照encoder・style tokenの実装と対照実験は未着手 |
 | semantic prompt、HuBERT/VQ、GPTの二段構成 | 上流`TTS.py`とARモデル経路 | 現VITSへの部分追加では成立しない。別モデル研究として保留 |
 | 長文で元参照と直前chunkの文脈を保持 | 上流`models_v5.py`の元参照＋32frame tail | 未実装。Piperの長文で症状を確認してから実験する |
-| 複数参照の平均 | 上流`models.py`の`ges`平均、Piper`extract_from_files` | 抽出helperは既存。全CLI・評価への複数参照接続は完了していない |
+| 複数参照の平均 | 上流`models.py`の参照埋め込み平均、Piper`extract_from_files` | 抽出helperは既存。全CLI・評価への複数参照接続は完了していない |
 | 参照のmono化・resampling・正規化 | Piper`extract_speaker_embedding.py` | 既存。上流の3〜10秒制約をPiperへそのまま移さない |
 | 無音・有声時間・clipping・異話者混入の参照検査 | 前回調査§4.2、工程4C | 品質条件を較正した実比較は未実施 |
 | runtime全長抽出とtraining chunk poolingの統一 | Piperの単一`session.run`と400frame pooling | 分布差が残る。実encoder・実WAVでの比較と採否は未実施 |
