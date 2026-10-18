@@ -54,7 +54,7 @@
 
 | 事実 | 場所 |
 |---|---|
-| 学習用CAM++は`audio_norm`から抽出。推論の参照WAVはtrimせずにfbank化する。**訂正 (2026-10-18、Ruling R14):** multilingual datasetのcacheは既定でVADなし + soxr MQ (`prepare_multilingual_dataset` → `norm_audio.cache_norm_audio_no_vad(resample_quality="MQ")`) で、`audio_norm`はVAD trim済みとは限らない。VAD trim (16kHz上のenergy VAD + soxr HQ) をするのは別のbuilder `norm_audio.cache_norm_audio_fast`。v10bの実データがどちらで作られたかはS2のdata auditで確定する | `extract_speaker_embedding.py` L102-136 (学習) / L65-99 (推論)、`norm_audio/__init__.py` (`cache_norm_audio_fast` / `cache_norm_audio_no_vad`)、`tools/prepare_multilingual_dataset.py` (`resample_quality="MQ"`) |
+| 学習用CAM++は`audio_norm`から抽出。推論の参照WAVはtrimせずにfbank化する。**訂正 (2026-10-18、Ruling R14):** multilingual datasetのcacheは既定でVADなし + soxr MQ (`prepare_multilingual_dataset` → `norm_audio.cache_norm_audio_no_vad(resample_quality="MQ")`) で、`audio_norm`はVAD trim済みとは限らない。VAD trim (16kHz上のenergy VAD + soxr HQ) をするのは別のbuilder `norm_audio.cache_norm_audio_fast`。v10bの実データがどちらで作られたかはS2で記録する (参照specはR17の参照専用cacheから読むので、frontend名はこの結果に依存しない) | `extract_speaker_embedding.py` L102-136 (学習) / L65-99 (推論)、`norm_audio/__init__.py` (`cache_norm_audio_fast` / `cache_norm_audio_no_vad`)、`tools/prepare_multilingual_dataset.py` (`resample_quality="MQ"`) |
 | Gへは生成対象と同じ発話の埋め込み。G・SCL・swap・Latent Fillingが1つの`speaker_embeddings`を共有 | `vits/lightning.py` L1963, L2059, L2283, L2418 |
 | `spk_proj`はLinear(192→512)→LN→GELU→Linear。gは`[B,512,1]` | `vits/models.py` L1459-1490 |
 | 話者情報損失の78%がdecoder段。prior/flowを完璧にしても上限は+0.04 (recon bound 0.714)。融合後のgはdecoderのFiLMにも入るが、decoderの描画歪みを直す保証はない | [zero-shot-v11-conditioning-design.md §10.1](zero-shot-v11-conditioning-design.md#101-チェーン会計--話者情報はどこで死ぬか実測) |
@@ -82,7 +82,7 @@
 |---|---|---|---|
 | S0 CPU検証 | Task 1〜4: 再開の厳格化、参照trim、fp32集計、CAM++統計抽出。既存v10b ep79で (a) 参照trim有無、(b) 複数参照の平均を埋め込み側/g側、(c) CAM++統計の話者分離度を測る | 不要 | G0: (a)(b)の採否と、学習・推論で使うfrontendを1つに固定。(c)で統計特徴の話者分離度が192次元以上と確認 (下回れば§6の分岐) |
 | S1 実装 | Task 5〜10: 融合module、Ccap、参照ペア、EMA・移行、ONNX、runtime拒否 | 不要 | G1: 全テスト成功、旧経路の出力不変、Torch/ORT一致 |
-| S2 データ | 元計画§5.1の復元・監査。CAM++ 192と統計1024を、G0で固定したfrontendで**同じpassで**再抽出し来歴を記録。参照ペアmanifest作成 | 不要 | G2: 選んだ学習集合が監査通過、自己参照fallback 0 |
+| S2 データ | 元計画§5.1の復元・監査。参照ペアmanifest作成 → 参照専用spec cacheを`no-vad;soxr-hq`で作成 (§8.3、R17。旧案のCAM++統計の再抽出は§8で廃止) | 不要 | G2: 選んだ学習集合が監査通過、自己参照fallback 0 |
 | S3 smoke | RTX 5090×1、bf16。各群100 batch warm start + 100 batch strict再開 | 要 | G3: 非有限値0、融合MLPの重みが変化、保存・再開が連続、回収成功 |
 | S4 pilot | 4群を同じ露出量で短期比較 (§3) | 要 | G4: F-statsがCcapとC0を開発群で上回るか判定。上回らなければS5へ進まず報告 |
 | S5 本比較 | C0とG4の選択候補を同露出で比較。新run 40epoch相当を初期案 | 要 | G5: 元計画§9.1の選抜条件 |
@@ -398,7 +398,7 @@ def test_missing_reference_features_raises(tiny_fused_model):
 
 S2ではあわせて次を行う (Ruling R14・R17、final review I1)。
 
-- 手順: ① `build_reference_pairs`で参照ペアを作る。datasetの行に`audio_path`があれば、参照の元音声を`reference_audio_path`として書き足す。② `build_reference_spec_cache`で、参照に使う発話の元音声から参照specをCPUで作り直す。frontendは閉じた集合の名前を1つ指定し、sample rateはdatasetの`config.json`、STFT設定はconfigか明示したflagから取る (既定値では作らない)。`reference_audio_spec_path`だけをcacheへ向け直した新しいjsonlと、cache dirの来歴sidecar (`reference_spec_cache.json`) ができる。③ 学習の`--reference-spec-frontend`に②と同じ名前を渡す。学習は起動時にsidecarを照合し、frontendやSTFT設定の食い違い、sidecarに載っていない参照specを`SystemExit`で拒否する。
+- 手順: ① `build_reference_pairs`で参照ペアを作る。datasetの行に`audio_path`があれば、参照の元音声を`reference_audio_path`として書き足す。② `build_reference_spec_cache`で、参照に使う発話の元音声から参照specをCPUで作り直す。frontendは`no-vad;soxr-hq`を使う (参照WAVはtrimしないというR7と、評価・推論で渡す参照音声の扱いに合わせる。CPUで1回作るだけなのでMQにする理由はない)。sample rateはdatasetの`config.json`、STFT設定はconfigか明示したflagから取る (既定値では作らない)。`reference_audio_spec_path`だけをcacheへ向け直した新しいjsonlと、cache dirの来歴sidecar (`reference_spec_cache.json`) ができる。③ 学習の`--reference-spec-frontend`に②と同じ名前を渡す。学習は起動時にsidecarを照合し、frontendやSTFT設定の食い違い、sidecarに載っていない参照specを`SystemExit`で拒否する。
 - 言語ごとに、学習音声のspec cacheをどのbuilderで作ったかを記録する。`prepare_multilingual_dataset`はJA+ENの発話をbilingual datasetのjsonlから取り込み、その`audio_norm_path`・`audio_spec_path`をそのまま使う。JA+ENのcacheは`prepare_bilingual_dataset`が`cache_norm_audio` (Silero VAD、閉じた集合の外) か`cache_norm_audio_fast` (`energy-vad@16k;soxr-hq`) で作ったもの。zh/es/fr/ptはVADなしで作られ、記録された手順では`--gpu-spec-device cuda:0` (閉じた集合の外) を使っている。参照specは参照専用cacheから読むので、この結果でfrontend名を決める必要はない。
 - dataset dirに`test_utterances.jsonl`があると、ref_specの学習は各行に`reference_audio_spec_path`を要求し、起動時に`ValueError`で止まる。この列も起動時の照合の対象になる。各行に`reference_audio_path`を書けば`build_reference_spec_cache`で向け直せるが、そのための手順はまだない。S2で書くか、ファイルを外すかを決める。同じ行の`speaker_embedding`と参照specが同じ発話のものかどうかは検査していない。
 - S3の注意: 自己参照で記録したnoneのcheckpoint (`generator_reference="self"`) からref_specへwarm startすると、`generator_reference`のWARNINGが1回出る。R16aどおりの想定した警告で、止める必要はない。
@@ -494,7 +494,7 @@ Ruling R3を置き換える: module属性名は`reference_encoder`と`capacity_c
 
 - **Ruling R7 (frontend):** ~~CAM++ 192次元はG0どおりtrimなし。F-melのspecは学習cache (VAD trim済み`audio_norm`由来) と同じ手順でtrimする。G0 (a) は既存モデルのCAM++経路での測定で、未学習のencoderには当てはまらないため。外れた場合の費用: S6でtrim有無をCPUで比べ直す。~~ **specの部分はRuling R14で置き換え** (学習cacheはVAD trim済みとは限らなかった)。CAM++ 192次元をtrimしない部分はそのまま。
 - **Ruling R8 (入力形式):** encoderの入力はmelではなく線形スペクトログラム。学習cacheをそのまま使え、runtimeはenc_qと同じSTFT 1回で作れるため。log圧縮はencoder内で行う。
-- **Ruling R14 (frontend、R7のspec部分を置き換え):** 参照specのfrontendは、実在するcache builderを写した名前の閉じた集合 (`energy-vad@16k;soxr-hq` / `no-vad;soxr-mq` / `no-vad;soxr-hq`) から明示的に選ぶ。学習は`--reference-spec-frontend`でcheckpointに残し、export・評価はそれとmanifestを照合する。v10bの実データのbuilderはS2のdata auditで確定する。理由: §1.2の前提 (学習cacheはVAD trim済み) がmultilingual cacheでは誤りだった。費用: hparam 1つと受け渡し。
+- **Ruling R14 (frontend、R7のspec部分を置き換え):** 参照specのfrontendは、実在するcache builderを写した名前の閉じた集合 (`energy-vad@16k;soxr-hq` / `no-vad;soxr-mq` / `no-vad;soxr-hq`) から明示的に選ぶ。学習は`--reference-spec-frontend`でcheckpointに残し、export・評価はそれとmanifestを照合する。参照specの作り方はR17の参照専用cacheで1つに揃えるので、v10bの学習cacheのbuilderはfrontend名の決定には使わない (S2で記録だけする)。理由: §1.2の前提 (学習cacheはVAD trim済み) がmultilingual cacheでは誤りだった。費用: hparam 1つと受け渡し。
 - **Ruling R15 (評価時の参照長):** 評価は参照specを、モデルの`reference_max_frames`まで先頭から切ってから渡す (学習の検証時と同じ切り方)。ONNXのconfigには`max_frames`を追加する。理由: 学習は512 frameより長い参照を見ないので、評価も学習と同じ分布の参照を渡す。費用: config 1項目。
 - **Ruling R16 (再開時の参照hparam照合):** 再開時に参照関連のhparam (`reference_spec_frontend` / `generator_reference` / `reference_max_frames`) をcheckpointと照合する。strict resumeは不一致で停止、weights-onlyとFTはfrontendの不一致のみ停止し他は警告、keyの無い旧checkpointは受け入れる。理由: CLIの値だけを見ると、続きの学習で宣言を変えても何も出ず、epochごとに宣言の違うcheckpointができて評価の比較が成り立たなくなる (final review I3)。
 - **Ruling R17 (参照専用spec cache):** Gの参照specは、学習音声のspec cacheではなく、参照に使う発話の元音声から名前付きfrontendでCPUで作り直した参照専用cache (`tools/build_reference_spec_cache.py`) から読む。学習は起動時にcacheのsidecarのfrontend・STFT設定をモデルと照合し、sidecarに載っていない参照specを拒否する。学習音声のcacheは変えない。理由: 学習音声のcacheは言語ごとに別のbuilder (閉じた集合の外を含む) で作られ、checkpointが宣言できるfrontend名は1つなので、そのままでは学習と評価のspecの作り方が食い違っても検出できない (final review I1)。費用: 参照される発話の数だけCPUでspecを作る。
@@ -536,7 +536,7 @@ S1 (Task 5R〜11R) の実装とCPUテストは`feat/zero-shot-v8-dataset-scaling
 - 範囲外のbug: `piper_plus/api/engine.py`の`_fill_speaker_embedding_inputs`が`speaker_embedding_mask`を常に渡す。
 - Rust・Go・C#・WASMのruntimeは、参照spec入力付きのモデルをまだ拒否しない (拒否はPython runtimeとC++のみ)。
 - 学習側の`piper_train.infer_onnx`も、参照spec入力付きのモデルを明示的に拒否せず、対応もしていない (ORTの入力欠落エラーで止まる)。
-- v10bの実データの学習cacheがどのbuilderで作られたか (frontend名) はS2のdata auditで確定する。
+- v10bの実データの学習cacheがどのbuilderで作られたかはS2で記録する。R17により参照specのfrontend名はこれに依存しない。
 - **決定 (Ruling R17):** 参照specのfrontendが言語ごとに異なる、または閉じた集合の外になる問題 (final review I1) は、参照に使う発話だけを名前付きのfrontendで作り直した参照専用のspec cacheに切り出し、`reference_audio_spec_path`をそこへ向けて解決する (`build_reference_spec_cache`、CPUのみ、参照される発話の数だけ)。学習は起動時にcacheのsidecarを照合する。別案の「GPU batch経路を許容誤差つきで閉じた集合に加える」は、言語ごとの混在を表せないので採らなかった。
 - dataset dirに`test_utterances.jsonl`があると、ref_specの学習は起動時に止まる。各行に`reference_audio_spec_path`が要るが、この列を書くtoolがない (§8.3)。
 - 学習は参照specをfp16で保存した`.spec.pt`からfloatに戻して使い、評価はfloat32のまま渡す。相対差は2^-11以下で、9Rの報告に記録した。揃える場合は評価で`.half().float()`してから渡す。
