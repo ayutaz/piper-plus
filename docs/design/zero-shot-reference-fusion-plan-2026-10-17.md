@@ -396,6 +396,12 @@ def test_missing_reference_features_raises(tiny_fused_model):
 
 §3のF-statsをF-melに置き換える。Ccapの`target_params`はF-melのencoderのパラメータ数にする。他の群 (E0・C0-self・C0) と予算 (§4) は変えない。S2ではCAM++統計の再抽出をやめ、参照ペアmanifestと参照発話のspec cache存在確認を行う (spec cacheは学習用に既存)。
 
+S2ではあわせて次を行う (Ruling R14、final review I1)。
+
+- 言語ごとに、学習音声のspec cacheをどのbuilderで作ったかを確かめる。`prepare_multilingual_dataset`はJA+ENの発話をbilingual datasetのjsonlから取り込み、その`audio_norm_path`・`audio_spec_path`をそのまま使う。JA+ENのcacheは`prepare_bilingual_dataset`が`cache_norm_audio` (Silero VAD、閉じた集合の外) か`cache_norm_audio_fast` (`energy-vad@16k;soxr-hq`) で作ったもの。zh/es/fr/ptはVADなしで作られ、記録された手順では`--gpu-spec-device cuda:0` (閉じた集合の外) を使っている。
+- 結果が1つのfrontend名にまとまらない (言語ごとに違う、または閉じた集合の外になる) 場合は、近い名前を選んで進めない。どう扱うかは未決で、§8.7の「残っていること」に置いた。S3の前に決める。
+- dataset dirに`test_utterances.jsonl`があると、ref_specの学習は各行に`reference_audio_spec_path`を要求し、起動時に`ValueError`で止まる。この列を書くtoolはない (`build_reference_pairs`は`dataset.jsonl`だけを扱う)。S2で手で書くか、ファイルを外すかを決める。同じ行の`speaker_embedding`と参照specが同じ発話のものかどうかは検査していない。
+
 ### 8.4 テストの方針 (2026-10-18 ユーザー指示)
 
 全タスクをTDDで実装する。各タスクで次を守る。
@@ -426,7 +432,7 @@ Ruling R3を置き換える: module属性名は`reference_encoder`と`capacity_c
 
 - [ ] **Step 1: テストを書く** — 少なくとも: `test_none_matches_legacy_output` (同じ重みで旧モデルと出力一致)、`test_zero_init_ref_spec_matches_legacy_output` (初期状態は`spk_proj`のみと一致)、`test_padding_does_not_change_output` (末尾padの長さを変えても出力不変)、`test_batch_rows_independent` (batch内の他行の参照が出力に影響しない)、`test_long_fp16_reference_is_finite` (8000 frame、fp16入力で有限)、`test_length_one_reference`、`test_zero_length_reference_raises`、`test_shape_and_dtype_errors`、`test_encoder_receives_gradient_after_steps`、`test_spk_proj_gradient_unchanged_at_init`、`test_capacity_control_param_count_within_5pct`、`test_missing_reference_spec_raises`、`test_reference_spec_on_legacy_model_raises`
 - [ ] **Step 2: 失敗を確認** — `uv run --no-sync pytest src/python/tests/test_reference_encoder.py --no-cov` → FAIL
-- [ ] **Step 3: 実装** — `spk_proj`を直接呼ぶ箇所 (`vits/lightning.py`のDINO、`models.py`内の直接呼び出し、`vits/telemetry.py`) を`_get_speaker_condition`経由に揃える
+- [ ] **Step 3: 実装** — `spk_proj`を直接呼ぶ箇所 (`vits/lightning.py`のDINO、`models.py`内の直接呼び出し、`vits/telemetry.py`) を`_get_speaker_condition`経由に揃える。**実装での変更:** DINOは意図して`spk_proj`を直接呼んだままにした。DINOは`spk_proj`本体とEMA teacher (`spk_proj`の複製) を比べる損失で、`_get_speaker_condition`を通すと参照項 (`reference_encoder` / `capacity_control`) がstudent側だけに入り、新経路へteacher由来の追加損失を掛けることになるため (§8.2「損失は追加しない」)。`models.py`内の呼び出しとtelemetryは`_get_speaker_condition`経由にし、telemetryには参照specを渡す
 - [ ] **Step 4: 成功を確認** — 新テストと`test_speaker_embedding.py`、`test_adaln_encp.py`、`test_snac_stats_flag.py`がPASS
 - [ ] **Step 5: Commit** — `feat(python): 参照スペクトログラムを話者条件へ加算するencoderと容量対照を追加`
 
@@ -458,7 +464,7 @@ Ruling R3を置き換える: module属性名は`reference_encoder`と`capacity_c
 #### Task 8R: ONNX export
 
 **Files:**
-- Modify: `src/python/piper_train/export_onnx.py` (`ref_spec`時に入力`reference_spec` `[B,513,T_ref]` float32と`reference_spec_lengths` `[B]` int64を追加。configへ`"reference_conditioning": {"schema": "ref_spec_v1", "spec_channels": 513, "filter_length", "hop_length", "win_length", "sample_rate", "center": false, "frontend": "energy-vad@16k;soxr-hq"}`を記録。`capacity`は入力を増やさない)
+- Modify: `src/python/piper_train/export_onnx.py` (`ref_spec`時に入力`reference_spec` `[B,513,T_ref]` float32と`reference_spec_lengths` `[B]` int64を追加。configへ`"reference_conditioning": {"schema": "ref_spec_v1", "spec_channels": 513, "filter_length", "hop_length", "win_length", "sample_rate", "center": false, "frontend", "max_frames"}`を記録。`frontend`は学習hparam `reference_spec_frontend`の値、`max_frames`は`reference_max_frames`の値をcheckpointから写す (Task 11RでR14・R15に合わせて修正。当初は`"energy-vad@16k;soxr-hq"`の固定値で`max_frames`がなかった)。`capacity`は入力を増やさない)
 - Modify: `src/python/piper_train/export_onnx_streaming.py` (`check_streaming_export_supported`で`reference_conditioning != "none"`を`NotImplementedError`)
 - Test: `src/python/tests/test_export_reference_encoder.py` (新規)
 
@@ -469,11 +475,11 @@ Ruling R3を置き換える: module属性名は`reference_encoder`と`capacity_c
 #### Task 9R: 評価経路の接続
 
 **Files:**
-- Modify: `src/python/piper_train/reference_frontend.py` (`reference_spec_from_audio(audio, sample_rate, *, target_sample_rate, filter_length, hop_length, win_length, trim=True) -> (Tensor[513,T], dict)`。`cache_norm_audio_fast`と同じ手順)
+- Modify: `src/python/piper_train/reference_frontend.py` (`reference_spec_from_audio(audio, sample_rate, *, target_sample_rate, filter_length, hop_length, win_length, frontend) -> (Tensor[513,T], dict)`。`frontend`は既定値なしの必須引数で、名前の閉じた集合 (`reference_spec_contract.py`) から選んだ学習cache builderと同じ手順で作る。当初案の`trim=True`と「`cache_norm_audio_fast`と同じ手順」はR14で置き換えた)
 - Modify: `src/python/piper_train/tools/generate_eval_audio.py`、`src/python/piper_train/evaluation_manifest.py`
 - Test: `src/python/tests/test_reference_frontend.py`、`src/python/tests/test_zs_eval_integration.py`
 
-- [ ] テスト: `test_reference_spec_matches_cache_norm_audio_fast` (同じWAVで学習cacheのspecと一致。Task 2の残課題も兼ねる)、`test_reference_spec_resamples_16k_and_44k`、`test_reference_spec_silent_audio_raises`、`test_eval_feeds_reference_spec_for_ref_spec_model`、`test_eval_legacy_model_unchanged`、`test_eval_manifest_records_frontend_and_spec_hash`
+- [ ] テスト: `test_reference_spec_matches_training_cache_builder` (同じWAVで、frontend名ごとに写したbuilderの学習cacheのspecと一致。3つのfrontendでparametrize。Task 2の残課題も兼ねる。当初名は`test_reference_spec_matches_cache_norm_audio_fast`)、`test_reference_spec_resamples_16k_and_44k`、`test_reference_spec_silent_audio_raises`、`test_eval_feeds_reference_spec_for_ref_spec_model`、`test_eval_legacy_model_unchanged`、`test_eval_manifest_records_frontend_and_spec_hash`
 - [ ] Commit — `feat(python): zero-shot評価に参照specのfeedと来歴を追加`
 
 #### Task 10R: 未対応runtimeでの拒否
@@ -489,6 +495,7 @@ Ruling R3を置き換える: module属性名は`reference_encoder`と`capacity_c
 - **Ruling R8 (入力形式):** encoderの入力はmelではなく線形スペクトログラム。学習cacheをそのまま使え、runtimeはenc_qと同じSTFT 1回で作れるため。log圧縮はencoder内で行う。
 - **Ruling R14 (frontend、R7のspec部分を置き換え):** 参照specのfrontendは、実在するcache builderを写した名前の閉じた集合 (`energy-vad@16k;soxr-hq` / `no-vad;soxr-mq` / `no-vad;soxr-hq`) から明示的に選ぶ。学習は`--reference-spec-frontend`でcheckpointに残し、export・評価はそれとmanifestを照合する。v10bの実データのbuilderはS2のdata auditで確定する。理由: §1.2の前提 (学習cacheはVAD trim済み) がmultilingual cacheでは誤りだった。費用: hparam 1つと受け渡し。
 - **Ruling R15 (評価時の参照長):** 評価は参照specを、モデルの`reference_max_frames`まで先頭から切ってから渡す (学習の検証時と同じ切り方)。ONNXのconfigには`max_frames`を追加する。理由: 学習は512 frameより長い参照を見ないので、評価も学習と同じ分布の参照を渡す。費用: config 1項目。
+- **Ruling R16 (再開時の参照hparam照合):** 再開時に参照関連のhparam (`reference_spec_frontend` / `generator_reference` / `reference_max_frames`) をcheckpointと照合する。strict resumeは不一致で停止、weights-onlyとFTはfrontendの不一致のみ停止し他は警告、keyの無い旧checkpointは受け入れる。理由: CLIの値だけを見ると、続きの学習で宣言を変えても何も出ず、epochごとに宣言の違うcheckpointができて評価の比較が成り立たなくなる (final review I3)。
 - **未解決 (S4で確認):** 参照encoderが話者以外 (録音条件・内容) を拾い、CERが悪化する可能性。§6の「類似度は上がるがCERが悪化」の行で扱う。
 
 ### 8.7 実装結果 (S1)
@@ -514,6 +521,7 @@ S1 (Task 5R〜11R) の実装とCPUテストは`feat/zero-shot-v8-dataset-scaling
 - **R13:** jsonlのsplitと学習時のランダムなtrain/val分割は一致しない。跨いだ参照は止めずに数えて警告する。
 - **R14:** 参照specのfrontendは名前の閉じた集合から明示的に選び、モデルの宣言とmanifestを照合する (§8.6)。
 - **R15:** 評価は参照specをモデルの`reference_max_frames`まで先頭から切って渡す (§8.6)。
+- **R16:** 再開時に参照関連のhparam (frontend / generator_reference / reference_max_frames) をcheckpointと照合する。strict resumeは不一致で停止、weights-onlyとFTはfrontendの不一致のみ停止し他は警告、keyの無い旧checkpointは受け入れる (§8.6)。
 
 残っていること:
 
@@ -524,4 +532,8 @@ S1 (Task 5R〜11R) の実装とCPUテストは`feat/zero-shot-v8-dataset-scaling
   - `test_piper_proc_exec` (ctestの下で実行したとき)
 - 範囲外のbug: `piper_plus/api/engine.py`の`_fill_speaker_embedding_inputs`が`speaker_embedding_mask`を常に渡す。
 - Rust・Go・C#・WASMのruntimeは、参照spec入力付きのモデルをまだ拒否しない (拒否はPython runtimeとC++のみ)。
+- 学習側の`piper_train.infer_onnx`も、参照spec入力付きのモデルを明示的に拒否せず、対応もしていない (ORTの入力欠落エラーで止まる)。
 - v10bの実データの学習cacheがどのbuilderで作られたか (frontend名) はS2のdata auditで確定する。
+- **未決 (S2の前に方針を決める):** 参照specのfrontendが言語ごとに異なる、または閉じた集合の外になる可能性がある (final review I1)。checkpointが持てるfrontend名は1つなので、そのままでは正しい名前が存在しない。近い名前を選ぶと、checkpoint・`.onnx.json`・評価manifestの照合はすべて通るのに、学習時と評価時のspecの作り方が食い違い、どこでも検出されない。案: 参照に使う発話だけを、名前付きのfrontendで作り直した参照専用のspec cacheに切り出し、`reference_audio_spec_path`をそこへ向ける (CPUのみ、参照される発話の数だけ)。別案の「GPU batch経路を許容誤差つきで閉じた集合に加える」は、言語ごとの混在を表せない。
+- dataset dirに`test_utterances.jsonl`があると、ref_specの学習は起動時に止まる。各行に`reference_audio_spec_path`が要るが、この列を書くtoolがない (§8.3)。
+- 学習は参照specをfp16で保存した`.spec.pt`からfloatに戻して使い、評価はfloat32のまま渡す。相対差は2^-11以下で、9Rの報告に記録した。揃える場合は評価で`.half().float()`してから渡す。
