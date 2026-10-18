@@ -10,18 +10,28 @@ import numpy as np
 from piper_plus.embedding import validate_embedding
 
 from .embedding_cache import atomic_write, file_sha256
+from .reference_spec_contract import (
+    REFERENCE_SPEC_FRONTENDS,
+    frontend_steps,
+    max_reference_frames,
+    spec_array_sha256,
+)
 
 
 NORMALIZATION_VERSION = "nfkc-strip-PZS-v1"
 BACKENDS = ("torch-raw", "torch-ema", "onnx")
 
 # 参照 spec (F-mel、reference_conditioning="ref_spec") の STFT 設定の既定値。
-# 学習 hparams (filter_length / hop_length / win_length) の既定と同じ契約値
+# 学習 hparams (filter_length / hop_length / win_length) の既定と同じ契約値。
+# frontend は既定値を持たない (モデルが学習した cache の作り方で決まる、R14)
 REFERENCE_SPEC_DEFAULTS = {"filter_length": 1024, "hop_length": 256, "win_length": 1024}
-# 評価では常に学習 cache と同じ trim 付き frontend を使う
-# (reference_frontend.REFERENCE_SPEC_FRONTEND と同じ文字列。torch を import
-# しないよう manifest 側では文字列で持ち、_reference_spec_record で一致を検査)
-_REFERENCE_SPEC_FRONTEND = "energy-vad@16k;soxr-hq"
+_REFERENCE_SPEC_SETTINGS_KEYS = {
+    "frontend",
+    *REFERENCE_SPEC_DEFAULTS,
+    "center",
+    "spec_channels",
+}
+_REFERENCE_SPEC_RECORD_KEYS = {"audio_sha256", "spec_sha256", "frames", "spec_path"}
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
 
 
@@ -32,36 +42,39 @@ def _is_int(value) -> bool:
 def reference_spec_settings(params: dict) -> dict:
     """manifest 最上位の ``reference_spec`` (frontend + STFT 設定) を作り検査する。
 
-    ``params`` は ``REFERENCE_SPEC_DEFAULTS`` の一部の上書き (未知の key は拒否)。
+    ``params`` は ``frontend`` (必須、``REFERENCE_SPEC_FRONTENDS`` の閉じた集合)
+    と ``REFERENCE_SPEC_DEFAULTS`` の一部の上書き (未知の key は拒否)。
     """
-    if not isinstance(params, dict) or set(params) - set(REFERENCE_SPEC_DEFAULTS):
+    allowed = {"frontend", *REFERENCE_SPEC_DEFAULTS}
+    if not isinstance(params, dict) or set(params) - allowed:
         raise ValueError(
-            f"reference_spec accepts only {sorted(REFERENCE_SPEC_DEFAULTS)}, "
-            f"got {params!r}"
+            f"reference_spec accepts only {sorted(allowed)}, got {params!r}"
+        )
+    if "frontend" not in params:
+        raise ValueError(
+            "reference_spec requires an explicit frontend (one of "
+            f"{sorted(REFERENCE_SPEC_FRONTENDS)}) matching the model's training "
+            "cache builder"
         )
     params = {**REFERENCE_SPEC_DEFAULTS, **params}
     settings = {
-        "frontend": _REFERENCE_SPEC_FRONTEND,
+        "frontend": params["frontend"],
         **{key: params[key] for key in REFERENCE_SPEC_DEFAULTS},
         "center": False,
-        "trim": True,
+        "spec_channels": None,
     }
+    if _is_int(settings["filter_length"]):
+        settings["spec_channels"] = settings["filter_length"] // 2 + 1
     _validate_reference_spec_settings(settings)
     return settings
 
 
 def _validate_reference_spec_settings(settings: dict) -> None:
-    if not isinstance(settings, dict) or set(settings) != {
-        "frontend",
-        *REFERENCE_SPEC_DEFAULTS,
-        "center",
-        "trim",
-    }:
+    if not isinstance(settings, dict) or set(settings) != _REFERENCE_SPEC_SETTINGS_KEYS:
         raise ValueError("Invalid reference_spec settings keys")
-    if settings["frontend"] != _REFERENCE_SPEC_FRONTEND:
-        raise ValueError(f"Unsupported reference_spec frontend: {settings['frontend']}")
-    if settings["center"] is not False or settings["trim"] is not True:
-        raise ValueError("reference_spec must use center=False and trim=True")
+    frontend_steps(settings["frontend"])
+    if settings["center"] is not False:
+        raise ValueError("reference_spec must use center=False")
     filter_length = settings["filter_length"]
     hop_length = settings["hop_length"]
     win_length = settings["win_length"]
@@ -78,13 +91,18 @@ def _validate_reference_spec_settings(settings: dict) -> None:
             "reference_spec win_length must be an int in (0, filter_length], "
             f"got {win_length!r}"
         )
+    if settings["spec_channels"] != filter_length // 2 + 1:
+        raise ValueError(
+            "reference_spec spec_channels must be filter_length // 2 + 1 "
+            f"({filter_length // 2 + 1}), got {settings['spec_channels']!r}"
+        )
 
 
 def compute_reference_spec(reference_path, settings: dict, sample_rate: int):
     """manifest の設定で参照 WAV から spec を作る (prepare と generate の共通経路)。
 
     Returns:
-        (spec ``[filter_length // 2 + 1, T_ref]`` float32,
+        (spec ``[filter_length // 2 + 1, T_ref]`` float32 torch.Tensor,
         clip 記録 ``{audio_sha256, spec_sha256, frames}``)。
     """
     from .reference_frontend import (  # noqa: PLC0415 — torch を遅延 import
@@ -98,13 +116,8 @@ def compute_reference_spec(reference_path, settings: dict, sample_rate: int):
         filter_length=settings["filter_length"],
         hop_length=settings["hop_length"],
         win_length=settings["win_length"],
-        trim=settings["trim"],
+        frontend=settings["frontend"],
     )
-    if info["frontend"] != settings["frontend"]:
-        raise ValueError(
-            f"reference_spec frontend {info['frontend']!r} does not match the "
-            f"manifest ({settings['frontend']!r})"
-        )
     record = {
         "audio_sha256": file_sha256(Path(reference_path)),
         "spec_sha256": reference_spec_sha256(spec),
@@ -113,7 +126,50 @@ def compute_reference_spec(reference_path, settings: dict, sample_rate: int):
     return spec, record
 
 
-def _validate_reference_spec_records(manifest: dict) -> None:
+def reference_spec_dir(manifest_path: Path) -> Path:
+    """prepare で固定した参照 spec (.npy) の置き場 (manifest の隣)。"""
+    manifest_path = Path(manifest_path)
+    return manifest_path.with_name(f"{manifest_path.stem}.reference_spec")
+
+
+def load_reference_spec(clip: dict, settings: dict) -> np.ndarray:
+    """prepare で保存した参照 spec を読み、manifest の固定値と照合して返す。
+
+    Returns:
+        ``[spec_channels, frames]`` float32 (C 順)。
+
+    Raises:
+        ValueError: 欠落・dtype/shape 違い・非有限・負値・hash 不一致。
+    """
+    tid = clip["id"]
+    record = clip["reference_spec"]
+    path = Path(record["spec_path"])
+    try:
+        spec = np.load(path, allow_pickle=False)
+    except (OSError, ValueError) as exc:
+        raise ValueError(
+            f"Missing/unreadable reference spec file for {tid}: {path}"
+        ) from exc
+    if spec.dtype != np.float32:
+        raise ValueError(
+            f"reference spec file for {tid} must be float32, got {spec.dtype}: {path}"
+        )
+    expected_shape = (settings["spec_channels"], record["frames"])
+    if spec.shape != expected_shape:
+        raise ValueError(
+            f"reference spec file shape for {tid} is {spec.shape}, the manifest "
+            f"pins {expected_shape}: {path}"
+        )
+    if not np.isfinite(spec).all() or (spec < 0).any():
+        raise ValueError(
+            f"reference spec file for {tid} must be finite and non-negative: {path}"
+        )
+    if spec_array_sha256(spec) != record["spec_sha256"]:
+        raise ValueError(f"reference spec file hash mismatch for {tid}: {path}")
+    return np.ascontiguousarray(spec)
+
+
+def _validate_reference_spec_records(manifest: dict, *, verify_files: bool) -> None:
     settings = manifest.get("reference_spec")
     records = [clip.get("reference_spec") for clip in manifest["clips"]]
     if settings is None:
@@ -123,28 +179,40 @@ def _validate_reference_spec_records(manifest: dict) -> None:
             )
         return
     _validate_reference_spec_settings(settings)
+    sample_rate = manifest["sample_rate"]
+    if not _is_int(sample_rate) or sample_rate <= 0:
+        raise ValueError("Invalid sample_rate")
+    limit = max_reference_frames(sample_rate, settings["hop_length"])
     for clip, record in zip(manifest["clips"], records, strict=True):
         tid = clip["id"]
         if record is None:
             raise ValueError(f"Missing reference_spec record for {tid}")
-        if not isinstance(record, dict) or set(record) != {
-            "audio_sha256",
-            "spec_sha256",
-            "frames",
-        }:
+        if not isinstance(record, dict) or set(record) != _REFERENCE_SPEC_RECORD_KEYS:
             raise ValueError(f"Invalid reference_spec record keys for {tid}")
-        if not clip["reference_audio"]:
-            raise ValueError(f"reference_spec requires reference audio for {tid}")
+        # 学習は 192 次元と spec を同じ参照発話 1 本から作るので、評価でも
+        # 1 本に限る (どの WAV の spec かを曖昧にしない)
+        if len(clip["reference_audio"]) != 1:
+            raise ValueError(
+                f"reference_spec requires exactly one reference audio for {tid}, "
+                f"got {len(clip['reference_audio'])}"
+            )
         if record["audio_sha256"] != clip["reference_audio"][0]["sha256"]:
             raise ValueError(
-                f"reference_spec audio_sha256 must pin the first reference audio of {tid}"
+                f"reference_spec audio_sha256 must pin the reference audio of {tid}"
             )
         if not isinstance(record["spec_sha256"], str) or not _SHA256_RE.fullmatch(
             record["spec_sha256"]
         ):
             raise ValueError(f"Invalid reference_spec spec_sha256 for {tid}")
-        if not _is_int(record["frames"]) or record["frames"] < 1:
-            raise ValueError(f"Invalid reference_spec frames (T_ref) for {tid}")
+        if not _is_int(record["frames"]) or not 1 <= record["frames"] <= limit:
+            raise ValueError(
+                f"Invalid reference_spec frames (T_ref) for {tid}: "
+                f"{record['frames']!r} (limit {limit})"
+            )
+        if not isinstance(record["spec_path"], str) or not record["spec_path"]:
+            raise ValueError(f"Invalid reference_spec spec_path for {tid}")
+        if verify_files:
+            load_reference_spec(clip, settings)
 
 
 def _source_files() -> list[Path]:
@@ -269,7 +337,7 @@ def validate_manifest(manifest: dict, *, verify_files: bool = True) -> dict:
                     clip_embedding(clip, dimension)
                 for reference in clip["reference_audio"]:
                     _verify_file(reference)
-        _validate_reference_spec_records(manifest)
+        _validate_reference_spec_records(manifest, verify_files=verify_files)
         scales = manifest["scales"]
         if (
             not isinstance(scales, list)
@@ -356,11 +424,13 @@ def create_manifest(
 ) -> dict:
     """評価条件を固定した manifest を書く。
 
-    ``reference_spec`` (opt-in、``REFERENCE_SPEC_DEFAULTS`` の上書き dict) を
-    渡すと、各 clip の先頭の参照 WAV から学習 cache と同じ frontend で参照
-    spec を作り、frontend・参照音声 hash・spec hash (float32 bytes)・T_ref を
-    記録する (ref_spec モデルの評価に必須)。既定 None の manifest は変更前と
-    同じ schema。
+    ``reference_spec`` (opt-in、``{"frontend": <必須>, ...STFT の上書き}``) を
+    渡すと、各 clip のただ 1 本の参照 WAV から名前付き frontend (学習 cache
+    builder の写し) で参照 spec を作り、manifest の隣の
+    ``<manifest stem>.reference_spec/<clip id>.npy`` に float32 で保存する。
+    manifest には frontend・STFT・参照音声 hash・spec hash (float32 bytes)・
+    T_ref・保存先を記録する (ref_spec モデルの評価に必須。generate はこの
+    保存 bytes を feed する)。既定 None の manifest は変更前と同じ schema。
     """
     source_path = Path(source_path).resolve()
     source = _pin(source_path)
@@ -406,20 +476,28 @@ def create_manifest(
     except (KeyError, TypeError, OSError) as exc:
         raise ValueError(f"Invalid evaluation source: {exc}") from exc
     settings = None
+    specs = {}
     if reference_spec is not None:
         settings = reference_spec_settings(reference_spec)
+        spec_dir = reference_spec_dir(Path(output_path).resolve())
         for clip in clips:
             if not clip["reference_audio"]:
                 raise ValueError(
                     f"reference_spec requires reference audio for {clip['id']}"
                 )
+            if len(clip["reference_audio"]) != 1:
+                raise ValueError(
+                    "reference_spec requires exactly one reference audio for "
+                    f"{clip['id']}, got {len(clip['reference_audio'])}"
+                )
             path = clip["reference_audio"][0]["path"]
             try:
-                _spec, clip["reference_spec"] = compute_reference_spec(
-                    path, settings, sample_rate
-                )
+                spec, record = compute_reference_spec(path, settings, sample_rate)
             except ValueError as exc:
                 raise ValueError(f"{exc} (clip {clip['id']}: {path})") from exc
+            spec_path = spec_dir / f"{clip['id']}.npy"
+            clip["reference_spec"] = {**record, "spec_path": str(spec_path)}
+            specs[spec_path] = spec.detach().cpu().numpy()
     manifest = {
         "version": 1,
         "source": {
@@ -449,11 +527,27 @@ def create_manifest(
         # 既定 (None) では key 自体を作らない (旧 manifest と同じ schema・hash)
         manifest["reference_spec"] = settings
     manifest["conditions_sha256"] = conditions_sha256(manifest)
-    validate_manifest(manifest)
-    atomic_write(
-        Path(output_path),
-        lambda target: target.write(
-            json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8")
-        ),
-    )
+    # 参照 spec は全 clip の計算が成功してから書く。manifest の検証・書き込みが
+    # 失敗したら、今回書いた spec も消す (manifest の無い spec を残さない)
+    # schema の誤りは spec を 1 つも書かないうちに止める
+    validate_manifest(manifest, verify_files=False)
+    written = []
+    try:
+        for spec_path, array in specs.items():
+            atomic_write(
+                spec_path,
+                lambda target, array=array: np.save(target, array, allow_pickle=False),
+            )
+            written.append(spec_path)
+        validate_manifest(manifest)
+        atomic_write(
+            Path(output_path),
+            lambda target: target.write(
+                json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8")
+            ),
+        )
+    except BaseException:
+        for spec_path in written:
+            spec_path.unlink(missing_ok=True)
+        raise
     return manifest
