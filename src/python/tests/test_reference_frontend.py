@@ -6,8 +6,14 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from piper_train.extract_speaker_embedding import preprocess_audio
-from piper_train.reference_frontend import trim_reference_audio
+
+# Windows CI (``[test,inference]``) は torch / soxr を入れない。module 最上位で
+# torch を import するので、collection の ImportError ではなく skip にする
+pytest.importorskip("torch", reason="reference frontend tests require torch")
+pytest.importorskip("soxr", reason="reference frontend tests require soxr")
+
+from piper_train.extract_speaker_embedding import preprocess_audio  # noqa: E402
+from piper_train.reference_frontend import trim_reference_audio  # noqa: E402
 
 
 def tone(n: int, amp: float, sr: int = 22050, freq: float = 220.0) -> np.ndarray:
@@ -166,22 +172,32 @@ def test_real_torch_weights_match_onnx_192():
 
 
 # ---------------------------------------------------------------------------
-# 参照 spec (F-mel) frontend: 学習 cache (cache_norm_audio_fast) と同じ手順
+# 参照 spec (F-mel) frontend: 名前付きの学習 cache builder を bit 単位で再現する
+# (Ruling R14: frontend は実在する cache builder を写した明示的な選択肢)
 # ---------------------------------------------------------------------------
 
 from piper_train.norm_audio import (  # noqa: E402
     cache_norm_audio_fast,
+    cache_norm_audio_no_vad,
     energy_vad_numpy,
 )
 from piper_train.reference_frontend import (  # noqa: E402
-    REFERENCE_SPEC_FRONTEND,
     reference_spec_from_audio,
     reference_spec_from_file,
+)
+from piper_train.reference_spec_contract import (  # noqa: E402
+    REFERENCE_SPEC_FRONTENDS,
+    REFERENCE_SPEC_MAX_SECONDS,
+    max_reference_frames,
 )
 from piper_train.vits.mel_processing import spectrogram_torch  # noqa: E402
 
 
 _SPEC_KW = {"filter_length": 1024, "hop_length": 256, "win_length": 1024}
+VAD = "energy-vad@16k;soxr-hq"
+NO_VAD_MQ = "no-vad;soxr-mq"
+NO_VAD_HQ = "no-vad;soxr-hq"
+ALL_FRONTENDS = [VAD, NO_VAD_MQ, NO_VAD_HQ]
 
 
 def voiced_with_silence(
@@ -195,15 +211,13 @@ def voiced_with_silence(
 ) -> np.ndarray:
     """前後に無音を持つ有声区間 (tone + 弱い noise) を float32 で作る。"""
     rng = np.random.default_rng(seed)
-    n = int(round(voiced * sr))
-    body = tone(n, 0.3, sr, freq) + (0.01 * rng.standard_normal(n)).astype(
-        np.float32
-    )
+    n = round(voiced * sr)
+    body = tone(n, 0.3, sr, freq) + (0.01 * rng.standard_normal(n)).astype(np.float32)
     return np.concatenate(
         [
-            np.zeros(int(round(lead * sr)), dtype=np.float32),
+            np.zeros(round(lead * sr), dtype=np.float32),
             body.astype(np.float32),
-            np.zeros(int(round(tail * sr)), dtype=np.float32),
+            np.zeros(round(tail * sr), dtype=np.float32),
         ]
     )
 
@@ -214,24 +228,34 @@ def write_wav(path: Path, audio: np.ndarray, sr: int) -> Path:
     return path
 
 
-def cache_spec(path: Path, cache_dir: Path, target_sr: int, **kw) -> torch.Tensor:
-    """学習 cache の ``.spec.pt`` (fp16) を作って読む。"""
+def builder_spec(
+    frontend: str, path: Path, cache_dir: Path, target_sr: int, **kw
+) -> torch.Tensor:
+    """frontend 名が写すはずの実在 cache builder を走らせ ``.spec.pt`` (fp16) を読む。"""
     cache_dir.mkdir(parents=True, exist_ok=True)
-    _norm, spec_path = cache_norm_audio_fast(
-        path,
-        cache_dir,
-        target_sr,
-        filter_length=kw.get("filter_length", 1024),
-        window_length=kw.get("win_length", 1024),
-        hop_length=kw.get("hop_length", 256),
-    )
+    stft = {
+        "filter_length": kw.get("filter_length", 1024),
+        "window_length": kw.get("win_length", 1024),
+        "hop_length": kw.get("hop_length", 256),
+    }
+    if frontend == VAD:
+        _norm, spec_path = cache_norm_audio_fast(path, cache_dir, target_sr, **stft)
+    else:
+        quality = {NO_VAD_MQ: "MQ", NO_VAD_HQ: "HQ"}[frontend]
+        _norm, spec_path = cache_norm_audio_no_vad(
+            path, cache_dir, target_sr, resample_quality=quality, **stft
+        )
     return torch.load(spec_path, weights_only=True)
 
 
-def frontend_spec(path: Path, target_sr: int, **kw):
+def frontend_spec(path: Path, target_sr: int, frontend: str, **kw):
     audio, src_sr = sf.read(str(path), dtype="float32", always_2d=False)
     return reference_spec_from_audio(
-        audio, src_sr, target_sample_rate=target_sr, **{**_SPEC_KW, **kw}
+        audio,
+        src_sr,
+        target_sample_rate=target_sr,
+        frontend=frontend,
+        **{**_SPEC_KW, **kw},
     )
 
 
@@ -247,48 +271,76 @@ def assert_cache_parity(ours: torch.Tensor, cached: torch.Tensor) -> None:
     assert torch.equal(ours.half(), cached)
 
 
-def test_reference_spec_matches_cache_norm_audio_fast(tmp_path):
+def test_reference_spec_frontends_are_a_closed_set():
+    # 実在する CPU 逐次の cache builder を写すものだけ。GPU batch STFT の
+    # builder (batch 内 0 埋め後の reflect pad / pad 512) は bit 単位で写せない
+    assert set(REFERENCE_SPEC_FRONTENDS) == set(ALL_FRONTENDS)
+
+
+@pytest.mark.parametrize("frontend", ALL_FRONTENDS)
+def test_reference_spec_matches_training_cache_builder(tmp_path, frontend):
     sr = 22050
     path = write_wav(tmp_path / "ref.wav", voiced_with_silence(sr), sr)
-    ours, _info = frontend_spec(path, sr)
-    assert_cache_parity(ours, cache_spec(path, tmp_path / "cache", sr))
+    ours, _info = frontend_spec(path, sr, frontend)
+    assert_cache_parity(ours, builder_spec(frontend, path, tmp_path / "cache", sr))
 
 
+@pytest.mark.parametrize("frontend", ALL_FRONTENDS)
 @pytest.mark.parametrize(
     "src_sr,target_sr", [(16000, 22050), (44100, 22050), (22050, 16000)]
 )
-def test_reference_spec_resamples_16k_and_44k(tmp_path, src_sr, target_sr):
+def test_reference_spec_resamples_16k_and_44k(tmp_path, frontend, src_sr, target_sr):
     path = write_wav(tmp_path / "ref.wav", voiced_with_silence(src_sr), src_sr)
-    ours, info = frontend_spec(path, target_sr)
+    ours, info = frontend_spec(path, target_sr, frontend)
     assert info["sample_rate"] == target_sr
-    assert_cache_parity(ours, cache_spec(path, tmp_path / "cache", target_sr))
+    assert_cache_parity(
+        ours, builder_spec(frontend, path, tmp_path / "cache", target_sr)
+    )
 
 
-def test_reference_spec_stereo_mixdown_matches_cache(tmp_path):
+@pytest.mark.parametrize("frontend", ALL_FRONTENDS)
+def test_reference_spec_stereo_mixdown_matches_cache(tmp_path, frontend):
     sr = 22050
     left = voiced_with_silence(sr, freq=220.0, seed=1)
     right = voiced_with_silence(sr, freq=330.0, seed=2) * np.float32(0.5)
     path = write_wav(tmp_path / "stereo.wav", np.stack([left, right], axis=1), sr)
-    ours, _info = frontend_spec(path, sr)
-    assert_cache_parity(ours, cache_spec(path, tmp_path / "cache", sr))
+    ours, _info = frontend_spec(path, sr, frontend)
+    assert_cache_parity(ours, builder_spec(frontend, path, tmp_path / "cache", sr))
 
 
-def test_reference_spec_non_default_stft_matches_cache(tmp_path):
+@pytest.mark.parametrize("frontend", ALL_FRONTENDS)
+def test_reference_spec_non_default_stft_matches_cache(tmp_path, frontend):
     sr = 22050
     kw = {"filter_length": 512, "hop_length": 128, "win_length": 512}
     path = write_wav(tmp_path / "ref.wav", voiced_with_silence(sr), sr)
-    ours, _info = frontend_spec(path, sr, **kw)
+    ours, _info = frontend_spec(path, sr, frontend, **kw)
     assert ours.shape[0] == 512 // 2 + 1
-    assert_cache_parity(ours, cache_spec(path, tmp_path / "cache", sr, **kw))
+    assert_cache_parity(
+        ours, builder_spec(frontend, path, tmp_path / "cache", sr, **kw)
+    )
 
 
-def test_reference_spec_from_file_matches_array_api(tmp_path):
+def test_reference_spec_mq_and_hq_differ():
+    # 品質の取り違えを parity テストが見分けられること (MQ と HQ で値が違う)
+    audio = voiced_with_silence(44100)
+    mq, _ = reference_spec_from_audio(
+        audio, 44100, target_sample_rate=22050, frontend=NO_VAD_MQ, **_SPEC_KW
+    )
+    hq, _ = reference_spec_from_audio(
+        audio, 44100, target_sample_rate=22050, frontend=NO_VAD_HQ, **_SPEC_KW
+    )
+    assert mq.shape == hq.shape
+    assert not torch.equal(mq.half(), hq.half())
+
+
+@pytest.mark.parametrize("frontend", ALL_FRONTENDS)
+def test_reference_spec_from_file_matches_array_api(tmp_path, frontend):
     sr = 44100
     path = write_wav(tmp_path / "ref.wav", voiced_with_silence(sr), sr)
     from_file, file_info = reference_spec_from_file(
-        path, target_sample_rate=22050, **_SPEC_KW
+        path, target_sample_rate=22050, frontend=frontend, **_SPEC_KW
     )
-    from_array, array_info = frontend_spec(path, 22050)
+    from_array, array_info = frontend_spec(path, 22050, frontend)
     assert torch.equal(from_file, from_array)
     assert file_info == array_info
 
@@ -299,20 +351,51 @@ def test_reference_spec_trim_bounds_follow_energy_vad():
     # chunk 49 (1.47-1.50 s) + keep_after=2 → 51 → end 1.56 s (duration 1.14 s)
     sr = 22050
     _spec, info = reference_spec_from_audio(
-        voiced_with_silence(sr), sr, target_sample_rate=sr, **_SPEC_KW
+        voiced_with_silence(sr), sr, target_sample_rate=sr, frontend=VAD, **_SPEC_KW
     )
-    assert info["trim"] is True
+    assert info["vad"] is True
     assert info["offset_sec"] == pytest.approx(0.42, abs=1e-9)
     assert info["duration_sec"] == pytest.approx(1.14, abs=1e-9)
 
 
-def test_reference_spec_info_records_frontend_and_frames():
+@pytest.mark.parametrize("frontend", [NO_VAD_MQ, NO_VAD_HQ])
+def test_reference_spec_no_vad_keeps_whole_audio(frontend):
+    # VAD なしは前後の無音を残す: center=False の frame 数は全長から決まる
+    # ((L + 2 * 384 - 1024) // 256 + 1、L = 2.2 s × 22050 = 48510 → 189)
+    sr = 22050
+    audio = voiced_with_silence(sr)
+    assert len(audio) == 48510
+    spec, info = reference_spec_from_audio(
+        audio, sr, target_sample_rate=sr, frontend=frontend, **_SPEC_KW
+    )
+    assert spec.shape[-1] == (48510 + 768 - 1024) // 256 + 1 == 189
+    assert info["vad"] is False
+    assert info["offset_sec"] == 0.0
+
+
+def test_reference_spec_vad_frontend_trims_frames():
+    sr = 22050
+    audio = voiced_with_silence(sr)
+    trimmed, _ = reference_spec_from_audio(
+        audio, sr, target_sample_rate=sr, frontend=VAD, **_SPEC_KW
+    )
+    whole, _ = reference_spec_from_audio(
+        audio, sr, target_sample_rate=sr, frontend=NO_VAD_HQ, **_SPEC_KW
+    )
+    assert trimmed.shape[-1] < whole.shape[-1]
+
+
+@pytest.mark.parametrize("frontend", ALL_FRONTENDS)
+def test_reference_spec_info_records_frontend_and_frames(frontend):
     sr = 22050
     spec, info = reference_spec_from_audio(
-        voiced_with_silence(sr), sr, target_sample_rate=sr, **_SPEC_KW
+        voiced_with_silence(sr),
+        sr,
+        target_sample_rate=sr,
+        frontend=frontend,
+        **_SPEC_KW,
     )
-    assert REFERENCE_SPEC_FRONTEND == "energy-vad@16k;soxr-hq"
-    assert info["frontend"] == REFERENCE_SPEC_FRONTEND
+    assert info["frontend"] == frontend
     assert info["frames"] == spec.shape[-1]
     assert spec.shape[0] == 513
     assert {
@@ -320,39 +403,23 @@ def test_reference_spec_info_records_frontend_and_frames():
     } == {**_SPEC_KW, "center": False}
 
 
-def test_reference_spec_trim_false_uses_whole_audio():
-    import soxr
-
-    src_sr, target_sr = 44100, 22050
-    audio = voiced_with_silence(src_sr)
-    ours, info = reference_spec_from_audio(
-        audio, src_sr, target_sample_rate=target_sr, trim=False, **_SPEC_KW
-    )
-    # 独立に組んだ「VAD なし」: soxr HQ で全長を resample → spectrogram_torch。
-    # 同じ演算列なので bit 一致を要求する
-    expected = spectrogram_torch(
-        torch.from_numpy(soxr.resample(audio, src_sr, target_sr, quality="HQ"))[None],
-        1024,
-        target_sr,
-        256,
-        1024,
-        center=False,
-    ).squeeze(0)
-    assert torch.equal(ours, expected)
-    assert info["trim"] is False
-    assert info["frontend"] != REFERENCE_SPEC_FRONTEND
+def test_reference_spec_unknown_frontend_raises():
+    with pytest.raises(ValueError, match="frontend"):
+        reference_spec_from_audio(
+            voiced_with_silence(22050),
+            22050,
+            target_sample_rate=22050,
+            frontend="silero-vad;torchaudio",
+            **_SPEC_KW,
+        )
 
 
-def test_reference_spec_trim_shortens_frames():
-    sr = 22050
-    audio = voiced_with_silence(sr)
-    trimmed, _ = reference_spec_from_audio(
-        audio, sr, target_sample_rate=sr, **_SPEC_KW
-    )
-    whole, _ = reference_spec_from_audio(
-        audio, sr, target_sample_rate=sr, trim=False, **_SPEC_KW
-    )
-    assert trimmed.shape[-1] < whole.shape[-1]
+def test_reference_spec_frontend_is_required():
+    # 既定値で 1 つの builder を黙って仮定しない
+    with pytest.raises(TypeError):
+        reference_spec_from_audio(
+            voiced_with_silence(22050), 22050, target_sample_rate=22050, **_SPEC_KW
+        )
 
 
 def test_reference_spec_float64_input_is_cast_like_cache():
@@ -360,44 +427,108 @@ def test_reference_spec_float64_input_is_cast_like_cache():
     # へ落としてから同じ手順を通す (精度を上げた別経路にしない)
     sr = 22050
     audio = voiced_with_silence(sr)
-    a, _ = reference_spec_from_audio(audio, sr, target_sample_rate=sr, **_SPEC_KW)
+    a, _ = reference_spec_from_audio(
+        audio, sr, target_sample_rate=sr, frontend=VAD, **_SPEC_KW
+    )
     b, _ = reference_spec_from_audio(
-        audio.astype(np.float64), sr, target_sample_rate=sr, **_SPEC_KW
+        audio.astype(np.float64), sr, target_sample_rate=sr, frontend=VAD, **_SPEC_KW
     )
     assert torch.equal(a, b)
 
 
-def test_reference_spec_minimum_length_gives_one_frame():
-    # center=False + reflect pad (n_fft - hop) / 2 = 384: reflect は pad < 長さ
-    # を要するので最小長は 385 sample、frame 数は (385 + 768 - 1024) // 256 + 1 = 1
+def test_reference_spec_shortest_voiced_audio_gives_one_frame():
+    # 有声判定の最小単位は 16 kHz の 1 chunk (480 sample = 30 ms)。VAD なしで
+    # 16 kHz の 480 sample は (480 + 768 - 1024) // 256 + 1 = 1 frame
     spec, info = reference_spec_from_audio(
-        np.full(385, 0.1, dtype=np.float32),
-        22050,
-        target_sample_rate=22050,
-        trim=False,
+        np.full(480, 0.1, dtype=np.float32),
+        16000,
+        target_sample_rate=16000,
+        frontend=NO_VAD_HQ,
         **_SPEC_KW,
     )
     assert spec.shape == (513, 1)
     assert info["frames"] == 1
 
 
-def test_reference_spec_below_minimum_length_raises():
-    with pytest.raises(ValueError, match="too short"):
+def test_reference_spec_shorter_than_one_vad_chunk_raises():
+    # 479 sample (< 1 chunk) は有声判定ができないので有声区間なしとして拒否する
+    with pytest.raises(ValueError, match="no voiced"):
         reference_spec_from_audio(
-            np.full(384, 0.1, dtype=np.float32),
-            22050,
-            target_sample_rate=22050,
-            trim=False,
+            np.full(479, 0.1, dtype=np.float32),
+            16000,
+            target_sample_rate=16000,
+            frontend=NO_VAD_HQ,
             **_SPEC_KW,
         )
 
 
-def test_reference_spec_silent_audio_raises():
+_LONG_FFT = {"filter_length": 8192, "hop_length": 256, "win_length": 8192}
+
+
+def test_reference_spec_reflect_pad_boundary_passes():
+    # filter 8192 / hop 256 の reflect pad は (8192 - 256) / 2 = 3968。reflect は
+    # pad < 長さを要するので 3969 sample が最短 → (3969 + 7936 - 8192) // 256 + 1 = 15
+    spec, _ = reference_spec_from_audio(
+        np.full(3969, 0.1, dtype=np.float32),
+        16000,
+        target_sample_rate=16000,
+        frontend=NO_VAD_HQ,
+        **_LONG_FFT,
+    )
+    assert spec.shape == (4097, 15)
+
+
+def test_reference_spec_below_reflect_pad_raises():
+    with pytest.raises(ValueError, match="too short"):
+        reference_spec_from_audio(
+            np.full(3968, 0.1, dtype=np.float32),
+            16000,
+            target_sample_rate=16000,
+            frontend=NO_VAD_HQ,
+            **_LONG_FFT,
+        )
+
+
+def test_reference_spec_max_frames_boundary_passes():
+    # 上限 T_ref = int(30 s × sr) // hop。16 kHz / hop 256 なら 1875 frame。
+    # VAD なしで L = 1875 × 256 sample → (L + 768 - 1024) // 256 + 1 = 1875
+    sr = 16000
+    limit = max_reference_frames(sr, 256)
+    assert REFERENCE_SPEC_MAX_SECONDS == 30.0
+    assert limit == 1875
+    spec, _ = reference_spec_from_audio(
+        np.full(limit * 256, 0.1, dtype=np.float32),
+        sr,
+        target_sample_rate=sr,
+        frontend=NO_VAD_HQ,
+        **_SPEC_KW,
+    )
+    assert spec.shape[-1] == limit
+
+
+def test_reference_spec_above_max_frames_raises():
+    sr = 16000
+    limit = max_reference_frames(sr, 256)
+    with pytest.raises(ValueError, match="T_ref"):
+        reference_spec_from_audio(
+            np.full((limit + 1) * 256, 0.1, dtype=np.float32),
+            sr,
+            target_sample_rate=sr,
+            frontend=NO_VAD_HQ,
+            **_SPEC_KW,
+        )
+
+
+@pytest.mark.parametrize("frontend", ALL_FRONTENDS)
+def test_reference_spec_silent_audio_raises(frontend):
+    # VAD なしの frontend でも、有声区間の無い参照は評価に使えないので拒否する
+    # (spec は trim しない。検出は energy VAD を有声判定にだけ使う)
     with pytest.raises(ValueError, match="no voiced"):
         reference_spec_from_audio(
             np.zeros(44100, dtype=np.float32),
             22050,
             target_sample_rate=22050,
+            frontend=frontend,
             **_SPEC_KW,
         )
 
@@ -407,7 +538,19 @@ def test_reference_spec_non_finite_audio_raises(bad):
     audio = voiced_with_silence(22050)
     audio[1000] = bad
     with pytest.raises(ValueError, match="finite"):
-        reference_spec_from_audio(audio, 22050, target_sample_rate=22050, **_SPEC_KW)
+        reference_spec_from_audio(
+            audio, 22050, target_sample_rate=22050, frontend=VAD, **_SPEC_KW
+        )
+
+
+def test_reference_spec_overflowing_spec_raises():
+    # 入力は有限でも |x| が極端に大きいと STFT の pow(2) が float32 で overflow
+    # する (1e30 × 窓和 ~512 → 二乗で 1e65 > 3.4e38)。feed 前に拒否する
+    audio = np.full(4000, 1e30, dtype=np.float32)
+    with pytest.raises(ValueError, match="finite"):
+        reference_spec_from_audio(
+            audio, 22050, target_sample_rate=22050, frontend=NO_VAD_HQ, **_SPEC_KW
+        )
 
 
 def test_reference_spec_empty_audio_raises():
@@ -416,6 +559,7 @@ def test_reference_spec_empty_audio_raises():
             np.zeros(0, dtype=np.float32),
             22050,
             target_sample_rate=22050,
+            frontend=VAD,
             **_SPEC_KW,
         )
 
@@ -426,6 +570,7 @@ def test_reference_spec_rejects_3d_audio():
             np.zeros((2, 2, 1000), dtype=np.float32),
             22050,
             target_sample_rate=22050,
+            frontend=VAD,
             **_SPEC_KW,
         )
 
@@ -438,6 +583,7 @@ def test_reference_spec_rejects_integer_pcm():
             np.zeros(4000, dtype=np.int16),
             22050,
             target_sample_rate=22050,
+            frontend=VAD,
             **_SPEC_KW,
         )
 
@@ -445,7 +591,12 @@ def test_reference_spec_rejects_integer_pcm():
 @pytest.mark.parametrize("field", ["sample_rate", "target_sample_rate"])
 @pytest.mark.parametrize("value", [0, -16000])
 def test_reference_spec_rejects_non_positive_sample_rate(field, value):
-    kwargs = {"sample_rate": 22050, "target_sample_rate": 22050, **_SPEC_KW}
+    kwargs = {
+        "sample_rate": 22050,
+        "target_sample_rate": 22050,
+        "frontend": VAD,
+        **_SPEC_KW,
+    }
     kwargs[field] = value
     with pytest.raises(ValueError, match="sample_rate"):
         reference_spec_from_audio(voiced_with_silence(22050), **kwargs)
@@ -454,7 +605,9 @@ def test_reference_spec_rejects_non_positive_sample_rate(field, value):
 def test_reference_spec_does_not_mutate_input():
     audio = voiced_with_silence(22050)
     before = audio.copy()
-    reference_spec_from_audio(audio, 22050, target_sample_rate=22050, **_SPEC_KW)
+    reference_spec_from_audio(
+        audio, 22050, target_sample_rate=22050, frontend=VAD, **_SPEC_KW
+    )
     assert np.array_equal(audio, before)
 
 
@@ -467,11 +620,33 @@ def test_reference_spec_vad_uses_cache_threshold():
     audio = np.concatenate([quiet, loud, quiet])
     offset, duration = energy_vad_numpy(audio, threshold=0.02)
     _spec, info = reference_spec_from_audio(
-        audio, sr, target_sample_rate=sr, **_SPEC_KW
+        audio, sr, target_sample_rate=sr, frontend=VAD, **_SPEC_KW
     )
     assert info["offset_sec"] == pytest.approx(offset)
     assert info["duration_sec"] == pytest.approx(duration)
     assert info["offset_sec"] > 0.9
+
+
+def test_reference_spec_trim_matches_trim_spectrogram_independent():
+    # VAD frontend: energy VAD 区間を元 sr で切ってから soxr HQ → STFT
+    # (独立に組み立てた手順と bit 一致)
+    import soxr
+
+    src_sr, target_sr = 44100, 22050
+    audio = voiced_with_silence(src_sr)
+    trimmed, _ = trim_reference_audio(audio, src_sr)
+    expected = spectrogram_torch(
+        torch.from_numpy(soxr.resample(trimmed, src_sr, target_sr, quality="HQ"))[None],
+        1024,
+        target_sr,
+        256,
+        1024,
+        center=False,
+    ).squeeze(0)
+    ours, _ = reference_spec_from_audio(
+        audio, src_sr, target_sample_rate=target_sr, frontend=VAD, **_SPEC_KW
+    )
+    assert torch.equal(ours, expected)
 
 
 def test_reference_spec_sha256_hashes_float32_c_order_bytes():
@@ -484,6 +659,15 @@ def test_reference_spec_sha256_hashes_float32_c_order_bytes():
         np.asarray(spec.numpy(), dtype="<f4", order="C").tobytes()
     ).hexdigest()
     assert reference_spec_sha256(spec) == expected
+
+
+def test_reference_spec_sha256_matches_numpy_contract_hash():
+    # manifest 検証 (torch なし) は numpy 配列で同じ hash を計算する
+    from piper_train.reference_frontend import reference_spec_sha256
+    from piper_train.reference_spec_contract import spec_array_sha256
+
+    spec = torch.randn(513, 7, generator=torch.Generator().manual_seed(0)).abs()
+    assert reference_spec_sha256(spec) == spec_array_sha256(spec.numpy())
 
 
 def test_reference_spec_sha256_ignores_memory_layout():

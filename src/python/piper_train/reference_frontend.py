@@ -4,6 +4,12 @@
 いる。推論時の参照 WAV は無加工で fbank 化されるため、前後の無音が CMVN 平均に
 混入する。``trim_reference_audio`` は ``cache_norm_audio_fast`` と同じ手順
 (16kHz soxr HQ → ``energy_vad_numpy`` → 元 sample rate で切り出し) を再現する。
+
+参照 spec (F-mel、``reference_conditioning="ref_spec"``) は
+``reference_spec_from_audio`` が名前付き frontend (``reference_spec_contract``
+の閉じた集合。各名前が実在する学習 cache builder を bit 単位で写す) で作る。
+参照 spec の frontend 選択は CAM++ 192 次元の経路 (``campplus_stats`` 等) を
+変えない。
 """
 
 from __future__ import annotations
@@ -11,13 +17,14 @@ from __future__ import annotations
 import numpy as np
 import torch
 
+from .reference_spec_contract import (
+    frontend_steps,
+    max_reference_frames,
+    spec_array_sha256,
+)
+
 
 VAD_METHOD = "energy_vad_numpy@16k"
-
-# 参照 spec の前処理を表す文字列 (config.json ``reference_conditioning.frontend``
-# と評価 manifest に記録する契約値)。trim=False は別の文字列にする
-REFERENCE_SPEC_FRONTEND = "energy-vad@16k;soxr-hq"
-REFERENCE_SPEC_FRONTEND_NO_TRIM = "no-vad;soxr-hq"
 
 
 def reference_spec_from_audio(
@@ -28,37 +35,45 @@ def reference_spec_from_audio(
     filter_length: int,
     hop_length: int,
     win_length: int,
-    trim: bool = True,
+    frontend: str,
 ) -> tuple[torch.Tensor, dict]:
-    """学習 cache (``cache_norm_audio_fast``) と同じ手順で参照の線形振幅 spec を作る。
+    """名前付きの学習 cache builder と同じ手順で参照の線形振幅 spec を作る。
 
-    手順: float32 化 → stereo なら channel 平均 → (trim 時) 16kHz soxr HQ 上で
-    ``energy_vad_numpy`` (cache と同じ閾値・chunk) → 元 sample rate で切り出し →
-    soxr HQ で ``target_sample_rate`` へ → ``spectrogram_torch(center=False)``。
-    学習 cache の ``.spec.pt`` はこの戻り値を ``.half()`` したものと一致する。
+    ``frontend`` は ``reference_spec_contract.REFERENCE_SPEC_FRONTENDS`` の閉じた
+    集合から選ぶ (既定値なし。モデルが学習した cache の作り方に合わせる)。
+    手順: float32 化 → stereo なら channel 平均 → (VAD frontend のみ) 16kHz
+    soxr HQ 上で ``energy_vad_numpy`` (cache と同じ閾値・chunk) → 元 sample rate
+    で切り出し → frontend の品質の soxr で ``target_sample_rate`` へ →
+    ``spectrogram_torch(center=False)``。対応する builder の ``.spec.pt`` は
+    この戻り値を ``.half()`` したものと一致する。
 
     Args:
         audio: ``[samples]`` または soundfile 形式の ``[samples, channels]``。
-            浮動小数点 ([-1, 1] に正規化済み) のみ受け付ける。
+            浮動小数点のみ (soundfile の float32 読み出しと同じ [-1, 1] 正規化を
+            想定。振幅範囲は cache と同じく検査しないが、STFT が非有限になる
+            極端な振幅は拒否する)。
         sample_rate: ``audio`` の sample rate。
         target_sample_rate: モデルの sample rate。
         filter_length / hop_length / win_length: STFT 設定 (学習 hparams と同じ)。
-        trim: False なら VAD を通さず全長を使う (frontend 文字列も変わる)。
+        frontend: frontend 名 (例 ``"no-vad;soxr-mq"``)。
 
     Returns:
         (spec ``[filter_length // 2 + 1, T]`` float32, info)。info は
-        ``frontend`` / ``trim`` / ``offset_sec`` / ``duration_sec`` /
-        ``frames`` / ``sample_rate`` / STFT 設定 / ``center``。
+        ``frontend`` / ``vad`` / ``offset_sec`` / ``duration_sec`` / ``frames`` /
+        ``sample_rate`` / STFT 設定 / ``center``。
 
     Raises:
         TypeError: 浮動小数点でない音声 (int PCM の取り違え)。
-        ValueError: 空・形状違い・非有限値・sample rate が正でない・有声区間なし
-            (trim 時)・STFT 1 frame に満たない長さ。
+        ValueError: 未知の frontend・空・形状違い・非有限値 (入力または spec)・
+            sample rate が正でない・有声区間なし (全 frontend。VAD なしの frontend
+            でも energy VAD を有声判定にだけ使い、spec は trim しない)・
+            STFT 1 frame に満たない長さ・T_ref が上限 (30 s 相当) を超える。
     """
     import soxr  # noqa: PLC0415 — lazy import (optional runtime dependency)
 
     from .vits.mel_processing import spectrogram_torch  # noqa: PLC0415
 
+    steps = frontend_steps(frontend)
     for name, value in (
         ("sample_rate", sample_rate),
         ("target_sample_rate", target_sample_rate),
@@ -86,15 +101,21 @@ def reference_spec_from_audio(
     if audio.ndim == 2:
         audio = audio.mean(axis=1)  # stereo → mono (cache と同じ)
 
-    if trim:
+    # 有声判定 (全 frontend) と VAD trim。極端な振幅で RMS の二乗が overflow
+    # しても判定結果 (inf >= 閾値) は変わらないので警告だけ抑える
+    with np.errstate(over="ignore", invalid="ignore"):
         trimmed, vad = trim_reference_audio(audio, int(sample_rate))
+    if steps["vad"]:
         offset_sec, duration_sec = vad["offset_sec"], vad["duration_sec"]
-        frontend = REFERENCE_SPEC_FRONTEND
     else:
         trimmed, offset_sec, duration_sec = audio, 0.0, len(audio) / sample_rate
-        frontend = REFERENCE_SPEC_FRONTEND_NO_TRIM
     audio_rs = (
-        soxr.resample(trimmed, sample_rate, target_sample_rate, quality="HQ")
+        soxr.resample(
+            trimmed,
+            sample_rate,
+            target_sample_rate,
+            quality=steps["resample_quality"],
+        )
         if sample_rate != target_sample_rate
         else trimmed
     )
@@ -104,6 +125,14 @@ def reference_spec_from_audio(
             f"reference audio too short for one STFT frame: {len(audio_rs)} "
             f"samples at {target_sample_rate} Hz (need > {pad})"
         )
+    frames = (len(audio_rs) + 2 * pad - filter_length) // hop_length + 1
+    limit = max_reference_frames(int(target_sample_rate), int(hop_length))
+    if frames > limit:
+        raise ValueError(
+            f"reference spec T_ref={frames} frames exceeds the limit {limit} "
+            f"(30 s at {target_sample_rate} Hz / hop {hop_length}); use a "
+            "shorter reference utterance"
+        )
     spec = spectrogram_torch(
         y=torch.from_numpy(np.ascontiguousarray(audio_rs)).unsqueeze(0),
         n_fft=filter_length,
@@ -112,9 +141,14 @@ def reference_spec_from_audio(
         win_size=win_length,
         center=False,
     ).squeeze(0)
+    if not bool(torch.isfinite(spec).all()):
+        raise ValueError(
+            "reference spec is not finite (STFT overflow: is the audio "
+            "normalized to [-1, 1]?)"
+        )
     info = {
         "frontend": frontend,
-        "trim": bool(trim),
+        "vad": bool(steps["vad"]),
         "offset_sec": float(offset_sec),
         "duration_sec": float(duration_sec),
         "frames": int(spec.shape[-1]),
@@ -134,7 +168,7 @@ def reference_spec_from_file(
     filter_length: int,
     hop_length: int,
     win_length: int,
-    trim: bool = True,
+    frontend: str,
 ) -> tuple[torch.Tensor, dict]:
     """音声ファイルを学習 cache と同じ reader で読み ``reference_spec_from_audio`` へ渡す。"""
     from .norm_audio import _read_audio_any  # noqa: PLC0415
@@ -147,7 +181,7 @@ def reference_spec_from_file(
         filter_length=filter_length,
         hop_length=hop_length,
         win_length=win_length,
-        trim=trim,
+        frontend=frontend,
     )
 
 
@@ -158,12 +192,9 @@ def reference_spec_sha256(spec: torch.Tensor) -> str:
         TypeError: float32 でない (fp16 cache 等の丸めた spec を float32 の
             来歴として記録させない)。
     """
-    import hashlib  # noqa: PLC0415
-
     if spec.dtype != torch.float32:
         raise TypeError(f"reference spec hash requires float32, got {spec.dtype}")
-    array = np.ascontiguousarray(spec.detach().cpu().numpy(), dtype=np.dtype("<f4"))
-    return hashlib.sha256(array.tobytes()).hexdigest()
+    return spec_array_sha256(spec.detach().cpu().numpy())
 
 
 def trim_reference_audio(

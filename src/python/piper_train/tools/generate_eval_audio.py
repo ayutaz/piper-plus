@@ -20,7 +20,9 @@ from ..evaluation_manifest import (
     compute_reference_spec,
     create_manifest,
     load_manifest,
+    load_reference_spec,
 )
+from ..reference_spec_contract import REFERENCE_SPEC_FRONTENDS, REFERENCE_SPEC_SCHEMA
 
 
 def load_torch_generator(path, *, device="auto"):
@@ -101,54 +103,162 @@ def _require_reference_spec_conditions(manifest: dict) -> dict:
     if settings is None:
         raise ValueError(
             "reference_conditioning='ref_spec' model requires a manifest prepared "
-            "with --reference-spec (frontend, reference spec hash and T_ref pinned)"
+            "with --reference-spec --reference-frontend <name> (frontend, stored "
+            "reference spec, its hash and T_ref pinned)"
         )
     return settings
 
 
-def _check_reference_stft(settings: dict, spec_channels, hparams: dict) -> None:
-    """モデルの参照 spec 契約 (bin 数・学習 STFT 設定) と manifest の設定を照合する。"""
-    expected = settings["filter_length"] // 2 + 1
-    if isinstance(spec_channels, int) and spec_channels != expected:
-        raise ValueError(
-            f"Model expects {spec_channels}-bin reference_spec but manifest "
-            f"filter_length={settings['filter_length']} gives {expected} bins"
-        )
-    for key in ("filter_length", "hop_length", "win_length"):
-        if key in hparams and hparams[key] != settings[key]:
+# モデルが宣言する参照 spec 契約のうち manifest の reference_spec と照合する項目
+_CONTRACT_FIELDS = (
+    "frontend",
+    "filter_length",
+    "hop_length",
+    "win_length",
+    "center",
+    "spec_channels",
+)
+_ONNX_BLOCK_FIELDS = ("schema", *_CONTRACT_FIELDS, "sample_rate")
+
+
+def _torch_reference_contract(generator, checkpoint: dict) -> dict:
+    """checkpoint hparams (STFT・sample rate・学習 frontend) と encoder の bin 数。
+
+    学習 frontend は hparams ``reference_spec_frontend`` (学習側で後から追加)
+    から読む。無い旧 checkpoint は frontend を照合できないので、拒否せず
+    ``frontend_verified: False`` として report に残す。
+    """
+    hparams = checkpoint.get("hyper_parameters") or {}
+    for key in ("filter_length", "hop_length", "win_length", "sample_rate"):
+        if key not in hparams:
             raise ValueError(
-                f"Checkpoint {key}={hparams[key]} does not match manifest "
-                f"reference_spec {key}={settings[key]}"
+                f"ref_spec checkpoint hyper_parameters lack {key}; cannot verify "
+                "the reference spec contract against the manifest"
+            )
+    frontend = hparams.get("reference_spec_frontend")
+    return {
+        "source": "checkpoint hyper_parameters",
+        "frontend": frontend,
+        "filter_length": hparams["filter_length"],
+        "hop_length": hparams["hop_length"],
+        "win_length": hparams["win_length"],
+        "center": False,  # 学習 cache の spectrogram_torch は center=False 固定
+        "spec_channels": generator.reference_encoder.spec_channels,
+        "sample_rate": hparams["sample_rate"],
+        "frontend_verified": frontend is not None,
+    }
+
+
+def _onnx_config_path(model_path: Path) -> Path:
+    """runtime と同じ探索順: ``<model>.onnx.json``、無ければ同じ dir の config.json。"""
+    model_path = Path(model_path)
+    for candidate in (
+        model_path.with_name(model_path.name + ".json"),
+        model_path.parent / "config.json",
+    ):
+        if candidate.is_file():
+            return candidate
+    raise ValueError(
+        "ONNX ref_spec model requires its config "
+        f"({model_path.name}.json or config.json next to it) with a "
+        f"reference_conditioning block; none found for {model_path}"
+    )
+
+
+def _onnx_reference_contract(model_path: Path, spec_input) -> dict:
+    """ONNX の config.json の ``reference_conditioning`` (8R 契約) を読み検査する。"""
+    config_path = _onnx_config_path(model_path)
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"Unreadable ONNX config {config_path}: {exc}") from exc
+    block = config.get("reference_conditioning") if isinstance(config, dict) else None
+    if not isinstance(block, dict):
+        raise ValueError(
+            f"ONNX config {config_path} has no reference_conditioning block; the "
+            "reference spec contract of this ref_spec model cannot be verified"
+        )
+    for field in _ONNX_BLOCK_FIELDS:
+        if field not in block:
+            raise ValueError(f"reference_conditioning in {config_path} lacks {field}")
+    if block["schema"] != REFERENCE_SPEC_SCHEMA:
+        raise ValueError(
+            f"reference_spec schema mismatch: model declares {block['schema']!r}, "
+            f"expected {REFERENCE_SPEC_SCHEMA!r}"
+        )
+    shape = list(spec_input.shape)
+    graph_channels = shape[1] if len(shape) == 3 else None
+    if isinstance(graph_channels, int) and graph_channels != block["spec_channels"]:
+        raise ValueError(
+            f"reference_spec spec_channels mismatch: ONNX input has {graph_channels} "
+            f"bins but {config_path.name} declares {block['spec_channels']!r}"
+        )
+    return {
+        "source": str(config_path.resolve()),
+        "config_sha256": file_sha256(config_path),
+        **{field: block[field] for field in _CONTRACT_FIELDS},
+        "sample_rate": block["sample_rate"],
+        "frontend_verified": True,
+    }
+
+
+def _same(model_value, manifest_value) -> bool:
+    # True == 1 等の型違いの一致を通さない (center=1 を False と区別する)
+    return type(model_value) is type(manifest_value) and model_value == manifest_value
+
+
+def _check_reference_contract(manifest: dict, contract: dict) -> None:
+    """モデルの宣言 (contract) と manifest の reference_spec を項目ごとに照合する。"""
+    settings = manifest["reference_spec"]
+    pairs = [(field, contract[field], settings[field]) for field in _CONTRACT_FIELDS]
+    pairs.append(("sample_rate", contract["sample_rate"], manifest["sample_rate"]))
+    for field, declared, pinned in pairs:
+        if field == "frontend" and declared is None:
+            continue  # 学習 frontend を宣言しない旧 checkpoint (report に未照合と残す)
+        if not _same(declared, pinned):
+            raise ValueError(
+                f"reference_spec {field} mismatch: model declares {declared!r}, "
+                f"manifest has {pinned!r} (re-run prepare with the model's "
+                "reference spec settings)"
             )
 
 
 def _reference_spec_for_clip(manifest: dict, clip: dict):
-    """学習 cache と同じ frontend で参照 spec を作り、manifest の来歴と照合する。
+    """prepare で保存した参照 spec を読み (feed する bytes)、再計算との差を記録する。
+
+    再計算は drift の記録だけに使う (別 machine の FFT・soxr の差で結果が
+    変わっても評価条件は保存 bytes で固定される)。参照 WAV 自体が変わって
+    いたら拒否する。
 
     Returns:
-        (spec ``[filter_length // 2 + 1, T_ref]`` float32, 来歴の記録)。
+        (spec ``[spec_channels, T_ref]`` float32 ndarray, 来歴の記録 + drift)。
     """
-    record = clip.get("reference_spec")
-    if record is None:
-        raise ValueError(f"Missing reference_spec record for {clip['id']}")
-    spec, actual = compute_reference_spec(
-        clip["reference_audio"][0]["path"],
-        manifest["reference_spec"],
-        manifest["sample_rate"],
-    )
-    if actual["audio_sha256"] != record["audio_sha256"]:
-        raise ValueError(f"reference audio hash mismatch for {clip['id']}")
-    if actual["frames"] != record["frames"]:
-        raise ValueError(
-            f"reference spec T_ref mismatch for {clip['id']}: "
-            f"{actual['frames']} frames vs pinned {record['frames']}"
+    settings = manifest["reference_spec"]
+    record = clip["reference_spec"]
+    stored = load_reference_spec(clip, settings)
+    drift = {
+        "recomputed_spec_sha256": None,
+        "recomputed_frames": None,
+        "bit_exact": False,
+        "max_abs_diff": None,
+    }
+    try:
+        recomputed, actual = compute_reference_spec(
+            clip["reference_audio"][0]["path"], settings, manifest["sample_rate"]
         )
-    if actual["spec_sha256"] != record["spec_sha256"]:
-        raise ValueError(
-            f"reference spec hash mismatch for {clip['id']}: the frontend output "
-            "differs from the pinned manifest (re-run prepare --reference-spec)"
-        )
-    return spec, actual
+    except ValueError as exc:
+        drift["error"] = str(exc)
+    else:
+        if actual["audio_sha256"] != record["audio_sha256"]:
+            raise ValueError(f"reference audio hash mismatch for {clip['id']}")
+        drift["recomputed_spec_sha256"] = actual["spec_sha256"]
+        drift["recomputed_frames"] = actual["frames"]
+        drift["bit_exact"] = actual["spec_sha256"] == record["spec_sha256"]
+        if actual["frames"] == record["frames"]:
+            drift["max_abs_diff"] = float(
+                np.max(np.abs(recomputed.detach().cpu().numpy() - stored))
+            )
+    return stored, {**record, "drift": drift}
 
 
 def generate_audio(
@@ -169,9 +279,12 @@ def generate_audio(
     generator = None
     restored_weights = None
     ema_report = {}
-    # 参照 spec (F-mel) を feed するモデルか。torch は読み込み時、ONNX は
-    # 入力名 (reference_spec) で判定する。旧モデル (none / capacity) は False
-    uses_reference_spec = False
+    # 参照 spec (F-mel) を feed するモデルなら、モデルが宣言する参照 spec 契約
+    # (torch: checkpoint hparams、ONNX: config.json の reference_conditioning)。
+    # 判定は loop の前に 1 回 (torch は読み込み時、ONNX は先頭 clip の session の
+    # 入力名)。旧モデル (none / capacity) は None で、評価出力は変更前と同じ
+    reference_contract = None
+    first_session = None
     if backend in ("torch-raw", "torch-ema"):
         generator, checkpoint, sample_rate = load_torch_generator(
             model_spec["path"], device=device
@@ -181,12 +294,9 @@ def generate_audio(
                 "Checkpoint does not support speaker_embedding conditioning"
             )
         if getattr(generator, "reference_conditioning", "none") == "ref_spec":
-            uses_reference_spec = True
-            _check_reference_stft(
-                _require_reference_spec_conditions(manifest),
-                generator.reference_encoder.spec_channels,
-                checkpoint.get("hyper_parameters") or {},
-            )
+            _require_reference_spec_conditions(manifest)
+            reference_contract = _torch_reference_contract(generator, checkpoint)
+            _check_reference_contract(manifest, reference_contract)
         if (
             manifest.get("training_epoch") is not None
             and checkpoint.get("epoch") != manifest["training_epoch"]
@@ -210,7 +320,21 @@ def generate_audio(
             except Exception:
                 generator.load_state_dict(restored_weights)
                 raise
-    elif backend != "onnx":
+    elif backend == "onnx":
+        # 先頭 clip の session (seed も先頭 clip のもの) を loop でそのまま使う
+        first_session = load_onnx_session(model_spec["path"], manifest["seed"])
+        inputs = {item.name: item for item in first_session.get_inputs()}
+        if "reference_spec" in inputs:
+            if "reference_spec_lengths" not in inputs:
+                raise ValueError(
+                    "ONNX reference_spec input requires the reference_spec_lengths input"
+                )
+            _require_reference_spec_conditions(manifest)
+            reference_contract = _onnx_reference_contract(
+                model_spec["path"], inputs["reference_spec"]
+            )
+            _check_reference_contract(manifest, reference_contract)
+    else:
         raise ValueError(f"Unsupported backend: {backend}")
     result = {
         "version": 1,
@@ -233,8 +357,11 @@ def generate_audio(
         "audio_encoding": "float32-raw",
         "clips": [],
     }
-    if uses_reference_spec:
-        result["reference_spec"] = manifest["reference_spec"]
+    if reference_contract is not None:
+        result["reference_spec"] = {
+            "settings": manifest["reference_spec"],
+            "model_contract": reference_contract,
+        }
     try:
         for ordinal, clip in enumerate(manifest["clips"]):
             seed = manifest["seed"] + ordinal
@@ -243,8 +370,8 @@ def generate_audio(
             lengths = np.asarray([text.shape[1]], dtype=np.int64)
             prosody = _prosody(clip)
             reference_spec = reference_record = None
-            if uses_reference_spec and generator is not None:
-                # ONNX は session の入力名を見てから下で作る
+            if reference_contract is not None:
+                # prepare で保存した bytes (hash 照合・有限性検査済み) を feed する
                 reference_spec, reference_record = _reference_spec_for_clip(
                     manifest, clip
                 )
@@ -272,7 +399,9 @@ def generate_audio(
                             device
                         )
                     if reference_spec is not None:
-                        kwargs["reference_spec"] = reference_spec[None].to(device)
+                        kwargs["reference_spec"] = torch.from_numpy(
+                            reference_spec[None]
+                        ).to(device)
                         kwargs["reference_spec_lengths"] = torch.tensor(
                             [reference_spec.shape[-1]], dtype=torch.long, device=device
                         )
@@ -287,7 +416,11 @@ def generate_audio(
                         .numpy()
                     )
                 else:
-                    session = load_onnx_session(model_spec["path"], seed)
+                    session = (
+                        first_session
+                        if ordinal == 0
+                        else load_onnx_session(model_spec["path"], seed)
+                    )
                     inputs = session.get_inputs()
                     names = {item.name for item in inputs}
                     if (
@@ -328,29 +461,9 @@ def generate_audio(
                         raise ValueError(
                             "Reference prosody requires ONNX prosody_features input"
                         )
-                    if "reference_spec" in names:
-                        if "reference_spec_lengths" not in names:
-                            raise ValueError(
-                                "ONNX reference_spec input requires the "
-                                "reference_spec_lengths input"
-                            )
-                        spec_input = next(
-                            item for item in inputs if item.name == "reference_spec"
-                        )
-                        _check_reference_stft(
-                            _require_reference_spec_conditions(manifest),
-                            list(spec_input.shape)[1]
-                            if len(spec_input.shape) == 3
-                            else None,
-                            {},
-                        )
-                        uses_reference_spec = True
-                        result["reference_spec"] = manifest["reference_spec"]
-                        reference_spec, reference_record = _reference_spec_for_clip(
-                            manifest, clip
-                        )
+                    if reference_spec is not None:
                         feeds["reference_spec"] = np.ascontiguousarray(
-                            reference_spec.numpy()[None], dtype=np.float32
+                            reference_spec[None], dtype=np.float32
                         )
                         feeds["reference_spec_lengths"] = np.asarray(
                             [reference_spec.shape[-1]], dtype=np.int64
@@ -380,7 +493,7 @@ def generate_audio(
                 "wav_sha256": file_sha256(path),
             }
             if reference_record is not None:
-                # 実際に feed した spec の来歴 (manifest の記録と照合済み)
+                # 実際に feed した保存 spec の来歴と、再計算との drift
                 entry["reference_spec"] = reference_record
             result["clips"].append(entry)
         atomic_write(
@@ -419,17 +532,28 @@ def main() -> int:
         "--reference-spec",
         action="store_true",
         help=(
-            "Pin the reference spectrogram (training-cache frontend, spec hash, "
-            "T_ref) of each clip's first reference audio; required to evaluate "
-            "reference_conditioning='ref_spec' models"
+            "Compute, store (float32 .npy next to the manifest) and pin the "
+            "reference spectrogram (frontend, spec hash, T_ref) of each clip's "
+            "single reference audio; required to evaluate "
+            "reference_conditioning='ref_spec' models. Needs --reference-frontend"
+        ),
+    )
+    prepare.add_argument(
+        "--reference-frontend",
+        choices=sorted(REFERENCE_SPEC_FRONTENDS),
+        help=(
+            "Reference spec frontend; must mirror the training cache builder of "
+            "the evaluated model (no default; required with --reference-spec)"
         ),
     )
     for key, value in REFERENCE_SPEC_DEFAULTS.items():
         prepare.add_argument(
             "--reference-" + key.replace("_", "-"),
             type=int,
-            default=value,
-            help=f"STFT {key} of the reference spectrogram (with --reference-spec)",
+            help=(
+                f"STFT {key} of the reference spectrogram (with --reference-spec; "
+                f"default {value})"
+            ),
         )
     generate = sub.add_parser("generate")
     generate.add_argument("--manifest", required=True, type=Path)
@@ -443,6 +567,22 @@ def main() -> int:
     )
     args = parser.parse_args()
     if args.command == "prepare":
+        stft_overrides = {
+            key: getattr(args, "reference_" + key)
+            for key in REFERENCE_SPEC_DEFAULTS
+            if getattr(args, "reference_" + key) is not None
+        }
+        if args.reference_spec and args.reference_frontend is None:
+            prepare.error(
+                "--reference-spec requires --reference-frontend (one of "
+                f"{', '.join(sorted(REFERENCE_SPEC_FRONTENDS))}) matching the "
+                "model's training cache builder"
+            )
+        if not args.reference_spec and (args.reference_frontend or stft_overrides):
+            # 黙って無視すると「frontend を固定したつもり」の manifest になる
+            prepare.error(
+                "--reference-frontend / --reference-*-length require --reference-spec"
+            )
         revision = args.source_revision
         if revision is None:
             root = Path(__file__).resolve().parents[4]
@@ -461,8 +601,8 @@ def main() -> int:
         extra = {}
         if args.reference_spec:
             extra["reference_spec"] = {
-                key: getattr(args, "reference_" + key)
-                for key in REFERENCE_SPEC_DEFAULTS
+                "frontend": args.reference_frontend,
+                **stft_overrides,
             }
         create_manifest(
             source_path=args.test_jsonl,

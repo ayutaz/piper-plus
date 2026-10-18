@@ -167,11 +167,14 @@ def test_prevention_gate_full_run_passes():
 
 # ---------------------------------------------------------------------------
 # Task 9R: 評価経路の参照 spec feed と来歴
-# (docs/design/zero-shot-reference-fusion-plan-2026-10-17.md §8 Task 9R)
+# (docs/design/zero-shot-reference-fusion-plan-2026-10-17.md §8 Task 9R、R14)
 #
-# ref_spec モデルの評価では manifest の参照 WAV から学習 cache と同じ frontend
-# で線形振幅 spec を作って feed し、frontend・参照音声 hash・spec hash・T_ref を
-# manifest と生成 report に記録する。none / capacity モデルの評価出力は変えない。
+# ref_spec モデルの評価では、prepare 時に manifest の参照 WAV から名前付きの
+# frontend (学習 cache builder の写し) で線形振幅 spec を作って float32 .npy で
+# 保存・hash 固定し、generate はその bytes を feed する (再計算は drift の記録
+# のみ)。manifest の frontend・STFT はモデルの宣言 (ONNX: config.json の
+# reference_conditioning、torch: checkpoint hparams) と照合する。none /
+# capacity モデルの評価出力は変えない。
 # ---------------------------------------------------------------------------
 
 import json  # noqa: E402
@@ -181,6 +184,8 @@ import numpy as np  # noqa: E402
 
 SR = 22050
 STFT = {"filter_length": 1024, "hop_length": 256, "win_length": 1024}
+VAD = "energy-vad@16k;soxr-hq"
+NO_VAD_MQ = "no-vad;soxr-mq"
 PHONEMES = [1] + [10] * 8 + [2]
 # 変更前 (6904ef0e) の generation.json の key 集合 (旧モデルの report schema)
 LEGACY_REPORT_KEYS = {
@@ -212,7 +217,7 @@ LEGACY_CLIP_KEYS = {
 
 def _voiced(sr, *, freq, seed, lead=0.4, voiced=0.8, tail=0.5):
     rng = np.random.default_rng(seed)
-    n = int(round(voiced * sr))
+    n = round(voiced * sr)
     t = np.arange(n) / sr
     body = 0.3 * np.sin(2 * np.pi * freq * t) + 0.01 * rng.standard_normal(n)
     return np.concatenate(
@@ -300,9 +305,7 @@ def _tiny_vits(monkeypatch, mode, *, seed=0):
         resblock_dilation_sizes=((1, 2),),
         reference_conditioning=mode,
     )
-    module = {"ref_spec": "reference_encoder", "capacity": "capacity_control"}.get(
-        mode
-    )
+    module = {"ref_spec": "reference_encoder", "capacity": "capacity_control"}.get(mode)
     if module is not None:
         # 最終層 zero-init のままでは参照入力が出力に効かず、feed の検証に
         # ならない (旧モデルとも区別できない) ので乱数で埋める
@@ -314,18 +317,28 @@ def _tiny_vits(monkeypatch, mode, *, seed=0):
     return model
 
 
-def _save_checkpoint(model, path):
+def _save_checkpoint(model, path, *, hparams=None, drop=()):
+    """checkpoint を保存する。``hparams`` で hparams を上書き、``drop`` で削除。"""
     import torch
 
+    hyper = {**dict(model.hparams), **(hparams or {})}
+    for key in drop:
+        hyper.pop(key)
     torch.save(
-        {
-            "hyper_parameters": dict(model.hparams),
-            "state_dict": model.state_dict(),
-            "epoch": 40,
-        },
+        {"hyper_parameters": hyper, "state_dict": model.state_dict(), "epoch": 40},
         path,
     )
     return path
+
+
+def _ref_spec_checkpoint(monkeypatch, path, *, frontend=VAD, **kwargs):
+    """学習 frontend を hparams に宣言した ref_spec checkpoint。"""
+    hparams = kwargs.pop("hparams", {})
+    if frontend is not None:
+        hparams = {"reference_spec_frontend": frontend, **hparams}
+    return _save_checkpoint(
+        _tiny_vits(monkeypatch, "ref_spec"), path, hparams=hparams, **kwargs
+    )
 
 
 def _prepare(options, models, *, reference_spec=None, **overrides):
@@ -336,11 +349,15 @@ def _prepare(options, models, *, reference_spec=None, **overrides):
     return create_manifest(**{**options, **overrides}, models=models, **extra)
 
 
-def _reference_defaults():
+def _params(frontend=VAD, **overrides):
     from piper_train.evaluation_manifest import REFERENCE_SPEC_DEFAULTS
 
     assert REFERENCE_SPEC_DEFAULTS == STFT  # 学習 hparams の既定と同じ契約値
-    return dict(REFERENCE_SPEC_DEFAULTS)
+    return {"frontend": frontend, **STFT, **overrides}
+
+
+def _settings(frontend=VAD):
+    return {"frontend": frontend, **STFT, "center": False, "spec_channels": 513}
 
 
 def _read_wav(path):
@@ -381,19 +398,58 @@ def _direct_infer(generator, clip, seed, reference_spec=None):
     return audio.detach().cpu().numpy().reshape(-1).astype(np.float32)
 
 
-def _frontend(path):
+def _frontend(path, frontend=VAD):
     from piper_train.reference_frontend import reference_spec_from_file
 
-    spec, _info = reference_spec_from_file(path, target_sample_rate=SR, **STFT)
+    spec, _info = reference_spec_from_file(
+        path, target_sample_rate=SR, frontend=frontend, **STFT
+    )
     return spec
 
 
-def _echo_onnx(path, *, spec_channels=513, with_lengths=True):
+def _pinned_spec(clip):
+    import torch
+
+    return torch.from_numpy(
+        np.load(clip["reference_spec"]["spec_path"], allow_pickle=False)
+    )
+
+
+def _block(**overrides):
+    """8R 契約の config.json ``reference_conditioning`` (ref_spec_v1)。"""
+    return {
+        "schema": "ref_spec_v1",
+        "spec_channels": 513,
+        **STFT,
+        "sample_rate": SR,
+        "center": False,
+        "frontend": VAD,
+        **overrides,
+    }
+
+
+def _write_config(onnx_path, block, *, sibling=False):
+    """``<model>.onnx.json`` (runtime が最初に探す名前) か同じ dir の config.json。"""
+    config = {"audio": {"sample_rate": SR}}
+    if block is not None:
+        config["reference_conditioning"] = block
+    target = (
+        onnx_path.parent / "config.json"
+        if sibling
+        else onnx_path.with_name(onnx_path.name + ".json")
+    )
+    target.write_text(json.dumps(config), encoding="utf-8")
+    return target
+
+
+def _echo_onnx(path, *, spec_channels=513, with_lengths=True, block="default"):
     """契約の入力名を持ち、``[T_ref, spec.flatten()]`` を output に返す ONNX。
 
     feed された reference_spec / lengths の中身をそのまま WAV に書き出させ、
-    評価経路が frontend の spec を契約の形 ([1, 513, T]、float32 / int64) で
-    渡していることを実 ONNX Runtime 上で確かめる (Task 8R の export 前の代用)。
+    評価経路が spec を契約の形 ([1, 513, T]、float32 / int64) で渡していることを
+    実 ONNX Runtime 上で確かめる (Task 8R の export 前の代用)。``block`` は
+    隣に書く config.json の reference_conditioning (None なら block なし、
+    ``"skip"`` なら config を書かない)。
     """
     onnx = pytest.importorskip("onnx", reason="real ONNX fixture")
     pytest.importorskip("onnxruntime", reason="real ONNX fixture")
@@ -438,6 +494,8 @@ def _echo_onnx(path, *, spec_channels=513, with_lengths=True):
     model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 13)])
     model.ir_version = 10
     onnx.save(model, path)
+    if block != "skip":
+        _write_config(path, _block() if block == "default" else block)
     return path
 
 
@@ -454,12 +512,7 @@ def _legacy_onnx(path):
     ]
     graph = helper.make_graph(
         [
-            helper.make_node(
-                "ReduceSum",
-                ["speaker_embedding"],
-                ["sum"],
-                keepdims=1,
-            ),
+            helper.make_node("ReduceSum", ["speaker_embedding"], ["sum"], keepdims=1),
             helper.make_node(
                 "Constant",
                 [],
@@ -489,93 +542,140 @@ def _rewrite_manifest(path, mutate):
     return manifest
 
 
+def _dummy_onnx(source):
+    (source.parent / "m.onnx").write_bytes(b"x")
+    return {"onnx": source.parent / "m.onnx"}
+
+
 @pytest.mark.unit
 @pytest.mark.usefixtures("frontend_deps")
 class TestReferenceSpecManifest:
-    """create_manifest / validate_manifest の参照 spec 来歴。"""
+    """create_manifest / validate_manifest の参照 spec 来歴と保存 spec。"""
 
-    def test_eval_manifest_records_frontend_and_spec_hash(self, ref_eval_inputs):
+    @pytest.mark.parametrize("frontend", [VAD, NO_VAD_MQ, "no-vad;soxr-hq"])
+    def test_eval_manifest_records_frontend_and_spec_hash(
+        self, ref_eval_inputs, frontend
+    ):
         from piper_train.embedding_cache import file_sha256
         from piper_train.reference_frontend import reference_spec_sha256
 
         source, rows, options = ref_eval_inputs
-        (source.parent / "m.onnx").write_bytes(b"x")
         manifest = _prepare(
-            options,
-            {"onnx": source.parent / "m.onnx"},
-            reference_spec=_reference_defaults(),
+            options, _dummy_onnx(source), reference_spec=_params(frontend)
         )
-        assert manifest["reference_spec"] == {
-            "frontend": "energy-vad@16k;soxr-hq",
-            **STFT,
-            "center": False,
-            "trim": True,
-        }
+        assert manifest["reference_spec"] == _settings(frontend)
         for row, clip in zip(rows, manifest["clips"], strict=True):
             wav = source.parent / row["reference_audio_paths"][0]
-            spec = _frontend(wav)
-            assert clip["reference_spec"] == {
+            spec = _frontend(wav, frontend)
+            record = dict(clip["reference_spec"])
+            assert Path(record.pop("spec_path")).is_file()
+            assert record == {
                 "audio_sha256": file_sha256(wav),
                 "spec_sha256": reference_spec_sha256(spec),
                 "frames": spec.shape[-1],
             }
 
+    def test_manifest_stores_spec_bytes_as_float32_npy(self, ref_eval_inputs):
+        import torch
+
+        source, rows, options = ref_eval_inputs
+        manifest = _prepare(options, _dummy_onnx(source), reference_spec=_params())
+        for row, clip in zip(rows, manifest["clips"], strict=True):
+            stored = np.load(clip["reference_spec"]["spec_path"], allow_pickle=False)
+            assert stored.dtype == np.float32
+            # 保存は float32 の無損失往復 (np.save) なので bit 一致
+            assert torch.equal(
+                torch.from_numpy(stored),
+                _frontend(source.parent / row["reference_audio_paths"][0]),
+            )
+
     def test_manifest_default_has_no_reference_spec_fields(self, ref_eval_inputs):
         # 既定 (reference_spec=None) の manifest schema は変更前と同じ
         source, _rows, options = ref_eval_inputs
-        (source.parent / "m.onnx").write_bytes(b"x")
-        manifest = _prepare(options, {"onnx": source.parent / "m.onnx"})
+        manifest = _prepare(options, _dummy_onnx(source))
         assert "reference_spec" not in manifest
         assert all("reference_spec" not in clip for clip in manifest["clips"])
+        assert not list(source.parent.glob("*.reference_spec"))
 
     def test_manifest_reference_spec_is_part_of_conditions_hash(self, ref_eval_inputs):
         source, _rows, options = ref_eval_inputs
-        (source.parent / "m.onnx").write_bytes(b"x")
-        models = {"onnx": source.parent / "m.onnx"}
+        models = _dummy_onnx(source)
         legacy = _prepare(options, models)
-        with_spec = _prepare(options, models, reference_spec=_reference_defaults())
+        with_spec = _prepare(options, models, reference_spec=_params())
         assert legacy["conditions_sha256"] != with_spec["conditions_sha256"]
+
+    def test_manifest_frontend_choice_changes_conditions_hash(self, ref_eval_inputs):
+        source, _rows, options = ref_eval_inputs
+        models = _dummy_onnx(source)
+        vad = _prepare(options, models, reference_spec=_params(VAD))
+        mq = _prepare(options, models, reference_spec=_params(NO_VAD_MQ))
+        assert vad["conditions_sha256"] != mq["conditions_sha256"]
+
+    def test_manifest_reference_spec_requires_frontend(self, ref_eval_inputs):
+        # frontend は既定値を持たない (学習 cache の作り方を明示させる)
+        source, _rows, options = ref_eval_inputs
+        with pytest.raises(ValueError, match="frontend"):
+            _prepare(options, _dummy_onnx(source), reference_spec=dict(STFT))
+        assert not options["output_path"].exists()
+
+    def test_manifest_rejects_unknown_frontend(self, ref_eval_inputs):
+        source, _rows, options = ref_eval_inputs
+        with pytest.raises(ValueError, match="frontend"):
+            _prepare(
+                options,
+                _dummy_onnx(source),
+                reference_spec=_params("silero-vad;torchaudio"),
+            )
+        assert not options["output_path"].exists()
 
     def test_manifest_reference_spec_requires_reference_audio(self, ref_eval_inputs):
         source, rows, options = ref_eval_inputs
-        (source.parent / "m.onnx").write_bytes(b"x")
         rows[1].pop("reference_audio_paths")
         _write_rows(source, rows)
         with pytest.raises(ValueError, match="reference audio"):
-            _prepare(
-                options,
-                {"onnx": source.parent / "m.onnx"},
-                reference_spec=_reference_defaults(),
-            )
+            _prepare(options, _dummy_onnx(source), reference_spec=_params())
+        assert not options["output_path"].exists()
+
+    def test_manifest_reference_spec_requires_exactly_one_reference(
+        self, ref_eval_inputs
+    ):
+        # 学習 (7R) は 192 次元と spec を同じ参照発話 1 本から作る。評価でも
+        # spec は 1 本に限り、どの WAV を使ったかの曖昧さを残さない
+        source, rows, options = ref_eval_inputs
+        rows[0]["reference_audio_paths"] = ["ref_a.wav", "ref_b.wav"]
+        _write_rows(source, rows)
+        with pytest.raises(ValueError, match="exactly one"):
+            _prepare(options, _dummy_onnx(source), reference_spec=_params())
         assert not options["output_path"].exists()
 
     def test_manifest_reference_spec_rejects_silent_reference(self, ref_eval_inputs):
         source, _rows, options = ref_eval_inputs
-        (source.parent / "m.onnx").write_bytes(b"x")
         _write_wav(source.parent / "ref_b.wav", np.zeros(44100, np.float32), 44100)
         with pytest.raises(ValueError, match="no voiced"):
-            _prepare(
-                options,
-                {"onnx": source.parent / "m.onnx"},
-                reference_spec=_reference_defaults(),
-            )
+            _prepare(options, _dummy_onnx(source), reference_spec=_params())
         assert not options["output_path"].exists()
+
+    def test_manifest_failure_leaves_no_spec_files(self, ref_eval_inputs):
+        # 2 本目で失敗したら 1 本目の保存 spec も残さない
+        source, _rows, options = ref_eval_inputs
+        _write_wav(source.parent / "ref_b.wav", np.zeros(44100, np.float32), 44100)
+        with pytest.raises(ValueError):
+            _prepare(options, _dummy_onnx(source), reference_spec=_params())
+        assert not list(source.parent.glob("*.reference_spec/*.npy"))
 
     @pytest.mark.parametrize(
         "field,value",
-        [("filter_length", 1000), ("hop_length", 0), ("win_length", 2048)],
+        [("filter_length", 1023), ("hop_length", 0), ("win_length", 2048)],
     )
     def test_manifest_rejects_invalid_reference_stft(
         self, ref_eval_inputs, field, value
     ):
-        # filter_length は偶数 (bins = n/2+1)、hop > 0、win <= filter_length
+        # bins = filter_length // 2 + 1 の契約上 filter_length は偶数、
+        # hop > 0、win <= filter_length
         source, _rows, options = ref_eval_inputs
-        (source.parent / "m.onnx").write_bytes(b"x")
         with pytest.raises(ValueError, match=field):
             _prepare(
-                options,
-                {"onnx": source.parent / "m.onnx"},
-                reference_spec={**_reference_defaults(), field: value},
+                options, _dummy_onnx(source), reference_spec=_params(**{field: value})
             )
         assert not options["output_path"].exists()
 
@@ -584,13 +684,17 @@ class TestReferenceSpecManifest:
         [
             "frames-zero",
             "frames-bool",
+            "frames-above-limit",
             "spec-sha-not-hex",
-            "audio-sha-not-first-reference",
+            "audio-sha-not-reference",
             "unknown-frontend",
             "missing-clip-record",
             "extra-clip-record-without-settings",
             "filter-length-not-int",
             "center-true",
+            "spec-channels-mismatch",
+            "two-reference-audio",
+            "missing-spec-path",
         ],
     )
     def test_validate_manifest_rejects_malformed_reference_spec(
@@ -599,25 +703,23 @@ class TestReferenceSpecManifest:
         from piper_train.evaluation_manifest import load_manifest
 
         source, _rows, options = ref_eval_inputs
-        (source.parent / "m.onnx").write_bytes(b"x")
-        _prepare(
-            options,
-            {"onnx": source.parent / "m.onnx"},
-            reference_spec=_reference_defaults(),
-        )
+        _prepare(options, _dummy_onnx(source), reference_spec=_params())
 
         def mutate(manifest):
             clip = manifest["clips"][0]
+            record = clip["reference_spec"]
             if mutation == "frames-zero":
-                clip["reference_spec"]["frames"] = 0
+                record["frames"] = 0
             elif mutation == "frames-bool":
-                clip["reference_spec"]["frames"] = True
+                record["frames"] = True
+            elif mutation == "frames-above-limit":
+                record["frames"] = 30 * SR // 256 + 1
             elif mutation == "spec-sha-not-hex":
-                clip["reference_spec"]["spec_sha256"] = "z" * 64
-            elif mutation == "audio-sha-not-first-reference":
-                clip["reference_spec"]["audio_sha256"] = manifest["clips"][1][
-                    "reference_audio"
-                ][0]["sha256"]
+                record["spec_sha256"] = "z" * 64
+            elif mutation == "audio-sha-not-reference":
+                record["audio_sha256"] = manifest["clips"][1]["reference_audio"][0][
+                    "sha256"
+                ]
             elif mutation == "unknown-frontend":
                 manifest["reference_spec"]["frontend"] = "silero-vad;torchaudio"
             elif mutation == "missing-clip-record":
@@ -626,22 +728,58 @@ class TestReferenceSpecManifest:
                 manifest.pop("reference_spec")
             elif mutation == "filter-length-not-int":
                 manifest["reference_spec"]["filter_length"] = 1024.0
-            else:
+            elif mutation == "center-true":
                 manifest["reference_spec"]["center"] = True
+            elif mutation == "spec-channels-mismatch":
+                manifest["reference_spec"]["spec_channels"] = 257
+            elif mutation == "two-reference-audio":
+                clip["reference_audio"].append(
+                    manifest["clips"][1]["reference_audio"][0]
+                )
+            else:
+                record.pop("spec_path")
 
         _rewrite_manifest(options["output_path"], mutate)
         with pytest.raises(ValueError, match="reference"):
             load_manifest(options["output_path"])
 
-    def test_prepare_cli_reference_spec_flag_records_spec(
-        self, ref_eval_inputs, monkeypatch
-    ):
+    def test_validate_manifest_detects_tampered_spec_file(self, ref_eval_inputs):
+        from piper_train.evaluation_manifest import load_manifest
+
+        source, _rows, options = ref_eval_inputs
+        manifest = _prepare(options, _dummy_onnx(source), reference_spec=_params())
+        path = Path(manifest["clips"][0]["reference_spec"]["spec_path"])
+        stored = np.load(path, allow_pickle=False)
+        stored[0, 0] = np.nextafter(stored[0, 0], np.float32(np.inf))
+        np.save(path, stored)
+        with pytest.raises(ValueError, match="reference spec file hash"):
+            load_manifest(options["output_path"])
+
+    def test_validate_manifest_rejects_spec_file_wrong_dtype(self, ref_eval_inputs):
+        from piper_train.evaluation_manifest import load_manifest
+
+        source, _rows, options = ref_eval_inputs
+        manifest = _prepare(options, _dummy_onnx(source), reference_spec=_params())
+        path = Path(manifest["clips"][0]["reference_spec"]["spec_path"])
+        np.save(path, np.load(path, allow_pickle=False).astype(np.float16))
+        with pytest.raises(ValueError, match="float32"):
+            load_manifest(options["output_path"])
+
+    def test_validate_manifest_rejects_missing_spec_file(self, ref_eval_inputs):
+        from piper_train.evaluation_manifest import load_manifest
+
+        source, _rows, options = ref_eval_inputs
+        manifest = _prepare(options, _dummy_onnx(source), reference_spec=_params())
+        Path(manifest["clips"][1]["reference_spec"]["spec_path"]).unlink()
+        with pytest.raises(ValueError, match="reference spec"):
+            load_manifest(options["output_path"])
+
+    def _cli(self, monkeypatch, source, options, *extra):
         import sys
 
         from piper_train.tools import generate_eval_audio as generation
 
-        source, _rows, options = ref_eval_inputs
-        (source.parent / "m.onnx").write_bytes(b"x")
+        _dummy_onnx(source)
         monkeypatch.setattr(
             sys,
             "argv",
@@ -658,42 +796,65 @@ class TestReferenceSpecManifest:
                 "a" * 40,
                 "--source-revision",
                 "b" * 40,
-                "--reference-spec",
+                *extra,
             ],
         )
-        assert generation.main() == 0
+        return generation.main()
+
+    def test_prepare_cli_reference_spec_records_named_frontend(
+        self, ref_eval_inputs, monkeypatch
+    ):
+        source, _rows, options = ref_eval_inputs
+        assert (
+            self._cli(
+                monkeypatch,
+                source,
+                options,
+                "--reference-spec",
+                "--reference-frontend",
+                NO_VAD_MQ,
+            )
+            == 0
+        )
         manifest = json.loads(options["output_path"].read_text(encoding="utf-8"))
-        assert manifest["reference_spec"]["frontend"] == "energy-vad@16k;soxr-hq"
+        assert manifest["reference_spec"] == _settings(NO_VAD_MQ)
         assert all(clip["reference_spec"]["frames"] > 0 for clip in manifest["clips"])
+
+    def test_prepare_cli_reference_spec_requires_frontend(
+        self, ref_eval_inputs, monkeypatch
+    ):
+        source, _rows, options = ref_eval_inputs
+        with pytest.raises(SystemExit):
+            self._cli(monkeypatch, source, options, "--reference-spec")
+        assert not options["output_path"].exists()
+
+    def test_prepare_cli_rejects_unknown_frontend(self, ref_eval_inputs, monkeypatch):
+        source, _rows, options = ref_eval_inputs
+        with pytest.raises(SystemExit):
+            self._cli(
+                monkeypatch,
+                source,
+                options,
+                "--reference-spec",
+                "--reference-frontend",
+                "silero-vad;torchaudio",
+            )
+        assert not options["output_path"].exists()
+
+    def test_prepare_cli_frontend_without_reference_spec_is_an_error(
+        self, ref_eval_inputs, monkeypatch
+    ):
+        # 黙って無視すると「frontend を固定したつもり」の manifest になる
+        source, _rows, options = ref_eval_inputs
+        with pytest.raises(SystemExit):
+            self._cli(monkeypatch, source, options, "--reference-frontend", VAD)
+        assert not options["output_path"].exists()
 
     def test_prepare_cli_default_records_no_reference_spec(
         self, ref_eval_inputs, monkeypatch
     ):
-        import sys
-
-        from piper_train.tools import generate_eval_audio as generation
-
         source, _rows, options = ref_eval_inputs
-        (source.parent / "m.onnx").write_bytes(b"x")
-        monkeypatch.setattr(
-            sys,
-            "argv",
-            [
-                "generation",
-                "prepare",
-                "--test-jsonl",
-                str(source),
-                "--output",
-                str(options["output_path"]),
-                "--onnx",
-                str(source.parent / "m.onnx"),
-                "--asr-revision",
-                "a" * 40,
-                "--source-revision",
-                "b" * 40,
-            ],
-        )
-        assert generation.main() == 0
+        assert self._cli(monkeypatch, source, options) == 0
         manifest = json.loads(options["output_path"].read_text(encoding="utf-8"))
         assert "reference_spec" not in manifest
 
@@ -703,34 +864,166 @@ class TestReferenceSpecManifest:
 class TestReferenceSpecTorchEval:
     """torch backend: ref_spec モデルへの feed と旧モデルの不変性 (実 tiny VITS)。"""
 
+    @pytest.mark.parametrize("frontend", [VAD, NO_VAD_MQ])
     def test_eval_feeds_reference_spec_for_ref_spec_model(
-        self, ref_eval_inputs, monkeypatch
+        self, ref_eval_inputs, monkeypatch, frontend
     ):
         from piper_train.tools import generate_eval_audio as generation
 
         source, rows, options = ref_eval_inputs
-        ckpt = _save_checkpoint(
-            _tiny_vits(monkeypatch, "ref_spec"), source.parent / "model.ckpt"
+        ckpt = _ref_spec_checkpoint(
+            monkeypatch, source.parent / "model.ckpt", frontend=frontend
         )
-        _prepare(options, {"torch-raw": ckpt}, reference_spec=_reference_defaults())
+        manifest = _prepare(
+            options, {"torch-raw": ckpt}, reference_spec=_params(frontend)
+        )
         output = source.parent / "out"
         generation.generate_audio(
             options["output_path"], "torch-raw", output, device="cpu"
         )
         loaded, _checkpoint, _rate = generation.load_torch_generator(ckpt, device="cpu")
-        for ordinal, row in enumerate(rows):
+        for ordinal, (row, clip) in enumerate(
+            zip(rows, manifest["clips"], strict=True)
+        ):
             expected = _direct_infer(
-                loaded,
-                row,
-                42 + ordinal,
-                reference_spec=_frontend(
-                    source.parent / row["reference_audio_paths"][0]
-                ),
+                loaded, row, 42 + ordinal, reference_spec=_pinned_spec(clip)
             )
             # 同じ CPU 演算列・同じ seed なので bit 一致を要求する
             np.testing.assert_array_equal(
                 _read_wav(output / f"{row['id']}.wav"), expected
             )
+
+    def test_eval_feeds_stored_spec_despite_frontend_drift(
+        self, ref_eval_inputs, monkeypatch
+    ):
+        # 別 machine の FFT 実装差を模して generate 時の再計算だけを 1 ulp 程度
+        # ずらしても、feed するのは prepare で保存した bytes なので WAV は不変
+        from piper_train.tools import generate_eval_audio as generation
+        from piper_train.vits import mel_processing
+
+        source, rows, options = ref_eval_inputs
+        ckpt = _ref_spec_checkpoint(monkeypatch, source.parent / "model.ckpt")
+        _prepare(options, {"torch-raw": ckpt}, reference_spec=_params())
+        clean = source.parent / "clean"
+        generation.generate_audio(
+            options["output_path"], "torch-raw", clean, device="cpu"
+        )
+        original = mel_processing.spectrogram_torch
+        monkeypatch.setattr(
+            mel_processing,
+            "spectrogram_torch",
+            lambda *args, **kwargs: original(*args, **kwargs) * (1 + 2**-20),
+        )
+        drifted = source.parent / "drifted"
+        generation.generate_audio(
+            options["output_path"], "torch-raw", drifted, device="cpu"
+        )
+        for row in rows:
+            np.testing.assert_array_equal(
+                _read_wav(clean / f"{row['id']}.wav"),
+                _read_wav(drifted / f"{row['id']}.wav"),
+            )
+
+    def test_eval_report_flags_frontend_drift(self, ref_eval_inputs, monkeypatch):
+        from piper_train.tools import generate_eval_audio as generation
+        from piper_train.vits import mel_processing
+
+        source, _rows, options = ref_eval_inputs
+        ckpt = _ref_spec_checkpoint(monkeypatch, source.parent / "model.ckpt")
+        manifest = _prepare(options, {"torch-raw": ckpt}, reference_spec=_params())
+        original = mel_processing.spectrogram_torch
+        monkeypatch.setattr(
+            mel_processing,
+            "spectrogram_torch",
+            lambda *args, **kwargs: original(*args, **kwargs) * (1 + 2**-20),
+        )
+        report = generation.generate_audio(
+            options["output_path"], "torch-raw", source.parent / "o", device="cpu"
+        )
+        for clip, pinned in zip(report["clips"], manifest["clips"], strict=True):
+            drift = clip["reference_spec"]["drift"]
+            assert drift["bit_exact"] is False
+            assert (
+                drift["recomputed_spec_sha256"]
+                != pinned["reference_spec"]["spec_sha256"]
+            )
+            assert drift["max_abs_diff"] > 0
+
+    def test_eval_report_records_no_drift_on_same_machine(
+        self, ref_eval_inputs, monkeypatch
+    ):
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, _rows, options = ref_eval_inputs
+        ckpt = _ref_spec_checkpoint(monkeypatch, source.parent / "model.ckpt")
+        _prepare(options, {"torch-raw": ckpt}, reference_spec=_params())
+        report = generation.generate_audio(
+            options["output_path"], "torch-raw", source.parent / "o", device="cpu"
+        )
+        for clip in report["clips"]:
+            assert clip["reference_spec"]["drift"] == {
+                "recomputed_spec_sha256": clip["reference_spec"]["spec_sha256"],
+                "recomputed_frames": clip["reference_spec"]["frames"],
+                "bit_exact": True,
+                "max_abs_diff": 0.0,
+            }
+
+    def test_eval_records_recomputed_t_ref_drift_and_feeds_stored_spec(
+        self, ref_eval_inputs, monkeypatch
+    ):
+        # frame 数まで変わる drift (VAD 境界の差) も拒否せず記録し、feed は
+        # 保存 bytes のまま (WAV は drift なしの実行と bit 一致)
+        from piper_train import reference_frontend
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, rows, options = ref_eval_inputs
+        ckpt = _ref_spec_checkpoint(monkeypatch, source.parent / "model.ckpt")
+        manifest = _prepare(options, {"torch-raw": ckpt}, reference_spec=_params())
+        clean = source.parent / "clean"
+        generation.generate_audio(
+            options["output_path"], "torch-raw", clean, device="cpu"
+        )
+        original = reference_frontend.trim_reference_audio
+        monkeypatch.setattr(
+            reference_frontend,
+            "trim_reference_audio",
+            lambda audio, sr: (
+                original(audio, sr)[0][: -sr // 10],
+                original(audio, sr)[1],
+            ),
+        )
+        drifted = source.parent / "drifted"
+        report = generation.generate_audio(
+            options["output_path"], "torch-raw", drifted, device="cpu"
+        )
+        for row, clip, pinned in zip(
+            rows, report["clips"], manifest["clips"], strict=True
+        ):
+            drift = clip["reference_spec"]["drift"]
+            assert drift["bit_exact"] is False
+            assert drift["recomputed_frames"] < pinned["reference_spec"]["frames"]
+            assert drift["max_abs_diff"] is None  # shape が違うので値は比べない
+            np.testing.assert_array_equal(
+                _read_wav(clean / f"{row['id']}.wav"),
+                _read_wav(drifted / f"{row['id']}.wav"),
+            )
+
+    def test_eval_ref_spec_refuses_changed_reference_audio(
+        self, ref_eval_inputs, monkeypatch
+    ):
+        # 参照 WAV 自体の差し替えは drift ではなく入力の改変なので拒否
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, _rows, options = ref_eval_inputs
+        ckpt = _ref_spec_checkpoint(monkeypatch, source.parent / "model.ckpt")
+        _prepare(options, {"torch-raw": ckpt}, reference_spec=_params())
+        _write_wav(source.parent / "ref_a.wav", _voiced(SR, freq=440.0, seed=9), SR)
+        output = source.parent / "o"
+        with pytest.raises(ValueError, match="hash mismatch"):
+            generation.generate_audio(
+                options["output_path"], "torch-raw", output, device="cpu"
+            )
+        assert not (output / "generation.json").exists()
 
     def test_eval_ref_spec_output_depends_on_reference_audio(
         self, ref_eval_inputs, monkeypatch
@@ -739,17 +1032,13 @@ class TestReferenceSpecTorchEval:
         from piper_train.tools import generate_eval_audio as generation
 
         source, rows, options = ref_eval_inputs
-        ckpt = _save_checkpoint(
-            _tiny_vits(monkeypatch, "ref_spec"), source.parent / "model.ckpt"
-        )
+        ckpt = _ref_spec_checkpoint(monkeypatch, source.parent / "model.ckpt")
         audio = {}
         for ref in ("ref_a.wav", "ref_b.wav"):
             for row in rows:
                 row["reference_audio_paths"] = [ref]
             _write_rows(source, rows)
-            _prepare(
-                options, {"torch-raw": ckpt}, reference_spec=_reference_defaults()
-            )
+            _prepare(options, {"torch-raw": ckpt}, reference_spec=_params())
             output = source.parent / f"out-{ref}"
             generation.generate_audio(
                 options["output_path"], "torch-raw", output, device="cpu"
@@ -763,22 +1052,26 @@ class TestReferenceSpecTorchEval:
         from piper_train.tools import generate_eval_audio as generation
 
         source, _rows, options = ref_eval_inputs
-        ckpt = _save_checkpoint(
-            _tiny_vits(monkeypatch, "ref_spec"), source.parent / "model.ckpt"
-        )
-        manifest = _prepare(
-            options, {"torch-raw": ckpt}, reference_spec=_reference_defaults()
-        )
+        ckpt = _ref_spec_checkpoint(monkeypatch, source.parent / "model.ckpt")
+        manifest = _prepare(options, {"torch-raw": ckpt}, reference_spec=_params())
         report = generation.generate_audio(
             options["output_path"], "torch-raw", source.parent / "out", device="cpu"
         )
-        assert report["reference_spec"] == manifest["reference_spec"]
+        assert report["reference_spec"]["settings"] == manifest["reference_spec"]
+        assert report["reference_spec"]["model_contract"] == {
+            "source": "checkpoint hyper_parameters",
+            **_settings(),
+            "sample_rate": SR,
+            "frontend_verified": True,
+        }
         for clip, expected in zip(report["clips"], manifest["clips"], strict=True):
-            assert clip["reference_spec"] == expected["reference_spec"]
+            record = dict(clip["reference_spec"])
+            record.pop("drift")
+            assert record == expected["reference_spec"]
         saved = json.loads(
             (source.parent / "out" / "generation.json").read_text(encoding="utf-8")
         )
-        assert saved["reference_spec"] == manifest["reference_spec"]
+        assert saved["reference_spec"] == report["reference_spec"]
 
     def test_eval_ref_spec_model_requires_reference_audio(
         self, ref_eval_inputs, monkeypatch
@@ -786,9 +1079,7 @@ class TestReferenceSpecTorchEval:
         from piper_train.tools import generate_eval_audio as generation
 
         source, rows, options = ref_eval_inputs
-        ckpt = _save_checkpoint(
-            _tiny_vits(monkeypatch, "ref_spec"), source.parent / "model.ckpt"
-        )
+        ckpt = _ref_spec_checkpoint(monkeypatch, source.parent / "model.ckpt")
         rows[1].pop("reference_audio_paths")
         _write_rows(source, rows)
         _prepare(options, {"torch-raw": ckpt})
@@ -802,13 +1093,11 @@ class TestReferenceSpecTorchEval:
     def test_eval_ref_spec_model_requires_manifest_reference_spec(
         self, ref_eval_inputs, monkeypatch
     ):
-        # 参照 WAV はあるが prepare 時に spec の来歴を固定していない manifest
+        # 参照 WAV はあるが prepare 時に spec を固定していない manifest
         from piper_train.tools import generate_eval_audio as generation
 
         source, _rows, options = ref_eval_inputs
-        ckpt = _save_checkpoint(
-            _tiny_vits(monkeypatch, "ref_spec"), source.parent / "model.ckpt"
-        )
+        ckpt = _ref_spec_checkpoint(monkeypatch, source.parent / "model.ckpt")
         _prepare(options, {"torch-raw": ckpt})
         output = source.parent / "out"
         with pytest.raises(ValueError, match="--reference-spec"):
@@ -817,88 +1106,102 @@ class TestReferenceSpecTorchEval:
             )
         assert not (output / "generation.json").exists()
 
-    def test_eval_ref_spec_detects_spec_hash_mismatch(
-        self, ref_eval_inputs, monkeypatch
+    @pytest.mark.parametrize(
+        "field,manifest_params,hparams",
+        [
+            ("frontend", {"frontend": NO_VAD_MQ}, {}),
+            ("filter_length", {"filter_length": 512, "win_length": 512}, {}),
+            ("hop_length", {"hop_length": 128}, {}),
+            ("win_length", {"win_length": 512}, {}),
+            ("hop_length", {}, {"hop_length": 128}),
+        ],
+    )
+    def test_eval_ref_spec_rejects_mismatch_with_checkpoint(
+        self, ref_eval_inputs, monkeypatch, field, manifest_params, hparams
     ):
-        # frontend の実装・依存が prepare 時から変わると spec hash が変わる
         from piper_train.tools import generate_eval_audio as generation
 
         source, _rows, options = ref_eval_inputs
-        ckpt = _save_checkpoint(
-            _tiny_vits(monkeypatch, "ref_spec"), source.parent / "model.ckpt"
+        ckpt = _ref_spec_checkpoint(
+            monkeypatch, source.parent / "model.ckpt", hparams=hparams
         )
-        _prepare(options, {"torch-raw": ckpt}, reference_spec=_reference_defaults())
-
-        def mutate(manifest):
-            manifest["clips"][1]["reference_spec"]["spec_sha256"] = "0" * 64
-
-        _rewrite_manifest(options["output_path"], mutate)
+        _prepare(
+            options,
+            {"torch-raw": ckpt},
+            reference_spec={**_params(), **manifest_params},
+        )
         output = source.parent / "out"
-        with pytest.raises(ValueError, match="reference spec hash"):
+        with pytest.raises(ValueError, match=field):
             generation.generate_audio(
                 options["output_path"], "torch-raw", output, device="cpu"
             )
         assert not (output / "generation.json").exists()
 
-    def test_eval_ref_spec_detects_frames_mismatch(self, ref_eval_inputs, monkeypatch):
-        from piper_train.tools import generate_eval_audio as generation
-
-        source, _rows, options = ref_eval_inputs
-        ckpt = _save_checkpoint(
-            _tiny_vits(monkeypatch, "ref_spec"), source.parent / "model.ckpt"
-        )
-        _prepare(options, {"torch-raw": ckpt}, reference_spec=_reference_defaults())
-
-        def mutate(manifest):
-            manifest["clips"][0]["reference_spec"]["frames"] += 1
-
-        _rewrite_manifest(options["output_path"], mutate)
-        with pytest.raises(ValueError, match="T_ref"):
-            generation.generate_audio(
-                options["output_path"], "torch-raw", source.parent / "o", device="cpu"
-            )
-
-    def test_eval_ref_spec_rejects_stft_mismatch_with_model(
+    def test_eval_ref_spec_rejects_spec_channel_mismatch_with_encoder(
         self, ref_eval_inputs, monkeypatch
     ):
-        # 513 bin のモデルに 257 bin (filter_length 512) の spec を作らない
+        # hparams と manifest が 512 で一致しても、encoder の入力 bin 数 (513) は
+        # 変わらない (filter_length の hparams だけを書き換えた checkpoint)
         from piper_train.tools import generate_eval_audio as generation
 
         source, _rows, options = ref_eval_inputs
-        ckpt = _save_checkpoint(
-            _tiny_vits(monkeypatch, "ref_spec"), source.parent / "model.ckpt"
+        ckpt = _ref_spec_checkpoint(
+            monkeypatch,
+            source.parent / "model.ckpt",
+            hparams={"filter_length": 512, "win_length": 512},
+        )
+        monkeypatch.setattr(
+            generation,
+            "load_torch_generator",
+            _loader_ignoring_hparams(generation.load_torch_generator),
         )
         _prepare(
             options,
             {"torch-raw": ckpt},
-            reference_spec={"filter_length": 512, "hop_length": 256, "win_length": 512},
+            reference_spec=_params(filter_length=512, win_length=512),
         )
-        output = source.parent / "out"
-        with pytest.raises(ValueError, match="filter_length"):
-            generation.generate_audio(
-                options["output_path"], "torch-raw", output, device="cpu"
-            )
-        assert not (output / "generation.json").exists()
-
-    def test_eval_ref_spec_rejects_hop_mismatch_with_checkpoint(
-        self, ref_eval_inputs, monkeypatch
-    ):
-        # bin 数が同じでも hop が学習 hparams と違えば時間軸の解像度が変わる
-        from piper_train.tools import generate_eval_audio as generation
-
-        source, _rows, options = ref_eval_inputs
-        ckpt = _save_checkpoint(
-            _tiny_vits(monkeypatch, "ref_spec"), source.parent / "model.ckpt"
-        )
-        _prepare(
-            options,
-            {"torch-raw": ckpt},
-            reference_spec={**_reference_defaults(), "hop_length": 128},
-        )
-        with pytest.raises(ValueError, match="hop_length"):
+        with pytest.raises(ValueError, match="spec_channels"):
             generation.generate_audio(
                 options["output_path"], "torch-raw", source.parent / "o", device="cpu"
             )
+
+    @pytest.mark.parametrize("key", ["filter_length", "hop_length", "win_length"])
+    def test_eval_ref_spec_refuses_checkpoint_without_stft_hparams(
+        self, ref_eval_inputs, monkeypatch, key
+    ):
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, _rows, options = ref_eval_inputs
+        ckpt = _ref_spec_checkpoint(monkeypatch, source.parent / "model.ckpt")
+        monkeypatch.setattr(
+            generation,
+            "load_torch_generator",
+            _loader_dropping_hparam(generation.load_torch_generator, key),
+        )
+        _prepare(options, {"torch-raw": ckpt}, reference_spec=_params())
+        with pytest.raises(ValueError, match=key):
+            generation.generate_audio(
+                options["output_path"], "torch-raw", source.parent / "o", device="cpu"
+            )
+
+    def test_eval_ref_spec_records_unverified_frontend_without_hparam(
+        self, ref_eval_inputs, monkeypatch
+    ):
+        # 学習側の reference_spec_frontend hparam (後続で追加) が無い旧 ckpt は
+        # frontend を照合できない。拒否せず、未照合であることを report に残す
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, _rows, options = ref_eval_inputs
+        ckpt = _ref_spec_checkpoint(
+            monkeypatch, source.parent / "model.ckpt", frontend=None
+        )
+        _prepare(options, {"torch-raw": ckpt}, reference_spec=_params())
+        report = generation.generate_audio(
+            options["output_path"], "torch-raw", source.parent / "o", device="cpu"
+        )
+        contract = report["reference_spec"]["model_contract"]
+        assert contract["frontend"] is None
+        assert contract["frontend_verified"] is False
 
     @pytest.mark.parametrize("mode", ["none", "capacity"])
     def test_eval_legacy_model_unchanged(self, ref_eval_inputs, monkeypatch, mode):
@@ -944,7 +1247,7 @@ class TestReferenceSpecTorchEval:
         source, rows, options = ref_eval_inputs
         ckpt = _save_checkpoint(_tiny_vits(monkeypatch, mode), source.parent / "m.ckpt")
         wavs = {}
-        for label, settings in (("legacy", None), ("spec", _reference_defaults())):
+        for label, settings in (("legacy", None), ("spec", _params())):
             _prepare(options, {"torch-raw": ckpt}, reference_spec=settings)
             output = source.parent / label
             generation.generate_audio(
@@ -955,10 +1258,46 @@ class TestReferenceSpecTorchEval:
             np.testing.assert_array_equal(legacy, spec)
 
 
+def _loader_dropping_hparam(loader, key):
+    """実 loader で読んだ後、返す checkpoint の hparams から ``key`` を除く。"""
+
+    def load(path, **kwargs):
+        generator, checkpoint, rate = loader(path, **kwargs)
+        hyper = dict(checkpoint["hyper_parameters"])
+        hyper.pop(key)
+        return generator, {**checkpoint, "hyper_parameters": hyper}, rate
+
+    return load
+
+
+def _loader_ignoring_hparams(loader):
+    """filter_length を書き換えた hparams でも 513 bin の encoder で組み直す。"""
+
+    def load(path, **kwargs):
+        import torch
+
+        checkpoint = torch.load(path, map_location="cpu", weights_only=False)
+        fixed = {
+            **checkpoint,
+            "hyper_parameters": {
+                **checkpoint["hyper_parameters"],
+                "filter_length": 1024,
+                "win_length": 1024,
+            },
+        }
+        rebuilt = Path(str(path) + ".rebuilt")
+        torch.save(fixed, rebuilt)
+        generator, _ignored, rate = loader(rebuilt, **kwargs)
+        return generator, checkpoint, rate
+
+    return load
+
+
 @pytest.mark.unit
 @pytest.mark.usefixtures("frontend_deps")
 class TestReferenceSpecOnnxEval:
-    """ONNX backend: 契約の入力名 (reference_spec / reference_spec_lengths) への feed。
+    """ONNX backend: 契約の入力名 (reference_spec / reference_spec_lengths) への
+    feed と config.json の reference_conditioning との照合。
 
     Task 8R の export と merge した後は、実 export の ref_spec ONNX でも
     ``test_eval_feeds_reference_spec_for_ref_spec_model`` 相当を再実行すること。
@@ -969,30 +1308,65 @@ class TestReferenceSpecOnnxEval:
 
         source, rows, options = ref_eval_inputs
         onnx_path = _echo_onnx(source.parent / "echo.onnx")
-        _prepare(options, {"onnx": onnx_path}, reference_spec=_reference_defaults())
+        manifest = _prepare(options, {"onnx": onnx_path}, reference_spec=_params())
         output = source.parent / "out"
         generation.generate_audio(options["output_path"], "onnx", output)
-        for row in rows:
-            spec = _frontend(source.parent / row["reference_audio_paths"][0])
+        for row, clip in zip(rows, manifest["clips"], strict=True):
+            spec = _pinned_spec(clip)
             echoed = _read_wav(output / f"{row['id']}.wav")
             # float32 のまま往復するので bit 一致 (lengths は小さい整数で厳密)
             assert echoed[0] == spec.shape[-1]
             np.testing.assert_array_equal(echoed[1:], spec.numpy().reshape(-1))
+
+    def test_eval_onnx_uses_sibling_config_json(self, ref_eval_inputs):
+        # runtime と同じ探索順: <model>.onnx.json が無ければ同じ dir の config.json
+        from piper_train.embedding_cache import file_sha256
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, _rows, options = ref_eval_inputs
+        onnx_path = _echo_onnx(source.parent / "echo.onnx", block="skip")
+        config = _write_config(onnx_path, _block(), sibling=True)
+        _prepare(options, {"onnx": onnx_path}, reference_spec=_params())
+        report = generation.generate_audio(
+            options["output_path"], "onnx", source.parent / "out"
+        )
+        contract = report["reference_spec"]["model_contract"]
+        assert contract["source"] == str(config.resolve())
+        assert contract["config_sha256"] == file_sha256(config)
+
+    def test_eval_onnx_ref_spec_creates_one_session_per_clip(
+        self, ref_eval_inputs, monkeypatch
+    ):
+        # ref_spec の判定・契約照合は loop の前に 1 回。session は clip ごとに
+        # 1 つ (seed も clip ごと) のまま
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, _rows, options = ref_eval_inputs
+        onnx_path = _echo_onnx(source.parent / "echo.onnx")
+        _prepare(options, {"onnx": onnx_path}, reference_spec=_params())
+        seeds = []
+        real = generation.load_onnx_session
+
+        def counting(path, seed):
+            seeds.append(seed)
+            return real(path, seed)
+
+        monkeypatch.setattr(generation, "load_onnx_session", counting)
+        generation.generate_audio(options["output_path"], "onnx", source.parent / "o")
+        assert seeds == [42, 43]
 
     def test_eval_onnx_ref_spec_requires_lengths_input(self, ref_eval_inputs):
         from piper_train.tools import generate_eval_audio as generation
 
         source, _rows, options = ref_eval_inputs
         onnx_path = _echo_onnx(source.parent / "echo.onnx", with_lengths=False)
-        _prepare(options, {"onnx": onnx_path}, reference_spec=_reference_defaults())
+        _prepare(options, {"onnx": onnx_path}, reference_spec=_params())
         output = source.parent / "out"
         with pytest.raises(ValueError, match="reference_spec_lengths"):
             generation.generate_audio(options["output_path"], "onnx", output)
         assert not (output / "generation.json").exists()
 
-    def test_eval_onnx_ref_spec_requires_manifest_reference_spec(
-        self, ref_eval_inputs
-    ):
+    def test_eval_onnx_ref_spec_requires_manifest_reference_spec(self, ref_eval_inputs):
         from piper_train.tools import generate_eval_audio as generation
 
         source, _rows, options = ref_eval_inputs
@@ -1016,24 +1390,104 @@ class TestReferenceSpecOnnxEval:
             generation.generate_audio(options["output_path"], "onnx", output)
         assert not (output / "generation.json").exists()
 
-    def test_eval_onnx_ref_spec_rejects_channel_mismatch(self, ref_eval_inputs):
+    def test_eval_onnx_ref_spec_refuses_missing_config(self, ref_eval_inputs):
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, _rows, options = ref_eval_inputs
+        onnx_path = _echo_onnx(source.parent / "echo.onnx", block="skip")
+        _prepare(options, {"onnx": onnx_path}, reference_spec=_params())
+        output = source.parent / "out"
+        with pytest.raises(ValueError, match="config"):
+            generation.generate_audio(options["output_path"], "onnx", output)
+        assert not (output / "generation.json").exists()
+
+    def test_eval_onnx_ref_spec_refuses_config_without_block(self, ref_eval_inputs):
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, _rows, options = ref_eval_inputs
+        onnx_path = _echo_onnx(source.parent / "echo.onnx", block=None)
+        _prepare(options, {"onnx": onnx_path}, reference_spec=_params())
+        output = source.parent / "out"
+        with pytest.raises(ValueError, match="reference_conditioning"):
+            generation.generate_audio(options["output_path"], "onnx", output)
+        assert not (output / "generation.json").exists()
+
+    @pytest.mark.parametrize(
+        "field,value",
+        [
+            ("frontend", NO_VAD_MQ),
+            ("filter_length", 2048),
+            ("hop_length", 128),
+            ("win_length", 512),
+            ("sample_rate", 16000),
+            ("center", True),
+            ("spec_channels", 257),
+            ("schema", "capacity_v1"),
+        ],
+    )
+    def test_eval_onnx_ref_spec_rejects_config_mismatch(
+        self, ref_eval_inputs, field, value
+    ):
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, _rows, options = ref_eval_inputs
+        onnx_path = _echo_onnx(
+            source.parent / "echo.onnx", block=_block(**{field: value})
+        )
+        _prepare(options, {"onnx": onnx_path}, reference_spec=_params())
+        output = source.parent / "out"
+        with pytest.raises(ValueError, match=field):
+            generation.generate_audio(options["output_path"], "onnx", output)
+        assert not (output / "generation.json").exists()
+
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "schema",
+            "frontend",
+            "filter_length",
+            "hop_length",
+            "win_length",
+            "sample_rate",
+            "center",
+            "spec_channels",
+        ],
+    )
+    def test_eval_onnx_ref_spec_rejects_config_missing_field(
+        self, ref_eval_inputs, field
+    ):
+        from piper_train.tools import generate_eval_audio as generation
+
+        source, _rows, options = ref_eval_inputs
+        block = _block()
+        block.pop(field)
+        onnx_path = _echo_onnx(source.parent / "echo.onnx", block=block)
+        _prepare(options, {"onnx": onnx_path}, reference_spec=_params())
+        with pytest.raises(ValueError, match=field):
+            generation.generate_audio(
+                options["output_path"], "onnx", source.parent / "o"
+            )
+
+    def test_eval_onnx_ref_spec_rejects_input_channel_mismatch(self, ref_eval_inputs):
+        # config と manifest が 513 で一致しても graph の入力が 257 bin なら拒否
         from piper_train.tools import generate_eval_audio as generation
 
         source, _rows, options = ref_eval_inputs
         onnx_path = _echo_onnx(source.parent / "echo.onnx", spec_channels=257)
-        _prepare(options, {"onnx": onnx_path}, reference_spec=_reference_defaults())
+        _prepare(options, {"onnx": onnx_path}, reference_spec=_params())
         output = source.parent / "out"
-        with pytest.raises(ValueError, match="filter_length"):
+        with pytest.raises(ValueError, match="spec_channels"):
             generation.generate_audio(options["output_path"], "onnx", output)
         assert not (output / "generation.json").exists()
 
     def test_eval_legacy_onnx_feeds_only_legacy_inputs(self, ref_eval_inputs):
         # 旧 ONNX は来歴付き manifest でも旧入力だけを受け取り、report も旧 schema
+        # (config.json も不要)
         from piper_train.tools import generate_eval_audio as generation
 
         source, _rows, options = ref_eval_inputs
         onnx_path = _legacy_onnx(source.parent / "legacy.onnx")
-        _prepare(options, {"onnx": onnx_path}, reference_spec=_reference_defaults())
+        _prepare(options, {"onnx": onnx_path}, reference_spec=_params())
         report = generation.generate_audio(
             options["output_path"], "onnx", source.parent / "out"
         )
