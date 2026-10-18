@@ -941,10 +941,15 @@ export class PiperPlus {
       //   ja — needs jpreprocess (no JS equivalent)
       //   zh — needs pinyin dictionary (JS G2P has no pinyin conversion)
       const WASM_REQUIRED_LANGUAGES = new Set(["ja", "zh"]);
+      // Languages the Rust WASM bundle reports as supported but only
+      // tokenizes letter by letter (PassthroughPhonemizer): English needs the
+      // CMU dictionary, which ships with the JS G2P instead
+      // (src/rust/piper-wasm/src/lib.rs).
+      const WASM_PASSTHROUGH_LANGUAGES = new Set(["en"]);
 
       // Load Rust WASM phonemizer when any model language benefits from it.
-      // When loaded, route ALL languages through WASM — the Rust
-      // MultilingualPhonemizer now respects language hints for Latin-script
+      // When loaded, route the languages it phonemizes through WASM — the
+      // Rust MultilingualPhonemizer respects language hints for Latin-script
       // languages (es/fr/pt/sv), so they are phonemized correctly.
       const needsWasm = languages && languages.some((l) => WASM_REQUIRED_LANGUAGES.has(l));
       if (needsWasm) {
@@ -953,10 +958,9 @@ export class PiperPlus {
             wasmUrl: options.wasmG2pUrl || "../../dist/rust-wasm/piper_plus_wasm.js",
             wasmLoader: options.wasmLoader,
           });
-          // Route all languages through WASM
           const wasmLangs = wasmAdapter.supportedLanguages;
           for (const lang of languages) {
-            if (wasmLangs.includes(lang)) {
+            if (wasmLangs.includes(lang) && !WASM_PASSTHROUGH_LANGUAGES.has(lang)) {
               phonemizerMap.set(lang, wasmAdapter);
             }
           }

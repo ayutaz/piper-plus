@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-05-19T00:00:00Z",
+  "generated_at": "2026-10-16T09:55:39Z",
   "totals": {
-    "executable": 231,
+    "executable": 242,
     "needs_placeholder": 8,
-    "skip_warranted": 264,
-    "total": 503
+    "skip_warranted": 268,
+    "total": 518
   },
   "by_language": {
     "bash": {
-      "executable": 169,
+      "executable": 174,
       "needs_placeholder": 8,
-      "skip_warranted": 47
+      "skip_warranted": 48
     },
     "csharp": {
       "executable": 5,
@@ -24,7 +24,7 @@
       "skip_warranted": 0
     },
     "python": {
-      "executable": 32,
+      "executable": 38,
       "needs_placeholder": 0,
       "skip_warranted": 1
     },
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 216
+      "skip_warranted": 219
     },
     "wasm": {
       "executable": 10,
@@ -295,6 +295,86 @@
       "hash_sha1": "2c55c0311705757d50b2b884ad4a1130caa79932"
     },
     {
+      "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
+      "line_start": 81,
+      "line_end": 142,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "52a01a3e07eb824a0965571398ac5d2232bc0b4e"
+    },
+    {
+      "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
+      "line_start": 174,
+      "line_end": 177,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "b9666a46e66fa8d6512fe471f365a50bfb590e92"
+    },
+    {
+      "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
+      "line_start": 197,
+      "line_end": 219,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "398f74e104b458ea7726e24a28ced39262dbf89d"
+    },
+    {
+      "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
+      "line_start": 245,
+      "line_end": 248,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "b918bab9c8f2e27913a86d5349978b94b40c7615"
+    },
+    {
+      "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
+      "line_start": 271,
+      "line_end": 276,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "125ff18c4ad021c86e261e9f946bca7e0b05e0a8"
+    },
+    {
+      "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
+      "line_start": 314,
+      "line_end": 317,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "cfdf160c85f97bd3ed68b27b7deb5accabdd786e"
+    },
+    {
       "file": "docs/design/multi-6lang-zero-shot-v7-training-results.md",
       "line_start": 36,
       "line_end": 39,
@@ -379,6 +459,21 @@
       ],
       "env_dependencies": [],
       "hash_sha1": "a3daeca983b96e3ce49f3887acf6009dfd3b92dd"
+    },
+    {
+      "file": "docs/design/zero-shot-gpt-sovits-adoption-plan-2026-10-17.md",
+      "line_start": 112,
+      "line_end": 126,
+      "language_raw": "mermaid",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "2f3b4f2ad3c45fcfd7911f0f8dd2bdc47146534c"
     },
     {
       "file": "docs/design/zero-shot-noise-root-cause-pqmf.md",
@@ -476,6 +571,58 @@
       ],
       "env_dependencies": [],
       "hash_sha1": "cf5f25de4edfe5c249c86ef7286ae3bb3094a9f3"
+    },
+    {
+      "file": "docs/design/zero-shot-reference-fusion-plan-2026-10-17.md",
+      "line_start": 139,
+      "line_end": 146,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "a237c0d868e2970d1bca67f2b78053d589be53f3"
+    },
+    {
+      "file": "docs/design/zero-shot-reference-fusion-plan-2026-10-17.md",
+      "line_start": 165,
+      "line_end": 178,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "5f7fb418e7dda923805ba6b8aa40316b9a52b1cf"
+    },
+    {
+      "file": "docs/design/zero-shot-reference-fusion-plan-2026-10-17.md",
+      "line_start": 198,
+      "line_end": 210,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "96a49ab7d51c2fff40afb416684534452dc4432b"
+    },
+    {
+      "file": "docs/design/zero-shot-reference-fusion-plan-2026-10-17.md",
+      "line_start": 251,
+      "line_end": 269,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "ffa224b22c8981f342268f37f51e80bf33baa51c"
     },
     {
       "file": "docs/design/zero-shot-v10-design.md",
@@ -1094,8 +1241,8 @@
     },
     {
       "file": "docs/features/webui.md",
-      "line_start": 88,
-      "line_end": 102,
+      "line_start": 91,
+      "line_end": 105,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1109,8 +1256,8 @@
     },
     {
       "file": "docs/features/webui.md",
-      "line_start": 115,
-      "line_end": 124,
+      "line_start": 118,
+      "line_end": 127,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1122,8 +1269,8 @@
     },
     {
       "file": "docs/features/webui.md",
-      "line_start": 153,
-      "line_end": 156,
+      "line_start": 156,
+      "line_end": 159,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4500,6 +4647,34 @@
       "hash_sha1": "d357dcc82db2fb29193042fabfd6401953855240"
     },
     {
+      "file": "docs/handoff/zero-shot-cpu-to-gpu-2026-10-17.md",
+      "line_start": 59,
+      "line_end": 71,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "skip_warranted",
+      "suggested_action": "sandbox_cannot_satisfy_env_dep",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [
+        "CUDA_VISIBLE_DEVICES"
+      ],
+      "hash_sha1": "2361e54de75b8dd2a15e97c27fd229b9de830c66"
+    },
+    {
+      "file": "docs/handoff/zero-shot-cpu-to-gpu-2026-10-17.md",
+      "line_start": 79,
+      "line_end": 84,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "0802338b14ba20f480cd5babf0e083f476364ab2"
+    },
+    {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
       "line_start": 23,
       "line_end": 40,
@@ -7044,6 +7219,34 @@
       ],
       "env_dependencies": [],
       "hash_sha1": "bca1a0a56455309fcff2b4e54e0c5517466de8d0"
+    },
+    {
+      "file": "docs/research/zero-shot-reference-fusion-s0-2026-10.md",
+      "line_start": 72,
+      "line_end": 81,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "3e40eb30d33afc54a40b1b8e7d8ae281fd8e7604"
+    },
+    {
+      "file": "docs/research/zero-shot-reference-fusion-s0-2026-10.md",
+      "line_start": 231,
+      "line_end": 233,
+      "language_raw": "",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "4c15b2368e5f55667c5323ab0c536ebb7b89eb82"
     },
     {
       "file": "docs/spec/training-batch-schedule.md",

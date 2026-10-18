@@ -865,7 +865,10 @@ impl ChinesePhonemizer {
     ///
     /// JSON formats:
     /// - pinyin_single.json: `{"19968": "yi1", "19969": "ding1,zheng4", ...}`
-    /// - pinyin_phrases.json: `{"一丁不識": [["yī"], ["dīng"], ...], "一个": "yi2 ge4", ...}`
+    /// - pinyin_phrases.json: `{"一丁不识": [["yi1"], ["ding1"], ...], "一个": "yi2 ge4", ...}`
+    ///
+    /// Tones must be trailing digits (`scripts/build_pinyin_dicts.py`); a
+    /// tone-marked syllable such as `yī` parses as tone 5 with a broken final.
     pub fn from_json_bytes(single_json: &[u8], phrase_json: &[u8]) -> Result<Self, G2pError> {
         let single_val: serde_json::Value =
             serde_json::from_slice(single_json).map_err(|e| G2pError::DictionaryLoad {

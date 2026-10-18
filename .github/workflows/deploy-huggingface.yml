@@ -7,6 +7,7 @@ on:
     paths:
       - 'huggingface-space/**'
       - 'src/python/g2p/**'
+      - 'src/python_run/piper_plus/**'
       - 'src/python/piper_train/infer_onnx.py'
       - 'src/python/piper_train/ort_utils.py'
       - '.github/workflows/deploy-huggingface.yml'
@@ -84,6 +85,9 @@ jobs:
           cp huggingface-space/download_models.py hf-space-deploy/
           cp huggingface-space/requirements.txt hf-space-deploy/
           cp huggingface-space/README.md hf-space-deploy/
+          cp huggingface-space/zero_shot.py hf-space-deploy/
+          # Pinned zs-v1 config (the ONNX files are downloaded on first use)
+          cp -r huggingface-space/zs-v1 hf-space-deploy/
 
           # Copy actual model files from test/models
           mkdir -p hf-space-deploy/models
@@ -122,6 +126,12 @@ jobs:
           cp -r src/python/g2p/piper_plus_g2p hf-space-deploy/
           echo "✓ Copied piper_plus_g2p ($(find hf-space-deploy/piper_plus_g2p -name '*.py' | wc -l) Python files)"
 
+          # Copy piper_plus runtime (PiperVoice + MultilingualPhonemizer for the zero-shot tab)
+          echo "Copying piper_plus runtime package..."
+          cp -r src/python_run/piper_plus hf-space-deploy/
+          find hf-space-deploy -name '__pycache__' -type d -prune -exec rm -rf {} +
+          echo "✓ Copied piper_plus ($(find hf-space-deploy/piper_plus -name '*.py' | wc -l) Python files)"
+
           echo "piper_train module ready: $(find hf-space-deploy/piper_train -name '*.py' | wc -l) total Python files"
           echo "piper_plus_g2p module ready: $(find hf-space-deploy/piper_plus_g2p -name '*.py' | wc -l) total Python files"
 
@@ -154,7 +164,7 @@ jobs:
       - name: Validate Python imports before deployment
         working-directory: hf-space-deploy
         run: |
-          pip install numpy onnxruntime
+          pip install numpy onnxruntime huggingface_hub
           echo "=== Pre-deployment import validation ==="
           python3 << 'PYEOF'
           import sys, importlib
@@ -168,6 +178,9 @@ jobs:
               ("piper_plus_g2p.encode.encoder", "PiperEncoder"),
               ("piper_train.vits.utils", "audio_float_to_int16"),
               ("piper_train.vits.wavfile", "write"),
+              ("piper_plus.voice", "PiperVoice"),
+              ("piper_plus.phonemize.multilingual", "MultilingualPhonemizer"),
+              ("zero_shot", "ZeroShotEngine"),
           ]
 
           failed = []

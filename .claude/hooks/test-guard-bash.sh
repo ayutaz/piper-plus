@@ -63,6 +63,28 @@ run "skill 内 (Skill tool record)" \
   "$(input_for 'gh pr create --base dev')" \
   0 ""
 
+# git worktree 内では project skill が `<worktree path>:<name>` という
+# directory-scoped 名で呼ばれる (例: `.worktrees/feat-x:create-pr`)。
+run "skill 内 (worktree の directory-scoped 名、 許可)" \
+  '{"name":"Skill","input":{"skill":".worktrees/feat-790-zero-shot-demo:create-pr","args":""}}' \
+  "$(input_for 'gh pr create --base dev')" \
+  0 ""
+
+run "skill 内 (directory-scoped な slash command marker、 許可)" \
+  '<command-name>/.worktrees/feat-x:create-pr</command-name>' \
+  "$(input_for 'gh pr create --base dev')" \
+  0 ""
+
+run "plugin の同名 skill (拒否)" \
+  '{"name":"Skill","input":{"skill":"some-plugin:create-pr","args":""}}' \
+  "$(input_for 'gh pr create --base dev')" \
+  0 "permissionDecision.*deny"
+
+run "directory-scoped 名でも別 skill (拒否)" \
+  '{"name":"Skill","input":{"skill":".worktrees/feat-x:watch-pr","args":""}}' \
+  "$(input_for 'gh pr create --base dev')" \
+  0 "permissionDecision.*deny"
+
 run "別 skill が最新 (拒否)" \
   '<command-name>/create-pr</command-name>{"name":"Skill","input":{"skill":"watch-pr"}}' \
   "$(input_for 'gh pr create --base dev')" \

@@ -241,7 +241,7 @@ repos:
         name: Custom dictionaries (data/dictionaries → WASM assets) byte-equal
         entry: uv run --no-sync python scripts/check_dictionary_consistency.py
         language: system
-        files: ^(data/dictionaries/(default_common|default_tech|additional_tech)_dict\.json|src/wasm/openjtalk-web/assets/(default_common|default_tech|additional_tech)_dict\.json|docs/spec/dictionary\-mirrors\.toml|scripts/_mirror_check\.py|scripts/check_dictionary_consistency\.py)$
+        files: ^(data/dictionaries/(default_common|default_tech|additional_tech)_dict\.json|src/wasm/openjtalk-web/assets/(default_common|default_tech|additional_tech)_dict\.json|(src/rust/piper\-plus\-g2p/data|src/wasm/openjtalk\-web/assets|test/models)/pinyin_(single|phrases)\.json|docs/spec/dictionary\-mirrors\.toml|scripts/_mirror_check\.py|scripts/check_dictionary_consistency\.py|scripts/build_pinyin_dicts\.py)$
         pass_filenames: false
 
       - id: ruff-version-sync

@@ -204,9 +204,15 @@ includes = [
 canonical_for = ["python-train", "python-runtime"]
 
 [chinese.pinyin_json_mirrors]
-# Pre-converted JSON form for non-Python runtimes.
-shared_format_single = "JSON object: { \"hanzi\": \"pinyin1\" }"
-shared_format_phrases = "JSON object: { \"phrase\": [\"pinyin1\", \"pinyin2\", ...] }"
+# Pre-converted JSON form for non-Python runtimes, generated from the
+# pinned pypinyin by scripts/build_pinyin_dicts.py. Tones are trailing digits
+# 1-5 (TONE3, neutral tone = 5, u-umlaut = v), matching the Python canonical
+# `pinyin(..., style=Style.TONE3, neutral_tone_with_five=True)`.
+# Regenerate after a pypinyin bump, then run
+# `scripts/check_dictionary_consistency.py --fix` to copy the mirrors.
+generator = "scripts/build_pinyin_dicts.py"
+shared_format_single = "JSON object: { \"<codepoint decimal>\": \"yi1,yi4\" }"
+shared_format_phrases = "JSON object: { \"phrase\": [[\"yi1\"], [\"ding1\"], ...] }"
 size_mb_approx_single = 0.7
 size_mb_approx_phrases = 1.9
 license = "MIT (pypinyin)"
