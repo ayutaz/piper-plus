@@ -19,6 +19,8 @@ from pathlib import Path
 import numpy as np
 import onnxruntime as ort
 
+from piper_plus.model_inputs import reject_unsupported_session_inputs
+
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +124,11 @@ def create_ort_session(
         model_path: Path to ``.onnx`` model file.
         device: ``"cpu"``, ``"gpu"``, ``"cuda"``, ``"cuda:N"``, or ``"auto"``.
         intra_threads: Override for intra-op thread count.
+
+    Raises:
+        piper_plus.model_inputs.UnsupportedModelInputError: The model declares
+            reference-spectrogram inputs (``reference_spec`` /
+            ``reference_spec_lengths``), which this engine cannot feed.
     """
     opts = ort.SessionOptions()
     opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
@@ -157,7 +164,11 @@ def create_ort_session(
 
     providers = _get_providers(device)
 
-    return ort.InferenceSession(str(model_path), opts, providers=providers)
+    session = ort.InferenceSession(str(model_path), opts, providers=providers)
+    # 参照spec入力 (ref_spec_v1) を宣言したモデルは本 engine で合成できない。
+    # warmup が欠落入力を warning で握り潰す前に、読み込み時点で明示拒否する。
+    reject_unsupported_session_inputs(session, model_path)
+    return session
 
 
 # ---------------------------------------------------------------------------

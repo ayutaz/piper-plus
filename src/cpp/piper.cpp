@@ -494,6 +494,42 @@ void loadModel(std::string modelPath, ModelSession &session,
   spdlog::debug("Loaded onnx model in {} second(s)",
                 std::chrono::duration<double>(endTime - startTime).count());
 
+  // Reference-conditioned (ref_spec_v1) models declare reference_spec
+  // [B, 513, T_ref] float32 / reference_spec_lengths [B] int64. This runtime
+  // never builds those tensors, so the first synthesis would fail with ORT's
+  // "Missing Input". Reject at load time with an explicit message instead.
+  // Same input names and message as the Python runtime
+  // (src/python_run/piper_plus/model_inputs.py). The message deliberately
+  // avoids the ORT markers the C API uses for PIPER_PLUS_ERR_ORT, so
+  // piper_plus_create() reports PIPER_PLUS_ERR_MODEL.
+  {
+    std::vector<std::string> declaredInputs;
+    for (size_t i = 0; i < session.onnx.GetInputCount(); i++) {
+      auto inputName = session.onnx.GetInputNameAllocated(i, session.allocator);
+      declaredInputs.emplace_back(inputName.get());
+    }
+    std::string found;
+    for (const char *referenceInput :
+         {"reference_spec", "reference_spec_lengths"}) {
+      if (std::find(declaredInputs.begin(), declaredInputs.end(),
+                    referenceInput) != declaredInputs.end()) {
+        if (!found.empty()) {
+          found += ", ";
+        }
+        found += referenceInput;
+      }
+    }
+    if (!found.empty()) {
+      session.onnx = Ort::Session(nullptr);
+      throw std::runtime_error(
+          "Model " + modelPath + " requires reference-spectrogram input (" +
+          found +
+          "; reference_conditioning schema ref_spec_v1), which this runtime "
+          "does not support. Use a model exported without reference "
+          "conditioning.");
+    }
+  }
+
   // Check if model has duration output
   size_t numOutputNodes = session.onnx.GetOutputCount();
   if (numOutputNodes >= 2) {
