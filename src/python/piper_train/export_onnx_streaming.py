@@ -84,6 +84,19 @@ def check_streaming_export_supported(model_g) -> None:
             "SNAC needs separate speaker/language components). "
             "Use piper_train.export_onnx instead."
         )
+    reference_mode = getattr(model_g, "reference_conditioning", "none")
+    if reference_mode != "none":
+        # reference-fusion plan §8 Task 8R: streaming encoder の入力は
+        # speaker_embeddings のみで、ref_spec の参照 spec 入力を持たない
+        # (参照項を落とした g を黙って出す)。capacity も含め、参照条件付き
+        # モデルの streaming 分割は検証していないので一律に拒否する。
+        raise NotImplementedError(
+            f"Streaming export does not support reference_conditioning="
+            f"{reference_mode!r} models (the streaming encoder has no reference "
+            "inputs, and the reference-conditioned speaker condition is not "
+            "verified across the encoder/decoder split). "
+            "Use piper_train.export_onnx instead."
+        )
     if getattr(model_g, "spk_proj_dp", None) is not None:
         # v10 M3: spk_proj_dp 残差を落とした DP conditioning になる。
         raise NotImplementedError(
