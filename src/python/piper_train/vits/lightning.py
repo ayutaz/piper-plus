@@ -1277,6 +1277,39 @@ class VitsModel(pl.LightningModule):
             return 1.0
         return min(1.0, self.generator_updates / warmup)
 
+    @staticmethod
+    def _reference_param_groups(optimizer) -> list:
+        raw = getattr(optimizer, "optimizer", optimizer)
+        return [g for g in raw.param_groups if g.get("name") == REFERENCE_PARAM_GROUP]
+
+    def on_train_start(self) -> None:
+        """strict resume で ``--reference-lr-scale`` の変更が効かないことを警告する。
+
+        ``optimizer.load_state_dict`` は保存時の group の lr / initial_lr を
+        復元する。今回の ``learning_rate × reference_lr_scale`` と食い違えば
+        保存値が使われる。on_fit_start は復元より前に呼ばれるため使えない
+        (Trainer._run: on_fit_start → restore_training_state → on_train_start)。
+        """
+        optimizers = self.optimizers(use_pl_optimizer=False)
+        if not isinstance(optimizers, (list, tuple)):
+            optimizers = [optimizers]
+        if not optimizers:
+            return
+        requested = self.hparams.learning_rate * getattr(
+            self.hparams, "reference_lr_scale", 1.0
+        )
+        for group in self._reference_param_groups(optimizers[0]):
+            saved = group.get("initial_lr", group["lr"])
+            if not math.isclose(saved, requested, rel_tol=1e-9):
+                _PKG_LOGGER.warning(
+                    "The reference-conditioning param group resumed with base lr "
+                    "%.3e from the checkpoint, but this run requests %.3e "
+                    "(learning_rate x --reference-lr-scale). The saved value is "
+                    "used; start from --resume-weights-only to change the scale.",
+                    saved,
+                    requested,
+                )
+
     @contextlib.contextmanager
     def _reference_lr_warmup(self, optimizer):
         """optimizer.step() の間だけ参照 group の lr に慣らし係数を掛ける。
@@ -1285,18 +1318,22 @@ class VitsModel(pl.LightningModule):
         連鎖的に更新する値なので、step が終われば必ず元に戻す。こうすると
         実効 lr = scheduler の lr × 係数 となり、scheduler の軌跡は慣らしの
         有無に依存しない。
+
+        参照 group があれば適用した係数を、なければ ``None`` を yield する。
         """
         factor = self._reference_lr_factor()
-        raw = getattr(optimizer, "optimizer", optimizer)
-        groups = [g for g in raw.param_groups if g.get("name") == REFERENCE_PARAM_GROUP]
-        if factor == 1.0 or not groups:
-            yield
+        groups = self._reference_param_groups(optimizer)
+        if not groups:
+            yield None
+            return
+        if factor == 1.0:
+            yield factor
             return
         saved = [g["lr"] for g in groups]
         for group in groups:
             group["lr"] = group["lr"] * factor
         try:
-            yield
+            yield factor
         finally:
             for group, lr in zip(groups, saved, strict=True):
                 group["lr"] = lr
@@ -1844,8 +1881,12 @@ class VitsModel(pl.LightningModule):
             self.manual_backward(loss_g)
             if grad_clip is not None:
                 torch.nn.utils.clip_grad_norm_(self.model_g.parameters(), grad_clip)
-            with self._reference_lr_warmup(opt_g):
+            with self._reference_lr_warmup(opt_g) as reference_factor:
                 stepped = self._step_optimizer(opt_g)
+            if reference_factor is not None:
+                self._log_with_batch_info(
+                    "reference_lr_factor", reference_factor, batch
+                )
             if stepped:
                 self.generator_updates += 1
                 self.generator_updated_this_batch = True
