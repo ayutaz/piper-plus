@@ -29,6 +29,9 @@ on:
       - 'scripts/check_python_run_test_coverage.py'
       - 'scripts/run_zero_shot_cpu_evaluation.py'
       - 'tests/scripts/test_zero_shot_cpu_hash_cache.py'
+      - 'scripts/run_reference_fusion_s0.py'
+      - 'tests/scripts/test_reference_fusion_s0.py'
+      - 'scripts/check_onnx_inputs.py'
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
@@ -178,7 +181,11 @@ jobs:
           src/python/tests/test_zs_metric_isolation_gate.py \
           src/python/tests/test_batch_pin_memory.py \
           src/python/tests/test_dataset_f0.py \
+          src/python/tests/test_resume_strict.py \
+          src/python/tests/test_extract_speaker_embedding.py \
+          src/python/tests/test_check_onnx_inputs.py \
           tests/scripts/test_zero_shot_cpu_hash_cache.py \
+          tests/scripts/test_reference_fusion_s0.py \
           -q --no-cov
 
     # ---------------------------------------------------------------
