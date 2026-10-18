@@ -436,3 +436,106 @@ def validate_training_batch(batch, *, gather=False, require_reference_pairs=Fals
         "min_positives": min(ids.count(speaker) - 1 for speaker in ids),
         "fallbacks": 0,
     }
+
+
+def validate_reference_spec_cache(
+    spec_paths, *, frontend, sample_rate, filter_length, hop_length, win_length
+) -> None:
+    """ref_spec の学習で G が読む参照 spec が参照専用 spec cache から来ているか確かめる。
+
+    参照融合計画 §8、Ruling R17: 学習音声の spec cache は言語ごとに別の builder で
+    作られていることがあるので、G の参照 spec は ``tools.build_reference_spec_cache``
+    が元音声から名前付き frontend で作り直した cache から読む。各参照 spec と同じ
+    dir の sidecar (``reference_spec_cache.json``) を読み、次のどれかで
+    ``SystemExit`` (学習を始めない):
+
+    * モデルが frontend を宣言していない (``reference_spec_frontend`` が None)
+    * sidecar が読めない・schema が違う
+    * sidecar の frontend がモデルの ``reference_spec_frontend`` と違う
+    * sidecar の sample rate・STFT 設定がモデルと違う
+    * sidecar の無い dir の参照 spec、または sidecar に載っていない参照 spec がある
+      (件数を出す)
+
+    none / capacity の学習はこの検査を呼ばない。
+    """
+    import json  # noqa: PLC0415
+    import os  # noqa: PLC0415
+
+    from .reference_spec_contract import (  # noqa: PLC0415
+        REFERENCE_SPEC_CACHE_SCHEMA,
+        REFERENCE_SPEC_CACHE_SIDECAR,
+    )
+
+    tool = "piper_train.tools.build_reference_spec_cache"
+    if frontend is None:
+        raise SystemExit(
+            "reference_conditioning='ref_spec' training requires "
+            "reference_spec_frontend: the reference specs must come from a "
+            f"reference-only spec cache built by {tool} with that frontend "
+            "(Ruling R17)"
+        )
+    expected = {
+        "sample_rate": sample_rate,
+        "filter_length": filter_length,
+        "hop_length": hop_length,
+        "win_length": win_length,
+    }
+    by_dir: dict[str, list[Path]] = {}
+    for raw in spec_paths:
+        path = Path(os.path.abspath(raw))
+        by_dir.setdefault(str(path.parent), []).append(path)
+    total = sum(len(paths) for paths in by_dir.values())
+    uncovered: list[str] = []
+    for directory in sorted(by_dir):
+        paths = by_dir[directory]
+        sidecar_path = Path(directory) / REFERENCE_SPEC_CACHE_SIDECAR
+        if not sidecar_path.is_file():
+            uncovered.extend(
+                f"{path} (no {REFERENCE_SPEC_CACHE_SIDECAR})" for path in paths
+            )
+            continue
+        try:
+            sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise SystemExit(
+                f"cannot read the reference spec cache sidecar {sidecar_path}: {exc}"
+            ) from exc
+        schema = sidecar.get("schema") if isinstance(sidecar, dict) else None
+        if schema != REFERENCE_SPEC_CACHE_SCHEMA or not isinstance(
+            sidecar.get("files"), dict
+        ):
+            raise SystemExit(
+                f"reference spec cache sidecar {sidecar_path} has schema {schema!r} "
+                f"(expected {REFERENCE_SPEC_CACHE_SCHEMA!r} with a files table); "
+                f"rebuild it with {tool}"
+            )
+        if sidecar.get("frontend") != frontend:
+            raise SystemExit(
+                f"reference spec cache {directory} was built with frontend "
+                f"{sidecar.get('frontend')!r}, but the model declares "
+                f"reference_spec_frontend={frontend!r}; rebuild it with {tool} "
+                f"--frontend {frontend!r} (Ruling R17)"
+            )
+        mismatched = [
+            f"{key}: cache {sidecar.get(key)!r} != model {value!r}"
+            for key, value in expected.items()
+            if sidecar.get(key) != value
+        ]
+        if mismatched:
+            raise SystemExit(
+                f"reference spec cache {directory} STFT settings differ from the "
+                f"model ({'; '.join(mismatched)}); rebuild it with {tool}"
+            )
+        uncovered.extend(
+            f"{path} (not in {REFERENCE_SPEC_CACHE_SIDECAR})"
+            for path in paths
+            if path.name not in sidecar["files"]
+        )
+    if uncovered:
+        raise SystemExit(
+            f"{len(uncovered)} of {total} reference specs are not covered by a "
+            f"reference spec cache sidecar (e.g. {uncovered[0]}). With "
+            "--reference-conditioning ref_spec the generator's reference specs "
+            f"must come from {tool} (named frontend {frontend!r}, Ruling R17), "
+            "not from the training audio cache."
+        )
