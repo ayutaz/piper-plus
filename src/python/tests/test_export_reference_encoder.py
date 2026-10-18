@@ -131,6 +131,19 @@ def _run_export(ckpt: Path, onnx_path: Path, *flags: str) -> None:
         sys.argv = saved
 
 
+def _cli_error(capsys, ckpt: Path, onnx_path: Path, *flags: str) -> str:
+    """export が argparse の error (exit 2) で止まることを確かめ、stderr を返す。
+
+    message まで照合させるために使う (exit 2 だけでは未知 flag など無関係な
+    argparse の拒否でも通ってしまう)。
+    """
+    capsys.readouterr()
+    with pytest.raises(SystemExit) as excinfo:
+        _run_export(ckpt, onnx_path, *flags)
+    assert excinfo.value.code == 2
+    return capsys.readouterr().err
+
+
 def _clone(model):
     """同じ hparams / 重みの別インスタンス (weight_norm 付き module は deepcopy 不可)。"""
     from piper_train.vits.lightning import VitsModel
@@ -276,6 +289,8 @@ def none_config_export(tmp_path_factory, none_export):
         root / "config.json", reference_conditioning=_expected_ref_spec_config()
     )
     path = root / "none.onnx"
+    # 既存の <out>.onnx.json を --overwrite-config で明示的に置き換える経路
+    Path(str(path) + ".json").write_text('{"stale": true}', "utf-8")
     _run_export(
         none_export["ckpt"],
         path,
@@ -283,6 +298,7 @@ def none_config_export(tmp_path_factory, none_export):
         "--no-fp16",
         "--config",
         str(source),
+        "--overwrite-config",
     )
     return {"onnx": path, "source": source}
 
@@ -294,7 +310,8 @@ def capacity_export(tmp_path_factory):
     ckpt = _save_ckpt(model, root / "cap.ckpt")
     config = _write_source_config(root / "config.json")
     path = root / "cap.onnx"
-    _run_export(ckpt, path, "--no-stochastic", "--config", str(config))
+    # FP16 変換は入力契約・config に影響しないので省く (export 時間の節約)
+    _run_export(ckpt, path, "--no-stochastic", "--no-fp16", "--config", str(config))
     return {"onnx": path}
 
 
@@ -382,14 +399,19 @@ class TestInputContract:
         )
         np.testing.assert_allclose(ort_audio, torch_audio, atol=PARITY_ATOL, rtol=0)
 
-    def test_ref_spec_export_requires_config(self, tmp_path, ref_spec_model):
+    def test_ref_spec_export_requires_config(self, tmp_path, capsys, ref_spec_model):
         """記録先なしで参照入力付き ONNX を出すと、runtime がフロントエンド契約を
-        知る手段がない。export 前に明示エラーにし、ONNX も残さない。"""
+        知る手段がない。export 前に明示エラーにする。"""
         ckpt = _save_ckpt(ref_spec_model, tmp_path / "ref.ckpt")
-        out = tmp_path / "ref.onnx"
-        with pytest.raises(SystemExit):
-            _run_export(ckpt, out, "--no-stochastic", "--no-fp16")
-        assert not out.exists()
+        err = _cli_error(capsys, ckpt, tmp_path / "ref.onnx", "--no-stochastic")
+        assert "reference_conditioning='ref_spec' models require --config" in err
+
+    def test_ref_spec_export_without_config_writes_nothing(
+        self, tmp_path, capsys, ref_spec_model
+    ):
+        ckpt = _save_ckpt(ref_spec_model, tmp_path / "ref.ckpt")
+        _cli_error(capsys, ckpt, tmp_path / "ref.onnx", "--no-stochastic")
+        assert sorted(p.name for p in tmp_path.iterdir()) == ["ref.ckpt"]
 
 
 # ---------------------------------------------------------------------------
@@ -490,29 +512,31 @@ class TestFp16:
         audio, _ = _ort_run(ref_spec_exports["fp16"], _feeds(spec=spec))
         assert np.isfinite(audio).all()
 
-    def test_fp16_keeps_log_floor_in_fp32(self, ref_spec_exports):
-        """参照 spec の log 圧縮の下限 1e-5 は fp16 では subnormal
-        (最小正規数 6.1e-5 未満) になる。subnormal を 0 に flush する実行環境
-        (GPU 等) では下限が 0 になり、無音 bin で log(0) = -inf → NaN になる。
-        FP16 変換後もこの下限は fp32 のまま保つ (initializer でも Constant
-        node でも、どちらの形で出力されても確かめる)。"""
-        from piper_train.vits.reference_encoder import _LOG_FLOOR
+    @staticmethod
+    def _constant_spec_output(path: Path, value: float) -> np.ndarray:
+        spec = np.full((1, SPEC_CHANNELS, 50), value, dtype=np.float32)
+        return _ort_run(path, _feeds(spec=spec))[0]
 
-        model = onnx.load(str(ref_spec_exports["fp16"]))
-        tensors = {i.name: i for i in model.graph.initializer}
-        for node in model.graph.node:
-            if node.op_type == "Constant":
-                value = next(a for a in node.attribute if a.name == "value")
-                tensors[node.output[0]] = value.t
-        clips = [
-            n
-            for n in model.graph.node
-            if n.op_type == "Clip" and n.name.startswith("/reference_encoder/")
-        ]
-        assert len(clips) == 1
-        floor = tensors[clips[0].input[1]]
-        assert floor.data_type == onnx.TensorProto.FLOAT
-        assert onnx.numpy_helper.to_array(floor).item() == np.float32(_LOG_FLOOR)
+    def test_fp16_log_floor_clamps_values_below_floor(self, ref_spec_exports):
+        """下限 1e-5 未満 (0 と 5e-6) はどちらも下限に張り付き、出力が一致する。"""
+        np.testing.assert_array_equal(
+            self._constant_spec_output(ref_spec_exports["fp16"], 0.0),
+            self._constant_spec_output(ref_spec_exports["fp16"], 5e-6),
+        )
+
+    def test_fp16_log_floor_value_stays_float32(self, ref_spec_exports):
+        """FP16 変換後も log の下限は float32 の 1e-5 のまま (graph 構造 (node の
+        種類・数) には依らず出力で確かめる)。
+
+        1e-5 を fp16 に丸めると subnormal の 1.00136e-5 (= 168 × 2^-24) になる。
+        その間の 1.0007e-5 は、下限が float32 の 1e-5 なら clamp されず無音 (0)
+        と異なる出力になり、fp16 に丸められた下限なら clamp されて無音と一致する。
+        """
+        between = np.float32(1.0007e-5)
+        assert np.float32(1e-5) < between < np.float32(np.float16(1e-5))
+        silent = self._constant_spec_output(ref_spec_exports["fp16"], 0.0)
+        above = self._constant_spec_output(ref_spec_exports["fp16"], float(between))
+        assert not np.array_equal(silent, above)
 
     def test_fp16_converts_reference_encoder_weights(self, ref_spec_exports):
         """下限以外の reference_encoder の重みは FP16 に落ちる (サイズ予算)。"""
@@ -628,27 +652,107 @@ class TestConfig:
             none_config_export["onnx"]
         )
 
-    def test_config_sample_rate_mismatch_rejected(self, tmp_path, ref_spec_model):
+    def test_config_sample_rate_mismatch_rejected(
+        self, tmp_path, capsys, ref_spec_model
+    ):
         ckpt = _save_ckpt(ref_spec_model, tmp_path / "ref.ckpt")
         source = _write_source_config(
             tmp_path / "config.json", audio={"sample_rate": 16000}
         )
-        out = tmp_path / "ref.onnx"
-        with pytest.raises(SystemExit):
-            _run_export(
-                ckpt, out, "--no-stochastic", "--no-fp16", "--config", str(source)
-            )
-        assert not out.exists()
-        assert not Path(str(out) + ".json").exists()
+        err = _cli_error(
+            capsys,
+            ckpt,
+            tmp_path / "ref.onnx",
+            "--no-stochastic",
+            "--config",
+            str(source),
+        )
+        assert (
+            "config audio.sample_rate (16000) does not match the checkpoint "
+            "sample_rate (22050)" in err
+        )
 
-    def test_missing_config_file_rejected(self, tmp_path, ref_spec_model):
+    def test_config_sample_rate_mismatch_writes_nothing(
+        self, tmp_path, capsys, ref_spec_model
+    ):
         ckpt = _save_ckpt(ref_spec_model, tmp_path / "ref.ckpt")
-        out = tmp_path / "ref.onnx"
-        with pytest.raises(SystemExit):
-            _run_export(
-                ckpt, out, "--no-stochastic", "--config", str(tmp_path / "missing.json")
-            )
+        source = _write_source_config(
+            tmp_path / "config.json", audio={"sample_rate": 16000}
+        )
+        _cli_error(
+            capsys,
+            ckpt,
+            tmp_path / "ref.onnx",
+            "--no-stochastic",
+            "--config",
+            str(source),
+        )
+        assert sorted(p.name for p in tmp_path.iterdir()) == ["config.json", "ref.ckpt"]
+
+    def test_missing_config_file_rejected(self, tmp_path, capsys, ref_spec_model):
+        ckpt = _save_ckpt(ref_spec_model, tmp_path / "ref.ckpt")
+        missing = tmp_path / "missing.json"
+        err = _cli_error(
+            capsys,
+            ckpt,
+            tmp_path / "ref.onnx",
+            "--no-stochastic",
+            "--config",
+            str(missing),
+        )
+        assert "--config:" in err
+        assert "missing.json" in err
+
+    def test_missing_config_file_writes_nothing(self, tmp_path, capsys, ref_spec_model):
+        ckpt = _save_ckpt(ref_spec_model, tmp_path / "ref.ckpt")
+        missing = tmp_path / "missing.json"
+        _cli_error(
+            capsys,
+            ckpt,
+            tmp_path / "ref.onnx",
+            "--no-stochastic",
+            "--config",
+            str(missing),
+        )
+        assert sorted(p.name for p in tmp_path.iterdir()) == ["ref.ckpt"]
+
+    def test_existing_config_refused_without_overwrite(
+        self, tmp_path, capsys, none_export
+    ):
+        """既存の <out>.onnx.json (手で直した config 等) を黙って上書きしない。"""
+        source = _write_source_config(tmp_path / "config.json")
+        out = tmp_path / "none.onnx"
+        Path(str(out) + ".json").write_text('{"hand_fixed": true}', "utf-8")
+        err = _cli_error(
+            capsys, none_export["ckpt"], out, "--no-stochastic", "--config", str(source)
+        )
+        assert "already exists" in err
+        assert "--overwrite-config" in err
+
+    def test_existing_config_kept_when_refused(self, tmp_path, capsys, none_export):
+        source = _write_source_config(tmp_path / "config.json")
+        out = tmp_path / "none.onnx"
+        existing = Path(str(out) + ".json")
+        existing.write_text('{"hand_fixed": true}', "utf-8")
+        _cli_error(
+            capsys, none_export["ckpt"], out, "--no-stochastic", "--config", str(source)
+        )
+        assert existing.read_text("utf-8") == '{"hand_fixed": true}'
         assert not out.exists()
+
+    def test_overwrite_config_replaces_existing(self, none_config_export):
+        """--overwrite-config 付きなら既存の <out>.onnx.json を置き換える。"""
+        assert "stale" not in _exported_config(none_config_export["onnx"])
+
+    def test_overwrite_config_requires_config(self, tmp_path, capsys, none_export):
+        err = _cli_error(
+            capsys,
+            none_export["ckpt"],
+            tmp_path / "none.onnx",
+            "--no-stochastic",
+            "--overwrite-config",
+        )
+        assert "--overwrite-config requires --config" in err
 
 
 class TestReferenceConditioningConfig:
@@ -714,6 +818,57 @@ class TestInferForwardPositional:
                 ),
             )[0]
         np.testing.assert_array_equal(audio, expected.numpy())
+
+
+# ---------------------------------------------------------------------------
+# ABI 契約 (docs/spec/onnx-export-contract.toml / scripts/check_onnx_inputs.py)
+# ---------------------------------------------------------------------------
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _export_contract() -> dict:
+    import tomllib
+
+    path = _REPO_ROOT / "docs" / "spec" / "onnx-export-contract.toml"
+    return tomllib.loads(path.read_text("utf-8"))
+
+
+def _check_onnx_inputs_module():
+    import importlib.util
+
+    path = _REPO_ROOT / "scripts" / "check_onnx_inputs.py"
+    spec = importlib.util.spec_from_file_location("_check_onnx_inputs_8r", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class TestAbiContract:
+    def test_contract_declares_every_ref_spec_input(self, ref_spec_exports):
+        """export された全入力名が契約の [tensor_names.inputs] に載っている。"""
+        declared = set(_export_contract()["tensor_names"]["inputs"])
+        assert set(_input_names(ref_spec_exports["fp32"])) <= declared
+
+    def test_contract_records_runtime_preconditions(self):
+        """graph は参照入力を検査しない (trace 中は検査を省く) ので、runtime が
+        session の前に検査すべき前提を契約に明記する。"""
+        pre = _export_contract()["tensor_names"]["reference_spec_preconditions"]
+        assert pre == {
+            "validated_in_graph": False,
+            "lengths_min": 1,
+            "lengths_max": "reference_spec.shape[2]",
+            "spec_finite": True,
+            "spec_non_negative": True,
+            "spec_channels": "config.json reference_conditioning.spec_channels",
+        }
+
+    def test_check_onnx_inputs_accepts_ref_spec_export(self, ref_spec_exports):
+        """配布前の入力 gate (scripts/check_onnx_inputs.py) が参照入力を知っている。"""
+        ok, message = _check_onnx_inputs_module().check(
+            ref_spec_exports["fp32"], allow_voice_cloning=False, strict_expected=None
+        )
+        assert ok, message
 
 
 # ---------------------------------------------------------------------------
