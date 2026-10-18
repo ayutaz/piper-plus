@@ -239,7 +239,22 @@ omit = [
     "*/piper_train/extract_speaker_embedding.py",
     "*/piper_train/tools/batch_spectrograms.py",
     "*/piper_train/tools/cache_audio.py",
+    # v8 dataset scaling のコーパス変換 / exporter — 生コーパス (OpenSLR tar
+    # 展開物 / HF parquet shard / Common Voice の tsv + clips) を読み書きする
+    # 一回限りの前処理 CLI。parquet の FLAC 直保存経路は
+    # test_export_flac_direct.py で別途固定 (pyarrow 未導入の環境では skip)。
+    "*/piper_train/tools/convert_libritts_r_to_ljspeech.py",
+    "*/piper_train/tools/export_libritts_r_from_parquet.py",
+    "*/piper_train/tools/export_cml_tts_from_parquet.py",
+    "*/piper_train/tools/export_common_voice_pt.py",
+    "*/piper_train/tools/export_common_voice_ko.py",
     # ----- (d) Network / model file 必須 -----
+    # SpeechBrain 公開 ECAPA 重みの download + ONNX export CLI。
+    "*/piper_train/tools/export_ecapa_onnx.py",
+    # pinned CPU 比較実験の stage 実行 CLI。CAM++/ECAPA ONNX と学習済み ckpt の
+    # 実ファイルが必須。hash 再検証の契約は tests/scripts/test_zero_shot_cpu_hash_cache.py、
+    # 部品 (cpu_reference_comparison / evaluation_manifest) は個別 test で計測する。
+    "*/piper_train/tools/prepare_zero_shot_cpu.py",
     "*/piper_train/speaker_encoder/__init__.py",
     "*/piper_train/speaker_encoder/encoder.py",
     "*/piper_train/speaker_encoder/audio_utils.py",
