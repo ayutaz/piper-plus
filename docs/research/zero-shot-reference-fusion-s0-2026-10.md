@@ -228,7 +228,7 @@ R1の標準化値は、100発話がつくよみちゃんのため、標準化が
 
 後続タスクが記録するfrontend文字列:
 
-```
+```text
 kaldi-fbank80-cmn@16k;trim=none
 ```
 

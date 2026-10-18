@@ -128,10 +128,12 @@ S2はS0・S1と並行できる。S3はG0〜G2がそろってから。
 ### Task 1: 再開の厳格化
 
 **Files:**
+
 - Modify: `src/python/piper_train/__main__.py:1957-1990`
 - Test: `src/python/tests/test_resume_strict.py` (新規)
 
 **Interfaces:**
+
 - Produces: `run_strict_resume(trainer, model, ckpt_path: str) -> None` (`__main__.py`内)。失敗時は`SystemExit`。weights-only読込は`--resume-weights-only`だけが行う。
 
 - [ ] **Step 1: 失敗するテストを書く**
@@ -153,11 +155,13 @@ def test_strict_resume_failure_does_not_fall_back(monkeypatch, tmp_path):
 ### Task 2: 参照音声のtrim (学習と同じenergy VAD)
 
 **Files:**
+
 - Create: `src/python/piper_train/reference_frontend.py`
 - Modify: `src/python/piper_train/extract_speaker_embedding.py:65-99` (`preprocess_audio`に`trim: bool = False`)、`src/python/piper_train/infer_onnx.py` (`--reference-trim {none,energy-vad}`、既定`none`)
 - Test: `src/python/tests/test_reference_frontend.py` (新規)
 
 **Interfaces:**
+
 - Produces: `trim_reference_audio(audio: np.ndarray, sample_rate: int) -> tuple[np.ndarray, dict]`。16kHzへsoxr HQで写した複写に`energy_vad_numpy(chunk_size=480, threshold=0.02, keep_before=2, keep_after=2)`を適用し、元のsample rateの音声を切る。dictは`offset_sec`, `duration_sec`, `method="energy_vad_numpy@16k"`。有声区間がなければ`ValueError`。
 
 - [ ] **Step 1: テストを書く**
@@ -185,11 +189,13 @@ def test_preprocess_audio_trim_default_off_is_unchanged(wav_with_silence):
 ### Task 3: fp32の時間平均とCAM++統計抽出
 
 **Files:**
+
 - Modify: `src/python/piper_train/reference_frontend.py`
 - Modify: `src/python/piper_train/extract_speaker_embedding.py` (`--per-utterance`に`--also-campp-stats`。出力は`<utt>.campp_stats.npy`とmanifestの`campp_stats_path`、来歴に`feature="campp_stats_v1"`, `dim=1024`, `frontend`, `weights_sha256`)
 - Test: `src/python/tests/test_reference_frontend.py`
 
 **Interfaces:**
+
 - Produces: `masked_time_mean_fp32(x: Tensor[B,C,T], mask: Tensor[B,1,T]) -> Tensor[B,C]` (float32。`x/len`を先に計算してから和をとる。全mask0の行は`ValueError`)。
 - Produces: `campplus_stats(model: CAMPPlus, fbank: Tensor[B,T,80]) -> Tensor[B,1024]` (`head`→`xvector`の`out_nonlinear`までを実行し、`statistics_pooling`と同じ定義の平均+標準偏差をfp32で返す。`dense`は通さない)。
 
@@ -217,11 +223,13 @@ def test_campplus_stats_matches_internal_statspool(campplus_random):
 ### Task 4: S0のCPU検証を実行し、G0を記録
 
 **Files:**
+
 - Modify: `src/python/piper_train/tools/cpu_reference_comparison.py` (`reference_embedding`に`trim: bool = False`、新関数`projected_average(model, embeddings: np.ndarray) -> torch.Tensor`= 各埋め込みを`spk_proj`へ通してからg側で平均)
 - Create: `docs/research/zero-shot-reference-fusion-s0-2026-10.md` (結果記録)
 - Test: `src/python/tests/test_cpu_reference_comparison.py`
 
 **Interfaces:**
+
 - Consumes: Task 2 `trim_reference_audio`、Task 3 `campplus_stats`
 - Produces: G0の判定 (`frontend`: trimの有無、複数参照の平均位置、統計特徴の採否)。S2の再抽出とTask 5〜10の既定値はこれに従う。
 
@@ -236,12 +244,14 @@ def test_campplus_stats_matches_internal_statspool(campplus_random):
 ### Task 5: 融合moduleと容量対照
 
 **Files:**
+
 - Create: `src/python/piper_train/vits/reference_fusion.py`
 - Modify: `src/python/piper_train/vits/models.py:1459-1543` (`SynthesizerTrn.__init__`に`reference_fusion: str = "none"`、`reference_feature_dim: int = 1024`。`_get_speaker_condition(speaker_embeddings=None, reference_features=None)`、`_get_global_conditioning(..., reference_features=None)`、`forward`/`infer`へ`reference_features`を通す)
 - Modify: `src/python/piper_train/__main__.py` (`--reference-fusion {none,campp_stats,capacity}`、既定`none`)
 - Test: `src/python/tests/test_reference_fusion.py` (新規)
 
 **Interfaces:**
+
 - Produces: `ReferenceFusion(in_dim: int, gin_channels: int)`: `Linear(in_dim, gin)` → `PReLU(gin)` → `Linear(gin, gin)` (最後のLinearの重みとbiasをzero-init)。`forward(features: Tensor[B,in_dim]) -> Tensor[B,gin,1]`。
 - Produces: `CapacityControl(gin_channels: int, target_params: int)`: 入力は192次元のCAM++埋め込み、同じ3層構成で隠れ幅を`target_params`の±5%に合わせて決める。最後のLinearはzero-init。
 - Produces: `g_spk = spk_proj(e) + fusion(...)`。`reference_fusion="campp_stats"`で`reference_features`がNoneなら`ValueError`。lang成分には足さない。
@@ -276,12 +286,14 @@ def test_missing_reference_features_raises(tiny_fused_model):
 ### Task 6: EMA・LR慣らし・重み移行
 
 **Files:**
+
 - Modify: `src/python/piper_train/vits/ema.py:18-20` (両scopeに`reference_fusion`と`capacity_control`を追加)
 - Modify: `src/python/piper_train/vits/lightning.py` (`configure_optimizers`で新moduleを別param groupにし、`--reference-fusion-lr-scale` (既定1.0) と`--reference-fusion-warmup-steps` (既定0) を適用。`requires_grad`は変更しない)
 - Modify: `src/python/piper_train/checkpoint_io.py`
 - Test: `src/python/tests/test_reference_fusion.py`、`src/python/tests/test_checkpoint_io.py`、`src/python/tests/test_ema_scope_extended.py`
 
 **Interfaces:**
+
 - Produces: `load_state_with_allowed_missing(model, state_dict: dict, allowed_prefixes: tuple[str, ...]) -> dict` (返り値は`{"missing": [...], "unexpected": [...]}`。許可prefix以外のmissing、unexpected、shape差は`ValueError`)。`--resume-weights-only`は融合有効時にこれを`allowed_prefixes=("reference_fusion.", "capacity_control.")`で使う。
 - Produces: 融合付きcheckpointを`reference_fusion="none"`のモデルへ読むと`ValueError` (unexpected keys)。
 
@@ -292,6 +304,7 @@ def test_missing_reference_features_raises(tiny_fused_model):
 ### Task 7: 学習時の参照ペア (SCLとの分離)
 
 **Files:**
+
 - Modify: `src/python/piper_train/vits/dataset.py:238-323, 618-691` (jsonlの`reference_utterance_id`・`reference_embedding_path`・`reference_feature_path`を読み、Batchに`reference_embeddings: Tensor[B,192] | None`、`reference_features: Tensor[B,1024] | None`、`reference_utterance_ids: list[str] | None`を追加)
 - Modify: `src/python/piper_train/vits/lightning.py:1963-2060` (Gには`reference_embeddings`があればそれを、なければ従来の`speaker_embeddings`を渡す。SCL・swap・Latent Fillingは`speaker_embeddings`のまま)
 - Modify: `src/python/piper_train/zero_shot_requirements.py`
@@ -299,6 +312,7 @@ def test_missing_reference_features_raises(tiny_fused_model):
 - Test: `src/python/tests/test_reference_pairs.py` (新規)
 
 **Interfaces:**
+
 - Produces: `validate_reference_pairs(utterance_ids, reference_utterance_ids, speaker_ids, splits, audio_sha256) -> None` (参照=target、別話者、別split、同一音声hashのいずれかで`ValueError`)。`--strict-zero-shot`はbatchごとに呼ぶ。
 - Produces: `build_reference_pairs(entries: list[dict], seed: int) -> tuple[list[dict], dict]` (各targetに同話者・同split・別hashの参照を1つ割り当てる。候補がないtargetは除外し、除外数と理由を返す)。
 - Produces: `--latent-filling-tau`または`--c-swap-spk`と融合を同時指定すると`SystemExit` (192次元のみを補間・交換するため)。
@@ -310,11 +324,13 @@ def test_missing_reference_features_raises(tiny_fused_model):
 ### Task 8: ONNX export
 
 **Files:**
+
 - Modify: `src/python/piper_train/export_onnx.py:33-81, 684-715` (融合有効時に入力`reference_features` `[B,1024]` float32を追加。configへ`"reference_conditioning": {"schema": "campp_stats_v1", "dim": 1024, "frontend": <G0の値>}`を記録)
 - Modify: `src/python/piper_train/export_onnx_streaming.py:71-95` (`check_streaming_export_supported`で融合モデルを`NotImplementedError`)
 - Test: `src/python/tests/test_export_reference_fusion.py` (新規)
 
 **Interfaces:**
+
 - Produces: ONNX入力名`reference_features`。融合なしモデルの入力名リストは従来と完全一致。
 
 - [ ] **Step 1: テストを書く** — `test_legacy_export_input_names_unchanged`、`test_fused_export_has_reference_features_input`、`test_torch_ort_parity_with_reference_features` (`--no-stochastic`、FP32、atol 1e-4)、`test_streaming_export_rejects_fusion`
@@ -324,11 +340,13 @@ def test_missing_reference_features_raises(tiny_fused_model):
 ### Task 9: 評価経路の接続
 
 **Files:**
+
 - Modify: `src/python/piper_train/tools/generate_eval_audio.py:181-231` (manifestの参照WAVから、G0のfrontendでCAM++ 192と統計1024を作りfeedする。manifestへfrontend・特徴hashを記録)
 - Modify: `src/python/piper_train/evaluation_manifest.py:246-261`
 - Test: `src/python/tests/test_zs_eval_integration.py`
 
 **Interfaces:**
+
 - Consumes: Task 3 `campplus_stats`、Task 8 の入力名
 - Produces: 融合モデルの評価で`reference_features`が欠けると例外。旧モデルの評価出力は不変。
 
@@ -338,11 +356,13 @@ def test_missing_reference_features_raises(tiny_fused_model):
 ### Task 10: 未対応runtimeでの拒否
 
 **Files:**
+
 - Modify: `src/python_run/piper_plus/voice.py:1076-1125`、`src/python_run/piper_plus/api/engine.py:168-196`
 - Modify: `src/cpp/piper.cpp:512-562`
 - Test: `src/python_run/tests/test_reference_schema_rejection.py` (新規)、`src/cpp/tests/` の入力検出テスト
 
 **Interfaces:**
+
 - Produces: ONNX入力に`reference_features`があるとき、Python・C++とも読み込み時に「このモデルは参照特徴入力が必要で、このruntimeは未対応」と明示エラー。旧モデルは不変。
 
 - [ ] **Step 1〜4:** `test_python_runtime_rejects_reference_features_model`、`test_python_runtime_legacy_model_loads`、C++の同等テストをFAIL→実装→PASS (`uv run --no-sync pytest src/python_run/tests/test_reference_schema_rejection.py --no-cov`、`ctest --test-dir build`)
@@ -421,12 +441,14 @@ Ruling R3を置き換える: module属性名は`reference_encoder`と`capacity_c
 #### Task 5R: 参照spec encoderと容量対照
 
 **Files:**
+
 - Create: `src/python/piper_train/vits/reference_encoder.py`
 - Modify: `src/python/piper_train/vits/models.py` (`SynthesizerTrn.__init__`に`reference_conditioning: str = "none"` (`none` / `ref_spec` / `capacity`)、`reference_spec_channels: int = 513`。`_get_speaker_condition(speaker_embeddings=None, reference_spec=None, reference_spec_lengths=None)`、`_get_global_conditioning`、`forward`、`infer`へ通す)
 - Modify: `src/python/piper_train/__main__.py` (`--reference-conditioning {none,ref_spec,capacity}`、既定`none`)
 - Test: `src/python/tests/test_reference_encoder.py` (新規)
 
 **Interfaces:**
+
 - Produces: `ReferenceSpecEncoder(spec_channels: int, gin_channels: int, hidden_channels: int = 128, kernel_size: int = 5, n_heads: int = 2)`、`forward(spec: Tensor[B,F,T], spec_lengths: LongTensor[B]) -> Tensor[B,gin,1]`。長さ0の行は`ValueError`。
 - Produces: `CapacityControl(in_dim: int, gin_channels: int, target_params: int)`、`forward(e: Tensor[B,in_dim]) -> Tensor[B,gin,1]`。
 - Produces: `reference_conditioning="ref_spec"`で`reference_spec`か長さがNoneなら`ValueError`。`none`のとき参照specが渡されたら`ValueError` (黙って落とさない)。
@@ -447,6 +469,7 @@ Ruling R3を置き換える: module属性名は`reference_encoder`と`capacity_c
 #### Task 7R: 学習時の参照ペア (SCLとの分離)
 
 **Files:**
+
 - Modify: `src/python/piper_train/vits/dataset.py` (jsonlの`reference_utterance_id`・`reference_audio_spec_path`・`reference_speaker_embedding_path`を読む。Batchに`reference_embeddings: Tensor[B,192] | None`、`reference_specs: Tensor[B,513,T_ref] | None`、`reference_spec_lengths: LongTensor[B] | None`、`reference_utterance_ids: list[str] | None`を追加。学習時はランダム切り出し、検証時は先頭固定)
 - Modify: `src/python/piper_train/vits/lightning.py` (`--generator-reference {self,cross_utt}` 既定`self`。`cross_utt`ではGへ`reference_embeddings` (と`ref_spec`時は`reference_specs`) を渡す。SCL・swap・Latent Fillingは`speaker_embeddings`のまま。validation・audio loggingのforwardにも同じ参照を渡す)
 - Modify: `src/python/piper_train/zero_shot_requirements.py`
@@ -454,6 +477,7 @@ Ruling R3を置き換える: module属性名は`reference_encoder`と`capacity_c
 - Test: `src/python/tests/test_reference_pairs.py` (新規)
 
 **Interfaces:**
+
 - Produces: `validate_reference_pairs(utterance_ids, reference_utterance_ids, speaker_ids, splits, audio_sha256) -> None` (参照=target、別話者、別split、同一音声hashのどれかで`ValueError`)。`--strict-zero-shot`はbatchごとに呼ぶ。
 - Produces: `build_reference_pairs(entries: list[dict], seed: int) -> tuple[list[dict], dict]` (各targetに同話者・同split・別hashの参照を1つ割り当て、上の3フィールドを書く。候補がないtargetは除外し、除外数と理由を返す)。
 - Produces: `--generator-reference cross_utt`で参照フィールドが欠ける発話は読み込み時に`ValueError` (自己参照へ黙って戻さない)。`--reference-conditioning`が`none`以外なら`cross_utt`必須 (違えば`SystemExit`)。`--latent-filling-tau`または`--c-swap-spk`との同時指定も`SystemExit`。
@@ -465,6 +489,7 @@ Ruling R3を置き換える: module属性名は`reference_encoder`と`capacity_c
 #### Task 8R: ONNX export
 
 **Files:**
+
 - Modify: `src/python/piper_train/export_onnx.py` (`ref_spec`時に入力`reference_spec` `[B,513,T_ref]` float32と`reference_spec_lengths` `[B]` int64を追加。configへ`"reference_conditioning": {"schema": "ref_spec_v1", "spec_channels": 513, "filter_length", "hop_length", "win_length", "sample_rate", "center": false, "frontend", "max_frames"}`を記録。`frontend`は学習hparam `reference_spec_frontend`の値、`max_frames`は`reference_max_frames`の値をcheckpointから写す (Task 11RでR14・R15に合わせて修正。当初は`"energy-vad@16k;soxr-hq"`の固定値で`max_frames`がなかった)。`capacity`は入力を増やさない)
 - Modify: `src/python/piper_train/export_onnx_streaming.py` (`check_streaming_export_supported`で`reference_conditioning != "none"`を`NotImplementedError`)
 - Test: `src/python/tests/test_export_reference_encoder.py` (新規)
@@ -476,6 +501,7 @@ Ruling R3を置き換える: module属性名は`reference_encoder`と`capacity_c
 #### Task 9R: 評価経路の接続
 
 **Files:**
+
 - Modify: `src/python/piper_train/reference_frontend.py` (`reference_spec_from_audio(audio, sample_rate, *, target_sample_rate, filter_length, hop_length, win_length, frontend) -> (Tensor[513,T], dict)`。`frontend`は既定値なしの必須引数で、名前の閉じた集合 (`reference_spec_contract.py`) から選んだ学習cache builderと同じ手順で作る。当初案の`trim=True`と「`cache_norm_audio_fast`と同じ手順」はR14で置き換えた)
 - Modify: `src/python/piper_train/tools/generate_eval_audio.py`、`src/python/piper_train/evaluation_manifest.py`
 - Test: `src/python/tests/test_reference_frontend.py`、`src/python/tests/test_zs_eval_integration.py`
