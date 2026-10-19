@@ -1406,9 +1406,10 @@ def load_weights_only_checkpoint(checkpoint_path: str, model) -> tuple[list, lis
         (missing_keys, unexpected_keys) — ログ済みだが呼び出し側の検証用に返す。
     """
     _LOGGER.info("Warm-restart (weights only) from: %s", checkpoint_path)
-    # NOTE: weights_only=False is required to handle PosixPath objects in checkpoints
-    # This poses a security risk - only load trusted checkpoints
-    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    # Trusted checkpoints only (weights_only=False). checkpoint_io maps the
+    # PosixPath / WindowsPath in hparams to pathlib.Path: a ckpt saved on the
+    # other OS cannot be unpickled by a plain torch.load.
+    checkpoint = load_checkpoint(checkpoint_path, mmap=False)
     # Ruling R16: 参照 hparam の照合は重みを書き換える前に
     validate_warm_start_reference_hparams(
         checkpoint.get("hyper_parameters"),
@@ -1516,9 +1517,10 @@ def load_single_speaker_checkpoint(checkpoint_path: str, model: VitsModel) -> No
     """
     # Load single-speaker checkpoint
     _LOGGER.debug("Resuming from single-speaker checkpoint: %s", checkpoint_path)
-    # NOTE: weights_only=False is required to handle PosixPath objects in checkpoints
-    # This poses a security risk - only load trusted checkpoints
-    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    # Trusted checkpoints only (weights_only=False). checkpoint_io maps the
+    # PosixPath / WindowsPath in hparams to pathlib.Path: a ckpt saved on the
+    # other OS cannot be unpickled by a plain torch.load.
+    checkpoint = load_checkpoint(checkpoint_path, mmap=False)
     # Ruling R16: 参照 hparam の照合は重みを書き換える前に
     validate_warm_start_reference_hparams(
         checkpoint.get("hyper_parameters"),
