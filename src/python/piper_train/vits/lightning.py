@@ -506,11 +506,13 @@ class VitsModel(pl.LightningModule):
         model_sd = self.state_dict()
 
         state_dict = checkpoint.get("state_dict")
+        cond_migrated = 0
         if state_dict:
             checkpoint["state_dict"], stats = normalize_checkpoint_state_dict(
                 state_dict, model_sd
             )
-            if stats["cond_migrated"]:
+            cond_migrated = stats["cond_migrated"]
+            if cond_migrated:
                 _LOGGER.info(
                     "Loaded a pre-FiLM checkpoint; decoder conditioning was "
                     "migrated to the Multi-scale FiLM layout (issue #616)."
@@ -532,7 +534,11 @@ class VitsModel(pl.LightningModule):
         # the first `step()` — and the caller's fallback then silently restarts
         # from epoch 0. Widen them when the parameter ordering can be
         # validated; otherwise drop them loudly.
-        if optimizer_states_need_migration(checkpoint, model_sd):
+        # Only pre-FiLM weights can come with pre-FiLM moments. The shape test
+        # alone also matches current moments that happen to be half as long as
+        # a FiLM dec.cond tensor (e.g. a 256-wide bias against the 512-wide
+        # dec.cond.bias), and dropping that valid state broke strict resume.
+        if cond_migrated and optimizer_states_need_migration(checkpoint, model_sd):
             if (
                 migrate_prefilm_optimizer_states(
                     checkpoint, self._generator_named_params()
