@@ -86,6 +86,36 @@ class TestLoadWeightsOnly:
         assert missing == []
         assert any(k.startswith("model_d_wavlm.") for k in unexpected)
 
+    @pytest.mark.parametrize("path_class", ["PosixPath", "WindowsPath"])
+    def test_ckpt_with_foreign_os_path_metadata_loads(self, tmp_path, path_class):
+        """別 OS で保存された ckpt (hparams に PosixPath / WindowsPath) も読める。
+
+        どちらかは実行中の OS で生成できないクラスで、素の torch.load は
+        UnsupportedOperation で落ちる (CloudRift の S3 smoke で v10b-ep79 の
+        WindowsPath により実測)。
+        """
+        import pathlib
+
+        cls = getattr(pathlib, path_class)
+
+        class _SavedPath:
+            def __reduce__(self):
+                return cls, ("C:/training/dataset",)
+
+        src = _TinyBase()
+        p = tmp_path / "foreign.ckpt"
+        torch.save(
+            {
+                "state_dict": src.state_dict(),
+                "hyper_parameters": {"dataset": _SavedPath()},
+            },
+            p,
+        )
+        dst = _TinyBase()
+        missing, unexpected = load_weights_only_checkpoint(str(p), dst)
+        assert (missing, unexpected) == ([], [])
+        assert torch.equal(dst.model_g.weight, src.model_g.weight)
+
     def test_legacy_hifigan_ckpt_rejected(self, tmp_path):
         """HiFi-GAN 系 ckpt (dec あり・MB-iSTFT マーカーなし) は明示エラー。"""
 
