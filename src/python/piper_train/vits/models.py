@@ -1023,8 +1023,13 @@ class WavLMDiscriminator(torch.nn.Module):
         # default model.
         self.wavlm = WavLMModel.from_pretrained(model_name)
 
-        # Enable gradient checkpointing for memory efficiency
-        self.wavlm.gradient_checkpointing_enable()
+        # Enable gradient checkpointing for memory efficiency.
+        # transformers 4.5x passes position_bias to each layer as a keyword
+        # argument; the reentrant checkpoint does not detach keyword tensors, so
+        # backward re-enters earlier layers' recomputation and never finishes.
+        self.wavlm.gradient_checkpointing_enable(
+            gradient_checkpointing_kwargs={"use_reentrant": False}
+        )
 
         # Freeze feature extractor (CNN layers)
         if freeze_feature_extractor:
