@@ -27,7 +27,10 @@ train = [
     "soundfile>=0.12",
     "pytorch-lightning>=2.4.0",
     "torchmetrics>=1.9.0",
-    "transformers>=4.50.0",
+    # transformers 5 は hidden_states を層の hook で集めるため、学習時の layerdrop で
+    # 飛んだ層が抜け、WavLMDiscriminator の use_layers がずれる (4.x は飛んだ層も
+    # 前の層の値で埋める)。学習で使っている 4.x に揃える。
+    "transformers>=4.50.0,<5",
     "onnx>=1.21.0",
     # Issue #372: floor must be >= C++ canonical (cmake/OnnxRuntime.cmake)
     "onnxruntime>=1.26.0",
