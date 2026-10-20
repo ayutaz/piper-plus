@@ -255,6 +255,11 @@ class _SealedFlagAction(argparse.Action):
         parser.error(self.message or f"{option_string} is sealed")
 
 
+def configure_cudnn_benchmark(args) -> None:
+    """cuDNN kernel search: on by default, off with --no-cudnn-benchmark."""
+    torch.backends.cudnn.benchmark = not args.no_cudnn_benchmark
+
+
 def create_parser():
     """Create the argument parser for piper_train.
 
