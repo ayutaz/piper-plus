@@ -383,7 +383,9 @@ class Flip(nn.Module):
     def forward(self, x: torch.Tensor, *args, reverse: bool = False, **kwargs):
         x = torch.flip(x, [1])
         if not reverse:
-            logdet = torch.zeros(x.size(0)).type_as(x)
+            logdet = x.new_zeros(
+                x.size(0)
+            )  # on x.device: a CPU tensor copied over was a host sync
             return x, logdet
         else:
             return x
