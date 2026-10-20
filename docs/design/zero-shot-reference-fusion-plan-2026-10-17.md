@@ -653,3 +653,44 @@ S5はC0とF-melを新runで各40 epoch (§9.1と同じrecipe、max_epochsだけ4
 - 各群のep19 checkpoint、学習ログ、評価JSONは`piper-v11-local/s4-cloudrift-2026-10-20/`にある。md5: C0-self `c602ceed`、C0 `1a31af44`、Ccap `98146a62`、F-mel `9aab3004`。
 - G4の判定出力は同じ場所の`g4.json`、評価JSONは`s4-eval-runs-all.tgz`にまとめた (wavは除く。Ccap ep19のwavのみ別に退避した)。
 - C0-self用とCcap用のVMは、退避を確認してから終了した。F-mel (A) とC0 (B) のVMは残している。
+
+## 10. 改訂2 (2026-10-21): S5′ — cross-utterance参照の確認 (S5′の出力を見る前に記録)
+
+### 10.1 なぜ比較を組み替えるか
+
+G4の不合格で、§9.4のS5 (F-mel対C0) は行わない。S4の出力を見たあとの探索的な比較で、参照の選び方だけが違うC0とC0-selfの間に差が見えた (`torch-ema`、ep19)。
+
+| 比較 | native ECAPAの話者単位の差の平均 | bootstrap 95%区間 | ECAPA ONNX正規化転写率の差 |
+|---|---|---|---|
+| C0 − C0-self | +0.014 | [−0.011, +0.040] | +0.099 |
+| Ccap − C0 | +0.005 | [−0.015, +0.028] | −0.008 |
+
+- ECAPA ONNXの差の大半は75e27ad3の1話者 (+0.40) から来ていて、区間も0をまたぐ。S4の開発群を見て立てた仮説なので、S4の結果は確認には使わない。
+- CcapとC0の差は見えないため、追加パラメータのないC0を候補にする。C0は学習時の参照の取り方だけを変える (`--generator-reference cross_utt`)。ONNXの入力とruntimeは変わらない。
+- F-melは「参照melの利得は未確認」として止める。同じ開発話者を見ながら設定を変えて再試行することはしない。コードはopt-in (既定off) のまま残す。
+
+### 10.2 実行条件
+
+- C0 (候補) とC0-self (対照) を新しいrunで各40 epoch学習する。recipe・データ・batch 24・warm start (v10b ep79 raw、weights only)・話者単位のtrain/val分割は§9.1と同じ。変えるのは`--max_epochs 40`だけで、LRのcosineも40 epochで終わる。
+- コードはc6b12f74、`--no-cudnn-benchmark`付き (§9.5)。両群とも最初から同じコードで学習する。
+- RTX 5090を1群1台 (C0はB、C0-selfはA)。1 epoch約27分で約18時間、費用は約$25。
+- 判定に使うcheckpointはep39。ep19も評価するが、推移の記録だけに使う。
+- 評価は§9.2の開発群・設定のまま (`--baseline-json`はE0)。CERの前に、評価するVMにffmpegがあることを確かめる。評価後は終了コードではなく`cer.json`の`n_clips`が72であることを確かめる (§9.6の不具合の再発防止)。
+
+### 10.3 G5′の判定規則
+
+`torch-ema`のep39で、C0がC0-selfに対して次をすべて満たしたときだけ合格とする。`torch-raw`は併記する。
+
+1. native ECAPAのcross-utterance類似度で、話者単位の差 (C0 − C0-self) の開発5話者平均が+0.01以上。
+2. 開発5話者から1人ずつ除いた5通りの4話者平均で、差がどれも0より大きい。1話者だけで決まる差を合格にしないための規則。
+3. ECAPA ONNXの正規化転写率の開発5話者平均で、C0 > C0-self。
+4. CAM++の正規化転写率の開発5話者平均で、C0がC0-self − 0.03以上。C0-selfはCAM++だけを上げる傾向があるため (§9.6)、CAM++は改善ではなく大きな悪化がないことだけを見る。
+5. C0の開発5話者で、`goodhart_flag`と`above_ceiling_flag`がどれもtrueでない。
+6. C0のCER median (72 clip) が0.30以下で、かつC0-self + 0.02以下。
+7. C0のcomb超過 (6群平均) が、C0-self + 0.3 dB未満。
+
+規則1の差のbootstrap 95%区間を併記し、区間が0をまたぐ場合は「有望」と書く。合格 (有望を含む) ならS6へ進み、学習にも開発群にも使っていない最終5話者 (§9.2) とつくよみで確認したうえで試聴する。S6の判定規則は、S6の合成前に別途記録する。不合格なら「cross-utterance参照の利得も未確認」と記録し、S6は行わない。
+
+### 10.4 S4の欠けている値
+
+C0-selfのep19のCERは未測定 (§9.6)。退避したcheckpointから合成し直して測り、S5′の評価と同じ表に併記する。判定には使わない。
