@@ -600,3 +600,14 @@ F-melが次をすべて満たしたときだけ、「開発群でCcapとC0を上
 ### 9.4 G5 (S5) の判定規則
 
 S5はC0とF-melを新runで各40 epoch (§9.1と同じrecipe、max_epochsだけ40) 学習し、ep39を§9.2の開発群で比べる。元計画§9.1の選抜条件をそのまま使う: native ECAPAの話者単位平均Δ (F-mel − C0) ≥ +0.01、CAM++の正規化転写率の改善、CER median ≤ 0.30かつC0比の悪化 ≤ 0.02、comb超過の非悪化 (§9.3の5と同じ)、`goodhart_flag`/`above_ceiling_flag`がtrueでない。最終群での確認と試聴はS6で行う。
+
+### 9.5 S4実行中の変更 (2026-10-20、判定規則・露出量・recipeは不変)
+
+- 03:59 UTC、F-melの学習がホストRAM不足で止まった (VMのRAMは23 GB。DataLoaderのworkerがcopy-on-writeで膨らみ、OOM killerがtmuxのscopeごと終了させたため、失敗markerも残らなかった)。ep0末のcheckpointから再開し、ep1を学び直した。以後、全VMに64 GBのswapを足した。
+- 1台目のCcap用VMはGPUを初期化できなかった (GSP)。同じGPU枠が再割り当てされたため、別のVMに替えた。
+- 06:12 UTC、学習コードを2068a0c4からc6b12f74に更新し、`--no-cudnn-benchmark`を付けて、各群を直前のepoch末のcheckpointから再開した。
+  - 理由: batchごとに系列長が変わるため、cuDNNのカーネル探索が新しい形状のたびに走り、学習時間の大半を占めていた。RTX 5090・S4 recipe・batch 24・毎batch新しい長さの合成データで、探索ありは1.81秒/step、探索なしは0.61秒/step。
+  - 同時に、GPUとの同期を1 batchあたり603回から46回に減らした (形状を固定した合成データで0.540→0.502秒/step)。対象は、ログ値の変換、`slice_segments`、splineの区間振り分け、CAM++のfbank、discriminator lossの内訳、Flipのlogdet。
+  - どれも旧実装との一致をテストで確認している (CPUで一致。CUDAではfloat32の数ulp以内)。
+  - 実測は約0.6秒/batch (以前は1.22秒)、1 epochは約27分。
+- 旧コードで学習したのは、F-melのep0〜1とC0のep0。CcapとC0-selfは最初から新コードで学習する。S5は全群を新コードで学習する。
