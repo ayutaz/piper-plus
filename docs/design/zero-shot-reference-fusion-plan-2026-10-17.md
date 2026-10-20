@@ -611,3 +611,45 @@ S5はC0とF-melを新runで各40 epoch (§9.1と同じrecipe、max_epochsだけ4
   - どれも旧実装との一致をテストで確認している (CPUで一致。CUDAではfloat32の数ulp以内)。
   - 実測は約0.6秒/batch (以前は1.22秒)、1 epochは約27分。
 - 旧コードで学習したのは、F-melのep0〜1とC0のep0。CcapとC0-selfは最初から新コードで学習する。S5は全群を新コードで学習する。
+
+### 9.6 G4の結果 (2026-10-20、不合格。S5は始めない)
+
+4群ともep19まで学習を終え、§9.2の開発群で評価した。§9.3の規則1〜3を満たさなかったため、G4は不合格とし、S5は始めない。
+
+開発5話者の平均 (`torch-ema`、ep19。E0はv10b ep79):
+
+| 群 | CAM++ 正規化転写率 | ECAPA ONNX 正規化転写率 | native ECAPA cross | CER median | comb超過 (6群平均) |
+|---|---|---|---|---|---|
+| E0 | 0.262 | 0.216 | 0.5059 | 0.190 | 1.97 dB |
+| C0-self | 0.347 | 0.199 | 0.5187 | (未測定) | 1.52 dB |
+| C0 | 0.340 | 0.298 | 0.5329 | 0.129 | 1.36 dB |
+| Ccap | 0.347 | 0.290 | 0.5381 | 0.130 | 1.05 dB |
+| F-mel | 0.335 | 0.227 | 0.5227 | 0.137 | 0.88 dB |
+
+規則ごとの結果 (`torch-ema`):
+
+1. 不成立。CAM++の正規化転写率は、F-mel 0.335がC0 0.340とCcap 0.347を下回った。
+2. 不成立。native ECAPAの話者単位の差の平均は、F-mel − C0 = −0.0102 (bootstrap 95%区間 [−0.034, +0.022])、F-mel − Ccap = −0.0154 ([−0.027, −0.004])。Ccapとの差は区間全体が負。
+3. 不成立。F-melの75e27ad3で`goodhart_flag`がtrue。E0比で、CAM++のcross類似度は+0.030上がったが、ECAPA ONNXは−0.007だった。
+4. 成立。F-melのCER 0.137は、C0 + 0.02 = 0.149以下。
+5. 成立。F-melのcomb超過0.88 dBは、C0 1.36 dBより低い。
+
+`torch-raw`でも規則1と2は不成立 (native ECAPAの差はC0比−0.0034、Ccap比−0.0068)。規則3は成立した。
+
+読み取れること:
+
+- 参照からの経路を足した3群 (C0、Ccap、F-mel) は、どれもE0より両encoderの転写率とCERが良い。CAM++だけが上がったC0-self (ECAPA ONNX 0.199はE0以下) と比べると、cross-utterance参照の学習が両encoderの改善に効いている。
+- 参照melを入れるF-melは、同じ容量を足すだけのCcapを、ECAPAの両指標で下回った。§6の「F-statsがCcapを上回らない」と同じ扱いで、参照melの利得は未確認として報告する。
+- F-melのcomb超過は4群で最も低い (0.88 dB)。ただしcombは判定の主指標ではなく、類似度の不足を補う根拠にはしない。
+- 単一seed・日本語5話者の探索結果であり、群間の差 (CAM++で±0.01) は契約§3.3の±0.03より小さい。C0とCcapの順位も確定とは言えない。
+
+評価中の不具合と処置:
+
+- B・D・FのVMにffmpegが入っておらず、C0・C0-self・CcapのCER評価が全clipで読み込みに失敗した (`cer_median: null`)。BとFにffmpegを入れ、残っていた合成wavからCERだけを再計算した (元の結果は`cer.ffmpeg-missing.json`として残した)。合成・SECS・native ECAPAは再実行していない。
+- Dはwavを退避する前に終了していたため、C0-selfのCERは未測定のまま。C0-selfは判定規則の比較相手ではない。
+
+成果物:
+
+- 各群のep19 checkpoint、学習ログ、評価JSONは`piper-v11-local/s4-cloudrift-2026-10-20/`にある。md5: C0-self `c602ceed`、C0 `1a31af44`、Ccap `98146a62`、F-mel `9aab3004`。
+- G4の判定出力は同じ場所の`g4.json`、評価JSONは`s4-eval-runs-all.tgz`にまとめた (wavは除く。Ccap ep19のwavのみ別に退避した)。
+- C0-self用とCcap用のVMは、退避を確認してから終了した。F-mel (A) とC0 (B) のVMは残している。
