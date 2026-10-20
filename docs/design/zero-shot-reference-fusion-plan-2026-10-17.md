@@ -566,3 +566,37 @@ S1 (Task 5R〜11R) の実装とCPUテストは`feat/zero-shot-v8-dataset-scaling
 - **決定 (Ruling R17):** 参照specのfrontendが言語ごとに異なる、または閉じた集合の外になる問題 (final review I1) は、参照に使う発話だけを名前付きのfrontendで作り直した参照専用のspec cacheに切り出し、`reference_audio_spec_path`をそこへ向けて解決する (`build_reference_spec_cache`、CPUのみ、参照される発話の数だけ)。学習は起動時にcacheのsidecarを照合する。別案の「GPU batch経路を許容誤差つきで閉じた集合に加える」は、言語ごとの混在を表せないので採らなかった。
 - dataset dirに`test_utterances.jsonl`があると、ref_specの学習は起動時に止まる。各行に`reference_audio_spec_path`が要るが、この列を書くtoolがない (§8.3)。
 - 学習は参照specをfp16で保存した`.spec.pt`からfloatに戻して使い、評価はfloat32のまま渡す。相対差は2^-11以下で、9Rの報告に記録した。揃える場合は評価で`.half().float()`してから渡す。
+
+## 9. S4・S5の実行条件と判定の事前登録 (2026-10-20、S4の出力を見る前に記録)
+
+### 9.1 露出量と実行
+
+- 速度: F-mel、batch 24、同一processの300 batch以後で1.22秒/batch (RTX 5090、700 batch計測)。language-balanced samplingの1 epochは約2,690 batch (最少のfrの話者数で決まる) で、約55分・$0.6。
+- S4: 4群 (C0-self / C0 / Ccap / F-mel) を各20 epoch。v10b ep79 rawからweights-only、optimizer・EMA・epochは継承しない。train / valは話者単位 (`--validation-split-by speaker`、seed 1234)。LRはwarmup 5 epoch + cosine (20 epoch)。敵対話者分類器の生成器項はepoch 10から5 epochで立ち上がる (全群共通)。batch 24、その他はS3 smokeと同じrecipe。
+- 4台のRTX 5090で1群1台。費用見込みはS4が約$60、S5 (2群×40 epoch) が約$55で、§4の上限内。
+- 判定に使うcheckpointは各群の最終epoch (S4はep19、S5はep39)。途中のepochは推移の記録のみ。
+
+### 9.2 評価集合 (S4の合成前に固定)
+
+- 学習に使っていない日本語10話者 (S2監査で、v10bの学習集合を復元した学習集合との話者・音声hashの重複0) を開発5・最終5に分ける。開発: 361eb7a2、673810f3 (以前つくよみのfloorに使った2話者) と、残り8話者からseed 20261020で引いた6b2b26d1、6e22f5cd、75e27ad3。最終: 11b1eb07、1cc3c6c0、23e5ef98、3d995663、46f336bf。最終群はS6まで使わない。
+- 開発話者ごとに、3〜10秒の発話をpath順に並べ、先頭2本を参照、次の8本をcross用の実発話にする。floorは他の開発4話者の実発話を2本ずつ (計8本)。つくよみ (学習外の別録音) は参照VOICEACTRESS100_001/002、実発話003〜010、floorは361eb7a2と673810f3の実発話4本ずつ。
+- 文は6文 (既存の固定3文と長めの3文)。1群あたり2参照×6文=12 clip、計72 clip。scales [0.4, 1.0, 0.5]、seed 42。参照のembeddingは参照wavからCAM++ ONNXで作り (runtimeと同じ、trimなし)、F-melの参照specは同じwavから`no-vad;soxr-hq`で作る。
+- 判定は`torch-ema`の出力で行い、`torch-raw`を併記する。
+- 指標: `eval_zs_secs` (CAM++とECAPA ONNX、`--baseline-json`はE0)、native ECAPA (SpeechBrain、元計画§9.1)、strict CER (whisper-small `973afd24`)、band/comb。
+- 元計画§5.2との差: 英語・中国語の未学習話者を用意できていないため、日本語だけの評価として報告する。12話者・2 seedの比較ではなく、単一seedの探索結果として扱う。
+
+### 9.3 G4 (S4) の判定規則
+
+F-melが次をすべて満たしたときだけ、「開発群でCcapとC0を上回った」としてS5へ進む。
+
+1. CAM++の正規化転写率の開発5話者平均で、F-mel > C0 かつ F-mel > Ccap。
+2. native ECAPAのcross-utterance類似度の話者単位の差の平均で、F-mel − C0 ≥ +0.01 かつ F-mel − Ccap ≥ +0.01。
+3. F-melの開発5話者で`goodhart_flag`と`above_ceiling_flag`がどれもtrueでない。
+4. F-melのCER median (72 clip) が C0 + 0.02 以下。
+5. F-melのcomb超過 (`comb.synth.comb_excess_db_median`、6群平均) がC0より0.3 dB以上悪くない。
+
+話者単位の差は5話者だけなので、差のbootstrap区間を併記する。区間が0をまたぐ場合は「有望」と書き、確定した改善とは呼ばない。つくよみの結果は併記するが、判定には使わない。満たさなければS5を始めず、結果を報告する。
+
+### 9.4 G5 (S5) の判定規則
+
+S5はC0とF-melを新runで各40 epoch (§9.1と同じrecipe、max_epochsだけ40) 学習し、ep39を§9.2の開発群で比べる。元計画§9.1の選抜条件をそのまま使う: native ECAPAの話者単位平均Δ (F-mel − C0) ≥ +0.01、CAM++の正規化転写率の改善、CER median ≤ 0.30かつC0比の悪化 ≤ 0.02、comb超過の非悪化 (§9.3の5と同じ)、`goodhart_flag`/`above_ceiling_flag`がtrueでない。最終群での確認と試聴はS6で行う。
