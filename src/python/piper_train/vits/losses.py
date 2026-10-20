@@ -30,8 +30,9 @@ def discriminator_loss(disc_real_outputs, disc_generated_outputs):
         r_loss = torch.mean((1 - dr) ** 2)
         g_loss = torch.mean(dg**2)
         loss += r_loss + g_loss
-        r_losses.append(r_loss.item())
-        g_losses.append(g_loss.item())
+        # Detached tensors, not .item(): reading each scale to the host was a GPU sync.
+        r_losses.append(r_loss.detach())
+        g_losses.append(g_loss.detach())
 
     return loss, r_losses, g_losses
 

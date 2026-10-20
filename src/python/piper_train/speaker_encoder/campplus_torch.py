@@ -467,15 +467,44 @@ class DifferentiableCamPPEncoder(nn.Module):
             audio = torchaudio.functional.resample(
                 audio, self.source_sr, self.target_sr
             )
-        fbanks = []
-        for i in range(audio.size(0)):
-            fb = torchaudio.compliance.kaldi.fbank(
-                audio[i : i + 1],
-                num_mel_bins=80,
-                sample_frequency=self.target_sr,
-                dither=0.0,
-            )
-            fbanks.append(fb - fb.mean(dim=0, keepdim=True))
-        x = torch.stack(fbanks)  # [B, T', 80] (equal-length slices in a batch)
+        x = self._fbank(audio)  # [B, T', 80] (equal-length slices in a batch)
         emb = self.model(x)
         return F.normalize(emb, p=2, dim=-1)
+
+    def _fbank(self, audio: torch.Tensor) -> torch.Tensor:
+        """``torchaudio.compliance.kaldi.fbank`` (80 mel, dither 0, other defaults) + CMN for all rows.
+
+        Calling torchaudio once per row copied its epsilon constant to the GPU on every
+        row (a host sync each). The same frames, povey window, power spectrum and log mel
+        energies are computed here for the whole batch.
+        """
+        window_size = int(self.target_sr * 0.025)
+        window_shift = int(self.target_sr * 0.010)
+        padded = 1 << (window_size - 1).bit_length()
+        frames = audio.unfold(
+            -1, window_size, window_shift
+        )  # [B, frames, window] (snip edges)
+        frames = frames - frames.mean(dim=-1, keepdim=True)  # remove DC offset
+        previous = torch.cat([frames[..., :1], frames[..., :-1]], dim=-1)
+        frames = frames - 0.97 * previous  # preemphasis; the first sample uses itself
+        window = torch.hann_window(
+            window_size, periodic=False, device=audio.device, dtype=audio.dtype
+        ).pow(0.85)
+        frames = F.pad(frames * window, (0, padded - window_size))
+        power = torch.fft.rfft(frames).abs().pow(2.0)
+        mel = torch.matmul(power, self._mel_banks(padded, power.device, power.dtype).T)
+        fbank = mel.clamp_min(torch.finfo(torch.float).eps).log()
+        return fbank - fbank.mean(dim=1, keepdim=True)
+
+    def _mel_banks(self, padded: int, device, dtype) -> torch.Tensor:
+        """Kaldi mel filters ``[80, padded // 2 + 1]``, built once per device and dtype."""
+        cache = self.__dict__.setdefault("_mel_bank_cache", {})
+        key = (padded, device, dtype)
+        if key not in cache:
+            from torchaudio.compliance.kaldi import get_mel_banks  # noqa: PLC0415
+
+            banks, _ = get_mel_banks(
+                80, padded, float(self.target_sr), 20.0, 0.0, 100.0, -500.0, 1.0
+            )
+            cache[key] = F.pad(banks, (0, 1)).to(device=device, dtype=dtype)
+        return cache[key]
