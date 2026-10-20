@@ -4,6 +4,7 @@ import dataclasses
 import logging
 import math
 import os
+import random
 from collections import Counter
 from pathlib import Path
 
@@ -12,7 +13,7 @@ import pytorch_lightning as pl
 import torch
 from torch import autocast
 from torch.nn import functional as F
-from torch.utils.data import DataLoader, Dataset, random_split
+from torch.utils.data import DataLoader, Dataset, Subset, random_split
 
 from piper_plus.embedding import validate_embedding
 
@@ -146,6 +147,53 @@ def _validate_reference_lr(mode: str, scale, warmup_steps) -> None:
             "reference_encoder / capacity_control parameter group; they require "
             "--reference-conditioning ref_spec or capacity (got none)."
         )
+
+
+VALIDATION_SPLIT_MODES = ("utterance", "speaker")
+
+
+def speaker_disjoint_split(
+    utterances, validation_split: float, seed: int
+) -> tuple[list[int], list[int]]:
+    """``(train_indices, val_indices)`` を話者単位で作る (``--validation-split-by speaker``)。
+
+    話者は発話数の最も多い言語 (同数なら小さい id) に属するものとし、言語ごとに
+    seed で並べた話者を、val の発話数がその言語の発話数 × ``validation_split``
+    以上になるまで val へ移す。どの言語も最後の 1 人は train に残す。1 人の話者の
+    発話はすべて片側に入るので、同話者の cross_utt 参照も subset を跨がない。
+    """
+    by_speaker: dict[int, list[int]] = {}
+    for index, utt in enumerate(utterances):
+        if utt.speaker_id is None:
+            raise ValueError(
+                "--validation-split-by speaker needs speaker_id on every utterance "
+                f"(row {index} has none)"
+            )
+        by_speaker.setdefault(int(utt.speaker_id), []).append(index)
+
+    by_language: dict[int, list[int]] = {}
+    for speaker, indices in by_speaker.items():
+        counts = Counter(utterances[i].language_id for i in indices)
+        language = min(counts, key=lambda lang: (-counts[lang], lang is None, lang))
+        by_language.setdefault(language, []).append(speaker)
+
+    rng = random.Random(seed)
+    val: list[int] = []
+    for language in sorted(by_language, key=lambda lang: (lang is None, lang)):
+        speakers = sorted(by_language[language])
+        rng.shuffle(speakers)
+        total = sum(len(by_speaker[s]) for s in speakers)
+        target = int(total * validation_split)
+        taken = 0
+        for speaker in speakers[:-1]:
+            if taken >= target or target == 0:
+                break
+            val.extend(by_speaker[speaker])
+            taken += len(by_speaker[speaker])
+
+    in_val = set(val)
+    train = [i for i in range(len(utterances)) if i not in in_val]
+    return train, sorted(val)
 
 
 def _split_reference_params(named_params) -> tuple[list, list]:
@@ -340,6 +388,7 @@ class VitsModel(pl.LightningModule):
         seed: int = 1234,
         num_test_examples: int = 2,
         validation_split: float = 0.1,
+        validation_split_by: str = "utterance",
         max_phoneme_ids: int | None = None,
         # Zero-shot TTS (enabled by default for multi-speaker models)
         use_zero_shot: bool = True,
@@ -1221,6 +1270,12 @@ class VitsModel(pl.LightningModule):
 
         # Task 7R: cross_utt のときだけ参照フィールドを読む (欠落は ValueError)
         load_references = self.hparams.get("generator_reference", "self") == "cross_utt"
+        split_by = self.hparams.get("validation_split_by", "utterance")
+        if split_by not in VALIDATION_SPLIT_MODES:
+            raise ValueError(
+                f"validation_split_by must be one of {VALIDATION_SPLIT_MODES}, "
+                f"got {split_by!r}"
+            )
 
         # Try to load fixed test dataset first
         test_utterances_path = self.hparams.dataset_dir / "test_utterances.jsonl"
@@ -1236,14 +1291,21 @@ class VitsModel(pl.LightningModule):
                 speaker_embedding_dim=self.hparams.get("spk_embed_dim", 192),
                 load_references=load_references,
             )
-            valid_set_size = int(len(full_dataset) * validation_split)
-            train_set_size = len(full_dataset) - valid_set_size
-            split_generator = torch.Generator().manual_seed(self.hparams.seed)
-            self._train_dataset, self._val_dataset = random_split(
-                full_dataset,
-                [train_set_size, valid_set_size],
-                generator=split_generator,
-            )
+            if split_by == "speaker":
+                train_idx, val_idx = speaker_disjoint_split(
+                    full_dataset.utterances, validation_split, self.hparams.seed
+                )
+                self._train_dataset = Subset(full_dataset, train_idx)
+                self._val_dataset = Subset(full_dataset, val_idx)
+            else:
+                valid_set_size = int(len(full_dataset) * validation_split)
+                train_set_size = len(full_dataset) - valid_set_size
+                split_generator = torch.Generator().manual_seed(self.hparams.seed)
+                self._train_dataset, self._val_dataset = random_split(
+                    full_dataset,
+                    [train_set_size, valid_set_size],
+                    generator=split_generator,
+                )
         else:
             # Fallback: use random split (old behavior)
             _LOGGER.warning(
@@ -1258,15 +1320,36 @@ class VitsModel(pl.LightningModule):
                 speaker_embedding_dim=self.hparams.get("spk_embed_dim", 192),
                 load_references=load_references,
             )
-            valid_set_size = int(len(full_dataset) * validation_split)
-            train_set_size = len(full_dataset) - valid_set_size - num_test_examples
+            if split_by == "speaker":
+                train_idx, val_idx = speaker_disjoint_split(
+                    full_dataset.utterances, validation_split, self.hparams.seed
+                )
+                # Test examples are only listened to; take them from train.
+                order = torch.randperm(
+                    len(train_idx),
+                    generator=torch.Generator().manual_seed(self.hparams.seed),
+                ).tolist()
+                test_idx = sorted(train_idx[i] for i in order[:num_test_examples])
+                taken = set(test_idx)
+                self._train_dataset = Subset(
+                    full_dataset, [i for i in train_idx if i not in taken]
+                )
+                self._test_dataset = Subset(full_dataset, test_idx)
+                self._val_dataset = Subset(full_dataset, val_idx)
+            else:
+                valid_set_size = int(len(full_dataset) * validation_split)
+                train_set_size = len(full_dataset) - valid_set_size - num_test_examples
 
-            split_generator = torch.Generator().manual_seed(self.hparams.seed)
-            self._train_dataset, self._test_dataset, self._val_dataset = random_split(
-                full_dataset,
-                [train_set_size, num_test_examples, valid_set_size],
-                generator=split_generator,
-            )
+                split_generator = torch.Generator().manual_seed(self.hparams.seed)
+                (
+                    self._train_dataset,
+                    self._test_dataset,
+                    self._val_dataset,
+                ) = random_split(
+                    full_dataset,
+                    [train_set_size, num_test_examples, valid_set_size],
+                    generator=split_generator,
+                )
 
         if self.hparams.get("reference_conditioning", "none") == "ref_spec":
             self._validate_reference_spec_cache(full_dataset)
@@ -3570,6 +3653,18 @@ class VitsModel(pl.LightningModule):
         parser = parent_parser.add_argument_group("VitsModel")
         parser.add_argument("--batch-size", type=int, required=True)
         parser.add_argument("--validation-split", type=float, default=0.1)
+        parser.add_argument(
+            "--validation-split-by",
+            choices=VALIDATION_SPLIT_MODES,
+            default="utterance",
+            help=(
+                "How train/val are split. 'utterance' (default): random rows, so a "
+                "speaker and its cross_utt references can sit on both sides. "
+                "'speaker': every speaker's rows go to one side; per language, "
+                "speakers move to val until --validation-split of its rows is "
+                "reached, keeping at least one speaker in train."
+            ),
+        )
         parser.add_argument("--num-test-examples", type=int, default=2)
         parser.add_argument(
             "--audio-log-epochs",

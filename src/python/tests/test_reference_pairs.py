@@ -1553,6 +1553,21 @@ class TestReferenceSubsetOverlap:
         unloaded = sum(n for k, n in overlap.items() if k.endswith("->unloaded"))
         assert unloaded == 2
 
+    def test_speaker_split_keeps_every_reference_in_its_subset(self, tmp_path, caplog):
+        # 同話者内の循環参照なので、話者単位で分ければ跨ぎは 0 になる
+        with caplog.at_level("WARNING"):
+            model = self._model(tmp_path, validation_split_by="speaker")
+        full, names = _subset_names(model)
+        sides = {}
+        for utt in full.utterances:
+            sides.setdefault(utt.speaker_id, set()).add(
+                names[str(utt.audio_norm_path.resolve())]
+            )
+        assert all(len(s) == 1 for s in sides.values()), sides
+        assert {"train", "val"} <= set(names.values())
+        assert model.hparams["reference_subset_overlap"] == {}
+        assert not any("random_split" in r.getMessage() for r in caplog.records)
+
     def test_self_mode_records_nothing(self, tmp_path, caplog):
         path = _write_dataset(tmp_path, rows=_CYCLE_ROWS)
         with caplog.at_level("WARNING"):
