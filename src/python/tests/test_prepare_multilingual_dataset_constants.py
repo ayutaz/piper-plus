@@ -78,3 +78,23 @@ class TestAllLanguages:
 
     def test_all_languages_exact_snapshot(self):
         assert ALL_LANGUAGES == ["ja", "en", "zh", "es", "fr", "pt", "sv"]
+
+
+@pytest.mark.unit
+def test_num_languages_covers_max_language_id():
+    """config の num_languages は max(language_id)+1 であること (静的契約)。
+
+    language_id は LANGUAGE_ID_MAP の固定値なので、一部の言語だけで dataset を
+    作ると (例: ja=0 と zh=2) 言語数 len() では language_id が emb_lang の
+    範囲外になり、学習が CUDA device-side assert で落ちる。
+    """
+    import inspect
+
+    from piper_train.tools import prepare_multilingual_dataset as pmd
+
+    src = inspect.getsource(pmd.main)
+    assert '"num_languages": max(config_language_id_map.values()) + 1' in src, (
+        "prepare_multilingual_dataset の num_languages は max(language_id)+1 で"
+        "計算すること (len(active_languages) は一部の言語だけの dataset で"
+        "language_id を範囲外にする)"
+    )

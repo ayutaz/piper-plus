@@ -351,3 +351,109 @@ class TestOptimizerStateMigration:
             GIN_CHANNELS,
             1,
         )
+
+
+_TINY_VITS = {
+    "num_symbols": 40,
+    "num_speakers": 2,
+    "num_languages": 1,
+    "dataset": None,
+    "upsample_rates": (4, 4),
+    "upsample_initial_channel": 32,
+    "upsample_kernel_sizes": (16, 16),
+    "hidden_channels": 32,
+    "inter_channels": 32,
+    "filter_channels": 64,
+    "n_layers": 1,
+    "prosody_dim": 0,
+    "gin_channels": 32,
+    "use_wavlm_discriminator": False,
+}
+
+
+def _adam_state(named_params, indices, *, halve=()) -> dict:
+    """Generator optimizer state with moments for ``indices`` (``halve`` = pre-FiLM)."""
+    state = {}
+    for index in indices:
+        shape = list(named_params[index][1].shape)
+        if index in halve:
+            shape[0] //= 2
+        state[index] = {
+            "step": torch.tensor(3.0),
+            "exp_avg": torch.ones(shape),
+            "exp_avg_sq": torch.ones(shape),
+        }
+    return {
+        "state": state,
+        "param_groups": [{"params": list(range(len(named_params)))}],
+    }
+
+
+@pytest.mark.unit
+class TestOnLoadCheckpointOptimizerState:
+    """``VitsModel.on_load_checkpoint`` and the generator optimizer state.
+
+    Only a checkpoint whose weights are pre-FiLM can hold pre-FiLM moments. The
+    shape test alone also matches any current moment half as long as a FiLM
+    ``dec.cond`` tensor (here every 32-wide bias vs the 64-wide ``dec.cond.bias``),
+    and the valid state was then dropped, which makes a strict resume of every
+    checkpoint saved after a training step fail (S3 smoke on CloudRift: stage B
+    "checkpoint contains only the model").
+    """
+
+    @staticmethod
+    def _model():
+        from piper_train.vits.lightning import VitsModel
+
+        torch.manual_seed(0)
+        return VitsModel(**_TINY_VITS)
+
+    def test_current_layout_state_is_kept(self) -> None:
+        model = self._model()
+        named = model._generator_named_params()
+        half = model.model_g.dec.cond.bias.shape[0] // 2
+        lookalike = [i for i, (_, p) in enumerate(named) if tuple(p.shape) == (half,)]
+        assert lookalike, "fixture must contain a moment that looks pre-FiLM"
+        optimizer = _adam_state(named, range(len(named)))
+        checkpoint = {
+            "state_dict": model.state_dict(),
+            "optimizer_states": [optimizer, {"state": {}, "param_groups": []}],
+            "lr_schedulers": [{}, {}],
+        }
+
+        model.on_load_checkpoint(checkpoint)
+
+        assert checkpoint["optimizer_states"][0] is optimizer
+        assert "lr_schedulers" in checkpoint
+        for index, (_, param) in enumerate(named):
+            assert optimizer["state"][index]["exp_avg"].shape == param.shape
+
+    def test_prefilm_checkpoint_moments_are_still_widened(self) -> None:
+        model = self._model()
+        named = model._generator_named_params()
+        cond = [
+            i
+            for i, (name, _) in enumerate(named)
+            if name in ("model_g.dec.cond.weight", "model_g.dec.cond.bias")
+        ]
+        assert len(cond) == 2
+        state_dict = {}
+        for key, value in model.state_dict().items():
+            if key.startswith("model_g.dec.cond_layers."):
+                continue
+            if key in ("model_g.dec.cond.weight", "model_g.dec.cond.bias"):
+                value = value[value.shape[0] // 2 :]
+            state_dict[key] = value.clone()
+        checkpoint = {
+            "state_dict": state_dict,
+            "optimizer_states": [
+                _adam_state(named, range(len(named)), halve=cond),
+                {"state": {}, "param_groups": []},
+            ],
+        }
+
+        model.on_load_checkpoint(checkpoint)
+
+        state = checkpoint["optimizer_states"][0]["state"]
+        for index in cond:
+            assert state[index]["exp_avg"].shape == named[index][1].shape
