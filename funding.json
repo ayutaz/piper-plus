@@ -4,7 +4,7 @@
   "entity": {
     "type": "individual",
     "role": "maintainer",
-    "name": "Yuta Inamoto",
+    "name": "ayutaz",
     "email": "hello@otohalabs.xyz",
     "description": "Independent developer in Japan who builds open-source speech technology that runs fully on-device. Creator and maintainer of piper-plus, an MIT-licensed multilingual text-to-speech engine, and of small Japanese speech models for microcontrollers. Publishes 80 models and 45 datasets on Hugging Face (ayousanz).",
     "webpageUrl": {
