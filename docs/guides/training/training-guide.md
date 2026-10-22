@@ -365,6 +365,13 @@ uv run python -m piper_train \
 > ではそのまま使えます。T4 は `--no-wavlm` と `16-mixed` を開始点にし、
 > V100 (sm_70) は `32-true --no-wavlm` を開始点にしてください。
 
+> **cuDNN のカーネル探索:** 既定では `torch.backends.cudnn.benchmark` が有効です。
+> VITS の学習は batch ごとに系列長が変わるため、新しい形状のたびに探索が走り、
+> 学習が止まったように遅くなることがあります。`--no-cudnn-benchmark` で探索を止められます。
+> RTX 5090・batch 24 の学習では、1.22 秒/batch が約 0.6 秒/batch になり、
+> GPU 電力は約 120 W から約 400 W に上がりました。
+> 学習が遅いときは、まず GPU 電力と、このフラグを付けているかを確認してください。
+
 
 ### Multi-Speaker Fine-Tuning
 
