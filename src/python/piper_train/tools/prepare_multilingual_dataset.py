@@ -1442,7 +1442,12 @@ def main():
         "num_symbols": len(ml_id_map),
         "num_speakers": num_speakers,
         "speaker_id_map": config_speaker_map,
-        "num_languages": len(active_languages),
+        # emb_lang の embedding テーブルサイズ。「言語数」ではなく
+        # 「max(language_id) + 1」でなければならない: language_id は
+        # LANGUAGE_ID_MAP の固定値なので、一部の言語だけで作ると (例: ja=0 と
+        # zh=2) len() では language_id が emb_lang の範囲外になり、学習が
+        # CUDA device-side assert で落ちる。
+        "num_languages": max(config_language_id_map.values()) + 1,
         "language_id_map": config_language_id_map,
         "prosody_num_symbols": 11,
         "prosody_id_map": {str(i): [i] for i in range(11)},
