@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Chinese G2P outside Python: regenerate the shared `pinyin_single.json` / `pinyin_phrases.json` from pypinyin 0.55.0 with numeric tones (`ni3`), matching the Python canonical output. The previous files carried tone marks (`nǐ`), which the Rust, Go, C++, WASM, Swift, and Android parsers read as tone 5 with a broken final (你好 became `n tone5 x o tone5`). Add `scripts/build_pinyin_dicts.py`, mirror gates for the copies, and a Rust test that compares against the Python golden fixture.
 - Browser (`piper-plus` npm): route English to the JS G2P even when the Rust WASM bundle loads for Japanese or Chinese. The WASM bundle has no English dictionary and spelled words out letter by letter.
+- Training (`--precision bf16-mixed`, the default): upcast bf16/fp16 waveforms to fp32 before the STFT in `spectrogram_torch`, `mel_spectrogram_torch`, and `mel_speaker_consistency_loss`. CUDA `torch.stft` raised `cuFFT doesn't support tensor of type: BFloat16`; the speaker-consistency loss now also builds its window and mel basis in fp32. The fp32 path is unchanged.
+- Training: compute the WavLM discriminator's gradient checkpoint non-reentrantly. With transformers 4.57 the reentrant checkpoint never finished the backward pass. Pin `transformers<5`, whose layer-drop changes the hidden-state layers that the WavLM discriminator reads.
+- Training: count `--d-update-interval` and `--wavlm-every-n-steps` in batches, not optimizer steps. Under manual optimization `global_step` advances once per G or D step, so an interval of 2 still updated G on every batch, and the D-side WavLM term never ran. The defaults (1 and 1) are unchanged.
+- Training: keep optimizer state on strict resume of a trained checkpoint. A 256-wide bias could match the 512-wide `dec.cond.bias` and discard the state, so resume fell back to a weights-only restart from epoch 0.
+- Training: read hparams paths saved on another OS or by Python 3.13 (`pathlib._local`) as `pathlib.Path` when warm-starting from a multi-speaker checkpoint or reloading weights after a failed resume.
+- Training: compare the first three Super-MAS (Triton) alignments with the Cython implementation and fall back to Cython for the rest of the process when IoU is below 0.90. Some environments returned corrupt alignments without an error.
+- MB-iSTFT: use the standard cosine-modulated PQMF (phase term `±(-1)^k·π/4`, modulation centred at `taps/2`, one polyphase offset). Round-trip reconstruction improves from about 8 dB to about 64 dB. Existing checkpoints restore their saved filter buffers, so their fine-tuning, export, and inference outputs are unchanged; only newly built models use the new coefficients.
+- Preprocessing: cut GPU batch spectrogram frames (`--gpu-spec-device`) the same way as the CPU path. Datasets built with the previous GPU path should be rebuilt.
+- Preprocessing: write `num_languages` as `max(language_id) + 1`. A dataset with only some languages (for example `ja` and `zh`) put a language ID outside `emb_lang` and crashed training.
+- `prepare_bilingual_dataset`: phonemize English through the implemented padding helper instead of an undefined function, and skip utterances whose prosody length does not match instead of crashing.
+- `infer_onnx`: use `--reference-audio` and `--speaker-encoder-model`. They were never read, so a zero-shot model fell back to a zero embedding with only a warning. They now take the same path as `--speaker-audio` / `--speaker-encoder`, including its errors when the reference cannot be loaded.
+- pre-commit: remove the duplicated legacy `gofmt` hook.
 
 ## [2.0.2] - 2026-10-16
 
