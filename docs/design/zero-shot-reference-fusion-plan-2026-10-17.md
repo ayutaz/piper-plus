@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-作成日: 2026-10-17。状態: **計画。コード変更・レンタル・学習は未実施**。
+作成日: 2026-10-17。状態 (2026-10-22): **終了。参照融合・cross-utterance参照とも利得は未確認**。S1の実装 (§8.7) は完了し、コードはopt-in (既定off) のまま残す。G4 (S4、F-mel対C0・Ccap) は不合格 (§9.6)、G5′ (S5′、C0対C0-self、40 epoch) も規則7のcomb超過で不合格 (§10.5) のため、S6 (最終群・試聴) は行わない。GPU費用はCloudRift RTX 5090の延べ約121時間、約$78 (§4)。
+
+> **改訂2 (2026-10-21):** G4の不合格を受けて、S5 (F-mel対C0) を取りやめ、C0とC0-selfを比べるS5′に組み替えた (§10)。
 
 > **改訂1 (2026-10-18):** S0のG0でCAM++統計 (F-stats) が不合格 (話者分割LDAプローブ平均 −0.0083、3/10 split勝ち。[S0記録](../research/zero-shot-reference-fusion-s0-2026-10.md))。§6の分岐に従い主候補をF-mel (参照スペクトログラムの小型encoder) へ切り替えた。Task 5〜10は§8で置き換える。§5のTask 5〜10本文はF-stats版の記録として残す。
 作成時のPiperソース: `638b18f5558d4421c6614de7531b0c8cb4cc4be8` (`feat/zero-shot-v8-dataset-scaling`)。
@@ -120,6 +122,8 @@ S2はS0・S1と並行できる。S3はG0〜G2がそろってから。
 | **合計** | **$1000** |
 
 速度は同一processで300 batch以後の窓で測る。残額でS5とS6を完了できない見積もりなら、S5を始めず集合・群数を再設計する。
+
+実績 (2026-10-22、`$0.65/時`×VMの起動から終了までの時間): S2・S3とS4・S5′を通して7台、延べ約121時間で約$78。内訳は、S2・S3からS4のF-mel・S5′のC0-selfまで使ったVM 1台が約$34、S4のC0・S5′のC0が約$26、S4のC0-selfとCcapが約$16、GPU初期化に失敗するなどで入れ替えた3台が約$3。
 
 ## 5. 実装タスク (S0〜S1)
 
@@ -524,11 +528,11 @@ Ruling R3を置き換える: module属性名は`reference_encoder`と`capacity_c
 - **Ruling R15 (評価時の参照長):** 評価は参照specを、モデルの`reference_max_frames`まで先頭から切ってから渡す (学習の検証時と同じ切り方)。ONNXのconfigには`max_frames`を追加する。理由: 学習は512 frameより長い参照を見ないので、評価も学習と同じ分布の参照を渡す。費用: config 1項目。
 - **Ruling R16 (再開時の参照hparam照合):** 再開時に参照関連のhparam (`reference_spec_frontend` / `generator_reference` / `reference_max_frames`) をcheckpointと照合する。strict resumeは不一致で停止、weights-onlyとFTはfrontendの不一致のみ停止し他は警告、keyの無い旧checkpointは受け入れる。理由: CLIの値だけを見ると、続きの学習で宣言を変えても何も出ず、epochごとに宣言の違うcheckpointができて評価の比較が成り立たなくなる (final review I3)。
 - **Ruling R17 (参照専用spec cache):** Gの参照specは、学習音声のspec cacheではなく、参照に使う発話の元音声から名前付きfrontendでCPUで作り直した参照専用cache (`tools/build_reference_spec_cache.py`) から読む。学習は起動時にcacheのsidecarのfrontend・STFT設定をモデルと照合し、sidecarに載っていない参照specを拒否する。学習音声のcacheは変えない。理由: 学習音声のcacheは言語ごとに別のbuilder (閉じた集合の外を含む) で作られ、checkpointが宣言できるfrontend名は1つなので、そのままでは学習と評価のspecの作り方が食い違っても検出できない (final review I1)。費用: 参照される発話の数だけCPUでspecを作る。
-- **未解決 (S4で確認):** 参照encoderが話者以外 (録音条件・内容) を拾い、CERが悪化する可能性。§6の「類似度は上がるがCERが悪化」の行で扱う。
+- **未解決 (S4で確認):** 参照encoderが話者以外 (録音条件・内容) を拾い、CERが悪化する可能性。§6の「類似度は上がるがCERが悪化」の行で扱う。→ S4では起きなかった。F-melのCER median 0.137は、C0 0.129 + 0.02以内 (§9.6)。
 
 ### 8.7 実装結果 (S1)
 
-S1 (Task 5R〜11R) の実装とCPUテストは`feat/zero-shot-v8-dataset-scaling`で完了した。GPUでの学習・評価はまだ行っていない。
+S1 (Task 5R〜11R) の実装とCPUテストは`feat/zero-shot-v8-dataset-scaling`で完了した。この節を書いた時点では、GPUでの学習・評価はまだ行っていなかった (S4は§9、S5′は§10)。
 
 | Task | 内容 | commit |
 |---|---|---|

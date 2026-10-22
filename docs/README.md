@@ -113,6 +113,7 @@ Linux ARM64 の glibc 2.31 互換修正は **v2.0.2** に収録されていま�
 - [つくよみちゃん zs-v1 公開前検証の履歴](design/tsukuyomi-zs-v1-release-2026-10-10.md) — 2026-10-10 時点の候補選定・来歴照合・検証 (公開前の状態の記録)
 - [Zero-Shot Public Model Release Plan](design/zero-shot-public-model-release-plan-2026-10-10.md) — 完了済み公開工程と将来の品質改善計画を分離した記録
 - [Zero-Shot Quality Improvement Plan](design/zero-shot-quality-improvement-plan.md) — 実装済み項目と未着手の研究提案
+- [Zero-Shot 参照融合 実験計画](design/zero-shot-reference-fusion-plan-2026-10-17.md) — 参照spec encoder (F-mel) とcross-utterance参照の実装・事前登録・判定 (G4・G5′とも不合格、2026-10-22終了)
 - [Zero-Shot v11 Roadmap](design/zero-shot-v11-roadmap.md) - **Canonical for the zero-shot lineage (v8 → v9 → v10 → v10b → v11)**: final v11 conclusion + v11b execution plan (§5)
 - [Zero-Shot Noise Root Cause (PQMF)](design/zero-shot-noise-root-cause-pqmf.md) - PQMF alias bug root-cause analysis, fixed in v9
 - [Multi-6lang Zero-Shot v7 Training Results](design/multi-6lang-zero-shot-v7-training-results.md) - Canonical v7 training results + 5 fix commit history
