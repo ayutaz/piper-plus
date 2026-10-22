@@ -16,6 +16,7 @@ VITS ベースの高品質ニューラル TTS。**6言語マルチリンガル�
 - [公開モデルカタログ](docs/guides/development/pretrained-models.md) — legacy root、public `releases/zs-v1`、private/gated research stores の区別。
 - [public zs-v1 release record](docs/design/zero-shot-base-zs-v1-release-2026-10-10.md) — pinned public base の配布・検証記録。
 - [Tsukuyomi publication record](docs/design/tsukuyomi-publication-ready-2026-10-12.md) — public `releases/zs-v1` の公開記録と品質上の制約。
+- [参照融合 実験計画](docs/design/zero-shot-reference-fusion-plan-2026-10-17.md) — 参照spec encoder (F-mel、`--reference-conditioning`) と別発話参照 (`--generator-reference cross_utt`) の実装・事前登録・判定。2026-10-22終了: G4・G5′とも不合格で利得は未確認、コードはopt-in (既定off) のまま。
 
 > 旧 root `model.ckpt` / `config.json`、`piper-v11-local`、`output/`、private/gated research stores は歴史的・研究用資産として保持します。public `zs-v1` と legacy root の設定・用途を混同しないでください。
 
@@ -439,7 +440,7 @@ cat test.jsonl | uv run python -m piper_train.infer_onnx --model <model.onnx> --
 |------|------|
 | 推論音声が「ピー」音 | DP 学習失敗。`--samples-per-speaker` を使う / `--disable_auto_lr_scaling` / `--base_lr 1e-4` |
 | GPU OOM | `NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1` / batch_size と samples_per_speaker を下げる / 異なる batch size からの resume を避ける |
-| 学習速度が遅い (Ada/Blackwell) | TF32 enabled 確認 (`torch.backends.cuda.matmul.allow_tf32 == True`、 DR-007 で default ON) / `--precision bf16-mixed` 使用 (Template default、 DR-008) / `--compile` 試行 (Triton 3.x autotune、 warm 後 +5-10%) / `nsys profile` で bottleneck 分析 |
+| 学習速度が遅い (Ada/Blackwell) | **GPU 電力が低い (例: RTX 5090 で ~120W) なら `--no-cudnn-benchmark`** (可変長入力で cuDNN のカーネル探索が毎 batch 走る。RTX 5090・batch 24 で 1.22 → 0.6 s/batch 実測、[参照融合計画 §9.5](docs/design/zero-shot-reference-fusion-plan-2026-10-17.md)) / TF32 enabled 確認 (`torch.backends.cuda.matmul.allow_tf32 == True`、 DR-007 で default ON) / `--precision bf16-mixed` 使用 (Template default、 DR-008) / `--compile` 試行 (Triton 3.x autotune、 warm 後 +5-10%) / `nsys profile` で bottleneck 分析 |
 | 学習速度が遅い (T4、 VRAM 16GB) | VRAM 制約を確認、 batch_size 8-12 に絞る / `--no-wavlm` で VRAM 1-2GB 節約 / 6lang base 規模なら Ada 6000 / RTX 5090 移行検討 |
 | ゾンビ GPU プロセス | `nvidia-smi --query-compute-apps=pid,used_memory --format=csv` で残存 PID 確認、 `kill` で解放 |
 | ONNX 変換エラー | `CUDA_VISIBLE_DEVICES=""` で CPU モード |
