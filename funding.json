@@ -1,0 +1,84 @@
+{
+  "$schema": "https://fundingjson.org/schema/v1.1.0.json",
+  "version": "v1.1.0",
+  "entity": {
+    "type": "individual",
+    "role": "maintainer",
+    "name": "Yuta Inamoto",
+    "email": "hello@otohalabs.xyz",
+    "description": "Independent developer in Japan who builds open-source speech technology that runs fully on-device. Creator and maintainer of piper-plus, an MIT-licensed multilingual text-to-speech engine, and of small Japanese speech models for microcontrollers. Publishes 80 models and 45 datasets on Hugging Face (ayousanz).",
+    "webpageUrl": {
+      "url": "https://github.com/ayutaz"
+    }
+  },
+  "projects": [
+    {
+      "guid": "piper-plus",
+      "name": "piper-plus",
+      "description": "piper-plus is an MIT-licensed, fully offline neural text-to-speech engine and a maintained fork of Piper (rhasspy/piper, archived in 2025; its successor moved to GPL-3.0). It provides pretrained voices for Japanese, English, Chinese, Spanish, French and Portuguese, its own grapheme-to-phoneme (G2P) front ends for eight languages without espeak-ng, and runtimes for Python, Rust, C#, Go, C++ and WebAssembly (in the browser), plus iOS and Android G2P libraries. Features include streaming, phoneme timing output, custom pronunciation dictionaries, SSML and voice cloning with precomputed speaker embeddings. It is used by other software, including the YukkuriMovieMaker 4 video editor, and is a permissively licensed option for embedding speech synthesis in apps, games, robots and accessibility tools without sending text to the cloud.",
+      "webpageUrl": {
+        "url": "https://github.com/ayutaz/piper-plus"
+      },
+      "repositoryUrl": {
+        "url": "https://github.com/ayutaz/piper-plus"
+      },
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "tags": [
+        "text-to-speech",
+        "speech-synthesis",
+        "tts",
+        "accessibility",
+        "offline",
+        "multilingual",
+        "japanese",
+        "webassembly",
+        "onnx",
+        "edge-ai"
+      ]
+    }
+  ],
+  "funding": {
+    "channels": [
+      {
+        "guid": "bank",
+        "type": "bank",
+        "address": "Bank transfer to the maintainer's account in Japan (details provided on request)",
+        "description": "Preferred for grants."
+      },
+      {
+        "guid": "github-sponsors",
+        "type": "payment-provider",
+        "address": "https://github.com/sponsors/ayutaz",
+        "description": "For individual sponsors."
+      }
+    ],
+    "plans": [
+      {
+        "guid": "maintenance-yearly",
+        "status": "active",
+        "name": "Maintenance and development",
+        "description": "Covers one year of maintenance: releases and security fixes across the six runtimes, issue triage, keeping the G2P front ends and pronunciation dictionaries up to date, GPU compute to retrain and evaluate voices, and an open evaluation set for reading errors.",
+        "amount": 25000,
+        "currency": "USD",
+        "frequency": "yearly",
+        "channels": [
+          "bank"
+        ]
+      },
+      {
+        "guid": "sponsor-any",
+        "status": "active",
+        "name": "Support any amount",
+        "description": "Sponsor any amount through GitHub Sponsors.",
+        "amount": 0,
+        "currency": "USD",
+        "frequency": "monthly",
+        "channels": [
+          "github-sponsors"
+        ]
+      }
+    ]
+  }
+}
