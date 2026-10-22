@@ -854,6 +854,12 @@ class VitsModel(pl.LightningModule):
             else:
                 batch_size = self._y.size(0) if hasattr(self, "_y") else None
 
+        if not isinstance(value, torch.Tensor):
+            # self.log turns a Python number into a CUDA tensor with a pageable
+            # host-to-device copy, which waits for all queued GPU work (once per
+            # batch right after the D step). A CPU tensor of the same default
+            # dtype logs the same value without the wait.
+            value = torch.tensor(value, dtype=torch.get_default_dtype())
         sync_dist = self.trainer.world_size > 1
         self.log(key, value, batch_size=batch_size, sync_dist=sync_dist)
 

@@ -161,6 +161,11 @@ def _build_trainer(args, loggers, num_gpus, num_speakers):
     return Trainer(**trainer_kwargs)
 
 
+def configure_cudnn_benchmark(args) -> None:
+    """cuDNN kernel search: on by default, off with --no-cudnn-benchmark."""
+    torch.backends.cudnn.benchmark = not args.no_cudnn_benchmark
+
+
 def create_parser():
     """Create the argument parser for piper_train.
 
@@ -412,6 +417,13 @@ def create_parser():
         "(default: 700). Use to prevent OOM on long utterances.",
     )
     parser.add_argument(
+        "--no-cudnn-benchmark",
+        action="store_true",
+        default=False,
+        help="Disable cuDNN kernel search. With per-batch sequence lengths the search reruns for "
+        "every new shape (RTX 5090, batch 24: 1.81 -> 0.61 s/step when disabled).",
+    )
+    parser.add_argument(
         "--compile",
         action="store_true",
         help="Enable torch.compile() for potential training speedup (requires PyTorch 2.0+)",
@@ -550,7 +562,7 @@ def main():
     if not args.default_root_dir:
         args.default_root_dir = args.dataset_dir
 
-    torch.backends.cudnn.benchmark = True
+    configure_cudnn_benchmark(args)
     # TF32 enable for Ampere+ (sm_80+: A100 / RTX 6000 Ada / RTX 5090). On
     # sm_75 (T4) and older, these settings are no-ops. Speeds up matmul and
     # conv by ~1.3-1.5x with negligible quality impact for TTS workloads.

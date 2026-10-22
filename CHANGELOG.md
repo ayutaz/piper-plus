@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - HF Space demo: add an experimental Zero-shot tab that speaks in the voice of an uploaded or recorded reference clip (#790). It uses the revision-pinned public `zs-v1` base and CAM++ encoder with the CI-verified embedding recipe, rejects text containing phonemes the model never learned or letters outside the six languages instead of dropping them, and is a functional demo, not a quality approval.
+- Training: `--no-cudnn-benchmark` turns off cuDNN kernel search. VITS batches change sequence length every step, so the search reruns for each new shape; on an RTX 5090 with batch 24 a step took 1.81 s with the search and 0.61 s without. The default stays on.
+
+### Changed
+
+- Training: remove per-step GPU-to-host syncs in the training loop. `slice_segments` and the rational-quadratic spline bin search no longer read indices to the host, the flow `Flip` builds its logdet on the training device, logged Python numbers become CPU tensors before `self.log`, and `discriminator_loss` returns the per-scale terms as detached tensors instead of calling `.item()`. Losses and gradients are unchanged.
 
 ### Fixed
 
