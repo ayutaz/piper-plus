@@ -1,5 +1,6 @@
 import copy
 import logging
+import math
 from pathlib import Path
 
 import numpy as np
@@ -48,6 +49,24 @@ _LOGGER = logging.getLogger("vits.lightning")
 
 # Memory cleanup frequency (iterations)
 MEMORY_CLEANUP_FREQUENCY = 500
+
+
+def _schedule_batch_index(module, batch_idx: int) -> int:
+    """Batch counter that drives the G/D/WavLM update periods.
+
+    Under manual optimization ``global_step`` advances once per optimizer
+    step (G and D each count), so it cannot express "every N batches":
+    ``global_step % d_update_interval`` let G update on every batch, and the
+    D-side WavLM check (evaluated after the G step) never fired for
+    ``wavlm_every_n_steps=2``. The fit loop's total batch index counts
+    batches across epochs and is restored on strict resume. Without a real
+    trainer (unit tests driving ``training_step`` directly) the in-epoch
+    ``batch_idx`` is used.
+    """
+    trainer = getattr(module, "_trainer", None)
+    if isinstance(trainer, pl.Trainer):
+        return trainer.fit_loop.epoch_loop.total_batch_idx
+    return batch_idx
 
 
 def normalize_id_tensor(
@@ -703,7 +722,9 @@ class VitsModel(pl.LightningModule):
         # but G backward+step only runs every d_update_interval steps.
         d_update_interval = self.hparams.d_update_interval
         grad_clip = getattr(self.hparams, "grad_clip", None)
-        update_generator = self.global_step % d_update_interval == 0
+        schedule_batch_idx = _schedule_batch_index(self, batch_idx)
+        self._schedule_batch_idx = schedule_batch_idx
+        update_generator = schedule_batch_idx % d_update_interval == 0
 
         # Periodic batch-info log for debugging (CUDA illegal access の発生位置特定用)
         if batch_idx % 50 == 0:
@@ -800,6 +821,28 @@ class VitsModel(pl.LightningModule):
                     )
                 else:
                     _LOGGER.debug(f"Memory cache cleared at iteration {batch_idx}")
+
+    def _wavlm_due(self, *, generator: bool = False) -> bool:
+        """Whether this batch runs the WavLM discriminator.
+
+        G and D read the same batch index latched in ``training_step``. On the
+        G side the WavLM loss only matters on batches where G is updated, so it
+        is computed only when both periods coincide.
+        """
+        idx = getattr(self, "_schedule_batch_idx", 0)
+        due = idx % self.hparams.wavlm_every_n_steps == 0
+        if generator and self.training:
+            due = due and idx % self.hparams.d_update_interval == 0
+        return due
+
+    def _wavlm_g_loss_scale(self) -> int:
+        """Compensate the G-side WavLM frequency among G updates, not batches.
+
+        G updates every d batches and WavLM runs every w batches, so they
+        coincide every lcm(d, w) batches, i.e. every w / gcd(w, d) G updates.
+        """
+        w = self.hparams.wavlm_every_n_steps
+        return w // math.gcd(w, self.hparams.d_update_interval)
 
     def _log_with_batch_info(
         self, key: str, value, batch: Batch = None, batch_size: int = None
@@ -1072,9 +1115,7 @@ class VitsModel(pl.LightningModule):
                             )
 
             # WavLM Discriminator loss (optional, computed every N steps)
-            if self.model_d_wavlm is not None and (
-                self.global_step % self.hparams.wavlm_every_n_steps == 0
-            ):
+            if self.model_d_wavlm is not None and self._wavlm_due(generator=True):
                 _y_d_hat_r_wlm, y_d_hat_g_wlm, fmap_r_wlm, fmap_g_wlm = (
                     self.model_d_wavlm(y, y_hat)
                 )
@@ -1084,7 +1125,7 @@ class VitsModel(pl.LightningModule):
                 loss_wavlm = (
                     (loss_gen_wavlm + loss_fm_wavlm)
                     * self.hparams.c_wavlm
-                    * self.hparams.wavlm_every_n_steps
+                    * self._wavlm_g_loss_scale()
                 )
                 loss_gen_all = loss_gen_all + loss_wavlm
 
@@ -1118,9 +1159,7 @@ class VitsModel(pl.LightningModule):
             loss_disc_all = loss_disc
 
             # WavLM Discriminator loss (optional, computed every N steps)
-            if self.model_d_wavlm is not None and (
-                self.global_step % self.hparams.wavlm_every_n_steps == 0
-            ):
+            if self.model_d_wavlm is not None and self._wavlm_due():
                 y_d_hat_r_wlm, y_d_hat_g_wlm, _, _ = self.model_d_wavlm(
                     y, y_hat_detached
                 )
