@@ -10,6 +10,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.strategies import DDPStrategy
 
+from .checkpoint_io import load_checkpoint
 from .vits.commons import (
     normalize_checkpoint_state_dict,
     remap_weight_norm_keys,
@@ -451,13 +452,10 @@ def load_multispeaker_checkpoint(checkpoint_path: str, model: VitsModel) -> None
     _LOGGER.info("Resuming from multispeaker checkpoint: %s", checkpoint_path)
 
     # 1. strict=False でロード（emb_g は自動スキップ）
-    # NOTE: weights_only=False is required to handle PosixPath objects in checkpoints
-    # This poses a security risk - only load trusted checkpoints
-    checkpoint = torch.load(
-        checkpoint_path,
-        map_location="cpu",
-        weights_only=False,
-    )
+    # Trusted checkpoints only (weights_only=False). checkpoint_io maps the
+    # PosixPath / WindowsPath in hparams to pathlib.Path: a ckpt saved on the
+    # other OS cannot be unpickled by a plain torch.load.
+    checkpoint = load_checkpoint(checkpoint_path, mmap=False)
     # Rejects HiFi-GAN checkpoints and migrates pre-FiLM decoders (issue #616).
     normalized_sd, _ = normalize_checkpoint_state_dict(
         checkpoint["state_dict"], model.state_dict(), checkpoint_path=checkpoint_path
@@ -783,11 +781,10 @@ def main():
             _LOGGER.info("Attempting to load weights only (strict=False)...")
 
             # モデルの重みだけをロードする (不一致は許容)
-            # NOTE: weights_only=False is required to handle PosixPath objects in checkpoints
-            # This poses a security risk - only load trusted checkpoints
-            checkpoint = torch.load(
-                args.resume_from_checkpoint, map_location="cpu", weights_only=False
-            )
+            # Trusted checkpoints only (weights_only=False). checkpoint_io maps
+            # the PosixPath / WindowsPath in hparams to pathlib.Path: a ckpt
+            # saved on the other OS cannot be unpickled by a plain torch.load.
+            checkpoint = load_checkpoint(args.resume_from_checkpoint, mmap=False)
             normalized_sd, _ = normalize_checkpoint_state_dict(
                 checkpoint["state_dict"],
                 model.state_dict(),

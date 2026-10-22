@@ -673,6 +673,23 @@ def resolve_config_path(model: str, config: str | None) -> Path:
     return model_path.parent / "config.json"
 
 
+def _merge_speaker_source_aliases(args) -> None:
+    """Merge --reference-audio / --speaker-encoder-model into the canonical fields.
+
+    The documented voice-cloning pair (--reference-audio +
+    --speaker-encoder-model) has separate argparse dests from the canonical
+    fields consumed by _resolve_speaker_embedding (--speaker-audio +
+    --speaker-encoder). Without this merge the documented flags are silently
+    ignored and zero-shot models fall back to a zero embedding (observed on
+    v8 local verification, 2026-08-09). Explicit canonical flags win on
+    conflict.
+    """
+    if args.reference_audio is not None and args.speaker_audio is None:
+        args.speaker_audio = args.reference_audio
+    if args.speaker_encoder_model is not None and args.speaker_encoder is None:
+        args.speaker_encoder = args.speaker_encoder_model
+
+
 def main():
     """Main entry point"""
     logging.basicConfig(level=logging.INFO)
@@ -803,6 +820,8 @@ def main():
             DeprecationWarning,
             stacklevel=1,
         )
+
+    _merge_speaker_source_aliases(args)
 
     # Lazy import: model_manager is optional (not available in HF Space environment)
     try:

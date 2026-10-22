@@ -492,6 +492,7 @@ class TestWavLMGradientCheckpointing:
             # PreTrainedModel sets `.gradient_checkpointing` on submodules
             assert getattr(wavlm, "gradient_checkpointing", False) is True
 
+    @pytest.mark.timeout(300)
     def test_gradient_checkpointing_backward(self, wavlm_disc_gc):
         """Backward through the classifier runs without error when GC is on.
 
@@ -501,9 +502,9 @@ class TestWavLMGradientCheckpointing:
         """
         from piper_train.vits.losses import discriminator_loss
 
+        # __init__ の設定のまま使う。ここで gradient_checkpointing_enable() を
+        # 引数なしで呼び直すと、本番と違う設定 (reentrant) で検査してしまう。
         wavlm_disc_gc.train()
-        # Re-enable explicitly in case a prior test toggled it.
-        wavlm_disc_gc.wavlm.gradient_checkpointing_enable()
 
         batch_size = 2
         audio_length = 22050
@@ -594,6 +595,80 @@ class TestWavLMMixedPrecision:
         assert torch.isfinite(loss), f"loss should be finite, got {loss.item()}"
         for fmap in fmap_rs[0]:
             assert torch.isfinite(fmap).all(), "feature maps should be finite"
+
+
+
+@pytest.fixture(scope="module")
+def tiny_wavlm_dir(tmp_path_factory):
+    """層の数だけ減らした実 WavLM を保存した directory (from_pretrained で読む)。
+
+    hidden_size は WavLMDiscriminator が 768 に固定しているので変えない。
+    dropout・layerdrop・SpecAugment の mask は 0 にし、train mode でも
+    forward が乱数に依らないようにする。relative position bias は既定のまま
+    (層 0 で作り、後の層へ受け渡す)。
+    """
+    torch.manual_seed(0)
+    config = transformers.WavLMConfig(
+        hidden_size=768,
+        num_hidden_layers=3,
+        num_attention_heads=4,
+        intermediate_size=64,
+        conv_dim=(16,) * 7,
+        num_conv_pos_embeddings=16,
+        num_conv_pos_embedding_groups=4,
+        hidden_dropout=0.0,
+        attention_dropout=0.0,
+        activation_dropout=0.0,
+        feat_proj_dropout=0.0,
+        final_dropout=0.0,
+        layerdrop=0.0,
+        mask_time_prob=0.0,
+        mask_feature_prob=0.0,
+    )
+    path = tmp_path_factory.mktemp("tiny_wavlm")
+    transformers.WavLMModel(config).save_pretrained(path)
+    return str(path)
+
+
+def _wavlm_gradients(model_dir, *, checkpointing):
+    from piper_train.vits.losses import discriminator_loss, feature_loss
+    from piper_train.vits.models import WavLMDiscriminator
+
+    torch.manual_seed(0)
+    disc = WavLMDiscriminator(model_name=model_dir, use_layers=[1, 2, 3])
+    if not checkpointing:
+        disc.wavlm.gradient_checkpointing_disable()
+    disc.train()
+
+    generator = torch.Generator().manual_seed(1)
+    y_real = torch.randn(2, 1, 22050, generator=generator)
+    y_fake = torch.randn(2, 1, 22050, generator=generator)
+    y_d_rs, y_d_gs, fmap_rs, fmap_gs = disc(y_real, y_fake)
+    loss = discriminator_loss(y_d_rs, y_d_gs)[0] + feature_loss(fmap_rs, fmap_gs)
+    loss.backward()
+    return {
+        name: param.grad.clone()
+        for name, param in disc.wavlm.named_parameters()
+        if param.requires_grad
+    }
+
+
+@pytest.mark.unit
+@pytest.mark.training
+# reentrant の checkpoint は kwargs で渡る position_bias を切り離さず、
+# 逆伝播で前の層の再計算が入れ子になって終わらない (CPU で 15 分以上)。
+@pytest.mark.timeout(120)
+def test_checkpointed_wavlm_gradients_equal_plain_gradients(tiny_wavlm_dir):
+    """勾配 checkpoint は計算を捨てて同じ演算をやり直すだけなので、勾配は変わらない。
+
+    同じ CPU で同じ入力に同じ演算を同じ順に行うため、許容誤差は 0 とする。
+    """
+    plain = _wavlm_gradients(tiny_wavlm_dir, checkpointing=False)
+    checkpointed = _wavlm_gradients(tiny_wavlm_dir, checkpointing=True)
+
+    assert checkpointed.keys() == plain.keys()
+    for name, grad in plain.items():
+        torch.testing.assert_close(checkpointed[name], grad, rtol=0, atol=0, msg=name)
 
 
 # Run tests with: pytest test_wavlm_discriminator.py -v
