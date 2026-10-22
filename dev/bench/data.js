@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792670858042,
+  "lastUpdate": 1792676217513,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1285,6 +1285,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Cold Start (en)",
             "value": 653.3,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 217.5,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3567f4a29ae3476d9f6d5408273684a433bb1c0b",
+          "message": "perf(train): 学習ループの GPU 同期削減と --no-cudnn-benchmark (#812 から切り出し) (#815)\n\n* perf(train): slice_segments と spline の区間振り分けを GPU 同期なしで計算する\n\nslice_segments は行ごとに ids_str を host へ読んでいた (1 batch 約 96 回の同期)。\ngather + torch.where で全行を一度に切り出す。旧実装と forward/backward が完全一致。\n\nunconstrained_rational_quadratic_spline は bool mask の添字で区間内外を振り分け、\nforward/backward ごとに要素数を host で数えていた。区間外の入力を 0 に置き換えて\n全要素を spline に通し torch.where で選ぶ。CPU で旧実装と完全一致、CUDA は数 ulp。\n\n(cherry picked from commit 2ec44a9d3f244c26a0fc4cf091b17bcc041b13e4)\n\n* perf(train): ログ値の Python 数値を CPU tensor にしてから self.log に渡す\n\nLightning は Python 数値を学習 device 上の tensor に変換するため、ログ 1 項目ごとに\nhost→GPU コピーが走っていた (RTX 5090 の学習 thread で 18.6%)。\n\n(cherry picked from commit 9d77593ad638606ee744e72715e4d4cfd9286036)\n\n* perf(train): flow の Flip の logdet を学習 device 上で直接作る\n\ntorch.zeros(B).type_as(x) は CPU に作ってから GPU へコピーするため、Flip ごとに\nhost と同期していた (1 batch 12 回)。x.new_zeros で同じ値・dtype・device を作る。\n\n(cherry picked from commit fdd8d63204ad95de4e2e534c3a9502e944397c26)\n\n* perf(train): --no-cudnn-benchmark で可変長学習の cuDNN カーネル探索を止められるようにする\n\ncudnn.benchmark=True は新しい入力形状のたびにカーネルを探索する。VITS は batch ごとに\n系列長が変わるため探索が学習時間の大半を占めていた (RTX 5090・S4 recipe・batch 24、\n毎 batch 新しい長さで 1.81 s/step、無効化で 0.61 s/step、形状固定時は 0.50 s/step)。\n既定は従来どおり有効。\n\n(cherry picked from commit c6b12f74b2c5d0d877406fea9c98abe4b0b75cc1)\n\n* perf(train): 判別器損失の scale ごとの内訳を .item() で host に読まない\n\ndiscriminator_loss は scale ごとの損失を .item() で host へ読んでおり、\nMPD/MSD/WavLM で 1 batch に十数回 GPU 同期していた。学習ループはこの内訳を\n使っていないため、勾配を切った tensor のまま返す。合計損失と各値は変わらない。\n\n研究ブランチ (feat/zero-shot-v8-dataset-scaling) の a6d496a3 のうち losses.py と\nそのテストだけを移植した (CAM++ fbank の部分は dev に該当コードがない)。\n\n* docs: --no-cudnn-benchmark と学習ループの同期削減を CHANGELOG と学習ガイドに記載する\n\n* test(docs): 学習ガイドへの注記追加で行番号がずれた doc examples 監査の snapshot を作り直す",
+          "timestamp": "2026-10-22T22:32:45+09:00",
+          "tree_id": "1c5b7af4d61ae51bf278801db03984a423855294",
+          "url": "https://github.com/ayutaz/piper-plus/commit/3567f4a29ae3476d9f6d5408273684a433bb1c0b"
+        },
+        "date": 1792676215643,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0953,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 24.5,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 25,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1162.1,
             "unit": "ms"
           },
           {
