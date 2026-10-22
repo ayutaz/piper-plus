@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792112133596,
+  "lastUpdate": 1792670858042,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1236,6 +1236,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 210.7,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "77b9f08a4a6eb78db0e2c14fe7366f46ae2a2b52",
+          "message": "fix(train): 学習・前処理・推論のバグ修正 (#812 から切り出し) (#814)\n\n* fix(deps): transformers を学習で使っている 4.x (5 未満) に固定する\n\ntransformers 5 は hidden_states を層の hook で集めるため、学習時の layerdrop で飛んだ層が抜け、WavLMDiscriminator の use_layers が別の層を指すか範囲外になる (CI の training step で IndexError)。4.x は飛んだ層も前の層の値で埋めるので層の位置がずれない。uv.lock は 4.57.6 のままで、学習の挙動は変わらない。\n\n* fix(train): WavLM 判別器の勾配 checkpoint を non-reentrant にし、逆伝播が終わらない不具合を直す\n\ntransformers 4.57 は position_bias を各層へ keyword 引数で渡す。reentrant の checkpoint は keyword の tensor を切り離さないため、逆伝播で前の層の再計算に入れ子で入り、終わらない (CI の training step が 15 分以上止まって kill / cancel)。層を減らした実 WavLM で、checkpoint ありの勾配がなしの勾配と完全に一致することを検査する。既存の backward テストは引数なしの gradient_checkpointing_enable() で本番と違う設定に戻していたので、その呼び直しをやめる。\n\n* fix(train): bf16-mixed で mel / spectrogram の STFT が cuFFT エラーで落ちる不具合を直す\n\n既定の --precision bf16-mixed では生成器の出力が bf16 のまま\nspectrogram_torch / mel_spectrogram_torch / mel_speaker_consistency_loss に届き、\nCUDA の torch.stft が \"cuFFT doesn't support tensor of type: BFloat16\" で落ちる。\nbf16 / fp16 の入力は STFT の前に fp32 に上げる。\n\nmel_speaker_consistency_loss は窓関数と mel 基底も入力の dtype で作っていたため、\n入力だけ上げても bf16 の窓・基底で解析が量子化され、fp32 の結果と大きくずれる。\nhalf 入力のときは窓・基底・STFT をすべて fp32 で計算する。fp32 入力の経路は変えない。\n\n研究ブランチ (feat/zero-shot-v8-dataset-scaling) の ec5c48dd / b7a1016c を dev に移植し、\n回帰テストを追加した (修正前は 6 件とも失敗する)。\n\n* fix(train): 学習後の checkpoint の strict resume でオプティマイザ状態を誤って捨てない\n\non_load_checkpoint は、オプティマイザの moment の形が FiLM の dec.cond の半分で\nあれば pre-FiLM とみなしていた。現在のモデルにも偶然その形の parameter (例:\n256 幅の bias と 512 幅の dec.cond.bias) があるため、1 step でも学習した\ncheckpoint は正しい状態を捨てられ、Lightning の復元が \"checkpoint contains only\nthe model\" で失敗していた (CloudRift の S3 smoke 段階 B で実測)。重み自体が\npre-FiLM で移行された場合に限ってオプティマイザ状態の移行・破棄を判定する。\n\n* fix(train): prepare_bilingual の EN 音素化を実装済み内部関数に接続\n\nPR #300 で g2p を独立 package 化した際、prepare_bilingual が呼ぶ\nphonemizer.post_process_ids() のリネームが漏れていた (MultilingualPhonemizer\nにも Phonemizer 基底クラスにも同名メソッドは存在しない)。既に同ファイル内で\n定義されている _add_inter_phoneme_padding が同等の実装なのでこれを呼ぶ。\nv8 学習で EN 93,540 発話が全て parse-skipped で消えた回帰を修正。\n\n* fix(train): prepare_bilingual で prosody 長さ不一致の発話を skip (crash 防止)\n\nja 音素マップに無い音素 (例: fy) を含む発話は preprocess/prosody 側で\nphoneme_ids と prosody_features の系列長がずれ、_add_inter_phoneme_padding\nの zip(strict=True) が ValueError で全体を落としていた。位置合わせが保証\nできない発話は warning + skip に変更 (v8 再構築実測: 55,678 発話中 2 件)。\n\n* chore(pre-commit): 重複していた gofmt hook の旧版を削除\n\nなぜ: #496 が per-file 検査 + vendor/pb.go 除外 + 構文エラー表面化を備えた\nrun_gofmt_check.sh 版を追加した際、#401 由来の inline 版の削除が漏れ、同一\nid が 2 箇所定義され .go 変更のたびに二重実行されていた。改良版のみ残す。\n\n* fix(preprocess): GPU batch spec のフレーム切り出しを CPU 経路と一致させる\n\n_compute_specs_gpu_batch の correct_frames が (T + n_fft - hop) // hop で\n3 フレーム過剰になり、バッチ 0 埋め由来の無音フレームが spec 末尾に混入\nしていた。spec/wav 長の不整合で MAS/KL が学習開始直後から発散し、v8 本走\n80 epoch が全損 (2026-08-05 実障害: loss_kl が cap 1e4 に貼り付き、\nloss_dur ~0、SECS ~0)。7 月の smoke は CPU 経路生成の別データセットを\n使っていたため潜伏していた。正式 (T + pad - win) // hop + 1 に修正し、\nCPU 単体経路との shape/値一致を test_gpu_spec_frames で pin (混在長\nバッチの末尾 1-2 フレームの値歪みは既知の制限として明記)。\n\n* fix(infer): --reference-audio / --speaker-encoder-model が黙って無視されるのを修正\n\nドキュメント記載の voice-cloning フラグ (--reference-audio /\n--speaker-encoder-model) は argparse dest が resolver の読む canonical\nフィールド (--speaker-audio / --speaker-encoder) と別で、どこからも配線\nされていなかった。zero-shot モデルでは警告のみで zero embedding に\nフォールバックし、参照音声を明示指定しても声がクローンされない\n「静かな失敗」。v8 ローカル検証で発見。\n\n_merge_speaker_source_aliases() で resolver 前に canonical へマージ\n(明示指定の canonical フラグが競合時に優先)。\n\n* fix(preprocess): config の num_languages を言語数ではなく max(language_id)+1 にする\n\nlanguage_id は LANGUAGE_ID_MAP の固定値なので、一部の言語だけで dataset を作ると\n(例: ja=0 と zh=2) num_languages = len(active_languages) = 2 になり、\nlanguage_id=2 が emb_lang の範囲外になって学習が CUDA device-side assert で落ちる。\nemb_lang のテーブルサイズとして max(language_id)+1 を書く。全言語の dataset では値は変わらない。\n\n研究ブランチの 6183fa87 を dev に移植し、静的契約テストを\ntest_prepare_multilingual_dataset_constants.py に追加した。\n\n* fix(train): 別 OS や Python 3.13 で保存した checkpoint の warm start / resume 読み直しで落ちる不具合を直す\n\nload_multispeaker_checkpoint と、strict resume が失敗したときの重みだけの読み直しは\n素の torch.load(weights_only=False) を使っていた。hparams に入っている\nPosixPath / WindowsPath は保存した OS のクラスで pickle されるため、Windows で\n保存した ckpt を Linux で読むと \"cannot instantiate 'WindowsPath'\" で落ちる。\nPython 3.13 は同じクラスを pathlib._local の名前で書くので、その綴りも扱う必要がある。\n\ncheckpoint_io.load_checkpoint を追加し、pickle の find_class で\npathlib / pathlib._local の PosixPath・WindowsPath を pathlib.Path に読み替える\n(グローバルな pathlib は変えない)。上の 2 か所をこれに差し替える。\n\n研究ブランチの fa9d86b4 / 22aabf5c から、パス型の読み替え部分だけを dev に移植した。\n\n* fix(train): Super-MAS の最初の 3 回の結果を Cython 実装と照合し、壊れていれば Cython に戻す\n\nSuper-MAS (Triton) は環境によってはエラーを出さずに壊れたアラインメントを返す。\n2026-08 の実例では、py3.12 と特定の triton の組み合わせで duration loss が\nほぼ 0 に潰れ、KL が上限に張り付いたまま 80 epoch 完走した。\n健全な環境の単体テストではこの壊れ方を検出できないため、学習中の最初の 3 回の\ndispatch を Cython の参照実装と IoU で照合し、0.90 未満ならそのプロセスでは\n以後 Cython を使う (その batch も参照実装の結果で学習する)。\nSuper-MAS を入れていない環境の挙動は変わらない。\n\n研究ブランチの fc182403 から MAS の部分だけを dev に移植した\n(KL 上限に張り付いたら止める部分は、dev に無い KL 上限が前提なので含めない)。\n\n* fix(train): PQMF を正しい cosine 変調の設計に直し、帯域間の折り返しを打ち消せるようにする\n\nMB-iSTFT の PQMF は cosine 変調の位相項 ±(-1)^k·π/4 が抜けており、変調の中心も\ntaps/2 ではなく subbands/2、間引きの位相も帯域ごとにずれていた。このため隣接帯域の\n折り返しが合成時に打ち消されず、analysis → synthesis の往復 SNR は 7〜8 dB しかなかった\n(帯域端のトーンは -1.6 dB)。sub-band loss の学習目標がこの折り返しで汚れることが、\nzero-shot 合成の「がびがび」ノイズの根本原因だった。\n\n標準の設計 (Nguyen 1994、ParallelWaveGAN の pqmf.py と同じ) に直し、往復 SNR は約 64 dB、\n帯域端トーンは約 59 dB になる。テストの基準を >= 55 dB に上げる。\n\nbuffer の形は変えていない。既存の MB-iSTFT checkpoint は state_dict から旧係数を\n読み戻すため、その FT・export・推論の出力は変わらない (公開 zs-v1 base の元の\nv7 ep32 checkpoint に model_g.dec.pqmf.* / pqmf.* が保存されていることを確認した)。\n旧係数が読み戻されることもテストで固定する。新しく作るモデルだけが正しい係数を使う。\n\n研究ブランチの 11690970 から PQMF の部分だけを dev に移植した\n(同じ commit の MRD・full-band STFT loss・帯域ノイズ指標は含めない)。\n\n* fix(train): --d-update-interval と --wavlm-every-n-steps の周期を optimizer step ではなく batch で数える\n\nmanual optimization では global_step が optimizer の step ごとに進む (G と D が両方\nstep する batch では 1 batch で +2)。周期を global_step で判定していたため:\n\n- --d-update-interval 2 でも G が毎 batch 更新されていた\n- --wavlm-every-n-steps 2 では、G の step 後 (奇数の global_step) に判定する\n  D 側の WavLM 判別器が一度も更新されなかった\n\nfit loop の total_batch_idx (epoch をまたいで batch を数え、strict resume で復元される)\nを周期の基準にし、G と D は training_step で取った同じ batch 番号で判定する。\nG 側の WavLM 項は G を更新する batch でだけ計算し、補償倍率は\nG 更新に対する頻度 (w / gcd(w, d)) にする。CLI の既定 (1 / 1) では挙動は変わらない。\n\n研究ブランチの 479d3ab6 は checkpoint への状態保存や EMA なども含むため、\ndev には周期の判定だけを新しく書いた。\n\n* docs(changelog): dev に移植した学習・前処理・推論のバグ修正を Unreleased の Fixed に記載する",
+          "timestamp": "2026-10-22T21:05:39+09:00",
+          "tree_id": "48e6a62531587f67112357ecd62f02e180455e97",
+          "url": "https://github.com/ayutaz/piper-plus/commit/77b9f08a4a6eb78db0e2c14fe7366f46ae2a2b52"
+        },
+        "date": 1792670855932,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0473,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 12,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 13.2,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 653.3,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 217.5,
             "unit": "MB"
           },
           {
