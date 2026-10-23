@@ -1611,6 +1611,181 @@
       "expected_token_count": 17
     },
     {
+      "language": "fr",
+      "input": "l'ami",
+      "description": "Elision l' merged with a vowel-initial host",
+      "expected_phonemes": "l a m i",
+      "expected_token_count": 4
+    },
+    {
+      "language": "fr",
+      "input": "l’ami",
+      "description": "Elision with a typographic apostrophe (U+2019)",
+      "expected_phonemes": "l a m i",
+      "expected_token_count": 4
+    },
+    {
+      "language": "fr",
+      "input": "d'accord",
+      "description": "Elision d'",
+      "expected_phonemes": "d a k k ɔ ʁ",
+      "expected_token_count": 6
+    },
+    {
+      "language": "fr",
+      "input": "j'ai faim",
+      "description": "Elision j'",
+      "expected_phonemes": "ʒ ɛ   f ɛ̃",
+      "expected_token_count": 6
+    },
+    {
+      "language": "fr",
+      "input": "Il n'est pas là.",
+      "description": "Elision n' (the clitic keeps its consonant)",
+      "expected_phonemes": "i l   n ɛ s   p a   l a .",
+      "expected_token_count": 16
+    },
+    {
+      "language": "fr",
+      "input": "s'il vous plaît",
+      "description": "Elision s'",
+      "expected_phonemes": "s i l   v u   p l a i",
+      "expected_token_count": 13
+    },
+    {
+      "language": "fr",
+      "input": "qu'il",
+      "description": "Elision qu'",
+      "expected_phonemes": "k i l",
+      "expected_token_count": 3
+    },
+    {
+      "language": "fr",
+      "input": "je t'aime",
+      "description": "Elision t'",
+      "expected_phonemes": "ʒ   t ɛ m",
+      "expected_token_count": 6
+    },
+    {
+      "language": "fr",
+      "input": "l'homme",
+      "description": "Elision before h muet",
+      "expected_phonemes": "l o m",
+      "expected_token_count": 3
+    },
+    {
+      "language": "fr",
+      "input": "les amis",
+      "description": "Liaison /z/ after a determiner",
+      "expected_phonemes": "l ə z   a m i",
+      "expected_token_count": 8
+    },
+    {
+      "language": "fr",
+      "input": "des enfants",
+      "description": "Liaison /z/ after des",
+      "expected_phonemes": "d ə z   ɑ̃ f ɑ̃",
+      "expected_token_count": 8
+    },
+    {
+      "language": "fr",
+      "input": "nous avons",
+      "description": "Liaison /z/ after a subject pronoun",
+      "expected_phonemes": "n u z   a v ɔ̃",
+      "expected_token_count": 8
+    },
+    {
+      "language": "fr",
+      "input": "vous êtes",
+      "description": "Liaison /z/ before ê",
+      "expected_phonemes": "v u z   ɛ t ə",
+      "expected_token_count": 8
+    },
+    {
+      "language": "fr",
+      "input": "ils ont",
+      "description": "Liaison /z/ after ils",
+      "expected_phonemes": "i l z   ɔ̃",
+      "expected_token_count": 6
+    },
+    {
+      "language": "fr",
+      "input": "un ami",
+      "description": "Liaison /n/ after un",
+      "expected_phonemes": "ɛ̃ n   a m i",
+      "expected_token_count": 7
+    },
+    {
+      "language": "fr",
+      "input": "mon ami",
+      "description": "Liaison /n/ after mon",
+      "expected_phonemes": "m ɔ̃ n   a m i",
+      "expected_token_count": 8
+    },
+    {
+      "language": "fr",
+      "input": "en avance",
+      "description": "Liaison /n/ after en",
+      "expected_phonemes": "ɑ̃ n   a v ɑ̃ s",
+      "expected_token_count": 8
+    },
+    {
+      "language": "fr",
+      "input": "très important",
+      "description": "Liaison /z/ after très",
+      "expected_phonemes": "t ʁ ɛ z   ɛ̃ p o ʁ t ɑ̃",
+      "expected_token_count": 12
+    },
+    {
+      "language": "fr",
+      "input": "deux enfants",
+      "description": "Liaison /z/ after a numeral",
+      "expected_phonemes": "d ø z   ɑ̃ f ɑ̃",
+      "expected_token_count": 8
+    },
+    {
+      "language": "fr",
+      "input": "chez elle",
+      "description": "Liaison /z/ after chez",
+      "expected_phonemes": "ʃ ə z   ɛ l",
+      "expected_token_count": 7
+    },
+    {
+      "language": "fr",
+      "input": "quand il",
+      "description": "Liaison /t/ after quand",
+      "expected_phonemes": "k ɑ̃ t   i l",
+      "expected_token_count": 7
+    },
+    {
+      "language": "fr",
+      "input": "ils sont arrivés",
+      "description": "Liaison /t/ after sont; none after ils before a consonant",
+      "expected_phonemes": "i l   s ɔ̃ t   a ʁ i v e",
+      "expected_token_count": 14
+    },
+    {
+      "language": "fr",
+      "input": "les garçons",
+      "description": "No liaison before a consonant",
+      "expected_phonemes": "l ə   ɡ a ʁ s ɔ̃",
+      "expected_token_count": 9
+    },
+    {
+      "language": "fr",
+      "input": "les, amis",
+      "description": "No liaison across punctuation",
+      "expected_phonemes": "l ə ,   a m i",
+      "expected_token_count": 8
+    },
+    {
+      "language": "fr",
+      "input": "c'est un homme",
+      "description": "Elision c' blocks the est liaison; liaison /n/ after un before h muet",
+      "expected_phonemes": "s ɛ s   ɛ̃ n   o m",
+      "expected_token_count": 11
+    },
+    {
       "language": "pt",
       "input": "sim",
       "description": "Yes — nasal vowel",

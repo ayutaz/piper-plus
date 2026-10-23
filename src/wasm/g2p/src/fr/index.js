@@ -21,7 +21,6 @@
 import {
   collapseNfdAccents,
   PUNCTUATION,
-  tokenize,
   normalizeWhitespace,
 } from "../latin-common/index.js";
 
@@ -248,28 +247,105 @@ function normalize(text) {
 // ---------------------------------------------------------------------------
 
 /**
- * Replace apostrophes (straight and curly) with spaces.
- * @param {string[]} chars
- * @returns {string[]}
+ * Elision clitics (french.py _ELISION_CLITICS): a clitic before an
+ * apostrophe is merged with the rest of the word, so "l'ami" is read as
+ * "lami" and the clitic consonant is not dropped as a silent final.
  */
-function normalizeApostrophes(chars) {
-  return chars.map((ch) => {
-    if (ch === "'" || ch === "\u2019" || ch === "\u2018") {
-      return " ";
-    }
-    return ch;
-  });
-}
+const ELISION_CLITICS = new Set(["l", "d", "j", "n", "s", "c", "m", "t", "qu"]);
 
 /**
- * Split normalized text into word and punctuation tokens.
- * Applies apostrophe normalization, then delegates to shared tokenizer.
+ * Liaison trigger words and their linking consonant (french.py _LIAISON_WORDS).
+ */
+const LIAISON_WORDS = new Map([
+  ["les", "z"], ["des", "z"], ["ces", "z"], ["mes", "z"], ["tes", "z"],
+  ["ses", "z"], ["nos", "z"], ["vos", "z"], ["aux", "z"], ["petits", "z"],
+  ["grands", "z"], ["gros", "z"], ["deux", "z"], ["trois", "z"], ["six", "z"],
+  ["dix", "z"], ["nous", "z"], ["vous", "z"], ["ils", "z"], ["elles", "z"],
+  ["on", "n"], ["en", "n"], ["dans", "z"], ["sans", "z"], ["chez", "z"],
+  ["un", "n"], ["mon", "n"], ["ton", "n"], ["son", "n"], ["tout", "t"],
+  ["quand", "t"], ["tr\u00E8s", "z"], ["plus", "z"], ["est", "t"], ["ont", "t"],
+  ["sont", "t"], ["font", "t"], ["vont", "t"],
+]);
+
+/**
+ * Split normalized text into word and punctuation tokens, like french.py
+ * _split_words: a word is a run of letters that may contain apostrophes
+ * between letters (typographic apostrophes count as apostrophes);
+ * punctuation characters are single tokens; anything else is dropped. In a
+ * word with apostrophes, an elision clitic starts a merge: it and every later
+ * part become one word ("qu'il" -> "quil"); other parts are words of their
+ * own ("aujourd'hui" -> "aujourd" + "hui").
  * @param {string[]} chars
  * @returns {Array<{chars: string[], isPunct: boolean}>}
  */
 function splitWords(chars) {
-  const processed = normalizeApostrophes(chars);
-  return tokenize(processed, isLetterFr);
+  const processed = chars.map((ch) =>
+    ch === "\u2019" || ch === "\u2018" ? "'" : ch,
+  );
+  const tokens = [];
+  const n = processed.length;
+  let i = 0;
+  while (i < n) {
+    const ch = processed[i];
+    if (PUNCTUATION.has(ch)) {
+      tokens.push({ chars: [ch], isPunct: true });
+      i++;
+      continue;
+    }
+    if (!isLetterFr(ch)) {
+      i++;
+      continue;
+    }
+
+    // Split the word at its inner apostrophes.
+    const parts = [[]];
+    while (i < n) {
+      if (isLetterFr(processed[i])) {
+        parts[parts.length - 1].push(processed[i]);
+        i++;
+      } else if (
+        processed[i] === "'" &&
+        i + 1 < n &&
+        isLetterFr(processed[i + 1])
+      ) {
+        parts.push([]);
+        i++;
+      } else {
+        break;
+      }
+    }
+
+    let merged = null;
+    parts.forEach((part, k) => {
+      if (merged) {
+        merged.push(...part);
+      } else if (k < parts.length - 1 && ELISION_CLITICS.has(part.join(""))) {
+        merged = [...part];
+      } else {
+        tokens.push({ chars: part, isPunct: false });
+      }
+    });
+    if (merged) {
+      tokens.push({ chars: merged, isPunct: false });
+    }
+  }
+  return tokens;
+}
+
+/**
+ * Starts with a vowel letter, or with "h" and a vowel (french.py
+ * _starts_with_vowel_sound; h aspire is not distinguished).
+ * @param {string[]} word
+ * @returns {boolean}
+ */
+function startsWithVowelSound(word) {
+  if (word.length === 0) {
+    return false;
+  }
+  if (isVowelChar(word[0])) {
+    return true;
+  }
+  return word[0] === "h" && word.length > 1 && isVowelChar(word[1]);
 }
 
 // ---------------------------------------------------------------------------
@@ -1086,7 +1162,8 @@ function phonemizeFrenchInternal(text) {
   const prosodyList = [];
   let needSpace = false;
 
-  for (const tok of tokens) {
+  for (let t = 0; t < tokens.length; t++) {
+    const tok = tokens[t];
     if (!tok.isPunct && needSpace) {
       phonemes.push(" ");
       prosodyList.push({ a1: 0, a2: 0, a3: 0 });
@@ -1099,6 +1176,15 @@ function phonemizeFrenchInternal(text) {
       }
     } else {
       const wordPhonemes = convertWord(tok.chars);
+      // Liaison (french.py _apply_liaison): a trigger word ends with its
+      // linking consonant when the next token is a word starting with a
+      // vowel sound. Punctuation in between blocks it. The consonant counts
+      // as part of the word for prosody.
+      const linking = LIAISON_WORDS.get(tok.chars.join(""));
+      const next = tokens[t + 1];
+      if (linking && next && !next.isPunct && startsWithVowelSound(next.chars)) {
+        wordPhonemes.push(linking);
+      }
       const wordPhonemeCount = wordPhonemes.length;
 
       // Find last vowel index for stress marking

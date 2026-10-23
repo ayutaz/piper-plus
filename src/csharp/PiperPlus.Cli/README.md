@@ -127,7 +127,7 @@ The CLI ships with the same default dictionaries as the C++ / Rust runtimes; exp
 | `zh` | Chinese | Bundled numeric-tone pinyin dictionaries (same as the other runtimes) |
 | `ko` | Korean | Built-in rule-based engine |
 | `es` | Spanish | DotNetG2P.Spanish |
-| `fr` | French | DotNetG2P.French |
+| `fr` | French | Built-in rule-based engine (`FrenchG2PEngine`, the rules of the Python G2P) |
 | `pt` | Portuguese | DotNetG2P.Portuguese |
 | `sv` | Swedish | Built-in rule-based engine |
 

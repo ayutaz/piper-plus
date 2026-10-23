@@ -8,7 +8,7 @@ namespace PiperPlus.Core.Phonemize;
 // -----------------------------------------------------------------
 
 /// <summary>
-/// Abstraction over a French G2P engine (e.g. DotNetG2P.French.FrenchG2PEngine).
+/// Abstraction over a French G2P engine (e.g. <see cref="FrenchG2PEngine"/>).
 /// <para>
 /// The engine converts French text to a flat list of IPA phoneme tokens
 /// using rule-based longest-match left-to-right scanning.  No external

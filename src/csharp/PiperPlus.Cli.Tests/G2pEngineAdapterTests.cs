@@ -61,16 +61,6 @@ public class G2pEngineAdapterTests
     }
 
     [Fact]
-    public void French_ReturnsYVowelToken()
-    {
-        // IFrenchG2PEngine promises "y_vowel" for [y]; a bare "y" is the
-        // Japanese glide in the phoneme_id_map.
-        var engine = new DotNetFrenchG2PEngine();
-
-        Assert.Equal(["t", "y_vowel"], engine.ToPhonemeList("tu"));
-    }
-
-    [Fact]
     public void Portuguese_KeepsAffricatesWhole()
     {
         // DotNetG2P.Portuguese writes the tie bar (d͡ʒ); without removing it

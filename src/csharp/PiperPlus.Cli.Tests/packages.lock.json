@@ -85,11 +85,6 @@
         "resolved": "1.8.0",
         "contentHash": "m8pyIwPbTVQE6F0FbcqUX8f0iyR8vp6YeOS03+OXs5ERayQQbfp3ndPoxTqO+GCVNdj6LpMwCIizX7Tmi2iIYA=="
       },
-      "DotNetG2P.French": {
-        "type": "Transitive",
-        "resolved": "1.8.0",
-        "contentHash": "VMQo6D2QtWbUiiCVNqP/UKSg67zkgCAKGlu8NgK6ncsLoVFkmMkkyMBtOM8x+Bv0M6ADXaSrQbmPubIMenSLDw=="
-      },
       "DotNetG2P.MeCab": {
         "type": "Transitive",
         "resolved": "1.8.0",
@@ -285,7 +280,6 @@
         "dependencies": {
           "DotNetG2P": "[1.8.0, )",
           "DotNetG2P.English": "[1.8.0, )",
-          "DotNetG2P.French": "[1.8.0, )",
           "DotNetG2P.MeCab": "[1.8.0, )",
           "DotNetG2P.Portuguese": "[1.8.0, )",
           "DotNetG2P.Spanish": "[1.8.0, )",
