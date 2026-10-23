@@ -1503,8 +1503,9 @@ PIPER_PLUS_API PiperPlusG2pHandle *piper_plus_g2p_create(const char *dict_dir) {
             force_openjtalk_dictionary_path(ojDir.c_str());
         }
 
-        // Optional dictionaries — failure to find is fine, English/Chinese
-        // gracefully degrade (rule-based + embedded loanword still work).
+        // Optional dictionaries. Without them only the embedded loanword data
+        // remains, so most English words and Chinese characters produce no
+        // phonemes (see piper_plus_g2p_create in piper_plus.h).
         std::string cmuPath = findG2pDictFile("cmudict_data.json", dictDir);
         if (!cmuPath.empty()) {
             piper::loadCmuDict(cmuPath, handle->voice.cmuDict);

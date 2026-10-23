@@ -218,6 +218,45 @@ dependencies {
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
 }
 
+// Bundle the English (CMU) and Mandarin (pinyin) dictionaries as assets under
+// `piper_plus_g2p_dicts/`. libpiper_plus.so does not embed them, and without
+// them English words and Chinese characters produce no phonemes. They are
+// copied from the canonical files at build time rather than committed again.
+abstract class SyncG2pDictionaries : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NAME_ONLY)
+    abstract val dictionaries: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun sync() {
+        val dest = outputDir.get().dir("piper_plus_g2p_dicts").asFile
+        dest.deleteRecursively()
+        dest.mkdirs()
+        dictionaries.forEach { it.copyTo(File(dest, it.name)) }
+    }
+}
+
+val syncG2pDictionaries = tasks.register<SyncG2pDictionaries>("syncG2pDictionaries") {
+    val data = rootProject.layout.projectDirectory.dir("../src/rust/piper-plus-g2p/data")
+    dictionaries.from(
+        data.file("cmudict_data.json"),
+        data.file("pinyin_single.json"),
+        data.file("pinyin_phrases.json"),
+    )
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(
+            syncG2pDictionaries,
+            SyncG2pDictionaries::outputDir,
+        )
+    }
+}
+
 // Copy the cross-runtime G2P fixture into androidTest assets so the L4 parity
 // instrumented test can read it via `assets.open(...)`. We copy the file
 // rather than symlink so Windows hosts work too.
