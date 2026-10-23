@@ -14,6 +14,13 @@ on:
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
+      # Read by phonemize/golden_parity_test.go.
+      - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
+      - 'tests/fixtures/g2p/known_divergences.json'
+      - 'tests/fixtures/g2p/english_no_drop_words.json'
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
+      - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
+      - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
       - 'test/fixtures/speaker_encoder_golden.json'
       - '.github/workflows/go-ci.yml'
   push:
@@ -25,6 +32,13 @@ on:
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
+      # Read by phonemize/golden_parity_test.go.
+      - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
+      - 'tests/fixtures/g2p/known_divergences.json'
+      - 'tests/fixtures/g2p/english_no_drop_words.json'
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
+      - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
+      - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
       - 'test/fixtures/speaker_encoder_golden.json'
   workflow_call:
 

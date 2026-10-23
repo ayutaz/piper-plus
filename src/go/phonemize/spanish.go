@@ -121,41 +121,180 @@ func esIsWordChar(ch rune) bool {
 
 // --- stress detection ---
 
-// esStressIndex returns the index (in runes) of the stressed vowel.
-// Returns -1 if no vowel found.
-func esStressIndex(word []rune) int {
-	// 1. Explicit accent mark
-	for i, ch := range word {
-		if esHasAccent(ch) {
-			return i
-		}
-	}
+// esUnit is one grapheme unit of a word: a digraph (ch, ll, rr, qu, gu/gü
+// before e/i, sc/xc before e/i) or a single letter. start is its rune index.
+type esUnit struct {
+	start   int
+	length  int
+	isVowel bool
+	silent  bool // silent h
+}
 
-	// Collect vowel positions
-	var vowelPositions []int
+// esSegmentGraphemes splits word into grapheme units, as Python's
+// _segment_graphemes does, so that syllabification never splits a digraph
+// and the silent u of qu/gu is not a vowel.
+func esSegmentGraphemes(word []rune) []esUnit {
+	n := len(word)
+	base := make([]rune, n)
 	for i, ch := range word {
-		if esIsVowel(ch) {
-			vowelPositions = append(vowelPositions, i)
+		base[i] = esBaseChar(ch)
+	}
+	frontVowelAt := func(i int) bool { return i < n && (base[i] == 'e' || base[i] == 'i') }
+
+	var units []esUnit
+	for i := 0; i < n; {
+		bch := base[i]
+		next := rune(0)
+		if i+1 < n {
+			next = base[i+1]
+		}
+		digraph := false
+		switch {
+		case bch == 'q' && next == 'u':
+			digraph = true
+		case bch == 'g' && i+1 < n && word[i+1] == 'ü' && frontVowelAt(i+2):
+			digraph = true
+		case bch == 'g' && next == 'u' && frontVowelAt(i+2):
+			digraph = true
+		case bch == 'c' && next == 'h', bch == 'l' && next == 'l', bch == 'r' && next == 'r':
+			digraph = true
+		case (bch == 's' || bch == 'x') && next == 'c' && frontVowelAt(i+2):
+			digraph = true
+		}
+		switch {
+		case digraph:
+			units = append(units, esUnit{start: i, length: 2})
+			i += 2
+		case bch == 'h':
+			units = append(units, esUnit{start: i, length: 1, silent: true})
+			i++
+		default:
+			units = append(units, esUnit{start: i, length: 1, isVowel: esVowels[bch]})
+			i++
 		}
 	}
-	if len(vowelPositions) == 0 {
+	return units
+}
+
+// esInseparableOnsets are consonant pairs that start a syllable together.
+var esInseparableOnsets = map[string]bool{
+	"bl": true, "br": true, "cl": true, "cr": true, "dr": true, "fl": true, "fr": true,
+	"gl": true, "gr": true, "pl": true, "pr": true, "tr": true, "tl": true,
+}
+
+// esSyllableStarts returns the unit indices where each syllable starts, as
+// Python's _find_syllable_boundaries does. Like Python, a consonant before
+// the first vowel also opens a syllable when another consonant precedes it
+// ("tres" is "t" + "res").
+func esSyllableStarts(word []rune, units []esUnit) []int {
+	var ns []int // indices of non-silent units
+	for idx, u := range units {
+		if !u.silent {
+			ns = append(ns, idx)
+		}
+	}
+	if len(ns) == 0 {
+		return []int{0}
+	}
+	isVowel := func(k int) bool { return units[ns[k]].isVowel }
+	lastRune := func(k int) rune {
+		u := units[ns[k]]
+		return word[u.start+u.length-1]
+	}
+	isStrong := func(r rune) bool { b := esBaseChar(r); return b == 'a' || b == 'e' || b == 'o' }
+	isWeak := func(r rune) bool { b := esBaseChar(r); return b == 'i' || b == 'u' }
+
+	starts := []int{0}
+	for i := 1; i < len(ns); {
+		if isVowel(i) {
+			if isVowel(i - 1) {
+				prev, curr := lastRune(i-1), lastRune(i)
+				switch {
+				case isStrong(prev) && isStrong(curr):
+					starts = append(starts, i) // hiatus
+				case (isWeak(curr) && esHasAccent(curr)) || (isWeak(prev) && esHasAccent(prev)):
+					starts = append(starts, i) // accented weak vowel breaks the diphthong
+				}
+			}
+			i++
+			continue
+		}
+		consStart := i
+		for i < len(ns) && !isVowel(i) {
+			i++
+		}
+		if i >= len(ns) {
+			break // no vowel follows
+		}
+		pair := func(k int) string { return string([]rune{esBaseChar(lastRune(k)), esBaseChar(lastRune(k + 1))}) }
+		switch count := i - consStart; {
+		case count == 1:
+			starts = append(starts, consStart)
+		case count == 2 && esInseparableOnsets[pair(consStart)]:
+			starts = append(starts, consStart)
+		case count == 2:
+			starts = append(starts, consStart+1)
+		case esInseparableOnsets[pair(i-2)]:
+			starts = append(starts, i-2)
+		default:
+			starts = append(starts, i-1)
+		}
+	}
+	for k, s := range starts {
+		starts[k] = ns[s]
+	}
+	return starts
+}
+
+// esStressIndex returns the rune index of the first vowel of the stressed
+// syllable, where Python's _insert_stress_marker puts the stress marker, or
+// -1 if that syllable has no vowel.
+//
+// Stress rules: an accent mark stresses its syllable; otherwise words ending
+// in a vowel, n or s stress the penultimate syllable and others the last.
+func esStressIndex(word []rune) int {
+	if len(word) == 0 {
 		return -1
 	}
-	if len(vowelPositions) == 1 {
-		return vowelPositions[0]
-	}
+	units := esSegmentGraphemes(word)
+	starts := esSyllableStarts(word, units)
 
-	// 2. Ends in vowel, n, s -> penultimate vowel
-	last := esBaseChar(word[len(word)-1])
-	if esVowels[last] || last == 'n' || last == 's' {
-		if len(vowelPositions) >= 2 {
-			return vowelPositions[len(vowelPositions)-2]
+	stressed := -1
+	for i, ch := range word {
+		if !esHasAccent(ch) {
+			continue
 		}
-		return vowelPositions[0]
+		stressed = 0
+		for s := len(starts) - 1; s >= 0; s-- {
+			u := units[starts[s]]
+			if u.start <= i {
+				stressed = s
+				break
+			}
+		}
+		break
+	}
+	if stressed < 0 {
+		switch last := esBaseChar(word[len(word)-1]); {
+		case len(starts) == 1:
+			stressed = 0
+		case esVowels[last] || last == 'n' || last == 's':
+			stressed = len(starts) - 2
+		default:
+			stressed = len(starts) - 1
+		}
 	}
 
-	// 3. Otherwise -> final vowel
-	return vowelPositions[len(vowelPositions)-1]
+	end := len(units)
+	if stressed+1 < len(starts) {
+		end = starts[stressed+1]
+	}
+	for _, u := range units[starts[stressed]:end] {
+		if u.isVowel {
+			return u.start
+		}
+	}
+	return -1
 }
 
 // --- G2P ---

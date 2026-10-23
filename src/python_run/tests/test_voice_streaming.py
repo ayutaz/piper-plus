@@ -110,7 +110,7 @@ class TestPhonemizeReturnsPerSentence:
         captured: list[str] = []
 
         class FakeMP:
-            def __init__(self, languages):
+            def __init__(self, languages, default_latin_language="en"):
                 self.languages = languages
 
             def phonemize(self, sentence: str) -> list[str]:

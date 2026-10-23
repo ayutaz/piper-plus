@@ -407,7 +407,9 @@ class TestVoiceIntegration:
         # produced sentence list, so stub _split_sentences explicitly and
         # let _phonemize_one_factory run unmocked.
         voice._split_sentences = MagicMock(return_value=["こんにちは"])
-        voice._phonemize_one_factory = lambda: PiperVoice._phonemize_one_factory(voice)
+        voice._phonemize_one_factory = lambda language_id=None: (
+            PiperVoice._phonemize_one_factory(voice, language_id)
+        )
 
         # Test that phonemize method uses the JA phonemizer
         with patch(

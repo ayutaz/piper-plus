@@ -42,7 +42,11 @@ type MultilingualPhonemizer struct {
 	languages            []string
 	defaultLatinLanguage string
 	detector             *UnicodeLanguageDetector
-	phonemizers          map[string]Phonemizer
+	// latinDetectors holds one detector per registered Latin-script language,
+	// used by PhonemizeWithLanguage to read Latin text as that language
+	// (es / fr / pt / sv cannot be told apart from English by script).
+	latinDetectors map[string]*UnicodeLanguageDetector
+	phonemizers    map[string]Phonemizer
 	// enableZhEnDispatch toggles ZH-EN code-switching (Issue #384).
 	// When true (default with both "zh" and "en" registered), English
 	// segments adjacent to Chinese are routed through the loanword
@@ -78,10 +82,18 @@ func NewMultilingualPhonemizer(
 	detector := NewUnicodeLanguageDetector(languages, defaultLatinLang)
 	_, hasZh := phonemizers["zh"]
 	_, hasEn := phonemizers["en"]
+	latinDetectors := make(map[string]*UnicodeLanguageDetector)
+	for _, l := range languages {
+		switch l {
+		case "en", "es", "fr", "pt", "sv":
+			latinDetectors[l] = NewUnicodeLanguageDetector(languages, l)
+		}
+	}
 	mp := &MultilingualPhonemizer{
 		languages:            languages,
 		defaultLatinLanguage: defaultLatinLang,
 		detector:             detector,
+		latinDetectors:       latinDetectors,
 		phonemizers:          phonemizers,
 	}
 	mp.enableZhEnDispatch.Store(hasZh && hasEn)
@@ -113,12 +125,32 @@ func (m *MultilingualPhonemizer) LanguageCode() string {
 // phonemizers, strips BOS/EOS from each segment, and concatenates the results.
 // The dynamically determined EOS token is stored in result.EOSToken.
 func (m *MultilingualPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	return m.phonemizeWithDetector(text, m.detector)
+}
+
+// PhonemizeWithLanguage phonemizes text as language: Latin-script text is
+// read as language instead of the default Latin language, as Python's
+// MultilingualPhonemizer does when language is its default_latin_language.
+// Other scripts are still split by character range. A language that is not
+// a registered Latin-script language (e.g. "zh", "ja", or "") behaves like
+// PhonemizeWithProsody.
+func (m *MultilingualPhonemizer) PhonemizeWithLanguage(text, language string) (*PhonemizeResult, error) {
+	detector, ok := m.latinDetectors[language]
+	if !ok {
+		detector = m.detector
+	}
+	return m.phonemizeWithDetector(text, detector)
+}
+
+// phonemizeWithDetector segments text with detector and delegates each
+// segment to its language's phonemizer.
+func (m *MultilingualPhonemizer) phonemizeWithDetector(text string, detector *UnicodeLanguageDetector) (*PhonemizeResult, error) {
 	// Normalize to NFC so that decomposed sequences (e.g. e + combining acute
 	// from macOS HFS+ or Web APIs) are folded into their composed equivalents
 	// before language detection and phonemization.
 	text = norm.NFC.String(text)
 
-	segments := SegmentText(text, m.detector)
+	segments := SegmentText(text, detector)
 	if len(segments) == 0 {
 		return &PhonemizeResult{
 			EOSToken: "$",
@@ -182,7 +214,7 @@ func (m *MultilingualPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeRe
 			if prevIsZh || nextIsZh {
 				tokens := zhCP.PhonemizeEmbeddedEnglish(seg.Text, loanwordD)
 				for _, tok := range tokens {
-					if bosEosTokens[tok] {
+					if isBoundaryToken(seg.Language, tok) {
 						if eosOnlyTokens[tok] {
 							lastEOS = tok
 						}
@@ -224,7 +256,7 @@ func (m *MultilingualPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeRe
 
 		// Strip BOS/EOS tokens from this segment's output and track the last EOS.
 		for i, tok := range result.Tokens {
-			if bosEosTokens[tok] {
+			if isBoundaryToken(seg.Language, tok) {
 				if eosOnlyTokens[tok] {
 					lastEOS = tok
 				}
@@ -244,6 +276,19 @@ func (m *MultilingualPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeRe
 		Prosody:  allProsody,
 		EOSToken: lastEOS,
 	}, nil
+}
+
+// isBoundaryToken reports whether tok, produced for a lang segment, is a
+// BOS/EOS token to strip from the concatenated output.
+//
+// Only Japanese ends a sentence with a question-marker EOS ("?", "?!", ...);
+// in other languages "?" is an ordinary phoneme, as in Python's
+// MultilingualPhonemizer, and the EOS stays "$".
+func isBoundaryToken(lang, tok string) bool {
+	if lang == "ja" {
+		return bosEosTokens[tok]
+	}
+	return tok == "^" || tok == "$"
 }
 
 // PostProcessMultilingualIDs wraps PostProcessIDs using the EOSToken from

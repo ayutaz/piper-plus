@@ -12,6 +12,11 @@ on:
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
+      # Read by the G2P golden parity tests.
+      - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
+      - 'tests/fixtures/g2p/known_divergences.json'
+      - 'tests/fixtures/g2p/english_no_drop_words.json'
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'test/fixtures/speaker_encoder_golden.json'
       - '.github/workflows/test-webassembly.yml'
   pull_request:
@@ -21,6 +26,11 @@ on:
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
+      # Read by the G2P golden parity tests.
+      - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
+      - 'tests/fixtures/g2p/known_divergences.json'
+      - 'tests/fixtures/g2p/english_no_drop_words.json'
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'test/fixtures/speaker_encoder_golden.json'
       - '.github/workflows/test-webassembly.yml'
 

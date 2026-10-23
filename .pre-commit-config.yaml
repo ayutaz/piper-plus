@@ -790,7 +790,7 @@ repos:
         name: G2P known-difference lists (known_divergences.json / english_no_drop_words.json)
         entry: uv run --no-sync python scripts/check_g2p_known_divergences.py
         language: system
-        files: ^(tests/fixtures/g2p/(known_divergences|english_no_drop_words|phoneme_test_cases_golden)\.json|scripts/check_g2p_known_divergences\.py|src/cpp/tests/test_c_api_g2p_golden\.cpp|src/rust/piper-plus-g2p/tests/golden_parity\.rs|android/piper-plus-g2p/src/androidTest/java/com/piperplus/g2p/PhonemeFixtureParityTest\.kt)$
+        files: ^(tests/fixtures/g2p/(known_divergences|english_no_drop_words|phoneme_test_cases_golden)\.json|scripts/check_g2p_known_divergences\.py|src/cpp/tests/test_c_api_g2p_golden\.cpp|src/rust/piper-plus-g2p/tests/golden_parity\.rs|android/piper-plus-g2p/src/androidTest/java/com/piperplus/g2p/PhonemeFixtureParityTest\.kt|tests/PiperPlusG2PTests/GoldenParityTests\.swift|tests/PiperPlusG2PTests/GoldenPhonemeTests\.swift|src/go/phonemize/golden_parity_test\.go|src/wasm/openjtalk-web/test/js/test-g2p-golden-parity\.js|src/wasm/g2p/test/test-g2p-golden-parity\.js|src/python_run/tests/test_g2p_golden_parity\.py|src/csharp/PiperPlus\.Cli\.Tests/G2pGoldenParityTests\.cs)$
         pass_filenames: false
 
       # Mirror of .github/workflows/ort-version-sync.yml. Same Dependabot

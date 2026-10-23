@@ -20,6 +20,12 @@
         "resolved": "1.8.0",
         "contentHash": "m8pyIwPbTVQE6F0FbcqUX8f0iyR8vp6YeOS03+OXs5ERayQQbfp3ndPoxTqO+GCVNdj6LpMwCIizX7Tmi2iIYA=="
       },
+      "DotNetG2P.French": {
+        "type": "Direct",
+        "requested": "[1.8.0, )",
+        "resolved": "1.8.0",
+        "contentHash": "VMQo6D2QtWbUiiCVNqP/UKSg67zkgCAKGlu8NgK6ncsLoVFkmMkkyMBtOM8x+Bv0M6ADXaSrQbmPubIMenSLDw=="
+      },
       "DotNetG2P.MeCab": {
         "type": "Direct",
         "requested": "[1.8.0, )",
@@ -28,6 +34,18 @@
         "dependencies": {
           "DotNetG2P": "1.8.0"
         }
+      },
+      "DotNetG2P.Portuguese": {
+        "type": "Direct",
+        "requested": "[1.8.0, )",
+        "resolved": "1.8.0",
+        "contentHash": "C1+LO07latGkcLZZ0imPsR4Li/ZuIJQKo1Sd+yvJedgybGV0ig7xRg7oTlgXt1NSnBXYVDIQibJoL+e5QRG/BA=="
+      },
+      "DotNetG2P.Spanish": {
+        "type": "Direct",
+        "requested": "[1.8.0, )",
+        "resolved": "1.8.0",
+        "contentHash": "JuycRe2EPx7wYCiJm0FukSUGG+M0Mhv4BbFAXVTgSHGxXMB+TCZ2LhoNzz3p81Ku6MQMe0ES1UN6fhWMzxDPEg=="
       },
       "Microsoft.CodeAnalysis.PublicApiAnalyzers": {
         "type": "Direct",
