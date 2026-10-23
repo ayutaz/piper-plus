@@ -2896,6 +2896,219 @@
       "status": "planned",
       "issue": 821,
       "reason": "Digits are passed through as raw tokens, which are not in phoneme_id_map, instead of being read as number words."
+    },
+    {
+      "runtimes": [
+        "swift"
+      ],
+      "language": "zh",
+      "input": "你好，GPS",
+      "status": "planned",
+      "issue": 827,
+      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
+    },
+    {
+      "runtimes": [
+        "swift"
+      ],
+      "language": "zh",
+      "input": "你好，Hello",
+      "status": "planned",
+      "issue": 827,
+      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
+    },
+    {
+      "runtimes": [
+        "swift"
+      ],
+      "language": "zh",
+      "input": "Hello，你好",
+      "status": "planned",
+      "issue": 827,
+      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
+    },
+    {
+      "runtimes": [
+        "swift"
+      ],
+      "language": "zh",
+      "input": "Hello、世界",
+      "status": "planned",
+      "issue": 827,
+      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "zh",
+      "input": "你好，GPS",
+      "status": "planned",
+      "issue": 833,
+      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "zh",
+      "input": "你好，Hello",
+      "status": "planned",
+      "issue": 833,
+      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "zh",
+      "input": "Hello，你好",
+      "status": "planned",
+      "issue": 833,
+      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "zh",
+      "input": "Hello、世界",
+      "status": "planned",
+      "issue": 833,
+      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "你好，今天天气很好。",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "你好，GPS",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "你好，Hello",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "Hello，你好",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "Hello、世界",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "Hello，world",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "Hello、world。",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "I have ３ cats．",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "go"
+      ],
+      "language": "en",
+      "input": "I have ３ cats．",
+      "status": "planned",
+      "issue": 821,
+      "reason": "Digits are word separators and are dropped; numbers are not expanded to words."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "Hello，world",
+      "status": "planned",
+      "issue": 832,
+      "reason": "The CLI's English adapter splits punctuation off only at word edges, so 'Hello,world' (the CJK comma rewritten as ASCII) stays one unknown word read as raw letters."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "Hello、world。",
+      "status": "planned",
+      "issue": 832,
+      "reason": "The CLI's English adapter splits punctuation off only at word edges, so 'Hello,world' (the CJK comma rewritten as ASCII) stays one unknown word read as raw letters."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "I have ３ cats．",
+      "status": "planned",
+      "issue": 821,
+      "reason": "Digits are passed through as raw tokens, which are not in phoneme_id_map, instead of being expanded to number words."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "Hola，amigo！",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
     }
   ]
 }

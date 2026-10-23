@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `normalize_cjk_punctuation_for_latin`, which `MultilingualPhonemizer`
+  applies to en/es/fr/pt/sv segments so the English G2P no longer deletes
+  `，` and joins the words around it (`Hello，world`). The rules are in
+  `docs/spec/cjk-punctuation-contract.toml`.
+
+### Changed
+
+- `UnicodeLanguageDetector.detect_char` returns `None` for CJK punctuation
+  and fullwidth ASCII symbols (U+3000-303F, U+FF00-FF20, U+FF3B-FF40,
+  U+FF5B-FF64, U+FFE0-FFEF) instead of `"ja"`, so `MultilingualPhonemizer`
+  keeps them in the segment around them: a Chinese sentence keeps its
+  `，` and `。`, and `你好，GPS` reads GPS in Mandarin (#823).
+
 ## [0.3.1] - 2026-10-16
 
 ### Fixed
