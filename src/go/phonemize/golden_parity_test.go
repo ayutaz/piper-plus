@@ -14,12 +14,10 @@ package phonemize
 // fixed. English words that must never phonemize to nothing are listed in
 // tests/fixtures/g2p/english_no_drop_words.json and follow the same rule.
 //
-// Two representation differences are not divergences:
-//   - multi-codepoint phonemes (rr, tʃ, tone3) are one PUA character here
-//     (pua.json) and spelled out in the golden. Only the golden side is
-//     mapped, so output that forgets the PUA encoding still fails.
-//   - Chinese punctuation and word boundaries: Python drops CJK punctuation,
-//     the other runtimes keep it. Compared without them until #823.
+// One representation difference is not a divergence: multi-codepoint
+// phonemes (rr, tʃ, tone3) are one PUA character here (pua.json) and spelled
+// out in the golden. Only the golden side is mapped, so output that forgets
+// the PUA encoding still fails.
 //
 // The dictionaries are the checked-in src/rust/piper-plus-g2p/data/ files, so
 // nothing here is skipped when a dictionary is missing: a load failure fails
@@ -197,24 +195,6 @@ func splitGoldenPhonemes(s string) []string {
 	return tokens
 }
 
-// zhIgnoredTokens are left out of zh comparisons until #823.
-var zhIgnoredTokens = map[string]bool{
-	" ": true, ".": true, ",": true, "!": true, "?": true, ";": true, ":": true,
-}
-
-func dropIgnoredTokens(lang string, tokens []string) []string {
-	if lang != "zh" {
-		return tokens
-	}
-	out := make([]string, 0, len(tokens))
-	for _, tok := range tokens {
-		if !zhIgnoredTokens[tok] {
-			out = append(out, tok)
-		}
-	}
-	return out
-}
-
 func TestGoldenParity_MatchesPythonExceptListedDivergences(t *testing.T) {
 	pua := goldenPUATable(t)
 
@@ -261,10 +241,7 @@ func TestGoldenParity_MatchesPythonExceptListedDivergences(t *testing.T) {
 		if err == nil {
 			actual = result.Tokens
 		}
-		matches := err == nil && tokenSliceEqual(
-			dropIgnoredTokens(c.Language, expected),
-			dropIgnoredTokens(c.Language, actual),
-		)
+		matches := err == nil && tokenSliceEqual(expected, actual)
 		verified++
 
 		label := fmt.Sprintf("[%s] %q", c.Language, c.Input)

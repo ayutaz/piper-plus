@@ -246,6 +246,16 @@ repos:
         files: ^(src/python/g2p/piper_plus_g2p/_vendor/g2p_en/.*|tests/fixtures/g2p/english_normalize_cases\.json|scripts/build_english_normalize_fixture\.py)$
         pass_filenames: false
 
+      - id: cjk-punctuation-contract
+        name: CJK punctuation contract, fixture and runtime tests agree
+        # Every runtime reads the fixture built from the contract (#823); a
+        # runtime whose test stops reading it could drift back to routing
+        # CJK punctuation to Japanese without a failing test.
+        entry: uv run --no-sync python scripts/check_cjk_punctuation_contract.py
+        language: system
+        files: ^(docs/spec/cjk-punctuation-contract\.toml|tests/fixtures/g2p/cjk_punctuation_cases\.json|scripts/(build_cjk_punctuation_fixture|check_cjk_punctuation_contract)\.py|src/python/g2p/tests/test_cjk_punctuation_contract\.py|src/python_run/tests/test_cjk_punctuation_contract\.py|src/rust/piper-plus-g2p/tests/cjk_punctuation_contract\.rs|src/go/phonemize/cjk_punctuation_contract_test\.go|src/wasm/g2p/test/test-cjk-punctuation-contract\.js|src/csharp/PiperPlus\.Core\.Tests/CjkPunctuationContractTests\.cs|src/cpp/tests/test_cjk_punctuation_contract\.cpp)$
+        pass_filenames: false
+
       - id: dictionary-consistency
         name: Custom dictionaries (data/dictionaries → WASM assets) byte-equal
         entry: uv run --no-sync python scripts/check_dictionary_consistency.py

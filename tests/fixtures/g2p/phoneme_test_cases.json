@@ -2893,6 +2893,51 @@
       "input": "동생",
       "description": "Younger sibling",
       "expected_token_count_min": 2
+    },
+    {
+      "language": "zh",
+      "input": "你好，今天天气很好。",
+      "description": "Issue #823: a Chinese sentence keeps its ， and 。 (CJK punctuation is neutral, not Japanese)"
+    },
+    {
+      "language": "zh",
+      "input": "你好，GPS",
+      "description": "Issue #823: English after a Chinese comma is still read as a loanword (the comma joins the Chinese segment)"
+    },
+    {
+      "language": "zh",
+      "input": "你好，Hello",
+      "description": "Issue #823: Chinese, CJK comma, then English"
+    },
+    {
+      "language": "zh",
+      "input": "Hello，你好",
+      "description": "Issue #823: English, CJK comma, then Chinese"
+    },
+    {
+      "language": "zh",
+      "input": "Hello、世界",
+      "description": "Issue #823: English, ideographic comma, then Chinese"
+    },
+    {
+      "language": "en",
+      "input": "Hello，world",
+      "description": "Issue #823: CJK comma inside English is read as an ASCII comma, not deleted (words stay apart)"
+    },
+    {
+      "language": "en",
+      "input": "Hello、world。",
+      "description": "Issue #823: ideographic comma and full stop inside English"
+    },
+    {
+      "language": "en",
+      "input": "I have ３ cats．",
+      "description": "Issue #823: fullwidth digit and full stop inside English"
+    },
+    {
+      "language": "es",
+      "input": "Hola，amigo！",
+      "description": "Issue #823: CJK comma and fullwidth ! inside Spanish"
     }
   ],
   "pua_map_count": 99,

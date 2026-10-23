@@ -80,6 +80,16 @@ public sealed class MultilingualPhonemizer : IPhonemizer
     };
 
     /// <summary>
+    /// Latin-script languages whose segments have their CJK punctuation
+    /// rewritten as ASCII before G2P (Issue #823,
+    /// <c>docs/spec/cjk-punctuation-contract.toml</c>).
+    /// </summary>
+    private static readonly HashSet<string> S_latinSegmentLanguages = new()
+    {
+        "en", "es", "fr", "pt", "pt-PT", "sv",
+    };
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="MultilingualPhonemizer"/> class.
     /// Create a new <see cref="MultilingualPhonemizer"/>.
     /// </summary>
@@ -140,6 +150,50 @@ public sealed class MultilingualPhonemizer : IPhonemizer
     {
         get => _enableZhEnDispatch;
         set => _enableZhEnDispatch = value;
+    }
+
+    /// <summary>
+    /// Rewrite CJK punctuation in a Latin-script segment as ASCII
+    /// (Issue #823, <c>docs/spec/cjk-punctuation-contract.toml</c>).
+    /// <para>
+    /// Fullwidth ASCII symbols and digits become their ASCII forms, 、 and 。
+    /// (and their halfwidth forms) become <c>,</c> and <c>.</c>, and any other
+    /// CJK punctuation becomes a space. Other characters are left as they are.
+    /// Port of the Python <c>normalize_cjk_punctuation_for_latin</c>.
+    /// </para>
+    /// </summary>
+    /// <param name="text">Text of a Latin-script segment.</param>
+    /// <returns>The rewritten text, or <paramref name="text"/> itself when it has no CJK punctuation.</returns>
+    public static string NormalizeCjkPunctuationForLatin(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        if (!text.Any(UnicodeLanguageDetector.IsCjkPunctuation))
+        {
+            return text;
+        }
+
+        return new string(text.Select(CjkPunctuationToLatin).ToArray());
+    }
+
+    private static char CjkPunctuationToLatin(char ch)
+    {
+        if (!UnicodeLanguageDetector.IsCjkPunctuation(ch))
+        {
+            return ch;
+        }
+
+        if (ch >= '\uFF01' && ch <= '\uFF5E')
+        {
+            return (char)(ch - 0xFEE0);
+        }
+
+        return ch switch
+        {
+            '\u3001' or '\uFF64' => ',',
+            '\u3002' or '\uFF61' => '.',
+            _ => ' ',
+        };
     }
 
     /// <inheritdoc />
@@ -277,6 +331,14 @@ public sealed class MultilingualPhonemizer : IPhonemizer
         for (int segIdx = 0; segIdx < segments.Count; segIdx++)
         {
             (string? lang, string? segmentText) = segments[segIdx];
+
+            // CJK punctuation is neutral, so it can sit inside a Latin segment;
+            // the Latin G2P would delete it and join the words around it
+            // (Issue #823, docs/spec/cjk-punctuation-contract.toml).
+            if (S_latinSegmentLanguages.Contains(lang))
+            {
+                segmentText = NormalizeCjkPunctuationForLatin(segmentText);
+            }
 
             // ZH-EN code-switching dispatch: route embedded en (with adjacent
             // zh) through the chinese loanword path. Issue #384, design §2.3.

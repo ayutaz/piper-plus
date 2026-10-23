@@ -77,6 +77,24 @@ std::string detectDominantLanguage(
     const std::string& utf8Text,
     const UnicodeLanguageDetector& detector);
 
+// CJK punctuation (Issue #823, docs/spec/cjk-punctuation-contract.toml).
+// U+3000-303F, U+FF00-FF20, U+FF3B-FF40, U+FF5B-FF64, U+FFE0-FFEF belong to
+// no language: detectChar() returns "" so they join the surrounding segment.
+bool isCjkPunctuation(char32_t cp);
+
+// True for the languages whose segments go through
+// normalizeCjkPunctuationForLatin() before phonemization
+// (en, es, fr, pt, pt-PT, sv).
+bool isLatinSegmentLanguage(const std::string& lang);
+
+// Rewrite CJK punctuation in a Latin-script segment as ASCII: fullwidth
+// ASCII symbols and digits (U+FF01-FF5E) become their ASCII forms, 、 。 and
+// their halfwidth forms become "," and ".", and any other CJK punctuation
+// becomes one space. Other characters are left as they are. Without this the
+// Latin G2P drops the characters and joins the words around them
+// ("Hello，world" -> "helloworld").
+std::string normalizeCjkPunctuationForLatin(const std::string& utf8Text);
+
 } // namespace piper
 
 #endif // LANGUAGE_DETECTOR_HPP

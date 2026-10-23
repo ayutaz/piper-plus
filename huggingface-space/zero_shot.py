@@ -176,7 +176,9 @@ def phoneme_ids_for_base(text: str, language: str, voice: PiperVoice) -> list[in
             "Text contains phonemes untrained in the zero-shot model: "
             + " ".join(sorted(missing))
         )
-    if not phones:
+    # A kept "?" alone is not speech: punctuation-only text has no language
+    # (#823) and is read as ASCII punctuation.
+    if all(unicodedata.category(p).startswith("P") for p in phones):
         raise ZeroShotInputError("Text produced no phonemes.")
     return voice.phonemes_to_ids(phones)
 

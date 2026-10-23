@@ -1,0 +1,77 @@
+# CJK punctuation contract (Issue #823).
+# ======================================
+# CJK punctuation (、。，！？「」 ...) and the fullwidth forms of ASCII
+# symbols belong to no language. Every G2P runtime must:
+#
+#   1. classify every code point in [neutral].ranges as neutral in its
+#      Unicode language detector, so the character joins the segment around
+#      it (a Chinese sentence keeps its 。 and ， and the ZH-EN loanword
+#      dispatch still sees the Chinese segment next to an English word);
+#   2. before a segment in a Latin-script language ([latin_segments].languages)
+#      is handed to that language's phonemizer, replace these characters as
+#      [latin_segments] says. Otherwise the Latin G2P (g2p_en and its ports)
+#      deletes them and joins the words around them ("Hello，world" ->
+#      "helloworld").
+#
+# Chinese segments need no rewriting (ChinesePhonemizer maps ，。！？ to
+# , . ! ?) and Japanese segments are read by OpenJTalk as they are.
+#
+# Before #823 Python, Rust, Go, the JS G2P and C# classified these characters
+# as Japanese whenever "ja" was a configured language, so a Chinese sentence
+# lost its punctuation in a multilingual model; C++ already treated them as
+# neutral (#262).
+#
+# Fixture: tests/fixtures/g2p/cjk_punctuation_cases.json, generated from this
+# file by scripts/build_cjk_punctuation_fixture.py. Gate:
+# scripts/check_cjk_punctuation_contract.py (fixture in sync, every consumer
+# test reads the fixture).
+
+[meta]
+spec_version = "1.0"
+last_updated = "2026-10-24"
+issue = 823
+forward_compat_policy = "strict"
+canonical_source = "src/python/g2p/piper_plus_g2p/multilingual.py"
+
+[neutral]
+# Inclusive code point ranges. The fullwidth Latin letters (U+FF21-FF3A,
+# U+FF41-FF5A) are Latin and the halfwidth katakana / hangul (U+FF65-FFDF)
+# are script characters, so neither is in this list.
+ranges = [
+    ["U+3000", "U+303F"], # CJK Symbols and Punctuation (、。「」〜 ideographic space)
+    ["U+FF00", "U+FF20"], # fullwidth ! " # ... 0-9 ... @
+    ["U+FF3B", "U+FF40"], # fullwidth [ \ ] ^ _ `
+    ["U+FF5B", "U+FF64"], # fullwidth { | } ~, white parentheses, halfwidth 。「」、
+    ["U+FFE0", "U+FFEF"], # fullwidth cent, pound, yen, ... and halfwidth forms
+]
+
+[latin_segments]
+# European Portuguese ("pt-PT") counts as "pt".
+languages = ["en", "es", "fr", "pt", "sv"]
+# Applied in this order to every neutral code point of a Latin segment
+# (other characters, the fullwidth Latin letters included, are left as they
+# are):
+#   - U+FF01-FF5E (fullwidth ASCII symbols and digits) -> the ASCII
+#     character (code point - 0xFEE0);
+#   - the code points in [latin_segments.punctuation] -> the given string;
+#   - any other neutral code point -> one ASCII space.
+fullwidth_ascii = ["U+FF01", "U+FF5E"]
+
+[latin_segments.punctuation]
+"U+3001" = "," # 、 ideographic comma
+"U+3002" = "." # 。 ideographic full stop
+"U+FF61" = "." # ｡ halfwidth ideographic full stop
+"U+FF64" = "," # ､ halfwidth ideographic comma
+
+[consumers]
+# Tests that read the fixture. The gate fails when one of them no longer
+# mentions the fixture file.
+tests = [
+    "src/python/g2p/tests/test_cjk_punctuation_contract.py",
+    "src/python_run/tests/test_cjk_punctuation_contract.py",
+    "src/rust/piper-plus-g2p/tests/cjk_punctuation_contract.rs",
+    "src/go/phonemize/cjk_punctuation_contract_test.go",
+    "src/wasm/g2p/test/test-cjk-punctuation-contract.js",
+    "src/csharp/PiperPlus.Core.Tests/CjkPunctuationContractTests.cs",
+    "src/cpp/tests/test_cjk_punctuation_contract.cpp",
+]

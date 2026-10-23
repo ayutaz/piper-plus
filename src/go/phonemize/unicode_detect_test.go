@@ -34,14 +34,14 @@ func TestEnglishTextSingleSegment(t *testing.T) {
 
 func TestMixedEnglishJapanese(t *testing.T) {
 	d := NewUnicodeLanguageDetector([]string{"ja", "en", "zh"}, "en")
-	// The comma is a neutral ASCII char absorbed into preceding "en" segment.
-	// Then Japanese text starts a new segment.
+	// The ideographic comma is neutral (Issue #823) and is absorbed into the
+	// preceding "en" segment. Then Japanese text starts a new segment.
 	segs := SegmentText("hello、こんにちは", d)
 	if len(segs) != 2 {
 		t.Fatalf("expected 2 segments, got %d: %+v", len(segs), segs)
 	}
-	if segs[0].Language != "en" {
-		t.Errorf("segment 0: expected language en, got %q", segs[0].Language)
+	if segs[0].Language != "en" || segs[0].Text != "hello、" {
+		t.Errorf("segment 0: expected en %q, got %s %q", "hello、", segs[0].Language, segs[0].Text)
 	}
 	if segs[1].Language != "ja" {
 		t.Errorf("segment 1: expected language ja, got %q", segs[1].Language)
@@ -135,8 +135,9 @@ func TestDetectCharPriority(t *testing.T) {
 		{'漢', true, "ja", "CJK with kana context -> ja"},
 		{'Ａ', false, "en", "fullwidth latin A"},
 		{'ｚ', false, "en", "fullwidth latin z"},
-		{'。', false, "ja", "CJK punctuation"},
-		{'！', false, "ja", "fullwidth exclamation"},
+		// CJK punctuation is neutral even with ja registered (Issue #823).
+		{'。', false, "", "CJK punctuation"},
+		{'！', false, "", "fullwidth exclamation"},
 		{'A', false, "en", "basic latin uppercase"},
 		{'z', false, "en", "basic latin lowercase"},
 		{'\u00C0', false, "en", "latin A-grave"},
@@ -306,28 +307,39 @@ func TestDetectChar_KanaNoJA(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDetectChar_FullwidthPunctBoundaries(t *testing.T) {
+	// CJK punctuation and fullwidth symbols used to be "ja" whenever ja was
+	// registered; they are neutral since Issue #823
+	// (docs/spec/cjk-punctuation-contract.toml), so a Chinese sentence keeps
+	// its punctuation.
 	d := NewUnicodeLanguageDetector([]string{"ja", "en"}, "en")
 	tests := []struct {
 		ch   rune
 		want string
 		desc string
 	}{
-		{0x3000, "ja", "ideographic space (CJK punct start)"},
-		{0x303F, "ja", "CJK punct end"},
-		{0xFF00, "ja", "fullwidth forms start (＀)"},
-		{0xFF20, "ja", "fullwidth @ (＠)"},
+		{0x3000, "", "ideographic space (CJK punct start)"},
+		{0x303F, "", "CJK punct end"},
+		{0xFF00, "", "fullwidth forms start (＀)"},
+		{0xFF20, "", "fullwidth @ (＠)"},
 		// 0xFF21 (Ａ) is fullwidth Latin -> en
 		{0xFF21, "en", "fullwidth A -> Latin"},
 		{0xFF3A, "en", "fullwidth Z -> Latin"},
-		// 0xFF3B (［) back to JA punct
-		{0xFF3B, "ja", "fullwidth [ -> JA punct"},
-		{0xFF40, "ja", "fullwidth ` -> JA punct"},
+		// 0xFF3B (［) back to neutral
+		{0xFF3B, "", "fullwidth [ -> neutral"},
+		{0xFF40, "", "fullwidth ` -> neutral"},
 		// 0xFF41 (ａ) is fullwidth Latin -> en
 		{0xFF41, "en", "fullwidth a -> Latin"},
 		{0xFF5A, "en", "fullwidth z -> Latin"},
-		// 0xFF5B (｛) -> JA punct
-		{0xFF5B, "ja", "fullwidth { -> JA punct"},
-		{0xFFEF, "ja", "halfwidth/fullwidth forms end"},
+		// 0xFF5B (｛) .. 0xFF64 (halfwidth ､) -> neutral
+		{0xFF5B, "", "fullwidth { -> neutral"},
+		{0xFF64, "", "halfwidth ideographic comma -> neutral"},
+		// 0xFF65 .. 0xFFDF halfwidth katakana / hangul -> JA
+		{0xFF65, "ja", "halfwidth katakana middle dot -> JA"},
+		{0xFF71, "ja", "halfwidth katakana a -> JA"},
+		{0xFFDF, "ja", "halfwidth forms end -> JA"},
+		// 0xFFE0 .. 0xFFEF fullwidth signs -> neutral
+		{0xFFE0, "", "fullwidth cent -> neutral"},
+		{0xFFEF, "", "halfwidth/fullwidth forms end"},
 	}
 	for _, tc := range tests {
 		got := d.DetectChar(tc.ch, false)
@@ -424,21 +436,23 @@ func TestHasKana_MixedWithCJK(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// CJK punctuation routing: JA not registered, ZH registered -> "zh"
+// CJK punctuation routing: neutral whichever languages are registered
 // ---------------------------------------------------------------------------
 
 func TestDetectChar_CJKPunctNoJAWithZH(t *testing.T) {
+	// These used to be "zh" when only ZH was registered. They are neutral
+	// since Issue #823 and join the Chinese segment around them instead.
 	d := NewUnicodeLanguageDetector([]string{"zh", "en"}, "en")
 	tests := []struct {
 		ch   rune
 		want string
 		desc string
 	}{
-		{'。', "zh", "CJK period -> zh when JA absent, ZH present"},
-		{'、', "zh", "CJK comma -> zh when JA absent, ZH present"},
-		{'「', "zh", "CJK left bracket -> zh when JA absent, ZH present"},
-		{0xFF01, "zh", "fullwidth ! -> zh when JA absent, ZH present"},
-		{0xFF5B, "zh", "fullwidth { -> zh when JA absent, ZH present"},
+		{'。', "", "CJK period -> neutral"},
+		{'、', "", "CJK comma -> neutral"},
+		{'「', "", "CJK left bracket -> neutral"},
+		{0xFF01, "", "fullwidth ! -> neutral"},
+		{0xFF5B, "", "fullwidth { -> neutral"},
 	}
 	for _, tc := range tests {
 		got := d.DetectChar(tc.ch, false)

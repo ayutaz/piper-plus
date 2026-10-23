@@ -484,7 +484,8 @@ func esProcess(text string) (tokens []string, prosody []*ProsodyInfo, eos string
 			if r == '?' || r == '!' || r == '.' {
 				eos = ch
 			}
-			needSpace = false
+			// needSpace stays as it is: the next word is still a new word,
+			// as in Python's spanish.py.
 			continue
 		}
 

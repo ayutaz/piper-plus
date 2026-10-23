@@ -31,14 +31,20 @@ public sealed class UnicodeLanguageDetector
         (ch >= '\u3400' && ch <= '\u4DBF') ||
         (ch >= '\uF900' && ch <= '\uFAFF');
 
-    // Japanese-specific: CJK punctuation + fullwidth forms.
-    // Excludes fullwidth Latin letters (U+FF21-FF3A, U+FF41-FF5A) which are
-    // handled separately as Latin characters.
-    private static bool IsJaPunct(char ch) =>
+    // CJK punctuation + fullwidth ASCII symbols / digits: neutral (Issue #823,
+    // docs/spec/cjk-punctuation-contract.toml). Excludes fullwidth Latin
+    // letters (U+FF21-FF3A, U+FF41-FF5A) and halfwidth katakana / hangul
+    // (U+FF65-FFDF).
+    internal static bool IsCjkPunctuation(char ch) =>
         (ch >= '\u3000' && ch <= '\u303F') ||
         (ch >= '\uFF00' && ch <= '\uFF20') ||
         (ch >= '\uFF3B' && ch <= '\uFF40') ||
-        (ch >= '\uFF5B' && ch <= '\uFFEF');
+        (ch >= '\uFF5B' && ch <= '\uFF64') ||
+        (ch >= '\uFFE0' && ch <= '\uFFEF');
+
+    // Halfwidth katakana / hangul: U+FF65-FFDF
+    private static bool IsHalfwidthForm(char ch) =>
+        ch >= '\uFF65' && ch <= '\uFFDF';
 
     // Fullwidth Latin letters: U+FF21-FF3A (A-Z), U+FF41-FF5A (a-z)
     private static bool IsFullwidthLatin(char ch) =>
@@ -183,9 +189,15 @@ public sealed class UnicodeLanguageDetector
             return _defaultLatinResult;
         }
 
-        // Japanese-specific punctuation (CJK punct + fullwidth forms,
-        // excluding fullwidth Latin already handled above)
-        if (IsJaPunct(ch))
+        // CJK punctuation and fullwidth ASCII symbols / digits: neutral, so
+        // they join the surrounding segment (Issue #823).
+        if (IsCjkPunctuation(ch))
+        {
+            return null;
+        }
+
+        // Halfwidth katakana / hangul -> Japanese
+        if (IsHalfwidthForm(ch))
         {
             return _hasJa ? "ja" : null;
         }

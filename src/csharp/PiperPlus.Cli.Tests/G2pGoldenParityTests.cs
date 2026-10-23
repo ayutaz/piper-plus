@@ -37,8 +37,7 @@ namespace PiperPlus.Cli.Tests;
 /// multi-codepoint phonemes (rr, tʃ, tone3) are one PUA character in the C#
 /// output and spelled out in the golden. Only the golden side is mapped
 /// (<c>pua.json</c>), so output that forgets the PUA encoding still fails, as
-/// it would at the ID lookup. Chinese punctuation and word boundaries are
-/// compared without them until #823.
+/// it would at the ID lookup.
 /// </para>
 /// <para>
 /// Nothing is skipped: a missing golden, registry or dictionary fails the test.
@@ -52,8 +51,6 @@ public class G2pGoldenParityTests
     private const string Runtime = "csharp";
 
     private static readonly string[] Languages = ["en", "es", "fr", "pt", "sv", "zh"];
-
-    private static readonly HashSet<string> ZhIgnored = [" ", ".", ",", "!", "?", ";", ":"];
 
     // Tokens that carry no sound: a word made only of these was dropped.
     private static readonly HashSet<string> Silent =
@@ -143,9 +140,6 @@ public class G2pGoldenParityTests
         return tokens;
     }
 
-    private static List<string> DropIgnored(string lang, IEnumerable<string> tokens) =>
-        lang == "zh" ? tokens.Where(t => !ZhIgnored.Contains(t)).ToList() : tokens.ToList();
-
     /// <summary>Joins like the golden and spells PUA characters as U+XXXX.</summary>
     private static string Describe(IEnumerable<string> tokens)
     {
@@ -213,7 +207,7 @@ public class G2pGoldenParityTests
             }
 
             bool matches = actual is not null
-                && DropIgnored(lang, expected).SequenceEqual(DropIgnored(lang, actual));
+                && expected.SequenceEqual(actual);
             verified++;
 
             string label = $"[{lang}] '{input}'";

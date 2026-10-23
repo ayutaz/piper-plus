@@ -483,20 +483,11 @@ class TestMultilingualProsodyPunctuation:
 class TestFullwidthDetection:
     """Regression / behavior-pinning tests for fullwidth (U+FF00-FFEF) chars.
 
-    The current implementation routes U+FF21-FF3A and U+FF41-FF5A
-    (fullwidth ASCII letters) to ``default_latin_language``, but routes
-    fullwidth digits (U+FF10-FF19) and fullwidth ASCII punctuation
-    (U+FF00-FF20, U+FF3B-FF40, U+FF5B-FFEF) to "ja" when JA is present
-    (otherwise None). These tests pin that behavior so an accidental
-    routing change is caught by CI.
-
-    See ``UnicodeLanguageDetector.detect_char`` in
-    ``piper_plus_g2p/multilingual.py``. Some of these assertions encode
-    behavior that arguably should be revisited (e.g. fullwidth digits
-    routed to JA inside a JA-EN-ZH detector) — those cases are flagged
-    via ``xfail(strict=False)`` and listed under "Future Work" in the
-    accompanying PR description so the next contributor can decide
-    whether to keep, tighten, or relax the contract.
+    U+FF21-FF3A and U+FF41-FF5A (fullwidth ASCII letters) route to
+    ``default_latin_language``; fullwidth digits and ASCII punctuation
+    belong to no language (docs/spec/cjk-punctuation-contract.toml,
+    Issue #823). The full contract is checked code point by code point in
+    ``test_cjk_punctuation_contract.py``.
     """
 
     def test_fullwidth_uppercase_letters_map_to_default_latin(self):
@@ -536,51 +527,24 @@ class TestFullwidthDetection:
         assert detector.detect_char("Ａ") is None
         assert detector.detect_char("ａ") is None
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "Fullwidth digits (U+FF10-FF19) currently route to 'ja' when JA is "
-            "present, but they are language-neutral semantically (just like "
-            "ASCII digits which return None). Future Work: consider returning "
-            "None to be consistent with ASCII digit handling."
-        ),
-    )
-    def test_fullwidth_digits_should_be_neutral(self):
-        """Future Work: fullwidth digits ideally return None like ASCII digits."""
+    def test_fullwidth_digits_are_neutral(self):
+        """Fullwidth digits return None like ASCII digits (Issue #823)."""
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
+
+        for languages in (["ja", "en"], ["en", "zh"]):
+            detector = UnicodeLanguageDetector(languages, default_latin_language="en")
+            assert detector.detect_char("０") is None
+            assert detector.detect_char("５") is None
+            assert detector.detect_char("９") is None
+
+    def test_fullwidth_punctuation_is_neutral(self):
+        """U+FF01 (！), U+FF3B (［), U+FF5E (～) belong to no language (Issue #823)."""
         from piper_plus_g2p.multilingual import UnicodeLanguageDetector
 
         detector = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
-        # Currently returns "ja". Marked xfail so when the implementation is
-        # tightened this flips to xpass and the contract update lands.
-        assert detector.detect_char("０") is None  # １
-        assert detector.detect_char("５") is None  # ５
-        assert detector.detect_char("９") is None  # ９
-
-    def test_fullwidth_digits_current_behavior(self):
-        """Pin the *current* fullwidth digit behavior (route to JA when JA in set)."""
-        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
-
-        detector_ja = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
-        # With JA in language set: fullwidth digits route to 'ja'.
-        assert detector_ja.detect_char("０") == "ja"
-        assert detector_ja.detect_char("９") == "ja"
-
-        # Without JA in language set: fullwidth digits return None.
-        detector_no_ja = UnicodeLanguageDetector(
-            ["en", "zh"], default_latin_language="en"
-        )
-        assert detector_no_ja.detect_char("０") is None
-        assert detector_no_ja.detect_char("９") is None
-
-    def test_fullwidth_punctuation_routes_to_ja(self):
-        """U+FF01 (！), U+FF3B ([)、U+FF5E (~) route to 'ja' when JA supported."""
-        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
-
-        detector = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
-        # Fullwidth ! (FF01), [ (FF3B), ~ (FF5E) all map to 'ja'.
-        assert detector.detect_char("！") == "ja"
-        assert detector.detect_char("［") == "ja"
-        assert detector.detect_char("～") == "ja"
+        assert detector.detect_char("！") is None
+        assert detector.detect_char("［") is None
+        assert detector.detect_char("～") is None
 
     def test_fullwidth_mixed_segment_with_jp_context(self):
         """Fullwidth ＡＢＣ inside JA text is segmented into a 'en' chunk."""

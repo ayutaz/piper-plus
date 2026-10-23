@@ -60,7 +60,15 @@ pub unsafe extern "C" fn piper_plus_g2p_phonemize(
             unsafe { CStr::from_ptr(language) }.to_str().ok()?
         };
         let p = h.registry.get(lang)?;
-        let (tokens, _) = p.phonemize_with_prosody(text).ok()?;
+        // One language's phonemizer, without the multilingual segmenter:
+        // rewrite CJK punctuation for a Latin-script language here (Issue
+        // #823, docs/spec/cjk-punctuation-contract.toml).
+        let text = if crate::multilingual::LATIN_SEGMENT_LANGUAGES.contains(&lang) {
+            crate::multilingual::normalize_cjk_punctuation_for_latin(text)
+        } else {
+            std::borrow::Cow::Borrowed(text)
+        };
+        let (tokens, _) = p.phonemize_with_prosody(&text).ok()?;
         let json = serde_json::json!({"tokens": tokens, "language": lang});
         CString::new(json.to_string()).ok()
     }));
@@ -287,6 +295,56 @@ mod tests {
             piper_plus_g2p_free_string(result);
             piper_plus_g2p_free(handle);
         }
+    }
+
+    /// Tokens JSON of `piper_plus_g2p_phonemize(text, lang)`.
+    #[cfg(any(
+        feature = "spanish",
+        all(feature = "english", feature = "bundled-dicts")
+    ))]
+    fn ffi_tokens(lang: &str, text: &str) -> String {
+        let lang = CString::new(lang).unwrap();
+        let text = CString::new(text).unwrap();
+        unsafe {
+            let handle = piper_plus_g2p_create(lang.as_ptr());
+            assert!(!handle.is_null());
+            let result = piper_plus_g2p_phonemize(handle, text.as_ptr(), lang.as_ptr());
+            assert!(!result.is_null());
+            let s = CStr::from_ptr(result).to_str().unwrap().to_owned();
+            piper_plus_g2p_free_string(result);
+            piper_plus_g2p_free(handle);
+            s
+        }
+    }
+
+    // The FFI reads text with one language's phonemizer, without the
+    // multilingual segmenter that rewrites CJK punctuation in Latin
+    // segments, so it must rewrite it itself (Issue #823,
+    // docs/spec/cjk-punctuation-contract.toml). Swift's PiperPlusG2P uses it.
+    #[test]
+    #[cfg(all(feature = "english", feature = "bundled-dicts"))]
+    fn test_ffi_english_reads_cjk_punctuation_like_ascii() {
+        assert_eq!(
+            ffi_tokens("en", "Hello，world"),
+            ffi_tokens("en", "Hello,world")
+        );
+        assert_eq!(
+            ffi_tokens("en", "Hello、world。"),
+            ffi_tokens("en", "Hello,world.")
+        );
+        assert_eq!(
+            ffi_tokens("en", "I have ３ cats．"),
+            ffi_tokens("en", "I have 3 cats.")
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "spanish")]
+    fn test_ffi_spanish_reads_cjk_punctuation_like_ascii() {
+        assert_eq!(
+            ffi_tokens("es", "Hola，amigo！"),
+            ffi_tokens("es", "Hola,amigo!")
+        );
     }
 
     #[test]

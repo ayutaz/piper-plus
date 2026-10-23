@@ -10,7 +10,8 @@
  *   Hangul                   -> 'ko' (if supported)
  *   CJK Ideographs           -> 'ja' (if context has kana) or 'zh'
  *   Fullwidth Latin           -> default Latin language
- *   CJK Punctuation          -> 'ja' (if supported)
+ *   CJK Punctuation          -> null (neutral, Issue #823)
+ *   Halfwidth Katakana/Hangul -> 'ja' (if supported)
  *   Latin                    -> default Latin language
  *   Otherwise                -> null (neutral: whitespace, digits, punctuation)
  *
@@ -65,6 +66,85 @@ function _loadSwedishLidData(data) {
 
 const { functionWords: SV_FUNCTION_WORDS, strongChars: SV_STRONG_CHARS } =
   _loadSwedishLidData(svFunctionWordsData);
+
+// ----------------------------------------------------------------------------
+// CJK punctuation (Issue #823, docs/spec/cjk-punctuation-contract.toml)
+//
+// CJK punctuation and the fullwidth forms of ASCII symbols belong to no
+// language: they join the segment around them, so a Chinese sentence keeps
+// its 。 and ，. In a Latin-script segment they are rewritten to ASCII first,
+// because the Latin G2Ps delete characters they do not know and would join the
+// words around them ("Hello，world" -> "helloworld").
+
+const CJK_PUNCT_LATIN = new Map([
+  [0x3001, ","],
+  [0x3002, "."],
+  [0xff61, "."],
+  [0xff64, ","],
+]);
+
+/**
+ * Whether a code point is CJK punctuation or a fullwidth ASCII symbol / digit
+ * (neutral in language detection).
+ *
+ * @param {number} code
+ * @returns {boolean}
+ */
+function _isCjkPunctuation(code) {
+  // CJK Symbols and Punctuation: U+3000-303F
+  // Fullwidth digits and symbols: U+FF00-FF20
+  // Fullwidth brackets and symbols: U+FF3B-FF40
+  // Fullwidth braces, white parentheses, halfwidth 。「」、: U+FF5B-FF64
+  // Fullwidth cent, pound, yen, ... and halfwidth forms: U+FFE0-FFEF
+  return (
+    (code >= 0x3000 && code <= 0x303f) ||
+    (code >= 0xff00 && code <= 0xff20) ||
+    (code >= 0xff3b && code <= 0xff40) ||
+    (code >= 0xff5b && code <= 0xff64) ||
+    (code >= 0xffe0 && code <= 0xffef)
+  );
+}
+
+/** @param {string} ch */
+function _cjkPunctuationToLatin(ch) {
+  const code = ch.codePointAt(0);
+  if (!_isCjkPunctuation(code)) {
+    return ch;
+  }
+  if (code >= 0xff01 && code <= 0xff5e) {
+    return String.fromCodePoint(code - 0xfee0);
+  }
+  return CJK_PUNCT_LATIN.get(code) ?? " ";
+}
+
+/**
+ * Rewrite CJK punctuation in a Latin-script segment as ASCII.
+ *
+ * Fullwidth ASCII symbols and digits become their ASCII forms, 、 and 。 (and
+ * their halfwidth forms) become `,` and `.`, and any other CJK punctuation
+ * becomes a space. Other characters are left as they are. Mirrors Python's
+ * `normalize_cjk_punctuation_for_latin` (Issue #823).
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+export function normalizeCjkPunctuationForLatin(text) {
+  let found = false;
+  for (const ch of text) {
+    if (_isCjkPunctuation(ch.codePointAt(0))) {
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    return text;
+  }
+  let out = "";
+  for (const ch of text) {
+    out += _cjkPunctuationToLatin(ch);
+  }
+  return out;
+}
 
 export class UnicodeLanguageDetector {
   /**
@@ -144,17 +224,10 @@ export class UnicodeLanguageDetector {
   }
 
   /** @private */
-  _isJaPunctuation(code) {
-    // CJK Symbols and Punctuation: U+3000-303F
-    // Fullwidth digits and symbols: U+FF00-FF20
-    // Fullwidth brackets and symbols: U+FF3B-FF40
-    // Fullwidth braces onwards: U+FF5B-FFEF
-    return (
-      (code >= 0x3000 && code <= 0x303f) ||
-      (code >= 0xff00 && code <= 0xff20) ||
-      (code >= 0xff3b && code <= 0xff40) ||
-      (code >= 0xff5b && code <= 0xffef)
-    );
+  _isHalfwidthScript(code) {
+    // Halfwidth katakana / hangul: U+FF65-FFDF (the rest of the Halfwidth and
+    // Fullwidth Forms block is fullwidth Latin or CJK punctuation)
+    return code >= 0xff65 && code <= 0xffdf;
   }
 
   /** @private */
@@ -229,8 +302,15 @@ export class UnicodeLanguageDetector {
       return this.languages.has(this.defaultLatinLanguage) ? this.defaultLatinLanguage : null;
     }
 
-    // Japanese-specific punctuation
-    if (this._isJaPunctuation(code)) {
+    // CJK punctuation and fullwidth ASCII symbols / digits: neutral, so they
+    // join the surrounding segment (Issue #823,
+    // docs/spec/cjk-punctuation-contract.toml)
+    if (_isCjkPunctuation(code)) {
+      return null;
+    }
+
+    // Halfwidth katakana / hangul -> Japanese
+    if (this._isHalfwidthScript(code)) {
       return this._hasJa ? "ja" : null;
     }
 

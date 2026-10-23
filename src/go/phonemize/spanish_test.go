@@ -1055,3 +1055,24 @@ func TestEsPhonemize_StressFollowsPythonSyllables(t *testing.T) {
 		}
 	}
 }
+
+func TestEsProcess_WordAfterPunctuationKeepsItsBoundary(t *testing.T) {
+	// Python's spanish.py keeps the word boundary across punctuation, so
+	// "Hola, amigo" reads "... a , ␣ a ..."; Go used to drop the space after
+	// any punctuation (found by the Issue #823 golden case "Hola，amigo！").
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"Hola, amigo", "ˈ o l a , _ a m ˈ i ɣ o"},
+		{"Hola,amigo!", "ˈ o l a , _ a m ˈ i ɣ o !"},
+		{"¿Hola?", "¿ ˈ o l a ?"},
+	}
+	for _, tc := range tests {
+		tokens, _, _ := esProcess(tc.input)
+		got := strings.ReplaceAll(strings.Join(tokens, " "), "   ", " _ ")
+		if got != tc.want {
+			t.Errorf("esProcess(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}

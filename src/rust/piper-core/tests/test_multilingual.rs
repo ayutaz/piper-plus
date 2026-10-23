@@ -170,21 +170,30 @@ fn test_latin_none_when_default_absent() {
 }
 
 // ===========================================================================
-// Language Detection — Japanese punctuation
+// Language Detection — CJK punctuation
 // ===========================================================================
+// CJK punctuation and fullwidth symbols used to be Japanese whenever "ja" was
+// configured, which cut them out of Chinese sentences. They are neutral now
+// (Issue #823, docs/spec/cjk-punctuation-contract.toml).
 
 #[test]
-fn test_detect_cjk_punctuation_as_japanese() {
+fn test_detect_cjk_punctuation_is_neutral() {
     let detector = make_detector(&["ja", "en"], "en");
-    assert_eq!(detector.detect_char('\u{3001}', false), Some("ja")); // ideographic comma
-    assert_eq!(detector.detect_char('\u{3002}', false), Some("ja")); // ideographic period
-    assert_eq!(detector.detect_char('\u{300C}', false), Some("ja")); // left corner bracket
+    assert_eq!(detector.detect_char('\u{3001}', false), None); // ideographic comma
+    assert_eq!(detector.detect_char('\u{3002}', false), None); // ideographic period
+    assert_eq!(detector.detect_char('\u{300C}', false), None); // left corner bracket
 }
 
 #[test]
-fn test_fullwidth_symbol_as_japanese() {
+fn test_fullwidth_symbol_is_neutral() {
     let detector = make_detector(&["ja", "en"], "en");
-    assert_eq!(detector.detect_char('\u{FF01}', false), Some("ja")); // fullwidth exclamation
+    assert_eq!(detector.detect_char('\u{FF01}', false), None); // fullwidth exclamation
+}
+
+#[test]
+fn test_halfwidth_katakana_as_japanese() {
+    let detector = make_detector(&["ja", "en"], "en");
+    assert_eq!(detector.detect_char('\u{FF71}', false), Some("ja")); // halfwidth katakana a
 }
 
 // ===========================================================================

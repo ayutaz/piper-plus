@@ -12,12 +12,10 @@
 //! fixed. English words that must never phonemize to nothing are listed in
 //! `tests/fixtures/g2p/english_no_drop_words.json` and follow the same rule.
 //!
-//! Two representation differences are not divergences:
-//!   - multi-codepoint phonemes (rr, tʃ, tone3) are one PUA character here
-//!     (`pua.json`) and spelled out in the golden. Only the golden side is
-//!     mapped, so output that forgets the PUA encoding still fails.
-//!   - Chinese punctuation and word boundaries: Python drops CJK punctuation,
-//!     the other runtimes keep it. Compared without them until #823.
+//! Multi-codepoint phonemes (rr, tʃ, tone3) are one PUA character here
+//! (`pua.json`) and spelled out in the golden; that representation difference
+//! is not a divergence. Only the golden side is mapped, so output that forgets
+//! the PUA encoding still fails.
 //!
 //! The dictionaries are the checked-in `data/` files, so nothing here is
 //! skipped when a dictionary is missing: a load failure fails the test.
@@ -148,16 +146,6 @@ fn split_phonemes(s: &str) -> Vec<String> {
     tokens
 }
 
-fn drop_ignored(lang: &str, tokens: Vec<String>) -> Vec<String> {
-    if lang != "zh" {
-        return tokens;
-    }
-    tokens
-        .into_iter()
-        .filter(|t| !matches!(t.as_str(), " " | "." | "," | "!" | "?" | ";" | ":"))
-        .collect()
-}
-
 #[test]
 fn matches_python_golden_except_listed_divergences() {
     let pua = pua_table();
@@ -192,9 +180,7 @@ fn matches_python_golden_except_listed_divergences() {
             .map(|t| pua.get(&t).cloned().unwrap_or(t))
             .collect();
         let actual = p.phonemize_with_language(input, lang).map(|(t, _)| t);
-        let matches = actual
-            .as_ref()
-            .is_ok_and(|t| drop_ignored(lang, expected.clone()) == drop_ignored(lang, t.clone()));
+        let matches = actual.as_ref().is_ok_and(|t| *t == expected);
         verified += 1;
 
         let label = format!("[{lang}] '{input}'");

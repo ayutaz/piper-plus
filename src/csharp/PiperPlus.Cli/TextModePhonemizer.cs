@@ -45,8 +45,9 @@ internal static partial class Program
             var phonemizers = new Dictionary<string, IPhonemizer>();
             foreach (var part in parts)
             {
-                // Recursively resolve each language (reuse existing switch cases)
-                phonemizers[part] = ResolveTextModePhonemizer(part);
+                // MultilingualPhonemizer rewrites the CJK punctuation of Latin
+                // segments itself, so it gets the plain phonemizers.
+                phonemizers[part] = ResolveSingleLanguagePhonemizer(part);
             }
 
             // Determine default Latin language (prefer en, then es, pt, fr)
@@ -63,6 +64,21 @@ internal static partial class Program
             return new MultilingualPhonemizer(phonemizers, defaultLatin);
         }
 
+        var phonemizer = ResolveSingleLanguagePhonemizer(language);
+
+        // A single Latin-script language skips MultilingualPhonemizer, which
+        // rewrites CJK punctuation as ASCII for these segments (Issue #823,
+        // docs/spec/cjk-punctuation-contract.toml); do the same here.
+        return language is "en" or "es" or "fr" or "pt" or "sv"
+            ? new CjkPunctuationAsAsciiPhonemizer(phonemizer)
+            : phonemizer;
+    }
+
+    [RequiresUnreferencedCode(
+        "G2P engine types are resolved via reflection. When publishing trimmed, " +
+        "ensure DotNetG2PEngine/DotNetEnglishG2PEngine are preserved.")]
+    private static IPhonemizer ResolveSingleLanguagePhonemizer(string language)
+    {
         switch (language)
         {
             case "ja":
@@ -95,4 +111,25 @@ internal static partial class Program
                     "Supported languages: ja, en, zh, ko, es, fr, pt, sv, or combined (e.g. ja-en-zh-ko-es-fr-pt).");
         }
     }
+}
+
+/// <summary>
+/// Rewrites CJK punctuation as ASCII before a Latin-script phonemizer reads
+/// the text, as <see cref="MultilingualPhonemizer"/> does for Latin segments.
+/// </summary>
+internal sealed class CjkPunctuationAsAsciiPhonemizer(IPhonemizer inner) : IPhonemizer
+{
+    public List<string> Phonemize(string text) =>
+        inner.Phonemize(MultilingualPhonemizer.NormalizeCjkPunctuationForLatin(text));
+
+    public (List<string> Tokens, List<ProsodyInfo?> Prosody) PhonemizeWithProsody(string text) =>
+        inner.PhonemizeWithProsody(MultilingualPhonemizer.NormalizeCjkPunctuationForLatin(text));
+
+    public Dictionary<string, int[]>? GetPhonemeIdMap() => inner.GetPhonemeIdMap();
+
+    public (List<int> Ids, List<ProsodyInfo?> Prosody) PostProcessIds(
+        List<int> phonemeIds,
+        List<ProsodyInfo?> prosodyFeatures,
+        Dictionary<string, int[]> phonemeIdMap) =>
+        inner.PostProcessIds(phonemeIds, prosodyFeatures, phonemeIdMap);
 }

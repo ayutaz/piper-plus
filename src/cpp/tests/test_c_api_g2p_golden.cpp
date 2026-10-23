@@ -8,12 +8,12 @@
  * library). A difference that is not listed fails, and so does a listed case
  * that now matches, so the list shrinks as the linked issues are fixed.
  *
- * Two representation differences are not divergences:
- *   - libpiper_plus encodes multi-codepoint phonemes (rr, tʃ, tone3) as one
- *     PUA character (pua.json); the golden spells them out. Only the golden
- *     side is mapped, so output that forgets the PUA encoding still fails.
- *   - Chinese punctuation and word boundaries: Python drops CJK punctuation,
- *     libpiper_plus keeps it (#262). Compared without them until #823.
+ * One representation difference is not a divergence: libpiper_plus encodes
+ * multi-codepoint phonemes (rr, tʃ, tone3) as one PUA character (pua.json);
+ * the golden spells them out. Only the golden side is mapped, so output that
+ * forgets the PUA encoding still fails. Chinese punctuation and word
+ * boundaries are compared as they are: since Issue #823 Python keeps CJK
+ * punctuation too (docs/spec/cjk-punctuation-contract.toml).
  *
  * Also checks that English words phonemize to at least one phoneme
  * (tests/fixtures/g2p/english_no_drop_words.json), with the same listing rule.
@@ -116,16 +116,6 @@ std::vector<std::string> splitPhonemes(const std::string &s) {
     return tokens;
 }
 
-std::vector<std::string> dropIgnored(const std::string &lang, std::vector<std::string> tokens) {
-    if (lang != "zh") return tokens;
-    static const std::set<std::string> ignored = {" ", ".", ",", "!", "?", ";", ":"};
-    std::vector<std::string> kept;
-    for (auto &t : tokens) {
-        if (!ignored.count(t)) kept.push_back(std::move(t));
-    }
-    return kept;
-}
-
 // Points PIPER_PLUS_DICTIONARIES_PATH at the canonical CMU / pinyin files,
 // as the Android AAR does, and restores the previous value afterwards.
 class ScopedDictionaries {
@@ -204,8 +194,7 @@ TEST_F(G2pGolden, MatchesPythonGoldenExceptListedDivergences) {
             expected.push_back(it != pua.end() ? it->second : t);
         }
         const auto actual = phonemize(handle_, input, lang);
-        const bool matches = actual.ok &&
-            dropIgnored(lang, expected) == dropIgnored(lang, splitPhonemes(actual.phonemes));
+        const bool matches = actual.ok && expected == splitPhonemes(actual.phonemes);
         ++verified;
 
         const std::string label = "[" + lang + "] '" + input + "'";

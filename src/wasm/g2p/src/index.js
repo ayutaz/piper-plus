@@ -15,7 +15,7 @@ import { FrenchG2P } from "./fr/index.js";
 import { EuropeanPortugueseG2P, PortugueseG2P } from "./pt/index.js";
 import { SwedishG2P } from "./sv/index.js";
 import { KoreanG2P } from "./ko/index.js";
-import { UnicodeLanguageDetector } from "./detect.js";
+import { UnicodeLanguageDetector, normalizeCjkPunctuationForLatin } from "./detect.js";
 import { Encoder } from "./encode.js";
 
 // ---- Constants ---------------------------------------------------------------
@@ -34,6 +34,14 @@ const LANGUAGE_FACTORIES = {
   "pt-PT": () => new EuropeanPortugueseG2P(),
   sv: () => new SwedishG2P(),
 };
+
+/**
+ * Latin-script languages. Their text goes through
+ * `normalizeCjkPunctuationForLatin` before it reaches their G2P, which would
+ * otherwise delete CJK punctuation and join the words around it (Issue #823,
+ * docs/spec/cjk-punctuation-contract.toml).
+ */
+const LATIN_SEGMENT_LANGUAGES = new Set(["en", "es", "fr", "pt", "pt-PT", "sv"]);
 
 // ---- G2P class ---------------------------------------------------------------
 
@@ -149,7 +157,7 @@ export class G2P {
     const language = this._resolveLanguage(text, options);
     const g2p = this._getPhonemizerOrThrow(language);
 
-    const result = g2p.phonemize(text);
+    const result = g2p.phonemize(this._prepareText(text, language));
     return {
       tokens: result.tokens,
       prosody: new Array(result.tokens.length).fill(null),
@@ -181,6 +189,7 @@ export class G2P {
     this._ensureNotDisposed();
     const language = this._resolveLanguage(text, options);
     const g2p = this._getPhonemizerOrThrow(language);
+    text = this._prepareText(text, language);
 
     if (typeof g2p.phonemizeWithProsody === "function") {
       const result = g2p.phonemizeWithProsody(text);
@@ -291,6 +300,22 @@ export class G2P {
   }
 
   /**
+   * Rewrite CJK punctuation as ASCII in text for a Latin-script language
+   * (Issue #823). Text for other languages is returned as it is.
+   *
+   * @param {string} text
+   * @param {string} language
+   * @returns {string}
+   * @private
+   */
+  _prepareText(text, language) {
+    if (typeof text !== "string" || !LATIN_SEGMENT_LANGUAGES.has(language)) {
+      return text;
+    }
+    return normalizeCjkPunctuationForLatin(text);
+  }
+
+  /**
    * Get the phonemizer for a language, throwing a descriptive error if the
    * language was not initialised.
    *
@@ -335,7 +360,7 @@ export { SwedishG2P } from "./sv/index.js";
 export { KoreanG2P } from "./ko/index.js";
 export { DictLoader } from "./dict-loader.js";
 export { Encoder } from "./encode.js";
-export { UnicodeLanguageDetector } from "./detect.js";
+export { UnicodeLanguageDetector, normalizeCjkPunctuationForLatin } from "./detect.js";
 export { CustomDictionary } from "./custom-dictionary.js";
 export { PUA_COMPAT_VERSION, checkPuaCompat, PUA_MAP, mapToken, unmapToken } from "./pua-map.js";
 export { extractPhonemesFromLabels, applyNPhonemeRules, mapToPUA } from "./ja/phoneme-extract.js";

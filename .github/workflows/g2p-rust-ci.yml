@@ -8,6 +8,8 @@ on:
       # Read by tests/golden_parity.rs.
       - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
       - 'tests/fixtures/g2p/known_divergences.json'
+      # Read by the CJK punctuation contract tests (#823).
+      - 'tests/fixtures/g2p/cjk_punctuation_cases.json'
       - 'tests/fixtures/g2p/english_no_drop_words.json'
       # Read by tests/english_normalize.rs.
       - 'tests/fixtures/g2p/english_normalize_cases.json'
@@ -21,6 +23,8 @@ on:
       # Read by tests/golden_parity.rs.
       - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
       - 'tests/fixtures/g2p/known_divergences.json'
+      # Read by the CJK punctuation contract tests (#823).
+      - 'tests/fixtures/g2p/cjk_punctuation_cases.json'
       - 'tests/fixtures/g2p/english_no_drop_words.json'
       # Read by tests/english_normalize.rs.
       - 'tests/fixtures/g2p/english_normalize_cases.json'

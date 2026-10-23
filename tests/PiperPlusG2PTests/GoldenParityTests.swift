@@ -11,12 +11,10 @@
 // are listed in tests/fixtures/g2p/english_no_drop_words.json and follow the
 // same rule.
 //
-// Two representation differences are not divergences:
-//   - multi-codepoint phonemes (rr, tʃ, tone3) are one PUA character here
-//     (pua.json) and spelled out in the golden. Only the golden side is
-//     mapped, so output that forgets the PUA encoding still fails.
-//   - Chinese punctuation and word boundaries: Python drops CJK punctuation,
-//     the other runtimes keep it. Compared without them until #823.
+// One representation difference is not a divergence: multi-codepoint
+// phonemes (rr, tʃ, tone3) are one PUA character here (pua.json) and spelled
+// out in the golden. Only the golden side is mapped, so output that forgets
+// the PUA encoding still fails.
 //
 // Japanese needs the OpenJTalk dictionary and Korean is absent from the golden
 // (and from the trained models), so both are left out.
@@ -81,7 +79,6 @@ enum GoldenFixtures {
 
 final class GoldenParityTests: XCTestCase {
     private static let languages: [Language] = [.english, .chinese, .spanish, .french, .portuguese, .swedish]
-    private static let zhIgnored: Set<String> = [" ", ".", ",", "!", "?", ";", ":"]
     private static let notPhonemes: Set<String> = [" ", ".", ",", "!", "?", ";", ":", "'", "\"", "-"]
 
     /// Tokens are joined with one space; a word boundary token " " therefore
@@ -105,10 +102,6 @@ final class GoldenParityTests: XCTestCase {
         return tokens
     }
 
-    private static func dropIgnored(_ language: String, _ tokens: [String]) -> [String] {
-        language == "zh" ? tokens.filter { !zhIgnored.contains($0) } : tokens
-    }
-
     func testMatchesPythonGoldenExceptListedDivergences() throws {
         let known = try GoldenFixtures.knownDivergences()
         let pua = try GoldenFixtures.puaTable()
@@ -127,9 +120,7 @@ final class GoldenParityTests: XCTestCase {
 
             let expected = Self.splitPhonemes(expectedText).map { pua[$0] ?? $0 }
             let actual = try? phonemizer.phonemize(input, language: language).tokens
-            let matches = actual.map {
-                Self.dropIgnored(code, $0) == Self.dropIgnored(code, expected)
-            } ?? false
+            let matches = actual == expected
             verified += 1
 
             let label = "[\(code)] '\(input)'"

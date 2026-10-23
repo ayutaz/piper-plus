@@ -15,7 +15,54 @@ from .base import Phonemizer, ProsodyInfo
 _LOGGER = logging.getLogger(__name__)
 
 
-__all__ = ["MultilingualPhonemizer", "UnicodeLanguageDetector"]
+__all__ = [
+    "MultilingualPhonemizer",
+    "UnicodeLanguageDetector",
+    "normalize_cjk_punctuation_for_latin",
+]
+
+# ---------------------------------------------------------------------------
+# CJK punctuation (Issue #823, docs/spec/cjk-punctuation-contract.toml)
+# ---------------------------------------------------------------------------
+# CJK punctuation and the fullwidth forms of ASCII symbols belong to no
+# language: they join the segment around them, so a Chinese sentence keeps
+# its 。 and ，. In a Latin-script segment they are rewritten to ASCII first,
+# because g2p_en deletes characters it does not know and would join the words
+# around them ("Hello，world" -> "helloworld").
+_LATIN_SEGMENT_LANGUAGES = frozenset({"en", "es", "fr", "pt", "pt-PT", "sv"})
+_CJK_PUNCT_LATIN = {0x3001: ",", 0x3002: ".", 0xFF61: ".", 0xFF64: ","}
+
+
+def _is_cjk_punctuation(code: int) -> bool:
+    return (
+        0x3000 <= code <= 0x303F
+        or 0xFF00 <= code <= 0xFF20
+        or 0xFF3B <= code <= 0xFF40
+        or 0xFF5B <= code <= 0xFF64
+        or 0xFFE0 <= code <= 0xFFEF
+    )
+
+
+def _cjk_punctuation_to_latin(ch: str) -> str:
+    code = ord(ch)
+    if not _is_cjk_punctuation(code):
+        return ch
+    if 0xFF01 <= code <= 0xFF5E:
+        return chr(code - 0xFEE0)
+    return _CJK_PUNCT_LATIN.get(code, " ")
+
+
+def normalize_cjk_punctuation_for_latin(text: str) -> str:
+    """Rewrite CJK punctuation in a Latin-script segment as ASCII.
+
+    Fullwidth ASCII symbols and digits become their ASCII forms, 、 and 。
+    (and their halfwidth forms) become ``,`` and ``.``, and any other CJK
+    punctuation becomes a space. Other characters are left as they are.
+    """
+    if not any(_is_cjk_punctuation(ord(ch)) for ch in text):
+        return text
+    return "".join(_cjk_punctuation_to_latin(ch) for ch in text)
+
 
 # ---------------------------------------------------------------------------
 # Swedish per-word LID support (Issue #539)
@@ -191,17 +238,17 @@ class UnicodeLanguageDetector:
                 return "zh"
             return None
 
-        # CJK Symbols and Punctuation: U+3000-303F (Japanese-specific punct)
-        if 0x3000 <= code <= 0x303F:
-            return "ja" if self._has_ja else None
+        # CJK punctuation and fullwidth ASCII symbols / digits: neutral, so
+        # they join the surrounding segment (Issue #823).
+        if _is_cjk_punctuation(code):
+            return None
 
         # Fullwidth forms: U+FF00-FFEF
         if 0xFF00 <= code <= 0xFFEF:
             # Fullwidth Latin uppercase U+FF21-FF3A, lowercase U+FF41-FF5A
             if (0xFF21 <= code <= 0xFF3A) or (0xFF41 <= code <= 0xFF5A):
                 return self._default_latin
-            # Remaining fullwidth forms -> Japanese punctuation/symbols
-            # (digits U+FF00-FF20, brackets U+FF3B-FF40, braces U+FF5B-FFEF)
+            # Halfwidth katakana / hangul (U+FF65-FFDF) -> Japanese
             return "ja" if self._has_ja else None
 
         # Basic Latin letters: A-Z (0x41-5A), a-z (0x61-7A)
@@ -429,7 +476,12 @@ class MultilingualPhonemizer(Phonemizer):
         all_phonemes: list[str] = []
         all_prosody: list[ProsodyInfo | None] = []
 
-        for i, (lang, segment_text) in enumerate(segments):
+        for i, (lang, raw_text) in enumerate(segments):
+            segment_text = (
+                normalize_cjk_punctuation_for_latin(raw_text)
+                if lang in _LATIN_SEGMENT_LANGUAGES
+                else raw_text
+            )
             if has_zh and lang == "en":
                 prev_is_zh = i > 0 and segments[i - 1][0] == "zh"
                 next_is_zh = i + 1 < len(segments) and segments[i + 1][0] == "zh"

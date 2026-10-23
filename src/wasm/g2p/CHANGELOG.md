@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **CJK punctuation is no longer Japanese (Issue #823)**: `UnicodeLanguageDetector` classified CJK punctuation (、。，！？「」 ...) and the fullwidth forms of ASCII symbols and digits as `ja` whenever Japanese was enabled, which split a Chinese sentence at every ， and 。 and put a Japanese segment between Chinese and an English word after a Chinese comma. These characters are now neutral and join the segment around them, as `docs/spec/cjk-punctuation-contract.toml` specifies for every runtime. Halfwidth katakana stays `ja` and fullwidth Latin letters stay Latin. `G2P` now rewrites them as ASCII (`，` → `,`, `、` → `,`, `。` → `.`, `３` → `3`, others → space) before an en / es / fr / pt / pt-PT / sv G2P sees the text, so `Hola，amigo！` reads like `Hola,amigo!` instead of losing its punctuation. The rewrite is exported as `normalizeCjkPunctuationForLatin`.
+
 ## [0.4.2] - 2026-08-28
 
 ### Fixed

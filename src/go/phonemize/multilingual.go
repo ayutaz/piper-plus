@@ -205,6 +205,12 @@ func (m *MultilingualPhonemizer) phonemizeWithDetector(text string, detector *Un
 	}
 
 	for i, seg := range segments {
+		// CJK punctuation in a Latin-script segment is read as ASCII
+		// (Issue #823, docs/spec/cjk-punctuation-contract.toml).
+		if latinSegmentLanguages[seg.Language] {
+			seg.Text = NormalizeCJKPunctuationForLatin(seg.Text)
+		}
+
 		// ZH-EN dispatch: route embedded en (with adjacent zh) through
 		// chinese loanword phonemizer. Issue #384, design §2.2.
 		if dispatchOn && hasZhSegment && zhCP != nil && loanwordD != nil &&
