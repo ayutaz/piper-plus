@@ -82,6 +82,7 @@ Rust には、テキスト全体を 1 つの phonemizer に渡す `phonemize_wit
 また piper-core はこれも使わず、言語指定を language_id の選択にしか使っていませんでした。
 
 そこで trait に `phonemize_with_language(text, language)` を追加しました。
+
 - `MultilingualPhonemizer` は、ラテン文字言語ごとに検出器を用意してこれを実装します。
 - piper-core の `SynthesisParams::language_override` と CLI の `--test-mode` はこの経路を通ります。
 - 言語指定がないときの動作は変わりません。
