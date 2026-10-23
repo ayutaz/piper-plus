@@ -60,10 +60,6 @@ def unconstrained_rational_quadratic_spline(
     min_derivative=DEFAULT_MIN_DERIVATIVE,
 ):
     inside_interval_mask = (inputs >= -tail_bound) & (inputs <= tail_bound)
-    outside_interval_mask = ~inside_interval_mask
-
-    outputs = torch.zeros_like(inputs)
-    logabsdet = torch.zeros_like(inputs)
 
     if tails == "linear":
         unnormalized_derivatives = F.pad(unnormalized_derivatives, pad=(1, 1))
@@ -71,20 +67,18 @@ def unconstrained_rational_quadratic_spline(
         unnormalized_derivatives[..., 0] = constant
         # unnormalized_derivatives[..., -1] = constant
         unnormalized_derivatives[..., unnormalized_derivatives.size(-1) - 1] = constant
-
-        outputs[outside_interval_mask] = inputs[outside_interval_mask]
-        logabsdet[outside_interval_mask] = 0
     else:
         raise RuntimeError(f"{tails} tails are not implemented.")
 
-    (
-        outputs[inside_interval_mask],
-        logabsdet[inside_interval_mask],
-    ) = rational_quadratic_spline(
-        inputs=inputs[inside_interval_mask],
-        unnormalized_widths=unnormalized_widths[inside_interval_mask, :],
-        unnormalized_heights=unnormalized_heights[inside_interval_mask, :],
-        unnormalized_derivatives=unnormalized_derivatives[inside_interval_mask, :],
+    # Every element goes through the spline and torch.where picks the result:
+    # boolean-mask indexing counts the selected elements on the host (a sync in
+    # forward and in backward). Outside inputs are replaced by 0, a point inside
+    # the interval, so the unused branch stays finite and gives zero gradient.
+    spline_outputs, spline_logabsdet = rational_quadratic_spline(
+        inputs=torch.where(inside_interval_mask, inputs, torch.zeros_like(inputs)),
+        unnormalized_widths=unnormalized_widths,
+        unnormalized_heights=unnormalized_heights,
+        unnormalized_derivatives=unnormalized_derivatives,
         inverse=inverse,
         left=-tail_bound,
         right=tail_bound,
@@ -94,7 +88,10 @@ def unconstrained_rational_quadratic_spline(
         min_bin_height=min_bin_height,
         min_derivative=min_derivative,
     )
-
+    outputs = torch.where(inside_interval_mask, spline_outputs, inputs)
+    logabsdet = torch.where(
+        inside_interval_mask, spline_logabsdet, torch.zeros_like(spline_logabsdet)
+    )
     return outputs, logabsdet
 
 

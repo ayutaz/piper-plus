@@ -101,17 +101,20 @@ def rand_gumbel_like(x):
 
 
 def slice_segments(x, ids_str, segment_size=4):
-    ret = torch.zeros_like(x[:, :, :segment_size])
-    for i in range(x.size(0)):
-        idx_str = max(0, ids_str[i])
-        idx_end = idx_str + segment_size
-        seg = x[i, :, idx_str:idx_end]
-        seg_len = seg.size(-1)
-        if seg_len < segment_size:
-            ret[i, :, :seg_len] = seg
-        else:
-            ret[i] = seg
-    return ret
+    # One gather for all rows: a per-row Python slice reads each GPU start index
+    # on the host (a sync per row). Same result as the row loop: negative starts
+    # clamp to 0, positions past the end are 0, and the width is
+    # min(segment_size, T).
+    width = x[:, :, :segment_size].size(-1)
+    starts = torch.as_tensor(ids_str, device=x.device).to(torch.long).clamp(min=0)
+    positions = starts[:, None] + torch.arange(width, device=x.device)
+    inside = (positions < x.size(-1))[:, None, :]
+    index = positions.clamp(max=x.size(-1) - 1)[:, None, :].expand(-1, x.size(1), -1)
+    return torch.where(
+        inside,
+        torch.gather(x, 2, index),
+        torch.zeros((), dtype=x.dtype, device=x.device),
+    )
 
 
 def rand_slice_segments(x, x_lengths=None, segment_size=4):

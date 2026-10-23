@@ -172,6 +172,18 @@ def process_ja_dataset(
 
             # Add inter-phoneme padding
             prosody = utt.get("prosody_features", [None] * len(new_ids))
+            if len(prosody) != len(new_ids):
+                # ja 音素マップに無い音素 (例: "fy") を含む発話は preprocess /
+                # prosody 側で系列長がずれる。位置合わせが保証できないため skip
+                # (v8 実測: 55,678 発話中 2 件)
+                _LOGGER.warning(
+                    "prosody length mismatch (ids=%d prosody=%d), skipping: %.40s",
+                    len(new_ids),
+                    len(prosody),
+                    utt.get("text", ""),
+                )
+                skipped += 1
+                continue
             new_ids, prosody = _add_inter_phoneme_padding(
                 new_ids, prosody, bilingual_id_map
             )
@@ -473,7 +485,7 @@ def _phonemize_en_worker(args: tuple[str, str, str, int]) -> dict:
             else:
                 missing.append(ph)
 
-        phoneme_ids, prosody_features = phonemizer.post_process_ids(
+        phoneme_ids, prosody_features = _add_inter_phoneme_padding(
             phoneme_ids, prosody_features, id_map
         )
 
@@ -697,7 +709,7 @@ def process_en_dataset(
                                 prosody_features.append(None)
                     else:
                         missing_phonemes[ph] += 1
-                phoneme_ids, prosody_features = phonemizer.post_process_ids(
+                phoneme_ids, prosody_features = _add_inter_phoneme_padding(
                     phoneme_ids, prosody_features, bilingual_id_map
                 )
                 if len(phoneme_ids) == 0:
