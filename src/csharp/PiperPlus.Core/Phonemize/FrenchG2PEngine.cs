@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -347,15 +348,7 @@ public sealed class FrenchG2PEngine : IFrenchG2PEngine
             // "fer" and the ErAsEhr words keep /ɛʁ/.
             if (ch == 'e' && i + 1 == n - 1 && word[i + 1] == 'r')
             {
-                int vowelCount = 0;
-                foreach (char c in word)
-                {
-                    if (IsVowel(c))
-                    {
-                        vowelCount++;
-                    }
-                }
-
+                int vowelCount = word.Count(IsVowel);
                 if (vowelCount >= 2 && !ErAsEhr.Contains(word))
                 {
                     ph.Add("e");
