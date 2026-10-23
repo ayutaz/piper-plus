@@ -195,6 +195,13 @@ android {
         }
     }
 
+    // GoldenParity (golden fixture comparison) runs on the emulator in L3
+    // and is unit-tested on the JVM in L1, so both source sets compile it.
+    sourceSets {
+        getByName("test").java.srcDir("src/sharedTest/java")
+        getByName("androidTest").java.srcDir("src/sharedTest/java")
+    }
+
     // Note: variant publishing is configured via the vanniktech
     // `AndroidSingleVariantLibrary(...)` block below — do NOT also declare
     // `android.publishing { singleVariant(...) }` here, otherwise the
@@ -207,6 +214,8 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+    // The JVM's android.jar stubs org.json, so L1 needs the real library.
+    testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("org.json:json:20240303")
@@ -259,10 +268,18 @@ androidComponents {
 
 // Copy the cross-runtime G2P fixture into androidTest assets so the L4 parity
 // instrumented test can read it via `assets.open(...)`. We copy the file
-// rather than symlink so Windows hosts work too.
+// rather than symlink so Windows hosts work too. The golden comparison also
+// needs the known-divergence list and the PUA table (libpiper_plus encodes
+// multi-codepoint phonemes as PUA characters, the golden does not).
 val syncG2pFixture = tasks.register<Copy>("syncG2pFixture") {
-    from(rootProject.layout.projectDirectory.dir("../tests/fixtures/g2p"))
-    include("phoneme_test_cases.json", "phoneme_test_cases_golden.json")
+    from(rootProject.layout.projectDirectory.dir("../tests/fixtures/g2p")) {
+        include(
+            "phoneme_test_cases.json",
+            "phoneme_test_cases_golden.json",
+            "known_divergences.json",
+        )
+    }
+    from(rootProject.layout.projectDirectory.file("../src/python/g2p/piper_plus_g2p/data/pua.json"))
     into(layout.projectDirectory.dir("src/androidTest/assets/g2p_fixtures"))
 }
 tasks.matching {

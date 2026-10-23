@@ -94,6 +94,15 @@ class BundledDictionariesTest {
     @Test
     fun `unsafe characters in the version do not escape the root`() {
         assertEquals(root, BundledDictionaries.extract(root, "..", ::open).parentFile)
-        assertEquals("v.._x_y", BundledDictionaries.extract(root, "../x y", ::open).name)
+        assertEquals("v___x_y", BundledDictionaries.extract(root, "../x y", ::open).name)
+    }
+
+    @Test
+    fun `a version ending in a dot still gets its own directory`() {
+        // Windows drops trailing dots from names, so "v2." would become "v2".
+        val dir = BundledDictionaries.extract(root, "2.", ::open)
+
+        assertEquals("v2_", dir.name)
+        assertTrue(File(dir, BundledDictionaries.FILES.first()).isFile)
     }
 }

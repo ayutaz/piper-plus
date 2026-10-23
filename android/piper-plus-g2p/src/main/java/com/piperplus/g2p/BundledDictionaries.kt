@@ -57,8 +57,10 @@ internal object BundledDictionaries {
      * written to a temporary name first so an interrupted copy is redone.
      */
     fun extract(root: File, version: String, open: (String) -> InputStream): File {
-        // The "v" prefix keeps names like ".." from leaving [root].
-        val dir = File(root, "v" + version.replace(Regex("[^A-Za-z0-9._-]"), "_"))
+        // Keep "2.0.2" readable but replace path separators and any dot not
+        // followed by a letter or digit: ".." must not leave [root], and
+        // Windows drops trailing dots from names.
+        val dir = File(root, "v" + version.replace(Regex("[^A-Za-z0-9._-]|\\.(?![A-Za-z0-9])"), "_"))
         val marker = File(dir, MARKER)
         if (!marker.isFile) {
             if (!dir.isDirectory && !dir.mkdirs()) throw IOException("cannot create $dir")

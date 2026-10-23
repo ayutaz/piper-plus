@@ -201,6 +201,8 @@ src/rust/target/*
 # git, hence the file-by-file ignore.
 android/piper-plus-g2p/src/androidTest/assets/g2p_fixtures/phoneme_test_cases.json
 android/piper-plus-g2p/src/androidTest/assets/g2p_fixtures/phoneme_test_cases_golden.json
+android/piper-plus-g2p/src/androidTest/assets/g2p_fixtures/known_divergences.json
+android/piper-plus-g2p/src/androidTest/assets/g2p_fixtures/pua.json
 android/piper-plus-g2p/src/main/jniLibs/
 android/piper-plus-g2p/.cxx/
 android/piper-plus-g2p/build/
