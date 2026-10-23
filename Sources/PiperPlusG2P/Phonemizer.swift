@@ -1,9 +1,9 @@
 // Phonemizer.swift — idiomatic Swift wrapper around the C FFI in piper_plus_g2p.h.
 //
-// The C API exposes a handle (`PiperG2pHandle`) that owns a registry of
-// language phonemizers. `init(languages:)` creates the handle and registers
-// each requested language; `phonemize(_:language:)` runs G2P and returns
-// the parsed JSON envelope. The handle is freed automatically in `deinit`.
+// The C API exposes a handle (`PiperG2pHandle`) that owns a multilingual
+// phonemizer over the requested languages. `init(languages:)` creates the
+// handle; `phonemize(_:language:)` runs G2P and returns the parsed JSON
+// envelope. The handle is freed automatically in `deinit`.
 
 @_exported import PiperPlusG2PBinary
 import Foundation
@@ -41,7 +41,10 @@ public final class Phonemizer: @unchecked Sendable {
         piper_plus_g2p_free(handle)
     }
 
-    /// Phonemize `text` using the phonemizer registered for `language`.
+    /// Phonemize `text` as `language`. Runs of another registered language
+    /// are read by that language (English letters in Chinese text become
+    /// pinyin when `.english` is registered, as in Python); Japanese text
+    /// goes whole to the Japanese phonemizer.
     ///
     /// - Returns: tokens (IPA + occasional PUA codepoints for language-
     ///   specific phonemes) plus the language code echo.

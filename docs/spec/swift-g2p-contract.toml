@@ -99,8 +99,14 @@ ownership = "caller must call piper_plus_g2p_free"
 
 [abi.functions.phonemize]
 signature = "char *piper_plus_g2p_phonemize(const PiperG2pHandle *h, const char *text, const char *language)"
-returns = "owned UTF-8 JSON string (see [json_envelope]), or NULL on lookup failure"
+returns = "owned UTF-8 JSON string (see [json_envelope]), or NULL when the language is not registered"
 ownership = "caller must call piper_plus_g2p_free_string"
+# Text goes through MultilingualPhonemizer::phonemize_with_language over the
+# handle's languages, with the given language as the Latin-script default, so
+# Chinese text with English letters reads them as pinyin when en is registered
+# (ZH-EN loanword, Issue #827), as Python does. Japanese text goes whole to the
+# Japanese phonemizer, which keeps its question EOS and its OpenJTalk reading.
+behavior = "multilingual over the handle's languages; ja goes whole to the Japanese phonemizer"
 
 [abi.functions.free_string]
 signature = "void piper_plus_g2p_free_string(char *ptr)"
@@ -108,7 +114,7 @@ behavior = "no-op on NULL; otherwise frees a string returned by phonemize / avai
 
 [abi.functions.free]
 signature = "void piper_plus_g2p_free(PiperG2pHandle *h)"
-behavior = "no-op on NULL; otherwise drops the registry"
+behavior = "no-op on NULL; otherwise drops the multilingual phonemizer and its language phonemizers"
 
 [abi.functions.available_languages]
 signature = "char *piper_plus_g2p_available_languages(const PiperG2pHandle *h)"
@@ -211,9 +217,9 @@ spm_product = "PiperPlusG2P"
 [swift_api.thread_safety]
 phonemizer_init = "thread-safe (each Phonemizer owns its handle)"
 phonemizer_phonemize = """
-Read-only across the FFI: PhonemizerRegistry::get returns &dyn
-Phonemize and individual phonemizers do not mutate state during
-phonemize_with_prosody. Multiple concurrent calls on the same
+The only state written during a call is MultilingualPhonemizer's
+last_eos, which a Mutex guards; language phonemizers do not mutate state
+during phonemize_with_prosody. Multiple concurrent calls on the same
 Phonemizer instance are supported (see ConcurrencyTests.swift).
 """
 

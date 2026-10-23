@@ -52,9 +52,10 @@ public sealed class MultilingualPhonemizer : IPhonemizer
     // -----------------------------------------------------------------
 
     /// <summary>
-    /// Tokens that are stripped from individual language segments.
+    /// Tokens that are stripped from individual Japanese segments.
     /// Includes BOS (^), standard EOS ($, ?), and PUA-mapped question
-    /// markers (?!, ?., ?~).
+    /// markers (?!, ?., ?~). Other languages strip only ^ and $
+    /// (see <see cref="IsBoundaryToken"/>).
     /// </summary>
     private static readonly HashSet<string> S_bosEosTokens = new()
     {
@@ -363,7 +364,7 @@ public sealed class MultilingualPhonemizer : IPhonemizer
                     for (int i = 0; i < n; i++)
                     {
                         var ph = result.Phonemes[i];
-                        if (S_bosEosTokens.Contains(ph))
+                        if (IsBoundaryToken(lang, ph))
                         {
                             if (S_eosTokens.Contains(ph))
                             {
@@ -396,7 +397,7 @@ public sealed class MultilingualPhonemizer : IPhonemizer
             for (int i = 0; i < phonemes.Count; i++)
             {
                 string ph = phonemes[i];
-                if (S_bosEosTokens.Contains(ph))
+                if (IsBoundaryToken(lang, ph))
                 {
                     if (S_eosTokens.Contains(ph))
                     {
@@ -414,4 +415,16 @@ public sealed class MultilingualPhonemizer : IPhonemizer
         _lastEos.Value = lastEos;
         return (allPhonemes, allProsody);
     }
+
+    /// <summary>
+    /// Whether <paramref name="ph"/>, produced for a <paramref name="lang"/>
+    /// segment, is a BOS/EOS token to strip.
+    /// <para>
+    /// Only Japanese ends a sentence with a question-marker EOS ("?", "?!",
+    /// ...); in other languages "?" is an ordinary phoneme, as in Python's
+    /// <c>MultilingualPhonemizer</c>, and the EOS stays "$".
+    /// </para>
+    /// </summary>
+    private static bool IsBoundaryToken(string lang, string ph) =>
+        lang == "ja" ? S_bosEosTokens.Contains(ph) : ph is "^" or "$";
 }

@@ -569,4 +569,35 @@ public sealed class MultilingualPhonemizerTests
         // JA(2) + EN(4) = 6 tokens
         Assert.Equal(6, tokens.Count);
     }
+
+    // ================================================================
+    // 13. NonJapaneseQuestionMark_KeptAsPhoneme
+    // ================================================================
+
+    /// <summary>
+    /// Only Japanese ends a sentence with a question-marker EOS. In the
+    /// other languages "?" is an ordinary phoneme, as in Python's
+    /// <c>MultilingualPhonemizer</c>: it stays in the tokens and the EOS
+    /// stays "$". Only "^" and "$" are stripped from those segments.
+    /// </summary>
+    [Fact]
+    public void NonJapaneseQuestionMark_KeptAsPhoneme()
+    {
+        var enQuestionStub = new StubPhonemizer(
+            new List<string> { "^", "h", "e", "?", "$" },
+            new List<ProsodyInfo?> { null, new ProsodyInfo(0, 0, 2), new ProsodyInfo(0, 1, 2), null, null });
+        MultilingualPhonemizer multilingual = MakeMultilingual(MakeJaStub(), enQuestionStub);
+
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = multilingual.PhonemizeWithProsody("he?");
+
+        Assert.Equal(new List<string> { "h", "e", "?" }, tokens);
+        Assert.Equal(tokens.Count, prosody.Count);
+
+        Dictionary<string, int[]> map = MakeMap();
+        (List<int>? ids, List<ProsodyInfo?> _) = multilingual.PostProcessIds(
+            new List<int> { 20, 21, 3 }, new List<ProsodyInfo?> { null, null, null }, map);
+
+        // "?" (ID=3) is read as a phoneme; the sentence ends with "$" (ID=2).
+        Assert.Equal(new List<int> { 1, 0, 20, 0, 21, 0, 3, 0, 2 }, ids);
+    }
 }

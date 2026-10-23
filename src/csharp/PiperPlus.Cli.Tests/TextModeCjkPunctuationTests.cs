@@ -5,12 +5,12 @@ using Xunit;
 namespace PiperPlus.Cli.Tests;
 
 /// <summary>
-/// <c>--language en</c> (and the other Latin-script languages) reads the text
-/// with that language's phonemizer alone, without
-/// <see cref="PiperPlus.Core.Phonemize.MultilingualPhonemizer"/>, so it must
-/// rewrite CJK punctuation as ASCII itself (Issue #823,
-/// <c>docs/spec/cjk-punctuation-contract.toml</c>). Otherwise DotNetG2P drops
-/// <c>，</c> and joins the words around it.
+/// <c>--language en</c> (and the other Latin-script languages) must read CJK
+/// punctuation as ASCII (Issue #823,
+/// <c>docs/spec/cjk-punctuation-contract.toml</c>), as
+/// <see cref="PiperPlus.Core.Phonemize.MultilingualPhonemizer"/> does for
+/// Latin segments. Otherwise DotNetG2P drops <c>，</c> and joins the words
+/// around it.
 /// </summary>
 public class TextModeCjkPunctuationTests
 {
