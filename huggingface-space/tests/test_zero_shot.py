@@ -160,9 +160,19 @@ def test_untrained_phonemes_raise(base_voice):
         zero_shot.phoneme_ids_for_base("Não sei.", "pt", base_voice)
 
 
-def test_text_without_phonemes_raises(base_voice):
+@pytest.mark.parametrize(
+    ("text", "language"),
+    [
+        ("。、！？", "ja"),
+        # CJK punctuation belongs to no language (#823), so it is read as
+        # ASCII punctuation; the "?" that survives is not speech either.
+        ("。、！？", "zh"),
+        ("?!", "en"),
+    ],
+)
+def test_text_without_phonemes_raises(base_voice, text, language):
     with pytest.raises(zero_shot.ZeroShotInputError, match="no phonemes"):
-        zero_shot.phoneme_ids_for_base("。、！？", "ja", base_voice)
+        zero_shot.phoneme_ids_for_base(text, language, base_voice)
 
 
 def test_unknown_language_raises(base_voice):
