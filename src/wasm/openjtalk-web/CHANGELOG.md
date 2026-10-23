@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-10-23
+
 ### Added
 
 - Add `base` and `zero-shot-base-zs-v1` registry aliases for the public experimental Zero-Shot bundle at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1`. Resolve its nested `releases/zs-v1/base.onnx` and matching `base.onnx.json` pair with revision-isolated cache keys; this records browser download resolution and does not claim browser synthesis or quality validation.
@@ -19,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Load `piper-plus` from unpkg in the README importmap example. jsDelivr refuses files over 50 MB, so the bundled G2P WASM (about 60 MB) returned 403 and Japanese text produced almost no audio. The browser test now also routes unpkg and fails if `piper-plus` is loaded from jsDelivr.
+- Route English to the JS G2P even when the Rust WASM bundle loads for Japanese or Chinese. The WASM bundle has no English dictionary and spelled words out letter by letter.
+- Regenerate the bundled `pinyin_single.json` / `pinyin_phrases.json` with numeric tones (`ni3`). The previous files carried tone marks (`nǐ`), which the WASM parser read as tone 5 with a broken final.
 
 ## [0.8.0] - 2026-10-06
 
