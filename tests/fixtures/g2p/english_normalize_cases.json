@@ -1,0 +1,915 @@
+{
+  "schema_version": 1,
+  "description": "g2p_en's text normalization, generated from the vendored Python code by scripts/build_english_normalize_fixture.py. 'numbers' is normalize_numbers(input); 'tokens' is the lowercased words after Unicode whitespace becomes a space (the ports' one deliberate change), normalize_numbers, accent stripping, the character filter, the i.e./e.g. replacement and nltk's TweetTokenizer.",
+  "numbers": [
+    {
+      "input": "0",
+      "output": "zero"
+    },
+    {
+      "input": "1",
+      "output": "one"
+    },
+    {
+      "input": "2",
+      "output": "two"
+    },
+    {
+      "input": "3",
+      "output": "three"
+    },
+    {
+      "input": "4",
+      "output": "four"
+    },
+    {
+      "input": "5",
+      "output": "five"
+    },
+    {
+      "input": "6",
+      "output": "six"
+    },
+    {
+      "input": "7",
+      "output": "seven"
+    },
+    {
+      "input": "8",
+      "output": "eight"
+    },
+    {
+      "input": "9",
+      "output": "nine"
+    },
+    {
+      "input": "10",
+      "output": "ten"
+    },
+    {
+      "input": "11",
+      "output": "eleven"
+    },
+    {
+      "input": "12",
+      "output": "twelve"
+    },
+    {
+      "input": "13",
+      "output": "thirteen"
+    },
+    {
+      "input": "14",
+      "output": "fourteen"
+    },
+    {
+      "input": "15",
+      "output": "fifteen"
+    },
+    {
+      "input": "16",
+      "output": "sixteen"
+    },
+    {
+      "input": "17",
+      "output": "seventeen"
+    },
+    {
+      "input": "18",
+      "output": "eighteen"
+    },
+    {
+      "input": "19",
+      "output": "nineteen"
+    },
+    {
+      "input": "20",
+      "output": "twenty"
+    },
+    {
+      "input": "21",
+      "output": "twenty-one"
+    },
+    {
+      "input": "30",
+      "output": "thirty"
+    },
+    {
+      "input": "40",
+      "output": "forty"
+    },
+    {
+      "input": "42",
+      "output": "forty-two"
+    },
+    {
+      "input": "45",
+      "output": "forty-five"
+    },
+    {
+      "input": "50",
+      "output": "fifty"
+    },
+    {
+      "input": "60",
+      "output": "sixty"
+    },
+    {
+      "input": "70",
+      "output": "seventy"
+    },
+    {
+      "input": "80",
+      "output": "eighty"
+    },
+    {
+      "input": "90",
+      "output": "ninety"
+    },
+    {
+      "input": "99",
+      "output": "ninety-nine"
+    },
+    {
+      "input": "100",
+      "output": "one hundred"
+    },
+    {
+      "input": "101",
+      "output": "one hundred one"
+    },
+    {
+      "input": "110",
+      "output": "one hundred ten"
+    },
+    {
+      "input": "115",
+      "output": "one hundred fifteen"
+    },
+    {
+      "input": "123",
+      "output": "one hundred twenty-three"
+    },
+    {
+      "input": "200",
+      "output": "two hundred"
+    },
+    {
+      "input": "999",
+      "output": "nine hundred ninety-nine"
+    },
+    {
+      "input": "1000",
+      "output": "one thousand"
+    },
+    {
+      "input": "1001",
+      "output": "ten oh one"
+    },
+    {
+      "input": "1009",
+      "output": "ten oh nine"
+    },
+    {
+      "input": "1010",
+      "output": "ten ten"
+    },
+    {
+      "input": "1099",
+      "output": "ten ninety-nine"
+    },
+    {
+      "input": "1100",
+      "output": "eleven hundred"
+    },
+    {
+      "input": "1234",
+      "output": "twelve thirty-four"
+    },
+    {
+      "input": "1900",
+      "output": "nineteen hundred"
+    },
+    {
+      "input": "1984",
+      "output": "nineteen eighty-four"
+    },
+    {
+      "input": "1999",
+      "output": "nineteen ninety-nine"
+    },
+    {
+      "input": "2000",
+      "output": "two thousand"
+    },
+    {
+      "input": "2001",
+      "output": "two thousand one"
+    },
+    {
+      "input": "2009",
+      "output": "two thousand nine"
+    },
+    {
+      "input": "2010",
+      "output": "twenty ten"
+    },
+    {
+      "input": "2024",
+      "output": "twenty twenty-four"
+    },
+    {
+      "input": "2100",
+      "output": "twenty-one hundred"
+    },
+    {
+      "input": "2999",
+      "output": "twenty-nine ninety-nine"
+    },
+    {
+      "input": "3000",
+      "output": "three thousand"
+    },
+    {
+      "input": "3001",
+      "output": "three thousand one"
+    },
+    {
+      "input": "9999",
+      "output": "nine thousand, nine hundred ninety-nine"
+    },
+    {
+      "input": "10000",
+      "output": "ten thousand"
+    },
+    {
+      "input": "12345",
+      "output": "twelve thousand, three hundred forty-five"
+    },
+    {
+      "input": "100000",
+      "output": "one hundred thousand"
+    },
+    {
+      "input": "999999",
+      "output": "nine hundred ninety-nine thousand, nine hundred ninety-nine"
+    },
+    {
+      "input": "1000000",
+      "output": "one million"
+    },
+    {
+      "input": "1000001",
+      "output": "one million one"
+    },
+    {
+      "input": "1234567",
+      "output": "one million, two hundred thirty-four thousand, five hundred sixty-seven"
+    },
+    {
+      "input": "1000000000",
+      "output": "one billion"
+    },
+    {
+      "input": "5005",
+      "output": "five thousand five"
+    },
+    {
+      "input": "5100",
+      "output": "five thousand, one hundred"
+    },
+    {
+      "input": "5110",
+      "output": "five thousand, one hundred ten"
+    },
+    {
+      "input": "10001",
+      "output": "ten thousand one"
+    },
+    {
+      "input": "21000",
+      "output": "twenty-one thousand"
+    },
+    {
+      "input": "100001",
+      "output": "one hundred thousand one"
+    },
+    {
+      "input": "100100",
+      "output": "one hundred thousand, one hundred"
+    },
+    {
+      "input": "100101",
+      "output": "one hundred thousand, one hundred one"
+    },
+    {
+      "input": "101000",
+      "output": "one hundred one thousand"
+    },
+    {
+      "input": "1000010",
+      "output": "one million ten"
+    },
+    {
+      "input": "1000100",
+      "output": "one million, one hundred"
+    },
+    {
+      "input": "1001001",
+      "output": "one million, one thousand one"
+    },
+    {
+      "input": "2000001",
+      "output": "two million one"
+    },
+    {
+      "input": "1000000001",
+      "output": "one billion one"
+    },
+    {
+      "input": "123456789012",
+      "output": "one hundred twenty-three billion, four hundred fifty-six million, seven hundred eighty-nine thousand twelve"
+    },
+    {
+      "input": "1000000000000000",
+      "output": "one quadrillion"
+    },
+    {
+      "input": "1000000000000000000",
+      "output": "one quintillion"
+    },
+    {
+      "input": "007",
+      "output": "seven"
+    },
+    {
+      "input": "1st",
+      "output": "first"
+    },
+    {
+      "input": "2nd",
+      "output": "second"
+    },
+    {
+      "input": "3rd",
+      "output": "third"
+    },
+    {
+      "input": "4th",
+      "output": "fourth"
+    },
+    {
+      "input": "11th",
+      "output": "eleventh"
+    },
+    {
+      "input": "12th",
+      "output": "twelfth"
+    },
+    {
+      "input": "13th",
+      "output": "thirteenth"
+    },
+    {
+      "input": "21st",
+      "output": "twenty-first"
+    },
+    {
+      "input": "22nd",
+      "output": "twenty-second"
+    },
+    {
+      "input": "101st",
+      "output": "one hundred and first"
+    },
+    {
+      "input": "111th",
+      "output": "one hundred and eleventh"
+    },
+    {
+      "input": "1000th",
+      "output": "one thousandth"
+    },
+    {
+      "input": "0th",
+      "output": "zeroth"
+    },
+    {
+      "input": "5th",
+      "output": "fifth"
+    },
+    {
+      "input": "8th",
+      "output": "eighth"
+    },
+    {
+      "input": "9th",
+      "output": "ninth"
+    },
+    {
+      "input": "20th",
+      "output": "twentieth"
+    },
+    {
+      "input": "40th",
+      "output": "fortieth"
+    },
+    {
+      "input": "100th",
+      "output": "one hundredth"
+    },
+    {
+      "input": "1100th",
+      "output": "one thousand, one hundredth"
+    },
+    {
+      "input": "5005th",
+      "output": "five thousand and fifth"
+    },
+    {
+      "input": "10001st",
+      "output": "ten thousand and first"
+    },
+    {
+      "input": "1000001st",
+      "output": "one million and first"
+    },
+    {
+      "input": "$0",
+      "output": "zero dollars"
+    },
+    {
+      "input": "$1",
+      "output": "one dollar"
+    },
+    {
+      "input": "$5",
+      "output": "five dollars"
+    },
+    {
+      "input": "$100",
+      "output": "one hundred dollars"
+    },
+    {
+      "input": "$1.50",
+      "output": "one dollar, fifty cents"
+    },
+    {
+      "input": "$0.99",
+      "output": "ninety-nine cents"
+    },
+    {
+      "input": "$1.01",
+      "output": "one dollar, one cent"
+    },
+    {
+      "input": "$.5",
+      "output": "five cents"
+    },
+    {
+      "input": "$1,000",
+      "output": "one thousand dollars"
+    },
+    {
+      "input": "$1.2.3",
+      "output": "one point two.three dollars"
+    },
+    {
+      "input": "£5",
+      "output": "five pounds"
+    },
+    {
+      "input": "3.14",
+      "output": "three point fourteen"
+    },
+    {
+      "input": "0.5",
+      "output": "zero point five"
+    },
+    {
+      "input": "10.25",
+      "output": "ten point twenty-five"
+    },
+    {
+      "input": "1,234",
+      "output": "twelve thirty-four"
+    },
+    {
+      "input": "1,000,000",
+      "output": "one million"
+    },
+    {
+      "input": "R2D2",
+      "output": "RtwoDtwo"
+    },
+    {
+      "input": "COVID-19",
+      "output": "COVID-nineteen"
+    },
+    {
+      "input": "It's 3 o'clock.",
+      "output": "It's three o'clock."
+    },
+    {
+      "input": "I have $250 in my pocket.",
+      "output": "I have two hundred fifty dollars in my pocket."
+    },
+    {
+      "input": "x, 5",
+      "output": "x, five"
+    },
+    {
+      "input": "5.",
+      "output": "five."
+    },
+    {
+      "input": "a1b2",
+      "output": "aonebtwo"
+    }
+  ],
+  "tokens": [
+    {
+      "input": "Hello, world!",
+      "tokens": [
+        "hello",
+        ",",
+        "world",
+        "!"
+      ]
+    },
+    {
+      "input": "don't",
+      "tokens": [
+        "don't"
+      ]
+    },
+    {
+      "input": "It's 3 o'clock.",
+      "tokens": [
+        "it's",
+        "three",
+        "o'clock",
+        "."
+      ]
+    },
+    {
+      "input": "'quote'",
+      "tokens": [
+        "'",
+        "quote",
+        "'"
+      ]
+    },
+    {
+      "input": "cats' toys",
+      "tokens": [
+        "cats",
+        "'",
+        "toys"
+      ]
+    },
+    {
+      "input": "uh-huh",
+      "tokens": [
+        "uh-huh"
+      ]
+    },
+    {
+      "input": "a-b-c",
+      "tokens": [
+        "a-b-c"
+      ]
+    },
+    {
+      "input": "x - y",
+      "tokens": [
+        "x",
+        "-",
+        "y"
+      ]
+    },
+    {
+      "input": "hello--world",
+      "tokens": [
+        "hello--world"
+      ]
+    },
+    {
+      "input": "-hello",
+      "tokens": [
+        "-",
+        "hello"
+      ]
+    },
+    {
+      "input": "hello-",
+      "tokens": [
+        "hello",
+        "-"
+      ]
+    },
+    {
+      "input": "wait...",
+      "tokens": [
+        "wait",
+        "..."
+      ]
+    },
+    {
+      "input": "wait . . . now",
+      "tokens": [
+        "wait",
+        ". . .",
+        "now"
+      ]
+    },
+    {
+      "input": "yes?!",
+      "tokens": [
+        "yes",
+        "?",
+        "!"
+      ]
+    },
+    {
+      "input": "Really?!!!!",
+      "tokens": [
+        "really",
+        "?",
+        "!",
+        "!",
+        "!"
+      ]
+    },
+    {
+      "input": "e.g. and i.e.",
+      "tokens": [
+        "for",
+        "example",
+        "and",
+        "that",
+        "is"
+      ]
+    },
+    {
+      "input": "E.G. or I.E.",
+      "tokens": [
+        "for",
+        "example",
+        "or",
+        "that",
+        "is"
+      ]
+    },
+    {
+      "input": "Mr. Smith",
+      "tokens": [
+        "mr",
+        ".",
+        "smith"
+      ]
+    },
+    {
+      "input": "U.S.A.",
+      "tokens": [
+        "u",
+        ".",
+        "s",
+        ".",
+        "a",
+        "."
+      ]
+    },
+    {
+      "input": "hi.there",
+      "tokens": [
+        "hi.there"
+      ]
+    },
+    {
+      "input": "foo.bar.baz",
+      "tokens": [
+        "foo.bar.baz"
+      ]
+    },
+    {
+      "input": "uh-huh.ok",
+      "tokens": [
+        "uh-huh.ok"
+      ]
+    },
+    {
+      "input": "x.co",
+      "tokens": [
+        "x.co"
+      ]
+    },
+    {
+      "input": "a.b",
+      "tokens": [
+        "a",
+        ".",
+        "b"
+      ]
+    },
+    {
+      "input": "well.i",
+      "tokens": [
+        "well",
+        ".",
+        "i"
+      ]
+    },
+    {
+      "input": "it's.ok",
+      "tokens": [
+        "it's",
+        ".",
+        "ok"
+      ]
+    },
+    {
+      "input": "hello.abcdefghijklmn",
+      "tokens": [
+        "hello",
+        ".",
+        "abcdefghijklmn"
+      ]
+    },
+    {
+      "input": "hello.there's",
+      "tokens": [
+        "hello.there",
+        "'",
+        "s"
+      ]
+    },
+    {
+      "input": "a----b",
+      "tokens": [
+        "a---b"
+      ]
+    },
+    {
+      "input": "wait.....",
+      "tokens": [
+        "wait",
+        "..."
+      ]
+    },
+    {
+      "input": "so''''",
+      "tokens": [
+        "so",
+        "'",
+        "'",
+        "'"
+      ]
+    },
+    {
+      "input": "x -- y",
+      "tokens": [
+        "x",
+        "-",
+        "-",
+        "y"
+      ]
+    },
+    {
+      "input": "café",
+      "tokens": [
+        "cafe"
+      ]
+    },
+    {
+      "input": "naïve",
+      "tokens": [
+        "naive"
+      ]
+    },
+    {
+      "input": "résumé",
+      "tokens": [
+        "resume"
+      ]
+    },
+    {
+      "input": "ChatGPT and GitHub",
+      "tokens": [
+        "chatgpt",
+        "and",
+        "github"
+      ]
+    },
+    {
+      "input": "iPhone",
+      "tokens": [
+        "iphone"
+      ]
+    },
+    {
+      "input": "rock'n'roll",
+      "tokens": [
+        "rock'n'roll"
+      ]
+    },
+    {
+      "input": "'90s",
+      "tokens": [
+        "'",
+        "ninetys"
+      ]
+    },
+    {
+      "input": "123",
+      "tokens": [
+        "one",
+        "hundred",
+        "twenty-three"
+      ]
+    },
+    {
+      "input": "COVID-19",
+      "tokens": [
+        "covid-nineteen"
+      ]
+    },
+    {
+      "input": "R2D2",
+      "tokens": [
+        "rtwodtwo"
+      ]
+    },
+    {
+      "input": "2nd",
+      "tokens": [
+        "second"
+      ]
+    },
+    {
+      "input": "$5",
+      "tokens": [
+        "five",
+        "dollars"
+      ]
+    },
+    {
+      "input": "3.14",
+      "tokens": [
+        "three",
+        "point",
+        "fourteen"
+      ]
+    },
+    {
+      "input": "(parens) [brackets] {braces}",
+      "tokens": [
+        "parens",
+        "brackets",
+        "braces"
+      ]
+    },
+    {
+      "input": "\"double quotes\"",
+      "tokens": [
+        "double",
+        "quotes"
+      ]
+    },
+    {
+      "input": "semi; colon: tab\tnew\nline",
+      "tokens": [
+        "semi",
+        "colon",
+        "tab",
+        "new",
+        "line"
+      ]
+    },
+    {
+      "input": "no break　space\r\nend",
+      "tokens": [
+        "no",
+        "break",
+        "space",
+        "end"
+      ]
+    },
+    {
+      "input": "a",
+      "tokens": [
+        "a"
+      ]
+    },
+    {
+      "input": "I",
+      "tokens": [
+        "i"
+      ]
+    },
+    {
+      "input": "",
+      "tokens": []
+    }
+  ]
+}

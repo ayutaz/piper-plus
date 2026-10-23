@@ -6,7 +6,9 @@
 //!
 //! ## Pipeline
 //!
-//! 1. Tokenize text into words and punctuation
+//! 1. Normalize and tokenize the text like Python's g2p_en (numbers spelled
+//!    out, accents stripped, `i.e.` / `e.g.` expanded, nltk `TweetTokenizer`);
+//!    see [`crate::english_normalize`]
 //! 2. Look up each word in the CMU dictionary (JSON: `cmudict_data.json`)
 //! 3. Convert ARPAbet to IPA with context-dependent rules
 //!    - AA + R -> merged `ɑːɹ`
@@ -27,8 +29,10 @@
 //!
 //! Words not found in the CMU dictionary are handled by morphological
 //! fallback: common English suffixes (-ing, -ed, -s/-es, -er, -ly, -est)
-//! are stripped and the base form is looked up.  Truly OOV words (no dict
-//! entry and no morphological match) produce no output.
+//! are stripped and the base form is looked up. Python reads the remaining
+//! words with g2p_en's neural guesser, which is not ported: they are split at
+//! `-` / `.`, retried without apostrophes, split at CamelCase boundaries, and
+//! finally spelled letter by letter, so no word is dropped.
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -222,67 +226,108 @@ static FUNCTION_WORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 });
 
 // ---------------------------------------------------------------------------
-// Tokenizer
+// Words
+//
+// The words come from `english_normalize`, which ports g2p_en's number
+// expansion, accent stripping, character filter and tokenizer. The helpers
+// below handle what g2p_en and english.py do after tokenization.
 // ---------------------------------------------------------------------------
 
-/// A token from the input text: either a word or a punctuation character.
-#[derive(Debug)]
-struct Token {
-    text: String,
-    is_word: bool,
+pub use crate::english_normalize::{normalize_and_tokenize, normalize_numbers};
+
+/// Words of the original text used to find function words.
+///
+/// Mirrors Python `re.findall(r"[a-zA-Z']+", text.lower())`. Python takes
+/// them from the text before number expansion and aligns them with the
+/// spoken words in order, so `the 3 of us` gives `three` the function-word
+/// flag of `of`. The training data was phonemized that way, so it is kept.
+fn source_words(text: &str) -> Vec<String> {
+    text.split(|c: char| !(c.is_ascii_alphabetic() || c == '\''))
+        .filter(|w| !w.is_empty())
+        .map(str::to_ascii_lowercase)
+        .collect()
 }
 
-/// Check if a character is part of a word (ASCII letter or apostrophe).
-fn is_alpha_or_apostrophe(ch: char) -> bool {
-    ch.is_ascii_alphabetic() || ch == '\''
+/// A word made of one punctuation character (`,` `.` `;` `:` `!` `?`):
+/// attached to the preceding word without a word boundary.
+fn is_punctuation_word(word: &str) -> bool {
+    let mut chars = word.chars();
+    matches!((chars.next(), chars.next()), (Some(c), None) if is_punctuation(c))
 }
 
-/// Tokenize text into words and punctuation.
-///
-/// Words are runs of `[a-zA-Z']` characters, lowercased.
-/// Punctuation characters (`,.:;!?`) are single tokens.
-/// Everything else (whitespace, digits, etc.) acts as a word separator.
-///
-/// Mirrors the Python: `re.findall(r"[a-zA-Z']+", text)` for source words
-/// and the C++ `tokenize()` function.
-fn tokenize(text: &str) -> Vec<Token> {
-    let chars: Vec<char> = text.chars().collect();
-    let mut tokens = Vec::new();
-    let n = chars.len();
+/// The name of a letter, used to spell words that cannot be read otherwise.
+fn letter_name_arpabet(ch: char) -> Option<&'static str> {
+    Some(match ch.to_ascii_lowercase() {
+        'a' => "EY1",
+        'b' => "B IY1",
+        'c' => "S IY1",
+        'd' => "D IY1",
+        'e' => "IY1",
+        'f' => "EH1 F",
+        'g' => "JH IY1",
+        'h' => "EY1 CH",
+        'i' => "AY1",
+        'j' => "JH EY1",
+        'k' => "K EY1",
+        'l' => "EH1 L",
+        'm' => "EH1 M",
+        'n' => "EH1 N",
+        'o' => "OW1",
+        'p' => "P IY1",
+        'q' => "K Y UW1",
+        'r' => "AA1 R",
+        's' => "EH1 S",
+        't' => "T IY1",
+        'u' => "Y UW1",
+        'v' => "V IY1",
+        'w' => "D AH1 B AH0 L Y UW0",
+        'x' => "EH1 K S",
+        'y' => "W AY1",
+        'z' => "Z IY1",
+        _ => return None,
+    })
+}
+
+/// Splits a word at CamelCase boundaries, like Python
+/// `re.findall(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+", word)`:
+/// `ChatGPT` -> `Chat` + `GPT`, `HTMLParser` -> `HTML` + `Parser`.
+fn split_camel_case(word: &str) -> Vec<&str> {
+    let b = word.as_bytes();
+    let run_end = |from: usize, pred: fn(&u8) -> bool| {
+        let mut j = from;
+        while j < b.len() && pred(&b[j]) {
+            j += 1;
+        }
+        j
+    };
+    let mut parts = Vec::new();
     let mut i = 0;
-
-    while i < n {
-        let ch = chars[i];
-
-        if is_alpha_or_apostrophe(ch) {
-            let mut word = String::new();
-            while i < n && is_alpha_or_apostrophe(chars[i]) {
-                word.push(chars[i].to_ascii_lowercase());
-                i += 1;
+    while i < b.len() {
+        if b[i].is_ascii_uppercase() {
+            let upper_end = run_end(i, u8::is_ascii_uppercase);
+            let lower_follows = upper_end < b.len() && b[upper_end].is_ascii_lowercase();
+            if lower_follows && upper_end - i >= 2 {
+                // The last capital starts the next part.
+                parts.push(&word[i..upper_end - 1]);
+                i = upper_end - 1;
+            } else if lower_follows {
+                let end = run_end(upper_end, u8::is_ascii_lowercase);
+                parts.push(&word[i..end]);
+                i = end;
+            } else {
+                parts.push(&word[i..upper_end]);
+                i = upper_end;
             }
-            tokens.push(Token {
-                text: word,
-                is_word: true,
-            });
-            continue;
-        }
-
-        if is_punctuation(ch) {
-            tokens.push(Token {
-                text: ch.to_string(),
-                is_word: false,
-            });
+        } else if b[i].is_ascii_lowercase() {
+            let end = run_end(i, u8::is_ascii_lowercase);
+            parts.push(&word[i..end]);
+            i = end;
+        } else {
             i += 1;
-            continue;
         }
-
-        // Skip whitespace, digits, other characters
-        i += 1;
     }
-
-    tokens
+    parts
 }
-
 // ---------------------------------------------------------------------------
 // ARPAbet parsing
 // ---------------------------------------------------------------------------
@@ -696,94 +741,95 @@ impl EnglishPhonemizer {
         })
     }
 
+    /// The dictionary entry of `word`, or of its stem (morphological fallback).
+    fn lookup(&self, word: &str) -> Option<String> {
+        let dict = self.cmu_dict.as_map();
+        let lower = word.to_ascii_lowercase();
+        dict.get(&lower)
+            .cloned()
+            .or_else(|| try_morphological_fallback(&lower, dict))
+    }
+
+    /// ARPAbet for a word; never `None` when the word has a letter.
+    ///
+    /// Python reads words missing from the dictionary with g2p_en's neural
+    /// guesser, which is not ported. Instead such a word is split at `-` and
+    /// `.`, retried without apostrophes, split at CamelCase boundaries, and
+    /// finally spelled letter by letter. The parts are joined into one word.
+    fn word_arpabet(&self, word: &str) -> Option<String> {
+        if let Some(arpa) = self.lookup(word) {
+            return Some(arpa);
+        }
+        let join = |parts: Vec<&str>| -> Option<String> {
+            let arpas: Vec<String> = parts
+                .into_iter()
+                .filter_map(|part| self.word_arpabet(part))
+                .collect();
+            (!arpas.is_empty()).then(|| arpas.join(" "))
+        };
+        if word.contains(['-', '.']) {
+            return join(word.split(['-', '.']).filter(|p| !p.is_empty()).collect());
+        }
+        if word.contains('\'') {
+            return self.word_arpabet(&word.replace('\'', ""));
+        }
+        let parts = split_camel_case(word);
+        if parts.len() > 1 {
+            return join(parts);
+        }
+        let spelled: Vec<&str> = word.chars().filter_map(letter_name_arpabet).collect();
+        (!spelled.is_empty()).then(|| spelled.join(" "))
+    }
+
     /// Core phonemization implementation.
     ///
-    /// Tokenizes the input text, looks up words in the CMU dictionary,
-    /// converts ARPAbet to IPA, applies function-word destressing,
-    /// inserts stress markers, and computes prosody features.
+    /// Normalizes and tokenizes the text like g2p_en, reads each word (CMU
+    /// dictionary, then the fallbacks of [`Self::word_arpabet`]), converts
+    /// ARPAbet to IPA, applies function-word destressing, inserts stress
+    /// markers, and computes prosody features as Python's `english.py` does.
     fn phonemize_impl(&self, text: &str) -> (Vec<String>, Vec<Option<ProsodyInfo>>) {
-        let tokens = tokenize(text);
-        if tokens.is_empty() {
-            return (Vec::new(), Vec::new());
-        }
-
-        // Extract source words for function-word detection
-        let source_words: Vec<&str> = tokens
-            .iter()
-            .filter(|t| t.is_word)
-            .map(|t| t.text.as_str())
-            .collect();
-
-        // Determine which tokens are function words
-        let mut word_is_function: Vec<bool> = Vec::with_capacity(tokens.len());
-        let mut src_idx = 0;
-        for tok in &tokens {
-            if tok.is_word {
-                let is_func = if src_idx < source_words.len() {
-                    let result = FUNCTION_WORDS.contains(source_words[src_idx]);
-                    src_idx += 1;
-                    result
-                } else {
-                    false
-                };
-                word_is_function.push(is_func);
-            } else {
-                word_is_function.push(false);
-            }
-        }
+        let source_words = source_words(text);
 
         let mut phonemes: Vec<String> = Vec::new();
         let mut prosody_list: Vec<Option<ProsodyInfo>> = Vec::new();
         let mut need_space = false;
+        let mut src_idx = 0;
 
-        for (ti, tok) in tokens.iter().enumerate() {
-            if !tok.is_word {
-                // Punctuation: attach to preceding word (no space before)
-                for ch in tok.text.chars() {
-                    phonemes.push(ch.to_string());
+        for word in normalize_and_tokenize(text) {
+            let is_punct = is_punctuation_word(&word);
+
+            // A word without a letter (`-`, `'`, `...`) is kept as is, one
+            // phoneme per character, as Python does.
+            let mut word_ipas = if word.bytes().any(|b| b.is_ascii_alphabetic()) {
+                match self.word_arpabet(&word) {
+                    Some(arpa) => convert_word_to_ipa(&parse_arpabet(&arpa)),
+                    None => continue,
+                }
+            } else {
+                vec![IpaPhoneme {
+                    ipa: word,
+                    stress: -1,
+                }]
+            };
+
+            if !is_punct {
+                // Function words are matched against the source words in order.
+                if src_idx < source_words.len() {
+                    if FUNCTION_WORDS.contains(source_words[src_idx].as_str()) {
+                        destress(&mut word_ipas);
+                    }
+                    src_idx += 1;
+                }
+                // Punctuation attaches to the preceding word; other words get
+                // a word boundary before them (except the first).
+                if need_space {
+                    phonemes.push(" ".to_string());
                     prosody_list.push(Some(ProsodyInfo {
                         a1: 0,
                         a2: 0,
                         a3: 0,
                     }));
                 }
-                need_space = true;
-                continue;
-            }
-
-            // Word token: look up in CMU dictionary
-            let dict = self.cmu_dict.as_map();
-            let arpa_str = if let Some(arpa) = dict.get(&tok.text) {
-                arpa.clone()
-            } else {
-                // OOV: try morphological fallback
-                match try_morphological_fallback(&tok.text, dict) {
-                    Some(arpa) => arpa,
-                    None => {
-                        // Truly OOV: skip this word
-                        need_space = true;
-                        continue;
-                    }
-                }
-            };
-
-            // Insert word-boundary space (except before first word)
-            if need_space {
-                phonemes.push(" ".to_string());
-                prosody_list.push(Some(ProsodyInfo {
-                    a1: 0,
-                    a2: 0,
-                    a3: 0,
-                }));
-            }
-
-            // Parse ARPAbet and convert to IPA
-            let arpa_tokens = parse_arpabet(&arpa_str);
-            let mut word_ipas = convert_word_to_ipa(&arpa_tokens);
-
-            // Apply function-word destressing
-            if word_is_function[ti] {
-                destress(&mut word_ipas);
             }
 
             // A3 = total IPA character count for the word
@@ -868,34 +914,42 @@ mod tests {
         EnglishPhonemizer::new_with_hashmap(make_dict(entries))
     }
 
-    // ===== 1. Tokenizer =====
+    /// Helper: phonemize and return the tokens only.
+    fn phonemes_of(p: &EnglishPhonemizer, text: &str) -> Vec<String> {
+        p.phonemize_impl(text).0
+    }
+
+    /// Helper: split a space-joined phoneme string; "_" stands for the
+    /// word-boundary token " ".
+    fn tokens(s: &str) -> Vec<String> {
+        s.split(' ')
+            .map(|t| if t == "_" { " " } else { t }.to_string())
+            .collect()
+    }
+
+    // ===== 1. Source words (function-word alignment) =====
 
     #[test]
-    fn test_tokenize_simple_sentence() {
-        let tokens = tokenize("Hello, world!");
-        assert_eq!(tokens.len(), 4);
-        assert_eq!(tokens[0].text, "hello");
-        assert!(tokens[0].is_word);
-        assert_eq!(tokens[1].text, ",");
-        assert!(!tokens[1].is_word);
-        assert_eq!(tokens[2].text, "world");
-        assert!(tokens[2].is_word);
-        assert_eq!(tokens[3].text, "!");
-        assert!(!tokens[3].is_word);
+    fn test_source_words_simple_sentence() {
+        assert_eq!(source_words("Hello, world!"), vec!["hello", "world"]);
     }
 
     #[test]
-    fn test_tokenize_apostrophe_kept() {
-        let tokens = tokenize("don't");
-        assert_eq!(tokens.len(), 1);
-        assert_eq!(tokens[0].text, "don't");
-        assert!(tokens[0].is_word);
+    fn test_source_words_apostrophe_kept() {
+        assert_eq!(source_words("don't"), vec!["don't"]);
+        assert_eq!(source_words("'quote'"), vec!["'quote'"]);
     }
 
     #[test]
-    fn test_tokenize_empty_and_whitespace() {
-        assert!(tokenize("").is_empty());
-        assert!(tokenize("   ").is_empty());
+    fn test_source_words_ignore_digits() {
+        // Taken from the text before number expansion, as in Python.
+        assert_eq!(source_words("the 3 of us"), vec!["the", "of", "us"]);
+    }
+
+    #[test]
+    fn test_source_words_empty_and_whitespace() {
+        assert!(source_words("").is_empty());
+        assert!(source_words("   ").is_empty());
     }
 
     // ===== 2. ARPAbet parsing =====
@@ -1124,11 +1178,29 @@ mod tests {
     // ===== 9. OOV handling =====
 
     #[test]
-    fn test_oov_word_skipped() {
+    fn test_oov_word_spelled_not_skipped() {
         let p = make_phonemizer(&[("hello", "HH AH0 L OW1")]);
-        let (phonemes, _) = p.phonemize_impl("hello xyzzy");
-        let joined: String = phonemes.join("");
-        assert!(joined.contains('h'), "hello should be phonemized");
+        let (phonemes, prosody) = p.phonemize_impl("hello xyz");
+        // x = EH1 K S, y = W AY1, z = Z IY1, read as one word.
+        assert_eq!(phonemes, tokens("h ə l ˈ o ʊ _ ˈ ɛ k s w ˈ a ɪ z ˈ i ː"));
+        assert_eq!(phonemes.len(), prosody.len());
+    }
+
+    #[test]
+    fn test_whitespace_separates_words_like_a_space() {
+        // g2p_en removes tabs and newlines, joining "hello<TAB>world" into one
+        // word it reads with its neural predictor. The port has no predictor
+        // and would spell the joined word, so whitespace separates words.
+        let p = make_phonemizer(&[("hello", "HH AH0 L OW1"), ("world", "W ER1 L D")]);
+        let (space, _) = p.phonemize_impl("hello world");
+        for text in [
+            "hello\tworld",
+            "hello\nworld",
+            "hello\r\nworld",
+            "hello\u{a0}world",
+        ] {
+            assert_eq!(p.phonemize_impl(text).0, space, "{text:?}");
+        }
     }
 
     // ===== 10. Phonemizer trait =====
@@ -1285,5 +1357,234 @@ mod tests {
             "should append AH0 S T, got: {}",
             arpa
         );
+    }
+
+    // ===== 21. Letter names (last OOV fallback) =====
+
+    #[test]
+    fn test_letter_name_table() {
+        let expected = [
+            ('a', "EY1"),
+            ('b', "B IY1"),
+            ('c', "S IY1"),
+            ('d', "D IY1"),
+            ('e', "IY1"),
+            ('f', "EH1 F"),
+            ('g', "JH IY1"),
+            ('h', "EY1 CH"),
+            ('i', "AY1"),
+            ('j', "JH EY1"),
+            ('k', "K EY1"),
+            ('l', "EH1 L"),
+            ('m', "EH1 M"),
+            ('n', "EH1 N"),
+            ('o', "OW1"),
+            ('p', "P IY1"),
+            ('q', "K Y UW1"),
+            ('r', "AA1 R"),
+            ('s', "EH1 S"),
+            ('t', "T IY1"),
+            ('u', "Y UW1"),
+            ('v', "V IY1"),
+            ('w', "D AH1 B AH0 L Y UW0"),
+            ('x', "EH1 K S"),
+            ('y', "W AY1"),
+            ('z', "Z IY1"),
+        ];
+        for (ch, arpa) in expected {
+            assert_eq!(letter_name_arpabet(ch), Some(arpa), "letter {ch}");
+            assert_eq!(
+                letter_name_arpabet(ch.to_ascii_uppercase()),
+                Some(arpa),
+                "letter {}",
+                ch.to_ascii_uppercase()
+            );
+        }
+        assert_eq!(letter_name_arpabet('\''), None);
+        assert_eq!(letter_name_arpabet('1'), None);
+    }
+
+    #[test]
+    fn test_all_caps_oov_spelled_as_one_word() {
+        let p = make_phonemizer(&[]);
+        // T IY1 + T IY1 + EH1 S: no word boundary between the letters.
+        assert_eq!(phonemes_of(&p, "TTS"), tokens("t ˈ i ː t ˈ i ː ˈ ɛ s"));
+    }
+
+    // ===== 22. CamelCase split =====
+
+    #[test]
+    fn test_split_camel_case() {
+        assert_eq!(split_camel_case("ChatGPT"), vec!["Chat", "GPT"]);
+        assert_eq!(split_camel_case("iPhone"), vec!["i", "Phone"]);
+        assert_eq!(split_camel_case("GitHub"), vec!["Git", "Hub"]);
+        assert_eq!(split_camel_case("MixedCase"), vec!["Mixed", "Case"]);
+        assert_eq!(split_camel_case("HTMLParser"), vec!["HTML", "Parser"]);
+        assert_eq!(split_camel_case("RtwoDtwo"), vec!["Rtwo", "Dtwo"]);
+        assert_eq!(split_camel_case("UPPERCASE"), vec!["UPPERCASE"]);
+        assert_eq!(split_camel_case("lower"), vec!["lower"]);
+        assert_eq!(split_camel_case("A"), vec!["A"]);
+    }
+
+    #[test]
+    fn test_camel_case_parts_joined_into_one_word() {
+        let p = make_phonemizer(&[("chat", "CH AE1 T"), ("phone", "F OW1 N"), ("i", "AY1")]);
+        // Chat + G P T (spelled), with no word boundary in between.
+        assert_eq!(
+            phonemes_of(&p, "ChatGPT"),
+            tokens("t ʃ ˈ æ t d ʒ ˈ i ː p ˈ i ː t ˈ i ː")
+        );
+        // i (dictionary) + Phone.
+        assert_eq!(phonemes_of(&p, "iPhone"), tokens("ˈ a ɪ f ˈ o ʊ n"));
+    }
+
+    // ===== 23. Hyphen / dot split =====
+
+    #[test]
+    fn test_hyphen_and_dot_split_joined_into_one_word() {
+        let p = make_phonemizer(&[("foo", "F UW1"), ("bar", "B AA1 R")]);
+        let expected = tokens("f ˈ u ː b ˈ ɑ ː ɹ");
+        assert_eq!(phonemes_of(&p, "foo-bar"), expected);
+        // "foo.bar" is one token (TweetTokenizer domain form).
+        assert_eq!(phonemes_of(&p, "foo.bar"), expected);
+    }
+
+    #[test]
+    fn test_hyphenated_dictionary_word_not_split() {
+        let p = make_phonemizer(&[("uh-huh", "AH1 HH AH1"), ("uh", "AH1"), ("huh", "HH AH1")]);
+        assert_eq!(phonemes_of(&p, "uh-huh"), tokens("ˈ ʌ h ˈ ʌ"));
+    }
+
+    // ===== 24. Apostrophe retry =====
+
+    #[test]
+    fn test_apostrophe_stripped_and_retried() {
+        let p = make_phonemizer(&[("rocknroll", "R AA1 K N R OW1 L")]);
+        assert_eq!(
+            phonemes_of(&p, "rock'n'roll"),
+            tokens("ɹ ˈ ɑ k n ɹ ˈ o ʊ l")
+        );
+        // Not found without the apostrophe either: spell the letters.
+        let p = make_phonemizer(&[]);
+        assert_eq!(phonemes_of(&p, "x'y"), tokens("ˈ ɛ k s w ˈ a ɪ"));
+    }
+
+    // ===== 25. OOV words are never dropped (real dictionary) =====
+
+    fn real_dict_phonemizer() -> EnglishPhonemizer {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("data/cmudict_data.json");
+        EnglishPhonemizer::new_with_hashmap(load_cmu_dict(&path).expect("data/cmudict_data.json"))
+    }
+
+    #[test]
+    fn test_oov_words_never_produce_zero_phonemes() {
+        let p = real_dict_phonemizer();
+        for word in [
+            "ChatGPT",
+            "TTS",
+            "xyz",
+            "aaaaa",
+            "UPPERCASE",
+            "MixedCase",
+            "iPhone",
+            "GitHub",
+            "COVID-19",
+            "R2D2",
+            "'90s",
+        ] {
+            let (phonemes, prosody) = p.phonemize_impl(word);
+            let spoken = phonemes.iter().any(|t| {
+                !matches!(
+                    t.as_str(),
+                    " " | "." | "," | "!" | "?" | ";" | ":" | "'" | "\"" | "-"
+                )
+            });
+            assert!(spoken, "{word:?} produced no phoneme: {phonemes:?}");
+            assert_ne!(
+                phonemes.first().map(String::as_str),
+                Some(" "),
+                "{word:?} starts with a word boundary: {phonemes:?}"
+            );
+            assert_eq!(phonemes.len(), prosody.len(), "{word:?}");
+        }
+    }
+
+    // ===== 26. No leading word boundary =====
+
+    #[test]
+    fn test_no_leading_word_boundary() {
+        let p = make_phonemizer(&[("hello", "HH AH0 L OW1")]);
+        for text in ["xyz hello", "'quote'", "...hello", "  hello", "3 hello"] {
+            let phonemes = phonemes_of(&p, text);
+            assert_ne!(
+                phonemes.first().map(String::as_str),
+                Some(" "),
+                "{text:?}: {phonemes:?}"
+            );
+        }
+    }
+
+    // ===== 27. Numbers, punctuation words and function-word alignment =====
+
+    #[test]
+    fn test_function_words_aligned_with_source_words_before_number_expansion() {
+        // Python: the source words of "the 3 of us" are [the, of, us], aligned
+        // with the spoken words [the, three, of, us]. "three" takes "of" and
+        // "of" takes "us", so both lose their stress and "us" keeps it.
+        let p = make_phonemizer(&[
+            ("the", "DH AH0"),
+            ("three", "TH R IY1"),
+            ("of", "AH1 V"),
+            ("us", "AH1 S"),
+        ]);
+        let (phonemes, prosody) = p.phonemize_impl("the 3 of us");
+        assert_eq!(phonemes, tokens("ð ə _ θ ɹ i ː _ ʌ v _ ˈ ʌ s"));
+        let a2: Vec<i32> = prosody.iter().map(|p| p.unwrap().a2).collect();
+        let a3: Vec<i32> = prosody.iter().map(|p| p.unwrap().a3).collect();
+        assert_eq!(a2, vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0]);
+        assert_eq!(a3, vec![2, 2, 0, 4, 4, 4, 4, 0, 2, 2, 0, 2, 2, 2]);
+    }
+
+    #[test]
+    fn test_non_punctuation_symbol_words_are_spoken_per_char() {
+        let p = make_phonemizer(&[
+            ("wait", "W EY1 T"),
+            ("now", "N AW1"),
+            ("quote", "K W OW1 T"),
+        ]);
+        // ". . ." is one word: each character, spaces included, is a phoneme.
+        let (phonemes, prosody) = p.phonemize_impl("wait . . . now");
+        assert_eq!(phonemes, tokens("w ˈ e ɪ t _ . _ . _ . _ n ˈ a ʊ"));
+        let a3: Vec<i32> = prosody.iter().map(|p| p.unwrap().a3).collect();
+        assert_eq!(a3, vec![4, 4, 4, 4, 4, 0, 5, 5, 5, 5, 5, 0, 3, 3, 3, 3]);
+        // Edge quotes are words of their own, preceded by a word boundary.
+        assert_eq!(phonemes_of(&p, "'quote'"), tokens("' _ k w ˈ o ʊ t _ '"));
+    }
+
+    #[test]
+    fn test_punctuation_prosody_matches_python() {
+        // Python counts the punctuation character itself: a3 = 1.
+        let p = make_phonemizer(&[("hello", "HH AH0 L OW1")]);
+        let (phonemes, prosody) = p.phonemize_impl("hello,");
+        assert_eq!(phonemes.last().map(String::as_str), Some(","));
+        let last = prosody.last().unwrap().unwrap();
+        assert_eq!((last.a1, last.a2, last.a3), (0, 0, 1));
+    }
+
+    #[test]
+    fn test_numbers_accents_and_abbreviations_are_normalized() {
+        let p = make_phonemizer(&[
+            ("cafe", "K AH0 F EY1"),
+            ("for", "F AO1 R"),
+            ("example", "IH0 G Z AE1 M P AH0 L"),
+            ("one", "W AH1 N"),
+            ("hundred", "HH AH1 N D R AH0 D"),
+        ]);
+        assert_eq!(phonemes_of(&p, "café"), tokens("k ə f ˈ e ɪ"));
+        assert_eq!(
+            phonemes_of(&p, "e.g."),
+            tokens("f ˈ ɔ ː ɹ _ ɪ ɡ z ˈ æ m p ə l")
+        );
+        assert_eq!(phonemes_of(&p, "100"), tokens("w ˈ ʌ n _ h ˈ ʌ n d ɹ ə d"));
     }
 }

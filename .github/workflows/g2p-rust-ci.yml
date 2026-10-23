@@ -9,6 +9,8 @@ on:
       - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
       - 'tests/fixtures/g2p/known_divergences.json'
       - 'tests/fixtures/g2p/english_no_drop_words.json'
+      # Read by tests/english_normalize.rs.
+      - 'tests/fixtures/g2p/english_normalize_cases.json'
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - '.github/workflows/g2p-rust-ci.yml'
     tags:
@@ -20,6 +22,8 @@ on:
       - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
       - 'tests/fixtures/g2p/known_divergences.json'
       - 'tests/fixtures/g2p/english_no_drop_words.json'
+      # Read by tests/english_normalize.rs.
+      - 'tests/fixtures/g2p/english_normalize_cases.json'
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - '.github/workflows/g2p-rust-ci.yml'
 

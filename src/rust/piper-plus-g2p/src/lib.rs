@@ -83,6 +83,8 @@ pub mod token_map;
 pub mod chinese;
 #[cfg(feature = "english")]
 pub mod english;
+#[cfg(feature = "english")]
+mod english_normalize;
 #[cfg(feature = "french")]
 pub mod french;
 #[cfg(feature = "japanese")]

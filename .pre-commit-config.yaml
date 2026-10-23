@@ -237,6 +237,15 @@ repos:
         files: ^(src/python/g2p/piper_plus_g2p/data/pua\.json|tests/fixtures/g2p/phoneme_test_cases\.json|scripts/regenerate_test_fixture\.py)$
         pass_filenames: false
 
+      - id: english-normalize-fixture-drift
+        name: English normalization fixture in sync with Python g2p_en
+        # The C++ / Rust ports of g2p_en's number expansion and tokenizer are
+        # tested against this fixture (#821); it must follow the vendored code.
+        entry: uv run --no-sync python scripts/build_english_normalize_fixture.py --check
+        language: system
+        files: ^(src/python/g2p/piper_plus_g2p/_vendor/g2p_en/.*|tests/fixtures/g2p/english_normalize_cases\.json|scripts/build_english_normalize_fixture\.py)$
+        pass_filenames: false
+
       - id: dictionary-consistency
         name: Custom dictionaries (data/dictionaries → WASM assets) byte-equal
         entry: uv run --no-sync python scripts/check_dictionary_consistency.py

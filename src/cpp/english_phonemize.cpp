@@ -8,12 +8,18 @@
 //   - Stress markers (primary/secondary) before vowels
 //   - Each IPA character is a separate phoneme codepoint
 //
-// Words not found in the CMU dictionary are handled by morphological
-// fallback: common English suffixes (-ing, -ed, -s/-es, -er, -ly, -est)
-// are stripped and the base form is looked up.  Truly OOV words (no dict
-// entry and no morphological match) produce no output.
+// Before the lookup the text goes through the port of g2p_en's
+// normalization (english_normalize.hpp): numbers are spelled out, accents
+// stripped, i.e./e.g. replaced, and the TweetTokenizer subset splits words.
+//
+// Python reads words outside the CMU dictionary with a neural predictor.
+// This port cannot, so it reads them with a ladder (englishWordToArpabet)
+// that never yields nothing: morphological fallback (-ing, -ed, -s/-es, -er,
+// -ly, -est), then the parts around '-' / '.', the word without apostrophes,
+// the CamelCase parts, and finally the names of the letters.
 
 #include "english_phonemize.hpp"
+#include "english_normalize.hpp"
 #include "json.hpp"
 #include "utf8.h"
 #include "utf8_utils.hpp"
@@ -178,65 +184,28 @@ using utf8_util::toCodepoints;
 // -----------------------------------------------------------------------
 // Tokenizer
 //
-// Splits text into tokens.  A "word" is a run of [a-zA-Z'] characters.
-// A "punct" token is a single punctuation character.
-// Everything else (whitespace, digits, unknown) acts as a word separator.
-//
-// This mirrors the Python: re.findall(r"[a-zA-Z']+", text) for source
-// words and the g2p-en tokenizer for the phoneme pipeline.
+// Words come from the g2p_en normalization port (english_normalize.hpp).
+// As in english.py, a word that is a single `, . ; : ! ?` is punctuation and
+// attaches to the preceding word; every other word (including "...", "'"
+// and "-") gets a word boundary before it.  A word without letters is
+// emitted as its characters; a word with letters is looked up.
 // -----------------------------------------------------------------------
 
 struct Token {
-    std::string text;  // lowercase word or punctuation char (UTF-8)
-    bool isWord;       // true = word, false = punctuation
+    std::string text;  // as written (case kept; looked up lowercased)
+    bool isWord;       // false = single punctuation character
+    bool hasLetter;
 };
 
-static bool isAlphaOrApostrophe(char32_t cp) {
-    if (cp >= 'A' && cp <= 'Z') return true;
-    if (cp >= 'a' && cp <= 'z') return true;
-    if (cp == '\'') return true;
-    return false;
-}
-
-static char32_t toLowerAscii(char32_t cp) {
-    if (cp >= 'A' && cp <= 'Z') return cp + 32;
-    return cp;
-}
-
 static std::vector<Token> tokenize(const std::string &text) {
-    auto cps = toCodepoints(text);
     std::vector<Token> tokens;
-    size_t n = cps.size();
-    size_t i = 0;
-
-    while (i < n) {
-        char32_t ch = cps[i];
-
-        // Word: run of alphabetic + apostrophe
-        if (isAlphaOrApostrophe(ch)) {
-            std::string word;
-            while (i < n && isAlphaOrApostrophe(cps[i])) {
-                char32_t lc = toLowerAscii(cps[i]);
-                utf8::unchecked::append(lc, std::back_inserter(word));
-                ++i;
-            }
-            tokens.push_back({std::move(word), true});
-            continue;
-        }
-
-        // Punctuation: single character
-        if (isPunctuation(ch)) {
-            std::string p;
-            utf8::unchecked::append(ch, std::back_inserter(p));
-            tokens.push_back({std::move(p), false});
-            ++i;
-            continue;
-        }
-
-        // Skip whitespace, digits, other characters
-        ++i;
+    for (auto &word : tokenizeEnglish(normalizeEnglishText(text))) {
+        const bool punct = word.size() == 1 && isPunctuation(static_cast<char32_t>(word[0]));
+        const bool hasLetter = std::any_of(word.begin(), word.end(), [](char c) {
+            return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+        });
+        tokens.push_back({std::move(word), !punct, hasLetter});
     }
-
     return tokens;
 }
 
@@ -367,23 +336,6 @@ static void emitWord(const std::vector<IpaPhoneme> &ipas,
             sentence.push_back(ch);
         }
     }
-}
-
-// -----------------------------------------------------------------------
-// Extract source words for function-word detection.
-// Matches english.py _get_source_words(): re.findall(r"[a-zA-Z']+", lower)
-// -----------------------------------------------------------------------
-
-static std::vector<std::string> getSourceWords(const std::vector<Token> &tokens) {
-    std::vector<std::string> words;
-    for (const auto &tok : tokens) {
-        if (tok.isWord) {
-            // Strip apostrophes for lookup (e.g. "don't" -> keep as-is
-            // since function word set contains plain forms)
-            words.push_back(tok.text);
-        }
-    }
-    return words;
 }
 
 // -----------------------------------------------------------------------
@@ -544,6 +496,72 @@ bool loadCmuDict(const std::string &jsonPath,
 }
 
 // -----------------------------------------------------------------------
+// Public API: ARPAbet for one word (CMU entry, else the OOV ladder)
+//
+// Python reads words outside the CMU dictionary with g2p_en's neural
+// predictor, which is not ported. The ladder never yields nothing for a word
+// with a letter: morphological fallback, then the parts around '-' / '.',
+// the word without apostrophes, the CamelCase parts, and finally the names
+// of the letters. The parts are joined into one word.
+// -----------------------------------------------------------------------
+
+std::string englishWordToArpabet(const std::string &word,
+                                 const std::unordered_map<std::string, std::string> &cmuDict) {
+    std::string lower;
+    lower.reserve(word.size());
+    for (char c : word) lower += (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
+
+    auto dictIt = cmuDict.find(lower);
+    if (dictIt != cmuDict.end()) return dictIt->second;
+    std::string morph = tryMorphologicalFallback(lower, cmuDict);
+    if (!morph.empty()) return morph;
+
+    auto joinParts = [&cmuDict](const std::vector<std::string> &parts) {
+        std::string joined;
+        for (const auto &part : parts) {
+            std::string arpa = englishWordToArpabet(part, cmuDict);
+            if (arpa.empty()) continue;
+            if (!joined.empty()) joined += ' ';
+            joined += arpa;
+        }
+        return joined;
+    };
+
+    if (word.find_first_of("-.") != std::string::npos) {
+        std::vector<std::string> parts;
+        std::string part;
+        for (char c : word) {
+            if (c == '-' || c == '.') {
+                if (!part.empty()) parts.push_back(std::move(part));
+                part.clear();
+            } else {
+                part += c;
+            }
+        }
+        if (!part.empty()) parts.push_back(std::move(part));
+        return joinParts(parts);
+    }
+    if (word.find('\'') != std::string::npos) {
+        std::string stripped;
+        for (char c : word) {
+            if (c != '\'') stripped += c;
+        }
+        return englishWordToArpabet(stripped, cmuDict);
+    }
+    auto camelParts = splitEnglishCamelCase(word);
+    if (camelParts.size() > 1) return joinParts(camelParts);
+
+    std::string spelled;
+    for (char c : word) {
+        const char *name = englishLetterArpabet(c);
+        if (!name) continue;
+        if (!spelled.empty()) spelled += ' ';
+        spelled += name;
+    }
+    return spelled;
+}
+
+// -----------------------------------------------------------------------
 // Public API: phonemize English text
 // -----------------------------------------------------------------------
 
@@ -556,76 +574,42 @@ void phonemize_english(const std::string &text,
         return;
     }
 
-    // Tokenize
     auto tokens = tokenize(text);
     if (tokens.empty()) return;
 
-    // Extract source words for function-word detection
-    auto sourceWords = getSourceWords(tokens);
+    // Function words are matched, in order, against the words of the text
+    // before number expansion (english.py _get_source_words).
+    const auto sourceWords = englishSourceWords(text);
     const auto &funcWords = functionWords();
-
-    // Determine which tokens are function words
-    // (mirrors english.py: iterate tokens, only count non-punct for src_idx)
-    std::vector<bool> wordIsFunction(tokens.size(), false);
     size_t srcIdx = 0;
-    for (size_t ti = 0; ti < tokens.size(); ++ti) {
-        if (tokens[ti].isWord) {
-            if (srcIdx < sourceWords.size()) {
-                wordIsFunction[ti] =
-                    funcWords.count(sourceWords[srcIdx]) > 0;
-                ++srcIdx;
-            }
-        }
-    }
 
-    // Build sentence
     std::vector<Phoneme> sentence;
     bool needSpace = false;
 
-    for (size_t ti = 0; ti < tokens.size(); ++ti) {
-        const auto &tok = tokens[ti];
-
-        if (!tok.isWord) {
-            // Punctuation: attach to preceding word (no space before)
-            auto cps = toCodepoints(tok.text);
-            for (auto cp : cps) {
-                sentence.push_back(cp);
-            }
-            needSpace = true;
-            continue;
+    for (const auto &tok : tokens) {
+        std::vector<IpaPhoneme> wordIpas;
+        if (tok.hasLetter) {
+            const std::string arpa = englishWordToArpabet(tok.text, cmuDict);
+            if (arpa.empty()) continue;
+            wordIpas = convertWordToIpa(parseArpabet(arpa));
+        } else {
+            // A word without letters ("-", "'", "...") is spoken as its
+            // characters, as Python does.
+            wordIpas.push_back({toCodepoints(tok.text), -1});
         }
 
-        // Word token: look up in CMU dictionary
-        auto dictIt = cmuDict.find(tok.text);
-        std::string morphArpa;  // holds result from morphological fallback
-        if (dictIt == cmuDict.end()) {
-            // OOV: try morphological fallback (strip suffix, retry lookup)
-            morphArpa = tryMorphologicalFallback(tok.text, cmuDict);
-            if (morphArpa.empty()) {
-                // Truly OOV: no dict entry, no morphological match
-                needSpace = true;
-                continue;
+        if (tok.isWord) {
+            if (srcIdx < sourceWords.size()) {
+                if (funcWords.count(sourceWords[srcIdx]) > 0) destress(wordIpas);
+                ++srcIdx;
+            }
+            // Insert word-boundary space (except before the first word);
+            // punctuation attaches to the preceding word.
+            if (needSpace) {
+                sentence.push_back(static_cast<Phoneme>(' '));
             }
         }
 
-        // Insert word-boundary space (except before first word)
-        if (needSpace) {
-            sentence.push_back(static_cast<Phoneme>(' '));
-        }
-
-        // Parse ARPAbet and convert to IPA
-        // Use morphological result if dict lookup missed, otherwise use dict entry
-        const std::string &arpaStr =
-            (dictIt != cmuDict.end()) ? dictIt->second : morphArpa;
-        auto arpaTokens = parseArpabet(arpaStr);
-        auto wordIpas = convertWordToIpa(arpaTokens);
-
-        // Apply function-word destressing
-        if (wordIsFunction[ti]) {
-            destress(wordIpas);
-        }
-
-        // Emit phonemes
         emitWord(wordIpas, sentence);
         needSpace = true;
     }
