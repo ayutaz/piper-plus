@@ -40,4 +40,4 @@ Rust・Python の多言語経路は、日本語の疑問の EOS (`?` と PUA の
 ## 残る差
 
 - C# の zh 数字 (`0`、`100`、`123`): 英語の区間に入るが、DotNetG2P.English が数字を展開しないため生のトークンのまま。#832 (C# の英語を CMU 辞書と正規化に置き換える) で扱う。
-- `--language ja` で日本語の文に英字が混ざる場合、C# CLI と FFI は英字を OpenJTalk で読む。Python は英語として読む。golden に該当ケースがなく、照合では見えていない。
+- `--language ja` で日本語の文に英字が混ざる場合、C# CLI と FFI は英字を OpenJTalk で読む。Python の多言語経路は英語として読むが、学習データ (`prepare_multilingual_dataset`) は言語ごとの音素化器で作るため、日本語の学習データの英字も OpenJTalk で読まれている。golden に該当ケースはなく、今回は変えない。
