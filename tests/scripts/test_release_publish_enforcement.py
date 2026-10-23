@@ -80,10 +80,11 @@ def shell(tmp_path, script, stubs=None, env=None):
         else shutil.which("bash")
     )
     posix_path = commands.as_posix()
+    # "C:/..." on Windows: Git Bash and the Windows python3 the steps call
+    # both open it, while "/c/..." works only in bash.
     scratch = tmp_path.as_posix()
     if os.name == "nt":
         posix_path = "/" + posix_path[0].lower() + posix_path[2:]
-        scratch = "/" + scratch[0].lower() + scratch[2:]
     script = re.sub(r"\$\{\{.*?\}\}", "0.8.0", script)
     script = script.replace("/tmp/", scratch + "/")
     return subprocess.run(
@@ -112,8 +113,45 @@ def shell(tmp_path, script, stubs=None, env=None):
 )
 def test_missing_published_package_fails(tmp_path, job, title, stubs):
     script = step("release-verify.yml", job, title)["run"]
-    result = shell(tmp_path, script, stubs)
+    # Keep the npm registry wait short; the real default waits ~20 minutes.
+    env = {"NPM_VIEW_ATTEMPTS": "2", "NPM_VIEW_DELAY": "0"}
+    result = shell(tmp_path, script, stubs, env)
     assert result.returncode != 0, result.stdout + result.stderr
+
+
+NPM_MANIFEST = (
+    '{"version": "0.8.0", "dist": {"attestations": '
+    '{"url": "https://registry.npmjs.org/-/npm/v1/attestations/piper-plus@0.8.0"}}}'
+)
+
+
+def test_npm_verify_waits_for_registry_propagation(tmp_path):
+    """npm view 404s for a few minutes after publish (#834); retry, then pass."""
+    npm = (
+        'n=$(cat npm-calls 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > npm-calls\n'
+        '[ "$n" -ge 3 ] || exit 1\n'
+        f"printf '%s' '{NPM_MANIFEST}'"
+    )
+    script = step("release-verify.yml", "verify-npm", "Verify provenance on npm registry")[
+        "run"
+    ]
+    result = shell(
+        tmp_path, script, {"npm": npm}, {"NPM_VIEW_ATTEMPTS": "5", "NPM_VIEW_DELAY": "0"}
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (tmp_path / "npm-calls").read_text().strip() == "3"
+
+
+def test_npm_verify_waits_as_long_as_the_nuget_check():
+    """The default wait covers the same ~20 minutes as the NuGet download."""
+    script = step("release-verify.yml", "verify-npm", "Verify provenance on npm registry")[
+        "run"
+    ]
+    attempts = int(re.search(r"NPM_VIEW_ATTEMPTS:-(\d+)", script).group(1))
+    delay = int(re.search(r"NPM_VIEW_DELAY:-(\d+)", script).group(1))
+    assert attempts * delay >= 1200
+    timeout = int(workflow("release-verify.yml")["jobs"]["verify-npm"]["timeout-minutes"])
+    assert timeout * 60 > attempts * delay
 
 
 def test_pypi_install_failure_fails(tmp_path):
