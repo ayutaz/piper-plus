@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792759030778,
+  "lastUpdate": 1792783234525,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1398,6 +1398,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 217.5,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8e5f3cf4f9a3643b45022ac59ed3f9fb501023d3",
+          "message": "fix(g2p): CJK 句読点をどの言語にも属さない文字として全ランタイムで扱う (#839)\n\n* fix(g2p): CJK 句読点をどの言語にも属さない文字として全ランタイムで扱う\n\nPython・Rust・Go・JS G2P・C# は、言語に ja が含まれると 、。，！ などの\nCJK 句読点と全角記号を日本語に振り分けていた。そのため多言語モデルで\n中国語の文から句読点が消え、「你好，GPS」の GPS が中国語読みにならなかった\n(#823)。C++ は既に句読点を中立に扱っていた。\n\n- docs/spec/cjk-punctuation-contract.toml を正本として、中立に扱う範囲と、\n  ラテン文字の言語のセグメントでの ASCII への置き換え規則を定める。\n  置き換えないと英語 G2P が全角読点を消し、\"Hello，world\" の 2 語が\n  つながる\n- 全ランタイムの言語判定を契約どおり中立にし、多言語音素化でラテン文字の\n  セグメントを置き換えてから各言語の音素化器へ渡す\n- 1 言語だけで読む経路 (C# CLI の --language en 等、Rust の C FFI =\n  Swift) でも同じ置き換えを行う\n- Go のスペイン語が句読点の後の単語境界を落としていたのを Python に合わせる\n- golden に #823 のケースを 9 件追加して再生成し、中国語の句読点を照合前に\n  取り除いていた回避策を C++/Rust/Go/JS/C#/Swift/Android から削除する\n- 再発防止: fixture (scripts/build_cjk_punctuation_fixture.py) を全ランタイムの\n  契約テストが読み、pre-commit cjk-punctuation-contract がその読み込みと\n  fixture の同期を検査する。各ランタイムの CI は fixture の変更でも走る\n\n* docs(g2p): #823 で残る差の記録と CHANGELOG・設計文書を追加する\n\n- known_divergences.json に、既存の Issue が原因で一致しない #823 の\n  新ケースを登録する (Swift/C# の ZH-EN 混在は #827/#833、JS の中国語は\n  #829、JS の英語は #828、C# の英語・スペイン語は #832、数字は #821)\n- CHANGELOG (root と piper-plus-g2p) と設計文書\n  docs/design/cjk-punctuation-neutral-2026-10-24.md を追加し、golden 照合の\n  設計文書から「#823 まで中国語の句読点を除く」記述を更新する\n\n* fix(hf-space): 句読点だけの入力を音素なしとして拒否する\n\n句読点はどの言語にも属さなくなった (#823) ため、「。、！？」は日本語の\n区間にならず ASCII の句読点として読まれ、\"?\" だけが残る。Space は\nこれを音素ありとみなして合成していた。残った音素がすべて句読点なら\n「音素なし」として拒否する。英語の \"?!\" も同じ扱いにする。",
+          "timestamp": "2026-10-24T04:17:21+09:00",
+          "tree_id": "5b5126c6a4fcf186dfec34a6cd867fb977d318aa",
+          "url": "https://github.com/ayutaz/piper-plus/commit/8e5f3cf4f9a3643b45022ac59ed3f9fb501023d3"
+        },
+        "date": 1792783232575,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0622,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 15.7,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 17.8,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 760.6,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 217.4,
             "unit": "MB"
           },
           {
