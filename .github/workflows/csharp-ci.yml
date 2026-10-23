@@ -134,13 +134,19 @@ jobs:
 
       - name: Generate coverage report
         if: matrix.os == 'ubuntu-24.04'
+        # PiperPlus.Cli.Tests references the CLI project, so the PiperPlus.Cli
+        # assembly is instrumented. Its G2P adapters are covered in-process;
+        # Program (the entry point), its JSONL record and the source-generated
+        # JSON context are exercised only by CliIntegrationTests through a
+        # child process, which coverlet cannot see. Leave those three out so
+        # the floor below keeps measuring what it measured before.
         run: |
           dotnet tool install -g dotnet-reportgenerator-globaltool || true
           reportgenerator \
             -reports:"**/coverage.cobertura.xml" \
             -targetdir:"coverage-report" \
             -reporttypes:"Html;Cobertura;TextSummary" \
-            -classfilters:"-*.Tests.*"
+            -classfilters:"-*.Tests.*;-PiperPlus.Cli.Program;-PiperPlus.Cli.JsonlUtterance;-PiperPlus.Cli.CliJsonContext"
           cat coverage-report/Summary.txt
 
       - name: Verify coverage threshold (Ubuntu)
