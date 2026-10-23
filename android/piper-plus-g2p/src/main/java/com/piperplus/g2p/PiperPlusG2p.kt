@@ -54,14 +54,7 @@ class PiperPlusG2p private constructor(
         val phonemes = triple[0]
         val resolvedLang = triple[1]
         val numPhonemes = triple[2].toIntOrNull() ?: 0
-        val list = if (phonemes.isEmpty()) {
-            emptyList()
-        } else {
-            // Defensive: wrap with toList() so the returned List<String> is
-            // a fresh immutable copy — callers can't mutate our internals via
-            // a downcast.
-            phonemes.split(' ').filter { it.isNotEmpty() }.toList()
-        }
+        val list = splitPhonemeString(phonemes)
         return PhonemeResult(
             phonemes = phonemes,
             phonemeList = java.util.Collections.unmodifiableList(list),
