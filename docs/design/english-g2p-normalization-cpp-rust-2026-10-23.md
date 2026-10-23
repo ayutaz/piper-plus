@@ -70,7 +70,7 @@ Python のコード (g2p_en の `normalize_numbers` と nltk の `TweetTokenizer
 
 - `0` は `zero`。21〜99 の 1 の位は `-` でつなぐ (`twenty-three`)。
 - 3 桁ごとの組に分け、0 でない組を `<百の位> hundred<and><下 2 桁> <単位>` にする。`<and>` は `and` が空なら空白 1 つ、そうでなければ ` and `。単位は `thousand`、`million`、`billion`、`trillion`、`quadrillion`、`quintillion`。
-- 組は `, ` でつなぐ。ただし最後の組が 1〜99 で、上に組があるときは、最後の組の前を `<and>` でつなぐ (`one million one`、`five thousand and fifth`)。
+- 組はカンマと空白 (`,` + 半角空白) でつなぐ。ただし最後の組が 1〜99 で、上に組があるときは、最後の組の前を `<and>` でつなぐ (`one million one`、`five thousand and fifth`)。
 - 先頭の 0 は無視する (`007` は `seven`)。
 
 序数は `words(n, and="and")` の最後の語を序数にします。`one`→`first`、`two`→`second`、`three`→`third`、`five`→`fifth`、`eight`→`eighth`、`nine`→`ninth`、`twelve`→`twelfth`、`zero`→`zeroth`、`-y` で終わる語は `-ieth`、それ以外は `-th` を付けます。序数には年号の読みを使いません (`1100th` は `one thousand, one hundredth`)。
