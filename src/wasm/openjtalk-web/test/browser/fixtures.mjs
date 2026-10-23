@@ -6,13 +6,18 @@ const ortVersion = JSON.parse(
   readFileSync(new URL("../../node_modules/onnxruntime-web/package.json", import.meta.url), "utf8")
 ).version;
 
-// Pinned sentences whose audio must last longer than one second. Both collapse
-// to a fraction of that when their G2P silently falls back (zh: missing pinyin
-// dictionaries, ja: Rust WASM not loaded).
+// Pinned sentences whose audio must last at least MIN_PINNED_SECONDS. Both
+// collapse when their G2P silently falls back (zh: missing pinyin dictionaries,
+// under 0.5 s; ja: Rust WASM not loaded, a few hundred samples).
 export const PINNED_TEXT = {
   ja: "こんにちは、今日はとても良い天気ですね。",
   zh: "你好，今天天气非常好。",
 };
+
+// VITS samples durations, so correct audio varies between runs: the CSS10
+// Chinese sentence measured 0.99 to 1.78 s in CI (2026-10-23). The threshold
+// sits between that and the silent fallbacks above.
+export const MIN_PINNED_SECONDS = 0.6;
 
 /** Substitute pinned local bytes for CDN URLs; ORT.run and G2P stay real. */
 export async function routeCdnToLocal(page) {
