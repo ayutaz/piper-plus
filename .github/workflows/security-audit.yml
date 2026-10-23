@@ -119,6 +119,14 @@ jobs:
           # pkg:pypi/pillow: MIT-CMU (HPND 系の permissive license)。 12.3.0 で
           # license 表記が機械可読化された (12.2.0 までは検出されず素通り) だけで
           # ライセンス自体の変更はない。 copyleft なし。
+          #
+          # pkg:cargo/webpki-roots: CDLA-Permissive-2.0 (permissive、 copyleft なし)。
+          # ureq 経由で ort-sys / jpreprocess-naist-jdic の build-dependencies に
+          # だけ入り、 配布物には含まれない。 src/rust/deny.toml でも同じ理由で
+          # 許可済み。 RUSTSEC-2026-0381 の修正で 1.0.6 → 1.0.10 に上げた際に
+          # 検出された (ライセンス自体の変更はない)。 allow-licenses に足すと
+          # CDLA-Permissive-2.0 全体を許可することになるため package 単位に絞る。
+          #
           # Published archives reviewed in docs/design/python-g2p-license-2026-10-16.md:
           # audioop-lts 0.2.2: PSF-2.0 (scanner expands historical Python licenses).
           # protobuf 7.36.2: BSD-3-Clause + original Google protobuf notice.
@@ -138,7 +146,8 @@ jobs:
             pkg:pypi/typing-extensions,
             pkg:pypi/llvmlite,
             pkg:pypi/soxr,
-            pkg:npm/protobufjs
+            pkg:npm/protobufjs,
+            pkg:cargo/webpki-roots
 
   # Python: pip-audit
   # tier は **監査対象が頒布物かどうか** で分ける。
