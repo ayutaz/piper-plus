@@ -29,26 +29,36 @@ impl G2pAdapter {
     }
 }
 
+/// Convert piper_plus_g2p::ProsodyInfo -> piper_core::phonemize::ProsodyInfo
+fn convert_prosody(prosody: Vec<Option<piper_plus_g2p::ProsodyInfo>>) -> Vec<Option<ProsodyInfo>> {
+    prosody
+        .into_iter()
+        .map(|opt| {
+            opt.map(|p| ProsodyInfo {
+                a1: p.a1,
+                a2: p.a2,
+                a3: p.a3,
+            })
+        })
+        .collect()
+}
+
 impl Phonemizer for G2pAdapter {
     fn phonemize_with_prosody(
         &self,
         text: &str,
     ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), PiperError> {
         let (tokens, prosody) = self.inner.phonemize_with_prosody(text)?;
+        Ok((tokens, convert_prosody(prosody)))
+    }
 
-        // Convert piper_plus_g2p::ProsodyInfo -> piper_core::phonemize::ProsodyInfo
-        let prosody = prosody
-            .into_iter()
-            .map(|opt| {
-                opt.map(|p| ProsodyInfo {
-                    a1: p.a1,
-                    a2: p.a2,
-                    a3: p.a3,
-                })
-            })
-            .collect();
-
-        Ok((tokens, prosody))
+    fn phonemize_with_language(
+        &self,
+        text: &str,
+        language: &str,
+    ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), PiperError> {
+        let (tokens, prosody) = self.inner.phonemize_with_language(text, language)?;
+        Ok((tokens, convert_prosody(prosody)))
     }
 
     fn get_phoneme_id_map(&self) -> Option<&PhonemeIdMap> {

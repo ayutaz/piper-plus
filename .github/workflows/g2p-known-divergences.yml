@@ -1,0 +1,65 @@
+name: "G2P Known Divergences Gate"
+
+# Every runtime's golden parity test compares its G2P output with the Python
+# golden (tests/fixtures/g2p/phoneme_test_cases_golden.json) and reads the
+# shared lists of known differences:
+#   - tests/fixtures/g2p/known_divergences.json (cases that differ, per runtime)
+#   - tests/fixtures/g2p/english_no_drop_words.json (English words that must
+#     never phonemize to nothing, and the runtimes that still drop them)
+# This gate checks the lists themselves: every entry names a declared runtime,
+# a GitHub issue and a reason, refers to a case that exists in the golden, and
+# every declared runtime names parity tests that exist and read the list. The
+# runtime tests run in their own workflows (CI / cpp-tests, CI / rust-tests,
+# Kotlin G2P CI, G2P Rust CI).
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'tests/fixtures/g2p/known_divergences.json'
+      - 'tests/fixtures/g2p/english_no_drop_words.json'
+      - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
+      - 'scripts/check_g2p_known_divergences.py'
+      - 'tests/scripts/test_check_g2p_known_divergences.py'
+      - 'src/cpp/tests/test_c_api_g2p_golden.cpp'
+      - 'src/rust/piper-plus-g2p/tests/golden_parity.rs'
+      - 'android/piper-plus-g2p/src/androidTest/java/com/piperplus/g2p/PhonemeFixtureParityTest.kt'
+      - '.github/workflows/g2p-known-divergences.yml'
+  pull_request:
+    paths:
+      - 'tests/fixtures/g2p/known_divergences.json'
+      - 'tests/fixtures/g2p/english_no_drop_words.json'
+      - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
+      - 'scripts/check_g2p_known_divergences.py'
+      - 'tests/scripts/test_check_g2p_known_divergences.py'
+      - 'src/cpp/tests/test_c_api_g2p_golden.cpp'
+      - 'src/rust/piper-plus-g2p/tests/golden_parity.rs'
+      - 'android/piper-plus-g2p/src/androidTest/java/com/piperplus/g2p/PhonemeFixtureParityTest.kt'
+      - '.github/workflows/g2p-known-divergences.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lists:
+    name: known-difference lists are valid
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.1.0
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.13'
+
+      - name: Unit tests for the gate
+        run: |
+          python -m pip install 'pytest>=9.1.1,<10'
+          python -m pytest tests/scripts/test_check_g2p_known_divergences.py -q -o addopts=
+
+      - name: Validate the lists
+        run: python scripts/check_g2p_known_divergences.py

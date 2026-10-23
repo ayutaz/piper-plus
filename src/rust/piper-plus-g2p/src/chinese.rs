@@ -1103,7 +1103,7 @@ fn phonemize_from_pinyin_syllables_with_prosody(
         return (Vec::new(), Vec::new());
     }
 
-    let mut st: Vec<(String, u8)> = syllables
+    let st: Vec<(String, u8)> = syllables
         .iter()
         .map(|s| {
             let (base, tone) = extract_tone(s);
@@ -1111,8 +1111,8 @@ fn phonemize_from_pinyin_syllables_with_prosody(
         })
         .collect();
 
-    apply_tone_sandhi(&mut st);
-
+    // No tone sandhi: like Python, the dictionary pinyin is spoken as written
+    // (the letter "E" is yi1 even before a tone-1 syllable).
     let mut tokens: Vec<String> = Vec::new();
     let mut prosody_list: Vec<Option<ProsodyInfo>> = Vec::new();
     for (normalized, tone) in &st {
@@ -1890,6 +1890,19 @@ mod tests {
             assert_eq!(p.a2, 1, "a2 must be 1 (chinese_text=\"\"); got {}", p.a2);
             assert_eq!(p.a3, 1, "a3 must be 1 (chinese_text=\"\"); got {}", p.a3);
         }
+    }
+
+    #[test]
+    fn test_zh_en_letters_keep_their_dictionary_tones() {
+        // Python's phonemize_from_pinyin_syllables applies no tone sandhi to
+        // loanword pinyin: "E" (yi1) before "H" (ai1) stays tone 1 instead
+        // of becoming yi4 as the character 一 would.
+        let data = load_default_loanword_data();
+        let (together, prosody) = phonemize_embedded_english_with_prosody("EH", data);
+        let (e, _) = phonemize_embedded_english_with_prosody("E", data);
+        let (h, _) = phonemize_embedded_english_with_prosody("H", data);
+        assert_eq!(together, [e, h].concat());
+        assert_eq!(prosody[0].unwrap().a1, 1);
     }
 
     #[test]

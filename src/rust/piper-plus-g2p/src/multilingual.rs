@@ -491,6 +491,9 @@ pub struct MultilingualPhonemizer {
     languages: Vec<String>,
     default_latin_language: String,
     detector: UnicodeLanguageDetector,
+    /// One detector per supported Latin-script language, used by
+    /// `phonemize_with_language` to assign Latin text to that language.
+    latin_detectors: HashMap<String, UnicodeLanguageDetector>,
     phonemizers: HashMap<String, Box<dyn Phonemizer>>,
     /// Dynamic EOS token captured during the last `phonemize_with_prosody`
     /// call. Accessible via `last_eos()`.
@@ -531,11 +534,17 @@ impl MultilingualPhonemizer {
         }
 
         let detector = UnicodeLanguageDetector::new(&languages, &default_latin_language);
+        let latin_detectors = languages
+            .iter()
+            .filter(|l| matches!(l.as_str(), "en" | "es" | "fr" | "pt" | "sv"))
+            .map(|l| (l.clone(), UnicodeLanguageDetector::new(&languages, l)))
+            .collect();
 
         Self {
             languages,
             default_latin_language,
             detector,
+            latin_detectors,
             phonemizers,
             last_eos: Mutex::new("$".to_string()),
             // Default-on when chinese feature is compiled in (TICKET-01 §7 懸念 5)
@@ -636,13 +645,12 @@ impl MultilingualPhonemizer {
             let (tokens, prosody) = phonemizer.phonemize_with_prosody(text)?;
 
             // Strip BOS/EOS tokens from the segment, then re-wrap
-            let bos_eos = Self::bos_eos_tokens();
             let eos_set = Self::eos_tokens();
             let mut last_eos = "$".to_string();
             let mut filtered_tokens = Vec::new();
             let mut filtered_prosody = Vec::new();
             for (ph, pr) in tokens.iter().zip(prosody.iter()) {
-                if bos_eos.contains(ph) {
+                if Self::is_boundary_token(language, ph) {
                     if eos_set.contains(ph) {
                         last_eos = ph.clone();
                     }
@@ -660,6 +668,91 @@ impl MultilingualPhonemizer {
         } else {
             // Unknown language hint — fall back to auto-detection
             self.phonemize_with_prosody(text)
+        }
+    }
+
+    /// Segment `text` with `detector` and phonemize each segment with its
+    /// language's phonemizer.
+    fn phonemize_segments(
+        &self,
+        text: &str,
+        detector: &UnicodeLanguageDetector,
+    ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError> {
+        let segments = segment_text(text, detector);
+        if segments.is_empty() {
+            return Ok((Vec::new(), Vec::new()));
+        }
+
+        let eos_set = Self::eos_tokens();
+
+        let mut all_phonemes: Vec<String> = Vec::new();
+        let mut all_prosody: Vec<Option<ProsodyInfo>> = Vec::new();
+        let mut last_eos = "$".to_string();
+
+        // Pre-compute whether text contains any zh segment, used for ZH-EN dispatch.
+        #[cfg(feature = "chinese")]
+        let has_zh_segment = segments.iter().any(|(lang, _)| lang == "zh");
+
+        for (i, (lang, seg_text)) in segments.iter().enumerate() {
+            // ZH-EN code-switching: route embedded en (with adjacent zh) through
+            // chinese loanword phonemizer. Issue #384, design §2.1.
+            #[cfg(feature = "chinese")]
+            if self.enable_zh_en_dispatch && lang == "en" && has_zh_segment {
+                let prev_is_zh = i > 0 && segments[i - 1].0 == "zh";
+                let next_is_zh = i + 1 < segments.len() && segments[i + 1].0 == "zh";
+                if prev_is_zh || next_is_zh {
+                    let data = crate::chinese::load_default_loanword_data();
+                    // Use `*_with_prosody` so each IPA token carries the
+                    // syllable's tone in `a1` (matches Python: a2=a3=1
+                    // because there is no surrounding chinese_text). Issue
+                    // #384 review note R-C1.
+                    let (tokens, prosody) =
+                        crate::chinese::phonemize_embedded_english_with_prosody(seg_text, data);
+                    debug_assert_eq!(tokens.len(), prosody.len());
+                    all_phonemes.extend(tokens);
+                    all_prosody.extend(prosody);
+                    continue;
+                }
+            }
+
+            let phonemizer = self
+                .phonemizers
+                .get(lang)
+                .ok_or_else(|| G2pError::UnsupportedLanguage { code: lang.clone() })?;
+
+            let (phonemes, prosody_list) = phonemizer.phonemize_with_prosody(seg_text)?;
+
+            // Strip BOS/EOS from individual segments.
+            // This includes PUA-encoded question markers from Japanese.
+            for (ph, pr) in phonemes.iter().zip(prosody_list.iter()) {
+                if Self::is_boundary_token(lang, ph) {
+                    if eos_set.contains(ph) {
+                        last_eos = ph.clone();
+                    }
+                    continue;
+                }
+                all_phonemes.push(ph.clone());
+                all_prosody.push(*pr);
+            }
+        }
+
+        // Update last_eos via interior mutability (Mutex).
+        if let Ok(mut guard) = self.last_eos.lock() {
+            *guard = last_eos;
+        }
+
+        Ok((all_phonemes, all_prosody))
+    }
+
+    /// Whether `ph`, produced for a `lang` segment, is a BOS/EOS token to strip.
+    ///
+    /// Only Japanese ends a sentence with a question-marker EOS ("?", "?!",
+    /// ...); in other languages "?" is an ordinary phoneme, as in Python.
+    fn is_boundary_token(lang: &str, ph: &str) -> bool {
+        if lang == "ja" {
+            Self::bos_eos_tokens().contains(ph)
+        } else {
+            ph == "^" || ph == "$"
         }
     }
 
@@ -707,71 +800,17 @@ impl Phonemizer for MultilingualPhonemizer {
         &self,
         text: &str,
     ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError> {
-        let segments = segment_text(text, &self.detector);
-        if segments.is_empty() {
-            return Ok((Vec::new(), Vec::new()));
-        }
+        self.phonemize_segments(text, &self.detector)
+    }
 
-        let bos_eos = Self::bos_eos_tokens();
-        let eos_set = Self::eos_tokens();
-
-        let mut all_phonemes: Vec<String> = Vec::new();
-        let mut all_prosody: Vec<Option<ProsodyInfo>> = Vec::new();
-        let mut last_eos = "$".to_string();
-
-        // Pre-compute whether text contains any zh segment, used for ZH-EN dispatch.
-        #[cfg(feature = "chinese")]
-        let has_zh_segment = segments.iter().any(|(lang, _)| lang == "zh");
-
-        for (i, (lang, seg_text)) in segments.iter().enumerate() {
-            // ZH-EN code-switching: route embedded en (with adjacent zh) through
-            // chinese loanword phonemizer. Issue #384, design §2.1.
-            #[cfg(feature = "chinese")]
-            if self.enable_zh_en_dispatch && lang == "en" && has_zh_segment {
-                let prev_is_zh = i > 0 && segments[i - 1].0 == "zh";
-                let next_is_zh = i + 1 < segments.len() && segments[i + 1].0 == "zh";
-                if prev_is_zh || next_is_zh {
-                    let data = crate::chinese::load_default_loanword_data();
-                    // Use `*_with_prosody` so each IPA token carries the
-                    // syllable's tone in `a1` (matches Python: a2=a3=1
-                    // because there is no surrounding chinese_text). Issue
-                    // #384 review note R-C1.
-                    let (tokens, prosody) =
-                        crate::chinese::phonemize_embedded_english_with_prosody(seg_text, data);
-                    debug_assert_eq!(tokens.len(), prosody.len());
-                    all_phonemes.extend(tokens);
-                    all_prosody.extend(prosody);
-                    continue;
-                }
-            }
-
-            let phonemizer = self
-                .phonemizers
-                .get(lang)
-                .ok_or_else(|| G2pError::UnsupportedLanguage { code: lang.clone() })?;
-
-            let (phonemes, prosody_list) = phonemizer.phonemize_with_prosody(seg_text)?;
-
-            // Strip BOS/EOS from individual segments.
-            // This includes PUA-encoded question markers from Japanese.
-            for (ph, pr) in phonemes.iter().zip(prosody_list.iter()) {
-                if bos_eos.contains(ph) {
-                    if eos_set.contains(ph) {
-                        last_eos = ph.clone();
-                    }
-                    continue;
-                }
-                all_phonemes.push(ph.clone());
-                all_prosody.push(*pr);
-            }
-        }
-
-        // Update last_eos via interior mutability (Mutex).
-        if let Ok(mut guard) = self.last_eos.lock() {
-            *guard = last_eos;
-        }
-
-        Ok((all_phonemes, all_prosody))
+    fn phonemize_with_language(
+        &self,
+        text: &str,
+        language: &str,
+    ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError> {
+        // Non-Latin or unsupported languages are recognised by their script.
+        let detector = self.latin_detectors.get(language).unwrap_or(&self.detector);
+        self.phonemize_segments(text, detector)
     }
 
     fn language_code(&self) -> &str {
@@ -1194,6 +1233,91 @@ mod tests {
             tokens_before, tokens_after,
             "replacement should produce same results"
         );
+    }
+
+    /// Emits one token naming the phonemizer that received the text.
+    struct LabelPhonemizer(&'static str);
+
+    impl Phonemizer for LabelPhonemizer {
+        fn phonemize_with_prosody(
+            &self,
+            text: &str,
+        ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError> {
+            Ok((vec![format!("{}:{}", self.0, text.trim())], vec![None]))
+        }
+
+        fn language_code(&self) -> &str {
+            self.0
+        }
+    }
+
+    fn make_label_phonemizer() -> MultilingualPhonemizer {
+        let mut phonemizers: HashMap<String, Box<dyn Phonemizer>> = HashMap::new();
+        for lang in ["en", "es", "zh"] {
+            phonemizers.insert(lang.to_string(), Box::new(LabelPhonemizer(lang)));
+        }
+        MultilingualPhonemizer::new(
+            vec!["en".to_string(), "es".to_string(), "zh".to_string()],
+            "en".to_string(),
+            phonemizers,
+        )
+    }
+
+    #[test]
+    fn test_phonemize_with_language_assigns_latin_text_to_that_language() {
+        let mp = make_label_phonemizer();
+        let (tokens, _) = mp.phonemize_with_language("perro grande", "es").unwrap();
+        assert_eq!(tokens, vec!["es:perro grande"]);
+        // Without a language, Latin text goes to the default (en).
+        let (tokens, _) = mp.phonemize_with_prosody("perro grande").unwrap();
+        assert_eq!(tokens, vec!["en:perro grande"]);
+    }
+
+    #[test]
+    fn test_phonemize_with_language_still_splits_by_script() {
+        let mp = make_label_phonemizer();
+        let (tokens, _) = mp.phonemize_with_language("hola 你好", "es").unwrap();
+        assert_eq!(tokens, vec!["es:hola", "zh:你好"]);
+    }
+
+    #[test]
+    fn test_phonemize_with_non_latin_or_unknown_language_uses_default() {
+        let mp = make_label_phonemizer();
+        for lang in ["zh", "xx"] {
+            let (tokens, _) = mp.phonemize_with_language("hello", lang).unwrap();
+            assert_eq!(tokens, vec!["en:hello"], "language {lang}");
+        }
+    }
+
+    #[test]
+    fn test_question_mark_is_a_phoneme_outside_japanese() {
+        // Only Japanese ends a sentence with a question-marker EOS token.
+        // Elsewhere "?" is an ordinary phoneme, as in Python, and the EOS
+        // stays "$".
+        let mut phonemizers: HashMap<String, Box<dyn Phonemizer>> = HashMap::new();
+        phonemizers.insert("es".to_string(), Box::new(PassthroughPhonemizer::new("es")));
+        let mp = MultilingualPhonemizer::new(vec!["es".to_string()], "es".to_string(), phonemizers);
+
+        for result in [
+            mp.phonemize_with_prosody("si?"),
+            mp.phonemize_with_language("si?", "es"),
+            mp.phonemize_with_language_hint("si?", "es"),
+        ] {
+            let (tokens, _) = result.unwrap();
+            assert_eq!(tokens, vec!["s", "i", "?"]);
+            assert_eq!(mp.last_eos(), "$");
+        }
+    }
+
+    #[test]
+    fn test_question_mark_is_the_eos_in_japanese() {
+        let mut phonemizers: HashMap<String, Box<dyn Phonemizer>> = HashMap::new();
+        phonemizers.insert("ja".to_string(), Box::new(PassthroughPhonemizer::new("ja")));
+        let mp = MultilingualPhonemizer::new(vec!["ja".to_string()], "ja".to_string(), phonemizers);
+
+        let (tokens, _) = mp.phonemize_with_prosody("あ?").unwrap();
+        assert_eq!(tokens, vec!["あ"]);
+        assert_eq!(mp.last_eos(), "?");
     }
 
     fn make_hint_test_phonemizer() -> MultilingualPhonemizer {

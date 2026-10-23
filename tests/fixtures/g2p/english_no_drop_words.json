@@ -1,0 +1,219 @@
+{
+  "schema_version": 1,
+  "description": "English words that a runtime must phonemize to at least one phoneme when given alone with language 'en'. Words that a runtime still drops are listed in known_drops with an issue; a listed word that is now spoken fails the test, so fixed entries must be removed. Runtimes are those declared in known_divergences.json. Checked by scripts/check_g2p_known_divergences.py.",
+  "words": [
+    "hello",
+    "world",
+    "the",
+    "don't",
+    "TTS",
+    "API",
+    "0",
+    "7",
+    "42",
+    "100",
+    "1984",
+    "3.14",
+    "2nd",
+    "$5",
+    "COVID-19",
+    "R2D2",
+    "café",
+    "naïve",
+    "résumé",
+    "ChatGPT",
+    "GitHub",
+    "iPhone",
+    "UPPERCASE",
+    "MixedCase",
+    "xyz",
+    "aaaaa",
+    "uh-huh",
+    "a-b-c",
+    "e.g.",
+    "i.e.",
+    "'quote'"
+  ],
+  "known_drops": [
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "TTS",
+      "issue": 821,
+      "reason": "all-caps acronym not in CMUdict is dropped instead of spelled letter by letter"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "API",
+      "issue": 821,
+      "reason": "all-caps acronym not in CMUdict is dropped instead of spelled letter by letter"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "0",
+      "issue": 821,
+      "reason": "digits are not expanded to number words and are dropped"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "7",
+      "issue": 821,
+      "reason": "digits are not expanded to number words and are dropped"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "42",
+      "issue": 821,
+      "reason": "digits are not expanded to number words and are dropped"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "100",
+      "issue": 821,
+      "reason": "digits are not expanded to number words and are dropped"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "1984",
+      "issue": 821,
+      "reason": "digits are not expanded to number words and are dropped"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "3.14",
+      "issue": 821,
+      "reason": "digits are not expanded to number words and are dropped"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "2nd",
+      "issue": 821,
+      "reason": "digits are not expanded to number words and are dropped"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "$5",
+      "issue": 821,
+      "reason": "digits are not expanded to number words and are dropped"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "COVID-19",
+      "issue": 821,
+      "reason": "digits are not expanded to number words and are dropped"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "café",
+      "issue": 821,
+      "reason": "accented letters are not folded before CMUdict lookup, so the word is dropped"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "ChatGPT",
+      "issue": 821,
+      "reason": "word not in CMUdict is dropped instead of being split or spelled letter by letter"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "GitHub",
+      "issue": 821,
+      "reason": "word not in CMUdict is dropped instead of being split or spelled letter by letter"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "iPhone",
+      "issue": 821,
+      "reason": "word not in CMUdict is dropped instead of being split or spelled letter by letter"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "UPPERCASE",
+      "issue": 821,
+      "reason": "word not in CMUdict is dropped instead of being split or spelled letter by letter"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "MixedCase",
+      "issue": 821,
+      "reason": "word not in CMUdict is dropped instead of being split or spelled letter by letter"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "xyz",
+      "issue": 821,
+      "reason": "word not in CMUdict is dropped instead of being split or spelled letter by letter"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "aaaaa",
+      "issue": 821,
+      "reason": "word not in CMUdict is dropped instead of being split or spelled letter by letter"
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "word": "'quote'",
+      "issue": 821,
+      "reason": "edge quotes are kept in the lookup key, so the word is not found and is dropped"
+    }
+  ]
+}

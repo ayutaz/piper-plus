@@ -56,6 +56,17 @@ pub trait Phonemizer: Send + Sync {
         id_map: &PhonemeIdMap,
     ) -> (Vec<i64>, Vec<Option<ProsodyFeature>>);
 
+    /// `language` のテキストとして音素化する。多言語 phonemizer はラテン文字を
+    /// `language` に割り当てる (es / fr / pt / sv は文字種で英語と区別できない)。
+    /// デフォルトは `language` を無視する。
+    fn phonemize_with_language(
+        &self,
+        text: &str,
+        _language: &str,
+    ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), PiperError> {
+        self.phonemize_with_prosody(text)
+    }
+
     /// 言語コード ("ja", "en", "zh" 等)
     fn language_code(&self) -> &str;
 

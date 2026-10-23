@@ -619,7 +619,7 @@ fn main() -> Result<()> {
             // --test-mode: phoneme IDs のみ出力して終了 (ONNX 推論スキップ)
             if cli.test_mode {
                 let ids = voice
-                    .phonemize_to_ids(&text_to_synth)
+                    .phonemize_to_ids_with_language(&text_to_synth, cli.language.as_deref())
                     .context("Failed to phonemize text")?;
                 let json =
                     serde_json::to_string(&ids).context("Failed to serialize phoneme IDs")?;
