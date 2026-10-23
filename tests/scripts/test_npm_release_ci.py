@@ -83,4 +83,6 @@ def test_publish_verifies_readme_on_real_cdns_after_publishing():
     publish = _index(steps, "npm publish *.tgz")
     real_cdn = _index(steps, "npm run test:real-cdn")
     assert publish < real_cdn
+    # Without waiting for the registry the check skips itself after publishing.
+    assert "--after-publish" in steps[real_cdn]["run"]
     assert steps[real_cdn].get("continue-on-error", "false") == "false"

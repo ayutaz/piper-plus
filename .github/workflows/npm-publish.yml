@@ -153,8 +153,10 @@ jobs:
 
       - name: Verify README importmap on the real CDNs
         # The CDNs serve the version only after it is on npm, so the README
-        # check that PRs skip for an unpublished version runs here.
-        run: npm run test:real-cdn
+        # check that PRs skip for an unpublished version runs here. It waits
+        # for the registry instead of skipping, and fails if the README does
+        # not pin this version.
+        run: npm run test:real-cdn -- --after-publish
 
       - name: Upload real-CDN results
         if: always()
