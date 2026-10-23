@@ -56,8 +56,6 @@
   "divergences": [
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "go",
         "swift"
       ],
@@ -70,7 +68,16 @@
     {
       "runtimes": [
         "cpp",
-        "rust",
+        "rust"
+      ],
+      "language": "zh",
+      "input": "123",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "'123' is read 'one hundred twenty-three' as in Python, but 'twenty-three' is not in CMUdict: Python reads it with its neural guesser, the port joins 'twenty' + 'three', so the stress differs."
+    },
+    {
+      "runtimes": [
         "go",
         "swift"
       ],
@@ -82,8 +89,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "go",
         "swift"
       ],
@@ -95,8 +100,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "go",
         "swift"
       ],
@@ -108,8 +111,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "go",
         "swift"
       ],
@@ -121,8 +122,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "go",
         "swift"
       ],
@@ -135,7 +134,16 @@
     {
       "runtimes": [
         "cpp",
-        "rust",
+        "rust"
+      ],
+      "language": "en",
+      "input": "123",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "'123' is read 'one hundred twenty-three' as in Python, but 'twenty-three' is not in CMUdict: Python reads it with its neural guesser, the port joins 'twenty' + 'three', so the stress differs."
+    },
+    {
+      "runtimes": [
         "go",
         "swift"
       ],
@@ -147,8 +155,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "go",
         "swift"
       ],
@@ -160,8 +166,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "go",
         "swift"
       ],
@@ -173,8 +177,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "swift"
       ],
       "language": "en",
@@ -185,8 +187,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "swift"
       ],
       "language": "en",
@@ -197,8 +197,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "go",
         "swift"
       ],
@@ -210,8 +208,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "go",
         "swift"
       ],
@@ -223,8 +219,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "swift"
       ],
       "language": "en",
@@ -235,8 +229,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "swift"
       ],
       "language": "en",
@@ -248,7 +240,16 @@
     {
       "runtimes": [
         "cpp",
-        "rust",
+        "rust"
+      ],
+      "language": "en",
+      "input": "ChatGPT and GitHub",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "Python reads out-of-dictionary words with its neural guesser, which is not ported. The port splits them at CamelCase boundaries and spells what is left letter by letter, so every word is spoken but the reading differs."
+    },
+    {
+      "runtimes": [
         "swift"
       ],
       "language": "en",
@@ -260,7 +261,16 @@
     {
       "runtimes": [
         "cpp",
-        "rust",
+        "rust"
+      ],
+      "language": "en",
+      "input": "UPPERCASE",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "Python reads out-of-dictionary words with its neural guesser, which is not ported. The port splits them at CamelCase boundaries and spells what is left letter by letter, so every word is spoken but the reading differs."
+    },
+    {
+      "runtimes": [
         "swift"
       ],
       "language": "en",
@@ -272,7 +282,16 @@
     {
       "runtimes": [
         "cpp",
-        "rust",
+        "rust"
+      ],
+      "language": "en",
+      "input": "MixedCase",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "Python reads out-of-dictionary words with its neural guesser, which is not ported. The port splits them at CamelCase boundaries and spells what is left letter by letter, so every word is spoken but the reading differs."
+    },
+    {
+      "runtimes": [
         "swift"
       ],
       "language": "en",
@@ -284,7 +303,16 @@
     {
       "runtimes": [
         "cpp",
-        "rust",
+        "rust"
+      ],
+      "language": "en",
+      "input": "xyz",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "Python reads out-of-dictionary words with its neural guesser, which is not ported. The port splits them at CamelCase boundaries and spells what is left letter by letter, so every word is spoken but the reading differs."
+    },
+    {
+      "runtimes": [
         "swift"
       ],
       "language": "en",
@@ -292,6 +320,17 @@
       "status": "accepted",
       "issue": 821,
       "reason": "Out-of-dictionary word is dropped (fix planned); an exact match needs Python's neural guesser, which is not ported."
+    },
+    {
+      "runtimes": [
+        "cpp",
+        "rust"
+      ],
+      "language": "en",
+      "input": "aaaaa",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "Python reads out-of-dictionary words with its neural guesser, which is not ported. The port splits them at CamelCase boundaries and spells what is left letter by letter, so every word is spoken but the reading differs."
     },
     {
       "runtimes": [

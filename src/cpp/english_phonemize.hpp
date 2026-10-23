@@ -16,6 +16,10 @@ namespace piper {
 bool loadCmuDict(const std::string &jsonPath,
                  std::unordered_map<std::string, std::string> &dict);
 
+// ARPAbet for one word: the CMU entry, else the out-of-vocabulary ladder.
+std::string englishWordToArpabet(const std::string &word,
+                                 const std::unordered_map<std::string, std::string> &cmuDict);
+
 // Phonemize English text using CMU dictionary + ARPAbet-to-IPA conversion.
 //
 // Pipeline (matches Python src/python/g2p/piper_plus_g2p/english.py):

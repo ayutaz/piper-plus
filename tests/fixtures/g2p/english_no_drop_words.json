@@ -37,8 +37,6 @@
   "known_drops": [
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "swift"
       ],
       "word": "TTS",
@@ -47,8 +45,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "swift"
       ],
       "word": "API",
@@ -57,8 +53,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "go",
         "swift",
         "wasm",
@@ -71,8 +65,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "go",
         "swift",
         "wasm",
@@ -85,8 +77,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "go",
         "swift",
         "wasm",
@@ -99,8 +89,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "go",
         "swift",
         "wasm",
@@ -113,8 +101,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "go",
         "swift",
         "wasm",
@@ -127,8 +113,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "go",
         "swift",
         "wasm",
@@ -141,8 +125,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "swift"
       ],
       "word": "2nd",
@@ -151,8 +133,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "go",
         "swift",
         "wasm",
@@ -165,8 +145,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "swift"
       ],
       "word": "COVID-19",
@@ -175,8 +153,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "swift"
       ],
       "word": "café",
@@ -185,8 +161,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "swift"
       ],
       "word": "ChatGPT",
@@ -195,8 +169,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "swift"
       ],
       "word": "GitHub",
@@ -205,8 +177,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "swift"
       ],
       "word": "iPhone",
@@ -215,8 +185,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "swift"
       ],
       "word": "UPPERCASE",
@@ -225,8 +193,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "swift"
       ],
       "word": "MixedCase",
@@ -235,8 +201,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "swift"
       ],
       "word": "xyz",
@@ -245,8 +209,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "swift"
       ],
       "word": "aaaaa",
@@ -255,8 +217,6 @@
     },
     {
       "runtimes": [
-        "cpp",
-        "rust",
         "swift"
       ],
       "word": "'quote'",

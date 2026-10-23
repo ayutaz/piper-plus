@@ -136,6 +136,8 @@ jobs:
               - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
               - 'tests/fixtures/g2p/known_divergences.json'
               - 'tests/fixtures/g2p/english_no_drop_words.json'
+              # Read by the C++ / Rust English normalization tests (#821).
+              - 'tests/fixtures/g2p/english_normalize_cases.json'
               - 'src/python/g2p/piper_plus_g2p/data/pua.json'
               - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
               - 'src/rust/piper-plus-g2p/data/pinyin_*.json'

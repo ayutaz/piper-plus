@@ -1005,6 +1005,31 @@ set_tests_properties(test_timing_helpers PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
+# English text normalization (#821): the C++ port of g2p_en's number
+# expansion, character filter and TweetTokenizer subset
+# (src/cpp/english_normalize.hpp) against the fixture generated from Python
+# (tests/fixtures/g2p/english_normalize_cases.json), plus the OOV ladder and
+# phoneme stream of english_phonemize.cpp against the CMU dictionary in the
+# source tree. Links gtest alone -- no onnxruntime.
+add_executable(test_english_normalize
+    test_english_normalize.cpp
+    ../english_phonemize.cpp
+)
+target_include_directories(test_english_normalize PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../
+)
+target_compile_definitions(test_english_normalize PRIVATE
+    PIPER_PLUS_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+)
+target_link_libraries(test_english_normalize
+    gtest_main
+)
+add_test(NAME test_english_normalize COMMAND test_english_normalize)
+set_tests_properties(test_english_normalize PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 # Cross-runtime speaker encoder mel parity test.
 # Reads test/fixtures/speaker_encoder_golden.json (generated from the Python
 # torchaudio reference) and asserts the spec mel pipeline (Hann + slaney mel
