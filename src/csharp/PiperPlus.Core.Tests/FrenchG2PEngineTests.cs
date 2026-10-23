@@ -44,7 +44,7 @@ public sealed class FrenchG2PEngineTests
     [InlineData("fille", "f|i|j")]
     [InlineData("parler", "p|a|\u0281|l|e")]
     [InlineData("hiver", "i|v|\u025b|\u0281")]
-    [InlineData("exemple", "\u0259|\u0261|z|\u0251\u0303|p|l")]
+    [InlineData("exil", "\u0259|\u0261|z|i|l")]
     [InlineData("porte", "p|\u0254|\u0281|t")]
     [InlineData("temps", "t|\u0251\u0303")]
     [InlineData("maison", "m|\u025b|z|\u0254\u0303")]

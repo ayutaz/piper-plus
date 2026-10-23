@@ -59,20 +59,61 @@ public sealed class FrenchG2PEngine : IFrenchG2PEngine
 
     private static readonly Dictionary<string, string> LiaisonWords = new()
     {
-        ["les"] = "z", ["des"] = "z", ["ces"] = "z", ["mes"] = "z", ["tes"] = "z",
-        ["ses"] = "z", ["nos"] = "z", ["vos"] = "z", ["aux"] = "z", ["petits"] = "z",
-        ["grands"] = "z", ["gros"] = "z", ["deux"] = "z", ["trois"] = "z", ["six"] = "z",
-        ["dix"] = "z", ["nous"] = "z", ["vous"] = "z", ["ils"] = "z", ["elles"] = "z",
-        ["on"] = "n", ["en"] = "n", ["dans"] = "z", ["sans"] = "z", ["chez"] = "z",
-        ["un"] = "n", ["mon"] = "n", ["ton"] = "n", ["son"] = "n", ["tout"] = "t",
-        ["quand"] = "t", ["tr\u00e8s"] = "z", ["plus"] = "z", ["est"] = "t", ["ont"] = "t",
-        ["sont"] = "t", ["font"] = "t", ["vont"] = "t",
+        ["les"] = "z",
+        ["des"] = "z",
+        ["ces"] = "z",
+        ["mes"] = "z",
+        ["tes"] = "z",
+        ["ses"] = "z",
+        ["nos"] = "z",
+        ["vos"] = "z",
+        ["aux"] = "z",
+        ["petits"] = "z",
+        ["grands"] = "z",
+        ["gros"] = "z",
+        ["deux"] = "z",
+        ["trois"] = "z",
+        ["six"] = "z",
+        ["dix"] = "z",
+        ["nous"] = "z",
+        ["vous"] = "z",
+        ["ils"] = "z",
+        ["elles"] = "z",
+        ["on"] = "n",
+        ["en"] = "n",
+        ["dans"] = "z",
+        ["sans"] = "z",
+        ["chez"] = "z",
+        ["un"] = "n",
+        ["mon"] = "n",
+        ["ton"] = "n",
+        ["son"] = "n",
+        ["tout"] = "t",
+        ["quand"] = "t",
+        ["tr\u00e8s"] = "z",
+        ["plus"] = "z",
+        ["est"] = "t",
+        ["ont"] = "t",
+        ["sont"] = "t",
+        ["font"] = "t",
+        ["vont"] = "t",
     };
 
     private static readonly Dictionary<char, string> SimpleConsonants = new()
     {
-        ['b'] = "b", ['d'] = "d", ['f'] = "f", ['k'] = "k", ['l'] = "l", ['m'] = "m", ['n'] = "n",
-        ['p'] = "p", ['s'] = "s", ['t'] = "t", ['v'] = "v", ['w'] = "w", ['z'] = "z",
+        ['b'] = "b",
+        ['d'] = "d",
+        ['f'] = "f",
+        ['k'] = "k",
+        ['l'] = "l",
+        ['m'] = "m",
+        ['n'] = "n",
+        ['p'] = "p",
+        ['s'] = "s",
+        ['t'] = "t",
+        ['v'] = "v",
+        ['w'] = "w",
+        ['z'] = "z",
     };
 
     private static readonly Regex S_whitespace = new(@"\s+", RegexOptions.Compiled);
@@ -559,23 +600,23 @@ public sealed class FrenchG2PEngine : IFrenchG2PEngine
                     i++;
                     continue;
                 case 'o':
-                {
-                    // Open /ɔ/ before pronounced final consonant(s), ignoring a
-                    // trailing silent e/es (porte, homme).
-                    string effective = word.Substring(i + 1);
-                    if (effective.EndsWith("es", StringComparison.Ordinal))
                     {
-                        effective = effective.Substring(0, effective.Length - 2);
-                    }
-                    else if (effective.EndsWith('e'))
-                    {
-                        effective = effective.Substring(0, effective.Length - 1);
-                    }
+                        // Open /ɔ/ before pronounced final consonant(s), ignoring a
+                        // trailing silent e/es (porte, homme).
+                        string effective = word.Substring(i + 1);
+                        if (effective.EndsWith("es", StringComparison.Ordinal))
+                        {
+                            effective = effective.Substring(0, effective.Length - 2);
+                        }
+                        else if (effective.EndsWith('e'))
+                        {
+                            effective = effective.Substring(0, effective.Length - 1);
+                        }
 
-                    ph.Add(effective.Length > 0 && AllConsonants(effective) && AnyPronounced(effective) ? OpenO : "o");
-                    i++;
-                    continue;
-                }
+                        ph.Add(effective.Length > 0 && AllConsonants(effective) && AnyPronounced(effective) ? OpenO : "o");
+                        i++;
+                        continue;
+                    }
 
                 case '\u00f9': // ù
                 case '\u00fb': // û
@@ -608,33 +649,33 @@ public sealed class FrenchG2PEngine : IFrenchG2PEngine
                     i++;
                     continue;
                 case 'e':
-                {
-                    // Word-final e is silent.
-                    if (i == n - 1)
                     {
+                        // Word-final e is silent.
+                        if (i == n - 1)
+                        {
+                            i++;
+                            continue;
+                        }
+
+                        // ɛ in a closed syllable: before 2+ consonants, or before only
+                        // consonants of which at least one is pronounced.
+                        string remaining = word.Substring(i + 1);
+                        int consonantCount = 0;
+                        foreach (char c in remaining)
+                        {
+                            if (!IsConsonant(c))
+                            {
+                                break;
+                            }
+
+                            consonantCount++;
+                        }
+
+                        bool closed = consonantCount >= 2 || (AllConsonants(remaining) && AnyPronounced(remaining));
+                        ph.Add(closed ? OpenE : Schwa);
                         i++;
                         continue;
                     }
-
-                    // ɛ in a closed syllable: before 2+ consonants, or before only
-                    // consonants of which at least one is pronounced.
-                    string remaining = word.Substring(i + 1);
-                    int consonantCount = 0;
-                    foreach (char c in remaining)
-                    {
-                        if (!IsConsonant(c))
-                        {
-                            break;
-                        }
-
-                        consonantCount++;
-                    }
-
-                    bool closed = consonantCount >= 2 || (AllConsonants(remaining) && AnyPronounced(remaining));
-                    ph.Add(closed ? OpenE : Schwa);
-                    i++;
-                    continue;
-                }
             }
 
             // Consonants
@@ -661,29 +702,29 @@ public sealed class FrenchG2PEngine : IFrenchG2PEngine
                     i += i + 1 < n && word[i + 1] == 'r' ? 2 : 1;
                     continue;
                 case 'x':
-                {
-                    // Silent at the end and before a final silent e/es.
-                    string after = word.Substring(i + 1);
-                    if (i == n - 1 || after == "e" || after == "es")
                     {
+                        // Silent at the end and before a final silent e/es.
+                        string after = word.Substring(i + 1);
+                        if (i == n - 1 || after == "e" || after == "es")
+                        {
+                            i++;
+                            continue;
+                        }
+
+                        // "ex" + vowel -> /ɡz/
+                        if (i > 0 && word[i - 1] == 'e' && i + 1 < n && IsVowel(word[i + 1]))
+                        {
+                            ph.Add("\u0261");
+                            ph.Add("z");
+                            i++;
+                            continue;
+                        }
+
+                        ph.Add("k");
+                        ph.Add("s");
                         i++;
                         continue;
                     }
-
-                    // "ex" + vowel -> /ɡz/
-                    if (i > 0 && word[i - 1] == 'e' && i + 1 < n && IsVowel(word[i + 1]))
-                    {
-                        ph.Add("\u0261");
-                        ph.Add("z");
-                        i++;
-                        continue;
-                    }
-
-                    ph.Add("k");
-                    ph.Add("s");
-                    i++;
-                    continue;
-                }
 
                 case 'h':
                     i++;
