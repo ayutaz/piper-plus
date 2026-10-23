@@ -85,9 +85,8 @@ public sealed class DotNetG2PEngineFixture : IDisposable
 /// </para>
 /// <para>
 /// <see cref="DotNetG2PEngine"/> is <c>internal sealed</c> in
-/// <c>PiperPlus.Cli</c>, so this test project source-links the file
-/// (<c>&lt;Compile Link&gt;</c> in the csproj) and exercises it in-process.
-/// This mirrors the approach used by <c>PiperPlus.Bench</c>.
+/// <c>PiperPlus.Cli</c>, which exposes its internals to this test project
+/// (<c>InternalsVisibleTo</c>), so it is exercised in-process.
 /// </para>
 /// <para>
 /// Uses <see cref="IClassFixture{T}"/> to share a single engine across all

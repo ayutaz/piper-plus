@@ -17,8 +17,8 @@ namespace PiperPlus.Cli.Tests;
 /// The other runtimes only checked that Chinese output was non-empty, so
 /// shipped dictionaries that dropped every tone passed for months (issue
 /// #790). <see cref="BundledChineseG2PEngine"/> is <c>internal</c> to
-/// <c>PiperPlus.Cli</c> and is source-linked here, so this exercises the
-/// exact engine the CLI uses.
+/// <c>PiperPlus.Cli</c>, which exposes its internals to this test project, so
+/// this exercises the exact engine the CLI uses.
 /// </remarks>
 public class ChineseGoldenTests
 {

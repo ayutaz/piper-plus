@@ -20,8 +20,8 @@ namespace PiperPlus.Cli.Tests;
 /// as the Latin default. The CLI's equivalent is <c>--text ... --language xx</c>:
 /// <see cref="Program.ResolveTextModePhonemizer"/> then returns that language's
 /// phonemizer, which reads the whole text. That method and the engine adapters
-/// it constructs are source-linked here, so this is the exact phonemizer a CLI
-/// user gets. The comparison is on <see cref="IPhonemizer.Phonemize"/>, the
+/// it constructs come from the referenced <c>PiperPlus.Cli</c> assembly, so this
+/// is the exact phonemizer a CLI user gets. The comparison is on <see cref="IPhonemizer.Phonemize"/>, the
 /// token list the CLI maps to IDs with the model's <c>phoneme_id_map</c>.
 /// </para>
 /// <para>
