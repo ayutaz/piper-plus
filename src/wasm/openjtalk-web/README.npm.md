@@ -314,6 +314,12 @@ Static async factory that downloads (and caches) the ONNX model and config, then
 
 Returns `Promise<PiperPlus>`.
 
+Japanese and Chinese need the Rust WASM phonemizer. If it fails to load (for
+example, the WASM file is not reachable), `initialize()` rejects when the model
+has no other language. Otherwise it logs a warning and keeps the remaining
+languages, and `synthesize()` rejects for Japanese or Chinese text instead of
+returning near-silent audio.
+
 ### `tts.synthesize(text, options?)`
 
 Synthesize speech from text.
