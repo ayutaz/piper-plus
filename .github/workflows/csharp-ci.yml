@@ -18,6 +18,8 @@ on:
       - 'tests/fixtures/g2p/known_divergences.json'
       # Read by the CJK punctuation contract tests (#823).
       - 'tests/fixtures/g2p/cjk_punctuation_cases.json'
+      # Read by the text-splitter contract tests (#831).
+      - 'tests/fixtures/text_splitter/**'
       - 'tests/fixtures/g2p/english_no_drop_words.json'
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'tests/fixtures/phoneme_timing/**'
@@ -38,6 +40,8 @@ on:
       - 'tests/fixtures/g2p/known_divergences.json'
       # Read by the CJK punctuation contract tests (#823).
       - 'tests/fixtures/g2p/cjk_punctuation_cases.json'
+      # Read by the text-splitter contract tests (#831).
+      - 'tests/fixtures/text_splitter/**'
       - 'tests/fixtures/g2p/english_no_drop_words.json'
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'tests/fixtures/phoneme_timing/**'

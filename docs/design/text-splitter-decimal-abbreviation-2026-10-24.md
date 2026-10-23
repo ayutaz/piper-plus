@@ -32,6 +32,8 @@
 - 契約に `[[split_cases]]` (13 件) を置き、`scripts/regenerate_text_splitter_fixture.py` が `tests/fixtures/text_splitter/contract.json` にコピーする。各ランタイムの契約テストは全ケースで分割結果の完全一致を検査する。
 - `scripts/check_text_splitter_contract.py` は、契約の `[consumers].split_case_tests` に並べたテストが存在し、fixture の `split_cases` を読み続けていることを検査する (pre-commit と parity-hub)。
 - Python ランタイムの golden 照合 (`src/python_run/tests/test_g2p_golden_parity.py`) は、全ケースを `PiperVoice.phonemize` (分割あり) にも通す。本当に複数の文である入力 (`。，！`) を除き、1 文のまま分割なしと同じ音素列になることを検査する。旧分割では `3.14` (en/es) と `e.g. and i.e.` で失敗する。
+- Python / Rust / Go / C# / C++ / JS のテストを動かす CI (python-tests、rust-tests、go-ci、csharp-ci、ci、test-webassembly) は、`tests/fixtures/text_splitter/**` の変更でも走る。以前は fixture だけを変えた PR で各ランタイムの契約テストが走らなかった。
+- ゲート自身のテスト (`tests/scripts/test_check_text_splitter_contract.py`) は parity-hub の text-splitter ジョブで動かす。`tests/scripts` 配下は CI で一括実行されないため、#823 の `test_check_cjk_punctuation_contract.py` も実行されていなかった。parity-hub に cjk-punctuation ジョブを足して、こちらも動かす。
 
 ## 各ランタイムの実装
 
