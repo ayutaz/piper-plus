@@ -58,7 +58,7 @@ For importmap users, update both CDN URLs as shown below.
 <script type="importmap">
 {
   "imports": {
-    "piper-plus": "https://cdn.jsdelivr.net/npm/piper-plus@0.8.1/src/index.js",
+    "piper-plus": "https://unpkg.com/piper-plus@0.8.1/src/index.js",
     "@piper-plus/g2p": "https://cdn.jsdelivr.net/npm/@piper-plus/g2p@0.4.2/src/index.js",
     "onnxruntime-web": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/ort.min.mjs"
   }
@@ -72,6 +72,10 @@ For importmap users, update both CDN URLs as shown below.
   await audio.play();
 </script>
 ```
+
+Load `piper-plus` from unpkg, not jsDelivr. The package loads its G2P WASM
+(`dist/rust-wasm/piper_plus_wasm_bg.wasm`, about 60 MB) relative to
+`src/index.js`, and jsDelivr does not serve files larger than 50 MB.
 
 ### Basic Usage
 
