@@ -29,14 +29,21 @@ const server = http.createServer(async (req, res) => {
       // Match the relative-path rewrite in the Pages deployment workflow.
       bytes = html.replaceAll("../../../", "./").replaceAll("../../", "./");
       type = "text/html";
-    } else if (pathname === "/readme.html" || pathname === "/basic.html") {
+    } else if (
+      pathname === "/readme.html" ||
+      pathname === "/basic.html" ||
+      pathname === "/readme-importmap.html"
+    ) {
       const readme = await readFile(path.join(packageRoot, "README.npm.md"), "utf8");
       const example = readme.match(/### importmap \(No Bundler\)[\s\S]*?```html\s*([\s\S]*?)```/);
       if (!example) {
         throw new Error("README importmap example missing");
       }
       let content = example[1];
-      if (pathname === "/basic.html") {
+      if (pathname === "/readme-importmap.html") {
+        // Only the README importmap; tests drive synthesis themselves.
+        content = example[1].match(/<script type="importmap">[\s\S]*?<\/script>/)[0];
+      } else if (pathname === "/basic.html") {
         const basic = readme.match(/### Basic Usage[\s\S]*?```javascript\s*([\s\S]*?)```/);
         if (!basic) {
           throw new Error("README Basic Usage missing");
@@ -44,7 +51,7 @@ const server = http.createServer(async (req, res) => {
         const importmap = example[1].match(/<script type="importmap">[\s\S]*?<\/script>/)[0];
         content = `${importmap}<script type="module">${basic[1]}</script>`;
       }
-      bytes = `<!doctype html><html><body>${content}</body></html>`;
+      bytes = `<!doctype html><html><head><meta charset="utf-8"></head><body>${content}</body></html>`;
       type = "text/html";
     } else {
       let base = packageRoot;

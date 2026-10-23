@@ -49,3 +49,4 @@ wasm_open_jtalk_reference/
 # Browser and ONNX regression reports
 /test-results/
 /playwright-report/
+/playwright-report-real-cdn/

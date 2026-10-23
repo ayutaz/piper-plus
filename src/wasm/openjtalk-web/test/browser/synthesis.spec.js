@@ -1,76 +1,20 @@
 import { test, expect } from "@playwright/test";
-import { readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
-const models = JSON.parse(readFileSync(new URL("./models.json", import.meta.url), "utf8"));
-const ortVersion = JSON.parse(
-  readFileSync(new URL("../../node_modules/onnxruntime-web/package.json", import.meta.url), "utf8")
-).version;
+import {
+  PINNED_TEXT,
+  observeErrors,
+  observeFailedResponses,
+  routeCdnToLocal,
+  routeModelsToLocal,
+  synthesizeWithReadmeImportmap,
+} from "./fixtures.mjs";
 
 async function localDistribution(page) {
   if (process.env.PIPER_PLUS_DEMO_URL) {
     return;
   }
-  // Substitute pinned local bytes for network URLs; ORT.run and G2P stay real.
-  const cdn = async (route) => {
-    const url = new URL(route.request().url());
-    let target;
-    const ort = url.pathname.match(/\/onnxruntime-web@([^/]+)\/dist\/(.*)/);
-    const piper = url.pathname.match(/\/piper-plus@[^/]+\/(.*)/);
-    const g2p = url.pathname.match(/\/@piper-plus\/g2p@[^/]+\/(.*)/);
-    if (ort) {
-      expect(ort[1], "Demo/README runtime must match installed browser runtime").toBe(ortVersion);
-      target = `/ort/${ort[2]}`;
-    } else if (piper) {
-      // jsDelivr refuses files over 50 MB, so the bundled G2P WASM would 403.
-      expect(url.hostname, "piper-plus must not be loaded from jsDelivr").not.toBe(
-        "cdn.jsdelivr.net"
-      );
-      target = `/${piper[1]}`;
-    } else if (g2p) {
-      target = `/g2p/${g2p[1]}`;
-    } else {
-      throw new Error(`Unexpected CDN import: ${url}`);
-    }
-    const response = await route.fetch({ url: `http://127.0.0.1:4173${target}` });
-    await route.fulfill({
-      response,
-      headers: { ...response.headers(), "access-control-allow-origin": "*" },
-    });
-  };
-  await page.route("https://cdn.jsdelivr.net/npm/**", cdn);
-  await page.route("https://unpkg.com/**", cdn);
-  await page.route("https://huggingface.co/**", async (route) => {
-    const url = new URL(route.request().url());
-    const model = models.find((m) => url.pathname.includes(m.repo));
-    if (!model) {
-      throw new Error(`Unexpected model request: ${url}`);
-    }
-    if (url.pathname.startsWith("/api/models/")) {
-      await route.fulfill({
-        json: { siblings: [{ rfilename: model.onnx }, { rfilename: "config.json" }] },
-      });
-    } else {
-      const file = url.pathname.endsWith(".json") ? "model.onnx.json" : "model.onnx";
-      const response = await route.fetch({
-        url: `http://127.0.0.1:4173/models/${model.key}/${file}`,
-      });
-      await route.fulfill({
-        response,
-        headers: { ...response.headers(), "access-control-allow-origin": "*" },
-      });
-    }
-  });
-}
-
-function observeErrors(page) {
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  page.on("console", (m) => {
-    if (m.type() === "error") {
-      errors.push(m.text());
-    }
-  });
-  return errors;
+  await routeCdnToLocal(page);
+  await routeModelsToLocal(page);
 }
 
 test("CSS10 official demo synthesizes and plays all six languages", async ({ page }, info) => {
@@ -79,9 +23,9 @@ test("CSS10 official demo synthesizes and plays all six languages", async ({ pag
   await page.goto("./");
   await expect(page.locator("#synthesizeBtn")).toBeEnabled();
   const texts = {
-    ja: "こんにちは、今日はとても良い天気ですね。",
+    ja: PINNED_TEXT.ja,
     en: "Hello world! This is a test of speech synthesis.",
-    zh: "你好，今天天气非常好。",
+    zh: PINNED_TEXT.zh,
     es: "Hola, el tiempo es hermoso, vamos a dar un paseo.",
     fr: "Bonjour, comment allez-vous aujourd'hui?",
     pt: "Olá, como você está hoje?",
@@ -114,9 +58,9 @@ test("CSS10 official demo synthesizes and plays all six languages", async ({ pag
     expect(wav.stats.frames).toBeGreaterThan(0);
     expect(wav.stats.finite).toBe(true);
     expect(wav.stats.nonzero).toBe(true);
-    if (language === "zh") {
-      // This pinned sentence collapses to <0.5s when the pinyin dictionaries
-      // are missing and Chinese silently falls back to character passthrough.
+    if (language === "zh" || language === "ja") {
+      // These pinned sentences collapse to <0.5s when their G2P silently falls
+      // back (zh: missing pinyin dictionaries, ja: Rust WASM not loaded).
       expect(wav.stats.frames / wav.stats.rate).toBeGreaterThan(1);
     }
     await page.waitForFunction(() => document.querySelector("#audioPlayer").currentTime > 0);
@@ -157,3 +101,41 @@ for (const [name, file] of [
     expect(errors).toEqual([]);
   });
 }
+
+// The README example speaks English, which never needs the Rust WASM G2P.
+// Japanese through the same importmap is what broke when jsDelivr refused
+// the WASM (#818), so check its length, not only that some audio played.
+test("README importmap synthesizes Japanese at full length", async ({ page }) => {
+  const errors = observeErrors(page);
+  const failed = observeFailedResponses(page);
+  await localDistribution(page);
+  await page.goto("./readme-importmap.html");
+  const ja = await synthesizeWithReadmeImportmap(page, PINNED_TEXT.ja);
+  expect(ja.error).toBeUndefined();
+  expect(ja).toMatchObject({ finite: true, nonzero: true });
+  expect(ja.seconds).toBeGreaterThan(1);
+  expect(failed).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+// When the WASM cannot be fetched, Japanese and Chinese must fail loudly
+// while the languages served by the JS G2P keep working (#819).
+test("WASM fetch failure rejects Japanese and Chinese but keeps English", async ({ page }) => {
+  await localDistribution(page);
+  // Registered last, so it runs before the CDN substitution.
+  await page.route("**/piper_plus_wasm_bg.wasm", (route) =>
+    route.fulfill({ status: 403, body: "File size exceeded the configured limit of 50 MB." })
+  );
+  await page.goto("./readme-importmap.html");
+  for (const [language, text] of Object.entries(PINNED_TEXT)) {
+    for (const hint of [language, undefined]) {
+      const result = await synthesizeWithReadmeImportmap(page, text, hint);
+      expect(result.error, `${language} (language: ${hint ?? "auto"})`).toMatch(
+        new RegExp(`Cannot synthesize "${language}": the Rust WASM G2P failed to load`)
+      );
+    }
+  }
+  const en = await synthesizeWithReadmeImportmap(page, "Hello, world!", "en");
+  expect(en.error).toBeUndefined();
+  expect(en.seconds).toBeGreaterThan(0.3);
+});
