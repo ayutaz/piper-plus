@@ -552,19 +552,21 @@ func TestMultilingualPhonemizer_ProsodyAlignmentThreeSegments(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestMultilingualPhonemizer_PunctuationBoundary(t *testing.T) {
-	// "hello、こんにちは" - the fullwidth "、" (U+3001) is detected as "ja" punctuation.
-	// This means "hello" is "en", then "、こんにちは" is "ja".
+	// "hello、こんにちは" - the fullwidth "、" (U+3001) used to be "ja"
+	// punctuation. It is neutral since Issue #823
+	// (docs/spec/cjk-punctuation-contract.toml), so it stays with "hello"
+	// and "こんにちは" is "ja".
 	detector := NewUnicodeLanguageDetector([]string{"ja", "en"}, "en")
 	segs := SegmentText("hello、こんにちは", detector)
 
 	if len(segs) != 2 {
 		t.Fatalf("expected 2 segments, got %d: %+v", len(segs), segs)
 	}
-	if segs[0].Language != "en" {
-		t.Errorf("segment 0: expected en, got %q", segs[0].Language)
+	if segs[0].Language != "en" || segs[0].Text != "hello、" {
+		t.Errorf("segment 0: expected en %q, got %s %q", "hello、", segs[0].Language, segs[0].Text)
 	}
-	if segs[1].Language != "ja" {
-		t.Errorf("segment 1: expected ja, got %q", segs[1].Language)
+	if segs[1].Language != "ja" || segs[1].Text != "こんにちは" {
+		t.Errorf("segment 1: expected ja %q, got %s %q", "こんにちは", segs[1].Language, segs[1].Text)
 	}
 }
 
@@ -827,18 +829,17 @@ func TestSegmentText_TrailingNeutralAbsorbedIntoPreceding(t *testing.T) {
 }
 
 func TestSegmentText_FullwidthPunctBoundary(t *testing.T) {
-	// Fullwidth punctuation (。, ！) is classified as "ja" by DetectChar.
-	// So "hello。" -> [en:"hello", ja:"。"]
+	// Fullwidth punctuation (。, ！) used to be classified as "ja", which
+	// split "hello。" into [en:"hello", ja:"。"]. It is neutral since
+	// Issue #823 (docs/spec/cjk-punctuation-contract.toml) and stays in the
+	// segment it ends.
 	detector := NewUnicodeLanguageDetector([]string{"ja", "en"}, "en")
 	segs := SegmentText("hello。", detector)
-	if len(segs) != 2 {
-		t.Fatalf("expected 2 segments, got %d: %+v", len(segs), segs)
+	if len(segs) != 1 {
+		t.Fatalf("expected 1 segment, got %d: %+v", len(segs), segs)
 	}
-	if segs[0].Language != "en" {
-		t.Errorf("segment 0: expected en, got %q", segs[0].Language)
-	}
-	if segs[1].Language != "ja" {
-		t.Errorf("segment 1: expected ja, got %q", segs[1].Language)
+	if segs[0].Language != "en" || segs[0].Text != "hello。" {
+		t.Errorf("segment 0: expected en %q, got %s %q", "hello。", segs[0].Language, segs[0].Text)
 	}
 }
 

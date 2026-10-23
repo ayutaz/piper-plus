@@ -707,6 +707,19 @@ export class UnicodeLanguageDetector {
     segmentText(text: string): Array<{ language: Language; text: string }>;
 }
 
+/**
+ * Rewrite CJK punctuation in Latin-script text as ASCII (Issue #823).
+ *
+ * Fullwidth ASCII symbols and digits become their ASCII forms, 、 and 。 (and
+ * their halfwidth forms) become `,` and `.`, and any other CJK punctuation
+ * becomes a space. Other characters are left as they are. `G2P` applies this
+ * to text for en / es / fr / pt / pt-PT / sv before phonemizing it.
+ *
+ * @param text - Latin-script text.
+ * @returns The text with CJK punctuation rewritten.
+ */
+export function normalizeCjkPunctuationForLatin(text: string): string;
+
 // ---------------------------------------------------------------------------
 // Encoder
 // ---------------------------------------------------------------------------

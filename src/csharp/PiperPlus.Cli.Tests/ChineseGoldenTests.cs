@@ -22,10 +22,10 @@ namespace PiperPlus.Cli.Tests;
 /// </remarks>
 public class ChineseGoldenTests
 {
-    // Python's MultilingualPhonemizer drops the sentence punctuation that
-    // the per-language phonemizers keep; compare the spoken tokens only.
-    private static readonly HashSet<string> Skipped =
-        ["^", "$", "_", " ", ".", ",", "!", "?", ";", ":"];
+    // BOS / EOS / PAD are added later, and the golden's word boundaries are
+    // lost when it is split on spaces below. Punctuation is compared: Python
+    // keeps the Chinese sentence punctuation since Issue #823.
+    private static readonly HashSet<string> Skipped = ["^", "$", "_", " "];
 
     private static string RepoRoot()
     {

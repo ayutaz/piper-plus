@@ -347,10 +347,16 @@ class TestUnicodeLanguageDetectorBranches:
         # U+FF41 fullwidth a
         assert det.detect_char("ａ") == "en"
 
-    def test_fullwidth_non_latin_routed_to_ja(self):
-        # U+FF01 fullwidth ! (non-Latin)
+    def test_fullwidth_symbol_is_neutral(self):
+        # U+FF01 fullwidth ! belongs to no language (Issue #823,
+        # docs/spec/cjk-punctuation-contract.toml).
         det = UnicodeLanguageDetector(["en", "ja"])
-        assert det.detect_char("！") == "ja"
+        assert det.detect_char("！") is None
+
+    def test_halfwidth_katakana_routed_to_ja(self):
+        # U+FF71 halfwidth katakana A is a script character, not punctuation.
+        det = UnicodeLanguageDetector(["en", "ja"])
+        assert det.detect_char("ｱ") == "ja"
 
     def test_extended_latin_routed_to_default(self):
         # U+00E9 é (Spanish/French) — routed to whatever the configured

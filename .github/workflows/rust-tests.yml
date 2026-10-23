@@ -14,6 +14,8 @@ on:
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
       - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
       - 'tests/fixtures/g2p/known_divergences.json'
+      # Read by the CJK punctuation contract tests (#823).
+      - 'tests/fixtures/g2p/cjk_punctuation_cases.json'
       - 'tests/fixtures/g2p/english_no_drop_words.json'
       - 'tests/fixtures/g2p/english_normalize_cases.json'
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
@@ -30,6 +32,8 @@ on:
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
       - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
       - 'tests/fixtures/g2p/known_divergences.json'
+      # Read by the CJK punctuation contract tests (#823).
+      - 'tests/fixtures/g2p/cjk_punctuation_cases.json'
       - 'tests/fixtures/g2p/english_no_drop_words.json'
       - 'tests/fixtures/g2p/english_normalize_cases.json'
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'

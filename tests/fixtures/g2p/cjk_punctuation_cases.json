@@ -1,0 +1,879 @@
+{
+  "schema_version": 1,
+  "description": "CJK punctuation contract (Issue #823), generated from docs/spec/cjk-punctuation-contract.toml by scripts/build_cjk_punctuation_fixture.py. A detector built with 'detector_languages' and Latin default 'default_latin' classifies every 'neutral' code point as neutral and every 'fullwidth_latin' one as 'default_latin'. In a segment of one of 'latin_languages', a neutral character is replaced by its 'latin' string.",
+  "detector_languages": [
+    "en",
+    "es",
+    "fr",
+    "ja",
+    "ko",
+    "pt",
+    "sv",
+    "zh"
+  ],
+  "default_latin": "en",
+  "latin_languages": [
+    "en",
+    "es",
+    "fr",
+    "pt",
+    "sv"
+  ],
+  "neutral": [
+    {
+      "code_point": "U+3000",
+      "char": "　",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3001",
+      "char": "、",
+      "latin": ","
+    },
+    {
+      "code_point": "U+3002",
+      "char": "。",
+      "latin": "."
+    },
+    {
+      "code_point": "U+3003",
+      "char": "〃",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3004",
+      "char": "〄",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3005",
+      "char": "々",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3006",
+      "char": "〆",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3007",
+      "char": "〇",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3008",
+      "char": "〈",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3009",
+      "char": "〉",
+      "latin": " "
+    },
+    {
+      "code_point": "U+300A",
+      "char": "《",
+      "latin": " "
+    },
+    {
+      "code_point": "U+300B",
+      "char": "》",
+      "latin": " "
+    },
+    {
+      "code_point": "U+300C",
+      "char": "「",
+      "latin": " "
+    },
+    {
+      "code_point": "U+300D",
+      "char": "」",
+      "latin": " "
+    },
+    {
+      "code_point": "U+300E",
+      "char": "『",
+      "latin": " "
+    },
+    {
+      "code_point": "U+300F",
+      "char": "』",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3010",
+      "char": "【",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3011",
+      "char": "】",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3012",
+      "char": "〒",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3013",
+      "char": "〓",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3014",
+      "char": "〔",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3015",
+      "char": "〕",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3016",
+      "char": "〖",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3017",
+      "char": "〗",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3018",
+      "char": "〘",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3019",
+      "char": "〙",
+      "latin": " "
+    },
+    {
+      "code_point": "U+301A",
+      "char": "〚",
+      "latin": " "
+    },
+    {
+      "code_point": "U+301B",
+      "char": "〛",
+      "latin": " "
+    },
+    {
+      "code_point": "U+301C",
+      "char": "〜",
+      "latin": " "
+    },
+    {
+      "code_point": "U+301D",
+      "char": "〝",
+      "latin": " "
+    },
+    {
+      "code_point": "U+301E",
+      "char": "〞",
+      "latin": " "
+    },
+    {
+      "code_point": "U+301F",
+      "char": "〟",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3020",
+      "char": "〠",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3021",
+      "char": "〡",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3022",
+      "char": "〢",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3023",
+      "char": "〣",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3024",
+      "char": "〤",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3025",
+      "char": "〥",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3026",
+      "char": "〦",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3027",
+      "char": "〧",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3028",
+      "char": "〨",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3029",
+      "char": "〩",
+      "latin": " "
+    },
+    {
+      "code_point": "U+302A",
+      "char": "〪",
+      "latin": " "
+    },
+    {
+      "code_point": "U+302B",
+      "char": "〫",
+      "latin": " "
+    },
+    {
+      "code_point": "U+302C",
+      "char": "〬",
+      "latin": " "
+    },
+    {
+      "code_point": "U+302D",
+      "char": "〭",
+      "latin": " "
+    },
+    {
+      "code_point": "U+302E",
+      "char": "〮",
+      "latin": " "
+    },
+    {
+      "code_point": "U+302F",
+      "char": "〯",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3030",
+      "char": "〰",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3031",
+      "char": "〱",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3032",
+      "char": "〲",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3033",
+      "char": "〳",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3034",
+      "char": "〴",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3035",
+      "char": "〵",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3036",
+      "char": "〶",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3037",
+      "char": "〷",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3038",
+      "char": "〸",
+      "latin": " "
+    },
+    {
+      "code_point": "U+3039",
+      "char": "〹",
+      "latin": " "
+    },
+    {
+      "code_point": "U+303A",
+      "char": "〺",
+      "latin": " "
+    },
+    {
+      "code_point": "U+303B",
+      "char": "〻",
+      "latin": " "
+    },
+    {
+      "code_point": "U+303C",
+      "char": "〼",
+      "latin": " "
+    },
+    {
+      "code_point": "U+303D",
+      "char": "〽",
+      "latin": " "
+    },
+    {
+      "code_point": "U+303E",
+      "char": "〾",
+      "latin": " "
+    },
+    {
+      "code_point": "U+303F",
+      "char": "〿",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FF00",
+      "char": "＀",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FF01",
+      "char": "！",
+      "latin": "!"
+    },
+    {
+      "code_point": "U+FF02",
+      "char": "＂",
+      "latin": "\""
+    },
+    {
+      "code_point": "U+FF03",
+      "char": "＃",
+      "latin": "#"
+    },
+    {
+      "code_point": "U+FF04",
+      "char": "＄",
+      "latin": "$"
+    },
+    {
+      "code_point": "U+FF05",
+      "char": "％",
+      "latin": "%"
+    },
+    {
+      "code_point": "U+FF06",
+      "char": "＆",
+      "latin": "&"
+    },
+    {
+      "code_point": "U+FF07",
+      "char": "＇",
+      "latin": "'"
+    },
+    {
+      "code_point": "U+FF08",
+      "char": "（",
+      "latin": "("
+    },
+    {
+      "code_point": "U+FF09",
+      "char": "）",
+      "latin": ")"
+    },
+    {
+      "code_point": "U+FF0A",
+      "char": "＊",
+      "latin": "*"
+    },
+    {
+      "code_point": "U+FF0B",
+      "char": "＋",
+      "latin": "+"
+    },
+    {
+      "code_point": "U+FF0C",
+      "char": "，",
+      "latin": ","
+    },
+    {
+      "code_point": "U+FF0D",
+      "char": "－",
+      "latin": "-"
+    },
+    {
+      "code_point": "U+FF0E",
+      "char": "．",
+      "latin": "."
+    },
+    {
+      "code_point": "U+FF0F",
+      "char": "／",
+      "latin": "/"
+    },
+    {
+      "code_point": "U+FF10",
+      "char": "０",
+      "latin": "0"
+    },
+    {
+      "code_point": "U+FF11",
+      "char": "１",
+      "latin": "1"
+    },
+    {
+      "code_point": "U+FF12",
+      "char": "２",
+      "latin": "2"
+    },
+    {
+      "code_point": "U+FF13",
+      "char": "３",
+      "latin": "3"
+    },
+    {
+      "code_point": "U+FF14",
+      "char": "４",
+      "latin": "4"
+    },
+    {
+      "code_point": "U+FF15",
+      "char": "５",
+      "latin": "5"
+    },
+    {
+      "code_point": "U+FF16",
+      "char": "６",
+      "latin": "6"
+    },
+    {
+      "code_point": "U+FF17",
+      "char": "７",
+      "latin": "7"
+    },
+    {
+      "code_point": "U+FF18",
+      "char": "８",
+      "latin": "8"
+    },
+    {
+      "code_point": "U+FF19",
+      "char": "９",
+      "latin": "9"
+    },
+    {
+      "code_point": "U+FF1A",
+      "char": "：",
+      "latin": ":"
+    },
+    {
+      "code_point": "U+FF1B",
+      "char": "；",
+      "latin": ";"
+    },
+    {
+      "code_point": "U+FF1C",
+      "char": "＜",
+      "latin": "<"
+    },
+    {
+      "code_point": "U+FF1D",
+      "char": "＝",
+      "latin": "="
+    },
+    {
+      "code_point": "U+FF1E",
+      "char": "＞",
+      "latin": ">"
+    },
+    {
+      "code_point": "U+FF1F",
+      "char": "？",
+      "latin": "?"
+    },
+    {
+      "code_point": "U+FF20",
+      "char": "＠",
+      "latin": "@"
+    },
+    {
+      "code_point": "U+FF3B",
+      "char": "［",
+      "latin": "["
+    },
+    {
+      "code_point": "U+FF3C",
+      "char": "＼",
+      "latin": "\\"
+    },
+    {
+      "code_point": "U+FF3D",
+      "char": "］",
+      "latin": "]"
+    },
+    {
+      "code_point": "U+FF3E",
+      "char": "＾",
+      "latin": "^"
+    },
+    {
+      "code_point": "U+FF3F",
+      "char": "＿",
+      "latin": "_"
+    },
+    {
+      "code_point": "U+FF40",
+      "char": "｀",
+      "latin": "`"
+    },
+    {
+      "code_point": "U+FF5B",
+      "char": "｛",
+      "latin": "{"
+    },
+    {
+      "code_point": "U+FF5C",
+      "char": "｜",
+      "latin": "|"
+    },
+    {
+      "code_point": "U+FF5D",
+      "char": "｝",
+      "latin": "}"
+    },
+    {
+      "code_point": "U+FF5E",
+      "char": "～",
+      "latin": "~"
+    },
+    {
+      "code_point": "U+FF5F",
+      "char": "｟",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FF60",
+      "char": "｠",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FF61",
+      "char": "｡",
+      "latin": "."
+    },
+    {
+      "code_point": "U+FF62",
+      "char": "｢",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FF63",
+      "char": "｣",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FF64",
+      "char": "､",
+      "latin": ","
+    },
+    {
+      "code_point": "U+FFE0",
+      "char": "￠",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FFE1",
+      "char": "￡",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FFE2",
+      "char": "￢",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FFE3",
+      "char": "￣",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FFE4",
+      "char": "￤",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FFE5",
+      "char": "￥",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FFE6",
+      "char": "￦",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FFE7",
+      "char": "￧",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FFE8",
+      "char": "￨",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FFE9",
+      "char": "￩",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FFEA",
+      "char": "￪",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FFEB",
+      "char": "￫",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FFEC",
+      "char": "￬",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FFED",
+      "char": "￭",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FFEE",
+      "char": "￮",
+      "latin": " "
+    },
+    {
+      "code_point": "U+FFEF",
+      "char": "￯",
+      "latin": " "
+    }
+  ],
+  "fullwidth_latin": [
+    {
+      "code_point": "U+FF21",
+      "char": "Ａ"
+    },
+    {
+      "code_point": "U+FF22",
+      "char": "Ｂ"
+    },
+    {
+      "code_point": "U+FF23",
+      "char": "Ｃ"
+    },
+    {
+      "code_point": "U+FF24",
+      "char": "Ｄ"
+    },
+    {
+      "code_point": "U+FF25",
+      "char": "Ｅ"
+    },
+    {
+      "code_point": "U+FF26",
+      "char": "Ｆ"
+    },
+    {
+      "code_point": "U+FF27",
+      "char": "Ｇ"
+    },
+    {
+      "code_point": "U+FF28",
+      "char": "Ｈ"
+    },
+    {
+      "code_point": "U+FF29",
+      "char": "Ｉ"
+    },
+    {
+      "code_point": "U+FF2A",
+      "char": "Ｊ"
+    },
+    {
+      "code_point": "U+FF2B",
+      "char": "Ｋ"
+    },
+    {
+      "code_point": "U+FF2C",
+      "char": "Ｌ"
+    },
+    {
+      "code_point": "U+FF2D",
+      "char": "Ｍ"
+    },
+    {
+      "code_point": "U+FF2E",
+      "char": "Ｎ"
+    },
+    {
+      "code_point": "U+FF2F",
+      "char": "Ｏ"
+    },
+    {
+      "code_point": "U+FF30",
+      "char": "Ｐ"
+    },
+    {
+      "code_point": "U+FF31",
+      "char": "Ｑ"
+    },
+    {
+      "code_point": "U+FF32",
+      "char": "Ｒ"
+    },
+    {
+      "code_point": "U+FF33",
+      "char": "Ｓ"
+    },
+    {
+      "code_point": "U+FF34",
+      "char": "Ｔ"
+    },
+    {
+      "code_point": "U+FF35",
+      "char": "Ｕ"
+    },
+    {
+      "code_point": "U+FF36",
+      "char": "Ｖ"
+    },
+    {
+      "code_point": "U+FF37",
+      "char": "Ｗ"
+    },
+    {
+      "code_point": "U+FF38",
+      "char": "Ｘ"
+    },
+    {
+      "code_point": "U+FF39",
+      "char": "Ｙ"
+    },
+    {
+      "code_point": "U+FF3A",
+      "char": "Ｚ"
+    },
+    {
+      "code_point": "U+FF41",
+      "char": "ａ"
+    },
+    {
+      "code_point": "U+FF42",
+      "char": "ｂ"
+    },
+    {
+      "code_point": "U+FF43",
+      "char": "ｃ"
+    },
+    {
+      "code_point": "U+FF44",
+      "char": "ｄ"
+    },
+    {
+      "code_point": "U+FF45",
+      "char": "ｅ"
+    },
+    {
+      "code_point": "U+FF46",
+      "char": "ｆ"
+    },
+    {
+      "code_point": "U+FF47",
+      "char": "ｇ"
+    },
+    {
+      "code_point": "U+FF48",
+      "char": "ｈ"
+    },
+    {
+      "code_point": "U+FF49",
+      "char": "ｉ"
+    },
+    {
+      "code_point": "U+FF4A",
+      "char": "ｊ"
+    },
+    {
+      "code_point": "U+FF4B",
+      "char": "ｋ"
+    },
+    {
+      "code_point": "U+FF4C",
+      "char": "ｌ"
+    },
+    {
+      "code_point": "U+FF4D",
+      "char": "ｍ"
+    },
+    {
+      "code_point": "U+FF4E",
+      "char": "ｎ"
+    },
+    {
+      "code_point": "U+FF4F",
+      "char": "ｏ"
+    },
+    {
+      "code_point": "U+FF50",
+      "char": "ｐ"
+    },
+    {
+      "code_point": "U+FF51",
+      "char": "ｑ"
+    },
+    {
+      "code_point": "U+FF52",
+      "char": "ｒ"
+    },
+    {
+      "code_point": "U+FF53",
+      "char": "ｓ"
+    },
+    {
+      "code_point": "U+FF54",
+      "char": "ｔ"
+    },
+    {
+      "code_point": "U+FF55",
+      "char": "ｕ"
+    },
+    {
+      "code_point": "U+FF56",
+      "char": "ｖ"
+    },
+    {
+      "code_point": "U+FF57",
+      "char": "ｗ"
+    },
+    {
+      "code_point": "U+FF58",
+      "char": "ｘ"
+    },
+    {
+      "code_point": "U+FF59",
+      "char": "ｙ"
+    },
+    {
+      "code_point": "U+FF5A",
+      "char": "ｚ"
+    }
+  ]
+}

@@ -21,8 +21,7 @@
  * where both G2Ps apply the PUA encoding, so multi-codepoint phonemes (rr, tʃ,
  * tone3) are one PUA character here and spelled out in the golden. Only the
  * golden side is mapped with `pua.json`, so output that forgets the PUA
- * encoding still fails. Chinese punctuation and word boundaries are compared
- * without them until #823 (Python drops CJK punctuation).
+ * encoding still fails.
  *
  * Cases known to differ are listed in `tests/fixtures/g2p/known_divergences.json`
  * for the `wasm` runtime. A difference that is not listed fails, and so does a
@@ -61,7 +60,6 @@ const EXPECTED_ROUTING = {
   zh: RustWasmAdapter,
 };
 const NOT_SPOKEN = new Set([" ", ".", ",", "!", "?", ";", ":", "'", '"', "-"]);
-const ZH_IGNORED = new Set([" ", ".", ",", "!", "?", ";", ":"]);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, "..", "..", "..", "..", "..");
@@ -99,10 +97,6 @@ function splitPhonemes(s) {
     }
   }
   return tokens;
-}
-
-function dropIgnored(language, tokens) {
-  return language === "zh" ? tokens.filter((t) => !ZH_IGNORED.has(t)) : tokens;
 }
 
 /**
@@ -304,10 +298,7 @@ describe(`G2P golden parity: piper-plus npm (runtime "${RUNTIME}")`, () => {
       } catch (e) {
         error = e;
       }
-      const matches =
-        actual !== null &&
-        JSON.stringify(dropIgnored(c.language, expected)) ===
-          JSON.stringify(dropIgnored(c.language, actual));
+      const matches = actual !== null && JSON.stringify(expected) === JSON.stringify(actual);
       verified++;
 
       const label = `[${c.language}] ${JSON.stringify(c.input)}`;

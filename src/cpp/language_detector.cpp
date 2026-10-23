@@ -59,12 +59,17 @@ bool UnicodeLanguageDetector::isFullwidthLatin(char32_t cp) {
 // forms, EXCLUDING fullwidth Latin letters (handled by isFullwidthLatin),
 // halfwidth Katakana (FF65-FF9F, handled by isKana), and
 // halfwidth Hangul (FFA0-FFDC, handled by isHangul).
-bool UnicodeLanguageDetector::isCJKPunct(char32_t cp) {
+// The ranges are the [neutral] ranges of docs/spec/cjk-punctuation-contract.toml.
+bool isCjkPunctuation(char32_t cp) {
     return (cp >= 0x3000 && cp <= 0x303F) ||
            (cp >= 0xFF00 && cp <= 0xFF20) ||  // Fullwidth digits & symbols
            (cp >= 0xFF3B && cp <= 0xFF40) ||  // Fullwidth brackets & symbols
            (cp >= 0xFF5B && cp <= 0xFF64) ||  // Fullwidth braces & misc symbols
            (cp >= 0xFFE0 && cp <= 0xFFEF);    // Fullwidth currency & misc
+}
+
+bool UnicodeLanguageDetector::isCJKPunct(char32_t cp) {
+    return isCjkPunctuation(cp);
 }
 
 // Basic Latin + Latin Extended-A diacritics.
@@ -535,6 +540,44 @@ std::vector<LangSegment> UnicodeLanguageDetector::refineLatinSegmentsForSwedish(
         }
     }
 
+    return result;
+}
+
+// ---------------------------------------------------------------------------
+// CJK punctuation in Latin-script segments (Issue #823,
+// docs/spec/cjk-punctuation-contract.toml [latin_segments])
+// ---------------------------------------------------------------------------
+
+bool isLatinSegmentLanguage(const std::string& lang) {
+    return lang == "en" || lang == "es" || lang == "fr" || lang == "pt" ||
+           lang == "pt-PT" || lang == "sv";
+}
+
+std::string normalizeCjkPunctuationForLatin(const std::string& utf8Text) {
+    if (!utf8::is_valid(utf8Text.begin(), utf8Text.end())) {
+        return utf8Text;
+    }
+
+    std::string result;
+    result.reserve(utf8Text.size());
+    auto it = utf8Text.begin();
+    auto end = utf8Text.end();
+    while (it != end) {
+        auto charStart = it;
+        char32_t cp = static_cast<char32_t>(utf8::unchecked::next(it));
+        if (!isCjkPunctuation(cp)) {
+            result.append(charStart, it);
+        } else if (cp >= 0xFF01 && cp <= 0xFF5E) {
+            // Fullwidth ASCII symbols and digits -> ASCII
+            result += static_cast<char>(cp - 0xFEE0);
+        } else if (cp == 0x3001 || cp == 0xFF64) {
+            result += ',';  // 、 ､
+        } else if (cp == 0x3002 || cp == 0xFF61) {
+            result += '.';  // 。 ｡
+        } else {
+            result += ' ';
+        }
+    }
     return result;
 }
 

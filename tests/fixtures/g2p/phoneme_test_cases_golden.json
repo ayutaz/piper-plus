@@ -305,15 +305,15 @@
       "language": "zh",
       "input": "北京欢迎你。",
       "description": "Chinese sentence with punctuation — tests multi-syllable processing",
-      "expected_phonemes": "p eɪ tone3 tɕ iŋ tone1 x uan tone1 iŋ tone2 n i tone3",
-      "expected_token_count": 14
+      "expected_phonemes": "p eɪ tone3 tɕ iŋ tone1 x uan tone1 iŋ tone2 n i tone3 .",
+      "expected_token_count": 15
     },
     {
       "language": "zh",
       "input": "我是学生。",
       "description": "Chinese sentence with tone 3 sandhi (wo3 shi4) — tests tone marker output",
-      "expected_phonemes": "uo tone3 ʂ ɻ̩ tone4 ɕ yɛ tone2 ʂ əŋ tone1",
-      "expected_token_count": 11
+      "expected_phonemes": "uo tone3 ʂ ɻ̩ tone4 ɕ yɛ tone2 ʂ əŋ tone1 .",
+      "expected_token_count": 12
     },
     {
       "language": "zh",
@@ -347,8 +347,8 @@
       "language": "zh",
       "input": "。，！",
       "description": "Chinese punctuation-only input; char-based JS: 3 chars",
-      "expected_phonemes": "",
-      "expected_token_count": 0
+      "expected_phonemes": ". , !",
+      "expected_token_count": 3
     },
     {
       "language": "zh",
@@ -2622,22 +2622,85 @@
       "language": "zh",
       "input": "。",
       "description": "Single period",
-      "expected_phonemes": "",
-      "expected_token_count": 0
+      "expected_phonemes": ".",
+      "expected_token_count": 1
     },
     {
       "language": "zh",
       "input": "！",
       "description": "Single exclamation",
-      "expected_phonemes": "",
-      "expected_token_count": 0
+      "expected_phonemes": "!",
+      "expected_token_count": 1
     },
     {
       "language": "zh",
       "input": "，",
       "description": "Comma alone",
-      "expected_phonemes": "",
-      "expected_token_count": 0
+      "expected_phonemes": ",",
+      "expected_token_count": 1
+    },
+    {
+      "language": "zh",
+      "input": "你好，今天天气很好。",
+      "description": "Issue #823: a Chinese sentence keeps its ， and 。 (CJK punctuation is neutral, not Japanese)",
+      "expected_phonemes": "n i tone2 x aʊ tone3 , tɕ in tone1 tʰ iɛn tone1 tʰ iɛn tone1 tɕʰ i tone4 x ən tone2 x aʊ tone3 .",
+      "expected_token_count": 26
+    },
+    {
+      "language": "zh",
+      "input": "你好，GPS",
+      "description": "Issue #823: English after a Chinese comma is still read as a loanword (the comma joins the Chinese segment)",
+      "expected_phonemes": "n i tone2 x aʊ tone3 , tɕ i tone4 pʰ i tone4 aɪ tone1 s ɨ tone4",
+      "expected_token_count": 18
+    },
+    {
+      "language": "zh",
+      "input": "你好，Hello",
+      "description": "Issue #823: Chinese, CJK comma, then English",
+      "expected_phonemes": "n i tone2 x aʊ tone3 , aɪ tone1 tʂʰ ɻ̩ tone4 i tone1 aɪ tone1 ɚ tone2 aɪ tone1 ɚ tone2 oʊ tone1",
+      "expected_token_count": 24
+    },
+    {
+      "language": "zh",
+      "input": "Hello，你好",
+      "description": "Issue #823: English, CJK comma, then Chinese",
+      "expected_phonemes": "aɪ tone1 tʂʰ ɻ̩ tone4 i tone1 aɪ tone1 ɚ tone2 aɪ tone1 ɚ tone2 oʊ tone1 n i tone2 x aʊ tone3",
+      "expected_token_count": 23
+    },
+    {
+      "language": "zh",
+      "input": "Hello、世界",
+      "description": "Issue #823: English, ideographic comma, then Chinese",
+      "expected_phonemes": "aɪ tone1 tʂʰ ɻ̩ tone4 i tone1 aɪ tone1 ɚ tone2 aɪ tone1 ɚ tone2 oʊ tone1 ʂ ɻ̩ tone4 tɕ iɛ tone4",
+      "expected_token_count": 23
+    },
+    {
+      "language": "en",
+      "input": "Hello，world",
+      "description": "Issue #823: CJK comma inside English is read as an ASCII comma, not deleted (words stay apart)",
+      "expected_phonemes": "h ə l ˈ o ʊ ,   w ˈ ɜ ː l d",
+      "expected_token_count": 15
+    },
+    {
+      "language": "en",
+      "input": "Hello、world。",
+      "description": "Issue #823: ideographic comma and full stop inside English",
+      "expected_phonemes": "h ə l ˈ o ʊ ,   w ˈ ɜ ː l d .",
+      "expected_token_count": 16
+    },
+    {
+      "language": "en",
+      "input": "I have ３ cats．",
+      "description": "Issue #823: fullwidth digit and full stop inside English",
+      "expected_phonemes": "a ɪ   h æ v   θ ɹ ˈ i ː   k ˈ æ t s .",
+      "expected_token_count": 22
+    },
+    {
+      "language": "es",
+      "input": "Hola，amigo！",
+      "description": "Issue #823: CJK comma and fullwidth ! inside Spanish",
+      "expected_phonemes": "ˈ o l a ,   a m ˈ i ɣ o !",
+      "expected_token_count": 14
     }
   ]
 }

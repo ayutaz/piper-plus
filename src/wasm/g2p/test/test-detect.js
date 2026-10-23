@@ -111,9 +111,16 @@ describe('UnicodeLanguageDetector.detectChar', () => {
         assert.equal(detector.detectChar('\uFF21'), 'en');
     });
 
-    it('should detect CJK punctuation as ja', () => {
-        // Ideographic comma U+3001
-        assert.equal(detector.detectChar('\u3001'), 'ja');
+    it('should return null for CJK punctuation (neutral)', () => {
+        // Ideographic comma U+3001. It used to be 'ja', which split a Chinese
+        // sentence at every \uff0c and \u3002 (Issue #823,
+        // docs/spec/cjk-punctuation-contract.toml).
+        assert.equal(detector.detectChar('\u3001'), null);
+    });
+
+    it('should still detect halfwidth katakana as ja', () => {
+        // Halfwidth katakana A = U+FF71 (not punctuation, so not neutral)
+        assert.equal(detector.detectChar('\uff71'), 'ja');
     });
 });
 

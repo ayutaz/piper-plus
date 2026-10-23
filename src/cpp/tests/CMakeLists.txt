@@ -1119,6 +1119,7 @@ add_executable(test_c_api
     test_c_api.cpp
     test_c_api_g2p.cpp
     test_c_api_g2p_golden.cpp
+    test_cjk_punctuation_contract.cpp
     ../piper_plus_c_api.cpp
 )
 
@@ -1132,7 +1133,9 @@ target_compile_definitions(test_c_api PRIVATE
     PIPER_PLUS_BUILDING_DLL
     _PIPER_VERSION=${piper_version}
     # test_c_api_g2p_golden.cpp reads the shared golden fixture, the PUA
-    # table and the CMU / pinyin dictionaries from the source tree.
+    # table and the CMU / pinyin dictionaries from the source tree;
+    # test_cjk_punctuation_contract.cpp reads the CJK punctuation fixture
+    # (Issue #823).
     PIPER_PLUS_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
 

@@ -38,14 +38,12 @@ internal data class ParityReport(
  * Compares libpiper_plus G2P output with `phoneme_test_cases_golden.json`,
  * which Python generates.
  *
- * Two representation differences are not divergences:
- *   - libpiper_plus encodes multi-codepoint phonemes (`rr`, `tʃ`, `tone3`)
- *     as single PUA characters (`pua.json`); the golden spells them out.
- *     Only the golden side is mapped, so a runtime that forgets the PUA
- *     encoding still fails.
- *   - Chinese punctuation (and with it the word boundaries): Python routes
- *     CJK punctuation to Japanese and drops it, libpiper_plus keeps it
- *     (#262). Tracked in Issue #823.
+ * One representation difference is not a divergence: libpiper_plus encodes
+ * multi-codepoint phonemes (`rr`, `tʃ`, `tone3`) as single PUA characters
+ * (`pua.json`); the golden spells them out. Only the golden side is mapped,
+ * so a runtime that forgets the PUA encoding still fails. Chinese
+ * punctuation and word boundaries are compared as they are: since Issue #823
+ * Python keeps CJK punctuation too (docs/spec/cjk-punctuation-contract.toml).
  * Real differences must be listed in `known_divergences.json`.
  */
 internal object GoldenParity {
@@ -53,7 +51,6 @@ internal object GoldenParity {
     const val RUNTIME = "cpp"
 
     private val STATUSES = setOf("planned", "accepted")
-    private val ZH_IGNORED = setOf(" ", ".", ",", "!", "?", ";", ":")
 
     fun parsePuaTable(json: String): Map<String, String> {
         val entries = JSONObject(json).getJSONArray("entries")
@@ -113,8 +110,8 @@ internal object GoldenParity {
     }
 
     /** [phonemes] as tokens in the form libpiper_plus emits them. */
-    fun normalize(language: String, phonemes: String, pua: Map<String, String>): List<String> =
-        dropIgnored(language, splitPhonemeString(phonemes).map { pua[it] ?: it })
+    fun normalize(phonemes: String, pua: Map<String, String>): List<String> =
+        splitPhonemeString(phonemes).map { pua[it] ?: it }
 
     fun compare(
         results: List<Pair<GoldenCase, String?>>,
@@ -127,8 +124,7 @@ internal object GoldenParity {
         for ((case, actual) in results) {
             val key = GoldenKey(case.language, case.input)
             val matches = actual != null &&
-                normalize(case.language, case.expectedPhonemes, pua) ==
-                dropIgnored(case.language, splitPhonemeString(actual))
+                normalize(case.expectedPhonemes, pua) == splitPhonemeString(actual)
             val label = "[${case.language}] '${case.input}'"
             when {
                 matches && key in known ->
@@ -142,9 +138,6 @@ internal object GoldenParity {
         }
         return ParityReport(results.size, knownCount, unexpected, stale)
     }
-
-    private fun dropIgnored(language: String, tokens: List<String>): List<String> =
-        if (language == "zh") tokens.filterNot { it in ZH_IGNORED } else tokens
 
     private fun entries(json: String): List<JSONObject> {
         val array = JSONObject(json).optJSONArray("divergences") ?: return emptyList()

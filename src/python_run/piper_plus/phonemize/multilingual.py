@@ -86,6 +86,44 @@ def _load_sv_function_words() -> tuple[frozenset[str], frozenset[str]]:
 _SV_FUNCTION_WORDS, _SV_STRONG_CHARS = _load_sv_function_words()
 
 
+# CJK punctuation contract (docs/spec/cjk-punctuation-contract.toml,
+# Issue #823): these characters belong to no language, and a Latin-script
+# segment gets them as ASCII, since the Latin G2P deletes what it does not know.
+_LATIN_SEGMENT_LANGUAGES = frozenset({"en", "es", "fr", "pt", "pt-PT", "sv"})
+_CJK_PUNCT_LATIN = {0x3001: ",", 0x3002: ".", 0xFF61: ".", 0xFF64: ","}
+
+
+def _is_cjk_punctuation(code: int) -> bool:
+    return (
+        0x3000 <= code <= 0x303F
+        or 0xFF00 <= code <= 0xFF20
+        or 0xFF3B <= code <= 0xFF40
+        or 0xFF5B <= code <= 0xFF64
+        or 0xFFE0 <= code <= 0xFFEF
+    )
+
+
+def _cjk_punctuation_to_latin(ch: str) -> str:
+    code = ord(ch)
+    if not _is_cjk_punctuation(code):
+        return ch
+    if 0xFF01 <= code <= 0xFF5E:
+        return chr(code - 0xFEE0)
+    return _CJK_PUNCT_LATIN.get(code, " ")
+
+
+def normalize_cjk_punctuation_for_latin(text: str) -> str:
+    """Rewrite CJK punctuation in a Latin-script segment as ASCII.
+
+    Fullwidth ASCII symbols and digits become their ASCII forms, 、 and 。
+    (and their halfwidth forms) become ``,`` and ``.``, and any other CJK
+    punctuation becomes a space. Other characters are left as they are.
+    """
+    if not any(_is_cjk_punctuation(ord(ch)) for ch in text):
+        return text
+    return "".join(_cjk_punctuation_to_latin(ch) for ch in text)
+
+
 class UnicodeLanguageDetector:
     """Detect language from Unicode character ranges.
 
@@ -107,16 +145,9 @@ class UnicodeLanguageDetector:
     # CJK Compatibility: U+F900-FAFF
     _RE_CJK = re.compile(r"[\u4E00-\u9FFF\u3400-\u4DBF\uF900-\uFAFF]")
 
-    # Japanese-specific: CJK punctuation (。、「」etc) + fullwidth forms
-    # Excludes fullwidth Latin letters (U+FF21-FF3A, U+FF41-FF5A) which are
-    # handled separately as Latin characters.
-    _RE_JA_PUNCT = re.compile(
-        r"[\u3000-\u303F"
-        r"\uFF00-\uFF20"  # Fullwidth digits and symbols (！＂...＠)
-        r"\uFF3B-\uFF40"  # Fullwidth brackets and symbols (［＼...｀)
-        r"\uFF5B-\uFFEF"  # Fullwidth braces onwards (｛｜...halfwidth/fullwidth forms)
-        r"]"
-    )
+    # Halfwidth katakana and hangul (U+FF65-FFDF) are script characters, not
+    # punctuation; they go to Japanese when JA is configured.
+    _RE_HALFWIDTH_SCRIPT = re.compile(r"[\uFF65-\uFFDF]")
 
     # Fullwidth Latin letters: U+FF21-FF3A (Ａ-Ｚ), U+FF41-FF5A (ａ-ｚ)
     _RE_FULLWIDTH_LATIN = re.compile(r"[\uFF21-\uFF3A\uFF41-\uFF5A]")
@@ -187,9 +218,12 @@ class UnicodeLanguageDetector:
                 return self.default_latin_language
             return None
 
-        # Japanese-specific punctuation (CJK punct + fullwidth forms,
-        # excluding fullwidth Latin already handled above)
-        if self._RE_JA_PUNCT.match(ch):
+        # CJK punctuation and fullwidth symbols belong to no language
+        # (docs/spec/cjk-punctuation-contract.toml, Issue #823).
+        if _is_cjk_punctuation(ord(ch)):
+            return None
+
+        if self._RE_HALFWIDTH_SCRIPT.match(ch):
             if self._has_ja:
                 return "ja"
             return None
@@ -439,8 +473,13 @@ class MultilingualPhonemizer:
 
         all_tokens: list[str] = []
 
-        for i, (lang, segment_text) in enumerate(segments):
+        for i, (lang, raw_text) in enumerate(segments):
             func = _get_phonemize_func(lang)
+            segment_text = (
+                normalize_cjk_punctuation_for_latin(raw_text)
+                if lang in _LATIN_SEGMENT_LANGUAGES
+                else raw_text
+            )
 
             if has_zh and lang == "en":
                 prev_is_zh = i > 0 and segments[i - 1][0] == "zh"

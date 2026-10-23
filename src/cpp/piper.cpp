@@ -2469,6 +2469,13 @@ void phonemizeText(const Voice &voice, const std::string &text,
 
         for (size_t segIdx = 0; segIdx < langSegments.size(); ++segIdx) {
           const auto& langSeg = langSegments[segIdx];
+          // CJK punctuation in a Latin-script segment is rewritten as ASCII
+          // before the Latin G2P (or the ZH-EN loanword path) sees it, which
+          // would otherwise drop it and join the words around it
+          // (Issue #823, docs/spec/cjk-punctuation-contract.toml).
+          const std::string segText = isLatinSegmentLanguage(langSeg.lang)
+              ? normalizeCjkPunctuationForLatin(langSeg.text)
+              : langSeg.text;
           std::vector<std::vector<Phoneme>> langPhonemes;
           std::vector<std::vector<ProsodyFeature>> langProsody;
 
@@ -2511,13 +2518,13 @@ void phonemizeText(const Voice &voice, const std::string &text,
             }
           } else if (langSeg.lang == "es") {
             // Spanish: native rule-based phonemizer
-            phonemize_spanish(langSeg.text, langPhonemes);
+            phonemize_spanish(segText, langPhonemes);
           } else if (langSeg.lang == "fr") {
             // French: native rule-based phonemizer
-            phonemize_french(langSeg.text, langPhonemes);
+            phonemize_french(segText, langPhonemes);
           } else if (langSeg.lang == "pt") {
             // Portuguese: native rule-based phonemizer
-            phonemize_portuguese(langSeg.text, langPhonemes);
+            phonemize_portuguese(segText, langPhonemes);
           } else if (langSeg.lang == "en") {
             // ZH-EN code-switching dispatch (Issue #384, TICKET-05 P3).
             // When the en segment is adjacent to zh, route through the
@@ -2531,7 +2538,7 @@ void phonemizeText(const Voice &voice, const std::string &text,
               auto loanwordData = piper::getDefaultLoanwordData();
               if (loanwordData) {
                 std::vector<Phoneme> embedded_flat;
-                piper::phonemizeEmbeddedEnglish(langSeg.text, embedded_flat, *loanwordData);
+                piper::phonemizeEmbeddedEnglish(segText, embedded_flat, *loanwordData);
                 if (!embedded_flat.empty()) {
                   langPhonemes.emplace_back(std::move(embedded_flat));
                 }
@@ -2563,14 +2570,14 @@ void phonemizeText(const Voice &voice, const std::string &text,
               spdlog::warn("English CMU dictionary not loaded; English text may not be phonemized correctly");
               warnedNoCmuDict = true;
             }
-            phonemize_english(langSeg.text, langPhonemes, voice.cmuDict);
+            phonemize_english(segText, langPhonemes, voice.cmuDict);
             // Check if CMU dict produced any phonemes
             bool hasAnyPhonemes = false;
             for (const auto& s : langPhonemes) {
               if (!s.empty()) { hasAnyPhonemes = true; break; }
             }
             if (!hasAnyPhonemes) {
-              spdlog::debug("English segment '{}' has no CMU dict matches; skipping", langSeg.text);
+              spdlog::debug("English segment '{}' has no CMU dict matches; skipping", segText);
             }
             }  // end ZH-EN dispatch else branch
           } else if (langSeg.lang == "zh") {
@@ -2587,7 +2594,7 @@ void phonemizeText(const Voice &voice, const std::string &text,
             phonemize_korean(langSeg.text, langPhonemes);
           } else if (langSeg.lang == "sv") {
             // Swedish: native rule-based phonemizer
-            phonemize_swedish(langSeg.text, langPhonemes);
+            phonemize_swedish(segText, langPhonemes);
           } else {
             spdlog::warn("No native phonemizer for language '{}'; skipping segment", langSeg.lang);
           }

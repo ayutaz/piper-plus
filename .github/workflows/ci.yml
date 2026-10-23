@@ -135,6 +135,8 @@ jobs:
               # load. A change here must re-run those tests, not only the gate.
               - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
               - 'tests/fixtures/g2p/known_divergences.json'
+              # Read by the CJK punctuation contract tests (#823).
+              - 'tests/fixtures/g2p/cjk_punctuation_cases.json'
               - 'tests/fixtures/g2p/english_no_drop_words.json'
               # Read by the C++ / Rust English normalization tests (#821).
               - 'tests/fixtures/g2p/english_normalize_cases.json'

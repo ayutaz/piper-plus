@@ -6,6 +6,7 @@
 //!
 //! Port of the Python `multilingual.py`.
 
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::{LazyLock, Mutex, OnceLock};
 
@@ -96,6 +97,58 @@ static SV_FUNCTION_WORDS: LazyLock<(HashSet<String>, HashSet<char>)> = LazyLock:
 
     (function_words, strong_chars)
 });
+
+// ---------------------------------------------------------------------------
+// CJK punctuation (Issue #823, docs/spec/cjk-punctuation-contract.toml)
+// ---------------------------------------------------------------------------
+// CJK punctuation and the fullwidth forms of ASCII symbols belong to no
+// language: they join the segment around them, so a Chinese sentence keeps
+// its 。 and ，. In a Latin-script segment they are rewritten to ASCII first,
+// because the English G2P deletes characters it does not know and would join
+// the words around them ("Hello，world" -> "helloworld").
+
+/// Languages whose segments go through [`normalize_cjk_punctuation_for_latin`].
+pub(crate) const LATIN_SEGMENT_LANGUAGES: [&str; 6] = ["en", "es", "fr", "pt", "pt-PT", "sv"];
+
+fn is_cjk_punctuation(cp: u32) -> bool {
+    (0x3000..=0x303F).contains(&cp)
+        || (0xFF00..=0xFF20).contains(&cp)
+        || (0xFF3B..=0xFF40).contains(&cp)
+        || (0xFF5B..=0xFF64).contains(&cp)
+        || (0xFFE0..=0xFFEF).contains(&cp)
+}
+
+fn push_cjk_punctuation_as_latin(out: &mut String, ch: char) {
+    let cp = ch as u32;
+    if !is_cjk_punctuation(cp) {
+        out.push(ch);
+    } else if (0xFF01..=0xFF5E).contains(&cp) {
+        // Fullwidth ASCII symbols and digits: the ASCII character.
+        out.push(char::from_u32(cp - 0xFEE0).unwrap_or(' '));
+    } else {
+        out.push(match cp {
+            0x3001 | 0xFF64 => ',',
+            0x3002 | 0xFF61 => '.',
+            _ => ' ',
+        });
+    }
+}
+
+/// Rewrite CJK punctuation in a Latin-script segment as ASCII.
+///
+/// Fullwidth ASCII symbols and digits become their ASCII forms, 、 and 。
+/// (and their halfwidth forms) become `,` and `.`, and any other CJK
+/// punctuation becomes a space. Other characters are left as they are.
+pub fn normalize_cjk_punctuation_for_latin(text: &str) -> Cow<'_, str> {
+    if !text.chars().any(|ch| is_cjk_punctuation(ch as u32)) {
+        return Cow::Borrowed(text);
+    }
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        push_cjk_punctuation_as_latin(&mut out, ch);
+    }
+    Cow::Owned(out)
+}
 
 // ---------------------------------------------------------------------------
 // UnicodeLanguageDetector
@@ -201,18 +254,19 @@ impl UnicodeLanguageDetector {
             };
         }
 
-        // 5. CJK punctuation (U+3000-303F) and fullwidth forms
-        //    (U+FF00-FF20, U+FF3B-FF40, U+FF5B-FFEF),
-        //    excluding fullwidth Latin letters handled above.
-        if (0x3000..=0x303F).contains(&cp)
-            || (0xFF00..=0xFF20).contains(&cp)
-            || (0xFF3B..=0xFF40).contains(&cp)
-            || (0xFF5B..=0xFFEF).contains(&cp)
-        {
+        // 5. CJK punctuation and fullwidth ASCII symbols / digits: neutral,
+        //    so they join the surrounding segment (Issue #823).
+        if is_cjk_punctuation(cp) {
+            return None;
+        }
+
+        // 6. Remaining fullwidth / halfwidth forms (halfwidth katakana and
+        //    hangul, U+FF65-FFDF) -> Japanese.
+        if (0xFF65..=0xFFDF).contains(&cp) {
             return if self.has_ja { Some("ja") } else { None };
         }
 
-        // 6. Latin characters: A-Z, a-z, and extended Latin with diacritics
+        // 7. Latin characters: A-Z, a-z, and extended Latin with diacritics
         //    (U+00C0-00D6, U+00D8-00F6, U+00F8-00FF)
         //    Excludes multiplication sign (U+00D7) and division sign (U+00F7).
         if ch.is_ascii_alphabetic()
@@ -227,7 +281,7 @@ impl UnicodeLanguageDetector {
             };
         }
 
-        // 7. Everything else: digits, ASCII punctuation, whitespace → neutral
+        // 8. Everything else: digits, ASCII punctuation, whitespace → neutral
         None
     }
 
@@ -694,6 +748,14 @@ impl MultilingualPhonemizer {
         let has_zh_segment = segments.iter().any(|(lang, _)| lang == "zh");
 
         for (i, (lang, seg_text)) in segments.iter().enumerate() {
+            // CJK punctuation in a Latin-script segment is read as ASCII
+            // (Issue #823, docs/spec/cjk-punctuation-contract.toml).
+            let seg_text = if LATIN_SEGMENT_LANGUAGES.contains(&lang.as_str()) {
+                normalize_cjk_punctuation_for_latin(seg_text)
+            } else {
+                Cow::Borrowed(seg_text.as_str())
+            };
+
             // ZH-EN code-switching: route embedded en (with adjacent zh) through
             // chinese loanword phonemizer. Issue #384, design §2.1.
             #[cfg(feature = "chinese")]
@@ -707,7 +769,7 @@ impl MultilingualPhonemizer {
                     // because there is no surrounding chinese_text). Issue
                     // #384 review note R-C1.
                     let (tokens, prosody) =
-                        crate::chinese::phonemize_embedded_english_with_prosody(seg_text, data);
+                        crate::chinese::phonemize_embedded_english_with_prosody(&seg_text, data);
                     debug_assert_eq!(tokens.len(), prosody.len());
                     all_phonemes.extend(tokens);
                     all_prosody.extend(prosody);
@@ -720,7 +782,7 @@ impl MultilingualPhonemizer {
                 .get(lang)
                 .ok_or_else(|| G2pError::UnsupportedLanguage { code: lang.clone() })?;
 
-            let (phonemes, prosody_list) = phonemizer.phonemize_with_prosody(seg_text)?;
+            let (phonemes, prosody_list) = phonemizer.phonemize_with_prosody(&seg_text)?;
 
             // Strip BOS/EOS from individual segments.
             // This includes PUA-encoded question markers from Japanese.
@@ -920,11 +982,32 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_cjk_punctuation_as_ja() {
+    fn test_detect_cjk_punctuation_is_neutral() {
+        // CJK punctuation used to be Japanese whenever "ja" was configured,
+        // which cut it out of Chinese sentences. It is neutral now (Issue
+        // #823, docs/spec/cjk-punctuation-contract.toml).
         let det = make_detector(&["ja", "en"], "en");
-        assert_eq!(det.detect_char('\u{3001}', false), Some("ja")); // 、
-        assert_eq!(det.detect_char('\u{3002}', false), Some("ja")); // 。
-        assert_eq!(det.detect_char('\u{300C}', false), Some("ja")); // 「
+        assert_eq!(det.detect_char('\u{3001}', false), None); // 、
+        assert_eq!(det.detect_char('\u{3002}', false), None); // 。
+        assert_eq!(det.detect_char('\u{300C}', false), None); // 「
+    }
+
+    #[test]
+    fn test_detect_halfwidth_katakana_as_ja() {
+        let det = make_detector(&["ja", "en"], "en");
+        assert_eq!(det.detect_char('\u{FF71}', false), Some("ja")); // ｱ
+    }
+
+    #[test]
+    fn test_segment_neutral_cjk_punctuation_joins_surrounding_segment() {
+        let det = make_detector(&["ja", "en", "zh"], "en");
+        let segs = segment_text("你好，世界。", &det);
+        assert_eq!(segs, vec![("zh".to_string(), "你好，世界。".to_string())]);
+        let segs = segment_text("こんにちは、世界。", &det);
+        assert_eq!(
+            segs,
+            vec![("ja".to_string(), "こんにちは、世界。".to_string())]
+        );
     }
 
     #[test]

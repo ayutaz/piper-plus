@@ -28,23 +28,25 @@ class GoldenParityTest {
     fun `expected tokens are mapped to their PUA codepoints`() {
         assertEquals(
             listOf("p", "ˈ", "e", "", "o"),
-            GoldenParity.normalize("es", "p ˈ e rr o", pua),
+            GoldenParity.normalize("p ˈ e rr o", pua),
         )
     }
 
     @Test
-    fun `word boundaries are kept outside Chinese`() {
+    fun `word boundaries are kept`() {
         assertEquals(
             listOf("a", " ", "b"),
-            GoldenParity.normalize("es", "a   b", pua),
+            GoldenParity.normalize("a   b", pua),
         )
     }
 
     @Test
-    fun `Chinese drops punctuation and word boundaries`() {
+    fun `Chinese keeps punctuation and word boundaries`() {
+        // Since Issue #823 Python keeps CJK punctuation, so Chinese is
+        // compared as it is (it used to drop " " and punctuation first).
         assertEquals(
-            listOf("n", "i", ""),
-            GoldenParity.normalize("zh", "n i tone3   .", pua),
+            listOf("n", "i", "", " ", "."),
+            GoldenParity.normalize("n i tone3   .", pua),
         )
     }
 

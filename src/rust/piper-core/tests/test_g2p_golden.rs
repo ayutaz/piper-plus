@@ -293,14 +293,9 @@ fn test_zh_matches_python_golden() {
                     .unwrap_or_else(|| t.to_string())
             })
             .collect();
+        // Python's MultilingualPhonemizer keeps CJK punctuation in a Chinese
+        // segment since Issue #823, so the punctuation is compared too.
         let (tokens, _) = p.phonemize_with_prosody(&case.input).unwrap();
-        // The golden comes from Python's MultilingualPhonemizer, which drops
-        // sentence punctuation; Python's ChinesePhonemizer keeps it as ".",
-        // like this one. Compare the spoken tokens only.
-        let tokens: Vec<String> = tokens
-            .into_iter()
-            .filter(|t| !matches!(t.as_str(), " " | "." | "," | "!" | "?" | ";" | ":"))
-            .collect();
         assert_eq!(tokens, expected, "zh mismatch for {:?}", case.input);
     }
 }

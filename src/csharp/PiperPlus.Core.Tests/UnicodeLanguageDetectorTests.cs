@@ -108,15 +108,22 @@ public sealed class UnicodeLanguageDetectorTests
     }
 
     // ================================================================
-    // 9. JapanesePunctuation_DetectsJapanese
+    // 9. CjkPunctuation_IsNeutral
     // ================================================================
     [Fact]
-    public void JapanesePunctuation_DetectsJapanese()
+    public void CjkPunctuation_IsNeutral()
     {
         UnicodeLanguageDetector detector = MakeDetector("ja", "en");
 
-        // CJK ideographic full stop (U+3002) -> Japanese
-        Assert.Equal("ja", detector.DetectChar('\u3002', contextHasKana: false));
+        // CJK punctuation used to be Japanese whenever "ja" was configured,
+        // which dropped the 。 and ， of a Chinese sentence. It belongs to no
+        // language now (Issue #823, docs/spec/cjk-punctuation-contract.toml);
+        // CjkPunctuationContractTests checks every code point.
+        Assert.Null(detector.DetectChar('\u3002', contextHasKana: false)); // 。
+        Assert.Null(detector.DetectChar('\u3002', contextHasKana: true));
+
+        // Halfwidth katakana (U+FF76) is still Japanese.
+        Assert.Equal("ja", detector.DetectChar('\uFF76', contextHasKana: false));
     }
 
     // ================================================================

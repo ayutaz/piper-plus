@@ -61,6 +61,60 @@ func init() {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// CJK punctuation (Issue #823, docs/spec/cjk-punctuation-contract.toml)
+// ---------------------------------------------------------------------------
+// CJK punctuation and the fullwidth forms of ASCII symbols belong to no
+// language: they join the segment around them, so a Chinese sentence keeps
+// its 。 and ，. In a Latin-script segment they are rewritten to ASCII first,
+// because the English G2P drops characters it does not know and would join
+// the words around them ("Hello，world" -> "helloworld").
+
+// latinSegmentLanguages are the languages whose segments are rewritten with
+// NormalizeCJKPunctuationForLatin before phonemization.
+var latinSegmentLanguages = map[string]bool{
+	"en": true, "es": true, "fr": true, "pt": true, "pt-PT": true, "sv": true,
+}
+
+// cjkPunctuationLatin maps the CJK commas and full stops to ASCII.
+var cjkPunctuationLatin = map[rune]rune{
+	0x3001: ',', 0x3002: '.', 0xFF61: '.', 0xFF64: ',',
+}
+
+func isCJKPunctuation(ch rune) bool {
+	return (ch >= 0x3000 && ch <= 0x303F) ||
+		(ch >= 0xFF00 && ch <= 0xFF20) ||
+		(ch >= 0xFF3B && ch <= 0xFF40) ||
+		(ch >= 0xFF5B && ch <= 0xFF64) ||
+		(ch >= 0xFFE0 && ch <= 0xFFEF)
+}
+
+func cjkPunctuationToLatin(ch rune) rune {
+	if !isCJKPunctuation(ch) {
+		return ch
+	}
+	if ch >= 0xFF01 && ch <= 0xFF5E {
+		return ch - 0xFEE0
+	}
+	if r, ok := cjkPunctuationLatin[ch]; ok {
+		return r
+	}
+	return ' '
+}
+
+// NormalizeCJKPunctuationForLatin rewrites CJK punctuation in a Latin-script
+// segment as ASCII.
+//
+// Fullwidth ASCII symbols and digits become their ASCII forms, 、 and 。
+// (and their halfwidth forms) become "," and ".", and any other CJK
+// punctuation becomes a space. Other characters are left as they are.
+func NormalizeCJKPunctuationForLatin(text string) string {
+	if strings.IndexFunc(text, isCJKPunctuation) < 0 {
+		return text
+	}
+	return strings.Map(cjkPunctuationToLatin, text)
+}
+
 // UnicodeLanguageDetector detects language from Unicode character ranges.
 type UnicodeLanguageDetector struct {
 	languages            map[string]bool
@@ -157,11 +211,14 @@ func (d *UnicodeLanguageDetector) DetectChar(ch rune, contextHasKana bool) strin
 		return d.defaultLatinLanguage
 	}
 
-	// 5. CJK Punctuation (U+3000-303F) + Fullwidth Forms (excluding fullwidth latin)
-	if (ch >= 0x3000 && ch <= 0x303F) ||
-		(ch >= 0xFF00 && ch <= 0xFF20) ||
-		(ch >= 0xFF3B && ch <= 0xFF40) ||
-		(ch >= 0xFF5B && ch <= 0xFFEF) {
+	// 5. CJK punctuation and fullwidth ASCII symbols / digits: neutral, so
+	// they join the surrounding segment (Issue #823).
+	if isCJKPunctuation(ch) {
+		return ""
+	}
+
+	// 5b. Halfwidth katakana / hangul (U+FF65-FFDF)
+	if ch >= 0xFF65 && ch <= 0xFFDF {
 		if d.hasJA {
 			return "ja"
 		}
