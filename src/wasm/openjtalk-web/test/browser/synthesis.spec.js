@@ -11,7 +11,7 @@ async function localDistribution(page) {
     return;
   }
   // Substitute pinned local bytes for network URLs; ORT.run and G2P stay real.
-  await page.route("https://cdn.jsdelivr.net/npm/**", async (route) => {
+  const cdn = async (route) => {
     const url = new URL(route.request().url());
     let target;
     const ort = url.pathname.match(/\/onnxruntime-web@([^/]+)\/dist\/(.*)/);
@@ -21,6 +21,10 @@ async function localDistribution(page) {
       expect(ort[1], "Demo/README runtime must match installed browser runtime").toBe(ortVersion);
       target = `/ort/${ort[2]}`;
     } else if (piper) {
+      // jsDelivr refuses files over 50 MB, so the bundled G2P WASM would 403.
+      expect(url.hostname, "piper-plus must not be loaded from jsDelivr").not.toBe(
+        "cdn.jsdelivr.net"
+      );
       target = `/${piper[1]}`;
     } else if (g2p) {
       target = `/g2p/${g2p[1]}`;
@@ -32,7 +36,9 @@ async function localDistribution(page) {
       response,
       headers: { ...response.headers(), "access-control-allow-origin": "*" },
     });
-  });
+  };
+  await page.route("https://cdn.jsdelivr.net/npm/**", cdn);
+  await page.route("https://unpkg.com/**", cdn);
   await page.route("https://huggingface.co/**", async (route) => {
     const url = new URL(route.request().url());
     const model = models.find((m) => url.pathname.includes(m.repo));
