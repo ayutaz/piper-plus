@@ -29,8 +29,9 @@ def discriminator_loss(disc_real_outputs, disc_generated_outputs):
         r_loss = torch.mean((1 - dr) ** 2)
         g_loss = torch.mean(dg**2)
         loss += r_loss + g_loss
-        r_losses.append(r_loss.item())
-        g_losses.append(g_loss.item())
+        # Detached tensors, not .item(): reading each scale to the host was a GPU sync.
+        r_losses.append(r_loss.detach())
+        g_losses.append(g_loss.detach())
 
     return loss, r_losses, g_losses
 
@@ -221,7 +222,13 @@ def mel_speaker_consistency_loss(
     if y.dim() == 3:
         y = y.squeeze(1)
 
-    window = torch.hann_window(win_length, device=y_hat.device, dtype=y_hat.dtype)
+    # cuFFT does not support BFloat16 / FP16, and a bf16 window / mel basis would
+    # quantise the analysis itself. Under bf16-mixed autocast the generator output
+    # arrives here in bf16, so the whole mel path runs in fp32 for half inputs.
+    compute_dtype = (
+        torch.float32 if y_hat.dtype in (torch.bfloat16, torch.float16) else y_hat.dtype
+    )
+    window = torch.hann_window(win_length, device=y_hat.device, dtype=compute_dtype)
 
     mel_basis = _get_mel_basis(
         n_fft=n_fft,
@@ -230,11 +237,12 @@ def mel_speaker_consistency_loss(
         fmin=mel_fmin,
         fmax=mel_fmax,
         device=y_hat.device,
-        dtype=y_hat.dtype,
+        dtype=compute_dtype,
     )
 
     def _to_mel(wav: torch.Tensor) -> torch.Tensor:
         """wav [B, T] -> log-mel [B, n_mels, frames]"""
+        wav = wav.to(compute_dtype)
         pad = (n_fft - hop_length) // 2
         wav = torch.nn.functional.pad(wav, (pad, pad), mode="reflect")
         stft = torch.stft(

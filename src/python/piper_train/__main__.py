@@ -10,6 +10,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.strategies import DDPStrategy
 
+from .checkpoint_io import load_checkpoint
 from .vits.commons import (
     normalize_checkpoint_state_dict,
     remap_weight_norm_keys,
@@ -158,6 +159,11 @@ def _build_trainer(args, loggers, num_gpus, num_speakers):
         _LOGGER.info("Disabled distributed sampler for SpeakerBalancedBatchSampler")
 
     return Trainer(**trainer_kwargs)
+
+
+def configure_cudnn_benchmark(args) -> None:
+    """cuDNN kernel search: on by default, off with --no-cudnn-benchmark."""
+    torch.backends.cudnn.benchmark = not args.no_cudnn_benchmark
 
 
 def create_parser():
@@ -411,6 +417,13 @@ def create_parser():
         "(default: 700). Use to prevent OOM on long utterances.",
     )
     parser.add_argument(
+        "--no-cudnn-benchmark",
+        action="store_true",
+        default=False,
+        help="Disable cuDNN kernel search. With per-batch sequence lengths the search reruns for "
+        "every new shape (RTX 5090, batch 24: 1.81 -> 0.61 s/step when disabled).",
+    )
+    parser.add_argument(
         "--compile",
         action="store_true",
         help="Enable torch.compile() for potential training speedup (requires PyTorch 2.0+)",
@@ -451,13 +464,10 @@ def load_multispeaker_checkpoint(checkpoint_path: str, model: VitsModel) -> None
     _LOGGER.info("Resuming from multispeaker checkpoint: %s", checkpoint_path)
 
     # 1. strict=False でロード（emb_g は自動スキップ）
-    # NOTE: weights_only=False is required to handle PosixPath objects in checkpoints
-    # This poses a security risk - only load trusted checkpoints
-    checkpoint = torch.load(
-        checkpoint_path,
-        map_location="cpu",
-        weights_only=False,
-    )
+    # Trusted checkpoints only (weights_only=False). checkpoint_io maps the
+    # PosixPath / WindowsPath in hparams to pathlib.Path: a ckpt saved on the
+    # other OS cannot be unpickled by a plain torch.load.
+    checkpoint = load_checkpoint(checkpoint_path, mmap=False)
     # Rejects HiFi-GAN checkpoints and migrates pre-FiLM decoders (issue #616).
     normalized_sd, _ = normalize_checkpoint_state_dict(
         checkpoint["state_dict"], model.state_dict(), checkpoint_path=checkpoint_path
@@ -552,7 +562,7 @@ def main():
     if not args.default_root_dir:
         args.default_root_dir = args.dataset_dir
 
-    torch.backends.cudnn.benchmark = True
+    configure_cudnn_benchmark(args)
     # TF32 enable for Ampere+ (sm_80+: A100 / RTX 6000 Ada / RTX 5090). On
     # sm_75 (T4) and older, these settings are no-ops. Speeds up matmul and
     # conv by ~1.3-1.5x with negligible quality impact for TTS workloads.
@@ -783,11 +793,10 @@ def main():
             _LOGGER.info("Attempting to load weights only (strict=False)...")
 
             # モデルの重みだけをロードする (不一致は許容)
-            # NOTE: weights_only=False is required to handle PosixPath objects in checkpoints
-            # This poses a security risk - only load trusted checkpoints
-            checkpoint = torch.load(
-                args.resume_from_checkpoint, map_location="cpu", weights_only=False
-            )
+            # Trusted checkpoints only (weights_only=False). checkpoint_io maps
+            # the PosixPath / WindowsPath in hparams to pathlib.Path: a ckpt
+            # saved on the other OS cannot be unpickled by a plain torch.load.
+            checkpoint = load_checkpoint(args.resume_from_checkpoint, mmap=False)
             normalized_sd, _ = normalize_checkpoint_state_dict(
                 checkpoint["state_dict"],
                 model.state_dict(),
