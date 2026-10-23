@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add `base` and `zero-shot-base-zs-v1` registry aliases for the public experimental Zero-Shot bundle at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1`. Resolve its nested `releases/zs-v1/base.onnx` and matching `base.onnx.json` pair with revision-isolated cache keys; this records browser download resolution and does not claim browser synthesis or quality validation.
+- Check CDN delivery in CI. `npm run check:cdn` fails when the README or the demo loads a package from a CDN that refuses one of its files (jsDelivr: over 50 MB). `npm run test:real-cdn` runs the README importmap against the real CDNs and requires Japanese audio longer than one second; it runs in required PR CI and again after `npm publish`. The browser tests now also check Japanese and Chinese audio length, cover a failed G2P WASM fetch, and fail on the WASM load-failure warning.
 
 ### Changed
 

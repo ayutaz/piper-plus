@@ -150,3 +150,18 @@ jobs:
         # 落ちた)。permissions.id-token: write の OIDC token で npm 側の
         # Trusted Publisher 設定に対して認証する。g2p-wasm-ci.yml と同じ構成。
         run: npm publish *.tgz --provenance --access public
+
+      - name: Verify README importmap on the real CDNs
+        # The CDNs serve the version only after it is on npm, so the README
+        # check that PRs skip for an unpublished version runs here.
+        run: npm run test:real-cdn
+
+      - name: Upload real-CDN results
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: npm-real-cdn-verification
+          path: |
+            src/wasm/openjtalk-web/test-results/real-cdn.xml
+            src/wasm/openjtalk-web/playwright-report-real-cdn
+          if-no-files-found: warn

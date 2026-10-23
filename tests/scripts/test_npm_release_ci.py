@@ -1,5 +1,6 @@
 """The exact packed distribution must pass before npm publication and on PRs."""
 
+import json
 from pathlib import Path
 
 import yaml
@@ -51,3 +52,35 @@ def test_local_g2p_install_does_not_rewrite_packed_dependencies():
     installs = [s["run"] for s in steps if "file:../g2p" in s.get("run", "")]
     assert installs
     assert all("--no-save" in command for command in installs)
+
+
+def _index(steps, needle, key="run"):
+    return next(i for i, s in enumerate(steps) if needle in s.get(key, ""))
+
+
+def test_cdn_delivery_checks_are_in_required_pr_job():
+    # The browser tests serve local bytes for CDN URLs, so they could not see
+    # jsDelivr refusing the ~60 MB G2P WASM (#818). These two steps can.
+    ci = workflow("ci.yml")
+    assert "npm-package-tests" in ci["jobs"]["ci-required"]["needs"]
+    steps = ci["jobs"]["npm-package-tests"]["steps"]
+    build = _index(steps, "wasm-pack build")
+    check = _index(steps, "npm run check:cdn")
+    browser = _index(steps, "npm run test:browser")
+    real_cdn = _index(steps, "npm run test:real-cdn")
+    assert build < check
+    assert browser < real_cdn
+    for i in (check, real_cdn):
+        assert steps[i].get("continue-on-error", "false") == "false"
+    package = json.loads(
+        (ROOT / "src/wasm/openjtalk-web/package.json").read_text(encoding="utf-8")
+    )
+    assert "test-cdn-delivery.js" in package["scripts"]["test:npm-package:all"]
+
+
+def test_publish_verifies_readme_on_real_cdns_after_publishing():
+    steps = workflow("npm-publish.yml")["jobs"]["publish"]["steps"]
+    publish = _index(steps, "npm publish *.tgz")
+    real_cdn = _index(steps, "npm run test:real-cdn")
+    assert publish < real_cdn
+    assert steps[real_cdn].get("continue-on-error", "false") == "false"
