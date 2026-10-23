@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { writeFile } from "node:fs/promises";
 import {
+  MIN_PINNED_SECONDS,
   PINNED_TEXT,
   observeErrors,
   observeFailedResponses,
@@ -59,9 +60,8 @@ test("CSS10 official demo synthesizes and plays all six languages", async ({ pag
     expect(wav.stats.finite).toBe(true);
     expect(wav.stats.nonzero).toBe(true);
     if (language === "zh" || language === "ja") {
-      // These pinned sentences collapse to <0.5s when their G2P silently falls
-      // back (zh: missing pinyin dictionaries, ja: Rust WASM not loaded).
-      expect(wav.stats.frames / wav.stats.rate).toBeGreaterThan(1);
+      // These pinned sentences collapse when their G2P silently falls back.
+      expect(wav.stats.frames / wav.stats.rate).toBeGreaterThan(MIN_PINNED_SECONDS);
     }
     await page.waitForFunction(() => document.querySelector("#audioPlayer").currentTime > 0);
     await page.locator("#audioPlayer").evaluate((el) => el.pause());
@@ -113,7 +113,7 @@ test("README importmap synthesizes Japanese at full length", async ({ page }) =>
   const ja = await synthesizeWithReadmeImportmap(page, PINNED_TEXT.ja);
   expect(ja.error).toBeUndefined();
   expect(ja).toMatchObject({ finite: true, nonzero: true });
-  expect(ja.seconds).toBeGreaterThan(1);
+  expect(ja.seconds).toBeGreaterThan(MIN_PINNED_SECONDS);
   expect(failed).toEqual([]);
   expect(errors).toEqual([]);
 });

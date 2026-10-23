@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import {
+  MIN_PINNED_SECONDS,
   PINNED_TEXT,
   observeErrors,
   observeFailedResponses,
@@ -20,6 +21,6 @@ test("README importmap on real CDNs synthesizes Japanese", async ({ page }) => {
   expect(failed).toEqual([]);
   expect(ja.error).toBeUndefined();
   expect(ja).toMatchObject({ finite: true, nonzero: true });
-  expect(ja.seconds).toBeGreaterThan(1);
+  expect(ja.seconds).toBeGreaterThan(MIN_PINNED_SECONDS);
   expect(errors).toEqual([]);
 });
