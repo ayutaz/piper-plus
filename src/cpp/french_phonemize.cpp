@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -316,23 +317,6 @@ static std::u32string normalize(const std::u32string &input) {
 // Tokenizer: split into words and punctuation
 // ---------------------------------------------------------------------------
 
-// Apostrophe normalization (curly -> straight, then treated as word boundary)
-static std::u32string normalizeApostrophes(const std::u32string &s) {
-    std::u32string result;
-    result.reserve(s.size());
-    for (char32_t ch : s) {
-        if (ch == 0x2019 || ch == 0x2018) {
-            // Typographic apostrophes -> space (word boundary)
-            result.push_back(U' ');
-        } else if (ch == U'\'') {
-            result.push_back(U' ');
-        } else {
-            result.push_back(ch);
-        }
-    }
-    return result;
-}
-
 static bool isLetterFr(char32_t ch) {
     // a-z
     if (ch >= U'a' && ch <= U'z') return true;
@@ -357,48 +341,98 @@ struct Token {
     bool isPunct;
 };
 
+// Elision clitics (french.py _ELISION_CLITICS): a clitic before an
+// apostrophe is merged with the rest of the word, so "l'ami" is read as
+// "lami" and the clitic consonant is not dropped as a silent final.
+static bool isElisionClitic(const std::u32string &part) {
+    static const std::unordered_set<std::u32string> clitics = {
+        U"l", U"d", U"j", U"n", U"s", U"c", U"m", U"t", U"qu",
+    };
+    return clitics.count(part) > 0;
+}
+
+// Tokenizes like french.py _split_words: a word is a run of letters that
+// may contain apostrophes between letters (typographic apostrophes count as
+// apostrophes); punctuation characters are single tokens; anything else is
+// dropped. In a word with apostrophes, an elision clitic starts a merge:
+// it and every later part become one word ("qu'il" -> "quil"); other parts
+// are words of their own ("aujourd'hui" -> "aujourd" + "hui").
 static std::vector<Token> splitWords(const std::u32string &text) {
-    std::u32string processed = normalizeApostrophes(text);
+    std::u32string processed = text;
+    for (char32_t &ch : processed) {
+        if (ch == 0x2019 || ch == 0x2018) ch = U'\'';
+    }
     std::vector<Token> tokens;
 
     size_t i = 0;
-    size_t n = processed.size();
+    const size_t n = processed.size();
     while (i < n) {
-        char32_t ch = processed[i];
+        const char32_t ch = processed[i];
 
-        // Skip spaces
-        if (ch == U' ') {
-            ++i;
-            continue;
-        }
-
-        // Punctuation token (single char)
         if (isPunctuation(ch)) {
-            Token tok;
-            tok.text.push_back(ch);
-            tok.isPunct = true;
-            tokens.push_back(std::move(tok));
+            tokens.push_back({std::u32string(1, ch), true});
+            ++i;
+            continue;
+        }
+        if (!isLetterFr(ch)) {
             ++i;
             continue;
         }
 
-        // Letter sequence (word)
-        if (isLetterFr(ch)) {
-            Token tok;
-            tok.isPunct = false;
-            while (i < n && isLetterFr(processed[i])) {
-                tok.text.push_back(processed[i]);
+        // Split the word at its inner apostrophes.
+        std::vector<std::u32string> parts(1);
+        while (i < n) {
+            if (isLetterFr(processed[i])) {
+                parts.back().push_back(processed[i]);
                 ++i;
+            } else if (processed[i] == U'\'' && i + 1 < n && isLetterFr(processed[i + 1])) {
+                parts.emplace_back();
+                ++i;
+            } else {
+                break;
             }
-            tokens.push_back(std::move(tok));
-            continue;
         }
 
-        // Skip unknown characters
-        ++i;
+        std::u32string merged;
+        for (size_t k = 0; k < parts.size(); ++k) {
+            if (!merged.empty()) {
+                merged += parts[k];
+            } else if (k + 1 < parts.size() && isElisionClitic(parts[k])) {
+                merged = parts[k];
+            } else {
+                tokens.push_back({parts[k], false});
+            }
+        }
+        if (!merged.empty()) tokens.push_back({std::move(merged), false});
     }
 
     return tokens;
+}
+
+// Starts with a vowel letter, or with 'h' and a vowel (french.py
+// _starts_with_vowel_sound; h aspire is not distinguished).
+static bool startsWithVowelSound(const std::u32string &word) {
+    if (word.empty()) return false;
+    if (isVowelChar(word[0])) return true;
+    return word[0] == U'h' && word.size() > 1 && isVowelChar(word[1]);
+}
+
+// Liaison consonant of a trigger word (french.py _LIAISON_WORDS), or 0.
+static char32_t liaisonConsonant(const std::u32string &word) {
+    static const std::unordered_map<std::u32string, char32_t> words = {
+        {U"les", U'z'},   {U"des", U'z'},    {U"ces", U'z'},    {U"mes", U'z'},
+        {U"tes", U'z'},   {U"ses", U'z'},    {U"nos", U'z'},    {U"vos", U'z'},
+        {U"aux", U'z'},   {U"petits", U'z'}, {U"grands", U'z'}, {U"gros", U'z'},
+        {U"deux", U'z'},  {U"trois", U'z'},  {U"six", U'z'},    {U"dix", U'z'},
+        {U"nous", U'z'},  {U"vous", U'z'},   {U"ils", U'z'},    {U"elles", U'z'},
+        {U"on", U'n'},    {U"en", U'n'},     {U"dans", U'z'},   {U"sans", U'z'},
+        {U"chez", U'z'},  {U"un", U'n'},     {U"mon", U'n'},    {U"ton", U'n'},
+        {U"son", U'n'},   {U"tout", U't'},   {U"quand", U't'},  {U"tr\u00e8s", U'z'},
+        {U"plus", U'z'},  {U"est", U't'},    {U"ont", U't'},    {U"sont", U't'},
+        {U"font", U't'},  {U"vont", U't'},
+    };
+    auto it = words.find(word);
+    return it == words.end() ? 0 : it->second;
 }
 
 // ---------------------------------------------------------------------------
@@ -1169,7 +1203,8 @@ void phonemize_french(const std::string &text,
     std::vector<Phoneme> sentence;
     bool needSpace = false;
 
-    for (const auto &tok : tokens) {
+    for (size_t t = 0; t < tokens.size(); ++t) {
+        const auto &tok = tokens[t];
         if (!tok.isPunct && needSpace) {
             sentence.push_back(CH_SPACE);
         }
@@ -1182,6 +1217,14 @@ void phonemize_french(const std::string &text,
             std::vector<Phoneme> wordPhonemes = convertWord(tok.text);
             for (Phoneme p : wordPhonemes) {
                 sentence.push_back(p);
+            }
+            // Liaison (french.py _apply_liaison): a trigger word ends with
+            // its linking consonant when the next token is a word starting
+            // with a vowel sound. Punctuation in between blocks it.
+            const char32_t linking = liaisonConsonant(tok.text);
+            if (linking != 0 && t + 1 < tokens.size() && !tokens[t + 1].isPunct &&
+                startsWithVowelSound(tokens[t + 1].text)) {
+                sentence.push_back(linking);
             }
         }
 

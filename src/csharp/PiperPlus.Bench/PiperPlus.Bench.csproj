@@ -17,7 +17,6 @@
     <PackageReference Include="DotNetG2P.MeCab" Version="1.8.0" />
     <PackageReference Include="DotNetG2P.English" Version="1.8.0" />
     <PackageReference Include="DotNetG2P.Spanish" Version="1.8.0" />
-    <PackageReference Include="DotNetG2P.French" Version="1.8.0" />
     <PackageReference Include="DotNetG2P.Portuguese" Version="1.8.0" />
   </ItemGroup>
 
@@ -40,7 +39,6 @@
     <Compile Include="..\PiperPlus.Cli\DotNetEnglishG2PEngine.cs" Link="Adapters\DotNetEnglishG2PEngine.cs" />
     <Compile Include="..\PiperPlus.Cli\BundledChineseG2PEngine.cs" Link="Adapters\BundledChineseG2PEngine.cs" />
     <Compile Include="..\PiperPlus.Cli\DotNetSpanishG2PEngine.cs" Link="Adapters\DotNetSpanishG2PEngine.cs" />
-    <Compile Include="..\PiperPlus.Cli\DotNetFrenchG2PEngine.cs" Link="Adapters\DotNetFrenchG2PEngine.cs" />
     <Compile Include="..\PiperPlus.Cli\DotNetPortugueseG2PEngine.cs" Link="Adapters\DotNetPortugueseG2PEngine.cs" />
   </ItemGroup>
 

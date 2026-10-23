@@ -318,38 +318,42 @@ fn normalize(text: &str) -> Vec<char> {
 // Tokenizer
 // ---------------------------------------------------------------------------
 
-fn normalize_apostrophes(chars: &[char]) -> Vec<char> {
-    chars
-        .iter()
-        .map(|&ch| {
-            if ch == '\'' || ch == '\u{2019}' || ch == '\u{2018}' {
-                ' '
-            } else {
-                ch
-            }
-        })
-        .collect()
-}
-
 #[derive(Debug)]
 struct Token {
     text: Vec<char>,
     is_punct: bool,
 }
 
+/// Elision clitics (french.py `_ELISION_CLITICS`): a clitic before an
+/// apostrophe is merged with the rest of the word, so `l'ami` is read as
+/// `lami` and the clitic consonant is not dropped as a silent final.
+fn is_elision_clitic(part: &[char]) -> bool {
+    matches!(
+        part,
+        ['l'] | ['d'] | ['j'] | ['n'] | ['s'] | ['c'] | ['m'] | ['t'] | ['q', 'u']
+    )
+}
+
+/// Tokenizes like french.py `_split_words`: a word is a run of letters that
+/// may contain apostrophes between letters (typographic apostrophes count as
+/// apostrophes); punctuation characters are single tokens; anything else is
+/// dropped. In a word with apostrophes, an elision clitic starts a merge: it
+/// and every later part become one word (`qu'il` -> `quil`); other parts are
+/// words of their own (`aujourd'hui` -> `aujourd` + `hui`).
 fn split_words(text: &[char]) -> Vec<Token> {
-    let processed = normalize_apostrophes(text);
+    let processed: Vec<char> = text
+        .iter()
+        .map(|&ch| match ch {
+            '\u{2019}' | '\u{2018}' => '\'',
+            _ => ch,
+        })
+        .collect();
     let mut tokens = Vec::new();
     let n = processed.len();
     let mut i = 0;
 
     while i < n {
         let ch = processed[i];
-
-        if ch == ' ' {
-            i += 1;
-            continue;
-        }
 
         if is_punctuation(ch) {
             tokens.push(Token {
@@ -359,24 +363,71 @@ fn split_words(text: &[char]) -> Vec<Token> {
             i += 1;
             continue;
         }
-
-        if is_letter_fr(ch) {
-            let mut word = Vec::new();
-            while i < n && is_letter_fr(processed[i]) {
-                word.push(processed[i]);
-                i += 1;
-            }
-            tokens.push(Token {
-                text: word,
-                is_punct: false,
-            });
+        if !is_letter_fr(ch) {
+            i += 1;
             continue;
         }
 
-        i += 1;
+        // Split the word at its inner apostrophes.
+        let mut parts: Vec<Vec<char>> = vec![Vec::new()];
+        while i < n {
+            if is_letter_fr(processed[i]) {
+                parts.last_mut().unwrap().push(processed[i]);
+                i += 1;
+            } else if processed[i] == '\'' && i + 1 < n && is_letter_fr(processed[i + 1]) {
+                parts.push(Vec::new());
+                i += 1;
+            } else {
+                break;
+            }
+        }
+
+        let mut merged: Vec<char> = Vec::new();
+        let last = parts.len() - 1;
+        for (k, part) in parts.into_iter().enumerate() {
+            if !merged.is_empty() {
+                merged.extend(part);
+            } else if k < last && is_elision_clitic(&part) {
+                merged = part;
+            } else {
+                tokens.push(Token {
+                    text: part,
+                    is_punct: false,
+                });
+            }
+        }
+        if !merged.is_empty() {
+            tokens.push(Token {
+                text: merged,
+                is_punct: false,
+            });
+        }
     }
 
     tokens
+}
+
+/// Starts with a vowel letter, or with `h` and a vowel (french.py
+/// `_starts_with_vowel_sound`; h aspire is not distinguished).
+fn starts_with_vowel_sound(word: &[char]) -> bool {
+    match word {
+        [first, ..] if is_vowel_char(*first) => true,
+        ['h', second, ..] => is_vowel_char(*second),
+        _ => false,
+    }
+}
+
+/// Liaison consonant of a trigger word (french.py `_LIAISON_WORDS`).
+fn liaison_consonant(word: &[char]) -> Option<char> {
+    let word: String = word.iter().collect();
+    Some(match word.as_str() {
+        "les" | "des" | "ces" | "mes" | "tes" | "ses" | "nos" | "vos" | "aux" | "petits"
+        | "grands" | "gros" | "deux" | "trois" | "six" | "dix" | "nous" | "vous" | "ils"
+        | "elles" | "dans" | "sans" | "chez" | "tr\u{e8}s" | "plus" => 'z',
+        "on" | "en" | "un" | "mon" | "ton" | "son" => 'n',
+        "tout" | "quand" | "est" | "ont" | "sont" | "font" | "vont" => 't',
+        _ => return None,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -1133,7 +1184,7 @@ pub fn phonemize_french_with_prosody(text: &str) -> (Vec<String>, Vec<Option<Pro
     let mut prosody_list: Vec<Option<ProsodyInfo>> = Vec::new();
     let mut need_space = false;
 
-    for tok in &tokens {
+    for (t, tok) in tokens.iter().enumerate() {
         if !tok.is_punct && need_space {
             phonemes.push(" ".to_string());
             prosody_list.push(Some(ProsodyInfo {
@@ -1153,7 +1204,18 @@ pub fn phonemize_french_with_prosody(text: &str) -> (Vec<String>, Vec<Option<Pro
                 }));
             }
         } else {
-            let word_phonemes = convert_word(&tok.text);
+            let mut word_phonemes = convert_word(&tok.text);
+            // Liaison (french.py `_apply_liaison`): a trigger word ends with
+            // its linking consonant when the next token is a word starting
+            // with a vowel sound. Punctuation in between blocks it. The
+            // consonant counts as part of the word for prosody.
+            if let Some(linking) = liaison_consonant(&tok.text)
+                && tokens
+                    .get(t + 1)
+                    .is_some_and(|next| !next.is_punct && starts_with_vowel_sound(&next.text))
+            {
+                word_phonemes.push(linking);
+            }
             let word_phoneme_count = word_phonemes.len() as i32;
 
             let last_vowel_idx = word_phonemes

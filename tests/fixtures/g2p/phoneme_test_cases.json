@@ -1452,6 +1452,156 @@
       "expected_token_count_min": 5
     },
     {
+      "language": "fr",
+      "input": "l'ami",
+      "description": "Elision l' merged with a vowel-initial host",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "fr",
+      "input": "l’ami",
+      "description": "Elision with a typographic apostrophe (U+2019)",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "fr",
+      "input": "d'accord",
+      "description": "Elision d'",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "fr",
+      "input": "j'ai faim",
+      "description": "Elision j'",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "fr",
+      "input": "Il n'est pas là.",
+      "description": "Elision n' (the clitic keeps its consonant)",
+      "expected_token_count_min": 8
+    },
+    {
+      "language": "fr",
+      "input": "s'il vous plaît",
+      "description": "Elision s'",
+      "expected_token_count_min": 8
+    },
+    {
+      "language": "fr",
+      "input": "qu'il",
+      "description": "Elision qu'",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "fr",
+      "input": "je t'aime",
+      "description": "Elision t'",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "fr",
+      "input": "l'homme",
+      "description": "Elision before h muet",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "fr",
+      "input": "les amis",
+      "description": "Liaison /z/ after a determiner",
+      "expected_token_count_min": 7
+    },
+    {
+      "language": "fr",
+      "input": "des enfants",
+      "description": "Liaison /z/ after des",
+      "expected_token_count_min": 7
+    },
+    {
+      "language": "fr",
+      "input": "nous avons",
+      "description": "Liaison /z/ after a subject pronoun",
+      "expected_token_count_min": 7
+    },
+    {
+      "language": "fr",
+      "input": "vous êtes",
+      "description": "Liaison /z/ before ê",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "fr",
+      "input": "ils ont",
+      "description": "Liaison /z/ after ils",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "fr",
+      "input": "un ami",
+      "description": "Liaison /n/ after un",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "fr",
+      "input": "mon ami",
+      "description": "Liaison /n/ after mon",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "fr",
+      "input": "en avance",
+      "description": "Liaison /n/ after en",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "fr",
+      "input": "très important",
+      "description": "Liaison /z/ after très",
+      "expected_token_count_min": 9
+    },
+    {
+      "language": "fr",
+      "input": "deux enfants",
+      "description": "Liaison /z/ after a numeral",
+      "expected_token_count_min": 7
+    },
+    {
+      "language": "fr",
+      "input": "chez elle",
+      "description": "Liaison /z/ after chez",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "fr",
+      "input": "quand il",
+      "description": "Liaison /t/ after quand",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "fr",
+      "input": "ils sont arrivés",
+      "description": "Liaison /t/ after sont; none after ils before a consonant",
+      "expected_token_count_min": 10
+    },
+    {
+      "language": "fr",
+      "input": "les garçons",
+      "description": "No liaison before a consonant",
+      "expected_token_count_min": 7
+    },
+    {
+      "language": "fr",
+      "input": "les, amis",
+      "description": "No liaison across punctuation",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "fr",
+      "input": "c'est un homme",
+      "description": "Elision c' blocks the est liaison; liaison /n/ after un before h muet",
+      "expected_token_count_min": 7
+    },
+    {
       "language": "pt",
       "input": "sim",
       "description": "Yes — nasal vowel",

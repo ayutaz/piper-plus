@@ -14,12 +14,6 @@
         "resolved": "1.8.0",
         "contentHash": "m8pyIwPbTVQE6F0FbcqUX8f0iyR8vp6YeOS03+OXs5ERayQQbfp3ndPoxTqO+GCVNdj6LpMwCIizX7Tmi2iIYA=="
       },
-      "DotNetG2P.French": {
-        "type": "Direct",
-        "requested": "[1.8.0, )",
-        "resolved": "1.8.0",
-        "contentHash": "VMQo6D2QtWbUiiCVNqP/UKSg67zkgCAKGlu8NgK6ncsLoVFkmMkkyMBtOM8x+Bv0M6ADXaSrQbmPubIMenSLDw=="
-      },
       "DotNetG2P.MeCab": {
         "type": "Direct",
         "requested": "[1.8.0, )",

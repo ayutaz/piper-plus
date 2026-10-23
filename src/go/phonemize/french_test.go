@@ -1240,8 +1240,14 @@ func TestFrSplit(t *testing.T) {
 	}{
 		{"bonjour le monde", []string{"bonjour", "le", "monde"}},
 		{"oui, non!", []string{"oui", ",", "non", "!"}},
-		{"l'ami", []string{"l", "ami"}},
-		{"l\u2019ami", []string{"l", "ami"}}, // curly apostrophe
+		// Elision clitics merge with the rest of the word (french.py _split_words).
+		{"l'ami", []string{"lami"}},
+		{"l\u2019ami", []string{"lami"}}, // curly apostrophe
+		{"qu'il", []string{"quil"}},
+		{"aujourd'hui", []string{"aujourd", "hui"}}, // not a clitic: two words
+		{"l' ami", []string{"l", "ami"}},            // no letter after the apostrophe
+		{"les, amis", []string{"les", ",", "amis"}},
+		{"na\u00efve 2 x", []string{"na\u00efve", "x"}}, // digits are dropped
 		{"", nil},
 		{"  spaces  ", []string{"spaces"}},
 	}

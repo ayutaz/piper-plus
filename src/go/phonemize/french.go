@@ -2,7 +2,6 @@ package phonemize
 
 import (
 	"strings"
-	"unicode"
 )
 
 // FrenchPhonemizer converts French text to IPA phonemes using rule-based G2P.
@@ -401,6 +400,36 @@ func frWord(word string) []string {
 	return ph
 }
 
+// frClitic lists the elision clitics (french.py _ELISION_CLITICS): a clitic
+// before an apostrophe is merged with the rest of the word, so "l'ami" is
+// read as "lami" and the clitic consonant is not dropped as a silent final.
+var frClitic = map[string]bool{
+	"l": true, "d": true, "j": true, "n": true, "s": true, "c": true, "m": true, "t": true, "qu": true,
+}
+
+// frLiaison maps a liaison trigger word to its linking consonant
+// (french.py _LIAISON_WORDS).
+var frLiaison = map[string]string{
+	"les": "z", "des": "z", "ces": "z", "mes": "z", "tes": "z", "ses": "z", "nos": "z", "vos": "z",
+	"aux": "z", "petits": "z", "grands": "z", "gros": "z", "deux": "z", "trois": "z", "six": "z",
+	"dix": "z", "nous": "z", "vous": "z", "ils": "z", "elles": "z", "on": "n", "en": "n",
+	"dans": "z", "sans": "z", "chez": "z", "un": "n", "mon": "n", "ton": "n", "son": "n",
+	"tout": "t", "quand": "t", "tr\u00e8s": "z", "plus": "z", "est": "t", "ont": "t", "sont": "t",
+	"font": "t", "vont": "t",
+}
+
+// frIsLetter reports the letters of french.py _split_words
+// ([a-zàâæéèêëîïôùûüœçñ]); other characters are dropped.
+func frIsLetter(r rune) bool {
+	return (r >= 'a' && r <= 'z') || frV[r] || r == '\u00e7' || r == '\u00f1'
+}
+
+// frSplit tokenizes like french.py _split_words: a word is a run of letters
+// that may contain apostrophes between letters (typographic apostrophes count
+// as apostrophes); punctuation characters are single tokens; anything else is
+// dropped. In a word with apostrophes, an elision clitic starts a merge: it
+// and every later part become one word ("qu'il" -> "quil"); other parts are
+// words of their own ("aujourd'hui" -> "aujourd" + "hui").
 func frSplit(text string) []string {
 	text = strings.NewReplacer("\u2019", "'", "\u2018", "'").Replace(text)
 	var t []string
@@ -408,26 +437,57 @@ func frSplit(text string) []string {
 	i := 0
 	for i < len(rs) {
 		ch := rs[i]
-		if unicode.IsSpace(ch) {
-			i++
-			continue
-		}
 		if frPu[ch] {
 			t = append(t, string(ch))
 			i++
 			continue
 		}
-		if unicode.IsLetter(ch) {
-			s := i
-			for i < len(rs) && unicode.IsLetter(rs[i]) {
-				i++
-			}
-			t = append(t, string(rs[s:i]))
+		if !frIsLetter(ch) {
+			i++
 			continue
 		}
-		i++
+		parts := []string{""}
+		s := i
+		for i < len(rs) {
+			if frIsLetter(rs[i]) {
+				i++
+			} else if rs[i] == '\'' && i+1 < len(rs) && frIsLetter(rs[i+1]) {
+				parts[len(parts)-1] += string(rs[s:i])
+				parts = append(parts, "")
+				i++
+				s = i
+			} else {
+				break
+			}
+		}
+		parts[len(parts)-1] += string(rs[s:i])
+		merged := ""
+		for k, part := range parts {
+			switch {
+			case merged != "":
+				merged += part
+			case k < len(parts)-1 && frClitic[part]:
+				merged = part
+			default:
+				t = append(t, part)
+			}
+		}
+		if merged != "" {
+			t = append(t, merged)
+		}
 	}
 	return t
+}
+
+// frStartsWithVowelSound reports a word starting with a vowel letter, or with
+// 'h' and a vowel (french.py _starts_with_vowel_sound; h aspire is not
+// distinguished).
+func frStartsWithVowelSound(word string) bool {
+	rs := []rune(word)
+	if len(rs) == 0 {
+		return false
+	}
+	return frV[rs[0]] || (rs[0] == 'h' && len(rs) > 1 && frV[rs[1]])
 }
 
 // PhonemizeWithProsody converts French text to phoneme tokens with prosody.
@@ -438,7 +498,7 @@ func (p *FrenchPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, 
 	var pro []*ProsodyInfo
 	sp := false
 	eos := "$"
-	for _, tk := range toks {
+	for ti, tk := range toks {
 		pu := true
 		for _, c := range tk {
 			if !frPu[c] {
@@ -461,6 +521,14 @@ func (p *FrenchPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, 
 			}
 		} else {
 			wp := frWord(tk)
+			// Liaison (french.py _apply_liaison): a trigger word ends with its
+			// linking consonant when the next token is a word starting with a
+			// vowel sound. Punctuation in between blocks it. The consonant
+			// counts as part of the word for prosody.
+			if l, ok := frLiaison[tk]; ok && ti+1 < len(toks) && !frPu[[]rune(toks[ti+1])[0]] &&
+				frStartsWithVowelSound(toks[ti+1]) {
+				wp = append(wp, l)
+			}
 			cnt := len(wp)
 			lv := -1
 			for j := cnt - 1; j >= 0; j-- {
