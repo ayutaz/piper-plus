@@ -679,6 +679,23 @@ class PiperVoice:
                 break
         return "en"
 
+    def _multilingual_languages(self) -> list[str]:
+        """Languages the multilingual phonemizer segments text into.
+
+        Swedish is added only when the model's ``language_id_map`` has ``sv``:
+        with ``sv`` among the languages, the per-word Swedish LID re-reads
+        Latin words such as "och" with the Swedish rules, which a model
+        trained without Swedish has no use for (the released 6-language
+        models). A model with ``sv`` gets the Latin-script languages the
+        training-side golden is generated with (``tools/generate_g2p_golden.py``).
+        """
+        if self.config.phoneme_type == PhonemeType.BILINGUAL:
+            return ["ja", "en"]
+        languages = ["ja", "en", "zh", "es", "fr", "pt"]
+        if self.config.language_id_map and "sv" in self.config.language_id_map:
+            languages.append("sv")
+        return languages
+
     def _phonemize_one_factory(self, language_id: int | None = None):
         """Return a callable that phonemizes a single sentence.
 
@@ -705,11 +722,7 @@ class PiperVoice:
                     "MultilingualPhonemizer unavailable; falling back to JA phonemizer"
                 )
             else:
-                languages = (
-                    ["ja", "en"]
-                    if self.config.phoneme_type == PhonemeType.BILINGUAL
-                    else ["ja", "en", "zh", "es", "fr", "pt"]
-                )
+                languages = self._multilingual_languages()
                 mp = MultilingualPhonemizer(
                     languages=languages,
                     default_latin_language=self._latin_language(language_id, languages),

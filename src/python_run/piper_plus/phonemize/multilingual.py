@@ -387,6 +387,10 @@ def _get_phonemize_func(lang: str):
         from .portuguese import phonemize_european_portuguese  # noqa: PLC0415
 
         func = phonemize_european_portuguese
+    elif lang == "sv":
+        from .swedish import phonemize_swedish  # noqa: PLC0415
+
+        func = phonemize_swedish
     else:
         raise ValueError(f"Unsupported language: {lang}")
 
