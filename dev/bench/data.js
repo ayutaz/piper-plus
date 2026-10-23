@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792676217513,
+  "lastUpdate": 1792759030778,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1339,6 +1339,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Cold Start (en)",
             "value": 1162.1,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 217.5,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a380f74618b863f9fff9bab4497349efac476488",
+          "message": "test(g2p): Go/WASM/Python/Swift/C# を Python の正解と全件照合する (#835)\n\n* test(g2p): Go/WASM/python_run/Swift/C# を Python の正解と全件照合し言語指定を直す\n\nC++ / Rust に続き、残りのランタイムも phoneme_test_cases_golden.json と\n完全一致で照合し、差は known_divergences.json に Issue 付きで記録する。\n\n- Go: PhonemizeWithLanguage を追加し WithLanguage が音素化に届くようにした。\n  ja 以外の ? を残し、英字の中国語読みの声調変化をやめ、スペイン語の強勢を\n  強勢母音の直前に置く。golden テストの黙ったスキップをやめた。\n- python_run: phonemize(text, language_id) がラテン文字言語を指定言語で読む。\n  ja 以外の ? を残す。CHAR2TOKEN の上書き破損を直した。\n- C#: 英語アダプタの正規化 (アクセント・i.e./e.g.・端の句読点)、仏語 y_vowel、\n  葡語の破擦音と鼻母音、西語の強勢位置、英字の中国語読みの声調変化を直した。\n- WASM: piper-wasm が ja 以外で言語指定付きの音素化を使う。\n- Swift: 決め打ちのスキップ一覧を known_divergences.json に置き換えた。\n- 残る差は #827 #828 #829 #830 #832 #833 と既存の #821 #822 に記録した。\n- 各ランタイムの CI が正解・記録・pua.json・辞書の変更でも動くようにした。\n\n* fix(ci): Go の照合テストが読む辞書を取得し、C# のテストは CLI を参照する\n\n- Go CI の unit-test は sparse-checkout で src/go と fixtures だけを取得して\n  いたため、golden_parity_test.go が読む pua.json と cmudict / pinyin 辞書が\n  なく失敗していた。両方のデータディレクトリを取得対象に加える。\n- PiperPlus.Cli.Tests は CLI のアダプタをソースリンクするため DotNetG2P の\n  各パッケージを直接参照しており、dependency-review が新しい直接依存\n  (Spanish / Portuguese / French) をライセンス不適合と判定していた。\n  CLI プロジェクトを参照し InternalsVisibleTo で内部型を見る構成に変え、\n  テスト側の直接依存を外す。CLI が出荷する構成そのものを検査する点は同じ。\n\n* ci(csharp): CLI の入口と JSON 生成型をカバレッジの集計から外す\n\nPiperPlus.Cli.Tests が CLI プロジェクトを参照するようになり、PiperPlus.Cli\nアセンブリ全体が計測対象に入った。音素化アダプタはテスト内で 94-100% 実行\nされているが、Program・JSONL のレコード型・ソース生成の JSON コンテキストは\nCliIntegrationTests が子プロセスで起動して検査するため行カバレッジに現れず、\n集計値が 63.1% に下がって 70% の下限を割っていた。下限は変えず、この 3 型\nだけを集計から外して以前と同じ範囲を測る。",
+          "timestamp": "2026-10-23T21:33:11+09:00",
+          "tree_id": "e5d1ce059a121ea6347c61cc9d960d077bbf40ab",
+          "url": "https://github.com/ayutaz/piper-plus/commit/a380f74618b863f9fff9bab4497349efac476488"
+        },
+        "date": 1792759029192,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0584,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 14.5,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 16.6,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 898.9,
             "unit": "ms"
           },
           {
