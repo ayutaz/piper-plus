@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using PiperPlus.Core.Mapping;
@@ -78,12 +79,11 @@ public sealed class PinyinDictionaryChineseG2PEngine : IChineseG2PEngine
         var singleDict = new Dictionary<int, string>();
         using (JsonDocument doc = JsonDocument.Parse(single))
         {
-            foreach (JsonProperty entry in doc.RootElement.EnumerateObject())
+            IEnumerable<JsonProperty> entries = doc.RootElement.EnumerateObject()
+                .Where(e => e.Value.ValueKind == JsonValueKind.String && int.TryParse(e.Name, out _));
+            foreach (JsonProperty entry in entries)
             {
-                if (int.TryParse(entry.Name, out int codepoint) && entry.Value.GetString() is { } readings)
-                {
-                    singleDict[codepoint] = readings;
-                }
+                singleDict[int.Parse(entry.Name)] = entry.Value.GetString()!;
             }
         }
 
@@ -92,16 +92,12 @@ public sealed class PinyinDictionaryChineseG2PEngine : IChineseG2PEngine
         {
             foreach (JsonProperty entry in doc.RootElement.EnumerateObject())
             {
-                var syllables = new List<string>();
-                foreach (JsonElement alternatives in entry.Value.EnumerateArray())
-                {
-                    if (alternatives.GetArrayLength() > 0 && alternatives[0].GetString() is { } first)
-                    {
-                        syllables.Add(first);
-                    }
-                }
-
-                phraseDict[entry.Name] = [.. syllables];
+                // First reading of each character; characters with no reading are skipped.
+                phraseDict[entry.Name] = entry.Value.EnumerateArray()
+                    .Where(alternatives => alternatives.GetArrayLength() > 0
+                        && alternatives[0].ValueKind == JsonValueKind.String)
+                    .Select(alternatives => alternatives[0].GetString()!)
+                    .ToArray();
             }
         }
 
@@ -270,9 +266,10 @@ public sealed class PinyinDictionaryChineseG2PEngine : IChineseG2PEngine
     private bool TryMatchPhrase(int[] codepoints, int start, out int length, out string[] syllables)
     {
         int maxLength = Math.Min(codepoints.Length - start, MaxPhraseLength);
+        var key = new StringBuilder();
         for (length = maxLength; length >= 2; length--)
         {
-            var key = new StringBuilder();
+            key.Clear();
             for (int k = start; k < start + length; k++)
             {
                 key.Append(char.ConvertFromUtf32(codepoints[k]));
