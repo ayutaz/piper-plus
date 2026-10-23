@@ -425,12 +425,15 @@ class MultilingualPhonemizer:
         if not segments:
             return []
 
-        # Build set of BOS/EOS tokens to strip (including PUA-mapped variants)
-        # Japanese question markers ?!, ?., ?~ are PUA-encoded single chars
-        _bos_eos_tokens = {"^", "$", "?"}
+        # Every per-language phonemizer here wraps its output in BOS/EOS
+        # ("^" ... "$"). Japanese ends a sentence with a question-marker EOS
+        # instead ("?", or the PUA-encoded ?!, ?., ?~); in other languages "?"
+        # is an ordinary phoneme, as in the training-side phonemizer.
+        _bos_eos_tokens = {"^", "$"}
+        _ja_bos_eos_tokens = {"^", "$", "?"}
         for marker in ("?!", "?.", "?~"):
             if marker in TOKEN2CHAR:
-                _bos_eos_tokens.add(TOKEN2CHAR[marker])
+                _ja_bos_eos_tokens.add(TOKEN2CHAR[marker])
 
         has_zh = "zh" in self._languages
 
@@ -448,9 +451,9 @@ class MultilingualPhonemizer:
             tokens = func(segment_text)
 
             # Strip BOS/EOS from individual segments
-            # This includes PUA-encoded question markers from Japanese
+            strip = _ja_bos_eos_tokens if lang == "ja" else _bos_eos_tokens
             for tok in tokens:
-                if tok in _bos_eos_tokens:
+                if tok in strip:
                     continue
                 all_tokens.append(tok)
 

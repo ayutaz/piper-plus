@@ -8,27 +8,6 @@
         "resolved": "6.0.4",
         "contentHash": "lkhqpF8Pu2Y7IiN7OntbsTtdbpR1syMsm2F3IgX6ootA4ffRqWL5jF7XipHuZQTdVuWG/gVAAcf8mjk8Tz0xPg=="
       },
-      "DotNetG2P": {
-        "type": "Direct",
-        "requested": "[1.8.0, )",
-        "resolved": "1.8.0",
-        "contentHash": "OPJnHbyQ5oQN7+plhnBvk4mOLLIQ9tmSnKken70i9GNqLbXsxh+t4m5zwhmYYwN88T/yVpil6BsEKwIAaZYF4Q=="
-      },
-      "DotNetG2P.English": {
-        "type": "Direct",
-        "requested": "[1.8.0, )",
-        "resolved": "1.8.0",
-        "contentHash": "m8pyIwPbTVQE6F0FbcqUX8f0iyR8vp6YeOS03+OXs5ERayQQbfp3ndPoxTqO+GCVNdj6LpMwCIizX7Tmi2iIYA=="
-      },
-      "DotNetG2P.MeCab": {
-        "type": "Direct",
-        "requested": "[1.8.0, )",
-        "resolved": "1.8.0",
-        "contentHash": "dDeIgcFqfPFnH0UMmjvcdE32+DCcUvax6GskHfAw6vSz5hSM0gGo/y+pyXGnxTgsoQmclPgOXinrKjPRlv6tiQ==",
-        "dependencies": {
-          "DotNetG2P": "1.8.0"
-        }
-      },
       "Microsoft.CodeAnalysis.PublicApiAnalyzers": {
         "type": "Direct",
         "requested": "[3.11.0-beta1.24454.1, )",
@@ -95,6 +74,39 @@
         "dependencies": {
           "xunit.v3.mtp-v1": "[3.2.2]"
         }
+      },
+      "DotNetG2P": {
+        "type": "Transitive",
+        "resolved": "1.8.0",
+        "contentHash": "OPJnHbyQ5oQN7+plhnBvk4mOLLIQ9tmSnKken70i9GNqLbXsxh+t4m5zwhmYYwN88T/yVpil6BsEKwIAaZYF4Q=="
+      },
+      "DotNetG2P.English": {
+        "type": "Transitive",
+        "resolved": "1.8.0",
+        "contentHash": "m8pyIwPbTVQE6F0FbcqUX8f0iyR8vp6YeOS03+OXs5ERayQQbfp3ndPoxTqO+GCVNdj6LpMwCIizX7Tmi2iIYA=="
+      },
+      "DotNetG2P.French": {
+        "type": "Transitive",
+        "resolved": "1.8.0",
+        "contentHash": "VMQo6D2QtWbUiiCVNqP/UKSg67zkgCAKGlu8NgK6ncsLoVFkmMkkyMBtOM8x+Bv0M6ADXaSrQbmPubIMenSLDw=="
+      },
+      "DotNetG2P.MeCab": {
+        "type": "Transitive",
+        "resolved": "1.8.0",
+        "contentHash": "dDeIgcFqfPFnH0UMmjvcdE32+DCcUvax6GskHfAw6vSz5hSM0gGo/y+pyXGnxTgsoQmclPgOXinrKjPRlv6tiQ==",
+        "dependencies": {
+          "DotNetG2P": "1.8.0"
+        }
+      },
+      "DotNetG2P.Portuguese": {
+        "type": "Transitive",
+        "resolved": "1.8.0",
+        "contentHash": "C1+LO07latGkcLZZ0imPsR4Li/ZuIJQKo1Sd+yvJedgybGV0ig7xRg7oTlgXt1NSnBXYVDIQibJoL+e5QRG/BA=="
+      },
+      "DotNetG2P.Spanish": {
+        "type": "Transitive",
+        "resolved": "1.8.0",
+        "contentHash": "JuycRe2EPx7wYCiJm0FukSUGG+M0Mhv4BbFAXVTgSHGxXMB+TCZ2LhoNzz3p81Ku6MQMe0ES1UN6fhWMzxDPEg=="
       },
       "Microsoft.ApplicationInsights": {
         "type": "Transitive",
@@ -191,6 +203,11 @@
         "resolved": "1.2.0.556",
         "contentHash": "zvn9Mqs/ox/83cpYPignI8hJEM2A93s2HkHs8HYMOAQW0PkampyoErAiIyKxgTLqbbad29HX/shv/6LGSjPJNQ=="
       },
+      "System.CommandLine": {
+        "type": "Transitive",
+        "resolved": "2.0.5",
+        "contentHash": "2XtWAPk1G6arpe3OCFNrYYuf6iIboznxs2elJSGgd8e0euou7LfGYFon6hBEfDWNtOLr0M3+oUVgy1a5EGa41A=="
+      },
       "System.Numerics.Tensors": {
         "type": "Transitive",
         "resolved": "9.0.0",
@@ -261,6 +278,20 @@
         "dependencies": {
           "xunit.v3.extensibility.core": "[3.2.2]",
           "xunit.v3.runner.common": "[3.2.2]"
+        }
+      },
+      "piperplus.cli": {
+        "type": "Project",
+        "dependencies": {
+          "DotNetG2P": "[1.8.0, )",
+          "DotNetG2P.English": "[1.8.0, )",
+          "DotNetG2P.French": "[1.8.0, )",
+          "DotNetG2P.MeCab": "[1.8.0, )",
+          "DotNetG2P.Portuguese": "[1.8.0, )",
+          "DotNetG2P.Spanish": "[1.8.0, )",
+          "Microsoft.ML.OnnxRuntime": "[1.24.3, )",
+          "PiperPlus.Core": "[0.5.1, )",
+          "System.CommandLine": "[2.0.5, )"
         }
       },
       "piperplus.core": {

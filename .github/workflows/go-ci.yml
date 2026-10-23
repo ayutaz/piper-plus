@@ -14,6 +14,13 @@ on:
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
+      # Read by phonemize/golden_parity_test.go.
+      - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
+      - 'tests/fixtures/g2p/known_divergences.json'
+      - 'tests/fixtures/g2p/english_no_drop_words.json'
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
+      - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
+      - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
       - 'test/fixtures/speaker_encoder_golden.json'
       - '.github/workflows/go-ci.yml'
   push:
@@ -25,6 +32,13 @@ on:
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
+      # Read by phonemize/golden_parity_test.go.
+      - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
+      - 'tests/fixtures/g2p/known_divergences.json'
+      - 'tests/fixtures/g2p/english_no_drop_words.json'
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
+      - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
+      - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
       - 'test/fixtures/speaker_encoder_golden.json'
   workflow_call:
 
@@ -55,10 +69,14 @@ jobs:
           # reference test models outside this path (e.g. test/models/) will not
           # find them here. Those tests run in the integration-test job which
           # does a full checkout.
+          # phonemize/golden_parity_test.go also reads pua.json and the
+          # canonical cmudict / pinyin dictionaries (see the paths filter).
           sparse-checkout: |
             src/go
             test/fixtures
             tests/fixtures
+            src/python/g2p/piper_plus_g2p/data
+            src/rust/piper-plus-g2p/data
       - uses: actions/setup-go@v5.6.0
         with:
           go-version: '1.26'

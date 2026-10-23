@@ -46,24 +46,16 @@ final class GoldenPhonemeTests: XCTestCase {
         XCTAssertFalse(suite.test_cases.isEmpty)
     }
 
-    // English fixture entries that exercise behavior the Rust crate's
-    // `EnglishPhonemizer` does not yet implement — namely a letter-spelling
-    // fallback for words missing from the bundled CMU dictionary. The
-    // shared fixture grew these cases in PR #400 (Kotlin G2P) where the
-    // Kotlin / Python implementations have such a fallback. Until the
-    // Rust side gains parity (tracked separately), these cases produce
-    // empty / near-empty token streams that fail the structural minima.
-    // We skip them here rather than weakening the assertion globally,
-    // so any new EN fixture entry still has to clear the bar.
-    private static let englishCasesNotSupportedByRustCrate: Set<String> = [
-        "ChatGPT and GitHub",
-        "aaaaa",
-        "xyz",
-        "café",
-        "UPPERCASE",
-        "MixedCase",
-        "'quote'",
-    ]
+    // Cases listed for the "swift" runtime in
+    // tests/fixtures/g2p/known_divergences.json are known to differ from
+    // Python (each entry names its issue). They are skipped here and checked by
+    // GoldenParityTests, which also fails once a listed case starts to match,
+    // so any other fixture entry still has to clear the structural bar.
+    private static let knownDivergences: Set<GoldenKey> = (try? GoldenFixtures.knownDivergences()) ?? []
+
+    func testKnownDivergencesLoad() throws {
+        XCTAssertFalse(try GoldenFixtures.knownDivergences().isEmpty, "known_divergences.json lists nothing for swift")
+    }
 
     func testJapaneseGoldenCases() throws {
         try runGoldenCases(language: .japanese)
@@ -112,8 +104,7 @@ final class GoldenPhonemeTests: XCTestCase {
         let phonemizer = try Phonemizer(languages: [language])
 
         for golden in cases {
-            if language == .english,
-               Self.englishCasesNotSupportedByRustCrate.contains(golden.input) {
+            if Self.knownDivergences.contains(GoldenKey(language: golden.language, input: golden.input)) {
                 continue
             }
             let label = "[\(golden.language)] \(golden.input) — \(golden.description ?? "")"

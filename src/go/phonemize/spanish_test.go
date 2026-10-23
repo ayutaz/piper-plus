@@ -1010,3 +1010,48 @@ func TestEsProcess_StressBeforeStressedVowel(t *testing.T) {
 }
 
 // sliceEqual is defined in chinese_test.go (same package).
+
+// ============================================================================
+// Stress follows Python's syllabification (diphthongs, silent u, h)
+// ============================================================================
+
+// Expected outputs are Python's phonemize_spanish. The stress marker goes
+// before the first vowel of the stressed syllable: before the weak vowel of
+// a diphthong ("bueno"), not before the vowel that carries the stress. The
+// silent u of qu/gu is not a vowel ("enrique"), an accented weak vowel breaks
+// a diphthong ("país"), and h does not separate vowels ("ahumado").
+// Python counts a word-initial consonant cluster as its own syllable, so a
+// one-syllable word starting with a cluster ("tres") gets no stress marker.
+func TestEsPhonemize_StressFollowsPythonSyllables(t *testing.T) {
+	cases := map[string]string{
+		"bueno":      "b ˈ u e n o",
+		"adiós":      "a ð ˈ i o s",
+		"gracias":    "ɡ ɾ ˈ a s i a s",
+		"estudiante": "e s t u ð ˈ i a n t e",
+		"enrique":    "e n rr ˈ i k e",
+		"pingüino":   "p i n ɡ w ˈ i n o",
+		"muy":        "m ˈ u i",
+		"ahumado":    "a u m ˈ a ð o",
+		"prohibido":  "p ɾ o i β ˈ i ð o",
+		"reír":       "rr e ˈ i ɾ",
+		"país":       "p a ˈ i s",
+		"ciudad":     "s i u ð ˈ a ð",
+		"construir":  "k o n s t ɾ ˈ u i ɾ",
+		"hoy":        "ˈ o i",
+		"rey":        "rr ˈ e i",
+		"flor":       "f l ˈ o ɾ",
+		"tres":       "t ɾ e s",
+		"gran":       "ɡ ɾ a n",
+	}
+	p := NewSpanishPhonemizer()
+	for word, want := range cases {
+		result, err := p.PhonemizeWithProsody(word)
+		if err != nil {
+			t.Fatalf("%q: unexpected error: %v", word, err)
+		}
+		wantTokens := MapSequence(strings.Fields(want))
+		if strings.Join(result.Tokens, " ") != strings.Join(wantTokens, " ") {
+			t.Errorf("%q: got %q, want %q", word, result.Tokens, wantTokens)
+		}
+	}
+}

@@ -1211,3 +1211,108 @@ func TestMultilingualPhonemizer_7LangNonSvLatin(t *testing.T) {
 		t.Errorf("expected [e] (EN mock), got %v", result.Tokens)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Test: PhonemizeWithLanguage assigns Latin text to the requested language
+// ---------------------------------------------------------------------------
+
+// labelPhonemizer emits one token naming the phonemizer that received the text.
+type labelPhonemizer struct{ lang string }
+
+func (l *labelPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	return &PhonemizeResult{
+		Tokens:   []string{l.lang + ":" + strings.TrimSpace(text)},
+		Prosody:  []*ProsodyInfo{nil},
+		EOSToken: "$",
+	}, nil
+}
+
+func (l *labelPhonemizer) LanguageCode() string { return l.lang }
+
+func newLabelMultilingualPhonemizer() *MultilingualPhonemizer {
+	phonemizers := map[string]Phonemizer{}
+	for _, lang := range []string{"en", "es", "zh"} {
+		phonemizers[lang] = &labelPhonemizer{lang: lang}
+	}
+	return NewMultilingualPhonemizer([]string{"en", "es", "zh"}, "en", phonemizers)
+}
+
+func TestMultilingualPhonemizer_PhonemizeWithLanguageAssignsLatinText(t *testing.T) {
+	mp := newLabelMultilingualPhonemizer()
+
+	result, err := mp.PhonemizeWithLanguage("perro grande", "es")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := strings.Join(result.Tokens, "|"); got != "es:perro grande" {
+		t.Errorf("with language es: got %q, want %q", got, "es:perro grande")
+	}
+
+	// Without a language, Latin text goes to the default (en).
+	result, err = mp.PhonemizeWithProsody("perro grande")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := strings.Join(result.Tokens, "|"); got != "en:perro grande" {
+		t.Errorf("without language: got %q, want %q", got, "en:perro grande")
+	}
+}
+
+func TestMultilingualPhonemizer_PhonemizeWithLanguageStillSplitsByScript(t *testing.T) {
+	mp := newLabelMultilingualPhonemizer()
+	mp.SetZhEnDispatch(false)
+
+	result, err := mp.PhonemizeWithLanguage("hola 你好", "es")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := strings.Join(result.Tokens, "|"); got != "es:hola|zh:你好" {
+		t.Errorf("got %q, want %q", got, "es:hola|zh:你好")
+	}
+}
+
+func TestMultilingualPhonemizer_PhonemizeWithNonLatinOrUnknownLanguageUsesDefault(t *testing.T) {
+	mp := newLabelMultilingualPhonemizer()
+	for _, lang := range []string{"", "zh", "xx", "fr"} {
+		result, err := mp.PhonemizeWithLanguage("hello", lang)
+		if err != nil {
+			t.Fatalf("language %q: unexpected error: %v", lang, err)
+		}
+		if got := strings.Join(result.Tokens, "|"); got != "en:hello" {
+			t.Errorf("language %q: got %q, want %q", lang, got, "en:hello")
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test: "?" is a question-marker EOS only in Japanese
+// ---------------------------------------------------------------------------
+
+func TestMultilingualPhonemizer_QuestionMarkIsAPhonemeOutsideJapanese(t *testing.T) {
+	// Only Japanese ends a sentence with a question-marker EOS token.
+	// Elsewhere "?" is an ordinary phoneme, as in Python, and the EOS stays "$".
+	for _, lang := range []string{"es", "fr", "pt", "sv", "en"} {
+		mp := newTestMultilingualPhonemizer(
+			[]string{lang},
+			lang,
+			map[string]*mockPhonemizer{
+				lang: {lang: lang, tokens: []string{"s", "i", "?"}},
+			},
+		)
+		for name, call := range map[string]func() (*PhonemizeResult, error){
+			"PhonemizeWithProsody":  func() (*PhonemizeResult, error) { return mp.PhonemizeWithProsody("si?") },
+			"PhonemizeWithLanguage": func() (*PhonemizeResult, error) { return mp.PhonemizeWithLanguage("si?", lang) },
+		} {
+			result, err := call()
+			if err != nil {
+				t.Fatalf("%s %s: unexpected error: %v", lang, name, err)
+			}
+			if got := strings.Join(result.Tokens, " "); got != "s i ?" {
+				t.Errorf("%s %s: tokens = %q, want %q", lang, name, got, "s i ?")
+			}
+			if result.EOSToken != "$" {
+				t.Errorf("%s %s: EOSToken = %q, want %q", lang, name, result.EOSToken, "$")
+			}
+		}
+	}
+}

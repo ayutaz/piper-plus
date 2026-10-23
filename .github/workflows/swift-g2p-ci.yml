@@ -27,6 +27,8 @@ on:
       - 'Sources/PiperPlusG2P/**'
       - 'tests/PiperPlusG2PTests/**'
       - 'tests/fixtures/g2p/**'
+      # pua.json maps the golden spelling in GoldenParityTests.
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'Package.swift'
       - 'Package.ci.swift'
       - 'examples/swift-g2p/HelloG2P/**'
@@ -37,6 +39,8 @@ on:
       - 'Sources/PiperPlusG2P/**'
       - 'tests/PiperPlusG2PTests/**'
       - 'tests/fixtures/g2p/**'
+      # pua.json maps the golden spelling in GoldenParityTests.
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'Package.swift'
       - 'Package.ci.swift'
       - 'examples/swift-g2p/HelloG2P/**'

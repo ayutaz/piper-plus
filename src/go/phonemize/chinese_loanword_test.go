@@ -526,3 +526,24 @@ func TestFixtureMatrixLoadable(t *testing.T) {
 		t.Fatal("no cases had `expected_token_count` — matrix is stale")
 	}
 }
+
+// Like Python's phonemize_from_pinyin_syllables, the pinyin of embedded
+// English is spoken as written: no tone sandhi. The letter "E" is yi1 even
+// before a tone-1 syllable, and two tone-3 syllables stay tone 3.
+func TestPhonemizeFromPinyinSyllables_NoToneSandhi(t *testing.T) {
+	cases := []struct {
+		syllables []string
+		want      []string
+	}{
+		{[]string{"yi1", "ai1"}, []string{"i", "tone1", "aɪ", "tone1"}},
+		{[]string{"ni3", "hao3"}, []string{"n", "i", "tone3", "x", "aʊ", "tone3"}},
+		{[]string{"bu4", "bu4"}, []string{"p", "u", "tone4", "p", "u", "tone4"}},
+	}
+	for _, c := range cases {
+		got := phonemizeFromPinyinSyllables(c.syllables)
+		want := MapSequence(c.want)
+		if strings.Join(got, " ") != strings.Join(want, " ") {
+			t.Errorf("%v: got %q, want %q", c.syllables, got, want)
+		}
+	}
+}

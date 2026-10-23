@@ -38,7 +38,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "word": "TTS",
       "issue": 821,
@@ -47,7 +48,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "word": "API",
       "issue": 821,
@@ -56,7 +58,12 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift",
+        "wasm",
+        "js-g2p",
+        "csharp"
       ],
       "word": "0",
       "issue": 821,
@@ -65,7 +72,12 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift",
+        "wasm",
+        "js-g2p",
+        "csharp"
       ],
       "word": "7",
       "issue": 821,
@@ -74,7 +86,12 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift",
+        "wasm",
+        "js-g2p",
+        "csharp"
       ],
       "word": "42",
       "issue": 821,
@@ -83,7 +100,12 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift",
+        "wasm",
+        "js-g2p",
+        "csharp"
       ],
       "word": "100",
       "issue": 821,
@@ -92,7 +114,12 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift",
+        "wasm",
+        "js-g2p",
+        "csharp"
       ],
       "word": "1984",
       "issue": 821,
@@ -101,7 +128,12 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift",
+        "wasm",
+        "js-g2p",
+        "csharp"
       ],
       "word": "3.14",
       "issue": 821,
@@ -110,7 +142,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "word": "2nd",
       "issue": 821,
@@ -119,7 +152,12 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift",
+        "wasm",
+        "js-g2p",
+        "csharp"
       ],
       "word": "$5",
       "issue": 821,
@@ -128,7 +166,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "word": "COVID-19",
       "issue": 821,
@@ -137,7 +176,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "word": "café",
       "issue": 821,
@@ -146,7 +186,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "word": "ChatGPT",
       "issue": 821,
@@ -155,7 +196,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "word": "GitHub",
       "issue": 821,
@@ -164,7 +206,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "word": "iPhone",
       "issue": 821,
@@ -173,7 +216,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "word": "UPPERCASE",
       "issue": 821,
@@ -182,7 +226,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "word": "MixedCase",
       "issue": 821,
@@ -191,7 +236,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "word": "xyz",
       "issue": 821,
@@ -200,7 +246,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "word": "aaaaa",
       "issue": 821,
@@ -209,11 +256,20 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "word": "'quote'",
       "issue": 821,
       "reason": "edge quotes are kept in the lookup key, so the word is not found and is dropped"
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "word": "R2D2",
+      "issue": 821,
+      "reason": "A word with digits misses the dictionary and is passed through as raw characters, none of them in phoneme_id_map."
     }
   ]
 }

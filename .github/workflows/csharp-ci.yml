@@ -14,6 +14,10 @@ on:
       # Embedded by PiperPlus.Cli / read by ChineseGoldenTests.
       - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
       - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
+      # Read by G2pGoldenParityTests.
+      - 'tests/fixtures/g2p/known_divergences.json'
+      - 'tests/fixtures/g2p/english_no_drop_words.json'
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
@@ -28,6 +32,10 @@ on:
       # Embedded by PiperPlus.Cli / read by ChineseGoldenTests.
       - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
       - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
+      # Read by G2pGoldenParityTests.
+      - 'tests/fixtures/g2p/known_divergences.json'
+      - 'tests/fixtures/g2p/english_no_drop_words.json'
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
@@ -126,13 +134,19 @@ jobs:
 
       - name: Generate coverage report
         if: matrix.os == 'ubuntu-24.04'
+        # PiperPlus.Cli.Tests references the CLI project, so the PiperPlus.Cli
+        # assembly is instrumented. Its G2P adapters are covered in-process;
+        # Program (the entry point), its JSONL record and the source-generated
+        # JSON context are exercised only by CliIntegrationTests through a
+        # child process, which coverlet cannot see. Leave those three out so
+        # the floor below keeps measuring what it measured before.
         run: |
           dotnet tool install -g dotnet-reportgenerator-globaltool || true
           reportgenerator \
             -reports:"**/coverage.cobertura.xml" \
             -targetdir:"coverage-report" \
             -reporttypes:"Html;Cobertura;TextSummary" \
-            -classfilters:"-*.Tests.*"
+            -classfilters:"-*.Tests.*;-PiperPlus.Cli.Program;-PiperPlus.Cli.JsonlUtterance;-PiperPlus.Cli.CliJsonContext"
           cat coverage-report/Summary.txt
 
       - name: Verify coverage threshold (Ubuntu)

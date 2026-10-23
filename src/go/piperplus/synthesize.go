@@ -135,6 +135,24 @@ func phonemizerForLanguage(lang string, dicts *dictData) (phonemize.Phonemizer, 
 	}
 }
 
+// languagePhonemizer is implemented by phonemizers that can read Latin-script
+// text as a given language (phonemize.MultilingualPhonemizer).
+type languagePhonemizer interface {
+	PhonemizeWithLanguage(text, language string) (*phonemize.PhonemizeResult, error)
+}
+
+// phonemizeText phonemizes text, reading Latin-script text as language when
+// one is given (WithLanguage / --language). es / fr / pt / sv cannot be told
+// apart from English by script, so without this a multilingual model reads
+// them as its default Latin language. Python's training data is phonemized
+// with the utterance language as that default.
+func phonemizeText(p phonemize.Phonemizer, text, language string) (*phonemize.PhonemizeResult, error) {
+	if lp, ok := p.(languagePhonemizer); ok && language != "" {
+		return lp.PhonemizeWithLanguage(text, language)
+	}
+	return p.PhonemizeWithProsody(text)
+}
+
 // prepareSynthesisRequest converts text into a SynthesisRequest ready for
 // engine.Synthesize. Carries no state, performs no inference, and is safe to
 // invoke concurrently from multiple goroutines as long as the underlying
@@ -157,7 +175,7 @@ func (v *Voice) prepareSynthesisRequest(text string, so SynthesisOptions) (*Synt
 		text = v.textDict.ApplyToText(text)
 	}
 
-	result, err := v.phonemizer.PhonemizeWithProsody(text)
+	result, err := phonemizeText(v.phonemizer, text, so.Language)
 	if err != nil {
 		return nil, false, fmt.Errorf("piperplus: phonemization failed: %w", err)
 	}

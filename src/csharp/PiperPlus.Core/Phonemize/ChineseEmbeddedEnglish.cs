@@ -105,8 +105,9 @@ public static class ChineseEmbeddedEnglish
             st.Add((PinyinToIpa.NormalizePinyin(baseSyl), tone));
         }
 
-        // Step 2: tone sandhi
-        PinyinToIpa.ApplyToneSandhi(st);
+        // Step 2: no tone sandhi. Like Python, the dictionary pinyin is spoken
+        // as written: the letter "E" is yi1 even before a tone-1 syllable,
+        // where the character 一 would become yi4.
 
         // Step 3: pinyin -> IPA tokens, recording the syllable's tone
         // alongside each emitted IPA token for downstream prosody alignment.

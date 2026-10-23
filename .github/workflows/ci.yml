@@ -165,7 +165,7 @@ jobs:
 
   csharp-tests:
     needs: [changes]
-    if: ${{ needs.changes.outputs.csharp == 'true' || needs.changes.outputs.ci-config-csharp == 'true' || needs.changes.outputs.zh-en-data == 'true' || needs.changes.outputs.swedish-lid-data == 'true' }}
+    if: ${{ needs.changes.outputs.csharp == 'true' || needs.changes.outputs.ci-config-csharp == 'true' || needs.changes.outputs.zh-en-data == 'true' || needs.changes.outputs.swedish-lid-data == 'true' || needs.changes.outputs.g2p-golden == 'true' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -216,7 +216,7 @@ jobs:
   csharp-build:
     runs-on: ${{ matrix.os }}
     needs: [changes, csharp-tests]
-    if: ${{ needs.changes.outputs.csharp == 'true' || needs.changes.outputs.ci-config-csharp == 'true' || needs.changes.outputs.zh-en-data == 'true' || needs.changes.outputs.swedish-lid-data == 'true' }}
+    if: ${{ needs.changes.outputs.csharp == 'true' || needs.changes.outputs.ci-config-csharp == 'true' || needs.changes.outputs.zh-en-data == 'true' || needs.changes.outputs.swedish-lid-data == 'true' || needs.changes.outputs.g2p-golden == 'true' }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -460,7 +460,7 @@ jobs:
 
   npm-package-tests:
     needs: [changes]
-    if: ${{ needs.changes.outputs.wasm == 'true' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.ci-config-wasm == 'true' || needs.changes.outputs.zh-en-data == 'true' || needs.changes.outputs.swedish-lid-data == 'true' }}
+    if: ${{ needs.changes.outputs.wasm == 'true' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.ci-config-wasm == 'true' || needs.changes.outputs.zh-en-data == 'true' || needs.changes.outputs.swedish-lid-data == 'true' || needs.changes.outputs.g2p-golden == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
@@ -509,6 +509,11 @@ jobs:
 
       - name: Install dependencies (with local @piper-plus/g2p)
         run: npm install --no-save "@piper-plus/g2p@file:../g2p"
+
+      - name: G2P golden parity (runtime wasm)
+        # Needs the WASM built above, so it runs here rather than in
+        # test:npm-package:all, which npm-publish.yml runs without a build.
+        run: npm run test:g2p-golden
 
       - name: Check CDN file-size limits for the packed files
         # jsDelivr refuses files over 50 MB; the G2P WASM is ~60 MB. The

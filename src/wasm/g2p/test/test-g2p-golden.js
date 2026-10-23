@@ -15,8 +15,9 @@
  *
  * This test performs `expected_token_count_min` and `expected_contains`
  * checks. Exact token match (`expected_tokens`) is performed when the
- * fixture provides it (e.g. ES). JA is skipped because it requires
- * the OpenJTalk WASM runtime.
+ * fixture provides it (e.g. ES). JA is not covered: it requires the
+ * OpenJTalk WASM runtime. Exact parity with the Python golden is checked by
+ * test-g2p-golden-parity.js.
  *
  * Additionally, `encode_test_cases` from the fixture are validated against
  * the Encoder class to verify BOS/PAD/EOS insertion and PUA mapping.
@@ -215,16 +216,6 @@ describe('G2P golden: Chinese', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Japanese (WASM required -- skipped in Node.js unit tests)
-// ---------------------------------------------------------------------------
-
-describe('G2P golden: Japanese', () => {
-    it('SKIP: JA requires OpenJTalk WASM (not available in Node.js unit tests)', {
-        skip: 'JA G2P requires OpenJTalk WASM -- test via browser E2E or integration test',
-    }, () => {});
-});
-
-// ---------------------------------------------------------------------------
 // Modification 2: encode_test_cases from fixture
 //
 // Validates that the Encoder correctly converts token sequences into
@@ -258,11 +249,11 @@ function buildTestPhonemeIdMap(encodeCases) {
 }
 
 describe('G2P golden: encode_test_cases', () => {
-    const encodeCases = FIXTURE.encode_test_cases;
-    if (!encodeCases || encodeCases.length === 0) {
-        it('SKIP: no encode_test_cases in fixture', { skip: true }, () => {});
-        return;
-    }
+    const encodeCases = FIXTURE.encode_test_cases ?? [];
+
+    it('fixture has encode_test_cases', () => {
+        assert.ok(encodeCases.length > 0, 'phoneme_test_cases.json has no encode_test_cases');
+    });
 
     const phonemeIdMap = buildTestPhonemeIdMap(encodeCases);
     const encoder = new Encoder(phonemeIdMap);

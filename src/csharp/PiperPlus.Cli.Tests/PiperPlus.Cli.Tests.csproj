@@ -6,8 +6,8 @@
     <RootNamespace>PiperPlus.Cli.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
     <IsTrimmable>false</IsTrimmable>
-    <!-- Suppress trim warnings: we source-link the CLI engine adapters
-         (DotNetG2PEngine etc.) which use reflection in MultilingualPhonemizer's
+    <!-- Suppress trim warnings: the referenced CLI engine adapters
+         (DotNetG2PEngine etc.) use reflection in MultilingualPhonemizer's
          delegating dispatch path. Same intent as PiperPlus.Cli.csproj /
          PiperPlus.Bench.csproj. -->
     <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
@@ -18,40 +18,16 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.3" />
-    <PackageReference Include="DotNetG2P" Version="1.8.0" />
-    <PackageReference Include="DotNetG2P.MeCab" Version="1.8.0" />
-    <PackageReference Include="DotNetG2P.English" Version="1.8.0" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\PiperPlus.Core\PiperPlus.Core.csproj" />
-  </ItemGroup>
-
-  <!-- Shared numeric-tone pinyin dictionaries for BundledChineseG2PEngine,
-       linked from the canonical copy (docs/spec/dictionary-mirrors.toml). -->
-  <ItemGroup>
-    <EmbeddedResource Include="..\..\rust\piper-plus-g2p\data\pinyin_single.json" LogicalName="PiperPlus.Cli.pinyin_single.json" Link="Data\pinyin_single.json" />
-    <EmbeddedResource Include="..\..\rust\piper-plus-g2p\data\pinyin_phrases.json" LogicalName="PiperPlus.Cli.pinyin_phrases.json" Link="Data\pinyin_phrases.json" />
-  </ItemGroup>
-
-  <!-- Source-link the CLI's per-language engine adapters so the test process
-       exercises the exact same JA/EN engine wiring the CLI uses. The
-       DotNetG2PEngine class is internal to PiperPlus.Cli (not transitively
-       reachable from PiperPlus.Core.Tests), so source-linking is the only way
-       to test its concurrency contract without making it public API. Same
-       approach as PiperPlus.Bench.csproj. -->
-  <ItemGroup>
-    <Compile Include="..\PiperPlus.Cli\DotNetG2PEngine.cs" Link="Adapters\DotNetG2PEngine.cs" />
-    <Compile Include="..\PiperPlus.Cli\DotNetEnglishG2PEngine.cs" Link="Adapters\DotNetEnglishG2PEngine.cs" />
-    <Compile Include="..\PiperPlus.Cli\BundledChineseG2PEngine.cs" Link="Adapters\BundledChineseG2PEngine.cs" />
-    <!-- Program.WriteFatalDiagnostics: the format of the CLI's fatal-error
-         output is what issue #735 depends on the next time its intermittent
-         failure happens, so it is asserted rather than hoped for. Program.cs
-         itself cannot be source-linked (its Main would collide with the test
-         host's entry point), which is why the method lives in its own file. -->
-    <Compile Include="..\PiperPlus.Cli\TimingOutput.cs" Link="Adapters\TimingOutput.cs" />
-    <Compile Include="..\PiperPlus.Cli\FatalDiagnostics.cs" Link="Adapters\FatalDiagnostics.cs" />
+    <!-- The CLI's engine adapters, TextModePhonemizer and helpers are internal
+         to PiperPlus.Cli (InternalsVisibleTo). Referencing the project instead
+         of source-linking its files tests the exact wiring the CLI ships, and
+         its G2P packages come with it rather than as new direct dependencies. -->
+    <ProjectReference Include="..\PiperPlus.Cli\PiperPlus.Cli.csproj" />
   </ItemGroup>
 
 </Project>

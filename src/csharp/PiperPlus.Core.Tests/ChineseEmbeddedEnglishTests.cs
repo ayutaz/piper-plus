@@ -54,6 +54,21 @@ public sealed class ChineseEmbeddedEnglishTests
     }
 
     [Fact]
+    public void EmbeddedEnglish_LettersKeepTheirDictionaryTones()
+    {
+        // Python's phonemize_from_pinyin_syllables applies no tone sandhi to
+        // loanword pinyin: "E" (yi1) before "H" (ai1) stays tone 1 instead of
+        // becoming yi4 as the character 一 would. Found by the golden case
+        // "Hello你好" (G2pGoldenParityTests); Rust had the same bug.
+        ChineseG2PResult together = ChineseEmbeddedEnglish.Convert("EH");
+        ChineseG2PResult e = ChineseEmbeddedEnglish.Convert("E");
+        ChineseG2PResult h = ChineseEmbeddedEnglish.Convert("H");
+
+        Assert.Equal(e.Phonemes.Concat(h.Phonemes), together.Phonemes);
+        Assert.Equal(1, together.A1[0]);
+    }
+
+    [Fact]
     public void EmbeddedEnglish_LoanwordPython_CaseSensitive()
     {
         ChineseG2PResult result = ChineseEmbeddedEnglish.Convert("Python");

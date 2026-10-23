@@ -178,6 +178,11 @@ def register(token: str) -> str:
     if token in TOKEN2CHAR:
         return TOKEN2CHAR[token]
 
+    # A character this table already produced (a PUA codepoint) maps to
+    # itself; recording it as its own token would break the reverse map.
+    if token in CHAR2TOKEN:
+        return token
+
     # If already single codepoint, use as-is
     if len(token) == 1:
         TOKEN2CHAR[token] = token

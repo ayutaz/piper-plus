@@ -259,16 +259,17 @@ func phonemizeFromPinyinSyllables(syllables []string) []string {
 		})
 	}
 
-	// Step 2: tone sandhi
-	zhApplyToneSandhi(st)
+	// No tone sandhi: like Python's phonemize_from_pinyin_syllables, the
+	// dictionary pinyin is spoken as written (the letter "E" is yi1 even
+	// before a tone-1 syllable).
 
-	// Step 3: pinyin -> IPA
+	// Step 2: pinyin -> IPA
 	var tokens []string
 	for _, syl := range st {
 		ipa := zhPinyinToIPA(syl.syllable, syl.tone)
 		tokens = append(tokens, ipa...)
 	}
 
-	// Step 4: multi-char IPA -> PUA codepoint mapping
+	// Step 3: multi-char IPA -> PUA codepoint mapping
 	return MapSequence(tokens)
 }

@@ -9,8 +9,8 @@ name: "G2P Known Divergences Gate"
 # This gate checks the lists themselves: every entry names a declared runtime,
 # a GitHub issue and a reason, refers to a case that exists in the golden, and
 # every declared runtime names parity tests that exist and read the list. The
-# runtime tests run in their own workflows (CI / cpp-tests, CI / rust-tests,
-# Kotlin G2P CI, G2P Rust CI).
+# runtime tests run in their own workflows (CI, Kotlin G2P CI, G2P Rust CI,
+# Go CI, C# CI, Python Tests, G2P WASM CI, Swift G2P CI).
 
 on:
   push:
@@ -24,6 +24,13 @@ on:
       - 'src/cpp/tests/test_c_api_g2p_golden.cpp'
       - 'src/rust/piper-plus-g2p/tests/golden_parity.rs'
       - 'android/piper-plus-g2p/src/androidTest/java/com/piperplus/g2p/PhonemeFixtureParityTest.kt'
+      - 'tests/PiperPlusG2PTests/GoldenParityTests.swift'
+      - 'tests/PiperPlusG2PTests/GoldenPhonemeTests.swift'
+      - 'src/go/phonemize/golden_parity_test.go'
+      - 'src/wasm/openjtalk-web/test/js/test-g2p-golden-parity.js'
+      - 'src/wasm/g2p/test/test-g2p-golden-parity.js'
+      - 'src/python_run/tests/test_g2p_golden_parity.py'
+      - 'src/csharp/PiperPlus.Cli.Tests/G2pGoldenParityTests.cs'
       - '.github/workflows/g2p-known-divergences.yml'
   pull_request:
     paths:
@@ -35,6 +42,13 @@ on:
       - 'src/cpp/tests/test_c_api_g2p_golden.cpp'
       - 'src/rust/piper-plus-g2p/tests/golden_parity.rs'
       - 'android/piper-plus-g2p/src/androidTest/java/com/piperplus/g2p/PhonemeFixtureParityTest.kt'
+      - 'tests/PiperPlusG2PTests/GoldenParityTests.swift'
+      - 'tests/PiperPlusG2PTests/GoldenPhonemeTests.swift'
+      - 'src/go/phonemize/golden_parity_test.go'
+      - 'src/wasm/openjtalk-web/test/js/test-g2p-golden-parity.js'
+      - 'src/wasm/g2p/test/test-g2p-golden-parity.js'
+      - 'src/python_run/tests/test_g2p_golden_parity.py'
+      - 'src/csharp/PiperPlus.Cli.Tests/G2pGoldenParityTests.cs'
       - '.github/workflows/g2p-known-divergences.yml'
   workflow_dispatch:
 

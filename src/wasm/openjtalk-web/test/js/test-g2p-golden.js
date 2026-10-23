@@ -17,7 +17,8 @@
  * JS 実装に適合する `expected_contains` チェックのみを実行する。
  * exact token match (`expected_tokens`) は JS ではスキップする。
  *
- * JA は WASM が必要なためスキップ。
+ * JA は WASM が必要なため対象外。Python の正解との完全一致は
+ * test-g2p-golden-parity.js (npm run test:g2p-golden) で照合する。
  *
  * Run with: node --test test/js/test-g2p-golden.js
  */
@@ -234,18 +235,4 @@ describe("G2P golden: Chinese", () => {
       // which does not emit tone1-tone5 markers.
     });
   }
-});
-
-// ---------------------------------------------------------------------------
-// Japanese (WASM required — skipped in Node.js unit tests)
-// ---------------------------------------------------------------------------
-
-describe("G2P golden: Japanese", () => {
-  it(
-    "SKIP: JA requires OpenJTalk WASM (not available in Node.js unit tests)",
-    {
-      skip: "JA G2P requires OpenJTalk WASM — test via browser E2E or integration test",
-    },
-    () => {}
-  );
 });

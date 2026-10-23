@@ -34,6 +34,9 @@ from .util import audio_float_to_int16
 
 _LOGGER = logging.getLogger(__name__)
 
+# Languages written in Latin script; one of them reads all Latin text.
+_LATIN_LANGUAGES = frozenset({"en", "es", "fr", "pt", "sv"})
+
 # Short-text mitigation constants (keep in sync with other runtimes — see
 # docs/spec/short-text-contract.toml).
 #
@@ -658,13 +661,35 @@ class PiperVoice:
             return []
         return split_sentences(text) or [text]
 
-    def _phonemize_one_factory(self):
+    def _latin_language(self, language_id: int | None, languages: list[str]) -> str:
+        """Language that reads Latin-script text for ``language_id``.
+
+        The requested language when it is a Latin-script language the
+        phonemizer supports, otherwise English. Training data was phonemized
+        with each utterance's own language, so Spanish text must be read with
+        the Spanish rules, not the English ones (the C API picks its Latin
+        default from ``languageId`` the same way).
+        """
+        if language_id is None or not self.config.language_id_map:
+            return "en"
+        for code, lid in self.config.language_id_map.items():
+            if lid == language_id:
+                if code in _LATIN_LANGUAGES and code in languages:
+                    return code
+                break
+        return "en"
+
+    def _phonemize_one_factory(self, language_id: int | None = None):
         """Return a callable that phonemizes a single sentence.
 
         Selecting the per-language backend once (here) lets both the
         list-returning :meth:`phonemize` (Phase 1) and the streaming
         pipeline in :meth:`synthesize_stream_raw` (Phase 2) submit each
         sentence to a thread pool without re-running the dispatch logic.
+
+        ``language_id`` selects the language that reads Latin-script text
+        (see :meth:`_latin_language`); other scripts are detected per
+        character as before.
         """
         # NOTE: PhonemeType.BILINGUAL is a legacy compatibility branch for
         # v3/v4 JA+EN datasets that predate the 6-language multilingual model
@@ -685,7 +710,10 @@ class PiperVoice:
                     if self.config.phoneme_type == PhonemeType.BILINGUAL
                     else ["ja", "en", "zh", "es", "fr", "pt"]
                 )
-                mp = MultilingualPhonemizer(languages=languages)
+                mp = MultilingualPhonemizer(
+                    languages=languages,
+                    default_latin_language=self._latin_language(language_id, languages),
+                )
                 # MultilingualPhonemizer instances are immutable after init
                 # (regex patterns, language sets) so concurrent .phonemize()
                 # calls are safe. The downstream per-language backends are
@@ -730,8 +758,12 @@ class PiperVoice:
 
         raise ValueError(f"Unsupported phoneme type: {self.config.phoneme_type}")
 
-    def phonemize(self, text: str) -> list[list[str]]:
+    def phonemize(self, text: str, language_id: int | None = None) -> list[list[str]]:
         """Text to phonemes grouped by sentence.
+
+        ``language_id`` (an id from the config's ``language_id_map``) selects
+        the language that reads Latin-script text in multilingual models,
+        as in :meth:`synthesize`. Without it, Latin text is read as English.
 
         Plain text is split at sentence boundaries (`.`, `!`, `?`, `。`,
         `！`, `？`, `．`, including trailing closing punctuation) so callers
@@ -745,7 +777,7 @@ class PiperVoice:
         sentences = self._split_sentences(text)
         if not sentences:
             return []
-        fn = self._phonemize_one_factory()
+        fn = self._phonemize_one_factory(language_id)
         parallelism = _resolve_g2p_parallelism(len(sentences))
         return _map_sentences(fn, sentences, parallelism)
 
@@ -862,7 +894,7 @@ class PiperVoice:
         if not sentences:
             return
 
-        phonemize_one = self._phonemize_one_factory()
+        phonemize_one = self._phonemize_one_factory(language_id)
         parallelism = _resolve_g2p_parallelism(len(sentences))
 
         # 16-bit mono
@@ -1319,7 +1351,7 @@ class PiperVoice:
                 self.config.phoneme_id_map, pua_reverse
             )
 
-            sentence_phonemes = self.phonemize(text)
+            sentence_phonemes = self.phonemize(text, language_id=language_id)
             num_silence_samples = int(sentence_silence * self.config.sample_rate)
             all_raw_frames: list[bytes] = []
 

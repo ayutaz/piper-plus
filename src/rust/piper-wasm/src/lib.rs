@@ -399,11 +399,10 @@ impl WasmPhonemizer {
 
     /// Phonemize text and return phoneme IDs + prosody features.
     ///
-    /// `language` is an optional language code hint (e.g. `"ja"`, `"en"`).
-    /// When provided, a warning is logged if auto-detection yields a different
-    /// language. Currently auto-detection is always used for the actual
-    /// phonemization; the parameter is reserved for future forced-language
-    /// support.
+    /// `language` is an optional language code (e.g. `"es"`, `"zh"`). When
+    /// given, the text is split by script and its Latin parts are read as
+    /// that language (Japanese: the whole text goes to OpenJTalk). Without
+    /// it, the language of each part is detected from its script.
     ///
     /// # Errors
     ///
@@ -424,26 +423,24 @@ impl WasmPhonemizer {
         }
 
         // Step 1: phonemize → raw tokens + prosody
-        // When a language hint is provided, route the entire text to that
-        // language's phonemizer. This is essential for Latin-script languages
-        // (es/fr/pt/sv) which cannot be distinguished from English by Unicode.
-        let (tokens, prosody_list) = if let Some(ref hint) = language {
-            self.phonemizer
-                .phonemize_with_language_hint(text, hint)
-                .map_err(|e| {
-                    create_wasm_error(
-                        ERROR_PHONEMIZE,
-                        &format!("Phonemization failed for the provided text: {e}"),
-                    )
-                })?
-        } else {
-            self.phonemizer.phonemize_with_prosody(text).map_err(|e| {
-                create_wasm_error(
-                    ERROR_PHONEMIZE,
-                    &format!("Phonemization failed for the provided text: {e}"),
-                )
-            })?
+        // With a language hint the text is split by script and the Latin
+        // parts are read as the hinted language, as Python's
+        // MultilingualPhonemizer does: es/fr/pt/sv cannot be told apart from
+        // English by Unicode, and English inside Chinese text goes through
+        // the ZH-EN loanword table. Japanese keeps the whole text, because
+        // OpenJTalk reads Latin letters itself and this build has no English
+        // G2P (EN is a letter-by-letter passthrough here).
+        let result = match language.as_deref() {
+            Some("ja") => self.phonemizer.phonemize_with_language_hint(text, "ja"),
+            Some(hint) => self.phonemizer.phonemize_with_language(text, hint),
+            None => self.phonemizer.phonemize_with_prosody(text),
         };
+        let (tokens, prosody_list) = result.map_err(|e| {
+            create_wasm_error(
+                ERROR_PHONEMIZE,
+                &format!("Phonemization failed for the provided text: {e}"),
+            )
+        })?;
 
         // Step 2: encode tokens → IDs with BOS/EOS/PAD + prosody alignment
         let eos = self.phonemizer.last_eos();
@@ -1452,6 +1449,53 @@ mod wasm_tests {
         // Mismatched hint: still succeeds (logs a console warning)
         let result = p.phonemize("こんにちは", Some("en".to_string()));
         assert!(result.is_ok());
+    }
+
+    /// With the `zh` hint, English inside Chinese text is read as Mandarin
+    /// through the ZH-EN loanword table, as Python does
+    /// (`tests/fixtures/g2p/phoneme_test_cases_golden.json`), instead of
+    /// reaching the Chinese phonemizer and being spelled as Latin letters.
+    #[cfg(any(feature = "zh", feature = "zh-external"))]
+    #[wasm_bindgen_test]
+    fn test_wasm_zh_hint_reads_embedded_english_as_mandarin() {
+        use piper_plus_g2p::token_map::token_to_pua;
+
+        // Python's phonemes for "Apple 公司" (language zh).
+        let golden: Vec<String> = "a tone1 pʰ oʊ tone1 k uŋ tone1 s ɨ tone1"
+            .split(' ')
+            .map(String::from)
+            .collect();
+
+        // Give every golden phoneme an ID so that none is skipped.
+        let mut config: serde_json::Value =
+            serde_json::from_str(&make_multilingual_config()).unwrap();
+        let id_map = config["phoneme_id_map"].as_object_mut().unwrap();
+        for (i, token) in golden.iter().enumerate() {
+            let symbols = token_to_pua(token).map_or_else(|| token.clone(), String::from);
+            for (j, ch) in symbols.chars().enumerate() {
+                id_map
+                    .entry(ch.to_string())
+                    .or_insert(serde_json::json!([600 + 10 * i as i64 + j as i64]));
+            }
+        }
+
+        let mut p = WasmPhonemizer::new(&config.to_string()).unwrap();
+        p.set_chinese_dictionary(
+            include_bytes!("../../piper-plus-g2p/data/pinyin_single.json"),
+            include_bytes!("../../piper-plus-g2p/data/pinyin_phrases.json"),
+        )
+        .unwrap();
+
+        let actual = p
+            .phonemize("Apple 公司", Some("zh".to_string()))
+            .unwrap()
+            .phoneme_ids;
+        let (expected, _) = p
+            .encoder
+            .encode_with_prosody_and_eos(&golden, &vec![None; golden.len()], Some("$"))
+            .unwrap();
+        let expected: Vec<i32> = expected.iter().map(|&id| id as i32).collect();
+        assert_eq!(actual, expected);
     }
 
     // -------------------------------------------------------------------

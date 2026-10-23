@@ -14,6 +14,19 @@ internal sealed class DotNetFrenchG2PEngine : IFrenchG2PEngine
     public List<string> ToPhonemeList(string text)
     {
         string ipa = _engine.ToIPA(text);
-        return IpaTokenizer.Tokenize(ipa);
+        List<string> tokens = IpaTokenizer.Tokenize(ipa);
+
+        // DotNetG2P.French writes the close front rounded vowel as IPA "y"
+        // (its glide is "j"). IFrenchG2PEngine and Python use "y_vowel"
+        // (PUA U+E01E); a bare "y" is the Japanese glide in the phoneme_id_map.
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            if (tokens[i] == "y")
+            {
+                tokens[i] = "y_vowel";
+            }
+        }
+
+        return tokens;
     }
 }

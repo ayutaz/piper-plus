@@ -14,13 +14,52 @@
       "tests": [
         "src/rust/piper-plus-g2p/tests/golden_parity.rs"
       ]
+    },
+    "swift": {
+      "description": "PiperPlusG2P (Swift) over the piper-plus-g2p C FFI, which hands the whole text to the phonemizer of the given language",
+      "tests": [
+        "tests/PiperPlusG2PTests/GoldenParityTests.swift",
+        "tests/PiperPlusG2PTests/GoldenPhonemeTests.swift"
+      ]
+    },
+    "go": {
+      "description": "Go phonemize.MultilingualPhonemizer.PhonemizeWithLanguage, which piperplus uses for WithLanguage / CLI --language",
+      "tests": [
+        "src/go/phonemize/golden_parity_test.go"
+      ]
+    },
+    "wasm": {
+      "description": "Browser npm piper-plus (src/wasm/openjtalk-web): JS EnglishG2P for en, the Rust WASM MultilingualPhonemizer for the other languages, compared as phoneme IDs",
+      "tests": [
+        "src/wasm/openjtalk-web/test/js/test-g2p-golden-parity.js"
+      ]
+    },
+    "js-g2p": {
+      "description": "npm @piper-plus/g2p on its own (G2P.encode), the pure-JS G2P used when a model has neither ja nor zh",
+      "tests": [
+        "src/wasm/g2p/test/test-g2p-golden-parity.js"
+      ]
+    },
+    "python_run": {
+      "description": "PyPI piper-plus runtime (src/python_run/piper_plus): the per-sentence phonemizer PiperVoice uses for a language ID",
+      "tests": [
+        "src/python_run/tests/test_g2p_golden_parity.py"
+      ]
+    },
+    "csharp": {
+      "description": "C# CLI text mode (PiperPlus.Cli TextModePhonemizer) with --language set to the case language: DotNetG2P.* for en/es/fr/pt, PiperPlus.Core for sv and zh",
+      "tests": [
+        "src/csharp/PiperPlus.Cli.Tests/G2pGoldenParityTests.cs"
+      ]
     }
   },
   "divergences": [
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift"
       ],
       "language": "zh",
       "input": "123",
@@ -31,7 +70,9 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift"
       ],
       "language": "zh",
       "input": "0",
@@ -42,7 +83,9 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift"
       ],
       "language": "zh",
       "input": "100",
@@ -53,7 +96,9 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift"
       ],
       "language": "en",
       "input": "0",
@@ -64,7 +109,9 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift"
       ],
       "language": "en",
       "input": "1",
@@ -75,7 +122,9 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift"
       ],
       "language": "en",
       "input": "123",
@@ -86,7 +135,9 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift"
       ],
       "language": "en",
       "input": "100",
@@ -97,7 +148,9 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift"
       ],
       "language": "en",
       "input": "3.14",
@@ -108,7 +161,9 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift"
       ],
       "language": "en",
       "input": "It's 3 o'clock.",
@@ -119,7 +174,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "language": "en",
       "input": "café",
@@ -130,7 +186,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "language": "en",
       "input": "naïve",
@@ -141,7 +198,9 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift"
       ],
       "language": "en",
       "input": "e.g. and i.e.",
@@ -152,7 +211,9 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift"
       ],
       "language": "en",
       "input": "uh-huh",
@@ -163,7 +224,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "language": "en",
       "input": "'quote'",
@@ -174,7 +236,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "language": "en",
       "input": "ChatGPT and GitHub",
@@ -185,7 +248,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "language": "en",
       "input": "UPPERCASE",
@@ -196,7 +260,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "language": "en",
       "input": "MixedCase",
@@ -207,7 +272,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "language": "en",
       "input": "xyz",
@@ -218,7 +284,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "language": "en",
       "input": "aaaaa",
@@ -229,7 +296,9 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift"
       ],
       "language": "en",
       "input": "a-b-c",
@@ -240,7 +309,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "language": "en",
       "input": "résumé",
@@ -251,7 +321,11 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift",
+        "wasm",
+        "js-g2p"
       ],
       "language": "fr",
       "input": "c'est",
@@ -262,7 +336,11 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift",
+        "wasm",
+        "js-g2p"
       ],
       "language": "fr",
       "input": "Je m'appelle Pierre.",
@@ -273,13 +351,2789 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "go",
+        "swift",
+        "wasm",
+        "js-g2p"
       ],
       "language": "fr",
       "input": "Quelle heure est-il ?",
       "status": "planned",
       "issue": 822,
       "reason": "Liaison is not implemented: the final 't' of 'est' before 'il' is not pronounced."
+    },
+    {
+      "runtimes": [
+        "swift"
+      ],
+      "language": "zh",
+      "input": "Hello你好",
+      "status": "planned",
+      "issue": 827,
+      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
+    },
+    {
+      "runtimes": [
+        "swift"
+      ],
+      "language": "zh",
+      "input": "Hello, 你好!",
+      "status": "planned",
+      "issue": 827,
+      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
+    },
+    {
+      "runtimes": [
+        "swift"
+      ],
+      "language": "zh",
+      "input": "我用 GPS 导航",
+      "status": "planned",
+      "issue": 827,
+      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
+    },
+    {
+      "runtimes": [
+        "swift"
+      ],
+      "language": "zh",
+      "input": "我喜欢 Python",
+      "status": "planned",
+      "issue": 827,
+      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
+    },
+    {
+      "runtimes": [
+        "swift"
+      ],
+      "language": "zh",
+      "input": "ChatGPT 很厉害",
+      "status": "planned",
+      "issue": 827,
+      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
+    },
+    {
+      "runtimes": [
+        "swift"
+      ],
+      "language": "zh",
+      "input": "Apple 公司",
+      "status": "planned",
+      "issue": 827,
+      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
+    },
+    {
+      "runtimes": [
+        "go"
+      ],
+      "language": "en",
+      "input": "café",
+      "status": "planned",
+      "issue": 821,
+      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes."
+    },
+    {
+      "runtimes": [
+        "go"
+      ],
+      "language": "en",
+      "input": "naïve",
+      "status": "planned",
+      "issue": 821,
+      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes."
+    },
+    {
+      "runtimes": [
+        "go"
+      ],
+      "language": "en",
+      "input": "'quote'",
+      "status": "planned",
+      "issue": 821,
+      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes."
+    },
+    {
+      "runtimes": [
+        "go"
+      ],
+      "language": "en",
+      "input": "ChatGPT and GitHub",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes. An exact match needs Python's neural guesser, which is not ported."
+    },
+    {
+      "runtimes": [
+        "go"
+      ],
+      "language": "en",
+      "input": "UPPERCASE",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes. An exact match needs Python's neural guesser, which is not ported."
+    },
+    {
+      "runtimes": [
+        "go"
+      ],
+      "language": "en",
+      "input": "MixedCase",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes. An exact match needs Python's neural guesser, which is not ported."
+    },
+    {
+      "runtimes": [
+        "go"
+      ],
+      "language": "en",
+      "input": "xyz",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes. An exact match needs Python's neural guesser, which is not ported."
+    },
+    {
+      "runtimes": [
+        "go"
+      ],
+      "language": "en",
+      "input": "aaaaa",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes. An exact match needs Python's neural guesser, which is not ported."
+    },
+    {
+      "runtimes": [
+        "go"
+      ],
+      "language": "en",
+      "input": "résumé",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes. An exact match needs Python's neural guesser, which is not ported."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "The quick brown fox jumps.",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "She's reading a book.",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm"
+      ],
+      "language": "zh",
+      "input": "123",
+      "status": "planned",
+      "issue": 828,
+      "reason": "Digits in zh input go to the English segment, which the Rust WASM passes through as characters ('1 2 3') because it has no English G2P."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "dog",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "bird",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "strength",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "photograph",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "photography",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "Mississippi",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "Albuquerque",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "knight",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "rhythm",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "xylophone",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "zebra",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "queue",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "uniform",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "hour",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "colonel",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "schedule",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "0",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "1",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "123",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "3.14",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "100",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "Good morning, everyone.",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "She doesn't know.",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "It's 3 o'clock.",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "I love New York.",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "ChatGPT and GitHub",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "a-b-c",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "\"quoted\" text",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "e.g. and i.e.",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "uh-huh",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "aaaaa",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "xyz",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "supercalifragilistic",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "naïve",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "café",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "résumé",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "hello world how are you doing today",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "UPPERCASE",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "MixedCase",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm",
+        "js-g2p"
+      ],
+      "language": "en",
+      "input": "'quote'",
+      "status": "planned",
+      "issue": 828,
+      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+    },
+    {
+      "runtimes": [
+        "wasm"
+      ],
+      "language": "zh",
+      "input": "0",
+      "status": "planned",
+      "issue": 828,
+      "reason": "Digits in zh input go to the English segment, which the Rust WASM passes through as characters ('1 2 3') because it has no English G2P."
+    },
+    {
+      "runtimes": [
+        "wasm"
+      ],
+      "language": "zh",
+      "input": "100",
+      "status": "planned",
+      "issue": 828,
+      "reason": "Digits in zh input go to the English segment, which the Rust WASM passes through as characters ('1 2 3') because it has no English G2P."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "你好",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "北京欢迎你。",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "我是学生。",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "谢谢",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "中国人",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "Hello你好",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "一二三",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "。，！",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "123",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "今天天气很好",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "是",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "不",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "我",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "你",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "他",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "她",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "我们",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "你们",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "他们",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "早上好",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "晚上好",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "再见",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "谢谢你",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "不客气",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "对不起",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "没关系",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "一",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "二",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "三",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "四",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "五",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "六",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "七",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "八",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "九",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "十",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "一百",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "一千",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "一万",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "中国",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "日本",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "北京",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "上海",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "世界",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "电脑",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "手机",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "Hello, 你好!",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "我用 GPS 导航",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "我喜欢 Python",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "ChatGPT 很厉害",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "Apple 公司",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "0",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "100",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "。",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "！",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "js-g2p"
+      ],
+      "language": "zh",
+      "input": "，",
+      "status": "planned",
+      "issue": 829,
+      "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "Hej, hur mår du?",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "God morgon Sverige.",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "tack",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "välkommen",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "Sverige",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "mjölk",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "skön",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "ljus",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "kort",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "barn",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "flicka",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "station",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "ja",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "nej",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "hej",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "hejdå",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "varsågod",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "Stockholm",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "Göteborg",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "Skåne",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "öl",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "är",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "å",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "ö",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "ä",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "åtta",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "nio",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "tio",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "hundra",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "tusen",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "blå",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "grön",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "röd",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "vit",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "svart",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "kärlek",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "stjärna",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "sjö",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "kyckling",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "smörgås",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "räka",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "pojke",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "Tack så mycket",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "God morgon",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "Hej hej",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "Vad heter du?",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "0",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "100",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "kaffe",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "te",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "python_run"
+      ],
+      "language": "sv",
+      "input": "vatten",
+      "status": "planned",
+      "issue": 830,
+      "reason": "The runtime has no Swedish phonemizer, so Swedish text is read by the English G2P."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "She's reading a book.",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.English (external) has a different dictionary entry for this word."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "zh",
+      "input": "Hello你好",
+      "status": "planned",
+      "issue": 833,
+      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "zh",
+      "input": "123",
+      "status": "planned",
+      "issue": 821,
+      "reason": "Digits are passed through as raw tokens, which are not in phoneme_id_map, instead of being read as number words."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "¿Cómo estás?",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "perro grande",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "guerra",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "rosa",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "el gato",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "todo",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "discípulo",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "enrique honra rosa",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "fr",
+      "input": "Comment allez-vous?",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.French (external) follows different rules: ɛ/œ/ɔ̃ read as ə, no elision, hyphenated words joined with a z liaison, dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "fr",
+      "input": "Je suis français.",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.French (external) follows different rules: ɛ/œ/ɔ̃ read as ə, no elision, hyphenated words joined with a z liaison, dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "fr",
+      "input": "ville",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.French (external) follows different rules: ɛ/œ/ɔ̃ read as ə, no elision, hyphenated words joined with a z liaison, dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "Bom dia, como você está?",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "Obrigado pela ajuda.",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "Brasil",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "bom",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "dia",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "rato",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "filho",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "junho",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "carro",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "gato",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "grande",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "manhã",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "0",
+      "status": "planned",
+      "issue": 821,
+      "reason": "Digits are passed through as raw tokens, which are not in phoneme_id_map, instead of being expanded to number words."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "1",
+      "status": "planned",
+      "issue": 821,
+      "reason": "Digits are passed through as raw tokens, which are not in phoneme_id_map, instead of being expanded to number words."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "123",
+      "status": "planned",
+      "issue": 821,
+      "reason": "Digits are passed through as raw tokens, which are not in phoneme_id_map, instead of being expanded to number words."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "3.14",
+      "status": "planned",
+      "issue": 821,
+      "reason": "Digits are passed through as raw tokens, which are not in phoneme_id_map, instead of being expanded to number words."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "100",
+      "status": "planned",
+      "issue": 821,
+      "reason": "Digits are passed through as raw tokens, which are not in phoneme_id_map, instead of being expanded to number words."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "It's 3 o'clock.",
+      "status": "planned",
+      "issue": 821,
+      "reason": "Digits are passed through as raw tokens, which are not in phoneme_id_map, instead of being expanded to number words."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "ChatGPT and GitHub",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "Out-of-dictionary word is read with DotNetG2P.English letter-to-sound rules; an exact match needs Python's neural guesser, which is not ported."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "a-b-c",
+      "status": "planned",
+      "issue": 821,
+      "reason": "Passed through as raw letters and hyphens instead of being read."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "\"quoted\" text",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.English (external) has a different dictionary entry for this word."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "aaaaa",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "Out-of-dictionary word is read with DotNetG2P.English letter-to-sound rules; an exact match needs Python's neural guesser, which is not ported."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "xyz",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "Out-of-dictionary word is read with DotNetG2P.English letter-to-sound rules; an exact match needs Python's neural guesser, which is not ported."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "résumé",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "After folding the accent, DotNetG2P.English picks the verb reading of 'resume'; Python picks the noun from part-of-speech tagging."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "UPPERCASE",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "Out-of-dictionary word is read with DotNetG2P.English letter-to-sound rules; an exact match needs Python's neural guesser, which is not ported."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "MixedCase",
+      "status": "accepted",
+      "issue": 821,
+      "reason": "Out-of-dictionary word is read with DotNetG2P.English letter-to-sound rules; an exact match needs Python's neural guesser, which is not ported."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "en",
+      "input": "'quote'",
+      "status": "planned",
+      "issue": 821,
+      "reason": "The edge quotes are stripped, while Python keeps them as tokens."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "no",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "adiós",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "perro",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "carro",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "río",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "guitarra",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "cien",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "Buenos días",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "Muchas gracias",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "Por favor",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "¿Dónde está el baño?",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "¡Qué bueno!",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "0",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "100",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "3.14",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "Madrid es la capital.",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "Yo soy estudiante.",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "Tú eres mi amigo.",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "es",
+      "input": "Hasta luego",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Spanish (external) follows different rules: no rr trill, no β/ð/ɣ allophones, glides for i/u, stressed function words, dropped punctuation, digits spelled out."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "fr",
+      "input": "oui",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.French (external) follows different rules: ɛ/œ/ɔ̃ read as ə, no elision, hyphenated words joined with a z liaison, dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "fr",
+      "input": "merci",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.French (external) follows different rules: ɛ/œ/ɔ̃ read as ə, no elision, hyphenated words joined with a z liaison, dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "fr",
+      "input": "hôtel",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.French (external) follows different rules: ɛ/œ/ɔ̃ read as ə, no elision, hyphenated words joined with a z liaison, dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "fr",
+      "input": "école",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.French (external) follows different rules: ɛ/œ/ɔ̃ read as ə, no elision, hyphenated words joined with a z liaison, dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "fr",
+      "input": "monsieur",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.French (external) follows different rules: ɛ/œ/ɔ̃ read as ə, no elision, hyphenated words joined with a z liaison, dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "fr",
+      "input": "aujourd'hui",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.French (external) follows different rules: ɛ/œ/ɔ̃ read as ə, no elision, hyphenated words joined with a z liaison, dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "fr",
+      "input": "c'est",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.French (external) follows different rules: ɛ/œ/ɔ̃ read as ə, no elision, hyphenated words joined with a z liaison, dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "fr",
+      "input": "0",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.French (external) follows different rules: ɛ/œ/ɔ̃ read as ə, no elision, hyphenated words joined with a z liaison, dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "fr",
+      "input": "Bonjour, comment allez-vous ?",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.French (external) follows different rules: ɛ/œ/ɔ̃ read as ə, no elision, hyphenated words joined with a z liaison, dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "fr",
+      "input": "Je m'appelle Pierre.",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.French (external) follows different rules: ɛ/œ/ɔ̃ read as ə, no elision, hyphenated words joined with a z liaison, dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "fr",
+      "input": "Voulez-vous danser ?",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.French (external) follows different rules: ɛ/œ/ɔ̃ read as ə, no elision, hyphenated words joined with a z liaison, dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "fr",
+      "input": "Quelle heure est-il ?",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.French (external) follows different rules: ɛ/œ/ɔ̃ read as ə, no elision, hyphenated words joined with a z liaison, dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "não",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "oi",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "obrigado",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "obrigada",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "Portugal",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "São Paulo",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "avião",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "coração",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "anão",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "mãe",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "pão",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "limões",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "comê-lo",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "dê-me",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "número",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "último",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "açúcar",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "noite",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "amor",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "cinco",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "sete",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "Bom dia",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "Boa tarde",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "Como você está?",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "Eu te amo.",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "0",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "pt",
+      "input": "100",
+      "status": "planned",
+      "issue": 832,
+      "reason": "DotNetG2P.Portuguese (external) follows different rules: ʁ read as ɾ, no final vowel reduction, no final l→w, phonemes outside the model's phoneme_id_map (ɐ, w̃, j̃), dropped punctuation."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "zh",
+      "input": "Hello, 你好!",
+      "status": "planned",
+      "issue": 833,
+      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "zh",
+      "input": "我用 GPS 导航",
+      "status": "planned",
+      "issue": 833,
+      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "zh",
+      "input": "我喜欢 Python",
+      "status": "planned",
+      "issue": 833,
+      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "zh",
+      "input": "ChatGPT 很厉害",
+      "status": "planned",
+      "issue": 833,
+      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "zh",
+      "input": "Apple 公司",
+      "status": "planned",
+      "issue": 833,
+      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "zh",
+      "input": "0",
+      "status": "planned",
+      "issue": 821,
+      "reason": "Digits are passed through as raw tokens, which are not in phoneme_id_map, instead of being read as number words."
+    },
+    {
+      "runtimes": [
+        "csharp"
+      ],
+      "language": "zh",
+      "input": "100",
+      "status": "planned",
+      "issue": 821,
+      "reason": "Digits are passed through as raw tokens, which are not in phoneme_id_map, instead of being read as number words."
     }
   ]
 }

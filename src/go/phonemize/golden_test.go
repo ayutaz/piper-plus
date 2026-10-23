@@ -75,7 +75,7 @@ func loadGoldenFixture(t *testing.T) *goldenFixture {
 
 	data, err := os.ReadFile(fixtureFile)
 	if err != nil {
-		t.Skipf("fixture file not found (expected at %s): %v", fixtureFile, err)
+		t.Fatalf("cannot read fixture %s: %v", fixtureFile, err)
 	}
 
 	var f goldenFixture
