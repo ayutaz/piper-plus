@@ -551,12 +551,13 @@ repos:
 
       # Text splitter (.!?。！？．) 終止符による文単位分割の cross-runtime
       # 整合性 gate。 v1.12.0 の breaking change (Python phonemize() の戻り値)
-      # 周辺の regression を防ぐ。
+      # 周辺の regression を防ぐ。 [consumers].split_case_tests の各テストが
+      # fixture の split_cases を読み続けていることも検査する (Issue #831)。
       - id: text-splitter-contract
         name: Text splitter contract (sentence-boundary parity)
         entry: uv run --no-sync python scripts/check_text_splitter_contract.py
         language: system
-        files: ^(docs/spec/text-splitter-contract\.toml|scripts/check_text_splitter_contract\.py|src/python_run/piper_plus/text_splitter\.py|src/rust/piper-core/src/streaming\.rs|scripts/regenerate_text_splitter_fixture\.py)$
+        files: ^(docs/spec/text-splitter-contract\.toml|scripts/check_text_splitter_contract\.py|src/python_run/piper_plus/text_splitter\.py|src/rust/piper-core/src/streaming\.rs|scripts/regenerate_text_splitter_fixture\.py|src/python_run/tests/test_text_splitter_contract\.py|src/rust/piper-core/tests/test_text_splitter_contract\.rs|src/go/piperplus/text_splitter_contract_test\.go|src/csharp/PiperPlus\.Core\.Tests/TextSplitterContractTests\.cs|src/cpp/tests/test_text_splitter_contract\.cpp|src/wasm/openjtalk-web/test/js/test-streaming-pipeline\.js)$
         pass_filenames: false
 
       # ONNX export の opset / checker / shape_inference / FP16 / EMA contract

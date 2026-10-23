@@ -257,6 +257,9 @@ pub fn crossfade(prev_tail: &[i16], next_head: &[i16], overlap_samples: usize) -
 /// the end of each chunk. Handles both Japanese (。！？) and Western (.!?)
 /// sentence terminators.
 ///
+/// A full stop between two digits ("3.14") or inside "e.g." / "i.e." does not
+/// end a sentence (Issue #831).
+///
 /// Consecutive whitespace between sentences is trimmed.
 /// Empty text returns an empty Vec.
 ///
@@ -334,21 +337,24 @@ fn split_sentences_plain(text: &str) -> Vec<String> {
     let mut sentences = Vec::new();
     let mut current = String::new();
 
-    let mut chars = text.chars().peekable();
+    // Indexed (not a peekable iterator) because `ends_sentence` looks at the
+    // characters on both sides of a full stop.
+    let chars: Vec<char> = text.chars().collect();
+    let n = chars.len();
+    let mut i = 0;
 
-    while let Some(ch) = chars.next() {
+    while i < n {
+        let ch = chars[i];
         current.push(ch);
+        i += 1;
 
         // Check if this character is a sentence terminator
-        if is_sentence_terminator(ch) {
+        if is_sentence_terminator(ch) && ends_sentence(&chars, i - 1) {
             // Consume any trailing closing punctuation that belongs with this sentence
             // (e.g., 」、）, closing quotes)
-            while let Some(&next_ch) = chars.peek() {
-                if is_closing_punctuation(next_ch) {
-                    current.push(chars.next().unwrap());
-                } else {
-                    break;
-                }
+            while i < n && is_closing_punctuation(chars[i]) {
+                current.push(chars[i]);
+                i += 1;
             }
 
             // Push the completed sentence (trimmed)
@@ -359,12 +365,8 @@ fn split_sentences_plain(text: &str) -> Vec<String> {
             current.clear();
 
             // Skip leading whitespace before the next sentence
-            while let Some(&next_ch) = chars.peek() {
-                if next_ch.is_whitespace() {
-                    chars.next();
-                } else {
-                    break;
-                }
+            while i < n && chars[i].is_whitespace() {
+                i += 1;
             }
         }
     }
@@ -376,6 +378,58 @@ fn split_sentences_plain(text: &str) -> Vec<String> {
     }
 
     sentences
+}
+
+/// Abbreviations whose full stops do not end a sentence (Issue #831).
+///
+/// g2p_en reads them as words ("e.g." is "for example") and the training data
+/// is phonemized without sentence splitting, so splitting inside them changes
+/// the phonemes. Keep in sync with `[[non_terminating_abbreviations]]` in
+/// `docs/spec/text-splitter-contract.toml`.
+pub const NON_TERMINATING_ABBREVIATIONS: &[&str] = &["e.g.", "i.e."];
+
+/// Whether the terminator `chars[i]` ends a sentence (Issue #831).
+///
+/// A full stop (`.` or fullwidth `．`) does not end a sentence when it sits
+/// between two digits ("3.14") or is one of the full stops of an abbreviation
+/// in [`NON_TERMINATING_ABBREVIATIONS`] that starts the text or follows a
+/// character that is not an ASCII letter or digit ("e.g.", but not "Note.g.").
+/// See "Full stops that do not end a sentence" in
+/// `docs/spec/text-splitter-contract.toml`.
+fn ends_sentence(chars: &[char], i: usize) -> bool {
+    if !matches!(chars[i], '.' | '\u{FF0E}') {
+        return true;
+    }
+    let n = chars.len();
+    if i > 0 && i + 1 < n && is_digit(chars[i - 1]) && is_digit(chars[i + 1]) {
+        return false;
+    }
+    for abbr in NON_TERMINATING_ABBREVIATIONS {
+        let abbr: Vec<char> = abbr.chars().collect();
+        for (j, &abbr_ch) in abbr.iter().enumerate() {
+            if abbr_ch != '.' || j > i {
+                continue;
+            }
+            let start = i - j;
+            let end = start + abbr.len();
+            if end > n {
+                continue;
+            }
+            let matches = chars[start..end]
+                .iter()
+                .zip(&abbr)
+                .all(|(c, a)| c.eq_ignore_ascii_case(a));
+            if matches && (start == 0 || !chars[start - 1].is_ascii_alphanumeric()) {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+/// ASCII digit or fullwidth digit (U+FF10-FF19).
+fn is_digit(ch: char) -> bool {
+    ch.is_ascii_digit() || ('\u{FF10}'..='\u{FF19}').contains(&ch)
 }
 
 /// Check whether a character is a sentence-ending terminator.
@@ -898,6 +952,26 @@ mod tests {
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], "Hello.");
         assert_eq!(result[1], "World.");
+    }
+
+    #[test]
+    fn test_split_sentences_ascii_full_stop_between_fullwidth_digits() {
+        // Issue #831: fullwidth digits (U+FF10-FF19) count as digits on both
+        // sides. split_cases covers U+FF0E, which rust does not split on, so
+        // pin the fullwidth-digit branch with an ASCII '.' here.
+        let result = split_sentences("気温は３.５度です。明日も晴れ。");
+        assert_eq!(result, vec!["気温は３.５度です。", "明日も晴れ。"]);
+    }
+
+    #[test]
+    fn test_split_sentences_abbreviation_at_text_start_and_after_digit() {
+        // "e.g." at the start of the text is an abbreviation; "1e.g." is not
+        // (the abbreviation follows an ASCII digit), so its full stops split.
+        assert_eq!(
+            split_sentences("e.g. this. Next."),
+            vec!["e.g. this.", "Next."]
+        );
+        assert_eq!(split_sentences("1e.g. Next."), vec!["1e.", "g.", "Next."]);
     }
 
     // ===================================================================

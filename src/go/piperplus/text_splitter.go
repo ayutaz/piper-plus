@@ -21,6 +21,9 @@ import (
 // any trailing text after `</speak>` is split using the normal sentence-
 // splitting logic. If the `<speak>` tag is unclosed, the function falls back
 // to normal splitting.
+//
+// A full stop between two digits ("3.14") or inside "e.g." / "i.e." does not
+// end a sentence (Issue #831).
 func SplitSentences(text string) []string {
 	if len(text) == 0 {
 		return nil
@@ -65,7 +68,7 @@ func splitSentencesPlain(text string) []string {
 		current.WriteRune(r)
 		i++
 
-		if !isSentenceTerminator(r) {
+		if !isSentenceTerminator(r) || !endsSentence(runes, i-1) {
 			continue
 		}
 
@@ -216,6 +219,81 @@ func isSentenceTerminator(r rune) bool {
 		return true
 	}
 	return false
+}
+
+// nonTerminatingAbbreviations lists abbreviations whose full stops do not end
+// a sentence. g2p_en reads them as words ("e.g." is "for example"), and the
+// training data is phonemized without splitting, so splitting inside them
+// changes the phonemes. Issue #831; mirrors [[non_terminating_abbreviations]]
+// in docs/spec/text-splitter-contract.toml and Python's
+// _NON_TERMINATING_ABBREVIATIONS.
+var nonTerminatingAbbreviations = []string{"e.g.", "i.e."}
+
+// endsSentence reports whether the terminator runes[i] ends a sentence.
+// A full stop (U+002E or U+FF0E) does not when it sits between two digits
+// ("3.14", "３．５") or is one of the full stops of a
+// nonTerminatingAbbreviations entry that starts the text or follows a
+// character that is not an ASCII letter or digit (Issue #831). Mirrors
+// Python's _ends_sentence.
+func endsSentence(runes []rune, i int) bool {
+	if runes[i] != '.' && runes[i] != '．' {
+		return true
+	}
+	n := len(runes)
+	if i > 0 && i < n-1 && isSplitterDigit(runes[i-1]) && isSplitterDigit(runes[i+1]) {
+		return false
+	}
+	for _, abbr := range nonTerminatingAbbreviations {
+		abbrRunes := []rune(abbr)
+		for j, ar := range abbrRunes {
+			if ar != '.' {
+				continue
+			}
+			start := i - j
+			end := start + len(abbrRunes)
+			if start < 0 || end > n {
+				continue
+			}
+			if !asciiEqualFold(runes[start:end], abbrRunes) {
+				continue
+			}
+			if start == 0 || !isASCIIAlnum(runes[start-1]) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// isSplitterDigit reports whether r is an ASCII or fullwidth (U+FF10-FF19)
+// digit.
+func isSplitterDigit(r rune) bool {
+	return ('0' <= r && r <= '9') || ('０' <= r && r <= '９')
+}
+
+// isASCIIAlnum reports whether r is an ASCII letter or digit.
+func isASCIIAlnum(r rune) bool {
+	return ('0' <= r && r <= '9') || ('a' <= r && r <= 'z') || ('A' <= r && r <= 'Z')
+}
+
+// asciiEqualFold reports whether a and b are equal, ignoring ASCII case only.
+func asciiEqualFold(a, b []rune) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k := range a {
+		if asciiLower(a[k]) != asciiLower(b[k]) {
+			return false
+		}
+	}
+	return true
+}
+
+func asciiLower(r rune) rune {
+	if 'A' <= r && r <= 'Z' {
+		return r + ('a' - 'A')
+	}
+	return r
 }
 
 // isClosingPunctuation reports whether r is a closing punctuation mark that

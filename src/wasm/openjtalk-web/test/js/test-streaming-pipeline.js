@@ -9,14 +9,20 @@
 
 import { strict as assert } from "assert";
 import { describe, it, beforeEach } from "node:test";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 
-let StreamingTTSPipeline, ChunkCrossfader, TextChunker, RingBuffer;
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+let StreamingTTSPipeline, ChunkCrossfader, TextChunker, RingBuffer, NON_TERMINATING_ABBREVIATIONS;
 try {
   const pipeline = await import("../../src/streaming-pipeline.js");
   StreamingTTSPipeline = pipeline.StreamingTTSPipeline;
   ChunkCrossfader = pipeline.ChunkCrossfader;
   TextChunker = pipeline.TextChunker;
   RingBuffer = pipeline.RingBuffer;
+  NON_TERMINATING_ABBREVIATIONS = pipeline.NON_TERMINATING_ABBREVIATIONS;
 } catch {
   StreamingTTSPipeline = null;
 }
@@ -60,6 +66,37 @@ describe("TextChunker", { skip }, () => {
       const chunks = TextChunker.split("Mr. Smith went home. He was tired.", "en");
       assert.equal(chunks.length, 2); // "Mr. Smith went home." と "He was tired."
     });
+  });
+
+  // Issue #831: "3.14" / "e.g." / "i.e." の "." では分割しない。
+  // tests/fixtures/text_splitter/contract.json の split_cases と照合する。
+  // TextChunker は言語を引数に取るので、仮名を含む入力は "ja"、それ以外は
+  // "en" で分割する (synthesizeStreaming が判定した言語を渡すのと同じ形)。
+  describe("text-splitter contract split_cases (Issue #831)", () => {
+    const fixture = JSON.parse(
+      readFileSync(
+        resolve(__dirname, "../../../../../tests/fixtures/text_splitter/contract.json"),
+        "utf-8"
+      )
+    );
+
+    it("略語の一覧が canonical.non_terminating_abbreviations と一致する", () => {
+      assert.deepStrictEqual(
+        [...NON_TERMINATING_ABBREVIATIONS],
+        fixture.canonical.non_terminating_abbreviations
+      );
+    });
+
+    it("split_cases が空でない", () => {
+      assert.ok(fixture.split_cases.length > 0);
+    });
+
+    for (const { input, expected } of fixture.split_cases) {
+      it(`split_cases: ${JSON.stringify(input)}`, () => {
+        const lang = /[ぁ-んァ-ン]/.test(input) ? "ja" : "en";
+        assert.deepStrictEqual(TextChunker.split(input, lang), expected);
+      });
+    }
   });
 });
 

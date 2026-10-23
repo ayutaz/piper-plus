@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace PiperPlus.Core.Phonemize;
 
@@ -23,12 +24,25 @@ namespace PiperPlus.Core.Phonemize;
 /// unclosed, the function falls back to normal splitting.
 /// </para>
 /// <para>
+/// A full stop between two digits (<c>3.14</c>) or inside <c>e.g.</c> /
+/// <c>i.e.</c> does not end a sentence (Issue #831).
+/// </para>
+/// <para>
 /// This mirrors the Rust implementation in
 /// <c>piper-core/src/streaming.rs::split_sentences</c>.
 /// </para>
 /// </summary>
 public static class TextSplitter
 {
+    /// <summary>
+    /// Abbreviations whose full stops do not end a sentence (Issue #831).
+    /// g2p_en reads them as part of the text around them (<c>e.g.</c> is
+    /// "for example"), and the training data is phonemized without
+    /// splitting. See <c>[[non_terminating_abbreviations]]</c> in
+    /// <c>docs/spec/text-splitter-contract.toml</c>.
+    /// </summary>
+    internal static readonly string[] NonTerminatingAbbreviations = ["e.g.", "i.e."];
+
     /// <summary>
     /// Split text into sentences at natural boundaries.
     /// </summary>
@@ -101,7 +115,7 @@ public static class TextSplitter
             i++;
 
             // Check if this character is a sentence terminator
-            if (IsSentenceTerminator(ch))
+            if (IsSentenceTerminator(ch) && EndsSentence(text, i - 1))
             {
                 // Consume any trailing closing punctuation that belongs
                 // with this sentence (e.g. 」、）, closing quotes)
@@ -147,6 +161,64 @@ public static class TextSplitter
     {
         return text.IndexOf("</speak>", StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// Whether the terminator at <paramref name="index"/> ends a sentence.
+    /// A full stop does not when it sits between two digits or is one of the
+    /// full stops of a <see cref="NonTerminatingAbbreviations"/> entry that
+    /// starts the text or follows a non-ASCII-alphanumeric character
+    /// (Issue #831, docs/spec/text-splitter-contract.toml).
+    /// </summary>
+    private static bool EndsSentence(string text, int index)
+    {
+        if (!IsFullStop(text[index]))
+        {
+            return true;
+        }
+
+        if (index > 0 && index < text.Length - 1
+            && IsDigit(text[index - 1]) && IsDigit(text[index + 1]))
+        {
+            return false;
+        }
+
+        return !NonTerminatingAbbreviations.Any(abbr =>
+            Enumerable.Range(0, abbr.Length)
+                .Any(j => abbr[j] == '.' && IsAbbreviationAt(text, index - j, abbr)));
+    }
+
+    /// <summary>
+    /// Whether <paramref name="abbr"/> occurs at <paramref name="start"/>
+    /// (ASCII case-insensitive) and starts the text or follows a character
+    /// that is not an ASCII letter or digit.
+    /// </summary>
+    private static bool IsAbbreviationAt(string text, int start, string abbr)
+    {
+        if (start < 0 || start + abbr.Length > text.Length)
+        {
+            return false;
+        }
+
+        if (string.Compare(text, start, abbr, 0, abbr.Length, StringComparison.OrdinalIgnoreCase) != 0)
+        {
+            return false;
+        }
+
+        return start == 0 || !char.IsAsciiLetterOrDigit(text[start - 1]);
+    }
+
+    /// <summary>
+    /// Full stops covered by Issue #831: <c>.</c> and the fullwidth
+    /// <c>．</c> (U+FF0E). C# does not treat U+FF0E as a terminator yet (see
+    /// <see cref="IsSentenceTerminator"/>), so only <c>.</c> reaches this
+    /// check today; U+FF0E is listed so the rule holds once it does.
+    /// </summary>
+    private static bool IsFullStop(char ch) => ch is '.' or '\uFF0E';
+
+    /// <summary>
+    /// ASCII <c>0</c>-<c>9</c> or fullwidth <c>０</c>-<c>９</c> (U+FF10-FF19).
+    /// </summary>
+    private static bool IsDigit(char ch) => ch is (>= '0' and <= '9') or (>= '\uFF10' and <= '\uFF19');
 
     /// <summary>
     /// Check whether a character is a sentence-ending terminator.

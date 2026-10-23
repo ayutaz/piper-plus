@@ -10,6 +10,11 @@ Per-runtime divergences (Rust / Go / C# / C++) are tracked in
 ``regenerate_text_splitter_fixture.py``'s RUNTIME_*_OMITS tables and validated
 by per-runtime tests, not here.
 
+It also checks that every test listed in the contract's
+``[consumers].split_case_tests`` exists and still reads ``split_cases`` from
+the fixture, so a runtime cannot stop checking where sentences split
+(Issue #831: "3.14" and "e.g." split into fragments).
+
 Usage:
     python scripts/check_text_splitter_contract.py            # CI mode
     python scripts/check_text_splitter_contract.py --verbose
@@ -20,10 +25,15 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SPLITTER_PATH = REPO_ROOT / "src/python_run/piper_plus/text_splitter.py"
+CONTRACT_PATH = REPO_ROOT / "docs/spec/text-splitter-contract.toml"
+# A consumer test must mention all of these: the fixture (Go joins the path
+# from parts, so they are checked separately) and the split cases.
+CONSUMER_MARKERS = ("text_splitter", "contract.json", "split_cases")
 
 # Lazy import so this script doesn't need the runtime in PYTHONPATH.
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
@@ -74,6 +84,29 @@ def _extract_set(text: str, name: str) -> set[str]:
     return elements
 
 
+def load_contract(path: Path = CONTRACT_PATH) -> dict:
+    with path.open("rb") as f:
+        return tomllib.load(f)
+
+
+def consumer_problems(contract: dict, root: Path = REPO_ROOT) -> list[str]:
+    """Problems with the tests that check the fixture's split cases."""
+    tests = contract.get("consumers", {}).get("split_case_tests", [])
+    if not tests:
+        return ["[consumers].split_case_tests is empty"]
+    problems: list[str] = []
+    for rel in tests:
+        path = root / rel
+        if not path.is_file():
+            problems.append(f"{rel}: listed in [consumers].split_case_tests but does not exist")
+            continue
+        text = path.read_text(encoding="utf-8")
+        missing = [m for m in CONSUMER_MARKERS if m not in text]
+        if missing:
+            problems.append(f"{rel}: no longer reads the fixture's split cases (missing {missing})")
+    return problems
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -121,6 +154,11 @@ def main() -> int:
             )
     elif args.verbose:
         print(f"  OK _SENTENCE_TERMINATORS: {len(actual_term)} chars")
+
+    problems = consumer_problems(load_contract())
+    errors += [f"  {p}" for p in problems]
+    if not problems and args.verbose:
+        print("  OK [consumers].split_case_tests read the fixture's split cases")
 
     if errors:
         print("ERROR: text-splitter contract drift detected:", file=sys.stderr)

@@ -12,6 +12,9 @@ package piperplus
 //      is greedily consumed after a sentence terminator.
 //   2. Each sentence-terminator codepoint listed in runtimes.go.sentence_terminators
 //      triggers a split (followed by greedy closing-punctuation consume).
+//   3. SplitSentences returns exactly split_cases[].expected for each input,
+//      and nonTerminatingAbbreviations matches
+//      canonical.non_terminating_abbreviations (Issue #831).
 //
 // The drift gate (parity-hub.yml text-splitter matrix entry) ensures the
 // fixture stays in sync with docs/spec/text-splitter-contract.toml.
@@ -21,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"testing"
 )
@@ -28,15 +32,20 @@ import (
 type textSplitterContract struct {
 	SchemaVersion int `json:"schema_version"`
 	Canonical     struct {
-		ClosingPunctuation  []int  `json:"closing_punctuation"`
-		SentenceTerminators []int  `json:"sentence_terminators"`
-		Strategy            string `json:"strategy"`
+		ClosingPunctuation          []int    `json:"closing_punctuation"`
+		SentenceTerminators         []int    `json:"sentence_terminators"`
+		Strategy                    string   `json:"strategy"`
+		NonTerminatingAbbreviations []string `json:"non_terminating_abbreviations"`
 	} `json:"canonical"`
 	Runtimes map[string]struct {
 		ClosingPunctuation  []int  `json:"closing_punctuation"`
 		SentenceTerminators []int  `json:"sentence_terminators"`
 		Strategy            string `json:"strategy"`
 	} `json:"runtimes"`
+	SplitCases []struct {
+		Input    string   `json:"input"`
+		Expected []string `json:"expected"`
+	} `json:"split_cases"`
 }
 
 func loadTextSplitterContract(t *testing.T) textSplitterContract {
@@ -130,5 +139,28 @@ func TestTextSplitterContract_GoSplitsAtListedTerminators(t *testing.T) {
 		if len(chunks) != 2 {
 			t.Errorf("U+%04X (%q): expected 2 chunks for %q, got %d: %#v", cp, term, input, len(chunks), chunks)
 		}
+	}
+}
+
+func TestTextSplitterContract_GoSplitCases(t *testing.T) {
+	// Issue #831: a full stop between digits ("3.14") or inside "e.g." /
+	// "i.e." does not end a sentence. split_cases is the cross-runtime pin.
+	c := loadTextSplitterContract(t)
+	if len(c.SplitCases) == 0 {
+		t.Fatalf("contract.split_cases missing or empty")
+	}
+	for _, tc := range c.SplitCases {
+		got := SplitSentences(tc.Input)
+		if !reflect.DeepEqual(got, tc.Expected) {
+			t.Errorf("SplitSentences(%q) = %#v, want %#v (per fixture split_cases)", tc.Input, got, tc.Expected)
+		}
+	}
+}
+
+func TestTextSplitterContract_GoNonTerminatingAbbreviationsMatchFixture(t *testing.T) {
+	c := loadTextSplitterContract(t)
+	if !reflect.DeepEqual(nonTerminatingAbbreviations, c.Canonical.NonTerminatingAbbreviations) {
+		t.Errorf("nonTerminatingAbbreviations = %#v, want %#v (per fixture canonical.non_terminating_abbreviations)",
+			nonTerminatingAbbreviations, c.Canonical.NonTerminatingAbbreviations)
 	}
 }

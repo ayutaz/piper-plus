@@ -165,6 +165,69 @@ inline bool isSentenceTerminator(char32_t c, SentenceSplitMode mode) {
   return false;
 }
 
+// Issue #831: g2p_en reads the full stops of these abbreviations as part of
+// the text ("e.g." is "for example", "i.e." is "that is"), and the training
+// data is phonemized without sentence splitting, so they do not end a
+// sentence. Canonically defined as [[non_terminating_abbreviations]] in
+// docs/spec/text-splitter-contract.toml.
+inline constexpr const char *kNonTerminatingAbbreviations[] = {"e.g.", "i.e."};
+
+inline bool isFullStop(char32_t c) {
+  return c == U'.' || c == U'．';  // U+002E, U+FF0E
+}
+
+// ASCII 0-9 or fullwidth U+FF10-FF19.
+inline bool isDigitCodepoint(char32_t c) {
+  return (c >= U'0' && c <= U'9') || (c >= U'０' && c <= U'９');
+}
+
+inline bool isAsciiAlnum(char32_t c) {
+  return (c >= U'0' && c <= U'9') || (c >= U'a' && c <= U'z') ||
+         (c >= U'A' && c <= U'Z');
+}
+
+// Whether the full stop at cps[i] does NOT end a sentence (Issue #831, see
+// docs/spec/text-splitter-contract.toml): it sits between two digits
+// ("3.14"), or it is one of the full stops of a kNonTerminatingAbbreviations
+// entry, matched ASCII case-insensitively, that starts the text or follows a
+// character other than an ASCII letter or digit ("Note.g." does not match).
+inline bool isNonTerminatingFullStop(const std::vector<char32_t> &cps,
+                                     std::size_t i) {
+  if (!isFullStop(cps[i])) {
+    return false;
+  }
+  const std::size_t n = cps.size();
+  if (i > 0 && i + 1 < n && isDigitCodepoint(cps[i - 1]) &&
+      isDigitCodepoint(cps[i + 1])) {
+    return true;
+  }
+  for (const char *abbr : kNonTerminatingAbbreviations) {
+    const std::string abbrText(abbr);
+    for (std::size_t j = 0; j < abbrText.size(); ++j) {
+      // Treat cps[i] as the abbreviation's j-th character, a full stop.
+      if (abbrText[j] != '.' || j > i || i - j + abbrText.size() > n) {
+        continue;
+      }
+      const std::size_t start = i - j;
+      bool matches = true;
+      for (std::size_t k = 0; k < abbrText.size(); ++k) {
+        char32_t c = cps[start + k];
+        if (c >= U'A' && c <= U'Z') {
+          c += U'a' - U'A';
+        }
+        if (c != static_cast<char32_t>(abbrText[k])) {
+          matches = false;
+          break;
+        }
+      }
+      if (matches && (start == 0 || !isAsciiAlnum(cps[start - 1]))) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 // Split text into sentences at natural boundaries. Iterates codepoints via
 // utf8_utils so multibyte UTF-8 (CJK punctuation, etc.) is handled correctly
 // (issue #343).
@@ -200,7 +263,11 @@ inline std::vector<std::string> splitTextToSentencesIn(
   std::size_t sentenceStart = 0;
 
   for (std::size_t i = 0; i < cpLen; ++i) {
-    if (!isBoundaryPunct(cps[i], mode)) {
+    // A full stop in "3.14" or "e.g." is not a boundary at all (Issue #831):
+    // no split there, and no closing punctuation is consumed after it. Only
+    // the first codepoint of a run needs the check -- a full stop that follows
+    // boundary punctuation has neither a digit nor a letter before it.
+    if (!isBoundaryPunct(cps[i], mode) || isNonTerminatingFullStop(cps, i)) {
       continue;
     }
 

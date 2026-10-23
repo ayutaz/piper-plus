@@ -81,6 +81,14 @@ on:
       - 'scripts/regenerate_ssml_fixture.py'
       - 'scripts/check_text_splitter_contract.py'
       - 'scripts/regenerate_text_splitter_fixture.py'
+      - 'tests/scripts/test_check_text_splitter_contract.py'
+      # Tests listed in text-splitter-contract.toml [consumers].split_case_tests
+      - 'src/python_run/tests/test_text_splitter_contract.py'
+      - 'src/rust/piper-core/tests/test_text_splitter_contract.rs'
+      - 'src/go/piperplus/text_splitter_contract_test.go'
+      - 'src/csharp/PiperPlus.Core.Tests/TextSplitterContractTests.cs'
+      - 'src/cpp/tests/test_text_splitter_contract.cpp'
+      - 'src/wasm/openjtalk-web/test/js/test-streaming-pipeline.js'
       - 'scripts/check_voice_catalog_parity.py'
       - '.github/workflows/parity-hub.yml'
   push:
@@ -132,6 +140,8 @@ jobs:
             scripts: |
               python scripts/check_text_splitter_contract.py --verbose
               python scripts/regenerate_text_splitter_fixture.py --check
+              pip install pytest
+              python -m pytest tests/scripts/test_check_text_splitter_contract.py -q -o addopts=
           - id: voice-catalog
             description: 5 runtime catalogs honour canonical vector
             scripts: |
