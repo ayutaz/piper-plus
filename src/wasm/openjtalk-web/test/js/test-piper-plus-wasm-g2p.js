@@ -240,6 +240,11 @@ const CONFIG_NO_WASM_LANGS = {
   language_id_map: { en: 0, es: 1, fr: 2 },
 };
 
+const CONFIG_WASM_LANGS_ONLY = {
+  ...BASE_CONFIG,
+  language_id_map: { ja: 0, zh: 1 },
+};
+
 let _origResolve;
 function installModelManagerStub() {
   _origResolve = ModelManager.prototype.resolveUrls;
@@ -324,6 +329,49 @@ describe("PiperPlus WASM G2P integration", { skip: skip ? "Import failed" : fals
         assert.ok(wasmWarnings.length > 0, "Should log WASM fallback warning");
 
         piper.dispose();
+      } finally {
+        console.warn = origWarn;
+      }
+    });
+
+    it("throws at init when WASM fails and no other model language remains", async () => {
+      setMockConfig(CONFIG_WASM_LANGS_ONLY);
+
+      await assert.rejects(
+        PiperPlus.initialize({ model: "test", ort: globalThis.ort }),
+        /Rust WASM G2P failed to load and the model has no other language \(ja, zh\)/
+      );
+    });
+
+    // Without this, a failed WASM load (e.g. a CDN refusing the ~60 MB file)
+    // routed Japanese text to the JS fallback and returned almost no audio.
+    it("rejects synthesis in a language dropped by a failed WASM load", async () => {
+      setMockConfig(CONFIG_WITH_JA);
+
+      const origWarn = console.warn;
+      console.warn = () => {};
+      try {
+        const piper = await PiperPlus.initialize({ model: "test", ort: globalThis.ort });
+        try {
+          await assert.rejects(
+            piper.synthesize("こんにちは", { language: "ja" }),
+            /Cannot synthesize "ja": the Rust WASM G2P failed to load/
+          );
+          await assert.rejects(
+            piper.synthesize("你好", { language: "zh" }),
+            /Cannot synthesize "zh"/
+          );
+          // Auto-detection: the remaining JS detector (mocked to answer "en",
+          // as the real one does without ja/zh) must not hide the failure.
+          await assert.rejects(piper.synthesize("こんにちは"), /Cannot synthesize "ja"/);
+          await assert.rejects(piper.synthesize("你好"), /Cannot synthesize "zh"/);
+          // Languages served by the JS G2P keep working.
+          const audio = await piper.synthesize("Hello", { language: "en" });
+          assert.ok(audio, "en synthesis should still succeed");
+          assert.equal(piper._detectLanguage("Hello"), "en");
+        } finally {
+          piper.dispose();
+        }
       } finally {
         console.warn = origWarn;
       }
@@ -466,9 +514,11 @@ describe("PiperPlus WASM G2P integration", { skip: skip ? "Import failed" : fals
     async function createInstanceWithWasmPhonemizer(wasmPhonemizer) {
       setMockConfig(CONFIG_WITH_JA);
 
+      // Load WASM at init so ja is not marked unavailable before the swap.
       const piper = await PiperPlus.initialize({
         model: "test",
         ort: globalThis.ort,
+        wasmLoader: async () => createMockWasmModule(),
       });
 
       // Build a mock CompositePhonemizer that routes JA to WASM, others to JS G2P
@@ -579,7 +629,7 @@ describe("PiperPlus WASM G2P integration", { skip: skip ? "Import failed" : fals
       piper.dispose();
     });
 
-    it("JA without WASM falls back to JS G2P via phonemizer", async () => {
+    it("JA without WASM is rejected instead of falling back to JS G2P", async () => {
       setMockConfig(CONFIG_WITH_JA);
 
       let encodeCalled = false;
@@ -600,9 +650,10 @@ describe("PiperPlus WASM G2P integration", { skip: skip ? "Import failed" : fals
       // phonemizer is set (CompositePhonemizer with JS fallback, no WASM)
       assert.ok(piper._phonemizer, "phonemizer should be set");
 
-      // Calling with 'ja' should fall back to JS G2P via CompositePhonemizer fallback
-      const result = await piper._textToPhonemeIds("こんにちは", "ja");
-      assert.ok(encodeCalled, "JS G2P encode should be called as fallback");
+      // The JS G2P has no Japanese phonemizer, so falling back would produce
+      // almost no audio. 'ja' must fail loudly instead.
+      await assert.rejects(piper._textToPhonemeIds("こんにちは", "ja"), /Cannot synthesize "ja"/);
+      assert.ok(!encodeCalled, "JS G2P encode must not be called for ja");
 
       piper.dispose();
     });

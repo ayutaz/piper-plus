@@ -106,6 +106,9 @@ export const TRIM_EOS_MAX_FRAMES = 0;
 export const DEFAULT_HOP_SIZE = 256;
 const TRIM_THRESHOLD_RMS = 0.01;
 const TRIM_MIN_SAMPLES = 2205; // 22050 Hz * 0.1 s
+// Script ranges used to spot ja/zh text after those languages were dropped.
+const KANA_RE = /[\u3040-\u30FF]/;
+const CJK_RE = /[\u3400-\u9FFF]/;
 
 // ---------------------------------------------------------------------------
 // Short-text mitigation helpers (Strategy A + B)
@@ -419,6 +422,9 @@ export class PiperPlus {
     this._session = null;
     this._config = null;
     this._phonemizer = null;
+    // Language code -> reason, for languages dropped when the Rust WASM G2P
+    // failed to load. Synthesizing them must fail instead of going silent.
+    this._unavailableLanguages = new Map();
     this._ort = null;
     this._initialized = false;
     this._warmupPromise = null;
@@ -936,6 +942,7 @@ export class PiperPlus {
 
       const phonemizerMap = new Map();
       let wasmAdapter = null;
+      this._unavailableLanguages.clear();
 
       // Languages that REQUIRE Rust WASM (no functional JS G2P fallback):
       //   ja — needs jpreprocess (no JS equivalent)
@@ -966,11 +973,21 @@ export class PiperPlus {
           }
         } catch (err) {
           const excluded = languages.filter((l) => WASM_REQUIRED_LANGUAGES.has(l));
+          languages = languages.filter((l) => !WASM_REQUIRED_LANGUAGES.has(l));
+          if (languages.length === 0) {
+            throw new Error(
+              `[piper-plus] Rust WASM G2P failed to load and the model has no other ` +
+                `language (${excluded.join(", ")}): ${err.message}. ` +
+                `Check that options.wasmG2pUrl points to a reachable piper_plus_wasm.js.`
+            );
+          }
           console.warn(
             `[piper-plus] Rust WASM G2P failed to load, excluding ${excluded.join(", ")}:`,
             err.message
           );
-          languages = languages.filter((l) => !WASM_REQUIRED_LANGUAGES.has(l));
+          for (const lang of excluded) {
+            this._unavailableLanguages.set(lang, err.message);
+          }
         }
       }
 
@@ -1017,7 +1034,24 @@ export class PiperPlus {
    * @private
    */
   _detectLanguage(text) {
-    return this._phonemizer.detectLanguage(text);
+    const detected = this._phonemizer.detectLanguage(text);
+    // When ja/zh were dropped by a failed WASM load, the remaining JS
+    // detector no longer knows kana or CJK and reports such text as the
+    // default Latin language. Name the dropped language instead, so
+    // _textToPhonemeIds rejects it rather than reading it as English.
+    const unavailable = this._unavailableLanguages;
+    if (unavailable.has("ja") && KANA_RE.test(text)) {
+      return "ja";
+    }
+    if (CJK_RE.test(text)) {
+      if (unavailable.has("zh")) {
+        return "zh";
+      }
+      if (unavailable.has("ja")) {
+        return "ja";
+      }
+    }
+    return detected;
   }
 
   /**
@@ -1026,6 +1060,14 @@ export class PiperPlus {
    * @private
    */
   async _textToPhonemeIds(text, language) {
+    const reason = this._unavailableLanguages.get(language);
+    if (reason !== undefined) {
+      throw new Error(
+        `[piper-plus] Cannot synthesize "${language}": the Rust WASM G2P failed to ` +
+          `load (${reason}). Check that options.wasmG2pUrl points to a reachable ` +
+          `piper_plus_wasm.js.`
+      );
+    }
     return this._phonemizer.encode(text, language);
   }
 

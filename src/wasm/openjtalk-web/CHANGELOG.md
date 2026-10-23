@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add `base` and `zero-shot-base-zs-v1` registry aliases for the public experimental Zero-Shot bundle at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1`. Resolve its nested `releases/zs-v1/base.onnx` and matching `base.onnx.json` pair with revision-isolated cache keys; this records browser download resolution and does not claim browser synthesis or quality validation.
 
+### Changed
+
+- Fail loudly when the Rust WASM phonemizer cannot be loaded. `initialize()` now rejects if the model has no language other than Japanese and Chinese; otherwise `synthesize()` rejects for Japanese or Chinese text (explicit or auto-detected) instead of routing it to the JS fallback, which produced almost no audio. Other languages keep working with a warning, as before.
+
 ### Fixed
 
 - Load `piper-plus` from unpkg in the README importmap example. jsDelivr refuses files over 50 MB, so the bundled G2P WASM (about 60 MB) returned 403 and Japanese text produced almost no audio. The browser test now also routes unpkg and fails if `piper-plus` is loaded from jsDelivr.
