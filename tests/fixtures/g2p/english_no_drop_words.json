@@ -37,7 +37,6 @@
   "known_drops": [
     {
       "runtimes": [
-        "go",
         "csharp"
       ],
       "word": "0",
@@ -46,7 +45,6 @@
     },
     {
       "runtimes": [
-        "go",
         "csharp"
       ],
       "word": "7",
@@ -55,7 +53,6 @@
     },
     {
       "runtimes": [
-        "go",
         "csharp"
       ],
       "word": "42",
@@ -64,7 +61,6 @@
     },
     {
       "runtimes": [
-        "go",
         "csharp"
       ],
       "word": "100",
@@ -73,7 +69,6 @@
     },
     {
       "runtimes": [
-        "go",
         "csharp"
       ],
       "word": "1984",
@@ -82,7 +77,6 @@
     },
     {
       "runtimes": [
-        "go",
         "csharp"
       ],
       "word": "3.14",
@@ -91,7 +85,6 @@
     },
     {
       "runtimes": [
-        "go",
         "csharp"
       ],
       "word": "$5",

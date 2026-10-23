@@ -21,11 +21,14 @@ step 3, which joins the words around them (``hello<TAB>world`` ->
 ``helloworld``); Python then reads the joined word with its neural
 predictor, which the ports do not have, so they would spell it letter by
 letter. The fixture applies the same change before the Python steps.
-This script records what Python produces, and the C++ and Rust tests compare
-their ports with it:
+This script records what Python produces, and the C++, Rust and Go tests
+compare their ports with it:
 
 * ``numbers``: ``normalize_numbers(input)``;
 * ``tokens``: the lowercased words after all five steps.
+
+``--check`` also fails when a test in ``CONSUMER_TESTS`` is missing or no
+longer reads the fixture, so a port cannot drift without a failing test.
 
 Usage:
     uv run python scripts/build_english_normalize_fixture.py          # write
@@ -44,6 +47,12 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OUTPUT = REPO_ROOT / "tests" / "fixtures" / "g2p" / "english_normalize_cases.json"
+# The ports' tests that compare with the fixture (#821 C++ / Rust, #841 Go).
+CONSUMER_TESTS = [
+    "src/cpp/tests/test_english_normalize.cpp",
+    "src/rust/piper-plus-g2p/tests/english_normalize.rs",
+    "src/go/phonemize/english_normalize_test.go",
+]
 
 NUMBER_INPUTS = [
     *[str(n) for n in range(0, 22)],
@@ -244,6 +253,20 @@ def build() -> dict:
     }
 
 
+def consumer_problems(tests: list[str], root: Path = REPO_ROOT) -> list[str]:
+    """Problems with the tests that compare a port with the fixture."""
+    if not tests:
+        return ["no test reads the fixture"]
+    problems = []
+    for rel in tests:
+        path = root / rel
+        if not path.is_file():
+            problems.append(f"{rel}: listed in CONSUMER_TESTS but does not exist")
+        elif OUTPUT.name not in path.read_text(encoding="utf-8"):
+            problems.append(f"{rel}: no longer reads {OUTPUT.name}")
+    return problems
+
+
 def render(doc: dict) -> str:
     return json.dumps(doc, ensure_ascii=False, indent=2) + "\n"
 
@@ -262,6 +285,10 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"{OUTPUT.relative_to(REPO_ROOT).as_posix()} is out of date; run without --check"
             )
+            return 1
+        problems = consumer_problems(CONSUMER_TESTS)
+        if problems:
+            print("\n".join(problems))
             return 1
         print(f"OK: {OUTPUT.relative_to(REPO_ROOT).as_posix()} is up to date")
         return 0

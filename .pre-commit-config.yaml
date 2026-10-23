@@ -242,11 +242,12 @@ repos:
 
       - id: english-normalize-fixture-drift
         name: English normalization fixture in sync with Python g2p_en
-        # The C++ / Rust ports of g2p_en's number expansion and tokenizer are
-        # tested against this fixture (#821); it must follow the vendored code.
+        # The C++ / Rust (#821) and Go (#841) ports of g2p_en's number
+        # expansion and tokenizer are tested against this fixture; it must
+        # follow the vendored code, and each port's test must keep reading it.
         entry: uv run --no-sync python scripts/build_english_normalize_fixture.py --check
         language: system
-        files: ^(src/python/g2p/piper_plus_g2p/_vendor/g2p_en/.*|tests/fixtures/g2p/english_normalize_cases\.json|scripts/build_english_normalize_fixture\.py)$
+        files: ^(src/python/g2p/piper_plus_g2p/_vendor/g2p_en/.*|tests/fixtures/g2p/english_normalize_cases\.json|scripts/build_english_normalize_fixture\.py|src/cpp/tests/test_english_normalize\.cpp|src/rust/piper-plus-g2p/tests/english_normalize\.rs|src/go/phonemize/english_normalize_test\.go)$
         pass_filenames: false
 
       - id: cjk-punctuation-contract

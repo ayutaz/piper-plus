@@ -56,21 +56,12 @@
   "divergences": [
     {
       "runtimes": [
-        "go"
-      ],
-      "language": "zh",
-      "input": "123",
-      "status": "planned",
-      "issue": 821,
-      "reason": "Digits in zh input fall back to the English path, which drops them."
-    },
-    {
-      "runtimes": [
         "cpp",
         "rust",
         "swift",
         "wasm",
-        "js-g2p"
+        "js-g2p",
+        "go"
       ],
       "language": "zh",
       "input": "123",
@@ -80,61 +71,12 @@
     },
     {
       "runtimes": [
-        "go"
-      ],
-      "language": "zh",
-      "input": "0",
-      "status": "planned",
-      "issue": 821,
-      "reason": "Digits in zh input fall back to the English path, which drops them."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "zh",
-      "input": "100",
-      "status": "planned",
-      "issue": 821,
-      "reason": "Digits in zh input fall back to the English path, which drops them."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "0",
-      "status": "planned",
-      "issue": 821,
-      "reason": "Digits are word separators and are dropped; numbers are not expanded to words."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "1",
-      "status": "planned",
-      "issue": 821,
-      "reason": "Digits are word separators and are dropped; numbers are not expanded to words."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "123",
-      "status": "planned",
-      "issue": 821,
-      "reason": "Digits are word separators and are dropped; numbers are not expanded to words."
-    },
-    {
-      "runtimes": [
         "cpp",
         "rust",
         "swift",
         "wasm",
-        "js-g2p"
+        "js-g2p",
+        "go"
       ],
       "language": "en",
       "input": "123",
@@ -144,61 +86,12 @@
     },
     {
       "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "100",
-      "status": "planned",
-      "issue": 821,
-      "reason": "Digits are word separators and are dropped; numbers are not expanded to words."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "3.14",
-      "status": "planned",
-      "issue": 821,
-      "reason": "Digits are word separators and are dropped; numbers are not expanded to words. Only the '.' survives."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "It's 3 o'clock.",
-      "status": "planned",
-      "issue": 821,
-      "reason": "Digits are word separators and are dropped; numbers are not expanded to words."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "e.g. and i.e.",
-      "status": "planned",
-      "issue": 821,
-      "reason": "'e.g.' / 'i.e.' are read letter by letter instead of being replaced by 'for example' / 'that is'."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "uh-huh",
-      "status": "planned",
-      "issue": 821,
-      "reason": "Hyphenated words are split instead of being looked up as one word."
-    },
-    {
-      "runtimes": [
         "cpp",
         "rust",
         "swift",
         "wasm",
-        "js-g2p"
+        "js-g2p",
+        "go"
       ],
       "language": "en",
       "input": "ChatGPT and GitHub",
@@ -212,7 +105,8 @@
         "rust",
         "swift",
         "wasm",
-        "js-g2p"
+        "js-g2p",
+        "go"
       ],
       "language": "en",
       "input": "UPPERCASE",
@@ -226,7 +120,8 @@
         "rust",
         "swift",
         "wasm",
-        "js-g2p"
+        "js-g2p",
+        "go"
       ],
       "language": "en",
       "input": "MixedCase",
@@ -240,7 +135,8 @@
         "rust",
         "swift",
         "wasm",
-        "js-g2p"
+        "js-g2p",
+        "go"
       ],
       "language": "en",
       "input": "xyz",
@@ -254,7 +150,8 @@
         "rust",
         "swift",
         "wasm",
-        "js-g2p"
+        "js-g2p",
+        "go"
       ],
       "language": "en",
       "input": "aaaaa",
@@ -283,103 +180,14 @@
         "rust",
         "swift",
         "wasm",
-        "js-g2p"
+        "js-g2p",
+        "go"
       ],
       "language": "en",
       "input": "résumé",
       "status": "accepted",
       "issue": 821,
       "reason": "Python picks the noun reading from part-of-speech tagging, which is not ported."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "café",
-      "status": "planned",
-      "issue": 821,
-      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "naïve",
-      "status": "planned",
-      "issue": 821,
-      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "'quote'",
-      "status": "planned",
-      "issue": 821,
-      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "ChatGPT and GitHub",
-      "status": "accepted",
-      "issue": 821,
-      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes. An exact match needs Python's neural guesser, which is not ported."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "UPPERCASE",
-      "status": "accepted",
-      "issue": 821,
-      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes. An exact match needs Python's neural guesser, which is not ported."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "MixedCase",
-      "status": "accepted",
-      "issue": 821,
-      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes. An exact match needs Python's neural guesser, which is not ported."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "xyz",
-      "status": "accepted",
-      "issue": 821,
-      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes. An exact match needs Python's neural guesser, which is not ported."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "aaaaa",
-      "status": "accepted",
-      "issue": 821,
-      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes. An exact match needs Python's neural guesser, which is not ported."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "résumé",
-      "status": "accepted",
-      "issue": 821,
-      "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes. An exact match needs Python's neural guesser, which is not ported."
     },
     {
       "runtimes": [
@@ -570,16 +378,6 @@
       "status": "planned",
       "issue": 821,
       "reason": "Digits are passed through as raw tokens, which are not in phoneme_id_map, instead of being read as number words."
-    },
-    {
-      "runtimes": [
-        "go"
-      ],
-      "language": "en",
-      "input": "I have ３ cats．",
-      "status": "planned",
-      "issue": 821,
-      "reason": "Digits are word separators and are dropped; numbers are not expanded to words."
     },
     {
       "runtimes": [
