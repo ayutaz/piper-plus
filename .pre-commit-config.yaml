@@ -781,6 +781,18 @@ repos:
         files: (zh_en_loanword(_matrix)?\.json|scripts/check_loanword_forward_compat\.py|tests/fixtures/g2p/zh_en_loanword_forward_compat\.json|docs/reference/zh\-en\-loanword/README\.md)$
         pass_filenames: false
 
+      # Mirror of .github/workflows/g2p-known-divergences.yml. The lists of
+      # known G2P differences are read by every runtime's golden parity test;
+      # this checks the lists themselves (issue + reason on every entry, cases
+      # that exist in the golden, declared runtimes whose tests still read the
+      # list) without building any runtime.
+      - id: g2p-known-divergences
+        name: G2P known-difference lists (known_divergences.json / english_no_drop_words.json)
+        entry: uv run --no-sync python scripts/check_g2p_known_divergences.py
+        language: system
+        files: ^(tests/fixtures/g2p/(known_divergences|english_no_drop_words|phoneme_test_cases_golden)\.json|scripts/check_g2p_known_divergences\.py|src/cpp/tests/test_c_api_g2p_golden\.cpp|src/rust/piper-plus-g2p/tests/golden_parity\.rs|android/piper-plus-g2p/src/androidTest/java/com/piperplus/g2p/PhonemeFixtureParityTest\.kt)$
+        pass_filenames: false
+
       # Mirror of .github/workflows/ort-version-sync.yml. Same Dependabot
       # drift pattern as ruff (cmake source-of-truth + 7 workflow + 5
       # workspace consumers). `check_ort_versions.py` is pure Python / IO.

@@ -1093,6 +1093,7 @@ add_test(NAME test_library_path COMMAND test_library_path)
 add_executable(test_c_api
     test_c_api.cpp
     test_c_api_g2p.cpp
+    test_c_api_g2p_golden.cpp
     ../piper_plus_c_api.cpp
 )
 
@@ -1105,6 +1106,9 @@ target_link_libraries(test_c_api PRIVATE
 target_compile_definitions(test_c_api PRIVATE
     PIPER_PLUS_BUILDING_DLL
     _PIPER_VERSION=${piper_version}
+    # test_c_api_g2p_golden.cpp reads the shared golden fixture, the PUA
+    # table and the CMU / pinyin dictionaries from the source tree.
+    PIPER_PLUS_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
 
 # Include directories: piper_plus.h lives in src/cpp/

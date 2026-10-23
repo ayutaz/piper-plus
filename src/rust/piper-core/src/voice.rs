@@ -447,7 +447,12 @@ impl PiperVoice {
         let is_short = crate::short_text::is_short_text(text);
 
         // 1. Phonemize: テキストをトークン列 + プロソディ情報に変換
-        let (tokens, prosody) = self.phonemizer.phonemize_with_prosody(text)?;
+        //    language_override があればラテン文字をその言語として読む。
+        let (tokens, prosody) = phonemize_text(
+            self.phonemizer.as_ref(),
+            text,
+            params.language_override.as_deref(),
+        )?;
 
         // 2. Convert tokens to IDs using phoneme_id_map
         let phoneme_id_map = self
@@ -564,7 +569,17 @@ impl PiperVoice {
     ///
     /// `--test-mode` (CI用) で phonemization パイプラインのみ検証する場合に使用。
     pub fn phonemize_to_ids(&self, text: &str) -> Result<Vec<i64>, PiperError> {
-        let (tokens, prosody) = self.phonemizer.phonemize_with_prosody(text)?;
+        self.phonemize_to_ids_with_language(text, None)
+    }
+
+    /// [`Self::phonemize_to_ids`] で、`language` を指定した場合は
+    /// [`SynthesisParams::language_override`] と同じくラテン文字をその言語として読む。
+    pub fn phonemize_to_ids_with_language(
+        &self,
+        text: &str,
+        language: Option<&str>,
+    ) -> Result<Vec<i64>, PiperError> {
+        let (tokens, prosody) = phonemize_text(self.phonemizer.as_ref(), text, language)?;
 
         let phoneme_id_map = self
             .phonemizer
@@ -707,6 +722,20 @@ impl PiperVoice {
 // ---------------------------------------------------------------------------
 // ヘルパー関数
 // ---------------------------------------------------------------------------
+
+/// テキストを音素化する。`language` を指定すると、多言語モデルでは
+/// ラテン文字のテキストをその言語として読む (es / fr / pt / sv は文字種だけでは
+/// 英語と区別できないため、指定がないと英語として音素化される)。
+fn phonemize_text(
+    phonemizer: &dyn Phonemizer,
+    text: &str,
+    language: Option<&str>,
+) -> Result<(Vec<String>, Vec<Option<crate::phonemize::ProsodyInfo>>), PiperError> {
+    match language {
+        Some(lang) => phonemizer.phonemize_with_language(text, lang),
+        None => phonemizer.phonemize_with_prosody(text),
+    }
+}
 
 /// ProsodyInfo 列を Option<ProsodyFeature> 列に変換する。
 ///
@@ -892,6 +921,38 @@ mod tests {
         assert!(result.is_ok(), "expected Ok, got: {:?}", result.err());
         let phonemizer = result.unwrap();
         assert_eq!(phonemizer.language_code(), "en");
+    }
+
+    #[test]
+    fn test_phonemize_text_uses_the_given_language_for_latin_text() {
+        // es / fr / pt cannot be told from English by their letters, so the
+        // language passed by the caller must reach the phonemizer.
+        let config = VoiceConfig {
+            audio: Default::default(),
+            num_speakers: 1,
+            num_symbols: 0,
+            phoneme_type: PhonemeType::Multilingual,
+            phoneme_id_map: HashMap::new(),
+            num_languages: 2,
+            language_id_map: [("en".into(), 0i64), ("es".into(), 1)]
+                .into_iter()
+                .collect(),
+            speaker_id_map: HashMap::new(),
+        };
+        let phonemizer = PiperVoice::create_phonemizer(&config, None).unwrap();
+        let (spanish, _) = piper_plus_g2p::Phonemizer::phonemize_with_prosody(
+            &piper_plus_g2p::spanish::SpanishPhonemizer::new(),
+            "perro grande",
+        )
+        .unwrap();
+
+        let (tokens, _) = phonemize_text(phonemizer.as_ref(), "perro grande", Some("es")).unwrap();
+        assert_eq!(tokens, spanish);
+        let (tokens, _) = phonemize_text(phonemizer.as_ref(), "perro grande", None).unwrap();
+        assert_ne!(
+            tokens, spanish,
+            "without a language, Latin text is read as English"
+        );
     }
 
     #[test]

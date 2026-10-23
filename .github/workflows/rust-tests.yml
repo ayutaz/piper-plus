@@ -12,6 +12,10 @@ on:
       - 'src/rust/**'
       - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
+      - 'tests/fixtures/g2p/known_divergences.json'
+      - 'tests/fixtures/g2p/english_no_drop_words.json'
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
@@ -23,6 +27,10 @@ on:
       - 'src/rust/**'
       - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
+      - 'tests/fixtures/g2p/known_divergences.json'
+      - 'tests/fixtures/g2p/english_no_drop_words.json'
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
@@ -93,6 +101,12 @@ jobs:
       # also runs the #[cfg(feature = "chinese")] dispatch tests added in
       # multilingual.rs (test_zh_en_dispatch_via_phonemizer_trait etc).
       run: cargo test -p piper-plus-g2p --no-fail-fast
+
+    - name: Run voice unit tests (onnx feature)
+      # voice.rs is compiled only with the onnx feature, so its unit tests
+      # (phonemizer construction, language override) never ran in the
+      # default-feature steps above.
+      run: cargo test -p piper-plus --features onnx --lib --no-fail-fast
 
     - name: Run short-text contract tests (onnx feature)
       # test_short_text_contract.rs imports piper_core::engine which is gated

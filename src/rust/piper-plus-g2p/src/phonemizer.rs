@@ -41,6 +41,19 @@ pub trait Phonemizer: Send + Sync {
         text: &str,
     ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError>;
 
+    /// Like [`Self::phonemize_with_prosody`], for text in `language`.
+    ///
+    /// Multilingual phonemizers still split the text by script, but assign
+    /// Latin-script text to `language`: es / fr / pt / sv cannot be told apart
+    /// from English by their letters. The default ignores `language`.
+    fn phonemize_with_language(
+        &self,
+        text: &str,
+        _language: &str,
+    ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError> {
+        self.phonemize_with_prosody(text)
+    }
+
     /// Language code (e.g. "ja", "en", "zh").
     fn language_code(&self) -> &str;
 

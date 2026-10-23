@@ -54,6 +54,7 @@ jobs:
       ci-config-wasm: ${{ steps.filter.outputs.ci-config-wasm }}
       zh-en-data: ${{ steps.filter.outputs.zh-en-data }}
       swedish-lid-data: ${{ steps.filter.outputs.swedish-lid-data }}
+      g2p-golden: ${{ steps.filter.outputs.g2p-golden }}
       ci-config-go: ${{ steps.filter.outputs.ci-config-go }}
       docs: ${{ steps.filter.outputs.docs }}
     steps:
@@ -127,6 +128,17 @@ jobs:
               - 'scripts/check_swedish_lid_consistency.py'
               - 'docs/spec/swedish-lid-mirrors.toml'
               - '.github/workflows/swedish-lid-sync.yml'
+            g2p-golden:
+              # Read by every runtime's golden parity test: the Python golden,
+              # the shared lists of known differences, the PUA table that maps
+              # the golden spelling, and the CMU / pinyin dictionaries the tests
+              # load. A change here must re-run those tests, not only the gate.
+              - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
+              - 'tests/fixtures/g2p/known_divergences.json'
+              - 'tests/fixtures/g2p/english_no_drop_words.json'
+              - 'src/python/g2p/piper_plus_g2p/data/pua.json'
+              - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
+              - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
             ci-config-go:
               - '.github/workflows/ci.yml'
               - '.github/workflows/go-ci.yml'
@@ -136,7 +148,7 @@ jobs:
 
   cpp-tests:
     needs: [changes]
-    if: ${{ needs.changes.outputs.cpp == 'true' || needs.changes.outputs.ci-config-cpp == 'true' || needs.changes.outputs.zh-en-data == 'true' || needs.changes.outputs.swedish-lid-data == 'true' }}
+    if: ${{ needs.changes.outputs.cpp == 'true' || needs.changes.outputs.ci-config-cpp == 'true' || needs.changes.outputs.zh-en-data == 'true' || needs.changes.outputs.swedish-lid-data == 'true' || needs.changes.outputs.g2p-golden == 'true' }}
     uses: ./.github/workflows/_build-test-cpp.yml
     with:
       run-integration-tests: true
@@ -350,7 +362,7 @@ jobs:
 
   rust-tests:
     needs: [changes]
-    if: ${{ needs.changes.outputs.rust == 'true' || needs.changes.outputs.ci-config-rust == 'true' || needs.changes.outputs.zh-en-data == 'true' || needs.changes.outputs.swedish-lid-data == 'true' }}
+    if: ${{ needs.changes.outputs.rust == 'true' || needs.changes.outputs.ci-config-rust == 'true' || needs.changes.outputs.zh-en-data == 'true' || needs.changes.outputs.swedish-lid-data == 'true' || needs.changes.outputs.g2p-golden == 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -386,6 +398,12 @@ jobs:
         # also runs the #[cfg(feature = "chinese")] dispatch tests added in
         # multilingual.rs (test_zh_en_dispatch_via_phonemizer_trait etc).
         run: cargo test -p piper-plus-g2p --no-fail-fast
+
+      - name: Run voice unit tests (onnx feature)
+        # voice.rs is compiled only with the onnx feature, so its unit tests
+        # (phonemizer construction, language override) never ran in the
+        # default-feature steps above.
+        run: cargo test -p piper-plus --features onnx --lib --no-fail-fast
 
       - uses: actions/setup-python@v6.2.0
         with:

@@ -5,12 +5,22 @@ on:
     branches: [dev, main]
     paths:
       - 'src/rust/piper-plus-g2p/**'
+      # Read by tests/golden_parity.rs.
+      - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
+      - 'tests/fixtures/g2p/known_divergences.json'
+      - 'tests/fixtures/g2p/english_no_drop_words.json'
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - '.github/workflows/g2p-rust-ci.yml'
     tags:
       - 'rust-g2p-v*'
   pull_request:
     paths:
       - 'src/rust/piper-plus-g2p/**'
+      # Read by tests/golden_parity.rs.
+      - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
+      - 'tests/fixtures/g2p/known_divergences.json'
+      - 'tests/fixtures/g2p/english_no_drop_words.json'
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - '.github/workflows/g2p-rust-ci.yml'
 
 concurrency:

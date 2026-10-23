@@ -1147,7 +1147,7 @@ fn phonemize_from_pinyin_syllables_with_prosody(
         return (Vec::new(), Vec::new());
     }
 
-    let mut st: Vec<(String, u8)> = syllables
+    let st: Vec<(String, u8)> = syllables
         .iter()
         .map(|s| {
             let (base, tone) = extract_tone(s);
@@ -1155,8 +1155,8 @@ fn phonemize_from_pinyin_syllables_with_prosody(
         })
         .collect();
 
-    apply_tone_sandhi(&mut st);
-
+    // No tone sandhi: like Python, the dictionary pinyin is spoken as written
+    // (the letter "E" is yi1 even before a tone-1 syllable).
     let mut tokens: Vec<String> = Vec::new();
     let mut prosody_list: Vec<Option<ProsodyInfo>> = Vec::new();
     for (normalized, tone) in &st {
