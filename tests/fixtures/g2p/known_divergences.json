@@ -100,8 +100,7 @@
     },
     {
       "runtimes": [
-        "go",
-        "swift"
+        "go"
       ],
       "language": "en",
       "input": "0",
@@ -111,8 +110,7 @@
     },
     {
       "runtimes": [
-        "go",
-        "swift"
+        "go"
       ],
       "language": "en",
       "input": "1",
@@ -122,8 +120,7 @@
     },
     {
       "runtimes": [
-        "go",
-        "swift"
+        "go"
       ],
       "language": "en",
       "input": "123",
@@ -134,7 +131,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "language": "en",
       "input": "123",
@@ -144,8 +142,7 @@
     },
     {
       "runtimes": [
-        "go",
-        "swift"
+        "go"
       ],
       "language": "en",
       "input": "100",
@@ -155,8 +152,7 @@
     },
     {
       "runtimes": [
-        "go",
-        "swift"
+        "go"
       ],
       "language": "en",
       "input": "3.14",
@@ -166,8 +162,7 @@
     },
     {
       "runtimes": [
-        "go",
-        "swift"
+        "go"
       ],
       "language": "en",
       "input": "It's 3 o'clock.",
@@ -177,28 +172,7 @@
     },
     {
       "runtimes": [
-        "swift"
-      ],
-      "language": "en",
-      "input": "café",
-      "status": "planned",
-      "issue": 821,
-      "reason": "Accented letters split the word and the out-of-dictionary pieces are dropped."
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "language": "en",
-      "input": "naïve",
-      "status": "planned",
-      "issue": 821,
-      "reason": "Accented letters split the word into 'na' + 've'."
-    },
-    {
-      "runtimes": [
-        "go",
-        "swift"
+        "go"
       ],
       "language": "en",
       "input": "e.g. and i.e.",
@@ -208,8 +182,7 @@
     },
     {
       "runtimes": [
-        "go",
-        "swift"
+        "go"
       ],
       "language": "en",
       "input": "uh-huh",
@@ -219,28 +192,9 @@
     },
     {
       "runtimes": [
-        "swift"
-      ],
-      "language": "en",
-      "input": "'quote'",
-      "status": "planned",
-      "issue": 821,
-      "reason": "Quotes at word edges are not split off, so the word is not found and dropped."
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "language": "en",
-      "input": "ChatGPT and GitHub",
-      "status": "accepted",
-      "issue": 821,
-      "reason": "Out-of-dictionary words are dropped (fix planned); an exact match needs Python's neural guesser, which is not ported."
-    },
-    {
-      "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "language": "en",
       "input": "ChatGPT and GitHub",
@@ -250,18 +204,9 @@
     },
     {
       "runtimes": [
-        "swift"
-      ],
-      "language": "en",
-      "input": "UPPERCASE",
-      "status": "accepted",
-      "issue": 821,
-      "reason": "Out-of-dictionary word is dropped (fix planned); an exact match needs Python's neural guesser, which is not ported."
-    },
-    {
-      "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "language": "en",
       "input": "UPPERCASE",
@@ -271,18 +216,9 @@
     },
     {
       "runtimes": [
-        "swift"
-      ],
-      "language": "en",
-      "input": "MixedCase",
-      "status": "accepted",
-      "issue": 821,
-      "reason": "Out-of-dictionary word is dropped (fix planned); an exact match needs Python's neural guesser, which is not ported."
-    },
-    {
-      "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "language": "en",
       "input": "MixedCase",
@@ -292,18 +228,9 @@
     },
     {
       "runtimes": [
-        "swift"
-      ],
-      "language": "en",
-      "input": "xyz",
-      "status": "accepted",
-      "issue": 821,
-      "reason": "Out-of-dictionary word is dropped (fix planned); an exact match needs Python's neural guesser, which is not ported."
-    },
-    {
-      "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "language": "en",
       "input": "xyz",
@@ -313,18 +240,9 @@
     },
     {
       "runtimes": [
-        "swift"
-      ],
-      "language": "en",
-      "input": "aaaaa",
-      "status": "accepted",
-      "issue": 821,
-      "reason": "Out-of-dictionary word is dropped (fix planned); an exact match needs Python's neural guesser, which is not ported."
-    },
-    {
-      "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "language": "en",
       "input": "aaaaa",

@@ -147,3 +147,4 @@ fixture・記録・CMU 辞書が変わったときにも C++ と Rust のテス�
 - `english_no_drop_words.json` の 20 語はどちらのランタイムでも読まれるようになったので、`known_drops` から `cpp` / `rust` を外しました。
 - 残る英語の差は、`123` (4 章)、辞書にない語 5 件 (`ChatGPT and GitHub` / `UPPERCASE` / `MixedCase` / `xyz` / `aaaaa`)、`a-b-c`、`résumé` です。いずれも Python のニューラル推定器か品詞判定が要るので accepted です。
 - Android (L3) は C++ の記録を共有するので、同じ結果になります。
+- Swift (`PiperPlusG2P`) は C FFI 経由で piper-plus-g2p の英語 G2P を使います。英語の 10 件と 20 語が同じく直るので、`swift` も記録から外しました。テキスト全体を指定言語の phonemizer に渡すため、zh の `0` / `100` は英語の経路を通らず、記録に残ります。残る英語の差 6 件は `cpp` / `rust` と同じ accepted の項目にまとめました。

@@ -37,24 +37,7 @@
   "known_drops": [
     {
       "runtimes": [
-        "swift"
-      ],
-      "word": "TTS",
-      "issue": 821,
-      "reason": "all-caps acronym not in CMUdict is dropped instead of spelled letter by letter"
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "word": "API",
-      "issue": 821,
-      "reason": "all-caps acronym not in CMUdict is dropped instead of spelled letter by letter"
-    },
-    {
-      "runtimes": [
         "go",
-        "swift",
         "wasm",
         "js-g2p",
         "csharp"
@@ -66,7 +49,6 @@
     {
       "runtimes": [
         "go",
-        "swift",
         "wasm",
         "js-g2p",
         "csharp"
@@ -78,7 +60,6 @@
     {
       "runtimes": [
         "go",
-        "swift",
         "wasm",
         "js-g2p",
         "csharp"
@@ -90,7 +71,6 @@
     {
       "runtimes": [
         "go",
-        "swift",
         "wasm",
         "js-g2p",
         "csharp"
@@ -102,7 +82,6 @@
     {
       "runtimes": [
         "go",
-        "swift",
         "wasm",
         "js-g2p",
         "csharp"
@@ -114,7 +93,6 @@
     {
       "runtimes": [
         "go",
-        "swift",
         "wasm",
         "js-g2p",
         "csharp"
@@ -125,16 +103,7 @@
     },
     {
       "runtimes": [
-        "swift"
-      ],
-      "word": "2nd",
-      "issue": 821,
-      "reason": "digits are not expanded to number words and are dropped"
-    },
-    {
-      "runtimes": [
         "go",
-        "swift",
         "wasm",
         "js-g2p",
         "csharp"
@@ -142,86 +111,6 @@
       "word": "$5",
       "issue": 821,
       "reason": "digits are not expanded to number words and are dropped"
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "word": "COVID-19",
-      "issue": 821,
-      "reason": "digits are not expanded to number words and are dropped"
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "word": "café",
-      "issue": 821,
-      "reason": "accented letters are not folded before CMUdict lookup, so the word is dropped"
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "word": "ChatGPT",
-      "issue": 821,
-      "reason": "word not in CMUdict is dropped instead of being split or spelled letter by letter"
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "word": "GitHub",
-      "issue": 821,
-      "reason": "word not in CMUdict is dropped instead of being split or spelled letter by letter"
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "word": "iPhone",
-      "issue": 821,
-      "reason": "word not in CMUdict is dropped instead of being split or spelled letter by letter"
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "word": "UPPERCASE",
-      "issue": 821,
-      "reason": "word not in CMUdict is dropped instead of being split or spelled letter by letter"
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "word": "MixedCase",
-      "issue": 821,
-      "reason": "word not in CMUdict is dropped instead of being split or spelled letter by letter"
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "word": "xyz",
-      "issue": 821,
-      "reason": "word not in CMUdict is dropped instead of being split or spelled letter by letter"
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "word": "aaaaa",
-      "issue": 821,
-      "reason": "word not in CMUdict is dropped instead of being split or spelled letter by letter"
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "word": "'quote'",
-      "issue": 821,
-      "reason": "edge quotes are kept in the lookup key, so the word is not found and is dropped"
     },
     {
       "runtimes": [
