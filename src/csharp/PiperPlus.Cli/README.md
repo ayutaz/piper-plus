@@ -124,7 +124,7 @@ The CLI ships with the same default dictionaries as the C++ / Rust runtimes; exp
 |------|----------|-------------|
 | `ja` | Japanese | DotNetG2P + DotNetG2P.MeCab (OpenJTalk-compatible, dictionary auto-download) |
 | `en` | English | DotNetG2P.English (Apache-2.0) |
-| `zh` | Chinese | DotNetG2P.Chinese (pinyin) |
+| `zh` | Chinese | Bundled numeric-tone pinyin dictionaries (same as the other runtimes) |
 | `ko` | Korean | Built-in rule-based engine |
 | `es` | Spanish | DotNetG2P.Spanish |
 | `fr` | French | DotNetG2P.French |

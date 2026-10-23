@@ -9,7 +9,7 @@
 | Phonemizer (Core 薄ラッパ) | `src/csharp/PiperPlus.Core/Phonemize/ChinesePhonemizer.cs` |
 | Embedded English | `src/csharp/PiperPlus.Core/Phonemize/ChineseEmbeddedEnglish.cs` |
 | Engine interface | `IChineseG2PEngine` |
-| Engine 実装 (Cli 側) | `DotNetChineseG2PEngine` (NuGet `DotNetG2P.Chinese 1.8.0` をラップ) |
+| Engine 実装 (Cli 側) | `BundledChineseG2PEngine` (Core の `PinyinDictionaryChineseG2PEngine` + 共有ピンイン辞書の埋め込み。#790 で `DotNetG2P.Chinese` のラッパーから置き換え。以下の DotNetG2P.Chinese の記述は設計時の記録) |
 | Multilingual | `src/csharp/PiperPlus.Core/Phonemize/MultilingualPhonemizer.cs` (`UnicodeLanguageDetector.SegmentText()` あり) |
 | 辞書データ | `src/csharp/PiperPlus.Core/Phonemize/Data/zh_en_loanword.json` |
 | テスト | `ChinesePhonemizerTests.cs` (401 行、StubEngine 利用) + `ChinesePhonemizerPuaTests.cs` |

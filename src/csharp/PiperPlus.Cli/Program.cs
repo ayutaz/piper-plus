@@ -1697,7 +1697,7 @@ internal static partial class Program
     /// <list type="bullet">
     ///   <item><c>ja</c> — Japanese (requires <c>JapanesePhonemizer</c> + <c>IJapaneseG2PEngine</c>)</item>
     ///   <item><c>en</c> — English (requires <c>EnglishPhonemizer</c> + <c>IEnglishG2PEngine</c>)</item>
-    ///   <item><c>zh</c> — Chinese (requires <c>ChinesePhonemizer</c> + <c>DotNetChineseG2PEngine</c>)</item>
+    ///   <item><c>zh</c> — Chinese (requires <c>ChinesePhonemizer</c> + <c>BundledChineseG2PEngine</c>)</item>
     ///   <item><c>es</c> — Spanish (requires <c>SpanishPhonemizer</c> + <c>DotNetSpanishG2PEngine</c>)</item>
     ///   <item><c>fr</c> — French (requires <c>FrenchPhonemizer</c> + <c>DotNetFrenchG2PEngine</c>)</item>
     ///   <item><c>pt</c> — Portuguese (requires <c>PortuguesePhonemizer</c> + <c>DotNetPortugueseG2PEngine</c>)</item>
@@ -1748,7 +1748,7 @@ internal static partial class Program
                 return new EnglishPhonemizer(new DotNetEnglishG2PEngine());
 
             case "zh":
-                return new ChinesePhonemizer(new DotNetChineseG2PEngine());
+                return new ChinesePhonemizer(new BundledChineseG2PEngine());
 
             case "ko":
                 return new KoreanPhonemizer(new DotNetKoreanG2PEngine());
