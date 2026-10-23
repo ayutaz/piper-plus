@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "g2p_en's text normalization, generated from the vendored Python code by scripts/build_english_normalize_fixture.py. 'numbers' is normalize_numbers(input); 'tokens' is the lowercased words after normalize_numbers, accent stripping, the character filter, the i.e./e.g. replacement and nltk's TweetTokenizer.",
+  "description": "g2p_en's text normalization, generated from the vendored Python code by scripts/build_english_normalize_fixture.py. 'numbers' is normalize_numbers(input); 'tokens' is the lowercased words after Unicode whitespace becomes a space (the ports' one deliberate change), normalize_numbers, accent stripping, the character filter, the i.e./e.g. replacement and nltk's TweetTokenizer.",
   "numbers": [
     {
       "input": "0",
@@ -881,7 +881,18 @@
       "tokens": [
         "semi",
         "colon",
-        "tabnewline"
+        "tab",
+        "new",
+        "line"
+      ]
+    },
+    {
+      "input": "no break　space\r\nend",
+      "tokens": [
+        "no",
+        "break",
+        "space",
+        "end"
       ]
     },
     {

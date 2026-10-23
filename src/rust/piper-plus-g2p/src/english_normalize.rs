@@ -304,11 +304,16 @@ fn fold_accent(ch: char) -> Option<char> {
 }
 
 /// Steps 2-3: strip accents and keep `a-z A-Z ' . , ? ! -` and ASCII space.
-/// The result is ASCII.
+/// The result is ASCII. Unlike g2p_en, any whitespace (tab, newline, no-break
+/// space, ...) becomes a space instead of being removed: removing it joins the
+/// words around it, and Python reads the joined word with a neural predictor
+/// this port does not have.
 fn strip_accents_and_filter(text: &str) -> String {
     text.chars()
         .filter_map(|ch| {
-            if ch.is_ascii() {
+            if ch.is_whitespace() {
+                Some(' ')
+            } else if ch.is_ascii() {
                 Some(ch)
             } else {
                 fold_accent(ch)
@@ -493,7 +498,11 @@ mod tests {
     fn test_accents_stripped_and_other_characters_removed() {
         assert_eq!(strip_accents_and_filter("Crème Brûlée"), "Creme Brulee");
         assert_eq!(strip_accents_and_filter("\u{212A}elvin"), "Kelvin");
-        assert_eq!(strip_accents_and_filter("a\tb\nc;d:e\"f"), "abcdef");
+        assert_eq!(strip_accents_and_filter("a\tb\nc;d:e\"f"), "a b cdef");
+        assert_eq!(
+            strip_accents_and_filter("a\u{a0}b\u{3000}c\u{85}d"),
+            "a b c d"
+        );
         assert_eq!(strip_accents_and_filter("日本 ß æ"), "  ");
     }
 

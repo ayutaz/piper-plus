@@ -154,8 +154,12 @@ TEST(EnglishNormalize, NumbersBeyondQuintillionAreReadDigitByDigit) {
               "nine hundred ninety-nine");
 }
 
-TEST(EnglishNormalize, TabsAndNewlinesJoinWords) {
-    EXPECT_EQ(piper::normalizeEnglishText("tab\tnew\nline"), "tabnewline");
+// g2p_en removes whitespace and joins the words around it; Python reads the
+// joined word with a neural predictor the port does not have, so the port
+// makes any whitespace a word separator (U+00A0 and U+3000 in UTF-8 here).
+TEST(EnglishNormalize, WhitespaceSeparatesWords) {
+    EXPECT_EQ(piper::normalizeEnglishText("tab\tnew\nline\r\nend"), "tab new line  end");
+    EXPECT_EQ(piper::normalizeEnglishText("no\xc2\xa0" "break\xe3\x80\x80" "space"), "no break space");
 }
 
 TEST(EnglishNormalize, CaseIsKeptForCamelCaseSplitting) {

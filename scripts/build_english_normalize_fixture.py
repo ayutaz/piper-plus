@@ -15,6 +15,12 @@ lookup it rewrites the text:
 5. nltk's ``TweetTokenizer`` splits the result into words.
 
 The other runtimes cannot import inflect or nltk, so they port these steps.
+They make one deliberate change first: every Unicode whitespace character
+(tab, newline, no-break space, ...) becomes a space. g2p_en removes these in
+step 3, which joins the words around them (``hello<TAB>world`` ->
+``helloworld``); Python then reads the joined word with its neural
+predictor, which the ports do not have, so they would spell it letter by
+letter. The fixture applies the same change before the Python steps.
 This script records what Python produces, and the C++ and Rust tests compare
 their ports with it:
 
@@ -186,10 +192,17 @@ TOKEN_INPUTS = [
     "(parens) [brackets] {braces}",
     '"double quotes"',
     "semi; colon: tab\tnew\nline",
+    "no\u00a0break\u3000space\r\nend",
     "a",
     "I",
     "",
 ]
+
+
+# Unicode White_Space (Rust's char::is_whitespace); see the module docstring.
+_WHITESPACE = re.compile(
+    "[\t\n\x0b\x0c\r\x85\xa0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+)
 
 
 def _strip_accents(text: str) -> str:
@@ -207,7 +220,9 @@ def build() -> dict:
     tokenize = TweetTokenizer().tokenize
 
     def tokens(text: str) -> list[str]:
-        # Same steps, in the same order, as g2p_en's G2p.__call__.
+        # Whitespace to spaces (the ports' one change), then the same steps,
+        # in the same order, as g2p_en's G2p.__call__.
+        text = _WHITESPACE.sub(" ", text)
         text = _strip_accents(normalize_numbers(text)).lower()
         text = re.sub(r"[^ a-z'.,?!\-]", "", text)
         text = text.replace("i.e.", "that is").replace("e.g.", "for example")
@@ -218,7 +233,8 @@ def build() -> dict:
         "description": (
             "g2p_en's text normalization, generated from the vendored Python code by "
             "scripts/build_english_normalize_fixture.py. 'numbers' is normalize_numbers(input); "
-            "'tokens' is the lowercased words after normalize_numbers, accent stripping, "
+            "'tokens' is the lowercased words after Unicode whitespace becomes a space "
+            "(the ports' one deliberate change), normalize_numbers, accent stripping, "
             "the character filter, the i.e./e.g. replacement and nltk's TweetTokenizer."
         ),
         "numbers": [

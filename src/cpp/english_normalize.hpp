@@ -227,6 +227,13 @@ inline size_t digitsEnd(const std::string &s, size_t begin) {
 // o with stroke, dotless i, ...) map to 0 and are removed, as in Python.
 // The tables were generated with Python's unicodedata ('-' = none) and are
 // the same as LATIN_BASE_00C0 / LATIN_BASE_1E00 in the Rust port.
+// Unicode White_Space, the set Rust's char::is_whitespace tests.
+inline bool isUnicodeWhitespace(char32_t cp) {
+    return (cp >= 0x09 && cp <= 0x0D) || cp == 0x20 || cp == 0x85 || cp == 0xA0 ||
+           cp == 0x1680 || (cp >= 0x2000 && cp <= 0x200A) || cp == 0x2028 || cp == 0x2029 ||
+           cp == 0x202F || cp == 0x205F || cp == 0x3000;
+}
+
 inline char latinBaseLetter(char32_t cp) {
     static const char kTable00C0[] =
         "AAAAAA-CEEEEIIII-NOOOOO--UUUUY--aaaaaa-ceeeeiiii-nooooo--uuuuy-y"  // U+00C0
@@ -427,14 +434,18 @@ inline std::string normalizeEnglishText(const std::string &text) {
 
     // NFD + combining marks removed + `[^ a-zA-Z'.,?!\-]` removed. Combining
     // marks (U+0300..U+036F) and everything else outside ASCII are removed by
-    // the filter; a precomposed letter keeps its base letter. Tabs and
-    // newlines are removed too, so the words around them join.
+    // the filter; a precomposed letter keeps its base letter. Unlike g2p_en,
+    // whitespace (tab, newline, no-break space, ...) becomes a space instead
+    // of being removed: removing it joins the words around it, and Python
+    // reads the joined word with a neural predictor this port does not have.
     std::string filtered;
     auto it = numbers.begin();
     while (it != numbers.end()) {
         const char32_t cp = utf8::unchecked::next(it);
         char c = 0;
-        if (cp < 0x80) {
+        if (isUnicodeWhitespace(cp)) {
+            c = ' ';
+        } else if (cp < 0x80) {
             c = static_cast<char>(cp);
             if (!(isLetter(c) || c == ' ' || c == '\'' || c == '.' || c == ',' || c == '?' ||
                   c == '!' || c == '-')) {

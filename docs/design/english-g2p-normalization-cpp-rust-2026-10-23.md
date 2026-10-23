@@ -46,7 +46,7 @@ C++ と Rust は同じ仕様で実装し、共有 fixture で検査します。
 Python のコード (g2p_en の `normalize_numbers` と nltk の `TweetTokenizer`) から生成します。
 
 - `numbers`: `normalize_numbers(input)` の結果。
-- `tokens`: 2 章の手順 1〜5 を通した後の、小文字の語の列。
+- `tokens`: 空白文字を半角空白にしてから (3.3 節)、2 章の手順 1〜5 を通した後の、小文字の語の列。
 
 両ランタイムのテストはこのファイルを読み、全件の一致を求めます。件数が 0 なら失敗します。
 
@@ -81,6 +81,12 @@ Python のコード (g2p_en の `normalize_numbers` と nltk の `TweetTokenizer
 `a-zA-Z ' . , ? ! -` と半角空白以外の文字を消し、`i.e.` と `e.g.` を大文字小文字を問わずに置き換えます。
 Python は小文字にしてから処理しますが、移植では大文字小文字を残します。
 CamelCase を分けるのに元の大文字が要るためです。語を辞書で引くときに小文字にします。
+
+Python と意図して違えるのは空白文字の扱いだけです。
+g2p_en はタブ・改行・ノーブレークスペースなども消すので、前後の語がつながります (`hello<タブ>world` → `helloworld`)。
+Python はつながった語をニューラル推定器で読みますが、移植には推定器がないので英字を 1 文字ずつ読むことになります。
+そこで移植では、Unicode の空白文字 (Rust の `char::is_whitespace` と同じ集合) を最初に半角空白にし、語の区切りとして扱います。
+修正前の C++ / Rust もタブと改行を区切りとして扱っていたので、その挙動を保ちます。Swift の `EdgeCaseTests` もこれを確かめています。
 
 ### 3.4 単語分割 (`TweetTokenizer` のうち、この文字種で起こる部分)
 

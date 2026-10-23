@@ -1186,6 +1186,23 @@ mod tests {
         assert_eq!(phonemes.len(), prosody.len());
     }
 
+    #[test]
+    fn test_whitespace_separates_words_like_a_space() {
+        // g2p_en removes tabs and newlines, joining "hello<TAB>world" into one
+        // word it reads with its neural predictor. The port has no predictor
+        // and would spell the joined word, so whitespace separates words.
+        let p = make_phonemizer(&[("hello", "HH AH0 L OW1"), ("world", "W ER1 L D")]);
+        let (space, _) = p.phonemize_impl("hello world");
+        for text in [
+            "hello\tworld",
+            "hello\nworld",
+            "hello\r\nworld",
+            "hello\u{a0}world",
+        ] {
+            assert_eq!(p.phonemize_impl(text).0, space, "{text:?}");
+        }
+    }
+
     // ===== 10. Phonemizer trait =====
 
     #[test]
