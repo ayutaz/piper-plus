@@ -52,6 +52,22 @@ class PhonemeResultTest {
         assertEquals(0, r.phonemeList.size)
     }
 
+    @Test
+    fun `splitPhonemeString keeps word boundaries as space tokens`() {
+        // Two words: 4 tokens, a boundary, 6 tokens = 11, as num_phonemes counts them.
+        val tokens = splitPhonemeString("o l ˈ a   m ˈ u n d o")
+        assertEquals(listOf("o", "l", "ˈ", "a", " ", "m", "ˈ", "u", "n", "d", "o"), tokens)
+    }
+
+    @Test
+    fun `splitPhonemeString handles boundaries at the edges and in a row`() {
+        assertEquals(listOf(" "), splitPhonemeString(" "))
+        assertEquals(listOf(" ", "a"), splitPhonemeString("  a"))
+        assertEquals(listOf("a", " "), splitPhonemeString("a  "))
+        assertEquals(listOf("a", " ", " ", "b"), splitPhonemeString("a     b"))
+        assertEquals(emptyList<String>(), splitPhonemeString(""))
+    }
+
     @Test(expected = UnsupportedOperationException::class)
     fun `phonemeList wrapped via Collections_unmodifiableList rejects mutation`() {
         // The downstream PiperPlusG2p.phonemize() wraps the list with

@@ -83,8 +83,8 @@ val dict = DictionaryDownloader.downloadFromHuggingFace(context)
 | Code | Language       | Dictionary needed? | Notes |
 |------|----------------|--------------------|-------|
 | `ja` | Japanese       | Yes (OpenJTalk)    | See dictionary guide. |
-| `en` | English        | No                 | g2p-en data embedded in `.so`. |
-| `zh` | Mandarin       | No                 | pypinyin data embedded; ZH-EN code-switching enabled by default. |
+| `en` | English        | No (bundled)       | CMU dictionary bundled in the AAR and extracted by `create()`. |
+| `zh` | Mandarin       | No (bundled)       | pinyin dictionaries bundled in the AAR and extracted by `create()`; ZH-EN code-switching enabled by default. |
 | `ko` | Korean         | No                 | g2pk2 data embedded. |
 | `es` | Spanish        | No                 | Rule-based. |
 | `fr` | French         | No                 | Rule-based. |
@@ -134,7 +134,10 @@ handle is freed via `piper_plus_g2p_free()`.
 | 16 KB page size (Android 15+) | All `.so` linked with `-Wl,-z,max-page-size=16384`. |
 
 The AAR ships `libpiper_plus.so` and `libpiper_plus_g2p_jni.so` for the
-above ABIs. AAR size (excluding the OpenJTalk dictionary) is **< 10 MB**.
+above ABIs, plus the English (CMU, 3.6 MB) and Mandarin (pinyin, 2.6 MB)
+dictionaries under `assets/piper_plus_g2p_dicts/`. The first `create()` copies
+those into `noBackupFilesDir` and points `PIPER_PLUS_DICTIONARIES_PATH` at them
+(a value the app already set is kept). The OpenJTalk dictionary is not bundled.
 
 ---
 
@@ -144,7 +147,7 @@ above ABIs. AAR size (excluding the OpenJTalk dictionary) is **< 10 MB**.
 |--------|------------|-----|
 | `UnsatisfiedLinkError: libpiper_plus.so` | The consumer app stripped JNI libs. | Disable shrinking for `lib/<abi>/` or switch to a non-stripped flavor. |
 | `phonemize("こんにちは", "ja")` returns empty | OpenJTalk dictionary not loaded. | Pass an `OpenJTalkDictionary` to `create()`. |
-| Empty phoneme list for `en` | CMU dict not found in `dict_dir`. | Embedded data still works — verify the input is non-empty. |
+| Empty phoneme list for `en` / `zh` | The bundled dictionaries could not be extracted (look for a `PiperPlusG2p` warning in logcat, e.g. no free space), or `PIPER_PLUS_DICTIONARIES_PATH` points elsewhere. | Free storage and recreate the instance, or unset the variable. |
 | Crash on Android 15 emulator | 16 KB page size mismatch. | Re-install (CI gates this — should not occur in shipping builds). |
 
 ---

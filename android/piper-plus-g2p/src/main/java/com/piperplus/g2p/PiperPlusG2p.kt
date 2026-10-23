@@ -7,9 +7,10 @@ import android.content.Context
  *
  * Wraps the C API entrypoints `piper_plus_g2p_*` (Issue #388). No ONNX model
  * is required — all 8 supported languages (`ja`, `en`, `zh`, `ko`, `es`, `fr`,
- * `pt`, `sv`) work with the data embedded in `libpiper_plus.so`. Only the
- * Japanese path additionally requires an OpenJTalk dictionary, supplied via
- * [OpenJTalkDictionary].
+ * `pt`, `sv`) work with the data embedded in `libpiper_plus.so` and the
+ * English (CMU) / Chinese (pinyin) dictionaries bundled in the AAR, which
+ * [create] extracts on first use. Only the Japanese path additionally
+ * requires an OpenJTalk dictionary, supplied via [OpenJTalkDictionary].
  *
  * ## Threading
  *
@@ -53,14 +54,7 @@ class PiperPlusG2p private constructor(
         val phonemes = triple[0]
         val resolvedLang = triple[1]
         val numPhonemes = triple[2].toIntOrNull() ?: 0
-        val list = if (phonemes.isEmpty()) {
-            emptyList()
-        } else {
-            // Defensive: wrap with toList() so the returned List<String> is
-            // a fresh immutable copy — callers can't mutate our internals via
-            // a downcast.
-            phonemes.split(' ').filter { it.isNotEmpty() }.toList()
-        }
+        val list = splitPhonemeString(phonemes)
         return PhonemeResult(
             phonemes = phonemes,
             phonemeList = java.util.Collections.unmodifiableList(list),
@@ -133,8 +127,9 @@ class PiperPlusG2p private constructor(
         /**
          * Create a new G2P instance.
          *
-         * @param context     Application context (used internally only when
-         *                    [dictionary] needs to be extracted from assets).
+         * @param context     Context used to extract the bundled English /
+         *                    Chinese dictionaries into `noBackupFilesDir` on
+         *                    the first call (about 6 MB).
          * @param dictionary  Optional handle to an extracted OpenJTalk
          *                    dictionary. Required for Japanese; the other
          *                    seven languages work without it.
@@ -146,11 +141,9 @@ class PiperPlusG2p private constructor(
             context: Context,
             dictionary: OpenJTalkDictionary? = null,
         ): PiperPlusG2p {
-            // Hold a reference to the application context so we participate
-            // in the standard Android lifecycle — even though the current
-            // native bridge does not need to read from it directly. This
-            // also keeps the API symmetric with the TTS module.
-            context.applicationContext
+            // English and Chinese read the CMU / pinyin dictionaries bundled
+            // in the AAR; extract them before the native handle loads them.
+            BundledDictionaries.configure(context.applicationContext)
             val handle = PiperPlusG2pNative.nativeCreate(dictionary?.path)
             if (handle == 0L) {
                 throw PiperPlusG2pException(

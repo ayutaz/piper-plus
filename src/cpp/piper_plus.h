@@ -429,8 +429,9 @@ typedef struct PiperPlusG2pHandle PiperPlusG2pHandle;
 /** Create a G2P handle without an ONNX model.
  *
  *  Uses a built-in language ID map for: en, fr, ja, ko, es, pt, sv, zh.
- *  English/Chinese/Korean/Spanish/French/Portuguese/Swedish all work without
- *  any external dictionary (rules and embedded data are statically linked).
+ *  Korean/Spanish/French/Portuguese/Swedish work without any external
+ *  dictionary (rules and embedded data are statically linked). English and
+ *  Chinese need the CMU / pinyin dictionaries described below.
  *  Japanese requires an OpenJTalk dictionary; pass its directory in `dict_dir`
  *  or set the dictionary via the usual auto-detect / `PIPER_PLUS_OPENJTALK_DICT_DIR`
  *  environment variable mechanism.
@@ -440,9 +441,11 @@ typedef struct PiperPlusG2pHandle PiperPlusG2pHandle;
  *  the `PIPER_PLUS_DICTIONARIES_PATH` environment variable. The exe-relative
  *  `<exe>/../share/piper-plus/dicts/` branch used by the CLI is intentionally NOT
  *  consulted by the engine-less G2P path because callers (Android AAR, JNI
- *  consumers) have no installed exe to anchor on. When not found,
- *  English/Chinese fall back to the embedded loanword dataset and rule-based
- *  output (still functional).
+ *  consumers) have no installed exe to anchor on. When they are not found,
+ *  only the embedded loanword dataset remains: most English words and Chinese
+ *  characters then produce no phonemes (e.g. "hello" and "你好" give an empty
+ *  result). The Android AAR bundles these files and exports their directory
+ *  through `PIPER_PLUS_DICTIONARIES_PATH`.
  *
  *  @param dict_dir  Optional directory containing OpenJTalk and/or CMU/pinyin
  *                   dictionaries. NULL = auto-detect only.
