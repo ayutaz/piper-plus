@@ -221,6 +221,37 @@ def test_sanitize_round_trip_against_fixture(sanitize, rules):
     )
 
 
+def test_sanitize_collapses_trailing_blank_lines(sanitize, rules):
+    """Issue #813: the C++ / C# CLIs print a trailing blank line, but the
+    pre-commit ``end-of-file-fixer`` strips it from the committed canonical.
+    Unless the sanitizer emits exactly one final newline, a canonical taken
+    verbatim from the CI artifact can never stay equal to the next capture.
+    """
+    actual = sanitize.sanitize(
+        raw="usage: x\n\n\n",
+        runtime="cpp",
+        source="x",
+        version="<VERSION>",
+        rules=rules,
+        timestamp="<TIMESTAMP>",
+    )
+    assert actual.endswith("usage: x\n")
+    assert not actual.endswith("\n\n")
+
+
+@pytest.mark.parametrize(
+    "runtime", ["python", "go", "rust", "wasm", "csharp", "cpp"],
+)
+def test_canonical_runtime_txt_ends_with_single_newline(runtime: str):
+    """The canonical must already be in the form ``end-of-file-fixer``
+    leaves, so the fixer and the sanitizer agree on the same bytes."""
+    canonical = REPO_ROOT / "docs" / "reference" / "cli-help" / f"{runtime}.txt"
+    text = canonical.read_text(encoding="utf-8")
+    assert text.endswith("\n") and not text.endswith("\n\n"), (
+        f"{runtime}.txt must end with exactly one newline."
+    )
+
+
 @pytest.mark.parametrize(
     "runtime", ["python", "go", "rust", "wasm", "csharp", "cpp"],
 )

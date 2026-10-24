@@ -25,6 +25,7 @@
 - **置き換え規則 (`sanitize_cli_help_rules.toml`)**
   - runner のパスは `]` の手前で止めます。
   - rust の `piper-plus-cli.exe` は `piper-plus-cli` にします。
+  - 取得結果の末尾の改行を 1 個にそろえます。C++ と C# の CLI は末尾に空行を出しますが、pre-commit の `end-of-file-fixer` は正本からその空行を削ります。そろえないと、成果物から取った正本が次の取得と一致しません。
 - **テスト**
   - `test_sanitize_cli_help.py` で、正本に `.exe`・日本語などの UI 文字列・手元のパスがないことを検査します。
   - `test_cli_help_extract_workflow.py` で、ワークフローが C++ を取得すること、英語の UI で取得すること、形式テストを実行すること、PR でずれを落とすことを検査します。

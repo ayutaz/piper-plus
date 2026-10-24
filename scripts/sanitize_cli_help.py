@@ -133,8 +133,10 @@ def sanitize(
         timestamp=timestamp,
     )
     sanitized_body = apply_rules(raw, runtime, rules)
-    if not sanitized_body.endswith("\n"):
-        sanitized_body += "\n"
+    # Exactly one final newline: the pre-commit ``end-of-file-fixer`` strips
+    # trailing blank lines from the committed canonical, so the capture must
+    # end the same way or it never matches (Issue #813, C++ / C# help).
+    sanitized_body = sanitized_body.rstrip("\n") + "\n"
     return header + sanitized_body
 
 
