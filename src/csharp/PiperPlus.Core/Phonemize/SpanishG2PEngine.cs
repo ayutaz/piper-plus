@@ -389,14 +389,7 @@ public sealed class SpanishG2PEngine : ISpanishG2PEngine
             char next = i + 1 < n ? bw[i + 1] : '\0';
             bool frontVowelAfterNext = i + 2 < n && (bw[i + 2] == 'e' || bw[i + 2] == 'i');
 
-            bool digraph = (b == 'q' && next == 'u')
-                || (b == 'g' && next == 'u' && frontVowelAfterNext)
-                || (b == 'c' && next == 'h')
-                || (b == 'l' && next == 'l')
-                || (b == 'r' && next == 'r')
-                || (b == 's' && next == 'c' && frontVowelAfterNext)
-                || (b == 'x' && next == 'c' && frontVowelAfterNext);
-            if (digraph)
+            if (IsDigraph(b, next, frontVowelAfterNext))
             {
                 units.Add(new GraphemeUnit(word.Substring(i, 2), false, false));
                 i += 2;
@@ -409,6 +402,35 @@ public sealed class SpanishG2PEngine : ISpanishG2PEngine
 
         return units;
     }
+
+    // qu, gu + e/i, ch, ll, rr, sc + e/i, xc + e/i are one unit.
+    private static bool IsDigraph(char b, char next, bool frontVowelAfterNext) => b switch
+    {
+        'q' => next == 'u',
+        'g' => next == 'u' && frontVowelAfterNext,
+        'c' => next == 'h',
+        'l' => next == 'l',
+        'r' => next == 'r',
+        's' or 'x' => next == 'c' && frontVowelAfterNext,
+        _ => false,
+    };
+
+    // Two adjacent vowels split when both are strong, or either is an
+    // accented i/u ("país" -> pa | ís).
+    private static bool IsHiatus(char prevGrapheme, char currGrapheme)
+    {
+        char prev = BaseChar(prevGrapheme);
+        char curr = BaseChar(currGrapheme);
+        if (StrongVowels.Contains(prev) && StrongVowels.Contains(curr))
+        {
+            return true;
+        }
+
+        return IsAccentedHighVowel(curr, currGrapheme) || IsAccentedHighVowel(prev, prevGrapheme);
+    }
+
+    private static bool IsAccentedHighVowel(char baseChar, char grapheme) =>
+        (baseChar == 'i' || baseChar == 'u') && StressAccents.Contains(grapheme);
 
     // The base letter at the end of a unit (_base_cons): "ch" -> 'h'.
     private static char LastBase(GraphemeUnit unit) => BaseChar(unit.Grapheme[^1]);
@@ -452,12 +474,7 @@ public sealed class SpanishG2PEngine : ISpanishG2PEngine
                 {
                     char prevGrapheme = units[nonSilent[i - 1]].Grapheme[^1];
                     char currGrapheme = units[nonSilent[i]].Grapheme[^1];
-                    char prev = BaseChar(prevGrapheme);
-                    char curr = BaseChar(currGrapheme);
-                    bool hiatus = (StrongVowels.Contains(prev) && StrongVowels.Contains(curr))
-                        || ((curr == 'i' || curr == 'u') && StressAccents.Contains(currGrapheme))
-                        || ((prev == 'i' || prev == 'u') && StressAccents.Contains(prevGrapheme));
-                    if (hiatus)
+                    if (IsHiatus(prevGrapheme, currGrapheme))
                     {
                         boundaries.Add(i);
                     }
