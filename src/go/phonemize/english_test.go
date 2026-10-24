@@ -1,6 +1,7 @@
 package phonemize
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -290,112 +291,26 @@ func TestConvertWordToIPA(t *testing.T) {
 }
 
 // ===========================================================================
-// 5. tokenizeText — text splitting into words and punctuation
+// 5. sourceWords — words used to find function words
 // ===========================================================================
 
-func TestTokenizeText(t *testing.T) {
+func TestSourceWords(t *testing.T) {
 	tests := []struct {
-		name  string
 		input string
-		want  []textToken
+		want  []string
 	}{
-		{
-			name:  "simple words",
-			input: "hello world",
-			want: []textToken{
-				{text: "hello", kind: tokenWord},
-				{text: "world", kind: tokenWord},
-			},
-		},
-		{
-			name:  "words with punctuation",
-			input: "Hello, world!",
-			want: []textToken{
-				{text: "Hello", kind: tokenWord},
-				{text: ",", kind: tokenPunct},
-				{text: "world", kind: tokenWord},
-				{text: "!", kind: tokenPunct},
-			},
-		},
-		{
-			name:  "apostrophe in word",
-			input: "don't",
-			want: []textToken{
-				{text: "don't", kind: tokenWord},
-			},
-		},
-		{
-			name:  "multiple apostrophes",
-			input: "I'm don't can't",
-			want: []textToken{
-				{text: "I'm", kind: tokenWord},
-				{text: "don't", kind: tokenWord},
-				{text: "can't", kind: tokenWord},
-			},
-		},
-		{
-			name:  "empty string",
-			input: "",
-			want:  nil,
-		},
-		{
-			name:  "only whitespace",
-			input: "   \t\n  ",
-			want:  nil,
-		},
-		{
-			name:  "only punctuation",
-			input: "...!?",
-			want: []textToken{
-				{text: ".", kind: tokenPunct},
-				{text: ".", kind: tokenPunct},
-				{text: ".", kind: tokenPunct},
-				{text: "!", kind: tokenPunct},
-				{text: "?", kind: tokenPunct},
-			},
-		},
-		{
-			name:  "numbers are skipped",
-			input: "hello 123 world",
-			want: []textToken{
-				{text: "hello", kind: tokenWord},
-				{text: "world", kind: tokenWord},
-			},
-		},
-		{
-			name:  "hyphens are skipped (split words)",
-			input: "self-driving",
-			want: []textToken{
-				{text: "self", kind: tokenWord},
-				{text: "driving", kind: tokenWord},
-			},
-		},
-		{
-			name:  "mixed case",
-			input: "Hello WORLD test",
-			want: []textToken{
-				{text: "Hello", kind: tokenWord},
-				{text: "WORLD", kind: tokenWord},
-				{text: "test", kind: tokenWord},
-			},
-		},
+		{"Hello, world!", []string{"hello", "world"}},
+		{"don't", []string{"don't"}},
+		{"'quote'", []string{"'quote'"}},
+		// Taken from the text before number expansion, as in Python.
+		{"the 3 of us", []string{"the", "of", "us"}},
+		{"", nil},
+		{"   ", nil},
 	}
-
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := tokenizeText(tc.input)
-			if len(got) != len(tc.want) {
-				t.Fatalf("tokenizeText(%q): got %d tokens, want %d\n  got:  %+v\n  want: %+v",
-					tc.input, len(got), len(tc.want), got, tc.want)
-			}
-			for i := range tc.want {
-				if got[i].text != tc.want[i].text || got[i].kind != tc.want[i].kind {
-					t.Errorf("tokenizeText(%q)[%d] = {%q, %d}, want {%q, %d}",
-						tc.input, i, got[i].text, got[i].kind,
-						tc.want[i].text, tc.want[i].kind)
-				}
-			}
-		})
+		if got := sourceWords(tc.input); !slices.Equal(got, tc.want) {
+			t.Errorf("sourceWords(%q) = %q, want %q", tc.input, got, tc.want)
+		}
 	}
 }
 
@@ -1056,7 +971,7 @@ func TestTokenProsodyLengthMatch(t *testing.T) {
 }
 
 // ===========================================================================
-// 17. OOV (out-of-vocabulary) fallback — letter-by-letter
+// 17. OOV (out-of-vocabulary) fallback — spelled with letter names
 // ===========================================================================
 
 func TestOOVFallback(t *testing.T) {
@@ -1069,16 +984,16 @@ func TestOOVFallback(t *testing.T) {
 		t.Fatalf("error: %v", err)
 	}
 
-	// OOV fallback: each letter becomes a token
+	// OOV fallback: x = EH1 K S, y = W AY1, z = Z IY1, read as one word.
 	got := joinTokens(result.Tokens)
-	if got != "xyz" {
-		t.Errorf("OOV fallback for 'xyz' = %q, want 'xyz'", got)
+	if want := "ˈɛkswˈaɪzˈiː"; got != want {
+		t.Errorf("OOV fallback for 'xyz' = %q, want %q", got, want)
 	}
 
-	// A3 should be the letter count of the word
+	// A3 is the IPA character count of the spelled word (3 + 3 + 3).
 	for _, pr := range result.Prosody {
-		if pr != nil && pr.A3 != 3 {
-			t.Errorf("OOV word A3 = %d, want 3 (letter count of 'xyz')", pr.A3)
+		if pr != nil && pr.A3 != 9 {
+			t.Errorf("OOV word A3 = %d, want 9 (IPA characters of the spelled 'xyz')", pr.A3)
 		}
 	}
 }
@@ -1368,7 +1283,7 @@ func TestNilDict_NoPanic(t *testing.T) {
 }
 
 func TestNilDict_LetterByLetterOutput(t *testing.T) {
-	// With a nil dictionary every word should use letter-by-letter fallback.
+	// With a nil dictionary every word is spelled with letter names.
 	p := NewEnglishPhonemizer(nil)
 
 	result, err := p.PhonemizeWithProsody("cat")
@@ -1376,16 +1291,17 @@ func TestNilDict_LetterByLetterOutput(t *testing.T) {
 		t.Fatalf("error: %v", err)
 	}
 
+	// c = S IY1, a = EY1, t = T IY1
 	got := joinTokens(result.Tokens)
-	want := "cat"
+	want := "sˈiːˈeɪtˈiː"
 	if got != want {
-		t.Errorf("nil dict phonemize(\"cat\") = %q, want %q (letter-by-letter)", got, want)
+		t.Errorf("nil dict phonemize(\"cat\") = %q, want %q (letter names)", got, want)
 	}
 
-	// A3 should equal the letter count of the word (3 for "cat")
+	// A3 is the IPA character count of the spelled word (3 + 2 + 3)
 	for i, pr := range result.Prosody {
-		if pr != nil && pr.A3 != 3 {
-			t.Errorf("nil dict Prosody[%d].A3 = %d, want 3", i, pr.A3)
+		if pr != nil && pr.A3 != 8 {
+			t.Errorf("nil dict Prosody[%d].A3 = %d, want 8", i, pr.A3)
 		}
 	}
 }
@@ -1399,10 +1315,11 @@ func TestEmptyDict_LetterByLetterOutput(t *testing.T) {
 		t.Fatalf("error: %v", err)
 	}
 
+	// h = EY1 CH, e = IY1, l = EH1 L, o = OW1
 	got := joinTokens(result.Tokens)
-	want := "hello"
+	want := "ˈeɪtʃˈiːˈɛlˈɛlˈoʊ"
 	if got != want {
-		t.Errorf("empty dict phonemize(\"hello\") = %q, want %q (letter-by-letter)", got, want)
+		t.Errorf("empty dict phonemize(\"hello\") = %q, want %q (letter names)", got, want)
 	}
 
 	// Token and prosody lengths must still match
@@ -1410,10 +1327,290 @@ func TestEmptyDict_LetterByLetterOutput(t *testing.T) {
 		t.Errorf("token count %d != prosody count %d", len(result.Tokens), len(result.Prosody))
 	}
 
-	// A3 should equal the letter count (5 for "hello")
+	// A3 is the IPA character count of the spelled word (4 + 2 + 2 + 2 + 2)
 	for i, pr := range result.Prosody {
-		if pr != nil && pr.A3 != 5 {
-			t.Errorf("empty dict Prosody[%d].A3 = %d, want 5", i, pr.A3)
+		if pr != nil && pr.A3 != 12 {
+			t.Errorf("empty dict Prosody[%d].A3 = %d, want 12", i, pr.A3)
+		}
+	}
+}
+
+// ===========================================================================
+// 25. Morphological fallback
+// ===========================================================================
+
+func TestMorphologicalFallback(t *testing.T) {
+	tests := []struct {
+		dict map[string][]string
+		word string
+		want []string
+	}{
+		{map[string][]string{"cat": {"K", "AE1", "T"}}, "cats", []string{"K", "AE1", "T", "Z"}},
+		// "running" -> base "runn" -> doubled consonant -> "run"
+		{map[string][]string{"run": {"R", "AH1", "N"}}, "running", []string{"R", "AH1", "N", "IH0", "NG"}},
+		{map[string][]string{"walk": {"W", "AO1", "K"}}, "walked", []string{"W", "AO1", "K", "D"}},
+		// "making" -> base "mak" (not found) -> restore 'e' -> "make"
+		{map[string][]string{"make": {"M", "EY1", "K"}}, "making", []string{"M", "EY1", "K", "IH0", "NG"}},
+		{map[string][]string{"cat": {"K", "AE1", "T"}}, "xyzzy", nil},
+	}
+	for _, tc := range tests {
+		if got := morphologicalFallback(tc.word, tc.dict); !slices.Equal(got, tc.want) {
+			t.Errorf("morphologicalFallback(%q) = %q, want %q", tc.word, got, tc.want)
+		}
+	}
+}
+
+// ===========================================================================
+// 26. Words missing from the dictionary are never dropped
+// ===========================================================================
+
+// phonemesOf returns the tokens of text.
+func phonemesOf(t *testing.T, p *EnglishPhonemizer, text string) []string {
+	t.Helper()
+	result, err := p.PhonemizeWithProsody(text)
+	if err != nil {
+		t.Fatalf("PhonemizeWithProsody(%q) error: %v", text, err)
+	}
+	return result.Tokens
+}
+
+// spaceTokens splits a space-joined phoneme string; "_" stands for the
+// word-boundary token " ".
+func spaceTokens(s string) []string {
+	tokens := strings.Split(s, " ")
+	for i, tok := range tokens {
+		if tok == "_" {
+			tokens[i] = " "
+		}
+	}
+	return tokens
+}
+
+func TestLetterNameArpabet(t *testing.T) {
+	names := map[byte]string{
+		'a': "EY1", 'b': "B IY1", 'c': "S IY1", 'd': "D IY1", 'e': "IY1",
+		'f': "EH1 F", 'g': "JH IY1", 'h': "EY1 CH", 'i': "AY1", 'j': "JH EY1",
+		'k': "K EY1", 'l': "EH1 L", 'm': "EH1 M", 'n': "EH1 N", 'o': "OW1",
+		'p': "P IY1", 'q': "K Y UW1", 'r': "AA1 R", 's': "EH1 S", 't': "T IY1",
+		'u': "Y UW1", 'v': "V IY1", 'w': "D AH1 B AH0 L Y UW0", 'x': "EH1 K S",
+		'y': "W AY1", 'z': "Z IY1",
+	}
+	for ch, want := range names {
+		upper := ch - 'a' + 'A'
+		for _, c := range []byte{ch, upper} {
+			if got := strings.Join(letterNameArpabet(c), " "); got != want {
+				t.Errorf("letter %c = %q, want %q", c, got, want)
+			}
+		}
+	}
+	for _, c := range []byte{'\'', '1', '-'} {
+		if got := letterNameArpabet(c); got != nil {
+			t.Errorf("letterNameArpabet(%q) = %q, want nil", c, got)
+		}
+	}
+}
+
+func TestOOVWordSpelledNotSkipped(t *testing.T) {
+	p := NewEnglishPhonemizer(map[string][]string{"hello": {"HH", "AH0", "L", "OW1"}})
+	result, err := p.PhonemizeWithProsody("hello xyz")
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	// x = EH1 K S, y = W AY1, z = Z IY1, read as one word.
+	want := spaceTokens("h ə l ˈ o ʊ _ ˈ ɛ k s w ˈ a ɪ z ˈ i ː")
+	if !slices.Equal(result.Tokens, want) {
+		t.Errorf("got %q, want %q", result.Tokens, want)
+	}
+	if len(result.Tokens) != len(result.Prosody) {
+		t.Errorf("token count %d != prosody count %d", len(result.Tokens), len(result.Prosody))
+	}
+}
+
+func TestAllCapsOOVSpelledAsOneWord(t *testing.T) {
+	p := NewEnglishPhonemizer(map[string][]string{})
+	// T IY1 + T IY1 + EH1 S: no word boundary between the letters.
+	if got, want := phonemesOf(t, p, "TTS"), spaceTokens("t ˈ i ː t ˈ i ː ˈ ɛ s"); !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestSplitCamelCase(t *testing.T) {
+	tests := []struct {
+		word string
+		want []string
+	}{
+		{"ChatGPT", []string{"Chat", "GPT"}},
+		{"iPhone", []string{"i", "Phone"}},
+		{"GitHub", []string{"Git", "Hub"}},
+		{"MixedCase", []string{"Mixed", "Case"}},
+		{"HTMLParser", []string{"HTML", "Parser"}},
+		{"RtwoDtwo", []string{"Rtwo", "Dtwo"}},
+		{"UPPERCASE", []string{"UPPERCASE"}},
+		{"lower", []string{"lower"}},
+		{"A", []string{"A"}},
+	}
+	for _, tc := range tests {
+		if got := splitCamelCase(tc.word); !slices.Equal(got, tc.want) {
+			t.Errorf("splitCamelCase(%q) = %q, want %q", tc.word, got, tc.want)
+		}
+	}
+}
+
+func TestCamelCasePartsJoinedIntoOneWord(t *testing.T) {
+	p := NewEnglishPhonemizer(map[string][]string{
+		"chat":  {"CH", "AE1", "T"},
+		"phone": {"F", "OW1", "N"},
+		"i":     {"AY1"},
+	})
+	// Chat + G P T (spelled), with no word boundary in between.
+	if got, want := phonemesOf(t, p, "ChatGPT"), spaceTokens("t ʃ ˈ æ t d ʒ ˈ i ː p ˈ i ː t ˈ i ː"); !slices.Equal(got, want) {
+		t.Errorf("ChatGPT: got %q, want %q", got, want)
+	}
+	// i (dictionary) + Phone.
+	if got, want := phonemesOf(t, p, "iPhone"), spaceTokens("ˈ a ɪ f ˈ o ʊ n"); !slices.Equal(got, want) {
+		t.Errorf("iPhone: got %q, want %q", got, want)
+	}
+}
+
+func TestHyphenAndDotSplitJoinedIntoOneWord(t *testing.T) {
+	p := NewEnglishPhonemizer(map[string][]string{
+		"foo": {"F", "UW1"},
+		"bar": {"B", "AA1", "R"},
+	})
+	want := spaceTokens("f ˈ u ː b ˈ ɑ ː ɹ")
+	// "foo.bar" is one token (TweetTokenizer domain form).
+	for _, text := range []string{"foo-bar", "foo.bar"} {
+		if got := phonemesOf(t, p, text); !slices.Equal(got, want) {
+			t.Errorf("%q: got %q, want %q", text, got, want)
+		}
+	}
+}
+
+func TestHyphenatedDictionaryWordNotSplit(t *testing.T) {
+	p := NewEnglishPhonemizer(map[string][]string{
+		"uh-huh": {"AH1", "HH", "AH1"},
+		"uh":     {"AH1"},
+		"huh":    {"HH", "AH1"},
+	})
+	if got, want := phonemesOf(t, p, "uh-huh"), spaceTokens("ˈ ʌ h ˈ ʌ"); !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestApostropheStrippedAndRetried(t *testing.T) {
+	p := NewEnglishPhonemizer(map[string][]string{"rocknroll": {"R", "AA1", "K", "N", "R", "OW1", "L"}})
+	if got, want := phonemesOf(t, p, "rock'n'roll"), spaceTokens("ɹ ˈ ɑ k n ɹ ˈ o ʊ l"); !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	// Not found without the apostrophe either: spell the letters.
+	p = NewEnglishPhonemizer(map[string][]string{})
+	if got, want := phonemesOf(t, p, "x'y"), spaceTokens("ˈ ɛ k s w ˈ a ɪ"); !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestNoLeadingWordBoundary(t *testing.T) {
+	p := NewEnglishPhonemizer(map[string][]string{"hello": {"HH", "AH0", "L", "OW1"}})
+	for _, text := range []string{"xyz hello", "'quote'", "...hello", "  hello", "3 hello"} {
+		if got := phonemesOf(t, p, text); len(got) > 0 && got[0] == " " {
+			t.Errorf("%q starts with a word boundary: %q", text, got)
+		}
+	}
+}
+
+// ===========================================================================
+// 27. Numbers, punctuation words and function-word alignment
+// ===========================================================================
+
+func TestFunctionWordsAlignedWithSourceWordsBeforeNumberExpansion(t *testing.T) {
+	// Python: the source words of "the 3 of us" are [the, of, us], aligned
+	// with the spoken words [the, three, of, us]. "three" takes "of" and
+	// "of" takes "us", so both lose their stress and "us" keeps it.
+	p := NewEnglishPhonemizer(map[string][]string{
+		"the":   {"DH", "AH0"},
+		"three": {"TH", "R", "IY1"},
+		"of":    {"AH1", "V"},
+		"us":    {"AH1", "S"},
+	})
+	result, err := p.PhonemizeWithProsody("the 3 of us")
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if want := spaceTokens("ð ə _ θ ɹ i ː _ ʌ v _ ˈ ʌ s"); !slices.Equal(result.Tokens, want) {
+		t.Errorf("tokens = %q, want %q", result.Tokens, want)
+	}
+	var a2, a3 []int
+	for _, pr := range result.Prosody {
+		a2 = append(a2, pr.A2)
+		a3 = append(a3, pr.A3)
+	}
+	if want := []int{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0}; !slices.Equal(a2, want) {
+		t.Errorf("A2 = %v, want %v", a2, want)
+	}
+	if want := []int{2, 2, 0, 4, 4, 4, 4, 0, 2, 2, 0, 2, 2, 2}; !slices.Equal(a3, want) {
+		t.Errorf("A3 = %v, want %v", a3, want)
+	}
+}
+
+func TestNonPunctuationSymbolWordsAreSpokenPerChar(t *testing.T) {
+	p := NewEnglishPhonemizer(map[string][]string{
+		"wait":  {"W", "EY1", "T"},
+		"now":   {"N", "AW1"},
+		"quote": {"K", "W", "OW1", "T"},
+	})
+	// ". . ." is one word: each character, spaces included, is a phoneme.
+	result, err := p.PhonemizeWithProsody("wait . . . now")
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if want := spaceTokens("w ˈ e ɪ t _ . _ . _ . _ n ˈ a ʊ"); !slices.Equal(result.Tokens, want) {
+		t.Errorf("tokens = %q, want %q", result.Tokens, want)
+	}
+	var a3 []int
+	for _, pr := range result.Prosody {
+		a3 = append(a3, pr.A3)
+	}
+	if want := []int{4, 4, 4, 4, 4, 0, 5, 5, 5, 5, 5, 0, 3, 3, 3, 3}; !slices.Equal(a3, want) {
+		t.Errorf("A3 = %v, want %v", a3, want)
+	}
+	// Edge quotes are words of their own, preceded by a word boundary.
+	if got, want := phonemesOf(t, p, "'quote'"), spaceTokens("' _ k w ˈ o ʊ t _ '"); !slices.Equal(got, want) {
+		t.Errorf("'quote': got %q, want %q", got, want)
+	}
+}
+
+func TestPunctuationProsodyMatchesPython(t *testing.T) {
+	// Python counts the punctuation character itself: A3 = 1.
+	p := NewEnglishPhonemizer(map[string][]string{"hello": {"HH", "AH0", "L", "OW1"}})
+	result, err := p.PhonemizeWithProsody("hello,")
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if last := result.Tokens[len(result.Tokens)-1]; last != "," {
+		t.Fatalf("last token = %q, want \",\"", last)
+	}
+	last := result.Prosody[len(result.Prosody)-1]
+	if last.A1 != 0 || last.A2 != 0 || last.A3 != 1 {
+		t.Errorf("comma prosody = %+v, want {A1:0 A2:0 A3:1}", *last)
+	}
+}
+
+func TestNumbersAccentsAndAbbreviationsAreNormalized(t *testing.T) {
+	p := NewEnglishPhonemizer(map[string][]string{
+		"cafe":    {"K", "AH0", "F", "EY1"},
+		"for":     {"F", "AO1", "R"},
+		"example": {"IH0", "G", "Z", "AE1", "M", "P", "AH0", "L"},
+		"one":     {"W", "AH1", "N"},
+		"hundred": {"HH", "AH1", "N", "D", "R", "AH0", "D"},
+	})
+	tests := []struct{ input, want string }{
+		{"café", "k ə f ˈ e ɪ"},
+		{"e.g.", "f ˈ ɔ ː ɹ _ ɪ ɡ z ˈ æ m p ə l"},
+		{"100", "w ˈ ʌ n _ h ˈ ʌ n d ɹ ə d"},
+	}
+	for _, tc := range tests {
+		if got, want := phonemesOf(t, p, tc.input), spaceTokens(tc.want); !slices.Equal(got, want) {
+			t.Errorf("%q: got %q, want %q", tc.input, got, want)
 		}
 	}
 }

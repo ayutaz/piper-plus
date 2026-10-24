@@ -95,6 +95,11 @@ on:
       - 'src/cpp/tests/test_text_splitter_contract.cpp'
       - 'src/wasm/openjtalk-web/test/js/test-streaming-pipeline.js'
       - 'scripts/check_voice_catalog_parity.py'
+      - 'scripts/build_english_normalize_fixture.py'
+      - 'tests/scripts/test_build_english_normalize_fixture.py'
+      - 'src/cpp/tests/test_english_normalize.cpp'
+      - 'src/rust/piper-plus-g2p/tests/english_normalize.rs'
+      - 'src/go/phonemize/english_normalize_test.go'
       - '.github/workflows/parity-hub.yml'
   push:
     branches: [dev, main]
@@ -153,6 +158,11 @@ jobs:
               python scripts/check_cjk_punctuation_contract.py
               pip install pytest
               python -m pytest tests/scripts/test_check_cjk_punctuation_contract.py -q -o addopts=
+          - id: english-normalize
+            description: Every English normalization port reads the shared fixture
+            scripts: |
+              pip install pytest
+              python -m pytest tests/scripts/test_build_english_normalize_fixture.py -q -o addopts=
           - id: voice-catalog
             description: 5 runtime catalogs honour canonical vector
             scripts: |

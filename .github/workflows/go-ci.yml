@@ -22,6 +22,8 @@ on:
       # Read by the text-splitter contract tests (#831).
       - 'tests/fixtures/text_splitter/**'
       - 'tests/fixtures/g2p/english_no_drop_words.json'
+      # Read by the English normalization test (#841).
+      - 'tests/fixtures/g2p/english_normalize_cases.json'
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
       - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
@@ -44,6 +46,8 @@ on:
       # Read by the text-splitter contract tests (#831).
       - 'tests/fixtures/text_splitter/**'
       - 'tests/fixtures/g2p/english_no_drop_words.json'
+      # Read by the English normalization test (#841).
+      - 'tests/fixtures/g2p/english_normalize_cases.json'
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
       - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
