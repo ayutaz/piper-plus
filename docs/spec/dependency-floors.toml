@@ -1,0 +1,34 @@
+# Security floors for Python dependencies (Issue #709).
+#
+# Each floor keeps a fresh resolution outside an advisory's affected range.
+# `scripts/check_dependency_floors.py` (pre-commit `dependency-floors`) fails when
+#   - a `<package>>=X` declaration in a tracked pyproject.toml, requirements*.txt,
+#     or workflow `pip install` has X below `minimum`,
+#   - a tracked uv.lock resolves the package below `minimum`,
+#   - no declaration of the package is found at all, or
+#   - an advisory in `fixed_advisories` is still suppressed in a workflow
+#     (`--ignore-vuln <id>` or `allow-ghsas: ... <id>`).
+#
+# The last check closes the hole of #588: a suppression left in place after
+# the floor moves out of the affected range keeps the audit green even if a
+# resolution falls back to a vulnerable version.
+
+[meta]
+forward_compat_policy = "strict"
+
+schema_version = 1
+
+[[floor]]
+package = "nltk"
+minimum = "3.10.4"
+# GHSA-8mgp-746c-j5xp (CVE-2026-81726): model-artifact APIs bypass pathsec,
+# affected `<= 3.10.3`. GHSA-p4gq-832x-fm9v (CVE-2026-54293): affected `<= 3.9.4`.
+fixed_advisories = ["GHSA-8mgp-746c-j5xp", "GHSA-p4gq-832x-fm9v"]
+issue = 709
+
+[[floor]]
+package = "joblib"
+minimum = "1.5.0"
+# PYSEC-2024-277 / CVE-2024-34997 (vendor-disputed), last_affected 1.4.2.
+fixed_advisories = ["PYSEC-2024-277"]
+issue = 588

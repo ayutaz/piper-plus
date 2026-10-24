@@ -273,6 +273,18 @@ repos:
         files: ^(\.pre-commit-config\.yaml|\.github/workflows/python-lint\.yml|pyproject\.toml|scripts/check_ruff_version_sync\.py|src/python/g2p/pyproject\.toml|src/python/pyproject\.toml)$
         pass_filenames: false
 
+      # Security floors (Issue #709): every `<pkg>>=X` declaration and uv.lock
+      # stays at or above docs/spec/dependency-floors.toml, and no workflow
+      # still suppresses an advisory the floor already fixes (#588 left a
+      # suppression that kept the audit green over a vulnerable floor).
+      # Runs the unit tests too; the last one checks the real tree.
+      - id: dependency-floors
+        name: dependency security floors (pyproject / requirements / uv.lock / workflow suppressions)
+        entry: uv run --no-sync python -m pytest tests/scripts/test_check_dependency_floors.py -q -o addopts=
+        language: system
+        files: (^|/)(pyproject\.toml|requirements[^/]*\.txt|uv\.lock)$|^\.github/workflows/[^/]+\.ya?ml$|^docs/spec/dependency-floors\.toml$|^scripts/check_dependency_floors\.py$|^tests/scripts/test_check_dependency_floors\.py$
+        pass_filenames: false
+
       # `exports["./wasm/*"]` は 3 箇所が揃って初めて出荷される — package.json の
       # 宣言、 build matrix のビルド、 npm-publish の artifact download。 #301 で
       # 追加された ./wasm/ja と ./wasm/ja-lite は 3 番目を欠いたまま 4 リリース

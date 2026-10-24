@@ -8,7 +8,7 @@ onnx>=1.22.0
 # For simplified deployment, using IPA-based fallback for English
 pypinyin>=0.50
 inflect>=0.3.1  # Bundled English backend numeral normalization
-nltk>=3.10.0
+nltk>=3.10.4
 joblib>=1.5.0
 # Zero-shot tab (CAM++ speaker embedding from reference audio)
 --extra-index-url https://download.pytorch.org/whl/cpu

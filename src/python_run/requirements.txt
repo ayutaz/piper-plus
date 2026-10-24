@@ -12,7 +12,11 @@ inflect>=0.3.1
 # Keep these above the OSV/PyPA advisory affected ranges so a fresh dependency
 # resolution can never regress into a genuinely-vulnerable version. See
 # docs/getting-started/troubleshooting.md ("Security Audit CI Issues").
-#   nltk>=3.10.0  : above CVE-2026-54293 / GHSA-p4gq-832x-fm9v (nltk.data.load()
+# scripts/check_dependency_floors.py checks these against
+# docs/spec/dependency-floors.toml.
+#   nltk>=3.10.4  : above CVE-2026-81726 / GHSA-8mgp-746c-j5xp (model-artifact
+#                   APIs bypass pathsec, affected `<= 3.10.3`, fixed in 3.10.4;
+#                   #709) and CVE-2026-54293 / GHSA-p4gq-832x-fm9v (nltk.data.load()
 #                   URL-encoded path traversal). Its affected range is `<= 3.9.4`
 #                   with first_patched_version 3.10.0, so the previous floor
 #                   `>=3.9.4` sat *inside* the affected range: a resolution that
@@ -23,7 +27,7 @@ inflect>=0.3.1
 #                   DoS/XSS fixes that landed in 3.9.4.
 #   joblib>=1.5.0 : above PYSEC-2024-277 / CVE-2024-34997 (NumpyArrayWrapper
 #                   pickle, vendor-DISPUTED false positive, last_affected 1.4.2).
-nltk>=3.10.0
+nltk>=3.10.4
 joblib>=1.5.0
 
 # Chinese phonemization
