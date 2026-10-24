@@ -2,6 +2,10 @@ import { expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
 const models = JSON.parse(readFileSync(new URL("./models.json", import.meta.url), "utf8"));
+// The zs-v1 base, CAM++ encoder and its config, pinned apart from models.json.
+export const zeroShot = JSON.parse(
+  readFileSync(new URL("./zero-shot-models.json", import.meta.url), "utf8")
+);
 const ortVersion = JSON.parse(
   readFileSync(new URL("../../node_modules/onnxruntime-web/package.json", import.meta.url), "utf8")
 ).version;
@@ -55,6 +59,21 @@ export async function routeCdnToLocal(page) {
 export async function routeModelsToLocal(page) {
   await page.route("https://huggingface.co/**", async (route) => {
     const url = new URL(route.request().url());
+    const zsPrefix = `/${zeroShot.repo}/resolve/${zeroShot.revision}/`;
+    if (url.pathname.startsWith(zsPrefix)) {
+      const file = zeroShot.files.find((f) => url.pathname === zsPrefix + f.remote);
+      if (!file) {
+        throw new Error(`Unexpected zero-shot request: ${url}`);
+      }
+      const response = await route.fetch({
+        url: `http://127.0.0.1:4173/models/${zeroShot.key}/${file.local}`,
+      });
+      await route.fulfill({
+        response,
+        headers: { ...response.headers(), "access-control-allow-origin": "*" },
+      });
+      return;
+    }
     const model = models.find((m) => url.pathname.includes(m.repo));
     if (!model) {
       throw new Error(`Unexpected model request: ${url}`);
@@ -74,6 +93,15 @@ export async function routeModelsToLocal(page) {
       });
     }
   });
+}
+
+/** CDN and model routing, unless PIPER_PLUS_DEMO_URL points at a deployed demo. */
+export async function localDistribution(page) {
+  if (process.env.PIPER_PLUS_DEMO_URL) {
+    return;
+  }
+  await routeCdnToLocal(page);
+  await routeModelsToLocal(page);
 }
 
 /**
@@ -133,4 +161,23 @@ export async function synthesizeWithReadmeImportmap(page, text, language) {
     },
     { text, language }
   );
+}
+
+/** Fetch an <audio> element's WAV and return its bytes and decoded stats. */
+export async function readWav(locator) {
+  const wav = await locator.evaluate(async (el) => {
+    const bytes = new Uint8Array(await (await fetch(el.src)).arrayBuffer());
+    const context = new AudioContext();
+    const decoded = await context.decodeAudioData(bytes.slice().buffer);
+    const pcm = decoded.getChannelData(0);
+    const stats = {
+      frames: decoded.length,
+      rate: decoded.sampleRate,
+      finite: pcm.every(Number.isFinite),
+      nonzero: pcm.some((x) => x !== 0),
+    };
+    await context.close();
+    return { bytes: Array.from(bytes), stats };
+  });
+  return { bytes: Buffer.from(wav.bytes), stats: wav.stats };
 }

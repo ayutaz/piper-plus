@@ -284,6 +284,13 @@ export class PiperPlus {
    */
   synthesizeFromReferenceAudio(params: SynthesizeFromReferenceAudioParams): Promise<AudioResult>;
 
+  /**
+   * Symbols the phonemizer produces for `text` that the loaded model's
+   * phoneme ID map lacks (synthesize() leaves them out silently). Includes
+   * unmapped whitespace and punctuation. Each symbol once, first-seen order.
+   */
+  findDroppedSymbols(text: string, options?: { language?: string }): Promise<string[]>;
+
   /** Streaming synthesis -- splits text into sentences and invokes onChunk for each chunk. */
   synthesizeStreaming(text: string, options?: StreamingSynthesizeOptions): Promise<void>;
 
@@ -465,8 +472,16 @@ export interface ModelManagerOptions {
 
 /** Options for SpeakerEncoder.initialize(). */
 export interface SpeakerEncoderOptions {
-  /** URL to the speaker encoder ONNX model. */
-  modelUrl: string;
+  /** URL to the speaker encoder ONNX model. Required unless modelData is given. */
+  modelUrl?: string;
+  /** Model bytes, used instead of modelUrl (e.g. after verifying a download's hash). */
+  modelData?: ArrayBuffer | Uint8Array;
+  /**
+   * Feature front end (default "mel", shared with the Rust/Go/C# runtimes).
+   * "kaldi-fbank" reproduces the public zs-v1 base's CAM++ recipe (kaiser_best
+   * resample, Kaldi fbank, mean subtraction) and L2-normalizes the embedding.
+   */
+  frontEnd?: "mel" | "kaldi-fbank";
   /** onnxruntime-web instance (defaults to globalThis.ort). */
   ort?: any;
 }

@@ -28,6 +28,9 @@ const MODEL_REGISTRY = {
 const PUBLIC_BASE_PREFIX =
   "https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/";
 const PUBLIC_BASE_ALIASES = new Set(["base", "zero-shot-base-zs-v1", "ayousanz/piper-plus-base"]);
+// The published base.onnx.json carries no sha256; keep in sync with
+// scripts/public_base_runtime.py (FILES["base.onnx"]).
+const PUBLIC_BASE_SHA256 = "e9860701a941db02149c7cfbe19cfb578c235c5e25020f1f592131d9b3b30f84";
 
 /**
  * Open (or create) the IndexedDB database used for model caching.
@@ -229,7 +232,8 @@ export class ModelManager {
    *   - Direct URL:        "https://example.com/model.onnx"
    *
    * @param {string} modelNameOrUrl
-   * @returns {Promise<{modelUrl: string, configUrl: string, configFallbackUrl: string|null, cacheKey: string}>}
+   * @returns {Promise<{modelUrl: string, configUrl: string, configFallbackUrl: string|null, cacheKey: string, sha256?: string}>}
+   *   `sha256` is the pinned model digest, set only for the public base.
    */
   async _resolveUrls(modelNameOrUrl) {
     if (PUBLIC_BASE_ALIASES.has(modelNameOrUrl)) {
@@ -239,6 +243,7 @@ export class ModelManager {
         configUrl: PUBLIC_BASE_PREFIX + "base.onnx.json",
         configFallbackUrl: null,
         cacheKey: modelUrl,
+        sha256: PUBLIC_BASE_SHA256,
       };
     }
     // Direct URL.
@@ -286,7 +291,7 @@ export class ModelManager {
    */
   async loadModel(modelNameOrUrl, options = {}) {
     const { onProgress } = options;
-    const { modelUrl, configUrl, configFallbackUrl, cacheKey } =
+    const { modelUrl, configUrl, configFallbackUrl, cacheKey, sha256: pinnedSha256 } =
       await this._resolveUrls(modelNameOrUrl);
 
     // Try the cache first.
@@ -318,12 +323,11 @@ export class ModelManager {
       console.warn(
         "[piper-plus] crypto.subtle unavailable — skipping SHA-256 integrity verification. Serve over HTTPS for full integrity checks."
       );
-    } else if (config.sha256) {
-      // Verify against the expected hash in the model config.
-      if (sha256 !== config.sha256) {
-        throw new Error(
-          `SHA-256 mismatch for downloaded model: expected ${config.sha256}, got ${sha256}`
-        );
+    } else {
+      // Verify against the pinned digest, else the expected hash in the config.
+      const expected = pinnedSha256 ?? config.sha256;
+      if (expected && sha256 !== expected) {
+        throw new Error(`SHA-256 mismatch for downloaded model: expected ${expected}, got ${sha256}`);
       }
     }
 

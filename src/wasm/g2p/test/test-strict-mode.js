@@ -44,3 +44,25 @@ describe('Encoder strict mode', () => {
         );
     });
 });
+
+describe('Encoder droppedSymbols', () => {
+    it('lists tokens missing from the map once, in first-seen order', () => {
+        const encoder = new Encoder(MINIMAL_MAP);
+        const result = encoder.encode(['a', 'Z', ' ', 'k', 'Z']);
+        assert.deepEqual(result.droppedSymbols, ['Z', ' ']);
+        assert.deepEqual(result.phonemeIds, [1, 3, 0, 0, 0, 4, 0, 0, 2]);
+    });
+
+    it('is empty when every token is mapped', () => {
+        const encoder = new Encoder(MINIMAL_MAP);
+        assert.deepEqual(encoder.encode(['a', 'k']).droppedSymbols, []);
+    });
+
+    it('is reported by encodeWithProsody with and without prosody', () => {
+        const encoder = new Encoder(MINIMAL_MAP);
+        const withProsody = encoder.encodeWithProsody(['a', 'Z'], [null, null]);
+        assert.deepEqual(withProsody.droppedSymbols, ['Z']);
+        const withoutProsody = encoder.encodeWithProsody(['Z', 'a'], null);
+        assert.deepEqual(withoutProsody.droppedSymbols, ['Z']);
+    });
+});

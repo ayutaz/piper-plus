@@ -3,7 +3,7 @@
  * @module piper-plus/phonemizer/js-g2p-adapter
  */
 
-import { G2P } from "@piper-plus/g2p";
+import { G2P, PUA_MAP } from "@piper-plus/g2p";
 
 export class JsG2pAdapter {
   /**
@@ -38,7 +38,9 @@ export class JsG2pAdapter {
    * Encode text into phoneme IDs and optional prosody features.
    * @param {string} text
    * @param {string} language
-   * @returns {{ phonemeIds: number[], prosodyFeatures: number[][]|null }}
+   * `droppedSymbols` lists tokens missing from the model's phoneme ID map,
+   * once each in first-seen order.
+   * @returns {{ phonemeIds: number[], prosodyFeatures: number[][]|null, droppedSymbols: string[] }}
    */
   encode(text, language) {
     const result = this._g2p.encode(text, this._phonemeIdMap, { language });
@@ -52,7 +54,33 @@ export class JsG2pAdapter {
       }
     }
 
-    return { phonemeIds: result.phonemeIds, prosodyFeatures };
+    const encoded = { phonemeIds: result.phonemeIds, prosodyFeatures };
+    if (Array.isArray(result.droppedSymbols)) {
+      encoded.droppedSymbols = result.droppedSymbols;
+      return encoded;
+    }
+    // The package depends on @piper-plus/g2p by semver range, and encode()
+    // results lack droppedSymbols up to 0.4.2. Work them out from the tokens,
+    // only when read: synthesize() never needs them.
+    let dropped;
+    Object.defineProperty(encoded, "droppedSymbols", {
+      enumerable: true,
+      get: () => (dropped ??= this._findDroppedSymbols(text, language)),
+    });
+    return encoded;
+  }
+
+  /**
+   * Tokens the Encoder skips: neither the token nor its PUA form is mapped.
+   * @private
+   */
+  _findDroppedSymbols(text, language) {
+    const map = this._phonemeIdMap;
+    const { tokens } = this._g2p.phonemizeWithProsody(text, { language });
+    const dropped = tokens.filter(
+      (token) => !Object.hasOwn(map, token) && !Object.hasOwn(map, PUA_MAP[token] ?? "")
+    );
+    return [...new Set(dropped)];
   }
 
   /**

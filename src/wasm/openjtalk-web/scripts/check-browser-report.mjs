@@ -10,6 +10,7 @@ const mandatory = names.length
       "README Basic Usage",
       "README importmap synthesizes Japanese at full length",
       "WASM fetch failure rejects Japanese and Chinese but keeps English",
+      "Zero-shot demo",
     ];
 const xml = readFileSync(report, "utf8");
 for (const name of mandatory) {

@@ -482,6 +482,28 @@ IDs; native G2P and listening quality were excluded, and quality approval
 remains false. These are separate checks and do not establish WASM-specific
 G2P or listening-quality approval.
 
+To compute the zs-v1 embedding in the browser instead, load the published
+`campplus.onnx` with the Kaldi fbank front end, which matches the Python recipe
+(torchaudio Kaiser resampling to 16 kHz, 80-bin `kaldi.fbank`, mean
+subtraction, L2 normalization). The default `frontEnd: "mel"` is unchanged and
+does not match zs-v1.
+
+```javascript
+import { SpeakerEncoder } from 'piper-plus'
+
+const encoder = await SpeakerEncoder.initialize({
+  modelData: campplusBytes, // or modelUrl
+  ort,
+  frontEnd: 'kaldi-fbank',
+})
+const embedding192 = await encoder.encode(audioBuffer) // or encode(float32Samples, sampleRate)
+
+// zs-v1 has no space and almost no punctuation in its phoneme table, and has
+// never seen a few phonemes (French "ɥ", Portuguese "ã"). They are dropped
+// silently; list them before synthesizing to warn the user.
+const dropped = await piper.findDroppedSymbols(text, { language: 'fr' })
+```
+
 `synthesizeSsml`, `synthesizeFromReferenceAudio`, and the `speakerEmbedding`
 option on `synthesize()` are available from `piper-plus 0.6.0` onwards (PR #478,
 PR #479). The W3C SSML subset matches the Python / Rust / C# / Go runtimes.

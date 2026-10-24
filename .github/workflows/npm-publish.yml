@@ -93,7 +93,7 @@ jobs:
         uses: actions/cache@v4.3.0
         with:
           path: src/wasm/openjtalk-web/test/browser/models
-          key: browser-tts-models-${{ hashFiles('src/wasm/openjtalk-web/test/browser/models.json') }}
+          key: browser-tts-models-${{ hashFiles('src/wasm/openjtalk-web/test/browser/models.json', 'src/wasm/openjtalk-web/test/browser/zero-shot-models.json') }}
 
       - name: Download WASM artifact
         uses: actions/download-artifact@v8.0.1

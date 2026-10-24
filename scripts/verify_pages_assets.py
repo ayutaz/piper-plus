@@ -41,6 +41,7 @@ DEFAULT_REQUIRED_PATHS: tuple[str, ...] = (
     "src/model-manager.js",
     "src/cache-manager.js",
     "src/phonemizer/rust-wasm-adapter.js",
+    "src/kaldi-fbank.js",  # zero-shot speaker front end, imported by index.js
     "g2p/src/index.js",
     "dist/rust-wasm/piper_plus_wasm.js",
     "dist/rust-wasm/piper_plus_wasm_bg.wasm",

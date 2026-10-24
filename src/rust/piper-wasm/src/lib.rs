@@ -170,13 +170,15 @@ use piper_plus_g2p::{PhonemeIdMap, Phonemizer, PiperEncoder, UnknownTokenMode};
 
 /// Phonemization result returned to JavaScript.
 ///
-/// Contains `phoneme_ids` (ready for ONNX inference) and
-/// `prosody_features` (flattened `[N*3]` array of A1/A2/A3 values).
+/// Contains `phoneme_ids` (ready for ONNX inference),
+/// `prosody_features` (flattened `[N*3]` array of A1/A2/A3 values) and
+/// `dropped_symbols` (symbols missing from the model's phoneme ID map).
 #[wasm_bindgen]
 #[derive(Debug)]
 pub struct PhonemizeResult {
     phoneme_ids: Vec<i32>,
     prosody_features: Vec<i32>,
+    dropped_symbols: Vec<String>,
 }
 
 #[wasm_bindgen]
@@ -198,6 +200,14 @@ impl PhonemizeResult {
     #[wasm_bindgen(getter, js_name = phonemeCount)]
     pub fn phoneme_count(&self) -> usize {
         self.phoneme_ids.len()
+    }
+
+    /// Symbols the model's phoneme ID map lacks, which were left out of
+    /// `phonemeIds` (each listed once). Includes whitespace and punctuation
+    /// the model does not map; callers decide which ones matter.
+    #[wasm_bindgen(getter, js_name = droppedSymbols)]
+    pub fn dropped_symbols(&self) -> Vec<String> {
+        self.dropped_symbols.clone()
     }
 }
 
@@ -451,6 +461,7 @@ impl WasmPhonemizer {
         })?;
 
         // Step 2: encode tokens → IDs with BOS/EOS/PAD + prosody alignment
+        let dropped_symbols = self.encoder.dropped_symbols(&tokens);
         let eos = self.phonemizer.last_eos();
         let (final_ids, final_prosody_features) = self
             .encoder
@@ -470,6 +481,7 @@ impl WasmPhonemizer {
         Ok(PhonemizeResult {
             phoneme_ids: phoneme_ids_i32,
             prosody_features: flat_prosody,
+            dropped_symbols,
         })
     }
 
@@ -945,6 +957,19 @@ mod tests {
         let result = p.phonemize("Hello world", None).unwrap();
         assert!(!result.phoneme_ids.is_empty());
         assert!(result.phoneme_ids.len() >= 3);
+    }
+
+    #[test]
+    fn test_phonemize_reports_dropped_symbols() {
+        // make_test_config maps only a/k/o/N, so the passthrough letters of
+        // "Hello" are dropped from the IDs and reported instead.
+        let narrow = WasmPhonemizer::new(&make_test_config()).unwrap();
+        let result = narrow.phonemize("Hello", None).unwrap();
+        assert_eq!(result.dropped_symbols(), vec!["H", "e", "l"]);
+
+        let full = WasmPhonemizer::new(&make_multilingual_config()).unwrap();
+        let result = full.phonemize("Hello", None).unwrap();
+        assert!(result.dropped_symbols().is_empty());
     }
 
     #[test]

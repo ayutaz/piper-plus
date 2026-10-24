@@ -7,6 +7,8 @@ on:
     paths:
       - 'src/wasm/**'
       - 'src/rust/piper-wasm/**'
+      # Compiled into the WASM bundle (encoder, phonemizers, bundled dicts).
+      - 'src/rust/piper-plus-g2p/**'
       - '.github/workflows/deploy-webassembly-demo.yml'
       - 'scripts/verify_pages_assets.py'
       - 'scripts/check_deploy_json_imports.py'
