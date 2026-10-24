@@ -323,6 +323,17 @@ repos:
         files: ^(src/python_run/tests/test_.*\.py|\.github/workflows/.*\.yml|scripts/check_python_run_test_coverage\.py)$
         pass_filenames: false
 
+      # tests/scripts と npm の node:test ファイルが、 どの workflow からも
+      # (package.json の script 経由も含めて) 実行されていなければ落とす。
+      # tests/scripts は 71 ファイル中 36 が、 npm は 2 ファイルが CI で
+      # 一度も動いていなかった。
+      - id: orphan-test-files
+        name: "tests/scripts and npm node:test files run by a CI workflow (meta gate)"
+        entry: uv run --no-sync python scripts/check_orphan_test_files.py
+        language: system
+        files: ^(tests/scripts/test_.*\.py|src/wasm/(g2p|openjtalk-web)/(package\.json|test/.*\.m?js)|\.github/workflows/.*\.ya?ml|scripts/check_orphan_test_files\.py)$
+        pass_filenames: false
+
       # SRT の ms 丸めは言語既定が分かれる (Python round() / .NET Math.Round は
       # half-to-even、 Rust / Go / JS / C++ は half-away-from-zero)。 spec が
       # 丸めを規定していなかったため Python と C# が .5 境界で 1ms 早い値を

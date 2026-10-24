@@ -1,0 +1,66 @@
+name: "Scripts Tests"
+
+# Runs every test in tests/scripts (the tests of the repository's gates,
+# release checks and tools) on the three OSes.
+#
+# Before this workflow, those files ran only when a workflow named them, so
+# 36 of the 71 files ran in no CI job, including the tests of the merge gate
+# (test_check_required_gate.py, test_required_gate_workflow_contract.py).
+# Running the directory makes a new file run without anyone listing it.
+# scripts/check_orphan_test_files.py fails when a tests/scripts or npm
+# node:test file is run by no workflow.
+#
+# No `paths:` filter: the gates' tests read files from all over the repository
+# (workflows, manifests, docs), so any change can break one.
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  scripts-tests:
+    name: tests/scripts (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v6.1.0
+
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: |
+            src/python/pyproject.toml
+            src/python/g2p/pyproject.toml
+            src/python_run/pyproject.toml
+
+      - name: Install dependencies
+        # The training extras (torch) are not needed: the tests that use
+        # them skip without it.
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "src/python/g2p[all]" -e "src/python[test,inference]" -e src/python_run PyYAML requests onnx packaging huggingface-hub markdown-it-py
+
+      - name: Run tests/scripts
+        # pytest.ini's addopts add coverage flags for src/python; tests/scripts
+        # is not in its testpaths, so override them.
+        run: python -m pytest tests/scripts -q -o addopts= -p no:cacheprovider
+
+      - name: Check every test file is run by a workflow
+        if: runner.os == 'Linux'
+        run: python scripts/check_orphan_test_files.py

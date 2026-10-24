@@ -25,6 +25,7 @@ Snapshot stability comes from status counts, not message text.
 from __future__ import annotations
 
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -108,6 +109,17 @@ def _run_subprocess(
     return proc.returncode, proc.stdout, proc.stderr, elapsed, False
 
 
+def _bash() -> str:
+    """The ``bash`` on PATH.
+
+    Windows' CreateProcess looks in System32 before PATH, so a bare ``"bash"``
+    starts the WSL launcher (``bash.exe`` in System32), which cannot
+    read the temporary script's Windows path and fails or hangs. ``which``
+    follows PATH, where the runners and Git for Windows put Git Bash.
+    """
+    return shutil.which("bash") or "bash"
+
+
 def _bash_body_with_safety(body: str) -> str:
     """Prepend ``set -euo pipefail`` unless the block leads with ``set -...``.
 
@@ -160,7 +172,7 @@ def run_bash(
             script_path = f.name
         try:
             exit_code, out, err, duration, timed_out = _run_subprocess(
-                ["bash", "-n", script_path],
+                [_bash(), "-n", script_path],
                 timeout_sec=timeout_sec,
             )
         finally:
@@ -182,7 +194,7 @@ def run_bash(
         script_path = f.name
     try:
         exit_code, out, err, duration, timed_out = _run_subprocess(
-            ["bash", script_path],
+            [_bash(), script_path],
             timeout_sec=timeout_sec,
         )
     finally:
