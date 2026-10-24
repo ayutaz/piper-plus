@@ -12,7 +12,7 @@ PiperPlus.Cli embeds the following data files from
 The NuGet dependencies (ONNX Runtime, DotNetG2P, System.CommandLine) carry
 their own license files in their packages.
 
-### CMU Pronouncing Dictionary License
+## CMU Pronouncing Dictionary License
 
 > The Carnegie Mellon University Pronouncing Dictionary [cmudict.0.7b]
 > [...]
@@ -44,7 +44,7 @@ their own license files in their packages.
 > THIS SOFTWARE IS PROVIDED BY CARNEGIE MELLON UNIVERSITY "AS IS" AND
 > ANY EXPRESSED OR IMPLIED WARRANTIES ARE DISCLAIMED.
 
-### pypinyin License (MIT)
+## pypinyin License (MIT)
 
 > Copyright (c) 2016 mozillazg, 闲耘 ([hotoo.cn@gmail.com](mailto:hotoo.cn@gmail.com))
 >
