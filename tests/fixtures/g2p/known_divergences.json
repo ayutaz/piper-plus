@@ -132,7 +132,9 @@
       "runtimes": [
         "cpp",
         "rust",
-        "swift"
+        "swift",
+        "wasm",
+        "js-g2p"
       ],
       "language": "en",
       "input": "123",
@@ -194,7 +196,9 @@
       "runtimes": [
         "cpp",
         "rust",
-        "swift"
+        "swift",
+        "wasm",
+        "js-g2p"
       ],
       "language": "en",
       "input": "ChatGPT and GitHub",
@@ -206,7 +210,9 @@
       "runtimes": [
         "cpp",
         "rust",
-        "swift"
+        "swift",
+        "wasm",
+        "js-g2p"
       ],
       "language": "en",
       "input": "UPPERCASE",
@@ -218,7 +224,9 @@
       "runtimes": [
         "cpp",
         "rust",
-        "swift"
+        "swift",
+        "wasm",
+        "js-g2p"
       ],
       "language": "en",
       "input": "MixedCase",
@@ -230,7 +238,9 @@
       "runtimes": [
         "cpp",
         "rust",
-        "swift"
+        "swift",
+        "wasm",
+        "js-g2p"
       ],
       "language": "en",
       "input": "xyz",
@@ -242,7 +252,9 @@
       "runtimes": [
         "cpp",
         "rust",
-        "swift"
+        "swift",
+        "wasm",
+        "js-g2p"
       ],
       "language": "en",
       "input": "aaaaa",
@@ -255,7 +267,9 @@
         "cpp",
         "rust",
         "go",
-        "swift"
+        "swift",
+        "wasm",
+        "js-g2p"
       ],
       "language": "en",
       "input": "a-b-c",
@@ -267,7 +281,9 @@
       "runtimes": [
         "cpp",
         "rust",
-        "swift"
+        "swift",
+        "wasm",
+        "js-g2p"
       ],
       "language": "en",
       "input": "résumé",
@@ -427,475 +443,13 @@
     },
     {
       "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "The quick brown fox jumps.",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "She's reading a book.",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
         "wasm"
       ],
       "language": "zh",
       "input": "123",
       "status": "planned",
-      "issue": 828,
-      "reason": "Digits in zh input go to the English segment, which the Rust WASM passes through as characters ('1 2 3') because it has no English G2P."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "dog",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "bird",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "strength",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "photograph",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "photography",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "Mississippi",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "Albuquerque",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "knight",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "rhythm",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "xylophone",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "zebra",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "queue",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "uniform",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "hour",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "colonel",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "schedule",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "0",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "1",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "123",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "3.14",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "100",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "Good morning, everyone.",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "She doesn't know.",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "It's 3 o'clock.",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "I love New York.",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "ChatGPT and GitHub",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "a-b-c",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "\"quoted\" text",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "e.g. and i.e.",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "uh-huh",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "aaaaa",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "xyz",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "supercalifragilistic",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "naïve",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "café",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "résumé",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "hello world how are you doing today",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "UPPERCASE",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "MixedCase",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "'quote'",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
+      "issue": 847,
+      "reason": "Digits in zh input go to the English segment, which the Rust WASM passes through as characters ('1 2 3') because it has no English G2P (#847)."
     },
     {
       "runtimes": [
@@ -904,8 +458,8 @@
       "language": "zh",
       "input": "0",
       "status": "planned",
-      "issue": 828,
-      "reason": "Digits in zh input go to the English segment, which the Rust WASM passes through as characters ('1 2 3') because it has no English G2P."
+      "issue": 847,
+      "reason": "Digits in zh input go to the English segment, which the Rust WASM passes through as characters ('1 2 3') because it has no English G2P (#847)."
     },
     {
       "runtimes": [
@@ -914,8 +468,8 @@
       "language": "zh",
       "input": "100",
       "status": "planned",
-      "issue": 828,
-      "reason": "Digits in zh input go to the English segment, which the Rust WASM passes through as characters ('1 2 3') because it has no English G2P."
+      "issue": 847,
+      "reason": "Digits in zh input go to the English segment, which the Rust WASM passes through as characters ('1 2 3') because it has no English G2P (#847)."
     },
     {
       "runtimes": [
@@ -3026,39 +2580,6 @@
       "status": "planned",
       "issue": 829,
       "reason": "The JS Chinese G2P is character-level and has no pinyin dictionary."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "Hello，world",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "Hello、world。",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
-    },
-    {
-      "runtimes": [
-        "wasm",
-        "js-g2p"
-      ],
-      "language": "en",
-      "input": "I have ３ cats．",
-      "status": "planned",
-      "issue": 828,
-      "reason": "The JS English G2P reads words from a small built-in dictionary and spelling rules instead of CMUdict and g2p-en, and drops digits."
     },
     {
       "runtimes": [

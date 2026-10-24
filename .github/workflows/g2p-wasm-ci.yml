@@ -7,6 +7,11 @@ on:
       - 'src/wasm/g2p/**'
       - 'src/wasm/g2p/src/latin-common/**'
       - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
+      # Canonical of the bundled CMU dictionary (test-package-metadata.js,
+      # test-english-cmudict.js).
+      - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
+      # Shared normalization cases read by test-english-normalize.js.
+      - 'tests/fixtures/g2p/english_normalize_cases.json'
       - 'tests/fixtures/g2p/phoneme_test_cases.json'
       # Read by test/test-g2p-golden-parity.js.
       - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
@@ -24,6 +29,11 @@ on:
       - 'src/wasm/g2p/**'
       - 'src/wasm/g2p/src/latin-common/**'
       - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
+      # Canonical of the bundled CMU dictionary (test-package-metadata.js,
+      # test-english-cmudict.js).
+      - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
+      # Shared normalization cases read by test-english-normalize.js.
+      - 'tests/fixtures/g2p/english_normalize_cases.json'
       - 'tests/fixtures/g2p/phoneme_test_cases.json'
       # Read by test/test-g2p-golden-parity.js.
       - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
@@ -133,11 +143,14 @@ jobs:
           SIZE_KB=$(awk "BEGIN {printf \"%.2f\", $SIZE / 1024}")
           echo "Package size: $SIZE bytes ($SIZE_KB KB)"
           rm -f "$TARBALL"
-          if [ "$SIZE" -gt 1048576 ]; then
-            echo "ERROR: Package size ($SIZE_KB KB) exceeds 1MB limit"
+          # The package bundles the CMU dictionary (#828, ~0.9 MB packed) and
+          # the pinyin dictionaries (#829, ~0.8 MB packed); 3 MB leaves room
+          # for both without hiding an accidental large file.
+          if [ "$SIZE" -gt 3145728 ]; then
+            echo "ERROR: Package size ($SIZE_KB KB) exceeds 3MB limit"
             exit 1
           fi
-          echo "OK: Package size is within the 1MB limit"
+          echo "OK: Package size is within the 3MB limit"
 
   publish:
     name: publish

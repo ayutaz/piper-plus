@@ -60,12 +60,34 @@ import { KoreanG2P } from '@piper-plus/g2p/ko';
 import { SwedishG2P } from '@piper-plus/g2p/sv';
 ```
 
+### English dictionary
+
+English reads words from the CMU Pronouncing Dictionary bundled as
+`data/cmudict_data.json` (~3.7 MB), after the same text normalization as
+Python's g2p_en (numbers, accents, `e.g.` / `i.e.`). It is loaded on demand:
+importing the package does not read it, and `G2P.create()` loads it only when
+English is enabled, so `G2P.create({ languages: ['ja'] })` never fetches it.
+
+```js
+import { EnglishG2P } from '@piper-plus/g2p/en';
+
+const en = await EnglishG2P.create(); // or: new EnglishG2P(); await en.initialize();
+en.phonemize('It costs $5.'); // numbers are read as words
+```
+
+In Node, `new EnglishG2P().phonemize()` also works without `initialize()`: the
+file is read synchronously on first use. In a browser an uninitialised
+`EnglishG2P` throws, because the file cannot be fetched synchronously. A
+dictionary served from elsewhere can be passed as
+`new EnglishG2P({ cmuDict })` or `G2P.create({ cmuDict })` (word -> ARPAbet
+string, e.g. `{ hello: 'HH AH0 L OW1' }`).
+
 ## Supported Languages
 
 | Language   | Code | Method              | External Dependencies |
 |------------|------|---------------------|-----------------------|
 | Japanese   | ja   | OpenJTalk WASM      | DictLoader dictionary asset |
-| English    | en   | Rule-based          | None |
+| English    | en   | CMU dictionary + g2p_en normalization | Bundled `data/cmudict_data.json` (~3.7 MB, loaded on demand) |
 | Chinese    | zh   | Pinyin-based        | None |
 | Spanish    | es   | Rule-based          | None |
 | French     | fr   | Rule-based          | None |

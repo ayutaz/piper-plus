@@ -111,6 +111,26 @@ export interface G2POptions {
     jaDict?: JaDictData;
     /** Custom dictionaries for pronunciation overrides. */
     customDicts?: CustomDictionary[];
+    /**
+     * English pronunciation dictionary (lowercase word -> ARPAbet string,
+     * e.g. `{ hello: "HH AH0 L OW1" }`) to use instead of the bundled CMU
+     * dictionary. When English is enabled and this is omitted,
+     * `G2P.create()` loads the bundled `data/cmudict_data.json` (~3.7 MB);
+     * it is not loaded when `languages` leaves English out.
+     */
+    cmuDict?: CmuDictData;
+}
+
+/**
+ * English pronunciation dictionary: lowercase word -> ARPAbet string
+ * (`"hello" -> "HH AH0 L OW1"`), as in `data/cmudict_data.json`.
+ */
+export type CmuDictData = Record<string, string> | Map<string, string>;
+
+/** Options for `new EnglishG2P()` / `EnglishG2P.create()`. */
+export interface EnglishG2POptions {
+    /** Dictionary to use instead of the bundled CMU dictionary. */
+    cmuDict?: CmuDictData;
 }
 
 /** Options for phonemize and encode methods. */
@@ -379,29 +399,47 @@ export class JapaneseG2P {
 }
 
 /**
- * English G2P using rule-based CMU-style conversion.
+ * English G2P following Python's g2p_en: text normalization (numbers,
+ * accents, `e.g.` / `i.e.`), the bundled CMU Pronouncing Dictionary, a
+ * suffix fallback, and spelling for words missing from the dictionary.
+ * Function word stress reduction is applied automatically.
  *
- * Converts English text to IPA phoneme sequences with stress markers.
- * Function word stress reduction (97 words) is applied automatically.
- * No external dependencies required.
+ * The dictionary (~3.7 MB) is loaded on demand: by `initialize()` /
+ * `EnglishG2P.create()` (and `G2P.create()` when English is enabled), or,
+ * in Node, synchronously on the first `phonemize()`. Elsewhere (a browser)
+ * `phonemize()` on an uninitialised instance throws.
  *
  * @example
  * ```js
  * import { EnglishG2P } from '@piper-plus/g2p/en';
  *
- * const en = new EnglishG2P();
+ * const en = await EnglishG2P.create();
  * const result = en.phonemize('Hello, world!');
- * // result.tokens => ["h", "ʌ", "l", "oʊ", ...]
+ * // result.tokens => ["h", "ə", "l", "ˈ", "o", "ʊ", ",", " ", "w", ...]
  * ```
  */
 export class EnglishG2P {
-    constructor(options?: {});
+    constructor(options?: EnglishG2POptions);
+
+    /** Create an instance with its dictionary loaded. */
+    static create(options?: EnglishG2POptions): Promise<EnglishG2P>;
+
+    /**
+     * Load the bundled CMU dictionary unless this instance already has one.
+     * Safe to call more than once.
+     */
+    initialize(): Promise<EnglishG2P>;
+
+    /** Whether this instance has its dictionary. */
+    readonly isInitialized: boolean;
 
     /**
      * Convert English text to IPA phoneme tokens.
      *
      * @param text - English text to phonemize.
      * @returns Phonemize result with IPA tokens and stress markers.
+     * @throws Error when the dictionary is not loaded and cannot be read
+     *   synchronously (outside Node, before `initialize()`).
      */
     phonemize(text: string): PhonemizeResult;
 
@@ -409,13 +447,34 @@ export class EnglishG2P {
      * Convert English text to IPA phoneme tokens with prosody features.
      *
      * Returns ProsodyInfo(a1=0, a2=stress_level, a3=word_phoneme_count)
-     * for each phoneme token.
+     * for each phoneme token, as Python's english.py does.
      *
      * @param text - English text to phonemize.
      * @returns Phonemize result with IPA tokens and prosody info.
      */
     phonemizeWithProsody(text: string): PhonemizeResult;
 }
+
+/**
+ * Load the bundled CMU dictionary (`data/cmudict_data.json`). Resolves to
+ * the same Map on every call.
+ */
+export function loadCmuDict(): Promise<Map<string, string>>;
+
+/** Whether the bundled CMU dictionary has been loaded. */
+export function isCmuDictLoaded(): boolean;
+
+/**
+ * g2p_en's number normalization (`123` -> `one hundred twenty-three`,
+ * `$5` -> `five dollars`, `2nd` -> `second`).
+ */
+export function normalizeNumbers(text: string): string;
+
+/**
+ * g2p_en's preprocessing and tokenization (numbers, accents, character
+ * filter, `i.e.` / `e.g.`, TweetTokenizer). The words keep their case.
+ */
+export function normalizeAndTokenize(text: string): string[];
 
 /**
  * Chinese G2P using pinyin-based phonemization.

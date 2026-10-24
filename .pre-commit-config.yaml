@@ -100,7 +100,10 @@ repos:
         args: [--maxkb=2048]
         # Reviewed 3.3 MB Apache-2.0 G2P inference asset. Its pinned upstream
         # hash and the two shipping copies are verified by bundled-english.
-        exclude: ^(src/python/g2p/piper_plus_g2p|src/python_run/piper_plus)/_vendor/g2p_en/checkpoint20\.npz$
+        # The 3.7 MB CMU dictionary shipped in @piper-plus/g2p (#828) is a
+        # byte-equal copy of the Rust canonical, verified by
+        # dictionary-consistency (docs/spec/dictionary-mirrors.toml).
+        exclude: ^((src/python/g2p/piper_plus_g2p|src/python_run/piper_plus)/_vendor/g2p_en/checkpoint20\.npz|src/wasm/g2p/data/cmudict_data\.json)$
       # ----- Standard hygiene additions (2026-05) -----
       - id: check-toml
         # Cargo.toml / pyproject.toml syntax check. Drift = local-clean /
@@ -260,7 +263,7 @@ repos:
         name: Custom dictionaries (data/dictionaries → WASM assets) byte-equal
         entry: uv run --no-sync python scripts/check_dictionary_consistency.py
         language: system
-        files: ^(data/dictionaries/(default_common|default_tech|additional_tech)_dict\.json|src/wasm/openjtalk-web/assets/(default_common|default_tech|additional_tech)_dict\.json|(src/rust/piper\-plus\-g2p/data|src/wasm/openjtalk\-web/assets|test/models)/pinyin_(single|phrases)\.json|docs/spec/dictionary\-mirrors\.toml|scripts/_mirror_check\.py|scripts/check_dictionary_consistency\.py|scripts/build_pinyin_dicts\.py)$
+        files: ^(data/dictionaries/(default_common|default_tech|additional_tech)_dict\.json|src/wasm/openjtalk-web/assets/(default_common|default_tech|additional_tech)_dict\.json|(src/rust/piper\-plus\-g2p/data|src/wasm/openjtalk\-web/assets|test/models)/pinyin_(single|phrases)\.json|(src/rust/piper\-plus\-g2p/data|src/wasm/g2p/data|test/models)/cmudict_data\.json|docs/spec/dictionary\-mirrors\.toml|scripts/_mirror_check\.py|scripts/check_dictionary_consistency\.py|scripts/build_pinyin_dicts\.py)$
         pass_filenames: false
 
       - id: ruff-version-sync

@@ -29,6 +29,15 @@ canonical = "data/dictionaries/additional_tech_dict.json"
 mirrors = ["src/wasm/openjtalk-web/assets/additional_tech_dict.json"]
 
 [[groups]]
+name = "cmudict dictionary"
+canonical = "src/rust/piper-plus-g2p/data/cmudict_data.json"
+mirrors = [
+  "src/wasm/g2p/data/cmudict_data.json",
+  "test/models/cmudict_data.json",
+]
+notes = "src/wasm/g2p/data/ ships in the @piper-plus/g2p npm package (Issue #828)."
+
+[[groups]]
 name = "pinyin_single dictionary"
 canonical = "src/rust/piper-plus-g2p/data/pinyin_single.json"
 mirrors = [
