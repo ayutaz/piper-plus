@@ -32,9 +32,11 @@ nltk 3.10.4 (2026-10-21) はこの脆弱性を修正した版です。この版�
 `scripts/check_dependency_floors.py` (pre-commit `dependency-floors`) は、`docs/spec/dependency-floors.toml` の下限について次を検査します。
 
 1. pyproject / requirements / workflow の `<package>>=X` が下限以上であること。コメント行は数えません。
-2. uv.lock で解決した版が下限以上であること。
+2. uv.lock で解決した版と、uv.lock に記録された各パッケージの要求 (`specifier = ">=X"`) が下限以上であること。
 3. 宣言が 1 つ以上見つかること。何も検査しないまま成功しないようにするためです。
 4. 修正済みの advisory (`fixed_advisories`) を、workflow が `--ignore-vuln` や `allow-ghsas` で抑止し続けていないこと。
+
+2 の要求の記録は、PR #852 の CI で見つかった漏れを塞ぐためのものです。`src/python_run` の依存は requirements.txt から動的に読まれます。手元の uv 0.12.20 は、その変化を検出しないまま `uv lock --check` を通しました。そのため root と `environments/webui` の lock に `nltk>=3.10.0` の記録が残り、CI の uv 0.13.5 の `uv lock --check` で失敗しました。解決した版は 3.10.4 だったので、版の検査だけでは見つけられません。
 
 4 は #588 の穴を塞ぐためのものです。#588 では下限 `nltk>=3.9.4` が対象範囲 `<= 3.9.4` の内側にありました。それでも抑止があったので、監査は脆弱な版に解決されても成功していました。
 

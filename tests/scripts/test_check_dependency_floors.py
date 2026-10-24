@@ -68,6 +68,25 @@ def test_lock_version_at_minimum_passes(floors):
     assert floors.check(files, [NLTK]) == []
 
 
+def test_lock_recorded_specifier_below_minimum_fails(floors):
+    """uv.lock records each member's requirements. A stale record means the
+    lock was not regenerated after the floor moved (PR #852: uv 0.12 kept
+    `specifier = ">=3.10.0"` for a requirements.txt-driven member, and
+    `uv lock --check` on uv 0.13 failed in CI)."""
+    files = {
+        "pyproject.toml": '"nltk>=3.10.4"\n',
+        "uv.lock": (
+            "[package.metadata]\nrequires-dist = [\n"
+            '    { name = "nltk", specifier = ">=3.10.0" },\n'
+            '    { name = "nltk", marker = "extra == \'en\'", specifier = ">=3.10.4" },\n'
+            "]\n"
+        ),
+    }
+    errors = floors.check(files, [NLTK])
+    assert len(errors) == 1
+    assert "uv.lock:3" in errors[0] and "3.10.0" in errors[0]
+
+
 def test_no_floor_site_fails(floors):
     """A gate that finds nothing to check must not pass silently."""
     errors = floors.check({"pyproject.toml": '"numpy>=1.26"\n'}, [NLTK])

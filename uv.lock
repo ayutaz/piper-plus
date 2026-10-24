@@ -3358,7 +3358,7 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'http'", specifier = ">=0.141.1,<1" },
     { name = "inflect", specifier = ">=0.3.1" },
     { name = "joblib", specifier = ">=1.5.0" },
-    { name = "nltk", specifier = ">=3.10.0" },
+    { name = "nltk", specifier = ">=3.10.4" },
     { name = "numpy", specifier = ">=1.26.4,<3.0" },
     { name = "onnxruntime", marker = "extra == 'cpu'", specifier = ">=1.26.0" },
     { name = "onnxruntime-gpu", marker = "extra == 'gpu'", specifier = ">=1.20.1,<1.26" },

@@ -7,7 +7,9 @@ fails when:
 
   - a `<package>>=X` declaration (pyproject.toml, requirements*.txt, or a
     workflow `pip install`) has X below the minimum,
-  - a uv.lock resolves the package below the minimum,
+  - a uv.lock resolves the package below the minimum, or still records a
+    member requirement below it (the lock was not regenerated after the
+    floor moved),
   - no declaration of the package is found (a gate that checks nothing must
     not pass), or
   - a workflow still suppresses one of the fixed advisories
@@ -84,6 +86,15 @@ def _lock_re(package: str) -> re.Pattern[str]:
     )
 
 
+def _lock_specifier_re(package: str) -> re.Pattern[str]:
+    # `requires-dist` records in uv.lock: { name = "nltk", specifier = ">=3.10.4" }
+    return re.compile(
+        rf'\{{ name = "{re.escape(package)}"(?:,[^}}\n]*)?, specifier = "[^"]*?'
+        rf'>=\s*([0-9][0-9A-Za-z.]*)',
+        re.MULTILINE,
+    )
+
+
 def _suppression_re(advisory: str) -> re.Pattern[str]:
     # Only live YAML / shell, not comments: the line must not start with `#`.
     return re.compile(
@@ -114,6 +125,14 @@ def check(files: dict[str, str], floors: list[dict]) -> list[str]:
                         errors.append(
                             f"{rel}: resolves {package} {m.group(1)}, below the "
                             f"security floor {minimum} (issue #{floor['issue']})",
+                        )
+                for m in _lock_specifier_re(package).finditer(text):
+                    if Version(m.group(1)) < minimum:
+                        line = text.count("\n", 0, m.start()) + 1
+                        errors.append(
+                            f"{rel}:{line}: records {package}>={m.group(1)}, "
+                            f"below the security floor {minimum}; regenerate "
+                            f"the lock (issue #{floor['issue']})",
                         )
             if WORKFLOW_RE.search(rel):
                 for advisory in floor.get("fixed_advisories", []):
