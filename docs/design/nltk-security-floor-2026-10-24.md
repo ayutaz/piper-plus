@@ -38,4 +38,6 @@ nltk 3.10.4 (2026-10-21) はこの脆弱性を修正した版です。この版�
 
 4 は #588 の穴を塞ぐためのものです。#588 では下限 `nltk>=3.9.4` が対象範囲 `<= 3.9.4` の内側にありました。それでも抑止があったので、監査は脆弱な版に解決されても成功していました。
 
+このゲートは pre-commit と、`security-audit.yml` の pip-audit の直前の step で走ります。workflow の `paths:` には、ゲートと、それが読む pyproject / lock / requirements を加えました。
+
 新しい advisory で下限を上げるときは、`dependency-floors.toml` に版と advisory を書き足します。
