@@ -21,8 +21,8 @@ step 3, which joins the words around them (``hello<TAB>world`` ->
 ``helloworld``); Python then reads the joined word with its neural
 predictor, which the ports do not have, so they would spell it letter by
 letter. The fixture applies the same change before the Python steps.
-This script records what Python produces, and the C++, Rust and Go tests
-compare their ports with it:
+This script records what Python produces, and the C++, Rust, Go, C# and JS
+g2p tests compare their ports with it:
 
 * ``numbers``: ``normalize_numbers(input)``;
 * ``tokens``: the lowercased words after all five steps.
@@ -47,11 +47,14 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OUTPUT = REPO_ROOT / "tests" / "fixtures" / "g2p" / "english_normalize_cases.json"
-# The ports' tests that compare with the fixture (#821 C++ / Rust, #841 Go).
+# The ports' tests that compare with the fixture (#821 C++ / Rust, #841 Go,
+# #832 C#, and the JS g2p package).
 CONSUMER_TESTS = [
     "src/cpp/tests/test_english_normalize.cpp",
     "src/rust/piper-plus-g2p/tests/english_normalize.rs",
     "src/go/phonemize/english_normalize_test.go",
+    "src/csharp/PiperPlus.Core.Tests/EnglishNormalizeTests.cs",
+    "src/wasm/g2p/test/test-english-normalize.js",
 ]
 
 NUMBER_INPUTS = [

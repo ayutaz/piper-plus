@@ -60,6 +60,7 @@ C++ / Rust (#821) と Go (#841) は、g2p_en の正規化と辞書にない語�
 ## 再発防止
 
 - `EnglishNormalizeTests` は、共有の正規化ケース `tests/fixtures/g2p/english_normalize_cases.json` を全件照合する。
+- `scripts/build_english_normalize_fixture.py` の `CONSUMER_TESTS` に、`EnglishNormalizeTests.cs` と `@piper-plus/g2p` の `test-english-normalize.js` を加えた。どちらかが消えるか正規化ケースを読まなくなると、`--check` (pre-commit `english-normalize-fixture-drift`) が失敗する。
 - `BundledDictionaryTests` は次を検査する。
   - 埋め込んだ辞書が canonical とバイト単位で一致すること
   - 埋め込んだ JSON ごとに `THIRD_PARTY_NOTICES.md` が許諾表示を持ち、nupkg に入ること
