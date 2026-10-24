@@ -93,16 +93,6 @@
           "DotNetG2P": "1.8.0"
         }
       },
-      "DotNetG2P.Portuguese": {
-        "type": "Transitive",
-        "resolved": "1.8.0",
-        "contentHash": "C1+LO07latGkcLZZ0imPsR4Li/ZuIJQKo1Sd+yvJedgybGV0ig7xRg7oTlgXt1NSnBXYVDIQibJoL+e5QRG/BA=="
-      },
-      "DotNetG2P.Spanish": {
-        "type": "Transitive",
-        "resolved": "1.8.0",
-        "contentHash": "JuycRe2EPx7wYCiJm0FukSUGG+M0Mhv4BbFAXVTgSHGxXMB+TCZ2LhoNzz3p81Ku6MQMe0ES1UN6fhWMzxDPEg=="
-      },
       "Microsoft.ApplicationInsights": {
         "type": "Transitive",
         "resolved": "2.23.0",
@@ -281,8 +271,6 @@
           "DotNetG2P": "[1.8.0, )",
           "DotNetG2P.English": "[1.8.0, )",
           "DotNetG2P.MeCab": "[1.8.0, )",
-          "DotNetG2P.Portuguese": "[1.8.0, )",
-          "DotNetG2P.Spanish": "[1.8.0, )",
           "Microsoft.ML.OnnxRuntime": "[1.24.3, )",
           "PiperPlus.Core": "[0.5.1, )",
           "System.CommandLine": "[2.0.5, )"

@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Linq;
 using PiperPlus.Core.Phonemize;
 using Xunit;
@@ -58,45 +57,5 @@ public class G2pEngineAdapterTests
         Assert.Equal(
             Words(engine.ConvertToArpabet("for example and that is")),
             Words(engine.ConvertToArpabet("e.g. and i.e.")));
-    }
-
-    [Fact]
-    public void Portuguese_KeepsAffricatesWhole()
-    {
-        // DotNetG2P.Portuguese writes the tie bar (d͡ʒ); without removing it
-        // the tokenizer emitted "d͡" + "ʒ", and "d͡" is not in the map.
-        var engine = new DotNetPortugueseG2PEngine();
-
-        List<string> dia = engine.ToPhonemeList("dia");
-        List<string> noite = engine.ToPhonemeList("noite");
-
-        Assert.Contains("d\u0292", dia);
-        Assert.Contains("t\u0283", noite);
-        Assert.DoesNotContain(dia.Concat(noite), t => t.Contains('\u0361'));
-    }
-
-    [Fact]
-    public void Portuguese_ComposesNasalVowels()
-    {
-        // IPortugueseG2PEngine promises NFC nasal vowels (U+0129), which
-        // is how the phoneme_id_map spells them; "i" + U+0303 is not in it.
-        var engine = new DotNetPortugueseG2PEngine();
-
-        List<string> sim = engine.ToPhonemeList("sim");
-
-        Assert.Contains("\u0129", sim);
-        Assert.DoesNotContain(sim, t => t.Contains('\u0303'));
-    }
-
-    [Fact]
-    public void Spanish_PutsStressBeforeTheVowel()
-    {
-        // DotNetG2P.Spanish marks stress at the start of the syllable
-        // ("ˈkasa"); Python, and SpanishPhonemizer's A2 rule ("the vowel
-        // immediately after ˈ"), put it right before the stressed vowel.
-        var engine = new DotNetSpanishG2PEngine();
-
-        Assert.Equal(["k", "\u02C8", "a", "s", "a"], engine.ToPhonemeList("casa"));
-        Assert.Equal(["\u02C8", "a", "s", "t", "a"], engine.ToPhonemeList("hasta"));
     }
 }

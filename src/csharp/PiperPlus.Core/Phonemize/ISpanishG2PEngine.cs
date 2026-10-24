@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace PiperPlus.Core.Phonemize;
 
 /// <summary>
-/// Abstraction over a Spanish G2P engine (e.g. DotNetG2P.Spanish.SpanishG2PEngine).
+/// Abstraction over a Spanish G2P engine (e.g. <see cref="SpanishG2PEngine"/>).
 /// <para>
 /// The engine converts raw Spanish text into a flat list of IPA phoneme tokens
 /// using rule-based Latin American pronunciation (seseo: c/z before e/i → /s/,
@@ -18,7 +18,9 @@ namespace PiperPlus.Core.Phonemize;
 /// <c>,</c>, <c>.</c>) appear as standalone tokens.
 /// </para>
 /// <para>
-/// Stress detection and prosody generation are handled by the
+/// The engine marks stress with a <c>"ˈ"</c> token right before the stressed
+/// vowel, as Python's <c>phonemize_spanish()</c> does. Prosody generation
+/// (A2 for the mark and that vowel, A3) is handled by the
 /// <c>SpanishPhonemizer</c> layer, not by this engine.
 /// </para>
 /// </summary>
