@@ -26,6 +26,13 @@ on:
       - "docker/python-inference/**"
       - "docker/wyoming/**"
       - "docker/webui/**"
+      # Security floor gate (#709) と、 それが読む宣言ファイル。
+      - "docs/spec/dependency-floors.toml"
+      - "scripts/check_dependency_floors.py"
+      - "src/python/g2p/pyproject.toml"
+      - "src/python/g2p/uv.lock"
+      - "environments/webui/uv.lock"
+      - "huggingface-space/requirements.txt"
       - ".github/workflows/security-audit.yml"
   push:
     branches: [dev, main]
@@ -64,14 +71,10 @@ jobs:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
           license-check: true
-          # 修正版が存在しない advisory の carve-out (dependency-review.yml と同期)。
-          # GHSA-8mgp-746c-j5xp (CVE-2026-81726, high): NLTK の model-artifact API が
-          # pathsec を回避する。 range `<= 3.10.3` で最新 3.10.3 でも patched 版なし
-          # (first_patched_version: null)。 依存を上げても下げても該当するため、
-          # 依存行を触った PR だけが落ちる状態になる。 piper-plus での nltk 利用は
-          # g2p-en 経由の cmudict ロードのみで model artifact のパスを外部入力から
-          # 組み立てる経路はない。 修正版が出たら carve-out を外す。
-          allow-ghsas: GHSA-8mgp-746c-j5xp
+          # 修正版が存在しない advisory は `allow-ghsas` で carve-out する
+          # (dependency-review.yml と同期)。 現在は無し。 GHSA-8mgp-746c-j5xp
+          # (nltk <= 3.10.3) は 3.10.4 で修正され、 floor を上げて外した (#709)。
+          # 修正済みの carve-out が残ると scripts/check_dependency_floors.py が落ちる。
           # 許容ライセンス (OSS 一般 + Unicode/OpenSSL/Zlib などライブラリ系)
           allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Unicode-DFS-2016, Unicode-3.0, CC0-1.0, MPL-2.0, Zlib, OpenSSL
           # dev / lint / docs 用 transitive dependency の例外
@@ -183,6 +186,12 @@ jobs:
       - uses: astral-sh/setup-uv@v6.8.0
       - name: Install pip-audit
         run: pip install pip-audit
+      - name: Check dependency security floors
+        # docs/spec/dependency-floors.toml の下限を下回る宣言・lock と、 下限で
+        # 修正済みの advisory の抑止が残っていないかを検査する (#709)。 抑止が
+        # 残ると、 脆弱な版に解決されても以下の pip-audit が緑になる (#588)。
+        # packaging は pip-audit の依存として入っている。
+        run: python scripts/check_dependency_floors.py
       - name: Audit root requirements
         # tier は informational (下の `continue-on-error: true` が無条件)。
         # 「PR は warning、schedule/push は fail」は `Audit src/python_run` 側の
@@ -191,21 +200,16 @@ jobs:
         # IGNORE 一覧 (`--ignore-vuln`) は本コメントブロックが single source。
         # 一 advisory = 一行 + justification + 解除条件 + tracking issue 番号 を
         # 明記する。 解除手順 (latest 確認 + 削除) の詳細は各 tracking issue 側。
-        # 現在 ignore 中:
-        #   - GHSA-8mgp-746c-j5xp (nltk ≤ 3.10.3 = 全リリース、CVE-2026-81726 /
-        #     PYSEC-2026-3740) — model-artifact API が許可 root 外のファイルに
-        #     触れる。 advisory の first_patched_version は null で upstream に
-        #     修正版が存在しないため、 nltk を上げても下げても該当する。
-        #     piper-plus は g2p-en / g2pk2 経由で library-internal の hardcoded
-        #     リソース名 (`"cmudict"` / `averaged_perceptron_tagger` 等) のみを
-        #     読み込み、 ユーザー入力が path に渡る経路が無いため実
-        #     エクスプロイト不可。 同 advisory は dependency-review-action 側でも
-        #     `allow-ghsas` で carve-out 済み (本ファイル + dependency-review.yml)。
-        #     解除条件: upstream fix リリース または g2p-en / g2pk2 を
-        #     nltk 非依存実装に置換。
-        #     tracking: #709
+        # 現在 ignore 中: なし。
         #
         # 解除済み (履歴。 同じ穴を再び開けないために残す):
+        #   - GHSA-8mgp-746c-j5xp (nltk ≤ 3.10.3、CVE-2026-81726 /
+        #     PYSEC-2026-3740) — model-artifact API が許可 root 外のファイルに
+        #     触れる。 公開時は修正版が無く抑止していたが、 nltk 3.10.4
+        #     (2026-10-21) で修正された。 floor を `>=3.10.4` へ上げ、 本抑止と
+        #     dependency-review の `allow-ghsas` を外した。 tracking: #709
+        #     floor と抑止の残りは scripts/check_dependency_floors.py
+        #     (docs/spec/dependency-floors.toml) が検査する。
         #   - GHSA-p4gq-832x-fm9v (nltk ≤ 3.9.4, CVE-2026-54293) — advisory が
         #     3.10.0 で patched となったため削除。 旧 floor `nltk>=3.9.4` は
         #     affected range `<= 3.9.4` の **内側** にあり、 3.9.4 に解決されると
@@ -262,8 +266,7 @@ jobs:
           # `==` の完全解決済みクロージャなので再解決自体が不要。
           pip-audit --requirement "${RUNNER_TEMP}/root-requirements.txt" \
             --disable-pip --no-deps \
-            --strict --vulnerability-service osv \
-            --ignore-vuln GHSA-8mgp-746c-j5xp
+            --strict --vulnerability-service osv
       - name: Audit src/python_run
         # 直前の `Audit root requirements` の結果に依存せず必ず実行する。 GitHub
         # Actions は step 失敗時に後続 step を既定で skip するため、 root が
@@ -286,8 +289,7 @@ jobs:
         # `--disable-pip --no-deps` は使えない (pip-audit が "not pinned to an
         # exact version" で fail する)。 pip resolve 経路のままにすること。
         run: |
-          pip-audit --strict --vulnerability-service osv --requirement requirements.txt \
-            --ignore-vuln GHSA-8mgp-746c-j5xp
+          pip-audit --strict --vulnerability-service osv --requirement requirements.txt
 
   # Rust: cargo-audit
   # fail-on-severity 統一 (High 以上): cargo-audit はデフォルトで vulnerability

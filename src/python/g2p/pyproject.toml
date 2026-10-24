@@ -29,7 +29,7 @@ readme = "README.md"
 
 [project.optional-dependencies]
 ja = ["pyopenjtalk-plus>=0.3,<1"]
-en = ["numpy>=1.26.4", "nltk>=3.10.0", "joblib>=1.5.0", "inflect>=0.3.1"]
+en = ["numpy>=1.26.4", "nltk>=3.10.4", "joblib>=1.5.0", "inflect>=0.3.1"]
 zh = ["pypinyin>=0.55.0,<1"]
 ko = ["g2pk2>=0.0.3,<1"]
 es = []
@@ -39,7 +39,7 @@ sv = []
 all = [
     "pyopenjtalk-plus>=0.3,<1",
     "numpy>=1.26.4",
-    "nltk>=3.10.0",
+    "nltk>=3.10.4",
     "joblib>=1.5.0",
     "inflect>=0.3.1",
     "pypinyin>=0.55.0,<1",

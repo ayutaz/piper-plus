@@ -169,7 +169,7 @@ jobs:
     # ---------------------------------------------------------------
     - name: Install runtime package dependencies
       run: |
-        pip install pyopenjtalk-plus inflect "nltk>=3.10.0" "joblib>=1.5.0" pypinyin
+        pip install pyopenjtalk-plus inflect "nltk>=3.10.4" "joblib>=1.5.0" pypinyin
         # HTTP サーバー (FastAPI) のテストに必要な依存。バージョン制約は src/python_run/setup.py の [http] extras で一元管理。
         pip install fastapi 'uvicorn[standard]' httpx
         pip install pytest-asyncio  # NEW: 既存の test_http_* tests で asyncio_mode=auto を使う
