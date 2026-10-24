@@ -2,8 +2,8 @@
 
 import json
 import os
-import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -41,20 +41,16 @@ def test_contract_job_runs_on_all_dev_prs_with_both_runtimes():
 def test_required_gate_rejects_every_non_success_contract_result(conclusion):
     gate = workflow("ci.yml")["jobs"]["ci-required"]
     assert "wasm-onnx-contract" in gate["needs"]
-    step = next(s for s in gate["steps"] if "WASM_CONTRACT_RESULT" in s.get("env", {}))
-    assert "needs.wasm-onnx-contract.result" in step["env"]["WASM_CONTRACT_RESULT"]
+    step = next(s for s in gate["steps"] if "check_ci_required.py" in s.get("run", ""))
+    assert step["env"]["NEEDS"] == "${{ toJSON(needs) }}"
     assert step.get("continue-on-error", "false") == "false"
-    bash = (
-        str(
-            Path(os.environ.get("PROGRAMFILES", "C:/Program Files"))
-            / "Git/bin/bash.exe"
-        )
-        if os.name == "nt"
-        else shutil.which("bash")
-    )
+    always_run = step["run"].split("--always-run ", 1)[1].split()[0]
+    assert "wasm-onnx-contract" in always_run.split(",")
+    needs = {name: {"result": "success"} for name in gate["needs"]}
+    needs["wasm-onnx-contract"] = {"result": conclusion}
     result = subprocess.run(
-        [bash, "-c", step["run"]],
-        env={**os.environ, "WASM_CONTRACT_RESULT": conclusion},
+        [sys.executable, str(ROOT / "scripts/check_ci_required.py"), "--always-run", always_run],
+        env={**os.environ, "NEEDS": json.dumps(needs)},
         capture_output=True,
         check=False,
     )

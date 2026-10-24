@@ -33,6 +33,11 @@ jobs:
           pip install 'pytest>=9.1.1,<10' PyYAML
           python -m pytest tests/scripts/test_release_publish_enforcement.py tests/scripts/test_native_release_notices.py tests/scripts/test_xcframework_archive.py tests/scripts/test_nuget_repository_copy.py tests/scripts/test_armv7_release.py tests/scripts/test_swift_release_consumer.py -q -o addopts=
           python scripts/check_release_regressions.py
+      - name: Test merge gate contracts
+        # ci-required and the Required Status Check Gate decide whether a PR
+        # can merge; their tests run here, in a job ci-required must see succeed.
+        run: |
+          python -m pytest tests/scripts/test_ci_required_contract.py tests/scripts/test_check_required_gate.py tests/scripts/test_required_gate_workflow_contract.py -q -o addopts=
 
   changes:
     runs-on: ubuntu-24.04
@@ -580,13 +585,19 @@ jobs:
 
   # ---------- required status check (single gate) ----------
   # This job always runs so GitHub branch-protection can use "ci-required"
-  # as the sole required check. It succeeds when every upstream job either
-  # passed or was skipped by paths-filter, and fails if any job failed.
+  # as a required check. It needs every other job in this workflow
+  # (tests/scripts/test_ci_required_contract.py enforces that) and fails
+  # unless the always-run jobs succeeded and the path-filtered ones succeeded
+  # or were skipped. `changes` must succeed: when it failed, every
+  # path-filtered job was skipped and this check used to pass with no test run.
+  # It stays `always()` (not `!cancelled()`): a skipped required check counts
+  # as passing.
 
   ci-required:
     if: always()
     needs:
       - release-contract
+      - changes
       - cpp-tests
       - csharp-tests
       - csharp-build
@@ -596,21 +607,12 @@ jobs:
       - wasm-onnx-contract
     runs-on: ubuntu-24.04
     steps:
-      - name: Require successful release contracts
-        env:
-          RELEASE_CONTRACT_RESULT: ${{ needs.release-contract.result }}
-        run: test "$RELEASE_CONTRACT_RESULT" = "success"
-      - name: Require successful ONNX contract checks
-        env:
-          WASM_CONTRACT_RESULT: ${{ needs.wasm-onnx-contract.result }}
-        run: test "$WASM_CONTRACT_RESULT" = "success"
+      - uses: actions/checkout@v6.1.0
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/check_ci_required.py
+          sparse-checkout-cone-mode: false
       - name: Check all job results
-        run: |
-          results=("${{ needs.cpp-tests.result }}" "${{ needs.csharp-tests.result }}" "${{ needs.csharp-build.result }}" "${{ needs.python-tests.result }}" "${{ needs.rust-tests.result }}" "${{ needs.npm-package-tests.result }}")
-          for result in "${results[@]}"; do
-            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
-              echo "One or more jobs failed or were cancelled (got: $result)"
-              exit 1
-            fi
-          done
-          echo "All jobs passed or were skipped"
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: python3 scripts/check_ci_required.py --always-run release-contract,changes,wasm-onnx-contract
