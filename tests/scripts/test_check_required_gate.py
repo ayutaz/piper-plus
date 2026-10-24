@@ -298,3 +298,173 @@ def test_classify_returns_pending_separately(gate):
     bad, pending = gate.classify(spokes, on_cancelled="fail", on_skipped="fail")
     assert bad == []
     assert [name for name, _ in pending] == ["Multi-Runtime RTF Benchmark"]
+
+
+# ---------------------------------------------------------------------------
+# --all-workflows: wait for EVERY workflow run at head_sha and report the
+# verdict as a commit status.
+#
+# The spoke list above covered 5 of the ~90 workflows a PR can trigger, and the
+# authoritative (workflow_run) verdict never reached the PR: workflow_run runs
+# are recorded against dev, so the final evaluation was only a sticky comment
+# while the PR's own check was a pull_request firing that always deferred.
+# These tests pin the replacement: every run for the PR head counts, and the
+# verdict is a commit status on that head, which a ruleset can require.
+# ---------------------------------------------------------------------------
+
+GATE_NAME = "Required Status Check Gate"
+
+
+def _r(run_id, name, *, status="completed", conclusion="success", event="pull_request",
+       sha=HEAD_SHA, run_number=1):
+    return {
+        "id": run_id, "name": name, "head_sha": sha, "status": status,
+        "conclusion": conclusion if status == "completed" else None,
+        "event": event, "run_number": run_number,
+        "html_url": f"https://example/{run_id}",
+    }
+
+
+def _all_mode(gate, tmp_path, runs, *extra):
+    runs_file = tmp_path / "runs.json"
+    runs_file.write_text(json.dumps({"workflow_runs": runs}))
+    argv = [
+        "--head-sha", HEAD_SHA,
+        "--all-workflows",
+        "--event", "pull_request",
+        "--exclude", GATE_NAME,
+        "--require-present", "CI",
+        "--runs-json", str(runs_file),
+        *extra,
+    ]
+    args = gate.build_parser().parse_args(argv)
+    return gate.evaluate(args)
+
+
+def test_all_workflows_success_when_every_run_succeeded(gate, tmp_path):
+    verdict = _all_mode(gate, tmp_path, [
+        _r(1, "CI"), _r(2, "Go CI"), _r(3, "PR Title Check"),
+    ])
+    assert verdict.state == "success"
+    assert verdict.exit_code == 0
+    assert "3" in verdict.description
+
+
+def test_all_workflows_failure_names_the_failed_workflow(gate, tmp_path):
+    verdict = _all_mode(gate, tmp_path, [
+        _r(1, "CI"), _r(2, "Go CI", conclusion="failure"), _r(3, "Kotlin G2P CI"),
+    ])
+    assert verdict.state == "failure"
+    assert verdict.exit_code == 1
+    assert "Go CI" in verdict.description
+
+
+def test_all_workflows_failure_is_reported_while_others_still_run(gate, tmp_path):
+    verdict = _all_mode(gate, tmp_path, [
+        _r(1, "CI", status="in_progress"), _r(2, "Go CI", conclusion="timed_out"),
+    ])
+    assert verdict.state == "failure"
+
+
+def test_all_workflows_pending_while_any_run_is_unfinished(gate, tmp_path):
+    verdict = _all_mode(gate, tmp_path, [
+        _r(1, "CI"), _r(2, "Build All Platforms", status="queued"),
+    ])
+    assert verdict.state == "pending"
+    assert verdict.exit_code == 0
+    assert "Build All Platforms" in verdict.body
+
+
+def test_all_workflows_cancelled_run_fails(gate, tmp_path):
+    verdict = _all_mode(gate, tmp_path, [_r(1, "CI"), _r(2, "Go CI", conclusion="cancelled")])
+    assert verdict.state == "failure"
+
+
+def test_all_workflows_skipped_and_neutral_runs_pass(gate, tmp_path):
+    """A run whose jobs were all skipped by `if:` is intentional, and
+    `neutral` is the first-PR fast lane's downgrade."""
+    verdict = _all_mode(gate, tmp_path, [
+        _r(1, "CI"), _r(2, "Release Kotlin G2P (Maven Central)", conclusion="skipped"),
+        _r(3, "Parity Hub", conclusion="neutral"),
+    ])
+    assert verdict.state == "success"
+
+
+def test_all_workflows_startup_failure_fails(gate, tmp_path):
+    """An invalid workflow file still creates a run, concluded startup_failure."""
+    verdict = _all_mode(gate, tmp_path, [_r(1, "CI"), _r(2, "Go CI", conclusion="startup_failure")])
+    assert verdict.state == "failure"
+
+
+def test_all_workflows_ignores_the_gate_itself_and_other_events(gate, tmp_path):
+    verdict = _all_mode(gate, tmp_path, [
+        _r(1, "CI"),
+        _r(2, GATE_NAME, status="in_progress"),
+        _r(3, "CodeQL", conclusion="failure", event="schedule"),
+        _r(4, "Go CI", conclusion="failure", sha="0" * 40),
+    ])
+    assert verdict.state == "success"
+
+
+def test_all_workflows_uses_the_latest_attempt_per_workflow(gate, tmp_path):
+    verdict = _all_mode(gate, tmp_path, [
+        _r(1, "CI"),
+        _r(2, "Go CI", conclusion="failure", run_number=7),
+        _r(3, "Go CI", conclusion="success", run_number=8),
+    ])
+    assert verdict.state == "success"
+
+
+def test_all_workflows_stays_pending_until_the_anchor_run_exists(gate, tmp_path):
+    """Runs are created a moment after the push. A firing that sees only the
+    fast workflows must not call the head green before CI's run exists."""
+    verdict = _all_mode(gate, tmp_path, [_r(2, "PR Title Check")])
+    assert verdict.state == "pending"
+    assert "CI" in verdict.body
+
+
+def test_all_workflows_does_not_require_monitored(gate):
+    args = gate.build_parser().parse_args(["--head-sha", HEAD_SHA, "--all-workflows"])
+    assert args.all_workflows is True
+
+
+def test_fetch_runs_for_sha_follows_every_page(gate, monkeypatch):
+    pages = {
+        "1": {"total_count": 150, "workflow_runs": [{"id": i} for i in range(100)]},
+        "2": {"total_count": 150, "workflow_runs": [{"id": i} for i in range(100, 150)]},
+    }
+    seen = []
+
+    def fake_get(path, token, **_):
+        page = path.split("page=")[-1].split("&")[0]
+        seen.append(page)
+        return pages[page]
+
+    monkeypatch.setattr(gate, "gh_get", fake_get)
+    runs = gate.fetch_runs_for_sha("o/r", HEAD_SHA, "t")
+    assert len(runs) == 150
+    assert seen == ["1", "2"]
+
+
+def test_status_payload_carries_state_context_and_target(gate, tmp_path, monkeypatch):
+    posted = {}
+
+    def fake_post(repo, sha, payload, token):
+        posted.update(repo=repo, sha=sha, **payload)
+
+    monkeypatch.setattr(gate, "post_commit_status", fake_post)
+    monkeypatch.setenv("GITHUB_TOKEN", "t")
+    runs_file = tmp_path / "runs.json"
+    runs_file.write_text(json.dumps({"workflow_runs": [_r(1, "CI", conclusion="failure")]}))
+    args = gate.build_parser().parse_args([
+        "--head-sha", HEAD_SHA, "--repo", "o/r", "--all-workflows",
+        "--require-present", "CI", "--runs-json", str(runs_file),
+        "--status-context", "all-workflows", "--target-url", "https://example/run",
+    ])
+    rc = gate.run(args)
+    assert rc == 1
+    assert posted["sha"] == HEAD_SHA
+    assert posted["state"] == "failure"
+    assert posted["context"] == "all-workflows"
+    assert posted["target_url"] == "https://example/run"
+    assert len(posted["description"]) <= 140

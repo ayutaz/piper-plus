@@ -375,7 +375,7 @@ dev へのマージ条件とタグの保護は、 リポジトリ設定の rules
 piper-plus は 18+ contract gate (PUA / loanword / ORT 等) を持ちますが、 **初回 PR ではこれらを `neutral` (warning) に降格** します。 GitHub の `author_association` が `FIRST_TIME_CONTRIBUTOR` / `FIRST_TIMER` / `NONE` のいずれかなら、 以下を満たすだけで merge を依頼できます:
 
 - ruff format / cargo fmt / gofmt / dotnet-format / clang-tidy 等の **コア lint pass**
-- `Required Status Check Gate` (cancelled / skipped baseline run の検出) pass
+- commit status `required-gate/all-workflows` (`Required Status Check Gate` が、PR の head に付いた全 workflow の完了を待って出す判定) が success
 - maintainer の review 通過
 
 contract gate の知識 (PUA fixture / loanword JSON / Ruff pin 同期 等) は初回 PR では学習対象外で、 warning として記録されます。 詳細: `.github/workflows/first-pr-fast-lane.yml` / `scripts/first_pr_fast_lane.py`。
