@@ -1,28 +1,24 @@
 """Contract tests for .github/workflows/required_status_check_gate.yml.
 
-``check_required_gate.py`` is well covered by tests/scripts/test_check_required_gate.py,
-but every defect found here lived in the WORKFLOW that invokes it -- the script
-did exactly what it was told with the wrong arguments:
+``check_required_gate.py`` is covered by tests/scripts/test_check_required_gate.py,
+but every defect found in the gate so far lived in the WORKFLOW that invokes
+it -- the script did exactly what it was told with the wrong arguments:
 
-  * ``--branch-for-supersede`` was given the PR's BASE ref. The script defers
-    when ``head_sha`` is not that branch's tip, and a PR head is never the tip
-    of its own base, so the gate exited 0 on every ``pull_request`` firing
-    without aggregating a single spoke. Measured: 4 of 4 ``pull_request`` runs
-    printed "Head SHA <pr-head> is no longer the branch tip (latest: <dev
-    tip>)". The hub whose purpose is closing a fail-open path was itself
-    fail-open on the event a PR's check list consults.
-  * ``--paths-filtered`` named 2 of the 4 monitored spokes that actually carry
-    a ``pull_request: paths:`` filter, so the ``workflow_run`` firing (the one
-    that did evaluate) reported ``Multi-Runtime RTF Benchmark`` and
-    ``Parity Hub`` as missing and failed.
+  * ``--branch-for-supersede`` was given the PR's base ref, so every
+    ``pull_request`` firing deferred and exited 0 (4 of 4 measured runs).
+  * ``--paths-filtered`` named 2 of the 4 path-filtered spokes, so the gate
+    reported the other 2 as missing and failed.
+  * The verdict that did evaluate everything came from ``workflow_run``
+    firings, which are recorded against dev and so never appeared on the PR;
+    it only reached a PR comment, and no ruleset required it.
 
-Both are invariants that can be derived from the workflow files rather than
-restated by hand, which is what these tests do.
+The gate now waits for every pull_request workflow and publishes a commit
+status on the PR head. The invariants below are derived from the workflow
+files rather than restated by hand.
 """
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
@@ -31,6 +27,9 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 GATE_WORKFLOW = WORKFLOW_DIR / "required_status_check_gate.yml"
+GATE_NAME = "Required Status Check Gate"
+STATUS_CONTEXT = "required-gate/all-workflows"
+ANCHOR = "CI"
 
 
 def _load(path: Path) -> dict:
@@ -40,11 +39,16 @@ def _load(path: Path) -> dict:
 def _triggers(doc: dict) -> dict:
     """``on:`` parses as the boolean True under YAML 1.1, so accept both."""
     on = doc.get(True, doc.get("on"))
+    if isinstance(on, str):
+        return {on: None}
+    if isinstance(on, list):
+        return {key: None for key in on}
     return on if isinstance(on, dict) else {}
 
 
-def _comma_list(raw: str) -> list[str]:
-    return [part.strip() for part in raw.split(",") if part.strip()]
+@pytest.fixture(scope="module")
+def gate_doc() -> dict:
+    return _load(GATE_WORKFLOW)
 
 
 @pytest.fixture(scope="module")
@@ -53,200 +57,106 @@ def gate_text() -> str:
 
 
 @pytest.fixture(scope="module")
-def monitored(gate_text: str) -> list[str]:
-    match = re.search(r"MONITORED_WORKFLOWS:\s*>-\s*\n\s*(.+)", gate_text)
-    assert match, "MONITORED_WORKFLOWS not found in the gate workflow"
-    return _comma_list(match.group(1))
-
-
-@pytest.fixture(scope="module")
-def declared_pr_filtered(gate_text: str) -> list[str]:
-    match = re.search(r'PR_FILTERED="([^"]*)"', gate_text)
-    assert match, "PR_FILTERED not found in the gate workflow"
-    return _comma_list(match.group(1))
-
-
-@pytest.fixture(scope="module")
-def declared_push_filtered(gate_text: str) -> list[str]:
-    match = re.search(r'PUSH_FILTERED="([^"]*)"', gate_text)
-    assert match, "PUSH_FILTERED not found in the gate workflow"
-    return _comma_list(match.group(1))
-
-
-@pytest.fixture(scope="module")
-def workflow_by_name() -> dict[str, Path]:
-    by_name: dict[str, Path] = {}
+def workflows() -> dict[str, dict]:
+    by_name: dict[str, dict] = {}
     for path in sorted(WORKFLOW_DIR.glob("*.yml")):
-        name = _load(path).get("name")
-        if isinstance(name, str):
-            by_name.setdefault(name, path)
+        doc = _load(path)
+        name = doc.get("name")
+        assert isinstance(name, str), f"{path.name} has no name"
+        assert name not in by_name, f"duplicate workflow name {name!r}"
+        by_name[name] = doc
     return by_name
 
 
-def _has_pull_request_paths_filter(path: Path) -> bool:
-    pull_request = _triggers(_load(path)).get("pull_request")
-    return isinstance(pull_request, dict) and bool(pull_request.get("paths"))
+@pytest.fixture(scope="module")
+def listed(gate_doc: dict) -> list[str]:
+    return list(_triggers(gate_doc)["workflow_run"]["workflows"])
 
 
-def _may_be_absent_on_push_to_dev(path: Path) -> bool:
-    """Can this workflow legitimately not run on a push to ``dev``?
+def test_gate_waits_for_every_pull_request_workflow(listed, workflows):
+    """The final firing comes from the last workflow to complete.
 
-    Yes if it has no ``push`` trigger, if ``dev`` is outside its push
-    branches, or if its push trigger carries a paths filter. Otherwise a push
-    to dev MUST produce a run, so the hub must not exempt it there.
+    A pull_request workflow missing from this list can finish last without
+    firing the gate, leaving the status pending (merge blocked) or, worse, a
+    stale success from an earlier firing. Add new workflows here.
     """
-    push = _triggers(_load(path)).get("push")
-    if push is None:
-        return True
-    if not isinstance(push, dict):
-        return False
-    if push.get("paths"):
-        return True
-    branches = push.get("branches")
-    if isinstance(branches, list) and "dev" not in branches:
-        return True
-    return False
-
-
-def test_every_monitored_spoke_resolves_to_a_workflow(monitored, workflow_by_name):
-    """A renamed spoke must not vanish from the hub silently.
-
-    MONITORED_WORKFLOWS holds display names, matched against the REST API's
-    ``name`` field. If a spoke is renamed and this list is not updated, the
-    hub reports it missing forever -- or, once it is also in --paths-filtered,
-    exempts it forever and checks nothing.
-    """
-    assert monitored, "MONITORED_WORKFLOWS is empty"
-    unresolved = [name for name in monitored if name not in workflow_by_name]
-    assert not unresolved, f"monitored spokes with no matching workflow: {unresolved}"
-
-
-def test_pr_list_declares_exactly_the_pull_request_filtered_spokes(
-    monitored, declared_pr_filtered, workflow_by_name
-):
-    """PR_FILTERED must equal the monitored spokes filtered on pull_request.
-
-    Under-declaring fails the gate on any PR whose diff misses that spoke's
-    paths (the original symptom). Over-declaring exempts a spoke that should
-    always run, which silently removes it from the gate.
-    """
-    actually_filtered = {
+    expected = {
         name
-        for name in monitored
-        if _has_pull_request_paths_filter(workflow_by_name[name])
+        for name, doc in workflows.items()
+        if "pull_request" in _triggers(doc) and name != GATE_NAME
     }
-    assert set(declared_pr_filtered) == actually_filtered
-
-
-def test_push_list_declares_exactly_the_spokes_that_may_skip_a_dev_push(
-    monitored, declared_push_filtered, workflow_by_name
-):
-    """PUSH_FILTERED must be derived from the PUSH triggers, not the PR ones.
-
-    Two monitored spokes (Multi-Runtime RTF Benchmark, Parity Hub) are
-    path-filtered on pull_request but have NO paths filter on push, so a push
-    to dev must produce a run for them. Reusing the pull_request list on the
-    push path would exempt them exactly where they are mandatory.
-    """
-    may_be_absent = {
-        name
-        for name in monitored
-        if _may_be_absent_on_push_to_dev(workflow_by_name[name])
+    assert set(listed) == expected, {
+        "not listed": sorted(expected - set(listed)),
+        "listed but not a pull_request workflow": sorted(set(listed) - expected),
     }
-    assert set(declared_push_filtered) == may_be_absent
 
 
-def test_the_two_lists_actually_differ(declared_pr_filtered, declared_push_filtered):
-    """Anti-vacuity for the pair above: one list must not stand in for both.
-
-    If they were equal, both tests would still pass while the event-awareness
-    this fix adds had been collapsed back to a single hardcoded list.
-    """
-    assert set(declared_pr_filtered) != set(declared_push_filtered)
-    assert set(declared_push_filtered) < set(declared_pr_filtered)
+def test_listed_workflows_are_not_themselves_workflow_run_chains(listed, workflows):
+    """``workflow_run`` cannot chain more than three levels."""
+    chained = [name for name in listed if "workflow_run" in _triggers(workflows[name])]
+    assert not chained
 
 
-def test_a_monitored_spoke_without_a_paths_filter_stays_undeclared(
-    monitored, declared_pr_filtered, declared_push_filtered, workflow_by_name
-):
-    """Anti-vacuity: the equalities above must not be "declare everything".
-
-    At least one monitored spoke runs on every PR and every push (no paths
-    filter either way), and a missing run for it is a real gate failure, so it
-    must be absent from BOTH lists. Without this, widening a list to all five
-    would still satisfy the equality tests.
-    """
-    unfiltered = [
-        name
-        for name in monitored
-        if not _has_pull_request_paths_filter(workflow_by_name[name])
-        and not _may_be_absent_on_push_to_dev(workflow_by_name[name])
-    ]
-    assert unfiltered, "expected at least one spoke mandatory on both events"
-    for name in unfiltered:
-        assert name not in declared_pr_filtered, name
-        assert name not in declared_push_filtered, name
+def test_gate_runs_only_from_workflow_run(gate_doc):
+    """A ``pull_request`` firing evaluates before anything finished, and its
+    check run would be a second, always-deferred verdict on the PR."""
+    assert set(_triggers(gate_doc)) == {"workflow_run"}
+    assert _triggers(gate_doc)["workflow_run"]["types"] == ["completed"]
 
 
-def test_run_step_uses_the_resolved_list_not_a_hardcoded_one(gate_text):
-    """The gate must be invoked with the ctx step's output.
-
-    Re-hardcoding a literal here would reintroduce a single event-blind list
-    while both declaration tests above kept passing.
-    """
-    assert '--paths-filtered "${PATHS_FILTERED}"' in gate_text
-    assert "PATHS_FILTERED: ${{ steps.ctx.outputs.paths_filtered }}" in gate_text
-
-
-def test_pull_request_firing_passes_no_supersede_branch(gate_text):
-    """The PR branch of the ctx step must emit an EMPTY base_branch.
-
-    A non-empty value becomes --branch-for-supersede, and comparing the PR
-    head against any branch tip makes the gate defer instead of evaluating.
-    """
-    pr_branch = re.search(
-        r'if \[ "\$\{EVENT_NAME\}" = "pull_request" \]; then\n(.*?)\n\s*else',
-        gate_text,
-        re.S,
+def test_gate_job_is_limited_to_pull_request_heads(gate_doc):
+    job = gate_doc["jobs"]["gate"]
+    assert job["if"] == (
+        "github.event.workflow_run.event == 'pull_request'"
+        " && github.event.workflow_run.conclusion != 'cancelled'"
     )
-    assert pr_branch, "could not locate the pull_request branch of the ctx step"
-    body = pr_branch.group(1)
-    assert re.search(r'echo "base_branch="\s*>>', body), body
-    assert "PR_BASE_REF" not in gate_text
 
 
-def test_workflow_run_firing_still_passes_its_head_branch(gate_text):
-    """Non-regression: the workflow_run path keeps the supersede guard.
-
-    That path is why the guard exists -- a spoke completing late fires the hub
-    on a SHA that is no longer the branch tip.
-    """
-    else_branch = gate_text.split('= "pull_request" ]; then', 1)[1].split("else", 1)[1]
-    assert 'echo "base_branch=${RUN_HEAD_BRANCH}"' in else_branch
+def test_a_skipped_firing_cannot_publish_success(gate_doc):
+    """Skipping cancelled completions is safe only because nothing else
+    publishes the status: the last published verdict saw that run unfinished
+    (pending), or saw it cancelled (failure)."""
+    steps = gate_doc["jobs"]["gate"]["steps"]
+    assert sum("check_required_gate.py" in step.get("run", "") for step in steps) == 1
 
 
-def test_workflow_run_firing_dispatches_on_the_original_event(gate_text):
-    """A workflow_run firing must pick its list from the ORIGINAL event.
+def test_gate_can_publish_a_commit_status(gate_doc):
+    assert gate_doc["permissions"].get("statuses") == "write"
+    assert gate_doc["permissions"].get("actions") == "read"
+    assert "pull-requests" not in gate_doc["permissions"]
 
-    ``workflow_run`` fires whenever a monitored spoke completes -- including
-    spokes that ran for a feature-branch pull_request. Those spokes ARE
-    path-filtered, so collapsing the workflow_run path to the push list makes
-    the hub demand runs that a PR's diff never triggers. The original event is
-    carried in ``github.event.workflow_run.event``, so the branch must test
-    RUN_EVENT and select PR_FILTERED for pull_request.
 
-    Pinned because a mutation that replaced this condition with a constant was
-    NOT caught by the declaration tests: both lists stayed correct while only
-    the dispatch between them was broken.
-    """
-    assert "RUN_EVENT: ${{ github.event.workflow_run.event }}" in gate_text
-    else_branch = gate_text.split('= "pull_request" ]; then', 1)[1].split("else", 1)[1]
-    dispatch = re.search(
-        r'if \[ "\$\{RUN_EVENT\}" = "pull_request" \]; then\s*\n'
-        r'\s*echo "paths_filtered=\$\{PR_FILTERED\}".*?\n'
-        r"\s*else\s*\n"
-        r'\s*echo "paths_filtered=\$\{PUSH_FILTERED\}"',
-        else_branch,
-        re.S,
-    )
-    assert dispatch, else_branch
+def test_firings_for_one_head_never_cancel_a_running_evaluation(gate_doc):
+    concurrency = gate_doc["concurrency"]
+    assert "github.event.workflow_run.head_sha" in concurrency["group"]
+    assert concurrency["cancel-in-progress"] is False
+
+
+def test_gate_is_invoked_in_all_workflows_mode(gate_text):
+    for flag in (
+        "--all-workflows",
+        "--event pull_request",
+        f'--exclude "{GATE_NAME}"',
+        f"--require-present {ANCHOR}",
+        "--on-cancelled fail",
+        f'--status-context "{STATUS_CONTEXT}"',
+        '--head-sha "${HEAD_SHA}"',
+        "HEAD_SHA: ${{ github.event.workflow_run.head_sha }}",
+    ):
+        assert flag in gate_text, flag
+    assert "--monitored" not in gate_text
+    assert "--branch-for-supersede" not in gate_text
+
+
+def test_excluded_name_is_the_gate_itself(gate_doc):
+    """Excluding any other name would drop a real workflow from the verdict."""
+    assert gate_doc["name"] == GATE_NAME
+
+
+def test_anchor_runs_on_every_pull_request(workflows):
+    """``--require-present CI`` holds the verdict at pending until CI's run
+    exists. If CI could be absent from a PR, that PR would never go green."""
+    pull_request = _triggers(workflows[ANCHOR])["pull_request"] or {}
+    assert not pull_request.get("paths")
+    assert not pull_request.get("paths-ignore")
+    assert pull_request.get("branches") in (None, ["dev"])
