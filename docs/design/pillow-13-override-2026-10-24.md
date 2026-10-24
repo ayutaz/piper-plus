@@ -53,6 +53,8 @@ Hugging Face Space (`huggingface-space/requirements.txt`) は、Space SDK が gr
 3. `requirements_webui.txt` を入れる Dockerfile がすべて `--override` を付け、上書きファイルを COPY していること。対象の Dockerfile が 5 本以上見つかること
 4. root と `environments/webui` の lock が Pillow 13.0.0 以上に解決していること
 
+`docs/spec/dependency-floors.toml` に Pillow の下限 13.0.0 を加えた。`scripts/check_dependency_floors.py` (pre-commit `dependency-floors`) は、`environments/webui` の `override-dependencies` の宣言と、すべての uv.lock が 13.0.0 以上であることも検査する。
+
 `consumer-contracts.yml` の WebUI 環境の検査は、これまで `uv pip check` をそのまま実行していた。上書きは「gradio は `pillow<13.0` を要求するが 13.0.0 が入っている」と報告されるので、`scripts/uv_pip_check_overrides.py` に替えた。このスクリプトは `override-dependencies` に宣言したパッケージについて、入っている版が上書きの指定を満たす食い違いだけを許す。ほかの不整合と、読めない出力行は失敗にする (`tests/scripts/test_uv_pip_check_overrides.py`)。
 
 gradio が Pillow 13 を許すようになったら、上書きファイル、Dockerfile の `--override`、pyproject の項目、このテスト、`uv_pip_check_overrides.py` を削除し、`uv pip check` に戻す。
