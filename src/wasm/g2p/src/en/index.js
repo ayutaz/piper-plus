@@ -1,14 +1,30 @@
 /**
  * @piper-plus/g2p - English G2P module
  *
- * Lightweight English grapheme-to-phoneme conversion.
- * Ported from SimpleEnglishPhonemizer (piper-plus npm package).
+ * English grapheme-to-phoneme conversion that follows Python's training-time
+ * G2P (g2p_en + english.py) the way the Rust port does
+ * (`src/rust/piper-plus-g2p/src/english.rs`):
  *
- * Uses a built-in pronunciation dictionary (common words) with
- * letter-by-letter fallback for unknown words, then converts to IPA tokens.
+ *   1. normalize and tokenize the text like g2p_en (numbers spelled out,
+ *      accents stripped, `i.e.` / `e.g.` expanded, nltk's TweetTokenizer);
+ *      see `./normalize.js`
+ *   2. look each word up in the bundled CMU Pronouncing Dictionary
+ *      (`data/cmudict_data.json`, loaded on demand; see `./cmudict.js`), then
+ *      try common suffixes (-ing, -ed, -s, -er, -ly, -est) on its stem
+ *   3. read the remaining words without g2p_en's neural guesser, which is not
+ *      ported: split them at `-` / `.`, retry without apostrophes, split at
+ *      CamelCase boundaries and finally spell them letter by letter, so no
+ *      word is dropped
+ *   4. convert ARPAbet to IPA with Python's context rules, remove the stress
+ *      of function words and put stress markers before stressed vowels.
  *
  * Pure JavaScript -- no external dependencies.
  */
+
+import { getCmuDictSync, isCmuDictLoaded, loadCmuDict, toCmuDictMap } from "./cmudict.js";
+import { normalizeAndTokenize, normalizeNumbers } from "./normalize.js";
+
+export { isCmuDictLoaded, loadCmuDict, normalizeAndTokenize, normalizeNumbers };
 
 // ---------------------------------------------------------------------------
 // ARPAbet -> IPA mapping (matches Python english.py ARPABET_TO_IPA)
@@ -58,9 +74,6 @@ const ARPABET_TO_IPA = {
 
 // Unstressed AH -> schwa
 const AH_UNSTRESSED_IPA = "\u0259"; // ə
-
-// Regex to split ARPAbet token: base letters + optional stress digit
-const RE_ARPABET = /^([A-Z]+)(\d)?$/;
 
 // Punctuation characters
 const PUNCTUATION = new Set([",", ".", ";", ":", "!", "?"]);
@@ -169,559 +182,497 @@ const FUNCTION_WORDS = new Set([
 ]);
 
 // ---------------------------------------------------------------------------
-// Built-in pronunciation dictionary (common words -> ARPAbet)
-//
-// Entries use CMU-dict style notation: uppercase base + stress digit on vowels.
-// This provides better quality than pure letter rules for frequent words.
-// ---------------------------------------------------------------------------
-
-const DICTIONARY = {
-  // Common words
-  hello: ["HH", "AH0", "L", "OW1"],
-  world: ["W", "ER1", "L", "D"],
-  the: ["DH", "AH0"],
-  a: ["AH0"],
-  an: ["AE1", "N"],
-  and: ["AE1", "N", "D"],
-  is: ["IH1", "Z"],
-  are: ["AA1", "R"],
-  was: ["W", "AA1", "Z"],
-  were: ["W", "ER1"],
-  been: ["B", "IH1", "N"],
-  have: ["HH", "AE1", "V"],
-  has: ["HH", "AE1", "Z"],
-  had: ["HH", "AE1", "D"],
-  do: ["D", "UW1"],
-  does: ["D", "AH1", "Z"],
-  did: ["D", "IH1", "D"],
-  will: ["W", "IH1", "L"],
-  would: ["W", "UH1", "D"],
-  can: ["K", "AE1", "N"],
-  could: ["K", "UH1", "D"],
-  should: ["SH", "UH1", "D"],
-  may: ["M", "EY1"],
-  might: ["M", "AY1", "T"],
-  must: ["M", "AH1", "S", "T"],
-  to: ["T", "UW1"],
-  of: ["AH1", "V"],
-  in: ["IH1", "N"],
-  on: ["AA1", "N"],
-  at: ["AE1", "T"],
-  by: ["B", "AY1"],
-  for: ["F", "AO1", "R"],
-  with: ["W", "IH1", "TH"],
-  from: ["F", "R", "AH1", "M"],
-  up: ["AH1", "P"],
-  out: ["AW1", "T"],
-  over: ["OW1", "V", "ER0"],
-  under: ["AH1", "N", "D", "ER0"],
-  not: ["N", "AA1", "T"],
-  all: ["AO1", "L"],
-  one: ["W", "AH1", "N"],
-  two: ["T", "UW1"],
-  three: ["TH", "R", "IY1"],
-  four: ["F", "AO1", "R"],
-  five: ["F", "AY1", "V"],
-  good: ["G", "UH1", "D"],
-  bad: ["B", "AE1", "D"],
-  new: ["N", "UW1"],
-  old: ["OW1", "L", "D"],
-  big: ["B", "IH1", "G"],
-  small: ["S", "M", "AO1", "L"],
-  this: ["DH", "IH1", "S"],
-  that: ["DH", "AE1", "T"],
-  these: ["DH", "IY1", "Z"],
-  those: ["DH", "OW1", "Z"],
-  what: ["W", "AH1", "T"],
-  when: ["W", "EH1", "N"],
-  where: ["W", "EH1", "R"],
-  which: ["W", "IH1", "CH"],
-  who: ["HH", "UW1"],
-  how: ["HH", "AW1"],
-  if: ["IH1", "F"],
-  then: ["DH", "EH1", "N"],
-  than: ["DH", "AE1", "N"],
-  so: ["S", "OW1"],
-  no: ["N", "OW1"],
-  yes: ["Y", "EH1", "S"],
-  or: ["AO1", "R"],
-  but: ["B", "AH1", "T"],
-  just: ["JH", "AH1", "S", "T"],
-  also: ["AO1", "L", "S", "OW0"],
-  very: ["V", "EH1", "R", "IY0"],
-  much: ["M", "AH1", "CH"],
-  more: ["M", "AO1", "R"],
-  most: ["M", "OW1", "S", "T"],
-  other: ["AH1", "DH", "ER0"],
-  some: ["S", "AH1", "M"],
-  any: ["EH1", "N", "IY0"],
-  each: ["IY1", "CH"],
-  every: ["EH1", "V", "ER0", "IY0"],
-  many: ["M", "EH1", "N", "IY0"],
-  few: ["F", "Y", "UW1"],
-  about: ["AH0", "B", "AW1", "T"],
-  after: ["AE1", "F", "T", "ER0"],
-  before: ["B", "IH0", "F", "AO1", "R"],
-  between: ["B", "IH0", "T", "W", "IY1", "N"],
-  into: ["IH1", "N", "T", "UW0"],
-  through: ["TH", "R", "UW1"],
-  because: ["B", "IH0", "K", "AH1", "Z"],
-  since: ["S", "IH1", "N", "S"],
-  while: ["W", "AY1", "L"],
-  only: ["OW1", "N", "L", "IY0"],
-  still: ["S", "T", "IH1", "L"],
-  even: ["IY1", "V", "AH0", "N"],
-  back: ["B", "AE1", "K"],
-  now: ["N", "AW1"],
-  here: ["HH", "IY1", "R"],
-  there: ["DH", "EH1", "R"],
-
-  // Common verbs
-  go: ["G", "OW1"],
-  going: ["G", "OW1", "IH0", "NG"],
-  come: ["K", "AH1", "M"],
-  get: ["G", "EH1", "T"],
-  make: ["M", "EY1", "K"],
-  know: ["N", "OW1"],
-  think: ["TH", "IH1", "NG", "K"],
-  take: ["T", "EY1", "K"],
-  see: ["S", "IY1"],
-  say: ["S", "EY1"],
-  said: ["S", "EH1", "D"],
-  give: ["G", "IH1", "V"],
-  use: ["Y", "UW1", "Z"],
-  find: ["F", "AY1", "N", "D"],
-  tell: ["T", "EH1", "L"],
-  ask: ["AE1", "S", "K"],
-  work: ["W", "ER1", "K"],
-  call: ["K", "AO1", "L"],
-  try: ["T", "R", "AY1"],
-  need: ["N", "IY1", "D"],
-  feel: ["F", "IY1", "L"],
-  keep: ["K", "IY1", "P"],
-  let: ["L", "EH1", "T"],
-  begin: ["B", "IH0", "G", "IH1", "N"],
-  seem: ["S", "IY1", "M"],
-  help: ["HH", "EH1", "L", "P"],
-  show: ["SH", "OW1"],
-  hear: ["HH", "IY1", "R"],
-  play: ["P", "L", "EY1"],
-  run: ["R", "AH1", "N"],
-  move: ["M", "UW1", "V"],
-  like: ["L", "AY1", "K"],
-  live: ["L", "IH1", "V"],
-  want: ["W", "AA1", "N", "T"],
-  look: ["L", "UH1", "K"],
-  put: ["P", "UH1", "T"],
-  read: ["R", "IY1", "D"],
-  write: ["R", "AY1", "T"],
-  open: ["OW1", "P", "AH0", "N"],
-  close: ["K", "L", "OW1", "Z"],
-  stop: ["S", "T", "AA1", "P"],
-  start: ["S", "T", "AA1", "R", "T"],
-
-  // Common nouns
-  people: ["P", "IY1", "P", "AH0", "L"],
-  time: ["T", "AY1", "M"],
-  year: ["Y", "IY1", "R"],
-  way: ["W", "EY1"],
-  day: ["D", "EY1"],
-  man: ["M", "AE1", "N"],
-  woman: ["W", "UH1", "M", "AH0", "N"],
-  child: ["CH", "AY1", "L", "D"],
-  part: ["P", "AA1", "R", "T"],
-  place: ["P", "L", "EY1", "S"],
-  case: ["K", "EY1", "S"],
-  week: ["W", "IY1", "K"],
-  hand: ["HH", "AE1", "N", "D"],
-  point: ["P", "OY1", "N", "T"],
-  home: ["HH", "OW1", "M"],
-  water: ["W", "AO1", "T", "ER0"],
-  room: ["R", "UW1", "M"],
-  name: ["N", "EY1", "M"],
-  school: ["S", "K", "UW1", "L"],
-  life: ["L", "AY1", "F"],
-
-  // Tech terms
-  text: ["T", "EH1", "K", "S", "T"],
-  speech: ["S", "P", "IY1", "CH"],
-  voice: ["V", "OY1", "S"],
-  audio: ["AO1", "D", "IY0", "OW0"],
-  system: ["S", "IH1", "S", "T", "AH0", "M"],
-  computer: ["K", "AH0", "M", "P", "Y", "UW1", "T", "ER0"],
-  artificial: ["AA1", "R", "T", "AH0", "F", "IH1", "SH", "AH0", "L"],
-  intelligence: ["IH0", "N", "T", "EH1", "L", "AH0", "JH", "AH0", "N", "S"],
-  technology: ["T", "EH0", "K", "N", "AA1", "L", "AH0", "JH", "IY0"],
-  synthesis: ["S", "IH1", "N", "TH", "AH0", "S", "IH0", "S"],
-  model: ["M", "AA1", "D", "AH0", "L"],
-  data: ["D", "EY1", "T", "AH0"],
-  language: ["L", "AE1", "NG", "G", "W", "AH0", "JH"],
-  english: ["IH1", "NG", "G", "L", "IH0", "SH"],
-  japanese: ["JH", "AE2", "P", "AH0", "N", "IY1", "Z"],
-  chinese: ["CH", "AY0", "N", "IY1", "Z"],
-  today: ["T", "AH0", "D", "EY1"],
-  test: ["T", "EH1", "S", "T"],
-  please: ["P", "L", "IY1", "Z"],
-  thank: ["TH", "AE1", "NG", "K"],
-  thanks: ["TH", "AE1", "NG", "K", "S"],
-  right: ["R", "AY1", "T"],
-  left: ["L", "EH1", "F", "T"],
-  first: ["F", "ER1", "S", "T"],
-  last: ["L", "AE1", "S", "T"],
-  long: ["L", "AO1", "NG"],
-  great: ["G", "R", "EY1", "T"],
-  little: ["L", "IH1", "T", "AH0", "L"],
-  own: ["OW1", "N"],
-  well: ["W", "EH1", "L"],
-  really: ["R", "IY1", "L", "IY0"],
-  always: ["AO1", "L", "W", "EY0", "Z"],
-  never: ["N", "EH1", "V", "ER0"],
-  again: ["AH0", "G", "EH1", "N"],
-  down: ["D", "AW1", "N"],
-  away: ["AH0", "W", "EY1"],
-  together: ["T", "AH0", "G", "EH1", "DH", "ER0"],
-  without: ["W", "IH0", "DH", "AW1", "T"],
-  however: ["HH", "AW0", "EH1", "V", "ER0"],
-  something: ["S", "AH1", "M", "TH", "IH0", "NG"],
-  nothing: ["N", "AH1", "TH", "IH0", "NG"],
-  everything: ["EH1", "V", "R", "IY0", "TH", "IH0", "NG"],
-};
-
-// ---------------------------------------------------------------------------
-// Letter-to-ARPAbet fallback rules
-//
-// Used for unknown words. Maps single letters to ARPAbet tokens.
-// Digraph patterns are checked first for better accuracy.
-// ---------------------------------------------------------------------------
-
-const DIGRAPH_RULES = [
-  ["th", ["TH"]],
-  ["sh", ["SH"]],
-  ["ch", ["CH"]],
-  ["ph", ["F"]],
-  ["wh", ["W"]],
-  ["ck", ["K"]],
-  ["ng", ["NG"]],
-  ["qu", ["K", "W"]],
-  ["oo", ["UW1"]],
-  ["ee", ["IY1"]],
-  ["ea", ["IY1"]],
-  ["ai", ["EY1"]],
-  ["ay", ["EY1"]],
-  ["oi", ["OY1"]],
-  ["oy", ["OY1"]],
-  ["ou", ["AW1"]],
-  ["ow", ["OW1"]],
-  ["aw", ["AO1"]],
-  ["au", ["AO1"]],
-  ["igh", ["AY1"]],
-];
-
-const LETTER_RULES = {
-  a: ["AE1"],
-  b: ["B"],
-  c: ["K"],
-  d: ["D"],
-  e: ["EH1"],
-  f: ["F"],
-  g: ["G"],
-  h: ["HH"],
-  i: ["IH1"],
-  j: ["JH"],
-  k: ["K"],
-  l: ["L"],
-  m: ["M"],
-  n: ["N"],
-  o: ["AA1"],
-  p: ["P"],
-  q: ["K"],
-  r: ["R"],
-  s: ["S"],
-  t: ["T"],
-  u: ["AH1"],
-  v: ["V"],
-  w: ["W"],
-  x: ["K", "S"],
-  y: ["Y"],
-  z: ["Z"],
-};
-
-// ---------------------------------------------------------------------------
-// Internal helpers
+// Words
 // ---------------------------------------------------------------------------
 
 /**
- * Convert a single ARPAbet token to (ipaString, stressLevel).
- * stress: 0 = unstressed vowel, 1 = primary, 2 = secondary, -1 = consonant.
+ * Words of the original text used to find function words.
+ *
+ * Mirrors Python `re.findall(r"[a-zA-Z']+", text.lower())`. Python takes
+ * them from the text before number expansion and aligns them with the
+ * spoken words in order, so `the 3 of us` gives `three` the function-word
+ * flag of `of`. The training data was phonemized that way, so it is kept.
+ *
+ * @param {string} text
+ * @returns {string[]}
  */
-function arpabetToIpa(token) {
-  const m = RE_ARPABET.exec(token);
-  if (!m) {
-    // Punctuation or unknown -- return as-is
-    return [token, -1];
-  }
-  const base = m[1];
-  const stress = m[2] !== undefined ? parseInt(m[2], 10) : -1;
-
-  // Unstressed AH -> schwa
-  if (base === "AH" && stress === 0) {
-    return [AH_UNSTRESSED_IPA, stress];
-  }
-
-  const ipa = ARPABET_TO_IPA[base];
-  if (ipa === undefined) {
-    return [token, stress];
-  }
-  return [ipa, stress];
+function sourceWords(text) {
+  return (text.match(/[a-zA-Z']+/g) ?? []).map((w) => w.toLowerCase());
 }
 
 /**
- * Convert a word's ARPAbet tokens to IPA with context-dependent rules.
- *   AA + R -> ɑːɹ
- *   ER with stress=1 -> ɜː
+ * A word made of one punctuation character (`,` `.` `;` `:` `!` `?`):
+ * attached to the preceding word without a word boundary.
+ *
+ * @param {string} word
+ * @returns {boolean}
+ */
+function isPunctuationWord(word) {
+  return word.length === 1 && PUNCTUATION.has(word);
+}
+
+/** The name of each letter, used to spell words that cannot be read otherwise. */
+const LETTER_NAMES = new Map([
+  ["a", "EY1"],
+  ["b", "B IY1"],
+  ["c", "S IY1"],
+  ["d", "D IY1"],
+  ["e", "IY1"],
+  ["f", "EH1 F"],
+  ["g", "JH IY1"],
+  ["h", "EY1 CH"],
+  ["i", "AY1"],
+  ["j", "JH EY1"],
+  ["k", "K EY1"],
+  ["l", "EH1 L"],
+  ["m", "EH1 M"],
+  ["n", "EH1 N"],
+  ["o", "OW1"],
+  ["p", "P IY1"],
+  ["q", "K Y UW1"],
+  ["r", "AA1 R"],
+  ["s", "EH1 S"],
+  ["t", "T IY1"],
+  ["u", "Y UW1"],
+  ["v", "V IY1"],
+  ["w", "D AH1 B AH0 L Y UW0"],
+  ["x", "EH1 K S"],
+  ["y", "W AY1"],
+  ["z", "Z IY1"],
+]);
+
+/** @param {string} c */
+function isUpper(c) {
+  return c >= "A" && c <= "Z";
+}
+
+/** @param {string} c */
+function isLower(c) {
+  return c >= "a" && c <= "z";
+}
+
+/**
+ * Splits a word at CamelCase boundaries, like Python
+ * `re.findall(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+", word)`:
+ * `ChatGPT` -> `Chat` + `GPT`, `HTMLParser` -> `HTML` + `Parser`.
+ *
+ * @param {string} word
+ * @returns {string[]}
+ */
+export function splitCamelCase(word) {
+  /** @param {number} from @param {(c: string) => boolean} pred */
+  const runEnd = (from, pred) => {
+    let j = from;
+    while (j < word.length && pred(word[j])) {
+      j++;
+    }
+    return j;
+  };
+  const parts = [];
+  let i = 0;
+  while (i < word.length) {
+    if (isUpper(word[i])) {
+      const upperEnd = runEnd(i, isUpper);
+      const lowerFollows = upperEnd < word.length && isLower(word[upperEnd]);
+      if (lowerFollows && upperEnd - i >= 2) {
+        // The last capital starts the next part.
+        parts.push(word.slice(i, upperEnd - 1));
+        i = upperEnd - 1;
+      } else if (lowerFollows) {
+        const end = runEnd(upperEnd, isLower);
+        parts.push(word.slice(i, end));
+        i = end;
+      } else {
+        parts.push(word.slice(i, upperEnd));
+        i = upperEnd;
+      }
+    } else if (isLower(word[i])) {
+      const end = runEnd(i, isLower);
+      parts.push(word.slice(i, end));
+      i = end;
+    } else {
+      i++;
+    }
+  }
+  return parts;
+}
+
+// ---------------------------------------------------------------------------
+// ARPAbet parsing and IPA conversion
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse an ARPAbet string: `"HH AH0 L OW1"` ->
+ * `[["HH", -1], ["AH", 0], ["L", -1], ["OW", 1]]`.
+ *
+ * @param {string} arpa
+ * @returns {[string, number][]}
+ */
+function parseArpabet(arpa) {
+  return arpa
+    .split(/\s+/)
+    .filter((t) => t)
+    .map((tok) => {
+      const last = tok[tok.length - 1];
+      if (tok.length > 1 && (last === "0" || last === "1" || last === "2")) {
+        return [tok.slice(0, -1), Number(last)];
+      }
+      return [tok, -1];
+    });
+}
+
+/**
+ * Convert parsed ARPAbet to IPA with Python's context rules:
+ * AA + R -> ɑːɹ, stressed ER -> ɜː, unstressed AH -> ə.
+ * Unknown symbols are skipped (as in the Rust and C++ ports).
+ *
+ * @param {[string, number][]} tokens
+ * @returns {[string, number][]} (ipa, stress) pairs
  */
 function convertWordToIpa(tokens) {
   const result = [];
   let i = 0;
   while (i < tokens.length) {
-    const token = tokens[i];
-    const m = RE_ARPABET.exec(token);
-    if (m) {
-      const base = m[1];
-      const stress = m[2] !== undefined ? parseInt(m[2], 10) : -1;
-
-      // AA + R -> ɑːɹ
-      if (base === "AA" && i + 1 < tokens.length && tokens[i + 1] === "R") {
-        result.push(["\u0251\u02d0\u0279", stress]); // ɑːɹ
-        i += 2;
-        continue;
-      }
-
-      // Stressed ER -> ɜː
-      if (base === "ER" && stress === 1) {
-        result.push(["\u025c\u02d0", stress]); // ɜː
-        i += 1;
-        continue;
-      }
+    const [base, stress] = tokens[i];
+    const next = tokens[i + 1];
+    if (base === "AA" && next && next[0] === "R" && next[1] === -1) {
+      result.push(["\u0251\u02d0\u0279", stress]); // ɑːɹ
+      i += 2;
+      continue;
     }
-
-    const [ipa, stress] = arpabetToIpa(token);
-    result.push([ipa, stress]);
+    if (base === "ER" && stress === 1) {
+      result.push(["\u025c\u02d0", stress]); // ɜː
+    } else if (base === "AH" && stress === 0) {
+      result.push([AH_UNSTRESSED_IPA, stress]);
+    } else if (Object.hasOwn(ARPABET_TO_IPA, base)) {
+      result.push([ARPABET_TO_IPA[base], stress]);
+    }
     i += 1;
   }
   return result;
 }
 
-/**
- * Check whether a word (ARPAbet token list) is punctuation only.
- */
-function isPunctuationWord(tokens) {
-  return tokens.every((t) => PUNCTUATION.has(t));
-}
+// ---------------------------------------------------------------------------
+// Morphological fallback for words missing from the dictionary
+// (C++ tryMorphologicalFallback / Rust try_morphological_fallback)
+// ---------------------------------------------------------------------------
 
 /**
- * Extract source (alphabetic) words from text for function-word matching.
+ * Strip a common suffix and look the stem up; returns the stem's ARPAbet
+ * with the suffix's phonemes appended, or null.
+ *
+ * @param {string} word lowercase
+ * @param {Map<string, string>} dict
+ * @returns {string|null}
  */
-function getSourceWords(text) {
-  const matches = text.toLowerCase().match(/[a-z']+/g);
-  return matches || [];
-}
+function tryMorphologicalFallback(word, dict) {
+  const len = word.length;
+  /** @param {string} base @param {string} suffixArpa */
+  const tryBase = (base, suffixArpa) => {
+    const arpa = dict.get(base);
+    return arpa === undefined ? null : `${arpa} ${suffixArpa}`;
+  };
+  /** @param {string} base */
+  const doubled = (base) => base.length >= 2 && base[base.length - 1] === base[base.length - 2];
 
-/**
- * Convert a cleaned word into ARPAbet tokens using dictionary + fallback.
- */
-function wordToArpabet(word) {
-  const entry = DICTIONARY[word];
-  if (entry) {
-    return entry;
-  }
-  // Fallback: digraph then letter rules
-  const tokens = [];
-  let i = 0;
-  while (i < word.length) {
-    let matched = false;
-    // Try trigraphs / digraphs first (longest match)
-    for (const [pattern, arpa] of DIGRAPH_RULES) {
-      if (word.substring(i, i + pattern.length) === pattern) {
-        tokens.push(...arpa);
-        i += pattern.length;
-        matched = true;
-        break;
-      }
-    }
-    if (!matched) {
-      const letter = word[i];
-      const arpa = LETTER_RULES[letter];
-      if (arpa) {
-        tokens.push(...arpa);
-      }
-      i += 1;
-    }
-  }
-  return tokens;
-}
-
-/**
- * Tokenize text into word groups (ARPAbet token arrays).
- * Punctuation characters form their own groups.
- */
-function textToArpabetWords(text) {
-  const rawWords = text.toLowerCase().split(/\s+/);
-  const words = [];
-
-  for (const raw of rawWords) {
-    if (!raw) {
-      continue;
-    }
-    // Separate trailing/leading punctuation from the word
-    let word = raw;
-    const trailingPunct = [];
-
-    // Strip trailing punctuation
-    while (word.length > 0 && PUNCTUATION.has(word[word.length - 1])) {
-      trailingPunct.unshift(word[word.length - 1]);
-      word = word.slice(0, -1);
-    }
-
-    // Strip leading punctuation (rare but possible)
-    const leadingPunct = [];
-    while (word.length > 0 && PUNCTUATION.has(word[0])) {
-      leadingPunct.push(word[0]);
-      word = word.slice(1);
-    }
-
-    for (const p of leadingPunct) {
-      words.push([p]);
-    }
-
-    if (word.length > 0) {
-      // Remove non-alpha characters (except apostrophe in contractions)
-      const cleanWord = word.replace(/[^a-z']/g, "");
-      if (cleanWord.length > 0) {
-        words.push(wordToArpabet(cleanWord));
-      }
-    }
-
-    for (const p of trailingPunct) {
-      words.push([p]);
+  // -ing (running->run, making->make, sitting->sit)
+  if (len > 4 && word.endsWith("ing")) {
+    const base = word.slice(0, -3);
+    const r =
+      tryBase(base, "IH0 NG") ??
+      (doubled(base) ? tryBase(base.slice(0, -1), "IH0 NG") : null) ??
+      tryBase(`${base}e`, "IH0 NG");
+    if (r !== null) {
+      return r;
     }
   }
 
-  return words;
+  // -ed (walked->walk, stopped->stop, loved->love)
+  if (len > 3 && word.endsWith("ed")) {
+    const base = word.slice(0, -2);
+    const r =
+      tryBase(base, "D") ??
+      (doubled(base) ? tryBase(base.slice(0, -1), "D") : null) ??
+      tryBase(word.slice(0, -1), "D");
+    if (r !== null) {
+      return r;
+    }
+  }
+
+  // -s / -es / -ies (cats->cat, boxes->box, countries->country)
+  if (len > 2 && word.endsWith("s")) {
+    const r =
+      (len > 4 && word.endsWith("ies") ? tryBase(`${word.slice(0, -3)}y`, "Z") : null) ??
+      (len > 3 && word.endsWith("es") ? tryBase(word.slice(0, -2), "IH0 Z") : null) ??
+      tryBase(word.slice(0, -1), "Z");
+    if (r !== null) {
+      return r;
+    }
+  }
+
+  // -er (faster->fast, runner->run)
+  if (len > 3 && word.endsWith("er")) {
+    const base = word.slice(0, -2);
+    const r = tryBase(base, "ER0") ?? (doubled(base) ? tryBase(base.slice(0, -1), "ER0") : null);
+    if (r !== null) {
+      return r;
+    }
+  }
+
+  // -ly / -ily (quickly->quick, happily->happy)
+  if (len > 3 && word.endsWith("ly")) {
+    const r =
+      tryBase(word.slice(0, -2), "L IY0") ??
+      (len > 4 && word[len - 3] === "i" ? tryBase(`${word.slice(0, -3)}y`, "L IY0") : null);
+    if (r !== null) {
+      return r;
+    }
+  }
+
+  // -est (fastest->fast)
+  if (len > 4 && word.endsWith("est")) {
+    return tryBase(word.slice(0, -3), "AH0 S T");
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------
 // EnglishG2P class
 // ---------------------------------------------------------------------------
 
+const NOT_LOADED_MESSAGE =
+  "EnglishG2P: the CMU dictionary is not loaded. Call `await englishG2P.initialize()` " +
+  "(EnglishG2P.create() and G2P.create() do this) before phonemizing, or pass a " +
+  "preloaded dictionary as `new EnglishG2P({ cmuDict })`.";
+
 export class EnglishG2P {
   /**
    * Create an EnglishG2P instance.
    *
-   * @param {Object} [options={}] - Reserved for future options.
+   * The CMU dictionary is not read here. Call `initialize()` (or use
+   * `EnglishG2P.create()`) to load the bundled one; in Node it is also read
+   * synchronously on the first `phonemize()` call.
+   *
+   * @param {Object} [options={}]
+   * @param {Record<string, string>|Map<string, string>} [options.cmuDict]
+   *   A dictionary to use instead of the bundled one: lowercase word ->
+   *   ARPAbet string (`{ hello: "HH AH0 L OW1" }`).
    */
   constructor(options = {}) {
-    // Reserved for future options (e.g. custom dictionary additions)
     this._options = options;
+    /** @type {Map<string, string>|null} */
+    this._dict = options.cmuDict ? toCmuDictMap(options.cmuDict) : null;
   }
 
   /**
-   * Convert English text to IPA tokens.
+   * Create an EnglishG2P instance with its dictionary loaded.
    *
-   * Processing flow:
-   *   1. Lowercase the text
-   *   2. Look up each word in the built-in dictionary (CMU-dict style)
-   *   3. Fall back to digraph / letter rules for unknown words
-   *   4. Convert ARPAbet tokens to IPA
-   *   5. Apply function-word stress removal
-   *   6. Insert stress markers (ˈ / ˌ) before stressed vowels
-   *   7. Return flat IPA token array with word-boundary spaces
-   *
-   * @param {string} text - Input English text.
-   * @returns {{ tokens: string[], prosody: null[] }}
+   * @param {Object} [options={}]  See the constructor.
+   * @returns {Promise<EnglishG2P>}
    */
-  phonemize(text) {
-    if (!text || typeof text !== "string") {
-      return { tokens: [], prosody: [] };
+  static async create(options = {}) {
+    const g2p = new EnglishG2P(options);
+    await g2p.initialize();
+    return g2p;
+  }
+
+  /**
+   * Load the bundled CMU dictionary unless this instance already has one.
+   * Safe to call more than once.
+   *
+   * @returns {Promise<EnglishG2P>}
+   */
+  async initialize() {
+    if (!this._dict) {
+      this._dict = await loadCmuDict();
     }
+    return this;
+  }
 
-    const words = textToArpabetWords(text);
-    const sourceWords = getSourceWords(text);
+  /** Whether this instance has its dictionary. */
+  get isInitialized() {
+    return this._dict !== null;
+  }
 
+  /**
+   * The dictionary, loading it synchronously when that is possible.
+   *
+   * @returns {Map<string, string>}
+   * @private
+   */
+  _requireDict() {
+    if (!this._dict) {
+      this._dict = getCmuDictSync();
+      if (!this._dict) {
+        throw new Error(NOT_LOADED_MESSAGE);
+      }
+    }
+    return this._dict;
+  }
+
+  /**
+   * The dictionary entry of `word`, or of its stem.
+   *
+   * @param {string} word
+   * @returns {string|null}
+   * @private
+   */
+  _lookup(word) {
+    const dict = this._requireDict();
+    const lower = word.toLowerCase();
+    return dict.get(lower) ?? tryMorphologicalFallback(lower, dict);
+  }
+
+  /**
+   * ARPAbet for a word; never null when the word has a letter.
+   *
+   * Python reads words missing from the dictionary with g2p_en's neural
+   * guesser, which is not ported. Instead such a word is split at `-` and
+   * `.`, retried without apostrophes, split at CamelCase boundaries, and
+   * finally spelled letter by letter. The parts are joined into one word.
+   *
+   * @param {string} word
+   * @returns {string|null}
+   * @private
+   */
+  _wordArpabet(word) {
+    const found = this._lookup(word);
+    if (found !== null) {
+      return found;
+    }
+    /** @param {string[]} parts */
+    const join = (parts) => {
+      const arpas = parts.map((p) => this._wordArpabet(p)).filter((a) => a !== null);
+      return arpas.length > 0 ? arpas.join(" ") : null;
+    };
+    if (word.includes("-") || word.includes(".")) {
+      return join(word.split(/[-.]/).filter((p) => p));
+    }
+    if (word.includes("'")) {
+      return this._wordArpabet(word.replace(/'/g, ""));
+    }
+    const parts = splitCamelCase(word);
+    if (parts.length > 1) {
+      return join(parts);
+    }
+    const spelled = [...word.toLowerCase()]
+      .map((c) => LETTER_NAMES.get(c))
+      .filter((a) => a !== undefined);
+    return spelled.length > 0 ? spelled.join(" ") : null;
+  }
+
+  /**
+   * Phonemes and Python's prosody for `text`.
+   *
+   * @param {string} text
+   * @returns {{ tokens: string[], prosody: {a1: number, a2: number, a3: number}[] }}
+   * @private
+   */
+  _phonemize(text) {
+    /** @type {string[]} */
     const tokens = [];
-
-    // Build function-word flags
+    /** @type {{a1: number, a2: number, a3: number}[]} */
+    const prosody = [];
+    if (!text || typeof text !== "string") {
+      return { tokens, prosody };
+    }
+    const words = normalizeAndTokenize(text);
+    const source = sourceWords(text);
+    let needSpace = false;
     let srcIdx = 0;
-    const wordIsFunction = [];
-    for (const wordTokens of words) {
-      if (isPunctuationWord(wordTokens)) {
-        wordIsFunction.push(false);
+
+    for (const word of words) {
+      const isPunct = isPunctuationWord(word);
+
+      // A word without a letter (`-`, `'`, `...`) is kept as it is, one
+      // phoneme per character, as Python does.
+      /** @type {[string, number][]} */
+      let wordIpas;
+      if (/[A-Za-z]/.test(word)) {
+        const arpa = this._wordArpabet(word);
+        if (arpa === null) {
+          continue;
+        }
+        wordIpas = convertWordToIpa(parseArpabet(arpa));
       } else {
-        let isFunc = false;
-        if (srcIdx < sourceWords.length) {
-          isFunc = FUNCTION_WORDS.has(sourceWords[srcIdx]);
+        wordIpas = [[word, -1]];
+      }
+
+      if (!isPunct) {
+        // Function words are matched against the source words in order.
+        if (srcIdx < source.length) {
+          if (FUNCTION_WORDS.has(source[srcIdx])) {
+            wordIpas = wordIpas.map(([ipa, stress]) => [ipa, stress >= 1 ? 0 : stress]);
+          }
           srcIdx += 1;
         }
-        wordIsFunction.push(isFunc);
-      }
-    }
-
-    let needSpace = false;
-
-    for (let wordIdx = 0; wordIdx < words.length; wordIdx++) {
-      const wordTokens = words[wordIdx];
-      const isPunct = isPunctuationWord(wordTokens);
-      const isFunc = wordIsFunction[wordIdx];
-
-      // Word boundary: space before non-punctuation words (except first)
-      if (!isPunct && needSpace) {
-        tokens.push(" ");
+        // Punctuation attaches to the preceding word; other words get a
+        // word boundary before them (except the first).
+        if (needSpace) {
+          tokens.push(" ");
+          prosody.push({ a1: 0, a2: 0, a3: 0 });
+        }
       }
 
-      // Convert ARPAbet -> IPA with context rules
-      let wordIpas = convertWordToIpa(wordTokens);
-
-      // Remove stress from function words
-      if (isFunc) {
-        wordIpas = wordIpas.map(([ipa, stress]) => [ipa, stress >= 1 ? 0 : stress]);
-      }
+      // A3 = total IPA character count for the word
+      const a3 = wordIpas.reduce((n, [ipa]) => n + [...ipa].length, 0);
 
       for (const [ipa, stress] of wordIpas) {
-        // Insert stress marker before stressed vowels
+        // stress -> A2: primary(1)->2, secondary(2)->1, others->0
+        const a2 = stress === 1 ? 2 : stress === 2 ? 1 : 0;
         if (stress === 1) {
           tokens.push("\u02c8"); // ˈ primary stress
+          prosody.push({ a1: 0, a2, a3 });
         } else if (stress === 2) {
           tokens.push("\u02cc"); // ˌ secondary stress
+          prosody.push({ a1: 0, a2, a3 });
         }
-
         // Each IPA character becomes a separate token
         for (const ch of ipa) {
           tokens.push(ch);
+          prosody.push({ a1: 0, a2, a3 });
         }
       }
 
       needSpace = true;
     }
 
-    return {
-      tokens,
-      prosody: new Array(tokens.length).fill(null),
-    };
+    return { tokens, prosody };
   }
 
   /**
-   * Convert English text to IPA tokens with prosody information.
+   * Convert English text to IPA tokens.
    *
-   * English does not have prosody features (A1/A2/A3) like Japanese,
-   * so this returns the same result as phonemize() -- prosody is always
-   * a null array matching the token length.
+   * Processing flow (as Python and the Rust port):
+   *   1. normalize and tokenize like g2p_en
+   *   2. look each word up in the CMU dictionary (then its stem)
+   *   3. split / spell words missing from it
+   *   4. convert ARPAbet to IPA, remove the stress of function words
+   *   5. insert stress markers (ˈ / ˌ) before stressed vowels
+   *   6. return a flat IPA token array with word-boundary spaces
+   *
+   * Needs the CMU dictionary: in Node it is read synchronously when
+   * `initialize()` has not been called; elsewhere an uninitialised instance
+   * throws for any text that has words.
    *
    * @param {string} text - Input English text.
    * @returns {{ tokens: string[], prosody: null[] }}
    */
+  phonemize(text) {
+    const { tokens } = this._phonemize(text);
+    return { tokens, prosody: new Array(tokens.length).fill(null) };
+  }
+
+  /**
+   * Convert English text to IPA tokens with Python's prosody features:
+   * a1 = 0, a2 = stress (primary 2, secondary 1, none 0) and a3 = the
+   * number of IPA characters of the word. Word boundaries get zeros.
+   *
+   * @param {string} text - Input English text.
+   * @returns {{ tokens: string[], prosody: {a1: number, a2: number, a3: number}[] }}
+   */
   phonemizeWithProsody(text) {
-    const { tokens } = this.phonemize(text);
-    const prosody = tokens.map(() => ({ a1: 0, a2: 0, a3: 0 }));
-    return { tokens, prosody };
+    return this._phonemize(text);
   }
 }

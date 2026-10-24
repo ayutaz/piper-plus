@@ -14,6 +14,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -96,5 +97,48 @@ describe('ライセンス同梱', () => {
             /Permission is hereby granted/i,
             'MIT license text must carry the permission notice'
         );
+    });
+});
+
+/**
+ * The files `npm pack` would publish, with their sizes, read from
+ * `npm pack --dry-run --json` (the same listing check-cdn-delivery.mjs uses).
+ *
+ * @returns {{ path: string, size: number }[]}
+ */
+function packedFiles() {
+    const out = execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {
+        cwd: PKG_ROOT,
+        encoding: 'utf-8',
+        shell: process.platform === 'win32',
+        stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return JSON.parse(out)[0].files.map((f) => ({ path: f.path.replace(/\\/g, '/'), size: f.size }));
+}
+
+describe('CMU 辞書の同梱 (Issue #828)', () => {
+    const DICT = 'data/cmudict_data.json';
+
+    it('files に data/cmudict_data.json が含まれる', () => {
+        assert.ok(
+            pkg.files.includes(DICT),
+            `${DICT} must be listed in files, or the English G2P has no dictionary once published`
+        );
+    });
+
+    it('npm pack の内容に辞書と CMU の許諾文が入る', () => {
+        const packed = packedFiles();
+        const dict = packed.find((f) => f.path === DICT);
+        assert.ok(dict, `${DICT} is not in the npm pack listing`);
+        assert.equal(dict.size, readFileSync(join(PKG_ROOT, DICT)).length);
+
+        // The CMU license requires its notice in every redistribution.
+        assert.ok(
+            packed.some((f) => f.path === 'THIRD_PARTY_LICENSES.md'),
+            'THIRD_PARTY_LICENSES.md (CMU notice) is not in the npm pack listing'
+        );
+        const notices = readFileSync(join(PKG_ROOT, 'THIRD_PARTY_LICENSES.md'), 'utf-8');
+        assert.match(notices, /Carnegie Mellon University/);
+        assert.match(notices, /This product includes data from the Carnegie\s+>?\s*Mellon Pronouncing Dictionary/);
     });
 });

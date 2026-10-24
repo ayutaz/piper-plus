@@ -25,7 +25,7 @@ const ALL_LANGUAGES = ["ja", "en", "zh", "ko", "es", "fr", "pt", "pt-PT", "sv"];
 
 /** Map from language code to G2P constructor (for non-JA languages). */
 const LANGUAGE_FACTORIES = {
-  en: () => new EnglishG2P(),
+  en: (options) => new EnglishG2P({ cmuDict: options.cmuDict }),
   zh: () => new ChineseG2P(),
   ko: () => new KoreanG2P(),
   es: () => new SpanishG2P(),
@@ -50,8 +50,9 @@ const LATIN_SEGMENT_LANGUAGES = new Set(["en", "es", "fr", "pt", "pt-PT", "sv"])
  * conversion.
  *
  * Use the async factory `G2P.create(options)` to construct an instance.
- * Japanese requires OpenJTalk WASM + dictionary data; other languages
- * are rule-based and initialise synchronously.
+ * Japanese requires OpenJTalk WASM + dictionary data, and English loads the
+ * bundled CMU dictionary; the other languages are rule-based and initialise
+ * synchronously.
  *
  * @example
  * import { G2P, DictLoader } from '@piper-plus/g2p';
@@ -90,6 +91,11 @@ export class G2P {
    *   Japanese dictionary data obtained from `DictLoader.loadJaDict()`.
    * @param {import('./custom-dictionary.js').CustomDictionary[]} [options.customDicts]
    *   Custom dictionary instances to apply before phonemisation.
+   * @param {Record<string, string>|Map<string, string>} [options.cmuDict]
+   *   English pronunciation dictionary (lowercase word -> ARPAbet string) to
+   *   use instead of the bundled CMU dictionary. When English is enabled and
+   *   this is not given, the bundled `data/cmudict_data.json` (~3.7 MB) is
+   *   loaded here; it is not loaded when `languages` leaves English out.
    * @returns {Promise<G2P>}
    */
   static async create(options = {}) {
@@ -117,14 +123,17 @@ export class G2P {
       phonemizers.set("ja", jaG2P);
     }
 
-    // Initialise rule-based languages (sync)
+    // Initialise the other languages (English loads its CMU dictionary)
     for (const lang of languages) {
       if (lang === "ja") {
         continue;
       }
       const factory = LANGUAGE_FACTORIES[lang];
       if (factory) {
-        const g2p = factory();
+        const g2p = factory(options);
+        if (typeof g2p.initialize === "function") {
+          await g2p.initialize();
+        }
         // Apply custom dicts if the G2P instance supports it
         if (options.customDicts && typeof g2p.setCustomDicts === "function") {
           g2p.setCustomDicts(options.customDicts);
@@ -351,7 +360,13 @@ export class G2P {
 // ---- Re-exports --------------------------------------------------------------
 
 export { JapaneseG2P } from "./ja/index.js";
-export { EnglishG2P } from "./en/index.js";
+export {
+  EnglishG2P,
+  loadCmuDict,
+  isCmuDictLoaded,
+  normalizeNumbers,
+  normalizeAndTokenize,
+} from "./en/index.js";
 export { ChineseG2P } from "./zh/index.js";
 export { SpanishG2P } from "./es/index.js";
 export { FrenchG2P } from "./fr/index.js";
