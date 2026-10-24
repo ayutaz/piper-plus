@@ -120,12 +120,6 @@ class TestPerformance:
 
         process = psutil.Process(os.getpid())
 
-        # Force garbage collection
-        gc.collect()
-
-        # Baseline memory
-        baseline_mem = process.memory_info().rss / 1024 / 1024  # MB
-
         # Process increasingly large texts. pyopenjtalk rejects input longer
         # than 16 KB after normalization ("Input text is too long after
         # normalization": 5461 three-byte characters at most), so stay below
@@ -133,8 +127,21 @@ class TestPerformance:
         text_sizes = [100, 1000, 5000]
         memory_usage = []
 
+        # The first call at each size grows RSS by one-time costs (allocator
+        # arenas, OpenJTalk buffers): +3.1 MB for 1000 chars on the first
+        # call vs +0.4 MB once warm. Warm every size up first, and clear the
+        # phonemizer's LRU cache before each measured call: a cache hit does
+        # no work and would measure 0 MB.
+        from piper_plus_g2p import japanese as _ja
+
+        for size in text_sizes:
+            _phonemize_japanese("あ" * size)
+        gc.collect()
+        baseline_mem = process.memory_info().rss / 1024 / 1024
+
         for size in text_sizes:
             text = "あ" * size
+            _ja._phonemize_core_cached.cache_clear()
 
             # Measure memory before
             gc.collect()
