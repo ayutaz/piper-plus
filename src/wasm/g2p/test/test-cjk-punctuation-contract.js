@@ -9,10 +9,10 @@
  *
  * `G2P` phonemizes a whole text with one language, so the Latin-segment
  * rewrite applies to the text `G2P.phonemize()` hands to a Latin-script G2P.
- * The JS Chinese G2P is character-level (no pinyin dictionary, #829), so the
- * Chinese cases are checked on the segmentation instead: the sentence stays
- * one Chinese segment, and the Chinese segment sits right before the English
- * one, which is what the ZH-EN loanword dispatch of the Rust WASM G2P needs.
+ * The Chinese cases are checked on the segmentation (their phonemes are
+ * compared with the Python golden in test-g2p-golden-parity.js): the sentence
+ * stays one Chinese segment, and the Chinese segment sits right before the
+ * English one, which is what the ZH-EN loanword dispatch needs.
  * Japanese needs the OpenJTalk WASM, so the `G2P` instance leaves it out.
  *
  * Run: node --test test/test-cjk-punctuation-contract.js

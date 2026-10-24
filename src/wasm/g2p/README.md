@@ -88,7 +88,7 @@ string, e.g. `{ hello: 'HH AH0 L OW1' }`).
 |------------|------|---------------------|-----------------------|
 | Japanese   | ja   | OpenJTalk WASM      | DictLoader dictionary asset |
 | English    | en   | CMU dictionary + g2p_en normalization | Bundled `data/cmudict_data.json` (~3.7 MB, loaded on demand) |
-| Chinese    | zh   | Pinyin-based        | None |
+| Chinese    | zh   | Pinyin dictionary (bundled, loaded on demand) | None |
 | Spanish    | es   | Rule-based          | None |
 | French     | fr   | Rule-based          | None |
 | Portuguese | pt   | Rule-based          | None |
@@ -122,7 +122,35 @@ string, e.g. `{ hello: 'HH AH0 L OW1' }`).
 Creates and initializes a G2P instance.
 
 - `options.languages` -- Array of language codes to load (default: all)
+- `options.pinyinDict` -- Pinyin dictionaries for Chinese, `{ single, phrases }`
+  (optional; see [Chinese](#chinese))
 - Returns: `Promise<G2P>`
+
+### Chinese
+
+Chinese is read with the pinyin dictionaries bundled in the package
+(`data/pinyin_single.json`, `data/pinyin_phrases.json`, about 2.7 MB of JSON),
+the same dictionaries and steps as the Rust and Python G2P: longest phrase
+match, tone sandhi (T3+T3, 一, 不), pinyin to IPA. English next to Chinese
+(`'我用 GPS 导航'`) is read as Mandarin pinyin with the ZH-EN loanword
+dictionary.
+
+The dictionaries are loaded only when Chinese is enabled: `G2P.create()` loads
+them when `zh` is in `languages` (the default includes it), so pass
+`languages` without `zh` if you never phonemize Chinese. To load them from a
+place of your own, pass `pinyinDict: { single, phrases }` (parsed JSON objects
+or JSON text).
+
+`ChineseG2P` on its own needs `await zh.initialize()` (or the `pinyinDict`
+option) first. Before that it is in `fallback` mode and passes every
+character through as a token, as earlier versions did.
+
+```js
+import { ChineseG2P } from '@piper-plus/g2p/zh';
+
+const zh = await new ChineseG2P().initialize();
+zh.phonemize('你好').tokens; // ['n', 'i', 'tone2', 'x', 'aʊ', 'tone3']
+```
 
 ### `g2p.phonemize(text, options?)`
 

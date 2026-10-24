@@ -12,6 +12,8 @@ on:
       - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
       # Shared normalization cases read by test-english-normalize.js.
       - 'tests/fixtures/g2p/english_normalize_cases.json'
+      # Canonical of the bundled pinyin dictionaries (test-package-metadata.js).
+      - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
       - 'tests/fixtures/g2p/phoneme_test_cases.json'
       # Read by test/test-g2p-golden-parity.js.
       - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
@@ -34,6 +36,8 @@ on:
       - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
       # Shared normalization cases read by test-english-normalize.js.
       - 'tests/fixtures/g2p/english_normalize_cases.json'
+      # Canonical of the bundled pinyin dictionaries (test-package-metadata.js).
+      - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
       - 'tests/fixtures/g2p/phoneme_test_cases.json'
       # Read by test/test-g2p-golden-parity.js.
       - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
