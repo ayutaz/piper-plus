@@ -6,12 +6,10 @@ name: CLI Help Extract
 # output.
 #
 # Runtimes: python, rust, csharp, go, wasm, cpp.
-# Initial canonical txt for csharp / cpp may be a PLACEHOLDER (when the
-# dev env that landed the PR lacked the SDK / toolchain). The drift-check
-# job skips any canonical that contains a "# PLACEHOLDER:" marker line —
-# run workflow_dispatch on a runner with the full toolchain and commit
-# the regenerated body in a follow-up PR to flip the runtime to a real
-# baseline.
+# Canonicals are the sanitized Linux capture of this workflow: take them
+# from the cli-help-<runtime>-<run_id> artifact, not from a local run
+# (a Windows / Japanese-locale capture drifts, #813). Drift fails pull
+# requests; the weekly run opens an issue.
 #
 # Existing cli-help-docs-sync.yml (Python-only, stale-only mode) is
 # preserved unchanged — both run in parallel (AC-4.2). Consolidation is
@@ -31,6 +29,8 @@ on:
       - 'docs/reference/cli-help/**'
       - 'scripts/sanitize_cli_help.py'
       - 'scripts/sanitize_cli_help_rules.toml'
+      - 'tests/scripts/test_sanitize_cli_help.py'
+      - 'tests/scripts/test_cli_help_extract_workflow.py'
       - '.github/workflows/cli-help-extract.yml'
   workflow_dispatch:
 
@@ -50,7 +50,14 @@ env:
 jobs:
   extract:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # The C++ CLI is built from source (ORT / OpenJTalk are downloaded by
+    # cmake), which takes longer than the other runtimes.
+    timeout-minutes: 30
+    env:
+      # English UI culture: a Japanese culture localized the C# headings
+      # (Usage: -> 使用法:) in a committed canonical (#813).
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
     strategy:
       fail-fast: false
       matrix:
@@ -149,15 +156,15 @@ jobs:
 
       - name: Build C++ + capture --help
         if: matrix.runtime == 'cpp'
-        continue-on-error: true
         run: |
           mkdir -p /tmp/cli-help
-          # C++ build is out-of-scope for the initial PR; this step is
-          # expected to leave /tmp/cli-help/cpp-raw.txt absent. The drift
-          # check honours the PLACEHOLDER marker in the committed canonical
-          # to keep the workflow green until the toolchain step lands.
-          echo "::warning::C++ build step not yet implemented; using PLACEHOLDER canonical."
-          : > /tmp/cli-help/cpp-raw.txt
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake
+          # Only the CLI target: tests and the shared library are not needed
+          # for --help. ORT and OpenJTalk are downloaded by cmake.
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DUSE_CUDA=OFF
+          cmake --build build --target piper -j"$(nproc)"
+          ./build/piper-plus --help > /tmp/cli-help/cpp-raw.txt 2>&1
         shell: bash
 
       # ----- Sanitize (skipped when raw is empty / build failed) -----
@@ -180,7 +187,7 @@ jobs:
             csharp) src='dotnet PiperPlus.Cli/bin/Release/net10.0/PiperPlus.Cli.dll --help' ;;
             go)     src='piper-plus --help' ;;
             wasm)   src='node piper-cli.js --help' ;;
-            cpp)    src='./build/piper_plus --help' ;;
+            cpp)    src='./build/piper-plus --help' ;;
             *)      echo "::error::No source mapped for ${rt}"; exit 1 ;;
           esac
           python scripts/sanitize_cli_help.py \
@@ -219,6 +226,15 @@ jobs:
         uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.13'
+
+      # The canonical format checks (4-line header, no Windows / localized /
+      # machine-specific text) were never run by CI, so canonicals captured
+      # on a developer machine were merged and drifted (#813).
+      - name: Canonical format and workflow tests
+        run: |
+          pip install pytest pyyaml
+          python -m pytest tests/scripts/test_sanitize_cli_help.py             tests/scripts/test_cli_help_extract_workflow.py -o addopts= -q
+        shell: bash
 
       - name: Download artifacts
         uses: actions/download-artifact@v6.0.0
@@ -306,6 +322,16 @@ jobs:
         with:
           header: cli-help-extract
           path: /tmp/cli-help-drift-report.md
+
+      # Drift used to be report-only, so a stale canonical reached dev and
+      # surfaced only in the weekly issue (#813). To update a canonical,
+      # download the cli-help-<runtime>-<run_id> artifact of this run.
+      - name: Fail on drift (pull request)
+        if: github.event_name == 'pull_request' && steps.diff.outputs.diff_count != '0'
+        run: |
+          echo "::error::CLI help drift: replace docs/reference/cli-help/<runtime>.txt with the cli-help-<runtime>-${{ github.run_id }} artifact of this run."
+          exit 1
+        shell: bash
 
       - name: Open issue on drift (scheduled only)
         if: github.event_name == 'schedule' && steps.diff.outputs.diff_count != '0'
