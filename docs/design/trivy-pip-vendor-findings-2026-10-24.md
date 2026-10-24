@@ -118,7 +118,8 @@ CUDA の base image そのものでのビルドは行っていない。 CI の `
   - `python:` イメージから始まる stage で、 `pip install --ignore-installed` に pip 自身を含めない。
   - `.trivyignore.yaml` の各エントリは版付きの PURL、 `statement`、 `expired_at` を持ち、 pip 同梱の版 (msgpack 1.1.2 / setuptools 70.3.0) を再び抑止していない。
   - 例外は `python-train` と `cpp-dev` だけで、 理由をテスト内に書いてある。
-- このテストは pre-commit hook `runtime-images-ship-no-pip` (Dockerfile、 `.trivyignore.yaml`、 Trivy workflow、 テスト自身の変更で動く) と、 `trivy-container-scan.yml` の `gate-script-tests` job で動く。 workflow の `paths:` にもテストを追加した。
+  - workflow が、 これらの Dockerfile から作った image を `docker run` するとき、 その中で `pip install` を呼ばない。 PR #853 の CI で、 `docker-test.yml` が python-inference の中で `pip install --user pytest httpx` を実行し、 `pip: command not found` で失敗した。 この step は `-u root` で `uv pip install --system` を使うように直した。
+- このテストは pre-commit hook `runtime-images-ship-no-pip` (Dockerfile、 `.trivyignore.yaml`、 workflow、 テスト自身の変更で動く) と、 `trivy-container-scan.yml` の `gate-script-tests` job で動く。 workflow の `paths:` にもテストを追加した。
 - 修正前の Dockerfile と `.trivyignore.yaml` では、 このテストは 7 件失敗する (Dockerfile 6 本と抑止 1 件)。
 
 ### 見立てを誤った理由

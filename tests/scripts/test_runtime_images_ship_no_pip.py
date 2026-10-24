@@ -351,6 +351,79 @@ def test_runtime_image_removes_pip(dockerfile):
 
 
 # --------------------------------------------------------------------------
+# Workflows that run commands inside the built runtime images.
+# --------------------------------------------------------------------------
+
+DOCKER_BUILD_RE = re.compile(r"docker (?:buildx )?build\b[^\n]*")
+
+
+def _built_tags(job: dict, runtime: set[str]) -> set[str]:
+    """Image tags a job builds from a Dockerfile that must not ship pip."""
+    tags: set[str] = set()
+    for step in job.get("steps") or []:
+        uses = step.get("uses") or ""
+        if uses.startswith("docker/build-push-action"):
+            with_ = step.get("with") or {}
+            dockerfile = with_.get("file") or f"{with_.get('context', '.')}/Dockerfile"
+            dockerfile = re.sub(r"^\./", "", str(dockerfile))
+            if dockerfile in runtime:
+                tags |= {t.strip() for t in re.split(r"[,\n]", str(with_.get("tags", ""))) if t.strip()}
+        for m in DOCKER_BUILD_RE.finditer(step.get("run") or ""):
+            f = re.search(r"(?:-f|--file)[ =](\S+)", m.group(0))
+            t = re.findall(r"(?:-t|--tag)[ =](\S+)", m.group(0))
+            if f and re.sub(r"^\./", "", f.group(1)) in runtime:
+                tags |= set(t)
+    return tags
+
+
+def pip_inside_runtime_containers(workflows: dict[str, dict], runtime: set[str]) -> list[str]:
+    """`docker run <runtime image> ... pip install` fails once pip is gone."""
+    problems = []
+    for name, data in sorted(workflows.items()):
+        for job_id, job in (data.get("jobs") or {}).items():
+            tags = _built_tags(job, runtime)
+            for step in job.get("steps") or []:
+                run = step.get("run") or ""
+                if "docker run" not in run or not any(t in run for t in tags):
+                    continue
+                if PIP_INSTALL_RE.search(run):
+                    problems.append(
+                        f"{name} job {job_id!r} step {step.get('name')!r}: runs pip "
+                        "inside a runtime image that ships without pip; use "
+                        "`uv pip install --system` (as root)"
+                    )
+    return problems
+
+
+def test_pip_inside_runtime_container_is_detected():
+    job = {
+        "steps": [
+            {
+                "uses": "docker/build-push-action@v6",
+                "with": {"file": "docker/a/Dockerfile", "tags": "img:test"},
+            },
+            {"run": 'docker run --rm img:test bash -c "pip install pytest && pytest"'},
+            {"run": 'docker run --rm -u root img:test bash -c "uv pip install --system pytest"'},
+            {"run": 'docker run --rm other:test bash -c "pip install pytest"'},
+        ]
+    }
+    problems = pip_inside_runtime_containers({"w.yml": {"jobs": {"j": job}}}, {"docker/a/Dockerfile"})
+    assert len(problems) == 1 and "w.yml" in problems[0]
+
+
+def test_workflows_do_not_run_pip_inside_runtime_images():
+    """docker-test.yml installed pytest with pip inside python-inference and
+    failed with `pip: command not found` once pip was removed (PR #853)."""
+    workflows = {
+        p.name: yaml.safe_load(p.read_text(encoding="utf-8"))
+        for p in sorted((REPO_ROOT / ".github" / "workflows").glob("*.y*ml"))
+    }
+    runtime = set(checked_dockerfiles())
+    assert any(_built_tags(j, runtime) for w in workflows.values() for j in (w.get("jobs") or {}).values())
+    assert pip_inside_runtime_containers(workflows, runtime) == []
+
+
+# --------------------------------------------------------------------------
 # .trivyignore.yaml
 # --------------------------------------------------------------------------
 
