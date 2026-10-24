@@ -126,8 +126,11 @@ class TestPerformance:
         # Baseline memory
         baseline_mem = process.memory_info().rss / 1024 / 1024  # MB
 
-        # Process increasingly large texts
-        text_sizes = [100, 1000, 10000, 50000]
+        # Process increasingly large texts. pyopenjtalk rejects input longer
+        # than 16 KB after normalization ("Input text is too long after
+        # normalization": 5461 three-byte characters at most), so stay below
+        # it, like test_stress_test.
+        text_sizes = [100, 1000, 5000]
         memory_usage = []
 
         for size in text_sizes:
