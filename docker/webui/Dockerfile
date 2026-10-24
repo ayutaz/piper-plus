@@ -30,10 +30,11 @@ COPY VERSION /app/VERSION
 COPY pyproject.toml /app/pyproject.toml
 COPY src/python /app/src/python
 COPY src/python_run/requirements_webui.txt /app/requirements_webui.txt
+COPY src/python_run/overrides_webui.txt /app/overrides_webui.txt
 
 # Install piper_train with inference extras + gradio + multilingual
 RUN uv pip install --system "/app/src/python[inference]" && \
-    uv pip install --system -r /app/requirements_webui.txt
+    uv pip install --system -r /app/requirements_webui.txt --override /app/overrides_webui.txt
 
 # Download NLTK data required by g2p-en (English phonemizer)
 # Use a shared path so data is accessible after USER switch to non-root

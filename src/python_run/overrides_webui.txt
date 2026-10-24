@@ -1,0 +1,14 @@
+# uv overrides for installing requirements_webui.txt
+# (`uv pip install -r requirements_webui.txt --override overrides_webui.txt`).
+#
+# gradio 6.26.0 (and 6.30.0, the latest) declares `pillow<13.0,>=8.0`, so a
+# plain install resolves Pillow 12.3.0. Pillow 13.0.0 fixes 40+ advisories,
+# 5 of them CRITICAL (CVE-2026-112393 / -112398 / -112403 / -112900 /
+# CVE-2026-96639). The WebUI uses gradio only for text and audio; gradio's
+# basic paths were checked with Pillow 13 (docs/design/pillow-13-override-2026-10-24.md).
+#
+# environments/webui/pyproject.toml repeats this in
+# `[tool.uv] override-dependencies`; tests/scripts/test_webui_pillow_override.py
+# keeps both and every Dockerfile in sync. Remove the override once gradio
+# allows Pillow 13.
+pillow>=13.0.0

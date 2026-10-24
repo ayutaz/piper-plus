@@ -71,11 +71,12 @@ COPY VERSION /build/VERSION
 COPY pyproject.toml /build/pyproject.toml
 COPY src/python /build/src/python
 COPY src/python_run/requirements_webui.txt /build/requirements_webui.txt
+COPY src/python_run/overrides_webui.txt /build/overrides_webui.txt
 
 # Install into system Python so /usr/local/lib/python3.13/site-packages
 # becomes a self-contained tree we can COPY into the distroless final.
 RUN uv pip install --system "/build/src/python[inference]"
-RUN uv pip install --system -r /build/requirements_webui.txt
+RUN uv pip install --system -r /build/requirements_webui.txt --override /build/overrides_webui.txt
 
 ENV NLTK_DATA=/usr/share/nltk_data
 RUN python -c "import nltk; \

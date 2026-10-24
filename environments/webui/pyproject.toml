@@ -10,6 +10,9 @@ dependencies = [
 
 [tool.uv]
 package = false
+# gradio caps `pillow<13.0`; Pillow 13.0.0 fixes 5 CRITICAL advisories. Same as
+# src/python_run/overrides_webui.txt (tests/scripts/test_webui_pillow_override.py).
+override-dependencies = ["pillow>=13.0.0"]
 
 [tool.uv.sources]
 piper-plus = { path = "../../src/python_run", editable = true }
