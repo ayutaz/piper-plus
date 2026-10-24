@@ -68,7 +68,8 @@
       "runtimes": [
         "cpp",
         "rust",
-        "swift"
+        "swift",
+        "wasm"
       ],
       "language": "zh",
       "input": "123",
@@ -378,36 +379,6 @@
       "status": "accepted",
       "issue": 821,
       "reason": "Out-of-dictionary word is emitted as its raw letters (for example 'c a f é'), which are not English phonemes. An exact match needs Python's neural guesser, which is not ported."
-    },
-    {
-      "runtimes": [
-        "wasm"
-      ],
-      "language": "zh",
-      "input": "123",
-      "status": "planned",
-      "issue": 847,
-      "reason": "Digits in zh input go to the English segment, which the Rust WASM passes through as characters ('1 2 3') because it has no English G2P (#847)."
-    },
-    {
-      "runtimes": [
-        "wasm"
-      ],
-      "language": "zh",
-      "input": "0",
-      "status": "planned",
-      "issue": 847,
-      "reason": "Digits in zh input go to the English segment, which the Rust WASM passes through as characters ('1 2 3') because it has no English G2P (#847)."
-    },
-    {
-      "runtimes": [
-        "wasm"
-      ],
-      "language": "zh",
-      "input": "100",
-      "status": "planned",
-      "issue": 847,
-      "reason": "Digits in zh input go to the English segment, which the Rust WASM passes through as characters ('1 2 3') because it has no English G2P (#847)."
     },
     {
       "runtimes": [

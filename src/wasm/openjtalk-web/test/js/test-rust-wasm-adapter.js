@@ -31,10 +31,16 @@ const CONFIG_JSON = JSON.stringify({
  * dictionary setters. Which setters exist is the whole point: the adapter is
  * expected to branch on their presence.
  *
- * @param {{ chinese?: boolean, japanese?: boolean, languages?: string[] }} opts
+ * @param {{ chinese?: boolean, japanese?: boolean, english?: boolean | Function,
+ *   languages?: string[] }} opts - `english` may be a replacement setter.
  */
-function createMockWasmModule({ chinese = false, japanese = false, languages } = {}) {
-  const calls = { chinese: [], japanese: [] };
+function createMockWasmModule({
+  chinese = false,
+  japanese = false,
+  english = false,
+  languages,
+} = {}) {
+  const calls = { chinese: [], japanese: [], english: [] };
 
   class WasmPhonemizer {
     constructor(configJson) {
@@ -57,6 +63,14 @@ function createMockWasmModule({ chinese = false, japanese = false, languages } =
     WasmPhonemizer.prototype.setJapaneseDictionary = function (bytes) {
       calls.japanese.push(bytes);
     };
+  }
+  if (english) {
+    WasmPhonemizer.prototype.setEnglishDictionary =
+      typeof english === "function"
+        ? english
+        : function (bytes) {
+            calls.english.push(bytes);
+          };
   }
 
   return { module: { WasmPhonemizer }, calls };
@@ -294,5 +308,103 @@ describe("RustWasmAdapter.create() — JA 外部辞書の opt-in 投入", () => 
     });
 
     assert.equal(adapter.japaneseDictionaryStatus, "not-requested");
+  });
+});
+
+describe("RustWasmAdapter.loadEnglishDictionary() — 中国語文中の英語・数字 (#847)", () => {
+  const CMU = new Map([
+    ["one", "W AH1 N"],
+    ["hundred", "HH AH1 N D R AH0 D"],
+  ]);
+
+  async function createAdapter(opts) {
+    activeFetch = installSafeFetch({});
+    const mock = createMockWasmModule(opts);
+    const adapter = await RustWasmAdapter.create(CONFIG_JSON, {
+      wasmLoader: async () => mock.module,
+    });
+    return { adapter, calls: mock.calls };
+  }
+
+  async function withWarnings(fn) {
+    const warnings = [];
+    const origWarn = console.warn;
+    console.warn = (...args) => warnings.push(args.join(" "));
+    try {
+      return { result: await fn(), warnings };
+    } finally {
+      console.warn = origWarn;
+    }
+  }
+
+  it("create() は CMU 辞書を渡さない (呼び出し側が zh と en のモデルでだけ渡す)", async () => {
+    const { calls } = await createAdapter({ english: true });
+    assert.equal(calls.english.length, 0);
+  });
+
+  it("読み込んだ辞書を JSON の bytes で setEnglishDictionary に 1 回渡す", async () => {
+    const { adapter, calls } = await createAdapter({ english: true });
+
+    const { result, warnings } = await withWarnings(() =>
+      adapter.loadEnglishDictionary(async () => CMU)
+    );
+
+    assert.equal(result, "loaded");
+    assert.deepEqual(warnings, []);
+    assert.equal(calls.english.length, 1);
+    assert.ok(calls.english[0] instanceof Uint8Array, "dictionary must be a Uint8Array");
+    assert.deepEqual(JSON.parse(new TextDecoder().decode(calls.english[0])), {
+      one: "W AH1 N",
+      hundred: "HH AH1 N D R AH0 D",
+    });
+  });
+
+  it("setter を持たないビルドでは辞書を読まず unsupported を返す", async () => {
+    const { adapter } = await createAdapter({ english: false });
+    let loaded = 0;
+
+    const { result, warnings } = await withWarnings(() =>
+      adapter.loadEnglishDictionary(async () => {
+        loaded++;
+        return CMU;
+      })
+    );
+
+    assert.equal(result, "unsupported");
+    assert.equal(loaded, 0, "no dictionary work for a build that cannot use it");
+    assert.deepEqual(warnings, []);
+  });
+
+  it("@piper-plus/g2p に loadCmuDict が無ければ警告して failed を返す", async () => {
+    const { adapter, calls } = await createAdapter({ english: true });
+
+    const { result, warnings } = await withWarnings(() => adapter.loadEnglishDictionary(undefined));
+
+    assert.equal(result, "failed");
+    assert.equal(calls.english.length, 0);
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /loadCmuDict/);
+  });
+
+  it("辞書の読み込みや setter が失敗しても reject せず failed を返す", async () => {
+    const failing = await createAdapter({ english: true });
+    const loadFailure = await withWarnings(() =>
+      failing.adapter.loadEnglishDictionary(async () => {
+        throw new Error("network down");
+      })
+    );
+    assert.equal(loadFailure.result, "failed");
+    assert.match(loadFailure.warnings.join(" | "), /network down/);
+
+    const rejecting = await createAdapter({
+      english: () => {
+        throw new Error("Failed to load English dictionary");
+      },
+    });
+    const setterFailure = await withWarnings(() =>
+      rejecting.adapter.loadEnglishDictionary(async () => CMU)
+    );
+    assert.equal(setterFailure.result, "failed");
+    assert.match(setterFailure.warnings.join(" | "), /Failed to load English dictionary/);
   });
 });

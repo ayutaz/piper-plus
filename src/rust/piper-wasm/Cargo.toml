@@ -13,14 +13,21 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = []
-multilingual = ["ja", "zh", "ko", "es", "fr", "pt", "sv"]
-multilingual-external = ["ja-external", "zh-external", "ko", "es", "fr", "pt", "sv"]
+multilingual = ["ja", "en", "zh", "ko", "es", "fr", "pt", "sv"]
+multilingual-external = ["ja-external", "en", "zh-external", "ko", "es", "fr", "pt", "sv"]
 # ja: Bundle NAIST-JDIC dictionary via include_bytes!() (~30 MB added to WASM binary).
 # Dictionary is immediately available at construction time.
 ja = ["piper-plus-g2p/naist-jdic"]
 # ja-external: Enable JA G2P code but load dictionary at runtime via setJapaneseDictionary().
 # Dictionary is NOT bundled -- caller must provide serialized dict bytes. Keeps WASM binary small.
 ja-external = ["piper-plus-g2p/japanese"]
+# en: Enable the EN G2P code (CMU dictionary + g2p_en number/abbreviation
+# normalization). The dictionary is NOT bundled: EN starts as
+# PassthroughPhonemizer and the caller hands over the CMU dictionary JSON via
+# setEnglishDictionary(). The browser package passes the copy that
+# @piper-plus/g2p already ships, for models with zh and en, so that digits and
+# Latin words inside Chinese text are read as English (Issue #847).
+en = ["piper-plus-g2p/english"]
 # zh: Enable ZH G2P code with Chinese pinyin dictionary support.
 # Starts as PassthroughPhonemizer; caller loads dictionaries via setChineseDictionary().
 # (Unlike JA, Chinese dicts are JSON-based and loaded at runtime in both modes.)

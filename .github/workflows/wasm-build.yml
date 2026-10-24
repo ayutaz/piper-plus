@@ -159,11 +159,18 @@ jobs:
         working-directory: src/rust
         run: cargo test -p piper-plus-wasm --features ja-external --no-fail-fast
 
+      - name: Run piper-plus-wasm tests (en)
+        # zh digits read as English numbers once setEnglishDictionary() has
+        # the CMU dictionary (#847); no dictionary download needed.
+        working-directory: src/rust
+        run: cargo test -p piper-plus-wasm --features en --no-fail-fast
+
       - name: Test feature flag combinations
         working-directory: src/rust
         run: |
           cargo check -p piper-plus-wasm --target wasm32-unknown-unknown --no-default-features --features ja
           cargo check -p piper-plus-wasm --target wasm32-unknown-unknown --no-default-features --features ja-external
+          cargo check -p piper-plus-wasm --target wasm32-unknown-unknown --no-default-features --features en
           cargo check -p piper-plus-wasm --target wasm32-unknown-unknown --no-default-features --features "ko,es"
           cargo check -p piper-plus-wasm --target wasm32-unknown-unknown --no-default-features
           cargo check -p piper-plus-wasm --target wasm32-unknown-unknown --all-features
