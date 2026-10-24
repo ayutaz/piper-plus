@@ -37,7 +37,6 @@ from __future__ import annotations
 
 import argparse
 import difflib
-import fnmatch
 import json
 import re
 import subprocess
