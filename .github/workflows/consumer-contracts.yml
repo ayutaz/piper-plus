@@ -120,7 +120,7 @@ jobs:
           # gradio caps pillow<13; the override in environments/webui is reported
           # as an incompatibility, so accept only what an override explains.
           uv run --project environments/webui --no-sync python scripts/uv_pip_check_overrides.py --python environments/webui/.venv/bin/python --pyproject environments/webui/pyproject.toml
-          uv run --project environments/webui --no-sync python scripts/check_python_licenses.py --root 'piper-plus[cpu,http]' --root gradio --report /tmp/webui-licenses.json
+          uv run --project environments/webui --no-sync python scripts/check_python_licenses.py --root 'piper-plus[cpu,http]' --root gradio --overrides-from environments/webui/pyproject.toml --report /tmp/webui-licenses.json
           uv run --project environments/webui --no-sync python -c "from pathlib import Path; from piper_plus.webui import create_interface; assert create_interface(Path('/tmp/models')) is not None"
           uv run --project environments/webui --no-sync python -m piper_plus --help
           uv run --project environments/webui --no-sync python scripts/check_python_provider.py --expected cpu --model /tmp/provider-fixture/model.onnx

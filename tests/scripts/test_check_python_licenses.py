@@ -54,8 +54,7 @@ def test_no_supported_extra_or_space_restores_old_english_dependency():
         declarations.extend(
             line.split("#", 1)[0].strip()
             for line in (root / relative).read_text(encoding="utf-8").splitlines()
-            if line.split("#", 1)[0].strip()
-            and not line.lstrip().startswith("-")
+            if line.split("#", 1)[0].strip() and not line.lstrip().startswith("-")
         )
     for declaration in declarations:
         assert (
@@ -108,6 +107,32 @@ def test_transitive_extra_is_not_lost():
 def test_version_mismatch_is_an_error():
     assert audit([Distribution("app", ["helper>=2"]), Distribution("helper")], ["app"])[
         "errors"
+    ]
+
+
+def test_version_mismatch_explained_by_an_override_is_accepted():
+    """environments/webui overrides gradio's `pillow<13.0` (Pillow 13.0.0 fixes
+    5 CRITICAL advisories); the audit accepts exactly that mismatch."""
+    distributions = [Distribution("app", ["helper<1"]), Distribution("helper")]
+    assert audit(distributions, ["app"], overrides=["helper>=1.0"])["errors"] == []
+
+
+def test_override_that_the_installed_version_misses_is_still_an_error():
+    distributions = [Distribution("app", ["helper<1"]), Distribution("helper")]
+    assert audit(distributions, ["app"], overrides=["helper>=2"])["errors"]
+
+
+def test_override_of_another_package_does_not_hide_a_mismatch():
+    distributions = [Distribution("app", ["helper>=2"]), Distribution("helper")]
+    assert audit(distributions, ["app"], overrides=["other>=1"])["errors"]
+
+
+def test_overrides_are_read_from_the_webui_pyproject():
+    from scripts.check_python_licenses import load_overrides
+
+    root = Path(__file__).resolve().parents[2]
+    assert load_overrides(root / "environments" / "webui" / "pyproject.toml") == [
+        "pillow>=13.0.0"
     ]
 
 

@@ -57,4 +57,6 @@ Hugging Face Space (`huggingface-space/requirements.txt`) は、Space SDK が gr
 
 `consumer-contracts.yml` の WebUI 環境の検査は、これまで `uv pip check` をそのまま実行していた。上書きは「gradio は `pillow<13.0` を要求するが 13.0.0 が入っている」と報告されるので、`scripts/uv_pip_check_overrides.py` に替えた。このスクリプトは `override-dependencies` に宣言したパッケージについて、入っている版が上書きの指定を満たす食い違いだけを許す。ほかの不整合と、読めない出力行は失敗にする (`tests/scripts/test_uv_pip_check_overrides.py`)。
 
-gradio が Pillow 13 を許すようになったら、上書きファイル、Dockerfile の `--override`、pyproject の項目、このテスト、`uv_pip_check_overrides.py` を削除し、`uv pip check` に戻す。
+同じ job のライセンス監査 `scripts/check_python_licenses.py` も、依存の版の食い違いを検査する。`--overrides-from environments/webui/pyproject.toml` を渡すと、上書きを宣言したパッケージで、入っている版が上書きの指定を満たす食い違いだけを許す。
+
+gradio が Pillow 13 を許すようになったら、上書きファイル、Dockerfile の `--override`、pyproject の項目、このテスト、`uv_pip_check_overrides.py` と `--overrides-from` の指定を削除し、`uv pip check` に戻す。
