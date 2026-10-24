@@ -217,3 +217,36 @@ def test_docstring_only_mentions_are_allowlisted_not_path_added(tc):
     for path in ("src/python/pyproject.toml", "src/python/g2p/pyproject.toml"):
         assert path in entries, path
         assert entries[path].strip(), path
+
+
+def test_tests_scripts_path_is_not_read_as_a_root_gate_script(tc, tmp_path, monkeypatch):
+    """``tests/scripts/test_x.py`` is not ``scripts/test_x.py`` (#813).
+
+    A pre-commit hook that runs ``pytest tests/scripts/test_sanitize_cli_help.py``
+    was reported as "entry script missing: scripts/test_sanitize_cli_help.py"
+    because the path regex matched in the middle of the test path.
+    """
+    config = tmp_path / ".pre-commit-config.yaml"
+    config.write_text(
+        "repos:\n"
+        "  - repo: local\n"
+        "    hooks:\n"
+        "      - id: pytest-hook\n"
+        "        entry: python -m pytest tests/scripts/test_sanitize_cli_help.py -q\n"
+        "        files: ^docs/reference/cli-help/.*$\n"
+        "      - id: script-hook\n"
+        "        entry: python scripts/check_x.py\n"
+        "        files: ^x$\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(tc, "PRECOMMIT_CONFIG", config)
+    assert tc.precommit_hooks() == [("script-hook", "scripts/check_x.py", "^x$")]
+
+    text = (
+        "jobs:\n"
+        "  gate:\n"
+        "    steps:\n"
+        "      - run: python -m pytest tests/scripts/test_check_x.py\n"
+    )
+    found = tc.referenced_paths(text, {"scripts/test_check_x.py"})
+    assert "scripts/test_check_x.py" not in found

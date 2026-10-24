@@ -249,7 +249,9 @@ ASSERTION_RE = re.compile(
 
 # A gate script the workflow invokes. Editing the checker must re-run it,
 # otherwise a broken checker ships in the same PR that broke it.
-GATE_SCRIPT_RE = re.compile(r"(scripts/(?:check|test|verify)_[\w_]+\.py)")
+# The lookbehind keeps ``tests/scripts/test_x.py`` from reading as the root
+# ``scripts/test_x.py`` (#813).
+GATE_SCRIPT_RE = re.compile(r"(?<![\w./-])(scripts/(?:check|test|verify)_[\w_]+\.py)")
 
 
 def gate_script_inputs(script_rel: str, tracked: set[str]) -> set[str]:
@@ -359,7 +361,7 @@ def precommit_hooks() -> list[tuple[str, str, str]]:
         files = re.search(r"\n        files:\s*(.+)", block)
         if not entry or not files:
             continue
-        script = re.search(r"(scripts/[\w_]+\.py)", entry.group(1))
+        script = re.search(r"(?<![\w./-])(scripts/[\w_]+\.py)", entry.group(1))
         if not script:
             continue
         hooks.append((hook_id, script.group(1), files.group(1).strip()))

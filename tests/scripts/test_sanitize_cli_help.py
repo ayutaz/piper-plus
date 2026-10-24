@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -13,6 +14,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "sanitize_cli_help.py"
 RULES_PATH = REPO_ROOT / "scripts" / "sanitize_cli_help_rules.toml"
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "cli-help"
+# Headings and built-in option text System.CommandLine prints in a Japanese
+# UI culture (seen in the C# canonical, #813).
+LOCALIZED_FRAMEWORK_TEXT = (
+    "使用法:",
+    "オプション:",
+    "説明:",
+    "バージョン情報を表示する",
+    "ヘルプと使用方法の情報を表示します",
+)
 
 
 def _load_module():
@@ -70,6 +80,20 @@ def test_apply_rules_strips_macos_runner_path(sanitize, rules):
     text = "checkout at /Users/runner/work/piper-plus/piper-plus"
     out = sanitize.apply_rules(text, runtime="python", rules=rules)
     assert "<RUNNER_PATH>" in out
+
+
+def test_apply_rules_keeps_bracket_after_runner_path(sanitize, rules):
+    """Issue #813: C#'s ``[default: <cwd>]`` lost its closing bracket."""
+    text = "Output directory [default: /home/runner/work/piper-plus/piper-plus]"
+    out = sanitize.apply_rules(text, runtime="csharp", rules=rules)
+    assert out == "Output directory [default: <RUNNER_PATH>]"
+
+
+def test_apply_rules_strips_windows_exe_suffix_from_rust_usage(sanitize, rules):
+    """Issue #813: a Windows capture printed ``piper-plus-cli.exe``."""
+    text = "Usage: piper-plus-cli.exe [OPTIONS]"
+    out = sanitize.apply_rules(text, runtime="rust", rules=rules)
+    assert out == "Usage: piper-plus-cli [OPTIONS]"
 
 
 def test_apply_rules_normalizes_python_prog(sanitize, rules):
@@ -229,6 +253,29 @@ def test_canonical_runtime_txt_has_4_line_header(sanitize, runtime: str):
         f"{runtime}.txt Version field must use <VERSION> placeholder so a "
         f"release bump does not require touching the committed help file."
     )
+
+
+@pytest.mark.parametrize(
+    "runtime", ["python", "go", "rust", "wasm", "csharp", "cpp"],
+)
+def test_canonical_runtime_txt_is_host_independent(runtime: str):
+    """Issue #813: a canonical captured on a developer machine (Windows,
+    Japanese UI) carried ``.exe``, localized headings and a local path, so
+    the CI capture drifted from it. Canonicals come from the workflow's
+    Linux capture (download the ``cli-help-<runtime>-<run_id>`` artifact).
+    """
+    canonical = REPO_ROOT / "docs" / "reference" / "cli-help" / f"{runtime}.txt"
+    body = canonical.read_text(encoding="utf-8")
+    assert ".exe" not in body, f"{runtime}.txt was captured on Windows (.exe)."
+    # Only text the CLI framework localizes from the UI culture. Help strings
+    # written in Japanese in the CLI source (the Rust CLI) are not locale.
+    localized = [w for w in LOCALIZED_FRAMEWORK_TEXT if w in body]
+    assert not localized, (
+        f"{runtime}.txt has localized text {localized!r}; capture it with an "
+        f"English UI culture (the workflow runs on Linux with C.UTF-8)."
+    )
+    local_paths = re.findall(r"[A-Za-z]:\\[^\s\]]*|/(?:home|Users)/[^\s\]]*", body)
+    assert not local_paths, f"{runtime}.txt has machine paths {local_paths!r}."
 
 
 @pytest.mark.parametrize(

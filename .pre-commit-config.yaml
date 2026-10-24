@@ -1005,6 +1005,18 @@ repos:
         files: ^(src/python_run/piper_plus/.*\.py|docs/guides/development/cli-usage\.md|scripts/check_cli_help_drift\.py|docs/migration/v1\.11\-to\-v1\.12\.md)$
         pass_filenames: false
 
+      # Committed CLI help canonicals (docs/reference/cli-help/) must be the
+      # sanitized Linux capture of cli-help-extract.yml: 4-line header, no
+      # .exe / localized headings / machine paths. A local Windows capture
+      # was merged unchecked and drifted (#813). The workflow runs the same
+      # tests.
+      - id: cli-help-canonical
+        name: CLI help canonicals and cli-help-extract workflow (tests)
+        entry: uv run --no-sync python -m pytest tests/scripts/test_sanitize_cli_help.py tests/scripts/test_cli_help_extract_workflow.py -o addopts= -q -p no:cacheprovider
+        language: system
+        files: ^(docs/reference/cli-help/.*\.txt|scripts/sanitize_cli_help(\.py|_rules\.toml)|tests/scripts/test_(sanitize_cli_help|cli_help_extract_workflow)\.py|\.github/workflows/cli-help-extract\.yml)$
+        pass_filenames: false
+
       # Host-specific secret-path leak detection. CLAUDE.md documents the
       # maintainer's training-machine secret env file path; if that pattern
       # leaks into executable code (sources, workflows, configs),

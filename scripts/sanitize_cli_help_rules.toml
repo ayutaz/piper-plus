@@ -50,21 +50,21 @@ note = "onnxruntime warnings missing the timestamp prefix (fallback)."
 # Generic: GitHub runner workspace paths.
 [[rules]]
 runtime = "*"
-pattern = "/home/runner/work/[^\\s]*"
+pattern = "/home/runner/work/[^\\s\\]]*"
 replace_with = "<RUNNER_PATH>"
-note = "GitHub Actions runner workspace paths."
+note = "GitHub Actions runner workspace paths. Stops at ] so C#'s [default: <cwd>] keeps its bracket (#813)."
 
 # Generic: macOS GitHub runner paths.
 [[rules]]
 runtime = "*"
-pattern = "/Users/runner/work/[^\\s]*"
+pattern = "/Users/runner/work/[^\\s\\]]*"
 replace_with = "<RUNNER_PATH>"
 note = "macOS GitHub Actions runner workspace paths."
 
 # Generic: Windows GitHub runner paths.
 [[rules]]
 runtime = "*"
-pattern = "D:\\\\a\\\\[^\\s]*"
+pattern = "D:\\\\a\\\\[^\\s\\]]*"
 replace_with = "<RUNNER_PATH>"
 note = "Windows GitHub Actions runner workspace paths."
 
@@ -81,6 +81,13 @@ runtime = "python"
 pattern = "piper-plus[ \\-]\\d+\\.\\d+\\.\\d+(?:[\\-+][A-Za-z0-9.]+)?"
 replace_with = "piper-plus <VERSION>"
 note = "Avoid version-only drift surfacing on every release."
+
+# Rust: a Windows capture names the binary piper-plus-cli.exe (#813).
+[[rules]]
+runtime = "rust"
+pattern = "piper-plus-cli\\.exe"
+replace_with = "piper-plus-cli"
+note = "Windows executable suffix in the clap usage line."
 
 # Rust: cargo binary version.
 [[rules]]
