@@ -8,12 +8,6 @@
         "resolved": "1.8.0",
         "contentHash": "OPJnHbyQ5oQN7+plhnBvk4mOLLIQ9tmSnKken70i9GNqLbXsxh+t4m5zwhmYYwN88T/yVpil6BsEKwIAaZYF4Q=="
       },
-      "DotNetG2P.English": {
-        "type": "Direct",
-        "requested": "[1.8.0, )",
-        "resolved": "1.8.0",
-        "contentHash": "m8pyIwPbTVQE6F0FbcqUX8f0iyR8vp6YeOS03+OXs5ERayQQbfp3ndPoxTqO+GCVNdj6LpMwCIizX7Tmi2iIYA=="
-      },
       "DotNetG2P.MeCab": {
         "type": "Direct",
         "requested": "[1.8.0, )",

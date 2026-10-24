@@ -100,6 +100,8 @@ on:
       - 'src/cpp/tests/test_english_normalize.cpp'
       - 'src/rust/piper-plus-g2p/tests/english_normalize.rs'
       - 'src/go/phonemize/english_normalize_test.go'
+      - 'src/csharp/PiperPlus.Core.Tests/EnglishNormalizeTests.cs'
+      - 'src/wasm/g2p/test/test-english-normalize.js'
       - '.github/workflows/parity-hub.yml'
   push:
     branches: [dev, main]

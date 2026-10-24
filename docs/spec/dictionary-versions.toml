@@ -28,7 +28,7 @@
 #   Python (runtime):   src/python_run/piper_plus/phonemize/                   (mirrors g2p package)
 #   Rust:               src/rust/piper-plus-g2p/                          (cmudict / pinyin / jpreprocess + naist-jdic)
 #   Go:                 src/go/phonemize/                                 (cmudict / pinyin mirrors)
-#   C#:                 src/csharp/PiperPlus.Core/Phonemize/              (DotNetG2P / NuGet)
+#   C#:                 src/csharp/PiperPlus.Core/Phonemize/              (ja: DotNetG2P / NuGet; en/zh: embedded cmudict / pinyin)
 #   C/C++:              src/cpp/                                          (OpenJTalk fork, libopenjtalk)
 #   WASM/JS:            src/wasm/openjtalk-web/                           (OpenJTalk WASM build + JSON mirrors)
 #   WASM/JS G2P:        src/wasm/g2p/                                     (npm @piper-plus/g2p)
@@ -298,7 +298,7 @@ mirrors = """
 Per-runtime ports under:
   src/rust/piper-plus-g2p/src/{spanish,portuguese,french,swedish}.rs
   src/go/phonemize/{spanish,portuguese,french,swedish}.go
-  src/csharp/PiperPlus.Core/Phonemize/{Spanish,Portuguese,French,Swedish}Phonemizer.cs
+  src/csharp/PiperPlus.Core/Phonemize/{Spanish,Portuguese,French,Swedish}{Phonemizer,G2PEngine}.cs
   src/wasm/g2p/src/{spanish,portuguese,french,swedish}.js
   src/cpp/g2p/{spanish,portuguese,french,swedish}.cpp
   android/piper-plus-g2p/src/main/kotlin/...
@@ -410,7 +410,7 @@ ci_gates_to_pass_post_bump = [
 # g2p-en (cmudict)      ✓       -     -   -          -    -     -       -
 # cmudict JSON mirror   -       M     M   M          -    M     -       -
 # pypinyin              ✓       -     -   -          -    -     -       -
-# pinyin JSON mirror    -       M     -   -          -    M     -       -
+# pinyin JSON mirror    -       M     -   M          -    M     -       -
 # g2pK2 (Korean)        ✓       -     -   -          -    -     -       -
 # rule-based ko/es/...  ✓       ✓     ✓   ✓          ✓    ✓     ✓       ✓
 # zh_en_loanword JSON   ✓       M     M   M          M    M     M       M

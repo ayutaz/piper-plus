@@ -123,7 +123,7 @@ The CLI ships with the same default dictionaries as the C++ / Rust runtimes; exp
 | Code | Language | G2P backend |
 |------|----------|-------------|
 | `ja` | Japanese | DotNetG2P + DotNetG2P.MeCab (OpenJTalk-compatible, dictionary auto-download) |
-| `en` | English | DotNetG2P.English (Apache-2.0) |
+| `en` | English | Bundled CMU dictionary with the normalization of the Python G2P (`EnglishG2PEngine`: numbers, accents, `e.g.`, words missing from the dictionary; same as the other runtimes) |
 | `zh` | Chinese | Bundled numeric-tone pinyin dictionaries (same as the other runtimes) |
 | `ko` | Korean | Built-in rule-based engine |
 | `es` | Spanish | Built-in rule-based engine (`SpanishG2PEngine`, the rules of the Python G2P) |

@@ -9,7 +9,7 @@ namespace PiperPlus.Core.Phonemize;
 // -----------------------------------------------------------------
 
 /// <summary>
-/// Abstraction over an English G2P engine (e.g. g2p-en, DotNetG2P.English).
+/// Abstraction over an English G2P engine (e.g. <see cref="EnglishG2PEngine"/>).
 /// <para>
 /// The engine converts raw text into per-word ARPAbet token sequences.
 /// Whitespace acts as a word boundary; punctuation characters appear as

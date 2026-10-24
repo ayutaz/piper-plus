@@ -11,7 +11,7 @@ namespace PiperPlus.Cli.Tests;
 
 /// <summary>
 /// xUnit fixture that holds shared <see cref="DotNetG2PEngine"/> and
-/// <see cref="DotNetEnglishG2PEngine"/> instances for the concurrency tests.
+/// <see cref="BundledEnglishG2PEngine"/> instances for the concurrency tests.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -33,14 +33,14 @@ namespace PiperPlus.Cli.Tests;
 /// </remarks>
 public sealed class DotNetG2PEngineFixture : IDisposable
 {
-    // DotNetG2PEngine と DotNetEnglishG2PEngine は PiperPlus.Cli で
+    // DotNetG2PEngine と BundledEnglishG2PEngine は PiperPlus.Cli で
     // internal sealed。 xUnit の IClassFixture DI (Activator.CreateInstance)
     // は fixture class を public にする必要があるが、 property 型が internal
     // だと CS0053 で fail する。 property を internal にして accessibility を
     // 揃える (assembly-internal なので tests 側からは問題なくアクセス可能)。
     internal DotNetG2PEngine JaEngine { get; }
 
-    internal DotNetEnglishG2PEngine EnEngine { get; }
+    internal BundledEnglishG2PEngine EnEngine { get; }
 
     internal MultilingualPhonemizer Multilingual { get; }
 
@@ -49,7 +49,7 @@ public sealed class DotNetG2PEngineFixture : IDisposable
     public DotNetG2PEngineFixture()
     {
         JaEngine = new DotNetG2PEngine();
-        EnEngine = new DotNetEnglishG2PEngine();
+        EnEngine = new BundledEnglishG2PEngine();
         JaPhonemizer = new JapanesePhonemizer(JaEngine);
         var phonemizers = new System.Collections.Generic.Dictionary<string, IPhonemizer>
         {
@@ -63,7 +63,7 @@ public sealed class DotNetG2PEngineFixture : IDisposable
     {
         JaEngine.Dispose();
 
-        // DotNetEnglishG2PEngine is not IDisposable in v1.8.x.
+        // BundledEnglishG2PEngine holds only the shared, immutable dictionary.
     }
 }
 

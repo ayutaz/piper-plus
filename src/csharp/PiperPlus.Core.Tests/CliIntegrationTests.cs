@@ -429,7 +429,7 @@ public sealed class CliIntegrationTests
     public async Task TestMode_WithText_OutputsPhonemeIds()
     {
         // --test-mode with --text skips ONNX inference and outputs phoneme IDs.
-        // The G2P engine (DotNetEnglishG2PEngine) is resolved via reflection
+        // The G2P engine (BundledEnglishG2PEngine) is resolved via reflection
         // and may not be available, in which case the CLI reports an error.
         (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "hello", "--language", "en");

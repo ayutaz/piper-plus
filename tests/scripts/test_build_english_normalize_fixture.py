@@ -39,10 +39,13 @@ def test_an_empty_consumer_list_fails(tmp_path: Path) -> None:
     assert fixture.consumer_problems([], tmp_path) != []
 
 
-@pytest.mark.parametrize("runtime_dir", ["src/cpp/", "src/rust/", "src/go/"])
+@pytest.mark.parametrize(
+    "runtime_dir", ["src/cpp/", "src/rust/", "src/go/", "src/csharp/", "src/wasm/"]
+)
 def test_every_ported_runtime_has_a_consumer(runtime_dir: str) -> None:
-    # The C++, Rust (#821) and Go (#841) ports are each checked against the
-    # fixture; a runtime that drops its test would drift without a failure.
+    # The C++, Rust (#821), Go (#841), C# (#832) and JS g2p ports are each
+    # checked against the fixture; a runtime that drops its test would drift
+    # without a failure.
     assert any(t.startswith(runtime_dir) for t in fixture.CONSUMER_TESTS)
 
 
