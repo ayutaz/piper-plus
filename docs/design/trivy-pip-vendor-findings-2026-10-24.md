@@ -18,7 +18,7 @@ Trivy の JSON 出力で見ると、 この 2 パッケージは `FilePath` と 
 
 pip 26.x は、 自分が同梱 (vendor) しているライブラリの一覧を CycloneDX 形式の SBOM として `pip/_vendor/bom.cdx.json` に入れている。 pip 26.2.2 の中身は次のとおり (抜粋)。
 
-```
+```text
 msgpack 1.1.2       pkg:pypi/msgpack@1.1.2
 setuptools 70.3.0   pkg:pypi/setuptools@70.3.0   (pip が同梱する pkg_resources)
 urllib3 2.7.0       pkg:pypi/urllib3@2.7.0

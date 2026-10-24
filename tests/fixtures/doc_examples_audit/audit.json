@@ -449,7 +449,7 @@
       "file": "docs/design/trivy-pip-vendor-findings-2026-10-24.md",
       "line_start": 21,
       "line_end": 26,
-      "language_raw": "",
+      "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
       "suggested_action": "route_via_language_alias_table",
