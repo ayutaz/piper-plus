@@ -313,8 +313,12 @@ def test_release_contracts_are_always_required_on_prs():
         "test_release_publish_enforcement.py" in s.get("run", "") for s in job["steps"]
     )
     gate = ci["jobs"]["ci-required"]
+    # ci-required requires every --always-run job to be `success`; skipped is
+    # accepted only for the path-filtered jobs (scripts/check_ci_required.py).
     assert any(
-        s.get("run") == 'test "$RELEASE_CONTRACT_RESULT" = "success"'
+        "check_ci_required.py --always-run" in s.get("run", "")
+        and "release-contract"
+        in s["run"].split("--always-run ", 1)[1].split()[0].split(",")
         for s in gate["steps"]
     )
 
