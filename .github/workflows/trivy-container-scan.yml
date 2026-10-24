@@ -27,6 +27,7 @@ on:
       - '.github/workflows/trivy-container-scan.yml'
       - 'scripts/check_trivy_sarif.py'
       - 'tests/scripts/test_check_trivy_sarif.py'
+      - 'tests/scripts/test_runtime_images_ship_no_pip.py'
       # 抑止リストを触る変更で scan が走らないと、 その編集が検証されない
       # (ゲートは trigger が見せる範囲しか守れない)。
       - '.trivyignore.yaml'
@@ -37,6 +38,7 @@ on:
       - 'src/python_run/overrides_webui.txt'
       - 'src/python_run/requirements_webui.txt'
       - 'scripts/check_trivy_sarif.py'
+      - 'tests/scripts/test_runtime_images_ship_no_pip.py'
       - '.trivyignore.yaml'
   workflow_dispatch:
   schedule:
@@ -72,11 +74,19 @@ jobs:
           python-version: "3.13"
 
       - name: Install pytest
-        run: python -m pip install --disable-pip-version-check "pytest>=9.0.3,<10"
+        run: python -m pip install --disable-pip-version-check "pytest>=9.0.3,<10" "PyYAML>=6,<7"
 
       - name: Unit test the Trivy SARIF severity gate
         run: |
           python -m pytest tests/scripts/test_check_trivy_sarif.py \
+            -v --override-ini="addopts="
+
+      # runtime image が pip (と pip 同梱の SBOM pip/_vendor/bom.cdx.json) を
+      # 持ち込まないこと、 .trivyignore.yaml の書式を静的に検査する (#748)。
+      # scan 対象の Dockerfile は本 workflow の matrix から読む。
+      - name: Runtime images ship no pip / .trivyignore.yaml policy
+        run: |
+          python -m pytest tests/scripts/test_runtime_images_ship_no_pip.py \
             -v --override-ini="addopts="
 
   scan:
@@ -166,10 +176,11 @@ jobs:
           #    SARIF には HIGH/MEDIUM も載せるが、 PR を fail させるのは
           #    CRITICAL のみという conservative 設定を維持。
           ignore-unfixed: true
-          # 3) trivyignores: 実体のない phantom entry を PURL 単位で抑止
-          #    (setuptools 70.3.0 / msgpack 1.1.2)。 版まで含めた PURL で
-          #    絞っているので、 実在パッケージの検知は維持される。
-          #    運用ルールと解除条件は .trivyignore.yaml と #748 を参照。
+          # 3) trivyignores: 抑止は版まで含めた PURL 単位で書く (現在は 0 件)。
+          #    以前ここで抑止していた setuptools 70.3.0 / msgpack 1.1.2 は
+          #    pip が同梱する SBOM (pip/_vendor/bom.cdx.json) 由来で、 抑止
+          #    ではなく image から pip を削除して解消した (#748)。 運用ルールは
+          #    .trivyignore.yaml を参照。
           trivyignores: .trivyignore.yaml
           exit-code: '0'
 
@@ -272,10 +283,11 @@ jobs:
           output: trivy-heavy-${{ matrix.target.name }}.sarif
           severity: CRITICAL,HIGH,MEDIUM
           ignore-unfixed: true
-          # 3) trivyignores: 実体のない phantom entry を PURL 単位で抑止
-          #    (setuptools 70.3.0 / msgpack 1.1.2)。 版まで含めた PURL で
-          #    絞っているので、 実在パッケージの検知は維持される。
-          #    運用ルールと解除条件は .trivyignore.yaml と #748 を参照。
+          # 3) trivyignores: 抑止は版まで含めた PURL 単位で書く (現在は 0 件)。
+          #    以前ここで抑止していた setuptools 70.3.0 / msgpack 1.1.2 は
+          #    pip が同梱する SBOM (pip/_vendor/bom.cdx.json) 由来で、 抑止
+          #    ではなく image から pip を削除して解消した (#748)。 運用ルールは
+          #    .trivyignore.yaml を参照。
           trivyignores: .trivyignore.yaml
           exit-code: '0'
 

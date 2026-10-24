@@ -60,12 +60,14 @@ jobs:
         run: |
           # Run docker/python-inference/test_openai_api.py inside the built image.
           # The test uses FastAPI TestClient with a mocked PiperInferenceEngine,
-          # so no ONNX model is required.
-          docker run --rm \
+          # so no ONNX model is required. The runtime image ships without pip
+          # (#748), so the test dependencies go in with uv, as root, into this
+          # throwaway container.
+          docker run --rm -u root \
             -v ${{ github.workspace }}/docker/python-inference/test_openai_api.py:/app/test_openai_api.py \
             -e PYTHONUNBUFFERED=1 \
             piper-python-inference:test \
-            bash -c "pip install --user --no-cache-dir pytest httpx && python -m pytest /app/test_openai_api.py -v --tb=short"
+            bash -c "uv pip install --system --no-cache pytest httpx && python -m pytest /app/test_openai_api.py -v --tb=short"
 
       - name: WebUI smoke test
         run: |

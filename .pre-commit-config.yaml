@@ -31,6 +31,19 @@ repos:
         additional_dependencies: [pyyaml]
         files: ^(\.github/workflows/docker-build\.yml|scripts/(check_docker_publish_stability|publish_docker_mirror)\.py)$
         pass_filenames: false
+      # #748: runtime image が pip (pip 同梱の SBOM pip/_vendor/bom.cdx.json
+      # を Trivy が読み、 msgpack 1.1.2 / setuptools 70.3.0 等を報告する) を
+      # 持ち込まないこと、 .trivyignore.yaml の抑止が版付き PURL + expired_at
+      # を持つことを静的に検査する。 workflow が runtime image の中で pip を
+      # 呼ばないことも検査するため、 全 workflow を対象にする。 CI では
+      # trivy-container-scan.yml の gate-script-tests job が同じテストを回す。
+      - id: runtime-images-ship-no-pip
+        name: Runtime Docker images remove pip / .trivyignore.yaml policy (#748)
+        entry: python -m pytest tests/scripts/test_runtime_images_ship_no_pip.py -q -o addopts= -p no:cacheprovider
+        language: python
+        additional_dependencies: ['pytest>=9.1.1,<10', PyYAML]
+        files: ^(docker/.*Dockerfile.*|\.trivyignore\.yaml|\.github/workflows/[^/]+\.ya?ml|tests/scripts/test_runtime_images_ship_no_pip\.py)$
+        pass_filenames: false
       - id: browser-runtime-version
         name: Browser runtime manifest, demo and README version parity
         entry: node src/wasm/openjtalk-web/scripts/sync-browser-runtime.mjs

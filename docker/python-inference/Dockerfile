@@ -104,13 +104,10 @@ COPY src/python/ /app/src/python/
 # 純粋な死荷重。 後段レイヤで `rm -rf` してもイメージサイズは減らない
 # (前段レイヤに残る) ので、 最初から書かせない。
 #
-# 注意: これは `trivy-python-inference` が報告する setuptools 70.3.0 /
-# msgpack 1.1.2 の対策では **ない**。 CI 上で検証した結果、 `--no-cache` を
-# 入れても Trivy の結果は変わらず (HIGH=2 MEDIUM=1 のまま)、 かつイメージ内の
-# setuptools は 84.0.0 の 1 件のみ (Trivy と同じ `METADATA` の `Name:` 基準で
-# 全走査して確認) だった。 報告されている版はイメージに存在せず、 在処は
-# 未特定のまま。 SARIF には `PkgPath` が出ないため、 追跡には Trivy の JSON
-# 出力が要る (別 PR)。
+# 注意: これは `trivy-python-inference` が報告していた setuptools 70.3.0 /
+# msgpack 1.1.2 の対策では **ない** (`--no-cache` を入れても結果は変わらな
+# かった)。 その出どころは pip が同梱する SBOM (`pip/_vendor/bom.cdx.json`)
+# で、 後段の `pip uninstall` の手順で pip ごと取り除く (#748)。
 RUN uv pip install --system --no-cache "/app/src/python/g2p"
 RUN uv pip install --system --no-cache "/app/src/python[inference-gpu]"
 
@@ -150,6 +147,34 @@ RUN python --version && \
     python -c "import onnxruntime as ort; print(f'ONNX Runtime: {ort.__version__}'); print(f'Providers: {ort.get_available_providers()}')" && \
     python -c "import piper_train; print('piper_train installed')" && \
     python -c "import gradio; print(f'Gradio: {gradio.__version__}')"
+
+# pip をイメージから外す (#748)。 pip 26.x は自分が同梱 (vendor) している
+# ライブラリの一覧を CycloneDX SBOM として `pip/_vendor/bom.cdx.json` に持つ。
+# Trivy はこの SBOM を読み、 msgpack 1.1.2 / setuptools 70.3.0 (pip 同梱の
+# pkg_resources) / urllib3 2.7.0 などを「インストール済みのパッケージ」として
+# 報告する (SBOM 由来なので FilePath も license も空になる)。 これは pip の中に
+# 実在する古いコードで、 実行時には pip を使わない (依存の導入はすべて
+# `uv pip`) ため、 最後の install の後で pip ごと削除する。 setuptools / wheel
+# は pkg_resources を import するライブラリのために残す。 追加の依存が要る
+# 場合は残してある `uv pip install --system` を使う。
+#
+# このイメージの pip は 2 つある:
+#   * 上の `pip install --ignore-installed pip` が入れた pip 26.x
+#     (/usr/local/lib/python3.13/dist-packages、 SBOM を持つ本体)
+#   * apt の python3-pip (24.0、 /usr/lib/python3/dist-packages、 dpkg 管理)
+# 前者を pip 自身で消し、 後者は apt で purge する。 後者を残すと python3.13
+# から `import pip` できてしまう (deadsnakes の python3.13 も
+# /usr/lib/python3/dist-packages を sys.path に持つ)。 purge は python3-pip
+# だけを外し、 依存として入った python3-setuptools / python3-wheel 等は
+# 消さない (`--auto-remove` は付けない)。
+# 削除後に pip を import できないこと、 `pip/_vendor` がどこにも残っていない
+# ことをビルド時に確認する (tests/scripts/test_runtime_images_ship_no_pip.py
+# がこの RUN の位置を検査する)。
+RUN python -m pip uninstall -y --break-system-packages pip \
+    && apt-get purge -y python3-pip \
+    && if python -c "import pip" 2>/dev/null; then echo "pip is still importable" >&2; exit 1; fi \
+    && leftover="$(find / -xdev -path '*/pip/_vendor' -prune -print 2>/dev/null || true)" \
+    && if [ -n "$leftover" ]; then echo "pip/_vendor is still present: $leftover" >&2; exit 1; fi
 
 # Run as non-root user for security
 # Ubuntu 24.04 (Noble) は既存 ubuntu user (UID 1000) を提供しているため
