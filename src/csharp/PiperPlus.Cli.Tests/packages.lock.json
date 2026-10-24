@@ -80,11 +80,6 @@
         "resolved": "1.8.0",
         "contentHash": "OPJnHbyQ5oQN7+plhnBvk4mOLLIQ9tmSnKken70i9GNqLbXsxh+t4m5zwhmYYwN88T/yVpil6BsEKwIAaZYF4Q=="
       },
-      "DotNetG2P.English": {
-        "type": "Transitive",
-        "resolved": "1.8.0",
-        "contentHash": "m8pyIwPbTVQE6F0FbcqUX8f0iyR8vp6YeOS03+OXs5ERayQQbfp3ndPoxTqO+GCVNdj6LpMwCIizX7Tmi2iIYA=="
-      },
       "DotNetG2P.MeCab": {
         "type": "Transitive",
         "resolved": "1.8.0",
@@ -269,7 +264,6 @@
         "type": "Project",
         "dependencies": {
           "DotNetG2P": "[1.8.0, )",
-          "DotNetG2P.English": "[1.8.0, )",
           "DotNetG2P.MeCab": "[1.8.0, )",
           "Microsoft.ML.OnnxRuntime": "[1.24.3, )",
           "PiperPlus.Core": "[0.5.1, )",

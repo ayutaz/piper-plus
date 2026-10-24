@@ -29,6 +29,8 @@
 
   <ItemGroup>
     <None Include="../../../README.md" Pack="true" PackagePath="/" />
+    <!-- Licenses of the embedded CMU and pinyin dictionaries (BundledDictionaryTests checks every embedded file is listed). -->
+    <None Include="THIRD_PARTY_NOTICES.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 
   <ItemGroup>
@@ -40,18 +42,20 @@
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.3" />
     <PackageReference Include="DotNetG2P" Version="1.8.0" />
     <PackageReference Include="DotNetG2P.MeCab" Version="1.8.0" />
-    <PackageReference Include="DotNetG2P.English" Version="1.8.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\PiperPlus.Core\PiperPlus.Core.csproj" />
   </ItemGroup>
 
-  <!-- Shared numeric-tone pinyin dictionaries for BundledChineseG2PEngine,
-       linked from the canonical copy (docs/spec/dictionary-mirrors.toml). -->
+  <!-- Shared numeric-tone pinyin dictionaries for BundledChineseG2PEngine
+       and the CMU dictionary for BundledEnglishG2PEngine, linked from the
+       canonical copies (docs/spec/dictionary-mirrors.toml) rather than copied:
+       BundledDictionaryTests checks the embedded bytes against them. -->
   <ItemGroup>
     <EmbeddedResource Include="..\..\rust\piper-plus-g2p\data\pinyin_single.json" LogicalName="PiperPlus.Cli.pinyin_single.json" Link="Data\pinyin_single.json" />
     <EmbeddedResource Include="..\..\rust\piper-plus-g2p\data\pinyin_phrases.json" LogicalName="PiperPlus.Cli.pinyin_phrases.json" Link="Data\pinyin_phrases.json" />
+    <EmbeddedResource Include="..\..\rust\piper-plus-g2p\data\cmudict_data.json" LogicalName="PiperPlus.Cli.cmudict_data.json" Link="Data\cmudict_data.json" />
   </ItemGroup>
 
   <!-- Banned API analyzer: shares src/csharp/BannedSymbols.txt with

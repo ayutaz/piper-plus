@@ -209,7 +209,7 @@ static IPhonemizer BuildMultilingualPhonemizer()
     var dict = new Dictionary<string, IPhonemizer>
     {
         ["ja"] = new JapanesePhonemizer(new DotNetG2PEngine()),
-        ["en"] = new EnglishPhonemizer(new DotNetEnglishG2PEngine()),
+        ["en"] = new EnglishPhonemizer(new BundledEnglishG2PEngine()),
         ["zh"] = new ChinesePhonemizer(new BundledChineseG2PEngine()),
         ["es"] = new SpanishPhonemizer(new SpanishG2PEngine()),
         ["fr"] = new FrenchPhonemizer(new FrenchG2PEngine()),

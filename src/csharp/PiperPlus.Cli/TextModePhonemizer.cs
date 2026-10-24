@@ -20,7 +20,7 @@ internal static partial class Program
     /// Currently supported languages:
     /// <list type="bullet">
     ///   <item><c>ja</c> — Japanese (requires <c>JapanesePhonemizer</c> + <c>IJapaneseG2PEngine</c>)</item>
-    ///   <item><c>en</c> — English (requires <c>EnglishPhonemizer</c> + <c>IEnglishG2PEngine</c>)</item>
+    ///   <item><c>en</c> — English (requires <c>EnglishPhonemizer</c> + <c>BundledEnglishG2PEngine</c>)</item>
     ///   <item><c>zh</c> — Chinese (requires <c>ChinesePhonemizer</c> + <c>BundledChineseG2PEngine</c>,
     ///         and the English phonemizer for embedded English letters)</item>
     ///   <item><c>es</c> — Spanish (requires <c>SpanishPhonemizer</c> + <c>SpanishG2PEngine</c>)</item>
@@ -36,7 +36,7 @@ internal static partial class Program
     /// <exception cref="NotSupportedException">When the language or its dependencies are unavailable.</exception>
     [RequiresUnreferencedCode(
         "G2P engine types are resolved via reflection. When publishing trimmed, " +
-        "ensure DotNetG2PEngine/DotNetEnglishG2PEngine are preserved.")]
+        "ensure DotNetG2PEngine is preserved.")]
     internal static IPhonemizer ResolveTextModePhonemizer(string language)
     {
         // Multi-language code: "ja-en", "ja-en-zh-es-fr-pt", etc.
@@ -91,7 +91,7 @@ internal static partial class Program
 
     [RequiresUnreferencedCode(
         "G2P engine types are resolved via reflection. When publishing trimmed, " +
-        "ensure DotNetG2PEngine/DotNetEnglishG2PEngine are preserved.")]
+        "ensure DotNetG2PEngine is preserved.")]
     private static IPhonemizer ResolveSingleLanguagePhonemizer(string language)
     {
         switch (language)
@@ -100,7 +100,7 @@ internal static partial class Program
                 return new JapanesePhonemizer(new DotNetG2PEngine());
 
             case "en":
-                return new EnglishPhonemizer(new DotNetEnglishG2PEngine());
+                return new EnglishPhonemizer(new BundledEnglishG2PEngine());
 
             case "zh":
                 return new ChinesePhonemizer(new BundledChineseG2PEngine());

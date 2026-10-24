@@ -15,18 +15,19 @@
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.3" />
     <PackageReference Include="DotNetG2P" Version="1.8.0" />
     <PackageReference Include="DotNetG2P.MeCab" Version="1.8.0" />
-    <PackageReference Include="DotNetG2P.English" Version="1.8.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\PiperPlus.Core\PiperPlus.Core.csproj" />
   </ItemGroup>
 
-  <!-- Shared numeric-tone pinyin dictionaries for BundledChineseG2PEngine,
-       linked from the canonical copy (docs/spec/dictionary-mirrors.toml). -->
+  <!-- Shared numeric-tone pinyin dictionaries for BundledChineseG2PEngine
+       and the CMU dictionary for BundledEnglishG2PEngine, linked from the
+       canonical copies (docs/spec/dictionary-mirrors.toml). -->
   <ItemGroup>
     <EmbeddedResource Include="..\..\rust\piper-plus-g2p\data\pinyin_single.json" LogicalName="PiperPlus.Cli.pinyin_single.json" Link="Data\pinyin_single.json" />
     <EmbeddedResource Include="..\..\rust\piper-plus-g2p\data\pinyin_phrases.json" LogicalName="PiperPlus.Cli.pinyin_phrases.json" Link="Data\pinyin_phrases.json" />
+    <EmbeddedResource Include="..\..\rust\piper-plus-g2p\data\cmudict_data.json" LogicalName="PiperPlus.Cli.cmudict_data.json" Link="Data\cmudict_data.json" />
   </ItemGroup>
 
   <!-- Re-use the CLI's per-language IPhonemizer engine adapters via source
@@ -34,7 +35,7 @@
        CLI without duplicating the wrapper code. -->
   <ItemGroup>
     <Compile Include="..\PiperPlus.Cli\DotNetG2PEngine.cs" Link="Adapters\DotNetG2PEngine.cs" />
-    <Compile Include="..\PiperPlus.Cli\DotNetEnglishG2PEngine.cs" Link="Adapters\DotNetEnglishG2PEngine.cs" />
+    <Compile Include="..\PiperPlus.Cli\BundledEnglishG2PEngine.cs" Link="Adapters\BundledEnglishG2PEngine.cs" />
     <Compile Include="..\PiperPlus.Cli\BundledChineseG2PEngine.cs" Link="Adapters\BundledChineseG2PEngine.cs" />
   </ItemGroup>
 

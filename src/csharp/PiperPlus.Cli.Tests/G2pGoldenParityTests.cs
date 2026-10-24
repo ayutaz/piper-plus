@@ -42,7 +42,7 @@ namespace PiperPlus.Cli.Tests;
 /// </para>
 /// <para>
 /// Nothing is skipped: a missing golden, registry or dictionary fails the test.
-/// English uses DotNetG2P.English's bundled dictionary and Chinese the
+/// English uses the embedded <c>cmudict_data.json</c> and Chinese the
 /// embedded <c>pinyin_*.json</c>, which is what the CLI ships. Japanese needs
 /// OpenJTalk and Korean is absent from the golden, so both are left out.
 /// </para>
@@ -239,9 +239,11 @@ public class G2pGoldenParityTests
     /// the model's <c>phoneme_id_map</c>, listed divergences included. A token
     /// outside the map is dropped at the ID lookup without an error, so the
     /// phoneme is silently lost: DotNetG2P.Portuguese emitted ɐ, w̃ and j̃
-    /// (Issue #832).
+    /// (Issue #832), and the English adapter passed digits and unknown words
+    /// through as raw characters (Issue #821).
     /// </summary>
     [Theory]
+    [InlineData("en")]
     [InlineData("es")]
     [InlineData("pt")]
     [InlineData("fr")]
