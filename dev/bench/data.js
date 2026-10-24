@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792783234525,
+  "lastUpdate": 1792807539805,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1452,6 +1452,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 217.4,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "eb7aac8341fdb6d02d5cf94331d67c062ac81ce3",
+          "message": "fix(splitter): 小数点と e.g. / i.e. の . で文を切らない (#840)\n\n* fix(splitter): 小数点と e.g. / i.e. の . で文を切らない\n\n文分割が . を文の終わりとして扱うため、3.14 が \"3.\" と \"14\" に、\ne.g. / i.e. が断片に割れていた。学習データは文分割せずに音素化している\nので、英語 G2P が \"three point one four\" を \"three\" と \"fourteen\" と読み、\ne.g. を \"for example\" にしないなど、学習時と違う音素列になっていた (#831)。\n\n- 契約 text-splitter-contract.toml に、数字に挟まれた . / ． と\n  略語 e.g. / i.e. の . は文を終わらせない規則、略語一覧、\n  split_cases 13 件、それを読むテストの一覧 [consumers] を追加\n- Python / Rust / Go / C# / C++ / JS (openjtalk-web の TextChunker)\n  の分割を規則どおりに直し、各契約テストで split_cases を検査\n- Python ランタイムの golden 照合を PiperVoice.phonemize (分割あり)\n  にも通す。旧分割では 3.14 と e.g. のケースで失敗する\n- check_text_splitter_contract.py が [consumers] のテストの存在と\n  split_cases の読み込みを検査 (pre-commit / parity-hub)\n\n* ci: 文分割と CJK 句読点の fixture・ゲートのテストを CI で動かす\n\n- 各ランタイムの CI (python-tests / rust-tests / go-ci / csharp-ci /\n  ci / test-webassembly) が tests/fixtures/text_splitter/** の変更でも\n  走るようにする。fixture だけを変えた PR で契約テストが走らなかった\n- tests/scripts は CI で一括実行されないため、ゲート自身のテスト\n  (text-splitter と #823 の cjk-punctuation) を parity-hub で動かす",
+          "timestamp": "2026-10-24T11:04:40+09:00",
+          "tree_id": "bc6e81d9c831497a7bcfcc2bb8a94ee2ae5f1356",
+          "url": "https://github.com/ayutaz/piper-plus/commit/eb7aac8341fdb6d02d5cf94331d67c062ac81ce3"
+        },
+        "date": 1792807537687,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0967,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 24.7,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 24.9,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1158.7,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 217.6,
             "unit": "MB"
           },
           {
