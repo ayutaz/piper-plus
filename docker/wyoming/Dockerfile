@@ -26,11 +26,16 @@ RUN apt-get update \
     libsndfile1-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip / setuptools / wheel to clear Trivy supply-chain CVEs. The
+# Upgrade setuptools / wheel to clear Trivy supply-chain CVEs. The
 # builder stage's `/usr/local` is copied verbatim into the runtime stage
 # (see the `COPY --from=builder /usr/local /usr/local` instruction below),
 # so upgrading here propagates into the published image.
-RUN pip install --no-cache-dir --break-system-packages --ignore-installed --upgrade pip setuptools wheel
+# pip 自身はここで upgrade しない (#748)。 `--ignore-installed` は base image
+# の pip を消さずに別版を同じ site-packages に重ねるため、 base の pip と版が
+# 違うと dist-info が 2 つ残り、 後段の `pip uninstall` が片方しか消せない
+# (base pip が 26.0.1 の python:3.13.13、 26.2.1 の 3.13.15 で実測)。 pip は最後に削除する
+# ので、 build 中に使う base の pip で足りる。
+RUN pip install --no-cache-dir --break-system-packages --ignore-installed --upgrade setuptools wheel
 
 # Pin uv to a known-good major version (workspace editable handling is uv version-sensitive)
 RUN pip install --no-cache-dir "uv>=0.9,<1"
@@ -75,6 +80,25 @@ import nltk; \
 nltk.download('averaged_perceptron_tagger', download_dir='/usr/share/nltk_data'); \
 nltk.download('averaged_perceptron_tagger_eng', download_dir='/usr/share/nltk_data'); \
 nltk.download('cmudict', download_dir='/usr/share/nltk_data')"
+
+# pip をイメージから外す (#748)。 pip 26.x は自分が同梱 (vendor) している
+# ライブラリの一覧を CycloneDX SBOM として `pip/_vendor/bom.cdx.json` に持つ。
+# Trivy はこの SBOM を読み、 msgpack 1.1.2 / setuptools 70.3.0 (pip 同梱の
+# pkg_resources) / urllib3 2.7.0 などを「インストール済みのパッケージ」として
+# 報告する (SBOM 由来なので FilePath も license も空になる)。 これは pip の中に
+# 実在する古いコードで、 実行時には pip を使わない (依存の導入はすべて
+# `uv pip`) ため、 最後の install の後で pip ごと削除する。 setuptools / wheel
+# は pkg_resources を import するライブラリのために残す。
+# trivy-container-scan.yml の heavy scan は本 builder stage を対象にするので
+# ここでも消す。 runtime stage は base image 自身の pip を持つため、 そちらは
+# runtime stage 側で別に消す。
+# 削除後に pip を import できないこと、 `pip/_vendor` がどこにも残っていない
+# ことをビルド時に確認する (tests/scripts/test_runtime_images_ship_no_pip.py
+# がこの RUN の位置を検査する)。
+RUN python -m pip uninstall -y pip \
+    && if python -c "import pip" 2>/dev/null; then echo "pip is still importable" >&2; exit 1; fi \
+    && leftover="$(find / -xdev -path '*/pip/_vendor' -prune -print 2>/dev/null || true)" \
+    && if [ -n "$leftover" ]; then echo "pip/_vendor is still present: $leftover" >&2; exit 1; fi
 
 
 # ============================================================
@@ -142,6 +166,14 @@ RUN python --version && \
     python -c "import piper_wyoming; print('piper_wyoming importable')" && \
     python -c "import piper_plus_g2p; print('piper_plus_g2p importable')" && \
     python -c "from huggingface_hub import hf_hub_download; print('huggingface_hub available')"
+
+# runtime stage の base image 自身が持つ pip も消す (#748、 理由は builder
+# stage の同じ手順のコメント参照)。 `COPY --from=builder /usr/local` は
+# builder に無いファイルを消さないので、 builder 側で消しただけでは残る。
+RUN python -m pip uninstall -y pip \
+    && if python -c "import pip" 2>/dev/null; then echo "pip is still importable" >&2; exit 1; fi \
+    && leftover="$(find / -xdev -path '*/pip/_vendor' -prune -print 2>/dev/null || true)" \
+    && if [ -n "$leftover" ]; then echo "pip/_vendor is still present: $leftover" >&2; exit 1; fi
 
 # Run as non-root user
 RUN useradd -m -u 1000 piper && \
