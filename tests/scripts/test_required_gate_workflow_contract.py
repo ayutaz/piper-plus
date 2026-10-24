@@ -68,9 +68,74 @@ def workflows() -> dict[str, dict]:
     return by_name
 
 
+# ``workflow_run.workflows`` entries are filter patterns, not names: GitHub
+# treats these characters as pattern syntax unless each is escaped with ``\``.
+# An unescaped ``C++ Tests`` made GitHub reject the whole trigger, and every
+# firing of the gate ended in startup_failure without running a job.
+FILTER_SPECIALS = frozenset("*?+[]!")
+
+
+def _literal_name(pattern: str) -> str | None:
+    """The workflow name ``pattern`` matches exactly, or None if it is a glob."""
+    name = []
+    chars = iter(pattern)
+    for char in chars:
+        if char == "\\":
+            escaped = next(chars, None)
+            if escaped is None:
+                return None
+            name.append(escaped)
+        elif char in FILTER_SPECIALS:
+            return None
+        else:
+            name.append(char)
+    return "".join(name)
+
+
 @pytest.fixture(scope="module")
-def listed(gate_doc: dict) -> list[str]:
+def listed_patterns(gate_doc: dict) -> list[str]:
     return list(_triggers(gate_doc)["workflow_run"]["workflows"])
+
+
+@pytest.fixture(scope="module")
+def listed(listed_patterns: list[str]) -> list[str]:
+    return [_literal_name(pattern) for pattern in listed_patterns]
+
+
+@pytest.mark.parametrize(
+    ("pattern", "name"),
+    [
+        ("CI", "CI"),
+        ("C\\+\\+ Tests", "C++ Tests"),
+        ("Co-install Smoke (piper-tts \\+ piper-plus)", "Co-install Smoke (piper-tts + piper-plus)"),
+        ("C++ Tests", None),
+        ("Build*", None),
+        ("!CI", None),
+        ("trailing\\", None),
+    ],
+)
+def test_literal_name(pattern, name):
+    assert _literal_name(pattern) == name
+
+
+def test_listed_entries_match_one_name_literally(listed_patterns):
+    """Escape every special character, e.g. ``'C\\+\\+ Tests'`` for ``C++ Tests``."""
+    globs = [pattern for pattern in listed_patterns if _literal_name(pattern) is None]
+    assert not globs
+
+
+def test_workflow_names_are_not_cut_by_a_yaml_comment():
+    """An unquoted ``name: E2E Issue #426`` is the name ``E2E Issue``: YAML
+    reads `` #`` onwards as a comment, and GitHub shows the cut name."""
+    cut = []
+    for path in sorted(WORKFLOW_DIR.glob("*.yml")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("name:"):
+                value = line[len("name:") :].strip()
+                if value[:1] not in ("'", '"') and " #" in value:
+                    cut.append(f"{path.name}: {line}")
+                break
+    assert not cut
 
 
 def test_gate_waits_for_every_pull_request_workflow(listed, workflows):
