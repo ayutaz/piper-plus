@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "comment": "Text-splitter contract fixture. Regenerate via `python scripts/regenerate_text_splitter_fixture.py`. Source: docs/spec/text-splitter-contract.toml. Each runtime asserts its actual closing-punct + terminator sets match `runtimes.<name>.*` here.",
+  "comment": "Text-splitter contract fixture. Regenerate via `python scripts/regenerate_text_splitter_fixture.py`. Source: docs/spec/text-splitter-contract.toml. Each runtime asserts its actual closing-punct + terminator sets match `runtimes.<name>.*` here, and that its splitter returns `split_cases[].expected` for each input.",
   "canonical": {
     "closing_punctuation": [
       34,
@@ -27,7 +27,11 @@
       65294,
       65311
     ],
-    "strategy": "post-consume"
+    "strategy": "post-consume",
+    "non_terminating_abbreviations": [
+      "e.g.",
+      "i.e."
+    ]
   },
   "runtimes": {
     "python": {
@@ -168,5 +172,96 @@
       ],
       "strategy": "post-consume"
     }
-  }
+  },
+  "split_cases": [
+    {
+      "input": "Hello. World!",
+      "expected": [
+        "Hello.",
+        "World!"
+      ]
+    },
+    {
+      "input": "It costs 3.14 dollars. Thanks.",
+      "expected": [
+        "It costs 3.14 dollars.",
+        "Thanks."
+      ]
+    },
+    {
+      "input": "Pi is 3.14.",
+      "expected": [
+        "Pi is 3.14."
+      ]
+    },
+    {
+      "input": "Version 2.0.1 is out. Update now!",
+      "expected": [
+        "Version 2.0.1 is out.",
+        "Update now!"
+      ]
+    },
+    {
+      "input": "The answer is 3. Next question.",
+      "expected": [
+        "The answer is 3.",
+        "Next question."
+      ]
+    },
+    {
+      "input": "Count to 3.Then stop.",
+      "expected": [
+        "Count to 3.",
+        "Then stop."
+      ]
+    },
+    {
+      "input": "Fruit, e.g. an apple. Done.",
+      "expected": [
+        "Fruit, e.g. an apple.",
+        "Done."
+      ]
+    },
+    {
+      "input": "One thing, i.e. this one. Next.",
+      "expected": [
+        "One thing, i.e. this one.",
+        "Next."
+      ]
+    },
+    {
+      "input": "E.g. this works. I.E. that too.",
+      "expected": [
+        "E.g. this works.",
+        "I.E. that too."
+      ]
+    },
+    {
+      "input": "A fruit (e.g. an apple) is sweet.",
+      "expected": [
+        "A fruit (e.g. an apple) is sweet."
+      ]
+    },
+    {
+      "input": "Note.g. Next.",
+      "expected": [
+        "Note.",
+        "g.",
+        "Next."
+      ]
+    },
+    {
+      "input": "気温は3.5度です。明日も晴れ。",
+      "expected": [
+        "気温は3.5度です。",
+        "明日も晴れ。"
+      ]
+    },
+    {
+      "input": "気温は３．５度です。",
+      "expected": [
+        "気温は３．５度です。"
+      ]
+    }
+  ]
 }

@@ -7,10 +7,13 @@ its own phonemizers under ``piper_plus.phonemize``. ``PiperVoice.phonemize``
 and ``PiperVoice.synthesize*`` split the text into sentences and phonemize each
 one with the phonemizer from ``PiperVoice._phonemize_one_factory(language_id)``;
 this test compares that phonemizer's output with the golden, so it is the
-phoneme sequence that reaches the model for a one-sentence input. Sentence
-splitting is a separate cross-runtime contract (text-splitter-contract.toml)
-and is not compared here. No ONNX model is needed: the voice is built from a
-config only.
+phoneme sequence that reaches the model for a one-sentence input.
+``test_sentence_splitting_keeps_golden_cases_whole`` also runs every case
+through ``PiperVoice.phonemize``: the training data is phonemized without
+sentence splitting, so a split inside a case ("3.14", "e.g.", Issue #831)
+would change its phonemes. The split rules themselves are the cross-runtime
+contract in text-splitter-contract.toml. No ONNX model is needed: the voice
+is built from a config only.
 
 Cases known to differ are listed in ``tests/fixtures/g2p/known_divergences.json``
 for the ``python_run`` runtime. A difference that is not listed fails, and so
@@ -23,9 +26,7 @@ case fails.
 Multi-codepoint phonemes (rr, tʃ, tone3) are one PUA character here
 (``pua.json``) and spelled out in the golden; that representation difference is
 not a divergence. Only the golden side is mapped, so output that forgets the
-PUA encoding still fails. Unlike the C++ and Rust tests, Chinese punctuation
-and word boundaries are compared as well: this runtime drops CJK punctuation
-like the training side does.
+PUA encoding still fails.
 
 Japanese needs the OpenJTalk dictionary and Korean is absent from the golden
 (and from the trained models), so both are left out. Nothing else is skipped:
@@ -198,6 +199,42 @@ def test_matches_python_golden_except_listed_divergences(voice: PiperVoice) -> N
         f"{len(failures)} failure(s), {known_count} known, {verified} cases:\n"
         + "\n".join(failures)
     )
+
+
+# Golden inputs that really are more than one sentence.
+MULTI_SENTENCE_CASES = {
+    # Punctuation only: the 。 ends the first sentence.
+    ("zh", "。，！"),
+}
+
+
+def test_sentence_splitting_keeps_golden_cases_whole(voice: PiperVoice) -> None:
+    golden = _load_json(GOLDEN)
+
+    checked = 0
+    failures: list[str] = []
+    for case in golden["test_cases"]:
+        lang = case["language"]
+        text = case["input"]
+        if lang not in LANGUAGES or (lang, text) in MULTI_SENTENCE_CASES:
+            continue
+        sentences = voice.phonemize(text, language_id=LANGUAGE_ID_MAP[lang])
+        checked += 1
+        if len(sentences) != 1:
+            failures.append(
+                f"[{lang}] {text!r} is split into {len(sentences)} sentences: "
+                f"{voice._split_sentences(text)!r}"
+            )
+        elif sentences[0] != _phonemize(voice, text, lang):
+            failures.append(f"[{lang}] {text!r} phonemizes differently when split")
+
+    assert checked > 0, "no golden case checked"
+    assert not failures, "\n".join(failures)
+
+
+def test_multi_sentence_cases_are_split(voice: PiperVoice) -> None:
+    for lang, text in MULTI_SENTENCE_CASES:
+        assert len(voice.phonemize(text, language_id=LANGUAGE_ID_MAP[lang])) > 1
 
 
 def test_english_words_are_not_dropped(voice: PiperVoice) -> None:

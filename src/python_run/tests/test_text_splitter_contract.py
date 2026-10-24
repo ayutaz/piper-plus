@@ -69,3 +69,26 @@ class TestTextSplitterContract:
             contract["runtimes"]["python"]["sentence_terminators"]
             == contract["canonical"]["sentence_terminators"]
         )
+
+
+@pytest.mark.unit
+class TestTextSplitterSplitCases:
+    """Issue #831: full stops between digits and inside e.g. / i.e. do not
+    end a sentence; every runtime returns the same chunks for these inputs."""
+
+    def test_python_abbreviations_match_fixture(self, contract):
+        from piper_plus.text_splitter import _NON_TERMINATING_ABBREVIATIONS
+
+        assert list(_NON_TERMINATING_ABBREVIATIONS) == (
+            contract["canonical"]["non_terminating_abbreviations"]
+        )
+
+    def test_split_cases(self, contract):
+        from piper_plus.text_splitter import split_sentences
+
+        wrong = [
+            (case["input"], split_sentences(case["input"]), case["expected"])
+            for case in contract["split_cases"]
+            if split_sentences(case["input"]) != case["expected"]
+        ]
+        assert wrong == []

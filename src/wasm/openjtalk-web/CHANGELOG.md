@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Streaming (`synthesizeStreaming`): do not end a chunk at a full stop between two digits (`3.14`) or inside `e.g.` / `i.e.` (#831). The pieces were phonemized separately and read differently from the whole sentence.
+
 ## [0.8.2] - 2026-10-23
 
 ### Added

@@ -88,6 +88,11 @@ def build_fixture() -> dict:
         _parse_codepoint(e["codepoint"]) for e in contract["sentence_terminators"]
     )
     canonical_strategy = contract["behavior"]["strategy"]
+    abbreviations = [e["text"] for e in contract["non_terminating_abbreviations"]]
+    split_cases = [
+        {"input": c["input"], "expected": list(c["expected"])}
+        for c in contract["split_cases"]
+    ]
 
     runtimes: dict[str, dict] = {}
     for name in ("python", "rust", "csharp", "cpp", "go"):
@@ -106,14 +111,19 @@ def build_fixture() -> dict:
             "`python scripts/regenerate_text_splitter_fixture.py`. "
             "Source: docs/spec/text-splitter-contract.toml. "
             "Each runtime asserts its actual closing-punct + terminator sets "
-            "match `runtimes.<name>.*` here."
+            "match `runtimes.<name>.*` here, and that its splitter returns "
+            "`split_cases[].expected` for each input."
         ),
         "canonical": {
             "closing_punctuation": canonical_close,
             "sentence_terminators": canonical_term,
             "strategy": canonical_strategy,
+            # Issue #831: full stops between digits and inside these
+            # abbreviations do not end a sentence.
+            "non_terminating_abbreviations": abbreviations,
         },
         "runtimes": runtimes,
+        "split_cases": split_cases,
     }
 
 
@@ -160,7 +170,7 @@ def main() -> int:
         return 0
 
     FIXTURE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    FIXTURE_PATH.write_text(serialized, encoding="utf-8")
+    FIXTURE_PATH.write_text(serialized, encoding="utf-8", newline="\n")
     print(f"Wrote {rel}")
     return 0
 

@@ -21,6 +21,8 @@ namespace PiperPlus.Core.Tests;
 ///      triggers a chunk split.
 ///   3. The known terminator omitted from C# (U+FF0E fullwidth full stop) is
 ///      NOT recognised today (current divergence — pinned to detect realignment).
+///   4. Every entry of split_cases splits to exactly its expected chunks, and the
+///      abbreviation list equals canonical.non_terminating_abbreviations (Issue #831).
 ///
 /// The drift gate (parity-hub.yml text-splitter matrix entry) ensures the fixture stays in sync
 /// with docs/spec/text-splitter-contract.toml.
@@ -139,5 +141,41 @@ public class TextSplitterContractTests
 
         var omitted = canonicalTerm.Except(csharpTerm).ToList();
         Assert.Equal(new[] { 0xFF0E }, omitted);
+    }
+
+    public static IEnumerable<object[]> SplitCases()
+    {
+        // Issue #831: split_cases pin full stops that do not end a sentence
+        // ("3.14", "e.g.", "i.e.") on top of the ordinary splits.
+        JsonElement fixture = LoadFixture();
+        return fixture.GetProperty("split_cases").EnumerateArray().Select(c => new object[]
+        {
+            c.GetProperty("input").GetString()!,
+            c.GetProperty("expected").EnumerateArray().Select(v => v.GetString()!).ToArray(),
+        });
+    }
+
+    [Theory]
+    [MemberData(nameof(SplitCases))]
+    public void Csharp_MatchesEachSplitCase(string input, string[] expected)
+    {
+        List<string> chunks = TextSplitter.SplitSentences(input);
+        Assert.Equal(expected, chunks);
+    }
+
+    [Fact]
+    public void Csharp_SplitCasesAreNotEmpty()
+    {
+        // Guards against the theory above silently running zero cases.
+        Assert.NotEmpty(SplitCases());
+    }
+
+    [Fact]
+    public void Csharp_NonTerminatingAbbreviationsMatchCanonical()
+    {
+        JsonElement fixture = LoadFixture();
+        var canonical = fixture.GetProperty("canonical").GetProperty("non_terminating_abbreviations")
+            .EnumerateArray().Select(v => v.GetString()!).ToArray();
+        Assert.Equal(canonical, TextSplitter.NonTerminatingAbbreviations);
     }
 }

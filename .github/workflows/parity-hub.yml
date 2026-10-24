@@ -30,6 +30,7 @@ on:
       - 'docs/spec/short-text-contract.toml'
       - 'docs/spec/ssml-contract.toml'
       - 'docs/spec/text-splitter-contract.toml'
+      - 'docs/spec/cjk-punctuation-contract.toml'
       - 'docs/reference/model-resolution.md'
       # Canonical / mirror fixtures
       - 'test/model_resolution_vectors.json'
@@ -38,6 +39,7 @@ on:
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ssml/**'
       - 'tests/fixtures/text_splitter/**'
+      - 'tests/fixtures/g2p/cjk_punctuation_cases.json'
       # cli-flag-parity runtime sources
       - 'src/python_run/piper_plus/__main__.py'
       - 'src/python/piper_train/infer_onnx.py'
@@ -81,6 +83,17 @@ on:
       - 'scripts/regenerate_ssml_fixture.py'
       - 'scripts/check_text_splitter_contract.py'
       - 'scripts/regenerate_text_splitter_fixture.py'
+      - 'tests/scripts/test_check_text_splitter_contract.py'
+      - 'scripts/check_cjk_punctuation_contract.py'
+      - 'scripts/build_cjk_punctuation_fixture.py'
+      - 'tests/scripts/test_check_cjk_punctuation_contract.py'
+      # Tests listed in text-splitter-contract.toml [consumers].split_case_tests
+      - 'src/python_run/tests/test_text_splitter_contract.py'
+      - 'src/rust/piper-core/tests/test_text_splitter_contract.rs'
+      - 'src/go/piperplus/text_splitter_contract_test.go'
+      - 'src/csharp/PiperPlus.Core.Tests/TextSplitterContractTests.cs'
+      - 'src/cpp/tests/test_text_splitter_contract.cpp'
+      - 'src/wasm/openjtalk-web/test/js/test-streaming-pipeline.js'
       - 'scripts/check_voice_catalog_parity.py'
       - '.github/workflows/parity-hub.yml'
   push:
@@ -132,6 +145,14 @@ jobs:
             scripts: |
               python scripts/check_text_splitter_contract.py --verbose
               python scripts/regenerate_text_splitter_fixture.py --check
+              pip install pytest
+              python -m pytest tests/scripts/test_check_text_splitter_contract.py -q -o addopts=
+          - id: cjk-punctuation
+            description: CJK punctuation contract, fixture and consumer tests agree
+            scripts: |
+              python scripts/check_cjk_punctuation_contract.py
+              pip install pytest
+              python -m pytest tests/scripts/test_check_cjk_punctuation_contract.py -q -o addopts=
           - id: voice-catalog
             description: 5 runtime catalogs honour canonical vector
             scripts: |

@@ -486,6 +486,36 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
+    // 4b. Full stop between digits (Issue #831)
+    // -----------------------------------------------------------------------
+    // A '.' splits only before whitespace or the end of the text, so a full
+    // stop between two digits ("3.14") never splits here; these pin rule 1 of
+    // "Full stops that do not end a sentence" in text-splitter-contract.toml.
+    #[test]
+    fn test_decimal_point_does_not_split() {
+        let result = split_sentences("It costs 3.14 dollars. Thanks.");
+        assert_eq!(result, vec!["It costs 3.14 dollars.", "Thanks."]);
+    }
+
+    #[test]
+    fn test_version_number_does_not_split() {
+        let result = split_sentences("Version 2.0.1 is out. Update now!");
+        assert_eq!(result, vec!["Version 2.0.1 is out.", "Update now!"]);
+    }
+
+    #[test]
+    fn test_decimal_at_end_of_text() {
+        let result = split_sentences("Pi is 3.14.");
+        assert_eq!(result, vec!["Pi is 3.14."]);
+    }
+
+    #[test]
+    fn test_fullwidth_decimal_does_not_split() {
+        let result = split_sentences("気温は３．５度です。明日も晴れ。");
+        assert_eq!(result, vec!["気温は３．５度です。", "明日も晴れ。"]);
+    }
+
+    // -----------------------------------------------------------------------
     // 5. Quoted speech
     // -----------------------------------------------------------------------
     #[test]

@@ -208,3 +208,105 @@ note = "In C++ and Go. Not in Rust/C#. Covers CJK fullwidth period usage."
 #   Input: 彼は「元気です。」と言った。終わり。
 #   Output: ["彼は「元気です。」", "と言った。", "終わり。"]  (3 chunks)
 strategy = "post-consume"
+
+# ---------------------------------------------------------------------------
+# Full stops that do not end a sentence (Issue #831)
+# ---------------------------------------------------------------------------
+# The training data is phonemized without sentence splitting, and the English
+# G2P (g2p_en) reads some full stops as part of the text around them: "3.14"
+# is "three point one four" and "e.g." is "for example". Splitting there
+# changes the phonemes ("three" + "fourteen"), so a full stop (U+002E, or the
+# fullwidth U+FF0E) is NOT a sentence terminator when
+#
+#   1. it sits between two digits (ASCII 0-9 or fullwidth U+FF10-FF19 on each
+#      side): "3.14", "2.0.1", "３．５";
+#   2. it is one of the full stops of an abbreviation below, matched ASCII
+#      case-insensitively, and the abbreviation is at the start of the text or
+#      follows a character that is not an ASCII letter or digit: "e.g.",
+#      "E.g.", "(i.e.". "Note.g." does not match ("e" follows "t").
+#
+# Only abbreviations g2p_en rewrites are listed; a title such as "Mr." keeps
+# the same phonemes when it is split off, so it still ends a chunk.
+
+[[non_terminating_abbreviations]]
+text = "e.g."
+reading = "for example"
+
+[[non_terminating_abbreviations]]
+text = "i.e."
+reading = "that is"
+
+# ---------------------------------------------------------------------------
+# Consumers (Issue #831)
+# ---------------------------------------------------------------------------
+# Tests that check every split case below. scripts/check_text_splitter_contract.py
+# fails when one of them is missing or no longer reads split_cases from
+# tests/fixtures/text_splitter/contract.json.
+
+[consumers]
+split_case_tests = [
+  "src/python_run/tests/test_text_splitter_contract.py",
+  "src/rust/piper-core/tests/test_text_splitter_contract.rs",
+  "src/go/piperplus/text_splitter_contract_test.go",
+  "src/csharp/PiperPlus.Core.Tests/TextSplitterContractTests.cs",
+  "src/cpp/tests/test_text_splitter_contract.cpp",
+  "src/wasm/openjtalk-web/test/js/test-streaming-pipeline.js",
+]
+
+# ---------------------------------------------------------------------------
+# Split cases (Issue #831)
+# ---------------------------------------------------------------------------
+# Every runtime's splitter must return exactly `expected` for `input`
+# (copied into tests/fixtures/text_splitter/contract.json as split_cases).
+
+[[split_cases]]
+input = "Hello. World!"
+expected = ["Hello.", "World!"]
+
+[[split_cases]]
+input = "It costs 3.14 dollars. Thanks."
+expected = ["It costs 3.14 dollars.", "Thanks."]
+
+[[split_cases]]
+input = "Pi is 3.14."
+expected = ["Pi is 3.14."]
+
+[[split_cases]]
+input = "Version 2.0.1 is out. Update now!"
+expected = ["Version 2.0.1 is out.", "Update now!"]
+
+[[split_cases]]
+input = "The answer is 3. Next question."
+expected = ["The answer is 3.", "Next question."]
+
+[[split_cases]]
+input = "Count to 3.Then stop."
+expected = ["Count to 3.", "Then stop."]
+
+[[split_cases]]
+input = "Fruit, e.g. an apple. Done."
+expected = ["Fruit, e.g. an apple.", "Done."]
+
+[[split_cases]]
+input = "One thing, i.e. this one. Next."
+expected = ["One thing, i.e. this one.", "Next."]
+
+[[split_cases]]
+input = "E.g. this works. I.E. that too."
+expected = ["E.g. this works.", "I.E. that too."]
+
+[[split_cases]]
+input = "A fruit (e.g. an apple) is sweet."
+expected = ["A fruit (e.g. an apple) is sweet."]
+
+[[split_cases]]
+input = "Note.g. Next."
+expected = ["Note.", "g.", "Next."]
+
+[[split_cases]]
+input = "気温は3.5度です。明日も晴れ。"
+expected = ["気温は3.5度です。", "明日も晴れ。"]
+
+[[split_cases]]
+input = "気温は３．５度です。"
+expected = ["気温は３．５度です。"]

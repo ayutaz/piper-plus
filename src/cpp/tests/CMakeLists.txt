@@ -1068,6 +1068,25 @@ set_tests_properties(test_short_text_contract PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
+# Cross-runtime text-splitter contract test.
+# Reads tests/fixtures/text_splitter/contract.json (generated from
+# docs/spec/text-splitter-contract.toml) and asserts the production splitter
+# in sentence_split.hpp matches the terminator / closing-punctuation sets and
+# split_cases (Issue #831). Self-contained: only links gtest + json.hpp, no
+# piper-library dependency.
+add_executable(test_text_splitter_contract test_text_splitter_contract.cpp)
+target_include_directories(test_text_splitter_contract PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../
+)
+target_link_libraries(test_text_splitter_contract
+    gtest_main
+)
+add_test(NAME test_text_splitter_contract COMMAND test_text_splitter_contract)
+set_tests_properties(test_text_splitter_contract PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 # Cross-runtime ORT session contract test.
 # Reads tests/fixtures/ort_session/contract.json (generated from
 # docs/spec/ort-session-contract.toml) and asserts the C++ session/warmup

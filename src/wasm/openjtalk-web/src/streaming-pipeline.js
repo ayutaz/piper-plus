@@ -8,6 +8,52 @@
 const ABBREVIATIONS =
   /(?:Mr|Dr|Mrs|Ms|Prof|Sr|Jr|St|Mt|Inc|Ltd|Corp|Co|vs|etc|Vol|Dept|Est|approx|Gen|Gov|Sgt|Cpl|Pvt|Capt|Lt|Col|Maj|Rev|Ph\.D)\./gi;
 
+// Issue #831: g2p_en reads these full stops as part of the text around them
+// ("e.g." is "for example", "i.e." is "that is"), and the training data is
+// phonemized without splitting, so they do not end a sentence. See
+// [[non_terminating_abbreviations]] in docs/spec/text-splitter-contract.toml.
+export const NON_TERMINATING_ABBREVIATIONS = Object.freeze(["e.g.", "i.e."]);
+
+const isDigit = (ch) => (ch >= "0" && ch <= "9") || (ch >= "０" && ch <= "９");
+const isAsciiAlnum = (ch) => /^[0-9A-Za-z]$/.test(ch);
+
+/**
+ * Whether the full stop at text[i] does not end a sentence (Issue #831): it
+ * sits between two digits ("3.14"), or it is one of the full stops of a
+ * NON_TERMINATING_ABBREVIATIONS entry (ASCII case-insensitive) that starts
+ * the text or follows a character other than an ASCII letter or digit.
+ * @param {string} text
+ * @param {number} i
+ * @returns {boolean}
+ */
+function isNonTerminatingFullStop(text, i) {
+  if (text[i] !== "." && text[i] !== "．") {
+    return false;
+  }
+  if (i > 0 && i + 1 < text.length && isDigit(text[i - 1]) && isDigit(text[i + 1])) {
+    return true;
+  }
+  for (const abbr of NON_TERMINATING_ABBREVIATIONS) {
+    for (let j = 0; j < abbr.length; j++) {
+      if (abbr[j] !== ".") {
+        continue;
+      }
+      const start = i - j;
+      const end = start + abbr.length;
+      if (start < 0 || end > text.length) {
+        continue;
+      }
+      if (text.slice(start, end).replace(/[A-Z]/g, (c) => c.toLowerCase()) !== abbr) {
+        continue;
+      }
+      if (start === 0 || !isAsciiAlnum(text[start - 1])) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export class TextChunker {
   /**
    * Split text into sentence chunks.
@@ -53,12 +99,14 @@ export class TextChunker {
       return match.slice(0, -1) + placeholder;
     });
 
-    // Split on sentence-ending punctuation (. ! ?)
+    // Split on sentence-ending punctuation (. ! ?), except a full stop in
+    // "3.14" or "e.g." (Issue #831). `replaced` keeps the length of `text`,
+    // so index i points at the same character in both.
     const chunks = [];
     let current = "";
     for (let i = 0; i < replaced.length; i++) {
       current += replaced[i];
-      if (".!?".includes(replaced[i])) {
+      if (".!?".includes(replaced[i]) && !isNonTerminatingFullStop(text, i)) {
         // Restore placeholders and push
         chunks.push(current.replaceAll(placeholder, "."));
         current = "";

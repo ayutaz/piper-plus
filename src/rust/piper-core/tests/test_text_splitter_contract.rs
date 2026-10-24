@@ -10,6 +10,9 @@
 //!    triggers a chunk split.
 //! 3. The known terminator omitted from rust (U+FF0E fullwidth full stop) is
 //!    NOT recognised as a terminator (current divergence).
+//! 4. Every `split_cases` entry splits to exactly its `expected` chunks, and
+//!    the non-terminating abbreviation list matches
+//!    `canonical.non_terminating_abbreviations` (Issue #831).
 //!
 //! The drift gate (`parity-hub.yml` text-splitter matrix entry) ensures the fixture stays in
 //! sync with `docs/spec/text-splitter-contract.toml`.
@@ -17,7 +20,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use piper_plus::streaming::split_sentences;
+use piper_plus::streaming::{NON_TERMINATING_ABBREVIATIONS, split_sentences};
 use serde_json::Value;
 
 fn fixture_path() -> PathBuf {
@@ -123,4 +126,42 @@ fn rust_does_not_recognise_omitted_terminator() {
         1,
         "U+FF0E should NOT split in rust today; got {chunks:?}"
     );
+}
+
+#[test]
+fn rust_matches_each_split_case() {
+    // Issue #831: a full stop between digits ("3.14") or inside "e.g." /
+    // "i.e." does not end a sentence. split_cases is the shared expectation.
+    let fixture = load_fixture();
+    let cases = fixture["split_cases"]
+        .as_array()
+        .expect("split_cases array");
+    assert!(!cases.is_empty(), "split_cases must not be empty");
+
+    for case in cases {
+        let input = case["input"].as_str().expect("split_cases input string");
+        let expected: Vec<String> = case["expected"]
+            .as_array()
+            .expect("split_cases expected array")
+            .iter()
+            .map(|v| v.as_str().expect("expected chunk string").to_string())
+            .collect();
+        assert_eq!(
+            split_sentences(input),
+            expected,
+            "split_cases mismatch for input {input:?}"
+        );
+    }
+}
+
+#[test]
+fn rust_non_terminating_abbreviations_match_fixture() {
+    let fixture = load_fixture();
+    let canonical: Vec<&str> = fixture["canonical"]["non_terminating_abbreviations"]
+        .as_array()
+        .expect("non_terminating_abbreviations array")
+        .iter()
+        .map(|v| v.as_str().expect("abbreviation string"))
+        .collect();
+    assert_eq!(NON_TERMINATING_ABBREVIATIONS, canonical.as_slice());
 }
