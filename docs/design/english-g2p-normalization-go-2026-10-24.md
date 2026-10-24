@@ -1,6 +1,6 @@
 # Go の英語 G2P に g2p_en の正規化を移す (Issue #841)
 
-#821 で C++ と Rust に移した英語の正規化 ([english-g2p-normalization-cpp-rust-2026-10-23.md](english-g2p-normalization-cpp-rust-2026-10-23.md)) を、Go (`src/go/phonemize`) にも移した。規則・意図的な変更点 (Unicode の空白を半角空白にする) は Rust と同じで、Rust の `english_normalize.rs` / `english.rs` を 1 対 1 で移している。
+Issue #821 で C++ と Rust に移した英語の正規化 ([english-g2p-normalization-cpp-rust-2026-10-23.md](english-g2p-normalization-cpp-rust-2026-10-23.md)) を、Go (`src/go/phonemize`) にも移した。規則・意図的な変更点 (Unicode の空白を半角空白にする) は Rust と同じで、Rust の `english_normalize.rs` / `english.rs` を 1 対 1 で移している。
 
 ## 変更
 
