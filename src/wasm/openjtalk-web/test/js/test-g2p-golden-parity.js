@@ -14,7 +14,10 @@
  * from the package files on disk) and the ONNX session are stand-ins. With
  * such a model the package routes `en` to the JS G2P (`@piper-plus/g2p`) and
  * the other languages to the Rust WASM G2P; the routing is asserted below so
- * the record in `known_divergences.json` keeps describing the same code.
+ * the record in `known_divergences.json` keeps describing the same code. The
+ * zh cases with digits ("0", "100", "123") also check that the Rust WASM gets
+ * the CMU dictionary of `@piper-plus/g2p` for the English segment it splits
+ * out of Chinese text, instead of reading it digit by digit (#847).
  *
  * The output is phoneme IDs, so the test gives every phoneme its own ID and
  * reads the tokens back from the IDs between the PAD separators. The IDs are

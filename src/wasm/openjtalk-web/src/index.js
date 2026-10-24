@@ -47,6 +47,10 @@ export {
 // ---------------------------------------------------------------------------
 
 import { checkPuaCompat, isSsml, parseSsml } from "@piper-plus/g2p";
+// Namespace import for `loadCmuDict`: @piper-plus/g2p releases up to 0.4.2
+// do not export it, and a named import of a missing export fails module
+// linking for the whole package. RustWasmAdapter checks it is a function.
+import * as piperPlusG2p from "@piper-plus/g2p";
 import { WebGPUSessionManager } from "./webgpu-session-manager.js";
 import { StreamingTTSPipeline } from "./streaming-pipeline.js";
 import { ModelManager } from "./model-manager.js";
@@ -425,6 +429,9 @@ export class PiperPlus {
     // Language code -> reason, for languages dropped when the Rust WASM G2P
     // failed to load. Synthesizing them must fail instead of going silent.
     this._unavailableLanguages = new Map();
+    // Hands the CMU dictionary to the Rust WASM on the first Chinese request
+    // (Issue #847); null when the model does not need it or it was done.
+    this._loadWasmEnglishDictionary = null;
     this._ort = null;
     this._initialized = false;
     this._warmupPromise = null;
@@ -949,9 +956,9 @@ export class PiperPlus {
       //   zh — needs pinyin dictionary (JS G2P has no pinyin conversion)
       const WASM_REQUIRED_LANGUAGES = new Set(["ja", "zh"]);
       // Languages the Rust WASM bundle reports as supported but only
-      // tokenizes letter by letter (PassthroughPhonemizer): English needs the
-      // CMU dictionary, which ships with the JS G2P instead
-      // (src/rust/piper-wasm/src/lib.rs).
+      // tokenizes letter by letter (PassthroughPhonemizer) until it is handed
+      // the CMU dictionary, which ships with the JS G2P
+      // (src/rust/piper-wasm/src/lib.rs). English text goes to the JS G2P.
       const WASM_PASSTHROUGH_LANGUAGES = new Set(["en"]);
 
       // Load Rust WASM phonemizer when any model language benefits from it.
@@ -1007,6 +1014,24 @@ export class PiperPlus {
             phonemizerMap.set(lang, jsAdapter);
           }
         }
+      }
+
+      // Chinese text goes whole to the Rust WASM, which splits digits and
+      // Latin words in it into an English segment. Without the CMU dictionary
+      // that segment is read letter by letter ("123" -> "1 2 3", Issue #847),
+      // so the WASM gets the dictionary that the JS G2P has already loaded
+      // for en. Models without zh and en never need it, and it is handed
+      // over on the first Chinese request: it adds ~18 MB to the WASM memory,
+      // which users of the model's other languages should not pay for.
+      this._loadWasmEnglishDictionary = null;
+      if (wasmAdapter && phonemizerMap.get("zh") === wasmAdapter && languages.includes("en")) {
+        let pending = null;
+        this._loadWasmEnglishDictionary = () => {
+          pending ??= wasmAdapter.loadEnglishDictionary(piperPlusG2p.loadCmuDict).finally(() => {
+            this._loadWasmEnglishDictionary = null;
+          });
+          return pending;
+        };
       }
 
       this._phonemizer = new CompositePhonemizer({
@@ -1067,6 +1092,12 @@ export class PiperPlus {
           `load (${reason}). Check that options.wasmG2pUrl points to a reachable ` +
           `piper_plus_wasm.js.`
       );
+    }
+    if (
+      this._loadWasmEnglishDictionary &&
+      (language || this._phonemizer.detectLanguage(text)) === "zh"
+    ) {
+      await this._loadWasmEnglishDictionary();
     }
     return this._phonemizer.encode(text, language);
   }

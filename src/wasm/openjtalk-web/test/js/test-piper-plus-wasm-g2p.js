@@ -469,10 +469,12 @@ describe("PiperPlus WASM G2P integration", { skip: skip ? "Import failed" : fals
       piper.dispose();
     });
 
-    // The Rust WASM bundle has no English G2P: it reports "en" as supported
-    // but phonemizes it with PassthroughPhonemizer (one token per letter, see
-    // src/rust/piper-wasm/src/lib.rs). Once WASM loads, English must still
-    // be routed to the JS G2P, or "Hello" is spoken as its spelling.
+    // The Rust WASM bundle reports "en" as supported but phonemizes it with
+    // PassthroughPhonemizer (one token per letter, see
+    // src/rust/piper-wasm/src/lib.rs) until it is handed the CMU dictionary,
+    // which happens only for English inside Chinese text. Once WASM loads,
+    // English must still be routed to the JS G2P, or "Hello" is spoken as its
+    // spelling.
     it("routes en to JS G2P even when WASM loads and reports en", async () => {
       setMockConfig(CONFIG_WITH_JA);
 
@@ -498,6 +500,80 @@ describe("PiperPlus WASM G2P integration", { skip: skip ? "Import failed" : fals
       } finally {
         piper.dispose();
       }
+    });
+
+    // Digits and Latin words inside Chinese text are split by the Rust WASM
+    // into an English segment, which it reads letter by letter without the
+    // CMU dictionary (Issue #847). The dictionary of @piper-plus/g2p is
+    // handed over for models with zh and en, on the first Chinese request:
+    // it adds ~18 MB to the WASM memory, which ja / en / es users of the same
+    // model do not need.
+    describe("CMU dictionary for English inside Chinese text (#847)", () => {
+      async function initWithEnglishSetter(config) {
+        setMockConfig(config);
+        const calls = [];
+        const piper = await PiperPlus.initialize({
+          model: "test",
+          ort: globalThis.ort,
+          wasmLoader: async () => {
+            const mod = createMockWasmModule();
+            mod.WasmPhonemizer = class extends mod.WasmPhonemizer {
+              setEnglishDictionary(bytes) {
+                calls.push(bytes);
+              }
+            };
+            return mod;
+          },
+        });
+        return { piper, calls };
+      }
+
+      it("passes the bundled CMU dictionary on the first zh request of a zh + en model", async () => {
+        const { piper, calls } = await initWithEnglishSetter(CONFIG_WITH_JA);
+        try {
+          assert.equal(calls.length, 0, "not at init");
+          await piper._textToPhonemeIds("こんにちは", "ja");
+          await piper._textToPhonemeIds("Hello", "en");
+          await piper._textToPhonemeIds("Hola 100", "es");
+          assert.equal(calls.length, 0, "not for other languages");
+
+          await piper._textToPhonemeIds("你好123", "zh");
+          await piper._textToPhonemeIds("100", "zh");
+          assert.equal(calls.length, 1, "setEnglishDictionary should be called once");
+          assert.ok(calls[0] instanceof Uint8Array);
+          const dict = JSON.parse(new TextDecoder().decode(calls[0]));
+          assert.equal(dict.hundred, "HH AH1 N D R AH0 D");
+          assert.ok(Object.keys(dict).length > 100000, "the full CMU dictionary");
+        } finally {
+          piper.dispose();
+        }
+      });
+
+      it("also passes it when zh is detected rather than given", async () => {
+        const { piper, calls } = await initWithEnglishSetter(CONFIG_WITHOUT_JA);
+        try {
+          piper._phonemizer.detectLanguage = () => "zh";
+          await piper._textToPhonemeIds("你好123");
+          assert.equal(calls.length, 1);
+        } finally {
+          piper.dispose();
+        }
+      });
+
+      it("does not pass it without en or without zh", async () => {
+        const jaEn = { ...BASE_CONFIG, language_id_map: { ja: 0, en: 1 } };
+        for (const config of [CONFIG_WASM_LANGS_ONLY, jaEn]) {
+          const { piper, calls } = await initWithEnglishSetter(config);
+          try {
+            for (const language of Object.keys(config.language_id_map)) {
+              await piper._textToPhonemeIds("100", language);
+            }
+            assert.equal(calls.length, 0, JSON.stringify(config.language_id_map));
+          } finally {
+            piper.dispose();
+          }
+        }
+      });
     });
   });
 

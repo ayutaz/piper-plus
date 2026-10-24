@@ -15,18 +15,23 @@
 //! - `zh-external` — Chinese with runtime dictionary loading (same as `zh` but
 //!   semantically indicates external dict loading, like `ja-external`).
 //!   Use `setChineseDictionary()` to load pinyin JSON dictionaries.
+//! - `en` — English (enables `piper-plus-g2p/english`). The CMU dictionary is not
+//!   bundled: EN starts as passthrough until `setEnglishDictionary()` is called.
 //! - `ko` — Korean (rule-based, no dictionary needed)
 //! - `es` — Spanish (rule-based, no dictionary needed)
 //! - `fr` — French (rule-based, no dictionary needed)
 //! - `pt` — Portuguese (rule-based, no dictionary needed)
 //! - `sv` — Swedish (rule-based, no dictionary needed)
-//! - `multilingual` — All languages with bundled JA dictionary + ZH G2P
-//! - `multilingual-external` — All languages with `ja-external` + `zh-external`
+//! - `multilingual` — All languages with bundled JA dictionary + EN/ZH G2P
+//! - `multilingual-external` — All languages with `ja-external` + `en` + `zh-external`
 //!
-//! **EN** always uses `PassthroughPhonemizer` (character-level tokenization)
-//! inside Rust WASM because its full G2P requires a large pronunciation
-//! dictionary (CMU-dict). The JS-side `@piper-plus/g2p` package provides
-//! richer EN phonemization separately.
+//! **EN** uses `PassthroughPhonemizer` (character-level tokenization) until
+//! the CMU dictionary JSON (~3.7 MB) is handed over with
+//! `setEnglishDictionary()`; it is not bundled into the binary. English text
+//! on its own is phonemized by the JS-side `@piper-plus/g2p` package, which
+//! ships the same dictionary. The browser package passes that copy here for
+//! models with zh and en, because digits and Latin words inside Chinese text
+//! are split into an English segment by this crate (Issue #847).
 //!
 //! All features are off by default. For a JA-only WASM build:
 //! ```sh
@@ -146,6 +151,8 @@ pub fn parse_ssml(text: &str) -> Result<String, JsValue> {
 use piper_plus::config::VoiceConfig;
 #[cfg(any(feature = "zh", feature = "zh-external"))]
 use piper_plus_g2p::chinese::ChinesePhonemizer;
+#[cfg(feature = "en")]
+use piper_plus_g2p::english::EnglishPhonemizer;
 #[cfg(feature = "fr")]
 use piper_plus_g2p::french::FrenchPhonemizer;
 #[cfg(any(feature = "ja", feature = "ja-external"))]
@@ -224,8 +231,9 @@ impl std::fmt::Debug for WasmPhonemizer {
 /// Helper: create a phonemizer for the given language code.
 ///
 /// When a language feature is enabled, the dedicated phonemizer is used.
-/// When disabled (or for EN/unknown), falls back to `PassthroughPhonemizer`.
-/// ZH starts as passthrough and is upgraded via `setChineseDictionary()`.
+/// When disabled (or for unknown languages), falls back to `PassthroughPhonemizer`.
+/// EN and ZH start as passthrough and are upgraded via `setEnglishDictionary()`
+/// and `setChineseDictionary()`.
 fn create_phonemizer(lang: &str) -> Result<Box<dyn Phonemizer>, String> {
     match lang {
         "ja" => {
@@ -313,8 +321,8 @@ fn create_phonemizer(lang: &str) -> Result<Box<dyn Phonemizer>, String> {
                 Ok(Box::new(PassthroughPhonemizer::new("zh")))
             }
         }
-        // EN requires a large pronunciation dictionary (CMU-dict) -- handled by the
-        // JS-side G2P package (@piper-plus/g2p) which provides EnglishG2P.
+        // EN needs the CMU dictionary, which is not bundled: it starts as
+        // passthrough and is replaced by setEnglishDictionary() (`en` feature).
         // Unknown languages also fall back to character-level tokenization.
         other => Ok(Box::new(PassthroughPhonemizer::new(other))),
     }
@@ -428,8 +436,8 @@ impl WasmPhonemizer {
         // MultilingualPhonemizer does: es/fr/pt/sv cannot be told apart from
         // English by Unicode, and English inside Chinese text goes through
         // the ZH-EN loanword table. Japanese keeps the whole text, because
-        // OpenJTalk reads Latin letters itself and this build has no English
-        // G2P (EN is a letter-by-letter passthrough here).
+        // OpenJTalk reads Latin letters itself (EN here is a letter-by-letter
+        // passthrough unless setEnglishDictionary() was called).
         let result = match language.as_deref() {
             Some("ja") => self.phonemizer.phonemize_with_language_hint(text, "ja"),
             Some(hint) => self.phonemizer.phonemize_with_language(text, hint),
@@ -537,6 +545,37 @@ impl WasmPhonemizer {
             })?;
         self.phonemizer
             .replace_phonemizer("zh", Box::new(zh_phonemizer));
+        Ok(())
+    }
+
+    /// Load the CMU pronunciation dictionary from JSON bytes.
+    ///
+    /// This replaces the initial PassthroughPhonemizer for English with the
+    /// full `EnglishPhonemizer` (CMU dictionary + g2p_en normalization) that
+    /// the Rust, C++ and Swift runtimes use. English segments then read
+    /// numbers and words as Python does, instead of character by character;
+    /// the browser package needs this for digits and Latin words inside
+    /// Chinese text, which this phonemizer splits into an English segment
+    /// (Issue #847).
+    ///
+    /// - `cmudict_json` — JSON bytes in the format of `cmudict_data.json`
+    ///   (`{"hello": "HH AH0 L OW1", ...}`), e.g. the copy shipped in
+    ///   `@piper-plus/g2p`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `CONFIG_PARSE_ERROR` if the dictionary JSON is invalid.
+    #[cfg(feature = "en")]
+    #[wasm_bindgen(js_name = setEnglishDictionary)]
+    pub fn set_english_dictionary(&mut self, cmudict_json: &[u8]) -> Result<(), JsValue> {
+        let en_phonemizer = EnglishPhonemizer::from_json_bytes(cmudict_json).map_err(|e| {
+            create_wasm_error(
+                ERROR_CONFIG_PARSE,
+                &format!("Failed to load English dictionary: {e}"),
+            )
+        })?;
+        self.phonemizer
+            .replace_phonemizer("en", Box::new(en_phonemizer));
         Ok(())
     }
 
@@ -705,6 +744,49 @@ fn make_multilingual_config() -> String {
         }
     })
     .to_string()
+}
+
+/// The 8-language test config plus an ID for every symbol of `golden`
+/// (Python's phonemes, space-joined, with PUA spelled out), so that none is
+/// skipped by the encoder.
+#[cfg(test)]
+#[allow(dead_code)]
+fn config_with_golden_symbols(golden: &[String]) -> String {
+    use piper_plus_g2p::token_map::token_to_pua;
+
+    let mut config: serde_json::Value = serde_json::from_str(&make_multilingual_config()).unwrap();
+    let id_map = config["phoneme_id_map"].as_object_mut().unwrap();
+    for (i, token) in golden.iter().enumerate() {
+        let symbols = token_to_pua(token).map_or_else(|| token.clone(), String::from);
+        for (j, ch) in symbols.chars().enumerate() {
+            id_map
+                .entry(ch.to_string())
+                .or_insert(serde_json::json!([600 + 10 * i as i64 + j as i64]));
+        }
+    }
+    config.to_string()
+}
+
+/// Split a golden phoneme string: tokens are joined with one space, so the
+/// word boundary token " " shows as three spaces.
+#[cfg(test)]
+#[allow(dead_code)]
+fn golden_tokens(s: &str) -> Vec<String> {
+    s.replace("   ", " _ ")
+        .split(' ')
+        .map(|t| if t == "_" { " " } else { t }.to_string())
+        .collect()
+}
+
+/// The phoneme IDs `p` should return for `golden` (BOS/PAD/EOS included).
+#[cfg(test)]
+#[allow(dead_code)]
+fn golden_ids(p: &WasmPhonemizer, golden: &[String]) -> Vec<i32> {
+    let (ids, _) = p
+        .encoder
+        .encode_with_prosody_and_eos(golden, &vec![None; golden.len()], Some("$"))
+        .unwrap();
+    ids.iter().map(|&id| id as i32).collect()
 }
 
 // ===========================================================================
@@ -1228,6 +1310,31 @@ mod tests {
         let result = JapanesePhonemizer::new_from_serialized_dict(b"invalid bincode data");
         assert!(result.is_err(), "invalid dict data should fail");
     }
+
+    // -------------------------------------------------------------------
+    // English dictionary tests (en feature, Issue #847)
+    // -------------------------------------------------------------------
+
+    /// Digits in Chinese text go to the English segment. Once the CMU
+    /// dictionary is set they are read as English numbers, as in Python
+    /// (`tests/fixtures/g2p/phoneme_test_cases_golden.json`, zh "100"),
+    /// instead of being passed through digit by digit.
+    #[cfg(feature = "en")]
+    #[test]
+    fn test_zh_digits_are_read_as_english_numbers_after_set_english_dictionary() {
+        let golden = golden_tokens("w ˈ ʌ n   h ˈ ʌ n d ɹ ə d");
+        let mut p = WasmPhonemizer::new(&config_with_golden_symbols(&golden)).unwrap();
+
+        let passthrough = p.phonemize("100", Some("zh".to_string())).unwrap();
+        assert_ne!(passthrough.phoneme_ids, golden_ids(&p, &golden));
+
+        p.set_english_dictionary(include_bytes!(
+            "../../piper-plus-g2p/data/cmudict_data.json"
+        ))
+        .unwrap();
+        let actual = p.phonemize("100", Some("zh".to_string())).unwrap();
+        assert_eq!(actual.phoneme_ids, golden_ids(&p, &golden));
+    }
 }
 
 // ===========================================================================
@@ -1496,6 +1603,34 @@ mod wasm_tests {
             .unwrap();
         let expected: Vec<i32> = expected.iter().map(|&id| id as i32).collect();
         assert_eq!(actual, expected);
+    }
+
+    /// Digits in Chinese text are read as English numbers once the CMU
+    /// dictionary is set, as in Python (Issue #847), not digit by digit.
+    #[cfg(feature = "en")]
+    #[wasm_bindgen_test]
+    fn test_wasm_zh_digits_are_read_as_english_numbers() {
+        // Python's phonemes for zh "0" and "100".
+        for (input, golden) in [("0", "z ˈ ɪ ɹ o ʊ"), ("100", "w ˈ ʌ n   h ˈ ʌ n d ɹ ə d")]
+        {
+            let golden = golden_tokens(golden);
+            let mut p = WasmPhonemizer::new(&config_with_golden_symbols(&golden)).unwrap();
+            p.set_english_dictionary(include_bytes!(
+                "../../piper-plus-g2p/data/cmudict_data.json"
+            ))
+            .unwrap();
+            let actual = p.phonemize(input, Some("zh".to_string())).unwrap();
+            assert_eq!(actual.phoneme_ids, golden_ids(&p, &golden), "zh {input:?}");
+        }
+    }
+
+    #[cfg(feature = "en")]
+    #[wasm_bindgen_test]
+    fn test_wasm_set_english_dictionary_rejects_invalid_json() {
+        let mut p = WasmPhonemizer::new(&make_multilingual_config()).unwrap();
+        let err = p.set_english_dictionary(b"not json").unwrap_err();
+        let code = js_sys::Reflect::get(&err, &"code".into()).unwrap();
+        assert_eq!(code.as_string().as_deref(), Some(ERROR_CONFIG_PARSE));
     }
 
     // -------------------------------------------------------------------

@@ -114,6 +114,53 @@ export class RustWasmAdapter {
   }
 
   /**
+   * Hand the CMU pronunciation dictionary to the Rust WASM English phonemizer.
+   *
+   * The Rust WASM splits digits and Latin words inside Chinese text into an
+   * English segment, which it reads letter by letter (`123` -> `1 2 3`)
+   * until it has the dictionary (Issue #847). With it, that segment goes
+   * through the same English G2P (CMU dictionary + g2p_en normalization) as
+   * the Rust, C++ and Swift runtimes, so `123` is read as an English number.
+   *
+   * The dictionary is not bundled into the WASM binary: the caller passes the
+   * copy that `@piper-plus/g2p` ships (and has already loaded for `en`), so
+   * call this only for models with both zh and en.
+   *
+   * Never throws: a failure leaves the passthrough in place and warns, as a
+   * missing Chinese dictionary does.
+   *
+   * @param {(() => Promise<Map<string, string>>)|undefined} loadCmuDict -
+   *   `loadCmuDict` of `@piper-plus/g2p`; undefined for releases without it.
+   * @returns {Promise<"loaded"|"unsupported"|"failed">} `"unsupported"` for
+   *   WASM builds without `setEnglishDictionary` (no `en` feature).
+   */
+  async loadEnglishDictionary(loadCmuDict) {
+    if (typeof this._wasm.setEnglishDictionary !== "function") {
+      return "unsupported";
+    }
+    if (typeof loadCmuDict !== "function") {
+      console.warn(
+        "[piper-plus] @piper-plus/g2p has no loadCmuDict (CMU dictionary); digits and " +
+          "Latin words inside Chinese text are read letter by letter. Update @piper-plus/g2p."
+      );
+      return "failed";
+    }
+    try {
+      const dict = await loadCmuDict();
+      const json = JSON.stringify(Object.fromEntries(dict));
+      this._wasm.setEnglishDictionary(new TextEncoder().encode(json));
+      return "loaded";
+    } catch (e) {
+      console.warn(
+        "[piper-plus] Failed to load the English dictionary into the Rust WASM G2P; " +
+          "English inside Chinese text will use passthrough:",
+        e.message
+      );
+      return "failed";
+    }
+  }
+
+  /**
    * Encode text into phoneme IDs and optional prosody features.
    * @param {string} text
    * @param {string} language

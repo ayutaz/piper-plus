@@ -702,14 +702,24 @@ impl EnglishPhonemizer {
         }
     }
 
+    /// Create an `EnglishPhonemizer` from CMU dictionary JSON bytes, in the
+    /// format of `data/cmudict_data.json` (`{"hello": "HH AH0 L OW1"}`).
+    ///
+    /// Reads no file, so it works where there is no file system (WASM: the
+    /// browser package hands over the dictionary bundled in
+    /// `@piper-plus/g2p`). Does not affect or use the global cache.
+    pub fn from_json_bytes(json: &[u8]) -> Result<Self, G2pError> {
+        let dict: HashMap<String, String> =
+            serde_json::from_slice(json).map_err(|e| G2pError::DictionaryLoad {
+                path: format!("(cmudict JSON bytes): {e}"),
+            })?;
+        Ok(Self::new_with_hashmap(dict))
+    }
+
     #[cfg(feature = "bundled-dicts")]
     pub fn new_bundled() -> Result<Self, G2pError> {
         const CMU_DICT_JSON: &str = include_str!("../data/cmudict_data.json");
-        let dict: HashMap<String, String> =
-            serde_json::from_str(CMU_DICT_JSON).map_err(|e| G2pError::DictionaryLoad {
-                path: format!("(bundled cmudict): {e}"),
-            })?;
-        Ok(Self::new_with_hashmap(dict))
+        Self::from_json_bytes(CMU_DICT_JSON.as_bytes())
     }
 
     /// Search well-known locations for the CMU dictionary JSON file.
@@ -1586,5 +1596,33 @@ mod tests {
             tokens("f ˈ ɔ ː ɹ _ ɪ ɡ z ˈ æ m p ə l")
         );
         assert_eq!(phonemes_of(&p, "100"), tokens("w ˈ ʌ n _ h ˈ ʌ n d ɹ ə d"));
+    }
+
+    // ===== Dictionary from JSON bytes (WASM: no file system) =====
+
+    #[test]
+    fn test_from_json_bytes_reads_the_dictionary() {
+        let json = br#"{"one": "W AH1 N", "hundred": "HH AH1 N D R AH0 D"}"#;
+        let p = EnglishPhonemizer::from_json_bytes(json).expect("valid JSON");
+        assert_eq!(phonemes_of(&p, "100"), tokens("w ˈ ʌ n _ h ˈ ʌ n d ɹ ə d"));
+    }
+
+    #[test]
+    fn test_from_json_bytes_reads_the_canonical_dictionary() {
+        let p = EnglishPhonemizer::from_json_bytes(include_bytes!("../data/cmudict_data.json"))
+            .expect("data/cmudict_data.json must parse");
+        assert_eq!(phonemes_of(&p, "0"), tokens("z ˈ ɪ ɹ o ʊ"));
+    }
+
+    #[test]
+    fn test_from_json_bytes_rejects_invalid_json() {
+        assert!(matches!(
+            EnglishPhonemizer::from_json_bytes(b"not json"),
+            Err(G2pError::DictionaryLoad { .. })
+        ));
+        assert!(matches!(
+            EnglishPhonemizer::from_json_bytes(b"[\"one\"]"),
+            Err(G2pError::DictionaryLoad { .. })
+        ));
     }
 }
