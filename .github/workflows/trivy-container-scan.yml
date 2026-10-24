@@ -22,6 +22,8 @@ on:
     branches: [dev]
     paths:
       - 'docker/**/Dockerfile*'
+      - 'src/python_run/overrides_webui.txt'
+      - 'src/python_run/requirements_webui.txt'
       - '.github/workflows/trivy-container-scan.yml'
       - 'scripts/check_trivy_sarif.py'
       - 'tests/scripts/test_check_trivy_sarif.py'
@@ -32,6 +34,8 @@ on:
     branches: [dev, main]
     paths:
       - 'docker/**/Dockerfile*'
+      - 'src/python_run/overrides_webui.txt'
+      - 'src/python_run/requirements_webui.txt'
       - 'scripts/check_trivy_sarif.py'
       - '.trivyignore.yaml'
   workflow_dispatch:

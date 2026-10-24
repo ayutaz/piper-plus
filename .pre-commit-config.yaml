@@ -1025,6 +1025,15 @@ repos:
       # .exe / localized headings / machine paths. A local Windows capture
       # was merged unchecked and drifted (#813). The workflow runs the same
       # tests.
+      # gradio caps `pillow<13`; every gradio install overrides it to Pillow
+      # 13.0.0, which fixes 5 CRITICAL advisories.
+      - id: webui-pillow-override
+        name: gradio installs override Pillow to >=13 (Dockerfiles / environments/webui / locks)
+        entry: uv run --no-sync python -m pytest tests/scripts/test_webui_pillow_override.py tests/scripts/test_uv_pip_check_overrides.py -o addopts= -q -p no:cacheprovider
+        language: system
+        files: ^(docker/.*Dockerfile[^/]*|src/python_run/(overrides|requirements)_webui\.txt|environments/webui/(pyproject\.toml|uv\.lock)|uv\.lock|scripts/uv_pip_check_overrides\.py|tests/scripts/test_(webui_pillow_override|uv_pip_check_overrides)\.py)$
+        pass_filenames: false
+
       - id: cli-help-canonical
         name: CLI help canonicals and cli-help-extract workflow (tests)
         entry: uv run --no-sync python -m pytest tests/scripts/test_sanitize_cli_help.py tests/scripts/test_cli_help_extract_workflow.py -o addopts= -q -p no:cacheprovider

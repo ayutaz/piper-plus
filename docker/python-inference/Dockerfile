@@ -116,7 +116,8 @@ RUN uv pip install --system --no-cache "/app/src/python[inference-gpu]"
 
 # Install Gradio WebUI requirements
 COPY src/python_run/requirements_webui.txt /app/requirements_webui.txt
-RUN uv pip install --system --no-cache -r /app/requirements_webui.txt
+COPY src/python_run/overrides_webui.txt /app/overrides_webui.txt
+RUN uv pip install --system --no-cache -r /app/requirements_webui.txt --override /app/overrides_webui.txt
 
 # Pre-download NLTK data for g2p-en (both old and new resource names for NLTK compatibility)
 # Use a shared path so data is accessible after USER switch to non-root

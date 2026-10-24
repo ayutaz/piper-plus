@@ -90,6 +90,7 @@ COPY VERSION /build/VERSION
 COPY pyproject.toml /build/pyproject.toml
 COPY src/python/ /build/src/python/
 COPY src/python_run/requirements_webui.txt /build/requirements_webui.txt
+COPY src/python_run/overrides_webui.txt /build/overrides_webui.txt
 
 # Install into the system Python so the layout under
 # /usr/local/lib/python3.13/site-packages is self-contained and copy-able
@@ -125,7 +126,7 @@ RUN uv pip install --system "/build/src/python/g2p[all]"
 # (or once the discovery pass can be disabled), and re-run this workflow to
 # confirm before doing so.
 RUN uv pip install --system "/build/src/python[inference]" "onnxruntime<1.29"
-RUN uv pip install --system -r /build/requirements_webui.txt
+RUN uv pip install --system -r /build/requirements_webui.txt --override /build/overrides_webui.txt
 
 # Pre-download NLTK data for g2p-en. The download dir is shared so the
 # distroless final stage can read it post-USER-switch.

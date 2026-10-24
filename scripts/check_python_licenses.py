@@ -3,6 +3,11 @@
 Run in a clean wheel consumer environment. Repeat --root to select extras,
 for example --root 'piper-plus[cpu,http]' --root 'piper-plus-g2p[all]'.
 Reports declared license metadata; it does not replace archive license review.
+
+--overrides-from <pyproject.toml> reads `[tool.uv] override-dependencies`: a
+version mismatch on an overridden package is accepted when the installed
+version satisfies the override (environments/webui overrides gradio's
+`pillow<13.0`).
 """
 
 from __future__ import annotations
@@ -11,6 +16,7 @@ import argparse
 import importlib.metadata
 import json
 import re
+import tomllib
 from pathlib import Path
 
 from packaging.markers import default_environment
@@ -24,7 +30,17 @@ COPYLEFT = re.compile(
 )
 
 
-def audit(distributions, roots: list[str]) -> dict:
+def load_overrides(pyproject: Path) -> list[str]:
+    with pyproject.open("rb") as f:
+        data = tomllib.load(f)
+    return list(data.get("tool", {}).get("uv", {}).get("override-dependencies", []))
+
+
+def audit(distributions, roots: list[str], overrides: list[str] = ()) -> dict:
+    override_specs = {
+        canonicalize_name(Requirement(o).name): Requirement(o).specifier
+        for o in overrides
+    }
     index = {}
     errors = []
     for dist in distributions:
@@ -46,7 +62,13 @@ def audit(distributions, roots: list[str]) -> dict:
             errors.append(f"Missing dependency: {parent} -> {requirement}")
             continue
         dist = index[name]
-        if requirement.specifier and dist.version not in requirement.specifier:
+        override = override_specs.get(name)
+        overridden = override is not None and dist.version in override
+        if (
+            requirement.specifier
+            and dist.version not in requirement.specifier
+            and not overridden
+        ):
             errors.append(
                 f"Version mismatch: {parent} -> {requirement}; installed {dist.version}"
             )
@@ -96,8 +118,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", action="append", required=True)
     parser.add_argument("--report", type=Path)
+    parser.add_argument("--overrides-from", type=Path)
     args = parser.parse_args()
-    result = audit(importlib.metadata.distributions(), args.root)
+    overrides = load_overrides(args.overrides_from) if args.overrides_from else []
+    result = audit(importlib.metadata.distributions(), args.root, overrides)
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")

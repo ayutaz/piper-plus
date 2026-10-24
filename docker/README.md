@@ -6,7 +6,9 @@ piper-plus の Docker 環境一式です。Python 推論 (CUDA / CPU)・学習�
 
 依存管理は全イメージで **uv** に統一されています。Python 推論イメージは
 `src/python/pyproject.toml` の extras を使い、WebUI の追加依存は
-`src/python_run/requirements_webui.txt` から uv でインストールします。
+`src/python_run/requirements_webui.txt` から uv でインストールします。gradio は
+`pillow<13` を宣言しているため、`src/python_run/overrides_webui.txt` で Pillow を
+13.0.0 以上に上書きします ([設計](../docs/design/pillow-13-override-2026-10-24.md))。
 
 ## 利用可能な環境
 

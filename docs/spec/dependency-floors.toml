@@ -32,3 +32,13 @@ minimum = "1.5.0"
 # PYSEC-2024-277 / CVE-2024-34997 (vendor-disputed), last_affected 1.4.2.
 fixed_advisories = ["PYSEC-2024-277"]
 issue = 588
+
+[[floor]]
+package = "pillow"
+minimum = "13.0.0"
+# 5 CRITICAL (CVE-2026-112393 / -112398 / -112403 / -112900 / CVE-2026-96639)
+# and 35+ HIGH/MEDIUM advisories, all fixed in 13.0.0. gradio caps
+# `pillow<13.0`, so the floor is declared as a uv override
+# (environments/webui `override-dependencies`, src/python_run/overrides_webui.txt).
+fixed_advisories = ["CVE-2026-112393", "CVE-2026-112398", "CVE-2026-112403", "CVE-2026-112900", "CVE-2026-96639"]
+issue = 854
