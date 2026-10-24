@@ -36,6 +36,7 @@ on:
       - 'pyproject.toml'
       - 'VERSION'
       - 'src/python_run/requirements_webui.txt'
+      - 'src/python_run/overrides_webui.txt'
       - '.github/workflows/docker-distroless-trial.yml'
   workflow_dispatch:
 
