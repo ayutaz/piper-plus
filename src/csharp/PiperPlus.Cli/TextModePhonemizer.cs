@@ -21,7 +21,8 @@ internal static partial class Program
     /// <list type="bullet">
     ///   <item><c>ja</c> — Japanese (requires <c>JapanesePhonemizer</c> + <c>IJapaneseG2PEngine</c>)</item>
     ///   <item><c>en</c> — English (requires <c>EnglishPhonemizer</c> + <c>IEnglishG2PEngine</c>)</item>
-    ///   <item><c>zh</c> — Chinese (requires <c>ChinesePhonemizer</c> + <c>BundledChineseG2PEngine</c>)</item>
+    ///   <item><c>zh</c> — Chinese (requires <c>ChinesePhonemizer</c> + <c>BundledChineseG2PEngine</c>,
+    ///         and the English phonemizer for embedded English letters)</item>
     ///   <item><c>es</c> — Spanish (requires <c>SpanishPhonemizer</c> + <c>DotNetSpanishG2PEngine</c>)</item>
     ///   <item><c>fr</c> — French (requires <c>FrenchPhonemizer</c> + <c>FrenchG2PEngine</c>)</item>
     ///   <item><c>pt</c> — Portuguese (requires <c>PortuguesePhonemizer</c> + <c>DotNetPortugueseG2PEngine</c>)</item>
@@ -64,14 +65,28 @@ internal static partial class Program
             return new MultilingualPhonemizer(phonemizers, defaultLatin);
         }
 
-        var phonemizer = ResolveSingleLanguagePhonemizer(language);
-
-        // A single Latin-script language skips MultilingualPhonemizer, which
-        // rewrites CJK punctuation as ASCII for these segments (Issue #823,
-        // docs/spec/cjk-punctuation-contract.toml); do the same here.
-        return language is "en" or "es" or "fr" or "pt" or "sv"
-            ? new CjkPunctuationAsAsciiPhonemizer(phonemizer)
-            : phonemizer;
+        // A single language goes through MultilingualPhonemizer with that
+        // language as the Latin default, as Python's golden does, so that
+        // English letters in a Chinese sentence get the ZH-EN loanword reading
+        // (Issue #384, #833) and CJK punctuation in Latin text is read as
+        // ASCII (Issue #823, docs/spec/cjk-punctuation-contract.toml).
+        // Chinese registers en next to it: the letters are read as pinyin when
+        // they touch Chinese text and as English otherwise. Japanese and Korean
+        // read the whole text themselves.
+        return language switch
+        {
+            "zh" => new MultilingualPhonemizer(
+                new Dictionary<string, IPhonemizer>
+                {
+                    ["zh"] = ResolveSingleLanguagePhonemizer("zh"),
+                    ["en"] = ResolveSingleLanguagePhonemizer("en"),
+                },
+                "en"),
+            "en" or "es" or "fr" or "pt" or "sv" => new MultilingualPhonemizer(
+                new Dictionary<string, IPhonemizer> { [language] = ResolveSingleLanguagePhonemizer(language) },
+                language),
+            _ => ResolveSingleLanguagePhonemizer(language),
+        };
     }
 
     [RequiresUnreferencedCode(
@@ -111,25 +126,4 @@ internal static partial class Program
                     "Supported languages: ja, en, zh, ko, es, fr, pt, sv, or combined (e.g. ja-en-zh-ko-es-fr-pt).");
         }
     }
-}
-
-/// <summary>
-/// Rewrites CJK punctuation as ASCII before a Latin-script phonemizer reads
-/// the text, as <see cref="MultilingualPhonemizer"/> does for Latin segments.
-/// </summary>
-internal sealed class CjkPunctuationAsAsciiPhonemizer(IPhonemizer inner) : IPhonemizer
-{
-    public List<string> Phonemize(string text) =>
-        inner.Phonemize(MultilingualPhonemizer.NormalizeCjkPunctuationForLatin(text));
-
-    public (List<string> Tokens, List<ProsodyInfo?> Prosody) PhonemizeWithProsody(string text) =>
-        inner.PhonemizeWithProsody(MultilingualPhonemizer.NormalizeCjkPunctuationForLatin(text));
-
-    public Dictionary<string, int[]>? GetPhonemeIdMap() => inner.GetPhonemeIdMap();
-
-    public (List<int> Ids, List<ProsodyInfo?> Prosody) PostProcessIds(
-        List<int> phonemeIds,
-        List<ProsodyInfo?> prosodyFeatures,
-        Dictionary<string, int[]> phonemeIdMap) =>
-        inner.PostProcessIds(phonemeIds, prosodyFeatures, phonemeIdMap);
 }

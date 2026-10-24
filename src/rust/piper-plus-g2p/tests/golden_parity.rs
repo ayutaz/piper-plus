@@ -211,6 +211,80 @@ fn matches_python_golden_except_listed_divergences() {
     );
 }
 
+/// Swift's `PiperPlusG2P` phonemizes through the C FFI (runtime `swift` in
+/// `known_divergences.json`). With the languages `GoldenParityTests.swift`
+/// registers, the FFI must return what `phonemize_with_language` returns, so
+/// the Swift runtime differs from the golden exactly where this one does
+/// (Issue #827).
+#[cfg(all(feature = "ffi", feature = "bundled-dicts"))]
+#[test]
+fn ffi_matches_phonemize_with_language() {
+    use std::ffi::{CStr, CString};
+
+    use piper_plus_g2p::ffi::{
+        piper_plus_g2p_create, piper_plus_g2p_free, piper_plus_g2p_free_string,
+        piper_plus_g2p_phonemize,
+    };
+
+    // `GoldenParityTests.languages`, in the same order.
+    let swift_languages = CString::new("en,zh,es,fr,pt,sv").unwrap();
+    let golden = load_json("tests/fixtures/g2p/phoneme_test_cases_golden.json");
+    let p = phonemizer();
+
+    let handle = unsafe { piper_plus_g2p_create(swift_languages.as_ptr()) };
+    assert!(!handle.is_null());
+    let mut compared = 0;
+    let mut failures = Vec::new();
+    for case in golden["test_cases"].as_array().expect("test_cases") {
+        let lang = case["language"].as_str().unwrap();
+        let input = case["input"].as_str().unwrap();
+        if !LANGUAGES.contains(&lang) {
+            continue;
+        }
+        let expected = p
+            .phonemize_with_language(input, lang)
+            .map(|(t, _)| t)
+            .unwrap_or_else(|e| panic!("[{lang}] '{input}': {e}"));
+        let text = CString::new(input).unwrap();
+        let language = CString::new(lang).unwrap();
+        let actual: Option<Vec<String>> = unsafe {
+            let result = piper_plus_g2p_phonemize(handle, text.as_ptr(), language.as_ptr());
+            if result.is_null() {
+                None
+            } else {
+                let json: Value =
+                    serde_json::from_str(CStr::from_ptr(result).to_str().unwrap()).unwrap();
+                piper_plus_g2p_free_string(result);
+                Some(
+                    json["tokens"]
+                        .as_array()
+                        .expect("tokens")
+                        .iter()
+                        .map(|t| t.as_str().unwrap().to_string())
+                        .collect(),
+                )
+            }
+        };
+        compared += 1;
+        if actual.as_ref() != Some(&expected) {
+            let got = actual.map_or_else(|| "(NULL)".to_string(), |t| t.join(" "));
+            failures.push(format!(
+                "[{lang}] '{input}'\n  phonemize_with_language: {}\n  ffi:                     {got}",
+                expected.join(" ")
+            ));
+        }
+    }
+    unsafe { piper_plus_g2p_free(handle) };
+
+    assert!(compared > 0, "no golden case compared");
+    assert!(
+        failures.is_empty(),
+        "{} of {compared} case(s) differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
 #[test]
 fn english_words_are_not_dropped() {
     let list = load_json("tests/fixtures/g2p/english_no_drop_words.json");

@@ -16,7 +16,7 @@
       ]
     },
     "swift": {
-      "description": "PiperPlusG2P (Swift) over the piper-plus-g2p C FFI, which hands the whole text to the phonemizer of the given language",
+      "description": "PiperPlusG2P (Swift) over the piper-plus-g2p C FFI, which reads text with MultilingualPhonemizer::phonemize_with_language over the handle's languages (Japanese text goes whole to the Japanese phonemizer)",
       "tests": [
         "tests/PiperPlusG2PTests/GoldenParityTests.swift",
         "tests/PiperPlusG2PTests/GoldenPhonemeTests.swift"
@@ -47,7 +47,7 @@
       ]
     },
     "csharp": {
-      "description": "C# CLI text mode (PiperPlus.Cli TextModePhonemizer) with --language set to the case language: DotNetG2P.* for en/es/fr/pt, PiperPlus.Core for sv and zh",
+      "description": "C# CLI text mode (PiperPlus.Cli TextModePhonemizer) with --language set to the case language: MultilingualPhonemizer with that language as the Latin default (zh also registers en), DotNetG2P.* for en/es/pt, PiperPlus.Core for fr, sv and zh",
       "tests": [
         "src/csharp/PiperPlus.Cli.Tests/G2pGoldenParityTests.cs"
       ]
@@ -56,8 +56,7 @@
   "divergences": [
     {
       "runtimes": [
-        "go",
-        "swift"
+        "go"
       ],
       "language": "zh",
       "input": "123",
@@ -68,7 +67,8 @@
     {
       "runtimes": [
         "cpp",
-        "rust"
+        "rust",
+        "swift"
       ],
       "language": "zh",
       "input": "123",
@@ -78,8 +78,7 @@
     },
     {
       "runtimes": [
-        "go",
-        "swift"
+        "go"
       ],
       "language": "zh",
       "input": "0",
@@ -89,8 +88,7 @@
     },
     {
       "runtimes": [
-        "go",
-        "swift"
+        "go"
       ],
       "language": "zh",
       "input": "100",
@@ -274,66 +272,6 @@
       "status": "accepted",
       "issue": 821,
       "reason": "Python picks the noun reading from part-of-speech tagging, which is not ported."
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "language": "zh",
-      "input": "Hello你好",
-      "status": "planned",
-      "issue": 827,
-      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "language": "zh",
-      "input": "Hello, 你好!",
-      "status": "planned",
-      "issue": 827,
-      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "language": "zh",
-      "input": "我用 GPS 导航",
-      "status": "planned",
-      "issue": 827,
-      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "language": "zh",
-      "input": "我喜欢 Python",
-      "status": "planned",
-      "issue": 827,
-      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "language": "zh",
-      "input": "ChatGPT 很厉害",
-      "status": "planned",
-      "issue": 827,
-      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "language": "zh",
-      "input": "Apple 公司",
-      "status": "planned",
-      "issue": 827,
-      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
     },
     {
       "runtimes": [
@@ -2002,16 +1940,6 @@
         "csharp"
       ],
       "language": "zh",
-      "input": "Hello你好",
-      "status": "planned",
-      "issue": 833,
-      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
-    },
-    {
-      "runtimes": [
-        "csharp"
-      ],
-      "language": "zh",
       "input": "123",
       "status": "planned",
       "issue": 821,
@@ -2832,56 +2760,6 @@
         "csharp"
       ],
       "language": "zh",
-      "input": "Hello, 你好!",
-      "status": "planned",
-      "issue": 833,
-      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
-    },
-    {
-      "runtimes": [
-        "csharp"
-      ],
-      "language": "zh",
-      "input": "我用 GPS 导航",
-      "status": "planned",
-      "issue": 833,
-      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
-    },
-    {
-      "runtimes": [
-        "csharp"
-      ],
-      "language": "zh",
-      "input": "我喜欢 Python",
-      "status": "planned",
-      "issue": 833,
-      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
-    },
-    {
-      "runtimes": [
-        "csharp"
-      ],
-      "language": "zh",
-      "input": "ChatGPT 很厉害",
-      "status": "planned",
-      "issue": 833,
-      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
-    },
-    {
-      "runtimes": [
-        "csharp"
-      ],
-      "language": "zh",
-      "input": "Apple 公司",
-      "status": "planned",
-      "issue": 833,
-      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
-    },
-    {
-      "runtimes": [
-        "csharp"
-      ],
-      "language": "zh",
       "input": "0",
       "status": "planned",
       "issue": 821,
@@ -2896,86 +2774,6 @@
       "status": "planned",
       "issue": 821,
       "reason": "Digits are passed through as raw tokens, which are not in phoneme_id_map, instead of being read as number words."
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "language": "zh",
-      "input": "你好，GPS",
-      "status": "planned",
-      "issue": 827,
-      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "language": "zh",
-      "input": "你好，Hello",
-      "status": "planned",
-      "issue": 827,
-      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "language": "zh",
-      "input": "Hello，你好",
-      "status": "planned",
-      "issue": 827,
-      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
-    },
-    {
-      "runtimes": [
-        "swift"
-      ],
-      "language": "zh",
-      "input": "Hello、世界",
-      "status": "planned",
-      "issue": 827,
-      "reason": "The FFI hands the whole text to the Chinese phonemizer, so the English letters skip the ZH-EN loanword reading and are passed through as raw letters (H e l l o)."
-    },
-    {
-      "runtimes": [
-        "csharp"
-      ],
-      "language": "zh",
-      "input": "你好，GPS",
-      "status": "planned",
-      "issue": 833,
-      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
-    },
-    {
-      "runtimes": [
-        "csharp"
-      ],
-      "language": "zh",
-      "input": "你好，Hello",
-      "status": "planned",
-      "issue": 833,
-      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
-    },
-    {
-      "runtimes": [
-        "csharp"
-      ],
-      "language": "zh",
-      "input": "Hello，你好",
-      "status": "planned",
-      "issue": 833,
-      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
-    },
-    {
-      "runtimes": [
-        "csharp"
-      ],
-      "language": "zh",
-      "input": "Hello、世界",
-      "status": "planned",
-      "issue": 833,
-      "reason": "--language zh builds the Chinese phonemizer alone, so the English letters skip the ZH-EN loanword reading and stay raw letters."
     },
     {
       "runtimes": [

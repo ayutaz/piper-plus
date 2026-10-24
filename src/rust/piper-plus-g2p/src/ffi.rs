@@ -1,15 +1,39 @@
 //! C FFI for piper-plus-g2p — foundation for mobile (UniFFI) bindings.
 
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::panic::AssertUnwindSafe;
 use std::ptr;
+use std::sync::Arc;
 
-use crate::phonemizer::PhonemizerRegistry;
+use crate::G2pError;
+use crate::multilingual::MultilingualPhonemizer;
+use crate::phonemizer::{Phonemizer, ProsodyInfo};
 
-/// Opaque handle to a PhonemizerRegistry.
+/// Opaque handle to a multilingual phonemizer over the registered languages.
 pub struct PiperG2pHandle {
-    registry: PhonemizerRegistry,
+    phonemizer: MultilingualPhonemizer,
+    /// The Japanese phonemizer of `phonemizer`, which reads Japanese text
+    /// whole: the multilingual phonemizer would drop its question-type EOS
+    /// ("?", "?!", ...) and read kanji without kana as Chinese.
+    japanese: Option<Arc<dyn Phonemizer>>,
+}
+
+/// A phonemizer the handle shares with its multilingual phonemizer.
+struct SharedPhonemizer(Arc<dyn Phonemizer>);
+
+impl Phonemizer for SharedPhonemizer {
+    fn phonemize_with_prosody(
+        &self,
+        text: &str,
+    ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError> {
+        self.0.phonemize_with_prosody(text)
+    }
+
+    fn language_code(&self) -> &str {
+        self.0.language_code()
+    }
 }
 
 /// Create a new G2P handle. Returns NULL on failure.
@@ -19,7 +43,6 @@ pub struct PiperG2pHandle {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn piper_plus_g2p_create(languages: *const c_char) -> *mut PiperG2pHandle {
     let result = std::panic::catch_unwind(|| {
-        let mut registry = PhonemizerRegistry::new();
         let langs: Vec<&str> = if languages.is_null() {
             default_languages()
         } else {
@@ -29,10 +52,31 @@ pub unsafe extern "C" fn piper_plus_g2p_create(languages: *const c_char) -> *mut
                 Err(_) => return ptr::null_mut(),
             }
         };
-        for lang in &langs {
-            let _ = register_one(&mut registry, lang);
+        let mut registered: Vec<String> = Vec::new();
+        let mut phonemizers: HashMap<String, Box<dyn Phonemizer>> = HashMap::new();
+        let mut japanese = None;
+        for lang in langs {
+            if phonemizers.contains_key(lang) {
+                continue;
+            }
+            let Ok(mut p) = new_phonemizer(lang) else {
+                continue;
+            };
+            if lang == "ja" {
+                let shared: Arc<dyn Phonemizer> = Arc::from(p);
+                japanese = Some(Arc::clone(&shared));
+                p = Box::new(SharedPhonemizer(shared));
+            }
+            registered.push(lang.to_string());
+            phonemizers.insert(lang.to_string(), p);
         }
-        Box::into_raw(Box::new(PiperG2pHandle { registry }))
+        // Latin letters in text of a non-Latin language go to English, or to
+        // the first registered language without it, as in Python.
+        let phonemizer = MultilingualPhonemizer::new(registered, "en".into(), phonemizers);
+        Box::into_raw(Box::new(PiperG2pHandle {
+            phonemizer,
+            japanese,
+        }))
     });
     result.unwrap_or(ptr::null_mut())
 }
@@ -59,16 +103,20 @@ pub unsafe extern "C" fn piper_plus_g2p_phonemize(
         } else {
             unsafe { CStr::from_ptr(language) }.to_str().ok()?
         };
-        let p = h.registry.get(lang)?;
-        // One language's phonemizer, without the multilingual segmenter:
-        // rewrite CJK punctuation for a Latin-script language here (Issue
-        // #823, docs/spec/cjk-punctuation-contract.toml).
-        let text = if crate::multilingual::LATIN_SEGMENT_LANGUAGES.contains(&lang) {
-            crate::multilingual::normalize_cjk_punctuation_for_latin(text)
-        } else {
-            std::borrow::Cow::Borrowed(text)
-        };
-        let (tokens, _) = p.phonemize_with_prosody(&text).ok()?;
+        if !h.phonemizer.languages().iter().any(|l| l == lang) {
+            return None;
+        }
+        // Japanese text goes whole to the Japanese phonemizer (see
+        // `PiperG2pHandle::japanese`). Other languages are split by script as
+        // in Python's MultilingualPhonemizer, with Latin letters read as
+        // `lang` when it is a Latin-script language. Latin letters next to Chinese are read as
+        // pinyin when English is registered (Issue #827), and CJK punctuation
+        // in a Latin-script segment is read as ASCII (Issue #823).
+        let (tokens, _) = match (&h.japanese, lang) {
+            (Some(japanese), "ja") => japanese.phonemize_with_prosody(text),
+            _ => h.phonemizer.phonemize_with_language(text, lang),
+        }
+        .ok()?;
         let json = serde_json::json!({"tokens": tokens, "language": lang});
         CString::new(json.to_string()).ok()
     }));
@@ -114,7 +162,7 @@ pub unsafe extern "C" fn piper_plus_g2p_available_languages(
     }
     let result = std::panic::catch_unwind(AssertUnwindSafe(|| {
         let h = unsafe { &*handle };
-        let joined = h.registry.available_languages().join(",");
+        let joined = h.phonemizer.languages().join(",");
         CString::new(joined).ok()
     }));
     match result {
@@ -158,73 +206,40 @@ fn default_languages() -> Vec<&'static str> {
     langs
 }
 
-fn register_one(registry: &mut PhonemizerRegistry, lang: &str) -> Result<(), crate::G2pError> {
-    match lang {
+fn new_phonemizer(lang: &str) -> Result<Box<dyn Phonemizer>, G2pError> {
+    Ok(match lang {
         #[cfg(all(feature = "english", feature = "bundled-dicts"))]
-        "en" => {
-            registry.register(
-                "en",
-                Box::new(crate::english::EnglishPhonemizer::new_bundled()?),
-            );
-        }
+        "en" => Box::new(crate::english::EnglishPhonemizer::new_bundled()?),
         #[cfg(all(feature = "english", not(feature = "bundled-dicts")))]
-        "en" => {
-            registry.register("en", Box::new(crate::english::EnglishPhonemizer::new()?));
-        }
+        "en" => Box::new(crate::english::EnglishPhonemizer::new()?),
         #[cfg(all(feature = "chinese", feature = "bundled-dicts"))]
-        "zh" => {
-            registry.register(
-                "zh",
-                Box::new(crate::chinese::ChinesePhonemizer::new_bundled()?),
-            );
-        }
+        "zh" => Box::new(crate::chinese::ChinesePhonemizer::new_bundled()?),
         #[cfg(all(feature = "chinese", not(feature = "bundled-dicts")))]
         "zh" => {
-            return Err(crate::G2pError::Phonemize(
+            return Err(G2pError::Phonemize(
                 "Chinese requires bundled-dicts feature or use from_dicts() directly".into(),
             ));
         }
         #[cfg(feature = "korean")]
-        "ko" => {
-            registry.register("ko", Box::new(crate::korean::KoreanPhonemizer::new()));
-        }
+        "ko" => Box::new(crate::korean::KoreanPhonemizer::new()),
         #[cfg(feature = "spanish")]
-        "es" => {
-            registry.register("es", Box::new(crate::spanish::SpanishPhonemizer::new()));
-        }
+        "es" => Box::new(crate::spanish::SpanishPhonemizer::new()),
         #[cfg(feature = "french")]
-        "fr" => {
-            registry.register("fr", Box::new(crate::french::FrenchPhonemizer::new()));
-        }
+        "fr" => Box::new(crate::french::FrenchPhonemizer::new()),
         #[cfg(feature = "portuguese")]
-        "pt" => {
-            registry.register(
-                "pt",
-                Box::new(crate::portuguese::PortuguesePhonemizer::new()),
-            );
-        }
+        "pt" => Box::new(crate::portuguese::PortuguesePhonemizer::new()),
         #[cfg(feature = "swedish")]
-        "sv" => {
-            registry.register("sv", Box::new(crate::swedish::SwedishPhonemizer::new()));
-        }
+        "sv" => Box::new(crate::swedish::SwedishPhonemizer::new()),
         #[cfg(feature = "naist-jdic")]
-        "ja" => {
-            registry.register(
-                "ja",
-                Box::new(crate::japanese::JapanesePhonemizer::new_bundled()?),
-            );
-        }
+        "ja" => Box::new(crate::japanese::JapanesePhonemizer::new_bundled()?),
         #[cfg(all(feature = "japanese", not(feature = "naist-jdic")))]
-        "ja" => {
-            registry.register("ja", Box::new(crate::japanese::JapanesePhonemizer::new()?));
-        }
+        "ja" => Box::new(crate::japanese::JapanesePhonemizer::new()?),
         _ => {
-            return Err(crate::G2pError::UnsupportedLanguage {
+            return Err(G2pError::UnsupportedLanguage {
                 code: lang.to_string(),
             });
         }
-    }
-    Ok(())
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -317,10 +332,9 @@ mod tests {
         }
     }
 
-    // The FFI reads text with one language's phonemizer, without the
-    // multilingual segmenter that rewrites CJK punctuation in Latin
-    // segments, so it must rewrite it itself (Issue #823,
-    // docs/spec/cjk-punctuation-contract.toml). Swift's PiperPlusG2P uses it.
+    // CJK punctuation in text of a Latin-script language is read as ASCII
+    // (Issue #823, docs/spec/cjk-punctuation-contract.toml). Swift's
+    // PiperPlusG2P uses the FFI.
     #[test]
     #[cfg(all(feature = "english", feature = "bundled-dicts"))]
     fn test_ffi_english_reads_cjk_punctuation_like_ascii() {
@@ -345,6 +359,87 @@ mod tests {
             ffi_tokens("es", "Hola，amigo！"),
             ffi_tokens("es", "Hola,amigo!")
         );
+    }
+
+    /// Tokens of `piper_plus_g2p_phonemize(text, lang)` on a handle created
+    /// with `languages`.
+    #[cfg(all(feature = "chinese", feature = "bundled-dicts"))]
+    fn ffi_token_list(languages: &str, lang: &str, text: &str) -> Vec<String> {
+        let languages = CString::new(languages).unwrap();
+        let lang = CString::new(lang).unwrap();
+        let text = CString::new(text).unwrap();
+        unsafe {
+            let handle = piper_plus_g2p_create(languages.as_ptr());
+            assert!(!handle.is_null());
+            let result = piper_plus_g2p_phonemize(handle, text.as_ptr(), lang.as_ptr());
+            assert!(!result.is_null());
+            let json: serde_json::Value =
+                serde_json::from_str(CStr::from_ptr(result).to_str().unwrap()).unwrap();
+            piper_plus_g2p_free_string(result);
+            piper_plus_g2p_free(handle);
+            json["tokens"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|t| t.as_str().unwrap().to_owned())
+                .collect()
+        }
+    }
+
+    // Latin letters in Chinese text are read as Python's
+    // MultilingualPhonemizer reads them: as pinyin when English is registered
+    // (ZH-EN dispatch, Issue #384), not as the letters themselves (Issue
+    // #827). Swift's PiperPlusG2P names one language per call.
+    #[test]
+    #[cfg(all(feature = "english", feature = "chinese", feature = "bundled-dicts"))]
+    fn test_ffi_chinese_reads_english_letters_as_pinyin_when_english_is_registered() {
+        let golden = "aɪ tone1 tʂʰ ɻ̩ tone4 i tone1 aɪ tone1 ɚ tone2 aɪ tone1 ɚ tone2 oʊ tone1 \
+                      n i tone2 x aʊ tone3";
+        let expected: Vec<String> = golden
+            .split(' ')
+            .map(|t| crate::token_map::token_to_pua(t).map_or_else(|| t.to_owned(), String::from))
+            .collect();
+        assert_eq!(ffi_token_list("en,zh", "zh", "Hello你好"), expected);
+    }
+
+    // Without English, Python leaves the letters as they are.
+    #[test]
+    #[cfg(all(feature = "chinese", feature = "bundled-dicts"))]
+    fn test_ffi_chinese_keeps_english_letters_when_english_is_not_registered() {
+        let tokens = ffi_token_list("zh", "zh", "Hello你好");
+        assert_eq!(tokens[..5], ["H", "e", "l", "l", "o"]);
+    }
+
+    // Japanese text is read whole by the Japanese phonemizer: it keeps the
+    // question-type EOS (Swift's GoldenPhonemeTests checks it), and kanji
+    // without kana stay Japanese when Chinese is registered too.
+    #[test]
+    #[cfg(all(feature = "naist-jdic", feature = "chinese", feature = "bundled-dicts"))]
+    fn test_ffi_japanese_is_read_by_the_japanese_phonemizer() {
+        let tokens = ffi_token_list("en,ja,zh", "ja", "これは何ですか？");
+        assert_eq!(tokens.first().map(String::as_str), Some("^"));
+        assert_eq!(tokens.last().map(String::as_str), Some("?"));
+        assert_eq!(
+            ffi_token_list("en,ja,zh", "ja", "日本語"),
+            ffi_token_list("ja", "ja", "日本語")
+        );
+    }
+
+    // A language the handle has not registered is still refused, even though
+    // the multilingual phonemizer could read the text by its script.
+    #[test]
+    #[cfg(all(feature = "english", feature = "chinese", feature = "bundled-dicts"))]
+    fn test_ffi_phonemize_unregistered_language_with_other_languages_registered() {
+        let languages = CString::new("en,zh").unwrap();
+        let text = CString::new("你好").unwrap();
+        let lang = CString::new("es").unwrap();
+        unsafe {
+            let handle = piper_plus_g2p_create(languages.as_ptr());
+            assert!(!handle.is_null());
+            let result = piper_plus_g2p_phonemize(handle, text.as_ptr(), lang.as_ptr());
+            assert!(result.is_null(), "unregistered 'es' should return NULL");
+            piper_plus_g2p_free(handle);
+        }
     }
 
     #[test]
@@ -599,7 +694,7 @@ mod tests {
     #[test]
     fn test_ffi_create_unsupported_language() {
         // Creating with an unsupported language should still return a handle
-        // (register_one silently fails for unknown languages)
+        // (new_phonemizer fails for unknown languages and they are skipped)
         let lang = CString::new("xx").unwrap();
         unsafe {
             let handle = piper_plus_g2p_create(lang.as_ptr());
@@ -824,13 +919,14 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // register_one() — error paths (commit 44008b8 added cfg gating)
+    // new_phonemizer() — error paths (commit 44008b8 added cfg gating)
     // -----------------------------------------------------------------------
 
     #[test]
-    fn test_register_one_unsupported_language() {
-        let mut registry = PhonemizerRegistry::new();
-        let err = register_one(&mut registry, "xx").expect_err("xx must fail");
+    fn test_new_phonemizer_unsupported_language() {
+        let Err(err) = new_phonemizer("xx") else {
+            panic!("xx must fail");
+        };
         match err {
             crate::G2pError::UnsupportedLanguage { code } => {
                 assert_eq!(code, "xx");
@@ -841,39 +937,36 @@ mod tests {
 
     #[test]
     #[cfg(all(feature = "chinese", not(feature = "bundled-dicts")))]
-    fn test_register_one_zh_without_bundled_dicts_returns_phonemize_error() {
-        // The path-based zh path is intentionally an error in register_one
+    fn test_new_phonemizer_zh_without_bundled_dicts_returns_phonemize_error() {
+        // The path-based zh path is intentionally an error in new_phonemizer
         // because we cannot reasonably ship JSON files alongside an iOS app.
-        let mut registry = PhonemizerRegistry::new();
-        let err =
-            register_one(&mut registry, "zh").expect_err("zh without bundled-dicts must fail");
+        let Err(err) = new_phonemizer("zh") else {
+            panic!("zh without bundled-dicts must fail");
+        };
         assert!(matches!(err, crate::G2pError::Phonemize(_)));
     }
 
     #[test]
     #[cfg(feature = "english")]
-    fn test_register_one_en_succeeds() {
-        let mut registry = PhonemizerRegistry::new();
-        register_one(&mut registry, "en").expect("en must register");
-        assert!(registry.get("en").is_some(), "en should be queryable");
+    fn test_new_phonemizer_en_succeeds() {
+        let p = new_phonemizer("en").expect("en must register");
+        assert_eq!(p.language_code(), "en");
     }
 
     #[test]
     #[cfg(feature = "korean")]
-    fn test_register_one_ko_rule_based_succeeds() {
+    fn test_new_phonemizer_ko_rule_based_succeeds() {
         // ko is rule-based, no dict needed — must always work when the
         // korean feature is enabled.
-        let mut registry = PhonemizerRegistry::new();
-        register_one(&mut registry, "ko").expect("ko must register");
-        assert!(registry.get("ko").is_some());
+        let p = new_phonemizer("ko").expect("ko must register");
+        assert_eq!(p.language_code(), "ko");
     }
 
     #[test]
     #[cfg(all(feature = "naist-jdic", feature = "bundled-dicts"))]
-    fn test_register_one_ja_with_naist_jdic_succeeds() {
-        let mut registry = PhonemizerRegistry::new();
-        register_one(&mut registry, "ja").expect("ja must register with naist-jdic");
-        assert!(registry.get("ja").is_some());
+    fn test_new_phonemizer_ja_with_naist_jdic_succeeds() {
+        let p = new_phonemizer("ja").expect("ja must register with naist-jdic");
+        assert_eq!(p.language_code(), "ja");
     }
 
     // -----------------------------------------------------------------------

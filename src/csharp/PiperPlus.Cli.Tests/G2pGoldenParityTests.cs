@@ -18,8 +18,9 @@ namespace PiperPlus.Cli.Tests;
 /// <para>
 /// The golden is Python's <c>MultilingualPhonemizer</c> with the case language
 /// as the Latin default. The CLI's equivalent is <c>--text ... --language xx</c>:
-/// <see cref="Program.ResolveTextModePhonemizer"/> then returns that language's
-/// phonemizer, which reads the whole text. That method and the engine adapters
+/// <see cref="Program.ResolveTextModePhonemizer"/> then returns a
+/// <c>MultilingualPhonemizer</c> with that language as the Latin default (zh
+/// also registers en for the ZH-EN loanword reading). That method and the engine adapters
 /// it constructs come from the referenced <c>PiperPlus.Cli</c> assembly, so this
 /// is the exact phonemizer a CLI user gets. The comparison is on <see cref="IPhonemizer.Phonemize"/>, the
 /// token list the CLI maps to IDs with the model's <c>phoneme_id_map</c>.
