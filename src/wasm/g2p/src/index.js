@@ -9,7 +9,7 @@
 
 import { JapaneseG2P } from "./ja/index.js";
 import { EnglishG2P } from "./en/index.js";
-import { ChineseG2P } from "./zh/index.js";
+import { ChineseG2P, createPinyinDictionary, loadPinyinDictionary } from "./zh/index.js";
 import { SpanishG2P } from "./es/index.js";
 import { FrenchG2P } from "./fr/index.js";
 import { EuropeanPortugueseG2P, PortugueseG2P } from "./pt/index.js";
@@ -17,16 +17,16 @@ import { SwedishG2P } from "./sv/index.js";
 import { KoreanG2P } from "./ko/index.js";
 import { UnicodeLanguageDetector, normalizeCjkPunctuationForLatin } from "./detect.js";
 import { Encoder } from "./encode.js";
+import { mapToken } from "./pua-map.js";
 
 // ---- Constants ---------------------------------------------------------------
 
 /** All supported language codes. */
 const ALL_LANGUAGES = ["ja", "en", "zh", "ko", "es", "fr", "pt", "pt-PT", "sv"];
 
-/** Map from language code to G2P constructor (for non-JA languages). */
+/** Map from language code to G2P constructor (for languages other than JA and ZH). */
 const LANGUAGE_FACTORIES = {
   en: (options) => new EnglishG2P({ cmuDict: options.cmuDict }),
-  zh: () => new ChineseG2P(),
   ko: () => new KoreanG2P(),
   es: () => new SpanishG2P(),
   fr: () => new FrenchG2P(),
@@ -42,6 +42,19 @@ const LANGUAGE_FACTORIES = {
  * docs/spec/cjk-punctuation-contract.toml).
  */
 const LATIN_SEGMENT_LANGUAGES = new Set(["en", "es", "fr", "pt", "pt-PT", "sv"]);
+
+/**
+ * Tokens stripped from a Japanese segment inside Chinese text: BOS/EOS and the
+ * question-marker EOS forms, spelled and PUA (Rust
+ * `MultilingualPhonemizer::is_boundary_token`). Other languages strip only
+ * `^` and `$`; there `?` is an ordinary phoneme.
+ */
+const JA_BOUNDARY_TOKENS = new Set([
+  "^",
+  "$",
+  "?",
+  ...["?!", "?.", "?~"].flatMap((t) => [t, mapToken(t)]),
+]);
 
 // ---- G2P class ---------------------------------------------------------------
 
@@ -69,12 +82,16 @@ export class G2P {
    * @private -- use G2P.create() instead.
    * @param {Map<string, object>} phonemizers  language -> G2P instance
    * @param {UnicodeLanguageDetector} detector  language detector
+   * @param {UnicodeLanguageDetector|null} [zhDetector]  detector that splits
+   *   text given as Chinese (Latin letters -> en when en is enabled)
    */
-  constructor(phonemizers, detector) {
+  constructor(phonemizers, detector, zhDetector = null) {
     /** @type {Map<string, object>} */
     this._phonemizers = phonemizers;
     /** @type {UnicodeLanguageDetector} */
     this._detector = detector;
+    /** @type {UnicodeLanguageDetector|null} */
+    this._zhDetector = zhDetector;
     /** @type {boolean} */
     this._disposed = false;
   }
@@ -96,6 +113,11 @@ export class G2P {
    *   use instead of the bundled CMU dictionary. When English is enabled and
    *   this is not given, the bundled `data/cmudict_data.json` (~3.7 MB) is
    *   loaded here; it is not loaded when `languages` leaves English out.
+   * @param {import('./zh/pinyin-dict.js').PinyinDictionary | { single: unknown, phrases: unknown }} [options.pinyinDict]
+   *   Pinyin dictionaries for Chinese (see `createPinyinDictionary`). When
+   *   omitted and `zh` is enabled, the dictionaries bundled with the package
+   *   are loaded (about 2.7 MB of JSON, once per process). They are not
+   *   loaded when `zh` is not in `languages`.
    * @returns {Promise<G2P>}
    */
   static async create(options = {}) {
@@ -123,9 +145,25 @@ export class G2P {
       phonemizers.set("ja", jaG2P);
     }
 
+    // Initialise Chinese (async -- the pinyin dictionaries are loaded here,
+    // and only when zh is enabled; Issue #829)
+    let zhDetector = null;
+    if (languages.includes("zh")) {
+      const pinyinDict = options.pinyinDict
+        ? createPinyinDictionary(options.pinyinDict)
+        : await loadPinyinDictionary();
+      phonemizers.set("zh", new ChineseG2P({ pinyinDict }));
+      // Text given as Chinese is split like Rust's MultilingualPhonemizer
+      // (default Latin language en): Latin letters go to English when it is
+      // enabled, otherwise they stay in the Chinese segment.
+      zhDetector = new UnicodeLanguageDetector(languages, {
+        defaultLatinLanguage: languages.includes("en") ? "en" : "zh",
+      });
+    }
+
     // Initialise the other languages (English loads its CMU dictionary)
     for (const lang of languages) {
-      if (lang === "ja") {
+      if (lang === "ja" || lang === "zh") {
         continue;
       }
       const factory = LANGUAGE_FACTORIES[lang];
@@ -142,7 +180,7 @@ export class G2P {
       }
     }
 
-    return new G2P(phonemizers, detector);
+    return new G2P(phonemizers, detector, zhDetector);
   }
 
   // ---- Public API ------------------------------------------------------------
@@ -166,7 +204,10 @@ export class G2P {
     const language = this._resolveLanguage(text, options);
     const g2p = this._getPhonemizerOrThrow(language);
 
-    const result = g2p.phonemize(this._prepareText(text, language));
+    const result =
+      language === "zh"
+        ? this._phonemizeChineseText(text)
+        : g2p.phonemize(this._prepareText(text, language));
     return {
       tokens: result.tokens,
       prosody: new Array(result.tokens.length).fill(null),
@@ -198,6 +239,10 @@ export class G2P {
     this._ensureNotDisposed();
     const language = this._resolveLanguage(text, options);
     const g2p = this._getPhonemizerOrThrow(language);
+    if (language === "zh") {
+      const result = this._phonemizeChineseText(text);
+      return { tokens: result.tokens, prosody: result.prosody, language };
+    }
     text = this._prepareText(text, language);
 
     if (typeof g2p.phonemizeWithProsody === "function") {
@@ -309,6 +354,61 @@ export class G2P {
   }
 
   /**
+   * Phonemize text given as Chinese, as Rust's
+   * `MultilingualPhonemizer::phonemize_with_language(text, "zh")` does: split
+   * it by script, read Chinese segments with the pinyin dictionaries, read an
+   * English segment next to a Chinese one with the ZH-EN loanword dictionary
+   * (Issue #384; the ChineseG2P `setZhEnDispatch` toggle), and give every
+   * other segment (e.g. digits only, or English away from Chinese) to its own
+   * language's G2P.
+   *
+   * @param {string} text
+   * @returns {{ tokens: string[], prosody: (ProsodyInfo|null)[] }}
+   * @private
+   */
+  _phonemizeChineseText(text) {
+    const zh = this._getPhonemizerOrThrow("zh");
+    if (typeof text !== "string" || !this._zhDetector) {
+      return zh.phonemizeWithProsody(text);
+    }
+    const segments = this._zhDetector.segmentText(text);
+    const hasZh = segments.some((s) => s.language === "zh");
+    const dispatch = zh.isZhEnDispatchEnabled() === true;
+
+    /** @type {string[]} */
+    const tokens = [];
+    /** @type {(ProsodyInfo|null)[]} */
+    const prosody = [];
+    segments.forEach((segment, i) => {
+      const lang = segment.language;
+      const segText = this._prepareText(segment.text, lang);
+
+      const besideZh = segments[i - 1]?.language === "zh" || segments[i + 1]?.language === "zh";
+      if (dispatch && lang === "en" && hasZh && besideZh) {
+        const result = zh.phonemizeEmbeddedEnglishWithProsody(segText);
+        tokens.push(...result.tokens);
+        prosody.push(...result.prosody);
+        return;
+      }
+
+      const g2p = this._getPhonemizerOrThrow(lang);
+      const result =
+        typeof g2p.phonemizeWithProsody === "function"
+          ? g2p.phonemizeWithProsody(segText)
+          : g2p.phonemize(segText);
+      result.tokens.forEach((token, j) => {
+        const boundary =
+          lang === "ja" ? JA_BOUNDARY_TOKENS.has(token) : token === "^" || token === "$";
+        if (!boundary) {
+          tokens.push(token);
+          prosody.push(result.prosody?.[j] ?? null);
+        }
+      });
+    });
+    return { tokens, prosody };
+  }
+
+  /**
    * Rewrite CJK punctuation as ASCII in text for a Latin-script language
    * (Issue #823). Text for other languages is returned as it is.
    *
@@ -367,7 +467,13 @@ export {
   normalizeNumbers,
   normalizeAndTokenize,
 } from "./en/index.js";
-export { ChineseG2P } from "./zh/index.js";
+export {
+  ChineseG2P,
+  PinyinDictionary,
+  createPinyinDictionary,
+  isPinyinDictionaryLoaded,
+  loadPinyinDictionary,
+} from "./zh/index.js";
 export { SpanishG2P } from "./es/index.js";
 export { FrenchG2P } from "./fr/index.js";
 export { EuropeanPortugueseG2P, PortugueseG2P } from "./pt/index.js";

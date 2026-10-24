@@ -18,6 +18,11 @@ on:
       - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
       - 'src/wasm/g2p/data/cmudict_data.json'
       - 'test/models/cmudict_data.json'
+      # Pinyin dictionary mirrors (docs/spec/dictionary-mirrors.toml).
+      - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
+      - 'src/wasm/openjtalk-web/assets/pinyin_*.json'
+      - 'src/wasm/g2p/data/pinyin_*.json'
+      - 'test/models/pinyin_*.json'
       - 'scripts/check_dictionary_consistency.py'
       - '.github/workflows/dictionary-consistency.yml'
       - 'docs/spec/dictionary-mirrors.toml'
@@ -32,6 +37,11 @@ on:
       - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
       - 'src/wasm/g2p/data/cmudict_data.json'
       - 'test/models/cmudict_data.json'
+      # Pinyin dictionary mirrors (docs/spec/dictionary-mirrors.toml).
+      - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
+      - 'src/wasm/openjtalk-web/assets/pinyin_*.json'
+      - 'src/wasm/g2p/data/pinyin_*.json'
+      - 'test/models/pinyin_*.json'
       - 'scripts/check_dictionary_consistency.py'
       - '.github/workflows/dictionary-consistency.yml'
       - 'docs/spec/dictionary-mirrors.toml'

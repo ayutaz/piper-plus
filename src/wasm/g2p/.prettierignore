@@ -4,6 +4,8 @@ node_modules/
 *.min.js
 pkg/
 types/
-# Canonical byte copy of src/rust/piper-plus-g2p/data/cmudict_data.json
-# (scripts/check_cmudict_mirrors.py); reformatting it would break the copy.
+# Byte-identical mirrors of src/rust/piper-plus-g2p/data/ (Issues #828, #829;
+# docs/spec/dictionary-mirrors.toml); reformatting them would break the copy.
 data/cmudict_data.json
+data/pinyin_single.json
+data/pinyin_phrases.json

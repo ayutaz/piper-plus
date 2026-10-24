@@ -56,6 +56,79 @@ describe('package.json files フィールド', () => {
     });
 });
 
+/**
+ * Data files the Chinese G2P reads at run time (Issue #829), with the
+ * canonical copy each must equal byte for byte.
+ */
+const BUNDLED_DATA = {
+    'data/pinyin_single.json': 'src/rust/piper-plus-g2p/data/pinyin_single.json',
+    'data/pinyin_phrases.json': 'src/rust/piper-plus-g2p/data/pinyin_phrases.json',
+    'data/zh_en_loanword.json': 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json',
+};
+
+const REPO_ROOT = resolve(PKG_ROOT, '..', '..', '..');
+
+/** @type {{ path: string, size: number }[]|null} */
+let packed = null;
+
+/**
+ * The files `npm pack` would publish, with their sizes, read from
+ * `npm pack --dry-run --json` (the same listing check-cdn-delivery.mjs uses).
+ * Computed once: both the Chinese (#829) and English (#828) checks read it.
+ *
+ * @returns {{ path: string, size: number }[]}
+ */
+function packedFiles() {
+    if (!packed) {
+        // npm is npm.cmd on Windows, which execFileSync can start only through a shell.
+        const out = execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {
+            cwd: PKG_ROOT,
+            encoding: 'utf-8',
+            shell: process.platform === 'win32',
+            stdio: ['ignore', 'pipe', 'ignore'],
+        });
+        packed = JSON.parse(out)[0].files.map((f) => ({ path: f.path.replace(/\\/g, '/'), size: f.size }));
+    }
+    return packed;
+}
+
+describe('同梱データ (中国語辞書, #829)', () => {
+    it('files に中国語 G2P が実行時に読むデータが含まれる', () => {
+        for (const path of Object.keys(BUNDLED_DATA)) {
+            assert.ok(pkg.files.includes(path), `${path} is read at run time but not in files`);
+        }
+    });
+
+    it('npm pack --dry-run の内容に辞書が入る', () => {
+        const files = packedFiles().map((f) => f.path);
+        for (const path of Object.keys(BUNDLED_DATA)) {
+            assert.ok(files.includes(path), `${path} is missing from npm pack: ${files.join(', ')}`);
+        }
+    });
+
+    it('pinyin 辞書の元 (pypinyin, MIT) の許諾文を同梱する', () => {
+        // The dictionaries are derived from pypinyin, whose MIT license asks for
+        // its notice in every copy.
+        assert.ok(pkg.files.includes('THIRD_PARTY_LICENSES.md'));
+        const text = readFileSync(join(PKG_ROOT, 'THIRD_PARTY_LICENSES.md'), 'utf-8');
+        assert.match(text, /Copyright \(c\) 2016 mozillazg/);
+        assert.match(text, /Permission is hereby granted/);
+        assert.ok(packedFiles().some((f) => f.path === 'THIRD_PARTY_LICENSES.md'));
+    });
+
+    it('同梱した辞書が canonical とバイト一致する', () => {
+        for (const [path, canonical] of Object.entries(BUNDLED_DATA)) {
+            const bundled = readFileSync(join(PKG_ROOT, path));
+            const source = readFileSync(join(REPO_ROOT, canonical));
+            assert.ok(
+                bundled.equals(source),
+                `${path} differs from ${canonical}; copy it with ` +
+                    'python scripts/check_dictionary_consistency.py --fix'
+            );
+        }
+    });
+});
+
 describe('ライセンス同梱', () => {
     it('license フィールドが宣言されている', () => {
         assert.equal(typeof pkg.license, 'string');
@@ -99,22 +172,6 @@ describe('ライセンス同梱', () => {
         );
     });
 });
-
-/**
- * The files `npm pack` would publish, with their sizes, read from
- * `npm pack --dry-run --json` (the same listing check-cdn-delivery.mjs uses).
- *
- * @returns {{ path: string, size: number }[]}
- */
-function packedFiles() {
-    const out = execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {
-        cwd: PKG_ROOT,
-        encoding: 'utf-8',
-        shell: process.platform === 'win32',
-        stdio: ['ignore', 'pipe', 'ignore'],
-    });
-    return JSON.parse(out)[0].files.map((f) => ({ path: f.path.replace(/\\/g, '/'), size: f.size }));
-}
 
 describe('CMU 辞書の同梱 (Issue #828)', () => {
     const DICT = 'data/cmudict_data.json';
