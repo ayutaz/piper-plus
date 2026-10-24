@@ -376,7 +376,7 @@ jobs:
     needs: gate
     if: contains(needs.gate.outputs.packages, 'npm')
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6.1.0
         with:
@@ -401,10 +401,19 @@ jobs:
           # `npm view ... --json` returns the manifest including the
           # `dist.attestations` block when --provenance was used. A missing
           # block on a tagged release is a regression.
-          npm view "piper-plus@${NPM_VERSION}" --json > /tmp/npm.json || {
-            echo "::error::npm view failed for piper-plus@${NPM_VERSION} — package may not exist yet."
-            exit 1
-          }
+          # The registry can answer 404 for a few minutes after publish
+          # (#834), so retry for up to ~20 minutes, as the NuGet check does.
+          attempts="${NPM_VIEW_ATTEMPTS:-120}"
+          delay="${NPM_VIEW_DELAY:-10}"
+          n=1
+          until npm view "piper-plus@${NPM_VERSION}" --json > /tmp/npm.json; do
+            if [ "$n" -ge "$attempts" ]; then
+              echo "::error::npm view failed for piper-plus@${NPM_VERSION} after ${n} attempts — package may not exist yet."
+              exit 1
+            fi
+            n=$((n + 1))
+            sleep "$delay"
+          done
           if ! python3 -c "
           import json, sys
           d = json.load(open('/tmp/npm.json'))
