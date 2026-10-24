@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792807539805,
+  "lastUpdate": 1792828064756,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1506,6 +1506,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 217.6,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "166b2b1c773d415b09062e788a0da4abe37a3213",
+          "message": "fix(python-run): スウェーデン語の音素化器を入れる (#845)\n\n* fix(python-run): スウェーデン語の音素化器を入れ、sv を英語 G2P で読まない\n\nPython ランタイムにはスウェーデン語の音素化器がなく、PiperVoice の\n言語一覧も 6 言語固定だったため、sv の文は英語 G2P で読まれ、学習側の\ngolden 51 件すべてとずれていた (#830)。\n\n- phonemize/swedish.py: 学習側 piper_plus_g2p.swedish を移植\n- multilingual.py: _get_phonemize_func に sv を追加\n- voice.py: language_id_map に sv があるモデルでだけ sv を言語に加える\n  (公開中の 6 言語モデルの動作は変えない)\n- test_swedish_phonemization.py: 学習側との一致と、区分けが出しうる\n  全言語に音素化器があることを検査。python-tests で実行し、\n  sv_golden.json の変更でも CI を走らせる\n- known_divergences: python_run の sv 51 件を削除\n\n* refactor(python_run): 移植した swedish.py から未使用の _UNSTRESSED_SUFFIXES を削除する\n\nCodeQL の未使用グローバル変数の指摘への対応。学習側でも参照されていない表で、\n音素化の出力は変わらない (sv の照合テスト 242 件が成功)。",
+          "timestamp": "2026-10-24T15:58:44+09:00",
+          "tree_id": "f351f581cee1a4b88ffca8cf608ce32812f632c8",
+          "url": "https://github.com/ayutaz/piper-plus/commit/166b2b1c773d415b09062e788a0da4abe37a3213"
+        },
+        "date": 1792828062744,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0989,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 25.2,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 25.5,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1265.3,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 217.4,
             "unit": "MB"
           },
           {
