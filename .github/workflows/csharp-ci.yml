@@ -21,6 +21,11 @@ on:
       # Read by the text-splitter contract tests (#831).
       - 'tests/fixtures/text_splitter/**'
       - 'tests/fixtures/g2p/english_no_drop_words.json'
+      # The golden ID-map test reads the 6-language model config; the es/pt
+      # engines are ports of these Python rules (#832).
+      - 'test/models/multilingual-test-medium.onnx.json'
+      - 'src/python/g2p/piper_plus_g2p/spanish.py'
+      - 'src/python/g2p/piper_plus_g2p/portuguese.py'
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
@@ -43,6 +48,11 @@ on:
       # Read by the text-splitter contract tests (#831).
       - 'tests/fixtures/text_splitter/**'
       - 'tests/fixtures/g2p/english_no_drop_words.json'
+      # The golden ID-map test reads the 6-language model config; the es/pt
+      # engines are ports of these Python rules (#832).
+      - 'test/models/multilingual-test-medium.onnx.json'
+      - 'src/python/g2p/piper_plus_g2p/spanish.py'
+      - 'src/python/g2p/piper_plus_g2p/portuguese.py'
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'

@@ -211,9 +211,9 @@ static IPhonemizer BuildMultilingualPhonemizer()
         ["ja"] = new JapanesePhonemizer(new DotNetG2PEngine()),
         ["en"] = new EnglishPhonemizer(new DotNetEnglishG2PEngine()),
         ["zh"] = new ChinesePhonemizer(new BundledChineseG2PEngine()),
-        ["es"] = new SpanishPhonemizer(new DotNetSpanishG2PEngine()),
+        ["es"] = new SpanishPhonemizer(new SpanishG2PEngine()),
         ["fr"] = new FrenchPhonemizer(new FrenchG2PEngine()),
-        ["pt"] = new PortuguesePhonemizer(new DotNetPortugueseG2PEngine()),
+        ["pt"] = new PortuguesePhonemizer(new PortugueseG2PEngine()),
     };
     return new MultilingualPhonemizer(dict, defaultLatinLanguage: "en");
 }

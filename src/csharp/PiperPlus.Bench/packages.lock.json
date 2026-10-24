@@ -23,18 +23,6 @@
           "DotNetG2P": "1.8.0"
         }
       },
-      "DotNetG2P.Portuguese": {
-        "type": "Direct",
-        "requested": "[1.8.0, )",
-        "resolved": "1.8.0",
-        "contentHash": "C1+LO07latGkcLZZ0imPsR4Li/ZuIJQKo1Sd+yvJedgybGV0ig7xRg7oTlgXt1NSnBXYVDIQibJoL+e5QRG/BA=="
-      },
-      "DotNetG2P.Spanish": {
-        "type": "Direct",
-        "requested": "[1.8.0, )",
-        "resolved": "1.8.0",
-        "contentHash": "JuycRe2EPx7wYCiJm0FukSUGG+M0Mhv4BbFAXVTgSHGxXMB+TCZ2LhoNzz3p81Ku6MQMe0ES1UN6fhWMzxDPEg=="
-      },
       "Microsoft.CodeAnalysis.PublicApiAnalyzers": {
         "type": "Direct",
         "requested": "[3.11.0-beta1.24454.1, )",

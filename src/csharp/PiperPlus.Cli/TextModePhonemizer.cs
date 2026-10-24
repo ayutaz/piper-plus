@@ -23,9 +23,9 @@ internal static partial class Program
     ///   <item><c>en</c> — English (requires <c>EnglishPhonemizer</c> + <c>IEnglishG2PEngine</c>)</item>
     ///   <item><c>zh</c> — Chinese (requires <c>ChinesePhonemizer</c> + <c>BundledChineseG2PEngine</c>,
     ///         and the English phonemizer for embedded English letters)</item>
-    ///   <item><c>es</c> — Spanish (requires <c>SpanishPhonemizer</c> + <c>DotNetSpanishG2PEngine</c>)</item>
+    ///   <item><c>es</c> — Spanish (requires <c>SpanishPhonemizer</c> + <c>SpanishG2PEngine</c>)</item>
     ///   <item><c>fr</c> — French (requires <c>FrenchPhonemizer</c> + <c>FrenchG2PEngine</c>)</item>
-    ///   <item><c>pt</c> — Portuguese (requires <c>PortuguesePhonemizer</c> + <c>DotNetPortugueseG2PEngine</c>)</item>
+    ///   <item><c>pt</c> — Portuguese (requires <c>PortuguesePhonemizer</c> + <c>PortugueseG2PEngine</c>)</item>
     ///   <item>Combined codes (e.g. <c>ja-en-zh-es-fr-pt</c>) — returns a
     ///         <see cref="MultilingualPhonemizer"/> that auto-detects language per segment.</item>
     /// </list>
@@ -109,13 +109,13 @@ internal static partial class Program
                 return new KoreanPhonemizer(new DotNetKoreanG2PEngine());
 
             case "es":
-                return new SpanishPhonemizer(new DotNetSpanishG2PEngine());
+                return new SpanishPhonemizer(new SpanishG2PEngine());
 
             case "fr":
                 return new FrenchPhonemizer(new FrenchG2PEngine());
 
             case "pt":
-                return new PortuguesePhonemizer(new DotNetPortugueseG2PEngine());
+                return new PortuguesePhonemizer(new PortugueseG2PEngine());
 
             case "sv":
                 return new SwedishPhonemizer(new DotNetSwedishG2PEngine());

@@ -234,6 +234,48 @@ public class G2pGoldenParityTests
             $"{failures.Count} failure(s), {knownCount} known, {verified} cases:\n" + string.Join("\n", failures));
     }
 
+    /// <summary>
+    /// Every token the CLI produces for the golden inputs of a language is in
+    /// the model's <c>phoneme_id_map</c>, listed divergences included. A token
+    /// outside the map is dropped at the ID lookup without an error, so the
+    /// phoneme is silently lost: DotNetG2P.Portuguese emitted ɐ, w̃ and j̃
+    /// (Issue #832).
+    /// </summary>
+    [Theory]
+    [InlineData("es")]
+    [InlineData("pt")]
+    [InlineData("fr")]
+    public void CliPhonemes_ForGoldenInputs_AreAllInModelPhonemeIdMap(string language)
+    {
+        HashSet<string> modelPhonemes = LoadModelPhonemes();
+        using JsonDocument golden = LoadJson("tests", "fixtures", "g2p", "phoneme_test_cases_golden.json");
+        IPhonemizer phonemizer = CliPhonemizer(language);
+
+        int checkedCases = 0;
+        var failures = new List<string>();
+        foreach (JsonElement c in golden.RootElement.GetProperty("test_cases").EnumerateArray())
+        {
+            if (c.GetProperty("language").GetString() != language)
+            {
+                continue;
+            }
+
+            string input = c.GetProperty("input").GetString()!;
+            List<string> unknown = phonemizer.Phonemize(input)
+                .Where(t => !modelPhonemes.Contains(t))
+                .Distinct()
+                .ToList();
+            checkedCases++;
+            if (unknown.Count > 0)
+            {
+                failures.Add($"'{input}': {Describe(unknown)}");
+            }
+        }
+
+        Assert.True(checkedCases > 0, $"no {language} golden case");
+        Assert.True(failures.Count == 0, "tokens not in phoneme_id_map:\n" + string.Join("\n", failures));
+    }
+
     [Fact]
     public void CliEnglish_DoesNotDropWords_ExceptKnownDrops()
     {

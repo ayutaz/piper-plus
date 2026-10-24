@@ -4,7 +4,7 @@ namespace PiperPlus.Core.Phonemize;
 
 /// <summary>
 /// Abstraction over a Brazilian Portuguese G2P engine
-/// (e.g. DotNetG2P.Portuguese.PortugueseG2PEngine).
+/// (e.g. <see cref="PortugueseG2PEngine"/>).
 /// <para>
 /// The engine converts raw Brazilian Portuguese text into a flat list of IPA
 /// phoneme tokens using rule-based grapheme-to-phoneme conversion. No external
@@ -29,8 +29,10 @@ namespace PiperPlus.Core.Phonemize;
 /// </list>
 /// </para>
 /// <para>
-/// Stress detection and prosody generation are handled by the
-/// <c>PortuguesePhonemizer</c> layer, not by this engine.
+/// The engine marks the stressed vowel with a preceding <c>"ˈ"</c> token.
+/// The <c>PortuguesePhonemizer</c> layer strips the mark (Python's output has
+/// none) and turns it into A2=2 on that vowel; prosody generation is handled
+/// there, not by this engine.
 /// </para>
 /// </summary>
 public interface IPortugueseG2PEngine

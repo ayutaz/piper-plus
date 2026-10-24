@@ -126,9 +126,9 @@ The CLI ships with the same default dictionaries as the C++ / Rust runtimes; exp
 | `en` | English | DotNetG2P.English (Apache-2.0) |
 | `zh` | Chinese | Bundled numeric-tone pinyin dictionaries (same as the other runtimes) |
 | `ko` | Korean | Built-in rule-based engine |
-| `es` | Spanish | DotNetG2P.Spanish |
+| `es` | Spanish | Built-in rule-based engine (`SpanishG2PEngine`, the rules of the Python G2P) |
 | `fr` | French | Built-in rule-based engine (`FrenchG2PEngine`, the rules of the Python G2P) |
-| `pt` | Portuguese | DotNetG2P.Portuguese |
+| `pt` | Portuguese | Built-in rule-based engine (`PortugueseG2PEngine`, the Brazilian rules of the Python G2P) |
 | `sv` | Swedish | Built-in rule-based engine |
 
 Combined codes (e.g. `ja-en-zh-es-fr-pt`) instantiate a `MultilingualPhonemizer` that selects per-segment language by Unicode block detection.
