@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -127,16 +128,7 @@ internal static partial class EnglishTextNormalizer
     /// </summary>
     private static string CanonicalDigits(string s)
     {
-        var digits = new StringBuilder(s.Length);
-        foreach (char ch in s)
-        {
-            if (char.IsAsciiDigit(ch))
-            {
-                digits.Append(ch);
-            }
-        }
-
-        string trimmed = digits.ToString().TrimStart('0');
+        string trimmed = new string(s.Where(char.IsAsciiDigit).ToArray()).TrimStart('0');
         return trimmed.Length == 0 ? "0" : trimmed;
     }
 
@@ -375,16 +367,13 @@ internal static partial class EnglishTextNormalizer
         var sb = new StringBuilder(text.Length);
         foreach (char ch in text)
         {
-            char? c;
             if (char.IsWhiteSpace(ch))
             {
-                c = ' ';
-            }
-            else
-            {
-                c = char.IsAscii(ch) ? ch : FoldAccent(ch);
+                sb.Append(' ');
+                continue;
             }
 
+            char? c = char.IsAscii(ch) ? ch : FoldAccent(ch);
             if (c is { } kept && IsKept(kept))
             {
                 sb.Append(kept);

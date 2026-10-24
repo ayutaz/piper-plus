@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 
 namespace PiperPlus.Core.Phonemize;
@@ -73,12 +74,10 @@ public sealed class EnglishG2PEngine : IEnglishG2PEngine
 
         using JsonDocument doc = JsonDocument.Parse(dictionary);
         var entries = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (JsonProperty entry in doc.RootElement.EnumerateObject())
+        foreach (JsonProperty entry in doc.RootElement.EnumerateObject()
+            .Where(e => e.Value.ValueKind == JsonValueKind.String))
         {
-            if (entry.Value.ValueKind == JsonValueKind.String)
-            {
-                entries[entry.Name] = entry.Value.GetString()!;
-            }
+            entries[entry.Name] = entry.Value.GetString()!;
         }
 
         return new EnglishG2PEngine(entries);
@@ -159,29 +158,21 @@ public sealed class EnglishG2PEngine : IEnglishG2PEngine
             return Join(parts);
         }
 
-        var spelled = new List<string>(word.Length);
-        foreach (char ch in word)
-        {
-            if (LetterNameArpabet(ch) is { } name)
-            {
-                spelled.Add(name);
-            }
-        }
-
+        List<string> spelled = word
+            .Select(LetterNameArpabet)
+            .Where(name => name is not null)
+            .Select(name => name!)
+            .ToList();
         return spelled.Count > 0 ? string.Join(' ', spelled) : null;
     }
 
     private string? Join(IEnumerable<string> parts)
     {
-        var arpabets = new List<string>();
-        foreach (string part in parts)
-        {
-            if (WordArpabet(part) is { } arpabet)
-            {
-                arpabets.Add(arpabet);
-            }
-        }
-
+        List<string> arpabets = parts
+            .Select(WordArpabet)
+            .Where(arpabet => arpabet is not null)
+            .Select(arpabet => arpabet!)
+            .ToList();
         return arpabets.Count > 0 ? string.Join(' ', arpabets) : null;
     }
 
