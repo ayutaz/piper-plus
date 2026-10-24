@@ -4,8 +4,8 @@
   "totals": {
     "executable": 234,
     "needs_placeholder": 7,
-    "skip_warranted": 234,
-    "total": 475
+    "skip_warranted": 236,
+    "total": 477
   },
   "by_language": {
     "bash": {
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 189
+      "skip_warranted": 191
     },
     "wasm": {
       "executable": 10,
@@ -444,6 +444,36 @@
       "directives_detected": [],
       "env_dependencies": [],
       "hash_sha1": "7395cde03023bb878773b0be5bba52d5aa7b1b50"
+    },
+    {
+      "file": "docs/design/trivy-pip-vendor-findings-2026-10-24.md",
+      "line_start": 21,
+      "line_end": 26,
+      "language_raw": "",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "32d9decdc3dbb1b3d9f22e11039a2269a3b32ac7"
+    },
+    {
+      "file": "docs/design/trivy-pip-vendor-findings-2026-10-24.md",
+      "line_start": 65,
+      "line_end": 70,
+      "language_raw": "dockerfile",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "2ab2615d4e4a3858b9ef7c503794606e869da743"
     },
     {
       "file": "docs/design/tsukuyomi-publication-ready-2026-10-12.md",
