@@ -127,6 +127,7 @@ on:
       - Test HF Space Build
       - Test Japanese TTS
       - Test Multilingual TTS
+      - Test Threshold Relaxation Gate
       - Test WebAssembly
       - Timing Monotonicity
       - Trivy Container Scan

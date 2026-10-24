@@ -109,6 +109,25 @@ uv run pytest src/python/g2p/tests/ -v
 cd src/python_run && uv run python -m pytest
 ```
 
+#### Relaxing a test threshold
+
+Before weakening a numeric threshold in a Python test (a smaller `>` floor, a
+larger `<` ceiling, a wider `abs=` / `rel=` / `atol=` / `rtol=` / `delta=`, or
+fewer `places=`), compare the measured value against a reference
+implementation or a first-principles bound. Then put the evidence on the
+assertion, or on one of the two lines above it:
+
+```python
+# threshold-relaxed: the reference implementation also measures 32 dB for 16 taps
+assert snr_db > 30
+```
+
+`scripts/check_test_threshold_relaxation.py` fails a commit (pre-commit hook
+`test-threshold-relaxation`) and a pull request (`test-threshold-relaxation.yml`)
+that relaxes a threshold without this comment. In PR #320 a filter bank's
+acceptance criterion was relaxed from -90 dB to > 5 dB to match a buggy
+measurement, and the bug shipped in every MB-iSTFT model for 15 months.
+
 ### Rust
 
 ```bash
