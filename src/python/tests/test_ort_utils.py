@@ -26,6 +26,10 @@ from piper_train.ort_utils import (
     warmup_onnx_session,
 )
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = pytest.mark.unit
+
 
 @pytest.mark.unit
 class TestCreateSessionOptions:

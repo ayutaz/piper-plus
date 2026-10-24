@@ -25,6 +25,10 @@ _BASE_ARGS = ["--dataset-dir", "/tmp/test", "--batch-size", "4"]
 # CLI parsing
 # ---------------------------------------------------------------------------
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = [pytest.mark.unit, pytest.mark.training]
+
 
 @pytest.mark.unit
 def test_gradient_clip_val_default():

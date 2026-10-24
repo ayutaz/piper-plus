@@ -17,6 +17,10 @@ import numpy as np
 transformers = pytest.importorskip("transformers")
 torchaudio = pytest.importorskip("torchaudio")
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = pytest.mark.unit
+
 
 @pytest.mark.training
 class TestWavLMDiscriminatorFeatureMapFormat:
@@ -61,7 +65,9 @@ class TestWavLMDiscriminatorFeatureMapFormat:
         for i, fmap in enumerate(fmap_rs[0]):
             # Each feature map should be (batch, hidden_size, seq_len)
             assert fmap.dim() == 3, f"Layer {i}: Expected 3D tensor, got {fmap.dim()}D"
-            assert fmap.size(0) == sample_audio.size(0), f"Layer {i}: Batch size mismatch"
+            assert fmap.size(0) == sample_audio.size(0), (
+                f"Layer {i}: Batch size mismatch"
+            )
             assert fmap.size(1) == 768, f"Layer {i}: Hidden size should be 768"
             # seq_len depends on audio length after resampling and WavLM processing
             assert fmap.size(2) > 0, f"Layer {i}: Sequence length should be positive"
@@ -151,9 +157,9 @@ class TestWavLMResampling:
 
         # Should be close to 1kHz
         assert abs(orig_freq_hz - freq) < 50, f"Original frequency off: {orig_freq_hz}"
-        assert (
-            abs(resampled_freq_hz - freq) < 50
-        ), f"Resampled frequency off: {resampled_freq_hz}"
+        assert abs(resampled_freq_hz - freq) < 50, (
+            f"Resampled frequency off: {resampled_freq_hz}"
+        )
 
     def test_sinc_vs_linear_aliasing(self, resampler_sinc, resampler_linear):
         """Test that sinc resampling has less aliasing than linear."""
@@ -323,7 +329,9 @@ class TestWavLMGradientFlow:
         # Check classifier gradients
         for name, param in wavlm_discriminator.classifier.named_parameters():
             assert param.grad is not None, f"Classifier {name} should have gradients"
-            assert not torch.isnan(param.grad).any(), f"Classifier {name} grad should not be NaN"
+            assert not torch.isnan(param.grad).any(), (
+                f"Classifier {name} grad should not be NaN"
+            )
 
 
 @pytest.mark.training
@@ -435,7 +443,9 @@ class TestWavLMIntegration:
             y_d_rs, y_d_gs, fmap_rs, fmap_gs = wavlm_discriminator(y_real, y_fake)
 
         # Outputs should be valid
-        assert not torch.isnan(y_d_rs[0]).any(), "Discrimination scores should not be NaN"
+        assert not torch.isnan(y_d_rs[0]).any(), (
+            "Discrimination scores should not be NaN"
+        )
         for fmap in fmap_rs[0]:
             assert not torch.isnan(fmap).any(), "Feature maps should not be NaN"
 
@@ -595,7 +605,6 @@ class TestWavLMMixedPrecision:
         assert torch.isfinite(loss), f"loss should be finite, got {loss.item()}"
         for fmap in fmap_rs[0]:
             assert torch.isfinite(fmap).all(), "feature maps should be finite"
-
 
 
 @pytest.fixture(scope="module")

@@ -1,6 +1,7 @@
 """Tests for English G2P module (g2p-en based)."""
 
-from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
+import pytest
+
 from piper_plus_g2p.base import ProsodyInfo
 from piper_plus_g2p.english import (
     ARPABET_TO_IPA,
@@ -9,9 +10,15 @@ from piper_plus_g2p.english import (
     phonemize_english,
     phonemize_english_with_prosody,
 )
+from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
+
 
 # EnglishProsodyInfo was always an alias for ProsodyInfo
 EnglishProsodyInfo = ProsodyInfo
+
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = pytest.mark.unit
 
 
 class TestArpabetToIpa:

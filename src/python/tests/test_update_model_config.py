@@ -17,6 +17,10 @@ from piper_train.update_model_config import (
     validate_phoneme_id_map,
 )
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = pytest.mark.unit
+
 
 def _make_config(phoneme_id_map: dict[str, list[int]]) -> dict:
     return {
@@ -89,6 +93,7 @@ class TestValidateOnlyEntryPoint:
             ["update_model_config", "--validate-only", str(cfg_path)],
         )
         from piper_train.update_model_config import main
+
         assert main() == 0
 
     def test_bad_config_exits_nonzero(self, tmp_path: Path, monkeypatch):
@@ -102,4 +107,5 @@ class TestValidateOnlyEntryPoint:
             ["update_model_config", "--validate-only", str(cfg_path)],
         )
         from piper_train.update_model_config import main
+
         assert main() == 1

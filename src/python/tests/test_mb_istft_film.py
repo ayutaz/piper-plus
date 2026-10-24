@@ -31,6 +31,10 @@ from piper_train.vits.mb_istft import MBiSTFTGenerator  # noqa: E402
 # 共通フィクスチャ
 # ---------------------------------------------------------------------------
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = [pytest.mark.unit, pytest.mark.training]
+
 
 def _make_generator(gin_channels: int = 512) -> MBiSTFTGenerator:
     """テスト用の小さい MBiSTFTGenerator を構築する"""
@@ -68,12 +72,16 @@ class TestApplyFilm:
         big_pos = torch.full((1, 8, 8), 100.0)
         y_pos = MBiSTFTGenerator._apply_film(x, big_pos)
         # shift=100 が上乗せされるので、scale 部分だけ確認するため shift をゼロにする
-        scale_only = torch.cat([torch.full((1, 4, 8), 100.0), torch.zeros(1, 4, 8)], dim=1)
+        scale_only = torch.cat(
+            [torch.full((1, 4, 8), 100.0), torch.zeros(1, 4, 8)], dim=1
+        )
         y_scale = MBiSTFTGenerator._apply_film(x, scale_only)
         assert torch.allclose(y_scale, torch.full_like(x, 1.5), atol=1e-5)
 
         # scale_raw = -inf → sigmoid → 0 → +0.5 = 0.5
-        scale_only_neg = torch.cat([torch.full((1, 4, 8), -100.0), torch.zeros(1, 4, 8)], dim=1)
+        scale_only_neg = torch.cat(
+            [torch.full((1, 4, 8), -100.0), torch.zeros(1, 4, 8)], dim=1
+        )
         y_neg = MBiSTFTGenerator._apply_film(x, scale_only_neg)
         assert torch.allclose(y_neg, torch.full_like(x, 0.5), atol=1e-5)
 
@@ -226,7 +234,9 @@ class TestGradientFlow:
 
         # Multi-scale FiLM (cond_layers) の勾配チェック
         for i, layer in enumerate(m.cond_layers):
-            assert layer.weight.grad is not None, f"cond_layers[{i}].weight.grad is None"
+            assert layer.weight.grad is not None, (
+                f"cond_layers[{i}].weight.grad is None"
+            )
             # zero-init で開始するので grad は出るはず (ただし shift ↔ scale で計算)
             assert layer.weight.grad.shape == layer.weight.shape
 

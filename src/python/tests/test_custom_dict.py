@@ -9,6 +9,10 @@ import pytest
 
 from piper_plus_g2p.custom_dict import CustomDictionary, apply_custom_dictionary
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = pytest.mark.unit
+
 
 @pytest.mark.unit
 class TestCustomDictionary:
@@ -64,13 +68,12 @@ class TestCustomDictionary:
 
     def test_load_v1_format(self):
         """V1形式の辞書読み込みテスト"""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8"
+        ) as f:
             data = {
                 "version": "1.0",
-                "entries": {
-                    "Docker": "ドッカー",
-                    "Python": "パイソン"
-                }
+                "entries": {"Docker": "ドッカー", "Python": "パイソン"},
             }
             json.dump(data, f, ensure_ascii=False)
             temp_path = f.name
@@ -84,13 +87,15 @@ class TestCustomDictionary:
 
     def test_load_v2_format(self):
         """V2形式の辞書読み込みテスト"""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8"
+        ) as f:
             data = {
                 "version": "2.0",
                 "entries": {
                     "Docker": {"pronunciation": "ドッカー", "priority": 9},
-                    "Python": {"pronunciation": "パイソン", "priority": 8}
-                }
+                    "Python": {"pronunciation": "パイソン", "priority": 8},
+                },
             }
             json.dump(data, f, ensure_ascii=False)
             temp_path = f.name
@@ -115,23 +120,23 @@ class TestCustomDictionary:
     def test_multiple_dictionaries(self):
         """複数辞書の読み込みテスト"""
         # 辞書1を作成
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f1:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8"
+        ) as f1:
             data1 = {
                 "version": "2.0",
-                "entries": {
-                    "Docker": {"pronunciation": "ドッカー", "priority": 5}
-                }
+                "entries": {"Docker": {"pronunciation": "ドッカー", "priority": 5}},
             }
             json.dump(data1, f1, ensure_ascii=False)
             temp_path1 = f1.name
 
         # 辞書2を作成
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f2:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8"
+        ) as f2:
             data2 = {
                 "version": "2.0",
-                "entries": {
-                    "Python": {"pronunciation": "パイソン", "priority": 5}
-                }
+                "entries": {"Python": {"pronunciation": "パイソン", "priority": 5}},
             }
             json.dump(data2, f2, ensure_ascii=False)
             temp_path2 = f2.name
@@ -149,7 +154,7 @@ class TestCustomDictionary:
         dict_obj = CustomDictionary()
         dict_obj.add_word("Test", "テスト", priority=7)
 
-        with tempfile.NamedTemporaryFile(suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
             temp_path = f.name
 
         try:
@@ -174,12 +179,12 @@ class TestCustomDictionary:
 
     def test_apply_function(self):
         """apply_custom_dictionary関数のテスト"""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8"
+        ) as f:
             data = {
                 "version": "2.0",
-                "entries": {
-                    "Docker": {"pronunciation": "ドッカー", "priority": 9}
-                }
+                "entries": {"Docker": {"pronunciation": "ドッカー", "priority": 9}},
             }
             json.dump(data, f, ensure_ascii=False)
             temp_path = f.name
@@ -281,10 +286,19 @@ class TestDefaultDictionaryLoading:
             # .jsonファイルを作成
             json_path = Path(temp_dir) / "test_dict.json"
             with open(json_path, "w", encoding="utf-8") as f:
-                json.dump({
-                    "version": "2.0",
-                    "entries": {"TestWord": {"pronunciation": "テストワード", "priority": 10}}
-                }, f, ensure_ascii=False)
+                json.dump(
+                    {
+                        "version": "2.0",
+                        "entries": {
+                            "TestWord": {
+                                "pronunciation": "テストワード",
+                                "priority": 10,
+                            }
+                        },
+                    },
+                    f,
+                    ensure_ascii=False,
+                )
 
             # .txtファイルを作成（読み込まれないはず）
             txt_path = Path(temp_dir) / "not_a_dict.txt"
@@ -294,10 +308,19 @@ class TestDefaultDictionaryLoading:
             # .json.bakファイルを作成（読み込まれないはず）
             bak_path = Path(temp_dir) / "backup.json.bak"
             with open(bak_path, "w", encoding="utf-8") as f:
-                json.dump({
-                    "version": "2.0",
-                    "entries": {"BackupWord": {"pronunciation": "バックアップ", "priority": 10}}
-                }, f, ensure_ascii=False)
+                json.dump(
+                    {
+                        "version": "2.0",
+                        "entries": {
+                            "BackupWord": {
+                                "pronunciation": "バックアップ",
+                                "priority": 10,
+                            }
+                        },
+                    },
+                    f,
+                    ensure_ascii=False,
+                )
 
             # 辞書を読み込み
             dict_obj = CustomDictionary()

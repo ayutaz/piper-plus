@@ -17,6 +17,10 @@ torch = pytest.importorskip("torch", reason="torch required")
 # Tests: SynthesizerTrn.infer() with speaker_embedding
 # ---------------------------------------------------------------------------
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = pytest.mark.unit
+
 
 class TestInferSpeakerEmbedding:
     """SynthesizerTrn.infer() speaker_embedding path."""

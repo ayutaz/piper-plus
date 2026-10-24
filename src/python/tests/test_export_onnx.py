@@ -8,6 +8,10 @@ import pytest
 import torch
 from torch import nn
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = pytest.mark.unit
+
 
 def _onnx_inference(
     onnx_path, phoneme_ids, prosody_features, noise_scale=0.4, noise_scale_w=0.5
@@ -1004,9 +1008,7 @@ def _zero_shot_onnx_export(tmp_path_factory):
     _infer = build_infer_forward(model, stochastic=False)
 
     def fwd(text, text_lengths, scales_t, spk_emb):
-        return _infer(
-            text, text_lengths, scales_t, speaker_embedding=spk_emb
-        )
+        return _infer(text, text_lengths, scales_t, speaker_embedding=spk_emb)
 
     _orig_forward = model.forward
     model.forward = fwd

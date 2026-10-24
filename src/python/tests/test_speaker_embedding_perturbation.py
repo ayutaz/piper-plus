@@ -32,6 +32,10 @@ import torch.nn.functional as F  # noqa: E402
 # 数学的性質: noise 加算 + L2 正規化
 # ---------------------------------------------------------------------------
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = [pytest.mark.unit, pytest.mark.training]
+
 
 class TestPerturbationMath:
     """L2 再正規化が norm を 1.0 に戻すことを数値的に検証"""
@@ -141,8 +145,7 @@ class _PerturbationModule(torch.nn.Module):
         # ``lightning.py:794`` の gate を 1:1 で再現
         if self.training and speaker_embeddings is not None:
             speaker_embeddings = (
-                speaker_embeddings
-                + torch.randn_like(speaker_embeddings) * self.sigma
+                speaker_embeddings + torch.randn_like(speaker_embeddings) * self.sigma
             )
             speaker_embeddings = torch.nn.functional.normalize(
                 speaker_embeddings, p=2, dim=-1
@@ -193,11 +196,7 @@ class TestPerturbationModeGating:
         torch.manual_seed(7)
         emb0 = F.normalize(torch.randn(16, 192), p=2, dim=-1)
         # 前提: 入力は norm=1
-        torch.testing.assert_close(
-            emb0.norm(dim=-1), torch.ones(16), atol=1e-6, rtol=0
-        )
+        torch.testing.assert_close(emb0.norm(dim=-1), torch.ones(16), atol=1e-6, rtol=0)
 
         out = module(emb0)
-        torch.testing.assert_close(
-            out.norm(dim=-1), torch.ones(16), atol=1e-5, rtol=0
-        )
+        torch.testing.assert_close(out.norm(dim=-1), torch.ones(16), atol=1e-5, rtol=0)

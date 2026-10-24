@@ -27,6 +27,10 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PYPROJECT_PATH = REPO_ROOT / "pyproject.toml"
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = pytest.mark.unit
+
 
 @pytest.fixture(scope="module")
 def pyproject_data() -> dict:

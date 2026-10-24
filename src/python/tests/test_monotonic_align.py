@@ -21,7 +21,13 @@ torch = pytest.importorskip("torch", reason="torch required for monotonic_align 
 try:
     from piper_train.vits import monotonic_align
 except ImportError:
-    pytest.skip("piper_train.vits.monotonic_align not available", allow_module_level=True)
+    pytest.skip(
+        "piper_train.vits.monotonic_align not available", allow_module_level=True
+    )
+
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = [pytest.mark.unit, pytest.mark.training]
 
 
 class TestMonotonicAlignChunking:
