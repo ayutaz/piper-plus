@@ -355,6 +355,17 @@ def test_runtime_image_removes_pip(dockerfile):
 # --------------------------------------------------------------------------
 
 DOCKER_BUILD_RE = re.compile(r"docker (?:buildx )?build\b[^\n]*")
+EXPRESSION_RE = re.compile(r"\$\{\{(.*?)\}\}", re.S)
+IMAGE_LITERAL_RE = re.compile(r"'([\w./-]+:[\w.-]+)'")
+
+
+def _tags_input(value: object) -> set[str]:
+    """Tags in a build-push-action `tags:` input. An expression such as
+    `${{ cond && 'img:test' || '' }}` contributes the image names quoted in it."""
+    text = str(value)
+    tags = {t for e in EXPRESSION_RE.findall(text) for t in IMAGE_LITERAL_RE.findall(e)}
+    plain = EXPRESSION_RE.sub("", text)
+    return tags | {t.strip() for t in re.split(r"[,\n]", plain) if t.strip()}
 
 
 def _built_tags(job: dict, runtime: set[str]) -> set[str]:
@@ -367,7 +378,7 @@ def _built_tags(job: dict, runtime: set[str]) -> set[str]:
             dockerfile = with_.get("file") or f"{with_.get('context', '.')}/Dockerfile"
             dockerfile = re.sub(r"^\./", "", str(dockerfile))
             if dockerfile in runtime:
-                tags |= {t.strip() for t in re.split(r"[,\n]", str(with_.get("tags", ""))) if t.strip()}
+                tags |= _tags_input(with_.get("tags", ""))
         for m in DOCKER_BUILD_RE.finditer(step.get("run") or ""):
             f = re.search(r"(?:-f|--file)[ =](\S+)", m.group(0))
             t = re.findall(r"(?:-t|--tag)[ =](\S+)", m.group(0))
@@ -411,6 +422,24 @@ def test_pip_inside_runtime_container_is_detected():
     assert len(problems) == 1 and "w.yml" in problems[0]
 
 
+def test_a_tag_added_by_an_expression_is_detected():
+    job = {
+        "steps": [
+            {
+                "uses": "docker/build-push-action@v6",
+                "with": {
+                    "file": "docker/a/Dockerfile",
+                    "tags": "${{ steps.meta.outputs.tags }}\n"
+                    "${{ github.event_name == 'pull_request' && 'img:test' || '' }}\n",
+                },
+            },
+            {"run": 'docker run --rm img:test bash -c "pip install pytest"'},
+        ]
+    }
+    problems = pip_inside_runtime_containers({"w.yml": {"jobs": {"j": job}}}, {"docker/a/Dockerfile"})
+    assert len(problems) == 1
+
+
 def test_workflows_do_not_run_pip_inside_runtime_images():
     """docker-test.yml installed pytest with pip inside python-inference and
     failed with `pip: command not found` once pip was removed (PR #853)."""
@@ -420,6 +449,9 @@ def test_workflows_do_not_run_pip_inside_runtime_images():
     }
     runtime = set(checked_dockerfiles())
     assert any(_built_tags(j, runtime) for w in workflows.values() for j in (w.get("jobs") or {}).values())
+    # The python-inference checks run in the job that builds the image.
+    build = workflows["docker-build.yml"]["jobs"]["build-python-inference"]
+    assert "piper-python-inference:test" in _built_tags(build, runtime)
     assert pip_inside_runtime_containers(workflows, runtime) == []
 
 
