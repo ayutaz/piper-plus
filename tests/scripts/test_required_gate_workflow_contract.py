@@ -124,6 +124,34 @@ def test_listed_entries_match_one_name_literally(listed_patterns):
     assert not globs
 
 
+def _workflow_run_lists() -> list[tuple[str, list[str]]]:
+    lists = []
+    for path in sorted(WORKFLOW_DIR.glob("*.yml")):
+        run = _triggers(_load(path)).get("workflow_run")
+        if isinstance(run, dict) and run.get("workflows"):
+            lists.append((path.name, list(run["workflows"])))
+    return lists
+
+
+def test_every_workflow_run_trigger_names_existing_workflows(workflows):
+    """Every ``workflow_run`` list in the repository, not only the gate's.
+
+    ``coverage-aggregation.yml`` listed ``go-ci`` / ``csharp-ci`` /
+    ``cpp-tests`` (the file names) while the workflows are named ``Go CI`` /
+    ``C# CI`` / ``C++ Tests``. GitHub matches names, so those entries never
+    fired and nothing reported it.
+    """
+    lists = _workflow_run_lists()
+    assert lists, "no workflow_run trigger found; the scan is broken"
+    unknown = []
+    for file_name, patterns in lists:
+        for pattern in patterns:
+            name = _literal_name(pattern)
+            if name is None or name not in workflows:
+                unknown.append(f"{file_name}: {pattern!r}")
+    assert not unknown
+
+
 def test_workflow_names_are_not_cut_by_a_yaml_comment():
     """An unquoted ``name: E2E Issue #426`` is the name ``E2E Issue``: YAML
     reads `` #`` onwards as a comment, and GitHub shows the cut name."""

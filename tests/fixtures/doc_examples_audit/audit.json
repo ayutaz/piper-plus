@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-25T05:26:29Z",
+  "generated_at": "2026-10-25T05:27:32Z",
   "totals": {
     "executable": 234,
     "needs_placeholder": 7,
@@ -5566,8 +5566,8 @@
     },
     {
       "file": "docs/reference/pua-test-matrix.md",
-      "line_start": 131,
-      "line_end": 134,
+      "line_start": 132,
+      "line_end": 135,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",

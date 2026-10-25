@@ -22,6 +22,7 @@ on:
       - 'src/wasm/g2p/src/pua-map.js'
       - 'src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs'
       - 'src/cpp/phoneme_parser.cpp'
+      - 'src/cpp/piper.cpp'
       - 'src/python/piper_train/update_model_config.py'
       - 'Sources/PiperPlusG2P/PUAMap.swift'
       - 'docs/spec/pua-contract.toml'
@@ -29,6 +30,9 @@ on:
       - '.github/workflows/pua-consistency.yml'
       - 'scripts/regenerate_test_fixture.py'
       - 'scripts/test_sync_gates_meta.py'
+      - 'scripts/check_config_phoneme_keys.py'
+      - 'tests/scripts/test_check_config_phoneme_keys.py'
+      - 'src/python_run/piper_plus/api/_model_resolver.py'
   pull_request:
     paths:
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
@@ -40,6 +44,7 @@ on:
       - 'src/wasm/g2p/src/pua-map.js'
       - 'src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs'
       - 'src/cpp/phoneme_parser.cpp'
+      - 'src/cpp/piper.cpp'
       - 'src/python/piper_train/update_model_config.py'
       - 'Sources/PiperPlusG2P/PUAMap.swift'
       - 'docs/spec/pua-contract.toml'
@@ -47,6 +52,9 @@ on:
       - '.github/workflows/pua-consistency.yml'
       - 'scripts/regenerate_test_fixture.py'
       - 'scripts/test_sync_gates_meta.py'
+      - 'scripts/check_config_phoneme_keys.py'
+      - 'tests/scripts/test_check_config_phoneme_keys.py'
+      - 'src/python_run/piper_plus/api/_model_resolver.py'
   schedule:
     # Weekly: catch a stale *distributed* (HuggingFace) config — e.g. the
     # v1.12.0 ɔɪ/œ̃/ɐ̃ multi-codepoint leak that broke C++ inference on Windows.
@@ -197,95 +205,27 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Validate any config.json checked into the repo
-        run: |
-          set -e
-          configs=$(find . -name 'config.json' -path '*/test/*' -o -name 'config.json' -path '*/tests/*' -o -name 'config.json' -path '*/fixtures/*' 2>/dev/null || true)
-          if [ -z "$configs" ]; then
-            echo "No test/fixture config.json files to validate."
-            exit 0
-          fi
-          echo "Found configs to validate:"
-          echo "$configs"
-          for cfg in $configs; do
-            echo ""
-            echo "Checking $cfg..."
-            python - <<EOF
-          import json, sys
-          with open("$cfg", encoding="utf-8") as f:
-              data = json.load(f)
-          pid_map = data.get("phoneme_id_map", {})
-          bad = [k for k in pid_map if len(k) > 1]
-          if bad:
-              print(f"FAIL: $cfg has {len(bad)} multi-codepoint key(s): {bad}")
-              sys.exit(1)
-          else:
-              print(f"OK: $cfg ({len(pid_map)} phoneme_id_map entries, all single-codepoint)")
-          EOF
-          done
+      # git 管理下で phoneme_id_map を持つ全 JSON を、 C++ reader と同じ規則
+      # (1 codepoint か、 contract の raw alias 3 key) で検査する。 以前は
+      # `config.json` という名前のファイルだけを探しており、 repo の config は
+      # `*.onnx.json` なので 1 件も検査せずに緑だった。
+      - name: Validate every config checked into the repo
+        run: python scripts/check_config_phoneme_keys.py --repo
 
   distributed-config-validator:
     name: Distributed (HF) config validator
-    # Only on schedule / manual dispatch: avoids HuggingFace egress on every
-    # PR. The in-repo configs are covered by config-key-validator above; this
-    # job catches a stale *distributed* config.json — the failure mode behind
-    # the v1.12.0 ɔɪ/œ̃/ɐ̃ leak that broke C++ inference for Windows users
-    # (the corrected config must be regenerated AND re-pushed to HuggingFace,
-    # which a PR-time gate cannot verify).
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # 配布中の config は HF にあり、 PR の差分には現れない (v1.12.0 の
+    # ɔɪ/œ̃/ɐ̃ 漏れで Windows の C++ 推論が壊れた事例)。 この workflow が
+    # 走るたびに (PUA 関連ファイルを触る PR / push と週次)、 MODEL_ALIASES の
+    # 各 config を pin された revision で取得して検査する。 取得に失敗した
+    # model は skip せず失敗にする (script 側で retry する)。
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6.1.0
-      - uses: actions/setup-python@v5.6.0
+      - uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.13'
 
-      - name: Validate HF-distributed model configs are PUA single-codepoint
-        run: |
-          python - <<'EOF'
-          import importlib.util, json, sys, urllib.request
-
-          # Load MODEL_ALIASES by file path so we don't import the piper_plus
-          # package __init__ (and its heavier optional deps). This dict is the
-          # single source of truth for which models we distribute.
-          spec = importlib.util.spec_from_file_location(
-              "_model_resolver", "src/python_run/piper_plus/api/_model_resolver.py")
-          mod = importlib.util.module_from_spec(spec)
-          spec.loader.exec_module(mod)
-          aliases = mod.MODEL_ALIASES
-
-          failures = []
-          for name, a in aliases.items():
-              url = (f"https://huggingface.co/{a['repo_id']}"
-                     f"/resolve/main/{a['config_file']}")
-              print(f"Checking '{name}': {url}")
-              try:
-                  with urllib.request.urlopen(url, timeout=30) as r:
-                      data = json.loads(r.read().decode("utf-8"))
-              except Exception as e:  # network/transient — log, do not flake-fail
-                  print(f"  WARN: could not fetch ({e}); skipping this model")
-                  continue
-              pid = data.get("phoneme_id_map", {})
-              bad = [k for k in pid if len(k) > 1]
-              if bad:
-                  hexed = ["+".join(f"U+{ord(c):04X}" for c in k) for k in bad]
-                  print(f"  FAIL: {len(bad)} multi-codepoint key(s): {hexed}")
-                  failures.append((name, hexed))
-              else:
-                  print(f"  OK: {len(pid)} entries, all single-codepoint")
-
-          if failures:
-              print("\nDistributed config validation FAILED:")
-              for name, hexed in failures:
-                  print(f"  {name}: {hexed}")
-              print(
-                  "\nFix: regenerate the config with PUA-encoded keys via "
-                  "`python scripts/regenerate_tsukuyomi_config.py` (or "
-                  "`python -m piper_train.update_model_config <cfg>`) and "
-                  "re-push it to HuggingFace. The C++ runtime rejects "
-                  "multi-codepoint phoneme_id_map keys (see "
-                  "src/cpp/tests/test_phonemize_config.cpp).")
-              sys.exit(1)
-          print("\nAll distributed configs OK.")
-          EOF
+      - name: Validate HF-distributed model configs load in the C++ reader
+        run: python scripts/check_config_phoneme_keys.py --distributed

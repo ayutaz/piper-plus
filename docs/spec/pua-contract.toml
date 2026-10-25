@@ -86,6 +86,10 @@ rule = "Any multi-codepoint token in any inventory list must appear as a token i
 #   ɔɪ -> U+E062, œ̃ -> U+E063, ɐ̃ -> U+E064.
 # Unknown multi-codepoint tokens and conflicting raw/PUA IDs are rejected.
 # Regression tests: src/cpp/tests/test_phonemize_config.cpp.
+# raw_aliases is the list scripts/check_config_phoneme_keys.py accepts; its
+# codepoints come from pua.json, and tests/scripts/test_check_config_phoneme_keys.py
+# checks that it equals the knownTokens table in src/cpp/piper.cpp.
+raw_aliases = ["\u0254\u026A", "\u0153\u0303", "\u0250\u0303"]  # ɔɪ, œ̃, ɐ̃
 rule = "All keys in phoneme_id_map must satisfy len(key) == 1 (Python str sense, i.e. single Unicode codepoint)"
 enforced_by = [
     "encode/pua.py:map_token() — raises if input is multi-codepoint and not in mapping",
