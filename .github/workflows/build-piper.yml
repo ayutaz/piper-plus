@@ -54,16 +54,16 @@ jobs:
         shell: bash
         run: |
           if [ -n "${{ inputs.artifact-name }}" ]; then
-            echo "name=${{ inputs.artifact-name }}" >> $GITHUB_OUTPUT
+            echo "name=${{ inputs.artifact-name }}" >> "$GITHUB_OUTPUT"
           else
-            echo "name=piper-${{ runner.os }}-${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "name=piper-${{ runner.os }}-${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set build path
         id: set-build-path
         shell: bash
         run: |
-          echo "path=${{ github.workspace }}/build" >> $GITHUB_OUTPUT
+          echo "path=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
       # Cache for Linux dependencies
       - name: Cache Linux dependencies
@@ -142,16 +142,16 @@ jobs:
           cd build
 
           # Set CMAKE flags
-          CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=${{ inputs.build-type }}"
+          CMAKE_FLAGS=("-DCMAKE_BUILD_TYPE=${{ inputs.build-type }}")
           if [ "${{ inputs.include-tests }}" = "true" ]; then
-            CMAKE_FLAGS="$CMAKE_FLAGS -DBUILD_TESTS=ON"
+            CMAKE_FLAGS+=(-DBUILD_TESTS=ON)
           fi
 
-          echo "Building with flags: $CMAKE_FLAGS"
+          echo "Building with flags: ${CMAKE_FLAGS[*]}"
 
           # Retry cmake configuration up to 3 times with delay for rate limiting
           for i in 1 2 3; do
-            if cmake .. $CMAKE_FLAGS; then
+            if cmake .. "${CMAKE_FLAGS[@]}"; then
               break
             else
               echo "CMake configuration failed (attempt $i/3)"
@@ -165,7 +165,7 @@ jobs:
             fi
           done
 
-          if ! make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu); then
+          if ! make -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)"; then
             echo "❌ Build failed"
             exit 1
           fi
@@ -189,6 +189,7 @@ jobs:
 
       - name: Build piper (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path build | Out-Null
           cd build
@@ -306,16 +307,24 @@ jobs:
             # Copy main libraries
             find build -name "*.so*" -type f -exec cp {} dist/piper-plus/lib/ \; 2>/dev/null || true
             # Check specific paths
-            [ -d "build/pi/lib" ] && cp build/pi/lib/*.so* dist/piper-plus/lib/ 2>/dev/null || true
-            [ -d "build/p/src/piper_phonemize_external-build/install/lib" ] && cp build/p/src/piper_phonemize_external-build/install/lib/*.so* dist/piper-plus/lib/ 2>/dev/null || true
+            if [ -d "build/pi/lib" ]; then
+              cp build/pi/lib/*.so* dist/piper-plus/lib/ 2>/dev/null || true
+            fi
+            if [ -d "build/p/src/piper_phonemize_external-build/install/lib" ]; then
+              cp build/p/src/piper_phonemize_external-build/install/lib/*.so* dist/piper-plus/lib/ 2>/dev/null || true
+            fi
             # Copy ONNX Runtime from system install location (installed by build step)
             cp /usr/local/lib/libonnxruntime*.so* dist/piper-plus/lib/ 2>/dev/null || true
           elif [ "${{ runner.os }}" = "macOS" ]; then
             # Copy main libraries
             find build -name "*.dylib" -type f -exec cp {} dist/piper-plus/lib/ \; 2>/dev/null || true
             # Check specific paths
-            [ -d "build/pi/lib" ] && cp build/pi/lib/*.dylib dist/piper-plus/lib/ 2>/dev/null || true
-            [ -d "build/p/src/piper_phonemize_external-build/install/lib" ] && cp build/p/src/piper_phonemize_external-build/install/lib/*.dylib dist/piper-plus/lib/ 2>/dev/null || true
+            if [ -d "build/pi/lib" ]; then
+              cp build/pi/lib/*.dylib dist/piper-plus/lib/ 2>/dev/null || true
+            fi
+            if [ -d "build/p/src/piper_phonemize_external-build/install/lib" ]; then
+              cp build/p/src/piper_phonemize_external-build/install/lib/*.dylib dist/piper-plus/lib/ 2>/dev/null || true
+            fi
             # Copy ONNX Runtime from system install location (installed by build step)
             cp /usr/local/lib/libonnxruntime*.dylib dist/piper-plus/lib/ 2>/dev/null || true
           fi
@@ -459,12 +468,15 @@ jobs:
           # Create a debug info file
           echo "Distribution package contents:" > dist-contents.txt
           find dist -type f | sort >> dist-contents.txt
-          echo "" >> dist-contents.txt
-          echo "Build directory OpenJTalk search:" >> dist-contents.txt
+          {
+            echo ""
+            echo "Build directory OpenJTalk search:"
+          } >> dist-contents.txt
           find build -name "open_jtalk" -type f 2>/dev/null | head -10 >> dist-contents.txt || echo "No open_jtalk found in build" >> dist-contents.txt
 
       - name: Create distribution package (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist/piper-plus/bin
           New-Item -ItemType Directory -Force -Path dist/piper-plus/lib

@@ -136,7 +136,7 @@ jobs:
       - name: Build (Unix)
         if: steps.skip_check.outputs.skip != 'true' && runner.os != 'Windows'
         shell: bash
-        run: cmake --build build --config Release -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+        run: cmake --build build --config Release -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
       - name: Build (Windows)
         if: steps.skip_check.outputs.skip != 'true' && runner.os == 'Windows'
@@ -366,9 +366,11 @@ jobs:
           # Symlink for CMake target_link_libraries (single-file path expectation)
           ln -sf onnxruntime.framework/onnxruntime ort-ios/lib/libonnxruntime.dylib
 
-          echo "ORT_IOS_DIR=${{ github.workspace }}/ort-ios" >> "$GITHUB_ENV"
-          echo "ORT_IOS_LIB=${{ github.workspace }}/ort-ios/lib/libonnxruntime.dylib" >> "$GITHUB_ENV"
-          echo "ORT_IOS_FRAMEWORK=${{ github.workspace }}/ort-ios/lib/onnxruntime.framework" >> "$GITHUB_ENV"
+          {
+            echo "ORT_IOS_DIR=${{ github.workspace }}/ort-ios"
+            echo "ORT_IOS_LIB=${{ github.workspace }}/ort-ios/lib/libonnxruntime.dylib"
+            echo "ORT_IOS_FRAMEWORK=${{ github.workspace }}/ort-ios/lib/onnxruntime.framework"
+          } >> "$GITHUB_ENV"
 
       - name: Configure CMake (iOS slice)
         run: |
@@ -393,7 +395,7 @@ jobs:
         # rebuild (release job Gate 2 fails on any mismatch).
         env:
           ZERO_AR_DATE: "1"
-        run: cmake --build build-ios --config Release -j$(sysctl -n hw.ncpu)
+        run: cmake --build build-ios --config Release -j"$(sysctl -n hw.ncpu)"
 
       - name: Verify slice arch
         run: |
@@ -980,8 +982,10 @@ jobs:
               cp -R "${HEADER_DIR2}/"* ort-android/include/
             fi
           fi
-          echo "ORT_ANDROID_DIR=${{ github.workspace }}/ort-android" >> "$GITHUB_ENV"
-          echo "ORT_ANDROID_LIB=${{ github.workspace }}/ort-android/lib/libonnxruntime.so" >> "$GITHUB_ENV"
+          {
+            echo "ORT_ANDROID_DIR=${{ github.workspace }}/ort-android"
+            echo "ORT_ANDROID_LIB=${{ github.workspace }}/ort-android/lib/libonnxruntime.so"
+          } >> "$GITHUB_ENV"
 
       - name: Configure CMake (Android)
         env:
@@ -1016,7 +1020,7 @@ jobs:
             $CMAKE_EXTRA_FLAGS
 
       - name: Build (Android)
-        run: cmake --build build-android --config Release -j$(nproc)
+        run: cmake --build build-android --config Release -j"$(nproc)"
 
       - name: Locate libpiper_plus.so
         id: locate-so
@@ -1167,19 +1171,19 @@ jobs:
           # Rename iOS M1-compat tar.gz (device slice only)
           if [ -f artifacts/libpiper_plus-ios-arm64/libpiper_plus-ios-arm64.tar.gz ]; then
             mv artifacts/libpiper_plus-ios-arm64/libpiper_plus-ios-arm64.tar.gz \
-              artifacts/libpiper_plus-ios-arm64/libpiper_plus-ios-arm64-${TAG}.tar.gz
+              "artifacts/libpiper_plus-ios-arm64/libpiper_plus-ios-arm64-${TAG}.tar.gz"
           fi
           # M2: Rename iOS xcframework.zip (device + simulator slices, modulemap + PrivacyInfo bundled)
           if [ -f artifacts/libpiper_plus-ios-xcframework/libpiper_plus-ios.xcframework.zip ]; then
             mv artifacts/libpiper_plus-ios-xcframework/libpiper_plus-ios.xcframework.zip \
-              artifacts/libpiper_plus-ios-xcframework/libpiper_plus-ios-${TAG}.xcframework.zip
+              "artifacts/libpiper_plus-ios-xcframework/libpiper_plus-ios-${TAG}.xcframework.zip"
           fi
           # Issue #387: Rename G2P xcframework.zip (PiperPlusG2P, no ORT).
           # `-apple` reflects iOS + macOS slices since v1.14.0 — consumer
           # Package.swift references this name in `g2pVersion`'s URL.
           if [ -f artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple.xcframework.zip ]; then
             mv artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple.xcframework.zip \
-              artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple-${TAG}.xcframework.zip
+              "artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple-${TAG}.xcframework.zip"
           fi
           # Rename Android artifacts (3 ABIs: arm64-v8a / armeabi-v7a / x86_64).
           # The build-android matrix produces one tar.gz per ABI; each is

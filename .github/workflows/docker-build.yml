@@ -172,12 +172,12 @@ jobs:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          images=""
+          images=()
           for tag in ${TAGS}; do
-            images+="${tag}@${DIGEST} "
+            images+=("${tag}@${DIGEST}")
           done
-          cosign sign --yes ${images}
-          for image in ${images}; do
+          cosign sign --yes "${images[@]}"
+          for image in "${images[@]}"; do
             cosign verify \
               --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
               --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
@@ -357,12 +357,12 @@ jobs:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          images=""
+          images=()
           for tag in ${TAGS}; do
-            images+="${tag}@${DIGEST} "
+            images+=("${tag}@${DIGEST}")
           done
-          cosign sign --yes ${images}
-          for image in ${images}; do
+          cosign sign --yes "${images[@]}"
+          for image in "${images[@]}"; do
             cosign verify \
               --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
               --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
@@ -494,12 +494,12 @@ jobs:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          images=""
+          images=()
           for tag in ${TAGS}; do
-            images+="${tag}@${DIGEST} "
+            images+=("${tag}@${DIGEST}")
           done
-          cosign sign --yes ${images}
-          for image in ${images}; do
+          cosign sign --yes "${images[@]}"
+          for image in "${images[@]}"; do
             cosign verify \
               --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
               --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
@@ -580,12 +580,12 @@ jobs:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          images=""
+          images=()
           for tag in ${TAGS}; do
-            images+="${tag}@${DIGEST} "
+            images+=("${tag}@${DIGEST}")
           done
-          cosign sign --yes ${images}
-          for image in ${images}; do
+          cosign sign --yes "${images[@]}"
+          for image in "${images[@]}"; do
             cosign verify \
               --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
               --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
@@ -670,12 +670,12 @@ jobs:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          images=""
+          images=()
           for tag in ${TAGS}; do
-            images+="${tag}@${DIGEST} "
+            images+=("${tag}@${DIGEST}")
           done
-          cosign sign --yes ${images}
-          for image in ${images}; do
+          cosign sign --yes "${images[@]}"
+          for image in "${images[@]}"; do
             cosign verify \
               --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
               --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
@@ -763,12 +763,12 @@ jobs:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          images=""
+          images=()
           for tag in ${TAGS}; do
-            images+="${tag}@${DIGEST} "
+            images+=("${tag}@${DIGEST}")
           done
-          cosign sign --yes ${images}
-          for image in ${images}; do
+          cosign sign --yes "${images[@]}"
+          for image in "${images[@]}"; do
             cosign verify \
               --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
               --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
@@ -927,12 +927,12 @@ jobs:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          images=""
+          images=()
           for tag in ${TAGS}; do
-            images+="${tag}@${DIGEST} "
+            images+=("${tag}@${DIGEST}")
           done
-          cosign sign --yes ${images}
-          for image in ${images}; do
+          cosign sign --yes "${images[@]}"
+          for image in "${images[@]}"; do
             cosign verify \
               --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}" \
               --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \

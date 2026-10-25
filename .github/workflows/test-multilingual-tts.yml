@@ -99,27 +99,29 @@ jobs:
             echo "Package contents:"
             find piper-plus -type f 2>/dev/null | head -20
             # Skip the test
-            echo "SKIP_TESTS=true" >> $GITHUB_ENV
+            echo "SKIP_TESTS=true" >> "$GITHUB_ENV"
           fi
-          [ -f "piper-plus/bin/open_jtalk" ] && chmod +x piper-plus/bin/open_jtalk || true
+          if [ -f "piper-plus/bin/open_jtalk" ]; then
+            chmod +x piper-plus/bin/open_jtalk || true
+          fi
 
           # Set up paths
           export PATH="${{ github.workspace }}/piper-plus/bin:$PATH"
-          echo "PATH=${{ github.workspace }}/piper-plus/bin:$PATH" >> $GITHUB_ENV
+          echo "PATH=${{ github.workspace }}/piper-plus/bin:$PATH" >> "$GITHUB_ENV"
 
           # Set library path for Linux and macOS
           if [ "${{ runner.os }}" = "Linux" ]; then
             export LD_LIBRARY_PATH="${{ github.workspace }}/piper-plus/lib:${LD_LIBRARY_PATH}"
-            echo "LD_LIBRARY_PATH=${{ github.workspace }}/piper-plus/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+            echo "LD_LIBRARY_PATH=${{ github.workspace }}/piper-plus/lib:${LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
           elif [ "${{ runner.os }}" = "macOS" ]; then
             export DYLD_LIBRARY_PATH="${{ github.workspace }}/piper-plus/lib:${DYLD_LIBRARY_PATH}"
-            echo "DYLD_LIBRARY_PATH=${{ github.workspace }}/piper-plus/lib:${DYLD_LIBRARY_PATH}" >> $GITHUB_ENV
+            echo "DYLD_LIBRARY_PATH=${{ github.workspace }}/piper-plus/lib:${DYLD_LIBRARY_PATH}" >> "$GITHUB_ENV"
           fi
 
           # Set espeak data path
           if [ -d "${{ github.workspace }}/piper-plus/share/espeak-ng-data" ]; then
             export ESPEAK_DATA_PATH="${{ github.workspace }}/piper-plus/share/espeak-ng-data"
-            echo "ESPEAK_DATA_PATH=${{ github.workspace }}/piper-plus/share/espeak-ng-data" >> $GITHUB_ENV
+            echo "ESPEAK_DATA_PATH=${{ github.workspace }}/piper-plus/share/espeak-ng-data" >> "$GITHUB_ENV"
           fi
 
           # Verify binaries and libraries
@@ -332,14 +334,15 @@ jobs:
           # Set library path for Linux and macOS
           if [ "${{ runner.os }}" = "Linux" ]; then
             export LD_LIBRARY_PATH="${PWD}/piper-plus/lib:${LD_LIBRARY_PATH}"
-            echo "LD_LIBRARY_PATH=${PWD}/piper-plus/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+            echo "LD_LIBRARY_PATH=${PWD}/piper-plus/lib:${LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
           elif [ "${{ runner.os }}" = "macOS" ]; then
             export DYLD_LIBRARY_PATH="${PWD}/piper-plus/lib:${DYLD_LIBRARY_PATH}"
-            echo "DYLD_LIBRARY_PATH=${PWD}/piper-plus/lib:${DYLD_LIBRARY_PATH}" >> $GITHUB_ENV
+            echo "DYLD_LIBRARY_PATH=${PWD}/piper-plus/lib:${DYLD_LIBRARY_PATH}" >> "$GITHUB_ENV"
           fi
 
       - name: Extract piper (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           Expand-Archive -Path piper-plus-cpp-Windows.zip -DestinationPath . -Force
 

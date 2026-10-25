@@ -60,10 +60,12 @@ jobs:
         run: |
           if ! diff -u /tmp/api-base.txt /tmp/api-current.txt > /tmp/api-diff.txt; then
             echo "::warning::Public API has changed. Verify semver bump is needed."
-            echo "## Rust Public API Diff" >> $GITHUB_STEP_SUMMARY
-            echo '```diff' >> $GITHUB_STEP_SUMMARY
-            cat /tmp/api-diff.txt >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
+            {
+              echo "## Rust Public API Diff"
+              echo '```diff'
+              cat /tmp/api-diff.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
           else
             echo "No public API changes detected"
           fi
@@ -88,10 +90,12 @@ jobs:
           BASE_SHA=$(git merge-base HEAD origin/${{ github.base_ref }})
           gorelease -base "$BASE_SHA" 2>&1 | tee /tmp/gorelease.txt || true
           if grep -q "Inferred base version" /tmp/gorelease.txt; then
-            echo "## Go Public API Diff" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            cat /tmp/gorelease.txt >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
+            {
+              echo "## Go Public API Diff"
+              echo '```'
+              cat /tmp/gorelease.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
         continue-on-error: true
 
@@ -120,9 +124,11 @@ jobs:
           # PublicAPI.Unshipped.txt の git diff を確認
           UNSHIPPED_DIFF=$(git diff origin/${{ github.base_ref }}..HEAD -- src/csharp/PiperPlus.Core/PublicAPI.Unshipped.txt 2>/dev/null || echo "")
           if [ -n "$UNSHIPPED_DIFF" ]; then
-            echo "## C# Public API Diff (PublicAPI.Unshipped.txt)" >> $GITHUB_STEP_SUMMARY
-            echo '```diff' >> $GITHUB_STEP_SUMMARY
-            echo "$UNSHIPPED_DIFF" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
+            {
+              echo "## C# Public API Diff (PublicAPI.Unshipped.txt)"
+              echo '```diff'
+              echo "$UNSHIPPED_DIFF"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
         continue-on-error: true

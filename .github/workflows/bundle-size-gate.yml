@@ -121,7 +121,7 @@ jobs:
             $CMAKE_EXTRA_FLAGS
 
       - name: Build (Android)
-        run: cmake --build build-android --config Release -j$(nproc)
+        run: cmake --build build-android --config Release -j"$(nproc)"
 
       - name: Locate libpiper_plus.so
         id: locate-so

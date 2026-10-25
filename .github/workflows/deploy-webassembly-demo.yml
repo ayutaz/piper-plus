@@ -355,7 +355,7 @@ jobs:
           else
             echo "Bare specifiers found: $BARE_SPECS"
 
-            for html in $(find deploy -name '*.html'); do
+            while IFS= read -r -d '' html; do
               # Skip HTML files that don't use ES modules
               if ! grep -q 'type="module"' "$html"; then
                 continue
@@ -394,7 +394,7 @@ jobs:
                 rm /tmp/importmap_error
                 ERRORS=$((ERRORS + 1))
               fi
-            done
+            done < <(find deploy -name '*.html' -print0)
           fi
 
           if [ "$ERRORS" -gt 0 ]; then

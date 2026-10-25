@@ -234,13 +234,13 @@ jobs:
         echo "JS size: $js_size bytes"
 
         # Fail if WASM is larger than 1MB (reasonable for OpenJTalk)
-        if [ $wasm_size -gt 1048576 ]; then
+        if [ "$wasm_size" -gt 1048576 ]; then
           echo "ERROR: WASM file is larger than 1MB"
           exit 1
         fi
 
         # Fail if JS is larger than 100KB
-        if [ $js_size -gt 102400 ]; then
+        if [ "$js_size" -gt 102400 ]; then
           echo "ERROR: JS file is larger than 100KB"
           exit 1
         fi

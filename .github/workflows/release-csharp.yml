@@ -127,17 +127,17 @@ jobs:
       - name: Publish C# CLI
         shell: bash
         run: |
-          PUBLISH_ARGS="-c Release -r ${{ matrix.rid }} --self-contained true"
-          PUBLISH_ARGS="$PUBLISH_ARGS -p:PublishSingleFile=true -p:PublishTrimmed=true"
+          PUBLISH_ARGS=(-c Release -r ${{ matrix.rid }} --self-contained true)
+          PUBLISH_ARGS+=(-p:PublishSingleFile=true -p:PublishTrimmed=true)
           # C# CLI uses its own version from csproj (independent from PyPI version)
 
           if [ "${{ matrix.cross }}" = "true" ]; then
-            PUBLISH_ARGS="$PUBLISH_ARGS -p:PublishReadyToRun=false"
+            PUBLISH_ARGS+=(-p:PublishReadyToRun=false)
           else
-            PUBLISH_ARGS="$PUBLISH_ARGS -p:PublishReadyToRun=true"
+            PUBLISH_ARGS+=(-p:PublishReadyToRun=true)
           fi
 
-          dotnet publish src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj $PUBLISH_ARGS -o publish/
+          dotnet publish src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj "${PUBLISH_ARGS[@]}" -o publish/
 
       - name: Include project license
         shell: bash

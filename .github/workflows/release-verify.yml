@@ -218,7 +218,7 @@ jobs:
           if [ -n "$INPUT_VERSION" ]; then
             VERSION="$INPUT_VERSION"
           else
-            VERSION=$(cat VERSION | tr -d '\n\r')
+            VERSION=$(tr -d '\n\r' < VERSION)
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -446,7 +446,7 @@ jobs:
             echo "::error::npm pack failed for piper-plus@${NPM_VERSION}"
             exit 1
           }
-          TARBALL=$(ls *.tgz | head -1)
+          TARBALL=$(find . -maxdepth 1 -name '*.tgz' | sort | head -1)
           if [ -z "$TARBALL" ]; then
             echo "::error::No tarball produced"
             exit 1

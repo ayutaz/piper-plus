@@ -64,10 +64,10 @@ jobs:
           # Set library path for Linux and macOS
           if [ "${{ runner.os }}" = "Linux" ]; then
             export LD_LIBRARY_PATH="${PWD}/piper-plus/lib:${LD_LIBRARY_PATH}"
-            echo "LD_LIBRARY_PATH=${PWD}/piper-plus/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+            echo "LD_LIBRARY_PATH=${PWD}/piper-plus/lib:${LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
           elif [ "${{ runner.os }}" = "macOS" ]; then
             export DYLD_LIBRARY_PATH="${PWD}/piper-plus/lib:${DYLD_LIBRARY_PATH}"
-            echo "DYLD_LIBRARY_PATH=${PWD}/piper-plus/lib:${DYLD_LIBRARY_PATH}" >> $GITHUB_ENV
+            echo "DYLD_LIBRARY_PATH=${PWD}/piper-plus/lib:${DYLD_LIBRARY_PATH}" >> "$GITHUB_ENV"
           fi
 
           # Verify OpenJTalk is available (check phonemizer version first)
@@ -86,6 +86,7 @@ jobs:
 
       - name: Extract piper (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           Expand-Archive -Path piper-plus-cpp-Windows.zip -DestinationPath . -Force
 
@@ -214,7 +215,7 @@ jobs:
           mkdir -p combined-results/performance
 
           # Find and combine all performance JSON files
-          find all-results -name "performance_summary.json" -o -name "*_metrics_*.json" | while read file; do
+          find all-results -name "performance_summary.json" -o -name "*_metrics_*.json" | while read -r file; do
             # Extract platform from path
             platform=$(echo "$file" | grep -oE "(ubuntu|macos|windows)-latest" | head -1)
             if [ -n "$platform" ]; then

@@ -502,10 +502,12 @@ jobs:
     steps:
       - name: Summary
         run: |
-          echo "## Security Audit Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- pip-audit: ${{ needs.pip-audit.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- cargo-audit: ${{ needs.cargo-audit.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- npm-audit: ${{ needs.npm-audit.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- govulncheck: ${{ needs.govulncheck.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- nuget-audit: ${{ needs.nuget-audit.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- trivy-docker-scan: ${{ needs.trivy-docker-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Security Audit Summary"
+            echo "- pip-audit: ${{ needs.pip-audit.result }}"
+            echo "- cargo-audit: ${{ needs.cargo-audit.result }}"
+            echo "- npm-audit: ${{ needs.npm-audit.result }}"
+            echo "- govulncheck: ${{ needs.govulncheck.result }}"
+            echo "- nuget-audit: ${{ needs.nuget-audit.result }}"
+            echo "- trivy-docker-scan: ${{ needs.trivy-docker-scan.result }}"
+          } >> "$GITHUB_STEP_SUMMARY"

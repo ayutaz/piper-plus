@@ -52,7 +52,7 @@ jobs:
       - name: Install NDK
         run: |
           sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> "$GITHUB_ENV"
 
       - name: Cache ONNX Runtime Android
         id: cache-ort-android
@@ -99,7 +99,7 @@ jobs:
             $CMAKE_EXTRA_FLAGS
 
       - name: Build
-        run: cmake --build build --config Release --target piper_plus -j$(nproc)
+        run: cmake --build build --config Release --target piper_plus -j"$(nproc)"
 
       - name: Verify binary
         run: |
