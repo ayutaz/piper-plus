@@ -1941,7 +1941,7 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "piper-plus"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "bincode",
  "flate2",
@@ -1965,7 +1965,7 @@ dependencies = [
 
 [[package]]
 name = "piper-plus-cli"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1980,7 +1980,7 @@ dependencies = [
 
 [[package]]
 name = "piper-plus-g2p"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "bincode",
  "jpreprocess",
@@ -1994,7 +1994,7 @@ dependencies = [
 
 [[package]]
 name = "piper-plus-python"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "numpy",
  "piper-plus",
@@ -2003,7 +2003,7 @@ dependencies = [
 
 [[package]]
 name = "piper-plus-wasm"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "console_error_panic_hook",
  "js-sys",
