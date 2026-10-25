@@ -198,6 +198,9 @@ jobs:
             tests/fixtures
             src/python/g2p/piper_plus_g2p/data
             src/rust/piper-plus-g2p/data
+            .github/actions/check-test-skips
+            scripts
+            docs/spec
       - uses: actions/setup-go@v5.6.0
         with:
           go-version: '1.26'
@@ -212,6 +215,8 @@ jobs:
         if: steps.cache-openjtalk.outputs.cache-hit != 'true'
         run: bash scripts/build-openjtalk.sh "$RUNNER_TEMP/openjtalk-work" "$RUNNER_TEMP/openjtalk/install" "$RUNNER_TEMP/openjtalk/dic"
       - name: Run tests with the openjtalk tag
+        # shell: bash adds pipefail, so tee keeps the exit code of go test.
+        shell: bash
         run: |
           OJ=$RUNNER_TEMP/openjtalk
           export CGO_ENABLED=1
@@ -219,7 +224,12 @@ jobs:
           export CGO_LDFLAGS="-L$OJ/install/lib -lopenjtalk -lstdc++ -lm"
           export OPENJTALK_DICTIONARY_PATH="$OJ/dic"
           go vet -tags openjtalk ./... ./phonemize/...
-          go test -v -race -count=1 -tags openjtalk ./... ./phonemize/...
+          go test -v -race -count=1 -tags openjtalk ./... ./phonemize/... 2>&1 | tee "$RUNNER_TEMP/go-test.log"
+      - name: Fail on tests skipped without an allowlist entry
+        uses: ./.github/actions/check-test-skips
+        with:
+          runtime: go
+          files: ${{ runner.temp }}/go-test.log
 
   build:
     runs-on: ${{ matrix.os }}
