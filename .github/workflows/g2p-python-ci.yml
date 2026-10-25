@@ -181,16 +181,16 @@ jobs:
 
   test-extras:
     needs: validate-release
-    name: test extras (${{ matrix.extra }})
+    name: test extras
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        extra: [ja, en, zh]
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6.1.0
       - uses: astral-sh/setup-uv@v6.8.0
+      # 1 extra ごとに別の venv を作り、その extra だけで phonemizer が動くことを
+      # 確かめる (extra ごとに 1 job だったときと同じ分離)。 各 step は前の
+      # extra が失敗しても走る。
+      #
       # venv は workspace (= cwd) の外に作る。 この job は uv.lock を経由せず
       # PyPI から fresh resolve するため nltk 3.10.x を引くが、 3.10 で追加された
       # nltk/inisec.py の NLTKSafeImportFinder は「解決先ファイルが cwd 配下に
@@ -199,14 +199,25 @@ jobs:
       # regex 等の正規依存まで誤検知される。
       # エラーメッセージが案内する `-P` / PYTHONSAFEPATH=1 は判定が sys.path では
       # なくファイルの物理位置なので回避にならない (実測で確認済み)。
-      - run: uv venv "${RUNNER_TEMP}/venv-extras"
-      - run: uv pip install --python "${RUNNER_TEMP}/venv-extras" "./src/python/g2p[${{ matrix.extra }}]"
-      - name: Download NLTK data (EN only)
-        if: matrix.extra == 'en'
+      - name: "ja: install and phonemize"
+        if: ${{ !cancelled() }}
         run: |
-          "${RUNNER_TEMP}/venv-extras/bin/python" -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
-      - run: |
-          "${RUNNER_TEMP}/venv-extras/bin/python" -c "from piper_plus_g2p import get_phonemizer; p = get_phonemizer('${{ matrix.extra }}'); print(p.phonemize('test'))"
+          uv venv "${RUNNER_TEMP}/venv-ja"
+          uv pip install --python "${RUNNER_TEMP}/venv-ja" "./src/python/g2p[ja]"
+          "${RUNNER_TEMP}/venv-ja/bin/python" -c "from piper_plus_g2p import get_phonemizer; p = get_phonemizer('ja'); print(p.phonemize('test'))"
+      - name: "en: install, download NLTK data and phonemize"
+        if: ${{ !cancelled() }}
+        run: |
+          uv venv "${RUNNER_TEMP}/venv-en"
+          uv pip install --python "${RUNNER_TEMP}/venv-en" "./src/python/g2p[en]"
+          "${RUNNER_TEMP}/venv-en/bin/python" -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
+          "${RUNNER_TEMP}/venv-en/bin/python" -c "from piper_plus_g2p import get_phonemizer; p = get_phonemizer('en'); print(p.phonemize('test'))"
+      - name: "zh: install and phonemize"
+        if: ${{ !cancelled() }}
+        run: |
+          uv venv "${RUNNER_TEMP}/venv-zh"
+          uv pip install --python "${RUNNER_TEMP}/venv-zh" "./src/python/g2p[zh]"
+          "${RUNNER_TEMP}/venv-zh/bin/python" -c "from piper_plus_g2p import get_phonemizer; p = get_phonemizer('zh'); print(p.phonemize('test'))"
 
   release-license:
     if: startsWith(github.ref, 'refs/tags/python-g2p-v') || github.event_name == 'workflow_dispatch'
