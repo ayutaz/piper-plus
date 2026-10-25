@@ -50,6 +50,7 @@ Mirrors: see ``test_speaker_encoder_parity.cpp`` and friends.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 
@@ -64,6 +65,30 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _FIXTURE_PATH = _REPO_ROOT / "test" / "fixtures" / "speaker_encoder_golden.json"
+
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = pytest.mark.unit
+
+# audio_utils.py still computes the ECAPA front end (n_fft=512) while #579 moved
+# the fixture and the Rust / Go / C# / WASM / C++ encoders to n_fft=400,
+# frame-major, CMVN. This file had no marker, so CI never ran it and the
+# divergence went unnoticed. strict: fixing #857 makes these pass, and then the
+# xfail has to come off.
+PYTHON_FRONT_END_DIVERGES = pytest.mark.xfail(
+    strict=True,
+    reason="#857: audio_utils.py front end (n_fft=512) differs from the golden fixture",
+)
+
+# Without scipy, _resample falls back to np.linspace(0, len - 1, n), which pins
+# both ends instead of stepping by from_rate / to_rate like the generator and
+# every runtime; the last samples then differ by ~0.11. src/python installed
+# with only [test,inference] (the Windows job, ci.yml) has no scipy.
+LINEAR_RESAMPLE_DIVERGES = pytest.mark.xfail(
+    importlib.util.find_spec("scipy") is None,
+    strict=True,
+    reason="#857: the linear resample fallback differs from the golden fixture",
+)
 
 
 @pytest.fixture(scope="module")
@@ -139,6 +164,7 @@ class TestSpeakerEncoderGoldenFixture:
 
     # -- mel params ----------------------------------------------------
 
+    @PYTHON_FRONT_END_DIVERGES
     def test_mel_params_match_golden(self, golden):
         """Default constants in audio_utils.py match the golden ``mel_params``.
 
@@ -164,6 +190,7 @@ class TestSpeakerEncoderGoldenFixture:
 
     # -- hann window ---------------------------------------------------
 
+    @PYTHON_FRONT_END_DIVERGES
     def test_hann_window_first_5_match(self, golden):
         """First 5 Hann samples agree to ~1e-5 (numpy symmetric vs golden
         periodic differ negligibly near n=0 because cos(0)=1)."""
@@ -265,6 +292,7 @@ class TestSpeakerEncoderGoldenFixture:
 
     # -- mel filterbank ------------------------------------------------
 
+    @PYTHON_FRONT_END_DIVERGES
     def test_mel_filterbank_shape(self, golden):
         from piper_train.speaker_encoder.audio_utils import (
             DEFAULT_FMAX,
@@ -285,6 +313,7 @@ class TestSpeakerEncoderGoldenFixture:
         expected_shape = tuple(golden["mel_filterbank"]["shape"])
         assert fb.shape == expected_shape
 
+    @PYTHON_FRONT_END_DIVERGES
     def test_mel_filterbank_total_sum(self, golden):
         """Total filterbank weight matches golden to high precision.
 
@@ -314,6 +343,7 @@ class TestSpeakerEncoderGoldenFixture:
             f"(rel_err={rel_err:.3e})"
         )
 
+    @PYTHON_FRONT_END_DIVERGES
     def test_mel_filterbank_band_sums(self, golden):
         """Per-band sums largely agree, but a handful of bands differ by
         <= 0.5 because of the float32 rounding of ``mel_points``.
@@ -371,6 +401,7 @@ class TestSpeakerEncoderGoldenFixture:
 
     # -- mel spectrogram test cases -----------------------------------
 
+    @PYTHON_FRONT_END_DIVERGES
     def test_440hz_sine_test_case(self, golden):
         """440 Hz / 1 s: shape and dominant-band parity.
 
@@ -429,6 +460,7 @@ class TestSpeakerEncoderGoldenFixture:
             f"440 Hz sine: dominant mel band should be near bin 15, got {py_dominant}"
         )
 
+    @PYTHON_FRONT_END_DIVERGES
     def test_1000hz_sine_test_case(self, golden):
         """1000 Hz / 0.5 s: structural + corner parity."""
         from piper_train.speaker_encoder.audio_utils import (
@@ -462,6 +494,7 @@ class TestSpeakerEncoderGoldenFixture:
             f"dominant ({dominant_440}) on the mel scale"
         )
 
+    @PYTHON_FRONT_END_DIVERGES
     def test_multitone_test_case(self, golden):
         """Multi-tone (200+600+2000 Hz): structural mel diversity."""
         from piper_train.speaker_encoder.audio_utils import compute_mel_spectrogram
@@ -501,6 +534,7 @@ class TestSpeakerEncoderGoldenFixture:
 
     # -- resample test case --------------------------------------------
 
+    @LINEAR_RESAMPLE_DIVERGES
     def test_resample_48k_to_16k_test_case(self, golden):
         """48 kHz -> 16 kHz resample matches golden closely.
 

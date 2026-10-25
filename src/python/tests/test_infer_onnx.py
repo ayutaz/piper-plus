@@ -19,6 +19,10 @@ from piper_train.infer_onnx import (
     text_to_phoneme_ids_and_prosody,
 )
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = pytest.mark.unit
+
 
 @pytest.mark.unit
 class TestTextToPhonemeIdsAndProsody:

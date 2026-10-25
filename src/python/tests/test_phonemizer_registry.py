@@ -13,6 +13,10 @@ from piper_plus_g2p import (
 # EnglishProsodyInfo was always an alias for ProsodyInfo
 EnglishProsodyInfo = ProsodyInfo
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = pytest.mark.unit
+
 
 class TestProsodyInfoUnification:
     """ProsodyInfo is shared across languages."""

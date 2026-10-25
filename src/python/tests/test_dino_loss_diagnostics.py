@@ -25,6 +25,10 @@ import torch  # noqa: E402
 
 from piper_train.vits.losses import dino_loss  # noqa: E402
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = [pytest.mark.unit, pytest.mark.training]
+
 
 @pytest.fixture
 def normal_inputs():

@@ -23,6 +23,10 @@ _SCRIPT_PATH = _REPO_ROOT / "scripts" / "check_onnx_inputs.py"
 onnx = pytest.importorskip("onnx")
 pytest.importorskip("onnxruntime")
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = pytest.mark.unit
+
 
 def _load_check_module():
     """Load scripts/check_onnx_inputs.py as a module."""

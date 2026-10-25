@@ -33,6 +33,10 @@ except ImportError:
         allow_module_level=True,
     )
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = [pytest.mark.unit, pytest.mark.training]
+
 
 class TestDispatcherDecision:
     """Confirm `_use_super_mas` predicate routes correctly."""

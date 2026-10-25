@@ -20,7 +20,13 @@ try:
 except ImportError:
     torch = None
 
-pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.training,
+    pytest.mark.skipif(torch is None, reason="torch not installed"),
+]
 
 # Path to checkpoint for flow.reverse diagnostic.
 # Set PIPER_PLUS_FLOW_DEBUG_CKPT env var to point at an actual local checkpoint.

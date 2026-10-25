@@ -29,6 +29,10 @@ from piper_train.vits.lightning import VitsModel  # noqa: E402
 # Single-rank (DDP 未初期化) 挙動
 # ---------------------------------------------------------------------------
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = [pytest.mark.unit, pytest.mark.training]
+
 
 class TestSingleRank:
     """torch.distributed が初期化されていない環境での挙動"""
@@ -290,8 +294,7 @@ class TestDUpdateIntervalNaNSkip:
             skip_counts[interval] = skip_count
 
         assert skip_counts[1] == skip_counts[2], (
-            f"NaN-skip 回数は d_update_interval に依存しないはず: "
-            f"{skip_counts}"
+            f"NaN-skip 回数は d_update_interval に依存しないはず: {skip_counts}"
         )
         assert skip_counts[1] == 1, (
             "step=2 の planted NaN がちょうど 1 回 skip として記録される"

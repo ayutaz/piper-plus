@@ -26,6 +26,10 @@ _FIXTURE_DIR = _REPO_ROOT / "tests" / "fixtures" / "mb_istft_speaker_embedding"
 _FIXTURE_MODEL = _FIXTURE_DIR / "model.onnx"
 _FIXTURE_BUILDER = _FIXTURE_DIR / "build_fixture.py"
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = pytest.mark.unit
+
 
 def _ensure_fixture() -> Path:
     if _FIXTURE_MODEL.exists():

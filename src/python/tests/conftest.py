@@ -579,3 +579,33 @@ def inference_params():
         "length_scale": 1.0,
         "noise_scale_w": 0.5,
     }
+
+
+# ---------------------------------------------------------------------------
+# Every test must carry a marker that a CI step selects
+# ---------------------------------------------------------------------------
+# python-tests.yml runs this directory only through `-m` expressions built on
+# `unit`, `integration` and `benchmark`. A test with none of them is collected
+# and then deselected by every step, so it never runs: 274 tests (25 files,
+# including the Super-MAS dispatch guard written after the v8 run lost 80
+# epochs) never appeared in a CI log. Fail the collection instead.
+# scripts/check_python_test_selection.py checks the other half: that the CI
+# expressions together select every collected test.
+SELECTABLE_MARKERS = frozenset({"unit", "integration", "benchmark"})
+
+
+# tryfirst: run before `-m` deselects anything, so a run with any expression
+# still sees the unmarked tests.
+@pytest.hookimpl(tryfirst=True)
+def pytest_collection_modifyitems(config, items):
+    unmarked = [
+        item.nodeid
+        for item in items
+        if not SELECTABLE_MARKERS & {mark.name for mark in item.iter_markers()}
+    ]
+    if unmarked:
+        listing = "\n  ".join(unmarked)
+        raise pytest.UsageError(
+            "tests without a unit / integration / benchmark marker are never "
+            f"selected by CI ({len(unmarked)}):\n  {listing}"
+        )

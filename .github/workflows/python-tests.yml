@@ -35,6 +35,8 @@ on:
       - '.github/workflows/python-tests.yml'
 
       - 'scripts/check_python_run_test_coverage.py'
+      - 'scripts/check_python_test_selection.py'
+      - 'tests/scripts/test_check_python_test_selection.py'
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
@@ -163,6 +165,25 @@ jobs:
       run: |
         cd src/python
         pytest tests/ -v --tb=short -m "training and unit" --no-cov
+
+    - name: Run benchmark tests (Unix only)
+      # The thresholds are loose (0.1 s per short sentence, RTF < 2.0); the
+      # point is that these tests run at all. No step selected them before.
+      if: runner.os != 'Windows'
+      run: |
+        cd src/python
+        pytest tests/ -v --tb=short -m "benchmark" --no-cov
+
+    - name: Check every test is selected by a CI step
+      # Collects src/python/tests once per `-m` expression above and fails
+      # when their union misses a test, or when a test has no unit /
+      # integration / benchmark marker (conftest.py). 274 tests were selected
+      # by no step until this check existed.
+      if: runner.os == 'Linux'
+      run: |
+        pip install PyYAML
+        python -m pytest tests/scripts/test_check_python_test_selection.py -q -o addopts=
+        python scripts/check_python_test_selection.py
 
     # ---------------------------------------------------------------
     # Runtime package tests (src/python_run — PyPI piper-plus)

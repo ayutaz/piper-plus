@@ -29,6 +29,10 @@ sys.path.insert(0, str(_REPO_ROOT / "src" / "python"))
 
 from piper_train import infer_onnx  # noqa: E402
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = pytest.mark.unit
+
 
 def _make_session_mock(input_names: list[str]) -> MagicMock:
     """Return a MagicMock that quacks like an onnxruntime InferenceSession.

@@ -23,6 +23,10 @@ from piper_train import extract_speaker_embedding as ese  # noqa: E402
 # _filter_for_shard
 # ---------------------------------------------------------------------------
 
+# Module-level so every test here is selected by a CI `-m` expression
+# (conftest.py rejects tests with no unit / integration / benchmark marker).
+pytestmark = [pytest.mark.unit, pytest.mark.training]
+
 
 class TestFilterForShard:
     """Validate the modulo-based shard partitioning helper."""

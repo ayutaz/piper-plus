@@ -2,6 +2,7 @@
 Performance benchmarks for phonemization and synthesis
 """
 
+import math
 import os
 import statistics
 import time
@@ -120,29 +121,52 @@ class TestPerformance:
 
         process = psutil.Process(os.getpid())
 
-        # Force garbage collection
-        gc.collect()
-
-        # Baseline memory
-        baseline_mem = process.memory_info().rss / 1024 / 1024  # MB
-
-        # Process increasingly large texts
-        text_sizes = [100, 1000, 10000, 50000]
+        # Process increasingly large texts. pyopenjtalk rejects input longer
+        # than 16 KB after normalization ("Input text is too long after
+        # normalization": 5461 three-byte characters at most), so stay below
+        # it, like test_stress_test.
+        text_sizes = [100, 1000, 5000]
         memory_usage = []
+
+        # The first call at each size grows RSS by one-time costs (allocator
+        # arenas, OpenJTalk buffers): +3.1 MB for 1000 chars on the first
+        # call vs +0.4 MB once warm. Warm every size up first, and clear the
+        # phonemizer's LRU cache before each measured call: a cache hit does
+        # no work and would measure 0 MB.
+        from piper_plus_g2p import japanese as _ja
+
+        for size in text_sizes:
+            _phonemize_japanese("あ" * size)
+        gc.collect()
+        baseline_mem = process.memory_info().rss / 1024 / 1024
+
+        # Even when warm, one call can move RSS by a one-time step as the
+        # allocator returns memory to the OS or takes it back: on CI
+        # (ubuntu-24.04) 1000 chars measured -7.7 MB and the next 5000 chars
+        # +9.5 MB (at most +10.6 MB), while WSL measured 0-2 MB. A leak grows
+        # RSS on every call, so measure the average growth over enough calls
+        # that a step of one_time_step_mb stays under the per-call budget.
+        # A planted leak of 5 MB per call (5000 chars) measures 4.75 MB.
+        one_time_step_mb = 20.0
 
         for size in text_sizes:
             text = "あ" * size
+            budget_mb = size * 0.001
+            calls = max(20, math.ceil(one_time_step_mb / budget_mb))
 
             # Measure memory before
             gc.collect()
             mem_before = process.memory_info().rss / 1024 / 1024
 
             # Process text
-            phonemes = _phonemize_japanese(text)
+            for _ in range(calls):
+                _ja._phonemize_core_cached.cache_clear()
+                phonemes = _phonemize_japanese(text)
 
             # Measure memory after
+            gc.collect()
             mem_after = process.memory_info().rss / 1024 / 1024
-            mem_increase = mem_after - mem_before
+            mem_increase = (mem_after - mem_before) / calls
 
             memory_usage.append(
                 {
@@ -153,12 +177,12 @@ class TestPerformance:
             )
 
             print(f"\nText size: {size} chars")
-            print(f"Memory increase: {mem_increase:.2f}MB")
+            print(f"Memory increase: {mem_increase:.3f}MB per call ({calls} calls)")
             print(f"Output size: {len(phonemes)} phonemes")
 
             # Memory usage should be reasonable
-            assert mem_increase < size * 0.001, (
-                f"Memory usage too high: {mem_increase:.2f}MB for {size} chars"
+            assert mem_increase < budget_mb, (
+                f"Memory usage too high: {mem_increase:.3f}MB per call for {size} chars"
             )
 
             # Clean up
