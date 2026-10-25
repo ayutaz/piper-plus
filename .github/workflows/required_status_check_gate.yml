@@ -118,6 +118,7 @@ on:
       - Runtime Parity Deep
       - rust-tests
       - sbom
+      - Scripts Tests
       - Secret Scan
       - Security Audit
       - Swedish LID Sync Gate

@@ -5,6 +5,11 @@ if(NOT DEFINED PREFIX)
   message(FATAL_ERROR "Usage: cmake -DPREFIX=<install_prefix> -P verify_install_layout.cmake")
 endif()
 
+# A native Windows path (C:\Users\...) would reach check_exists() with its
+# backslashes, where macro argument substitution reads `\U` as an escape and
+# fails. Use the CMake form (forward slashes) everywhere below.
+file(TO_CMAKE_PATH "${PREFIX}" PREFIX)
+
 set(_errors 0)
 
 macro(check_exists path description)
