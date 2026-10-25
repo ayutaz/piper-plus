@@ -8,7 +8,8 @@
 //   * src/index.js は public API の Single Source of Truth。
 //     `export const` で公開された数値定数は、ここから抽出して
 //     types/index.d.ts に projection する (ort_session/contract.json と
-//     同様のパターン)。
+//     同様のパターン)。 src/index.js が `./short-text.js` から re-export
+//     する定数 (MIN_PHONEME_IDS 等) も含める。
 //   * types/index.d.ts には `// AUTO-GENERATED CONSTANTS START/END` で
 //     囲まれたブロックを 1 つだけ置き、その中身が完全に置換される。
 //     ブロック外 (interface / class / 型情報) は手動編集領域。
@@ -74,6 +75,33 @@ function parseExports(source) {
   return out;
 }
 
+// Local modules whose re-exported `export const` declarations are projected
+// too. short-text.js holds the short-text constants that used to be declared
+// in src/index.js. timing.js is not listed: DEFAULT_HOP_LENGTH is declared by
+// hand next to the timing types in types/index.d.ts.
+const RE_EXPORT_MODULES = new Set(['./short-text.js']);
+
+/**
+ * Constants that src/index.js re-exports from RE_EXPORT_MODULES
+ * (`export { A, B } from "./short-text.js";`). They are part of the public
+ * API too, so their `export const` declarations are read from that module.
+ */
+function parseReExports(source) {
+  const re = /^\s*export\s*\{([^}]*)\}\s*from\s*["'](\.\/[^"']+)["']/gm;
+  const out = [];
+  for (const m of source.matchAll(re)) {
+    if (!RE_EXPORT_MODULES.has(m[2])) continue;
+    const names = new Set(
+      m[1].split(',').map((n) => n.trim()).filter(Boolean),
+    );
+    const modSource = readFileSync(resolve(dirname(SRC_INDEX), m[2]), 'utf-8');
+    for (const entry of parseExports(modSource)) {
+      if (names.has(entry.name)) out.push(entry);
+    }
+  }
+  return out;
+}
+
 /**
  * Heuristic type inference from RHS expression. Returns a TypeScript type
  * string. We keep this conservative: integers / floats / aliases all become
@@ -129,7 +157,7 @@ function main() {
   const checkMode = process.argv.includes('--check');
 
   const sourceContent = readFileSync(SRC_INDEX, 'utf-8');
-  const entries = parseExports(sourceContent);
+  const entries = [...parseExports(sourceContent), ...parseReExports(sourceContent)];
   if (entries.length === 0) {
     throw new Error('No `export const NAME = ...` declarations found in src/index.js');
   }
