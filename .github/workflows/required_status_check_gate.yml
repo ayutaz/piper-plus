@@ -47,16 +47,16 @@ on:
       - Build piper-phonemize Windows wheels
       - Bundle size gate
       - C# CI
-      - C++ ABI Compliance Check
-      - C++ Lint
-      - C++ Tests
+      - 'C\+\+ ABI Compliance Check'
+      - 'C\+\+ Lint'
+      - 'C\+\+ Tests'
       - CHANGELOG Format
       - CI
       - clang-tidy
       - CLI and Python consumer contracts
       - CLI Help / Docs Drift Gate
       - CLI Help Extract
-      - Co-install Smoke (piper-tts + piper-plus)
+      - 'Co-install Smoke (piper-tts \+ piper-plus)'
       - CodeQL
       - codespell
       - Commitlint
@@ -69,7 +69,7 @@ on:
       - Docker Build Validate
       - Docker Tests
       - docker-distroless-trial
-      - E2E Issue
+      - 'E2E Issue #426 (speaker_embedding)'
       - Extended contract gates
       - First-PR Fast Lane
       - Forward-compat Fuzz
@@ -82,7 +82,7 @@ on:
       - Go CI
       - hadolint
       - Inference Input Contract Gate
-      - Integration Tests (Issue
+      - 'Integration Tests (Issue #426)'
       - Kotlin G2P CI
       - License Compliance Check
       - link-check
@@ -126,6 +126,7 @@ on:
       - Test HF Space Build
       - Test Japanese TTS
       - Test Multilingual TTS
+      - Test Threshold Relaxation Gate
       - Test WebAssembly
       - Timing Monotonicity
       - Trivy Container Scan

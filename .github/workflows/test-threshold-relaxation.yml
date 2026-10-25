@@ -1,0 +1,53 @@
+name: "Test Threshold Relaxation Gate"
+
+# Fails a pull request that weakens a numeric threshold in a Python test
+# (a smaller `>` floor, a larger `<` ceiling, a wider tolerance, fewer
+# assertAlmostEqual places) without a `# threshold-relaxed: <evidence>`
+# comment on or just above the assertion.
+#
+# The pre-commit hook `test-threshold-relaxation` checks the staged diff, but
+# only for those who installed the hooks; this workflow checks the whole
+# pull request. In the PQMF incident (PR #320) the acceptance criterion was
+# relaxed from -90 dB to > 5 dB and the bug shipped for 15 months.
+#
+# No `paths:` filter: the check is a few seconds and test files live in many
+# directories.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  threshold-relaxation:
+    name: No unjustified test threshold relaxation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6.1.0
+        with:
+          # The merge base of the base commit and the PR's merge commit.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+
+      - name: Install pytest
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Gate tests
+        # pytest.ini's addopts add coverage flags for src/python.
+        run: python -m pytest tests/scripts/test_check_test_threshold_relaxation.py -q -o addopts=
+
+      - name: Check the pull request's diff
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python scripts/check_test_threshold_relaxation.py --base "$BASE_SHA"
