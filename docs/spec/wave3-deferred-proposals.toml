@@ -578,7 +578,7 @@ effort = "L (~2 週間)"
 status = "proposal"
 description = """
 7 runtime の public API を JSON dump し、 cross-runtime drift を detect。
-現状 Rust (cargo public-api) / Go (gorelease) / C# (PublicApiAnalyzer)
+現状 Rust (cargo public-api) / Go (apidiff) / C# (PublicApiAnalyzer)
 のみ track、 Python / WASM / C / Kotlin / Swift は全くの blind。
 """
 implementation = """
