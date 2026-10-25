@@ -1,0 +1,47 @@
+{
+  "name": "piper-dev",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": ["refs/heads/dev*"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {"type": "deletion"},
+    {"type": "non_fast_forward"},
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 0,
+        "dismiss_stale_reviews_on_push": false,
+        "required_reviewers": [],
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": true,
+        "require_extra_approval_for_unattributed_changes": true,
+        "allowed_merge_methods": ["squash"]
+      }
+    },
+    {
+      "type": "copilot_code_review",
+      "parameters": {
+        "review_on_push": false,
+        "review_draft_pull_requests": false
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": false,
+        "do_not_enforce_on_create": false,
+        "required_status_checks": [
+          {"context": "ci-required", "integration_id": 15368},
+          {"context": "required-gate/all-workflows", "integration_id": 15368}
+        ]
+      }
+    }
+  ],
+  "bypass_actors": []
+}

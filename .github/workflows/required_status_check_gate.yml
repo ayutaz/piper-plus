@@ -114,6 +114,7 @@ on:
       - Release Shared Library
       - RTF Regression
       - Ruff Version Sync Gate
+      - Rulesets
       - Runtime Parity Deep
       - rust-tests
       - sbom
