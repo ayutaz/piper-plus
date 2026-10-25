@@ -97,13 +97,16 @@ def render_markdown(rows: list[dict], threshold: float) -> str:
             f"| {r['status']} | {r['lang']} | {mb(r['baseline_mb'])} | {mb(r['observed_mb'])} | {delta} |"
         )
     failing = sum(1 for r in rows if r["status"] in FAILING_STATUSES)
+    note = (
+        "_MISSING means the benchmark produced no peak_memory_mb; NO-BASELINE means "
+        "tests/fixtures/memory-baseline.json has no value. Both fail the job, like FAIL. "
+        "After an intended change, update the baseline in the same PR._"
+    )
     lines += [
         "",
         f"Summary: {failing} failing / {len(rows) - failing} ok.",
         "",
-        "_MISSING means the benchmark produced no peak_memory_mb; NO-BASELINE means "
-        "tests/fixtures/memory-baseline.json has no value. Both fail the job, like FAIL. "
-        "After an intended change, update the baseline in the same PR._",
+        note,
     ]
     return "\n".join(lines) + "\n"
 
