@@ -1608,6 +1608,9 @@ mod tests {
     }
 
     #[test]
+    // Parsing the whole 3.6 MB dictionary does not finish within the 60-minute
+    // miri job (rust-miri-nightly.yml); `cargo test` runs it in under a second.
+    #[cfg_attr(miri, ignore = "parses the whole CMU dictionary; too slow under miri")]
     fn test_from_json_bytes_reads_the_canonical_dictionary() {
         let p = EnglishPhonemizer::from_json_bytes(include_bytes!("../data/cmudict_data.json"))
             .expect("data/cmudict_data.json must parse");
