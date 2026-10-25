@@ -276,14 +276,14 @@ jobs:
       - name: Publish self-contained binary
         shell: bash
         run: |
-          PUBLISH_ARGS="-c Release -r ${{ matrix.rid }} --self-contained true"
-          PUBLISH_ARGS="$PUBLISH_ARGS -p:PublishSingleFile=true -p:PublishTrimmed=true"
+          PUBLISH_ARGS=(-c Release -r ${{ matrix.rid }} --self-contained true)
+          PUBLISH_ARGS+=(-p:PublishSingleFile=true -p:PublishTrimmed=true)
           if [ "${{ matrix.cross }}" = "true" ]; then
-            PUBLISH_ARGS="$PUBLISH_ARGS -p:PublishReadyToRun=false"
+            PUBLISH_ARGS+=(-p:PublishReadyToRun=false)
           else
-            PUBLISH_ARGS="$PUBLISH_ARGS -p:PublishReadyToRun=true"
+            PUBLISH_ARGS+=(-p:PublishReadyToRun=true)
           fi
-          dotnet publish src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj $PUBLISH_ARGS -o publish/
+          dotnet publish src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj "${PUBLISH_ARGS[@]}" -o publish/
 
       - name: Verify binary exists
         run: ls -lh publish/
@@ -344,7 +344,7 @@ jobs:
           mkdir -p build
           cd build
           cmake ..
-          make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
+          make -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)"
 
       - name: Download OpenJTalk dictionary
         run: |

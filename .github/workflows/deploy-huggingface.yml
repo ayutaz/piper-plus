@@ -265,21 +265,23 @@ jobs:
 
       - name: Deploy summary
         run: |
-          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Successfully deployed to Hugging Face Spaces" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Space URL**: https://huggingface.co/spaces/ayousanz/piper-plus-demo" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Deployment Summary"
+            echo ""
+            echo "✅ Successfully deployed to Hugging Face Spaces"
+            echo ""
+            echo "**Space URL**: https://huggingface.co/spaces/ayousanz/piper-plus-demo"
+            echo ""
 
-          # Show model information
-          echo "**Deployed Models**:" >> $GITHUB_STEP_SUMMARY
-          if [ -f "hf-space-deploy/models/multilingual-test-medium.onnx" ]; then
-            echo "- Multilingual Model: $(du -h hf-space-deploy/models/multilingual-test-medium.onnx | cut -f1)" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
+            # Show model information
+            echo "**Deployed Models**:"
+            if [ -f "hf-space-deploy/models/multilingual-test-medium.onnx" ]; then
+              echo "- Multilingual Model: $(du -h hf-space-deploy/models/multilingual-test-medium.onnx | cut -f1)"
+            fi
+            echo ""
 
-          echo "**Deployed files**:" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          find hf-space-deploy -type f | sort >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "**Deployed files**:"
+            echo "\`\`\`"
+            find hf-space-deploy -type f | sort
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"

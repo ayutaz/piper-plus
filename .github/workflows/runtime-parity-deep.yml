@@ -147,10 +147,10 @@ jobs:
         # job sees the same library layout.
         run: |
           if [ ! -f onnxruntime/lib/libonnxruntime.so ]; then
-            wget -q https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-x64-${ORT_VERSION}.tgz
-            tar xzf onnxruntime-linux-x64-${ORT_VERSION}.tgz
+            wget -q "https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-x64-${ORT_VERSION}.tgz"
+            tar xzf "onnxruntime-linux-x64-${ORT_VERSION}.tgz"
             mkdir -p onnxruntime/lib
-            cp onnxruntime-linux-x64-${ORT_VERSION}/lib/libonnxruntime.so* onnxruntime/lib/
+            cp "onnxruntime-linux-x64-${ORT_VERSION}"/lib/libonnxruntime.so* onnxruntime/lib/
           fi
 
       - name: Build piper-plus (Go CLI)
@@ -227,7 +227,7 @@ jobs:
           mkdir -p build
           cd build
           cmake -DCMAKE_BUILD_TYPE=Release ..
-          make -j$(nproc) piper
+          make -j"$(nproc)" piper
 
       - name: Synthesize via --json-input
         run: |

@@ -25,23 +25,37 @@ jobs:
     steps:
       - uses: actions/checkout@v6.1.0
 
-      - name: Download actionlint
-        id: get_actionlint
+      - name: Install actionlint and shellcheck (pinned)
+        # Pinned so CI and local runs report the same findings: the runner's
+        # preinstalled shellcheck and the "latest" download script both drift.
+        # Keep ACTIONLINT_VERSION in sync with the actionlint rev in
+        # .pre-commit-config.yaml (tests/scripts/test_actionlint_workflow.py).
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+          SHELLCHECK_VERSION: 0.11.0
+          SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
         run: |
-          bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
-          echo "executable=$(pwd)/actionlint" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/lint"
+          cd "$RUNNER_TEMP/lint"
+          al="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLo "$al" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${al}"
+          echo "${ACTIONLINT_SHA256}  ${al}" | sha256sum -c -
+          tar xzf "$al" actionlint
+          sc="shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          curl -fsSLo "$sc" "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/${sc}"
+          echo "${SHELLCHECK_SHA256}  ${sc}" | sha256sum -c -
+          tar xJf "$sc"
+          ./actionlint -version
+          "./shellcheck-v${SHELLCHECK_VERSION}/shellcheck" --version
         shell: bash
 
       - name: Check workflow files
-        # Workflows are validated for:
-        #   - YAML syntax
-        #   - Action input/output types
-        #   - Shell script (bash/sh/pwsh) via shellcheck integration
-        #   - Workflow trigger types
-        #   - Job dependencies
-        # Initial pass: continue-on-error so existing 56 workflows can be
-        # incrementally cleaned up. Once baseline is clean, remove this flag.
+        # YAML syntax, action inputs/outputs, expressions, job dependencies,
+        # and every bash `run:` script through shellcheck. A finding fails
+        # the job.
         run: |
-          ${{ steps.get_actionlint.outputs.executable }} -color
+          lint="$RUNNER_TEMP/lint"
+          "$lint/actionlint" -color -shellcheck "$lint/shellcheck-v0.11.0/shellcheck"
         shell: bash
-        continue-on-error: true

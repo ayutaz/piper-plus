@@ -54,16 +54,16 @@ jobs:
         shell: bash
         run: |
           if [ -n "${{ inputs.artifact-name }}" ]; then
-            echo "name=${{ inputs.artifact-name }}" >> $GITHUB_OUTPUT
+            echo "name=${{ inputs.artifact-name }}" >> "$GITHUB_OUTPUT"
           else
-            echo "name=piper-${{ runner.os }}-${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "name=piper-${{ runner.os }}-${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set build path
         id: set-build-path
         shell: bash
         run: |
-          echo "path=${{ github.workspace }}/build" >> $GITHUB_OUTPUT
+          echo "path=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
       # Cache for Linux dependencies
       - name: Cache Linux dependencies
@@ -142,16 +142,16 @@ jobs:
           cd build
 
           # Set CMAKE flags
-          CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=${{ inputs.build-type }}"
+          CMAKE_FLAGS=("-DCMAKE_BUILD_TYPE=${{ inputs.build-type }}")
           if [ "${{ inputs.include-tests }}" = "true" ]; then
-            CMAKE_FLAGS="$CMAKE_FLAGS -DBUILD_TESTS=ON"
+            CMAKE_FLAGS+=(-DBUILD_TESTS=ON)
           fi
 
-          echo "Building with flags: $CMAKE_FLAGS"
+          echo "Building with flags: ${CMAKE_FLAGS[*]}"
 
           # Retry cmake configuration up to 3 times with delay for rate limiting
           for i in 1 2 3; do
-            if cmake .. $CMAKE_FLAGS; then
+            if cmake .. "${CMAKE_FLAGS[@]}"; then
               break
             else
               echo "CMake configuration failed (attempt $i/3)"
@@ -165,7 +165,7 @@ jobs:
             fi
           done
 
-          if ! make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu); then
+          if ! make -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)"; then
             echo "❌ Build failed"
             exit 1
           fi
@@ -189,6 +189,7 @@ jobs:
 
       - name: Build piper (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path build | Out-Null
           cd build
@@ -459,12 +460,15 @@ jobs:
           # Create a debug info file
           echo "Distribution package contents:" > dist-contents.txt
           find dist -type f | sort >> dist-contents.txt
-          echo "" >> dist-contents.txt
-          echo "Build directory OpenJTalk search:" >> dist-contents.txt
+          {
+            echo ""
+            echo "Build directory OpenJTalk search:"
+          } >> dist-contents.txt
           find build -name "open_jtalk" -type f 2>/dev/null | head -10 >> dist-contents.txt || echo "No open_jtalk found in build" >> dist-contents.txt
 
       - name: Create distribution package (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist/piper-plus/bin
           New-Item -ItemType Directory -Force -Path dist/piper-plus/lib

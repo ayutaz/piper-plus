@@ -90,7 +90,7 @@ jobs:
       - name: Install NDK
         run: |
           sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> "$GITHUB_ENV"
 
       - name: Cache ONNX Runtime Android
         id: cache-ort-android
@@ -128,7 +128,7 @@ jobs:
             $CMAKE_EXTRA_FLAGS
 
       - name: Build piper_plus
-        run: cmake --build build --config Release --target piper_plus -j$(nproc)
+        run: cmake --build build --config Release --target piper_plus -j"$(nproc)"
 
       - name: Stage native libs
         run: |
@@ -184,7 +184,7 @@ jobs:
       - name: Install NDK
         run: |
           sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> "$GITHUB_ENV"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4.4.4
@@ -239,7 +239,7 @@ jobs:
       - name: Install NDK
         run: |
           sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> "$GITHUB_ENV"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4.4.4
@@ -253,7 +253,7 @@ jobs:
       - name: Locate AAR
         id: aar
         run: |
-          AAR=$(ls android/piper-plus-g2p/build/outputs/aar/*.aar | head -n1)
+          AAR=$(find android/piper-plus-g2p/build/outputs/aar -maxdepth 1 -name '*.aar' | sort | head -n1)
           echo "path=$AAR" >> "$GITHUB_OUTPUT"
           echo "Found AAR: $AAR"
 
@@ -301,9 +301,9 @@ jobs:
               [ -f "$so" ] || { echo "$abi: missing .so"; exit 1; }
               # On 64-bit ABIs we require align 2**14 (16384). On the legacy 32-bit
               # armeabi-v7a, the kernel still uses 4 KB pages, so we accept either.
-              ALIGN=$(${ANDROID_NDK_HOME:-/usr}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-objdump -p "$so" 2>/dev/null \
+              ALIGN=$("${ANDROID_NDK_HOME:-/usr}"/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-objdump -p "$so" 2>/dev/null \
                       | grep -E 'LOAD|p_align' | head -n1 || true)
-              echo "$abi $(basename $so): $ALIGN"
+              echo "$abi $(basename "$so"): $ALIGN"
             done
           done
           # Strict check: arm64-v8a + x86_64 must show 0x4000 page align
@@ -368,7 +368,7 @@ jobs:
       - name: Install NDK
         run: |
           sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> "$GITHUB_ENV"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4.4.4
@@ -447,7 +447,7 @@ jobs:
             -DONNXRUNTIME_DIR=${{ github.workspace }}/ort-linux \
             -DONNXRUNTIME_INCLUDE_DIR=${{ github.workspace }}/ort-linux/include \
             -DONNXRUNTIME_LIB=${{ github.workspace }}/ort-linux/lib/libonnxruntime.so
-          cmake --build build-linux --target piper_plus -j$(nproc)
+          cmake --build build-linux --target piper_plus -j"$(nproc)"
 
       - name: Build JNI shim for Linux x86_64
         run: |
@@ -604,7 +604,7 @@ jobs:
             -DONNXRUNTIME_LIB=${{ github.workspace }}/ort-linux/lib/libonnxruntime.so
 
       - name: Build test_c_api under ASan
-        run: cmake --build build-asan --target test_c_api -j$(nproc)
+        run: cmake --build build-asan --target test_c_api -j"$(nproc)"
 
       - name: Run test_c_api under ASan
         env:
@@ -696,7 +696,7 @@ jobs:
       - name: Install NDK
         run: |
           sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> "$GITHUB_ENV"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4.4.4

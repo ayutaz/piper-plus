@@ -56,7 +56,7 @@ jobs:
       - name: Install NDK
         run: |
           sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> "$GITHUB_ENV"
       - name: Cache ONNX Runtime Android
         id: cache-ort
         uses: actions/cache@v4.3.0
@@ -90,7 +90,7 @@ jobs:
             -DONNXRUNTIME_LIB=${{ github.workspace }}/ort-android/lib/libonnxruntime.so \
             $CMAKE_EXTRA_FLAGS
       - name: Build piper_plus
-        run: cmake --build build --config Release --target piper_plus -j$(nproc)
+        run: cmake --build build --config Release --target piper_plus -j"$(nproc)"
       - name: Stage native libs
         run: |
           mkdir -p staging/${{ matrix.abi }}
@@ -128,7 +128,7 @@ jobs:
       - name: Install NDK
         run: |
           sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> "$GITHUB_ENV"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4.4.4
@@ -156,7 +156,7 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          if [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/kotlin-g2p-v* ]]; then
+          if [ "${{ github.event_name }}" = "push" ] && [[ "$GITHUB_REF" == refs/tags/kotlin-g2p-v* ]]; then
             VERSION="${GITHUB_REF##refs/tags/kotlin-g2p-v}"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.version }}"
