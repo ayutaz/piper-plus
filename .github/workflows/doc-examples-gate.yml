@@ -59,7 +59,6 @@ jobs:
 
       - name: Execute (syntax-only)
         id: execute
-        continue-on-error: true
         run: |
           # Pre-seed both files so a script crash before they're written
           # doesn't turn the sticky-comment / upload-artifact steps into
@@ -75,10 +74,11 @@ jobs:
             > /tmp/doc-examples-report.json
           python scripts/check_doc_examples.py execute \
             --report /tmp/doc-examples-report.json \
-            --sticky-comment /tmp/doc-examples-sticky.md
+            --sticky-comment /tmp/doc-examples-sticky.md \
+            --strict
 
       - name: Post sticky comment (PR only)
-        if: github.event_name == 'pull_request' && hashFiles('/tmp/doc-examples-sticky.md') != ''
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && hashFiles('/tmp/doc-examples-sticky.md') != '' }}
         uses: marocchino/sticky-pull-request-comment@v2.9.4
         with:
           header: doc-examples-gate

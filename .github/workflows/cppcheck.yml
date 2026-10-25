@@ -33,6 +33,7 @@ jobs:
 
       - name: Run cppcheck
         run: |
+          set -o pipefail
           cppcheck --enable=warning,style,performance,portability \
             --suppress=missingIncludeSystem \
             --suppress=missingInclude \
@@ -40,12 +41,14 @@ jobs:
             --suppress=*:*/_deps/* \
             --suppress=*:*/build/* \
             --inline-suppr \
-            --error-exitcode=0 \
+            --error-exitcode=1 \
             --xml --xml-version=2 \
             --output-file=cppcheck-report.xml \
             -j 4 \
             src/cpp/ 2>&1 | tee cppcheck-output.txt
-          # 初期 baseline は warn のみ
+        # The step fails on any finding; continue-on-error still ignores it
+        # until the backlog is fixed (tracked in
+        # docs/spec/continue-on-error-allowlist.toml).
         continue-on-error: true
 
       - name: Upload cppcheck report

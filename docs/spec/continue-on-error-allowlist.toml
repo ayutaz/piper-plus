@@ -1,0 +1,194 @@
+# continue-on-error allowlist — every `continue-on-error` in .github/workflows
+# that is not literally `false` must have an entry here.
+#
+# Enforced by scripts/check_continue_on_error.py (pre-commit hook
+# `continue-on-error-allowlist` and tests/scripts/test_check_continue_on_error.py,
+# which scripts-tests.yml runs on every PR and push).
+#
+# Why: in 2026-10 the workflows had 62 continue-on-error keys. 37 of them hid
+# checks whose results nobody read; several had been failing on every run
+# (sbom npm, trivy-docker, the RTF wasm cell, generate-combined-report) and
+# the ones promising "warn-only until the baseline settles, then strict"
+# were about five months past that point.
+#
+# Fields:
+#   workflow  file name under .github/workflows/
+#   job       job id
+#   step      step `name` (or `uses` when unnamed); omit for a job-level key
+#   kind      "harmless" — the step cannot hide a check result: a cache
+#                          restore, an artifact / report upload, an upload to
+#                          an external coverage service, a display-only reporter.
+#             "tracked"  — a check whose failure is ignored on purpose for now.
+#                          Requires `expires` (YYYY-MM-DD). After that date the
+#                          gate fails until the entry is removed (fix the check
+#                          and drop continue-on-error) or renewed with a new
+#                          reason in a reviewed PR.
+#   reason    why the failure may be ignored (and, for tracked, what has to
+#             happen before the key can go)
+#
+# A tracked check must not also hide its result inside the step (`|| true`,
+# `--error-exitcode=0`, a pipe without pipefail): the step has to fail when
+# the check fails, so the failure is visible on the run and removing
+# continue-on-error turns it into a real gate.
+
+[meta]
+spec_version = 1
+last_updated = "2026-10-25"
+applies_to = ["github-actions"]
+canonical_reference = ".github/workflows/*.yml"
+# Unknown entry fields fail the gate (a typo such as `expire` must not
+# silently drop the deadline).
+forward_compat_policy = "strict"
+
+# ---------------------------------------------------------------------------
+# harmless
+# ---------------------------------------------------------------------------
+
+[[entry]]
+workflow = "_build-test-cpp.yml"
+job = "build-and-test"
+step = "Upload coverage to Codecov (C++)"
+kind = "harmless"
+reason = "Upload to an external service (fail_ci_if_error: false); the tests ran in earlier steps."
+
+[[entry]]
+workflow = "ci.yml"
+job = "csharp-tests"
+step = "Cache NuGet packages"
+kind = "harmless"
+reason = "Cache restore; a miss only makes the restore slower."
+
+[[entry]]
+workflow = "ci.yml"
+job = "csharp-build"
+step = "Cache NuGet packages"
+kind = "harmless"
+reason = "Cache restore; a miss only makes the restore slower."
+
+[[entry]]
+workflow = "ci.yml"
+job = "python-tests"
+step = "Cache uv downloads"
+kind = "harmless"
+reason = "Cache restore; a miss only makes the install slower."
+
+[[entry]]
+workflow = "clang-tidy.yml"
+job = "clang-tidy"
+step = "Upload clang-tidy report"
+kind = "harmless"
+reason = "Report upload; the report only exists for push runs."
+
+[[entry]]
+workflow = "coverage-aggregation.yml"
+job = "aggregate"
+step = "Upload aggregated coverage to Codecov"
+kind = "harmless"
+reason = "Upload to an external service (fail_ci_if_error: false); each runtime's own workflow runs the tests."
+
+[[entry]]
+workflow = "cppcheck.yml"
+job = "cppcheck"
+step = "Upload cppcheck report"
+kind = "harmless"
+reason = "Report upload."
+
+[[entry]]
+workflow = "csharp-ci.yml"
+job = "build-and-test"
+step = "Cache NuGet packages"
+kind = "harmless"
+reason = "Cache restore; a miss only makes the restore slower."
+
+[[entry]]
+workflow = "csharp-ci.yml"
+job = "build-and-test"
+step = "Publish test results to GitHub Checks tab"
+kind = "harmless"
+reason = "Display only (fail-on-error: false); dotnet test's exit code fails the job."
+
+[[entry]]
+workflow = "csharp-ci.yml"
+job = "build-and-test"
+step = "Upload coverage to Codecov"
+kind = "harmless"
+reason = "Upload to an external service (fail_ci_if_error: false)."
+
+[[entry]]
+workflow = "go-ci.yml"
+job = "unit-test"
+step = "Upload coverage to Codecov"
+kind = "harmless"
+reason = "Upload to an external service; go test ran in an earlier step."
+
+[[entry]]
+workflow = "mutation-testing.yml"
+job = "csharp"
+step = "Cache NuGet packages"
+kind = "harmless"
+reason = "Cache restore; a miss only makes the restore slower."
+
+[[entry]]
+workflow = "python-tests.yml"
+job = "test"
+step = "Upload coverage to Codecov (runtime + g2p)"
+kind = "harmless"
+reason = "Upload to an external service (fail_ci_if_error: false)."
+
+[[entry]]
+workflow = "rust-tests.yml"
+job = "coverage"
+step = "Upload coverage to Codecov"
+kind = "harmless"
+reason = "Upload to an external service; the coverage run itself is an earlier step."
+
+# ---------------------------------------------------------------------------
+# tracked — ignored on purpose, with a deadline
+# ---------------------------------------------------------------------------
+
+[[entry]]
+workflow = "audio-mos-proxy.yml"
+job = "mos-proxy"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "The metrics are stubs that report zero and tests/fixtures/audio-mos-baseline.json is empty, so the job compares nothing. Implement the PESQ/STOI/UTMOS/WER proxies and record a baseline, then drop continue-on-error."
+
+[[entry]]
+workflow = "clang-tidy.yml"
+job = "clang-tidy"
+step = "Run clang-tidy on changed files (PR)"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "The first 50 files report about 2,250 warnings and 37 files fail to process (gtest / onnxruntime headers missing from the compilation database). Fix the database, settle the check list in .clang-tidy, then gate changed files."
+
+[[entry]]
+workflow = "clang-tidy.yml"
+job = "clang-tidy"
+step = "Run clang-tidy on all files (push to dev/main)"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Same backlog as the PR step (about 2,250 warnings in the first 50 files)."
+
+[[entry]]
+workflow = "cppcheck.yml"
+job = "cppcheck"
+step = "Run cppcheck"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "168-170 findings on src/cpp (155 style, mostly useStlAlgorithm; 7 performance; 3 syntaxError in tests; 2 ignoredReturnValue; 1 portability). Fix or suppress them inline, then drop continue-on-error."
+
+[[entry]]
+workflow = "license-check.yml"
+job = "go-licenses-report"
+step = "Run go-licenses (report mode, warn-only)"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Report mode only; the forbidden-license gate is deferred (wave3-deferred-proposals.toml T26). src/go/phonemize was once reported as Unknown license."
+
+[[entry]]
+workflow = "security-audit.yml"
+job = "pip-audit"
+step = "Audit root requirements"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "The root workspace (training environment, not published) reports 15 advisories in setuptools 81, torch 2.11 and transformers 4.57; the fixes need torch / huggingface-hub major moves. The published wheel is audited by the blocking 'Audit src/python_run' step."

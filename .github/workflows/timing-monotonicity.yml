@@ -31,7 +31,6 @@ jobs:
   property:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6.1.0
       - uses: actions/setup-python@v6.2.0
