@@ -37,7 +37,8 @@ pub struct SpeakerEncoder {
 impl SpeakerEncoder {
     /// Load a speaker encoder model from the given ONNX file path.
     pub fn new(model_path: &Path) -> Result<Self, PiperError> {
-        let session = Session::builder()
+        let env = crate::ort_env::environment()?;
+        let session = Session::builder(&env)
             .map_err(|e| PiperError::ModelLoad(format!("speaker encoder session builder: {e}")))?
             .with_optimization_level(GraphOptimizationLevel::Level3)
             .map_err(|e| PiperError::ModelLoad(format!("speaker encoder opt level: {e}")))?

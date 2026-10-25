@@ -69,7 +69,8 @@ impl WasmVoice {
     pub fn load_from_bytes(model_bytes: &[u8], config_json: &str) -> Result<Self, PiperError> {
         let config: VoiceConfig = parse_config(config_json)?;
 
-        let session = Session::builder()
+        let env = crate::ort_env::environment()?;
+        let session = Session::builder(&env)
             .map_err(|e| PiperError::ModelLoad(e.to_string()))?
             .commit_from_memory(model_bytes)
             .map_err(|e| PiperError::ModelLoad(e.to_string()))?;

@@ -226,7 +226,7 @@ pub fn list_devices() -> Vec<DeviceInfo> {
 /// Uses ort v2 API:
 /// ```ignore
 /// use ort::ep;
-/// let builder = Session::builder()?
+/// let builder = Session::builder(&piper_plus::ort_env::environment()?)?
 ///     .with_execution_providers([ep::CUDA::default().build()])?;
 /// ```
 pub fn configure_session_builder(
@@ -306,7 +306,7 @@ fn apply_cpu_ep(
 #[cfg(feature = "cuda")]
 fn is_cuda_available() -> bool {
     use ort::ep::{CUDA, ExecutionProvider};
-    CUDA::default().is_available().unwrap_or(false)
+    CUDA::is_available().unwrap_or(false)
 }
 
 #[cfg(feature = "cuda")]
@@ -330,7 +330,7 @@ fn configure_cuda(
 #[cfg(feature = "coreml")]
 fn is_coreml_available() -> bool {
     use ort::ep::{CoreML, ExecutionProvider};
-    CoreML::default().is_available().unwrap_or(false)
+    CoreML::is_available().unwrap_or(false)
 }
 
 #[cfg(feature = "coreml")]
@@ -353,7 +353,7 @@ fn configure_coreml(
 #[cfg(feature = "directml")]
 fn is_directml_available() -> bool {
     use ort::ep::{DirectML, ExecutionProvider};
-    DirectML::default().is_available().unwrap_or(false)
+    DirectML::is_available().unwrap_or(false)
 }
 
 #[cfg(feature = "directml")]
@@ -379,7 +379,7 @@ fn configure_directml(
 #[cfg(feature = "tensorrt")]
 fn is_tensorrt_available() -> bool {
     use ort::ep::{ExecutionProvider, TensorRT};
-    TensorRT::default().is_available().unwrap_or(false)
+    TensorRT::is_available().unwrap_or(false)
 }
 
 #[cfg(feature = "tensorrt")]
@@ -405,6 +405,11 @@ fn configure_tensorrt(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_builder() -> ort::session::builder::SessionBuilder {
+        let env = crate::ort_env::environment().expect("environment");
+        ort::session::Session::builder(&env).expect("session builder")
+    }
 
     // -----------------------------------------------------------------------
     // parse_device_string tests
@@ -717,7 +722,7 @@ mod tests {
     #[test]
     fn test_configure_cpu_returns_cpu() {
         // CPU configuration should always succeed without needing an actual model
-        let builder = ort::session::Session::builder().expect("session builder");
+        let builder = test_builder();
         let (_, actual_device) = configure_session_builder(builder, &DeviceType::Cpu).unwrap();
         assert_eq!(actual_device, DeviceType::Cpu);
     }
@@ -725,7 +730,7 @@ mod tests {
     #[test]
     fn test_configure_cpu_with_arena_allocator() {
         let ep = ort::ep::CPU::default().with_arena_allocator(true).build();
-        let builder = ort::session::Session::builder().expect("session builder");
+        let builder = test_builder();
         let result = builder.with_execution_providers([ep]);
         match result {
             Ok(_) => {}
@@ -742,7 +747,7 @@ mod tests {
     #[cfg(not(feature = "cuda"))]
     #[test]
     fn test_cuda_fallback_without_feature() {
-        let builder = ort::session::Session::builder().expect("session builder");
+        let builder = test_builder();
         let (_, actual_device) =
             configure_session_builder(builder, &DeviceType::Cuda { device_id: 0 }).unwrap();
         assert_eq!(actual_device, DeviceType::Cpu);
@@ -751,7 +756,7 @@ mod tests {
     #[cfg(not(feature = "coreml"))]
     #[test]
     fn test_coreml_fallback_without_feature() {
-        let builder = ort::session::Session::builder().expect("session builder");
+        let builder = test_builder();
         let (_, actual_device) = configure_session_builder(builder, &DeviceType::CoreML).unwrap();
         assert_eq!(actual_device, DeviceType::Cpu);
     }
@@ -759,7 +764,7 @@ mod tests {
     #[cfg(not(feature = "directml"))]
     #[test]
     fn test_directml_fallback_without_feature() {
-        let builder = ort::session::Session::builder().expect("session builder");
+        let builder = test_builder();
         let (_, actual_device) =
             configure_session_builder(builder, &DeviceType::DirectML { device_id: 0 }).unwrap();
         assert_eq!(actual_device, DeviceType::Cpu);
@@ -768,7 +773,7 @@ mod tests {
     #[cfg(not(feature = "tensorrt"))]
     #[test]
     fn test_tensorrt_fallback_without_feature() {
-        let builder = ort::session::Session::builder().expect("session builder");
+        let builder = test_builder();
         let (_, actual_device) =
             configure_session_builder(builder, &DeviceType::TensorRT { device_id: 0 }).unwrap();
         assert_eq!(actual_device, DeviceType::Cpu);
