@@ -203,20 +203,24 @@ def test_multi_line_run_block_still_works(tc):
     assert "scripts/check_pua_consistency.py" in tc.referenced_paths(text, tracked)
 
 
-def test_docstring_only_mentions_are_allowlisted_not_path_added(tc):
-    """The two ruff floors must be exempt by REASON, not by a paths: entry.
+def test_allowlist_entry_for_a_removed_workflow_is_dead(tc, monkeypatch):
+    """An entry keyed by a workflow file that no longer exists exempts nothing.
 
-    ``check_ruff_version_sync.py`` names src/python/pyproject.toml and
-    src/python/g2p/pyproject.toml in its docstring precisely to say it does
-    NOT check them (they carry ``ruff>=``, a floor, not a pin). Adding them to
-    ruff-version-sync.yml's paths: would run the gate on changes it ignores;
-    the allowlist records why instead. Pinned so the reasons cannot be
-    silently dropped in favour of a path.
+    ruff-version-sync.yml was merged into lint-gates.yml, which has no paths:
+    filter, and its entries stayed behind: the gate only checked that each
+    exempted PATH was tracked, so a key naming a deleted workflow passed.
     """
-    entries = tc.ALLOWLIST["ruff-version-sync.yml"]
-    for path in ("src/python/pyproject.toml", "src/python/g2p/pyproject.toml"):
-        assert path in entries, path
-        assert entries[path].strip(), path
+    monkeypatch.setattr(
+        tc, "ALLOWLIST", {"no-such-workflow.yml": {"README.md": "a reason"}}
+    )
+    failures = tc.check_allowlist_is_live(tc.tracked_files())
+    assert any("no-such-workflow.yml" in f and "no such workflow" in f for f in failures)
+
+
+def test_allowlist_keys_name_existing_workflows(tc):
+    for key in tc.ALLOWLIST:
+        if not key.startswith("precommit:"):
+            assert (tc.WORKFLOW_DIR / key).is_file(), key
 
 
 def test_tests_scripts_path_is_not_read_as_a_root_gate_script(tc, tmp_path, monkeypatch):

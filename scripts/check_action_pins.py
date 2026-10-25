@@ -78,7 +78,7 @@ BASELINE = REPO_ROOT / "scripts/action_pins_baseline.txt"
 
 # Files scanned, relative to the repo root. Kept in sync with the `files:`
 # pattern of the `action-pin-gate` pre-commit hook and with the `paths:`
-# filter of .github/workflows/action-pin-gate.yml.
+# filter of the former .github/workflows/action-pin-gate.yml (its steps now run in lint-gates.yml).
 TARGET_GLOBS = (
     ".github/workflows/*.yml",
     ".github/workflows/*.yaml",

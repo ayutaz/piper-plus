@@ -1,0 +1,903 @@
+name: Lint and gates
+
+# Lints and repository gates that each finish in seconds, run as steps of one
+# job. They used to be 23 workflows of one job each, and a pull request push
+# started all of them at once: GitHub Free runs 20 jobs at a time for the
+# whole account, so a few pushes in a row queued ubuntu jobs for over an hour
+# (2026-10-25: 18 running, 559 waiting). One job pays for one runner, one
+# checkout and one Python setup instead of 23.
+#
+# Every step runs on every pull request and every push to dev; none keeps the
+# paths filter its workflow had. Each check takes seconds, and a gate whose
+# trigger missed the file it guards was skipped exactly when it mattered
+# (scripts/check_trigger_coverage.py). Checks that only make sense for a pull
+# request (its diff, its labels) still run only there.
+#
+# Order: the scanners that read the whole working tree (codespell,
+# markdownlint, ruff, gitleaks) run before anything writes into it (lychee's
+# cache, the editable installs, the help capture).
+#
+# Reading a failure:
+#   * every step is named "<check>: <what it does>" and runs with
+#     `!cancelled()`, so one failing check does not hide the others;
+#   * the last step writes each step's outcome to the job summary;
+#   * re-running the job re-runs every check (about a minute in total).
+#
+# Former workflows: action-pin-gate, actionlint, changelog-format,
+# cli-help-docs-sync, codespell, dependency-review, g2p-known-divergences,
+# hadolint, inference-input-contract, link-check, markdownlint,
+# migration-changelog-parity, migration-guide-lint, model-quality-gate,
+# ort-version-sync, public-abi-snapshot, python-lint, readme-heading-tree-parity,
+# rulesets, ruff-version-sync, secret-scan, test-threshold-relaxation,
+# version-consistency. The pull-request title / body / commit message checks
+# are in pr-metadata.yml, which also runs when the title or body is edited.
+
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+  schedule:
+    # rulesets: the live rulesets must equal .github/rulesets/*.json, and a
+    # change made in the settings UI turns this red. link-check: link rot.
+    # secret-scan: the full history.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      mode_override:
+        description: 'version-consistency: override `mode` (warn|fail) — empty to use toml setting'
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint and gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      # sticky / drift comments (cli-help-docs-sync, public-abi-snapshot),
+      # dependency-review summary, gitleaks PR comments
+      pull-requests: write
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6.1.0
+        with:
+          # secret-scan scans the history; test-threshold-relaxation diffs
+          # against the base commit.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+
+      - name: "setup: pytest for the gate self-tests"
+        run: python -m pip install --upgrade pip 'pytest>=9.1.1,<10'
+
+      # ---------------------------------------------------------------- actionlint
+      # Fails on a shellcheck finding; tests/scripts/test_actionlint_workflow.py
+      # keeps these two steps pinned and in step with the pre-commit hook.
+      - name: Install actionlint and shellcheck (pinned)
+        id: actionlint-install
+        if: ${{ !cancelled() }}
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+          SHELLCHECK_VERSION: 0.11.0
+          SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/lint"
+          cd "$RUNNER_TEMP/lint"
+          al="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLo "$al" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${al}"
+          echo "${ACTIONLINT_SHA256}  ${al}" | sha256sum -c -
+          tar xzf "$al" actionlint
+          sc="shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          curl -fsSLo "$sc" "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/${sc}"
+          echo "${SHELLCHECK_SHA256}  ${sc}" | sha256sum -c -
+          tar xJf "$sc"
+          ./actionlint -version
+          "./shellcheck-v${SHELLCHECK_VERSION}/shellcheck" --version
+        shell: bash
+
+      - name: Check workflow files
+        id: actionlint
+        if: ${{ !cancelled() }}
+        run: |
+          lint="$RUNNER_TEMP/lint"
+          "$lint/actionlint" -color -shellcheck "$lint/shellcheck-v0.11.0/shellcheck"
+        shell: bash
+
+      # ----------------------------------------------------------------- codespell
+      # The version must match `rev: v<VER>` of the codespell-project/codespell
+      # entry in .pre-commit-config.yaml, so the local hook and CI use the same
+      # dictionary. Files are listed explicitly with git ls-files: codespell's
+      # `skip =` does not prune subtrees, and crawling the tree scanned the
+      # multi-megabyte phoneme dictionaries and minified bundles (40-50 min runs
+      # of false positives). Non-English test corpora and G2P sources are
+      # excluded for the same reason.
+      - name: "codespell: install"
+        id: codespell-install
+        if: ${{ !cancelled() }}
+        run: pip install 'codespell==2.4.2'
+
+      - name: "codespell: run"
+        id: codespell
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
+        run: |
+          codespell --version
+          git ls-files \
+            '*.py' '*.pyi' '*.pyx' \
+            '*.rs' \
+            '*.go' \
+            '*.cs' '*.csproj' '*.sln' \
+            '*.kt' '*.kts' \
+            '*.swift' \
+            '*.md' '*.markdown' '*.mdx' \
+            '*.yaml' '*.yml' \
+            '*.toml' \
+            '*.cfg' '*.ini' \
+            '*.sh' '*.bash' '*.zsh' \
+            '*Dockerfile*' 'Makefile' \
+            '.codespellrc' '.codespell-ignore-words.txt' \
+            '.editorconfig' '.gitignore' '.gitattributes' '.pre-commit-config.yaml' \
+            ':!:README_DE.md' ':!:README_ES.md' ':!:README_FR.md' \
+            ':!:README_KO.md' ':!:README_PT.md' ':!:README_ZH.md' \
+            ':!:tools/benchmark/**' \
+            ':!:test/models/**' \
+            ':!:**/testdata/**' \
+            ':!:**/phonemize/**' \
+            ':!:**/Phonemize/**' \
+            ':!:src/rust/piper-plus-g2p/**' \
+            ':!:src/python/g2p/**' \
+            ':!:**/test_swedish*' ':!:**/test_chinese*' ':!:**/test_french*' \
+            ':!:**/test_spanish*' ':!:**/test_portuguese*' \
+            ':!:**/SwedishPhonemizerTests.cs' ':!:**/ChinesePhonemizerTests.cs' \
+            ':!:**/FrenchPhonemizerTests.cs' ':!:**/SpanishPhonemizerTests.cs' \
+            ':!:**/PortuguesePhonemizerTests.cs' \
+            ':!:src/python_run/piper_plus/sample_texts.py' \
+            ':!:src/python_run/piper_plus/webui.py' \
+            | xargs --no-run-if-empty codespell
+
+      # -------------------------------------------------------------- markdownlint
+      - name: "markdownlint: lint Markdown"
+        id: markdownlint
+        if: ${{ !cancelled() }}
+        uses: DavidAnson/markdownlint-cli2-action@v17
+        with:
+          globs: |
+            **/*.md
+            !node_modules
+            !**/node_modules/**
+            !.git
+            !.build/**
+            !**/.venv/**
+            !test/models/**
+            !**/build/**
+            !build-*/**
+            !**/dist/**
+            !**/target/**
+          config: .markdownlint.yaml
+
+      # ------------------------------------------------------------------ hadolint
+      # --failure-threshold error: warnings are reported as info; only the rules
+      # escalated by .hadolint.yaml's override.error (DL3000/DL3002/DL3025/
+      # DL4000/DL4006) fail. Every Dockerfile is linted even after one fails.
+      - name: "hadolint: lint every Dockerfile"
+        id: hadolint
+        if: ${{ !cancelled() }}
+        run: |
+          HADOLINT_VERSION=2.12.0
+          curl -fsSL -o /tmp/hadolint \
+            "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-x86_64"
+          chmod +x /tmp/hadolint
+          /tmp/hadolint --version
+          failed=()
+          for dockerfile in \
+            docker/cpp-dev/Dockerfile \
+            docker/cpp-inference/Dockerfile \
+            docker/cpp-inference/Dockerfile.distroless \
+            docker/cpp-inference/Dockerfile.test \
+            docker/python-inference/Dockerfile \
+            docker/python-inference/Dockerfile.cpu \
+            docker/python-inference/Dockerfile.cpu.distroless \
+            docker/python-train/Dockerfile \
+            docker/wyoming/Dockerfile \
+            docker/webui/Dockerfile \
+            docker/webui/Dockerfile.distroless
+          do
+            echo "::group::hadolint ${dockerfile}"
+            if ! /tmp/hadolint --config .hadolint.yaml --failure-threshold error --no-color "$dockerfile"; then
+              failed+=("$dockerfile")
+            fi
+            echo "::endgroup::"
+          done
+          if [ "${#failed[@]}" -ne 0 ]; then
+            for f in "${failed[@]}"; do echo "::error file=${f}::hadolint found an error-level finding in ${f}"; done
+            exit 1
+          fi
+
+      # ---------------------------------------------------------------- python-lint
+      # One of the ruff pin sites that scripts/check_ruff_version_sync.py keeps
+      # equal (with .pre-commit-config.yaml and pyproject.toml).
+      - name: "python-lint: install Ruff"
+        id: ruff-install
+        if: ${{ !cancelled() }}
+        run: pip install ruff==0.15.15
+
+      - name: "python-lint: ruff check"
+        id: ruff-check
+        if: ${{ !cancelled() }}
+        run: ruff check --output-format=github
+
+      - name: "python-lint: ruff format --check"
+        id: ruff-format
+        if: ${{ !cancelled() }}
+        run: ruff format --check
+
+      # ---------------------------------------------------------------- secret-scan
+      - name: "secret-scan: Gitleaks"
+        id: gitleaks
+        if: ${{ !cancelled() }}
+        uses: gitleaks/gitleaks-action@v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "true"
+          GITLEAKS_ENABLE_SUMMARY: "true"
+
+      # On a pull request gitleaks-action scans only the base...head commits,
+      # so a line that already exists on the base but reappears as new after a
+      # squash merge goes unseen until the push to dev (PR #401). This runs the
+      # same full working-tree scan as a push, before the merge. The binary is
+      # checked against the release's checksums.txt.
+      - name: "secret-scan: Gitleaks (full working-tree parity scan)"
+        id: gitleaks-tree
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          GITLEAKS_VERSION: "8.21.2"
+        run: |
+          set -euo pipefail
+          ARCHIVE="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          BASE_URL="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          cd /tmp
+          curl -sSfL -o "${ARCHIVE}" "${BASE_URL}/${ARCHIVE}"
+          curl -sSfL -o gitleaks_checksums.txt \
+            "${BASE_URL}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep " ${ARCHIVE}\$" gitleaks_checksums.txt \
+            | sha256sum --check --strict
+          tar -xzf "${ARCHIVE}" gitleaks
+          cd "${GITHUB_WORKSPACE}"
+          /tmp/gitleaks dir \
+            --config .gitleaks.toml \
+            --redact \
+            --no-banner \
+            --exit-code 1 \
+            .
+
+      # ---------------------------------------------------------------- link-check
+      - name: "link-check: restore lychee cache"
+        id: lychee-cache
+        if: ${{ !cancelled() }}
+        uses: actions/cache@v4.3.0
+        with:
+          path: .lycheecache
+          key: lychee-${{ github.sha }}
+          restore-keys: lychee-
+
+      - name: "link-check: scan Markdown links"
+        id: link-scan
+        if: ${{ !cancelled() }}
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --config .lychee.toml
+            --no-progress
+            --root-dir ${{ github.workspace }}
+            './**/*.md'
+          lycheeVersion: v0.24.2
+          fail: false
+          jobSummary: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "link-check: retry failed full scans with lower concurrency"
+        id: link-check
+        if: ${{ !cancelled() && steps.link-scan.outcome == 'success' && steps.link-scan.outputs.exit_code != '0' }}
+        timeout-minutes: 15
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for delay in 5 15; do
+            sleep "$delay"
+            if lychee --config .lychee.toml --no-progress --cache=false \
+              --max-concurrency 1 --root-dir "$GITHUB_WORKSPACE" \
+              --format markdown --output lychee/retry.md './**/*.md'; then
+              cat lychee/retry.md >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          done
+          cat lychee/retry.md >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      # ----------------------------------------------------------- action-pin-gate
+      - name: "action-pin-gate: detection contract (test_check_action_pins.py)"
+        id: action-pin-tests
+        if: ${{ !cancelled() }}
+        run: pytest tests/scripts/test_check_action_pins.py -v --override-ini="addopts="
+
+      - name: "action-pin-gate: no new sliding-major-tag refs"
+        id: action-pin
+        if: ${{ !cancelled() }}
+        run: python scripts/check_action_pins.py
+
+      # ---------------------------------------------------------- changelog-format
+      - name: "changelog-format: validate CHANGELOG.md"
+        id: changelog-format
+        if: ${{ !cancelled() }}
+        run: python scripts/check_changelog_format.py CHANGELOG.md
+
+      # --------------------------------------------------------- dependency-review
+      # Only a pull request has a dependency diff to review.
+      - name: "dependency-review: review the pull request's dependency changes"
+        id: dependency-review
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        uses: actions/dependency-review-action@v4.9.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+          allow-licenses: >-
+            MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC,
+            Unicode-DFS-2016, Unicode-3.0, CC0-1.0, MPL-2.0,
+            Zlib, OpenSSL, BSL-1.0, 0BSD, Apache-2.0 WITH LLVM-exception
+          allow-dependencies-licenses: >-
+            pkg:pypi/audioop-lts,
+            pkg:pypi/protobuf,
+            pkg:pypi/regex,
+            pkg:pypi/astroid,
+            pkg:pypi/defusedxml,
+            pkg:pypi/pillow,
+            pkg:pypi/matplotlib,
+            pkg:pypi/mypy,
+            pkg:pypi/pylint,
+            pkg:pypi/sphinx-rtd-theme,
+            pkg:pypi/typing-extensions,
+            pkg:pypi/llvmlite,
+            pkg:pypi/soxr,
+            pkg:npm/protobufjs,
+            pkg:cargo/webpki-roots
+          warn-only: false
+          vulnerability-check: true
+
+      # ----------------------------------------------------- g2p-known-divergences
+      - name: "g2p-known-divergences: unit tests for the gate"
+        id: g2p-known-divergences-tests
+        if: ${{ !cancelled() }}
+        run: python -m pytest tests/scripts/test_check_g2p_known_divergences.py -q -o addopts=
+
+      - name: "g2p-known-divergences: known-difference lists are valid"
+        id: g2p-known-divergences
+        if: ${{ !cancelled() }}
+        run: python scripts/check_g2p_known_divergences.py
+
+      # -------------------------------------------------- inference-input-contract
+      - name: "inference-input-contract: contract constants match the Python implementation"
+        id: inference-input-contract
+        if: ${{ !cancelled() }}
+        run: python scripts/check_inference_input_contract.py
+
+      # ------------------------------------------------ migration-changelog-parity
+      - name: "migration-changelog-parity: CHANGELOG breaking items have migration coverage"
+        id: migration-changelog-parity
+        if: ${{ !cancelled() }}
+        run: python scripts/check_migration_changelog_parity.py --verbose
+
+      # ------------------------------------------------------ migration-guide-lint
+      # The cross-reference lint runs when the pull request carries the
+      # `breaking` label or adds a `### Breaking` heading to CHANGELOG.md, and on
+      # a manual run.
+      - name: "migration-guide-lint: detect breaking-change signal"
+        id: migration-signal
+        if: ${{ !cancelled() }}
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          has_label=false
+          has_diff=false
+          if [ -n "$LABELS" ]; then
+            if echo "$LABELS" | tr ',' '\n' | grep -qx breaking; then
+              has_label=true
+            fi
+          fi
+          if [ -n "$BASE_SHA" ]; then
+            git fetch --no-tags --depth=1 origin "$BASE_SHA" 2>/dev/null || true
+            if git diff "$BASE_SHA"...HEAD -- CHANGELOG.md 2>/dev/null | grep -E "^\+### Breaking" >/dev/null; then
+              has_diff=true
+            fi
+          fi
+          echo "has_label=$has_label" >> "$GITHUB_OUTPUT"
+          echo "has_diff=$has_diff" >> "$GITHUB_OUTPUT"
+          echo "Signal: label=$has_label diff=$has_diff"
+
+      - name: "migration-guide-lint: migration cross-ref lint"
+        id: migration-guide-lint
+        if: ${{ !cancelled() && (steps.migration-signal.outputs.has_label == 'true' || steps.migration-signal.outputs.has_diff == 'true' || github.event_name == 'workflow_dispatch') }}
+        run: python scripts/check_migration_xref.py
+
+      # ----------------------------------------------------------- ort-version-sync
+      - name: "ort-version-sync: pin regex contract (test_check_ort_versions.py)"
+        id: ort-version-sync-tests
+        if: ${{ !cancelled() }}
+        run: pytest scripts/test_check_ort_versions.py -v --override-ini="addopts="
+
+      - name: "ort-version-sync: cmake / workflows ORT versions match"
+        id: ort-version-sync
+        if: ${{ !cancelled() }}
+        run: python scripts/check_ort_versions.py --verbose
+
+      # -------------------------------------------------------- public-abi-snapshot
+      - name: "public-abi-snapshot: C ABI diff (bootstrap, current = baseline)"
+        id: abi-c
+        if: ${{ !cancelled() }}
+        run: |
+          python scripts/diff_public_abi.py diff \
+            --surface c \
+            --baseline tests/fixtures/public-abi/c.json \
+            --current  tests/fixtures/public-abi/c.json \
+            --output /tmp/c-abi-diff.md
+
+      - name: "public-abi-snapshot: Swift ABI diff (bootstrap)"
+        id: abi-swift
+        if: ${{ !cancelled() }}
+        run: |
+          python scripts/diff_public_abi.py diff \
+            --surface swift \
+            --baseline tests/fixtures/public-abi/swift.json \
+            --current  tests/fixtures/public-abi/swift.json \
+            --output /tmp/swift-abi-diff.md
+
+      - name: "public-abi-snapshot: Kotlin ABI diff (bootstrap)"
+        id: abi-kotlin
+        if: ${{ !cancelled() }}
+        run: |
+          python scripts/diff_public_abi.py diff \
+            --surface kotlin \
+            --baseline tests/fixtures/public-abi/kotlin.json \
+            --current  tests/fixtures/public-abi/kotlin.json \
+            --output /tmp/kotlin-abi-diff.md
+
+      - name: "public-abi-snapshot: post sticky comment"
+        if: ${{ !cancelled() && steps.abi-c.outcome == 'success' && github.event_name == 'pull_request' }}
+        uses: marocchino/sticky-pull-request-comment@v2.9.4
+        with:
+          header: public-abi-snapshot
+          path: /tmp/c-abi-diff.md
+
+      - name: "public-abi-snapshot: upload artifacts"
+        uses: actions/upload-artifact@v4.6.2
+        if: always()
+        with:
+          name: public-abi-${{ github.run_id }}
+          path: |
+            /tmp/c-abi-diff.md
+            /tmp/swift-abi-diff.md
+            /tmp/kotlin-abi-diff.md
+          retention-days: 90
+
+      # ------------------------------------------------- readme-heading-tree-parity
+      - name: "readme-heading-tree-parity: README heading tree parity (informational)"
+        id: readme-heading-tree-parity
+        if: ${{ !cancelled() }}
+        run: python scripts/check_readme_heading_tree.py
+
+      # ------------------------------------------------------------------- rulesets
+      # .github/rulesets/*.json is the source of the repository rulesets. A
+      # pull request checks the files keep the merge requirements; elsewhere
+      # the live rulesets must also equal the files (a change made in the
+      # settings UI turns this red). An admin applies them with
+      # `python scripts/check_rulesets.py --apply`.
+      - name: "rulesets: script tests"
+        id: rulesets-tests
+        if: ${{ !cancelled() }}
+        run: python -m pytest tests/scripts/test_check_rulesets.py -q -o addopts=
+
+      - name: "rulesets: ruleset files keep the merge requirements"
+        id: rulesets-validate
+        if: ${{ !cancelled() }}
+        run: python scripts/check_rulesets.py --validate
+
+      - name: "rulesets: live rulesets equal the files"
+        id: rulesets-live
+        if: ${{ !cancelled() && github.event_name != 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/check_rulesets.py --check --repo "$GITHUB_REPOSITORY"
+
+      # ------------------------------------------------------------ ruff-version-sync
+      - name: "ruff-version-sync: ruff pin sites agree"
+        id: ruff-version-sync
+        if: ${{ !cancelled() }}
+        run: python scripts/check_ruff_version_sync.py
+
+      # -------------------------------------------------- test-threshold-relaxation
+      - name: "test-threshold-relaxation: gate tests"
+        id: threshold-tests
+        if: ${{ !cancelled() }}
+        run: python -m pytest tests/scripts/test_check_test_threshold_relaxation.py -q -o addopts=
+
+      - name: "test-threshold-relaxation: check the pull request's diff"
+        id: threshold-relaxation
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python scripts/check_test_threshold_relaxation.py --base "$BASE_SHA"
+
+      # -------------------------------------------------------- version-consistency
+      # Compares each manifest's version with the major.minor prefix pinned in
+      # docs/spec/release-versions.toml. `mode = "warn"` there emits warnings
+      # and exits 0; a manual run can override it with the mode_override input.
+      - name: "version-consistency: pinned versions vs manifests"
+        id: version-consistency
+        if: ${{ !cancelled() }}
+        env:
+          MODE_OVERRIDE: ${{ github.event.inputs.mode_override }}
+        run: |
+          python3 - <<'PY'
+          """
+          Reads docs/spec/release-versions.toml and compares each pinned
+          `expected_prefix` against the actual version extracted from the
+          named manifest. Honours `mode = "warn" | "fail"` from the toml,
+          with `MODE_OVERRIDE` env var taking precedence (used by
+          workflow_dispatch).
+          """
+          from __future__ import annotations
+          import json
+          import os
+          import re
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          ROOT = Path(".").resolve()
+          SPEC = ROOT / "docs/spec/release-versions.toml"
+
+          if not SPEC.exists():
+              print(f"::error::Missing spec file: {SPEC}")
+              sys.exit(1)
+
+          with SPEC.open("rb") as fh:
+              spec = tomllib.load(fh)
+
+          mode = (os.environ.get("MODE_OVERRIDE") or spec.get("meta", {}).get("mode") or "warn").strip()
+          if mode not in ("warn", "fail"):
+              print(f"::warning::Unknown mode '{mode}' — defaulting to 'warn'")
+              mode = "warn"
+          print(f"Running in mode: {mode}")
+
+          # ---------- Manifest extractors ----------------------------------------
+          def read_text(rel: str) -> str:
+              p = ROOT / rel
+              if not p.exists():
+                  raise FileNotFoundError(rel)
+              return p.read_text(encoding="utf-8")
+
+          def extract_version_file(rel: str) -> str:
+              return read_text(rel).strip()
+
+          def extract_csproj(rel: str) -> str:
+              text = read_text(rel)
+              m = re.search(r"<Version>([^<]+)</Version>", text)
+              if not m:
+                  raise ValueError(f"<Version> not found in {rel}")
+              return m.group(1).strip()
+
+          def extract_cargo_workspace(rel: str) -> str:
+              text = read_text(rel)
+              # Workspace-level version: first `^version = "..."` after
+              # `[workspace.package]` (or the top-level `[package]` for
+              # non-workspace crates).
+              for line in text.splitlines():
+                  m = re.match(r'^\s*version\s*=\s*"([^"]+)"\s*$', line)
+                  if m:
+                      return m.group(1)
+              raise ValueError(f"version line not found in {rel}")
+
+          def extract_package_json(rel: str) -> str:
+              data = json.loads(read_text(rel))
+              return str(data["version"])
+
+          def extract_swift_let(rel: str, field: str) -> str:
+              text = read_text(rel)
+              # Match: `let version = "1.13.0"` (allows leading whitespace).
+              pat = rf'^\s*let\s+{re.escape(field)}\s*=\s*"([^"]+)"'
+              m = re.search(pat, text, flags=re.MULTILINE)
+              if not m:
+                  raise ValueError(f"`let {field}` not found in {rel}")
+              return m.group(1)
+
+          def extract_gradle_property(rel: str, field: str) -> str:
+              text = read_text(rel)
+              # Match: `VERSION_NAME=1.0.0` (no quotes, ignore spaces).
+              pat = rf'^\s*{re.escape(field)}\s*=\s*([^\s#]+)'
+              m = re.search(pat, text, flags=re.MULTILINE)
+              if not m:
+                  raise ValueError(f"property `{field}` not found in {rel}")
+              return m.group(1).strip()
+
+          def detect_pyproject_dynamic(rel: str) -> bool:
+              text = read_text(rel)
+              return bool(re.search(r'dynamic\s*=\s*\[\s*"version"\s*\]', text))
+
+          # ---------- Per-section dispatch ---------------------------------------
+          # Each section knows how to map a spec entry to (label, actual_version
+          # or sentinel "DYNAMIC"). The spec keys are arbitrary — we walk all
+          # tables except [meta] and dispatch by manifest extension / fields.
+          failures: list[str] = []
+          warnings: list[str] = []
+
+          def emit(label: str, manifest: str, expected: str, actual: str):
+              ok = actual.startswith(expected)
+              symbol = "OK   " if ok else "MISS "
+              print(f"{symbol} {label:30s}  manifest={manifest}  expected_prefix={expected}  actual={actual}")
+              if not ok:
+                  msg = (
+                      f"{label}: manifest `{manifest}` reports version "
+                      f"`{actual}` but expected_prefix is `{expected}` "
+                      f"(see docs/spec/release-versions.toml)."
+                  )
+                  if mode == "fail":
+                      failures.append(msg)
+                  else:
+                      warnings.append(msg)
+
+          for section_name, body in spec.items():
+              if section_name == "meta" or not isinstance(body, dict):
+                  continue
+              # A section may have its own `manifest` key AND nested children
+              # (e.g. `[python]` carries the VERSION file, while `[python.pyproject]`
+              # carries pyproject.toml). Collect both.
+              entries = []
+              if "manifest" in body:
+                  entries.append((section_name, body))
+              for sub_name, sub_body in body.items():
+                  if isinstance(sub_body, dict) and "manifest" in sub_body:
+                      entries.append((f"{section_name}.{sub_name}", sub_body))
+
+              for label, entry in entries:
+                  manifest = entry["manifest"]
+                  expected = entry.get("expected_prefix")
+                  field = entry.get("field")
+                  dynamic = entry.get("dynamic", False)
+
+                  try:
+                      if dynamic and manifest.endswith("pyproject.toml"):
+                          if detect_pyproject_dynamic(manifest):
+                              print(f"OK    {label:30s}  manifest={manifest}  (dynamic version)")
+                          else:
+                              msg = f"{label}: pyproject.toml expected `dynamic = ['version']`."
+                              (failures if mode == "fail" else warnings).append(msg)
+                          continue
+
+                      if manifest == "VERSION":
+                          actual = extract_version_file(manifest)
+                      elif manifest.endswith(".csproj"):
+                          actual = extract_csproj(manifest)
+                      elif manifest.endswith("Cargo.toml"):
+                          actual = extract_cargo_workspace(manifest)
+                      elif manifest.endswith("package.json"):
+                          actual = extract_package_json(manifest)
+                      elif manifest.endswith("Package.swift"):
+                          if not field:
+                              raise ValueError(f"{label}: Package.swift entry needs `field` (version|g2pVersion)")
+                          actual = extract_swift_let(manifest, field)
+                      elif manifest.endswith("gradle.properties"):
+                          if not field:
+                              raise ValueError(f"{label}: gradle.properties entry needs `field`")
+                          actual = extract_gradle_property(manifest, field)
+                      else:
+                          raise ValueError(f"{label}: unsupported manifest type: {manifest}")
+
+                      if expected is None:
+                          # No prefix means "ignore version, just verify file exists".
+                          print(f"INFO  {label:30s}  manifest={manifest}  actual={actual}  (no expected_prefix)")
+                      else:
+                          emit(label, manifest, expected, actual)
+                  except FileNotFoundError as e:
+                      msg = f"{label}: manifest not found: {e}"
+                      (failures if mode == "fail" else warnings).append(msg)
+                  except Exception as e:
+                      msg = f"{label}: extraction error: {e}"
+                      (failures if mode == "fail" else warnings).append(msg)
+
+          # ---------- Reporting --------------------------------------------------
+          if warnings:
+              print()
+              print("---- Warnings (drift detected, mode=warn) ----")
+              for w in warnings:
+                  print(f"::warning::{w}")
+          if failures:
+              print()
+              print("---- Failures (drift detected, mode=fail) ----")
+              for f in failures:
+                  print(f"::error::{f}")
+              sys.exit(1)
+
+          if not warnings and not failures:
+              print()
+              print("All pinned versions match their manifests.")
+          else:
+              print()
+              print(f"Detected {len(warnings)} warning(s) — exiting 0 because mode=warn.")
+          PY
+
+      # -------------------------------------------------------- model-quality-gate
+      - name: "model-quality-gate: check ONNX export contract"
+        id: mq-onnx-export
+        if: ${{ !cancelled() }}
+        run: python scripts/check_onnx_export_contract.py
+
+      - name: "model-quality-gate: model artifact verifier and published manifest regression tests"
+        id: mq-artifact-tests
+        if: ${{ !cancelled() }}
+        run: pytest tests/scripts/test_model_artifact_tools.py tests/scripts/test_check_model_sha256_manifest.py -q --override-ini="addopts="
+
+      - name: "model-quality-gate: install actual ONNX artifact validator dependencies"
+        id: mq-install
+        if: ${{ !cancelled() }}
+        run: pip install onnx onnxruntime numpy
+
+      - name: "model-quality-gate: execute artifact loading, warmup and negative output tests"
+        id: mq-artifact-validation
+        if: ${{ !cancelled() }}
+        run: pytest tests/scripts/test_onnx_artifact_validation.py -q --override-ini="addopts="
+
+      - name: "model-quality-gate: check phoneme set version contract"
+        id: mq-phoneme-set
+        if: ${{ !cancelled() }}
+        run: python scripts/check_phoneme_set_version.py
+
+      - name: "model-quality-gate: gate self-test (check_dictionary_versions)"
+        id: mq-dictionary-tests
+        if: ${{ !cancelled() }}
+        run: pytest tests/scripts/test_check_dictionary_versions.py -q --override-ini="addopts="
+
+      - name: "model-quality-gate: check dictionary versions"
+        id: mq-dictionary
+        if: ${{ !cancelled() }}
+        run: python scripts/check_dictionary_versions.py --verbose
+
+      - name: "model-quality-gate: gate self-test (check_ort_version_drift)"
+        id: mq-ort-drift-tests
+        if: ${{ !cancelled() }}
+        run: pytest tests/scripts/test_check_ort_version_drift.py -q --override-ini="addopts="
+
+      - name: "model-quality-gate: check ORT version drift"
+        id: mq-ort-drift
+        if: ${{ !cancelled() }}
+        run: python scripts/check_ort_version_drift.py --verbose
+
+      - name: "model-quality-gate: verify model checksums (manifest print)"
+        id: mq-checksums
+        if: ${{ !cancelled() }}
+        run: python scripts/verify_model_checksums.py --print-manifest
+
+      # -------------------------------------------------------- cli-help-docs-sync
+      # Every flag listed in docs/guides/development/cli-usage.md must still be
+      # advertised by `python -m piper_plus --help`. `--mode stale-only` blocks
+      # only a flag that left `--help` while its markdown row survived: the
+      # reference doc covers the C++ CLI, so a new Python flag missing from it
+      # is reported but does not fail.
+      - name: "cli-help-docs-sync: install piper-plus (python_run) for --help capture"
+        id: cli-help-install
+        if: ${{ !cancelled() }}
+        run: |
+          pip install --no-cache-dir uv
+          uv pip install --system -e "src/python/g2p"
+          uv pip install --system -e "src/python_run[cpu]"
+
+      - name: "cli-help-docs-sync: capture `python -m piper_plus --help`"
+        id: cli-help-capture
+        if: ${{ !cancelled() }}
+        run: |
+          python -m piper_plus --help > piper_help.txt 2>&1 || true
+          echo '--- captured help ---'
+          cat piper_help.txt
+
+      - name: "cli-help-docs-sync: CLI help / docs drift"
+        id: cli-help-drift
+        if: ${{ !cancelled() }}
+        timeout-minutes: 10
+        run: |
+          set -o pipefail
+          python scripts/check_cli_help_drift.py \
+            --help-file piper_help.txt \
+            --docs docs/guides/development/cli-usage.md \
+            --mode stale-only \
+            --allow=--custom-dict \
+            --allow=--gpu-device-id \
+            --allow=--json-input \
+            --allow=--language \
+            --allow=--model-dir \
+            --allow=--output-timing \
+            --allow=--phoneme-silence \
+            --allow=--quiet \
+            --allow=--raw-phonemes \
+            --allow=--streaming \
+            --allow=--test-mode \
+            --allow=--text \
+            --allow=--timing-format \
+            --allow=--use-cuda \
+            2>&1 | tee drift_report.txt
+
+      - name: "cli-help-docs-sync: upload drift report"
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: cli-help-drift-report
+          path: |
+            piper_help.txt
+            drift_report.txt
+          retention-days: 7
+
+      - name: "cli-help-docs-sync: comment drift report on PR"
+        if: ${{ !cancelled() && steps.cli-help-drift.outcome == 'failure' && github.event_name == 'pull_request' }}
+        uses: actions/github-script@v7.1.0
+        with:
+          script: |
+            const fs = require('fs');
+            let body = '## CLI Help / Docs Drift detected\n\n';
+            body += 'The user-facing CLI doc references flags that `python -m piper_plus --help` ';
+            body += 'no longer exposes. This usually means a flag was removed or renamed ';
+            body += '(see v1.12.0 `--mb-istft` removal as a precedent) but the markdown ';
+            body += 'flag-table row was not updated.\n\n';
+            body += '<details><summary>Drift report</summary>\n\n```\n';
+            try {
+              body += fs.readFileSync('drift_report.txt', 'utf8');
+            } catch (e) {
+              body += '(drift report not captured)';
+            }
+            body += '\n```\n\n</details>\n\n';
+            body += 'Fix: update `docs/guides/development/cli-usage.md` to remove or rename the ';
+            body += 'stale row, or pass `--allow <flag>` in the workflow if intentional.';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+
+      # ------------------------------------------------------------------- report
+      - name: Report every check
+        if: always()
+        env:
+          STEPS: ${{ toJSON(steps) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          steps = json.loads(os.environ["STEPS"])
+          mark = {"success": "pass", "failure": "FAIL", "skipped": "skipped", "cancelled": "cancelled"}
+          lines = ["| check step | result |", "|---|---|"]
+          failed = []
+          for step_id, info in steps.items():
+              outcome = info.get("outcome", "")
+              lines.append(f"| `{step_id}` | {mark.get(outcome, outcome)} |")
+              if outcome == "failure":
+                  failed.append(step_id)
+          head = f"## Lint and gates: {len(failed)} failed" if failed else "## Lint and gates: all passed"
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as fh:
+              fh.write(head + "\n\n" + "\n".join(lines) + "\n")
+          print(head)
+          for step_id in failed:
+              print(f"::error::{step_id} failed")
+          PY

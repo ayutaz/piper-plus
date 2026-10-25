@@ -66,7 +66,7 @@ exact-match group.
 | `android-build.yml` | `env.ONNXRUNTIME_VERSION` (job-level) | Android PR CI builds |
 | `release-kotlin-g2p.yml` | `env.ONNXRUNTIME_VERSION` (top-level) | Kotlin G2P AAR release |
 | `kotlin-g2p-ci.yml` | `env.ONNXRUNTIME_VERSION` (top-level) | Kotlin G2P PR CI |
-| `ort-version-sync.yml` | (gate; runs `scripts/check_ort_versions.py`) | All exact-match + floor-check files |
+| `lint-gates.yml` | (gate; its ort-version-sync step runs `scripts/check_ort_versions.py`) | All exact-match + floor-check files |
 
 ## Updating
 
@@ -91,7 +91,7 @@ When bumping the C++ canonical ORT version (e.g. 1.20.0 → 1.22.0):
    * WASM: `src/wasm/openjtalk-web/package.json` peerDependencies.
 8. Update this table.
 9. Run `python scripts/check_ort_versions.py --verbose` locally to
-   confirm. The CI gate (`ort-version-sync.yml`) runs the same check
+   confirm. The CI gate (`lint-gates.yml`) runs the same check
    on PR / push.
 
 ## Rust `ort` exemption (Issue #372 follow-up)

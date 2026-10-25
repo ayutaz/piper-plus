@@ -1,4 +1,4 @@
-"""Contract tests for .github/workflows/actionlint.yml.
+"""Contract tests for the actionlint steps of .github/workflows/lint-gates.yml.
 
 The workflow ran with ``continue-on-error: true`` and the pre-commit hook
 passed ``-shellcheck=``, so 256 shellcheck findings (including PowerShell
@@ -17,7 +17,8 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
-ACTIONLINT_YML = WORKFLOWS / "actionlint.yml"
+ACTIONLINT_YML = WORKFLOWS / "lint-gates.yml"
+JOB = "lint"
 PRE_COMMIT = REPO_ROOT / ".pre-commit-config.yaml"
 
 
@@ -27,7 +28,7 @@ def workflow() -> dict:
 
 
 def _steps(workflow: dict) -> dict[str, dict]:
-    return {s["name"]: s for s in workflow["jobs"]["actionlint"]["steps"] if "name" in s}
+    return {s["name"]: s for s in workflow["jobs"][JOB]["steps"] if "name" in s}
 
 
 def _install_env(workflow: dict) -> dict:
@@ -44,7 +45,7 @@ def _pre_commit_actionlint() -> tuple[dict, dict]:
 
 
 def test_no_continue_on_error(workflow):
-    job = workflow["jobs"]["actionlint"]
+    job = workflow["jobs"][JOB]
     assert "continue-on-error" not in job
     for step in job["steps"]:
         assert "continue-on-error" not in step, step.get("name")

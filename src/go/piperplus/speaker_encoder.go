@@ -339,6 +339,14 @@ func resampleLinear(samples []float32, fromRate int) []float32 {
 // Returns a flattened [n_frames * n_mels] array (frame-major / time-first order)
 // matching CAM++'s expected input layout [1, T, 80].
 func computeMelSpectrogram(samples []float32) []float32 {
+	melSpec := computeLogMel(samples)
+	applyCMVN(melSpec)
+	return melSpec
+}
+
+// computeLogMel computes the log mel spectrogram before CMVN, in the same
+// frame-major layout as computeMelSpectrogram.
+func computeLogMel(samples []float32) []float32 {
 	melFilters := createMelFilterbank()
 	window := hannWindow(melNFFT)
 
@@ -387,8 +395,13 @@ func computeMelSpectrogram(samples []float32) []float32 {
 			melSpec[frameIdx*melNMels+melIdx] = float32(math.Log(float64(energy)))
 		}
 	}
+	return melSpec
+}
 
-	// CMVN: subtract per-band mean across all frames (global mean normalization)
+// applyCMVN subtracts each mel band's mean across all frames (global mean
+// normalization), in place.
+func applyCMVN(melSpec []float32) {
+	nFrames := len(melSpec) / melNMels
 	if nFrames > 0 {
 		for melIdx := 0; melIdx < melNMels; melIdx++ {
 			var sum float32
@@ -401,8 +414,6 @@ func computeMelSpectrogram(samples []float32) []float32 {
 			}
 		}
 	}
-
-	return melSpec
 }
 
 func hannWindow(length int) []float32 {

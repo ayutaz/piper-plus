@@ -232,7 +232,7 @@ tests/fixtures/mb_istft_speaker_embedding/model.onnx.json
 # Python  : mutmut が生成する on-disk cache / report
 # Rust    : cargo-mutants が `mutants.out/` 配下に diff + log を吐く
 # C# (.NET): Stryker.NET の HTML/JSON report と内部 sandbox。
-# 詳細: docs/spec/mutation-testing.md
+# 詳細: docs/reference/mutation-testing.md
 .mutmut-cache
 .mutmut-cache/
 mutants.out/

@@ -6,11 +6,12 @@ CLAUDE.md says "ruff version is pinned in 3 places" but the actual count
 is **5 pin sites** across 3 files:
 
   1. .pre-commit-config.yaml      `rev: v<VER>`            (ruff-pre-commit)
-  2. .github/workflows/python-lint.yml `pip install ruff==<VER>`
+  2. .github/workflows/lint-gates.yml  `pip install ruff==<VER>` (python-lint step)
   3. pyproject.toml                    `"ruff==<VER>"` × 3 (dev / test / quality groups)
 
 `.github/workflows/ci.yml` used to be a sixth site, but PR #462
-(`36e40904`) deleted its Ruff lint job as a duplicate of python-lint.yml.
+(`36e40904`) deleted its Ruff lint job as a duplicate of python-lint.yml
+(now the python-lint steps of lint-gates.yml).
 This script kept listing it afterwards; because a missing match in
 `single` mode was silently ignored, the gate reported "Found 5 pin sites"
 and passed while believing it had checked 6. A site that yields no match
@@ -83,11 +84,11 @@ def grep_all(path: Path, pattern: str) -> list[tuple[str, int]]:
 # was enforced, `.github/workflows/ci.yml` stayed in the site list for
 # three months after PR #462 deleted its ruff job, and the gate reported
 # success while checking one site fewer than it claimed. The same silence
-# would hide python-lint.yml losing its `pip install ruff==` line — i.e.
+# would hide lint-gates.yml losing its `pip install ruff==` line — i.e.
 # the gate would go green precisely when the pin it guards disappeared.
 EXPECTED_PIN_COUNT = {
     ".pre-commit-config.yaml": 1,
-    ".github/workflows/python-lint.yml": 1,
+    ".github/workflows/lint-gates.yml": 1,
     "pyproject.toml": 3,  # dev / test / quality dependency groups
 }
 TOTAL_EXPECTED_PINS = sum(EXPECTED_PIN_COUNT.values())
@@ -104,8 +105,8 @@ def main(argv: list[str] | None = None) -> int:
             "next",
         ),
         (
-            ".github/workflows/python-lint.yml",
-            REPO_ROOT / ".github/workflows/python-lint.yml",
+            ".github/workflows/lint-gates.yml",
+            REPO_ROOT / ".github/workflows/lint-gates.yml",
             r"pip install\s+ruff==([0-9][0-9.]*)",
             "single",
         ),
@@ -160,8 +161,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  - {item}", file=sys.stderr)
         print(
             "\nEither the pin was removed (restore it) or the site genuinely "
-            "went away (drop it from `sites` AND from EXPECTED_PIN_COUNT, and "
-            "update the paths filter in .github/workflows/ruff-version-sync.yml).",
+            "went away (drop it from `sites` AND from EXPECTED_PIN_COUNT).",
             file=sys.stderr,
         )
         return 1

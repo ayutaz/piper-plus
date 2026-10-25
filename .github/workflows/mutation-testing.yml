@@ -1,16 +1,24 @@
 name: mutation-testing
 
 # -----------------------------------------------------------------------------
-# Mutation testing (manual + weekly cron 専用)
+# Mutation testing (manual + weekly cron)
 # -----------------------------------------------------------------------------
-# - 重い (30 分 - 数時間) ため push 毎には走らせない
-# - 結果は artifact (HTML/JSON report) として 30 日保持
-# - 初期は warn-only (continue-on-error: true) — baseline 確立後に閾値で fail させる
-# - 仕様詳細: docs/reference/mutation-testing.md
+# - Too slow for every push (the slowest target takes over an hour), so it
+#   runs weekly and on demand.
+# - Targets, the tests run against each one and the `break` scores live in
+#   docs/spec/mutation-testing.toml; the `plan` job turns that file into
+#   the job matrices, and every job fails when its score is below `break`
+#   (scripts/check_mutation_score.py).
+# - Reports (HTML / JSON) are kept as artifacts for 30 days.
+# - Details: docs/reference/mutation-testing.md
+#
+# Until 2026-10 every job was continue-on-error and none of them had ever
+# measured anything: mutmut was unpinned and its Cython build step failed,
+# cargo-mutants found 0 mutants (wrong --file paths), and Stryker rejected
+# its config (`_comment` keys; `-c` means --concurrency in Stryker 5).
 # -----------------------------------------------------------------------------
 
 on:
-  # Manual trigger (PR 検証や ad-hoc 実験で利用)
   workflow_dispatch:
     inputs:
       runtime:
@@ -28,7 +36,6 @@ on:
     - cron: "0 0 * * 0"
 
 concurrency:
-  # Manual / schedule どちらでも 1 並列に絞る (ランナー時間節約)
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
@@ -36,93 +43,102 @@ permissions:
   contents: read
 
 jobs:
+  plan:
+    name: Plan (docs/spec/mutation-testing.toml)
+    runs-on: ubuntu-24.04
+    outputs:
+      python: ${{ steps.matrix.outputs.python }}
+      rust: ${{ steps.matrix.outputs.rust }}
+      csharp: ${{ steps.matrix.outputs.csharp }}
+    steps:
+      - uses: actions/checkout@v6.1.0
+
+      - name: Build matrices
+        id: matrix
+        run: |
+          for runtime in python rust csharp; do
+            echo "${runtime}=$(python3 scripts/check_mutation_score.py matrix "$runtime")" >> "$GITHUB_OUTPUT"
+          done
+
   python:
-    name: Python (mutmut)
+    name: Python (mutmut) / ${{ matrix.module }}
+    needs: plan
     if: github.event_name == 'schedule' || github.event.inputs.runtime == 'all' || github.event.inputs.runtime == 'python'
     runs-on: ubuntu-24.04
-    # 60 min 上限 (実測 30-60 分想定)。ハングした際の安全網
-    timeout-minutes: 90
-    # 初期 baseline 確立まで warn-only (mutmut の exit code を fail にしない)
-    continue-on-error: true
+    timeout-minutes: ${{ matrix.timeout_minutes }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.python) }}
+    env:
+      TARGET: ${{ matrix.target }}
+      TESTS: ${{ join(matrix.tests, ' ') }}
 
     steps:
       - uses: actions/checkout@v6.1.0
 
-      - name: Set up Python
-        uses: actions/setup-python@v6.2.0
-        with:
-          python-version: "3.13"
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libsndfile1 sox build-essential
-
-      - name: Install uv
-        run: |
-          python -m pip install --upgrade pip
-          pip install --no-cache-dir uv
+      - uses: astral-sh/setup-uv@v8.1.0
 
       - name: Install project + mutmut
         run: |
-          cd src/python
-          uv pip install --system -e "g2p[all]" -e ".[test]"
-          uv pip install --system 'mutmut>=2.4,<3'
+          uv venv --python 3.13 "$RUNNER_TEMP/mut-venv"
+          echo "VIRTUAL_ENV=$RUNNER_TEMP/mut-venv" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/mut-venv/bin" >> "$GITHUB_PATH"
+          VIRTUAL_ENV="$RUNNER_TEMP/mut-venv" uv pip install \
+            -e "src/python/g2p[all]" -e "src/python_run[test,cpu,http]" 'mutmut==2.5.1'
 
-      - name: Build Cython extensions
+      - name: Run the target's tests once (unmutated)
         run: |
-          cd src/python
-          uv pip install --system cython
-          python piper_train/vits/monotonic_align/setup.py build_ext --inplace
+          # shellcheck disable=SC2086  # TESTS holds several paths
+          python -m pytest $TESTS -q -p no:cacheprovider --override-ini=addopts=
 
-      - name: Run mutmut (text_splitter)
-        # 個別 file 実行: workflow が長すぎる場合に file 単位で並列化する余地
-        # を残す。初回は text_splitter から。
+      - name: Run mutmut
         run: |
-          uvx mutmut run \
-            --paths-to-mutate src/python_run/piper_plus/text_splitter.py \
-            || echo "mutmut exit code $? (warn-only: baseline 未確定)"
+          set +e
+          mutmut run \
+            --paths-to-mutate "$TARGET" \
+            --runner "python -m pytest $TESTS -x -q -p no:cacheprovider --override-ini=addopts= -p no:randomly" \
+            --no-progress
+          rc=$?
+          set -e
+          # The exit code is a bit mask: 1 = mutmut itself failed; 2 / 4 / 8
+          # = some mutants survived / timed out / were suspicious, which the
+          # score check below judges.
+          if [ $(( rc & 1 )) -ne 0 ]; then
+            echo "::error::mutmut failed (exit code $rc)"
+            exit 1
+          fi
 
-      - name: Run mutmut (timing)
-        run: |
-          uvx mutmut run \
-            --paths-to-mutate src/python_run/piper_plus/timing.py \
-            || echo "mutmut exit code $? (warn-only)"
+      - name: Check score against break
+        run: python scripts/check_mutation_score.py score python "${{ matrix.module }}" .mutmut-cache
 
-      - name: Run mutmut (g2p ssml + multilingual + base)
-        # base.py は ABC + PhonemizationResult を提供する G2P 共通基盤
-        # (.mutmut.toml の paths_to_mutate に追記済み)。 ssml / multilingual と
-        # 同じ step で実行することで言語非依存の核心ロジックを mutation 対象に
-        # 含める。
-        run: |
-          uvx mutmut run \
-            --paths-to-mutate src/python/g2p/piper_plus_g2p/ssml.py,src/python/g2p/piper_plus_g2p/multilingual.py,src/python/g2p/piper_plus_g2p/base.py \
-            || echo "mutmut exit code $? (warn-only)"
-
-      - name: Show results
+      - name: Write reports
         if: always()
         run: |
-          uvx mutmut results || true
-          uvx mutmut html || true
-          ls -la html/ 2>/dev/null || echo "(no html report)"
+          mutmut results || true
+          mutmut junitxml > mutmut-junit.xml || true
+          mutmut html || true
 
       - name: Upload mutmut report
         if: always()
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: mutation-report-python
+          name: mutation-report-python-${{ matrix.module }}
           path: |
             html/
+            mutmut-junit.xml
             .mutmut-cache
           retention-days: 30
           if-no-files-found: warn
 
   rust:
-    name: Rust (cargo-mutants)
+    name: Rust (cargo-mutants) / ${{ matrix.module }}
+    needs: plan
     if: github.event_name == 'schedule' || github.event.inputs.runtime == 'all' || github.event.inputs.runtime == 'rust'
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
-    continue-on-error: true
+    timeout-minutes: ${{ matrix.timeout_minutes }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.rust) }}
 
     steps:
       - uses: actions/checkout@v6.1.0
@@ -137,43 +153,51 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
 
       - name: Install cargo-mutants
-        run: cargo install --locked cargo-mutants
+        run: cargo install --locked cargo-mutants@27.1.0
 
-      - name: Run cargo-mutants (piper-plus-g2p ssml)
+      - name: Run cargo-mutants
         working-directory: src/rust
+        env:
+          PACKAGE: ${{ matrix.package }}
+          FILE: ${{ matrix.file }}
+          CARGO_TEST_ARGS: ${{ matrix.cargo_test_args }}
+        # --in-place: the crates read data with include_str! paths outside
+        # the crate, which a copied tree does not have.
+        # Exit code 2 / 3 = some mutants were missed / timed out, which the
+        # score check below judges; anything else is a failure of the run.
         run: |
-          cargo mutants \
-            -p piper-plus-g2p \
-            --file src/ssml.rs \
-            --no-shuffle \
-            || echo "cargo-mutants exit code $? (warn-only: baseline 未確定)"
+          set +e
+          # shellcheck disable=SC2086  # CARGO_TEST_ARGS holds several arguments
+          cargo mutants -p "$PACKAGE" --file "$FILE" --no-shuffle --in-place --timeout 60 \
+            -- $CARGO_TEST_ARGS
+          rc=$?
+          set -e
+          case "$rc" in
+            0|2|3) ;;
+            *) echo "::error::cargo-mutants failed (exit code $rc)"; exit 1 ;;
+          esac
 
-      - name: Run cargo-mutants (piper-core text_splitter)
-        working-directory: src/rust
-        run: |
-          cargo mutants \
-            -p piper-plus \
-            --file src/text_splitter.rs \
-            --no-shuffle \
-            || echo "cargo-mutants exit code $? (warn-only)"
+      - name: Check score against break
+        run: python3 scripts/check_mutation_score.py score rust "${{ matrix.module }}" src/rust/mutants.out/outcomes.json
 
       - name: Upload cargo-mutants report
         if: always()
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: mutation-report-rust
-          path: |
-            src/rust/mutants.out/
-            src/rust/mutants.out.old/
+          name: mutation-report-rust-${{ matrix.module }}
+          path: src/rust/mutants.out/
           retention-days: 30
           if-no-files-found: warn
 
   csharp:
-    name: C# (Stryker.NET)
+    name: C# (Stryker.NET) / ${{ matrix.module }}
+    needs: plan
     if: github.event_name == 'schedule' || github.event.inputs.runtime == 'all' || github.event.inputs.runtime == 'csharp'
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
-    continue-on-error: true
+    timeout-minutes: ${{ matrix.timeout_minutes }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.csharp) }}
 
     steps:
       - uses: actions/checkout@v6.1.0
@@ -193,29 +217,34 @@ jobs:
             ${{ runner.os }}-nuget-stryker-
             ${{ runner.os }}-nuget-
 
-      - name: Restore + build (warm up project graph)
+      - name: Install Stryker.NET
         run: |
-          dotnet restore src/csharp/PiperPlus.sln
-          dotnet build src/csharp/PiperPlus.sln -c Release --no-restore
-
-      - name: Install Stryker.NET global tool
-        run: dotnet tool install --global dotnet-stryker
-
-      - name: Ensure dotnet tools on PATH
-        run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+          dotnet tool install --global dotnet-stryker --version 5.0.0
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
 
       - name: Run Stryker.NET
+        # `--config-file`: in Stryker 5, `-c` is --concurrency.
+        # The config's thresholds.break equals the spec's `break`, so
+        # Stryker itself fails below it; the score check repeats it from the
+        # JSON report so all three runtimes are judged the same way.
+        run: dotnet stryker --config-file "$GITHUB_WORKSPACE/${{ matrix.config }}"
         working-directory: src/csharp
+
+      - name: Check score against break
+        if: ${{ !cancelled() }}
         run: |
-          dotnet stryker -c stryker-config.json \
-            || echo "Stryker exit code $? (warn-only: baseline 未確定)"
+          report=$(find src/csharp/StrykerOutput -name mutation-report.json -path '*/reports/*' | sort | tail -n 1)
+          if [ -z "$report" ]; then
+            echo "::error::Stryker wrote no mutation-report.json"
+            exit 1
+          fi
+          python3 scripts/check_mutation_score.py score csharp "${{ matrix.module }}" "$report"
 
       - name: Upload Stryker report
         if: always()
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: mutation-report-csharp
-          path: |
-            src/csharp/StrykerOutput/
+          name: mutation-report-csharp-${{ matrix.module }}
+          path: src/csharp/StrykerOutput/
           retention-days: 30
           if-no-files-found: warn

@@ -17,7 +17,7 @@
   "enabledManagers": ["regex"],
   "packageRules": [
     {
-      "description": "ruff 6 箇所 (pyproject.toml × 3 dependency group + .pre-commit-config.yaml + python-lint.yml + ci.yml) を 1 PR に集約。 PR #401 の format drift 再発防止。",
+      "description": "ruff 6 箇所 (pyproject.toml × 3 dependency group + .pre-commit-config.yaml + lint-gates.yml + ci.yml) を 1 PR に集約。 PR #401 の format drift 再発防止。",
       "matchPackageNames": ["ruff"],
       "groupName": "ruff (cross-runtime sync)",
       "groupSlug": "ruff-cross-sync"
@@ -53,7 +53,7 @@
       "description": "ruff version pin in non-package files (.pre-commit-config.yaml の rev / workflow file の pip install ruff==X)。 pyproject.toml の `ruff==X` は dependabot uv-ecosystem が更新するが、 これら 3 箇所は uv ecosystem の scan 範囲外なので Renovate regex-manager で補完。",
       "fileMatch": [
         "^\\.pre-commit-config\\.yaml$",
-        "^\\.github/workflows/python-lint\\.yml$",
+        "^\\.github/workflows/lint-gates\\.yml$",
         "^\\.github/workflows/ci\\.yml$"
       ],
       "matchStrings": [

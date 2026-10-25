@@ -7,7 +7,7 @@ This gate has exactly one job: keep the ``## Current versions`` table in
 ``docs/reference/ort-versions.md`` honest. It does **not** check that the
 pins satisfy the canonical floor -- ``scripts/check_ort_versions.py``
 already does that with real ``parse_version`` comparisons over
-``EXACT_TARGETS`` / ``FLOOR_TARGETS``, gated by ``ort-version-sync.yml``.
+``EXACT_TARGETS`` / ``FLOOR_TARGETS``, gated by ``lint-gates.yml``.
 Duplicating it here would put the same contract behind a weaker check.
 
 Rows deliberately not covered:
@@ -29,7 +29,7 @@ The previous implementation never once failed a job:
    ``continue``d silently. Two of the six targets had nothing to match:
    ``src/python_run/setup.py`` lost its pin in Issue #418, and
    ``src/rust/piper-wasm/Cargo.toml`` does not depend on ``ort`` at all.
-3. ``model-quality-gate.yml`` also carried ``continue-on-error: true`` on
+3. ``model-quality-gate.yml`` (now steps of ``lint-gates.yml``) also carried ``continue-on-error: true`` on
    this step -- present since the workflow's first commit ``692cb3f6``
    (#401), so the step could not fail the job even in principle.
 

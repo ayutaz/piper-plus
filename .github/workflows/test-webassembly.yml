@@ -40,6 +40,10 @@ on:
       - 'test/fixtures/kaldi_fbank_golden.json'
       - '.github/workflows/test-webassembly.yml'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 env:
   NODE_VERSION: '24.x'
 
