@@ -24,8 +24,10 @@
 #              `[` starts a character class in a pattern; to match a
 #              parametrized test, use `*` or write the whole ID exactly.
 #   kind       "harmless" — the skip is correct where it happens: the test
-#                           does not apply to that OS or optional dependency,
-#                           and another job or OS runs it.
+#                           does not apply to that OS or optional dependency
+#                           and another job or OS runs it, or it needs what CI
+#                           does not have by design (a CUDA GPU, a maintainer's
+#                           private checkpoint).
 #              "tracked"  — the test should run in CI but does not yet.
 #                           Requires `expires` (YYYY-MM-DD); after that date
 #                           the gate fails until the test runs or the entry is
@@ -95,6 +97,63 @@ kind = "tracked"
 expires = "2027-01-31"
 reason = "Same as jsonl_per_line_output_file_overrides_cli_flag: #[ignore] and no workflow runs ignored tests."
 
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_export_onnx.py::*"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "The export fixtures turn every exception into a skip ('ONNX export not supported: ...'). The exceptions are real failures of the test models: 'SynthesizerTrn' object has no attribute 'emb_g' (TestSpeakerEmbeddingMaskMixedBatch) and a 4D input to conv1d (TestGraphInputSchema, TestUnifyEmbLangOnnxExport). Fix the fixtures and let export errors fail."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_multilingual_inference.py::TestOnnxOutputShape::test_onnx_output_is_3d"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Looks for the model under src/test/models (parents[2] is src/, not the repository root). With the path fixed, the shipped test/models/multilingual-test-medium.onnx outputs 4D [1, 1, 1, T], the regression (#38) the test guards against. Re-export the test model or test a fresh export."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_zero_shot.py::TestGeneratorFiLMConditioning::*"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Unconditional @pytest.mark.skip: written for the HiFi-GAN Generator, which MBiSTFTGenerator replaced (#320). Rewrite for MBiSTFTGenerator or delete."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_wavlm_discriminator.py::TestWavLMGradientFlow::*"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Unconditional @pytest.mark.skip (transformers WavLM cannot set requires_grad on a non-leaf tensor after resampling), so the gradient flow into the generated audio is never checked."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_performance.py::TestPerformance::test_synthesis_performance"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Imports piper_plus, which the training test job does not install, and skips on the ImportError ('Piper not installed'). Move it to a job with the runtime or install it."
+
+[[entry]]
+runtime = "python"
+test = "src/python_run/tests/test_training_integration.py::TestTrainingIntegration::test_real_piper_train_invocation"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Needs piper_train next to the WebUI; neither python-tests nor webui-test installs both, so it never runs."
+
+[[entry]]
+runtime = "python"
+test = "test/test_speaker_encoder_e2e.py::test_e2e_cosine_gate_against_pinned_embedding"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Same fixture gap as the Go entry: speaker_encoder_golden.json has no e2e_cosine_gate block."
+
+[[entry]]
+runtime = "csharp"
+test = "PiperPlus.Cli.Tests.DotNetG2PEngineConcurrencyTests.*"
+kind = "tracked"
+expires = "2027-01-31"
+platforms = ["macos"]
+reason = "Skipped on macOS: DotNetG2P.MeCab 1.8.x opens sys.dic with FileShare.None and never releases it, so a second MeCabTokenizer fails. The lock in DotNetG2PEngine only serializes construction, so sentence-parallel Japanese encoding may fail for macOS users as well; unverified while the tests skip."
+
 # ---------------------------------------------------------------------------
 # harmless — correct where it happens; another OS or job runs the test
 # ---------------------------------------------------------------------------
@@ -112,3 +171,119 @@ test = "PiperPlus.Core.Tests.CliWorkingDirectoryTests.Version_FromDeletedParentD
 kind = "harmless"
 platforms = ["macos", "windows"]
 reason = "A Linux-only regression (getcwd returning ENOENT after the current directory is deleted); runs on Linux."
+
+[[entry]]
+runtime = "python"
+test = "src/python/g2p/tests/test_korean.py::*"
+kind = "harmless"
+platforms = ["macos", "windows"]
+reason = "g2pk2 is not importable on the macOS and Windows runners; the Korean tests run on Linux."
+
+[[entry]]
+runtime = "python"
+test = "src/python/g2p/tests/test_cross_platform.py::TestKOPhonemeFixtures::*"
+kind = "harmless"
+platforms = ["macos", "windows"]
+reason = "Korean (g2pk2); runs on Linux."
+
+[[entry]]
+runtime = "python"
+test = "src/python/g2p/tests/test_custom_dict.py::TestKoreanIntegration::*"
+kind = "harmless"
+platforms = ["macos", "windows"]
+reason = "Korean (g2pk2); runs on Linux."
+
+[[entry]]
+runtime = "python"
+test = "src/python/g2p/tests/test_e2e.py::TestKoreanE2E::*"
+kind = "harmless"
+platforms = ["macos", "windows"]
+reason = "Korean (g2pk2); runs on Linux."
+
+[[entry]]
+runtime = "python"
+test = "src/python/g2p/tests/test_edge_cases.py::*_ko*"
+kind = "harmless"
+platforms = ["macos", "windows"]
+reason = "Korean (g2pk2); runs on Linux."
+
+[[entry]]
+runtime = "python"
+test = "src/python/g2p/tests/test_language_code.py::TestLanguageCode::test_korean_language_code"
+kind = "harmless"
+platforms = ["macos", "windows"]
+reason = "Korean (g2pk2); runs on Linux."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_compat.py::test_posixpath_routed_to_windowspath_on_windows"
+kind = "harmless"
+platforms = ["linux", "macos"]
+reason = "Tests the PosixPath to WindowsPath patch, which only applies on Windows; runs on Windows."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_ort_utils.py::TestCacheConcurrentRace::test_concurrent_cache_creation_no_corruption"
+kind = "harmless"
+platforms = ["macos", "windows"]
+reason = "The .opt.onnx + .ok cache race depends on Linux filesystem semantics; runs on Linux."
+
+[[entry]]
+runtime = "python"
+test = "src/python_run/tests/test_webui.py::*"
+kind = "harmless"
+reason = "Needs gradio; webui-test.yml installs the WebUI requirements and runs this file."
+
+[[entry]]
+runtime = "python"
+test = "src/python_run/tests/test_training_manager.py::TestTrainingWebUIIntegration::*"
+kind = "harmless"
+reason = "Needs gradio; webui-test.yml runs tests/test_training_manager.py."
+
+[[entry]]
+runtime = "python"
+test = "src/python_run/tests/test_training_integration.py::TestTrainingIntegration::test_*_training_*"
+kind = "harmless"
+reason = "Needs gradio; webui-test.yml runs tests/test_training_integration.py."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_flow_debug.py::TestFlowReverseNumerics::*"
+kind = "harmless"
+reason = "Maintainer-only numerics checks on a private checkpoint (PIPER_PLUS_FLOW_DEBUG_CKPT)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_*_host_sync.py::*"
+kind = "harmless"
+reason = "Checks CUDA host synchronization; CI has no GPU runner."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_slice_segments.py::*"
+kind = "harmless"
+reason = "CUDA-only case; CI has no GPU runner."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_monotonic_align.py::*"
+kind = "harmless"
+reason = "CUDA-only case of the Super-MAS dispatch; CI has no GPU runner."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_super_mas_dispatch.py::*"
+kind = "harmless"
+reason = "GPU dispatch decision; CI has no GPU runner."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_vits.py::TestWavLMDiscriminator::*"
+kind = "harmless"
+reason = "WavLM forward passes need a GPU to finish in reasonable time; CI has no GPU runner."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_python313_migration.py::test_torch_211_cu128_resolution_on_linux"
+kind = "harmless"
+reason = "Checks the CUDA (cu128) torch wheel; CI has no GPU runner."

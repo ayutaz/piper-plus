@@ -205,6 +205,27 @@ def test_main_check_takes_runner_os_as_the_platform(tmp_path):
         assert m.main(args) == code, runner_os
 
 
+def test_main_reports_every_skip_when_stdout_cannot_encode_the_test_id(tmp_path):
+    # Windows runners write stdout as cp1252. Parametrized test IDs carry
+    # Hangul jamo, and printing one used to raise UnicodeEncodeError and cut
+    # the report after the first such ID.
+    spec = tmp_path / "allow.toml"
+    spec.write_text('[[entry]]\nruntime = "go"\ntest = "TestZ"\nkind = "harmless"\nreason = "r"\n', encoding="utf-8")
+    log = tmp_path / "go.log"
+    log.write_text("--- SKIP: TestA/ᄡ (0.00s)\n--- SKIP: TestB (0.00s)\n", encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--spec", str(spec), "check", "--runtime", "go", "--platform", "windows", str(log)],
+        env={**os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"},
+        capture_output=True,
+        check=False,
+    )
+    out = result.stdout.decode("cp1252")
+    assert result.returncode == 1, out + result.stderr.decode("cp1252", "replace")
+    assert b"Traceback" not in result.stderr
+    assert "TestA/" in out
+    assert "TestB" in out
+
+
 # --- pytest plugin ------------------------------------------------------------
 
 

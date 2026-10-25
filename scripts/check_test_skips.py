@@ -229,7 +229,12 @@ def check(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    # Windows runners write stdout as cp1252, which cannot encode the Hangul
+    # in parametrized test IDs; print those as \uXXXX instead of failing.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="backslashreplace")
+    parser =argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--spec", type=Path, default=SPEC)
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("check", "list"):
