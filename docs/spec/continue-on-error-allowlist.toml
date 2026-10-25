@@ -200,41 +200,8 @@ kind = "tracked"
 expires = "2027-01-31"
 reason = "The root workspace (training environment, not published) reports 15 advisories in setuptools 81, torch 2.11 and transformers 4.57; the fixes need torch / huggingface-hub major moves. The published wheel is audited by the blocking 'Audit src/python_run' step."
 
-# The keys below are removed by open PRs (#872 public-api-diff, the
-# mutation-testing fix). They expire soon so they cannot outlive
-# those PRs.
-
-[[entry]]
-workflow = "public-api-diff.yml"
-job = "rust-public-api"
-step = "Generate public API for current branch"
-kind = "tracked"
-expires = "2026-11-15"
-reason = "Removed by #872 (public API diff that actually produces a diff)."
-
-[[entry]]
-workflow = "public-api-diff.yml"
-job = "rust-public-api"
-step = "Generate public API for base branch"
-kind = "tracked"
-expires = "2026-11-15"
-reason = "Removed by #872."
-
-[[entry]]
-workflow = "public-api-diff.yml"
-job = "go-public-api"
-step = "Run gorelease (compare to base)"
-kind = "tracked"
-expires = "2026-11-15"
-reason = "Removed by #872."
-
-[[entry]]
-workflow = "public-api-diff.yml"
-job = "csharp-public-api"
-step = "Comment PR with API diff (if changed)"
-kind = "tracked"
-expires = "2026-11-15"
-reason = "Removed by #872."
+# The keys below are removed by the open mutation-testing fix. They
+# expire soon so they cannot outlive that PR.
 
 [[entry]]
 workflow = "mutation-testing.yml"
