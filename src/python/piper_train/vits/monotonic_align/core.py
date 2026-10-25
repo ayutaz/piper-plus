@@ -25,7 +25,10 @@ def _maximum_path_each(path, value, t_y, t_x):
 
     for y in range(t_y - 1, -1, -1):
         path[y, index] = 1
-        if index != 0 and (index == y or value[y - 1, index] < value[y - 1, index - 1]):
+        # Same guard as core.pyx: never read value[-1, ...] (t_x > t_y).
+        if index != 0 and (
+            index == y or (y > 0 and value[y - 1, index] < value[y - 1, index - 1])
+        ):
             index = index - 1
 
 
