@@ -9,5 +9,5 @@
 #
 # onnxruntime: #700 で `~=1.11.0` から更新済み。 canonical な Python ORT の
 # floor (`>=1.26.0`、 docs/reference/ort-versions.md) を上回る。
-onnxruntime~=1.30.0
+onnxruntime~=1.31.0
 torch==2.11.0
