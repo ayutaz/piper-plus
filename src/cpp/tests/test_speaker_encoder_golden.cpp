@@ -159,8 +159,7 @@ std::vector<float> compute_mel_spectrogram(const std::vector<float>& samples) {
                 energy += filters[m * fft_bins + k] * power_spec[k];
             }
             // Frame-major, like test/generate_speaker_encoder_golden.py.
-            mel[frame * MEL_N_MELS + m] =
-                std::log(std::max(energy, 1e-10f));
+            mel[frame * MEL_N_MELS + m] = std::log(std::max(energy, 1e-10f));
         }
     }
 
