@@ -28,7 +28,7 @@ uv の group 選択は [公式の依存管理ドキュメント](https://docs.as
 
 ## WebUI
 
-Gradio 6.26.0 は HF Hub 1.x を要求し、root の Transformers 4.x 学習環境は HF Hub <1 を要求します。専用 lock を持つ環境を使用します。
+Gradio 6.30.0 は HF Hub 1.x 以上 (`>=1.16`) を要求し、root の Transformers 4.x 学習環境は HF Hub <1 を要求します。専用 lock を持つ環境を使用します。
 
 ```bash
 uv sync --project environments/webui --locked
