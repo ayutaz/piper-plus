@@ -24,10 +24,12 @@ on:
 permissions:
   contents: read
 
-# Cancel duplicate runs from the same ref so a re-tag doesn't double-publish.
+# Runs from the same ref queue instead of overlapping, so a re-tag doesn't
+# double-publish. A pull request only does the publishToMavenLocal dry run,
+# so a newer push to it cancels the older run.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   ANDROID_NDK_VERSION: "26.1.10909125"
