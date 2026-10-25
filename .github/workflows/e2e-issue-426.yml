@@ -13,7 +13,7 @@
 # `tests/fixtures/mb_istft_speaker_embedding/build_fixture.py` so the
 # CI does not need to fetch a large model from HuggingFace.
 
-name: E2E Issue #426 (speaker_embedding)
+name: "E2E Issue #426 (speaker_embedding)"
 
 on:
   pull_request:

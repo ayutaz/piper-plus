@@ -29,7 +29,12 @@ cdef void maximum_path_each(int[:,::1] path, float[:,::1] value, int t_y, int t_
 
   for y in range(t_y - 1, -1, -1):
     path[y, index] = 1
-    if index != 0 and (index == y or value[y-1, index] < value[y-1, index-1]):
+    # `y > 0`: with more tokens than frames (t_x > t_y) the path cannot reach
+    # index 0, so at y == 0 the comparison would read value[-1, ...], which
+    # (wraparound off) is memory before the buffer. On Linux/macOS a large
+    # buffer is mmap'd and that read segfaults (#197). With t_x <= t_y,
+    # index == 0 at y == 0, so the guard never changes the result.
+    if index != 0 and (index == y or (y > 0 and value[y-1, index] < value[y-1, index-1])):
       index = index - 1
 
 

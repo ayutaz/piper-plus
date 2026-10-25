@@ -323,6 +323,17 @@ repos:
         files: ^(src/python_run/tests/test_.*\.py|\.github/workflows/.*\.yml|scripts/check_python_run_test_coverage\.py)$
         pass_filenames: false
 
+      # tests/scripts と npm の node:test ファイルが、 どの workflow からも
+      # (package.json の script 経由も含めて) 実行されていなければ落とす。
+      # tests/scripts は 71 ファイル中 36 が、 npm は 2 ファイルが CI で
+      # 一度も動いていなかった。
+      - id: orphan-test-files
+        name: "tests/scripts and npm node:test files run by a CI workflow (meta gate)"
+        entry: uv run --no-sync python scripts/check_orphan_test_files.py
+        language: system
+        files: ^(tests/scripts/test_.*\.py|src/wasm/(g2p|openjtalk-web)/(package\.json|test/.*\.m?js)|\.github/workflows/.*\.ya?ml|scripts/check_orphan_test_files\.py)$
+        pass_filenames: false
+
       # SRT の ms 丸めは言語既定が分かれる (Python round() / .NET Math.Round は
       # half-to-even、 Rust / Go / JS / C++ は half-away-from-zero)。 spec が
       # 丸めを規定していなかったため Python と C# が .5 境界で 1ms 早い値を
@@ -1136,6 +1147,21 @@ repos:
         language: system
         files: ^src/(python|python_run)/.*tests?/.*\.py$|^scripts/check_test_skip_reason\.py$
         pass_filenames: true
+
+      # Goalpost-moving guard: block commits that WEAKEN a numeric test
+      # threshold (assert x > N with smaller N, wider approx tolerances,
+      # fewer assertAlmostEqual places) unless the changed assertion carries
+      # a non-empty `# threshold-relaxed: <evidence>` justification. Born
+      # from the PQMF incident (PR #320): acceptance -90dB was relaxed to
+      # >5dB, mislabeled "theoretical limit", and the aliasing bug shipped
+      # in every MB-iSTFT model for 15 months. CI runs the same check on the
+      # pull request's diff (test-threshold-relaxation.yml).
+      - id: test-threshold-relaxation
+        name: test threshold relaxation requires evidence
+        entry: uv run --no-sync python scripts/check_test_threshold_relaxation.py
+        language: system
+        files: (^|/)tests?/.*\.py$|(^|/)test_[^/]*\.py$|^scripts/check_test_threshold_relaxation\.py$
+        pass_filenames: false
 
       # gofmt drift catch. Go's tooling already enforces this in CI, but
       # catching it at commit time prevents the cycle-of-shame

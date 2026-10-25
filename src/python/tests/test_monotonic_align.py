@@ -1,9 +1,13 @@
 """Tests for monotonic_align module with chunked processing.
 
-These tests verify that the adaptive chunking in monotonic_align.maximum_path
-correctly handles large matrices that would otherwise cause SIGSEGV crashes.
+These tests verify that monotonic_align.maximum_path handles large matrices
+and inputs with more text tokens than frames without crashing.
 
-Issue: https://github.com/ayutaz/piper-plus/issues/197
+Issue: https://github.com/ayutaz/piper-plus/issues/197 (the training SIGSEGV
+on an 829-frame x 1068-token sample). Its cause was not memory pressure: with
+more tokens than frames the Cython backtrack read value[-1, ...] at y == 0,
+memory before the buffer, which segfaults on Linux/macOS when the buffer is
+mmap'd. core.pyx now guards that read; see TestMoreTokensThanFrames.
 
 Note: These tests require torch and piper_train to be installed.
 They are skipped in CI environments without GPU/training dependencies.
@@ -34,10 +38,10 @@ class TestMonotonicAlignChunking:
     """Test adaptive chunking for large matrices."""
 
     def test_large_matrix_subprocess(self):
-        """Test large matrices in subprocess to avoid pytest memory issues.
+        """The #197 crash case (batch=20, 829 frames x 1068 tokens).
 
-        The original crash case (batch=20, 829x1068) requires running in a
-        separate process due to pytest memory management conflicts.
+        Run in a subprocess so that a regression is reported as a failed
+        test instead of a segfault that ends the whole pytest session.
         """
         code = """
 import torch
@@ -132,3 +136,36 @@ print("SUCCESS")
             row_sums = path.sum(dim=1)
             # Each row should have at most one 1
             assert torch.all(row_sums <= 1)
+
+
+class TestMoreTokensThanFrames:
+    """More text tokens than frames (t_s > t_t): no monotonic path covers them.
+
+    The backtrack then never reaches token 0, and before the fix it compared
+    value[-1, ...] at the first frame, reading memory before the buffer. With
+    buffers large enough to be mmap'd this segfaulted on Linux and macOS
+    (batch 10 x 300 x 400 did in CI); Windows read the memory and passed.
+    """
+
+    @pytest.mark.parametrize("shape", [(10, 300, 400), (1, 829, 1068)])
+    def test_does_not_read_before_the_buffer(self, shape):
+        code = f"""
+import torch
+from piper_train.vits import monotonic_align
+b, t_t, t_s = {shape}
+path = monotonic_align.maximum_path(torch.randn(b, t_t, t_s), torch.ones(b, t_t, t_s))
+assert path.shape == (b, t_t, t_s)
+# The backtrack marks exactly one token per frame.
+assert int(path.sum()) == b * t_t, int(path.sum())
+print("SUCCESS")
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert result.returncode == 0, (
+            f"exit {result.returncode} (-11 / 139 = segfault): {result.stderr[-2000:]}"
+        )
+        assert "SUCCESS" in result.stdout

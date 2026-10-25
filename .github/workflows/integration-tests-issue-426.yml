@@ -11,7 +11,7 @@
 # install Python+torch, and the fixture builder requires both. Keeping
 # this gate distinct avoids slowing down the routine per-runtime CIs.
 
-name: Integration Tests (Issue #426)
+name: "Integration Tests (Issue #426)"
 
 # 最小権限 (least privilege): test / report のみ、 書込不要。
 permissions:

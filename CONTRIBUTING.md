@@ -109,6 +109,25 @@ uv run pytest src/python/g2p/tests/ -v
 cd src/python_run && uv run python -m pytest
 ```
 
+#### Relaxing a test threshold
+
+Before weakening a numeric threshold in a Python test (a smaller `>` floor, a
+larger `<` ceiling, a wider `abs=` / `rel=` / `atol=` / `rtol=` / `delta=`, or
+fewer `places=`), compare the measured value against a reference
+implementation or a first-principles bound. Then put the evidence on the
+assertion, or on one of the two lines above it:
+
+```python
+# threshold-relaxed: the reference implementation also measures 32 dB for 16 taps
+assert snr_db > 30
+```
+
+`scripts/check_test_threshold_relaxation.py` fails a commit (pre-commit hook
+`test-threshold-relaxation`) and a pull request (`test-threshold-relaxation.yml`)
+that relaxes a threshold without this comment. In PR #320 a filter bank's
+acceptance criterion was relaxed from -90 dB to > 5 dB to match a buggy
+measurement, and the bug shipped in every MB-iSTFT model for 15 months.
+
 ### Rust
 
 ```bash
@@ -361,12 +380,21 @@ Python runtimeのPyPI公開は、準備済みタグを選択した `dev-create-r
 
 推奨順序: タグなしでnative/Apple成果物を生成・検証 → Package.swiftの版番号・URL・checksumをPRで更新 → PR mergeとCI確認 → 必要な独立パッケージを公開 → 同じ検証済みコミットに `docker-v<X.Y.Z>` をpushしてDocker公開・署名・consumer検証 → 同じコミットに `v<X.Y.Z>` tagをpush → 同じタグから `dev-create-release.yml` をdispatch。既公開の `wasm-g2p-v*` / `kotlin-g2p-v*` は再tag不要です。
 
+## マージ条件とタグの保護 (rulesets)
+
+dev へのマージ条件とタグの保護は、 リポジトリ設定の ruleset で決まります。 その正本は `.github/rulesets/*.json` です (1 ファイル = 1 ruleset、 `name` で照合)。
+
+- `piper-dev` (`refs/heads/dev*`): squash のみ、 削除と force push を禁止、 必須チェックは `ci-required` と `required-gate/all-workflows`、 未解決のレビュースレッドがあるとマージ不可、 strict (base の最新化を必須にする設定) は off、 例外の人は置かない。
+- `release-tags` (`refs/tags/v*`、 `refs/tags/*-v*`、 `refs/tags/src/go/**`): タグの削除と付け直し (移動) を禁止、 例外の人は置かない。 意図して動かす `openjtalk-binaries-latest` と `dev-20250610` はどの pattern にも当たらない。
+
+変更の手順: JSON を PR で変える → PR では `Rulesets` workflow がファイルの条件 (`scripts/check_rulesets.py --validate`) を検査する → マージ後、 admin が `python scripts/check_rulesets.py --apply` で差分を表示して適用し、 読み戻して一致を確かめる。 dev への push・毎日の schedule では `--check` が live の設定とファイルを比べ、 設定画面で直接変えると赤になります。
+
 ## First-PR fast lane (新規 contributor 向け)
 
 piper-plus は 18+ contract gate (PUA / loanword / ORT 等) を持ちますが、 **初回 PR ではこれらを `neutral` (warning) に降格** します。 GitHub の `author_association` が `FIRST_TIME_CONTRIBUTOR` / `FIRST_TIMER` / `NONE` のいずれかなら、 以下を満たすだけで merge を依頼できます:
 
 - ruff format / cargo fmt / gofmt / dotnet-format / clang-tidy 等の **コア lint pass**
-- `Required Status Check Gate` (cancelled / skipped baseline run の検出) pass
+- commit status `required-gate/all-workflows` (`Required Status Check Gate` が、PR の head に付いた全 workflow の完了を待って出す判定) が success
 - maintainer の review 通過
 
 contract gate の知識 (PUA fixture / loanword JSON / Ruff pin 同期 等) は初回 PR では学習対象外で、 warning として記録されます。 詳細: `.github/workflows/first-pr-fast-lane.yml` / `scripts/first_pr_fast_lane.py`。
