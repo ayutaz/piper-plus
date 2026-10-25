@@ -16,6 +16,13 @@ on:
         default: false
         type: boolean
 
+# A newer push to a pull request cancels the older run. Tag pushes and
+# manual runs, which can publish to PyPI, each get a group of their own
+# (the run id) and are never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 env:
   CIBW_BUILD_VERBOSITY: 1
 

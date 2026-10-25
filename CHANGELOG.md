@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Pages demo: zero-shot section that computes a CAM++ embedding from an uploaded or recorded clip in the browser and reads text in six languages with the public zs-v1 base (Issue #790).
 - Browser (`piper-plus` npm): `SpeakerEncoder` option `frontEnd: "kaldi-fbank"` that matches the zs-v1 Python embedding recipe (torchaudio Kaiser resampling + 80-bin `kaldi.fbank`), checked against a torchaudio golden fixture. The default front end is unchanged.
 - Browser (`piper-plus` npm) and Rust WASM: `findDroppedSymbols()` / `droppedSymbols` report the phonemes a model's table lacks, which encoding skips silently (for zs-v1: French `ɥ`, Portuguese `ã`, and most punctuation).
+- CI: a newer push to a pull request now cancels the older run of six workflows that kept it going. `release-shared-lib.yml` (up to five macOS jobs) and `release-kotlin-g2p.yml` queued every push of a pull request behind the previous one, and `build-linux-armv7.yml`, `build-phonemize-wheels.yml`, `csharp-cwd-regression.yml` and `test-webassembly.yml` had no `concurrency` at all. Tag pushes and manual runs of the two release workflows still queue instead of cancelling; `build-linux-armv7.yml` and `build-phonemize-wheels.yml` give every run that is not a pull request (tag, manual, `workflow_call`) a group of its own, so none of them is cancelled. The other two use the same group as the rest of CI.
 
 ### Fixed
 
