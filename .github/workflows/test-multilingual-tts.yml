@@ -101,7 +101,9 @@ jobs:
             # Skip the test
             echo "SKIP_TESTS=true" >> "$GITHUB_ENV"
           fi
-          [ -f "piper-plus/bin/open_jtalk" ] && chmod +x piper-plus/bin/open_jtalk || true
+          if [ -f "piper-plus/bin/open_jtalk" ]; then
+            chmod +x piper-plus/bin/open_jtalk || true
+          fi
 
           # Set up paths
           export PATH="${{ github.workspace }}/piper-plus/bin:$PATH"

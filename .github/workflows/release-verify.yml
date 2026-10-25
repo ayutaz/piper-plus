@@ -218,7 +218,7 @@ jobs:
           if [ -n "$INPUT_VERSION" ]; then
             VERSION="$INPUT_VERSION"
           else
-            VERSION=$(cat VERSION | tr -d '\n\r')
+            VERSION=$(tr -d '\n\r' < VERSION)
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 

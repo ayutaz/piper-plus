@@ -59,7 +59,7 @@ jobs:
 
           # Check the version committed at the selected tag.
           if [ -f "VERSION" ]; then
-            FILE_VERSION=$(cat VERSION | tr -d '\n\r')
+            FILE_VERSION=$(tr -d '\n\r' < VERSION)
             if [ "$FILE_VERSION" != "$VERSION" ]; then
               echo "❌ VERSION file has '$FILE_VERSION', expected '$VERSION'"
               exit 1
