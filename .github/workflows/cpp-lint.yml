@@ -1,8 +1,19 @@
 name: C++ Lint
+
+# Checks the formatting of the C / C++ lines a PR changes against
+# .clang-format. Until 2026-10 the step ran clang-format on every file and
+# ended with `|| true`, so it was always green; .hpp files were not checked
+# either. The existing code is not formatted (clang-format would rewrite
+# about 12,500 lines in 130 files), so only the changed lines are checked:
+# `git clang-format --diff <base>` formats the lines that differ from the
+# base commit and prints what it would change.
 on:
   pull_request:
     branches: [dev]
-    paths: ['src/cpp/**']
+    paths:
+      - 'src/cpp/**'
+      - '.clang-format'
+      - '.github/workflows/cpp-lint.yml'
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
@@ -13,8 +24,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6.1.0
-      - name: Check formatting
+
+      - name: Fetch the base commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git fetch --no-tags --depth=1 origin "$BASE_SHA"
+
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.12'
+
+      - name: Install clang-format
+        # Pinned so that a new release does not change the result of an
+        # unchanged PR. The wheel also ships git-clang-format.
+        run: pip install clang-format==18.1.8
+
+      - name: Check the formatting of the changed lines
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          find src/cpp \( -name '*.cpp' -o -name '*.h' -o -name '*.c' \) -print0 | \
-            xargs -0 clang-format --dry-run --Werror 2>&1 || true
-          echo "Note: clang-format check is advisory only"
+          if ! git clang-format --diff --extensions c,cc,cpp,h,hpp "$BASE_SHA" -- src/cpp > clang-format.diff; then
+            cat clang-format.diff
+            echo "::error::Changed C/C++ lines do not match .clang-format. Apply the diff above, or run: git clang-format $BASE_SHA -- src/cpp"
+            exit 1
+          fi
+          cat clang-format.diff
