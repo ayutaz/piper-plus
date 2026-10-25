@@ -93,9 +93,6 @@ export const WARMUP_LENGTH_SCALE = DEFAULT_LENGTH_SCALE;
 export const WARMUP_NOISE_W = DEFAULT_NOISE_W;
 
 import {
-  MIN_PHONEME_IDS,
-  MIN_BODY_FOR_STRATEGY_A,
-  TRIM_EOS_MAX_FRAMES,
   DEFAULT_HOP_SIZE,
   padPhonemeIds,
   trimPaddingByDurations,
