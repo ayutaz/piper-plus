@@ -159,6 +159,14 @@ environment must hand it over with `piper_plus::ort_env::set_environment`
 before loading the first model. `tests/test_ort_environment.rs` loads
 several models in one process to keep this from regressing.
 
+`piper_plus::ort_env::session_builder()` also sets
+`AutoDevicePolicy::PreferCPU`. `ort`'s `SessionBuilder` defaults to
+`MaxEfficiency`, which on macOS registers the CoreML EP even when the CPU EP
+is registered explicitly; with ONNX Runtime 1.31 CoreML compiles nodes and
+saving the optimized model fails ("Unable to serialize model as it contains
+compiled nodes"), so every cached load failed on the macOS CI. `piper-core`
+picks its EPs explicitly from `--device`, so automatic selection stays off.
+
 Action items tracked separately:
 
 * Migrate to `ort 2.x stable` as soon as it lands on crates.io.

@@ -10,14 +10,32 @@
 //! 別の ONNX モデルも動かしている、など) は、最初のモデルを読み込む前に
 //! [`set_environment`] で渡す。渡さずにアプリ側で先に作ると、piper-plus は
 //! Environment を作れずにモデルの読み込みが失敗する。
+//!
+//! セッションは [`session_builder`] から作る。ort の `SessionBuilder` は
+//! 既定で EP を自動選択し (`AutoDevicePolicy::MaxEfficiency`)、macOS では
+//! CPU EP を明示しても CoreML EP を登録する。CoreML がノードをコンパイルすると
+//! 最適化済みモデルを保存できず、キャッシュ付きの読み込みが失敗する
+//! ("Unable to serialize model as it contains compiled nodes")。piper-plus は
+//! 使う EP を `--device` で明示的に選ぶので、自動選択は止めておく。
 
 use std::sync::{Mutex, PoisonError};
 
 use ort::environment::Environment;
+use ort::session::Session;
+use ort::session::builder::{AutoDevicePolicy, SessionBuilder};
 
 use crate::error::PiperError;
 
 static ENVIRONMENT: Mutex<Option<Environment>> = Mutex::new(None);
+
+/// 共有の Environment から、EP の自動選択を止めた `SessionBuilder` を作る。
+pub fn session_builder() -> Result<SessionBuilder, PiperError> {
+    let env = environment()?;
+    Session::builder(&env)
+        .map_err(|e| PiperError::ModelLoad(format!("session builder: {e}")))?
+        .with_auto_device(AutoDevicePolicy::PreferCPU)
+        .map_err(|e| PiperError::ModelLoad(format!("auto device policy: {e}")))
+}
 
 /// piper-plus が使う Environment を返す。まだなければ既定の設定で作る。
 pub fn environment() -> Result<Environment, PiperError> {

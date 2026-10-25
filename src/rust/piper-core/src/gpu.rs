@@ -226,7 +226,7 @@ pub fn list_devices() -> Vec<DeviceInfo> {
 /// Uses ort v2 API:
 /// ```ignore
 /// use ort::ep;
-/// let builder = Session::builder(&piper_plus::ort_env::environment()?)?
+/// let builder = piper_plus::ort_env::session_builder()?
 ///     .with_execution_providers([ep::CUDA::default().build()])?;
 /// ```
 pub fn configure_session_builder(
@@ -407,8 +407,7 @@ mod tests {
     use super::*;
 
     fn test_builder() -> ort::session::builder::SessionBuilder {
-        let env = crate::ort_env::environment().expect("environment");
-        ort::session::Session::builder(&env).expect("session builder")
+        crate::ort_env::session_builder().expect("session builder")
     }
 
     // -----------------------------------------------------------------------
