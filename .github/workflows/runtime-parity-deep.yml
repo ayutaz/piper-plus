@@ -41,7 +41,7 @@ permissions:
 env:
   MODEL_PATH: test/models/multilingual-test-medium.onnx
   CONFIG_PATH: test/models/multilingual-test-medium.onnx.json
-  FIXTURE: tests/fixtures/audio-corpus/parity/phoneme_ids.jsonl
+  FIXTURE: tests/fixtures/audio-corpus/parity/deterministic_phoneme_ids.jsonl
   # ONNX Runtime version pinned to match .github/workflows/go-ci.yml so the
   # Go runtime can dlopen the same .so the production CI does.
   ORT_VERSION: '1.24.4'
@@ -50,7 +50,6 @@ jobs:
   dump-python:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6.1.0
       - uses: actions/setup-python@v6.2.0
@@ -72,6 +71,7 @@ jobs:
             --model "$MODEL_PATH" \
             --config "$CONFIG_PATH" \
             --json-input \
+            --noise-scale 0 --noise-w 0 --length-scale 1 --sentence-silence 0 \
             --output-file /tmp/parity/python.wav \
             < "$FIXTURE"
           ls -lh /tmp/parity/python.wav
@@ -85,7 +85,6 @@ jobs:
   dump-rust:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
-    continue-on-error: true
     defaults:
       run:
         working-directory: src/rust
@@ -111,6 +110,7 @@ jobs:
             --model "$MODEL_PATH" \
             --config "$CONFIG_PATH" \
             --output-file /tmp/parity/rust.wav \
+            --noise-scale 0 --noise-w 0 --length-scale 1 --sentence-silence 0 \
             --no-warmup \
             < "$FIXTURE"
           ls -lh /tmp/parity/rust.wav
@@ -124,7 +124,6 @@ jobs:
   dump-go:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6.1.0
       - uses: actions/setup-go@v5.6.0
@@ -169,6 +168,7 @@ jobs:
             --model "$MODEL_PATH" \
             --config "$CONFIG_PATH" \
             --json-input \
+            --noise-scale 0 --noise-w 0 --length-scale 1 --sentence-silence 0 \
             --output-dir /tmp/parity/go-out \
             < "$FIXTURE"
           mv /tmp/parity/go-out/line_001.wav /tmp/parity/go.wav
@@ -183,7 +183,6 @@ jobs:
   dump-csharp:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6.1.0
       - uses: actions/setup-dotnet@v5.4.0
@@ -200,6 +199,7 @@ jobs:
             --model "$MODEL_PATH" \
             --config "$CONFIG_PATH" \
             --json-input \
+            --noise-scale 0 --noise-w 0 --length-scale 1 --sentence-silence 0 \
             --output-file /tmp/parity/csharp.wav \
             < "$FIXTURE"
           ls -lh /tmp/parity/csharp.wav
@@ -213,7 +213,6 @@ jobs:
   dump-cpp:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6.1.0
 
@@ -235,6 +234,7 @@ jobs:
           ./build/piper-plus \
             --model "$MODEL_PATH" \
             --json-input \
+            --noise_scale 0 --noise_w 0 --length_scale 1 --sentence_silence 0 \
             --output_file /tmp/parity/cpp.wav \
             < "$FIXTURE"
           ls -lh /tmp/parity/cpp.wav
@@ -248,7 +248,6 @@ jobs:
   dump-wasm:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    continue-on-error: true
     defaults:
       run:
         working-directory: src/wasm/openjtalk-web
@@ -272,6 +271,7 @@ jobs:
             --model "$MODEL_PATH" \
             --config "$CONFIG_PATH" \
             --json-input \
+            --noise-scale 0 --noise-w 0 --length-scale 1 \
             --output-file /tmp/parity/wasm.wav \
             < "$FIXTURE"
           ls -lh /tmp/parity/wasm.wav
@@ -287,7 +287,6 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6.1.0
       - uses: actions/setup-python@v6.2.0
