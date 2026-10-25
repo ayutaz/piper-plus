@@ -1,0 +1,119 @@
+# Mutation testing targets and break scores.
+#
+# Read by scripts/check_mutation_score.py: `matrix <runtime>` builds the job
+# matrix of .github/workflows/mutation-testing.yml from this file, and
+# `score` fails a job whose score is below its target's `break`.
+# Background and how to read a report: docs/reference/mutation-testing.md.
+#
+# score = detected / (detected + undetected)
+#   detected   killed, or timed out (the tests noticed an infinite loop)
+#   undetected survived, suspicious (mutmut: tests passed, only slower),
+#              no coverage (Stryker)
+#   left out   does not compile (unviable / CompileError), `pragma: no mutate`
+#
+# `break` is the measured score of 2026-10-25 rounded down to a multiple of
+# 5, a little below the measurement. A target's score only moves when its
+# code or its tests change, so a drop below `break` means new code without
+# tests, or a weakened test. Raise `break` when tests are added; lowering it
+# needs the same review as relaxing any other test threshold.
+#
+# `tests` are the tests that exercise the target. Running the whole suite
+# per mutant made the jobs too slow to finish (cargo-mutants on
+# text_splitter.rs: 85 s per mutant, 198 mutants).
+
+[meta]
+spec_version = 1
+last_updated = "2026-10-25"
+applies_to = ["python", "rust", "csharp"]
+canonical_reference = ".github/workflows/mutation-testing.yml"
+forward_compat_policy = "strict"
+
+# ---------------------------------------------------------------------------
+# Python — mutmut 2.5.1
+# ---------------------------------------------------------------------------
+
+[[python]]
+module = "text_splitter"
+target = "src/python_run/piper_plus/text_splitter.py"
+tests = ["src/python_run/tests/test_text_splitter.py", "src/python_run/tests/test_text_splitter_contract.py"]
+timeout_minutes = 30
+measured = "95/107 = 88.8%"
+break = 85
+
+[[python]]
+module = "timing"
+target = "src/python_run/piper_plus/timing.py"
+tests = [
+    "src/python_run/tests/test_phoneme_timing.py",
+    "src/python_run/tests/test_phoneme_timing_parity.py",
+    "src/python_run/tests/test_voice_timing.py",
+    "src/python_run/tests/test_http_timing.py",
+]
+timeout_minutes = 30
+measured = "85/102 = 83.3%"
+break = 80
+
+[[python]]
+module = "ssml"
+target = "src/python/g2p/piper_plus_g2p/ssml.py"
+tests = ["src/python/g2p/tests/test_ssml.py", "src/python/g2p/tests/test_ssml_attacks.py"]
+timeout_minutes = 60
+measured = "92/132 = 69.7%"
+break = 65
+
+[[python]]
+module = "base"
+target = "src/python/g2p/piper_plus_g2p/base.py"
+tests = ["src/python/g2p/tests/test_base.py", "src/python/g2p/tests/test_encode.py", "src/python/g2p/tests/test_encoder.py"]
+timeout_minutes = 30
+# 16 of 18 mutants survive: the tests barely check base.py's own logic.
+measured = "2/18 = 11.1%"
+break = 10
+
+[[python]]
+module = "multilingual"
+target = "src/python/g2p/piper_plus_g2p/multilingual.py"
+tests = [
+    "src/python/g2p/tests/test_multilingual.py",
+    "src/python/g2p/tests/test_segment_text.py",
+    "src/python/g2p/tests/test_cjk_punctuation_contract.py",
+]
+timeout_minutes = 240
+measured = "129/306 = 42.2%"
+break = 40
+
+# ---------------------------------------------------------------------------
+# Rust — cargo-mutants 27.1.0 (run from src/rust, `--in-place`)
+# ---------------------------------------------------------------------------
+
+[[rust]]
+module = "g2p-ssml"
+package = "piper-plus-g2p"
+file = "piper-plus-g2p/src/ssml.rs"
+cargo_test_args = ""
+timeout_minutes = 60
+measured = "63/71 = 88.7%"
+break = 85
+
+[[rust]]
+module = "text_splitter"
+package = "piper-plus"
+file = "piper-core/src/text_splitter.rs"
+cargo_test_args = "--lib --test test_text_splitter --test test_text_splitter_contract"
+# 154 minutes on a local Windows machine (25 mutants hit the 60 s timeout).
+timeout_minutes = 240
+measured = "140/197 = 71.1%"
+break = 70
+
+# ---------------------------------------------------------------------------
+# C# — Stryker.NET 4.x / 5.0.0 (src/csharp/stryker-config.json)
+# ---------------------------------------------------------------------------
+
+[[csharp]]
+module = "core"
+config = "src/csharp/stryker-config.json"
+# 31 min on a 16-thread desktop with concurrency 4 (test-runner mtp).
+timeout_minutes = 120
+# (417 killed + 17 timeout) / (434 + 32 survived + 15 no coverage).
+measured = "434/481 = 90.2%"
+break = 90
