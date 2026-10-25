@@ -1,5 +1,5 @@
 {
-  "_comment": "Bundle size baseline consumed by scripts/check_bundle_size.py. Each entry pins the on-disk size of one public distribution unit. size_bytes: null is a placeholder; replace it via 'uv run python scripts/check_bundle_size.py --update-baseline' from a clean CI run, then commit the result in a follow-up PR. tolerance is fractional (0.03 = 3%). schema_version pins the JSON shape so future migrations can warn rather than silently misread.",
+  "_comment": "Bundle size baseline consumed by scripts/check_bundle_size.py (bundle-size-gate.yml). Each entry pins the on-disk size of one public distribution unit as built on the ubuntu-24.04 CI runner. A missing artifact or a null size fails the gate. After an intended size change, copy observed_bytes from the CI job's bundle-size-report.json (or run 'uv run python scripts/check_bundle_size.py --update-baseline' on a full build) and commit it in the same PR. tolerance is fractional (0.03 = 3%) and applies in both directions. schema_version pins the JSON shape so future migrations can warn rather than silently misread.",
   "schema_version": "1.0",
   "version": 1,
   "artifacts": {
@@ -7,37 +7,37 @@
       "package": "piper-plus",
       "ecosystem": "cargo",
       "tolerance": 0.05,
-      "size_bytes": null
+      "size_bytes": 316914
     },
     "maven::piper-plus-g2p-android": {
       "package": "piper-plus-g2p-android",
       "ecosystem": "maven",
       "tolerance": 0.05,
-      "size_bytes": null
+      "size_bytes": 4762390
     },
     "npm::@piper-plus/g2p": {
       "package": "@piper-plus/g2p",
       "ecosystem": "npm",
       "tolerance": 0.03,
-      "size_bytes": null
+      "size_bytes": 1707304
     },
     "npm::piper-plus": {
       "package": "piper-plus",
       "ecosystem": "npm",
       "tolerance": 0.03,
-      "size_bytes": null
+      "size_bytes": 819496
     },
     "nuget::PiperPlus.Cli": {
       "package": "PiperPlus.Cli",
       "ecosystem": "nuget",
       "tolerance": 0.05,
-      "size_bytes": null
+      "size_bytes": 128467998
     },
     "nuget::PiperPlus.Core": {
       "package": "PiperPlus.Core",
       "ecosystem": "nuget",
       "tolerance": 0.05,
-      "size_bytes": null
+      "size_bytes": 138030
     }
   }
 }
