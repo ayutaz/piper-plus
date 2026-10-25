@@ -50,36 +50,46 @@ jobs:
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DBUILD_TESTING=OFF \
             -DPIPER_BUILD_LIBRARY=OFF \
-            -DPIPER_BUILD_CLI=OFF || \
-            echo "::warning::CMake configure failed; clang-tidy will run with limited compilation database"
-        continue-on-error: true
+            -DPIPER_BUILD_CLI=OFF
 
       - name: Run clang-tidy on changed files (PR)
         if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          # Only check files changed in this PR (faster)
-          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}..HEAD -- 'src/cpp/*.cpp' 'src/cpp/*.c' 'src/cpp/*.hpp' 'src/cpp/*.h' || true)
+          set -euo pipefail
+          # The checkout is shallow, so `origin/<base>..HEAD` did not resolve
+          # and `|| true` turned that into "No C++ files changed" on every PR.
+          # Fetch the base commit and diff the two trees directly.
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          CHANGED_FILES=$(git diff --name-only "$BASE_SHA" HEAD -- 'src/cpp/*.cpp' 'src/cpp/*.c' 'src/cpp/*.hpp' 'src/cpp/*.h')
           if [ -z "$CHANGED_FILES" ]; then
             echo "No C++ files changed in PR"
             exit 0
           fi
           echo "Files to check:"
           echo "$CHANGED_FILES"
-          # 各ファイルに対して clang-tidy 実行
-          # 既存ノイズを許容するため continue-on-error は workflow 全体で設定
+          # Check every file, then fail if any of them failed. Failures are
+          # still ignored by continue-on-error (tracked in
+          # docs/spec/continue-on-error-allowlist.toml) until the backlog is fixed.
+          status=0
           for file in $CHANGED_FILES; do
             if [ -f "$file" ]; then
-              clang-tidy -p build-tidy "$file" --use-color=true || true
+              clang-tidy -p build-tidy "$file" --use-color=true || status=1
             fi
           done
-        continue-on-error: true  # baseline 確立まで warn
+          exit "$status"
+        continue-on-error: true
 
       - name: Run clang-tidy on all files (push to dev/main)
         if: github.event_name == 'push'
         run: |
-          # Full scan, but parallelize for speed
+          set -o pipefail
+          # Full scan, but parallelize for speed. The step fails when
+          # clang-tidy does; continue-on-error (tracked in
+          # docs/spec/continue-on-error-allowlist.toml) still ignores it.
           find src/cpp -name '*.cpp' -o -name '*.c' | head -50 | \
-            xargs -I {} -P 4 clang-tidy -p build-tidy {} --use-color=true 2>&1 | tee tidy-output.txt || true
+            xargs -I {} -P 4 clang-tidy -p build-tidy {} --use-color=true 2>&1 | tee tidy-output.txt
         continue-on-error: true
 
       - name: Upload clang-tidy report

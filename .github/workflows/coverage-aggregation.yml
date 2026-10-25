@@ -24,19 +24,35 @@ jobs:
     steps:
       - uses: actions/checkout@v6.1.0
 
+      # Coverage reports travel in the `*test-results*` artifacts
+      # (python-tests: coverage.xml, csharp-ci / ci: coverage.cobertura.xml).
+      # Downloading every artifact pulled release binaries and Docker build
+      # records too, and failed after 5 retries on Go CI's `*.dockerbuild`
+      # artifacts; that failure was hidden by continue-on-error.
       - name: Download coverage artifacts from triggering workflow
         uses: actions/download-artifact@v6.0.0
         with:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: '*test-results*'
           path: ./artifacts
-        continue-on-error: true
+
+      - name: Find coverage reports
+        id: reports
+        run: |
+          mkdir -p ./artifacts  # nothing matched the pattern -> no directory
+          count=$(find ./artifacts \( -name 'coverage*.xml' -o -name 'lcov.info' -o -name 'coverage.out' \) -type f 2>/dev/null | wc -l)
+          echo "coverage reports: ${count}"
+          echo "count=${count}" >> "$GITHUB_OUTPUT"
 
       - name: List downloaded artifacts
         run: |
-          find ./artifacts -type f | head -30 || true
+          find ./artifacts -type f | head -30
 
+      # Workflows that upload coverage straight to Codecov (Go, Rust, C++)
+      # leave nothing to aggregate here.
       - name: Upload aggregated coverage to Codecov
+        if: steps.reports.outputs.count != '0'
         uses: codecov/codecov-action@v5.5.5
         with:
           directory: ./artifacts

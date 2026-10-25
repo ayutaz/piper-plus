@@ -193,10 +193,9 @@ jobs:
         # packaging は pip-audit の依存として入っている。
         run: python scripts/check_dependency_floors.py
       - name: Audit root requirements
-        # tier は informational (下の `continue-on-error: true` が無条件)。
-        # 「PR は warning、schedule/push は fail」は `Audit src/python_run` 側の
-        # 挙動で、 本 step には当てはまらない (#628 で root を informational へ
-        # 移した際、 #401 由来のこの 1 行が取り残され 26 行下の実装と矛盾していた)。
+        # tier は informational (下の `continue-on-error: true` が無条件。期限と
+        # 理由は docs/spec/continue-on-error-allowlist.toml)。 配布 wheel を見る
+        # `Audit src/python_run` は PR / push / schedule のすべてで blocking。
         # IGNORE 一覧 (`--ignore-vuln`) は本コメントブロックが single source。
         # 一 advisory = 一行 + justification + 解除条件 + tracking issue 番号 を
         # 明記する。 解除手順 (latest 確認 + 削除) の詳細は各 tracking issue 側。
@@ -283,7 +282,7 @@ jobs:
         # 依存だけを対象にする。dev / gpu / webui は optional extras で
         # 配布 wheel には含まれないため audit 対象外。
         # `--ignore-vuln` 一覧は root 側 step のコメントブロックが single source。
-        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        # PR でも blocking (以前は PR のときだけ continue-on-error だった)。
         working-directory: src/python_run
         # NOTE: requirements.txt は floor (`>=`) 指定なので root 側 step の
         # `--disable-pip --no-deps` は使えない (pip-audit が "not pinned to an

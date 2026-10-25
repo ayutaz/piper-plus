@@ -97,7 +97,6 @@ jobs:
 
       - name: Verify recent releases
         id: verify
-        continue-on-error: true
         env:
           LIMIT: ${{ inputs.limit || '10' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -112,6 +111,8 @@ jobs:
 
       - name: Compute fail flag
         id: flag
+        # The verify step fails the job; this flag still drives the issue.
+        if: ${{ !cancelled() }}
         # Copilot review on PR #513: grep-based detection misclassified
         # "report missing / script aborted early" as success. Use the
         # script's exit code (captured into steps.verify.outputs.exit_code)
@@ -147,7 +148,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Open issue on verify failure
-        if: steps.flag.outputs.fail == '1' && github.event_name == 'schedule'
+        if: ${{ !cancelled() && steps.flag.outputs.fail == '1' && github.event_name == 'schedule' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

@@ -87,6 +87,7 @@ jobs:
         # `forbidden` mode 移行は wave3-deferred-proposals.toml T26 で deferred。
         continue-on-error: true
         run: |
+          set -o pipefail
           go-licenses report ./... 2>&1 | tee /tmp/go-licenses-report.txt
           echo "::notice::go-licenses report 完了 (warn-only)。 GPL/AGPL 検出時は wave3-deferred-proposals.toml T26 (forbidden mode 化) を参照"
       - name: Check for GPL/AGPL contamination (warn-only)
