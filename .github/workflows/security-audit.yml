@@ -462,17 +462,27 @@ jobs:
           ignore-unfixed: true
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3.12.0
+      # python-inference は CUDA base で、 build 中に runner の disk を圧迫する
+      # (trivy-container-scan.yml の scan job と同じ軽量 cleanup)。
+      - name: Free up disk space (light cleanup)
+        run: |
+          docker system prune -af
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android \
+            /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h | head -5
       - name: Build image (no push)
-        # image scan のため、push せず local に build。失敗しても次の step
-        # で skip 判定するために `continue-on-error: true`。
-        # PR 時は cache from gha で高速化。
+        # image scan のため、 push せず local に build する。 Dockerfile は
+        # repo root からの相対パスで COPY する (`COPY src/python/ ...`) ので、
+        # build context は repo root。 以前は context を docker/<image> に
+        # していて全 build が失敗し、 `continue-on-error` と
+        # `if: steps.build.outcome == 'success'` で image scan が skip された
+        # まま job は緑だった。 build の失敗は job の失敗にする
+        # (tests/scripts/test_docker_scan_build_context.py)。
         id: build
-        continue-on-error: true
         run: |
           docker build -t piper-plus-${{ matrix.image }}:scan \
-            -f docker/${{ matrix.image }}/Dockerfile docker/${{ matrix.image }}
+            -f docker/${{ matrix.image }}/Dockerfile .
       - name: Trivy image scan
-        if: steps.build.outcome == 'success'
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: image

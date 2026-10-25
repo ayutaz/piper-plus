@@ -16,5 +16,5 @@
 # 本ファイルは README 8 言語版が `uv pip install -r` で直接案内するユーザー向け
 # 導入手順で、 docker/webui/Dockerfile と docker/python-inference/Dockerfile
 # (.cpu 含む) も COPY するため、 1 箇所の drift が手動導入と Docker 双方に効く。
-gradio==6.26.0
+gradio==6.30.0
 numpy>=1.26.4,<2.3
