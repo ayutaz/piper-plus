@@ -1,0 +1,672 @@
+# Skipped-test allowlist — every test that CI skips must match an entry here.
+#
+# Enforced by scripts/check_test_skips.py, which the test jobs run after their
+# tests (python-tests, go-ci, the C++ jobs of _build-test-cpp, csharp-ci and
+# ci.yml csharp-tests, rust-tests). The pre-commit hook `test-skip-allowlist`
+# checks the fields of this file; tests/scripts/test_check_test_skips.py
+# covers the parsers.
+#
+# Why: test runners report a skipped test as passing the job. In 2026-10 a
+# Go Japanese golden test, about 50 Rust tests and the speaker-encoder E2E
+# gates of every runtime were skipping in CI because a dictionary, fixture or
+# environment variable was missing, while every job stayed green.
+#
+# Fields:
+#   runtime    python | go | cpp | csharp | rust
+#   test       test ID, or an fnmatch pattern (`*` / `?`). IDs by runtime:
+#                python  pytest node ID relative to the repository root
+#                        (src/python/tests/test_x.py::TestY::test_z[param]);
+#                        a module skipped at import is its file path
+#                go      test name (TestX, TestX/subtest)
+#                cpp     gtest Suite.Test, or a ctest test name
+#                csharp  TRX testName (Namespace.Class.Method)
+#                rust    cargo test name (module::test_name)
+#              `[` starts a character class in a pattern; to match a
+#              parametrized test, use `*` or write the whole ID exactly.
+#   kind       "harmless" — the skip is correct where it happens: the test
+#                           does not apply to that OS or optional dependency
+#                           and another job or OS runs it, or it needs what CI
+#                           does not have by design (a CUDA GPU, a maintainer's
+#                           private checkpoint).
+#              "tracked"  — the test should run in CI but does not yet.
+#                           Requires `expires` (YYYY-MM-DD); after that date
+#                           the gate fails until the test runs or the entry is
+#                           renewed with a new reason in a reviewed PR.
+#   reason     why the skip is acceptable (tracked: what has to happen)
+#   platforms  optional; linux | macos | windows. Omitted = all.
+
+[meta]
+spec_version = 1
+last_updated = "2026-10-25"
+applies_to = ["python", "go", "cpp", "csharp", "rust"]
+canonical_reference = "scripts/check_test_skips.py"
+# Unknown entry fields fail the gate (a typo such as `expire` must not
+# silently drop the deadline).
+forward_compat_policy = "strict"
+
+# ---------------------------------------------------------------------------
+# tracked — should run in CI, with a deadline
+# ---------------------------------------------------------------------------
+
+[[entry]]
+runtime = "go"
+test = "TestSpeakerEncoderE2ECosineGate"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "test/fixtures/speaker_encoder_golden.json has no e2e_cosine_gate block, so the end-to-end cosine gate is skipped in every runtime. Regenerate the fixture with the gate block."
+
+[[entry]]
+runtime = "csharp"
+test = "PiperPlus.Core.Tests.SpeakerEncoderE2ETests.E2ECosineGate_AgainstPinnedEmbedding"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Same fixture gap as the Go entry: speaker_encoder_golden.json has no e2e_cosine_gate block."
+
+[[entry]]
+runtime = "cpp"
+test = "SpeakerEncoderE2E.CosineGateAgainstPinnedEmbedding"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Same fixture gap as the Go entry: speaker_encoder_golden.json has no e2e_cosine_gate block."
+
+[[entry]]
+runtime = "cpp"
+test = "SpeakerEmbeddingInferenceTest.*"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "tests/fixtures/mb_istft_speaker_embedding/model.onnx is not checked in and no CI job runs build_fixture.py, so the speaker_embedding input path of the C++ runtime is untested. Check in the fixture or build it in the job."
+
+[[entry]]
+runtime = "cpp"
+test = "OpenJTalkOptimizedTest.*"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "openjtalk_optimized.c runs the open_jtalk command-line binary, which the CI runners do not have. piper does not call this code (it uses the OpenJTalk library in-process), so remove the code and its test, or install the binary in the job."
+
+[[entry]]
+runtime = "rust"
+test = "jsonl_per_line_output_file_overrides_cli_flag"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "#[ignore] (needs the test model and ONNX Runtime). The attribute says runtime-parity-deep runs it, but no workflow passes --ignored, so it never runs in CI."
+
+[[entry]]
+runtime = "rust"
+test = "jsonl_phoneme_ids_writes_valid_wav_file"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Same as jsonl_per_line_output_file_overrides_cli_flag: #[ignore] and no workflow runs ignored tests."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_export_onnx.py::*"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "The export fixtures turn every exception into a skip ('ONNX export not supported: ...'). The exceptions are real failures of the test models: 'SynthesizerTrn' object has no attribute 'emb_g' (TestSpeakerEmbeddingMaskMixedBatch) and a 4D input to conv1d (TestGraphInputSchema, TestUnifyEmbLangOnnxExport). Fix the fixtures and let export errors fail."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_multilingual_inference.py::TestOnnxOutputShape::test_onnx_output_is_3d"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Looks for the model under src/test/models (parents[2] is src/, not the repository root). With the path fixed, the shipped test/models/multilingual-test-medium.onnx outputs 4D [1, 1, 1, T], the regression (#38) the test guards against. Re-export the test model or test a fresh export."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_zero_shot.py::TestGeneratorFiLMConditioning::*"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Unconditional @pytest.mark.skip: written for the HiFi-GAN Generator, which MBiSTFTGenerator replaced (#320). Rewrite for MBiSTFTGenerator or delete."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_wavlm_discriminator.py::TestWavLMGradientFlow::*"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Unconditional @pytest.mark.skip (transformers WavLM cannot set requires_grad on a non-leaf tensor after resampling), so the gradient flow into the generated audio is never checked."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_performance.py::TestPerformance::test_synthesis_performance"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Imports piper_plus, which the training test job does not install, and skips on the ImportError ('Piper not installed'). Move it to a job with the runtime or install it."
+
+[[entry]]
+runtime = "python"
+test = "src/python_run/tests/test_training_integration.py::TestTrainingIntegration::test_real_piper_train_invocation"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Needs piper_train next to the WebUI; neither python-tests nor webui-test installs both, so it never runs."
+
+[[entry]]
+runtime = "python"
+test = "test/test_speaker_encoder_e2e.py::test_e2e_cosine_gate_against_pinned_embedding"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Same fixture gap as the Go entry: speaker_encoder_golden.json has no e2e_cosine_gate block."
+
+[[entry]]
+runtime = "csharp"
+test = "PiperPlus.Cli.Tests.DotNetG2PEngineConcurrencyTests.*"
+kind = "tracked"
+expires = "2027-01-31"
+platforms = ["macos"]
+reason = "Skipped on macOS: DotNetG2P.MeCab 1.8.x opens sys.dic with FileShare.None and never releases it, so a second MeCabTokenizer fails. The lock in DotNetG2PEngine only serializes construction, so sentence-parallel Japanese encoding may fail for macOS users as well; unverified while the tests skip."
+
+# ---------------------------------------------------------------------------
+# harmless — correct where it happens; another OS or job runs the test
+# ---------------------------------------------------------------------------
+
+[[entry]]
+runtime = "csharp"
+test = "PiperPlus.Core.Tests.CacheStorageTests.Create_ReadOnlyModelDirectory_StillRunsInference"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Tests Unix directory permissions; runs on Linux and macOS."
+
+[[entry]]
+runtime = "csharp"
+test = "PiperPlus.Core.Tests.CliWorkingDirectoryTests.Version_FromDeletedParentDirectory_Succeeds"
+kind = "harmless"
+platforms = ["macos", "windows"]
+reason = "A Linux-only regression (getcwd returning ENOENT after the current directory is deleted); runs on Linux."
+
+[[entry]]
+runtime = "python"
+test = "src/python/g2p/tests/test_korean.py::*"
+kind = "harmless"
+reason = "g2pk2's G2p() needs mecab-ko, which starts in CI only on ubuntu with Python 3.11 and 3.12 (87 Korean tests pass there). It fails on macOS, Windows and Python 3.13; entries cannot name a Python version, so they apply on every platform."
+
+[[entry]]
+runtime = "python"
+test = "src/python/g2p/tests/test_cross_platform.py::TestKOPhonemeFixtures::*"
+kind = "harmless"
+reason = "Korean (g2pk2); runs on ubuntu with Python 3.11 / 3.12 only, see test_korean.py."
+
+[[entry]]
+runtime = "python"
+test = "src/python/g2p/tests/test_custom_dict.py::TestKoreanIntegration::*"
+kind = "harmless"
+reason = "Korean (g2pk2); runs on ubuntu with Python 3.11 / 3.12 only, see test_korean.py."
+
+[[entry]]
+runtime = "python"
+test = "src/python/g2p/tests/test_e2e.py::TestKoreanE2E::*"
+kind = "harmless"
+reason = "Korean (g2pk2); runs on ubuntu with Python 3.11 / 3.12 only, see test_korean.py."
+
+[[entry]]
+runtime = "python"
+test = "src/python/g2p/tests/test_edge_cases.py::*_ko*"
+kind = "harmless"
+reason = "Korean (g2pk2); runs on ubuntu with Python 3.11 / 3.12 only, see test_korean.py."
+
+[[entry]]
+runtime = "python"
+test = "src/python/g2p/tests/test_language_code.py::TestLanguageCode::test_korean_language_code"
+kind = "harmless"
+reason = "Korean (g2pk2); runs on ubuntu with Python 3.11 / 3.12 only, see test_korean.py."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_compat.py::test_posixpath_routed_to_windowspath_on_windows"
+kind = "harmless"
+platforms = ["linux", "macos"]
+reason = "Tests the PosixPath to WindowsPath patch, which only applies on Windows; runs on Windows."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_ort_utils.py::TestCacheConcurrentRace::test_concurrent_cache_creation_no_corruption"
+kind = "harmless"
+platforms = ["macos", "windows"]
+reason = "The .opt.onnx + .ok cache race depends on Linux filesystem semantics; runs on Linux."
+
+[[entry]]
+runtime = "python"
+test = "src/python_run/tests/test_webui.py::*"
+kind = "harmless"
+reason = "Needs gradio; webui-test.yml installs the WebUI requirements and runs this file."
+
+[[entry]]
+runtime = "python"
+test = "src/python_run/tests/test_training_manager.py::TestTrainingWebUIIntegration::*"
+kind = "harmless"
+reason = "Needs gradio; webui-test.yml runs tests/test_training_manager.py."
+
+[[entry]]
+runtime = "python"
+test = "src/python_run/tests/test_training_integration.py::TestTrainingIntegration::test_*_training_*"
+kind = "harmless"
+reason = "Needs gradio; webui-test.yml runs tests/test_training_integration.py."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_flow_debug.py::TestFlowReverseNumerics::*"
+kind = "harmless"
+reason = "Maintainer-only numerics checks on a private checkpoint (PIPER_PLUS_FLOW_DEBUG_CKPT)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_*_host_sync.py::*"
+kind = "harmless"
+reason = "Checks CUDA host synchronization; CI has no GPU runner."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_slice_segments.py::*"
+kind = "harmless"
+reason = "CUDA-only case; CI has no GPU runner."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_monotonic_align.py::*"
+kind = "harmless"
+reason = "CUDA-only case of the Super-MAS dispatch; CI has no GPU runner."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_super_mas_dispatch.py::*"
+kind = "harmless"
+reason = "GPU dispatch decision; CI has no GPU runner."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_vits.py::TestWavLMDiscriminator::*"
+kind = "harmless"
+reason = "WavLM forward passes need a GPU to finish in reasonable time; CI has no GPU runner."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_python313_migration.py::test_torch_211_cu128_resolution_on_linux"
+kind = "harmless"
+reason = "Checks the CUDA (cu128) torch wheel; CI has no GPU runner."
+
+# Windows installs src/python with [test,inference] only and runs
+# -m "unit and not training ..." (python-tests.yml, "Install Python
+# dependencies (Windows)"). The files below need torch, Lightning, onnx,
+# torchaudio, transformers or huggingface-hub and run on Linux and macOS.
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_batch_spectrograms.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required for batch_spectrograms)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_build_infer_forward.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required for build_infer_forward tests)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_check_onnx_inputs.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (could not import 'onnx': No module named 'onnx')."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_checkpoint_compat_contract.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required to rebuild the model)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_checkpoint_film_migration.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required for checkpoint migration)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_checkpoint_io.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (Checkpoint preparation needs the train extra; lightweight Windows CI omits it.)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_compat_pickle_names.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required for checkpoint I/O)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_convert_fp16.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (could not import 'onnx': No module named 'onnx')."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_cudnn_benchmark_flag.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required for piper_train.__main__)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_dataset_getitem.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (could not import 'torch': No module named 'torch')."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_dataset_parsers.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (could not import 'torch': No module named 'torch')."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_ddp_strategy.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (could not import 'pytorch_lightning': No module named 'pytorch_lightning')."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_ddp_synced_finite.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required for VitsModel)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_dino_loss_diagnostics.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_discriminator_loss_host_sync.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (needs torch)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_energy_vad.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (could not import 'torchaudio': No module named 'torchaudio')."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_extract_speaker_embedding.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (could not import 'torchaudio': No module named 'torchaudio')."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_flip_host_sync.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (needs torch)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_freeze_dp.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_gpu_spec_frames.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (could not import 'torch': No module named 'torch')."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_gradient_clip.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required for piper_train.__main__)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_hifigan_ckpt_rejection.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (could not import 'torch': No module named 'torch')."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_intersperse_padding.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required for intersperse tests)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_m3_inference_pipeline.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (onnxruntime and onnxscript required for ONNX export tests)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_main_mb_istft.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required for piper_train.__main__)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_mb_istft_film.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required for MBiSTFTGenerator)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_mb_istft_generator.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_mb_istft_utilities.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_model_config.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (Training dependencies not available: No module named 'torch')."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_multispeaker_transfer.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (could not import 'torch': No module named 'torch')."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_pqmf.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_prepare_multilingual_dataset_constants.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (could not import 'torch': No module named 'torch')."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_prosody_extraction.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (Dataset module not available)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_python313_migration.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (could not import 'torch': No module named 'torch')."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_scl_providers.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required for piper_train.vits.lightning)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_slice_segments.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (needs torch)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_speaker_balanced_sampler.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch is required for SpeakerBalancedBatchSampler tests)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_speaker_embedding.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_speaker_embedding_perturbation.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_spline_host_sync.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (needs torch)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_stft_half_precision_inputs.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (could not import 'torch': No module named 'torch')."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_stft_loss.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_stft_onnx.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_super_mas_dispatch.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required for dispatch tests)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_synthesizer_trn_mb_istft.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_training_host_sync.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (lightning module needs the train extra (torch).)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_update_schedule.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (could not import 'torch': No module named 'torch')."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_validation_metrics.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_vitsmodel_mb_istft.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch required)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_wavlm_safetensors.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (could not import 'transformers': No module named 'transformers')."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_zero_shot.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch not installed)."
+
+[[entry]]
+runtime = "python"
+test = "src/python_run/tests/test_model_resolver.py*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (huggingface-hub not installed)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_compat.py::test_piper_train_import_triggers_compat"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra (torch.serialization)."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_compat.py::test_posixpath_unchanged_on_non_windows"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Checks that non-Windows keeps PosixPath; runs on Linux and macOS."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_infer_onnx_speaker_embedding_integration.py::TestInferOnnxSpeakerEmbeddingFallback::*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra; the fixture model is built with torch (tests/fixtures/mb_istft_speaker_embedding/build_fixture.py)."

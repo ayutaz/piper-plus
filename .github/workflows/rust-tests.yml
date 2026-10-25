@@ -26,6 +26,9 @@ on:
       - 'tests/fixtures/ort_session/**'
       - 'test/fixtures/speaker_encoder_golden.json'
       - '.github/workflows/rust-tests.yml'
+      - 'scripts/check_test_skips.py'
+      - 'docs/spec/test-skip-allowlist.toml'
+      - '.github/actions/check-test-skips/**'
   push:
     branches: [ dev ]
     paths:
@@ -45,6 +48,9 @@ on:
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
       - 'test/fixtures/speaker_encoder_golden.json'
+      - 'scripts/check_test_skips.py'
+      - 'docs/spec/test-skip-allowlist.toml'
+      - '.github/actions/check-test-skips/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
@@ -83,6 +89,8 @@ jobs:
     defaults:
       run:
         working-directory: src/rust
+        # bash on every OS so the test output can be kept with tee (pipefail is on).
+        shell: bash
     steps:
     - uses: actions/checkout@v6.1.0
     - uses: dtolnay/rust-toolchain@stable
@@ -98,44 +106,50 @@ jobs:
         python -m pip install onnx==1.22.0
         python ../../tests/fixtures/ort_session/build_embedding_fixture.py
     - name: Run actual embedding dimension inference (onnx feature)
-      run: cargo test --locked -p piper-plus --no-default-features --features onnx --test test_embedding_dimensions
+      run: cargo test --locked -p piper-plus --no-default-features --features onnx --test test_embedding_dimensions 2>&1 | tee -a "$RUNNER_TEMP/rust-test.log"
 
     - name: Run tests (default features)
-      run: cargo test -p piper-plus --no-fail-fast
+      run: cargo test -p piper-plus --no-fail-fast 2>&1 | tee -a "$RUNNER_TEMP/rust-test.log"
 
     - name: Run tests (naist-jdic)
-      run: cargo test -p piper-plus --features naist-jdic --no-fail-fast
+      run: cargo test -p piper-plus --features naist-jdic --no-fail-fast 2>&1 | tee -a "$RUNNER_TEMP/rust-test.log"
 
     - name: Run g2p chinese feature tests (ZH-EN dispatch via Phonemizer trait)
       # `chinese` is enabled by piper-plus-g2p's default features, so this
       # also runs the #[cfg(feature = "chinese")] dispatch tests added in
       # multilingual.rs (test_zh_en_dispatch_via_phonemizer_trait etc).
-      run: cargo test -p piper-plus-g2p --no-fail-fast
+      run: cargo test -p piper-plus-g2p --no-fail-fast 2>&1 | tee -a "$RUNNER_TEMP/rust-test.log"
 
     - name: Run voice unit tests (onnx feature)
       # voice.rs is compiled only with the onnx feature, so its unit tests
       # (phonemizer construction, language override) never ran in the
       # default-feature steps above.
-      run: cargo test -p piper-plus --features onnx --lib --no-fail-fast
+      run: cargo test -p piper-plus --features onnx --lib --no-fail-fast 2>&1 | tee -a "$RUNNER_TEMP/rust-test.log"
 
     - name: Run short-text contract tests (onnx feature)
       # test_short_text_contract.rs imports piper_core::engine which is gated
       # behind the onnx feature. Run it explicitly so the parity gate is
       # exercised in CI.
-      run: cargo test -p piper-plus --features onnx --test test_short_text_contract --no-fail-fast
+      run: cargo test -p piper-plus --features onnx --test test_short_text_contract --no-fail-fast 2>&1 | tee -a "$RUNNER_TEMP/rust-test.log"
 
     - name: Run ORT session contract tests (onnx feature)
       # test_ort_session_contract.rs imports MAX_INTRA_THREADS / WARMUP_PHONEME_LENGTH
       # from piper_core::engine which is gated behind onnx; mirror the short-text
       # gate so the per-runtime drift assert runs in CI.
-      run: cargo test -p piper-plus --features onnx --test test_ort_session_contract --no-fail-fast
+      run: cargo test -p piper-plus --features onnx --test test_ort_session_contract --no-fail-fast 2>&1 | tee -a "$RUNNER_TEMP/rust-test.log"
 
     - name: Run zero-shot E2E tests (onnx feature, Linux only)
       if: runner.os == 'Linux'
-      run: cargo test --test test_zero_shot_e2e --features onnx --no-fail-fast
+      run: cargo test --test test_zero_shot_e2e --features onnx --no-fail-fast 2>&1 | tee -a "$RUNNER_TEMP/rust-test.log"
 
     - name: Run CLI tests
-      run: cargo test -p piper-plus-cli --no-fail-fast
+      run: cargo test -p piper-plus-cli --no-fail-fast 2>&1 | tee -a "$RUNNER_TEMP/rust-test.log"
+
+    - name: Fail on tests skipped without an allowlist entry
+      uses: ./.github/actions/check-test-skips
+      with:
+        runtime: rust
+        files: ${{ runner.temp }}/rust-test.log
 
   wasm-test:
     name: piper-wasm wasm-bindgen tests (wasm32)

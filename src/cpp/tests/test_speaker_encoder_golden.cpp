@@ -158,8 +158,23 @@ std::vector<float> compute_mel_spectrogram(const std::vector<float>& samples) {
             for (std::size_t k = 0; k < fft_bins; ++k) {
                 energy += filters[m * fft_bins + k] * power_spec[k];
             }
-            mel[m * n_frames + frame] =
-                std::log(std::max(energy, 1e-10f));
+            // Frame-major, like test/generate_speaker_encoder_golden.py.
+            mel[frame * MEL_N_MELS + m] = std::log(std::max(energy, 1e-10f));
+        }
+    }
+
+    // CMVN: subtract each band's mean across all frames (the generator does
+    // the same; without it the fixture comparison is off by the band means).
+    if (n_frames > 0) {
+        for (std::size_t m = 0; m < MEL_N_MELS; ++m) {
+            double sum = 0.0;
+            for (std::size_t frame = 0; frame < n_frames; ++frame) {
+                sum += mel[frame * MEL_N_MELS + m];
+            }
+            const float mean = static_cast<float>(sum / static_cast<double>(n_frames));
+            for (std::size_t frame = 0; frame < n_frames; ++frame) {
+                mel[frame * MEL_N_MELS + m] -= mean;
+            }
         }
     }
 
@@ -308,6 +323,17 @@ std::string fixture_text() {
     return text;
 }
 
+// Position of the test case with this id, or npos. The generator writes
+// `"id": "..."` (json.dump separators); a search for `"id":"..."` alone never
+// matched, so the cases below were skipped since they were added.
+std::size_t find_case(const std::string& text, const std::string& id) {
+    for (const char* sep : {"\": \"", "\":\""}) {
+        const auto pos = text.find("\"id" + std::string(sep) + id + "\"");
+        if (pos != std::string::npos) return pos;
+    }
+    return std::string::npos;
+}
+
 double l2_relative(const std::vector<double>& actual, const std::vector<double>& expected) {
     double num = 0.0, den = 0.0;
     const std::size_t n = std::min(actual.size(), expected.size());
@@ -392,8 +418,9 @@ TEST(SpeakerEncoderGolden, MelComputationMatchesFixtureWithin2pctL2) {
     // Test cases cycle: extract each "id", "audio_params", and
     // "mel_sampled_every_10". For brevity we exercise just the first
     // sine_440hz_1s case; the algorithm is shared with the rest.
-    auto pos = text.find("\"id\":\"sine_440hz_1s\"");
-    if (pos == std::string::npos) GTEST_SKIP() << "sine_440hz_1s not in fixture";
+    // The fixture is checked in, so a missing case is a failure, not a skip.
+    auto pos = find_case(text, "sine_440hz_1s");
+    ASSERT_NE(pos, std::string::npos) << "sine_440hz_1s not in fixture";
 
     // Anchor block from id forward.
     auto block = text.substr(pos);
@@ -435,8 +462,8 @@ TEST(SpeakerEncoderGolden, ResampleLinearMatchesFixture) {
     const std::string text = fixture_text();
     if (text.empty()) GTEST_SKIP() << "fixture not loadable";
 
-    auto pos = text.find("\"id\":\"resample_48k_to_16k\"");
-    if (pos == std::string::npos) GTEST_SKIP() << "resample case missing";
+    auto pos = find_case(text, "resample_48k_to_16k");
+    ASSERT_NE(pos, std::string::npos) << "resample case missing";
     auto block = text.substr(pos);
 
     auto first10 = parse_float_array(extract_value_after(block, "output_first_10"));

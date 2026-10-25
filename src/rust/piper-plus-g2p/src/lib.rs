@@ -24,7 +24,11 @@
 //!
 //! ## Quick start
 //!
-//! ```rust,ignore
+//! The example is compiled but not run: `EnglishPhonemizer::new()` reads
+//! `cmudict_data.json` (`CMUDICT_PATH` or the working directory).
+//!
+#![cfg_attr(feature = "english", doc = "```rust,no_run")]
+#![cfg_attr(not(feature = "english"), doc = "```rust,ignore")]
 //! use piper_plus_g2p::{Phonemizer, PhonemizerRegistry, PiperEncoder, UnknownTokenMode};
 //! use piper_plus_g2p::english::EnglishPhonemizer;
 //!

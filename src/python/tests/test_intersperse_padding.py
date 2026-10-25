@@ -18,7 +18,11 @@ import pytest
 pyopenjtalk = pytest.importorskip(
     "pyopenjtalk", reason="pyopenjtalk required for JA tests"
 )
-g2p_en = pytest.importorskip("g2p_en", reason="g2p_en required for EN tests")
+# g2p_en is vendored in piper_plus_g2p (#801); the top-level `g2p_en`
+# package is no longer installed, so importing it skipped this module.
+g2p_en = pytest.importorskip(
+    "piper_plus_g2p._vendor.g2p_en", reason="piper_plus_g2p required for EN tests"
+)
 torch = pytest.importorskip("torch", reason="torch required for intersperse tests")
 
 # g2p_en depends on NLTK's averaged_perceptron_tagger_eng data at runtime.

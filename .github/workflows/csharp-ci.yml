@@ -36,6 +36,9 @@ on:
       - 'tests/fixtures/ort_session/**'
       - 'test/fixtures/speaker_encoder_golden.json'
       - '.github/workflows/csharp-ci.yml'
+      - 'scripts/check_test_skips.py'
+      - 'docs/spec/test-skip-allowlist.toml'
+      - '.github/actions/check-test-skips/**'
   push:
     branches: [dev]
     paths:
@@ -67,6 +70,9 @@ on:
       - 'tests/fixtures/ort_session/**'
       - 'test/fixtures/speaker_encoder_golden.json'
       - '.github/workflows/csharp-ci.yml'
+      - 'scripts/check_test_skips.py'
+      - 'docs/spec/test-skip-allowlist.toml'
+      - '.github/actions/check-test-skips/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
@@ -129,14 +135,24 @@ jobs:
         shell: bash
 
       - name: Run C# tests
+        # Each test project writes src/csharp/<project>/TestResults/test-results.xml.
+        # A shared --results-directory made every project write the same file,
+        # so only PiperPlus.Core.Tests' results survived in the TRX.
         shell: bash
         run: |
           dotnet test src/csharp/PiperPlus.sln -c Release --no-build \
             --blame-hang-timeout 30s \
             --logger "trx;LogFileName=test-results.xml" \
-            --results-directory TestResults \
             --collect:"XPlat Code Coverage" \
             --settings src/csharp/PiperPlus.runsettings
+
+      - name: Fail on tests skipped without an allowlist entry
+        uses: ./.github/actions/check-test-skips
+        with:
+          runtime: csharp
+          files: >-
+            src/csharp/PiperPlus.Core.Tests/TestResults/test-results.xml
+            src/csharp/PiperPlus.Cli.Tests/TestResults/test-results.xml
 
       - name: Publish test results to GitHub Checks tab
         # 失敗時にも結果を表示するため if: always()。dotnet test が non-zero

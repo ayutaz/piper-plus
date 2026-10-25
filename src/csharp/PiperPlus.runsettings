@@ -9,7 +9,6 @@
          (Ubuntu / Windows pass even with 0 because their FileShare semantics
          tolerate the brief overlap window; macOS does not.) -->
     <MaxCpuCount>1</MaxCpuCount>
-    <ResultsDirectory>./TestResults</ResultsDirectory>
     <!-- Wall-clock cap for the entire test session (5 min). -->
     <TestSessionTimeout>300000</TestSessionTimeout>
     <!-- Per-test hang timeout (30s). Equivalent of dotnet test

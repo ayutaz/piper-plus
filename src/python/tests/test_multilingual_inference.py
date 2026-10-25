@@ -181,7 +181,7 @@ class TestEnPaddingAlways:
     def test_en_always_has_padding(self):
         """EN phonemizer always has padding via base class post_process_ids,
         regardless of language_id_map."""
-        g2p_en = pytest.importorskip("g2p_en", reason="g2p_en required")  # noqa: F841
+        g2p_en = pytest.importorskip("piper_plus_g2p._vendor.g2p_en", reason="piper_plus_g2p required")  # noqa: F841
 
         # Case 1: with multilingual language_id_map
         id_map_multi = _get_multilingual_id_map(["ja", "en"])
@@ -218,7 +218,7 @@ class TestComboCodeNotPromoted:
 
     def test_combo_code_not_promoted(self):
         """A combo code like 'ja-en' must not be further promoted."""
-        g2p_en = pytest.importorskip("g2p_en", reason="g2p_en required")  # noqa: F841
+        g2p_en = pytest.importorskip("piper_plus_g2p._vendor.g2p_en", reason="piper_plus_g2p required")  # noqa: F841
 
         id_map = _get_multilingual_id_map(["ja", "en"])
         # Use language="ja-en" with a multilingual language_id_map
@@ -261,7 +261,7 @@ class TestAlignment:
     @_skip_no_nltk
     def test_phoneme_ids_prosody_alignment_en(self):
         """EN: phoneme_ids and prosody_features must also align."""
-        g2p_en = pytest.importorskip("g2p_en", reason="g2p_en required")  # noqa: F841
+        g2p_en = pytest.importorskip("piper_plus_g2p._vendor.g2p_en", reason="piper_plus_g2p required")  # noqa: F841
 
         id_map = _get_multilingual_id_map(["ja", "en"])
         phoneme_ids, prosody_features = _call_text_to_phoneme_ids(
@@ -317,7 +317,7 @@ class TestPhonemeIdRange:
     @_skip_no_nltk
     def test_all_ids_within_valid_range_en(self):
         """EN: all phoneme IDs must also be within range."""
-        g2p_en = pytest.importorskip("g2p_en", reason="g2p_en required")  # noqa: F841
+        g2p_en = pytest.importorskip("piper_plus_g2p._vendor.g2p_en", reason="piper_plus_g2p required")  # noqa: F841
 
         id_map = _get_multilingual_id_map(["ja", "en"])
         num_symbols = len(id_map)
