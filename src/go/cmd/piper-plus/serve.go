@@ -17,6 +17,7 @@ import (
 
 var serveAddr string
 
+// editorconfig-checker-disable (the help text below is a raw string)
 var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Start HTTP TTS server",
@@ -28,6 +29,8 @@ Endpoints:
   GET      /info        Model information`,
 	RunE: runServe,
 }
+
+// editorconfig-checker-enable
 
 func init() {
 	serveCmd.Flags().StringVar(&serveAddr, "addr", ":8080", "listen address (host:port)")

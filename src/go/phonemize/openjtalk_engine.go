@@ -3,6 +3,7 @@
 package phonemize
 
 /*
+// editorconfig-checker-disable (C code below, indented with spaces)
 #cgo LDFLAGS: -lopenjtalk -lstdc++ -lm
 
 #include <stdio.h>
@@ -280,6 +281,7 @@ static void ojt_result_free(GoOJTResult* r) {
     }
     free(r);
 }
+// editorconfig-checker-enable
 */
 import "C"
 
