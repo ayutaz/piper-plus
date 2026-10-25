@@ -22,17 +22,33 @@ canonical fixture。 G2P をバイパスして phoneme IDs を直接渡すので
 
 ## 既存 fixture: `あいうえお` (ja)
 
+`phoneme_ids.jsonl` は各 runtime の CLI smoke test が使う (Rust の
+`test_cli_smoke.rs` など)。 parity の比較には使わない。
+
 `[1, 10, 0, 11, 0, 12, 0, 13, 0, 14, 0, 2]` は `test/models/multilingual-test-medium.onnx`
 の `phoneme_id_map` で `^ a _ i _ u _ e _ o _ $` に相当する 12-ID 列。
 `PhonemeType.MULTILINGUAL` の intersperse padding 慣例
 (`src/python_run/piper_plus/voice.py:phonemes_to_ids`) を踏襲。
+
+## deterministic_phoneme_ids.jsonl (runtime-parity-deep の入力)
+
+`runtime-parity-deep.yml` が 6 runtime に渡す fixture。「こんにちは、今日は
+いい天気ですね。」(ja、 `language_id = 0`) の 70 ID で、 短文対策の padding
+(`docs/spec/short-text-contract.toml` の `min_phoneme_ids = 15`) がかからない
+長さにしてある。 12 ID の `phoneme_ids.jsonl` では padding と、 その trim の
+runtime 差が decoder の差に混ざっていた。
+
+各 runtime は `noise_scale = noise_w = 0`、 `length_scale = 1`、 sentence
+silence 0 で合成する (既定の noise は runtime ごとに乱数を引くので一致しない)。
+期待するフレーム数は 46,592 (EOS 領域の trim 後)。 判定は
+`docs/spec/audio-parity-contract.toml` を参照。
 
 ## zero_shot_phoneme_ids.jsonl + test_speaker.npy
 
 Zero-shot TTS (v7 multi-6lang) の speaker-embedding 入力契約を検証する
 fixture。`speaker_id` の代わりに `speaker_embedding` (192-dim float32、L2
 正規化済み) を渡す形式を Python 側の parity fixture test が検証する。
-`runtime-parity-deep.yml` の現行音声比較ジョブは `phoneme_ids.jsonl` を使用し、
+`runtime-parity-deep.yml` の音声比較ジョブは `deterministic_phoneme_ids.jsonl` を使用し、
 この zero-shot fixture を全 runtime に配布するジョブではない。
 
 | field | 型 | 役割 |

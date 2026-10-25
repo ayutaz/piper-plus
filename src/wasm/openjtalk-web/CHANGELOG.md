@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `piper-plus` bin (`bin/piper-cli.js`, the Node CLI for `--json-input`): apply the same short-text handling and Issue #499 EOS-region trim as `PiperPlus.synthesize()`. The bin wrote the raw decoder output, 1,536 samples (6 frames) longer than the other runtimes for the parity fixture. The helpers moved to `src/short-text.js`; `src/index.js` re-exports them, so the public API is unchanged.
 - Chinese text with digits or Latin words, for models with zh and en: read them with the English G2P instead of character by character (#847). `123` became `1 2 3` because the Rust WASM G2P had no English dictionary; it now gets the CMU dictionary of `@piper-plus/g2p` on the first Chinese request. With an `@piper-plus/g2p` that has no `loadCmuDict` (up to the 0.4.2 release on npm), a warning is logged and the old reading is kept.
 - Streaming (`synthesizeStreaming`): do not end a chunk at a full stop between two digits (`3.14`) or inside `e.g.` / `i.e.` (#831). The pieces were phonemized separately and read differently from the whole sentence.
 

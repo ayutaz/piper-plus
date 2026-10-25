@@ -91,11 +91,15 @@ def test_identical_wavs_pass_tier1(ap, tmp_path):
     contract = ap.load_contract(CONTRACT)
     res = ap.compare_pair(sa, sb, contract)
     assert res.passed
-    assert res.tiers[0].name == "sha256"
-    assert res.tiers[0].passed
+    assert [t.name for t in res.tiers] == ["frames", "sha256"]
+    assert all(t.passed for t in res.tiers)
 
 
-def test_distinct_but_close_pair_passes_rms_tier(ap, tmp_path):
+def _tiers(res):
+    return {t.name: t.passed for t in res.tiers}
+
+
+def test_distinct_but_close_pair_passes_rms_and_snr(ap, tmp_path):
     a = tmp_path / "a.wav"
     b = tmp_path / "b.wav"
     _write_sine(a, amp=0.1)
@@ -104,29 +108,91 @@ def test_distinct_but_close_pair_passes_rms_tier(ap, tmp_path):
     sb = ap.snapshot("rust", b)
     contract = ap.load_contract(CONTRACT)
     res = ap.compare_pair(sa, sb, contract)
-    # sha256 differs but rms diff is well below 0.005
-    assert not res.tiers[0].passed
-    assert res.tiers[1].name == "peak_rms"
-    assert res.tiers[1].passed
+    tiers = _tiers(res)
+    assert tiers["frames"] is True
+    assert tiers["sha256"] is False
+    assert tiers["peak_rms"] is True
+    assert tiers["snr"] is True
+    assert res.passed
 
 
-def test_distinct_pair_falls_through_to_snr(ap, tmp_path):
-    """Different amplitudes that exceed peak-RMS tolerance still meet SNR."""
+def test_amplitude_only_difference_passes_after_peak_and_gain_matching(ap, tmp_path):
+    """Python peak-normalises its output and the other runtimes do not, so a
+    pure gain difference must not count as a mismatch: peak RMS is taken on
+    peak-normalised samples and SNR after least-squares gain matching."""
     a = tmp_path / "a.wav"
     b = tmp_path / "b.wav"
     _write_sine(a, amp=0.1)
-    _write_sine(b, amp=0.2)  # rms diff ~0.07 > threshold (0.005)
-    sa = ap.snapshot("python", a)
-    sb = ap.snapshot("rust", b)
-    contract = ap.load_contract(CONTRACT)
-    res = ap.compare_pair(sa, sb, contract)
-    assert res.tiers[0].name == "sha256" and not res.tiers[0].passed
-    assert res.tiers[1].name == "peak_rms" and not res.tiers[1].passed
-    # SNR depends on the contract threshold; an amplitude-only difference
-    # at this scale tends to fall well below 60dB and therefore fail.
-    assert res.tiers[2].name == "snr"
-    # We do not assert pass/fail here — the snapshot pins how the script
-    # cascades. The next test pins a definite failure scenario.
+    _write_sine(b, amp=0.2)
+    res = ap.compare_pair(
+        ap.snapshot("python", a), ap.snapshot("rust", b), ap.load_contract(CONTRACT)
+    )
+    tiers = _tiers(res)
+    assert tiers["sha256"] is False
+    assert tiers["peak_rms"] is True
+    assert tiers["snr"] is True
+    assert res.passed
+
+
+def test_same_rms_but_different_waveform_fails(ap, tmp_path):
+    """Regression: the old cascade passed a pair as soon as any tier passed,
+    so two unrelated signals with equal RMS were reported as parity. A
+    440 Hz and an 880 Hz sine have the same RMS but are not the same sound."""
+    a = tmp_path / "a.wav"
+    b = tmp_path / "b.wav"
+    _write_sine(a, freq=440.0)
+    _write_sine(b, freq=880.0)
+    res = ap.compare_pair(
+        ap.snapshot("python", a), ap.snapshot("rust", b), ap.load_contract(CONTRACT)
+    )
+    tiers = _tiers(res)
+    assert tiers["peak_rms"] is True
+    assert tiers["snr"] is False
+    assert not res.passed
+
+
+def test_frame_count_mismatch_fails_even_when_rms_matches(ap, tmp_path):
+    """Regression: frame counts were only checked inside the SNR tier, which
+    the cascade never reached once peak RMS passed. Rust appended 0.2 s of
+    sentence silence and C# doubled the length, and both still "passed"."""
+    a = tmp_path / "a.wav"
+    b = tmp_path / "b.wav"
+    _write_sine(a, dur_sec=0.5)
+    _write_sine(b, dur_sec=0.6)
+    res = ap.compare_pair(
+        ap.snapshot("python", a), ap.snapshot("rust", b), ap.load_contract(CONTRACT)
+    )
+    assert res.tiers[0].name == "frames"
+    assert res.tiers[0].passed is False
+    assert "11025 vs 13230" in res.tiers[0].detail
+    assert not res.passed
+
+
+def test_sample_rate_mismatch_fails_frames_tier(ap, tmp_path):
+    a = tmp_path / "a.wav"
+    b = tmp_path / "b.wav"
+    _write_sine(a)
+    with wave.open(str(a), "rb") as src, wave.open(str(b), "wb") as dst:
+        dst.setnchannels(1)
+        dst.setsampwidth(2)
+        dst.setframerate(16000)
+        dst.writeframes(src.readframes(src.getnframes()))
+    res = ap.compare_pair(
+        ap.snapshot("python", a), ap.snapshot("rust", b), ap.load_contract(CONTRACT)
+    )
+    assert _tiers(res)["frames"] is False
+    assert not res.passed
+
+
+def test_both_silent_pair_passes(ap, tmp_path):
+    a = tmp_path / "a.wav"
+    b = tmp_path / "b.wav"
+    _write_silence(a)
+    _write_silence(b)
+    res = ap.compare_pair(
+        ap.snapshot("python", a), ap.snapshot("rust", b), ap.load_contract(CONTRACT)
+    )
+    assert res.passed
 
 
 def test_silent_vs_loud_fails_all_tiers(ap, tmp_path):
@@ -139,7 +205,10 @@ def test_silent_vs_loud_fails_all_tiers(ap, tmp_path):
     contract = ap.load_contract(CONTRACT)
     res = ap.compare_pair(sa, sb, contract)
     assert not res.passed
-    assert all(not t.passed for t in res.tiers)
+    tiers = _tiers(res)
+    assert tiers["frames"] is True  # same length
+    assert tiers["sha256"] is False
+    assert tiers["snr"] is False
 
 
 def test_render_markdown(ap, tmp_path):
@@ -195,6 +264,43 @@ def test_cli_compare_fail_on_mismatch(ap, tmp_path):
     )
     rc = args.func(args)
     assert rc == 1
+
+
+def test_cli_require_all_runtimes_fails_when_any_runtime_is_missing(ap, tmp_path):
+    """A dump job that dies uploads no WAV; the compare step used to turn that
+    into a skip row and exit 0, so a broken runtime looked like parity."""
+    a = tmp_path / "a.wav"
+    _write_sine(a)
+    args = ap.build_parser().parse_args(
+        [
+            "compare",
+            "--inputs",
+            f"python={a}",
+            f"rust={a}",
+            "--output",
+            str(tmp_path / "diff.md"),
+            "--fail-on-mismatch",
+            "--require-all-runtimes",
+        ]
+    )
+    assert args.func(args) == 1
+
+
+def test_cli_require_all_runtimes_passes_with_every_runtime(ap, tmp_path):
+    a = tmp_path / "a.wav"
+    _write_sine(a)
+    args = ap.build_parser().parse_args(
+        [
+            "compare",
+            "--inputs",
+            *(f"{name}={a}" for name in ALL_RUNTIMES),
+            "--output",
+            str(tmp_path / "diff.md"),
+            "--fail-on-mismatch",
+            "--require-all-runtimes",
+        ]
+    )
+    assert args.func(args) == 0
 
 
 def test_parse_inputs_requires_runtime_prefix(ap):
@@ -873,3 +979,101 @@ def test_audio_parity_contract_includes_zero_shot_model_entry(ap):
     assert isinstance(entry, dict)
     assert entry.get("has_speaker_embedding") is True
     assert entry.get("expected_embedding_dim") == 192
+
+
+# ---------- runtime-parity-deep.yml wiring ----------
+
+WORKFLOW = REPO_ROOT / ".github" / "workflows" / "runtime-parity-deep.yml"
+DETERMINISTIC_FIXTURE = (
+    REPO_ROOT
+    / "tests"
+    / "fixtures"
+    / "audio-corpus"
+    / "parity"
+    / "deterministic_phoneme_ids.jsonl"
+)
+WASM_BIN = REPO_ROOT / "src" / "wasm" / "openjtalk-web" / "bin" / "piper-cli.js"
+
+
+def _workflow_text() -> str:
+    return WORKFLOW.read_text(encoding="utf-8")
+
+
+def test_workflow_has_no_continue_on_error():
+    """The jobs used to run with continue-on-error, so a red parity result
+    still showed as a green check."""
+    assert "continue-on-error" not in _workflow_text()
+
+
+def test_workflow_compare_fails_on_mismatch_and_missing_runtime():
+    text = _workflow_text()
+    compare = text[text.index("python scripts/audio_parity.py compare \\") :]
+    compare = compare[: compare.index("cat /tmp/parity/parity-diff.md")]
+    assert "--fail-on-mismatch" in compare
+    assert "--require-all-runtimes" in compare
+
+
+def test_workflow_uses_deterministic_fixture_and_zero_noise():
+    """Default noise_scale / noise_w sample random noise per runtime, so the
+    outputs can never match; every runtime is pinned to noise 0 and the
+    same length scale."""
+    import yaml
+
+    data = yaml.safe_load(_workflow_text())
+    assert data["env"]["FIXTURE"] == (
+        "tests/fixtures/audio-corpus/parity/deterministic_phoneme_ids.jsonl"
+    )
+    for name, job in data["jobs"].items():
+        if not name.startswith("dump-"):
+            continue
+        script = "\n".join(step.get("run", "") for step in job["steps"])
+        if name == "dump-cpp":
+            flags = ("--noise_scale 0", "--noise_w 0", "--length_scale 1")
+        else:
+            flags = ("--noise-scale 0", "--noise-w 0", "--length-scale 1")
+        for flag in flags:
+            assert flag in script, f"{name} is missing {flag}"
+        if name != "dump-wasm":  # the Node bin has no sentence silence
+            silence = "--sentence_silence 0" if name == "dump-cpp" else "--sentence-silence 0"
+            assert silence in script, f"{name} is missing {silence}"
+
+
+def test_deterministic_fixture_is_long_enough_to_skip_short_text_padding():
+    """Short inputs are padded to 15 IDs (docs/spec/short-text-contract.toml),
+    and how each runtime trims that padding is a separate concern. The
+    parity fixture stays above the threshold so it measures the decoder."""
+    import json
+    import tomllib
+
+    contract = tomllib.loads(
+        (REPO_ROOT / "docs" / "spec" / "short-text-contract.toml").read_text(
+            encoding="utf-8"
+        )
+    )
+    min_ids = contract["padding"]["min_phoneme_ids"]
+    lines = [
+        line
+        for line in DETERMINISTIC_FIXTURE.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(lines) == 1
+    entry = json.loads(lines[0])
+    ids = entry["phoneme_ids"]
+    assert ids[0] == 1 and ids[-1] == 2
+    assert len(ids) >= min_ids
+    assert entry["language_id"] == 0
+
+
+def test_wasm_parity_bin_applies_the_npm_post_processing():
+    """The Node bin returned the raw decoder output while PiperPlus.synthesize()
+    trims the EOS region (Issue #499), so wasm was 1,536 samples longer than
+    the other runtimes. Both now share src/short-text.js."""
+    text = WASM_BIN.read_text(encoding="utf-8")
+    assert "from '../src/short-text.js'" in text
+    for name in (
+        "adjustScalesForShortInput(",
+        "padPhonemeIds(",
+        "trimPaddingByDurations(",
+        "trimEosRegion(",
+    ):
+        assert name in text, name
