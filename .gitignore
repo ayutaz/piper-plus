@@ -225,6 +225,9 @@ tests/fixtures/mb_istft_speaker_embedding/model.onnx.json
 # ort optimized-model cache (sibling to any .onnx the runtime loads)
 *.opt.onnx
 *.opt.onnx.ok
+# Rust dictionary cache (sibling to any cmudict / pinyin JSON the runtime loads,
+# e.g. src/rust/piper-plus-g2p/data/ when the piper-core tests run)
+*.json.bincode
 
 # -----------------------------------------------------------------------------
 # Mutation testing artifacts (manual / weekly CI でのみ生成、commit しない)
