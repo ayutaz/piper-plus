@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792828064756,
+  "lastUpdate": 1792894420505,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1555,6 +1555,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Cold Start (en)",
             "value": 1265.3,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 217.4,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fe50828d7a6ad857af851946e258a5c4cf45c3f5",
+          "message": "fix(train): テキスト長がフレーム数を超えると MAS がバッファの手前を読む問題を塞ぐ (#862)\n\nテキストのトークン数がフレーム数より多いと、単調な経路はトークン 0 に届かず、\nCython のバックトラックが最初のフレームで value[-1, ...] を比較していた\n(wraparound off のためバッファの手前のメモリ)。Linux/macOS では大きな\nバッファが mmap 領域に置かれ、この読み出しで segfault する。#197 の学習中の\nSIGSEGV (829 フレーム x 1068 トークン) の原因はこれで、メモリ不足ではなかった。\n\n- core.pyx / core.py: 最初のフレームでは比較しない。トークン数 <= フレーム数の\n  入力ではそこで必ずトークン 0 にいるため、結果は変わらない\n  (Linux で 201 通りをバイト単位で比較)\n- core.c を Cython 3.3.0 で生成し直す (旧版は 0.29.33 製で古いソースのまま)\n- test_monotonic_align.py: 10x300x400 と 1x829x1068 を subprocess で実行する\n  回帰テストを追加し、CI の式に選ばれるようマーカーを付ける",
+          "timestamp": "2026-10-25T11:10:41+09:00",
+          "tree_id": "8c0883707910d441d00612f2a0f0a06ccd1e70c9",
+          "url": "https://github.com/ayutaz/piper-plus/commit/fe50828d7a6ad857af851946e258a5c4cf45c3f5"
+        },
+        "date": 1792894417676,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0996,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 25.4,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 25.5,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1227.9,
             "unit": "ms"
           },
           {
