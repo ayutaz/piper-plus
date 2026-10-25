@@ -3,7 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Include the individual OpenJTalk component headers
+// Include the individual OpenJTalk component headers. The order matters:
+// mecab2njd.h and njd2jpcommon.h use NJD / JPCommon without including
+// njd.h / jpcommon.h, so clang-format must not sort this block.
+// clang-format off
 #include "text2mecab.h"
 #include "mecab.h"
 #include "njd.h"
@@ -16,6 +19,7 @@
 #include "njd_set_accent_type.h"
 #include "njd_set_long_vowel.h"
 #include "njd_set_unvoiced_vowel.h"
+// clang-format on
 #include "openjtalk_dictionary_manager.h"
 
 // ============================================================================

@@ -18,8 +18,8 @@ Why a separate script (vs ``scripts/benchmark.py``):
     process and times ``session.run()`` directly. Cross-runtime comparison
     needs a black-box harness that treats the runtime as opaque and only
     observes wall-clock + emitted WAV. This script is consumed by
-    ``.github/workflows/multi-runtime-rtf.yml`` (one job per
-    runtime x text-length matrix cell).
+    ``.github/workflows/multi-runtime-rtf.yml`` (one job per runtime, one
+    step per text length).
 
 Usage:
     uv run python scripts/benchmark_runtime.py \\

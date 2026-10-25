@@ -10,8 +10,14 @@
 # versions). The six contracts gated here cover orthogonal axes (audio
 # format, EP matrix, streaming API surface, Swift FFI, Portuguese
 # dialect, speaker encoder). Keeping them in their own workflow makes the
-# matrix readable and lets reviewers identify which contract drifted
+# step list readable and lets reviewers identify which contract drifted
 # without reading the whole quality-gate log.
+#
+# One job per OS runs every contract as its own step. Each check takes a
+# second or two, so a job per (contract, OS) pair spent most of its time on
+# checkout and Python setup and took 30 runner slots per push. Every step
+# runs even when an earlier one fails (`!cancelled()`), and the step name
+# names the contract that drifted.
 #
 # Source-of-truth contract: docs/spec/<name>-contract.{toml,md}
 # Check script:             scripts/check_<name>_contract.py
@@ -57,6 +63,34 @@ on:
       - 'src/python_run/pyproject.toml'  # test-flake-retry: pytest-rerunfailures dep
       - '.github/workflows/python-tests.yml'  # test-flake-retry: --reruns flag
       - '.github/workflows/contract-gates-extended.yml'
+      # Files the check scripts read. They went unlisted while the script
+      # name was built in a `case` statement, which check_trigger_coverage.py
+      # could not see through.
+      # audio-format: runtime sources that name the output sample format
+      - 'src/python_run/piper_plus/voice.py'
+      - 'src/python_run/piper_plus/http_server.py'
+      - 'src/rust/piper-core/src/engine.rs'
+      - 'src/go/piperplus/synthesize.go'
+      - 'src/csharp/PiperPlus.Core/Inference/PiperSession.cs'
+      - 'src/wasm/openjtalk-web/src/index.js'
+      # swift-g2p / model-sha256-manifest: helpers the checks import
+      - 'scripts/check_pua_consistency.py'
+      - 'scripts/verify_model_checksums.py'
+      # pt-dialect: the parity test the contract names
+      - 'src/python_run/tests/test_pt_dialect_parity.py'
+      # speaker-encoder: golden generator and per-runtime golden / e2e tests
+      - 'test/generate_speaker_encoder_golden.py'
+      - 'test/test_speaker_encoder_e2e.py'
+      - 'src/cpp/tests/test_speaker_encoder_e2e.cpp'
+      - 'src/cpp/tests/test_speaker_encoder_golden.cpp'
+      - 'src/csharp/PiperPlus.Core.Tests/SpeakerEncoderE2ETests.cs'
+      - 'src/csharp/PiperPlus.Core.Tests/SpeakerEncoderTests.cs'
+      - 'src/go/piperplus/speaker_encoder_e2e_test.go'
+      - 'src/go/piperplus/speaker_encoder_test.go'
+      - 'src/rust/piper-core/tests/test_speaker_encoder_e2e.rs'
+      - 'src/rust/piper-core/tests/test_speaker_encoder_golden.rs'
+      - 'src/wasm/openjtalk-web/test/js/test-speaker-encoder-e2e.js'
+      - 'src/wasm/openjtalk-web/test/js/test-speaker-encoder-golden.js'
   push:
     branches: [dev, main]
   workflow_dispatch:
@@ -70,9 +104,9 @@ permissions:
 
 jobs:
   contract-checks:
-    name: ${{ matrix.contract }} (${{ matrix.os }})
+    name: contract-checks (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -80,17 +114,10 @@ jobs:
         # failures (non-UTF-8 console encoding, path separators) that an
         # ubuntu-only matrix never caught — see the QA CI-coverage gap.
         os: [ubuntu-latest, macos-latest, windows-latest]
-        contract:
-          - audio-format
-          - ort-provider
-          - streaming-api
-          - swift-g2p
-          - pt-dialect
-          - speaker-encoder
-          - model-sha256-manifest
-          - artifact-retention
-          - test-flake-retry
-          - label-refs
+    defaults:
+      run:
+        # bash on all three OSes (windows-latest ships Git Bash), as before.
+        shell: bash
     steps:
       - uses: actions/checkout@v6.1.0
 
@@ -100,23 +127,42 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Run contract drift check
-        # bash on all three OSes (windows-latest ships Git Bash) so the
-        # case statement below stays portable.
-        shell: bash
-        run: |
-          # Map the matrix contract id to its check script.
-          case "${{ matrix.contract }}" in
-            audio-format)            script=check_audio_format_contract.py ;;
-            ort-provider)            script=check_ort_provider_contract.py ;;
-            streaming-api)           script=check_streaming_api_contract.py ;;
-            swift-g2p)               script=check_swift_g2p_contract.py ;;
-            pt-dialect)              script=check_pt_dialect_contract.py ;;
-            speaker-encoder)         script=check_speaker_encoder_contract.py ;;
-            model-sha256-manifest)   script=check_model_sha256_manifest.py ;;
-            artifact-retention)      script=check_artifact_retention.py ;;
-            test-flake-retry)        script=check_test_flake_retry.py ;;
-            label-refs)              script=check_label_references.py ;;
-            *) echo "::error::unknown contract id ${{ matrix.contract }}"; exit 1 ;;
-          esac
-          python "scripts/$script"
+      - name: audio-format
+        if: ${{ !cancelled() }}
+        run: python scripts/check_audio_format_contract.py
+
+      - name: ort-provider
+        if: ${{ !cancelled() }}
+        run: python scripts/check_ort_provider_contract.py
+
+      - name: streaming-api
+        if: ${{ !cancelled() }}
+        run: python scripts/check_streaming_api_contract.py
+
+      - name: swift-g2p
+        if: ${{ !cancelled() }}
+        run: python scripts/check_swift_g2p_contract.py
+
+      - name: pt-dialect
+        if: ${{ !cancelled() }}
+        run: python scripts/check_pt_dialect_contract.py
+
+      - name: speaker-encoder
+        if: ${{ !cancelled() }}
+        run: python scripts/check_speaker_encoder_contract.py
+
+      - name: model-sha256-manifest
+        if: ${{ !cancelled() }}
+        run: python scripts/check_model_sha256_manifest.py
+
+      - name: artifact-retention
+        if: ${{ !cancelled() }}
+        run: python scripts/check_artifact_retention.py
+
+      - name: test-flake-retry
+        if: ${{ !cancelled() }}
+        run: python scripts/check_test_flake_retry.py
+
+      - name: label-refs
+        if: ${{ !cancelled() }}
+        run: python scripts/check_label_references.py

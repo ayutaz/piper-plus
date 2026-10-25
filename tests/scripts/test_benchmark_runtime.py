@@ -132,6 +132,19 @@ def test_a_failed_cell_fails_the_job(workflow):
     assert "continue-on-error" not in job
     for step in job["steps"]:
         assert "continue-on-error" not in step, step.get("name")
-    run = next(s for s in job["steps"] if s.get("name") == "Run benchmark")["run"]
-    assert "|| echo" not in run
-    assert "|| true" not in run
+    # One step per text length; each must fail on its own.
+    runs = {
+        s["name"]: s["run"]
+        for s in job["steps"]
+        if s.get("name", "").startswith("Run benchmark")
+    }
+    assert sorted(runs) == [
+        "Run benchmark (long)",
+        "Run benchmark (medium)",
+        "Run benchmark (short)",
+    ]
+    for name, run in runs.items():
+        text = name.split("(")[1].rstrip(")")
+        assert f"--text-key {text} " in run, name
+        assert "|| echo" not in run, name
+        assert "|| true" not in run, name

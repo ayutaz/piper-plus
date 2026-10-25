@@ -9,10 +9,12 @@ name: Multi-Runtime RTF Benchmark
 #   runtime's CLI as a black box via ``scripts/benchmark_runtime.py`` and
 #   reports wall-clock RTF + P50/P95 per (runtime, text-length) cell.
 #
-# Matrix: 6 runtimes (python/rust/go/csharp/cpp/wasm) x 3 text lengths
-#   (short/medium/long) = 18 parallel jobs. Each job builds its runtime CLI
-#   then runs warmup=5 + runs=30 against ``test/models/multilingual-test-medium.onnx``
-#   on the same fixed text from ``tests/fixtures/benchmark-texts.json``.
+# Matrix: 6 runtimes (python/rust/go/csharp/cpp/wasm), one job each. A job
+#   builds its runtime CLI once, then measures the 3 text lengths
+#   (short/medium/long) as 3 steps, each warmup=5 + runs=30 against
+#   ``test/models/multilingual-test-medium.onnx`` on the same fixed text from
+#   ``tests/fixtures/benchmark-texts.json``. (It was 18 jobs, one per
+#   runtime x text cell, and every job built its CLI again.)
 #
 # Initial policy: warn-only. The baseline JSON
 # (``tests/fixtures/multi-runtime-rtf-baseline.json``) ships with ``null``
@@ -22,7 +24,7 @@ name: Multi-Runtime RTF Benchmark
 # step (see ``Compare against baseline`` below) to make it a hard gate.
 #
 # A cell that cannot run (CLI does not build, wrong path, no audio) fails
-# the job. Only the comparison against the baseline is warn-only. The wasm
+# its step and the job; the other text lengths still run. Only the comparison against the baseline is warn-only. The wasm
 # cell drives bin/piper-cli.js (onnxruntime-node), which has no G2P: the
 # harness phonemizes the text once with the Python runtime and pipes the
 # phoneme ids, so its numbers cover inference only (`g2p_in_timing: false`
@@ -64,12 +66,12 @@ concurrency:
 permissions:
   # write は gh-pages への push / baseline commit を行う aggregate job だけが
   # jobLevel で持つ (Scorecard Token-Permissions: topLevel の write を避ける)。
-  # benchmark job は matrix 18 セルすべて読み取りのみで足りる。
+  # benchmark job (6 runtime) は読み取りのみで足りる。
   contents: read
 
 jobs:
   benchmark:
-    name: bench (${{ matrix.runtime }}, ${{ matrix.text }})
+    name: bench (${{ matrix.runtime }})
     runs-on: ubuntu-24.04
     # Fork PRs can't post sticky comments; skip cleanly (mirrors
     # rtf-regression.yml's policy).
@@ -79,7 +81,6 @@ jobs:
       fail-fast: false
       matrix:
         runtime: [python, rust, go, csharp, cpp, wasm]
-        text: [short, medium, long]
     steps:
       - uses: actions/checkout@v6.1.0
 
@@ -202,26 +203,63 @@ jobs:
           esac
 
       # ---- Run benchmark ----
-      # A failed cell fails the job. Regressions against the baseline are
+      # A failed cell fails its step and the job. Regressions against the baseline are
       # reported by the aggregate job and stay warn-only until the baseline
       # is calibrated (policy in tests/fixtures/multi-runtime-rtf-baseline.json).
-      - name: Run benchmark
+      # Each text length is its own step, so a failure in one still lets the
+      # other two run and upload. They run one after another on the same
+      # runner; each invocation does its own warmup.
+      - name: Run benchmark (short)
+        if: ${{ !cancelled() && steps.cli.outcome == 'success' }}
+        env:
+          CLI_CMD: ${{ steps.cli.outputs.cmd }}
         run: |
           uv run python scripts/benchmark_runtime.py \
               --runtime "${{ matrix.runtime }}" \
-              --cli-cmd "${{ steps.cli.outputs.cmd }}" \
+              --cli-cmd "$CLI_CMD" \
               --model test/models/multilingual-test-medium.onnx \
               --config test/models/multilingual-test-medium.onnx.json \
               --text-file tests/fixtures/benchmark-texts.json \
-              --text-key "${{ matrix.text }}" \
+              --text-key short \
               --runs 30 --warmup 5 \
-              --output "bench-${{ matrix.runtime }}-${{ matrix.text }}.json"
+              --output "bench-${{ matrix.runtime }}-short.json"
+
+      - name: Run benchmark (medium)
+        if: ${{ !cancelled() && steps.cli.outcome == 'success' }}
+        env:
+          CLI_CMD: ${{ steps.cli.outputs.cmd }}
+        run: |
+          uv run python scripts/benchmark_runtime.py \
+              --runtime "${{ matrix.runtime }}" \
+              --cli-cmd "$CLI_CMD" \
+              --model test/models/multilingual-test-medium.onnx \
+              --config test/models/multilingual-test-medium.onnx.json \
+              --text-file tests/fixtures/benchmark-texts.json \
+              --text-key medium \
+              --runs 30 --warmup 5 \
+              --output "bench-${{ matrix.runtime }}-medium.json"
+
+      - name: Run benchmark (long)
+        if: ${{ !cancelled() && steps.cli.outcome == 'success' }}
+        env:
+          CLI_CMD: ${{ steps.cli.outputs.cmd }}
+        run: |
+          uv run python scripts/benchmark_runtime.py \
+              --runtime "${{ matrix.runtime }}" \
+              --cli-cmd "$CLI_CMD" \
+              --model test/models/multilingual-test-medium.onnx \
+              --config test/models/multilingual-test-medium.onnx.json \
+              --text-file tests/fixtures/benchmark-texts.json \
+              --text-key long \
+              --runs 30 --warmup 5 \
+              --output "bench-${{ matrix.runtime }}-long.json"
 
       - name: Upload benchmark JSON
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: multi-runtime-rtf-${{ matrix.runtime }}-${{ matrix.text }}
-          path: bench-${{ matrix.runtime }}-${{ matrix.text }}.json
+          name: multi-runtime-rtf-${{ matrix.runtime }}
+          path: bench-${{ matrix.runtime }}-*.json
           retention-days: 30
 
   aggregate:
