@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-25T08:17:22Z",
+  "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
     "executable": 234,
     "needs_placeholder": 7,
@@ -5497,35 +5497,9 @@
     },
     {
       "file": "docs/reference/mutation-testing.md",
-      "line_start": 42,
-      "line_end": 56,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "5f05089ab6e6988d2e4f36e162ec3e50824ae970"
-    },
-    {
-      "file": "docs/reference/mutation-testing.md",
-      "line_start": 75,
-      "line_end": 94,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "7c0e63b5290e4db2fac388b542a44e115d15799b"
-    },
-    {
-      "file": "docs/reference/mutation-testing.md",
-      "line_start": 98,
-      "line_end": 105,
-      "language_raw": "toml",
+      "line_start": 20,
+      "line_end": 27,
+      "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
       "suggested_action": "route_via_language_alias_table",
@@ -5534,12 +5508,12 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "ed27a9aaefd679eb47a8dd0c3d1f1c4e53f5bc53"
+      "hash_sha1": "d360e5ead4780214ffe9a32cdc74b927dce8bbb6"
     },
     {
       "file": "docs/reference/mutation-testing.md",
-      "line_start": 120,
-      "line_end": 128,
+      "line_start": 77,
+      "line_end": 87,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -5547,7 +5521,33 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "e1bff66231daccc9b32eee3752f6271b0313dbb5"
+      "hash_sha1": "d2cb0c6873f10667858c9d6dfc673aafc1776dd1"
+    },
+    {
+      "file": "docs/reference/mutation-testing.md",
+      "line_start": 96,
+      "line_end": 103,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "ef418ea4276b0701b412fb123e60cad6a62eff0d"
+    },
+    {
+      "file": "docs/reference/mutation-testing.md",
+      "line_start": 110,
+      "line_end": 115,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "ea4170bf2ac059046ff6e9b82dc4dca662f564d3"
     },
     {
       "file": "docs/reference/ort-versions.md",
