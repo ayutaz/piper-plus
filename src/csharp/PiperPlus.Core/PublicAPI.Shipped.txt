@@ -1,1 +1,557 @@
 #nullable enable
+const PiperPlus.Core.Inference.ShortTextProcessor.SilencePadMs = 300 -> int
+const PiperPlus.Core.Inference.TimingWriter.UnknownSampleRate = 0 -> int
+const PiperPlus.Core.Phonemize.SentenceParallelEncoder.AutoParallelismCap = 4 -> int
+const PiperPlus.Core.Phonemize.SentenceParallelEncoder.ParallelismEnvVar = "PIPER_PLUS_G2P_PARALLELISM" -> string!
+override PiperPlus.Core.Config.VoiceFileInfo.Equals(object? obj) -> bool
+override PiperPlus.Core.Config.VoiceFileInfo.GetHashCode() -> int
+override PiperPlus.Core.Config.VoiceFileInfo.ToString() -> string!
+override PiperPlus.Core.Config.VoiceInfo.Equals(object? obj) -> bool
+override PiperPlus.Core.Config.VoiceInfo.GetHashCode() -> int
+override PiperPlus.Core.Config.VoiceInfo.ToString() -> string!
+override PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase.GetHashCode() -> int
+override PiperPlus.Core.Inference.SynthesisInput.Equals(object? obj) -> bool
+override PiperPlus.Core.Inference.SynthesisInput.GetHashCode() -> int
+override PiperPlus.Core.Inference.SynthesisInput.ToString() -> string!
+override PiperPlus.Core.Inference.SynthesisResult.Equals(object? obj) -> bool
+override PiperPlus.Core.Inference.SynthesisResult.GetHashCode() -> int
+override PiperPlus.Core.Inference.SynthesisResult.ToString() -> string!
+override PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.Equals(object? obj) -> bool
+override PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.GetHashCode() -> int
+override PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.ToString() -> string!
+override PiperPlus.Core.Phonemize.ChineseG2PResult.Equals(object? obj) -> bool
+override PiperPlus.Core.Phonemize.ChineseG2PResult.GetHashCode() -> int
+override PiperPlus.Core.Phonemize.ChineseG2PResult.ToString() -> string!
+override PiperPlus.Core.Phonemize.Data.LoanwordData.Equals(object? obj) -> bool
+override PiperPlus.Core.Phonemize.Data.LoanwordData.GetHashCode() -> int
+override PiperPlus.Core.Phonemize.Data.LoanwordData.ToString() -> string!
+override PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData.Equals(object? obj) -> bool
+override PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData.GetHashCode() -> int
+override PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData.ToString() -> string!
+override PiperPlus.Core.Phonemize.G2PResult.Equals(object? obj) -> bool
+override PiperPlus.Core.Phonemize.G2PResult.GetHashCode() -> int
+override PiperPlus.Core.Phonemize.G2PResult.ToString() -> string!
+override PiperPlus.Core.Phonemize.KoreanG2PResult.Equals(object? obj) -> bool
+override PiperPlus.Core.Phonemize.KoreanG2PResult.GetHashCode() -> int
+override PiperPlus.Core.Phonemize.KoreanG2PResult.ToString() -> string!
+override PiperPlus.Core.Phonemize.ProsodyInfo.GetHashCode() -> int
+override PiperPlus.Core.Phonemize.TextOrPhonemes.Equals(object? obj) -> bool
+override PiperPlus.Core.Phonemize.TextOrPhonemes.GetHashCode() -> int
+override PiperPlus.Core.Phonemize.TextOrPhonemes.ToString() -> string!
+override PiperPlus.Core.Ssml.SsmlSegment.Equals(object? obj) -> bool
+override PiperPlus.Core.Ssml.SsmlSegment.GetHashCode() -> int
+override PiperPlus.Core.Ssml.SsmlSegment.ToString() -> string!
+PiperPlus.Core.Config.AudioConfig
+PiperPlus.Core.Config.AudioConfig.AudioConfig() -> void
+PiperPlus.Core.Config.AudioConfig.HopSize.get -> int?
+PiperPlus.Core.Config.AudioConfig.HopSize.set -> void
+PiperPlus.Core.Config.AudioConfig.SampleRate.get -> int
+PiperPlus.Core.Config.AudioConfig.SampleRate.set -> void
+PiperPlus.Core.Config.DictionaryManager
+PiperPlus.Core.Config.EspeakConfig
+PiperPlus.Core.Config.EspeakConfig.EspeakConfig() -> void
+PiperPlus.Core.Config.EspeakConfig.Voice.get -> string?
+PiperPlus.Core.Config.EspeakConfig.Voice.set -> void
+PiperPlus.Core.Config.InferenceConfig
+PiperPlus.Core.Config.InferenceConfig.InferenceConfig() -> void
+PiperPlus.Core.Config.InferenceConfig.LengthScale.get -> float
+PiperPlus.Core.Config.InferenceConfig.LengthScale.set -> void
+PiperPlus.Core.Config.InferenceConfig.NoiseScale.get -> float
+PiperPlus.Core.Config.InferenceConfig.NoiseScale.set -> void
+PiperPlus.Core.Config.InferenceConfig.NoiseW.get -> float
+PiperPlus.Core.Config.InferenceConfig.NoiseW.set -> void
+PiperPlus.Core.Config.ModelManager
+PiperPlus.Core.Config.PiperConfig
+PiperPlus.Core.Config.PiperConfig.Audio.get -> PiperPlus.Core.Config.AudioConfig!
+PiperPlus.Core.Config.PiperConfig.Audio.set -> void
+PiperPlus.Core.Config.PiperConfig.Espeak.get -> PiperPlus.Core.Config.EspeakConfig?
+PiperPlus.Core.Config.PiperConfig.Espeak.set -> void
+PiperPlus.Core.Config.PiperConfig.Inference.get -> PiperPlus.Core.Config.InferenceConfig!
+PiperPlus.Core.Config.PiperConfig.Inference.set -> void
+PiperPlus.Core.Config.PiperConfig.LanguageIdMap.get -> System.Collections.Generic.Dictionary<string!, int>?
+PiperPlus.Core.Config.PiperConfig.LanguageIdMap.set -> void
+PiperPlus.Core.Config.PiperConfig.NumLanguages.get -> int?
+PiperPlus.Core.Config.PiperConfig.NumLanguages.set -> void
+PiperPlus.Core.Config.PiperConfig.NumSpeakers.get -> int
+PiperPlus.Core.Config.PiperConfig.NumSpeakers.set -> void
+PiperPlus.Core.Config.PiperConfig.PhonemeIdMap.get -> System.Collections.Generic.Dictionary<string!, int[]!>!
+PiperPlus.Core.Config.PiperConfig.PhonemeIdMap.set -> void
+PiperPlus.Core.Config.PiperConfig.PhonemeMap.get -> System.Collections.Generic.Dictionary<string!, string![]!>?
+PiperPlus.Core.Config.PiperConfig.PhonemeMap.set -> void
+PiperPlus.Core.Config.PiperConfig.PhonemeType.get -> string?
+PiperPlus.Core.Config.PiperConfig.PhonemeType.set -> void
+PiperPlus.Core.Config.PiperConfig.PiperConfig() -> void
+PiperPlus.Core.Config.PiperConfig.ProsodyIdMap.get -> System.Collections.Generic.Dictionary<string!, int[]!>?
+PiperPlus.Core.Config.PiperConfig.ProsodyIdMap.set -> void
+PiperPlus.Core.Config.PiperConfig.ProsodyNumSymbols.get -> int?
+PiperPlus.Core.Config.PiperConfig.ProsodyNumSymbols.set -> void
+PiperPlus.Core.Config.PiperConfig.SpeakerIdMap.get -> System.Collections.Generic.Dictionary<string!, int>?
+PiperPlus.Core.Config.PiperConfig.SpeakerIdMap.set -> void
+PiperPlus.Core.Config.VoiceCatalog
+PiperPlus.Core.Config.VoiceFileInfo
+PiperPlus.Core.Config.VoiceFileInfo.Deconstruct(out string! RelativePath, out long SizeBytes, out string! Md5Digest) -> void
+PiperPlus.Core.Config.VoiceFileInfo.Md5Digest.get -> string!
+PiperPlus.Core.Config.VoiceFileInfo.Md5Digest.init -> void
+PiperPlus.Core.Config.VoiceFileInfo.RelativePath.get -> string!
+PiperPlus.Core.Config.VoiceFileInfo.RelativePath.init -> void
+PiperPlus.Core.Config.VoiceFileInfo.SizeBytes.get -> long
+PiperPlus.Core.Config.VoiceFileInfo.SizeBytes.init -> void
+PiperPlus.Core.Config.VoiceFileInfo.VoiceFileInfo(PiperPlus.Core.Config.VoiceFileInfo! original) -> void
+PiperPlus.Core.Config.VoiceFileInfo.VoiceFileInfo(string! RelativePath, long SizeBytes, string! Md5Digest) -> void
+PiperPlus.Core.Config.VoiceInfo
+PiperPlus.Core.Config.VoiceInfo.Aliases.get -> System.Collections.Generic.IReadOnlyList<string!>!
+PiperPlus.Core.Config.VoiceInfo.Aliases.init -> void
+PiperPlus.Core.Config.VoiceInfo.Deconstruct(out string! Key, out string! Name, out string! LanguageCode, out string! LanguageFamily, out string! LanguageNameNative, out string! LanguageNameEnglish, out string! Quality, out int NumSpeakers, out string! Source, out string! RepoId, out System.Collections.Generic.IReadOnlyList<PiperPlus.Core.Config.VoiceFileInfo!>! Files, out System.Collections.Generic.IReadOnlyList<string!>! Aliases, out string! Description) -> void
+PiperPlus.Core.Config.VoiceInfo.Description.get -> string!
+PiperPlus.Core.Config.VoiceInfo.Description.init -> void
+PiperPlus.Core.Config.VoiceInfo.Files.get -> System.Collections.Generic.IReadOnlyList<PiperPlus.Core.Config.VoiceFileInfo!>!
+PiperPlus.Core.Config.VoiceInfo.Files.init -> void
+PiperPlus.Core.Config.VoiceInfo.Key.get -> string!
+PiperPlus.Core.Config.VoiceInfo.Key.init -> void
+PiperPlus.Core.Config.VoiceInfo.LanguageCode.get -> string!
+PiperPlus.Core.Config.VoiceInfo.LanguageCode.init -> void
+PiperPlus.Core.Config.VoiceInfo.LanguageFamily.get -> string!
+PiperPlus.Core.Config.VoiceInfo.LanguageFamily.init -> void
+PiperPlus.Core.Config.VoiceInfo.LanguageNameEnglish.get -> string!
+PiperPlus.Core.Config.VoiceInfo.LanguageNameEnglish.init -> void
+PiperPlus.Core.Config.VoiceInfo.LanguageNameNative.get -> string!
+PiperPlus.Core.Config.VoiceInfo.LanguageNameNative.init -> void
+PiperPlus.Core.Config.VoiceInfo.Name.get -> string!
+PiperPlus.Core.Config.VoiceInfo.Name.init -> void
+PiperPlus.Core.Config.VoiceInfo.NumSpeakers.get -> int
+PiperPlus.Core.Config.VoiceInfo.NumSpeakers.init -> void
+PiperPlus.Core.Config.VoiceInfo.Quality.get -> string!
+PiperPlus.Core.Config.VoiceInfo.Quality.init -> void
+PiperPlus.Core.Config.VoiceInfo.RepoId.get -> string!
+PiperPlus.Core.Config.VoiceInfo.RepoId.init -> void
+PiperPlus.Core.Config.VoiceInfo.Source.get -> string!
+PiperPlus.Core.Config.VoiceInfo.Source.init -> void
+PiperPlus.Core.Config.VoiceInfo.VoiceInfo(PiperPlus.Core.Config.VoiceInfo! original) -> void
+PiperPlus.Core.Config.VoiceInfo.VoiceInfo(string! Key, string! Name, string! LanguageCode, string! LanguageFamily, string! LanguageNameNative, string! LanguageNameEnglish, string! Quality, int NumSpeakers, string! Source, string! RepoId, System.Collections.Generic.IReadOnlyList<PiperPlus.Core.Config.VoiceFileInfo!>! Files, System.Collections.Generic.IReadOnlyList<string!>! Aliases, string! Description = "") -> void
+PiperPlus.Core.Inference.PhonemeSilenceProcessor
+PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase
+PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase.Deconstruct(out System.Collections.Generic.List<long>! PhonemeIds, out System.Collections.Generic.List<long>? ProsodyFlat, out int SilenceSamples) -> void
+PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase.Equals(PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase other) -> bool
+PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase.PhonemeIds.get -> System.Collections.Generic.List<long>!
+PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase.PhonemeIds.init -> void
+PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase.Phrase() -> void
+PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase.Phrase(System.Collections.Generic.List<long>! PhonemeIds, System.Collections.Generic.List<long>? ProsodyFlat, int SilenceSamples) -> void
+PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase.ProsodyFlat.get -> System.Collections.Generic.List<long>?
+PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase.ProsodyFlat.init -> void
+PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase.SilenceSamples.get -> int
+PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase.SilenceSamples.init -> void
+PiperPlus.Core.Inference.PiperModel
+PiperPlus.Core.Inference.PiperModel.Dispose() -> void
+PiperPlus.Core.Inference.PiperModel.HasDurationOutput.get -> bool
+PiperPlus.Core.Inference.PiperModel.HasLanguageId.get -> bool
+PiperPlus.Core.Inference.PiperModel.HasProsody.get -> bool
+PiperPlus.Core.Inference.PiperModel.HasSpeakerEmbedding.get -> bool
+PiperPlus.Core.Inference.PiperModel.HasSpeakerEmbeddingMask.get -> bool
+PiperPlus.Core.Inference.PiperModel.HasSpeakerId.get -> bool
+PiperPlus.Core.Inference.PiperModel.HopSize.get -> int
+PiperPlus.Core.Inference.PiperModel.InputNames.get -> System.Collections.Generic.IReadOnlyList<string!>!
+PiperPlus.Core.Inference.PiperModel.PiperModel(Microsoft.ML.OnnxRuntime.InferenceSession! session, PiperPlus.Core.Config.PiperConfig! config) -> void
+PiperPlus.Core.Inference.PiperModel.SampleRate.get -> int
+PiperPlus.Core.Inference.PiperSession
+PiperPlus.Core.Inference.PiperSession.PiperSession(PiperPlus.Core.Inference.PiperModel! model) -> void
+PiperPlus.Core.Inference.PiperSession.SentenceSilenceSeconds.get -> float
+PiperPlus.Core.Inference.PiperSession.SentenceSilenceSeconds.set -> void
+PiperPlus.Core.Inference.PiperSession.Synthesize(PiperPlus.Core.Inference.SynthesisInput! input) -> short[]!
+PiperPlus.Core.Inference.PiperSession.SynthesizeToFloat(PiperPlus.Core.Inference.SynthesisInput! input) -> float[]!
+PiperPlus.Core.Inference.PiperSession.SynthesizeWithDurations(PiperPlus.Core.Inference.SynthesisInput! input) -> PiperPlus.Core.Inference.SynthesisResult!
+PiperPlus.Core.Inference.SessionFactory
+PiperPlus.Core.Inference.ShortTextProcessor
+PiperPlus.Core.Inference.SpeakerEncoder
+PiperPlus.Core.Inference.SpeakerEncoder.Dispose() -> void
+PiperPlus.Core.Inference.SpeakerEncoder.Encode(float[]! audioSamples, int sampleRate) -> float[]!
+PiperPlus.Core.Inference.SpeakerEncoder.EncodeFile(string! audioPath) -> float[]!
+PiperPlus.Core.Inference.SpeakerEncoder.SpeakerEncoder(string! modelPath) -> void
+PiperPlus.Core.Inference.StreamingWriter
+PiperPlus.Core.Inference.SynthesisInput
+PiperPlus.Core.Inference.SynthesisInput.Deconstruct(out long[]! PhonemeIds, out int SpeakerId, out int LanguageId, out long[]? ProsodyFeatures, out float NoiseScale, out float LengthScale, out float NoiseW, out float[]? SpeakerEmbedding) -> void
+PiperPlus.Core.Inference.SynthesisInput.LanguageId.get -> int
+PiperPlus.Core.Inference.SynthesisInput.LanguageId.init -> void
+PiperPlus.Core.Inference.SynthesisInput.LengthScale.get -> float
+PiperPlus.Core.Inference.SynthesisInput.LengthScale.init -> void
+PiperPlus.Core.Inference.SynthesisInput.NoiseScale.get -> float
+PiperPlus.Core.Inference.SynthesisInput.NoiseScale.init -> void
+PiperPlus.Core.Inference.SynthesisInput.NoiseW.get -> float
+PiperPlus.Core.Inference.SynthesisInput.NoiseW.init -> void
+PiperPlus.Core.Inference.SynthesisInput.PhonemeIds.get -> long[]!
+PiperPlus.Core.Inference.SynthesisInput.PhonemeIds.init -> void
+PiperPlus.Core.Inference.SynthesisInput.ProsodyFeatures.get -> long[]?
+PiperPlus.Core.Inference.SynthesisInput.ProsodyFeatures.init -> void
+PiperPlus.Core.Inference.SynthesisInput.SpeakerEmbedding.get -> float[]?
+PiperPlus.Core.Inference.SynthesisInput.SpeakerEmbedding.init -> void
+PiperPlus.Core.Inference.SynthesisInput.SpeakerId.get -> int
+PiperPlus.Core.Inference.SynthesisInput.SpeakerId.init -> void
+PiperPlus.Core.Inference.SynthesisInput.SynthesisInput(long[]! PhonemeIds, int SpeakerId = 0, int LanguageId = 0, long[]? ProsodyFeatures = null, float NoiseScale = 0.4, float LengthScale = 1, float NoiseW = 0.5, float[]? SpeakerEmbedding = null) -> void
+PiperPlus.Core.Inference.SynthesisInput.SynthesisInput(PiperPlus.Core.Inference.SynthesisInput! original) -> void
+PiperPlus.Core.Inference.SynthesisInput.Validate() -> void
+PiperPlus.Core.Inference.SynthesisResult
+PiperPlus.Core.Inference.SynthesisResult.Audio.get -> short[]!
+PiperPlus.Core.Inference.SynthesisResult.Audio.init -> void
+PiperPlus.Core.Inference.SynthesisResult.Deconstruct(out short[]! Audio, out float[]? Durations) -> void
+PiperPlus.Core.Inference.SynthesisResult.Durations.get -> float[]?
+PiperPlus.Core.Inference.SynthesisResult.Durations.init -> void
+PiperPlus.Core.Inference.SynthesisResult.SynthesisResult(PiperPlus.Core.Inference.SynthesisResult! original) -> void
+PiperPlus.Core.Inference.SynthesisResult.SynthesisResult(short[]! Audio, float[]? Durations) -> void
+PiperPlus.Core.Inference.TimingWriter
+PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry
+PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.Deconstruct(out string! Phoneme, out float StartMs, out float EndMs, out float DurationMs) -> void
+PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.DurationMs.get -> float
+PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.DurationMs.init -> void
+PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.EndMs.get -> float
+PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.EndMs.init -> void
+PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.Phoneme.get -> string!
+PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.Phoneme.init -> void
+PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.PhonemeTimingEntry(PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry! original) -> void
+PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.PhonemeTimingEntry(string! Phoneme, float StartMs, float EndMs, float DurationMs) -> void
+PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.StartMs.get -> float
+PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.StartMs.init -> void
+PiperPlus.Core.Inference.WavWriter
+PiperPlus.Core.Mapping.OpenJTalkToPiperMapping
+PiperPlus.Core.Phonemize.ArpabetToIPAConverter
+PiperPlus.Core.Phonemize.ChineseEmbeddedEnglish
+PiperPlus.Core.Phonemize.ChineseG2PResult
+PiperPlus.Core.Phonemize.ChineseG2PResult.A1.get -> System.Collections.Generic.IReadOnlyList<int>!
+PiperPlus.Core.Phonemize.ChineseG2PResult.A1.init -> void
+PiperPlus.Core.Phonemize.ChineseG2PResult.A2.get -> System.Collections.Generic.IReadOnlyList<int>!
+PiperPlus.Core.Phonemize.ChineseG2PResult.A2.init -> void
+PiperPlus.Core.Phonemize.ChineseG2PResult.A3.get -> System.Collections.Generic.IReadOnlyList<int>!
+PiperPlus.Core.Phonemize.ChineseG2PResult.A3.init -> void
+PiperPlus.Core.Phonemize.ChineseG2PResult.ChineseG2PResult(PiperPlus.Core.Phonemize.ChineseG2PResult! original) -> void
+PiperPlus.Core.Phonemize.ChineseG2PResult.ChineseG2PResult(System.Collections.Generic.IReadOnlyList<string!>! Phonemes, System.Collections.Generic.IReadOnlyList<int>! A1, System.Collections.Generic.IReadOnlyList<int>! A2, System.Collections.Generic.IReadOnlyList<int>! A3) -> void
+PiperPlus.Core.Phonemize.ChineseG2PResult.Deconstruct(out System.Collections.Generic.IReadOnlyList<string!>! Phonemes, out System.Collections.Generic.IReadOnlyList<int>! A1, out System.Collections.Generic.IReadOnlyList<int>! A2, out System.Collections.Generic.IReadOnlyList<int>! A3) -> void
+PiperPlus.Core.Phonemize.ChineseG2PResult.Phonemes.get -> System.Collections.Generic.IReadOnlyList<string!>!
+PiperPlus.Core.Phonemize.ChineseG2PResult.Phonemes.init -> void
+PiperPlus.Core.Phonemize.ChinesePhonemizer
+PiperPlus.Core.Phonemize.ChinesePhonemizer.ChinesePhonemizer(PiperPlus.Core.Phonemize.IChineseG2PEngine! engine) -> void
+PiperPlus.Core.Phonemize.ChinesePhonemizer.GetPhonemeIdMap() -> System.Collections.Generic.Dictionary<string!, int[]!>?
+PiperPlus.Core.Phonemize.ChinesePhonemizer.Phonemize(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.ChinesePhonemizer.PhonemizeEmbeddedEnglish(string! text) -> System.Collections.Generic.IReadOnlyList<string!>!
+PiperPlus.Core.Phonemize.ChinesePhonemizer.PhonemizeEmbeddedEnglishWithProsody(string! text) -> (System.Collections.Generic.IReadOnlyList<string!>! Phonemes, System.Collections.Generic.IReadOnlyList<int>! A1, System.Collections.Generic.IReadOnlyList<int>! A2, System.Collections.Generic.IReadOnlyList<int>! A3)
+PiperPlus.Core.Phonemize.ChinesePhonemizer.PhonemizeWithProsody(string! text) -> (System.Collections.Generic.List<string!>! Tokens, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.ChinesePhonemizer.PostProcessIds(System.Collections.Generic.List<int>! phonemeIds, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! prosodyFeatures, System.Collections.Generic.Dictionary<string!, int[]!>! phonemeIdMap) -> (System.Collections.Generic.List<int>! Ids, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.CustomDictionary
+PiperPlus.Core.Phonemize.CustomDictionary.ApplyToText(string! text) -> string!
+PiperPlus.Core.Phonemize.CustomDictionary.Count.get -> int
+PiperPlus.Core.Phonemize.CustomDictionary.CustomDictionary() -> void
+PiperPlus.Core.Phonemize.CustomDictionary.LoadDefaults() -> void
+PiperPlus.Core.Phonemize.CustomDictionary.LoadDictionaries(System.Collections.Generic.IEnumerable<string!>! filePaths) -> void
+PiperPlus.Core.Phonemize.CustomDictionary.LoadDictionary(string! filePath) -> void
+PiperPlus.Core.Phonemize.Data.LoanwordData
+PiperPlus.Core.Phonemize.Data.LoanwordData.<Clone>$() -> PiperPlus.Core.Phonemize.Data.LoanwordData!
+PiperPlus.Core.Phonemize.Data.LoanwordData.Acronyms.get -> System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyList<string!>!>!
+PiperPlus.Core.Phonemize.Data.LoanwordData.Acronyms.init -> void
+PiperPlus.Core.Phonemize.Data.LoanwordData.Deconstruct(out int Version, out System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyList<string!>!>! Acronyms, out System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyList<string!>!>! Loanwords, out System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyList<string!>!>! LetterFallback) -> void
+PiperPlus.Core.Phonemize.Data.LoanwordData.Equals(PiperPlus.Core.Phonemize.Data.LoanwordData? other) -> bool
+PiperPlus.Core.Phonemize.Data.LoanwordData.LetterFallback.get -> System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyList<string!>!>!
+PiperPlus.Core.Phonemize.Data.LoanwordData.LetterFallback.init -> void
+PiperPlus.Core.Phonemize.Data.LoanwordData.LoanwordData(int Version, System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyList<string!>!>! Acronyms, System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyList<string!>!>! Loanwords, System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyList<string!>!>! LetterFallback) -> void
+PiperPlus.Core.Phonemize.Data.LoanwordData.Loanwords.get -> System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyList<string!>!>!
+PiperPlus.Core.Phonemize.Data.LoanwordData.Loanwords.init -> void
+PiperPlus.Core.Phonemize.Data.LoanwordData.Version.get -> int
+PiperPlus.Core.Phonemize.Data.LoanwordData.Version.init -> void
+PiperPlus.Core.Phonemize.Data.LoanwordDataLoader
+PiperPlus.Core.Phonemize.Data.LoanwordSchemaException
+PiperPlus.Core.Phonemize.Data.LoanwordSchemaException.LoanwordSchemaException() -> void
+PiperPlus.Core.Phonemize.Data.LoanwordSchemaException.LoanwordSchemaException(string! message) -> void
+PiperPlus.Core.Phonemize.Data.LoanwordSchemaException.LoanwordSchemaException(string! message, System.Exception! innerException) -> void
+PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData
+PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData.<Clone>$() -> PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData!
+PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData.Deconstruct(out System.Collections.Generic.IReadOnlySet<string!>! FunctionWords, out System.Collections.Generic.IReadOnlySet<char>! StrongChars) -> void
+PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData.Equals(PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData? other) -> bool
+PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData.FunctionWords.get -> System.Collections.Generic.IReadOnlySet<string!>!
+PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData.FunctionWords.init -> void
+PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData.StrongChars.get -> System.Collections.Generic.IReadOnlySet<char>!
+PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData.StrongChars.init -> void
+PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData.SwedishFunctionWordData(System.Collections.Generic.IReadOnlySet<string!>! FunctionWords, System.Collections.Generic.IReadOnlySet<char>! StrongChars) -> void
+PiperPlus.Core.Phonemize.Data.SwedishFunctionWordDataLoader
+PiperPlus.Core.Phonemize.EnglishPhonemizer
+PiperPlus.Core.Phonemize.EnglishPhonemizer.EnglishPhonemizer(PiperPlus.Core.Phonemize.IEnglishG2PEngine! engine) -> void
+PiperPlus.Core.Phonemize.EnglishPhonemizer.GetPhonemeIdMap() -> System.Collections.Generic.Dictionary<string!, int[]!>?
+PiperPlus.Core.Phonemize.EnglishPhonemizer.Phonemize(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.EnglishPhonemizer.PhonemizeWithProsody(string! text) -> (System.Collections.Generic.List<string!>! Tokens, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.EnglishPhonemizer.PostProcessIds(System.Collections.Generic.List<int>! phonemeIds, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! prosodyFeatures, System.Collections.Generic.Dictionary<string!, int[]!>! phonemeIdMap) -> (System.Collections.Generic.List<int>! Ids, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.EuropeanPortuguesePhonemizer
+PiperPlus.Core.Phonemize.EuropeanPortuguesePhonemizer.EuropeanPortuguesePhonemizer(PiperPlus.Core.Phonemize.IPortugueseG2PEngine! engine) -> void
+PiperPlus.Core.Phonemize.EuropeanPortuguesePhonemizer.GetPhonemeIdMap() -> System.Collections.Generic.Dictionary<string!, int[]!>?
+PiperPlus.Core.Phonemize.EuropeanPortuguesePhonemizer.Phonemize(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.EuropeanPortuguesePhonemizer.PhonemizeWithProsody(string! text) -> (System.Collections.Generic.List<string!>! Tokens, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.EuropeanPortuguesePhonemizer.PostProcessIds(System.Collections.Generic.List<int>! phonemeIds, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! prosodyFeatures, System.Collections.Generic.Dictionary<string!, int[]!>! phonemeIdMap) -> (System.Collections.Generic.List<int>! Ids, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.FrenchPhonemizer
+PiperPlus.Core.Phonemize.FrenchPhonemizer.FrenchPhonemizer(PiperPlus.Core.Phonemize.IFrenchG2PEngine! engine) -> void
+PiperPlus.Core.Phonemize.FrenchPhonemizer.GetPhonemeIdMap() -> System.Collections.Generic.Dictionary<string!, int[]!>?
+PiperPlus.Core.Phonemize.FrenchPhonemizer.Phonemize(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.FrenchPhonemizer.PhonemizeWithProsody(string! text) -> (System.Collections.Generic.List<string!>! Tokens, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.FrenchPhonemizer.PostProcessIds(System.Collections.Generic.List<int>! phonemeIds, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! prosodyFeatures, System.Collections.Generic.Dictionary<string!, int[]!>! phonemeIdMap) -> (System.Collections.Generic.List<int>! Ids, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.G2PResult
+PiperPlus.Core.Phonemize.G2PResult.A1.get -> int[]!
+PiperPlus.Core.Phonemize.G2PResult.A1.init -> void
+PiperPlus.Core.Phonemize.G2PResult.A2.get -> int[]!
+PiperPlus.Core.Phonemize.G2PResult.A2.init -> void
+PiperPlus.Core.Phonemize.G2PResult.A3.get -> int[]!
+PiperPlus.Core.Phonemize.G2PResult.A3.init -> void
+PiperPlus.Core.Phonemize.G2PResult.Deconstruct(out string![]! Phonemes, out int[]! A1, out int[]! A2, out int[]! A3) -> void
+PiperPlus.Core.Phonemize.G2PResult.G2PResult(PiperPlus.Core.Phonemize.G2PResult! original) -> void
+PiperPlus.Core.Phonemize.G2PResult.G2PResult(string![]! Phonemes, int[]! A1, int[]! A2, int[]! A3) -> void
+PiperPlus.Core.Phonemize.G2PResult.Phonemes.get -> string![]!
+PiperPlus.Core.Phonemize.G2PResult.Phonemes.init -> void
+PiperPlus.Core.Phonemize.IChineseG2PEngine
+PiperPlus.Core.Phonemize.IChineseG2PEngine.Convert(string! text) -> PiperPlus.Core.Phonemize.ChineseG2PResult!
+PiperPlus.Core.Phonemize.IChineseG2PEngine.ConvertEmbeddedEnglish(string! text, PiperPlus.Core.Phonemize.Data.LoanwordData? loanwordData = null) -> PiperPlus.Core.Phonemize.ChineseG2PResult!
+PiperPlus.Core.Phonemize.IEnglishG2PEngine
+PiperPlus.Core.Phonemize.IEnglishG2PEngine.ConvertToArpabet(string! text) -> System.Collections.Generic.List<System.Collections.Generic.List<string!>!>!
+PiperPlus.Core.Phonemize.IFrenchG2PEngine
+PiperPlus.Core.Phonemize.IFrenchG2PEngine.ToPhonemeList(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.IJapaneseG2PEngine
+PiperPlus.Core.Phonemize.IJapaneseG2PEngine.Convert(string! text) -> PiperPlus.Core.Phonemize.G2PResult!
+PiperPlus.Core.Phonemize.IKoreanG2PEngine
+PiperPlus.Core.Phonemize.IKoreanG2PEngine.Convert(string! text) -> PiperPlus.Core.Phonemize.KoreanG2PResult!
+PiperPlus.Core.Phonemize.InlinePhonemeParser
+PiperPlus.Core.Phonemize.IpaTokenizer
+PiperPlus.Core.Phonemize.IPhonemizer
+PiperPlus.Core.Phonemize.IPhonemizer.GetPhonemeIdMap() -> System.Collections.Generic.Dictionary<string!, int[]!>?
+PiperPlus.Core.Phonemize.IPhonemizer.Phonemize(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.IPhonemizer.PhonemizeWithProsody(string! text) -> (System.Collections.Generic.List<string!>! Tokens, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.IPhonemizer.PostProcessIds(System.Collections.Generic.List<int>! phonemeIds, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! prosodyFeatures, System.Collections.Generic.Dictionary<string!, int[]!>! phonemeIdMap) -> (System.Collections.Generic.List<int>! Ids, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.IPortugueseG2PEngine
+PiperPlus.Core.Phonemize.IPortugueseG2PEngine.ToPhonemeList(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.ISpanishG2PEngine
+PiperPlus.Core.Phonemize.ISpanishG2PEngine.ToPhonemeList(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.ISwedishG2PEngine
+PiperPlus.Core.Phonemize.ISwedishG2PEngine.ToPhonemeList(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.JapanesePhonemizer
+PiperPlus.Core.Phonemize.JapanesePhonemizer.GetPhonemeIdMap() -> System.Collections.Generic.Dictionary<string!, int[]!>?
+PiperPlus.Core.Phonemize.JapanesePhonemizer.JapanesePhonemizer(PiperPlus.Core.Phonemize.IJapaneseG2PEngine! engine) -> void
+PiperPlus.Core.Phonemize.JapanesePhonemizer.Phonemize(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.JapanesePhonemizer.PhonemizeWithProsody(string! text) -> (System.Collections.Generic.List<string!>! Tokens, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.KoreanG2PResult
+PiperPlus.Core.Phonemize.KoreanG2PResult.A1.get -> System.Collections.Generic.IReadOnlyList<int>!
+PiperPlus.Core.Phonemize.KoreanG2PResult.A1.init -> void
+PiperPlus.Core.Phonemize.KoreanG2PResult.A2.get -> System.Collections.Generic.IReadOnlyList<int>!
+PiperPlus.Core.Phonemize.KoreanG2PResult.A2.init -> void
+PiperPlus.Core.Phonemize.KoreanG2PResult.A3.get -> System.Collections.Generic.IReadOnlyList<int>!
+PiperPlus.Core.Phonemize.KoreanG2PResult.A3.init -> void
+PiperPlus.Core.Phonemize.KoreanG2PResult.Deconstruct(out System.Collections.Generic.IReadOnlyList<string!>! Phonemes, out System.Collections.Generic.IReadOnlyList<int>! A1, out System.Collections.Generic.IReadOnlyList<int>! A2, out System.Collections.Generic.IReadOnlyList<int>! A3) -> void
+PiperPlus.Core.Phonemize.KoreanG2PResult.KoreanG2PResult(PiperPlus.Core.Phonemize.KoreanG2PResult! original) -> void
+PiperPlus.Core.Phonemize.KoreanG2PResult.KoreanG2PResult(System.Collections.Generic.IReadOnlyList<string!>! Phonemes, System.Collections.Generic.IReadOnlyList<int>! A1, System.Collections.Generic.IReadOnlyList<int>! A2, System.Collections.Generic.IReadOnlyList<int>! A3) -> void
+PiperPlus.Core.Phonemize.KoreanG2PResult.Phonemes.get -> System.Collections.Generic.IReadOnlyList<string!>!
+PiperPlus.Core.Phonemize.KoreanG2PResult.Phonemes.init -> void
+PiperPlus.Core.Phonemize.KoreanPhonemizer
+PiperPlus.Core.Phonemize.KoreanPhonemizer.GetPhonemeIdMap() -> System.Collections.Generic.Dictionary<string!, int[]!>?
+PiperPlus.Core.Phonemize.KoreanPhonemizer.KoreanPhonemizer(PiperPlus.Core.Phonemize.IKoreanG2PEngine! engine) -> void
+PiperPlus.Core.Phonemize.KoreanPhonemizer.Phonemize(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.KoreanPhonemizer.PhonemizeWithProsody(string! text) -> (System.Collections.Generic.List<string!>! Tokens, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.KoreanPhonemizer.PostProcessIds(System.Collections.Generic.List<int>! phonemeIds, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! prosodyFeatures, System.Collections.Generic.Dictionary<string!, int[]!>! phonemeIdMap) -> (System.Collections.Generic.List<int>! Ids, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.MultilingualPhonemizer
+PiperPlus.Core.Phonemize.MultilingualPhonemizer.EnableZhEnDispatch.get -> bool
+PiperPlus.Core.Phonemize.MultilingualPhonemizer.EnableZhEnDispatch.set -> void
+PiperPlus.Core.Phonemize.MultilingualPhonemizer.GetPhonemeIdMap() -> System.Collections.Generic.Dictionary<string!, int[]!>?
+PiperPlus.Core.Phonemize.MultilingualPhonemizer.MultilingualPhonemizer(System.Collections.Generic.Dictionary<string!, PiperPlus.Core.Phonemize.IPhonemizer!>! phonemizers, string! defaultLatinLanguage = "en") -> void
+PiperPlus.Core.Phonemize.MultilingualPhonemizer.Phonemize(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.MultilingualPhonemizer.PhonemizeWithProsody(string! text) -> (System.Collections.Generic.List<string!>! Tokens, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.MultilingualPhonemizer.PostProcessIds(System.Collections.Generic.List<int>! phonemeIds, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! prosodyFeatures, System.Collections.Generic.Dictionary<string!, int[]!>! phonemeIdMap) -> (System.Collections.Generic.List<int>! Ids, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.PhonemeEncoder
+PiperPlus.Core.Phonemize.PiperPhonemeConverter
+PiperPlus.Core.Phonemize.PortuguesePhonemizer
+PiperPlus.Core.Phonemize.PortuguesePhonemizer.GetPhonemeIdMap() -> System.Collections.Generic.Dictionary<string!, int[]!>?
+PiperPlus.Core.Phonemize.PortuguesePhonemizer.Phonemize(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.PortuguesePhonemizer.PhonemizeWithProsody(string! text) -> (System.Collections.Generic.List<string!>! Tokens, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.PortuguesePhonemizer.PortuguesePhonemizer(PiperPlus.Core.Phonemize.IPortugueseG2PEngine! engine) -> void
+PiperPlus.Core.Phonemize.PortuguesePhonemizer.PostProcessIds(System.Collections.Generic.List<int>! phonemeIds, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! prosodyFeatures, System.Collections.Generic.Dictionary<string!, int[]!>! phonemeIdMap) -> (System.Collections.Generic.List<int>! Ids, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.ProsodyInfo
+PiperPlus.Core.Phonemize.ProsodyInfo.A1.get -> int
+PiperPlus.Core.Phonemize.ProsodyInfo.A1.set -> void
+PiperPlus.Core.Phonemize.ProsodyInfo.A2.get -> int
+PiperPlus.Core.Phonemize.ProsodyInfo.A2.set -> void
+PiperPlus.Core.Phonemize.ProsodyInfo.A3.get -> int
+PiperPlus.Core.Phonemize.ProsodyInfo.A3.set -> void
+PiperPlus.Core.Phonemize.ProsodyInfo.Deconstruct(out int A1, out int A2, out int A3) -> void
+PiperPlus.Core.Phonemize.ProsodyInfo.Equals(PiperPlus.Core.Phonemize.ProsodyInfo other) -> bool
+PiperPlus.Core.Phonemize.ProsodyInfo.ProsodyInfo() -> void
+PiperPlus.Core.Phonemize.ProsodyInfo.ProsodyInfo(int A1, int A2, int A3) -> void
+PiperPlus.Core.Phonemize.RawPhonemeParser
+PiperPlus.Core.Phonemize.SentenceParallelEncoder
+PiperPlus.Core.Phonemize.SpanishPhonemizer
+PiperPlus.Core.Phonemize.SpanishPhonemizer.GetPhonemeIdMap() -> System.Collections.Generic.Dictionary<string!, int[]!>?
+PiperPlus.Core.Phonemize.SpanishPhonemizer.Phonemize(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.SpanishPhonemizer.PhonemizeWithProsody(string! text) -> (System.Collections.Generic.List<string!>! Tokens, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.SpanishPhonemizer.PostProcessIds(System.Collections.Generic.List<int>! phonemeIds, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! prosodyFeatures, System.Collections.Generic.Dictionary<string!, int[]!>! phonemeIdMap) -> (System.Collections.Generic.List<int>! Ids, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.SpanishPhonemizer.SpanishPhonemizer(PiperPlus.Core.Phonemize.ISpanishG2PEngine! engine) -> void
+PiperPlus.Core.Phonemize.SwedishG2PEngine
+PiperPlus.Core.Phonemize.SwedishG2PEngine.SwedishG2PEngine() -> void
+PiperPlus.Core.Phonemize.SwedishG2PEngine.ToPhonemeList(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.SwedishPhonemizer
+PiperPlus.Core.Phonemize.SwedishPhonemizer.GetPhonemeIdMap() -> System.Collections.Generic.Dictionary<string!, int[]!>?
+PiperPlus.Core.Phonemize.SwedishPhonemizer.Phonemize(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.SwedishPhonemizer.PhonemizeWithProsody(string! text) -> (System.Collections.Generic.List<string!>! Tokens, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.SwedishPhonemizer.PostProcessIds(System.Collections.Generic.List<int>! phonemeIds, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! prosodyFeatures, System.Collections.Generic.Dictionary<string!, int[]!>! phonemeIdMap) -> (System.Collections.Generic.List<int>! Ids, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+PiperPlus.Core.Phonemize.SwedishPhonemizer.SwedishPhonemizer(PiperPlus.Core.Phonemize.ISwedishG2PEngine! engine) -> void
+PiperPlus.Core.Phonemize.TextOrPhonemes
+PiperPlus.Core.Phonemize.TextOrPhonemes.Deconstruct(out bool IsPhonemes, out string! Text) -> void
+PiperPlus.Core.Phonemize.TextOrPhonemes.IsPhonemes.get -> bool
+PiperPlus.Core.Phonemize.TextOrPhonemes.IsPhonemes.init -> void
+PiperPlus.Core.Phonemize.TextOrPhonemes.Text.get -> string!
+PiperPlus.Core.Phonemize.TextOrPhonemes.Text.init -> void
+PiperPlus.Core.Phonemize.TextOrPhonemes.TextOrPhonemes(bool IsPhonemes, string! Text) -> void
+PiperPlus.Core.Phonemize.TextOrPhonemes.TextOrPhonemes(PiperPlus.Core.Phonemize.TextOrPhonemes! original) -> void
+PiperPlus.Core.Phonemize.TextSplitter
+PiperPlus.Core.Phonemize.UnicodeLanguageDetector
+PiperPlus.Core.Phonemize.UnicodeLanguageDetector.DefaultLatinLanguage.get -> string!
+PiperPlus.Core.Phonemize.UnicodeLanguageDetector.DetectChar(char ch, bool contextHasKana = false) -> string?
+PiperPlus.Core.Phonemize.UnicodeLanguageDetector.HasKana(string! text) -> bool
+PiperPlus.Core.Phonemize.UnicodeLanguageDetector.SegmentText(string! text) -> System.Collections.Generic.List<(string! Lang, string! Text)>!
+PiperPlus.Core.Phonemize.UnicodeLanguageDetector.UnicodeLanguageDetector(System.Collections.Generic.IReadOnlyList<string!>! languages, string! defaultLatinLanguage = "en") -> void
+PiperPlus.Core.Ssml.SsmlParser
+PiperPlus.Core.Ssml.SsmlSegment
+PiperPlus.Core.Ssml.SsmlSegment.BreakMs.get -> int
+PiperPlus.Core.Ssml.SsmlSegment.BreakMs.init -> void
+PiperPlus.Core.Ssml.SsmlSegment.Deconstruct(out string! Text, out int BreakMs, out float Rate) -> void
+PiperPlus.Core.Ssml.SsmlSegment.Rate.get -> float
+PiperPlus.Core.Ssml.SsmlSegment.Rate.init -> void
+PiperPlus.Core.Ssml.SsmlSegment.SsmlSegment(PiperPlus.Core.Ssml.SsmlSegment! original) -> void
+PiperPlus.Core.Ssml.SsmlSegment.SsmlSegment(string! Text, int BreakMs = 0, float Rate = 1) -> void
+PiperPlus.Core.Ssml.SsmlSegment.Text.get -> string!
+PiperPlus.Core.Ssml.SsmlSegment.Text.init -> void
+static PiperPlus.Core.Config.DictionaryManager.EnsureDictionaryAsync(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+static PiperPlus.Core.Config.DictionaryManager.FindDictionary() -> string?
+static PiperPlus.Core.Config.DictionaryManager.IsValidDictionary(string? path) -> bool
+static PiperPlus.Core.Config.ModelManager.DownloadModelAsync(string! modelName, string! modelDir, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+static PiperPlus.Core.Config.ModelManager.FindVoice(string! nameOrAlias) -> PiperPlus.Core.Config.VoiceInfo?
+static PiperPlus.Core.Config.ModelManager.GetDefaultModelDir() -> string!
+static PiperPlus.Core.Config.ModelManager.ListModels(string? languageFilter = null) -> void
+static PiperPlus.Core.Config.ModelManager.ResolveModelPathAsync(string! modelStr, string? modelDir = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+static PiperPlus.Core.Config.PiperConfig.FindConfigPath(string? explicitPath, string? modelPath) -> string?
+static PiperPlus.Core.Config.PiperConfig.LoadFromFile(string! configPath) -> PiperPlus.Core.Config.PiperConfig!
+static PiperPlus.Core.Config.VoiceCatalog.LoadBuiltInCatalog() -> System.Collections.Generic.IReadOnlyList<PiperPlus.Core.Config.VoiceInfo!>!
+static PiperPlus.Core.Config.VoiceCatalog.LoadFromFile(string! path) -> System.Collections.Generic.IReadOnlyList<PiperPlus.Core.Config.VoiceInfo!>!
+static PiperPlus.Core.Config.VoiceCatalog.LoadMergedCatalog(string? externalVoicesJsonPath = null) -> System.Collections.Generic.IReadOnlyList<PiperPlus.Core.Config.VoiceInfo!>!
+static PiperPlus.Core.Config.VoiceFileInfo.operator !=(PiperPlus.Core.Config.VoiceFileInfo? left, PiperPlus.Core.Config.VoiceFileInfo? right) -> bool
+static PiperPlus.Core.Config.VoiceFileInfo.operator ==(PiperPlus.Core.Config.VoiceFileInfo? left, PiperPlus.Core.Config.VoiceFileInfo? right) -> bool
+static PiperPlus.Core.Config.VoiceInfo.operator !=(PiperPlus.Core.Config.VoiceInfo? left, PiperPlus.Core.Config.VoiceInfo? right) -> bool
+static PiperPlus.Core.Config.VoiceInfo.operator ==(PiperPlus.Core.Config.VoiceInfo? left, PiperPlus.Core.Config.VoiceInfo? right) -> bool
+static PiperPlus.Core.Inference.PhonemeSilenceProcessor.Parse(string! specification) -> System.Collections.Generic.Dictionary<string!, float>!
+static PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase.operator !=(PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase left, PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase right) -> bool
+static PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase.operator ==(PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase left, PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase right) -> bool
+static PiperPlus.Core.Inference.PhonemeSilenceProcessor.SplitAtPhonemeSilence(long[]! phonemeIds, long[]? prosodyFlat, System.Collections.Generic.Dictionary<string!, float>! phonemeSilence, System.Collections.Generic.Dictionary<string!, int[]!>! phonemeIdMap, int sampleRate) -> System.Collections.Generic.List<PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase>!
+static PiperPlus.Core.Inference.PiperSession.ConvertToInt16(System.ReadOnlySpan<float> audio) -> short[]!
+static PiperPlus.Core.Inference.SessionFactory.Create(string! modelPath, bool useCuda = false, int gpuDeviceId = 0, bool testMode = false, Microsoft.Extensions.Logging.ILogger? logger = null) -> Microsoft.ML.OnnxRuntime.InferenceSession!
+static PiperPlus.Core.Inference.SessionFactory.Warmup(Microsoft.ML.OnnxRuntime.InferenceSession! session, int runs = 2, Microsoft.Extensions.Logging.ILogger? logger = null) -> void
+static PiperPlus.Core.Inference.ShortTextProcessor.PadSilenceForShortText(short[]! audio, int sampleRate) -> short[]!
+static PiperPlus.Core.Inference.ShortTextProcessor.WrapShortTextWithBreaks(string! text) -> string!
+static PiperPlus.Core.Inference.StreamingWriter.WriteChunked(System.IO.Stream! output, System.ReadOnlySpan<short> samples, int chunkSamples = 1024) -> void
+static PiperPlus.Core.Inference.StreamingWriter.WriteImmediate(System.IO.Stream! output, System.ReadOnlySpan<short> samples) -> void
+static PiperPlus.Core.Inference.SynthesisInput.operator !=(PiperPlus.Core.Inference.SynthesisInput? left, PiperPlus.Core.Inference.SynthesisInput? right) -> bool
+static PiperPlus.Core.Inference.SynthesisInput.operator ==(PiperPlus.Core.Inference.SynthesisInput? left, PiperPlus.Core.Inference.SynthesisInput? right) -> bool
+static PiperPlus.Core.Inference.SynthesisResult.operator !=(PiperPlus.Core.Inference.SynthesisResult? left, PiperPlus.Core.Inference.SynthesisResult? right) -> bool
+static PiperPlus.Core.Inference.SynthesisResult.operator ==(PiperPlus.Core.Inference.SynthesisResult? left, PiperPlus.Core.Inference.SynthesisResult? right) -> bool
+static PiperPlus.Core.Inference.TimingWriter.CalculateTiming(long[]! phonemeIds, float[]! durations, System.Collections.Generic.Dictionary<string!, int[]!>! phonemeIdMap, int sampleRate, int hopSize = 256) -> System.Collections.Generic.List<PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry!>!
+static PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.operator !=(PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry? left, PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry? right) -> bool
+static PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.operator ==(PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry? left, PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry? right) -> bool
+static PiperPlus.Core.Inference.TimingWriter.WriteJson(string! filePath, System.Collections.Generic.List<PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry!>! entries) -> void
+static PiperPlus.Core.Inference.TimingWriter.WriteJson(string! filePath, System.Collections.Generic.List<PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry!>! entries, int sampleRate) -> void
+static PiperPlus.Core.Inference.TimingWriter.WriteJson(System.IO.Stream! stream, System.Collections.Generic.List<PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry!>! entries) -> void
+static PiperPlus.Core.Inference.TimingWriter.WriteJson(System.IO.Stream! stream, System.Collections.Generic.List<PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry!>! entries, int sampleRate) -> void
+static PiperPlus.Core.Inference.TimingWriter.WriteSrt(string! filePath, System.Collections.Generic.List<PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry!>! entries) -> void
+static PiperPlus.Core.Inference.TimingWriter.WriteSrt(System.IO.Stream! stream, System.Collections.Generic.List<PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry!>! entries) -> void
+static PiperPlus.Core.Inference.TimingWriter.WriteTsv(string! filePath, System.Collections.Generic.List<PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry!>! entries) -> void
+static PiperPlus.Core.Inference.TimingWriter.WriteTsv(System.IO.Stream! stream, System.Collections.Generic.List<PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry!>! entries) -> void
+static PiperPlus.Core.Inference.WavWriter.Write(string! filePath, System.ReadOnlySpan<short> samples, int sampleRate) -> void
+static PiperPlus.Core.Inference.WavWriter.Write(System.IO.Stream! stream, System.ReadOnlySpan<short> samples, int sampleRate) -> void
+static PiperPlus.Core.Mapping.OpenJTalkToPiperMapping.CharToToken.get -> System.Collections.Generic.IReadOnlyDictionary<char, string!>!
+static PiperPlus.Core.Mapping.OpenJTalkToPiperMapping.MapSequence(System.Collections.Generic.IReadOnlyList<string!>! tokens) -> System.Collections.Generic.IReadOnlyList<string!>!
+static PiperPlus.Core.Mapping.OpenJTalkToPiperMapping.MapToken(string! token) -> string!
+static PiperPlus.Core.Mapping.OpenJTalkToPiperMapping.TokenToChar.get -> System.Collections.Generic.IReadOnlyDictionary<string!, char>!
+static PiperPlus.Core.Phonemize.ArpabetToIPAConverter.ArpabetToIpa.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+static PiperPlus.Core.Phonemize.ArpabetToIPAConverter.ConvertToken(string! arpabetToken) -> (string! Ipa, int Stress)
+static PiperPlus.Core.Phonemize.ArpabetToIPAConverter.ConvertWord(System.Collections.Generic.IReadOnlyList<string!>! tokens) -> System.Collections.Generic.List<(string! Ipa, int Stress)>!
+static PiperPlus.Core.Phonemize.ArpabetToIPAConverter.IsFunctionWord(string! word) -> bool
+static PiperPlus.Core.Phonemize.ArpabetToIPAConverter.IsPunctuation(string! token) -> bool
+static PiperPlus.Core.Phonemize.ChineseEmbeddedEnglish.Convert(string! text, PiperPlus.Core.Phonemize.Data.LoanwordData? data = null) -> PiperPlus.Core.Phonemize.ChineseG2PResult!
+static PiperPlus.Core.Phonemize.ChineseG2PResult.operator !=(PiperPlus.Core.Phonemize.ChineseG2PResult? left, PiperPlus.Core.Phonemize.ChineseG2PResult? right) -> bool
+static PiperPlus.Core.Phonemize.ChineseG2PResult.operator ==(PiperPlus.Core.Phonemize.ChineseG2PResult? left, PiperPlus.Core.Phonemize.ChineseG2PResult? right) -> bool
+static PiperPlus.Core.Phonemize.CustomDictionary.SetLogger(Microsoft.Extensions.Logging.ILogger! logger) -> void
+static PiperPlus.Core.Phonemize.Data.LoanwordData.operator !=(PiperPlus.Core.Phonemize.Data.LoanwordData? left, PiperPlus.Core.Phonemize.Data.LoanwordData? right) -> bool
+static PiperPlus.Core.Phonemize.Data.LoanwordData.operator ==(PiperPlus.Core.Phonemize.Data.LoanwordData? left, PiperPlus.Core.Phonemize.Data.LoanwordData? right) -> bool
+static PiperPlus.Core.Phonemize.Data.LoanwordDataLoader.Default.get -> PiperPlus.Core.Phonemize.Data.LoanwordData!
+static PiperPlus.Core.Phonemize.Data.LoanwordDataLoader.LoadFromBytes(string! label, byte[]! data) -> PiperPlus.Core.Phonemize.Data.LoanwordData!
+static PiperPlus.Core.Phonemize.Data.LoanwordDataLoader.LoadFromPath(string! path) -> PiperPlus.Core.Phonemize.Data.LoanwordData!
+static PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData.operator !=(PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData? left, PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData? right) -> bool
+static PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData.operator ==(PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData? left, PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData? right) -> bool
+static PiperPlus.Core.Phonemize.Data.SwedishFunctionWordDataLoader.Default.get -> PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData!
+static PiperPlus.Core.Phonemize.Data.SwedishFunctionWordDataLoader.LoadFromBytes(byte[]! data) -> PiperPlus.Core.Phonemize.Data.SwedishFunctionWordData!
+static PiperPlus.Core.Phonemize.G2PResult.operator !=(PiperPlus.Core.Phonemize.G2PResult? left, PiperPlus.Core.Phonemize.G2PResult? right) -> bool
+static PiperPlus.Core.Phonemize.G2PResult.operator ==(PiperPlus.Core.Phonemize.G2PResult? left, PiperPlus.Core.Phonemize.G2PResult? right) -> bool
+static PiperPlus.Core.Phonemize.InlinePhonemeParser.Parse(string? input) -> System.Collections.Generic.List<PiperPlus.Core.Phonemize.TextOrPhonemes!>!
+static PiperPlus.Core.Phonemize.IpaTokenizer.Tokenize(string! ipa, System.Collections.Generic.IReadOnlySet<string!>? knownDigraphs = null) -> System.Collections.Generic.List<string!>!
+static PiperPlus.Core.Phonemize.KoreanG2PResult.operator !=(PiperPlus.Core.Phonemize.KoreanG2PResult? left, PiperPlus.Core.Phonemize.KoreanG2PResult? right) -> bool
+static PiperPlus.Core.Phonemize.KoreanG2PResult.operator ==(PiperPlus.Core.Phonemize.KoreanG2PResult? left, PiperPlus.Core.Phonemize.KoreanG2PResult? right) -> bool
+static PiperPlus.Core.Phonemize.PhonemeEncoder.Encode(PiperPlus.Core.Phonemize.IPhonemizer! phonemizer, string! text, System.Collections.Generic.Dictionary<string!, int[]!>! phonemeIdMap) -> (System.Collections.Generic.List<int>! PhonemeIds, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! ProsodyFeatures)
+static PiperPlus.Core.Phonemize.PhonemeEncoder.EncodeDirect(PiperPlus.Core.Phonemize.IPhonemizer! phonemizer, string! text, System.Collections.Generic.Dictionary<string!, int[]!>! phonemeIdMap) -> (long[]! PhonemeIds, long[]? ProsodyFlat)
+static PiperPlus.Core.Phonemize.PhonemeEncoder.SetLogger(Microsoft.Extensions.Logging.ILogger! logger) -> void
+static PiperPlus.Core.Phonemize.PiperPhonemeConverter.ApplyNPhonemeRules(System.Collections.Generic.List<string!>! tokens) -> System.Collections.Generic.List<string!>!
+static PiperPlus.Core.Phonemize.PiperPhonemeConverter.EspeakPostProcessIds(System.Collections.Generic.List<int>! phonemeIds, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! prosodyFeatures, System.Collections.Generic.Dictionary<string!, int[]!>! phonemeIdMap) -> (System.Collections.Generic.List<int>! Ids, System.Collections.Generic.List<PiperPlus.Core.Phonemize.ProsodyInfo?>! Prosody)
+static PiperPlus.Core.Phonemize.PiperPhonemeConverter.GetQuestionType(string! text) -> string!
+static PiperPlus.Core.Phonemize.PiperPhonemeConverter.MapSequence(System.Collections.Generic.List<string!>! tokens) -> System.Collections.Generic.IReadOnlyList<string!>!
+static PiperPlus.Core.Phonemize.ProsodyInfo.operator !=(PiperPlus.Core.Phonemize.ProsodyInfo left, PiperPlus.Core.Phonemize.ProsodyInfo right) -> bool
+static PiperPlus.Core.Phonemize.ProsodyInfo.operator ==(PiperPlus.Core.Phonemize.ProsodyInfo left, PiperPlus.Core.Phonemize.ProsodyInfo right) -> bool
+static PiperPlus.Core.Phonemize.RawPhonemeParser.Parse(string? phonemeString, System.Collections.Generic.Dictionary<string!, int[]!>! phonemeIdMap) -> long[]!
+static PiperPlus.Core.Phonemize.RawPhonemeParser.SetLogger(Microsoft.Extensions.Logging.ILogger! logger) -> void
+static PiperPlus.Core.Phonemize.SentenceParallelEncoder.EncodeAll<TResult>(System.Collections.Generic.IReadOnlyList<string!>! sentences, System.Func<string!, TResult>! encodeOne, int? parallelismOverride = null) -> TResult[]!
+static PiperPlus.Core.Phonemize.SentenceParallelEncoder.ResolveParallelism(int sentenceCount) -> int
+static PiperPlus.Core.Phonemize.SwedishG2PEngine.ApplyRetroflex(System.Collections.Generic.List<string!>! phonemes) -> System.Collections.Generic.List<string!>!
+static PiperPlus.Core.Phonemize.SwedishG2PEngine.CountSyllables(string! word) -> int
+static PiperPlus.Core.Phonemize.SwedishG2PEngine.DetectStress(string! word) -> int
+static PiperPlus.Core.Phonemize.TextOrPhonemes.operator !=(PiperPlus.Core.Phonemize.TextOrPhonemes? left, PiperPlus.Core.Phonemize.TextOrPhonemes? right) -> bool
+static PiperPlus.Core.Phonemize.TextOrPhonemes.operator ==(PiperPlus.Core.Phonemize.TextOrPhonemes? left, PiperPlus.Core.Phonemize.TextOrPhonemes? right) -> bool
+static PiperPlus.Core.Phonemize.TextSplitter.SplitSentences(string! text) -> System.Collections.Generic.List<string!>!
+static PiperPlus.Core.Ssml.SsmlParser.IsSsml(string! text) -> bool
+static PiperPlus.Core.Ssml.SsmlParser.Parse(string! ssmlText) -> System.Collections.Generic.List<PiperPlus.Core.Ssml.SsmlSegment!>!
+static PiperPlus.Core.Ssml.SsmlSegment.operator !=(PiperPlus.Core.Ssml.SsmlSegment? left, PiperPlus.Core.Ssml.SsmlSegment? right) -> bool
+static PiperPlus.Core.Ssml.SsmlSegment.operator ==(PiperPlus.Core.Ssml.SsmlSegment? left, PiperPlus.Core.Ssml.SsmlSegment? right) -> bool
+virtual PiperPlus.Core.Config.VoiceFileInfo.<Clone>$() -> PiperPlus.Core.Config.VoiceFileInfo!
+virtual PiperPlus.Core.Config.VoiceFileInfo.EqualityContract.get -> System.Type!
+virtual PiperPlus.Core.Config.VoiceFileInfo.Equals(PiperPlus.Core.Config.VoiceFileInfo? other) -> bool
+virtual PiperPlus.Core.Config.VoiceFileInfo.PrintMembers(System.Text.StringBuilder! builder) -> bool
+virtual PiperPlus.Core.Config.VoiceInfo.<Clone>$() -> PiperPlus.Core.Config.VoiceInfo!
+virtual PiperPlus.Core.Config.VoiceInfo.EqualityContract.get -> System.Type!
+virtual PiperPlus.Core.Config.VoiceInfo.Equals(PiperPlus.Core.Config.VoiceInfo? other) -> bool
+virtual PiperPlus.Core.Config.VoiceInfo.PrintMembers(System.Text.StringBuilder! builder) -> bool
+virtual PiperPlus.Core.Inference.SynthesisInput.<Clone>$() -> PiperPlus.Core.Inference.SynthesisInput!
+virtual PiperPlus.Core.Inference.SynthesisInput.EqualityContract.get -> System.Type!
+virtual PiperPlus.Core.Inference.SynthesisInput.Equals(PiperPlus.Core.Inference.SynthesisInput? other) -> bool
+virtual PiperPlus.Core.Inference.SynthesisInput.PrintMembers(System.Text.StringBuilder! builder) -> bool
+virtual PiperPlus.Core.Inference.SynthesisResult.<Clone>$() -> PiperPlus.Core.Inference.SynthesisResult!
+virtual PiperPlus.Core.Inference.SynthesisResult.EqualityContract.get -> System.Type!
+virtual PiperPlus.Core.Inference.SynthesisResult.Equals(PiperPlus.Core.Inference.SynthesisResult? other) -> bool
+virtual PiperPlus.Core.Inference.SynthesisResult.PrintMembers(System.Text.StringBuilder! builder) -> bool
+virtual PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.<Clone>$() -> PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry!
+virtual PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.EqualityContract.get -> System.Type!
+virtual PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.Equals(PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry? other) -> bool
+virtual PiperPlus.Core.Inference.TimingWriter.PhonemeTimingEntry.PrintMembers(System.Text.StringBuilder! builder) -> bool
+virtual PiperPlus.Core.Phonemize.ChineseG2PResult.<Clone>$() -> PiperPlus.Core.Phonemize.ChineseG2PResult!
+virtual PiperPlus.Core.Phonemize.ChineseG2PResult.EqualityContract.get -> System.Type!
+virtual PiperPlus.Core.Phonemize.ChineseG2PResult.Equals(PiperPlus.Core.Phonemize.ChineseG2PResult? other) -> bool
+virtual PiperPlus.Core.Phonemize.ChineseG2PResult.PrintMembers(System.Text.StringBuilder! builder) -> bool
+virtual PiperPlus.Core.Phonemize.G2PResult.<Clone>$() -> PiperPlus.Core.Phonemize.G2PResult!
+virtual PiperPlus.Core.Phonemize.G2PResult.EqualityContract.get -> System.Type!
+virtual PiperPlus.Core.Phonemize.G2PResult.Equals(PiperPlus.Core.Phonemize.G2PResult? other) -> bool
+virtual PiperPlus.Core.Phonemize.G2PResult.PrintMembers(System.Text.StringBuilder! builder) -> bool
+virtual PiperPlus.Core.Phonemize.KoreanG2PResult.<Clone>$() -> PiperPlus.Core.Phonemize.KoreanG2PResult!
+virtual PiperPlus.Core.Phonemize.KoreanG2PResult.EqualityContract.get -> System.Type!
+virtual PiperPlus.Core.Phonemize.KoreanG2PResult.Equals(PiperPlus.Core.Phonemize.KoreanG2PResult? other) -> bool
+virtual PiperPlus.Core.Phonemize.KoreanG2PResult.PrintMembers(System.Text.StringBuilder! builder) -> bool
+virtual PiperPlus.Core.Phonemize.TextOrPhonemes.<Clone>$() -> PiperPlus.Core.Phonemize.TextOrPhonemes!
+virtual PiperPlus.Core.Phonemize.TextOrPhonemes.EqualityContract.get -> System.Type!
+virtual PiperPlus.Core.Phonemize.TextOrPhonemes.Equals(PiperPlus.Core.Phonemize.TextOrPhonemes? other) -> bool
+virtual PiperPlus.Core.Phonemize.TextOrPhonemes.PrintMembers(System.Text.StringBuilder! builder) -> bool
+virtual PiperPlus.Core.Ssml.SsmlSegment.<Clone>$() -> PiperPlus.Core.Ssml.SsmlSegment!
+virtual PiperPlus.Core.Ssml.SsmlSegment.EqualityContract.get -> System.Type!
+virtual PiperPlus.Core.Ssml.SsmlSegment.Equals(PiperPlus.Core.Ssml.SsmlSegment? other) -> bool
+virtual PiperPlus.Core.Ssml.SsmlSegment.PrintMembers(System.Text.StringBuilder! builder) -> bool
+~override PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase.Equals(object obj) -> bool
+~override PiperPlus.Core.Inference.PhonemeSilenceProcessor.Phrase.ToString() -> string
+~override PiperPlus.Core.Phonemize.ProsodyInfo.Equals(object obj) -> bool
+~override PiperPlus.Core.Phonemize.ProsodyInfo.ToString() -> string

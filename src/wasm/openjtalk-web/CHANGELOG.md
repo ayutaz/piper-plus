@@ -32,9 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `SpeakerEncoder.initialize({ frontEnd: "kaldi-fbank" })`, which computes the zs-v1 CAM++ embedding the same way as the Python recipe (torchaudio Kaiser resampling to 16 kHz, 80-bin `kaldi.fbank`, mean subtraction, L2 normalization). Checked against torchaudio with a golden fixture. `initialize` also accepts `modelData` in place of `modelUrl`. The default `"mel"` front end is unchanged.
 - Add `PiperPlus.findDroppedSymbols(text, { language })`, which lists the symbols the phonemizer produced but the model's phoneme table lacks. Encoding still drops them silently; this lets an app warn before synthesis. It also works with `@piper-plus/g2p` 0.4.2, whose `encode()` does not report them.
 - The GitHub Pages multilingual demo gains a zero-shot section: upload or record a reference clip, compute the embedding in the browser, and read text in six languages with the public zs-v1 base.
-
-### Fixed
-
 - `model: "base"` / `"zero-shot-base-zs-v1"` now checks the downloaded `base.onnx` against its pinned SHA-256. The published `base.onnx.json` has no `sha256`, so the file was previously not verified.
 
 ## [0.8.0] - 2026-10-06

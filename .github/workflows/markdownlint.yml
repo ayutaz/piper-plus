@@ -34,7 +34,6 @@ jobs:
             !.git
             !.build/**
             !**/.venv/**
-            !**/CHANGELOG.md
             !test/models/**
             !**/build/**
             !build-*/**
