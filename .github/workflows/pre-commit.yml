@@ -173,11 +173,7 @@ jobs:
           #   * hadolint                          → hadolint.yml
           #   * gitleaks                          → secret-scan.yml (the hook
           #     scans staged changes only, which CI does not have)
-          #   * editorconfig-checker              → about 16,000 findings on
-          #     the whole repository (mostly generated / vendored files and
-          #     C++ indented with 2 spaces against .clang-format's 4); to be
-          #     enabled once that drift is fixed.
-          SKIP: cargo-clippy,cargo-fmt,gofmt,go-vet,golangci-lint,mypy-g2p,dotnet-format,markdownlint-cli2,codespell,hadolint,gitleaks,editorconfig-checker
+          SKIP: cargo-clippy,cargo-fmt,gofmt,go-vet,golangci-lint,mypy-g2p,dotnet-format,markdownlint-cli2,codespell,hadolint,gitleaks
           SCOPE: ${{ steps.scope.outputs.args }}
         run: |
           # --show-diff-on-failure makes drift trivial to fix locally

@@ -14,7 +14,7 @@ import (
 // to validate that Go phonemizers produce output consistent with
 // Python, Rust, and JS runtimes.
 //
-// Japanese (ja) is skipped because it requires the openjtalk build tag.
+// Japanese (ja) needs the openjtalk build tag; see golden_ja_test.go.
 // ===========================================================================
 
 // fixtureFile is the relative path from src/go/phonemize/ to the shared fixture.
@@ -610,14 +610,6 @@ func TestGolden_SV(t *testing.T) {
 			}
 		})
 	}
-}
-
-// ---------------------------------------------------------------------------
-// Japanese — skipped (requires openjtalk build tag)
-// ---------------------------------------------------------------------------
-
-func TestGolden_JA_Skipped(t *testing.T) {
-	t.Skip("Japanese golden tests require the openjtalk build tag; skipping in default build")
 }
 
 // ===========================================================================

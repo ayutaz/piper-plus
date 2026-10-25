@@ -1337,30 +1337,21 @@ repos:
     hooks:
       - id: editorconfig-checker
         stages: [pre-push]
-        # csproj/cmake/.github yml continuation-indents and registry.py
-        # ReST docstring blocks use alignment-style indentation that
-        # editorconfig-checker 3.0.3 cannot opt-out via `indent_size = unset`
-        # alone (the indent-multiple-of-N check still fires). Skip those
-        # specific files at the hook level until editorconfig-checker is
-        # upgraded to a version that honors `unset` for this check.
+        # The "indent must be a multiple of indent_size" check is off. It
+        # fired on continuation lines aligned to an opening parenthesis,
+        # raw-string and heredoc contents and ReST docstrings in nearly every
+        # language (about 15,700 of the 16,064 findings in 2026-10), and the
+        # formatters (ruff, rustfmt, gofmt, dotnet format, clang-format)
+        # decide indentation. Tabs vs spaces, trailing whitespace, the final
+        # newline, line endings and the charset are still checked.
+        args: [-disable-indent-size]
         # Note: leading `(?x)` enables re.VERBOSE so newlines/indentation are
         # ignored — keep each alternative on its own line for diff hygiene.
         exclude: |-
           (?x)
           ^(node_modules|build|dist|target|\.git|test/models|tools/benchmark/issue-383|src/wasm/openjtalk-web/(build|demo|models|voices|patches)|tests/fuzz)/|
-          ^src/csharp/.*\.csproj$|
-          ^src/csharp/.*\.props$|
-          ^\.claude/hooks/.*\.sh$|
-          ^cmake/.*\.cmake$|
-          ^src/python/g2p/piper_plus_g2p/registry\.py$|
-          ^\.github/workflows/android-build\.yml$|
-          ^scripts/check_(bundle_size|cli_help_drift|migration_changelog_parity|phoneme_timing_contract)\.py$|
-          ^scripts/benchmark_runtime\.py$|
-          ^docs/spec/mutation-testing\.md$|
-          ^docs/reference/cli-help/.*\.txt$|
-          ^tests/scripts/fixtures/cli-help/(raw|expected)/.*\.txt$|
-          ^src/cpp/tests/test_streaming_raw_phonemes\.cpp$|
-          ^src/rust/Cargo\.lock$
+          # Third-party files kept verbatim.
+          (^|/)_vendor/
 
   # ---------------------------------------------------------------------------
   # pyproject.toml schema validation (PEP 621 + PEP 518). Catches typos in
