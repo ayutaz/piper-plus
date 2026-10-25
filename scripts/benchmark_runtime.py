@@ -65,8 +65,12 @@ from pathlib import Path
 #
 #   stdin_text: if True, the text body is piped on stdin (Python / Rust / Go /
 #       C# / C++ all accept stdin-driven synthesis by default).
-#   text_arg:   if set, pass the text via this flag instead (WASM Node harness
-#       uses ``--text`` because there's no portable stdin pipe).
+#   text_arg:   if set, pass the text via this flag instead.
+#   jsonl_input: if True, the runtime has no G2P: the harness phonemizes the
+#       text once with the Python runtime (outside the timed runs) and pipes
+#       one phoneme_ids JSONL line on stdin.
+#   g2p_in_timing: whether the measured wall clock includes G2P. Recorded in
+#       the result so a jsonl_input runtime is not read as end to end.
 #   output_flag: flag name for the output WAV path.
 #   extra_args: appended verbatim to the CLI invocation.
 
@@ -78,6 +82,7 @@ RUNTIME_PROFILES: dict[str, dict] = {
         # python -m piper_plus has no --quiet flag (only --debug); omit to avoid
         # "unrecognized argument" error that silently fails every cell.
         "extra_args": [],
+        "g2p_in_timing": True,
     },
     "rust": {
         # Rust CLI defaults to JSONL stdin; use --text for plain-text synthesis.
@@ -86,6 +91,7 @@ RUNTIME_PROFILES: dict[str, dict] = {
         "output_flag": "--output-file",
         "config_flag": "--config",
         "extra_args": ["--quiet"],
+        "g2p_in_timing": True,
     },
     "go": {
         # Go CLI defaults to JSONL stdin; use --text for plain-text synthesis.
@@ -94,6 +100,7 @@ RUNTIME_PROFILES: dict[str, dict] = {
         "output_flag": "--output-file",
         "config_flag": "--config",
         "extra_args": ["--quiet"],
+        "g2p_in_timing": True,
     },
     "csharp": {
         # C# CLI defaults to JSONL stdin; use --text for plain-text synthesis.
@@ -102,6 +109,7 @@ RUNTIME_PROFILES: dict[str, dict] = {
         "output_flag": "--output_file",
         "config_flag": "--config",
         "extra_args": ["--quiet"],
+        "g2p_in_timing": True,
     },
     "cpp": {
         # C++ CLI defaults to JSONL stdin; use --text for plain-text synthesis.
@@ -110,18 +118,42 @@ RUNTIME_PROFILES: dict[str, dict] = {
         "output_flag": "--output_file",
         "config_flag": "--config",
         "extra_args": ["--quiet"],
+        "g2p_in_timing": True,
     },
     "wasm": {
-        # Node entrypoint doesn't read stdin by default — pass text inline.
-        # No `--config` flag on the WASM bin: the config is bundled with the
-        # model in JS-land, so the harness drops it for this runtime.
-        "stdin_text": False,
-        "text_arg": "--text",
+        # bin/piper-cli.js (onnxruntime-node) has no G2P and reads
+        # phoneme_ids JSONL on stdin, like the --json-input path of the
+        # other CLIs. Its timing covers inference, not G2P.
+        "stdin_text": True,
+        "jsonl_input": True,
         "output_flag": "--output-file",
-        "config_flag": None,
-        "extra_args": [],
+        "config_flag": "--config",
+        "extra_args": ["--json-input"],
+        "g2p_in_timing": False,
     },
 }
+
+
+def _phoneme_jsonl(model: str, config: str | None, text: str) -> str:
+    """One phoneme_ids JSONL line for a runtime without G2P.
+
+    The text is read as English (the benchmark texts are English-only).
+    Every sentence goes into the one line: the Node bin writes each line to
+    ``--output-file``, so a second line would overwrite the first.
+    """
+    if not config:
+        raise SystemExit("--config is required for a jsonl_input runtime")
+    from piper_plus.voice import PiperVoice
+
+    voice = PiperVoice.load(model, config_path=config)
+    language_id = (voice.config.language_id_map or {}).get("en")
+    ids: list[int] = []
+    for phonemes in voice.phonemize(text, language_id=language_id):
+        ids.extend(voice.phonemes_to_ids(phonemes))
+    entry: dict = {"phoneme_ids": ids}
+    if language_id is not None:
+        entry["language_id"] = language_id
+    return json.dumps(entry)
 
 
 # ---------------------------------------------------------------------------
@@ -308,6 +340,9 @@ def benchmark_runtime(
             f"unknown runtime {runtime!r} (valid: {sorted(RUNTIME_PROFILES)})"
         )
 
+    if RUNTIME_PROFILES[runtime].get("jsonl_input"):
+        text = _phoneme_jsonl(model, config, text)
+
     # ---- Warmup ----
     for i in range(warmup):
         print(f"[warmup {i + 1}/{warmup}]", file=sys.stderr, flush=True)
@@ -346,6 +381,7 @@ def benchmark_runtime(
         "latency_p95_ms": round(p95_ms, 1),
         "wall_mean_ms": round(mean_wall * 1000, 1),
         "audio_mean_s": round(mean_audio, 3),
+        "g2p_in_timing": RUNTIME_PROFILES[runtime]["g2p_in_timing"],
         "system": {
             "os": f"{platform.system()} {platform.release()}",
             "cpu": platform.processor() or platform.machine(),

@@ -21,10 +21,12 @@ name: Multi-Runtime RTF Benchmark
 # weeks of variance data, flip ``--fail-on-regression`` in the aggregator
 # step (see ``Compare against baseline`` below) to make it a hard gate.
 #
-# WASM is best-effort: building / running the Node CLI under CI is brittle
-# (emscripten artefacts, dictionary download). The wasm matrix cell uses
-# ``continue-on-error: true`` so a wasm regression doesn't block PRs while
-# we stabilise the harness.
+# A cell that cannot run (CLI does not build, wrong path, no audio) fails
+# the job. Only the comparison against the baseline is warn-only. The wasm
+# cell drives bin/piper-cli.js (onnxruntime-node), which has no G2P: the
+# harness phonemizes the text once with the Python runtime and pipes the
+# phoneme ids, so its numbers cover inference only (`g2p_in_timing: false`
+# in the result JSON).
 
 on:
   pull_request:
@@ -73,13 +75,6 @@ jobs:
     # rtf-regression.yml's policy).
     if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
     timeout-minutes: 30
-    # During the warn-only baseline calibration period (policy=warn-only in
-    # tests/fixtures/multi-runtime-rtf-baseline.json), individual runtime
-    # cells are allowed to fail without blocking the PR. The aggregate job
-    # still runs with `if: always()` and reports `(missing)` for failed
-    # cells. Flip to strict (drop continue-on-error) once baselines have
-    # ~2-3 weeks of variance data and each runtime cell is stable.
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -108,7 +103,6 @@ jobs:
       - name: Compile Rust CLI (release)
         if: matrix.runtime == 'rust'
         working-directory: src/rust
-        continue-on-error: true
         run: cargo build --release -p piper-plus-cli
 
       - name: Set up Go
@@ -120,7 +114,6 @@ jobs:
       - name: Compile Go CLI
         if: matrix.runtime == 'go'
         working-directory: src/go
-        continue-on-error: true
         run: go build -o piper-plus ./cmd/piper-plus
 
       - name: Download ONNX Runtime for Go
@@ -143,7 +136,6 @@ jobs:
       - name: Compile C# CLI (Release)
         if: matrix.runtime == 'csharp'
         working-directory: src/csharp
-        continue-on-error: true
         run: dotnet build PiperPlus.Cli/PiperPlus.Cli.csproj -c Release
 
       - name: Install C++ build deps
@@ -166,7 +158,6 @@ jobs:
 
       - name: Compile C++ CLI
         if: matrix.runtime == 'cpp'
-        continue-on-error: true
         run: |
           cmake -S . -B build-cpp \
             -DCMAKE_BUILD_TYPE=Release \
@@ -182,7 +173,6 @@ jobs:
       - name: Install WASM package
         if: matrix.runtime == 'wasm'
         working-directory: src/wasm/openjtalk-web
-        continue-on-error: true
         run: npm ci
 
       # ---- Resolve runtime CLI command ----
@@ -206,34 +196,17 @@ jobs:
               echo "cmd=build-cpp/piper-plus" >> "$GITHUB_OUTPUT"
               ;;
             wasm)
-              # Node entrypoint shipped by the npm package. If this path does
-              # not exist the wasm cell fails fast and continue-on-error swallows it.
-              echo "cmd=node src/wasm/openjtalk-web/bin/piper-plus.js" >> "$GITHUB_OUTPUT"
+              # Node bin shipped by the npm package (phoneme_ids JSONL input).
+              echo "cmd=node src/wasm/openjtalk-web/bin/piper-cli.js" >> "$GITHUB_OUTPUT"
               ;;
           esac
 
       # ---- Run benchmark ----
-      # Step-level `continue-on-error: true` keeps the job conclusion as
-      # success even when the actual benchmark fails. This is intentional
-      # during the warn-only baseline calibration period: a single
-      # runtime/CLI not being ready (model file missing, CLI flag drift,
-      # WASM dictionary download flake, etc.) should NOT show up as a
-      # FAILURE check on the PR. The aggregate job runs with
-      # `if: always()` and surfaces the failed cells as "(missing)" rows
-      # in the sticky PR comment, which is the canonical report channel.
-      # Drop this flag once baselines have stabilised (~2-3 weeks).
+      # A failed cell fails the job. Regressions against the baseline are
+      # reported by the aggregate job and stay warn-only until the baseline
+      # is calibrated (policy in tests/fixtures/multi-runtime-rtf-baseline.json).
       - name: Run benchmark
         run: |
-          # `|| true` forces a zero exit so the job conclusion stays SUCCESS
-          # even when the benchmark fails (model file missing, CLI flag
-          # drift, WASM dictionary flake, etc.). The aggregate job reads the
-          # uploaded JSON (or treats it as missing) and surfaces failures in
-          # the sticky PR comment — the canonical report channel during the
-          # warn-only baseline calibration period. Note: `continue-on-error:
-          # true` at job level alone is NOT sufficient — GitHub still
-          # reports the per-cell FAILURE in the PR check rollup, which
-          # confuses reviewers. Removing this `|| true` once baselines have
-          # ~2-3 weeks of variance data converts the gate to strict.
           uv run python scripts/benchmark_runtime.py \
               --runtime "${{ matrix.runtime }}" \
               --cli-cmd "${{ steps.cli.outputs.cmd }}" \
@@ -242,8 +215,7 @@ jobs:
               --text-file tests/fixtures/benchmark-texts.json \
               --text-key "${{ matrix.text }}" \
               --runs 30 --warmup 5 \
-              --output "bench-${{ matrix.runtime }}-${{ matrix.text }}.json" \
-              || echo "::warning::benchmark cell failed (warn-only): runtime=${{ matrix.runtime }} text=${{ matrix.text }}"
+              --output "bench-${{ matrix.runtime }}-${{ matrix.text }}.json"
 
       - name: Upload benchmark JSON
         uses: actions/upload-artifact@v4.6.2

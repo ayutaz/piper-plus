@@ -2,11 +2,12 @@ name: coverage-aggregation
 
 on:
   workflow_run:
-    # C++ coverage now uploads from `CI / cpp-tests` (ci.yml) since
-    # the duplicate `cpp-tests` job in cpp-tests.yml was removed.
-    # `cpp-tests` workflow is retained (sanitizers / c-api-examples /
-    # ios-toolchain-smoke) but it no longer produces coverage artefacts.
-    workflows: [python-tests, rust-tests, go-ci, csharp-ci, cpp-tests, CI]
+    # GitHub は workflow の `name:` で照合する (ファイル名ではない)。 以前は
+    # `go-ci` / `csharp-ci` / `cpp-tests` と書いていて、 `Go CI` / `C# CI` /
+    # `C++ Tests` の完了では一度も起動していなかった。 `+` はパターンの
+    # 特殊文字なので `\+` と書く。 名前の実在は
+    # tests/scripts/test_required_gate_workflow_contract.py が全 workflow で検査する。
+    workflows: [python-tests, rust-tests, 'Go CI', 'C# CI', 'C\+\+ Tests', CI]
     types:
       - completed
   workflow_dispatch:
@@ -51,7 +52,9 @@ jobs:
           echo "| Language | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
           for lang in python rust go csharp cpp; do
-            if find ./artifacts -path "*${lang}*" -name "*.xml" 2>/dev/null | head -1 > /dev/null; then
+            # `find ... | head -1 > /dev/null` は head の終了コード (常に 0) を
+            # 返すため、 artifact が無くても全言語が uploaded と表示されていた。
+            if [ -n "$(find ./artifacts -path "*${lang}*" -name "*.xml" 2>/dev/null | head -1)" ]; then
               echo "| $lang | uploaded |" >> $GITHUB_STEP_SUMMARY
             else
               echo "| $lang | missing |" >> $GITHUB_STEP_SUMMARY
