@@ -108,9 +108,11 @@ jobs:
     steps:
       - name: Summary
         run: |
-          echo "## License Compliance Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- cargo-deny (Rust): ${{ needs.cargo-deny-licenses.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- go-licenses (Go): ${{ needs.go-licenses-report.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Python/JS/.NET license は dependency-review-action (security-audit.yml) で PR 時に gate。" >> $GITHUB_STEP_SUMMARY
-          echo "本 workflow は cargo-deny + go-licenses の補完 (週次 + transitive cascade 検出)。" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## License Compliance Summary"
+            echo "- cargo-deny (Rust): ${{ needs.cargo-deny-licenses.result }}"
+            echo "- go-licenses (Go): ${{ needs.go-licenses-report.result }}"
+            echo ""
+            echo "Python/JS/.NET license は dependency-review-action (security-audit.yml) で PR 時に gate。"
+            echo "本 workflow は cargo-deny + go-licenses の補完 (週次 + transitive cascade 検出)。"
+          } >> "$GITHUB_STEP_SUMMARY"

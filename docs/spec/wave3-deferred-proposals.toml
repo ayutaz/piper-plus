@@ -1777,7 +1777,7 @@ effort = "XS"
 status = "proposal"
 description = """
 scripts/*.sh + .github/workflows/*.yml に shellcheck standalone CI。
-actionlint は -shellcheck= disabled (Wave 5)。
+workflow の run: は actionlint.yml が shellcheck 0.11.0 で検査済み。scripts/*.sh は未対象。
 """
 implementation = """
   1. shellcheck.yml で find + shellcheck-docker

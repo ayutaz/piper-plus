@@ -122,11 +122,12 @@ jobs:
         shell: bash
         run: |
           export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
-          CMAKE_ARGS="-DCMAKE_BUILD_TYPE=${{ matrix.build-type }} -DBUILD_TESTS=ON -DPIPER_PLUS_BUILD_SHARED=ON -DUSE_CUDA=OFF"
+          CMAKE_ARGS=(-DCMAKE_BUILD_TYPE=${{ matrix.build-type }} -DBUILD_TESTS=ON -DPIPER_PLUS_BUILD_SHARED=ON -DUSE_CUDA=OFF)
 
-          # Append caller-provided extra args
+          # Append caller-provided extra args (split on whitespace, as before)
           if [ -n "${{ inputs.cmake-args }}" ]; then
-            CMAKE_ARGS="${CMAKE_ARGS} ${{ inputs.cmake-args }}"
+            read -r -a EXTRA_CMAKE_ARGS <<< "${{ inputs.cmake-args }}"
+            CMAKE_ARGS+=("${EXTRA_CMAKE_ARGS[@]}")
           fi
 
           # Sanitizer flags (caller-driven; default 'none' is a no-op)
@@ -155,17 +156,17 @@ jobs:
             # pinning a generator name breaks project() after a runner VS upgrade.
             cmake -B build \
               -A x64 \
-              ${CMAKE_ARGS} \
+              "${CMAKE_ARGS[@]}" \
               -DONNXRUNTIME_ROOT_PATH="$ONNXRUNTIME_ROOT_PATH"
           elif [ "${{ runner.os }}" == "macOS" ]; then
             if [[ $(uname -m) == "arm64" ]]; then
-              CMAKE_ARGS="${CMAKE_ARGS} -DCMAKE_OSX_ARCHITECTURES=arm64"
+              CMAKE_ARGS+=(-DCMAKE_OSX_ARCHITECTURES=arm64)
             else
-              CMAKE_ARGS="${CMAKE_ARGS} -DCMAKE_OSX_ARCHITECTURES=x86_64"
+              CMAKE_ARGS+=(-DCMAKE_OSX_ARCHITECTURES=x86_64)
             fi
-            cmake -B build ${CMAKE_ARGS}
+            cmake -B build "${CMAKE_ARGS[@]}"
           else
-            cmake -B build ${CMAKE_ARGS}
+            cmake -B build "${CMAKE_ARGS[@]}"
           fi
 
       - name: Build
@@ -174,12 +175,12 @@ jobs:
           export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
           # Windows needs less parallelism to avoid timeout
           if [ "${{ runner.os }}" == "Windows" ]; then
-            PARALLEL_JOBS="--parallel 2"
+            PARALLEL_JOBS=(--parallel 2)
           else
-            PARALLEL_JOBS="-j$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
+            PARALLEL_JOBS=("-j$(nproc 2>/dev/null || sysctl -n hw.ncpu)")
           fi
 
-          if ! cmake --build build --config ${{ matrix.build-type }} $PARALLEL_JOBS; then
+          if ! cmake --build build --config ${{ matrix.build-type }} "${PARALLEL_JOBS[@]}"; then
             echo "Build failed"
             exit 1
           fi
@@ -344,20 +345,22 @@ jobs:
         shell: bash
         run: |
           cd build
-          echo "## C++ Test Results (${{ matrix.os }} / ${{ matrix.build-type }})" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          ctest -C ${{ matrix.build-type }} -N 2>/dev/null | grep -E "Test #|Total Tests:" >> "$GITHUB_STEP_SUMMARY" || echo "No tests registered" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          if [ -f Testing/Temporary/LastTest.log ]; then
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "<details><summary>Last test log (truncated)</summary>" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            tail -100 Testing/Temporary/LastTest.log >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            echo "</details>" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          {
+            echo "## C++ Test Results (${{ matrix.os }} / ${{ matrix.build-type }})"
+            echo ""
+            echo '```'
+            ctest -C ${{ matrix.build-type }} -N 2>/dev/null | grep -E "Test #|Total Tests:" || echo "No tests registered"
+            echo '```'
+            if [ -f Testing/Temporary/LastTest.log ]; then
+              echo ""
+              echo "<details><summary>Last test log (truncated)</summary>"
+              echo ""
+              echo '```'
+              tail -100 Testing/Temporary/LastTest.log 2>/dev/null || true
+              echo '```'
+              echo "</details>"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # ── Coverage (Ubuntu Debug only) ─────────────────────────
       # NOTE: produces empty coverage report unless the build adds
@@ -514,8 +517,8 @@ jobs:
           run_smoke() {
             local name="$1"
             local bin="$2"
-            local out err rc
-            out=$("$bin" 2>/tmp/smoke_err) && rc=$? || rc=$?
+            local err rc
+            "$bin" >/dev/null 2>/tmp/smoke_err && rc=$? || rc=$?
             err=$(cat /tmp/smoke_err)
             echo "  [$name] exit=$rc"
             echo "  [$name] stderr: $(echo "$err" | head -1)"

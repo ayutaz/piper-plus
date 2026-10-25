@@ -12,14 +12,14 @@ name: Memory regression (per-language)
 #     which expects a single time-series datapoint per run. The per-
 #     language memory matrix would need a custom adapter and would
 #     dilute the throughput chart on gh-pages.
-#   - Memory regressions are noisier than throughput regressions on
-#     hosted runners (page-cache, BSS layout), so we keep this gate
-#     ``warn-only`` for the foreseeable future to avoid alert fatigue.
 #
 # Policy:
 #   - Threshold ``+15 %`` vs ``tests/fixtures/memory-baseline.json``.
-#   - Warn-only: the job always exits 0 and posts a sticky PR comment.
-#     Tighten to fail once we have a few weeks of variance data.
+#     Six CI runs in 2026-10 varied by at most 0.5 MB (~0.2 %) per
+#     language, so the threshold leaves a wide margin for runner noise.
+#   - The job fails on growth beyond the threshold, on a missing result
+#     and on a null baseline (scripts/check_memory_regression.py). It used
+#     to be warn-only with every baseline ``null``, so it compared nothing.
 
 on:
   pull_request:
@@ -28,6 +28,7 @@ on:
       - 'src/python/piper_train/**'
       - 'src/python_run/piper_plus/**'
       - 'scripts/benchmark.py'
+      - 'scripts/check_memory_regression.py'
       - 'tests/fixtures/memory-baseline.json'
       - 'test/models/multilingual-test-medium.onnx*'
       - '.github/workflows/memory-regression.yml'
@@ -37,15 +38,11 @@ on:
       - 'src/python/piper_train/**'
       - 'src/python_run/piper_plus/**'
       - 'scripts/benchmark.py'
+      - 'scripts/check_memory_regression.py'
       - 'tests/fixtures/memory-baseline.json'
       - 'test/models/multilingual-test-medium.onnx*'
       - '.github/workflows/memory-regression.yml'
   workflow_dispatch:
-    inputs:
-      initialize_baseline:
-        description: 'Observed values を baseline として commit する (初回初期化用)'
-        type: boolean
-        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
@@ -62,7 +59,7 @@ jobs:
     # Fork PRs cannot post comments; matches rtf-regression.yml.
     if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
     permissions:
-      contents: write  # read normally; write needed for initialize_baseline commit
+      contents: read
       pull-requests: write
     steps:
       - uses: actions/checkout@v6.1.0
@@ -93,52 +90,14 @@ jobs:
             echo "::endgroup::"
           done
 
-      # Compare against the baseline. Inline Python so we do not need
-      # another script; the logic is short and self-contained.
-      - name: Compare against baseline (warn-only)
+      - name: Compare against baseline
         id: compare
         run: |
-          uv run python - <<'PY'
-          import json, pathlib, sys, os
-          base = json.loads(pathlib.Path("tests/fixtures/memory-baseline.json").read_text())
-          threshold = float(base.get("threshold_pct", 0.15))
-          rows = ["## Memory regression (per-language)",
-                  "",
-                  f"Threshold: +{threshold*100:.0f}% peak RSS vs baseline (warn-only).",
-                  "",
-                  "| Status | Lang | Baseline (MB) | Observed (MB) | Delta |",
-                  "|--------|------|---------------|---------------|-------|"]
-          warn = 0
-          skip = 0
-          for lang in ("ja", "en", "zh", "es", "fr", "pt"):
-              cfg = base["languages"].get(lang, {})
-              base_mb = cfg.get("peak_memory_mb")
-              try:
-                  data = json.loads(pathlib.Path(f"memory-results/{lang}.json").read_text())
-                  obs_mb = data[0]["peak_memory_mb"] if isinstance(data, list) else data.get("peak_memory_mb")
-              except Exception as e:
-                  obs_mb = None
-                  print(f"WARN: could not read memory-results/{lang}.json: {e}", file=sys.stderr)
-              if base_mb is None or obs_mb is None:
-                  rows.append(f"| SKIP | {lang} | {base_mb if base_mb is not None else 'n/a'} | {obs_mb if obs_mb is not None else 'n/a'} | n/a |")
-                  skip += 1
-                  continue
-              delta = (obs_mb - base_mb) / base_mb
-              status = "WARN" if delta > threshold else "OK"
-              if status == "WARN":
-                  warn += 1
-              rows.append(f"| {status} | {lang} | {base_mb:.1f} | {obs_mb:.1f} | {delta*100:+.2f}% |")
-          rows.append("")
-          rows.append(f"Summary: {warn} warn / {skip} skip / {6 - warn - skip} ok.")
-          rows.append("")
-          rows.append("_SKIP means the baseline entry is a placeholder (peak_memory_mb: null). "
-                      "The first dev push after this workflow lands is expected to seed the baseline._")
-          pathlib.Path("memory-report.md").write_text("\n".join(rows) + "\n")
-          print("\n".join(rows))
-          # Warn-only — never fail the job.
-          PY
+          uv run python scripts/check_memory_regression.py \
+              --results-dir memory-results --output memory-report.md
 
       - name: Upload memory results
+        if: always() && steps.compare.outcome != 'skipped'
         uses: actions/upload-artifact@v4.6.2
         with:
           name: memory-regression-${{ github.event_name }}-${{ github.run_attempt }}
@@ -148,7 +107,7 @@ jobs:
           retention-days: 30
 
       - name: Upsert sticky PR comment
-        if: github.event_name == 'pull_request'
+        if: always() && steps.compare.outcome != 'skipped' && github.event_name == 'pull_request'
         uses: actions/github-script@v7.1.0
         with:
           script: |
@@ -172,38 +131,3 @@ jobs:
                 owner, repo, issue_number, body: payload,
               });
             }
-
-      - name: Initialize baseline (workflow_dispatch only)
-        if: github.event_name == 'workflow_dispatch' && inputs.initialize_baseline == true
-        run: |
-          uv run python - <<'EOF'
-          import json, pathlib
-
-          baseline_path = pathlib.Path("tests/fixtures/memory-baseline.json")
-          baseline = json.loads(baseline_path.read_text())
-
-          for lang in ("ja", "en", "zh", "es", "fr", "pt"):
-              result_path = pathlib.Path(f"memory-results/{lang}.json")
-              if not result_path.exists():
-                  continue
-              try:
-                  data = json.loads(result_path.read_text())
-                  obs_mb = data[0]["peak_memory_mb"] if isinstance(data, list) else data.get("peak_memory_mb")
-              except Exception as e:
-                  print(f"WARN: could not read memory-results/{lang}.json: {e}")
-                  continue
-              if obs_mb is not None:
-                  baseline["languages"].setdefault(lang, {})["peak_memory_mb"] = round(obs_mb, 1)
-                  print(f"  {lang}: {obs_mb:.1f} MB")
-
-          baseline_path.write_text(json.dumps(baseline, indent=2, ensure_ascii=False) + "\n")
-          print("memory baseline updated")
-          EOF
-        shell: bash
-
-      - name: Commit initialized baseline
-        if: github.event_name == 'workflow_dispatch' && inputs.initialize_baseline == true
-        uses: stefanzweifel/git-auto-commit-action@v5.2.0
-        with:
-          commit_message: "chore(bench): initialize memory baseline from first run"
-          file_pattern: tests/fixtures/memory-baseline.json

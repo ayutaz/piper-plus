@@ -47,16 +47,18 @@ jobs:
       - name: Coverage summary comment
         if: github.event.workflow_run.event == 'pull_request'
         run: |
-          echo "## Coverage Aggregation Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Language | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Coverage Aggregation Summary"
+            echo ""
+            echo "| Language | Status |"
+            echo "|----------|--------|"
+          } >> "$GITHUB_STEP_SUMMARY"
           for lang in python rust go csharp cpp; do
             # `find ... | head -1 > /dev/null` は head の終了コード (常に 0) を
             # 返すため、 artifact が無くても全言語が uploaded と表示されていた。
             if [ -n "$(find ./artifacts -path "*${lang}*" -name "*.xml" 2>/dev/null | head -1)" ]; then
-              echo "| $lang | uploaded |" >> $GITHUB_STEP_SUMMARY
+              echo "| $lang | uploaded |" >> "$GITHUB_STEP_SUMMARY"
             else
-              echo "| $lang | missing |" >> $GITHUB_STEP_SUMMARY
+              echo "| $lang | missing |" >> "$GITHUB_STEP_SUMMARY"
             fi
           done

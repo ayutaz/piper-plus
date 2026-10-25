@@ -28,7 +28,7 @@ def test_publish_checks_exact_tarball_before_attestation_and_upload():
         i for i, s in enumerate(steps) if "attest-build-provenance" in s.get("uses", "")
     )
     publish = next(
-        i for i, s in enumerate(steps) if "npm publish *.tgz" in s.get("run", "")
+        i for i, s in enumerate(steps) if "npm publish ./*.tgz" in s.get("run", "")
     )
     assert pack < verify < attest < publish
     assert steps[verify].get("continue-on-error", "false") == "false"
@@ -80,7 +80,7 @@ def test_cdn_delivery_checks_are_in_required_pr_job():
 
 def test_publish_verifies_readme_on_real_cdns_after_publishing():
     steps = workflow("npm-publish.yml")["jobs"]["publish"]["steps"]
-    publish = _index(steps, "npm publish *.tgz")
+    publish = _index(steps, "npm publish ./*.tgz")
     real_cdn = _index(steps, "npm run test:real-cdn")
     assert publish < real_cdn
     # Without waiting for the registry the check skips itself after publishing.

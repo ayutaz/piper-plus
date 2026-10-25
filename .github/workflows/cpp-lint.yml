@@ -15,6 +15,6 @@ jobs:
       - uses: actions/checkout@v6.1.0
       - name: Check formatting
         run: |
-          find src/cpp -name '*.cpp' -o -name '*.h' -o -name '*.c' | \
-            xargs clang-format --dry-run --Werror 2>&1 || true
+          find src/cpp \( -name '*.cpp' -o -name '*.h' -o -name '*.c' \) -print0 | \
+            xargs -0 clang-format --dry-run --Werror 2>&1 || true
           echo "Note: clang-format check is advisory only"
