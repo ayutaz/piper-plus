@@ -417,7 +417,6 @@ jobs:
 
       - name: Clippy
         run: cargo clippy --workspace -- -D warnings
-        continue-on-error: true
 
       - name: Run tests
         run: cargo test -p piper-plus --no-fail-fast

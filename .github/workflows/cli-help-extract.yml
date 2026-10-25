@@ -112,11 +112,9 @@ jobs:
         uses: actions/setup-dotnet@v5.4.0
         with:
           dotnet-version: '10.0.x'
-        continue-on-error: true
 
       - name: Build C# + capture --help
         if: matrix.runtime == 'csharp'
-        continue-on-error: true
         run: |
           mkdir -p /tmp/cli-help
           dotnet build src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj -c Release --nologo
@@ -171,7 +169,6 @@ jobs:
 
       - name: Sanitize
         id: sanitize
-        continue-on-error: true
         run: |
           rt='${{ matrix.runtime }}'
           raw=/tmp/cli-help/${rt}-raw.txt
@@ -245,7 +242,8 @@ jobs:
 
       - name: Defensive log + diff vs canonical
         id: diff
-        continue-on-error: true
+        # Writes the report and diff_count; the "Fail on drift" steps below
+        # turn drift into a failure, so a crash of this step is a failure too.
         # Walk the full 6-runtime set (matrix may have lost some at extract
         # time). Capture vs. canonical produces 4 outcomes per runtime:
         #   - canonical missing                → NO_CANONICAL (drift)
@@ -311,7 +309,6 @@ jobs:
           } > /tmp/cli-help-drift-report.md
           cat /tmp/cli-help-drift-report.md >> "$GITHUB_STEP_SUMMARY"
           echo "diff_count=$diff_count" >> "$GITHUB_OUTPUT"
-          if [ "$diff_count" -gt 0 ]; then exit 1; fi
         shell: bash
 
       - name: Post sticky comment (PR only)
@@ -343,4 +340,11 @@ jobs:
             --label cli-help-drift \
             --title "[cli-help-drift] CLI help drift detected (${DATE})" \
             --body-file /tmp/cli-help-drift-report.md
+        shell: bash
+
+      - name: Fail on drift (schedule / workflow_dispatch)
+        if: github.event_name != 'pull_request' && steps.diff.outputs.diff_count != '0'
+        run: |
+          echo "::error::CLI help drift: see the report in this run's summary."
+          exit 1
         shell: bash

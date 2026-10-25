@@ -51,7 +51,6 @@ jobs:
         id: detect
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
         run: |
           python scripts/check_action_sha_drift.py \
             --report /tmp/action-sha-drift-report.md
@@ -60,6 +59,8 @@ jobs:
 
       - name: Compute drift flag
         id: flag
+        # The detector fails the job on drift; the report steps below still run.
+        if: ${{ !cancelled() }}
         run: |
           if grep -E '^\| .*\| \*\*(DANGLING|FORCE-PUSHED)\*\* \|' /tmp/action-sha-drift-report.md >/dev/null 2>&1; then
             echo "drift=1" >> "$GITHUB_OUTPUT"
@@ -69,10 +70,12 @@ jobs:
         shell: bash
 
       - name: Append to step summary
+        if: ${{ !cancelled() }}
         run: cat /tmp/action-sha-drift-report.md >> "$GITHUB_STEP_SUMMARY"
         shell: bash
 
       - name: Upload artifact
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4.6.2
         with:
           name: action-sha-drift-report-${{ github.run_id }}
@@ -80,14 +83,14 @@ jobs:
           retention-days: 30
 
       - name: Post sticky comment (PR only)
-        if: github.event_name == 'pull_request'
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         uses: marocchino/sticky-pull-request-comment@v2.9.4
         with:
           header: action-sha-drift
           path: /tmp/action-sha-drift-report.md
 
       - name: Open issue on drift (scheduled only)
-        if: steps.flag.outputs.drift == '1' && github.event_name == 'schedule'
+        if: ${{ !cancelled() && steps.flag.outputs.drift == '1' && github.event_name == 'schedule' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -99,7 +102,9 @@ jobs:
         shell: bash
 
       - name: Update baseline (workflow_dispatch only)
-        if: github.event_name == 'workflow_dispatch' && inputs.update_baseline == true
+        # The detector exits 1 on drift, which is exactly when a baseline
+        # update is wanted, so run after a failure too.
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.update_baseline == true }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

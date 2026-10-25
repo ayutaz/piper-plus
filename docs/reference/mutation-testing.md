@@ -83,7 +83,7 @@ TESTS="src/python_run/tests/test_text_splitter.py src/python_run/tests/test_text
   --runner "python -m pytest $TESTS -x -q -p no:cacheprovider --override-ini=addopts= -p no:randomly"
 python scripts/check_mutation_score.py score python text_splitter .mutmut-cache
 .mut-venv/bin/mutmut results          # 生き残った mutant の一覧
-.mut-venv/bin/mutmut show <id>        # 個別の diff
+.mut-venv/bin/mutmut show "$MUTANT_ID"  # 個別の diff (id は results の一覧にある番号)
 ```
 
 ### Rust (cargo-mutants 27.1.0)

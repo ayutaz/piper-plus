@@ -526,6 +526,17 @@ repos:
         files: ^(docs/spec/artifact-retention-contract\.toml|\.github/workflows/.*\.ya?ml|scripts/check_artifact_retention\.py)$
         pass_filenames: false
 
+      # workflow の continue-on-error は全て docs/spec/continue-on-error-allowlist.toml
+      # に理由付きで載せる。 結果を隠す (tracked) ものは期限必須で、 期限を過ぎると
+      # 落ちる。 「warn-only で様子見してから strict」 の約束が 5 か月放置された
+      # (2026-10) ため。 scripts-tests.yml でも全 PR で同じ検査が走る。
+      - id: continue-on-error-allowlist
+        name: continue-on-error は理由と期限付きで allowlist に載っているか
+        entry: uv run --no-sync python scripts/check_continue_on_error.py
+        language: system
+        files: ^(docs/spec/continue-on-error-allowlist\.toml|\.github/workflows/.*\.ya?ml|scripts/check_continue_on_error\.py)$
+        pass_filenames: false
+
       # M2 T-008: docs/spec/test-flake-retry-contract.toml gate。
       # phase-1/2 runtime の dependency/CI flag 同期 + retry-count-max-2 invariant。
       - id: test-flake-retry

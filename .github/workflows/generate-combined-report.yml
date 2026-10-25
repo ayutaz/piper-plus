@@ -4,17 +4,26 @@ name: Generate Combined Performance Report
 permissions:
   contents: read
 
+# Only Test Japanese TTS uploads performance data
+# (japanese-tts-combined-summary-run<N>). Test Multilingual TTS uploads
+# audio only, so it used to trigger this workflow for nothing: both
+# downloads looked for a non-existent `*-combined-summary-*` name in the
+# triggering run and were continue-on-error, so every run (20 of 20 in
+# 2026-10) reported "no performance data" and stayed green.
 on:
   workflow_run:
-    workflows: ["Test Japanese TTS", "Test Multilingual TTS"]
+    workflows: ["Test Japanese TTS"]
     types:
       - completed
 
 jobs:
   generate_combined_report:
     name: Generate Combined Performance Report
-    if: ${{ github.event.workflow_run.event == 'pull_request' }}
+    if: ${{ github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read  # download artifacts of the triggering run
 
     steps:
       - uses: actions/checkout@v6.1.0
@@ -24,24 +33,22 @@ jobs:
         with:
           python-version: '3.13'
 
-      # Download artifacts from both workflows
       - name: Download Japanese TTS results
-        uses: dawidd6/action-download-artifact@8a338493df3d275e4a7a63bcff3b8fe97e51a927  # v19
+        uses: actions/download-artifact@v6.0.0
         with:
-          workflow: test-japanese-tts.yml
-          run_id: ${{ github.event.workflow_run.id }}
-          name: japanese-combined-summary-*
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: japanese-tts-combined-summary-run*
           path: japanese-results
-        continue-on-error: true
 
-      - name: Download Multilingual TTS results
-        uses: dawidd6/action-download-artifact@8a338493df3d275e4a7a63bcff3b8fe97e51a927  # v19
-        with:
-          workflow: test-multilingual-tts.yml
-          run_id: ${{ github.event.workflow_run.id }}
-          name: multilingual-combined-summary-*
-          path: multilingual-results
-        continue-on-error: true
+      - name: Require performance data
+        run: |
+          count=$(find japanese-results -name '*.json' -type f 2>/dev/null | wc -l)
+          echo "performance JSON files: ${count}"
+          if [ "$count" -eq 0 ]; then
+            echo "::error::No performance JSON in japanese-tts-combined-summary-run* of run ${{ github.event.workflow_run.id }}"
+            exit 1
+          fi
 
       - name: Combine all results
         run: |
@@ -50,15 +57,7 @@ jobs:
           # Create combined directory
           mkdir -p all-combined-results/performance
 
-          # Copy Japanese results
-          if [ -d "japanese-results" ]; then
-            find japanese-results -name "*.json" -print0 | xargs -0 -r cp -t all-combined-results/performance/
-          fi
-
-          # Copy Multilingual results
-          if [ -d "multilingual-results" ]; then
-            find multilingual-results -name "*.json" -print0 | xargs -0 -r cp -t all-combined-results/performance/
-          fi
+          find japanese-results -name "*.json" -print0 | xargs -0 -r cp -t all-combined-results/performance/
 
           # List all collected files
           echo "Collected performance files:"
@@ -66,17 +65,7 @@ jobs:
 
       - name: Generate final combined summary
         run: |
-          if [ -d "all-combined-results" ] && [ "$(find all-combined-results -name '*.json' -type f | wc -l)" -gt 0 ]; then
-            echo "Generating combined performance report..."
-            python scripts/generate_job_summary.py --results-dir all-combined-results
-          else
-            echo "No performance data found to generate report"
-            {
-              echo "## 📊 TTS パフォーマンスレポート"
-              echo ""
-              echo "パフォーマンスデータが見つかりませんでした。"
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
+          python scripts/generate_job_summary.py --results-dir all-combined-results
 
       - name: Upload final combined report
         if: always()

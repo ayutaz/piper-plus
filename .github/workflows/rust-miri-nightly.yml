@@ -57,10 +57,9 @@ jobs:
         working-directory: src/rust
         env:
           MIRIFLAGS: "-Zmiri-disable-isolation"
-        # informational tier: failure を artifact 経由で確認、 PR を block しない
-        # `continue-on-error: true` は steps 単位 (set-output で記録可能だが
-        # 本 workflow は単独 job なので job 全体を fail にしない形にする)。
-        continue-on-error: true
+        # miri の失敗は job を赤にする (以前は continue-on-error で参考扱い
+        # だったが、 直近の run は 375 件すべて成功していた)。 ログは下の
+        # upload で残る。
         id: miri_run
         run: |
           set -o pipefail
