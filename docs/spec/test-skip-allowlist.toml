@@ -663,3 +663,10 @@ test = "src/python/tests/test_compat.py::test_posixpath_unchanged_on_non_windows
 kind = "harmless"
 platforms = ["windows"]
 reason = "Checks that non-Windows keeps PosixPath; runs on Linux and macOS."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_infer_onnx_speaker_embedding_integration.py::TestInferOnnxSpeakerEmbeddingFallback::*"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Windows CI does not install the train extra; the fixture model is built with torch (tests/fixtures/mb_istft_speaker_embedding/build_fixture.py)."
