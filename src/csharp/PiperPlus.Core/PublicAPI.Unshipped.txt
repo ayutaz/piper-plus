@@ -1,1 +1,21 @@
 #nullable enable
+PiperPlus.Core.Config.VoiceInfo.Revision.get -> string!
+PiperPlus.Core.Config.VoiceInfo.Revision.init -> void
+PiperPlus.Core.Phonemize.EnglishG2PEngine
+PiperPlus.Core.Phonemize.EnglishG2PEngine.ConvertToArpabet(string! text) -> System.Collections.Generic.List<System.Collections.Generic.List<string!>!>!
+PiperPlus.Core.Phonemize.EnglishG2PEngine.EnglishG2PEngine(System.Collections.Generic.IReadOnlyDictionary<string!, string!>! dictionary) -> void
+PiperPlus.Core.Phonemize.FrenchG2PEngine
+PiperPlus.Core.Phonemize.FrenchG2PEngine.FrenchG2PEngine() -> void
+PiperPlus.Core.Phonemize.FrenchG2PEngine.ToPhonemeList(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.PinyinDictionaryChineseG2PEngine
+PiperPlus.Core.Phonemize.PinyinDictionaryChineseG2PEngine.Convert(string! text) -> PiperPlus.Core.Phonemize.ChineseG2PResult!
+PiperPlus.Core.Phonemize.PinyinDictionaryChineseG2PEngine.PinyinDictionaryChineseG2PEngine(System.Collections.Generic.IReadOnlyDictionary<int, string!>! single, System.Collections.Generic.IReadOnlyDictionary<string!, string![]!>! phrases) -> void
+PiperPlus.Core.Phonemize.PortugueseG2PEngine
+PiperPlus.Core.Phonemize.PortugueseG2PEngine.PortugueseG2PEngine() -> void
+PiperPlus.Core.Phonemize.PortugueseG2PEngine.ToPhonemeList(string! text) -> System.Collections.Generic.List<string!>!
+PiperPlus.Core.Phonemize.SpanishG2PEngine
+PiperPlus.Core.Phonemize.SpanishG2PEngine.SpanishG2PEngine() -> void
+PiperPlus.Core.Phonemize.SpanishG2PEngine.ToPhonemeList(string! text) -> System.Collections.Generic.List<string!>!
+static PiperPlus.Core.Phonemize.EnglishG2PEngine.FromJson(System.IO.Stream! dictionary) -> PiperPlus.Core.Phonemize.EnglishG2PEngine!
+static PiperPlus.Core.Phonemize.MultilingualPhonemizer.NormalizeCjkPunctuationForLatin(string! text) -> string!
+static PiperPlus.Core.Phonemize.PinyinDictionaryChineseG2PEngine.FromJson(System.IO.Stream! single, System.IO.Stream! phrases) -> PiperPlus.Core.Phonemize.PinyinDictionaryChineseG2PEngine!
