@@ -16,7 +16,7 @@
 #
 # # Version pinning:
 #   ruff version below MUST match the pins in
-#   .github/workflows/python-lint.yml and pyproject.toml (dev / test /
+#   .github/workflows/lint-gates.yml (python-lint step) and pyproject.toml (dev / test /
 #   tool.uv dependency groups) — currently 0.15.15. Drift between these =
 #   local-clean / CI-fail mismatch (PR #401 cause). Enforced by
 #   scripts/check_ruff_version_sync.py (ruff-version-sync gate, 5 pin sites).
@@ -852,7 +852,7 @@ repos:
         files: (zh_en_loanword(_matrix)?\.json|scripts/check_loanword_forward_compat\.py|tests/fixtures/g2p/zh_en_loanword_forward_compat\.json|docs/reference/zh\-en\-loanword/README\.md)$
         pass_filenames: false
 
-      # Mirror of .github/workflows/g2p-known-divergences.yml. The lists of
+      # Mirror of the g2p-known-divergences steps of .github/workflows/lint-gates.yml. The lists of
       # known G2P differences are read by every runtime's golden parity test;
       # this checks the lists themselves (issue + reason on every entry, cases
       # that exist in the golden, declared runtimes whose tests still read the
@@ -864,7 +864,7 @@ repos:
         files: ^(tests/fixtures/g2p/(known_divergences|english_no_drop_words|phoneme_test_cases_golden)\.json|scripts/check_g2p_known_divergences\.py|src/cpp/tests/test_c_api_g2p_golden\.cpp|src/rust/piper-plus-g2p/tests/golden_parity\.rs|android/piper-plus-g2p/src/androidTest/java/com/piperplus/g2p/PhonemeFixtureParityTest\.kt|tests/PiperPlusG2PTests/GoldenParityTests\.swift|tests/PiperPlusG2PTests/GoldenPhonemeTests\.swift|src/go/phonemize/golden_parity_test\.go|src/wasm/openjtalk-web/test/js/test-g2p-golden-parity\.js|src/wasm/g2p/test/test-g2p-golden-parity\.js|src/python_run/tests/test_g2p_golden_parity\.py|src/csharp/PiperPlus\.Cli\.Tests/G2pGoldenParityTests\.cs)$
         pass_filenames: false
 
-      # Mirror of .github/workflows/ort-version-sync.yml. Same Dependabot
+      # Mirror of the ort-version-sync steps of .github/workflows/lint-gates.yml. Same Dependabot
       # drift pattern as ruff (cmake source-of-truth + 7 workflow + 5
       # workspace consumers). `check_ort_versions.py` is pure Python / IO.
       - id: ort-version-sync
@@ -884,7 +884,7 @@ repos:
         files: ^(test/model_resolution_vectors\.json|src/python_run/piper_plus/download\.py|src/cpp/(piper_plus_voices\.json|model_manager\.cpp)|src/rust/piper-core/src/model_download\.rs|src/csharp/PiperPlus\.Core/Config/VoiceCatalog\.cs|src/go/piperplus/voice_catalog\.go|scripts/check_voice_catalog_parity\.py|src/python_run/piper_plus/voices\.json)$
         pass_filenames: false
 
-      # Mirror of .github/workflows/action-pin-gate.yml. Codespell-baseline
+      # Mirror of the action-pin-gate steps of .github/workflows/lint-gates.yml. Codespell-baseline
       # pattern: snapshot current sliding-tag set in
       # scripts/action_pins_baseline.txt; fail only on *new* sliding-tag
       # references not in baseline. Prevents recurrence of PR #414
@@ -1008,7 +1008,7 @@ repos:
       # Version manifest sync gate (Wave 3, S-4 Release 自動化).
       # release-versions.toml の expected_prefix と各 manifest の実 version
       # を比較し、 9 polyglot manifest の drift を検出。 既存 CI workflow
-      # `.github/workflows/version-consistency.yml` の local 版として、
+      # `.github/workflows/lint-gates.yml` の version-consistency step の local 版として、
       # commit 時に該当 file 変更があれば走る。 mode は release-versions.toml
       # の meta.mode (warn / fail) を尊重し、 本 hook は --strict なしで
       # warn-only 動作。 tag push 時の hard gate は pre-push hook 側で行う。
@@ -1031,7 +1031,7 @@ repos:
         files: ^(docker/webui/app\.py|docker/python-inference/(inference|test_openai_api)\.py|scripts/check_language_parity\.py)$
         pass_filenames: false
 
-      # Mirror of .github/workflows/cli-help-docs-sync.yml. Catches v1.12.0-
+      # Mirror of the cli-help-docs-sync steps of .github/workflows/lint-gates.yml. Catches v1.12.0-
       # style breaking changes (e.g. `--mb-istft` removed when HiFi-GAN was
       # deleted) where the user-facing CLI doc would otherwise carry a flag
       # `python -m piper_plus --help` no longer accepts.
@@ -1165,7 +1165,7 @@ repos:
       # from the PQMF incident (PR #320): acceptance -90dB was relaxed to
       # >5dB, mislabeled "theoretical limit", and the aliasing bug shipped
       # in every MB-iSTFT model for 15 months. CI runs the same check on the
-      # pull request's diff (test-threshold-relaxation.yml).
+      # pull request's diff (lint-gates.yml).
       - id: test-threshold-relaxation
         name: test threshold relaxation requires evidence
         entry: uv run --no-sync python scripts/check_test_threshold_relaxation.py
@@ -1283,7 +1283,7 @@ repos:
   # tomllib in stdlib (<3.11).
   # ---------------------------------------------------------------------------
   - repo: https://github.com/codespell-project/codespell
-    # `.github/workflows/codespell.yml` の `pip install 'codespell==X'` と
+    # `.github/workflows/lint-gates.yml` の `pip install 'codespell==X'` と
     # 同一版にすること。 drift すると「ローカル pre-push は緑 / CI は赤」
     # (辞書エントリが版で増えるため) が起きる。 2.3.0 のまま CI だけ 2.4.2 に
     # 上がっていた状態を解消。
@@ -1313,7 +1313,7 @@ repos:
   # without --no-install-recommends, missing pinned versions, etc.). Scoped
   # to docker/ so we don't accidentally lint embedded fixtures.
   #
-  # `--failure-threshold=error` mirrors `.github/workflows/hadolint.yml` so
+  # `--failure-threshold=error` mirrors the hadolint step of `.github/workflows/lint-gates.yml` so
   # local pre-commit and PR CI agree on what counts as a hard failure
   # (only `.hadolint.yaml::override.error` rules block; warning/info report
   # but don't exit non-zero). Without this, info-level rules unrelated to
@@ -1404,11 +1404,11 @@ repos:
         pass_filenames: false
 
   # ---------------------------------------------------------------------------
-  # Wave 5 — actionlint local pre-commit (mirror of .github/workflows/actionlint.yml).
+  # Wave 5 — actionlint local pre-commit (mirror of the actionlint steps of .github/workflows/lint-gates.yml).
   # GitHub Actions workflow の syntax / job-needs cycle 等を commit 時点で検出。
-  # CI gate (`actionlint.yml`) は shellcheck 0.11.0 込みで失敗扱い。 ここでは
+  # CI gate (lint-gates.yml) は shellcheck 0.11.0 込みで失敗扱い。 ここでは
   # PATH に shellcheck があれば同じ検査をし、 無ければ actionlint が
-  # shellcheck の検査だけを飛ばす。 rev は actionlint.yml の
+  # shellcheck の検査だけを飛ばす。 rev は lint-gates.yml の
   # ACTIONLINT_VERSION とそろえる (tests/scripts/test_actionlint_workflow.py)。
   # ---------------------------------------------------------------------------
   - repo: https://github.com/rhysd/actionlint

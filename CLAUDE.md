@@ -82,13 +82,13 @@ CHANGELOG unreleased) を full-repo で実行 (~20-30 秒)。`SKIP=...` で comm
 > しても PR 時に検出)。
 
 > **ruff version pin:** `.pre-commit-config.yaml` の `rev: vX` と
-> `.github/workflows/python-lint.yml` の `pip install ruff==X`、加えて
+> `.github/workflows/lint-gates.yml` (python-lint step) の `pip install ruff==X`、加えて
 > `pyproject.toml` の 3 dependency group エントリ (合計 5 箇所) は同期必須。
 > drift = local-clean / CI-fail mismatch (PR #401 の根本原因の一つ)。
-> `scripts/check_ruff_version_sync.py` + `ruff-version-sync.yml` で
+> `scripts/check_ruff_version_sync.py` (lint-gates.yml の ruff-version-sync step) で
 > 5 箇所一致を CI gate (本 gate がなければ Dependabot uv-workspace PR が
 > pyproject.toml だけ bump → drift → 後追い PR が発生する)。
-> `ci.yml` は PR #462 で ruff job を削除済み (python-lint.yml と重複) のため
+> `ci.yml` は PR #462 で ruff job を削除済み (旧 python-lint.yml と重複) のため
 > pin サイトではない。 site 一覧に載る場所が pin を失った場合は gate が
 > 落ちる (`EXPECTED_PIN_COUNT`) — 以前は無言で skip され、 pin が消えた
 > ときに限って gate が緑になっていた。

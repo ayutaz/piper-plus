@@ -1,236 +1,145 @@
-# Mutation Testing Specification
+# Mutation Testing
 
-> 3 runtime (Python / Rust / C#) で mutation testing を導入し、
-> 「unit test がバグを検出できる強度 (mutation kill-rate)」を測定する。
-> 重い (~30 min - 数時間) ため **manual + weekly cron 専用**で、 push 毎には走らせない。
+> Python / Rust / C# の決まった対象に小さな変異 (`+` → `-`、`==` → `!=`、
+> `True` → `False` など) を入れ、テストがそれを失敗として検出するかを測る。
+> 1 対象で数十分から 2 時間かかるため、**毎週と手動実行だけ**で動かす。
+> 対象・使うテスト・`break` score の正本は
+> [`docs/spec/mutation-testing.toml`](../spec/mutation-testing.toml)。
 
-## 動機 (Why mutation testing?)
+## なぜ測るか
 
-通常の line/branch coverage は「実行されたか」しか見ないため、 assert が
-無い test でも 100% 取れる。 mutation testing は source に小さな変異
-(`+` → `-`, `==` → `!=`, `True` → `False` 等) を注入し、 test suite が
-それを fail させるかを測ることで **test の検出力** を直接測る。
+line / branch coverage は「実行されたか」しか見ないので、assert のない
+テストでも 100% になる。mutation testing は、コードを壊したときにテストが
+落ちるかを直接測る。対象は分岐が多く入出力が決まっている G2P / SSML /
+text splitter / timing に絞っている。ONNX 推論や I/O は対象外。
 
-`piper-plus` は G2P / SSML / text splitter / timing といった **pure logic
-で分岐が多い**モジュールに高い test カバレッジを持っており、 mutation testing
-の費用対効果が最も高い対象。 ONNX 推論や I/O は対象外 (mutation の意味が薄い)。
+## score の数え方
 
-## Target module の選定基準
+`scripts/check_mutation_score.py score` が 3 ツール共通で次の式を使う。
 
-1. **Pure logic (deterministic)**: 入力 → 出力が決定的で、 mock や fixture が
-   軽量に組める。
-2. **High existing coverage (>= 80%)**: line coverage が低い場所で mutation
-   を回しても、 大半が "no test reaches this" になるだけで意味が薄い。
-3. **High-impact**: regression が起きると user-visible (発音の崩れ、
-   SSML 解釈ミス、 splitter の文末判定ミス等)。
-
-## Runtime 別構成
-
-### Python (`mutmut`)
-
-| 項目 | 値 |
-|------|-----|
-| Tool | [`mutmut`](https://github.com/boxed/mutmut) >= 2.4 (stable、 pytest 互換) |
-| 候補比較 | `cosmic-ray` は機能豊富だが設定が重い。 `mutmut` は CLI が簡潔で `paths_to_mutate` に絞れる |
-| 設定ファイル | `.mutmut.toml` (repo root) |
-| Target | `src/python/g2p/piper_plus_g2p/multilingual.py`, `ssml.py`, `base.py` / `src/python_run/piper_plus/text_splitter.py`, `timing.py` |
-| Test runner | `uv run pytest src/python/g2p/tests src/python_run/tests -x -q --no-cov` |
-| Cache | `.mutmut-cache` (`.gitignore` 済) |
-
-#### Install / run
-
-```bash
-# install (dev group に pin 済み — uv sync 済みなら不要)
-pip install 'mutmut>=2.4,<3'   # or: uvx --from 'mutmut>=2.4,<3' mutmut --version
-
-# 全 module を実行 (manual; 数十分 - 1 時間オーダー)
-uvx --from 'mutmut>=2.4,<3' mutmut run
-
-# 特定 file のみ
-uvx --from 'mutmut>=2.4,<3' mutmut run --paths-to-mutate src/python_run/piper_plus/text_splitter.py
-
-# 結果確認
-uvx --from 'mutmut>=2.4,<3' mutmut results        # survived/killed の summary
-uvx --from 'mutmut>=2.4,<3' mutmut html           # html/index.html を生成 (CI artifact 化)
-uvx --from 'mutmut>=2.4,<3' mutmut show '<id>'    # 個別 mutant の diff (id を実値に置換)
+```text
+score = detected / (detected + undetected)
+  detected    killed、timeout (テストが無限ループに気づいた)
+  undetected  survived、suspicious (mutmut: テストは通り、遅くなっただけ)、
+              no coverage (Stryker: どのテストも通らない行)
+  数えない    compile できない mutant (unviable / CompileError)、
+              `# pragma: no mutate` の行
 ```
 
-`pyproject.toml` の dev group と CI のインストール指定は `mutmut>=2.4,<3`
-です。`uvx` は指定しないと最新リリースを解決するため、この章の実行例では
-同じ上限を明示しています。CI workflow に残る裸の `uvx mutmut` 呼び出しも
-この pin に揃えることが、再現可能な CI 結果には必要です。
+ジョブは次のどれかで失敗する。
 
-### Rust (`cargo-mutants`)
+- score が `break` 未満
+- mutant が 1 つも生成されない、または全部はテストされていない
+  (2026-10 まで、どのジョブもこの状態のまま緑だった)
+- ツール自体の異常終了
 
-| 項目 | 値 |
-|------|-----|
-| Tool | [`cargo-mutants`](https://github.com/sourcefrog/cargo-mutants) (stable Rust 対応) |
-| 候補比較 | `mutagen` は nightly compiler 必須で CI コスト過大。 `cargo-mutants` は stable で動き、 `--file` で対象を絞れる |
-| 設定 | CLI フラグで指定 (workspace 全体に config file は置かない)。 `--file` で対象モジュールを限定 |
-| Target | `src/rust/piper-plus-g2p/src/ssml.rs`, `src/rust/piper-core/src/text_splitter.rs` |
-| Cache | `mutants.out/` (`.gitignore` 済) |
+## `break` の決め方
 
-#### Install / run
+`break` は 2026-10-25 の実測値を 5 の倍数に切り下げた値で、実測より少し下に
+置く。score が動くのは対象のコードかテストが変わったときだけなので、`break`
+を割ったら「テストのない新しいコード」か「弱くなったテスト」を意味する。
+テストを足したら `break` を上げる。下げるときは、他のテスト閾値を緩める
+ときと同じく理由を書いてレビューを通す。
+`tests/scripts/test_check_mutation_score.py` が「`break` は `measured` 以下で、
+5 ポイント以内」を検査している。
+
+| runtime | 対象 | 実測 (2026-10-25) | break |
+|---|---|---|---:|
+| Python | `piper_plus/text_splitter.py` | 95/107 = 88.8% | 85 |
+| Python | `piper_plus/timing.py` | 85/102 = 83.3% | 80 |
+| Python | `piper_plus_g2p/ssml.py` | 92/132 = 69.7% | 65 |
+| Python | `piper_plus_g2p/base.py` | 2/18 = 11.1% | 10 |
+| Python | `piper_plus_g2p/multilingual.py` | 129/306 = 42.2% | 40 |
+| Rust | `piper-plus-g2p/src/ssml.rs` | 63/71 = 88.7% | 85 |
+| Rust | `piper-core/src/text_splitter.rs` | 140/197 = 71.1% | 70 |
+| C# | Phonemize 4 ファイル + `Ssml/SsmlParser.cs` | 434/481 = 90.2% | 90 |
+
+`base.py` と `multilingual.py` は score が低い。テストが各ファイル自身の
+処理をほとんど確かめていないためで、テストを足す候補になっている。
+
+## 対象ごとにテストを絞る理由
+
+mutant ごとにテスト全体を流すと終わらない (cargo-mutants で text_splitter.rs
+を全テストで回すと 1 mutant 85 秒 × 198 個)。toml の `tests` /
+`cargo_test_args` に、その対象を実際に使うテストだけを書く。対象を使う
+テストを新しく書いたら、ここにも足す。
+
+## ツール別の手順
+
+CI と同じ版・同じ引数で手元でも実行できる。
+
+### Python (mutmut 2.5.1)
+
+3.x は CLI と結果の形式が違うので 2.5.1 に固定している。
+mutmut 2.x は `setup.cfg` / `[tool.mutmut]` しか読まないため、設定は
+コマンドラインで渡す (以前あった `.mutmut.toml` は一度も読まれていなかった)。
 
 ```bash
-# install (CI と同様 — latest stable)
-cargo install --locked cargo-mutants
-# or pinned (再現性が必要な場合; 現在の stable に合わせて随時更新):
-# cargo install --locked cargo-mutants@25.3.1
-#
-# CI workflow 側は `--locked` で十分 (Cargo.lock 相当の挙動)、 docs で
-# pin 例を示すに留め、 workflow は最新 stable を取り続ける運用。
-# version drift で結果が変わった場合は本 doc の Baseline 章 + pin を更新。
+uv venv --python 3.13 .mut-venv
+VIRTUAL_ENV=.mut-venv uv pip install -e "src/python/g2p[all]" -e "src/python_run[test,cpu,http]" 'mutmut==2.5.1'
+TARGET=src/python_run/piper_plus/text_splitter.py
+TESTS="src/python_run/tests/test_text_splitter.py src/python_run/tests/test_text_splitter_contract.py"
+.mut-venv/bin/mutmut run --paths-to-mutate "$TARGET" \
+  --runner "python -m pytest $TESTS -x -q -p no:cacheprovider --override-ini=addopts= -p no:randomly"
+python scripts/check_mutation_score.py score python text_splitter .mutmut-cache
+.mut-venv/bin/mutmut results          # 生き残った mutant の一覧
+.mut-venv/bin/mutmut show <id>        # 個別の diff
+```
 
-# piper-plus-g2p の ssml.rs を変異 (manual)
+### Rust (cargo-mutants 27.1.0)
+
+`src/rust` で実行する。`--in-place` を付けるのは、コピー先の木では
+`include_str!` で読むデータ (`piper-plus-g2p/data/`) が見つからないため。
+実行中は対象ファイルが書き換わるので、終わるまで同じ作業ツリーで
+commit しない。
+
+```bash
+cargo install --locked cargo-mutants@27.1.0
 cd src/rust
-cargo mutants -p piper-plus-g2p --file src/ssml.rs --no-shuffle
-
-# piper-core の text_splitter.rs
-cargo mutants -p piper-plus --file src/text_splitter.rs --no-shuffle
-
-# 結果は mutants.out/ 配下に diff + log として残る。
-# `cargo mutants --list-files` で対象 ファイルを事前確認できる。
+cargo mutants -p piper-plus --file piper-core/src/text_splitter.rs \
+  --no-shuffle --in-place --timeout 60 \
+  -- --lib --test test_text_splitter --test test_text_splitter_contract
+python ../../scripts/check_mutation_score.py score rust text_splitter mutants.out/outcomes.json
 ```
 
-参考 (将来 `.cargo/config-mutants.toml` を導入する場合の雛形):
+`--file` は `src/rust` からの相対パス。以前の `--file src/ssml.rs` は
+どのファイルにも一致せず、0 個の mutant で成功していた。
 
-```toml
-# src/rust/.cargo/config-mutants.toml — 参考のみ (実体は CLI で渡す)
-# cargo-mutants v25+ では `--in-place=false` がデフォルト。
-# build profile を mutants 専用に分けたい場合に活用する:
-# [profile.mutants]
-# inherits = "test"
-# debug = "line-tables-only"
-```
-
-### C# (`Stryker.NET`)
-
-| 項目 | 値 |
-|------|-----|
-| Tool | [`Stryker.NET`](https://stryker-mutator.io/docs/stryker-net/introduction/) (stable、 .NET 9 / 10 対応) |
-| 候補比較 | 実質一強。 NuGet ではなく `dotnet tool install --global dotnet-stryker` で導入 |
-| 設定ファイル | `src/csharp/stryker-config.json` |
-| Target | `Phonemize/MultilingualPhonemizer.cs`, `InlinePhonemeParser.cs`, `IpaTokenizer.cs`, `ArpabetToIPAConverter.cs`, `Ssml/SsmlParser.cs` |
-| Test project | `PiperPlus.Core.Tests/` |
-| Cache | `StrykerOutput/` (`.gitignore` 済) |
-
-#### Install / run
+### C# (Stryker.NET 5.0.0)
 
 ```bash
-# install (global tool)
-dotnet tool install --global dotnet-stryker
-
-# 実行 (config file を参照)
+dotnet tool install --global dotnet-stryker --version 5.0.0
 cd src/csharp
-dotnet stryker -c stryker-config.json
-# → StrykerOutput/<timestamp>/reports/mutation-report.html
+dotnet stryker --config-file stryker-config.json
+# → StrykerOutput/<timestamp>/reports/mutation-report.{html,json}
 ```
 
-## 閾値ポリシー (high / low / break)
+- `stryker-config.json` の `"test-runner": "mtp"` は必須。test project は
+  xunit v3 (実行ファイル形式) で、既定の vstest ランナーでは mutant が
+  有効にならず、score が 4.2% (Killed 1 / Survived 461) と出ていた。
+  mtp では同じ対象が 90.2% になる。
+- `thresholds.break` は toml の `break` と同じ値にする (テストで検査)。
+  Stryker 自身もこの値を割ると非 0 で終わる。
+- Stryker 5 は知らないキーを拒否するので、config に `_comment` を書かない。
+  `-c` は 5.x では `--concurrency` の意味になったので、設定ファイルは
+  `--config-file` で渡す。
 
-Stryker.NET の慣習に従い、 3 runtime 全体で同じ運用にする:
+## CI
 
-| 閾値 | 値 | 意味 |
-|------|-----|------|
-| `high` | **80** | 良好。 これ以上を target にする (新規 PR で逆行させない) |
-| `low` | **60** | 許容下限。 これ未満で warn |
-| `break` | **50** | これ未満で CI fail |
+`.github/workflows/mutation-testing.yml`
 
-ただし **初期 (baseline 確立まで) は `break = 0`** で warn-only 運用する。
-理由: 初回は survived mutant の多くが「テスト不足」ではなく「mutmut/Stryker
-の semantic-equivalent mutation」「timing 依存」「言語固有の挙動」等の
-ノイズである可能性があり、 まず実値を観測して baseline を決める必要がある。
-
-数週間 (3-4 回) 走らせて分布が安定したら、 各 runtime の中央値 - 5pt 程度を
-break として昇格する。
-
-### Mutant 状態の解釈
-
-| 状態 | 意味 | 対応 |
-|------|------|------|
-| `killed` | テストが mutant を検出 (期待動作) | OK |
-| `survived` | テストが mutant を見逃した | テスト追加 or assertion 強化 |
-| `timeout` | mutant がテストを停止させた (無限ループ等) | killed とみなす (Stryker default) |
-| `no_coverage` | mutant が test 実行で touch されない | 対象範囲外 — 設定で除外推奨 |
-| `compile_error` | mutant が compile に失敗 | tool が自動除外 |
-
-kill rate = `killed / (killed + survived)` (timeout を分子に含める実装もある)。
-
-この `high` / `low` / `break` 表と昇格手順は提案ポリシーです。現在の
-workflow は全 runtime で `continue-on-error: true` の warn-only 運用を実施し、
-下記の baseline は未確立です。
-
-## CI cadence
-
-`.github/workflows/mutation-testing.yml`:
-
-- **Trigger**:
-  - `workflow_dispatch`: 手動実行 (PR 検証や ad-hoc 実験用)
-  - `schedule: cron '0 0 * * 0'`: **毎週日曜 00:00 UTC** (= 09:00 JST 月曜)
-- **Matrix**: `[python, rust, csharp]` (各々 1 job、 合計 3 並列)
-- **Artifact**: mutation report (HTML / JSON) を 30 日 retention で upload
-- **Push to main**: しない (artifact を見るだけで OK、 result は read-only)
-- **PR への影響**: ゼロ。 PR-time CI は走らない。
-
-### 想定実行時間
-
-| Runtime | 想定 | 備考 |
-|---------|------|------|
-| Python | 30 - 60 min | 5 files × ~数百 mutant × test suite |
-| Rust | 20 - 45 min | `cargo-mutants` は build cache を毎回 invalidate するので長め |
-| C# | 30 - 90 min | 5 files、 xUnit v3 が ~1000 test |
-
-合計でも 90 分以内に収まる想定 (parallel 3 job)。 GitHub Actions の
-6 時間 job timeout に対して十分マージンあり。
-
-## 初回 baseline の確立フロー
-
-1. PR で本 spec / config / workflow をマージ
-2. `workflow_dispatch` で初回手動実行 (各 runtime)
-3. 各 runtime の kill-rate を本 doc の "Baseline" 章に記録 (本 PR の follow-up)
-4. 週次 cron で安定運用、 3-4 回後に `break` 閾値を実値に基づき設定
-5. その後の新規 PR で kill-rate が下がったら CI fail (regression gate として機能)
-
-### Baseline 昇格 (warn-only → break 強制) の運用ルール
-
-| 項目 | 値 |
-|------|-----|
-| 決定権者 | **Team maintainer** (本リポジトリの管理者 1 名が最終承認。 周辺担当者の review 推奨) |
-| 観測期間 | **4 週間** (= weekly cron 4 回ぶんのサンプル) |
-| 判定指標 | 4 週間の **median kill-rate** (外れ値を排除するため mean ではなく median を採用) |
-| `break` 閾値 | **median − 5pt** (整数に round-down)。 例: median 72% なら `break = 67` |
-| `low` / `high` | `low = median − 5pt`、 `high = max(80, median)` を目安に同時更新 |
-| 適用方法 | C# は `src/csharp/stryker-config.json` の `thresholds.break` を編集。 Rust/Python は本 doc に閾値表を維持し、 workflow の `continue-on-error: true` を `false` に切り替え |
-| PR タイトル convention | `chore(quality-gates): mutation baseline 昇格 (week N)` (N は累計 cron 実行回数) |
-| Rollback | 昇格後に regression PR が頻発した場合、 同じ convention で `(rollback)` を付けて閾値を 5pt 下げる |
-
-### Baseline JSON 出力 path (各 runtime)
-
-CI artifact から直接 baseline 値を再現できるよう、 報告書 JSON の正規 path
-を以下で固定する。 本 doc の "Baseline" 表更新時は、 これらの JSON を一次
-ソースとして数値を引用する:
-
-| Runtime | JSON 出力 path (CI artifact 内) | 抽出キー |
-|---------|--------------------------------|---------|
-| Python (`mutmut`) | `html/mutmut.json` (※`uvx mutmut html` で生成。 環境により `html/index.html` のみの場合あり、 その際は `mutmut results` 出力を保存) | `killed` / `survived` / `timeout` の counts |
-| Rust (`cargo-mutants`) | `src/rust/mutants.out/outcomes.json` | `outcomes[].summary` (caught / missed / timeout / unviable) |
-| C# (`Stryker.NET`) | `src/csharp/StrykerOutput/<timestamp>/reports/mutation-report.json` | `files.*.mutants[].status` を集計 (`Killed` / `Survived` / `Timeout`) |
-
-## Baseline (TBD)
-
-> 初回実行後に follow-up PR で記入する。
-
-| Runtime | Date | Killed | Survived | Timeout | Kill rate |
-|---------|------|-------:|---------:|--------:|----------:|
-| Python  | TBD  | -      | -        | -       | - |
-| Rust    | TBD  | -      | -        | -       | - |
-| C#      | TBD  | -      | -        | -       | - |
+- trigger: `schedule` (毎週日曜 00:00 UTC) と `workflow_dispatch`
+  (`runtime` で python / rust / csharp / all を選ぶ)
+- `plan` job が toml から 3 つの matrix を作る。対象を足すときは toml に
+  entry を足すだけでよい
+- report は 30 日間 artifact に残る
+  (Python `html/` + `.mutmut-cache`、Rust `mutants.out/`、
+  C# `StrykerOutput/**/reports/`)
 
 ## 関連ファイル
 
-- `.mutmut.toml` — Python mutmut 設定
-- `src/csharp/stryker-config.json` — C# Stryker 設定
-- `.github/workflows/mutation-testing.yml` — 週次 / 手動 CI
-- `pyproject.toml` (dev group) — `mutmut>=2.4,<3` を pin
-- `.gitignore` — 中間ファイル除外
+- `docs/spec/mutation-testing.toml` — 対象・テスト・timeout・実測・`break`
+- `scripts/check_mutation_score.py` — matrix の生成と score の判定
+- `tests/scripts/test_check_mutation_score.py` — 上記と workflow / config の整合
+- `src/csharp/stryker-config.json` — Stryker の設定
+- `.github/workflows/mutation-testing.yml` — 毎週 / 手動の CI

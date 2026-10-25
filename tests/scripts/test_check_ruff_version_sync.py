@@ -28,9 +28,9 @@ repos:
 """
 
 PYTHON_LINT = """\
-name: Python Linting
+name: Lint and gates
 jobs:
-  ruff:
+  lint:
     steps:
       - run: |
           pip install ruff=={ver}
@@ -67,7 +67,7 @@ def _write_repo(
     if pre_commit is not None:
         (root / ".pre-commit-config.yaml").write_text(pre_commit, encoding="utf-8")
     if python_lint is not None:
-        (root / ".github/workflows/python-lint.yml").write_text(
+        (root / ".github/workflows/lint-gates.yml").write_text(
             python_lint, encoding="utf-8"
         )
     if pyproject is not None:
@@ -120,13 +120,13 @@ def test_vanished_pin_is_a_hard_failure(mod, tmp_path, capsys):
         # File exists (so the path.exists() guard does not fire) but the
         # `pip install ruff==` line is gone — exactly what happened to
         # ci.yml in PR #462.
-        python_lint="name: Python Linting\njobs:\n  ruff:\n    steps:\n      - run: echo hi\n",
+        python_lint="name: Lint and gates\njobs:\n  lint:\n    steps:\n      - run: echo hi\n",
         pyproject=PYPROJECT.format(ver="0.15.15"),
     )
     assert _run(mod, tmp_path) == 1
     err = capsys.readouterr().err
     assert "pin site inventory mismatch" in err
-    assert "python-lint.yml: expected 1 ruff pin(s), found 0" in err
+    assert "lint-gates.yml: expected 1 ruff pin(s), found 0" in err
 
 
 def test_extra_pyproject_entry_is_a_hard_failure(mod, tmp_path, capsys):
@@ -150,7 +150,7 @@ def test_missing_file_still_reported(mod, tmp_path, capsys):
         pyproject=PYPROJECT.format(ver="0.15.15"),
     )
     assert _run(mod, tmp_path) == 1
-    assert "python-lint.yml" in capsys.readouterr().err
+    assert "lint-gates.yml" in capsys.readouterr().err
 
 
 def test_real_repo_is_in_sync(mod, capsys):

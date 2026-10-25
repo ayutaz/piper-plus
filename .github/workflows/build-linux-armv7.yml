@@ -20,6 +20,14 @@ on:
       - 'src/wasm/openjtalk-web/test/browser/models.json'
       - 'tests/scripts/test_armv7_release.py'
 
+# A newer push to a pull request cancels the older run. Other runs get a
+# group of their own (the run id), so a release build called through
+# workflow_call is never cancelled. The literal prefix keeps the group apart
+# from a caller's: under workflow_call, github.workflow is the caller's name.
+concurrency:
+  group: linux-armv7-${{ github.event_name == 'pull_request' && github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

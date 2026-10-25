@@ -35,10 +35,12 @@ permissions:
 # cancel-in-progress: an interrupted release that has already uploaded
 # the linux/macos slice but not the iOS xcframework leaves an asymmetric
 # GitHub Release that's awkward to clean up. Letting the second run
-# queue is preferable. PR runs are not affected (different ref).
+# queue is preferable. A pull request has its own ref, and a newer push to
+# it makes the older run's result moot, so only there the older run is
+# cancelled instead of holding up to five macOS runners until it finishes.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # Issue #383 follow-up: ORT 1.17.0 → 1.20.0
