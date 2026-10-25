@@ -31,4 +31,4 @@ runs:
         set -f
         # shellcheck disable=SC2086
         python scripts/check_test_skips.py check \
-          --runtime "$SKIP_RUNTIME" --platform "${RUNNER_OS,,}" $SKIP_FILES
+          --runtime "$SKIP_RUNTIME" --platform "$RUNNER_OS" $SKIP_FILES

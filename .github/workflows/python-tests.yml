@@ -326,7 +326,7 @@ jobs:
     - name: Fail on tests skipped without an allowlist entry
       # pytest reports a skipped test as passing the job. See "Record skipped tests".
       shell: bash
-      run: python scripts/check_test_skips.py check --runtime python --platform "${RUNNER_OS,,}" "$PIPER_PLUS_SKIP_LOG"
+      run: python scripts/check_test_skips.py check --runtime python --platform "$RUNNER_OS" "$PIPER_PLUS_SKIP_LOG"
 
     - name: Upload test results
       if: always()

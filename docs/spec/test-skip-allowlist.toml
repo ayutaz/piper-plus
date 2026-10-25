@@ -59,3 +59,56 @@ test = "PiperPlus.Core.Tests.SpeakerEncoderE2ETests.E2ECosineGate_AgainstPinnedE
 kind = "tracked"
 expires = "2027-01-31"
 reason = "Same fixture gap as the Go entry: speaker_encoder_golden.json has no e2e_cosine_gate block."
+
+[[entry]]
+runtime = "cpp"
+test = "SpeakerEncoderE2E.CosineGateAgainstPinnedEmbedding"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Same fixture gap as the Go entry: speaker_encoder_golden.json has no e2e_cosine_gate block."
+
+[[entry]]
+runtime = "cpp"
+test = "SpeakerEmbeddingInferenceTest.*"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "tests/fixtures/mb_istft_speaker_embedding/model.onnx is not checked in and no CI job runs build_fixture.py, so the speaker_embedding input path of the C++ runtime is untested. Check in the fixture or build it in the job."
+
+[[entry]]
+runtime = "cpp"
+test = "OpenJTalkOptimizedTest.*"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "openjtalk_optimized.c runs the open_jtalk command-line binary, which the CI runners do not have. piper does not call this code (it uses the OpenJTalk library in-process), so remove the code and its test, or install the binary in the job."
+
+[[entry]]
+runtime = "rust"
+test = "jsonl_per_line_output_file_overrides_cli_flag"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "#[ignore] (needs the test model and ONNX Runtime). The attribute says runtime-parity-deep runs it, but no workflow passes --ignored, so it never runs in CI."
+
+[[entry]]
+runtime = "rust"
+test = "jsonl_phoneme_ids_writes_valid_wav_file"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Same as jsonl_per_line_output_file_overrides_cli_flag: #[ignore] and no workflow runs ignored tests."
+
+# ---------------------------------------------------------------------------
+# harmless — correct where it happens; another OS or job runs the test
+# ---------------------------------------------------------------------------
+
+[[entry]]
+runtime = "csharp"
+test = "PiperPlus.Core.Tests.CacheStorageTests.Create_ReadOnlyModelDirectory_StillRunsInference"
+kind = "harmless"
+platforms = ["windows"]
+reason = "Tests Unix directory permissions; runs on Linux and macOS."
+
+[[entry]]
+runtime = "csharp"
+test = "PiperPlus.Core.Tests.CliWorkingDirectoryTests.Version_FromDeletedParentDirectory_Succeeds"
+kind = "harmless"
+platforms = ["macos", "windows"]
+reason = "A Linux-only regression (getcwd returning ENOENT after the current directory is deleted); runs on Linux."

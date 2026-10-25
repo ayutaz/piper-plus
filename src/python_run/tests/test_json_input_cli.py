@@ -233,11 +233,20 @@ except Exception:
         kwargs_dump = tmp_path / "kwargs.json"
         site_dir = self._write_mock_sitecustomize(tmp_path, kwargs_dump)
 
+        # sitecustomize runs before `-m` puts the working directory on
+        # sys.path, so the package root is listed explicitly. Without it the
+        # import only worked while PYTHONPATH was empty (the trailing empty
+        # entry stands for the working directory); otherwise the ImportError
+        # in sitecustomize was swallowed and the real voice ran unmocked.
         env = {
             **dict(__import__("os").environ),
-            "PYTHONPATH": str(site_dir)
-            + __import__("os").pathsep
-            + __import__("os").environ.get("PYTHONPATH", ""),
+            "PYTHONPATH": __import__("os").pathsep.join(
+                [
+                    str(site_dir),
+                    str(Path(__file__).resolve().parents[1]),
+                    __import__("os").environ.get("PYTHONPATH", ""),
+                ]
+            ),
         }
         proc = subprocess.run(
             [

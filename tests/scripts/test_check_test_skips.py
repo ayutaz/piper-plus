@@ -190,6 +190,21 @@ def test_main_check_exit_codes(tmp_path, capsys):
     assert m.main(args) == 0
 
 
+def test_main_check_takes_runner_os_as_the_platform(tmp_path):
+    # The workflows pass $RUNNER_OS unchanged: macOS runners ship bash 3.2,
+    # which cannot lowercase with ${RUNNER_OS,,}.
+    spec = tmp_path / "allow.toml"
+    spec.write_text(
+        '[[entry]]\nruntime = "go"\ntest = "Test*"\nkind = "harmless"\nreason = "r"\nplatforms = ["macos"]\n',
+        encoding="utf-8",
+    )
+    log = tmp_path / "go.log"
+    log.write_text(GO_OUTPUT, encoding="utf-8")
+    for runner_os, code in (("macOS", 0), ("Linux", 1)):
+        args = ["--spec", str(spec), "check", "--runtime", "go", "--platform", runner_os, str(log)]
+        assert m.main(args) == code, runner_os
+
+
 # --- pytest plugin ------------------------------------------------------------
 
 

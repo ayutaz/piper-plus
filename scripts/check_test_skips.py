@@ -237,7 +237,8 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--runtime", choices=RUNTIMES, required=True)
         p.add_argument("files", nargs="+", help="test output files or glob patterns")
         if name == "check":
-            p.add_argument("--platform", choices=PLATFORMS, required=True)
+            # type=str.lower takes $RUNNER_OS (Linux, macOS, Windows) as is.
+            p.add_argument("--platform", type=str.lower, choices=PLATFORMS, required=True)
             p.add_argument("--today", type=dt.date.fromisoformat, default=dt.date.today())
     sub.add_parser("validate")
     args = parser.parse_args(argv)
