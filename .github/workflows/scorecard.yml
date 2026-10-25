@@ -57,7 +57,7 @@ jobs:
           persist-credentials: false
 
       - name: Run analysis
-        uses: ossf/scorecard-action@v2.4.4
+        uses: ossf/scorecard-action@v2.5.0
         with:
           results_file: results.sarif
           results_format: sarif
@@ -88,6 +88,6 @@ jobs:
         run: python3 scripts/filter_scorecard_sarif.py results.sarif -o results.filtered.sarif
 
       - name: Upload to code scanning
-        uses: github/codeql-action/upload-sarif@v3.38.2
+        uses: github/codeql-action/upload-sarif@v3.39.1
         with:
           sarif_file: results.filtered.sarif

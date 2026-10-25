@@ -226,7 +226,7 @@ jobs:
         workspaces: src/rust -> target
         key: coverage
     - name: Install cargo-llvm-cov
-      uses: taiki-e/install-action@v2.87.23
+      uses: taiki-e/install-action@v2.87.30
       with:
         tool: cargo-llvm-cov
     - name: Build mandatory embedding dimension fixtures
