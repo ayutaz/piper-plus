@@ -14,58 +14,18 @@ name: Pre-commit
 #     (e.g. ruff version drift between CI's `pip install ruff==X` and
 #     pre-commit's `rev: vX`).
 
+# Runs on every PR and every push to dev. It used to be limited by `paths`
+# to a list of source extensions, so a PR touching only Markdown, YAML,
+# shell scripts, Dockerfiles or .editorconfig never ran the hooks that
+# match those files (yamllint, shellcheck, check-yaml, actionlint, the
+# trailing-whitespace / end-of-file fixers, ...). Each hook still filters
+# its own files with `files:`, so an unrelated PR only pays for the
+# checkout and the always-run gates.
 on:
   pull_request:
     branches: [ dev ]
-    paths:
-      - '.pre-commit-config.yaml'
-      - '.github/workflows/pre-commit.yml'
-      # Trigger on any source change so all hooks run; pre-commit itself
-      # short-circuits hooks that are scoped via `files:` in the config.
-      #
-      # The non-Python extensions are not optional. The config registers hooks
-      # that only ever match them -- `cargo fmt --check`, `gofmt -l`, `go vet`,
-      # `ktlint`, `swiftformat --lint`, and the SRT rounding parity gate, whose
-      # six formatter files are .py/.cs/.rs/.go/.js/.cpp. Without these globs a
-      # PR touching only src/go/piperplus/timing.go or src/cpp/piper.cpp does
-      # not start this workflow at all, so those hooks never run in CI.
-      - '**/*.py'
-      - '**/*.pyi'
-      - '**/*.json'
-      - '**/*.toml'
-      - '**/*.rs'
-      - '**/*.go'
-      - '**/*.cs'
-      - '**/*.js'
-      - '**/*.mjs'
-      - '**/*.cpp'
-      - '**/*.hpp'
-      - '**/*.h'
-      - '**/*.kt'
-      - '**/*.kts'
-      - '**/*.swift'
-      - 'scripts/**'
   push:
     branches: [ dev ]
-    paths:
-      - '.pre-commit-config.yaml'
-      - '.github/workflows/pre-commit.yml'
-      - '**/*.py'
-      - '**/*.pyi'
-      - '**/*.json'
-      - '**/*.toml'
-      - '**/*.rs'
-      - '**/*.go'
-      - '**/*.cs'
-      - '**/*.js'
-      - '**/*.mjs'
-      - '**/*.cpp'
-      - '**/*.hpp'
-      - '**/*.h'
-      - '**/*.kt'
-      - '**/*.kts'
-      - '**/*.swift'
-      - 'scripts/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
@@ -97,11 +57,13 @@ jobs:
         # `git fetch --depth=1 <sha>` pulls just the base commit's tree
         # (no intermediate history). Sufficient for `git diff base..HEAD`
         # which is what `pre-commit run --from-ref` uses internally.
-        # Skipped when BASE_SHA is empty (e.g. workflow_dispatch event).
+        # Skipped when BASE_SHA is empty or all zeros (a newly created
+        # branch); the next step then checks every file.
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          if [ -n "${BASE_SHA:-}" ] && ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+          if [ -n "${BASE_SHA:-}" ] && [ "$BASE_SHA" != "0000000000000000000000000000000000000000" ] \
+            && ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
             git fetch --no-tags --depth=1 origin "${BASE_SHA}"
           fi
 
@@ -171,34 +133,54 @@ jobs:
             pre-commit-${{ runner.os }}-py3.13-${{ hashFiles('.pre-commit-config.yaml') }}-
             pre-commit-${{ runner.os }}-py3.13-
 
-      - name: Run hooks (changed files mode)
+      # The hooks run on the files this PR / push changed, except when the
+      # hook configuration itself changed: then every file is checked, since
+      # a new or tightened hook applies to files the PR did not touch.
+      - name: Decide which files to check
+        id: scope
         env:
-          # Skip heavy cross-language lint hooks (each gated by a dedicated
-          # CI workflow with the right toolchain installed). Entries are
-          # idempotent with .pre-commit-config.yaml `stages: [pre-push]`
-          # markers (commit-stage filter already excludes those hooks).
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -z "${BASE_SHA:-}" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "no base commit: checking every file"
+            echo "args=--all-files" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$BASE_SHA" HEAD | grep -qxE '\.pre-commit-config\.yaml|\.github/workflows/pre-commit\.yml'; then
+            echo "hook configuration changed: checking every file"
+            echo "args=--all-files" >> "$GITHUB_OUTPUT"
+          else
+            echo "checking the files changed since $BASE_SHA"
+            echo "args=--from-ref $BASE_SHA --to-ref HEAD" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run hooks (pre-push stage)
+        env:
+          # `--hook-stage pre-push` runs the hooks a contributor gets from
+          # `pre-commit install --hook-type pre-push` as well: every hook
+          # without `stages:` runs in both stages, so this is a superset of a
+          # commit-stage run. Before, the pre-push hooks (the full-repo
+          # contract gates among them) ran in CI only if a contributor had
+          # installed the pre-push hook.
+          #
+          # Skipped here because a dedicated workflow runs the same check on
+          # every PR that touches the files, with the toolchain installed:
           #   * cargo-clippy / cargo-fmt          → rust-tests.yml
           #   * gofmt / go-vet / golangci-lint    → go-ci.yml
           #   * dotnet-format                     → csharp-ci.yml + ci.yml
           #   * mypy-g2p                          → g2p-python-ci.yml
           #   * markdownlint-cli2                 → markdownlint.yml
-          #   * codespell                         → codespell.yml
+          #   * codespell                         → codespell.yml (the hook has
+          #     no file-type filter; on every file it ran for over an hour)
           #   * hadolint                          → hadolint.yml
-          #   * editorconfig-checker              → full-repo scan has 17k
-          #     latent drift; new drift caught locally via
-          #     `pre-commit install --hook-type pre-push`.
-          SKIP: cargo-clippy,cargo-fmt,gofmt,go-vet,golangci-lint,mypy-g2p,dotnet-format,markdownlint-cli2,codespell,hadolint,editorconfig-checker
+          #   * gitleaks                          → secret-scan.yml (the hook
+          #     scans staged changes only, which CI does not have)
+          #   * editorconfig-checker              → about 16,000 findings on
+          #     the whole repository (mostly generated / vendored files and
+          #     C++ indented with 2 spaces against .clang-format's 4); to be
+          #     enabled once that drift is fixed.
+          SKIP: cargo-clippy,cargo-fmt,gofmt,go-vet,golangci-lint,mypy-g2p,dotnet-format,markdownlint-cli2,codespell,hadolint,gitleaks,editorconfig-checker
+          SCOPE: ${{ steps.scope.outputs.args }}
         run: |
-          # Tier 2-F: --from-ref/--to-ref runs hooks only on files changed
-          # in this PR/push (~5x faster than --all-files for typical PRs
-          # which touch <1% of repo). Latent drift in unchanged files is
-          # NOT caught here — for full-repo check, run
-          # `pre-commit run --all-files --hook-stage push` locally before
-          # release tags. A periodic cron (weekly) could add a full-repo
-          # gate as follow-up.
           # --show-diff-on-failure makes drift trivial to fix locally
           # (contributors see the exact patch the hooks produced).
-          pre-commit run \
-            --from-ref ${{ github.event.pull_request.base.sha || github.event.before }} \
-            --to-ref HEAD \
-            --show-diff-on-failure
+          # shellcheck disable=SC2086  # SCOPE holds several arguments
+          pre-commit run --hook-stage pre-push $SCOPE --show-diff-on-failure
