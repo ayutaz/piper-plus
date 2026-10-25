@@ -1,43 +1,26 @@
 //! Integration tests for the Chinese (Mandarin) phonemizer.
 //!
-//! ChinesePhonemizer uses rule-based pinyin-to-IPA conversion with embedded
-//! lookup tables. No external dictionary files are required.
-//!
-//! If the phonemizer cannot be created for any reason (e.g., future external
-//! dependency not available), tests gracefully skip.
+//! The pinyin dictionaries are read from the repo
+//! (`src/rust/piper-plus-g2p/data/`). These tests used to look for them in
+//! the working directory or `PIPER_PLUS_DICT_DIR`, neither of which CI
+//! provides, and returned early without checking anything: every test in
+//! this file passed without running.
 
 use piper_plus::phonemize::Phonemizer;
 use piper_plus::phonemize::chinese::ChinesePhonemizer;
 
-fn try_create() -> Option<ChinesePhonemizer> {
-    // ChinesePhonemizer requires pinyin dictionary JSON files.
-    // Try well-known paths; skip tests if not found.
-    let single = std::path::PathBuf::from("pinyin_single.json");
-    let phrase = std::path::PathBuf::from("pinyin_phrases.json");
-    if single.exists() && phrase.exists() {
-        return ChinesePhonemizer::new(&single, &phrase).ok();
-    }
-    // Try env var
-    if let Ok(dir) = std::env::var("PIPER_PLUS_DICT_DIR") {
-        let dir = std::path::PathBuf::from(dir);
-        let s = dir.join("pinyin_single.json");
-        let p = dir.join("pinyin_phrases.json");
-        if s.exists() && p.exists() {
-            return ChinesePhonemizer::new(&s, &p).ok();
-        }
-    }
-    None
+fn create() -> ChinesePhonemizer {
+    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../piper-plus-g2p/data");
+    ChinesePhonemizer::new(
+        &data.join("pinyin_single.json"),
+        &data.join("pinyin_phrases.json"),
+    )
+    .expect("ChinesePhonemizer::new with the repo's pinyin dictionaries")
 }
 
 macro_rules! require_phonemizer {
     () => {
-        match try_create() {
-            Some(p) => p,
-            None => {
-                eprintln!("SKIP: ChinesePhonemizer could not be created");
-                return;
-            }
-        }
+        create()
     };
 }
 
@@ -252,17 +235,23 @@ fn test_third_tone_sandhi() {
 // =========================================================================
 
 #[test]
-fn test_post_process_ids_passthrough() {
+fn test_post_process_ids_matches_default() {
+    // Same BOS / padding / EOS as the production path (G2pAdapter ->
+    // default_post_process_ids): ^ _ a _ b _ c _ $
     let p = require_phonemizer!();
-    let ids = vec![1i64, 2, 3];
+    let mut map = std::collections::HashMap::new();
+    map.insert("_".to_string(), vec![0i64]);
+    map.insert("^".to_string(), vec![1]);
+    map.insert("$".to_string(), vec![2]);
+    let ids = vec![10i64, 11, 12];
     let prosody = vec![Some([0i32, 1, 2]), None, Some([1, 2, 3])];
-    let map = std::collections::HashMap::new();
 
     let (result_ids, result_prosody) = p.post_process_ids(ids.clone(), prosody.clone(), &map);
-    // Chinese phonemizer should pass through IDs without BOS/EOS wrapping
-    // (BOS/EOS is handled at a higher level for non-JA languages)
-    assert_eq!(result_ids, ids);
-    assert_eq!(result_prosody.len(), prosody.len());
+    assert_eq!(result_ids, vec![1, 0, 10, 0, 11, 0, 12, 0, 2]);
+    assert_eq!(
+        (result_ids, result_prosody),
+        piper_plus_g2p::multilingual::default_post_process_ids(ids, prosody, &map, "$")
+    );
 }
 
 // =========================================================================

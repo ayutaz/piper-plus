@@ -11,6 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::{LazyLock, OnceLock};
 
+use super::multilingual::default_post_process_ids;
 use super::token_map::token_to_pua;
 use super::{Phonemizer, ProsodyFeature, ProsodyInfo};
 use crate::config::PhonemeIdMap;
@@ -927,42 +928,11 @@ impl Phonemizer for ChinesePhonemizer {
         prosody: Vec<Option<ProsodyFeature>>,
         id_map: &PhonemeIdMap,
     ) -> (Vec<i64>, Vec<Option<ProsodyFeature>>) {
-        // BOS + intersperse padding + EOS (same as English default)
-        let bos = id_map
-            .get("^")
-            .and_then(|v| v.first().copied())
-            .unwrap_or(1);
-        let eos = id_map
-            .get("$")
-            .and_then(|v| v.first().copied())
-            .unwrap_or(2);
-        let pad = id_map
-            .get("_")
-            .and_then(|v| v.first().copied())
-            .unwrap_or(0);
-
-        let mut out_ids = Vec::with_capacity(ids.len() * 2 + 2);
-        let mut out_prosody = Vec::with_capacity(ids.len() * 2 + 2);
-
-        // BOS
-        out_ids.push(bos);
-        out_prosody.push(None);
-
-        for (i, &id) in ids.iter().enumerate() {
-            if i > 0 {
-                // Intersperse padding between tokens
-                out_ids.push(pad);
-                out_prosody.push(None);
-            }
-            out_ids.push(id);
-            out_prosody.push(prosody.get(i).cloned().unwrap_or(None));
-        }
-
-        // EOS
-        out_ids.push(eos);
-        out_prosody.push(None);
-
-        (out_ids, out_prosody)
+        // Same as English and as the production path (G2pAdapter). This
+        // used to pad only between tokens (`^ a _ b $`), unlike the
+        // `^ _ a _ b _ $` the models are trained on; the test that would
+        // have shown it never ran (tests/test_chinese.rs).
+        default_post_process_ids(ids, prosody, id_map, "$")
     }
 
     fn language_code(&self) -> &str {
@@ -1553,13 +1523,14 @@ mod tests {
 
         let (out_ids, out_prosody) = phon.post_process_ids(ids, prosody, &id_map);
 
-        // Expected: BOS(1), 10, PAD(0), 20, PAD(0), 30, EOS(2)
-        assert_eq!(out_ids, vec![1, 10, 0, 20, 0, 30, 2]);
-        assert_eq!(out_prosody.len(), 7);
+        // Expected: BOS(1), PAD(0), 10, PAD(0), 20, PAD(0), 30, PAD(0), EOS(2)
+        assert_eq!(out_ids, vec![1, 0, 10, 0, 20, 0, 30, 0, 2]);
+        assert_eq!(out_prosody.len(), 9);
         assert!(out_prosody[0].is_none()); // BOS
-        assert_eq!(out_prosody[1], Some([1, 1, 2])); // first token
-        assert!(out_prosody[2].is_none()); // pad
-        assert!(out_prosody[6].is_none()); // EOS
+        assert!(out_prosody[1].is_none()); // pad
+        assert_eq!(out_prosody[2], Some([1, 1, 2])); // first token
+        assert!(out_prosody[3].is_none()); // pad
+        assert!(out_prosody[8].is_none()); // EOS
     }
 
     // ===== 8. Word boundary prosody =====

@@ -301,19 +301,18 @@ fn test_zh_matches_python_golden() {
 }
 
 // ---------------------------------------------------------------------------
-// English (requires CMU dictionary — skipped when not available)
+// English (CMU dictionary from src/rust/piper-plus-g2p/data/)
 // ---------------------------------------------------------------------------
 
 #[test]
 fn test_en_golden() {
     let fixture = load_fixture();
-    let p = match piper_plus_g2p::english::EnglishPhonemizer::new() {
-        Ok(p) => p,
-        Err(_) => {
-            eprintln!("SKIP: CMU dictionary not found — skipping EN golden test");
-            return;
-        }
-    };
+    // `EnglishPhonemizer::new()` looks in the working directory or
+    // `CMUDICT_PATH`; CI provides neither, so this test used to skip.
+    let dict =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../piper-plus-g2p/data/cmudict_data.json");
+    let p = piper_plus_g2p::english::EnglishPhonemizer::new_with_dict(&dict)
+        .expect("EnglishPhonemizer with the repo's CMU dictionary");
     for case in cases_for(&fixture, "en") {
         let (tokens, _) = p.phonemize_with_prosody(&case.input).unwrap();
         assert_case(&tokens, case);
@@ -330,15 +329,34 @@ fn test_ja_golden() {
     let fixture = load_fixture();
     use piper_plus_g2p::japanese::JapanesePhonemizer;
 
+    // The default features bundle NAIST-JDIC. `JapanesePhonemizer::new()`
+    // looks for a dictionary file instead, which CI does not provide, so
+    // this test used to return early without checking anything.
+    #[cfg(feature = "naist-jdic")]
+    let p =
+        JapanesePhonemizer::new_bundled().expect("JapanesePhonemizer with the bundled NAIST-JDIC");
+    #[cfg(not(feature = "naist-jdic"))]
     let p = match JapanesePhonemizer::new() {
         Ok(p) => p,
-        Err(_) => {
+        Err(e) => {
+            assert!(
+                std::env::var_os("CI").is_none(),
+                "no NAIST-JDIC dictionary: {e} (build with the naist-jdic feature)"
+            );
             eprintln!("SKIP: OpenJTalk dictionary not found — skipping JA golden test");
             return;
         }
     };
 
-    let question_markers: HashSet<&str> = ["?", "?!", "?.", "?~"].iter().copied().collect();
+    // The phonemizer returns multi-character tokens ("cl", "?!") as their
+    // PUA codepoints, so expected tokens are converted the same way.
+    let pua = |t: &str| {
+        piper_plus_g2p::token_map::token_to_pua(t)
+            .map(|c| c.to_string())
+            .unwrap_or_else(|| t.to_string())
+    };
+    let question_markers: HashSet<String> =
+        ["?", "?!", "?.", "?~"].iter().map(|t| pua(t)).collect();
 
     for case in cases_for(&fixture, "ja") {
         let (tokens, _) = p.phonemize_with_prosody(&case.input).unwrap();
@@ -357,7 +375,7 @@ fn test_ja_golden() {
             let token_set: HashSet<&str> = tokens.iter().map(|s| s.as_str()).collect();
             for expected in expected_contains {
                 assert!(
-                    token_set.contains(expected.as_str()),
+                    token_set.contains(pua(expected).as_str()),
                     "JA output missing {:?} for {:?}: {:?}",
                     expected,
                     case.input,
@@ -366,7 +384,7 @@ fn test_ja_golden() {
             }
         }
         if case.expected_has_question_marker == Some(true) {
-            let has_marker = tokens.iter().any(|t| question_markers.contains(t.as_str()));
+            let has_marker = tokens.iter().any(|t| question_markers.contains(t));
             assert!(
                 has_marker,
                 "JA output missing question marker for {:?}: {:?}",

@@ -1,19 +1,20 @@
 use piper_plus::phonemize::Phonemizer;
 use piper_plus::phonemize::english::EnglishPhonemizer;
 
-fn try_create_phonemizer() -> Option<EnglishPhonemizer> {
-    EnglishPhonemizer::new().ok()
+// The CMU dictionary is read from the repo (`src/rust/piper-plus-g2p/data/`).
+// `EnglishPhonemizer::new()` looks in the working directory or
+// `CMUDICT_PATH`, neither of which CI provides, so these tests used to
+// return early without checking anything.
+fn create() -> EnglishPhonemizer {
+    let dict = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../piper-plus-g2p/data/cmudict_data.json");
+    EnglishPhonemizer::new_with_dict(&dict)
+        .expect("EnglishPhonemizer with the repo's CMU dictionary")
 }
 
 macro_rules! require_phonemizer {
     () => {
-        match try_create_phonemizer() {
-            Some(p) => p,
-            None => {
-                eprintln!("SKIP: CMU dictionary not found");
-                return;
-            }
-        }
+        create()
     };
 }
 
