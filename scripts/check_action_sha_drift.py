@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Action SHA drift detector (T-002, complement of action-pin-gate.yml).
+"""Action SHA drift detector (T-002, complement of the action-pin-gate check).
 
-``action-pin-gate.yml`` enforces the SHA pin **shape** (40-hex or full
+``check_action_pins.py`` (lint-gates.yml) enforces the SHA pin **shape** (40-hex or full
 SemVer, never sliding ``@v<major>``). This script complements it by
 verifying that each 40-hex SHA pin is still **alive** on GitHub (not
 dangling and not force-pushed). The gate calls
@@ -55,7 +55,7 @@ SILENT_ZERO_RATIO = 0.5
 def collect_sha_pins(workflow_dir: Path = WORKFLOW_DIR) -> list[tuple[str, str]]:
     """Return (action, sha) tuples for every 40-hex SHA pin in workflows.
 
-    SemVer pins are ignored — action-pin-gate.yml already enforces that they
+    SemVer pins are ignored — check_action_pins.py already enforces that they
     are not sliding-major. Resolving SemVer tags against the upstream API
     would be redundant with the registry's own tag-immutability.
     """

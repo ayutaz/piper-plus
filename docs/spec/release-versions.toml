@@ -1,7 +1,7 @@
 # piper-plus Release Version Pinning
 # ==================================
 # This file is the canonical "expected version" table used by the
-# `version-consistency` workflow (.github/workflows/version-consistency.yml)
+# `version-consistency` step of .github/workflows/lint-gates.yml
 # to detect *unintentional* version drift across the polyglot package
 # manifests.
 #

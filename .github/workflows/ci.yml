@@ -107,7 +107,7 @@ jobs:
             ci-config-python:
               - '.github/workflows/ci.yml'
               - '.github/workflows/python-tests.yml'
-              - '.github/workflows/python-lint.yml'
+              - '.github/workflows/lint-gates.yml'
             ci-config-rust:
               - '.github/workflows/ci.yml'
               - '.github/workflows/rust-tests.yml'
