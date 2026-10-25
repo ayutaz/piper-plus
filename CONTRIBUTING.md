@@ -282,7 +282,9 @@ If you want to contribute a **trained model** (rather than code), see [CONTRIBUT
 
 ## Your First Pull Request
 
-1. Fork the repository and create a branch from `dev`
+1. Fork the repository and create a branch from `dev`. Give it a name other than `dev` or `main`:
+   the required `required-gate/all-workflows` status is not published for a pull request from a branch
+   with either name, so it cannot be merged
 2. Make your changes in the appropriate `src/<language>/` directory
 3. Add or update tests
 4. Run the relevant test suite (see [Running Tests](#running-tests))

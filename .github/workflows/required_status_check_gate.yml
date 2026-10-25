@@ -32,6 +32,17 @@
 #   status is `pending`, and a failure is published as soon as it is seen.
 #   `--require-present CI` keeps the verdict pending until CI's run exists,
 #   so a firing just after the push cannot call a half-created set green.
+#
+# Why `branches-ignore: [dev, main]`:
+#   The filter is on the branch the completed run ran on. Pushes to dev and
+#   schedules run on dev, and the job `if:` below skipped every one of
+#   their completions, but each still created a run first: measured over
+#   24 hours to 2026-10-26, 863 gate runs, 98 of which evaluated. A pull
+#   request's runs carry its head branch, so they still fire. A fork PR
+#   from a branch named dev or main fires nothing, its status is never
+#   published, and the required status keeps it unmergeable until it is
+#   reopened from another branch (CONTRIBUTING.md says so); it cannot
+#   merge unchecked.
 
 name: Required Status Check Gate
 
@@ -115,6 +126,7 @@ on:
       - Wyoming Protocol Smoke Test
       - ZH-EN Loanword Sync Gate
     types: [completed]
+    branches-ignore: [dev, main]
 
 concurrency:
   group: required-gate-${{ github.event.workflow_run.head_sha }}
