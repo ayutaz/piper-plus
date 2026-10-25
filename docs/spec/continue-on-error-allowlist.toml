@@ -122,13 +122,6 @@ kind = "harmless"
 reason = "Upload to an external service; go test ran in an earlier step."
 
 [[entry]]
-workflow = "link-check.yml"
-job = "lychee"
-step = "Restore lychee cache"
-kind = "harmless"
-reason = "Cache restore; a miss only re-checks more links."
-
-[[entry]]
 workflow = "mutation-testing.yml"
 job = "csharp"
 step = "Cache NuGet packages"
@@ -199,27 +192,3 @@ step = "Audit root requirements"
 kind = "tracked"
 expires = "2027-01-31"
 reason = "The root workspace (training environment, not published) reports 15 advisories in setuptools 81, torch 2.11 and transformers 4.57; the fixes need torch / huggingface-hub major moves. The published wheel is audited by the blocking 'Audit src/python_run' step."
-
-# The keys below are removed by the open mutation-testing fix. They
-# expire soon so they cannot outlive that PR.
-
-[[entry]]
-workflow = "mutation-testing.yml"
-job = "python"
-kind = "tracked"
-expires = "2026-11-15"
-reason = "mutmut never ran (setuptools missing for the Cython build, unpinned uvx mutmut). Removed by the mutation-testing fix."
-
-[[entry]]
-workflow = "mutation-testing.yml"
-job = "rust"
-kind = "tracked"
-expires = "2026-11-15"
-reason = "cargo-mutants found 0 mutants (wrong --file paths) and the copied tree cannot read include_str! data. Removed by the mutation-testing fix."
-
-[[entry]]
-workflow = "mutation-testing.yml"
-job = "csharp"
-kind = "tracked"
-expires = "2026-11-15"
-reason = "Stryker rejected the config (_comment keys, -c means concurrency in 5.x). Removed by the mutation-testing fix."
