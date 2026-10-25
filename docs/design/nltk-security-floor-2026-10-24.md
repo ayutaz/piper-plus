@@ -25,7 +25,7 @@ nltk 3.10.4 (2026-10-21) はこの脆弱性を修正した版です。この版�
 
 - **英語 G2P**: g2p_en は nltk の `pos_tag` と cmudict を使います。nltk 3.10.4 の環境で Python の golden (`tools/generate_g2p_golden.py`) を作り直したところ、韓国語を除く 346 件すべてが既存の golden と一致しました。韓国語は g2pk2 が手元にないため対象外です。
 - **pip-audit**: `src/python_run/requirements.txt` は抑止なしで「No known vulnerabilities found」でした。
-- **Docker**: nltk 3.10.4 は、ほかのアカウントが書き込めるデータディレクトリを読み飛ばします。イメージは root で `/usr/share/nltk_data` に取得するため、この条件には当たりません。`docker-test.yml` の「NLTK data availability test」で確認します。
+- **Docker**: nltk 3.10.4 は、ほかのアカウントが書き込めるデータディレクトリを読み飛ばします。イメージは root で `/usr/share/nltk_data` に取得するため、この条件には当たりません。`docker-build.yml` の `build-python-train` ジョブの「NLTK data availability test」で確認します (PR のとき)。
 
 ## 再発防止
 

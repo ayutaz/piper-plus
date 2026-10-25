@@ -510,13 +510,14 @@ docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
 
 手動トリガー (`workflow_dispatch`) にも対応しています。
 
-### テスト (`docker-test.yml`)
+### テスト
 
-PR 時に以下の 3 イメージに対してスモークテストが実行されます。
+PR では、イメージをビルドしたジョブの中でそのイメージを docker に読み込み、続けて中身を検査します。
 
-- `test-python-inference` — Python 推論イメージのビルドとインポートテスト
-- `test-cpp-inference` — C++ 推論イメージのビルドと `piper --version` テスト
-- `test-webui` — WebUI イメージのビルドとインポートテスト
+- `docker-build.yml` の `build-python-inference` — インポート、OpenAI 互換 API、WebUI、日本語・英語の推論、config の自動検出とフォールバック
+- `docker-build.yml` の `build-python-train` — インポート、NLTK データ、英語 G2P
+- `docker-test.yml` の `test-cpp-inference` — C++ 推論イメージのビルド、`piper-plus --version`、推論と config の扱い
+- `docker-test.yml` の `test-cpp-unit-tests` — `Dockerfile.test` のビルド中に C++ の単体テストを実行
 
 ## トラブルシューティング
 

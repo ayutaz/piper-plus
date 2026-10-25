@@ -13,7 +13,8 @@ name: Docker Build Validate
 #   ことで、 GitHub Actions runner の "Set up job" フェーズで action を
 #   解決させ、不在タグ (e.g. `@v4`) を merge 前に検知する。
 #   実ビルドは行わず、 cosign --help 程度の動作確認のみ。
-#   (実 image build は既存 docker-test.yml が PR で 4 image をカバーする;
+#   (実 image build は docker-build.yml (PR では push しない) と
+#    docker-test.yml が PR で行う;
 #    本 workflow は残り 3 image の Dockerfile も含めた hadolint との 2 段
 #    で多層防御する。)
 
