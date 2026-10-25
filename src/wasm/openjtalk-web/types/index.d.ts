@@ -141,7 +141,8 @@ export interface StreamingSynthesizeOptions extends SynthesizeOptions {
 // Short-text mitigation helpers (Strategy A + B)
 // Numeric constants (MIN_PHONEME_IDS, MIN_BODY_FOR_STRATEGY_A,
 // TRIM_EOS_MAX_FRAMES, DEFAULT_HOP_SIZE) live in the AUTO-GENERATED block
-// at the bottom of this file — projected from src/index.js exports.
+// at the bottom of this file — projected from src/short-text.js, which
+// src/index.js re-exports.
 // ---------------------------------------------------------------------------
 
 /**
@@ -372,7 +373,8 @@ export function timingToSrt(result: TimingResult): string;
  * NOTE: this is re-exported from `./timing.js` (not declared as `export const`
  * in `src/index.js`), so it stays as a hand-written declaration here. The
  * AUTO-GENERATED block at the bottom of this file only covers
- * `export const NAME = VALUE` declarations from `src/index.js` itself.
+ * `export const NAME = VALUE` declarations from `src/index.js` and
+ * `src/short-text.js`.
  */
 export const DEFAULT_HOP_LENGTH: number;
 

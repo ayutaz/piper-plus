@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `piper-plus` bin (`bin/piper-cli.js`, the Node CLI for `--json-input`): apply the same short-text handling and Issue #499 EOS-region trim as `PiperPlus.synthesize()`. The bin wrote the raw decoder output, 1,536 samples (6 frames) longer than the other runtimes for the parity fixture. The helpers moved to `src/short-text.js`; `src/index.js` re-exports them, so the public API is unchanged.
 - Chinese text with digits or Latin words, for models with zh and en: read them with the English G2P instead of character by character (#847). `123` became `1 2 3` because the Rust WASM G2P had no English dictionary; it now gets the CMU dictionary of `@piper-plus/g2p` on the first Chinese request. With an `@piper-plus/g2p` that has no `loadCmuDict` (up to the 0.4.2 release on npm), a warning is logged and the old reading is kept.
 - Streaming (`synthesizeStreaming`): do not end a chunk at a full stop between two digits (`3.14`) or inside `e.g.` / `i.e.` (#831). The pieces were phonemized separately and read differently from the whole sentence.
 
@@ -31,9 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `SpeakerEncoder.initialize({ frontEnd: "kaldi-fbank" })`, which computes the zs-v1 CAM++ embedding the same way as the Python recipe (torchaudio Kaiser resampling to 16 kHz, 80-bin `kaldi.fbank`, mean subtraction, L2 normalization). Checked against torchaudio with a golden fixture. `initialize` also accepts `modelData` in place of `modelUrl`. The default `"mel"` front end is unchanged.
 - Add `PiperPlus.findDroppedSymbols(text, { language })`, which lists the symbols the phonemizer produced but the model's phoneme table lacks. Encoding still drops them silently; this lets an app warn before synthesis. It also works with `@piper-plus/g2p` 0.4.2, whose `encode()` does not report them.
 - The GitHub Pages multilingual demo gains a zero-shot section: upload or record a reference clip, compute the embedding in the browser, and read text in six languages with the public zs-v1 base.
-
-### Fixed
-
 - `model: "base"` / `"zero-shot-base-zs-v1"` now checks the downloaded `base.onnx` against its pinned SHA-256. The published `base.onnx.json` has no `sha256`, so the file was previously not verified.
 
 ## [0.8.0] - 2026-10-06

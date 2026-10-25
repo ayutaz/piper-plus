@@ -243,7 +243,7 @@ jobs:
       - name: List wheels
         run: |
           ls -la dist/
-          echo "Total wheels: $(ls -1 dist/*.whl | wc -l)"
+          echo "Total wheels: $(find dist -maxdepth 1 -name '*.whl' | wc -l)"
 
       - name: Generate build provenance attestation
         # SLSA provenance for all wheels before they are uploaded to PyPI.

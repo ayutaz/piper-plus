@@ -149,7 +149,7 @@ jobs:
         # 要求して EOTP で失敗する (npm-v0.7.0 の初回 publish が実際にこれで
         # 落ちた)。permissions.id-token: write の OIDC token で npm 側の
         # Trusted Publisher 設定に対して認証する。g2p-wasm-ci.yml と同じ構成。
-        run: npm publish *.tgz --provenance --access public
+        run: npm publish ./*.tgz --provenance --access public
 
       - name: Verify README importmap on the real CDNs
         # The CDNs serve the version only after it is on npm, so the README

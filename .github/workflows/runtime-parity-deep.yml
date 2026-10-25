@@ -1,19 +1,19 @@
-# Runtime Parity Deep — audio output equivalence (informational tier)
-# =====================================================================
-# 同一 model + 同一 phoneme IDs から各 runtime が出力する WAV が階層化
-# 判定で「同じ音」 と認められるかを検証する。 階層は SHA256 / peak-RMS /
-# SNR の順で評価され、 informational tier (continue-on-error: true) で
-# 4 週間運用後 blocker 昇格を maintainer が判定する。
-#
-# Phase 2 (PR #511 系列): 6 runtime (Python / Rust / Go / C# / C++ / WASM)
-# 全てで稼働。 contract toml の supports_dump_wav=false な runtime は
-# scripts/audio_parity.py 側で skip 行として報告される (現状ゼロ)。
+# Runtime Parity Deep — audio output equivalence
+# ===============================================
+# 同一 model + 同一 phoneme IDs から 6 runtime (Python / Rust / Go / C# /
+# C++ / WASM) が出力する WAV が「同じ音」かを検証し、 違えば失敗にする。
+# 判定 (scripts/audio_parity.py): フレーム数の一致が必須で、 そのうえで
+# sha256 の一致か、 peak 正規化 RMS の差とゲインを合わせた SNR の両方が
+# docs/spec/audio-parity-contract.toml の閾値を満たせば合格。
 #
 # 各 runtime は同一の fixture を入力:
 #   - model:       test/models/multilingual-test-medium.onnx (~38 MB, git)
-#   - phoneme IDs: tests/fixtures/audio-corpus/parity/phoneme_ids.jsonl
-# 各 build job が WAV 1 個を artifact upload → 最後の compare job が
-# scripts/audio_parity.py で 6 pair (C(4,2)) の tier 判定を出力する。
+#   - phoneme IDs: tests/fixtures/audio-corpus/parity/deterministic_phoneme_ids.jsonl
+#     (短文対策の padding がかからない 70 ID)
+#   - noise_scale = noise_w = 0、 length_scale = 1、 sentence silence 0
+#     (既定の noise は runtime ごとに乱数を引くので一致しない)
+# 各 dump job が WAV 1 個を artifact upload → compare job が 15 pair を判定。
+# dump job が落ちて WAV が欠けた場合も --require-all-runtimes で失敗にする。
 
 name: Runtime Parity Deep
 
@@ -41,7 +41,7 @@ permissions:
 env:
   MODEL_PATH: test/models/multilingual-test-medium.onnx
   CONFIG_PATH: test/models/multilingual-test-medium.onnx.json
-  FIXTURE: tests/fixtures/audio-corpus/parity/phoneme_ids.jsonl
+  FIXTURE: tests/fixtures/audio-corpus/parity/deterministic_phoneme_ids.jsonl
   # ONNX Runtime version pinned to match .github/workflows/go-ci.yml so the
   # Go runtime can dlopen the same .so the production CI does.
   ORT_VERSION: '1.24.4'
@@ -50,7 +50,6 @@ jobs:
   dump-python:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6.1.0
       - uses: actions/setup-python@v6.2.0
@@ -72,6 +71,7 @@ jobs:
             --model "$MODEL_PATH" \
             --config "$CONFIG_PATH" \
             --json-input \
+            --noise-scale 0 --noise-w 0 --length-scale 1 --sentence-silence 0 \
             --output-file /tmp/parity/python.wav \
             < "$FIXTURE"
           ls -lh /tmp/parity/python.wav
@@ -85,7 +85,6 @@ jobs:
   dump-rust:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
-    continue-on-error: true
     defaults:
       run:
         working-directory: src/rust
@@ -111,6 +110,7 @@ jobs:
             --model "$MODEL_PATH" \
             --config "$CONFIG_PATH" \
             --output-file /tmp/parity/rust.wav \
+            --noise-scale 0 --noise-w 0 --length-scale 1 --sentence-silence 0 \
             --no-warmup \
             < "$FIXTURE"
           ls -lh /tmp/parity/rust.wav
@@ -124,7 +124,6 @@ jobs:
   dump-go:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6.1.0
       - uses: actions/setup-go@v5.6.0
@@ -147,10 +146,10 @@ jobs:
         # job sees the same library layout.
         run: |
           if [ ! -f onnxruntime/lib/libonnxruntime.so ]; then
-            wget -q https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-x64-${ORT_VERSION}.tgz
-            tar xzf onnxruntime-linux-x64-${ORT_VERSION}.tgz
+            wget -q "https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-x64-${ORT_VERSION}.tgz"
+            tar xzf "onnxruntime-linux-x64-${ORT_VERSION}.tgz"
             mkdir -p onnxruntime/lib
-            cp onnxruntime-linux-x64-${ORT_VERSION}/lib/libonnxruntime.so* onnxruntime/lib/
+            cp "onnxruntime-linux-x64-${ORT_VERSION}"/lib/libonnxruntime.so* onnxruntime/lib/
           fi
 
       - name: Build piper-plus (Go CLI)
@@ -169,6 +168,7 @@ jobs:
             --model "$MODEL_PATH" \
             --config "$CONFIG_PATH" \
             --json-input \
+            --noise-scale 0 --noise-w 0 --length-scale 1 --sentence-silence 0 \
             --output-dir /tmp/parity/go-out \
             < "$FIXTURE"
           mv /tmp/parity/go-out/line_001.wav /tmp/parity/go.wav
@@ -183,7 +183,6 @@ jobs:
   dump-csharp:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6.1.0
       - uses: actions/setup-dotnet@v5.4.0
@@ -200,6 +199,7 @@ jobs:
             --model "$MODEL_PATH" \
             --config "$CONFIG_PATH" \
             --json-input \
+            --noise-scale 0 --noise-w 0 --length-scale 1 --sentence-silence 0 \
             --output-file /tmp/parity/csharp.wav \
             < "$FIXTURE"
           ls -lh /tmp/parity/csharp.wav
@@ -213,7 +213,6 @@ jobs:
   dump-cpp:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6.1.0
 
@@ -227,7 +226,7 @@ jobs:
           mkdir -p build
           cd build
           cmake -DCMAKE_BUILD_TYPE=Release ..
-          make -j$(nproc) piper
+          make -j"$(nproc)" piper
 
       - name: Synthesize via --json-input
         run: |
@@ -235,6 +234,7 @@ jobs:
           ./build/piper-plus \
             --model "$MODEL_PATH" \
             --json-input \
+            --noise_scale 0 --noise_w 0 --length_scale 1 --sentence_silence 0 \
             --output_file /tmp/parity/cpp.wav \
             < "$FIXTURE"
           ls -lh /tmp/parity/cpp.wav
@@ -248,7 +248,6 @@ jobs:
   dump-wasm:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    continue-on-error: true
     defaults:
       run:
         working-directory: src/wasm/openjtalk-web
@@ -272,6 +271,7 @@ jobs:
             --model "$MODEL_PATH" \
             --config "$CONFIG_PATH" \
             --json-input \
+            --noise-scale 0 --noise-w 0 --length-scale 1 \
             --output-file /tmp/parity/wasm.wav \
             < "$FIXTURE"
           ls -lh /tmp/parity/wasm.wav
@@ -287,7 +287,6 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6.1.0
       - uses: actions/setup-python@v6.2.0
@@ -323,17 +322,20 @@ jobs:
             if [ -f "$wav" ]; then
               INPUTS+=("${r}=${wav}")
             else
-              echo "WARN: $wav missing — runtime ${r} will be reported as skipped."
+              echo "ERROR: $wav missing — runtime ${r} did not produce a WAV; compare will fail."
             fi
           done
           echo "Collected inputs (${#INPUTS[@]} runtimes): ${INPUTS[*]}"
           python scripts/audio_parity.py compare \
             --inputs "${INPUTS[@]}" \
-            --output /tmp/parity/parity-diff.md
+            --output /tmp/parity/parity-diff.md \
+            --fail-on-mismatch \
+            --require-all-runtimes || rc=$?
           cat /tmp/parity/parity-diff.md
+          exit "${rc:-0}"
 
       - name: Post sticky comment
-        if: github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2.9.4
         with:
           header: runtime-parity-deep

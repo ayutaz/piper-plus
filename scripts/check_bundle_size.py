@@ -42,16 +42,16 @@ Usage
 Notes
 -----
 
-* When an artifact is missing on disk the gate records ``size_bytes: null``
-  and skips comparison for that entry (CI ``packages.bundle-size`` job is
-  expected to produce them via ``npm pack`` / ``dotnet pack`` /
-  ``cargo package`` / ``./gradlew :piper-plus-g2p:bundleRelease``).  The
-  comparison itself is robust to a partial matrix so contributors can run
-  the script locally without building every ecosystem.
-* The baseline JSON intentionally uses ``size_bytes: null`` for the
-  initial commit; the first CI run after merging this script is
-  responsible for replacing the placeholders via ``--update-baseline``
-  (manually triggered, reviewed in a follow-up PR).
+* An artifact that is missing on disk (``MISSING``) or has no baseline
+  value (``NO-BASELINE``) fails the gate just like a size regression. The
+  bundle-size-gate.yml job builds every artifact via ``npm pack`` /
+  ``dotnet pack`` / ``cargo package`` / ``./gradlew :piper-plus-g2p:assembleRelease``,
+  so a missing one means a pack step broke. Both used to be a ``SKIP``
+  that never failed, which kept the gate green with all six baselines
+  set to ``null``. Pass ``--warn-only`` to run on a partial local build.
+* After an intended size change, re-snapshot with ``--update-baseline``
+  on a full build (or copy ``observed_bytes`` from the CI job's
+  ``bundle-size-report.json``) and commit the JSON in the same PR.
 """
 
 from __future__ import annotations
@@ -262,12 +262,19 @@ class Comparison:
 
     @property
     def status(self) -> str:
-        # ``skip``  — baseline or observation missing (warn, never fail).
-        # ``ok``    — within tolerance.
-        # ``fail``  — exceeds tolerance.
-        if self.delta_pct is None:
-            return "skip"
+        # ``missing``     — the artifact was not built.
+        # ``no-baseline`` — the baseline has no positive size for it.
+        # ``ok``          — within tolerance.
+        # ``fail``        — exceeds tolerance.
+        # Everything except ``ok`` fails the gate (see FAILING_STATUSES).
+        if self.observed is None:
+            return "missing"
+        if not self.baseline:
+            return "no-baseline"
         return "ok" if abs(self.delta_pct) <= self.tolerance else "fail"
+
+
+FAILING_STATUSES = frozenset({"fail", "missing", "no-baseline"})
 
 
 def _compare(baseline: dict, observed: dict) -> list[Comparison]:
@@ -313,7 +320,12 @@ def _fmt_pct(p: float | None) -> str:
 
 def _emoji(status: str) -> str:
     # Keep ASCII-only so PR comments render cleanly on any client.
-    return {"ok": "OK", "fail": "FAIL", "skip": "SKIP"}[status]
+    return {
+        "ok": "OK",
+        "fail": "FAIL",
+        "missing": "MISSING",
+        "no-baseline": "NO-BASELINE",
+    }[status]
 
 
 def _render_markdown(results: list[Comparison]) -> str:
@@ -327,18 +339,19 @@ def _render_markdown(results: list[Comparison]) -> str:
         lines.append(
             f"| {_emoji(r.status)} | {r.ecosystem} | `{r.package}` | {_fmt_bytes(r.baseline)} | {_fmt_bytes(r.observed)} | {_fmt_pct(r.delta_pct)} | ±{r.tolerance:.0%} |"
         )
-    skips = sum(1 for r in results if r.status == "skip")
-    fails = sum(1 for r in results if r.status == "fail")
-    skip_note = (
-        "_SKIP means the artifact was not built in this job, or the "
-        "baseline is a placeholder. The gate never fails on SKIP._"
+    fails = sum(1 for r in results if r.status in FAILING_STATUSES)
+    note = (
+        "_MISSING means the artifact was not built in this job; NO-BASELINE "
+        "means tests/fixtures/bundle-size-baseline.json has no size for it. "
+        "Both fail the gate, like FAIL. After an intended size change, put "
+        "the observed bytes into the baseline in the same PR._"
     )
     lines.extend(
         [
             "",
-            f"Summary: {fails} fail / {skips} skip / {len(results) - fails - skips} ok",
+            f"Summary: {fails} failing / {len(results) - fails} ok",
             "",
-            skip_note,
+            note,
         ]
     )
     return "\n".join(lines)
@@ -390,13 +403,26 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--warn-only",
         action="store_true",
-        help="Never exit non-zero on regression (still prints the table).",
+        help="Never exit non-zero, even on FAIL / MISSING / NO-BASELINE "
+        "(still prints the table). For partial local builds only.",
     )
     args = ap.parse_args(argv)
 
     snapshot = _current_snapshot()
 
     if args.update_baseline:
+        missing = [k for k, v in snapshot["artifacts"].items() if v["size_bytes"] is None]
+        if missing:
+            # A partial build would write null back and fail every later run.
+            print(
+                "ERROR: refusing to update the baseline; not built: " + ", ".join(missing),
+                file=sys.stderr,
+            )
+            return 1
+        if args.baseline.exists():
+            comment = _load_baseline(args.baseline).get("_comment")
+            if comment:
+                snapshot = {"_comment": comment, **snapshot}
         _save_baseline(args.baseline, snapshot)
         print(f"Updated baseline: {args.baseline}", file=sys.stderr)
         return 0
@@ -433,10 +459,11 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(rendered)
 
-    fails = [r for r in results if r.status == "fail"]
+    fails = [r for r in results if r.status in FAILING_STATUSES]
     if fails and not args.warn_only:
         print(
-            f"\nERROR: {len(fails)} artifact(s) exceed the size tolerance.",
+            f"\nERROR: {len(fails)} artifact(s) failed the gate: "
+            + ", ".join(f"{r.ecosystem}::{r.package} ({r.status})" for r in fails),
             file=sys.stderr,
         )
         return 1

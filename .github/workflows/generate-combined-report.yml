@@ -71,9 +71,11 @@ jobs:
             python scripts/generate_job_summary.py --results-dir all-combined-results
           else
             echo "No performance data found to generate report"
-            echo "## 📊 TTS パフォーマンスレポート" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "パフォーマンスデータが見つかりませんでした。" >> $GITHUB_STEP_SUMMARY
+            {
+              echo "## 📊 TTS パフォーマンスレポート"
+              echo ""
+              echo "パフォーマンスデータが見つかりませんでした。"
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload final combined report

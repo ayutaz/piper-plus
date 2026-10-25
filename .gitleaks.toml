@@ -81,6 +81,12 @@ regexes = [
     # 対応言語コードは voices.json の収録範囲に合わせて拡張。今後 voice
     # を追加する際は新しい言語コードもここに加えること。
     '''\b(ca|cs|da|de|el|en|es|fi|fr|hu|is|it|ja|ka|kk|ko|lb|ne|nl|no|pl|pt|ro|ru|sk|sr|sv|sw|tr|uk|vi|zh)_[A-Z]{2}-[a-z0-9][a-z0-9_-]*-[a-z0-9-]+\b''',
+    # Go module pseudo-versions (v0.0.0-<UTC 14 桁>-<commit 12 桁>)。
+    # public-api-diff.yml の `APIDIFF_VERSION: v0.0.0-20261014143641-f0251eb4aa3e`
+    # が、キー名の "API" と commit hash の entropy で generic-api-key に
+    # 当たった false positive。Go が決める固定の形だけを丸ごと一致で allow
+    # する (この形の秘密情報はない)。
+    '''^v0\.0\.0-\d{14}-[0-9a-f]{12}$''',
 ]
 
 # Stop words that, when present in a match, mark it as a false-positive.

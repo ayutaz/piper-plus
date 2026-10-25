@@ -37,6 +37,14 @@
 import { argv, exit, stdin, stdout, stderr } from 'node:process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
+import {
+  DEFAULT_HOP_SIZE,
+  adjustScalesForShortInput,
+  padPhonemeIds,
+  trimEosRegion,
+  trimPaddingByDurations,
+  trimSilence,
+} from '../src/short-text.js';
 
 const HELP = `Usage: piper-plus --model <onnx> --config <json> --json-input [--output-file <wav>]
 
@@ -225,18 +233,25 @@ async function main() {
   let wroteAny = false;
   for (const line of lines) {
     const entry = JSON.parse(line);
-    const phonemeIds = entry.phoneme_ids;
-    if (!Array.isArray(phonemeIds) || phonemeIds.length === 0) {
+    const originalIds = entry.phoneme_ids;
+    if (!Array.isArray(originalIds) || originalIds.length === 0) {
       stderr.write(`ERROR: line missing phoneme_ids: ${line}\n`);
       exit(2);
     }
+    // Same short-text handling as PiperPlus.synthesize() in src/index.js
+    // (Strategy B, then Strategy A), so this bin measures what the npm
+    // package actually ships.
+    const { noiseScale, noiseW } = adjustScalesForShortInput(
+      originalIds.length, opts.noiseScale, opts.noiseW,
+    );
+    const { phonemeIds, wasPadded, frontPad, backPad } = padPhonemeIds(originalIds, null);
     const ids = BigInt64Array.from(phonemeIds.map((n) => BigInt(n)));
     const feeds = {
       input: new ort.Tensor('int64', ids, [1, phonemeIds.length]),
       input_lengths: new ort.Tensor('int64', BigInt64Array.from([BigInt(phonemeIds.length)]), [1]),
       scales: new ort.Tensor(
         'float32',
-        Float32Array.from([opts.noiseScale, opts.lengthScale, opts.noiseW]),
+        Float32Array.from([noiseScale, opts.lengthScale, noiseW]),
         [3],
       ),
     };
@@ -268,7 +283,17 @@ async function main() {
     const outputs = await session.run(feeds);
     const audioName = session.outputNames.includes('output')
       ? 'output' : session.outputNames[0];
-    const audioFloat = outputs[audioName].data;
+    let audioFloat = outputs[audioName].data;
+    const durations = outputs.durations?.data
+      ? new Float32Array(outputs.durations.data) : null;
+    const hopSize = config?.audio?.hop_size > 0 ? config.audio.hop_size : DEFAULT_HOP_SIZE;
+    if (wasPadded) {
+      audioFloat = durations != null
+        ? trimPaddingByDurations(audioFloat, durations, frontPad, backPad, hopSize)
+        : trimSilence(audioFloat);
+    } else if (durations != null) {
+      audioFloat = trimEosRegion(audioFloat, durations, hopSize);
+    }
     const audio = floatToInt16(audioFloat);
 
     const sink = entry.output_file ?? opts.outputFile;

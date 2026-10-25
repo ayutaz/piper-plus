@@ -61,15 +61,15 @@ jobs:
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Sync deps
         run: uv sync --extra dev
 
       - name: Build fixture
         run: |
-          CUDA_VISIBLE_DEVICES="" uv run python ${FIXTURE_DIR}/build_fixture.py
-          ls -la ${FIXTURE_DIR}
+          CUDA_VISIBLE_DEVICES="" uv run python "${FIXTURE_DIR}/build_fixture.py"
+          ls -la "${FIXTURE_DIR}"
 
       # Pin the fixture's ONNX input set so any future export_onnx.py change
       # that adds/removes/renames a graph input is caught at PR time (Issue
@@ -81,7 +81,7 @@ jobs:
           uv run python scripts/check_onnx_inputs.py \
             --strict \
             --expected input,input_lengths,scales,sid,speaker_embedding,speaker_embedding_mask \
-            ${FIXTURE_DIR}/model.onnx
+            "${FIXTURE_DIR}/model.onnx"
 
       - name: Upload fixture
         uses: actions/upload-artifact@v4.6.2
@@ -108,7 +108,7 @@ jobs:
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Sync deps
         run: uv sync --extra dev

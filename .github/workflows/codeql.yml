@@ -128,21 +128,21 @@ jobs:
         id: should-skip
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           elif [ "${{ matrix.language }}" = "python" ] && [ "${{ needs.filter.outputs.python }}" = "true" ]; then
-            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           elif [ "${{ matrix.language }}" = "javascript-typescript" ] && [ "${{ needs.filter.outputs.javascript-typescript }}" = "true" ]; then
-            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           elif [ "${{ matrix.language }}" = "go" ] && [ "${{ needs.filter.outputs.go }}" = "true" ]; then
-            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           elif [ "${{ matrix.language }}" = "csharp" ] && [ "${{ needs.filter.outputs.csharp }}" = "true" ]; then
-            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           elif [ "${{ matrix.language }}" = "cpp" ] && [ "${{ needs.filter.outputs.cpp }}" = "true" ]; then
-            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           elif [ "${{ matrix.language }}" = "kotlin" ] && [ "${{ needs.filter.outputs.kotlin }}" = "true" ]; then
-            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           else
-            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: actions/checkout@v6.1.0

@@ -20,7 +20,7 @@
  * the WASM runtime — see CLAUDE.md):
  *   - ssml_injection.short_text_chars / silence_pad_ms / skip_if_ssml
  *
- * What is checked behaviourally only (private constants in index.js):
+ * What is checked behaviourally only (private constants in short-text.js):
  *   - trim.threshold_rms (0.01) and trim.min_samples (2205)
  */
 
@@ -40,7 +40,7 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_PATH = resolve(__dirname, "../../../../../tests/fixtures/short_text/contract.json");
-const INDEX_SOURCE_PATH = resolve(__dirname, "../../src/index.js");
+const SHORT_TEXT_SOURCE_PATH = resolve(__dirname, "../../src/short-text.js");
 
 const fixture = JSON.parse(readFileSync(FIXTURE_PATH, "utf-8"));
 
@@ -153,25 +153,25 @@ describe("short-text contract — WASM/JS behavioural parity", () => {
   });
 });
 
-describe("short-text contract — index.js source-level constants (private)", () => {
+describe("short-text contract — short-text.js source-level constants (private)", () => {
   // These constants are intentionally non-exported (internal trim helpers),
   // so we verify them via source inspection rather than runtime import.
   // This catches drift between the constant declaration and the spec.
-  const indexSrc = readFileSync(INDEX_SOURCE_PATH, "utf-8");
+  const shortTextSrc = readFileSync(SHORT_TEXT_SOURCE_PATH, "utf-8");
 
   it("TRIM_THRESHOLD_RMS literal matches contract trim.threshold_rms", () => {
     const expected = fixture.trim.threshold_rms;
     const re = /const\s+TRIM_THRESHOLD_RMS\s*=\s*([0-9.]+)\s*;/m;
-    const m = re.exec(indexSrc);
-    assert.ok(m, "TRIM_THRESHOLD_RMS declaration not found in src/index.js");
+    const m = re.exec(shortTextSrc);
+    assert.ok(m, "TRIM_THRESHOLD_RMS declaration not found in src/short-text.js");
     assert.strictEqual(parseFloat(m[1]), expected);
   });
 
   it("TRIM_MIN_SAMPLES literal matches contract trim.min_samples", () => {
     const expected = fixture.trim.min_samples;
     const re = /const\s+TRIM_MIN_SAMPLES\s*=\s*([0-9]+)\s*;/m;
-    const m = re.exec(indexSrc);
-    assert.ok(m, "TRIM_MIN_SAMPLES declaration not found in src/index.js");
+    const m = re.exec(shortTextSrc);
+    assert.ok(m, "TRIM_MIN_SAMPLES declaration not found in src/short-text.js");
     assert.strictEqual(parseInt(m[1], 10), expected);
   });
 });
