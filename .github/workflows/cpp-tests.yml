@@ -31,6 +31,9 @@ on:
       # the workflow file itself
       - '.github/workflows/cpp-tests.yml'
       - '.github/workflows/_build-test-cpp.yml'
+      - 'scripts/check_test_skips.py'
+      - 'docs/spec/test-skip-allowlist.toml'
+      - '.github/actions/check-test-skips/**'
   workflow_dispatch:
 
 concurrency:

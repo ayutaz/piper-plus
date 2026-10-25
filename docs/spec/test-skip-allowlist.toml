@@ -1,0 +1,61 @@
+# Skipped-test allowlist — every test that CI skips must match an entry here.
+#
+# Enforced by scripts/check_test_skips.py, which the test jobs run after their
+# tests (python-tests, go-ci, the C++ jobs of _build-test-cpp, csharp-ci and
+# ci.yml csharp-tests, rust-tests). The pre-commit hook `test-skip-allowlist`
+# checks the fields of this file; tests/scripts/test_check_test_skips.py
+# covers the parsers.
+#
+# Why: test runners report a skipped test as passing the job. In 2026-10 a
+# Go Japanese golden test, about 50 Rust tests and the speaker-encoder E2E
+# gates of every runtime were skipping in CI because a dictionary, fixture or
+# environment variable was missing, while every job stayed green.
+#
+# Fields:
+#   runtime    python | go | cpp | csharp | rust
+#   test       test ID, or an fnmatch pattern (`*` / `?`). IDs by runtime:
+#                python  pytest node ID relative to the repository root
+#                        (src/python/tests/test_x.py::TestY::test_z[param]);
+#                        a module skipped at import is its file path
+#                go      test name (TestX, TestX/subtest)
+#                cpp     gtest Suite.Test, or a ctest test name
+#                csharp  TRX testName (Namespace.Class.Method)
+#                rust    cargo test name (module::test_name)
+#              `[` starts a character class in a pattern; to match a
+#              parametrized test, use `*` or write the whole ID exactly.
+#   kind       "harmless" — the skip is correct where it happens: the test
+#                           does not apply to that OS or optional dependency,
+#                           and another job or OS runs it.
+#              "tracked"  — the test should run in CI but does not yet.
+#                           Requires `expires` (YYYY-MM-DD); after that date
+#                           the gate fails until the test runs or the entry is
+#                           renewed with a new reason in a reviewed PR.
+#   reason     why the skip is acceptable (tracked: what has to happen)
+#   platforms  optional; linux | macos | windows. Omitted = all.
+
+[meta]
+spec_version = 1
+last_updated = "2026-10-25"
+applies_to = ["python", "go", "cpp", "csharp", "rust"]
+canonical_reference = "scripts/check_test_skips.py"
+# Unknown entry fields fail the gate (a typo such as `expire` must not
+# silently drop the deadline).
+forward_compat_policy = "strict"
+
+# ---------------------------------------------------------------------------
+# tracked — should run in CI, with a deadline
+# ---------------------------------------------------------------------------
+
+[[entry]]
+runtime = "go"
+test = "TestSpeakerEncoderE2ECosineGate"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "test/fixtures/speaker_encoder_golden.json has no e2e_cosine_gate block, so the end-to-end cosine gate is skipped in every runtime. Regenerate the fixture with the gate block."
+
+[[entry]]
+runtime = "csharp"
+test = "PiperPlus.Core.Tests.SpeakerEncoderE2ETests.E2ECosineGate_AgainstPinnedEmbedding"
+kind = "tracked"
+expires = "2027-01-31"
+reason = "Same fixture gap as the Go entry: speaker_encoder_golden.json has no e2e_cosine_gate block."

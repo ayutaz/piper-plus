@@ -1,0 +1,34 @@
+name: 'Check test skips'
+description: >-
+  Fail when a test was skipped without an entry in
+  docs/spec/test-skip-allowlist.toml (scripts/check_test_skips.py).
+  A job with a sparse checkout must include scripts and docs/spec.
+inputs:
+  runtime:
+    description: 'python, go, cpp, csharp or rust (selects the parser)'
+    required: true
+  files:
+    description: >-
+      Space-separated test output files, relative to the workspace or
+      absolute. Glob patterns (`**` included) are expanded by the script, so
+      Windows paths from runner.temp keep their backslashes.
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-python@v6.2.0
+      with:
+        python-version: '3.12'
+    - name: Check skipped tests against the allowlist
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        SKIP_RUNTIME: ${{ inputs.runtime }}
+        SKIP_FILES: ${{ inputs.files }}
+      run: |
+        # Split SKIP_FILES on whitespace without letting bash expand globs.
+        set -f
+        # shellcheck disable=SC2086
+        python scripts/check_test_skips.py check \
+          --runtime "$SKIP_RUNTIME" --platform "${RUNNER_OS,,}" $SKIP_FILES

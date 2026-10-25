@@ -535,6 +535,16 @@ repos:
         files: ^(docs/spec/test-flake-retry-contract\.toml|src/python_run/pyproject\.toml|\.github/workflows/python-tests\.yml|scripts/check_test_flake_retry\.py)$
         pass_filenames: false
 
+      # Skipped tests: the CI test jobs fail on a skip that
+      # docs/spec/test-skip-allowlist.toml does not list. This hook checks the
+      # list itself (fields, kinds, dates) when it changes.
+      - id: test-skip-allowlist
+        name: test-skip-allowlist.toml の形式検査
+        entry: uv run --no-sync python scripts/check_test_skips.py validate
+        language: system
+        files: ^(docs/spec/test-skip-allowlist\.toml|scripts/check_test_skips\.py|scripts/pytest_plugins/piper_plus_skip_log\.py)$
+        pass_filenames: false
+
       # CI 設定が名指しする GitHub label が `.github/labels.yml` に宣言済みか
       # 検査する。 label 参照は文字列でしか書けず、 存在しない label を指しても
       # GitHub は分かりやすいエラーを出さない (dependabot は PR に注記して素通り、

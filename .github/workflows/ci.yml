@@ -100,14 +100,23 @@ jobs:
               - '.github/workflows/_build-test-cpp.yml'
               - '.github/workflows/cpp-tests.yml'
               - '.github/workflows/cpp-lint.yml'
+              - 'scripts/check_test_skips.py'
+              - 'docs/spec/test-skip-allowlist.toml'
+              - '.github/actions/check-test-skips/**'
             ci-config-csharp:
               - '.github/workflows/ci.yml'
               - '.github/workflows/csharp-ci.yml'
               - '.github/workflows/csharp-build-all-platforms.yml'
+              - 'scripts/check_test_skips.py'
+              - 'docs/spec/test-skip-allowlist.toml'
+              - '.github/actions/check-test-skips/**'
             ci-config-python:
               - '.github/workflows/ci.yml'
               - '.github/workflows/python-tests.yml'
               - '.github/workflows/python-lint.yml'
+              - 'scripts/check_test_skips.py'
+              - 'docs/spec/test-skip-allowlist.toml'
+              - '.github/actions/check-test-skips/**'
             ci-config-rust:
               - '.github/workflows/ci.yml'
               - '.github/workflows/rust-tests.yml'
@@ -217,6 +226,14 @@ jobs:
             --logger "trx;LogFileName=test-results.xml" \
             --collect:"XPlat Code Coverage" \
             --settings src/csharp/PiperPlus.runsettings
+
+      - name: Fail on tests skipped without an allowlist entry
+        uses: ./.github/actions/check-test-skips
+        with:
+          runtime: csharp
+          files: >-
+            src/csharp/PiperPlus.Core.Tests/TestResults/test-results.xml
+            src/csharp/PiperPlus.Cli.Tests/TestResults/test-results.xml
 
       - name: Upload test results
         uses: actions/upload-artifact@v4.6.2

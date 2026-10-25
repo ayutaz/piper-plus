@@ -294,14 +294,14 @@ jobs:
 
           if [ "${{ inputs.run-integration-tests }}" == "true" ]; then
             echo "Running all tests..."
-            if ctest -C ${{ matrix.build-type }} --output-on-failure -V --timeout 120; then
+            if ctest -C ${{ matrix.build-type }} --output-on-failure -V --timeout 120 2>&1 | tee "$RUNNER_TEMP/cpp-test.log"; then
               echo "All tests passed"
             else
               CRITICAL_TESTS_PASSED=false
             fi
           else
             echo "Running unit tests (excluding integration tests)..."
-            if ctest -C ${{ matrix.build-type }} -E "${INTEGRATION_TESTS}" --output-on-failure -V --timeout 120; then
+            if ctest -C ${{ matrix.build-type }} -E "${INTEGRATION_TESTS}" --output-on-failure -V --timeout 120 2>&1 | tee "$RUNNER_TEMP/cpp-test.log"; then
               echo "All unit tests passed"
             else
               CRITICAL_TESTS_PASSED=false
@@ -314,6 +314,13 @@ jobs:
             echo "Critical tests failed!"
             exit 1
           fi
+
+      # gtest reports GTEST_SKIP() as passing the test, and ctest the job.
+      - name: Fail on tests skipped without an allowlist entry
+        uses: ./.github/actions/check-test-skips
+        with:
+          runtime: cpp
+          files: ${{ runner.temp }}/cpp-test.log
 
       # ── CLI phoneme timing E2E (issue #652) ───────────────────
       # Runs the built CLI exactly as the #652 reporter did. The gtest suites
