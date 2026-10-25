@@ -1487,6 +1487,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "loads the whole CMU dictionary; too slow under miri")]
     fn test_oov_words_never_produce_zero_phonemes() {
         let p = real_dict_phonemizer();
         for word in [
