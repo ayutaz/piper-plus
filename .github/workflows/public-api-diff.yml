@@ -1,5 +1,19 @@
 name: public-api-diff
 
+# Lists the public API of the Rust crates, the Go modules and the C# library
+# for the PR head and for the merge base, and reports the difference in the
+# job summary. An API change is reported as a warning (a semver bump may be
+# needed); a tool that fails to produce the listing fails the job.
+#
+# The three jobs used to stay green while measuring nothing:
+#   - Rust: cargo-public-api needs a nightly toolchain that was never
+#     installed, both listings were empty, and `continue-on-error` hid it,
+#     so the diff always said "No public API changes detected".
+#   - Go: gorelease could not resolve the `replace`d phonemize module
+#     (`unknown revision src/go/phonemize/v0.0.0`) and `|| true` hid it.
+#   - C#: PublicAPI.{Shipped,Unshipped}.txt were empty and RS0016/RS0017
+#     were in NoWarn, so the "verify" step only echoed a message.
+
 on:
   pull_request:
     branches: [dev]
@@ -7,9 +21,12 @@ on:
       - 'src/rust/**/src/**'
       - 'src/rust/**/Cargo.toml'
       - 'src/go/**/*.go'
+      - 'src/go/**/go.mod'
       - 'src/csharp/**/PiperPlus.Core/**/*.cs'
-      - '.github/workflows/public-api-diff.yml'
+      - 'src/csharp/PiperPlus.Core/PublicAPI.Shipped.txt'
       - 'src/csharp/PiperPlus.Core/PublicAPI.Unshipped.txt'
+      - 'src/csharp/Directory.Build.props'
+      - '.github/workflows/public-api-diff.yml'
   workflow_dispatch:
 
 permissions:
@@ -20,46 +37,68 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
+env:
+  BASE_REF: ${{ github.base_ref || 'dev' }}
+
 jobs:
   rust-public-api:
     runs-on: ubuntu-24.04
+    env:
+      # cargo-public-api 0.50-0.52 read rustdoc JSON from nightly-2025-08-02
+      # or later. Both are pinned so the listing does not change with a new
+      # nightly's rustdoc JSON format.
+      CARGO_PUBLIC_API_VERSION: 0.52.0
+      RUSTDOC_NIGHTLY: nightly-2026-05-06
+      # The published surface: default features plus the optional modules.
+      # Execution-provider features (cuda, ...) only forward to ort.
+      CORE_FEATURES: onnx,playback,resample
+      G2P_FEATURES: all-languages,ffi
     steps:
       - uses: actions/checkout@v6.1.0
         with:
-          fetch-depth: 0  # need full history for diff
+          fetch-depth: 0  # merge base for the comparison
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
+
+      - name: Install the pinned nightly for rustdoc JSON
+        run: rustup toolchain install "$RUSTDOC_NIGHTLY" --profile minimal
+
+      - name: Install ALSA dev (playback feature)
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src/rust -> target
 
       - name: Install cargo-public-api
-        run: cargo install cargo-public-api --locked
+        run: cargo install cargo-public-api --version "$CARGO_PUBLIC_API_VERSION" --locked
 
-      - name: Generate public API for current branch
-        working-directory: src/rust
+      - name: List public API (head and merge base)
         run: |
-          cargo public-api --simplified -p piper-plus > /tmp/api-current.txt
-          cargo public-api --simplified -p piper-plus-g2p >> /tmp/api-current.txt
-        continue-on-error: true
-
-      - name: Generate public API for base branch
-        working-directory: src/rust
-        run: |
-          git fetch origin ${{ github.base_ref }}
-          git checkout origin/${{ github.base_ref }} -- .
-          cargo public-api --simplified -p piper-plus > /tmp/api-base.txt
-          cargo public-api --simplified -p piper-plus-g2p >> /tmp/api-base.txt
-          git checkout HEAD -- .
-        continue-on-error: true
+          set -euo pipefail
+          base_sha=$(git merge-base HEAD "origin/$BASE_REF")
+          git worktree add --detach "$RUNNER_TEMP/base" "$base_sha"
+          list() {
+            # $1 = repo checkout, $2 = output file. Shares one target dir so
+            # the base build reuses the head build's dependencies.
+            (
+              cd "$1/src/rust"
+              cargo "+$RUSTDOC_NIGHTLY" public-api --simplified -p piper-plus --features "$CORE_FEATURES"
+              cargo "+$RUSTDOC_NIGHTLY" public-api --simplified -p piper-plus-g2p --features "$G2P_FEATURES"
+            ) > "$2"
+          }
+          export CARGO_TARGET_DIR="$GITHUB_WORKSPACE/src/rust/target"
+          list "$GITHUB_WORKSPACE" /tmp/api-current.txt
+          list "$RUNNER_TEMP/base" /tmp/api-base.txt
+          wc -l /tmp/api-current.txt /tmp/api-base.txt
+          # An empty listing means the tool produced nothing, not "no API".
+          test -s /tmp/api-current.txt
+          test -s /tmp/api-base.txt
 
       - name: Diff public API
         run: |
           if ! diff -u /tmp/api-base.txt /tmp/api-current.txt > /tmp/api-diff.txt; then
-            echo "::warning::Public API has changed. Verify semver bump is needed."
+            echo "::warning::Rust public API has changed. Verify semver bump is needed."
             {
               echo "## Rust Public API Diff"
               echo '```diff'
@@ -67,11 +106,14 @@ jobs:
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "No public API changes detected"
+            echo "No Rust public API changes detected"
           fi
 
   go-public-api:
     runs-on: ubuntu-24.04
+    env:
+      # golang.org/x/exp has no tags; pin the pseudo-version.
+      APIDIFF_VERSION: v0.0.0-20261014143641-f0251eb4aa3e
     steps:
       - uses: actions/checkout@v6.1.0
         with:
@@ -81,54 +123,82 @@ jobs:
         with:
           go-version-file: src/go/go.mod
 
-      - name: Install gorelease
-        run: go install golang.org/x/exp/cmd/gorelease@latest
+      - name: Install apidiff
+        run: go install "golang.org/x/exp/cmd/apidiff@$APIDIFF_VERSION"
 
-      - name: Run gorelease (compare to base)
-        working-directory: src/go
+      - name: Compare module APIs to the merge base
+        env:
+          # src/go/go.work joins both modules; compare each module on its
+          # own (src/go reaches phonemize through its `replace`).
+          GOWORK: 'off'
         run: |
-          BASE_SHA=$(git merge-base HEAD origin/${{ github.base_ref }})
-          gorelease -base "$BASE_SHA" 2>&1 | tee /tmp/gorelease.txt || true
-          if grep -q "Inferred base version" /tmp/gorelease.txt; then
+          set -euo pipefail
+          base_sha=$(git merge-base HEAD "origin/$BASE_REF")
+          git worktree add --detach "$RUNNER_TEMP/base" "$base_sha"
+          : > /tmp/apidiff.txt
+          for dir in src/go src/go/phonemize; do
+            mod=$(cd "$dir" && go list -m)
+            if [ ! -f "$RUNNER_TEMP/base/$dir/go.mod" ]; then
+              echo "$mod: new module (no base to compare)" | tee -a /tmp/apidiff.txt
+              continue
+            fi
+            export_file="$RUNNER_TEMP/$(echo "$mod" | tr '/' '_').api"
+            # Each apidiff writes to a file first so that a failure to load
+            # the module fails the step (set -e) instead of being filtered.
+            (cd "$RUNNER_TEMP/base/$dir" && apidiff -m -w "$export_file" "$mod")
+            (cd "$dir" && apidiff -m "$export_file" "$mod") > /tmp/report.txt
+            (cd "$dir" && apidiff -m -incompatible "$export_file" "$mod") > /tmp/incompatible.txt
+            report=$(grep -v '^Ignoring internal package' /tmp/report.txt || true)
+            if [ -n "$report" ]; then
+              { echo "### $mod"; echo "$report"; } >> /tmp/apidiff.txt
+            fi
+            if grep -q '^- ' /tmp/incompatible.txt; then
+              echo "::warning::Incompatible Go API change in $mod. Verify semver bump is needed."
+            fi
+          done
+          if [ -s /tmp/apidiff.txt ]; then
             {
               echo "## Go Public API Diff"
               echo '```'
-              cat /tmp/gorelease.txt
+              cat /tmp/apidiff.txt
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No Go public API changes detected"
           fi
-        continue-on-error: true
 
   csharp-public-api:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6.1.0
+        with:
+          fetch-depth: 0  # origin/$BASE_REF for the PublicAPI diff
 
       - uses: actions/setup-dotnet@v5.4.0
         with:
           dotnet-version: 10.0.x
 
-      - name: Build PiperPlus.Core
+      - name: Build PiperPlus.Core (PublicAPI baseline enforced)
+        # PublicApiAnalyzers fails the build (TreatWarningsAsErrors) when a
+        # public symbol is missing from PublicAPI.{Shipped,Unshipped}.txt
+        # (RS0016) or a declared one no longer exists (RS0017).
         run: dotnet build src/csharp/PiperPlus.Core/PiperPlus.Core.csproj -c Release
 
-      - name: Verify PublicAPI.{Shipped,Unshipped}.txt is consistent
-        run: |
-          # Microsoft.CodeAnalysis.PublicApiAnalyzers will fail the build
-          # if PublicAPI.Unshipped.txt has uncommitted changes.
-          # If build succeeds, baseline is consistent.
-          echo "PublicAPI baseline check passed (see Roslyn diagnostic RS0016 / RS0017 if missing)"
-
-      - name: Comment PR with API diff (if changed)
+      - name: Report PublicAPI changes
         if: github.event_name == 'pull_request'
         run: |
-          # PublicAPI.Unshipped.txt の git diff を確認
-          UNSHIPPED_DIFF=$(git diff origin/${{ github.base_ref }}..HEAD -- src/csharp/PiperPlus.Core/PublicAPI.Unshipped.txt 2>/dev/null || echo "")
-          if [ -n "$UNSHIPPED_DIFF" ]; then
+          set -euo pipefail
+          api_diff=$(git diff "origin/$BASE_REF...HEAD" -- \
+            src/csharp/PiperPlus.Core/PublicAPI.Shipped.txt \
+            src/csharp/PiperPlus.Core/PublicAPI.Unshipped.txt)
+          if [ -n "$api_diff" ]; then
+            echo "::warning::C# public API has changed. Verify semver bump is needed."
             {
-              echo "## C# Public API Diff (PublicAPI.Unshipped.txt)"
+              echo "## C# Public API Diff (PublicAPI.*.txt)"
               echo '```diff'
-              echo "$UNSHIPPED_DIFF"
+              echo "$api_diff"
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No C# public API changes detected"
           fi
-        continue-on-error: true
