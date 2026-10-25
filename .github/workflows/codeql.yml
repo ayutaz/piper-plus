@@ -225,7 +225,7 @@ jobs:
         # 落ちて解析対象化する。 ArtifactsPath で obj/bin ごと外へ出す。
         # ★ このプロパティは **本コマンドラインでのみ** 渡すこと。
         #   src/csharp/Directory.Build.props に置くと bin/ も移動し、
-        #   cli-help-extract.yml:116,180 と multi-runtime-rtf.yml:200 が
+        #   cli-help-extract.yml:116,180 と multi-runtime-rtf.yml (Resolve --cli-cmd) が
         #   hard-code する bin/Release/net10.0/PiperPlus.Cli.dll が壊れる。
         run: >-
           dotnet build src/csharp/PiperPlus.sln -c Release
