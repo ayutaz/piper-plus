@@ -1,0 +1,17 @@
+{
+  "name": "release-tags",
+  "target": "tag",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": ["refs/tags/v*", "refs/tags/*-v*", "refs/tags/src/go/**"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {"type": "deletion"},
+    {"type": "non_fast_forward"},
+    {"type": "update"}
+  ],
+  "bypass_actors": []
+}
