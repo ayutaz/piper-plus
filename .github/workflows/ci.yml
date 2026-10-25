@@ -63,6 +63,8 @@ jobs:
       ci-config-go: ${{ steps.filter.outputs.ci-config-go }}
       docs: ${{ steps.filter.outputs.docs }}
     steps:
+      - name: Fail on purpose (test PR, do not merge)
+        run: exit 1
       - uses: actions/checkout@v6.1.0
       - uses: dorny/paths-filter@v3.0.4
         id: filter
