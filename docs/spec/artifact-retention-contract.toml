@@ -60,7 +60,7 @@ examples = [
     "test-japanese-tts.yml: jp-tts-output",
     "test-webassembly.yml: wasm-test-output",
     "_build-test-cpp.yml: cpp-test-output",
-    "cli-help-docs-sync.yml: cli-help-drift-report",
+    "lint-gates.yml: cli-help-drift-report",
     "csharp-ci.yml: csharp-coverage-report",
     "go-ci.yml: go-binary",
     "clang-tidy.yml: clang-tidy-report",

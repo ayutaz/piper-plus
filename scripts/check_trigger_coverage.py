@@ -99,17 +99,6 @@ ALLOWLIST: dict[str, dict[str, str]] = {
             "of paths (push tags has no paths filter)"
         ),
     },
-    "ruff-version-sync.yml": {
-        "src/python/pyproject.toml": (
-            "named in check_ruff_version_sync.py's docstring as a site that is "
-            "INTENTIONALLY NOT checked: it declares ruff>=0.12 (a minimum), not "
-            "the pinned tool version, and lags the active pin deliberately"
-        ),
-        "src/python/g2p/pyproject.toml": (
-            "same as src/python/pyproject.toml: ruff>=0.8.0 is a floor, not a "
-            "pin, and is listed in the docstring only to say it is excluded"
-        ),
-    },
     "test-hf-space.yml": {
         "scripts/check_ruff_version_sync.py": (
             "cross-reference in check_hf_space_gradio_sync.py's docstring "
@@ -436,10 +425,16 @@ def check_allowlist_is_live(tracked: set[str]) -> list[str]:
     """An allowlist entry for a path nobody references any more is dead weight.
 
     Without this, exemptions accumulate and quietly start covering paths that
-    a later edit brought back into scope.
+    a later edit brought back into scope. The same holds for an entry keyed by
+    a workflow that was deleted or merged into another.
     """
     failures: list[str] = []
     for key, entries in sorted(ALLOWLIST.items()):
+        if not key.startswith("precommit:") and not (WORKFLOW_DIR / key).is_file():
+            failures.append(
+                f"ALLOWLIST[{key}] names no such workflow under .github/workflows; "
+                "drop the entry"
+            )
         for path, reason in sorted(entries.items()):
             if not reason.strip():
                 failures.append(f"ALLOWLIST[{key}][{path}] has an empty reason")

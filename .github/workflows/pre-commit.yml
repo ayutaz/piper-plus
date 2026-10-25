@@ -5,7 +5,7 @@ name: Pre-commit
 # workflow catches ruff/format/PUA drift at PR time — eliminating the
 # "5 separate ruff format commits" cycle of shame seen in PR #401.
 #
-# Why a dedicated workflow (separate from python-lint.yml + pua-consistency.yml):
+# Why a dedicated workflow (separate from lint-gates.yml + pua-consistency.yml):
 #   * Runs ALL hooks declared in .pre-commit-config.yaml at once, so adding
 #     a new hook (e.g. shellcheck, codespell) requires editing only one
 #     manifest — not the workflow + the manifest in lockstep.
@@ -167,11 +167,11 @@ jobs:
           #   * gofmt / go-vet / golangci-lint    → go-ci.yml
           #   * dotnet-format                     → csharp-ci.yml + ci.yml
           #   * mypy-g2p                          → g2p-python-ci.yml
-          #   * markdownlint-cli2                 → markdownlint.yml
-          #   * codespell                         → codespell.yml (the hook has
+          #   * markdownlint-cli2                 → lint-gates.yml
+          #   * codespell                         → lint-gates.yml (the hook has
           #     no file-type filter; on every file it ran for over an hour)
-          #   * hadolint                          → hadolint.yml
-          #   * gitleaks                          → secret-scan.yml (the hook
+          #   * hadolint                          → lint-gates.yml
+          #   * gitleaks                          → lint-gates.yml (the hook
           #     scans staged changes only, which CI does not have)
           SKIP: cargo-clippy,cargo-fmt,gofmt,go-vet,golangci-lint,mypy-g2p,dotnet-format,markdownlint-cli2,codespell,hadolint,gitleaks
           SCOPE: ${{ steps.scope.outputs.args }}

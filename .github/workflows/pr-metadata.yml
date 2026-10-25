@@ -1,0 +1,173 @@
+name: PR metadata
+
+# The pull request's title, body and commit messages, checked in one job. They
+# were three workflows of one job each (pr-title-check, pr-body-validate,
+# commitlint); see lint-gates.yml for why one-job workflows were merged.
+# This one stays separate from lint-gates.yml because it must also re-run
+# when the title or body is edited, which does not change the code.
+#
+# * pr-title-check: a squash merge's commit message is the PR title, so the
+#   title must follow Conventional Commits (the /create-pr skill enforces it
+#   too; this is the safety net for PRs opened in the GitHub UI).
+# * pr-body-validate: the required sections of .github/pull_request_template.md
+#   must not be left empty; an empty ## Test Plan leaves a reviewer nothing to
+#   verify (PR #401). Bot PRs and the `skip-pr-body-validate` label skip it.
+# * commitlint: a merge or rebase merge keeps every commit message in the log,
+#   so each must follow the same format (.commitlintrc.json lists the types).
+#
+# Every step runs with `!cancelled()`, so one failing check does not hide the
+# others.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches: [dev, main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: PR metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.1.0
+        with:
+          fetch-depth: 0
+
+      - name: "pr-title-check: PR title follows Conventional Commits"
+        id: title
+        if: ${{ !cancelled() }}
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # 許容形式:
+          #   feat(scope): summary
+          #   fix(scope): summary
+          #   chore(scope): summary  または  chore: summary
+          #   feat(scope)!: breaking summary
+          #
+          # type allow-list:
+          #   feat / fix / chore / docs / test / ci / refactor / perf / build / style / revert
+          # scope は optional (chore: docs: 等は scope なしで OK)
+          # scope は kebab-case ASCII or 言語コード (python, rust, cpp, cs, go,
+          # wasm, ssml, g2p, deps 等)。 multi-scope は kebab,kebab で許容。
+          #
+          # PR #498 wave2 で導入。
+          pattern='^(feat|fix|chore|docs|test|ci|refactor|perf|build|style|revert)(\([a-z0-9][a-z0-9\-]*([,/][a-z0-9][a-z0-9\-]*)*\))?!?: .+'
+
+          echo "PR title: $TITLE"
+          if echo "$TITLE" | grep -qE "$pattern"; then
+            echo "OK: PR title matches Conventional Commits format"
+          else
+            echo "ERROR: PR title does NOT match Conventional Commits format" >&2
+            echo "" >&2
+            echo "Expected: <type>(<scope>): <summary>" >&2
+            echo "  type:  feat | fix | chore | docs | test | ci | refactor | perf | build | style | revert" >&2
+            echo "  scope: optional kebab-case (e.g. python, rust, cpp, cs, go, wasm, deps)" >&2
+            echo "  !:     append after scope for breaking changes" >&2
+            echo "" >&2
+            echo "Examples:" >&2
+            echo "  feat(python): add streaming TTS support" >&2
+            echo "  fix(rust): correct phoneme ID overflow" >&2
+            echo "  chore(deps): bump onnxruntime to 1.20.0" >&2
+            echo "  feat(g2p)!: change PhonemizeOutput schema" >&2
+            echo "  docs: update README installation guide" >&2
+            exit 1
+          fi
+
+      - name: "pr-body-validate: required sections of the PR template are filled"
+        id: body
+        if: >-
+          ${{ !cancelled()
+          && github.event.pull_request.user.login != 'dependabot[bot]'
+          && github.event.pull_request.user.login != 'renovate[bot]'
+          && github.event.pull_request.user.login != 'github-actions[bot]'
+          && !contains(github.event.pull_request.labels.*.name, 'skip-pr-body-validate') }}
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUM: ${{ github.event.pull_request.number }}
+        run: |
+          set -e
+          if [ -z "${PR_BODY}" ]; then
+            echo "::error::PR body is empty. Please follow .github/pull_request_template.md"
+            exit 1
+          fi
+
+          ERRORS=0
+          NOTES=()
+
+          # ----- ## Test Plan: section が存在し、 placeholder コメントだけでない -----
+          if ! echo "${PR_BODY}" | grep -q "^## Test Plan"; then
+            echo "::error::Missing required section: ## Test Plan"
+            NOTES+=("Add a ## Test Plan section explaining how this change was tested.")
+            ERRORS=$((ERRORS + 1))
+          else
+            # Test Plan section の内容 (次の ## 行までの間) を抽出し、
+            # placeholder コメント `<!-- ... -->` を除いて空でないか check。
+            TEST_PLAN_BODY=$(echo "${PR_BODY}" | awk '/^## Test Plan/{flag=1; next} /^## /{flag=0} flag' | sed -E 's/<!--.*-->//g' | tr -d '[:space:]')
+            if [ -z "${TEST_PLAN_BODY}" ]; then
+              echo "::error::## Test Plan section is empty (only placeholder comments). Describe how this change was tested."
+              NOTES+=("## Test Plan must include at least 1 line of actual test description.")
+              ERRORS=$((ERRORS + 1))
+            fi
+          fi
+
+          # ----- ## Risk Level: ちょうど 1 つ check -----
+          RISK_COUNT=$(echo "${PR_BODY}" | awk '/^## Risk Level/{flag=1; next} /^## /{flag=0} flag' | grep -cE '^\- \[x\] ' || true)
+          if [ "${RISK_COUNT}" -ne 1 ]; then
+            echo "::error::## Risk Level must have exactly 1 box checked (found ${RISK_COUNT})"
+            NOTES+=("Pick exactly one of: patch / minor / major in ## Risk Level.")
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # ----- ## Affected Components: 最低 1 つ check -----
+          AFFECTED_COUNT=$(echo "${PR_BODY}" | awk '/^## Affected Components/{flag=1; next} /^## /{flag=0} flag' | grep -cE '^\- \[x\] ' || true)
+          if [ "${AFFECTED_COUNT}" -lt 1 ]; then
+            echo "::error::## Affected Components must have at least 1 box checked (found ${AFFECTED_COUNT})"
+            NOTES+=("Check at least one component in ## Affected Components.")
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # ----- ## Type: 最低 1 つ check -----
+          TYPE_COUNT=$(echo "${PR_BODY}" | awk '/^## Type/{flag=1; next} /^## /{flag=0} flag' | grep -cE '^\- \[x\] ' || true)
+          if [ "${TYPE_COUNT}" -lt 1 ]; then
+            echo "::error::## Type must have at least 1 box checked (found ${TYPE_COUNT})"
+            NOTES+=("Check at least one type in ## Type.")
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # ----- summary -----
+          if [ "${ERRORS}" -gt 0 ]; then
+            echo ""
+            echo "::error::PR #${PR_NUM} body validation failed: ${ERRORS} issue(s)"
+            echo ""
+            echo "To fix:"
+            for note in "${NOTES[@]}"; do
+              echo "  - ${note}"
+            done
+            echo ""
+            echo "Edit the PR body in the GitHub UI (not via a new comment, per CONTRIBUTING.md)."
+            echo "Or add the 'skip-pr-body-validate' label to bypass for trivial PRs."
+            exit 1
+          fi
+
+          echo "PR body validation OK (Test Plan filled, Risk=${RISK_COUNT}, Affected=${AFFECTED_COUNT}, Type=${TYPE_COUNT})"
+
+      - name: "commitlint: every commit message follows Conventional Commits"
+        id: commitlint
+        if: ${{ !cancelled() }}
+        # @v6.2.1 (2025-09 release) — fail-on-warnings は OFF 維持 (header
+        # 100 文字 over 等は warn のみ、 既存 commits との互換性確保)。
+        uses: wagoid/commitlint-github-action@v6.2.1
+        with:
+          configFile: .commitlintrc.json
+          failOnWarnings: false
+          failOnErrors: true
+          helpURL: https://www.conventionalcommits.org/en/v1.0.0/

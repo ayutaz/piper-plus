@@ -1,12 +1,12 @@
 name: Trivy Container Scan
 
 # Dockerfile の build → image vulnerability scan を Aqua Security Trivy で
-# 走らせる。 既存 hadolint.yml (Dockerfile lint) と security-audit.yml (deps
+# 走らせる。 既存 hadolint (lint-gates.yml、 Dockerfile lint) と security-audit.yml (deps
 # audit) と相補的: 本ワークフローは「実際にビルドされる layer 内の OS / lang
 # 依存に既知 CVE が無いか」 を検出する。
 #
 # 既存 security 監査:
-#   * hadolint.yml         : Dockerfile static lint
+#   * lint-gates.yml       : hadolint (Dockerfile static lint)
 #   * security-audit.yml   : pip-audit / cargo-audit / npm-audit / govulncheck
 #                            / nuget-audit / trivy fs (repo scan)
 #   * codeql.yml           : SAST (Python/JS/TS/Go/C#/C++/Kotlin)
@@ -59,10 +59,10 @@ concurrency:
 jobs:
   # gate script 自身の unit test。 `tests/scripts/` は pytest.ini の
   # `testpaths` に含まれず、 既存 workflow のどれも実行していないため
-  # (changelog-format.yml / readme-heading-tree-parity.yml は path trigger に
+  # (旧 changelog-format.yml / readme-heading-tree-parity.yml は path trigger に
   # 挙げるだけで pytest は走らせていない)、 本 workflow 内で明示的に回す。
   # `--override-ini="addopts="` は pytest.ini の `--cov` 系を無効化する
-  # (ort-version-sync.yml と同じ手法)。
+  # (lint-gates.yml の ort-version-sync step と同じ手法)。
   gate-script-tests:
     runs-on: ubuntu-24.04
     timeout-minutes: 5

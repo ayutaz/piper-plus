@@ -5,7 +5,7 @@
 # is now checked at PR time so a silent file rename / table deletion / key
 # mismatch is caught before merge.
 #
-# Why a dedicated workflow?  The existing model-quality-gate.yml is
+# Why a dedicated workflow?  The existing model-quality-gate steps (lint-gates.yml) are
 # scoped to ONNX-export-side artefacts (model files, phoneme set, ORT
 # versions). The six contracts gated here cover orthogonal axes (audio
 # format, EP matrix, streaming API surface, Swift FFI, Portuguese

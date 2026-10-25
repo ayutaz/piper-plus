@@ -11,7 +11,7 @@ mode (release-versions.toml の meta.mode):
 `--strict` flag を指定すると mode 設定を無視して "fail" 化 (pre-push hook
 で tag push 時に強制 fail 用)。
 
-CI 側の `.github/workflows/version-consistency.yml` と同等のロジック。
+CI 側の `.github/workflows/lint-gates.yml` (version-consistency step) と同等のロジック。
 本 script は pre-push hook + /prepare-release skill から呼ばれる local 版。
 
 Usage:

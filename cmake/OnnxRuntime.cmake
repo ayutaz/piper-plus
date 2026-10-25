@@ -14,7 +14,7 @@ elseif(NOT DEFINED ONNXRUNTIME_DIR)
   # Linux/macOS: Download pre-built ONNX Runtime if not already available
   #
   # Source of truth for the C++ pipeline ORT version. The CI gate
-  # `scripts/check_ort_versions.py` (workflow: ort-version-sync.yml) cross-
+  # `scripts/check_ort_versions.py` (workflow: lint-gates.yml) cross-
   # checks every cmake / GitHub Actions reference against this value.
   #
   # Issue #383 follow-up: bumped 1.17.0 → 1.20.0 alongside the parallelism

@@ -88,7 +88,7 @@ rg "onnxruntime-web" src/wasm/openjtalk-web/
 6 箇所同時更新:
 
 1. `.pre-commit-config.yaml` `rev: v<VER>`
-2. `.github/workflows/python-lint.yml` `pip install ruff==<VER>`
+2. `.github/workflows/lint-gates.yml` `pip install ruff==<VER>` (python-lint step)
 3. `.github/workflows/ci.yml` `uv pip install ... ruff==<VER>`
 4. `pyproject.toml` 3 dependency group の `"ruff==<VER>"`
 

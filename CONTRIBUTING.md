@@ -123,7 +123,7 @@ assert snr_db > 30
 ```
 
 `scripts/check_test_threshold_relaxation.py` fails a commit (pre-commit hook
-`test-threshold-relaxation`) and a pull request (`test-threshold-relaxation.yml`)
+`test-threshold-relaxation`) and a pull request (`lint-gates.yml`)
 that relaxes a threshold without this comment. In PR #320 a filter bank's
 acceptance criterion was relaxed from -90 dB to > 5 dB to match a buggy
 measurement, and the bug shipped in every MB-iSTFT model for 15 months.
@@ -192,7 +192,7 @@ may therefore be accepted as an explicitly documented exception:
 | `soxr` | LGPL-2.1-or-later | Mandatory dependency of `librosa` 0.11, and `train` extra only. Absent from `src/python_run/requirements.txt`, so piper-plus never redistributes it and no LGPL obligation attaches. |
 
 Adding a row requires PR review plus a matching `allow-dependencies-licenses`
-entry in both `.github/workflows/dependency-review.yml` and
+entry in both `.github/workflows/lint-gates.yml` (dependency-review step) and
 `.github/workflows/security-audit.yml`. Packages carved out in those workflows to
 work around scanner parser bugs (a permissive license misreported as a composite
 SPDX expression, e.g. `typing-extensions`, `llvmlite`) are **not** exceptions to
