@@ -234,7 +234,8 @@ public sealed class PiperSession
     /// <param name="input">Synthesis parameters.</param>
     /// <param name="includeDurations">
     /// When <c>true</c> and the model exposes a <c>durations</c> output,
-    /// the durations tensor is requested and returned.
+    /// the durations are returned. The tensor is requested whenever the model
+    /// has it, because the post-inference trims need it either way.
     /// </param>
     /// <returns>
     /// Raw float32 audio (shape squeezed to 1-D) and optional durations array.
@@ -392,7 +393,11 @@ public sealed class PiperSession
         try
         {
             // ----- Build output names -----
-            bool requestDurations = includeDurations && _model.HasDurationOutput;
+            // Always request durations when the model has them: the
+            // Strategy A and Issue #499 EOS-region trims below depend on
+            // them. Gating this on includeDurations left Synthesize() and
+            // SynthesizeToFloat() untrimmed.
+            bool requestDurations = _model.HasDurationOutput;
             string[] outputNames = requestDurations
                 ? ["output", "durations"]
                 : ["output"];
@@ -456,7 +461,7 @@ public sealed class PiperSession
                 durations = trimmed;
             }
 
-            return (audio, durations);
+            return (audio, includeDurations ? durations : null);
         }
         finally
         {

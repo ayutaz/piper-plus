@@ -4,17 +4,16 @@
 # 判定で「同じ音」と認められる閾値を pinning する canonical spec。 個別の
 # script / workflow は本 file を single source of truth として参照する。
 #
-# 階層化判定 (tier 1 → 4 の順):
-#   tier 1: SHA256 完全一致 (期待値、 ただし FP16 量子化や iSTFT の浮動小数
-#           演算で破られることが多い)
-#   tier 2: peak RMS の差が `peak_rms_max_diff` 以下
-#   tier 3: chromaprint fingerprint の Hamming distance が
-#           `chromaprint_max_hamming` 以下
-#   tier 4: mel-spec MSE が `mel_spec_max_mse` 以下、 かつ
-#           SNR が `snr_min_db` dB 以上
-#
-# 4 週間 informational tier 運用後、 maintainer が閾値を見直し blocker
-# 昇格する (M2.2 / PR #511 実装完了 informational bootstrap DoD)。
+# 判定 (scripts/audio_parity.py、 ペアごと):
+#   frames:   sample rate とフレーム数の一致。 必須
+#   sha256:   ファイルの完全一致。 一致すれば合格
+#   peak_rms: peak 正規化後の RMS の差が `peak_rms_max_diff` 以下
+#   snr:      最小二乗でゲインを合わせたあとの SNR が `snr_min_db` 以上
+#   合格 = frames かつ (sha256 または (peak_rms かつ snr))
+# Python は出力を peak 正規化し、 ほかの runtime はしないので、 音量だけの
+# 差は不一致に数えない。 runtime-parity-deep.yml はこの判定で失敗にする
+# (blocker)。 `chromaprint_max_hamming` と `mel_spec_max_mse` は現在の
+# 判定では使っていない。
 
 [meta]
 schema_version = 1
@@ -30,10 +29,14 @@ referencing_scripts = [
 [thresholds]
 # All-zero thresholds would silently pass any input, so the script enforces
 # a non-zero floor on every tier; see `scripts/audio_parity.py:_validate_thresholds`.
-peak_rms_max_diff = 0.005      # informational tier upper bound (~ -46 dBFS)
+peak_rms_max_diff = 0.005      # on peak-normalised samples
 chromaprint_max_hamming = 32   # /256-bit chunks; ~12% bit-difference allowance
 mel_spec_max_mse = 1.0e-3      # 80-bin log-mel, normalised
-snr_min_db = 60.0              # signal-to-noise vs reference (cross-runtime)
+# Gain-matched SNR. Measured on deterministic_phoneme_ids.jsonl in CI
+# (2026-10-25): python = rust = csharp sample-identical, go / cpp
+# ~97 dB, wasm ~75 dB (it does not peak-normalise, so its int16
+# rounding noise is relatively larger).
+snr_min_db = 60.0
 sample_rate = 22050            # piper-plus uses 22.05 kHz mono throughout
 
 [runtimes]
