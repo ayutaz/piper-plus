@@ -313,7 +313,8 @@ describe("piper-plus bin: bin source structural contract", () => {
   it("scales は float32 [3] tensor で feed する", () => {
     const content = readFileSync(BIN, "utf8");
     assert.match(content, /new ort\.Tensor\(\s*['"]float32['"],\s*Float32Array/);
-    assert.match(content, /noiseScale, opts\.lengthScale, opts\.noiseW/);
+    // Strategy B で調整した noiseScale / noiseW を渡す
+    assert.match(content, /\[noiseScale, opts\.lengthScale, noiseW\]/);
   });
 
   it("multi-speaker / multilingual / prosody_features / speaker_embedding の optional inputs を条件付きで feed する", () => {
@@ -343,8 +344,19 @@ describe("piper-plus bin: bin source structural contract", () => {
 
   it("phoneme_ids array validation を実装している", () => {
     const content = readFileSync(BIN, "utf8");
-    assert.match(content, /Array\.isArray\(phonemeIds\)/);
+    assert.match(content, /Array\.isArray\(originalIds\)/);
     assert.match(content, /missing phoneme_ids/);
+  });
+
+  it("PiperPlus.synthesize() と同じ短文対策と EOS trim を src/short-text.js から使う", () => {
+    // 以前の bin は decoder の素の出力を書き、 Issue #499 の EOS trim を
+    // かけなかったので、 parity fixture で他の runtime より 1,536 sample 長かった。
+    const content = readFileSync(BIN, "utf8");
+    assert.match(content, /from ['"]\.\.\/src\/short-text\.js['"]/);
+    assert.match(content, /adjustScalesForShortInput\(/);
+    assert.match(content, /padPhonemeIds\(originalIds/);
+    assert.match(content, /trimPaddingByDurations\(/);
+    assert.match(content, /trimEosRegion\(audioFloat, durations, hopSize\)/);
   });
 });
 
