@@ -643,8 +643,7 @@ impl OnnxEngine {
         cache_save_path: Option<&std::path::Path>,
     ) -> Result<(Session, crate::gpu::DeviceType, bool), PiperError> {
         let mut cache_save_enabled = false;
-        let mut builder = Session::builder()
-            .map_err(|e| PiperError::ModelLoad(e.to_string()))?
+        let mut builder = crate::ort_env::session_builder()?
             .with_intra_threads(num_intra_threads)
             .map_err(|e| PiperError::ModelLoad(format!("intra_threads: {e}")))?
             .with_inter_threads(1)
@@ -1674,7 +1673,7 @@ mod tests {
     fn test_session_builder_with_all_options() {
         // SessionBuilder に parallel_execution(false), memory_pattern(true),
         // dynamic_block_base(4) を設定してエラーが発生しないことを検証する。
-        let builder = Session::builder()
+        let builder = crate::ort_env::session_builder()
             .expect("session builder")
             .with_intra_threads(1)
             .expect("intra_threads")

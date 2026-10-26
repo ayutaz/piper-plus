@@ -45,7 +45,7 @@ exact-match group.
 |----------|-------------|--------------------|------------------|
 | Python (training) | `>=1.26.0` (gpu extra: `onnxruntime-gpu>=1.20.1,<1.26`) | `>=1.20.0` ✓ | `src/python/pyproject.toml` extras (train / inference / inference-gpu) |
 | Python (runtime) | `>=1.26.0` (gpu: `onnxruntime-gpu>=1.20.1,<1.26`) | `>=1.20.0` ✓ | `src/python_run/pyproject.toml` (CPU extra) + `requirements_gpu.txt` |
-| Rust     | 2.0.0-rc.13 (`ort` crate, wraps ORT 1.28.0) | exempt (no stable upstream) | `ort` (crates.io; resolved by `src/rust/Cargo.lock`, manifest range starts at rc.12) |
+| Rust     | 2.0.0-rc.15 (`ort` crate, wraps ORT 1.31.0) | exempt (no stable upstream) | `ort` (crates.io; `piper-core/Cargo.toml` pins `=2.0.0-rc.15`) |
 | C#       | 1.24.3      | `>=1.20.0` ✓ | `Microsoft.ML.OnnxRuntime{,.Managed}` (NuGet) — 5 csproj files |
 | Go       | 1.27.0      | `>=1.20.0` ✓ | `github.com/yalue/onnxruntime_go` |
 | C++ (canonical) | **1.20.0** | — | `cmake/OnnxRuntime.cmake` (source of truth) |
@@ -96,19 +96,25 @@ When bumping the C++ canonical ORT version (e.g. 1.20.0 → 1.22.0):
 
 ## Rust `ort` exemption (Issue #372 follow-up)
 
-The Rust ecosystem currently resolves the `ort` crate at
-`2.0.0-rc.13` (RC); `piper-core/Cargo.toml` declares the compatible minimum
-as `2.0.0-rc.12`. Reasons it is exempt from the floor check:
+The Rust ecosystem uses the `ort` crate at `2.0.0-rc.15` (RC), pinned
+exactly (`=2.0.0-rc.15`) in `piper-core/Cargo.toml`. Every `ort` RC has
+broken the API (rc.14: `Session::builder(&env)`, static
+`ExecutionProvider::is_available()`), and a caret range lets a fresh
+`cargo install piper-plus-cli` resolve a newer RC that does not compile —
+published `piper-plus` 0.5.2 declared `^2.0.0-rc.12` and stopped building
+for new installs when rc.14 shipped (2026-10-12). Bumping the pin is a
+code change reviewed in its own PR, not a lockfile refresh.
+Reasons it is exempt from the floor check:
 
 * `ort`'s 2.x line redesigns the API and has not shipped a stable
-  release as of 2026-08. The pre-release (`2.0.0-rc.13`) wraps ORT
-  1.28.0 internally (`ort-sys` の `build/download/dist.tsv`), but
+  release as of 2026-10. The pre-release (`2.0.0-rc.15`) wraps ORT
+  1.31.0 internally (`ort-sys` の `build/download/dist.tsv`), but
   exposing this in the gate would couple CI to upstream `ort` cadence.
 * `ort 1.x` stable exists but uses a different API; downgrading would
   require rewriting `piper-core` / `piper-cli` / `piper-python` /
   `piper-wasm` for negligible compatibility gain.
 
-Because Rust is exempt, the bundled ORT (1.28.0) is intentionally
+Because Rust is exempt, the bundled ORT (1.31.0) is intentionally
 allowed to run ahead of the C++ canonical (1.20.0). This is a
 divergence the gate does not police — it is a documented consequence
 of the exemption, not a drift to be "fixed" by bumping C++.
@@ -132,7 +138,7 @@ The `ort?/` form keeps these a no-op when the `onnx` feature is off
 
 Two consequences worth knowing:
 
-* **CUDA 13 only.** `ort-sys` `rc.13` ships prebuilt distributions
+* **CUDA 13 only.** `ort-sys` (`rc.13` and later) ships prebuilt distributions
   tagged `cuda13` — there is no `cuda12` entry. Consumers enabling the
   `cuda` feature need a CUDA 13 runtime.
 * **`--all-features` does not link.** No prebuilt distribution carries
@@ -140,6 +146,26 @@ Two consequences worth knowing:
   `cargo build --all-features` fails in `ort-sys` at link time. CI's
   `cargo check` / `cargo clippy --all-features` are unaffected because
   neither links. Build with a single EP (e.g. `--features onnx,cuda`).
+
+### One environment per process (`ort` >= 2.0.0-rc.14)
+
+From `rc.14` every session is built with `Session::builder(&env)`, and
+`ort::init().build()` succeeds only once per process — a second call fails
+with "only one environment is allowed per process" even after the first
+environment is dropped. `piper-core` therefore keeps a single environment
+in `piper_plus::ort_env` and builds every session (voice model, speaker
+encoder, `WasmVoice`) from it. An application that creates its own
+environment must hand it over with `piper_plus::ort_env::set_environment`
+before loading the first model. `tests/test_ort_environment.rs` loads
+several models in one process to keep this from regressing.
+
+`piper_plus::ort_env::session_builder()` also sets
+`AutoDevicePolicy::PreferCPU`. `ort`'s `SessionBuilder` defaults to
+`MaxEfficiency`, which on macOS registers the CoreML EP even when the CPU EP
+is registered explicitly; with ONNX Runtime 1.31 CoreML compiles nodes and
+saving the optimized model fails ("Unable to serialize model as it contains
+compiled nodes"), so every cached load failed on the macOS CI. `piper-core`
+picks its EPs explicitly from `--device`, so automatic selection stays off.
 
 Action items tracked separately:
 

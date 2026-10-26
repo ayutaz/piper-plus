@@ -34,6 +34,8 @@ pub mod gpu;
 #[cfg(feature = "onnx")]
 pub mod input;
 #[cfg(feature = "onnx")]
+pub mod ort_env;
+#[cfg(feature = "onnx")]
 pub mod segments;
 #[cfg(feature = "onnx")]
 pub mod speaker_encoder;
