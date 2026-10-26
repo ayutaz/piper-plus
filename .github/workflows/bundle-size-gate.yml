@@ -200,9 +200,14 @@ jobs:
           dotnet pack src/csharp/PiperPlus.Core/PiperPlus.Core.csproj -c Release
           dotnet pack src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj  -c Release
 
+      # piper-plus-g2p is packaged in the same command so Cargo resolves it
+      # from a local staging registry. Packaged alone, piper-plus looks the
+      # bumped g2p version up on crates.io, which fails on every version-bump
+      # PR because the release publishes it only after merge (#899).
+      # check_bundle_size.py measures only the piper-plus crate.
       - name: cargo package (piper-plus)
         working-directory: src/rust
-        run: cargo package -p piper-plus --no-verify --allow-dirty
+        run: cargo package -p piper-plus-g2p -p piper-plus --no-verify --allow-dirty
 
       # Issue #494: stage the prebuilt libpiper_plus.so produced by the
       # build-android-shared-libs matrix into jniLibs/<ABI>/ so the JNI
