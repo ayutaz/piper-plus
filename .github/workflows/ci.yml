@@ -187,67 +187,12 @@ jobs:
       build-type-matrix: '["Release", "Debug"]'
       timeout-minutes: 25
 
-  csharp-tests:
-    needs: [changes]
-    if: ${{ needs.changes.outputs.csharp == 'true' || needs.changes.outputs.ci-config-csharp == 'true' || needs.changes.outputs.zh-en-data == 'true' || needs.changes.outputs.swedish-lid-data == 'true' || needs.changes.outputs.g2p-golden == 'true' }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, macos-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@v6.1.0
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5.4.0
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v4.3.0
-        continue-on-error: true
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('src/csharp/**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
-
-      - name: Build C# solution
-        run: dotnet build src/csharp/PiperPlus.sln -c Release
-
-      - name: Check formatting
-        run: dotnet format src/csharp/PiperPlus.sln --verify-no-changes --no-restore
-
-      - name: Run C# tests
-        shell: bash
-        run: |
-          dotnet test src/csharp/PiperPlus.sln -c Release --no-build \
-            --logger "trx;LogFileName=test-results.xml" \
-            --collect:"XPlat Code Coverage" \
-            --settings src/csharp/PiperPlus.runsettings
-
-      - name: Fail on tests skipped without an allowlist entry
-        uses: ./.github/actions/check-test-skips
-        with:
-          runtime: csharp
-          files: >-
-            src/csharp/PiperPlus.Core.Tests/TestResults/test-results.xml
-            src/csharp/PiperPlus.Cli.Tests/TestResults/test-results.xml
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4.6.2
-        if: always()
-        with:
-          name: csharp-test-results-${{ matrix.os }}
-          path: |
-            **/TestResults/test-results.xml
-            **/coverage.cobertura.xml
-          retention-days: 30
-
+  # The C# tests are not copied here: csharp-ci.yml runs them on Ubuntu,
+  # Windows and both macOS images, and the Required Status Check Gate fails
+  # a pull request when it fails. This job checks that every RID publishes.
   csharp-build:
     runs-on: ${{ matrix.os }}
-    needs: [changes, csharp-tests]
+    needs: [changes]
     if: ${{ needs.changes.outputs.csharp == 'true' || needs.changes.outputs.ci-config-csharp == 'true' || needs.changes.outputs.zh-en-data == 'true' || needs.changes.outputs.swedish-lid-data == 'true' || needs.changes.outputs.g2p-golden == 'true' }}
     timeout-minutes: 20
     strategy:
@@ -615,7 +560,6 @@ jobs:
       - release-contract
       - changes
       - cpp-tests
-      - csharp-tests
       - csharp-build
       - python-tests
       - rust-tests
