@@ -1,8 +1,28 @@
 """Check publication invariants without building or accessing registries."""
 
+import re
 from pathlib import Path
 
 import yaml
+
+
+# A pull request reads the cache and writes none: its cache was evicted
+# before its next push read it. The export is written only on a push.
+PUSH_ONLY_RE = re.compile(
+    r"\$\{\{\s*github\.event_name != 'pull_request' && "
+    r"(?:'(?P<plain>[^']*)'|format\('(?P<fmt>[^']*)',\s*(?P<arg>[\w.]+)\))"
+    r" \|\| '' \}\}"
+)
+
+
+def cache_export(value):
+    """The cache-to spec a push uses, or None if a pull request exports too."""
+    m = PUSH_ONLY_RE.fullmatch(value.strip())
+    if not m:
+        return None
+    if m.group("plain") is not None:
+        return m.group("plain")
+    return m.group("fmt").replace("{0}", "${{ " + m.group("arg") + " }}")
 
 
 def check(data):
@@ -22,11 +42,11 @@ def check(data):
             errors.append(f"{name}: missing bounded job timeout")
         for step in builds:
             options = step.get("with", {})
-            cache = dict(
-                p.split("=", 1)
-                for p in options.get("cache-to", "").split(",")
-                if "=" in p
-            )
+            spec = cache_export(options.get("cache-to", ""))
+            if spec is None:
+                errors.append(f"{name}: a pull request must not export the cache")
+                spec = options.get("cache-to", "")
+            cache = dict(p.split("=", 1) for p in spec.split(",") if "=" in p)
             scope = cache.get("scope")
             if not scope or scope in scopes:
                 errors.append(f"{name}: cache scope missing or shared")

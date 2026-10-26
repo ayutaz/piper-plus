@@ -173,7 +173,13 @@ jobs:
             ${{ github.event_name == 'pull_request' && 'piper-python-inference:test' || '' }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=build-python-inference,timeout=2m
-          cache-to: type=gha,mode=max,scope=build-python-inference,timeout=2m,ignore-error=true
+          # A pull request reads the cache and writes none. The repository
+          # holds 10 GB of Actions cache (one python-train layer is 4.2 GB),
+          # so a pull request's cache was evicted before its next push
+          # could read it: no layer of any image was reused on a second push
+          # (PR #903, 2026-10-26), while the export took 42 runner-minutes a
+          # run (20 for python-train). A push to dev still writes it.
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max,scope=build-python-inference,timeout=2m,ignore-error=true' || '' }}
           # NEW: SLSA provenance + SBOM attestation. A PR pushes nothing, so
           # its attestations were never used, and an image with attestations
           # is a manifest list that `load` cannot import.
@@ -546,7 +552,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=build-python-inference-cpu,timeout=2m
-          cache-to: type=gha,mode=max,scope=build-python-inference-cpu,timeout=2m,ignore-error=true
+          # Written on a push only (see build-python-inference).
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max,scope=build-python-inference-cpu,timeout=2m,ignore-error=true' || '' }}
           # NEW: SLSA provenance + SBOM attestation
           provenance: true
           sbom: true
@@ -625,7 +632,8 @@ jobs:
           load: false
           tags: piper-plus-${{ matrix.target.name }}:distroless-trial
           cache-from: type=gha,scope=${{ matrix.target.cache_scope }},timeout=2m
-          cache-to: type=gha,mode=max,scope=${{ matrix.target.cache_scope }},timeout=2m,ignore-error=true
+          # Written on a push only (see build-python-inference).
+          cache-to: ${{ github.event_name != 'pull_request' && format('type=gha,mode=max,scope={0},timeout=2m,ignore-error=true', matrix.target.cache_scope) || '' }}
 
   build-python-train:
     runs-on: ubuntu-latest
@@ -731,12 +739,8 @@ jobs:
             ${{ github.event_name == 'pull_request' && 'piper-python-train:test' || '' }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=build-python-train,timeout=2m
-          # A PR exports mode=min, as docker-test.yml did for this image.
-          # mode=max writes every intermediate stage (CUDA devel + cuDNN8
-          # builder, ~15GB): on PR run 40234640733 the export alone took
-          # 2756s of a 56-minute job, and it competes with `load` for disk
-          # ("no space left on device", PR #474). Pushes keep mode=max.
-          cache-to: type=gha,mode=${{ github.event_name == 'pull_request' && 'min' || 'max' }},scope=build-python-train,timeout=2m,ignore-error=true
+          # Written on a push only (see build-python-inference).
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max,scope=build-python-train,timeout=2m,ignore-error=true' || '' }}
           # NEW: SLSA provenance + SBOM attestation. A PR pushes nothing, so
           # its attestations were never used, and an image with attestations
           # is a manifest list that `load` cannot import.
@@ -865,7 +869,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=build-cpp-dev,timeout=2m
-          cache-to: type=gha,mode=max,scope=build-cpp-dev,timeout=2m,ignore-error=true
+          # Written on a push only (see build-python-inference).
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max,scope=build-cpp-dev,timeout=2m,ignore-error=true' || '' }}
           # NEW: SLSA provenance + SBOM attestation
           provenance: true
           sbom: true
@@ -955,7 +960,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=build-cpp-inference,timeout=2m
-          cache-to: type=gha,mode=max,scope=build-cpp-inference,timeout=2m,ignore-error=true
+          # Written on a push only (see build-python-inference).
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max,scope=build-cpp-inference,timeout=2m,ignore-error=true' || '' }}
           # NEW: SLSA provenance + SBOM attestation
           provenance: true
           sbom: true
@@ -1048,7 +1054,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=build-wyoming,timeout=2m
-          cache-to: type=gha,mode=max,scope=build-wyoming,timeout=2m,ignore-error=true
+          # Written on a push only (see build-python-inference).
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max,scope=build-wyoming,timeout=2m,ignore-error=true' || '' }}
           # NEW: SLSA provenance + SBOM attestation
           provenance: true
           sbom: true
@@ -1212,7 +1219,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=build-webui,timeout=2m
-          cache-to: type=gha,mode=max,scope=build-webui,timeout=2m,ignore-error=true
+          # Written on a push only (see build-python-inference).
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max,scope=build-webui,timeout=2m,ignore-error=true' || '' }}
           # NEW: SLSA provenance + SBOM attestation
           provenance: true
           sbom: true
