@@ -66,13 +66,6 @@ kind = "harmless"
 reason = "Cache restore; a miss only makes the restore slower."
 
 [[entry]]
-workflow = "ci.yml"
-job = "python-tests"
-step = "Cache uv downloads"
-kind = "harmless"
-reason = "Cache restore; a miss only makes the install slower."
-
-[[entry]]
 workflow = "clang-tidy.yml"
 job = "clang-tidy"
 step = "Upload clang-tidy report"

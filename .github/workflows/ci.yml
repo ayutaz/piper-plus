@@ -19,6 +19,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
+# The Python and Rust unit tests are not copied here: python-tests.yml and
+# rust-tests.yml run them on every OS and version, and the Required Status
+# Check Gate fails a pull request when either fails. ci.yml ran a subset of
+# each (Ubuntu / 3.13; Ubuntu + macOS) a second time.
 jobs:
   release-contract:
     runs-on: ubuntu-24.04
@@ -45,7 +49,6 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      python: ${{ steps.filter.outputs.python }}
       rust: ${{ steps.filter.outputs.rust }}
       csharp: ${{ steps.filter.outputs.csharp }}
       cpp: ${{ steps.filter.outputs.cpp }}
@@ -54,8 +57,6 @@ jobs:
       docker: ${{ steps.filter.outputs.docker }}
       ci-config-cpp: ${{ steps.filter.outputs.ci-config-cpp }}
       ci-config-csharp: ${{ steps.filter.outputs.ci-config-csharp }}
-      ci-config-python: ${{ steps.filter.outputs.ci-config-python }}
-      ci-config-rust: ${{ steps.filter.outputs.ci-config-rust }}
       ci-config-wasm: ${{ steps.filter.outputs.ci-config-wasm }}
       zh-en-data: ${{ steps.filter.outputs.zh-en-data }}
       swedish-lid-data: ${{ steps.filter.outputs.swedish-lid-data }}
@@ -68,11 +69,6 @@ jobs:
         id: filter
         with:
           filters: |
-            python:
-              - 'src/python/**'
-              - 'src/python_run/**'
-              - 'pyproject.toml'
-              - 'uv.lock'
             rust:
               - 'src/rust/**'
             csharp:
@@ -110,16 +106,6 @@ jobs:
               - 'scripts/check_test_skips.py'
               - 'docs/spec/test-skip-allowlist.toml'
               - '.github/actions/check-test-skips/**'
-            ci-config-python:
-              - '.github/workflows/ci.yml'
-              - '.github/workflows/python-tests.yml'
-              - '.github/workflows/lint-gates.yml'
-              - 'scripts/check_test_skips.py'
-              - 'docs/spec/test-skip-allowlist.toml'
-              - '.github/actions/check-test-skips/**'
-            ci-config-rust:
-              - '.github/workflows/ci.yml'
-              - '.github/workflows/rust-tests.yml'
             ci-config-wasm:
               - '.github/workflows/ci.yml'
               - '.github/workflows/wasm-build.yml'
@@ -313,144 +299,6 @@ jobs:
           path: publish/
           retention-days: 7
 
-  python-tests:
-    needs: [changes]
-    if: ${{ needs.changes.outputs.python == 'true' || needs.changes.outputs.ci-config-python == 'true' || needs.changes.outputs.zh-en-data == 'true' || needs.changes.outputs.swedish-lid-data == 'true' }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04]
-        python-version: ['3.13']
-
-    steps:
-      - uses: actions/checkout@v6.1.0
-
-      - name: Set up Python
-        uses: actions/setup-python@v6.2.0
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Cache uv downloads
-        uses: actions/cache@v4.3.0
-        continue-on-error: true
-        with:
-          path: ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ matrix.python-version }}-${{ hashFiles('uv.lock', 'src/python/pyproject.toml', 'src/python/g2p/pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-uv-${{ matrix.python-version }}-
-            ${{ runner.os }}-uv-
-
-      - name: Install system dependencies (Ubuntu)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libsndfile1-dev build-essential cmake
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install --no-cache-dir uv
-          uv pip install --system -e "src/python/g2p[all]"
-          cd src/python
-          uv pip install --system -e ".[test,inference]"
-          # For pyopenjtalk-plus dependencies (optional)
-          uv pip install --system sudachipy sudachidict_core || echo "Japanese dependencies optional"
-
-      - name: Build C++ executable
-        run: |
-          mkdir -p build
-          cd build
-          cmake ..
-          make -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)"
-
-      - name: Download OpenJTalk dictionary
-        run: |
-          cd build
-          ../scripts/download_openjtalk_dict.sh || true
-
-      - name: Run Python tests
-        run: |
-          cd src/python
-          # `--no-cov` で coverage 計測を無効化 (subset 実行で 70% 閾値を満たさず誤検知)。
-          # 完全な coverage は python-tests.yml の "Run unit tests" で計測。
-          # Exclude inference tests - they require PyTorch and are covered by python-tests.yml.
-          # Use --ignore to prevent collection (import) of files that require torch.
-          python -m pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference" --no-cov \
-            --ignore=tests/test_pytorch_onnx_parity.py \
-            --ignore=tests/test_export_onnx.py \
-            --ignore=tests/test_export_onnx_mb_istft.py \
-            --ignore=tests/test_infer_onnx.py \
-            --ignore=tests/test_english_phonemizer.py \
-            --ignore=tests/test_vits.py \
-            --ignore=tests/test_wavlm_discriminator.py
-
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v5.5.5
-        if: matrix.python-version == '3.13'
-        with:
-          files: ./coverage.xml
-          flags: python
-          name: Python ${{ matrix.python-version }} - ${{ runner.os }}
-
-  rust-tests:
-    needs: [changes]
-    if: ${{ needs.changes.outputs.rust == 'true' || needs.changes.outputs.ci-config-rust == 'true' || needs.changes.outputs.zh-en-data == 'true' || needs.changes.outputs.swedish-lid-data == 'true' || needs.changes.outputs.g2p-golden == 'true' }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, macos-latest]
-    defaults:
-      run:
-        working-directory: src/rust
-    steps:
-      - uses: actions/checkout@v6.1.0
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src/rust -> target
-
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-      - name: Clippy
-        run: cargo clippy --workspace -- -D warnings
-
-      - name: Run tests
-        run: cargo test -p piper-plus --no-fail-fast
-
-      - name: Run tests (naist-jdic)
-        run: cargo test -p piper-plus --features naist-jdic --no-fail-fast
-
-      - name: Run g2p chinese feature tests (ZH-EN dispatch via Phonemizer trait)
-        # `chinese` is enabled by piper-plus-g2p's default features, so this
-        # also runs the #[cfg(feature = "chinese")] dispatch tests added in
-        # multilingual.rs (test_zh_en_dispatch_via_phonemizer_trait etc).
-        run: cargo test -p piper-plus-g2p --no-fail-fast
-
-      - name: Run voice unit tests (onnx feature)
-        # voice.rs is compiled only with the onnx feature, so its unit tests
-        # (phonemizer construction, language override) never ran in the
-        # default-feature steps above.
-        run: cargo test -p piper-plus --features onnx --lib --no-fail-fast
-
-      - uses: actions/setup-python@v6.2.0
-        with:
-          python-version: '3.13'
-
-      - name: Check piper-plus-python
-        run: cargo check -p piper-plus-python
-
-      - name: Build mandatory cache regression fixtures
-        run: |
-          python -m pip install onnx==1.22.0
-          python ../../tests/fixtures/ort_session/build_embedding_fixture.py
-
-      - name: Require actual ONNX cache and embedding inference
-        run: cargo test --locked -p piper-plus --no-default-features --features onnx --test test_embedding_dimensions
-
   # Small, real ORT Web graphs verify input shapes on every PR, without Rust.
   wasm-onnx-contract:
     runs-on: ubuntu-24.04
@@ -617,8 +465,6 @@ jobs:
       - cpp-tests
       - csharp-tests
       - csharp-build
-      - python-tests
-      - rust-tests
       - npm-package-tests
       - wasm-onnx-contract
     runs-on: ubuntu-24.04

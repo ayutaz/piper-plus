@@ -29,6 +29,19 @@ on:
       - 'scripts/check_test_skips.py'
       - 'docs/spec/test-skip-allowlist.toml'
       - '.github/actions/check-test-skips/**'
+      # ci.yml ran its copy of these tests on a change to any loanword or
+      # Swedish LID mirror, not only the Python one; kept when the copy moved
+      # here.
+      - '**/zh_en_loanword.json'
+      - '**/zh_en_loanword_matrix.json'
+      - 'scripts/check_loanword_consistency.py'
+      - 'cmake/EmbedJson.cmake'
+      - 'cmake/PiperCommon.cmake'
+      - '.github/workflows/zh-en-loanword-sync.yml'
+      - '**/sv_function_words.json'
+      - 'scripts/check_swedish_lid_consistency.py'
+      - 'docs/spec/swedish-lid-mirrors.toml'
+      - '.github/workflows/swedish-lid-sync.yml'
   push:
     branches: [ dev ]
     paths:
@@ -51,6 +64,19 @@ on:
       - 'scripts/check_test_skips.py'
       - 'docs/spec/test-skip-allowlist.toml'
       - '.github/actions/check-test-skips/**'
+      # ci.yml ran its copy of these tests on a change to any loanword or
+      # Swedish LID mirror, not only the Python one; kept when the copy moved
+      # here.
+      - '**/zh_en_loanword.json'
+      - '**/zh_en_loanword_matrix.json'
+      - 'scripts/check_loanword_consistency.py'
+      - 'cmake/EmbedJson.cmake'
+      - 'cmake/PiperCommon.cmake'
+      - '.github/workflows/zh-en-loanword-sync.yml'
+      - '**/sv_function_words.json'
+      - 'scripts/check_swedish_lid_consistency.py'
+      - 'docs/spec/swedish-lid-mirrors.toml'
+      - '.github/workflows/swedish-lid-sync.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
@@ -94,6 +120,8 @@ jobs:
     steps:
     - uses: actions/checkout@v6.1.0
     - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy
     - uses: Swatinem/rust-cache@v2
       with:
         workspaces: src/rust -> target
@@ -144,6 +172,17 @@ jobs:
 
     - name: Run CLI tests
       run: cargo test -p piper-plus-cli --no-fail-fast 2>&1 | tee -a "$RUNNER_TEMP/rust-test.log"
+
+    # The clippy job lints --all-features. Code compiled only while a
+    # feature is off is linted here, on the two OSes ci.yml's copy of
+    # these tests ran on.
+    - name: Clippy (default features)
+      if: runner.os != 'Windows'
+      run: cargo clippy --workspace -- -D warnings
+
+    - name: Check piper-plus-python (default features)
+      if: runner.os != 'Windows'
+      run: cargo check -p piper-plus-python
 
     - name: Fail on tests skipped without an allowlist entry
       uses: ./.github/actions/check-test-skips

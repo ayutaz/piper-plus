@@ -11,6 +11,8 @@ on:
     paths:
       - 'src/python/**'
       - 'src/python_run/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
       - 'test/**'
       - 'tools/benchmark/**'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
@@ -33,7 +35,6 @@ on:
       - 'docs/spec/ort-session-contract.toml'
       - 'docker/wyoming/**'
       - '.github/workflows/python-tests.yml'
-
       - 'scripts/check_python_run_test_coverage.py'
       - 'scripts/check_python_test_selection.py'
       - 'tests/scripts/test_check_python_test_selection.py'
@@ -41,6 +42,72 @@ on:
       - 'scripts/check_test_skips.py'
       - 'scripts/pytest_plugins/**'
       - 'docs/spec/test-skip-allowlist.toml'
+      - '.github/actions/check-test-skips/**'
+      # ci.yml ran its copy of these tests on a change to any loanword or
+      # Swedish LID mirror, not only the Python one; kept when the copy moved
+      # here.
+      - '**/zh_en_loanword.json'
+      - '**/zh_en_loanword_matrix.json'
+      - 'scripts/check_loanword_consistency.py'
+      - 'cmake/EmbedJson.cmake'
+      - 'cmake/PiperCommon.cmake'
+      - '.github/workflows/zh-en-loanword-sync.yml'
+      - '**/sv_function_words.json'
+      - 'scripts/check_swedish_lid_consistency.py'
+      - 'docs/spec/swedish-lid-mirrors.toml'
+      - '.github/workflows/swedish-lid-sync.yml'
+  # A push to dev runs the Ubuntu / Python 3.13 entry only (see the
+  # matrix), as ci.yml's copy of the unit tests did before it was removed.
+  push:
+    branches: [ dev ]
+    paths:
+      - 'src/python/**'
+      - 'src/python_run/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'test/**'
+      - 'tools/benchmark/**'
+      - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - 'tests/fixtures/g2p/pt_dialect_parity.json'
+      # Read by src/python_run/tests/test_g2p_golden_parity.py.
+      - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
+      - 'tests/fixtures/g2p/known_divergences.json'
+      # Read by the CJK punctuation contract tests (#823).
+      - 'tests/fixtures/g2p/cjk_punctuation_cases.json'
+      # Read by the text-splitter contract tests (#831).
+      - 'tests/fixtures/text_splitter/**'
+      - 'tests/fixtures/g2p/english_no_drop_words.json'
+      # Read by src/python_run/tests/test_swedish_phonemization.py (#830).
+      - 'tests/fixtures/g2p/sv_golden.json'
+      - 'tests/fixtures/phoneme_timing/**'
+      - 'tests/fixtures/short_text/**'
+      - 'tests/fixtures/ort_session/**'
+      - 'docs/spec/phoneme-timing-contract.toml'
+      - 'docs/spec/short-text-contract.toml'
+      - 'docs/spec/ort-session-contract.toml'
+      - 'docker/wyoming/**'
+      - '.github/workflows/python-tests.yml'
+      - 'scripts/check_python_run_test_coverage.py'
+      - 'scripts/check_python_test_selection.py'
+      - 'tests/scripts/test_check_python_test_selection.py'
+      # Skipped-test gate (last step of the test job).
+      - 'scripts/check_test_skips.py'
+      - 'scripts/pytest_plugins/**'
+      - 'docs/spec/test-skip-allowlist.toml'
+      - '.github/actions/check-test-skips/**'
+      # ci.yml ran its copy of these tests on a change to any loanword or
+      # Swedish LID mirror, not only the Python one; kept when the copy moved
+      # here.
+      - '**/zh_en_loanword.json'
+      - '**/zh_en_loanword_matrix.json'
+      - 'scripts/check_loanword_consistency.py'
+      - 'cmake/EmbedJson.cmake'
+      - 'cmake/PiperCommon.cmake'
+      - '.github/workflows/zh-en-loanword-sync.yml'
+      - '**/sv_function_words.json'
+      - 'scripts/check_swedish_lid_consistency.py'
+      - 'docs/spec/swedish-lid-mirrors.toml'
+      - '.github/workflows/swedish-lid-sync.yml'
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
@@ -52,7 +119,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-latest, macos-latest]
+        # A pull request runs every OS and Python version. A push to dev runs
+        # Ubuntu / 3.13 only: that is what ran there before (ci.yml's copy of
+        # the unit tests), and the pull request already ran the rest.
+        os: ${{ fromJSON(github.event_name == 'push' && github.ref == 'refs/heads/dev' && '["ubuntu-24.04"]' || '["ubuntu-24.04", "windows-latest", "macos-latest"]') }}
         # `requires-python = ">=3.11"` をリポジトリ内 7 pyproject.toml
         # (root / src/python / src/python/g2p / src/python_run / src/python_stub /
         #  src/piper_phonemize_bundled / src/rust/piper-python) で宣言済みで、
@@ -63,7 +133,7 @@ jobs:
         # 退行 (typing / std lib 変更 / deprecation) が PyPI release 直前まで
         # 見えなかった。 OSS public で CI minute 無制限のため
         # (memory: feedback_ci_matrix_no_reduction.md) 全 3 系列を回す。
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ${{ fromJSON(github.event_name == 'push' && github.ref == 'refs/heads/dev' && '["3.13"]' || '["3.11", "3.12", "3.13"]') }}
 
     steps:
     - uses: actions/checkout@v6.1.0
