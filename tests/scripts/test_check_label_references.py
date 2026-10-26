@@ -70,9 +70,6 @@ jobs:
           gh issue edit "${ISSUE_NUMBER}" --add-label "alpha,undeclared-three"
 """
 
-FAST_LANE = 'PROMOTE_LABEL = "alpha"\n'
-
-
 @pytest.fixture(scope="module")
 def mod():
     # Ensure platform_utils is importable from scripts/
@@ -95,7 +92,6 @@ def _build(root: Path, **overrides) -> None:
         ".github/workflows/stale.yml": STALE_WORKFLOW,
         ".github/workflows/docker-build.yml": DOCKER_WORKFLOW,
         ".github/workflows/routing.yml": GH_CLI_WORKFLOW,
-        "scripts/first_pr_fast_lane.py": FAST_LANE,
     }
     files.update(overrides)
     for rel, content in files.items():
@@ -113,14 +109,12 @@ def _point_at(mod, root: Path):
             "LABELS_YML",
             "DEPENDABOT_YML",
             "WORKFLOWS_DIR",
-            "FAST_LANE_SCRIPT",
         )
     }
     mod.REPO_ROOT = root
     mod.LABELS_YML = root / ".github" / "labels.yml"
     mod.DEPENDABOT_YML = root / ".github" / "dependabot.yml"
     mod.WORKFLOWS_DIR = root / ".github" / "workflows"
-    mod.FAST_LANE_SCRIPT = root / "scripts" / "first_pr_fast_lane.py"
     return saved
 
 
@@ -188,7 +182,6 @@ def test_zero_references_is_a_failure(mod, tmp_path, capsys):
             ".github/workflows/stale.yml": "name: stale\n",
             ".github/workflows/docker-build.yml": DOCKER_WORKFLOW,
             ".github/workflows/routing.yml": "name: routing\n",
-            "scripts/first_pr_fast_lane.py": "# no promote label\n",
         },
     )
     assert _run(mod, tmp_path) == 1

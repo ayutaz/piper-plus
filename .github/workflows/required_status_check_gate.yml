@@ -73,7 +73,6 @@ on:
       - docker-distroless-trial
       - 'E2E Issue #426 (speaker_embedding)'
       - Extended contract gates
-      - First-PR Fast Lane
       - Fuzz Smoke
       - G2P Cross-Platform Consistency
       - G2P Python CI

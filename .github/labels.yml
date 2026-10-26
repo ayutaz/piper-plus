@@ -2,8 +2,8 @@
 #
 # This file is the source-of-truth for every label that CI configuration
 # names. `scripts/check_label_references.py` fails the build when
-# `.github/dependabot.yml`, a workflow, or `scripts/first_pr_fast_lane.py`
-# references a label that is not declared below. Labels created ad hoc for
+# `.github/dependabot.yml` or a workflow references a label that is not
+# declared below. Labels created ad hoc for
 # human triage do not have to appear here; labels that automation depends on
 # do, because a reference to a label nobody created is not an error GitHub
 # reports anywhere useful — Dependabot just comments and moves on, `gh issue
@@ -22,12 +22,6 @@
 # create --force` updates an existing label in place rather than failing, so
 # the emitted commands are safe to re-run. Nothing here ever deletes a label:
 # the repository legitimately carries labels this file does not list.
-
-- name: run-full-gate
-  color: "B60205"
-  description: >-
-    Promote all contract gates back to blocker for a first-PR fast lane PR.
-    Attach before merge so PUA / loanword / ORT / migration parity is enforced.
 
 - name: breaking
   color: "D93F0B"

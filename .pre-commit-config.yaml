@@ -566,7 +566,7 @@ repos:
         name: CI が参照する GitHub label が labels.yml に宣言済みか
         entry: uv run --no-sync python scripts/check_label_references.py
         language: system
-        files: ^(\.github/(labels|dependabot)\.yml|\.github/workflows/.*\.ya?ml|scripts/(check_label_references|first_pr_fast_lane)\.py)$
+        files: ^(\.github/(labels|dependabot)\.yml|\.github/workflows/.*\.ya?ml|scripts/check_label_references\.py)$
         pass_filenames: false
 
       # Release 時に CHANGELOG.md の `### Breaking changes` と

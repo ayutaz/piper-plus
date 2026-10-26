@@ -22,7 +22,7 @@ name: CI Observability Snapshot
 
 on:
   schedule:
-    - cron: '0 8 * * 1'  # 月曜 UTC 08:00 (typosquatting=09:00 / first-pr-health=月曜帯と隣接、 1 時間ずらして並走負荷を分散)
+    - cron: '0 8 * * 1'  # 月曜 UTC 08:00 (typosquatting=09:00 と 1 時間ずらして並走負荷を分散)
   workflow_dispatch:
     inputs:
       days:
