@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeps them in the segment around them: a Chinese sentence keeps its
   `，` and `。`, and `你好，GPS` reads GPS in Mandarin (#823).
 
+### Security
+
+- The `en` and `all` extras require `nltk>=3.10.4` instead of
+  `nltk>=3.10.0`, which leaves GHSA-8mgp-746c-j5xp / CVE-2026-81726
+  (model-artifact APIs bypass pathsec, affected `<= 3.10.3`). English
+  output is unchanged.
+
 ## [0.3.1] - 2026-10-16
 
 ### Fixed
@@ -102,3 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - IPA-first: `phonemize()` returns clean IPA tokens; encoding to integer IDs is handled separately by `PiperEncoder`
 - GPL-free: no eSpeak-ng dependency; all runtime dependencies are MIT/Apache-2.0/BSD-3-Clause
 - Plugin system via setuptools `entry_points` (`piper_plus_g2p.phonemizers` group)
+
+[Unreleased]: https://github.com/ayutaz/piper-plus/compare/python-g2p-v0.3.1...HEAD
+[0.3.1]: https://github.com/ayutaz/piper-plus/releases/tag/python-g2p-v0.3.1
+[0.3.0]: https://github.com/ayutaz/piper-plus/releases/tag/python-g2p-v0.3.0

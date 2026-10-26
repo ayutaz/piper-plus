@@ -7,11 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add `SpeakerEncoder.initialize({ frontEnd: "kaldi-fbank" })`, which computes the zs-v1 CAM++ embedding the same way as the Python recipe (torchaudio Kaiser resampling to 16 kHz, 80-bin `kaldi.fbank`, mean subtraction, L2 normalization). Checked against torchaudio with a golden fixture. `initialize` also accepts `modelData` in place of `modelUrl`. The default `"mel"` front end is unchanged.
+- Add `PiperPlus.findDroppedSymbols(text, { language })`, which lists the symbols the phonemizer produced but the model's phoneme table lacks. Encoding still drops them silently; this lets an app warn before synthesis. It also works with `@piper-plus/g2p` 0.4.2, whose `encode()` does not report them.
+- The GitHub Pages multilingual demo gains a zero-shot section: upload or record a reference clip, compute the embedding in the browser, and read text in six languages with the public zs-v1 base.
+
 ### Fixed
 
 - `piper-plus` bin (`bin/piper-cli.js`, the Node CLI for `--json-input`): apply the same short-text handling and Issue #499 EOS-region trim as `PiperPlus.synthesize()`. The bin wrote the raw decoder output, 1,536 samples (6 frames) longer than the other runtimes for the parity fixture. The helpers moved to `src/short-text.js`; `src/index.js` re-exports them, so the public API is unchanged.
 - Chinese text with digits or Latin words, for models with zh and en: read them with the English G2P instead of character by character (#847). `123` became `1 2 3` because the Rust WASM G2P had no English dictionary; it now gets the CMU dictionary of `@piper-plus/g2p` on the first Chinese request. With an `@piper-plus/g2p` that has no `loadCmuDict` (up to the 0.4.2 release on npm), a warning is logged and the old reading is kept.
 - Streaming (`synthesizeStreaming`): do not end a chunk at a full stop between two digits (`3.14`) or inside `e.g.` / `i.e.` (#831). The pieces were phonemized separately and read differently from the whole sentence.
+- Text with a language is phonemized by the bundled Rust WASM G2P as in Python: the text is split by script and its Latin-script parts are read as that language, so English words inside Chinese text are read in Mandarin through the ZH-EN loanword table instead of being passed to the Chinese phonemizer as raw letters. Japanese text still goes whole to OpenJTalk.
+- French in the bundled Rust WASM G2P: an elision clitic (`l'` `d'` `j'` `qu'` ..., straight or typographic apostrophe) is read together with the rest of the word, so `c'est` is `s ɛ s`, and a liaison trigger (`les`, `nous`, `est`, ...) ends with its linking consonant before a word starting with a vowel or h + vowel, as in Python (#822).
+- CJK punctuation (、。，！？「」 ...) and fullwidth ASCII symbols belong to no language in the bundled Rust WASM G2P (#823). A Chinese sentence in a model with `ja` lost its `，` and `。`, which were put in a Japanese segment; in a Latin-script segment they are now rewritten as ASCII before G2P.
+
+### Security
+
+- `model: "base"` / `"zero-shot-base-zs-v1"` now checks the downloaded `base.onnx` against its pinned SHA-256. The published `base.onnx.json` has no `sha256`, so the file was previously not verified.
 
 ## [0.8.2] - 2026-10-23
 
@@ -29,10 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Load `piper-plus` from unpkg in the README importmap example. jsDelivr refuses files over 50 MB, so the bundled G2P WASM (about 60 MB) returned 403 and Japanese text produced almost no audio. The browser test now also routes unpkg and fails if `piper-plus` is loaded from jsDelivr.
 - Route English to the JS G2P even when the Rust WASM bundle loads for Japanese or Chinese. The WASM bundle has no English dictionary and spelled words out letter by letter.
 - Regenerate the bundled `pinyin_single.json` / `pinyin_phrases.json` with numeric tones (`ni3`). The previous files carried tone marks (`nǐ`), which the WASM parser read as tone 5 with a broken final.
-- Add `SpeakerEncoder.initialize({ frontEnd: "kaldi-fbank" })`, which computes the zs-v1 CAM++ embedding the same way as the Python recipe (torchaudio Kaiser resampling to 16 kHz, 80-bin `kaldi.fbank`, mean subtraction, L2 normalization). Checked against torchaudio with a golden fixture. `initialize` also accepts `modelData` in place of `modelUrl`. The default `"mel"` front end is unchanged.
-- Add `PiperPlus.findDroppedSymbols(text, { language })`, which lists the symbols the phonemizer produced but the model's phoneme table lacks. Encoding still drops them silently; this lets an app warn before synthesis. It also works with `@piper-plus/g2p` 0.4.2, whose `encode()` does not report them.
-- The GitHub Pages multilingual demo gains a zero-shot section: upload or record a reference clip, compute the embedding in the browser, and read text in six languages with the public zs-v1 base.
-- `model: "base"` / `"zero-shot-base-zs-v1"` now checks the downloaded `base.onnx` against its pinned SHA-256. The published `base.onnx.json` has no `sha256`, so the file was previously not verified.
+
+## [0.8.1] - 2026-10-08
+
+### Changed
+
+- Update the README installation and importmap examples and the demo to ONNX Runtime Web 1.30.0, the version the package is tested with; the peer dependency stays `onnxruntime-web >=1.22.0`. `npm run check:browser-runtime` fails in PR CI and pre-commit when an example or the demo drifts from that pin.
 
 ## [0.8.0] - 2026-10-06
 
@@ -263,7 +278,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Streaming synthesis pipeline
 - TypeScript type definitions
 
-[0.1.1]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.1.1
-[0.3.0]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.3.0
+[Unreleased]: https://github.com/ayutaz/piper-plus/compare/npm-v0.8.2...HEAD
+[0.8.2]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.8.2
+[0.8.1]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.8.1
+[0.8.0]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.8.0
+[0.7.0]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.7.0
+[0.6.0]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.6.0
 [0.3.1]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.3.1
-[0.4.0]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.4.0
+[0.3.0]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.3.0
+[0.1.1]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.1.1
