@@ -53,13 +53,6 @@ reason = "Upload to an external service (fail_ci_if_error: false); the tests ran
 
 [[entry]]
 workflow = "ci.yml"
-job = "csharp-tests"
-step = "Cache NuGet packages"
-kind = "harmless"
-reason = "Cache restore; a miss only makes the restore slower."
-
-[[entry]]
-workflow = "ci.yml"
 job = "csharp-build"
 step = "Cache NuGet packages"
 kind = "harmless"

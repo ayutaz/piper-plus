@@ -1,8 +1,8 @@
 # Skipped-test allowlist — every test that CI skips must match an entry here.
 #
 # Enforced by scripts/check_test_skips.py, which the test jobs run after their
-# tests (python-tests, go-ci, the C++ jobs of _build-test-cpp, csharp-ci and
-# ci.yml csharp-tests, rust-tests). The pre-commit hook `test-skip-allowlist`
+# tests (python-tests, go-ci, the C++ jobs of _build-test-cpp, csharp-ci,
+# rust-tests). The pre-commit hook `test-skip-allowlist`
 # checks the fields of this file; tests/scripts/test_check_test_skips.py
 # covers the parsers.
 #
