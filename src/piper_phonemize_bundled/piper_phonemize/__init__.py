@@ -168,8 +168,10 @@ if _DATA_DIR.exists():
     os.environ["ESPEAK_DATA_PATH"] = str(_DATA_DIR / "espeak-ng-data")
 
 
-# Print debug info if requested
-if os.environ.get("PIPER_PHONEMIZE_DEBUG"):
+# Print debug info if requested. v2.0 renamed the public env vars to
+# PIPER_PLUS_* with no fallback to the old names, so PIPER_PHONEMIZE_DEBUG is
+# not read.
+if os.environ.get("PIPER_PLUS_PHONEMIZE_DEBUG"):
     print(f"piper_phonemize version: {__version__}")
     print(f"C++ extension available: {_cpp_available}")
     if not _cpp_available:

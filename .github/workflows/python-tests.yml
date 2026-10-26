@@ -27,6 +27,8 @@ on:
       - 'tests/fixtures/g2p/english_no_drop_words.json'
       # Read by src/python_run/tests/test_swedish_phonemization.py (#830).
       - 'tests/fixtures/g2p/sv_golden.json'
+      # Imported by src/python/tests/test_piper_phonemize_debug_env.py.
+      - 'src/piper_phonemize_bundled/piper_phonemize/__init__.py'
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
@@ -79,6 +81,8 @@ on:
       - 'tests/fixtures/g2p/english_no_drop_words.json'
       # Read by src/python_run/tests/test_swedish_phonemization.py (#830).
       - 'tests/fixtures/g2p/sv_golden.json'
+      # Imported by src/python/tests/test_piper_phonemize_debug_env.py.
+      - 'src/piper_phonemize_bundled/piper_phonemize/__init__.py'
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
