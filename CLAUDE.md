@@ -182,7 +182,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 
 - **FP16 デフォルト** (`export_onnx.py`) — モデルサイズ ~50% 削減。CLI: `--no-fp16` で無効化。
 - **emb_lang 自動統一** (`export_onnx.py:should_unify_emb_lang`) — シングルスピーカー多言語モデルで自動有効化、声質統一。CLI: `--unify-emb-lang` / `--no-unify-emb-lang` (auto), `--unify-emb-lang-source N`。テスト: `src/python/tests/test_export_onnx.py`。
-- **Speaker Embedding 入力パス** (`vits/models.py:infer`, `export_onnx.py`) — `speaker_embedding` テンソルで声質指定、speaker_id と排他。CLI: `--speaker-embedding`, `--reference-audio`, `--speaker-encoder-model`。テスト: `src/python/tests/test_speaker_embedding.py`。
+- **Speaker Embedding 入力パス** (`vits/models.py:infer`, `export_onnx.py`) — `speaker_embedding` テンソルで声質指定、speaker_id と排他。export CLI: `--export-mode auto|zero-shot|sid` (`sid` は非推奨で zero-shot に fallback)。推論 CLI (`infer_onnx.py`): `--speaker-embedding`, `--reference-audio`, `--speaker-encoder-model`。テスト: `src/python/tests/test_speaker_embedding.py`。
 
 ### Voice Cloning
 
@@ -237,12 +237,12 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 | C# (NuGet) | `PiperPlus.Core` / `PiperPlus.Cli` | 0.5.1 | CI / `dotnet test` 実測 | `src/csharp/PiperPlus.{Core,Cli}/` (TFM `net10.0`) |
 | Rust (crates.io) | `piper-plus` / `piper-plus-cli` | 0.5.3 | 多数 | `src/rust/piper-{core,cli,python,wasm}/` |
 | Go (Go module) | `github.com/ayutaz/piper-plus/src/go` | tag-based | CI / `go test ./...` 実測 | `src/go/piperplus/`, `src/go/cmd/piper-plus/` |
-| JS/WASM (npm) | `piper-plus` | 0.8.1 | CI / `npm run test:npm-package:all` 実測 | `src/wasm/openjtalk-web/`, `src/rust/piper-wasm/` |
+| JS/WASM (npm) | `piper-plus` | 0.8.2 | CI / `npm run test:npm-package:all` 実測 | `src/wasm/openjtalk-web/`, `src/rust/piper-wasm/` |
 | C API | `libpiper_plus` | shared lib | C/Dart/Godot サンプル | `src/cpp/piper_plus.{h,c_api.cpp}`, `cmake/PiperPlusShared.cmake` |
 | iOS xcframework + SPM | `piper-plus` (Swift Package) | 2.0.2 | release-shared-lib CI | `Package.swift`, `Sources/PiperPlus/`, `cmake/PrivacyInfo.xcprivacy` |
 | **Kotlin/Android G2P (Maven Central)** | `io.github.ayutaz:piper-plus-g2p-android` | 1.0.1 | L1〜L5 (kotlin-g2p-ci.yml) | `android/piper-plus-g2p/` |
-| iOS / macOS Swift G2P (SPM) | `PiperPlusG2P` (Swift product, 別 xcframework `-apple-`) | 2.0.2 | XCTest (CI) + `examples/swift-g2p/HelloG2P` CLI | `Sources/PiperPlusG2P/`, `Tests/PiperPlusG2PTests/`, `examples/swift-g2p/`, `Package.swift` (Issue #387) |
-| 独立 G2P | `piper-plus-g2p` (Py/Rust)、`@piper-plus/g2p` (npm)、`src/go/phonemize` (Go)、`io.github.ayutaz:piper-plus-g2p-android` (Kotlin) | 同上 | — | `src/{python/g2p,rust/piper-plus-g2p,wasm/g2p,go/phonemize}/`、`android/piper-plus-g2p/` |
+| iOS / macOS Swift G2P (SPM) | `PiperPlusG2P` (Swift product, 別 xcframework `-apple-`) | 2.0.2 | XCTest (CI) + `examples/swift-g2p/HelloG2P` CLI | `Sources/PiperPlusG2P/`, `tests/PiperPlusG2PTests/`, `examples/swift-g2p/`, `Package.swift` (Issue #387) |
+| 独立 G2P | `piper-plus-g2p` (Py/Rust)、`@piper-plus/g2p` (npm)、`src/go/phonemize` (Go)、`io.github.ayutaz:piper-plus-g2p-android` (Kotlin) | Py 0.3.1 / Rust 0.5.3 (workspace 共通) / npm 0.4.2 / Go 0.3.0 / Kotlin 1.0.1 | — | `src/{python/g2p,rust/piper-plus-g2p,wasm/g2p,go/phonemize}/`、`android/piper-plus-g2p/` |
 
 **主な追加機能 (ソースブランチの対応):** モデル名自動解決 (`--model tsukuyomi` でエイリアス + 自動 DL)、カスタム辞書 (JSON v1/v2 / TSV)、`[[ phoneme ]]` インライン音素記法 (C#/Python)、`--sentence-silence` / `--phoneme-silence` 制御、`--list-models` 言語フィルタ。`base` / `zero-shot-base-zs-v1` alias は Python 2.0.2 に収録され、旧 2.0.0 / 2.0.1 にはないため、公開 package の catalog は [`docs/guides/development/pretrained-models.md`](docs/guides/development/pretrained-models.md) を確認する。
 
@@ -289,7 +289,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 | Phoneme Timing 仕様 | `docs/spec/phoneme-timing-contract.toml` |
 | Audio Parity 仕様 | `docs/spec/audio-parity-contract.toml` |
 | ORT バージョン表 | `docs/reference/ort-versions.md` |
-| マイグレーションガイド | `docs/migration/v1.11-to-v1.12.md` |
+| マイグレーションガイド | `docs/migration/v1.12-to-v2.0.md` (最新)、`docs/migration/v1.11-to-v1.12.md` |
 
 ### 各言語ランタイム
 
@@ -373,7 +373,7 @@ cat test.jsonl | uv run python -m piper_train.infer_onnx --model <model.onnx> --
 | つくよみちゃん legacy ONNX | `ayousanz/piper-plus-tsukuyomi-chan` (HF root files; package aliases remain legacy) |
 | CSS10 JA ONNX | `ayousanz/piper-plus-css10-ja-6lang` (HF) |
 | 20話者データセット | `ayousanz/moe-speech-20speakers-ljspeech` (HF) |
-| パッケージレジストリ | PyPI / NuGet / crates.io / npm — それぞれ `piper-plus` または `PiperPlus.*` で検索 |
+| パッケージレジストリ | PyPI / NuGet / crates.io / npm — それぞれ `piper-plus` または `PiperPlus.*` で検索。Kotlin G2P は Maven Central (`io.github.ayutaz:piper-plus-g2p-android`)、Swift は SwiftPM (本リポジトリの `Package.swift`) |
 
 ---
 
@@ -396,7 +396,7 @@ cat test.jsonl | uv run python -m piper_train.infer_onnx --model <model.onnx> --
 | `/bump-deps` | ORT/openjtalk/ruff の cross-runtime canonical sync 更新 |
 | `/skill-health` | skill / hook 自身の health check (frontmatter / script 参照 / trigger 衝突) |
 
-pre-commit / pre-push gate は `.pre-commit-config.yaml` に集約 (50+ hook、 contract gate 18+、 cross-language formatter 6 言語)。 各 hook の trigger 条件と既知パターンは [.claude/README.md](.claude/README.md) を参照。
+pre-commit / pre-push gate は `.pre-commit-config.yaml` に集約 (119 hook、 うち id に `contract` を含む gate 19、 cross-language formatter 6 言語)。 各 hook の trigger 条件と既知パターンは [.claude/README.md](.claude/README.md) を参照。
 
 ---
 

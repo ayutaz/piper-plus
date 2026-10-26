@@ -34,7 +34,7 @@
 - [クイックスタート](#クイックスタート)
 - [インストール](#インストール)
 - [使い方](#使い方)
-- [学習](#学習)
+- [学習](#学習-1)
 - [事前学習済みモデル](#事前学習済みモデル)
 - [プラットフォーム](#プラットフォーム)
 - [関連リンク](#関連リンク)
@@ -90,7 +90,7 @@ Python / Rust / Go / C# / C++ / WASM の 6 ランタイムを `multilingual-test
 
 - **WavLM Discriminator** — MOS +0.15-0.25 向上 (デフォルト有効、学習時のみ使用)
 - **MB-iSTFT-VITS2 Decoder** — Decoder を MB-iSTFT + PQMF に統一、CPU 推論 2.21x 高速化。ONNX 形式不変で既存ランタイム互換
-- **FP16 Mixed Precision** — 学習速度2-3倍、メモリ約50%削減 (デフォルト有効)
+- **BF16 Mixed Precision** — `--precision bf16-mixed` が既定 (TF32 も既定で有効)。FP16 より数値が安定し loss scaling 不要。BF16 非対応の GPU (T4 等) では `--precision 16-mixed` を指定
 - **EMA** — Exponential Moving Average による学習安定性向上 (デフォルト有効)
 - **マルチGPU** — DDP対応、自動学習率スケーリング
 - **Prosody Features** — Duration Predictorへの韻律情報注入 (`--prosody-dim 16`)
@@ -104,7 +104,7 @@ Python / Rust / Go / C# / C++ / WASM の 6 ランタイムを `multilingual-test
 - **[iOS xcframework + SPM](docs/guides/platform/ios-integration.md)** — `PiperPlus` (Swift Package)、合成エンジン本体を iOS arm64 device + simulator universal で配信
 - **[iOS Swift G2P (SPM)](docs/guides/platform/swift-g2p-integration.md)** — `PiperPlusG2P` 単独ライブラリ、8言語の G2P を ONNX Runtime 非依存で iOS 上で利用可能 (Issue #387)
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — ブラウザ内で完全動作、**音素タイミング出力 (JSON/TSV/SRT)**、サーバー不要
-- **[Docker](docker/README.md)** — 推論・学習・WebUI・C++の5イメージ提供
+- **[Docker](docker/README.md)** — 推論・学習・WebUI・C++ (推論/開発)・Wyoming (Home Assistant) の6イメージ提供
 - **PyPI** — `pip install piper-plus` で簡単インストール、8言語G2P/音素化 (現行の学習済みモデルは6言語)、**音素タイミング出力 (JSON/TSV/SRT)**、ストリーミング、HTTP API
 - **C# CLI** — .NET 10 クロスプラットフォーム、8言語G2P/音素化 (現行の学習済みモデルは6言語)、ONNX推論、**音素タイミング出力 (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応、**音素タイミング出力 (JSON/TSV/SRT)**、辞書自動ダウンロード
@@ -160,6 +160,16 @@ cd piper-plus
 
 ```bash
 curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
+tar xzf piper-plus-cpp.tar.gz
+cd piper-plus
+```
+
+**Linux (ARMv7, 32bit ARM):**
+
+ARMv7 の配布物は C++ CLI のみです。CI では QEMU 上の Debian Trixie (32bit ARM) でビルドと日本語合成を確認しています。Raspberry Pi 実機は未検証です。
+
+```bash
+curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-armv7.tar.gz
 tar xzf piper-plus-cpp.tar.gz
 cd piper-plus
 ```
@@ -263,9 +273,8 @@ docker pull ghcr.io/ayutaz/piper-plus/python-train:dev
 docker pull ghcr.io/ayutaz/piper-plus/webui:dev
 docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:dev
 docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
+docker pull ghcr.io/ayutaz/piper-plus/wyoming:dev
 ```
-
-> **Note:** webui イメージは CI で自動ビルドされません。`docker build -t piper-webui -f docker/webui/Dockerfile .` で手動ビルドしてください。
 
 詳細は [docker/README.md](docker/README.md) を参照。
 

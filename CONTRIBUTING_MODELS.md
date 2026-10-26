@@ -206,7 +206,7 @@ uv run python -m piper_train.tools.prepare_multilingual_dataset \
 
 ### 2. ファインチューニング実行
 
-以下は推奨パラメータです。`CONTRIBUTING.md` の Template B を参照してください。
+以下は推奨パラメータです。[`CLAUDE.md`](CLAUDE.md) の「学習テンプレート」節にある Template B (シングルスピーカー ファインチューニング) と同じ設定です。
 
 ```bash
 uv run python -m piper_train \

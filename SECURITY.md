@@ -64,8 +64,10 @@ reporters informed if a particular issue requires more time.
     (`PiperPlus`, `PiperPlusG2P`).
   - Kotlin/Android G2P AAR
     (`io.github.ayutaz:piper-plus-g2p-android` on Maven Central).
-- Official Docker images shipped from this repository
-  (`docker/python-inference/`, `docker/webui/`, `docker/wyoming/`).
+- Official Docker images shipped from this repository to
+  `ghcr.io/ayutaz/piper-plus/*` (`docker/python-inference/`,
+  `docker/python-train/`, `docker/webui/`, `docker/cpp-inference/`,
+  `docker/cpp-dev/`, `docker/wyoming/`).
 - Pre-trained model weights and configs published from this repository or its
   associated Hugging Face accounts.
 
@@ -94,10 +96,10 @@ images are dismissed as `won't fix`.
 | Image | Distribution | Trivy monitored? | Notes |
 |-------|-------------|-----------------:|-------|
 | `python-inference` (CUDA) | Production (GHCR / DockerHub) | ✅ | OpenAI-compatible TTS API server for GPU clusters |
-| `python-inference-cpu-distroless` | Production | ✅ | Multi-arch CPU inference image |
-| `webui` / `webui-distroless` | Production | ✅ | Gradio demo / WebUI |
+| `python-inference-cpu-distroless` | Build-only trial (not published) | ✅ | Distroless variant of the multi-arch CPU inference image (the published CPU image is `python-inference` with a `-cpu` tag suffix) |
+| `webui` / `webui-distroless` | Production (`-distroless` is a build-only trial, not published) | ✅ | Gradio demo / WebUI |
 | `wyoming` | Production | ✅ | Home Assistant Wyoming Protocol TTS |
-| `cpp-inference` / `cpp-inference-distroless` | Production | ✅ | Native C++ inference binary |
+| `cpp-inference` / `cpp-inference-distroless` | Production (`-distroless` is a build-only trial, not published) | ✅ | Native C++ inference binary |
 | `cpp-dev` | Local development helper | ✅ | Build / debug environment (kept under monitoring as a hygiene baseline) |
 | `python-train` | **Local development only** (4-GPU training stack) | ❌ | Not deployed to clusters; executed on individual researcher machines. CVE alerts on the ML/training apt layer (CUDA + cuDNN + ML toolchain) do not represent an exposed network attack surface for piper-plus |
 
