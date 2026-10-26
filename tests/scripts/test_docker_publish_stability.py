@@ -29,23 +29,40 @@ def test_real_workflow_has_bounded_independent_caches_and_no_hub_rebuild():
     assert load("check_docker_publish_stability").check(workflow()) == []
 
 
+def test_push_only_export_keeps_the_matrix_scope():
+    module = load("check_docker_publish_stability")
+    value = (
+        "${{ github.event_name != 'pull_request' && "
+        "format('type=gha,mode=max,scope={0},timeout=2m,ignore-error=true', "
+        "matrix.target.cache_scope) || '' }}"
+    )
+    assert module.cache_export(value) == (
+        "type=gha,mode=max,scope=${{ matrix.target.cache_scope }},timeout=2m,ignore-error=true"
+    )
+
+
 def test_root_release_does_not_rebuild_the_docker_release_again():
     data = workflow()
     triggers = data.get("on", data.get(True))
     assert triggers["push"]["tags"] == ["docker-v*"]
 
 
-@pytest.mark.parametrize("mutation", ["shared", "timeout", "fatal", "rebuild"])
+@pytest.mark.parametrize("mutation", ["shared", "timeout", "fatal", "rebuild", "pr-export"])
 def test_guard_rejects_publication_regressions(mutation):
     data = copy.deepcopy(workflow())
     steps = data["jobs"]["build-python-inference"]["steps"]
     build = next(s for s in steps if s.get("id") == "build")
+    push_only = "${{ github.event_name != 'pull_request' && '%s' || '' }}"
     if mutation == "shared":
-        build["with"]["cache-to"] = "type=gha,mode=max"
+        build["with"]["cache-to"] = push_only % "type=gha,mode=max"
     elif mutation == "timeout":
-        build["with"]["cache-to"] = "type=gha,scope=gpu,ignore-error=true"
+        build["with"]["cache-to"] = push_only % "type=gha,scope=gpu,ignore-error=true"
     elif mutation == "fatal":
-        build["with"]["cache-to"] = "type=gha,scope=gpu,timeout=2m"
+        build["with"]["cache-to"] = push_only % "type=gha,scope=gpu,timeout=2m"
+    elif mutation == "pr-export":
+        build["with"]["cache-to"] = (
+            "type=gha,mode=max,scope=build-python-inference,timeout=2m,ignore-error=true"
+        )
     else:
         steps.append(
             {
