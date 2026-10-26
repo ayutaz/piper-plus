@@ -42,8 +42,10 @@ def test_release_sboms_preserve_attested_json_without_mutating_binary_inventory(
 
 
 def test_required_rust_ci_runs_actual_onnx_cache_regressions():
-    jobs = workflow("ci.yml")["jobs"]
-    steps = jobs["rust-tests"]["steps"]
+    # rust-tests.yml runs the Rust tests; the Required Status Check Gate
+    # fails a pull request when that workflow fails.
+    config = workflow("rust-tests.yml")
+    steps = config["jobs"]["test"]["steps"]
     fixture = next(
         i
         for i, s in enumerate(steps)
@@ -57,7 +59,8 @@ def test_required_rust_ci_runs_actual_onnx_cache_regressions():
     assert fixture < inference
     assert "--features onnx" in steps[inference]["run"]
     assert not steps[inference].get("continue-on-error", False)
-    assert "rust-tests" in jobs["ci-required"]["needs"]
+    gate = workflow("required_status_check_gate.yml")
+    assert config["name"] in gate[True]["workflow_run"]["workflows"]
 
 
 def test_release_regressions_are_required_and_available_as_commit_hook():
