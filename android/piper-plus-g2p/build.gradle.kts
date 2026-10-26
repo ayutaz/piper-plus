@@ -304,7 +304,10 @@ mavenPublishing {
         signAllPublications()
     }
 
-    val publishVersion = project.findProperty("VERSION_NAME") as? String ?: "1.0.0"
+    // android/gradle.properties (or ORG_GRADLE_PROJECT_VERSION_NAME in
+    // release-kotlin-g2p.yml) is the only source; a missing VERSION_NAME fails
+    // the build instead of publishing a stale literal.
+    val publishVersion = project.property("VERSION_NAME") as String
     coordinates(
         groupId    = "io.github.ayutaz",
         artifactId = "piper-plus-g2p-android",

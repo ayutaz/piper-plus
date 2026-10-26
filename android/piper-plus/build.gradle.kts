@@ -73,7 +73,9 @@ afterEvaluate {
 
                 groupId = "com.piperplus"
                 artifactId = "piper-plus"
-                version = project.findProperty("VERSION_NAME") as? String ?: "0.1.0"
+                // android/gradle.properties is the only source; a missing
+                // VERSION_NAME fails the build instead of publishing a stale literal.
+                version = project.property("VERSION_NAME") as String
 
                 pom {
                     name.set("piper-plus")
