@@ -24,12 +24,14 @@ name: Lint and gates
 #   * re-running the job re-runs every check (about a minute in total).
 #
 # Former workflows: action-pin-gate, actionlint, changelog-format,
-# cli-help-docs-sync, codespell, dependency-review, g2p-known-divergences,
-# hadolint, inference-input-contract, link-check, markdownlint,
+# cli-help-docs-sync, codespell, dependency-review, doc-examples-gate,
+# forward-compat-fuzz, g2p-known-divergences, hadolint,
+# inference-input-contract, link-check, markdownlint,
 # migration-changelog-parity, migration-guide-lint, model-quality-gate,
 # ort-version-sync, public-abi-snapshot, python-lint, readme-heading-tree-parity,
 # rulesets, ruff-version-sync, secret-scan, test-threshold-relaxation,
-# version-consistency. The pull-request title / body / commit message checks
+# timing-monotonicity, version-consistency; and the pull-request run of
+# action-sha-drift (its weekly issue and baseline update stay there). The pull-request title / body / commit message checks
 # are in pr-metadata.yml, which also runs when the title or body is edited.
 
 on:
@@ -45,6 +47,10 @@ on:
     inputs:
       mode_override:
         description: 'version-consistency: override `mode` (warn|fail) — empty to use toml setting'
+        required: false
+        type: string
+      fuzz_seed:
+        description: 'forward-compat-fuzz: random seed — empty for a random one'
         required: false
         type: string
 
@@ -338,6 +344,34 @@ jobs:
         if: ${{ !cancelled() }}
         run: python scripts/check_action_pins.py
 
+      # ---------------------------------------------------------- action-sha-drift
+      # Each 40-hex SHA pin must still exist on GitHub (not force-pushed away).
+      # The weekly issue and the baseline update stay in action-sha-drift.yml.
+      # The report goes to the job summary: a sticky comment on every pull
+      # request would be noise now that this runs on all of them.
+      - name: "action-sha-drift: every SHA pin still resolves on GitHub"
+        id: action-sha-drift
+        if: ${{ !cancelled() }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/check_action_sha_drift.py --report /tmp/action-sha-drift-report.md
+
+      - name: "action-sha-drift: report to the job summary"
+        if: ${{ !cancelled() && steps.action-sha-drift.outcome != 'skipped' }}
+        run: |
+          if [ -f /tmp/action-sha-drift-report.md ]; then
+            cat /tmp/action-sha-drift-report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: "action-sha-drift: upload report"
+        if: ${{ !cancelled() && steps.action-sha-drift.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: action-sha-drift-report-${{ github.run_id }}
+          path: /tmp/action-sha-drift-report.md
+          retention-days: 30
+          if-no-files-found: warn
+
       # ---------------------------------------------------------- changelog-format
       - name: "changelog-format: validate CHANGELOG.md"
         id: changelog-format
@@ -375,6 +409,83 @@ jobs:
             pkg:cargo/webpki-roots
           warn-only: false
           vulnerability-check: true
+
+      # --------------------------------------------------------- doc-examples-gate
+      # Syntax-validates (bash -n / py_compile) every docs block the audit JSON
+      # classifies as executable; nothing is actually run. The report goes to
+      # the job summary.
+      - name: "doc-examples-gate: install markdown-it-py"
+        id: doc-examples-install
+        if: ${{ !cancelled() }}
+        run: pip install markdown-it-py==4.0.0
+
+      - name: "doc-examples-gate: audit snapshot matches the docs"
+        id: doc-examples-audit
+        if: ${{ !cancelled() }}
+        run: |
+          python scripts/check_doc_examples.py audit \
+            --check-snapshot tests/fixtures/doc_examples_audit/audit.json \
+            --generated-at 2026-05-19T00:00:00Z
+
+      - name: "doc-examples-gate: syntax-validate executable docs blocks"
+        id: doc-examples-execute
+        if: ${{ !cancelled() }}
+        run: |
+          # Pre-seed both files so a script crash before they are written still
+          # leaves a summary and an artifact.
+          printf '%s\n' \
+            "## doc-examples-gate report (informational)" \
+            "" \
+            "_The execute script did not complete successfully; this is a placeholder._" \
+            > /tmp/doc-examples-sticky.md
+          printf '%s\n' '{"results": [], "observed_total": 0, "expected_total": 0, "runner_languages": []}' \
+            > /tmp/doc-examples-report.json
+          python scripts/check_doc_examples.py execute \
+            --report /tmp/doc-examples-report.json \
+            --sticky-comment /tmp/doc-examples-sticky.md \
+            --strict
+
+      - name: "doc-examples-gate: report to the job summary"
+        if: ${{ !cancelled() && steps.doc-examples-execute.outcome != 'skipped' }}
+        run: cat /tmp/doc-examples-sticky.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "doc-examples-gate: upload report"
+        if: ${{ !cancelled() && steps.doc-examples-execute.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: doc-examples-report-${{ github.run_id }}
+          path: /tmp/doc-examples-report.json
+          retention-days: 30
+          if-no-files-found: warn
+
+      # ------------------------------------------------------- forward-compat-fuzz
+      # 1000 random future-schema inputs (schema_version > 2, unknown fields)
+      # for the zh_en_loanword.json / pua.json loaders must not raise.
+      - name: "forward-compat-fuzz: random future-schema inputs to the Python loaders"
+        id: forward-compat-fuzz
+        if: ${{ !cancelled() }}
+        env:
+          SEED: ${{ inputs.fuzz_seed }}
+        run: |
+          seed_args=()
+          if [ -n "$SEED" ]; then seed_args=(--seed "$SEED"); fi
+          python scripts/fuzz_forward_compat.py fuzz \
+            --iterations 1000 "${seed_args[@]}" --output /tmp/fuzz.json
+
+      - name: "forward-compat-fuzz: record dashboard entry"
+        id: forward-compat-record
+        if: ${{ !cancelled() && steps.forward-compat-fuzz.outcome == 'success' }}
+        run: python scripts/fuzz_forward_compat.py record --input /tmp/fuzz.json
+
+      - name: "forward-compat-fuzz: upload results"
+        if: ${{ !cancelled() && steps.forward-compat-fuzz.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: forward-compat-fuzz-${{ github.run_id }}
+          path: |
+            /tmp/fuzz.json
+            docs/ci-dashboard/data/forward-compat-fuzz.jsonl
+          retention-days: 90
 
       # ----------------------------------------------------- g2p-known-divergences
       - name: "g2p-known-divergences: unit tests for the gate"
@@ -540,6 +651,24 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: python scripts/check_test_threshold_relaxation.py --base "$BASE_SHA"
+
+      # ------------------------------------------------------- timing-monotonicity
+      # The 4 invariants of docs/spec/phoneme-timing-contract.toml on 1000
+      # random inputs (timing-parity checks fixed fixtures only).
+      - name: "timing-monotonicity: random inputs keep the timing invariants"
+        id: timing-monotonicity
+        if: ${{ !cancelled() }}
+        run: |
+          python scripts/check_timing_monotonicity.py fuzz \
+            --iterations 1000 --output /tmp/timing-fuzz.json
+
+      - name: "timing-monotonicity: upload results"
+        if: ${{ !cancelled() && steps.timing-monotonicity.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: timing-monotonicity-${{ github.run_id }}
+          path: /tmp/timing-fuzz.json
+          retention-days: 90
 
       # -------------------------------------------------------- version-consistency
       # Compares each manifest's version with the major.minor prefix pinned in

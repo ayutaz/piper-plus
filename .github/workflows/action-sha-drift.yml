@@ -3,8 +3,10 @@ name: Action SHA Drift Detector
 # T-002 (informational tier): complements action-pin-gate.yml.
 # action-pin-gate.yml enforces the SHA pin **shape** (40-hex or full SemVer,
 # never sliding @v<major>). This workflow verifies that each 40-hex SHA pin is
-# still **alive** on GitHub (commit exists, not force-pushed). Run weekly +
-# on PRs that touch workflow YAMLs / the gate script / the baseline.
+# still **alive** on GitHub (commit exists, not force-pushed). Runs weekly
+# (opens an issue on drift) and on dispatch (baseline update). Pull
+# requests and pushes to dev run the same check as a step of
+# lint-gates.yml.
 #
 # Tier: informational (PR run does NOT fail CI on drift — sticky comment only).
 # Promotion to blocker is gated on 4 consecutive green weekly runs (CON-3.1).
@@ -12,12 +14,6 @@ name: Action SHA Drift Detector
 on:
   schedule:
     - cron: '0 4 * * 1'  # Monday 04:00 UTC, 1h after T-001 rekor-verify (queue spread).
-  pull_request:
-    paths:
-      - '.github/workflows/**.yml'
-      - 'scripts/check_action_sha_drift.py'
-      - 'scripts/action_sha_baseline.json'
-      - 'scripts/platform_utils.py'
   workflow_dispatch:
     inputs:
       update_baseline:
@@ -27,7 +23,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
   issues: write
 
 concurrency:
@@ -81,13 +76,6 @@ jobs:
           name: action-sha-drift-report-${{ github.run_id }}
           path: /tmp/action-sha-drift-report.md
           retention-days: 30
-
-      - name: Post sticky comment (PR only)
-        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
-        uses: marocchino/sticky-pull-request-comment@v2.9.4
-        with:
-          header: action-sha-drift
-          path: /tmp/action-sha-drift-report.md
 
       - name: Open issue on drift (scheduled only)
         if: ${{ !cancelled() && steps.flag.outputs.drift == '1' && github.event_name == 'schedule' }}
