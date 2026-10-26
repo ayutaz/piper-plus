@@ -13,6 +13,13 @@ on:
       - 'src/cpp/**'
       - 'CMakeLists.txt'
       - 'cmake/**'
+      # Also copied by the C++ Dockerfiles
+      # (tests/scripts/test_docker_workflow_paths.py).
+      - 'VERSION'
+      - 'LICENSE.md'
+      - 'src/rust/piper-plus-g2p/data/**'
+      - 'src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md'
+      - 'test/models/multilingual-test-medium.onnx*'
       - '.github/workflows/docker-test.yml'
   workflow_dispatch:
 
