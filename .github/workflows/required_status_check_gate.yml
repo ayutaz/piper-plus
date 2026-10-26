@@ -49,7 +49,6 @@ name: Required Status Check Gate
 on:
   workflow_run:
     workflows:
-      - Action SHA Drift Detector
       - Android Build
       - Audio MOS Proxy
       - Build All Platforms
@@ -68,7 +67,6 @@ on:
       - cppcheck
       - CSharp deleted working directory regression
       - Dictionary Consistency Gate
-      - doc-examples-gate
       - Docker Build and Push
       - Docker Build Validate
       - Docker Tests
@@ -76,7 +74,6 @@ on:
       - 'E2E Issue #426 (speaker_embedding)'
       - Extended contract gates
       - First-PR Fast Lane
-      - Forward-compat Fuzz
       - Fuzz Smoke
       - G2P Cross-Platform Consistency
       - G2P Python CI
@@ -118,7 +115,6 @@ on:
       - Test Japanese TTS
       - Test Multilingual TTS
       - Test WebAssembly
-      - Timing Monotonicity
       - Trivy Container Scan
       - Tsukuyomi Publication Preparation
       - WASM Build
