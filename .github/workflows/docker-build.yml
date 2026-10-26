@@ -26,6 +26,11 @@ on:
       - 'src/python/**'
       - 'pyproject.toml'
       - 'CMakeLists.txt'
+      # Copied by the python-inference / webui / wyoming / python-train /
+      # cpp-inference Dockerfiles (tests/scripts/test_docker_workflow_paths.py).
+      - 'VERSION'
+      - 'src/python_run/requirements_webui.txt'
+      - 'src/python_run/overrides_webui.txt'
       - '.github/workflows/docker-build.yml'
       - 'tests/scripts/test_docker_release_tags.py'
       - 'tests/scripts/test_docker_publish_stability.py'
@@ -54,6 +59,11 @@ on:
       - 'src/python/**'
       - 'pyproject.toml'
       - 'CMakeLists.txt'
+      # Copied by the python-inference / webui / wyoming / python-train /
+      # cpp-inference Dockerfiles (tests/scripts/test_docker_workflow_paths.py).
+      - 'VERSION'
+      - 'src/python_run/requirements_webui.txt'
+      - 'src/python_run/overrides_webui.txt'
       - '.github/workflows/docker-build.yml'
       - 'tests/scripts/test_docker_release_tags.py'
       - 'tests/scripts/test_docker_publish_stability.py'
