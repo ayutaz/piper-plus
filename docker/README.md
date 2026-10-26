@@ -144,11 +144,24 @@ response.stream_to_file("output.wav")
 
 対応エンドポイント:
 
-- `POST /v1/audio/speech` — 音声合成
+- `POST /v1/audio/speech` — 音声合成 (OpenAI 互換。`"stream": true` でチャンク転送)
 - `GET /v1/models` — モデル一覧
 - `GET /v1/audio/speech/languages` — 対応言語一覧
+- `GET /synthesize` — クエリ (`text`, `language`, `speaker_id`, `noise_scale`, `length_scale`, `noise_w`) で WAV を返す
+- `POST /api/phoneme-timing` — JSON body (`text`, `language` など) から音素タイミングを返す
+- `GET /health` — ヘルスチェック (`{"status": "healthy"}`)。認証とレート制限の対象外
 
 > **Note:** `response_format` は `wav` のみ対応。
+
+API サーバーは次の環境変数で認証とレート制限を設定できます。
+
+| 変数名 | 既定値 | 説明 |
+|--------|--------|------|
+| `PIPER_PLUS_API_KEYS` | (未設定) | カンマ区切りの API キー。設定すると `/synthesize` と `/v1/*` に `Authorization: Bearer <key>` が必要。未設定なら認証なし |
+| `PIPER_PLUS_RATE_LIMIT_ENABLED` | `true` | IP ごとのレート制限を有効にする |
+| `PIPER_PLUS_RATE_LIMIT_SPEECH` | `30/minute` | 合成系エンドポイントの上限 |
+| `PIPER_PLUS_RATE_LIMIT_LIGHT` | `600/minute` | `/v1/models` などメタデータ系の上限 |
+| `PIPER_PLUS_WEBUI` | (未設定) | `1` / `true` で API サーバーの代わりに Gradio WebUI を起動 |
 
 ## Python 学習
 
@@ -427,7 +440,7 @@ curl http://localhost:8080/info
 |---------|-------|----------|
 | Python 推論 | 8000 | FastAPI |
 | Python 学習 | 6006 | TensorBoard |
-| Python 学習 | 8888 | Jupyter |
+| Python 学習 | 8888 | Jupyter 用に EXPOSE のみ (Jupyter 本体は未導入) |
 | WebUI | 7860 | Gradio |
 
 ## GPU 対応
@@ -494,9 +507,15 @@ docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:dev
 
 # C++ 開発
 docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
+
+# Python 推論 (CPU 版、arm64 / amd64)
+docker pull ghcr.io/ayutaz/piper-plus/python-inference:dev-cpu
+
+# Wyoming (Home Assistant)
+docker pull ghcr.io/ayutaz/piper-plus/wyoming:dev
 ```
 
-タグには `main` (最新の main ブランチ)、セマンティックバージョン (`v1.0.0` 等)、コミット SHA が使用できます。
+タグには `dev` (最新の dev ブランチ)、`docker-v*` タグから作るバージョン (`docker-v2.0.2` なら `2.0.2`)、コミット SHA (`sha-<短縮SHA>`) が使用できます。Python 推論の CPU 版は同じタグに `-cpu` を付けます (`dev-cpu`、`2.0.2-cpu` など)。
 
 ### ビルドトリガー
 

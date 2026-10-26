@@ -148,7 +148,7 @@ dotnet build src/csharp/PiperPlus.sln -c Release
 dotnet run --project src/csharp/PiperPlus.Cli -- --help
 ```
 
-The solution also contains `PiperPlus.Core` (library) and `PiperPlus.Core.Tests` (~1000 xUnit v3 tests).
+The solution also contains `PiperPlus.Core` (library), `PiperPlus.Core.Tests` (about 1,240 xUnit v3 test methods), and `PiperPlus.Cli.Tests`.
 
 ## Related packages
 

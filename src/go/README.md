@@ -159,22 +159,23 @@ piper-plus -m model.onnx -t "Hello" --streaming | aplay -r 22050 -f S16_LE
 | `--length-scale` | `1.0` | Speech rate (length scale) |
 | `--noise-w` | `0.5` | Duration predictor noise scale |
 | `--sentence-silence` | `0.2` | Silence between sentences (seconds) |
-| `--phoneme-silence` | | Per-phoneme silence override (`p:0.1,t:0.05` syntax) |
+| `--phoneme-silence` | | Per-phoneme silence override in `phoneme:seconds` form; repeat the flag for each phoneme (e.g. `--phoneme-silence p:0.1 --phoneme-silence t:0.05`) |
 | `--device` | `cpu` | Inference device (cpu, cuda, coreml, directml) |
 | `--streaming` | `false` | Write raw PCM int16 to stdout |
 | `--output-raw` | `false` | Same as `--streaming` (legacy alias) |
 | `--batch` | | Batch file with one text line per utterance |
-| `--json-input` | | Read JSONL `{phoneme_ids, speaker_id?, ...}` from path / stdin |
+| `--json-input` | `false` | Boolean: read JSONL (`{phoneme_ids, speaker_id?, ...}` or `{text, language?, ...}`) from stdin. Piped stdin is also detected without this flag |
 | `--output-timing` | | Write phoneme timing to file |
 | `--timing-format` | `json` | Timing output format (json / tsv / srt) |
 | `--reference-audio` | | Voice cloning input WAV; use with a compatible encoder model and the published zs-v1 preprocessing flow |
-| `--speaker-embedding` | | Voice cloning: load a pre-computed model-compatible embedding (.bin / .npy) |
+| `--speaker-embedding` | | Voice cloning: load a pre-computed model-compatible embedding (NumPy `.npy` or raw little-endian float32 `.bin`) |
 | `--speaker-encoder-model` | | Speaker encoder ONNX used with `--reference-audio`; its output dimension must match the loaded TTS model |
-| `--model-dir` | `${PIPER_PLUS_MODEL_DIR}` | Model cache directory (defaults to `~/.cache/piper-plus`) |
+| `--model-dir` | `$PIPER_PLUS_MODEL_DIR`, else `DefaultCacheDir()` | Model cache directory. The OS-specific default is described under [Model Manager](#model-manager--モデル管理) |
 | `--list-models` | | List models already downloaded in the cache |
 | `--download-model` | | Download one model/config file by HTTPS URL and exit |
-| `--version` | | Print version (resolved from build ldflags) and exit |
-| `--quiet` | `false` | Suppress informational output |
+| `--version` | | Print the CLI version string and exit |
+| `--custom-dict` | | Custom dictionary path (JSON v1/v2 or TSV); repeatable |
+| `-q, --quiet` | `false` | Suppress informational output |
 | `--debug` | `false` | Enable debug logging |
 
 ### Public zs-v1 model files
@@ -308,7 +309,7 @@ no public `base` alias is provided by this Go runtime.
 
 | Function | Default | Description |
 |----------|---------|-------------|
-| `WithLanguage(lang string)` | `""` | Target language code (ja, en, zh, es, fr, pt, sv). |
+| `WithLanguage(lang string)` | `""` | Target language code (ja, en, zh, ko, es, fr, pt, sv). |
 | `WithSpeakerID(id int64)` | `0` | Speaker ID for multi-speaker models. |
 | `WithNoiseScale(v float32)` | `0.4` | Generation noise scale (higher = more variation). |
 | `WithLengthScale(v float32)` | `1.0` | Speech rate (< 1.0 = faster, > 1.0 = slower). |
@@ -462,7 +463,7 @@ The CLI binary doubles as an HTTP server when invoked with `serve` as the first 
 # Local serve (host)
 piper-plus serve -m model.onnx --addr :8080
 
-# Streaming + custom dictionary
+# Custom dictionary
 piper-plus serve -m model.onnx --addr :8080 --custom-dict dict.json
 
 # In Docker (port-forwarded)
@@ -475,8 +476,14 @@ docker run -p 8080:8080 -v /path/to/models:/models \
 | `--addr` | `:8080` | HTTP listen address |
 | `-m, --model` | (required) | ONNX model path |
 | `-c, --config` | auto-detected | `config.json` path |
-| `--custom-dict` | | Custom dictionary path (JSON v1/v2 or TSV) |
+| `--custom-dict` | | Custom dictionary path (JSON v1/v2 or TSV); repeatable |
 | `--device` | `cpu` | Inference device (`cpu`, `cuda`, `coreml`, `directml`) |
+| `--model-dir` | | Model cache directory override |
+| `-q, --quiet` / `--debug` | `false` | Logging level |
+
+`--addr` is the only `serve`-specific flag. The other flags in this table are
+persistent root flags, so they are shared with the synthesis mode; synthesis-only
+flags such as `--text`, `--language`, or `--noise-scale` are not available to `serve`.
 
 ## Environment Variables / 環境変数
 
@@ -516,6 +523,7 @@ src/go/
   cmd/
     piper-plus/
       main.go                     # CLI application (cobra)
+      serve.go                    # `serve` subcommand (HTTP server)
   piperplus/
     doc.go                        # Package documentation
     init.go                       # Init() / Shutdown() — ONNX Runtime lifecycle
@@ -532,22 +540,30 @@ src/go/
     jsonl.go                      # JSONL input parsing
     text_splitter.go              # SplitSentences() — multilingual sentence splitting
     timing.go                     # Phoneme timing (DurationsToTiming)
+    short_text.go                 # Short-text strategies A/B/C
+    phoneme_silence.go            # Per-phoneme silence insertion
+    speaker_encoder.go            # Speaker encoder + embedding file loading
+    dict_loader.go                # Dictionary path discovery
+    voice_catalog.go              # Voice catalog entries / aliases
     model_manager.go              # ModelManager — download, cache, discovery
     errors.go                     # Error types and sentinel errors
+    ssml/                         # SSML basic profile parser
+    internal/parallelism/         # G2P parallelism helpers
     *_test.go                     # Unit tests
     testdata/                     # Test fixtures (config JSONs)
-  phonemize/
+  phonemize/                      # Separate module (own go.mod), see phonemize/README.md
     phonemizer.go                 # Phonemizer interface, TokensToIDs, PostProcessIDs
     multilingual.go               # MultilingualPhonemizer — language routing
     unicode_detect.go             # UnicodeLanguageDetector — script-based detection
     pua.go                        # PUA (Private Use Area) token mapping
-    dict.go                       # Dictionary-based G2P
+    dict.go / custom_dict.go      # Custom dictionaries
     english.go                    # English phonemizer
-    japanese.go                   # Japanese phonemizer
-    chinese.go                    # Chinese phonemizer
+    japanese.go                   # Japanese phonemizer (OpenJTalk, `openjtalk` build tag)
+    chinese.go                    # Chinese phonemizer (+ chinese_loanword.go for ZH-EN)
+    korean.go                     # Korean phonemizer
     spanish.go                    # Spanish phonemizer
     french.go                     # French phonemizer
-    portuguese.go                 # Portuguese phonemizer
+    portuguese.go                 # Portuguese phonemizer (pt-BR / pt-PT)
     swedish.go                    # Swedish phonemizer
     *_test.go                     # Unit tests
   docker/

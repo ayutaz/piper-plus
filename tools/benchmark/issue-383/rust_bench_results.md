@@ -1,5 +1,8 @@
 # Issue #383 Phase 1 — Rust 実機ベンチ結果
 
+> Issue #383 の実装ブランチに対する歴史的な計測記録です。数値・コマンド名・
+> 依存バージョンは当時の環境と commit に固定され、現行 release の性能保証ではありません。
+
 > **対象 commit:** `a9c3d996` `feat(rust): G2P を全文並列実行 (Phase 1, Issue #383)`
 > **ベンチハーネス:** `src/rust/piper-core/examples/bench_phase1.rs`
 

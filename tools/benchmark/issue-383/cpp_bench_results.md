@@ -1,5 +1,8 @@
 # C++ Phase 1 実機ベンチ結果 (Issue #383)
 
+> Issue #383 の実装ブランチに対する歴史的な計測記録です。数値・コマンド名・
+> 依存バージョンは当時の環境と commit に固定され、現行 release の性能保証ではありません。
+
 `piper.exe` を `--text` 引数経由で叩き、PowerShell の `Measure-Command`
 相当 (`System.Diagnostics.Stopwatch`) で wall-clock を計測。serial =
 `PIPER_G2P_PARALLELISM=1`、parallel = env unset (auto)。

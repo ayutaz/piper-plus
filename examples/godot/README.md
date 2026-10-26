@@ -10,7 +10,7 @@ This example demonstrates how to wrap the piper-plus C API into a `PiperTTS` nod
 
 ```text
 examples/godot/
-  SConstruct                   # SCons build script (~15 lines)
+  SConstruct                   # SCons build script (~20 lines, 3 build statements)
   src/
     register_types.h           # GDExtension entry point
     register_types.cpp
@@ -155,7 +155,7 @@ On Linux/macOS, set `LD_LIBRARY_PATH` / `DYLD_LIBRARY_PATH` if the shared librar
 
 ## Migration from godot-piper-plus (Source Copy)
 
-[godot-piper-plus](https://github.com/ayutaz/godot-piper-plus) currently copies 25+ C++ source files from piper-plus and compiles them directly into the GDExtension. The C API shared library approach replaces this with a thin wrapper (~200 lines of C++) that links against a pre-built `libpiper_plus`.
+[godot-piper-plus](https://github.com/ayutaz/godot-piper-plus) currently copies 25+ C++ source files from piper-plus and compiles them directly into the GDExtension. The C API shared library approach replaces this with a thin wrapper (~420 lines of C++) that links against a pre-built `libpiper_plus`.
 
 ### Before (Source Copy)
 
@@ -181,9 +181,9 @@ godot-piper-plus/
 ```text
 examples/godot/
   src/
-    piper_tts_node.h / .cpp    # GDExtension wrapper (~150 lines)
-    register_types.h / .cpp    # Entry point (~30 lines)
-  SConstruct                   # 3 lines: SConscript + ParseConfig + SharedLibrary
+    piper_tts_node.h / .cpp    # GDExtension wrapper (~370 lines)
+    register_types.h / .cpp    # Entry point (~50 lines)
+  SConstruct                   # 3 build statements: SConscript + ParseConfig + SharedLibrary
 ```
 
 - Updating piper-plus: just replace `libpiper_plus.so` / `.dylib` / `.dll`
@@ -202,13 +202,13 @@ examples/godot/
 
 | Feature | godot-piper-plus (source copy) | This example (C API) |
 |---------|-------------------------------|---------------------|
-| Wrapper code size | ~25+ files | 4 files (~200 lines) |
+| Wrapper code size | ~25+ files | 4 files (~420 lines) |
 | Build time | Minutes | Seconds |
 | piper-plus update | Re-copy all sources | Replace shared library |
 | Custom dictionary | Requires source changes | `piper_plus_load_custom_dict()` via C API |
 | Streaming synthesis | Custom implementation | `piper_plus_synth_start/next()` via C API |
 | Thread safety | Varies | Documented: one engine per thread |
-| Platforms | Linux, Windows, macOS | Linux, Windows, macOS, **iOS (xcframework, v2.0.1+)** |
+| Platforms | Linux, Windows, macOS | Linux, Windows, macOS, **iOS (xcframework, v2.0.2+)** |
 
 ## Platform Notes
 
@@ -230,7 +230,7 @@ export DYLD_LIBRARY_PATH=/usr/local/lib:$DYLD_LIBRARY_PATH
 
 Place `piper_plus.dll` and `onnxruntime.dll` in the same directory as the Godot executable or the exported game executable.
 
-### iOS (v2.0.1+)
+### iOS (v2.0.2+)
 
 - **Architecture**: arm64 (device) + arm64/x86_64 (simulator universal)
 - **Status**: Stable
@@ -258,14 +258,15 @@ The `ios.dependencies` entry instructs Godot's iOS exporter to embed `onnxruntim
 ```bash
 # Place inside your Godot project
 mkdir -p addons/piper-plus/ios
-gh release download v2.0.1 -p 'libpiper_plus-ios-*.xcframework.zip' \
+gh release download v2.0.2 -p 'libpiper_plus-ios-*.xcframework.zip' \
   -O addons/piper-plus/ios/libpiper_plus-ios.xcframework.zip
 unzip addons/piper-plus/ios/libpiper_plus-ios.xcframework.zip \
   -d addons/piper-plus/ios/
 
 # ORT (CDN option, see ios-integration.md for CocoaPods/SPM alternatives)
-curl -LO https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.0.zip
-unzip pod-archive-onnxruntime-c-1.17.0.zip -d addons/piper-plus/ios/
+# sha256 (1.20.0): 50891a8aadd17d4811acb05ed151ba6c394129bb3ab14e843b0fc83a48d450ff
+curl -LO https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.20.0.zip
+unzip pod-archive-onnxruntime-c-1.20.0.zip -d addons/piper-plus/ios/
 ```
 
 For the cross-runtime guide (Dart / Godot / Swift) see [`docs/guides/platform/ios-integration.md`](../../docs/guides/platform/ios-integration.md).

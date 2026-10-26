@@ -330,6 +330,7 @@ Synthesize speech from text.
 | `noiseScale` | `number` | `0.4` | Controls voice variation. |
 | `lengthScale` | `number` | `1.0` | Controls speech speed (lower = faster). |
 | `noiseW` | `number` | `0.5` | Controls phoneme duration variation. |
+| `speakerEmbedding` | `Float32Array` | -- | Pre-computed speaker embedding for voice cloning. Its dimension must match the loaded model (zs-v1: 192). |
 
 Returns `Promise<AudioResult>`.
 
@@ -343,6 +344,7 @@ Streaming synthesis that splits text into sentences and delivers audio chunks vi
 | `noiseScale` | `number` | `0.4` | Controls voice variation. |
 | `lengthScale` | `number` | `1.0` | Controls speech speed. |
 | `noiseW` | `number` | `0.5` | Controls phoneme duration variation. |
+| `speakerEmbedding` | `Float32Array` | -- | Same as `synthesize()`. |
 | `onChunk` | `function` | -- | Callback receiving a `Float32Array` of PCM samples per sentence. |
 
 Returns `Promise<void>`.
@@ -398,13 +400,26 @@ const tts = await PiperPlus.initialize({ model: "ayousanz/piper-plus-tsukuyomi-c
 const tts = await PiperPlus.initialize({ model: "tsukuyomi", ort });
 ```
 
-The public `zs-v1` base is stored below a versioned subdirectory. This source
-update recognizes `base`, `zero-shot-base-zs-v1`, and `ayousanz/piper-plus-base`
-as pinned aliases for its TTS graph and matching `base.onnx.json`, without
-repository sibling auto-detection. These aliases target the next npm release.
-For earlier packages, use the direct URL below to avoid legacy root files:
-The browser resolves pinned URLs; it does not validate the published release
-manifest hashes. Use the bundle manifest for separate integrity checks.
+The public `zs-v1` base is stored below a versioned subdirectory. Since npm
+0.8.2, `base`, `zero-shot-base-zs-v1`, and `ayousanz/piper-plus-base` are
+pinned aliases for its TTS graph and matching `base.onnx.json`, without
+repository sibling auto-detection. For 0.8.1 and earlier, use the direct URL
+below to avoid legacy root files.
+
+Integrity checks differ between the published package and the development
+branch:
+
+- **npm 0.8.2**: the aliases resolve pinned URLs, but `base.onnx` is not checked
+  against a hash, because the published `base.onnx.json` has no `sha256` field.
+- **Next npm release** (on the `dev` branch, not yet published): `base.onnx`
+  fetched through these aliases is checked against a pinned SHA-256 digest, and
+  loading stops on a mismatch. The check needs `crypto.subtle` (a secure
+  context such as HTTPS); without it the runtime logs a warning and skips the
+  check.
+
+In both versions a direct URL is checked only when its config has a `sha256`
+field, and the other bundle files are not checked against the release
+manifest. Use the bundle manifest for separate integrity checks.
 
 ```javascript
 const zsRevision = "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1";
@@ -442,7 +457,7 @@ candidate when resolving URLs yourself.
 | Language | Code | Phonemization Engine | Notes |
 |----------|------|---------------------|-------|
 | Japanese | `ja` | jpreprocess (Rust WASM) | Full phoneme analysis with prosody features (A1/A2/A3); NAIST-JDIC dictionary bundled |
-| English | `en` | Rule-based (JS) | SimpleEnglishPhonemizer |
+| English | `en` | CMU dictionary G2P (`@piper-plus/g2p`) | CMU Pronouncing Dictionary + g2p_en-style normalization |
 | Chinese | `zh` | Rule-based G2P (`@piper-plus/g2p`) | Pinyin → IPA with ZH-EN code-switching loanword dispatch |
 | Spanish | `es` | Rule-based G2P (`@piper-plus/g2p`) | IPA via rule-based phonemizer |
 | French | `fr` | Rule-based G2P (`@piper-plus/g2p`) | IPA via rule-based phonemizer |
@@ -465,11 +480,12 @@ const audio = await piper.synthesize('<speak>Hello <break time="400ms"/>world.</
 // The public zs-v1 bundle uses a CAM++ 192-dim Float32Array.
 // Application-specific loader for the embedding produced by the published example.
 const embedding192 = await loadEmbeddingFromPublishedExample()
-const cloned = await piper.synthesizeWithVoiceCloning(
-  'こんにちは。',
-  embedding192,
-  { language: 'ja' },
-)
+const cloned = await piper.synthesize('こんにちは。', {
+  language: 'ja',
+  speakerEmbedding: embedding192,
+})
+// synthesizeWithVoiceCloning(text, embedding, options) is deprecated; use the
+// speakerEmbedding option above.
 ```
 
 See the [published zs-v1 README](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/README.md)
@@ -481,6 +497,9 @@ CI run `38189966578` reports six-runtime inference from shared Python phoneme
 IDs; native G2P and listening quality were excluded, and quality approval
 remains false. These are separate checks and do not establish WASM-specific
 G2P or listening-quality approval.
+
+The Kaldi fbank front end, the `modelData` option, and `findDroppedSymbols()`
+below were added after npm 0.8.2 (on the `dev` branch, not yet published).
 
 To compute the zs-v1 embedding in the browser instead, load the published
 `campplus.onnx` with the Kaldi fbank front end, which matches the Python recipe
@@ -558,7 +577,7 @@ const modelManager = new ModelManager();
 await modelManager.clearCache();
 ```
 
-> **Note:** In v0.2.0, the Japanese dictionary is bundled in the WASM binary. There is no separate dictionary cache. If upgrading from v0.1.x, see [MIGRATION.md](./MIGRATION.md) for instructions on cleaning up legacy IndexedDB dictionary data.
+> **Note:** Since v0.2.0, the Japanese dictionary is bundled in the WASM binary. There is no separate dictionary cache. If upgrading from v0.1.x, see [MIGRATION.md](./MIGRATION.md) for instructions on cleaning up legacy IndexedDB dictionary data.
 
 ### URL Resolution
 

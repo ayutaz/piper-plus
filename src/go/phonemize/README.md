@@ -77,14 +77,18 @@ Override phonemization for specific words:
 
 ```go
 dict, err := phonemize.LoadDictFile("custom.json")
-p := phonemize.WrapPhonemizer(phonemize.NewEnglishPhonemizer(cmuDict), dict)
+if err != nil {
+    log.Fatal(err)
+}
+p := dict.WrapPhonemizer(phonemize.NewEnglishPhonemizer(cmuDict))
 ```
 
 ## PUA Encoding
 
 Multi-character phoneme tokens (e.g., `"tʃ"`, `"N_m"`, `"tone1"`) are mapped to
-single Unicode codepoints in the Private Use Area (U+E000–U+E058) for compatibility
-with Piper ONNX model input format.
+single Unicode codepoints in the Private Use Area (fixed table U+E000–U+E064;
+unknown tokens are allocated dynamically from U+E065) for compatibility with
+Piper ONNX model input format.
 
 ## Cross-Platform Consistency
 
