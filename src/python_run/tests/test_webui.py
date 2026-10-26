@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Integration tests for Piper WebUI"""
 
+import ast
 import inspect
 import os
 import sys
@@ -28,6 +29,33 @@ try:
     WEBUI_AVAILABLE = True
 except ImportError:
     WEBUI_AVAILABLE = False
+
+
+TRAINER_MAIN = (
+    Path(__file__).resolve().parents[3] / "src" / "python" / "piper_train" / "__main__.py"
+)
+
+
+def _trainer_quality_choices() -> tuple[str, ...]:
+    """Read the ``--quality`` choices from piper_train's argparse setup.
+
+    Parsed with ``ast`` so the test does not import piper_train (torch).
+    """
+    tree = ast.parse(TRAINER_MAIN.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "add_argument"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and node.args[0].value == "--quality"
+        ):
+            continue
+        for keyword in node.keywords:
+            if keyword.arg == "choices":
+                return tuple(ast.literal_eval(keyword.value))
+    raise AssertionError(f"--quality choices not found in {TRAINER_MAIN}")
 
 
 @pytest.mark.skipif(not WEBUI_AVAILABLE, reason="WebUI dependencies not installed")
@@ -137,6 +165,27 @@ class TestWebUI:
 
             # Check that interface has components
             assert len(interface.blocks) > 0
+
+    def test_training_quality_choices_match_trainer(self, tmp_path):
+        """The Training tab offers only --quality values piper_train accepts.
+
+        The tab offered "low", which piper_train rejects (its choices are
+        x-low / medium / high), so a training run started with it exited at
+        argument parsing.
+        """
+        interface = create_interface(tmp_path)
+        radios = [
+            block
+            for block in interface.blocks.values()
+            if isinstance(block, gr.Radio) and block.label == "Model Quality"
+        ]
+        assert len(radios) == 1
+        ui_values = [
+            choice[1] if isinstance(choice, tuple) else choice
+            for choice in radios[0].choices
+        ]
+        assert ui_values == list(_trainer_quality_choices())
+        assert radios[0].value in ui_values
 
     def test_synthesis_function_signature(self):
         """Test that synthesis function has correct signature"""
