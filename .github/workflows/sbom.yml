@@ -30,17 +30,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ----------------------------------------------------------------
-  # 1) Repository-level SBOM (all source files, polyglot project)
-  # ----------------------------------------------------------------
-  syft-repo:
+  # One job generates every SBOM. They were six jobs of one to three minutes
+  # each, on nearly every pull request (src/**) and every push. Each step
+  # runs even when an earlier one failed (!cancelled()), so one broken
+  # generator still shows next to the others in a single run; the job fails
+  # when any of them does.
+  generate:
+    name: SBOMs (repository, Python, Rust, Go, C#, npm)
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CYCLONEDX_BOM_VERSION: 7.5.0
+      CARGO_CYCLONEDX_VERSION: 0.5.9
+      CYCLONEDX_GOMOD_VERSION: v1.12.0
+      CYCLONEDX_DOTNET_VERSION: 6.3.1
+      CYCLONEDX_NPM_VERSION: 6.0.1
     steps:
       - uses: actions/checkout@v6.1.0
         with:
           fetch-depth: 0
 
-      - name: Generate SBOM (SPDX JSON)
+      # --------------------------------------------------------------
+      # 1) Repository-level SBOM (all source files, polyglot project).
+      # First, before a later step writes a lock file or an SBOM into the
+      # tree.
+      # --------------------------------------------------------------
+      - name: Repository SBOM (SPDX JSON)
+        if: ${{ !cancelled() }}
         uses: anchore/sbom-action@v0.24.3
         with:
           path: .
@@ -48,7 +64,8 @@ jobs:
           output-file: sbom-repo.spdx.json
           artifact-name: sbom-repo-spdx
 
-      - name: Generate SBOM (CycloneDX JSON)
+      - name: Repository SBOM (CycloneDX JSON)
+        if: ${{ !cancelled() }}
         uses: anchore/sbom-action@v0.24.3
         with:
           path: .
@@ -56,23 +73,19 @@ jobs:
           output-file: sbom-repo.cyclonedx.json
           artifact-name: sbom-repo-cyclonedx
 
-  # ----------------------------------------------------------------
-  # 2) Python package SBOM (piper-plus runtime + g2p)
-  # ----------------------------------------------------------------
-  # Built from uv.lock (the versions a user gets), not from the runner's
-  # Python environment: `cyclonedx-py environment` on a bare runner only
-  # listed cyclonedx-py's own dependencies.
-  cyclonedx-python:
-    runs-on: ubuntu-24.04
-    env:
-      CYCLONEDX_BOM_VERSION: 7.5.0
-    steps:
-      - uses: actions/checkout@v6.1.0
-      - uses: astral-sh/setup-uv@v6.8.0
+      # --------------------------------------------------------------
+      # 2) Python package SBOM (piper-plus runtime + g2p)
+      # --------------------------------------------------------------
+      # Built from uv.lock (the versions a user gets), not from the runner's
+      # Python environment: `cyclonedx-py environment` on a bare runner only
+      # listed cyclonedx-py's own dependencies.
+      - if: ${{ !cancelled() }}
+        uses: astral-sh/setup-uv@v6.8.0
         with:
           python-version: '3.13'
 
       - name: Generate Python SBOMs from uv.lock
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           sbom() {
@@ -91,7 +104,8 @@ jobs:
           sbom piper-plus src/python_run/pyproject.toml sbom-python-runtime.cyclonedx.json --extra cpu --extra http
           sbom piper-plus-g2p src/python/g2p/pyproject.toml sbom-python-g2p.cyclonedx.json --extra all
 
-      - uses: actions/upload-artifact@v4.6.2
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: sbom-python
           path: |
@@ -100,24 +114,21 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-  # ----------------------------------------------------------------
-  # 3) Rust workspace SBOM (cargo-cyclonedx)
-  # ----------------------------------------------------------------
-  cyclonedx-rust:
-    runs-on: ubuntu-24.04
-    env:
-      CARGO_CYCLONEDX_VERSION: 0.5.9
-    steps:
-      - uses: actions/checkout@v6.1.0
-      - uses: dtolnay/rust-toolchain@stable
+      # --------------------------------------------------------------
+      # 3) Rust workspace SBOM (cargo-cyclonedx)
+      # --------------------------------------------------------------
+      - if: ${{ !cancelled() }}
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-cyclonedx
+        if: ${{ !cancelled() }}
         run: cargo install cargo-cyclonedx --version "$CARGO_CYCLONEDX_VERSION" --locked
 
       - name: Generate Rust SBOM
         # cargo-cyclonedx writes one `<crate dir>/<package>.cdx.json` per
         # workspace member (piper-core/piper-plus.cdx.json, ...). The upload
         # used to look for `sbom-rust*.json` and uploaded nothing.
+        if: ${{ !cancelled() }}
         working-directory: src/rust
         run: |
           set -euo pipefail
@@ -127,28 +138,25 @@ jobs:
             echo "$f: $(jq '.components | length' "$f") components"
           done
 
-      - uses: actions/upload-artifact@v4.6.2
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: sbom-rust
           path: src/rust/*/*.cdx.json
           retention-days: 30
           if-no-files-found: error
 
-  # ----------------------------------------------------------------
-  # 4) Go module SBOM (cyclonedx-gomod)
-  # ----------------------------------------------------------------
-  cyclonedx-go:
-    runs-on: ubuntu-24.04
-    env:
-      CYCLONEDX_GOMOD_VERSION: v1.12.0
-    steps:
-      - uses: actions/checkout@v6.1.0
-      - uses: actions/setup-go@v5.6.0
+      # --------------------------------------------------------------
+      # 4) Go module SBOM (cyclonedx-gomod)
+      # --------------------------------------------------------------
+      - if: ${{ !cancelled() }}
+        uses: actions/setup-go@v5.6.0
         with:
           go-version-file: src/go/go.mod
           cache-dependency-path: src/go/go.sum
 
       - name: Install cyclonedx-gomod
+        if: ${{ !cancelled() }}
         run: go install "github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@$CYCLONEDX_GOMOD_VERSION"
 
       - name: Generate Go SBOM
@@ -156,71 +164,68 @@ jobs:
         # src/go/cmd/piper-plus/ 配下に main があり src/go 直下には Go file
         # が無い ('no Go files in /home/runner/.../src/go' エラー)。
         # `mod` mode で go.mod 全体の dependency tree を SBOM 化する。
+        if: ${{ !cancelled() }}
         working-directory: src/go
         run: |
           set -euo pipefail
           cyclonedx-gomod mod -json -output ../../sbom-go.cyclonedx.json
           jq -e '(.components | length) > 0' ../../sbom-go.cyclonedx.json > /dev/null
 
-      - uses: actions/upload-artifact@v4.6.2
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: sbom-go
           path: sbom-go.cyclonedx.json
           retention-days: 30
           if-no-files-found: error
 
-  # ----------------------------------------------------------------
-  # 5) C# project SBOM (CycloneDX-DotNet)
-  # ----------------------------------------------------------------
-  cyclonedx-dotnet:
-    runs-on: ubuntu-24.04
-    env:
-      CYCLONEDX_DOTNET_VERSION: 6.3.1
-    steps:
-      - uses: actions/checkout@v6.1.0
-      - uses: actions/setup-dotnet@v5.4.0
+      # --------------------------------------------------------------
+      # 5) C# project SBOM (CycloneDX-DotNet)
+      # --------------------------------------------------------------
+      - if: ${{ !cancelled() }}
+        uses: actions/setup-dotnet@v5.4.0
         with:
           dotnet-version: 10.0.x
 
       - name: Install CycloneDX.DotNet tool
+        if: ${{ !cancelled() }}
         run: dotnet tool install --global CycloneDX --version "$CYCLONEDX_DOTNET_VERSION"
 
       - name: Generate C# SBOM
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           dotnet CycloneDX src/csharp/PiperPlus.sln \
             --json --filename sbom-csharp.cyclonedx.json --output .
           jq -e '(.components | length) > 0' sbom-csharp.cyclonedx.json > /dev/null
 
-      - uses: actions/upload-artifact@v4.6.2
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: sbom-csharp
           path: sbom-csharp.cyclonedx.json
           retention-days: 30
           if-no-files-found: error
 
-  # ----------------------------------------------------------------
-  # 6) NPM package SBOM (cyclonedx-npm for both g2p + openjtalk-web)
-  # ----------------------------------------------------------------
-  # Both steps ran without node_modules and failed (exit 254, "missing
-  # evidence" / "npm-ls exited with errors") behind `continue-on-error`.
-  # They now read the dependency tree from a package lock instead.
-  cyclonedx-npm:
-    runs-on: ubuntu-24.04
-    env:
-      CYCLONEDX_NPM_VERSION: 6.0.1
-    steps:
-      - uses: actions/checkout@v6.1.0
-      - uses: actions/setup-node@v6.5.0
+      # --------------------------------------------------------------
+      # 6) NPM package SBOM (cyclonedx-npm for both g2p + openjtalk-web)
+      # --------------------------------------------------------------
+      # Both steps ran without node_modules and failed (exit 254, "missing
+      # evidence" / "npm-ls exited with errors") behind `continue-on-error`.
+      # They now read the dependency tree from a package lock instead.
+      - if: ${{ !cancelled() }}
+        uses: actions/setup-node@v6.5.0
         with:
           node-version: '24'
 
       - name: Install @cyclonedx/cyclonedx-npm
+        if: ${{ !cancelled() }}
         run: npm install -g "@cyclonedx/cyclonedx-npm@$CYCLONEDX_NPM_VERSION"
 
       - name: Generate NPM SBOM (g2p)
         # g2p commits no package-lock.json (the lockfile-size gate keeps it
         # out), so resolve one here without installing anything.
+        if: ${{ !cancelled() }}
         working-directory: src/wasm/g2p
         run: |
           set -euo pipefail
@@ -229,13 +234,15 @@ jobs:
           jq -e '(.components | length) > 0' ../../../sbom-npm-g2p.cyclonedx.json > /dev/null
 
       - name: Generate NPM SBOM (openjtalk-web)
+        if: ${{ !cancelled() }}
         working-directory: src/wasm/openjtalk-web
         run: |
           set -euo pipefail
           cyclonedx-npm --package-lock-only --output-file ../../../sbom-npm-openjtalk.cyclonedx.json
           jq -e '(.components | length) > 0' ../../../sbom-npm-openjtalk.cyclonedx.json > /dev/null
 
-      - uses: actions/upload-artifact@v4.6.2
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: sbom-npm
           path: |
@@ -250,7 +257,7 @@ jobs:
   # publisher. This read-only workflow must not create/publish that release.
   # ----------------------------------------------------------------
   aggregate:
-    needs: [syft-repo, cyclonedx-python, cyclonedx-rust, cyclonedx-go, cyclonedx-dotnet, cyclonedx-npm]
+    needs: [generate]
     runs-on: ubuntu-24.04
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
