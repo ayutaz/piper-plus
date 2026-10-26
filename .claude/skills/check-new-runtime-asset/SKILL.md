@@ -78,8 +78,12 @@ path を追加** する。新規 sync gate が必要なら `check_dictionary_con
 ```bash
 # テンプレートをコピーして新規 sync gate を作る場合
 cp scripts/check_dictionary_consistency.py scripts/check_<topic>_consistency.py
-# PAIRS リストを編集 → CI workflow を追加 → .pre-commit-config.yaml に登録
+# PAIRS リストを編集 → .github/workflows/lint-gates.yml に step を追加 → .pre-commit-config.yaml に登録
 ```
+
+秒単位で終わる gate は新しい workflow を作らず、 `lint-gates.yml` の 1 job に
+`"<check>: <what it does>"` 形式の step (`if: ${{ !cancelled() }}`) として足す
+(1 job 1 workflow が並んで runner 待ちを起こしたため統合済み。 経緯は同ファイル冒頭のコメント)。
 
 ## 確認すべき事項
 

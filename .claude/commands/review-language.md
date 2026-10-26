@@ -55,8 +55,8 @@ piper-plus の新言語実装を徹底的にレビューするスキルです。
 - `src/cpp/$ARGUMENTS_phonemize.cpp/.hpp` — 全ルール実装
 - `src/cpp/piper.cpp` — ディスパッチ + #include
 - `src/cpp/language_detector.cpp/.hpp` — 言語検出
-- `CMakeLists.txt` — ビルド設定
-- `src/cpp/tests/CMakeLists.txt` — テストターゲット
+- `cmake/PiperCommon.cmake` — `PIPER_COMMON_SOURCES` への登録
+- `src/cpp/tests/CMakeLists.txt` — テストターゲットとソース link
 - ASCII化されたダイアクリティカルマーク (ö→o 等) がないか **要注意**
 
 #### Agent 6: C# 実装完全性
@@ -88,9 +88,9 @@ piper-plus の新言語実装を徹底的にレビューするスキルです。
 
 #### Agent 9: CI 実行確認
 
-- `.github/workflows/cpp-tests.yml` — テスト実行リストに含まれるか
-- `.github/workflows/ci.yml` — テスト実行リストに含まれるか
-- `.github/workflows/dev-build-all.yml` — スモークテストに含まれるか
+- C++: `src/cpp/tests/CMakeLists.txt` の `add_test` に登録され `ctest -N` に出るか (workflow にテスト名のリストはない)
+- `.github/workflows/ci.yml` — paths filter が新規ファイルを拾い、 該当ランタイム job が起動するか
+- `.github/workflows/dev-build-all.yml` — `Smoke test all N languages` step の言語リストに含まれるか
 - C#: `dotnet test` で自動検出されるか
 - Rust: `cargo test` で自動検出されるか
 - Python: `pytest` マーカーが正しいか
@@ -99,7 +99,7 @@ piper-plus の新言語実装を徹底的にレビューするスキルです。
 #### Agent 10: ドキュメント + 学習パイプライン
 
 - CLAUDE.md — フォネマイザーテーブル、ファイルパス
-- README (4言語版) — 言語数更新
+- README (`README.md` + 翻訳版 7 本の計 8 本) — 言語数更新
 - npm README — 言語テーブル
 - 学習パイプライン制約:
   - `num_languages` ハードコード制限がないか
@@ -167,7 +167,7 @@ piper-plus の新言語実装を徹底的にレビューするスキルです。
 ### C++ 固有
 
 - **ASCII化ダイアクリティカル**: 例外語リストの ö→o, ä→a → UTF-8 文字列確認
-- **リンカエラー**: CMakeLists.txt にソース未追加 → 3ターゲットすべてに追加
+- **リンカエラー**: `cmake/PiperCommon.cmake` の `PIPER_COMMON_SOURCES` にソース未追加、 または `src/cpp/tests/CMakeLists.txt` で phonemizer ソースを列挙しているテストターゲットへの追加漏れ
 
 ### CI 固有
 

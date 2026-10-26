@@ -1,6 +1,6 @@
 ---
 name: watch-ci-patterns
-description: CI workflow の最近 run を集計し、 failure を「flake / drift / env / test bug」に自動分類する skill。 既存 `/watch-pr <PR>` の workflow-level 拡張。 引数なしで全 workflow の health check、 `--workflow <name>` で個別 workflow の最近失敗パターンを抽出。 docker-build 45% / go-ci 14% / csharp-ci 13% のような chronic flake を可視化する。
+description: CI workflow の最近 run を集計し、 failure を「flake / drift / env / test bug」に自動分類する skill。 既存 `/watch-pr <PR>` の workflow-level 拡張。 引数なしで全 workflow の health check、 `--workflow <name>` で個別 workflow の最近失敗パターンを抽出。 docker-build のような chronic flake (2026-05 の監査時点で failure rate 45%) を可視化する。
 argument-hint: "[--workflow <name>] [--limit 30] [--since 7d]"
 disable-model-invocation: false
 allowed-tools: Bash(gh run list *) Bash(gh run view *) Bash(gh workflow list *) Bash(ls .github/workflows/*) Bash(rg *) Bash(grep *) Bash(awk *) Bash(sort *) Bash(uniq *) Read Grep
@@ -8,15 +8,17 @@ allowed-tools: Bash(gh run list *) Bash(gh run view *) Bash(gh workflow list *) 
 
 # CI Failure Pattern Watcher
 
-15 エージェント workflow 監査の調査結果に基づく skill。 主要 failing workflow:
+15 エージェント workflow 監査 (2026-05、 PR #498) の調査結果に基づく skill。 当時の主要 failing workflow と、 CI 統合 (#883〜#906) 後の再測定値:
 
-| Workflow | Failure rate | 主要 failure 種別 |
-|----------|-------------|-----------------|
-| docker-build.yml | 45% | flake (arm64 QEMU / disk space / network) |
-| docker-test.yml | 16% | feature-branch test env (disk / arm64) |
-| go-ci.yml | 14% | dep drift (go.mod resolver) |
-| csharp-ci.yml | 13% | feature-branch issue-426 (docker mount) |
-| multi-runtime-rtf.yml | 5% | timing variance / RTF baseline |
+| Workflow | 2026-05 監査時 | 2026-10-26 再測定 (直近 50 run) | 主要 failure 種別 (監査時) |
+|----------|---------------|-------------------------------|-----------------|
+| docker-build.yml | 45% | 1/39 (~3%) | flake (arm64 QEMU / disk space / network) |
+| docker-test.yml | 16% | 0/37 (0%) | feature-branch test env (disk / arm64) |
+| go-ci.yml | 14% | 3/46 (~7%) | dep drift (go.mod resolver) |
+| csharp-ci.yml | 13% | 2/45 (~4%) | feature-branch issue-426 (docker mount) |
+| multi-runtime-rtf.yml | 5% | 1/31 (~3%) | timing variance / RTF baseline |
+
+再測定値は failure / (success + failure)。 数値は時間とともに変わるため、 判断には本 skill で集計した最新値を使う。
 
 ## 分類カテゴリ
 
@@ -40,7 +42,8 @@ allowed-tools: Bash(gh run list *) Bash(gh run view *) Bash(gh workflow list *) 
 ## フェーズ 1: workflow 一覧取得
 
 ```bash
-gh workflow list --limit 50 --json name,state,id | jq -r '.[] | select(.state == "active") | .name'
+# workflow は 100 本超 (.github/workflows/ に 103 ファイル、 2026-10-26)。 --limit 50 では取りこぼす
+gh workflow list --limit 200 --json name,state,id --jq '.[] | select(.state == "active") | .name'
 ```
 
 `--workflow` 指定時はその 1 つだけ、 省略時は全 active workflow を順次処理。
@@ -64,8 +67,8 @@ gh run list --workflow="$WORKFLOW" --limit "$LIMIT" \
 
 ```bash
 gh run list --workflow="$WORKFLOW" --status=failure --limit 50 \
-    --json headSha,headBranch,databaseId,createdAt | \
-    jq -r 'group_by(.headSha) | map({sha: .[0].headSha, count: length, branches: [.[].headBranch] | unique}) | .[]'
+    --json headSha,headBranch,databaseId,createdAt \
+    --jq 'group_by(.headSha) | map({sha: .[0].headSha, count: length, branches: ([.[].headBranch] | unique)}) | .[]'
 ```
 
 `count >= 2 && branches.length == 1` = flake or test bug。 `count == 1 && branches.length > 1` = drift。
@@ -98,7 +101,7 @@ grep -E "FAILED.*test_" /tmp/run_$RUN_ID.log | head -5  # 実 test failure 名
 - total runs (last $LIMIT): $TOTAL
 - failure rate (overall): $RATE%
 
-### Top failing workflows
+### Top failing workflows (値は記入例)
 | Workflow | Failure% | Primary category |
 |----------|---------|------------------|
 | docker-build | 45% | env (arm64 QEMU) |
@@ -147,7 +150,7 @@ test bug は個別 fix なので skill では着手しない、 issue 番号で�
 
 ## 期待効果
 
-- chronic flake (docker-build 45%) と **本物の drift / test bug を分離**
+- chronic flake (2026-05 監査時の docker-build 45% など) と **本物の drift / test bug を分離**
 - failure log の **手作業 `gh run view` 巡回を skill 化**
 - drift と判定したら **既存 `/bump-deps` / `/precheck` skill** にバトンを渡す
 - `/loop` と組み合わせて **継続的 CI health monitor**

@@ -38,7 +38,7 @@ memory `feedback_conservative_changes.md` に従い、 デフォルト dry-run�
 
 ```bash
 uv run python scripts/check_ort_versions.py --verbose 2>&1 | head -30
-uv run python scripts/check_openjtalk_version_sync.py --verbose 2>&1 | head -20
+uv run python scripts/check_openjtalk_version_sync.py 2>&1 | head -20
 uv run python scripts/check_ruff_version_sync.py 2>&1 | head -20
 ```
 
@@ -47,20 +47,25 @@ drift があれば「先に解消」を提案、 なければ「新 target へ�
 ## フェーズ 2: ORT bump 案 (`ort` の場合)
 
 ```bash
-# 6 ファイルの diff を生成
-TARGET="$2"  # 例 1.18.0
+# 対象一覧の正本は scripts/check_ort_versions.py の EXACT_TARGETS / FLOOR_TARGETS
+CURRENT=$(rg -o 'ONNXRUNTIME_VERSION "([0-9.]+)"' -r '$1' cmake/OnnxRuntime.cmake)  # 現在値 (例 1.20.0)
+TARGET="$2"       # 例 1.21.0
 
-# 1. cmake/OnnxRuntime.cmake
-rg "set\(ONNXRUNTIME_VERSION" cmake/OnnxRuntime.cmake
+# 1. cmake/OnnxRuntime.cmake (canonical) + cmake/find_onnxruntime_windows.cmake
+rg "set\(ONNXRUNTIME_VERSION" cmake/
 
-# 2. .github/workflows/{ort-version-sync,release-shared-lib,android-build,release-kotlin-g2p,kotlin-g2p-ci,build-piper,_build-test-cpp}.yml
-rg "ONNXRUNTIME_VERSION:" .github/workflows/ -l
+# 2. .github/workflows/ の exact-match 対象 7 本
+#    env 変数 `ONNXRUNTIME_VERSION:` を持つもの:
+#      release-shared-lib / android-build / release-kotlin-g2p / kotlin-g2p-ci / bundle-size-gate
+#    URL / cache key に version を直書きしているもの:
+#      build-piper / _build-test-cpp
+rg -F "$CURRENT" .github/workflows/{release-shared-lib,android-build,release-kotlin-g2p,kotlin-g2p-ci,bundle-size-gate,build-piper,_build-test-cpp}.yml
 
-# 3. docker/cpp-dev/Dockerfile
-rg "ONNXRUNTIME_VERSION" docker/cpp-dev/Dockerfile
+# 3. docker/cpp-dev/Dockerfile (URL 直書き)
+rg -F "$CURRENT" docker/cpp-dev/Dockerfile
 
-# 4. src/python/pyproject.toml + src/python_run/requirements*.txt
-rg "onnxruntime[<>=~]" src/python/ src/python_run/
+# 4. Python floor pin: src/python/pyproject.toml + src/python_run/{pyproject.toml,requirements_gpu.txt}
+rg "onnxruntime(-gpu)?[<>=~]" src/python/pyproject.toml src/python_run/pyproject.toml src/python_run/requirements_gpu.txt
 
 # 5. src/csharp/*.csproj
 rg "Microsoft.ML.OnnxRuntime" src/csharp/
@@ -75,22 +80,23 @@ rg "onnxruntime-web" src/wasm/openjtalk-web/
 各 hit の前後を markdown diff 形式で出力:
 
 ```diff
-- set(ONNXRUNTIME_VERSION 1.17.1)
-+ set(ONNXRUNTIME_VERSION 1.18.0)
+- set(ONNXRUNTIME_VERSION "1.20.0")
++ set(ONNXRUNTIME_VERSION "1.21.0")
 ```
 
 ## フェーズ 3: openjtalk bump 案 (`openjtalk` の場合)
 
-`cmake/ExternalDeps.cmake` の URL pattern (例えば `pyopenjtalk-plus/archive/v0.4.1.post7.tar.gz`) と、 `src/python/pyproject.toml` / `requirements.txt` / `src/python/g2p/pyproject.toml` の `pyopenjtalk-plus==0.4.1.post7` を同期。
+`cmake/ExternalDeps.cmake` の `PYOPENJTALK_PLUS_URL` (PyPI sdist、 例えば `pyopenjtalk_plus-0.4.1.post8.tar.gz`) と `URL_HASH SHA256=` (2 箇所) を更新し、 repo 内の全 `pyproject.toml` / `requirements*.txt` の `pyopenjtalk-plus` 指定 (例: `src/python_run/requirements.txt` の `pyopenjtalk-plus>=0.4.1.post8`、 `src/python/g2p/pyproject.toml` の `>=0.3,<1`) が新 version を許容するか確認する。 `check_openjtalk_version_sync.py` は `==` / `~=` 違反を ERROR、 範囲指定の違反を WARN として扱う。
 
 ## フェーズ 4: ruff bump 案 (`ruff` の場合)
 
-6 箇所同時更新:
+5 箇所同時更新 (`scripts/check_ruff_version_sync.py` の `EXPECTED_PIN_COUNT` と一致):
 
-1. `.pre-commit-config.yaml` `rev: v<VER>`
+1. `.pre-commit-config.yaml` `rev: v<VER>` (astral-sh/ruff-pre-commit)
 2. `.github/workflows/lint-gates.yml` `pip install ruff==<VER>` (python-lint step)
-3. `.github/workflows/ci.yml` `uv pip install ... ruff==<VER>`
-4. `pyproject.toml` 3 dependency group の `"ruff==<VER>"`
+3. `pyproject.toml` 3 dependency group の `"ruff==<VER>"`
+
+`.github/workflows/ci.yml` は PR #462 で ruff job を削除済みのため pin site ではない。
 
 ## フェーズ 5: 再検証
 
@@ -120,20 +126,20 @@ gh run list --workflow=ci.yml --limit 5
 ## 注意
 
 - **memory feedback_conservative_changes**: ORT は ABI 互換が崩れやすいため、 patch bump (`0.0.X`) のみ default、 minor / major bump は明示 `--target` 指定必須。
-- **memory feedback_pin_actions_sha**: actions の SHA pin に類する操作はこの skill では行わない (`/check-action-pins` 別 skill)。
+- **memory feedback_pin_actions_sha**: actions の SHA pin に類する操作はこの skill では行わない (action の pin は pre-commit / lint-gates の `action-pin-gate` = `scripts/check_action_pins.py` が検査する)。
 - **memory feedback_merge_caution**: `--apply` で Edit を実行する時はファイル単位で confirm。
 
 ## 使用例
 
 ```text
-# ORT を 1.18.0 に bump (dry-run)
-/bump-deps ort --target 1.18.0
+# ORT を 1.21.0 に bump (dry-run)
+/bump-deps ort --target 1.21.0
 
 # ruff を 0.16.0 に bump して即適用
 /bump-deps ruff --target 0.16.0 --apply
 
 # openjtalk patch bump
-/bump-deps openjtalk --target 0.4.1.post8
+/bump-deps openjtalk --target 0.4.1.post9
 ```
 
 ## 期待効果

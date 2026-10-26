@@ -50,7 +50,7 @@ Swift G2P) + 2 docker image (python-inference / webui) が **同じ振る舞い�
 
 | カテゴリ | パス | 対応する他ランタイム |
 |---|---|---|
-| **A. ランタイム推論** | `src/python_run/piper_plus/*.py` (voice.py, http_server.py, text_splitter.py, timing.py, model_manager.py) | C# / Rust core / Go / WASM / C API / iOS SPM |
+| **A. ランタイム推論** | `src/python_run/piper_plus/*.py` (voice.py, http_server.py, text_splitter.py, timing.py, download.py) | C# / Rust core / Go / WASM / C API / iOS SPM |
 | **B. G2P / phonemizer** | `src/python/g2p/piper_plus_g2p/*.py` (japanese.py, chinese.py, multilingual.py, ssml.py 等) | Rust piper-plus-g2p / Go phonemize / C# Phonemize / WASM g2p / C++ *_phonemize.cpp / Kotlin / Swift G2P |
 | **C. モデルエクスポート / 学習** | `src/python/piper_train/*.py` (export_onnx.py / vits/models.py / infer_onnx.py) | **ONNX I/O 変更なら `/check-runtime-parity` を使う**。 それ以外の周辺ロジック (chunking / scaling / sentence split 等) が本 skill 対象 |
 
@@ -170,14 +170,25 @@ G2P_FILES=$(git diff --name-only origin/dev...HEAD | \
   grep -E '^src/python/g2p/piper_plus_g2p/[a-z_]+\.py$' | \
   xargs -I{} basename {} .py)
 
+# WASM g2p は言語コードのディレクトリ (src/wasm/g2p/src/ja/ 等)、
+# C++ の日本語は openjtalk_phonemize.cpp なので名前を変換する
+code_of() {
+  case "$1" in
+    japanese) echo ja ;; english) echo en ;; chinese) echo zh ;; korean) echo ko ;;
+    spanish) echo es ;; portuguese) echo pt ;; french) echo fr ;; swedish) echo sv ;;
+    *) echo "$1" ;;
+  esac
+}
+cpp_of() { [ "$1" = japanese ] && echo openjtalk || echo "$1"; }
+
 for lang in $G2P_FILES; do
   echo "=== $lang phonemizer の configured runtime target 同期確認 ==="
   echo "  Python:    src/python/g2p/piper_plus_g2p/${lang}.py  [canonical]"
   ls -la "src/rust/piper-plus-g2p/src/${lang}.rs"           2>/dev/null && echo "  Rust:      OK" || echo "  Rust:      MISSING"
   ls -la "src/go/phonemize/${lang}.go"                       2>/dev/null && echo "  Go:        OK" || echo "  Go:        MISSING"
   ls -la "src/csharp/PiperPlus.Core/Phonemize/"              2>/dev/null | grep -i "$lang" || echo "  C#:        要確認"
-  ls -la "src/wasm/g2p/src/${lang}"                          2>/dev/null && echo "  WASM:      OK" || echo "  WASM:      MISSING"
-  ls -la "src/cpp/${lang}_phonemize.cpp"                     2>/dev/null && echo "  C++:       OK" || echo "  C++:       MISSING"
+  ls -la "src/wasm/g2p/src/$(code_of "$lang")"               2>/dev/null && echo "  WASM:      OK" || echo "  WASM:      MISSING"
+  ls -la "src/cpp/$(cpp_of "$lang")_phonemize.cpp"           2>/dev/null && echo "  C++:       OK" || echo "  C++:       MISSING"
   ls -la "android/piper-plus-g2p/src/main/"                  2>/dev/null | grep -i "$lang" || echo "  Kotlin:    要確認"
   ls -la "Sources/PiperPlusG2P/"                             2>/dev/null | grep -i "$lang" || echo "  Swift:     要確認"
 done

@@ -20,7 +20,7 @@ allowed-tools: Bash(cat *) Bash(grep *) Bash(jq *) Bash(rg *) Bash(awk *) Bash(c
 | Lockfile 再生成 | uv.lock / Cargo.lock / package-lock.json の更新コマンド提示 |
 | Swift checksum | xcframework artifact 取得後の `swift package compute-checksum` 手順 |
 | CHANGELOG 昇格 | `[Unreleased]` → `[X.Y.Z] - YYYY-MM-DD` の markdown diff |
-| Tag 順序ガイド | npm tag (g2p 先行) / shared-lib tag / 内部 chain tag の順序 |
+| Tag 順序ガイド | 独立パッケージ tag (npm は g2p 先行) → `docker-v` → `v` tag → Manual Release dispatch の順序 |
 | 公開後検証 | 各 registry で publish 完了確認の手順 |
 
 ## 引数
@@ -111,7 +111,7 @@ swift package compute-checksum libpiper_plus_g2p-apple.xcframework.zip   # g2pVe
 #    `let g2pChecksum` は g2pVersion が今回 tag と一致する時のみ更新
 #    (異なる場合 release-shared-lib.yml が g2p checksum 検証を自動 skip する)。
 
-# 4. dev に commit し、その commit に v<TARGET_VERSION> tag を push (フェーズ 7 の順序)
+# 4. PR で dev に入れ、その commit に v<TARGET_VERSION> tag を push (フェーズ 7 の順序)
 ```
 
 workflow_dispatch build と tag build は deterministic なので checksum は一致する。**この手順は tag push の直前** (フェーズ 7)。 dry-run でも手順を出力する。
@@ -138,19 +138,23 @@ awk '/^## \[Unreleased\]/{flag=1; next} /^## /{flag=0} flag' CHANGELOG.md
 
 ## フェーズ 7: Publish 順序ガイド
 
-CONTRIBUTING.md の規約に従い、 tag push 順序を明示:
+`CONTRIBUTING.md` の「Release order」「`v<X.Y.Z>` tag push の注意点」と各 release workflow の `on:` トリガーを正とする。 推奨順序:
 
-1. **First**: `wasm-g2p-v<X.Y.Z>` (npm `@piper-plus/g2p`) — g2p に変更が無く既公開なら skip
-2. **Second**: `npm-v<X.Y.Z>` (npm `piper-plus`、 g2p に依存)
-3. **Third**: `dev-create-release.yml` を **workflow_dispatch** (version 入力) で実行
-   → PyPI / crates.io / NuGet を sleep 30 入りで連鎖 publish。 **tag 駆動ではない** (Actions UI から手動実行)
-4. **Fourth**: `kotlin-g2p-v<X.Y.Z>` (Maven Central、 独立) — 既公開なら skip
-5. **Fifth**: **Package.swift の `checksum` を pre-tag 更新** (フェーズ 5 の workflow_dispatch artifact から compute-checksum → dev に commit)
-6. **Last**: その checksum commit に `v<X.Y.Z>` tag を push → release-shared-lib.yml (libpiper_plus + iOS/Android xcframework)
+1. **タグなしで native / Apple 成果物を生成・検証**: `release-shared-lib.yml` を workflow_dispatch (フェーズ 5)
+2. **Package.swift の版番号・URL・checksum を PR で更新** → merge と CI 確認 (この commit が以降すべてのタグの対象)
+3. **必要な独立パッケージを公開** (既公開なら skip、 再 tag 不要):
+   - npm: `wasm-g2p-v<X.Y.Z>` (`g2p-wasm-ci.yml`、 `@piper-plus/g2p`) の公開完了を待ってから `npm-v<X.Y.Z>` (`npm-publish.yml`、 `piper-plus`)。 逆順だと `piper-plus` の fresh install が `notarget` で失敗する
+   - crates.io: `rust-v<X.Y.Z>` tag を push し、 その tag を選んで `release-rust.yml` を **workflow_dispatch** (`piper-plus-g2p` → `piper-plus` → `piper-plus-cli` の順に publish)
+   - NuGet: `csharp-v<X.Y.Z>` tag を push し、 その tag を選んで `release-csharp.yml` を **workflow_dispatch**
+   - PyPI (G2P): `python-g2p-v<X.Y.Z>` (`g2p-python-ci.yml`)
+   - Maven Central: `kotlin-g2p-v<X.Y.Z>` (`release-kotlin-g2p.yml`)
+4. **Docker**: 同じ検証済み commit に `docker-v<X.Y.Z>` を push → `docker-build.yml` が build・署名・公開 (`<X.Y.Z>` / `latest`)。 consumer 検証まで行う。 `v<X.Y.Z>` だけでは Docker は公開されない
+5. **`v<X.Y.Z>`**: 同じ commit に push → `release-shared-lib.yml` (libpiper_plus + iOS/Android xcframework、 Package.swift checksum 検証) と `sbom.yml` が発火
+6. **PyPI (Python runtime)**: 同じ `v<X.Y.Z>` tag を選んで `dev-create-release.yml` (Manual Release) を **workflow_dispatch** (version 入力)。 PyPI へ公開し、 NuGet / crates.io は**既存パッケージの検証のみ** (ここでは publish しないので手順 3 を先に済ませる)
 
-> **重要 (フェーズ 5 参照):** Swift checksum 更新は `v<X.Y.Z>` tag の **前** (ステップ 5)。 placeholder のまま tag を push すると release-shared-lib.yml の release job が hard-fail し、 post-tag の後追い PR では SwiftPM 解決を救済できない (tag の git ref が解決対象のため)。
+> **重要 (フェーズ 5 参照):** Swift checksum 更新は `v<X.Y.Z>` tag の **前** (手順 2)。 placeholder のまま tag を push すると release-shared-lib.yml の release job が hard-fail し、 post-tag の後追い PR では SwiftPM 解決を救済できない (tag の git ref が解決対象のため)。
 >
-> 順序逆転による npm install 失敗 (g2p が無いと `piper-plus` install fail) も防ぐ。 `v<X.Y.Z>` tag は release-shared-lib.yml と **docker-build.yml を同時発火**させ、 Docker image (`<X.Y.Z>` / `latest`) も自動 publish される点に留意。
+> GitHub Release は `dev-create-release.yml` (draft + 自動 note) と `release-shared-lib.yml` (asset 添付) の 2 workflow から作られ、 どちらも CHANGELOG `[X.Y.Z]` 本文を使わない。 draft の本文を CHANGELOG `[X.Y.Z]` で手動置換してから publish する。
 
 ## フェーズ 8: 公開後検証コマンド
 

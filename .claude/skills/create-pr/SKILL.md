@@ -39,19 +39,21 @@ allowed-tools: Bash(git *) Bash(gh *) Bash(sleep *) Bash(python *) Bash(cat *) R
 
 ## PR 本文フォーマット (重要 — テンプレート準拠必須)
 
-**PR 本文は `.github/pull_request_template.md` の必須セクションをすべて含むこと。** `validate-pr-body` CI ゲートが以下を検査し、 欠けると PR が必ず red になる (PR #505 で発生した既知バグ — 旧フォーマットはこのゲートを通らなかった):
+**PR 本文は `.github/pull_request_template.md` の必須セクションをすべて含むこと。** `PR metadata` workflow (`.github/workflows/pr-metadata.yml`) の `pr-body-validate` step が以下を検査し、 欠けると PR が必ず red になる (PR #505 で発生した既知バグ — 旧フォーマットはこのゲートを通らなかった):
 
-- `## Test Plan` セクションが存在し非空 (**大文字 P**。 `## Test plan` は grep `^## Test Plan` に不一致で fail)
+- 本文が空でない
+- `## Test Plan` セクションが存在し非空 (**大文字 P**。 `## Test plan` は grep `^## Test Plan` に不一致で fail。 `<!-- -->` コメントだけも fail)
 - `## Risk Level` セクションでチェックボックスがちょうど **1 個** `- [x]`
 - `## Affected Components` セクションでチェックボックス最低 1 個 `- [x]`
+- `## Type` セクションでチェックボックス最低 1 個 `- [x]`
 
-PR title は **70 文字以内**、 `type(scope):` prefix (例 `fix(g2p):` `ci:` `feat(workflow):`)。
+PR title は **70 文字以内**、 `type(scope):` prefix (例 `fix(g2p):` `ci:` `feat(workflow):`)。 同じ workflow の `pr-title-check` step が Conventional Commits 形式 (type: `feat` / `fix` / `chore` / `docs` / `test` / `ci` / `refactor` / `perf` / `build` / `style` / `revert`) を、 `commitlint` step が各 commit message を検査する。
 
 PR 本文は以下を **この順** で含める (1-8 は template 準拠の必須セクション、 9-10 は create-pr 独自の value-add):
 
 1. `## Summary` — 解決する問題 / 動機 (1-3 文)。 時系列表現 (Phase 1/2) は使わない
-2. `## Affected Components` — 該当を `- [x]`: Python / Rust / C# / C++ / Go / WASM-npm / Docker / CI-CD / Documentation
-3. `## Type` — Bug fix / New feature / Refactoring / Documentation / CI/CD / Dependencies
+2. `## Affected Components` — 該当を `- [x]` (最低 1 個): Python / Rust / C# / C++ / Go / WASM-npm / Kotlin-Android / Swift-iOS / Docker / CI-CD / Documentation
+3. `## Type` — 該当を `- [x]` (最低 1 個): Bug fix / New feature / Refactoring / Documentation / CI/CD / Dependencies
 4. `## Risk Level` — patch / minor / major の **ちょうど 1 個**を `- [x]` (patch=bugfix/内部, minor=新機能/非破壊, major=破壊的変更)
 5. `## Contract Impact` — `docs/spec/*.toml` 影響。 無ければ `- [x] None`
 6. `## 変更内容` — 機能カテゴリ別の表 `機能名 / 動作 / これがないと起こること` の 3 列
@@ -80,7 +82,7 @@ git rev-parse --abbrev-ref @{u} 2>/dev/null || echo "no-upstream"
 
 `git log <base>..HEAD --pretty=format:"%h %s%n%b"` で全 commit を読み、 機能カテゴリ・規模・トレードオフを抽出。 上記 10 セクションを埋めて `/tmp/pr-body-<branch-slug>.md` に書き出す。
 
-### フェーズ 2.5: PR 本文 self-check (validate-pr-body 先取り)
+### フェーズ 2.5: PR 本文 self-check (pr-body-validate 先取り)
 
 push 前に必須セクションを検証する。 1 つでも欠けたら修正してからフェーズ 3 へ:
 
@@ -93,6 +95,8 @@ done
 awk '/^## Risk Level/{f=1;next}/^## /{f=0}f' "$B" | grep -cE '^- \[x\] '
 # Affected Components は [x] 1 個以上
 awk '/^## Affected Components/{f=1;next}/^## /{f=0}f' "$B" | grep -cE '^- \[x\] '
+# Type は [x] 1 個以上
+awk '/^## Type/{f=1;next}/^## /{f=0}f' "$B" | grep -cE '^- \[x\] '
 ```
 
 ### フェーズ 3: push
@@ -145,9 +149,10 @@ PR 作成後、 CI を完了まで監視する。 **`/watch-pr` skill は呼ば�
 | build error | `error[E` `cannot find` | ログ提示、 user 方針確認 |
 | flake | `timeout` `network` `rate limit` | `gh run rerun <id> --failed` 提案 |
 | contract drift | `MISMATCH` `OUT OF SYNC` | 該当 `/check-*` skill 案内 |
-| validate-pr-body | `Missing required section` | フェーズ 2 に戻り本文修正 → `gh pr edit --body-file` |
+| PR 本文 (`pr-body-validate`) | `Missing required section` `section is empty` `must have exactly 1 box` `must have at least 1 box` | フェーズ 2 に戻り本文修正 → `gh pr edit --body-file` |
+| PR title (`pr-title-check`) | `PR title does NOT match Conventional Commits` | `gh pr edit <PR> --title "<type>(<scope>): ..."` |
 
-分類結果と推奨アクションを user に提示。 format drift / validate-pr-body は本 skill で修正→push まで実施してよい。 test/build error は user 判断。
+分類結果と推奨アクションを user に提示。 format drift / PR 本文 / PR title は本 skill で修正→push (本文・title は `gh pr edit`) まで実施してよい。 test/build error は user 判断。
 
 ### フェーズ 6: review thread 返信 + resolve (inline — skill handoff なし)
 
@@ -233,6 +238,6 @@ PR body 内に `--no-verify` 等の禁止文字列があると pre-commit / GitH
 ## 期待効果
 
 - **skill 間 handoff ゼロ** — push / PR 作成 / CI 監視 / review 対応が 1 skill の連続フェーズ。 「次の skill を呼び忘れて工程が抜ける」 (PR #496 / #505) を構造的に防止
-- PR 本文が `pull_request_template.md` 準拠で `validate-pr-body` を必ず通る
+- PR 本文が `pull_request_template.md` 準拠で `pr-metadata.yml` の `pr-body-validate` を必ず通る
 - PR body の構造標準化、 フェーズ/マイルストーン表記の排除
 - review thread の reply+resolve 漏れ防止
