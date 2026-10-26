@@ -197,6 +197,15 @@ def test_gate_runs_only_from_workflow_run(gate_doc):
     assert _triggers(gate_doc)["workflow_run"]["types"] == ["completed"]
 
 
+def test_gate_is_not_fired_by_runs_on_dev_or_main(gate_doc):
+    """Pushes and schedules on dev only ever reached the job `if:` to be
+    skipped, after creating a run each. Only an ignore list is allowed:
+    a `branches:` allow list would drop pull request head branches."""
+    trigger = _triggers(gate_doc)["workflow_run"]
+    assert trigger["branches-ignore"] == ["dev", "main"]
+    assert "branches" not in trigger
+
+
 def test_gate_job_is_limited_to_pull_request_heads(gate_doc):
     job = gate_doc["jobs"]["gate"]
     assert job["if"] == (
