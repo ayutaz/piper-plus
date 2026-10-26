@@ -8,6 +8,8 @@
 
 `v<X>-to-v<Y>.md` の形 (例: `v1.11-to-v1.12.md`)。 hot-fix を伴う場合も major.minor 単位で 1 ファイルに集約し、 patch-level の細分化はしません (`v1.12.0-to-v1.12.1.md` 等は作らない)。
 
+例外として、 patch release 内の 1 つの話題だけを扱う移行資料は話題名のファイルにします (例: `provider-environments.md`、 `python-g2p-license.md`)。 `scripts/check_migration_xref.py` は `v*-to-v*.md` へのリンクだけを数えるため、 `### Breaking` の entry には話題名ファイルに加えて `v<X>-to-v<Y>.md` へのリンクも 1 つ含めてください。
+
 ## 見出し規約
 
 各 migration guide のトップ見出しは `# vX → vY migration guide`。 そのほかの構造は自由ですが、 個別の breaking change には **`## <change-id>` の H2 見出し** を 1 つずつ用意してください。 H2 見出しのテキストは GitHub Markdown anchor として CHANGELOG から `[label](docs/migration/vX-to-vY.md#change-id)` で参照されるので、 一度公開した H2 はリネームしないでください (anchor が壊れます)。
@@ -65,6 +67,8 @@ CI は anchor なしを fail にはしません。 ただし strict CI で `--st
 
 - [v1.11 → v1.12](v1.11-to-v1.12.md) — HiFi-GAN `Generator` 削除 + `phonemize()` 戻り値変更 + streaming/SSML 関連
 - [v1.12 → v2.0](v1.12-to-v2.0.md) — Issue #527 Python 3.13 + CUDA 12.8 + Ubuntu 24.04 統一 + 新 GPU 最適化 (TF32 / bf16-mixed default)
+- [Python 2.0.2 の provider と WebUI 環境](provider-environments.md) — v2.0.2 から CPU/GPU の ORT を `[cpu]` / `[gpu]` extra で明示的に選ぶ
+- [Python 英語G2Pのライセンス対応](python-g2p-license.md) — `piper-plus==2.0.2` / `piper-plus-g2p==0.3.1` での Distance 依存の除去と既存配布物との差
 
 ## 関連 doc
 

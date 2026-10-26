@@ -7,8 +7,10 @@ piper-plus の npm パッケージをバンドラーと組み合わせて使う�
 ## 前提条件
 
 ```bash
-npm install piper-plus onnxruntime-web
+npm install piper-plus onnxruntime-web@1.30.0
 ```
+
+`onnxruntime-web` は peerDependency (`>=1.22.0`) です。ブラウザでの検証は `1.30.0` で行っています。ランタイムごとの ORT 版は [ORT Version Matrix](../../reference/ort-versions.md) を参照してください。
 
 ## Vite
 

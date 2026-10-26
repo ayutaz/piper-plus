@@ -538,5 +538,5 @@ echo "Test [[ t ɛ s t ]]" | piper-plus --model model.onnx --debug -f test.wav
 ## See Also
 
 - [Phoneme Mapping](../api-reference/phoneme-mapping.md) - Technical details on phoneme mapping
-- Japanese Usage Guide - Japanese-specific features
+- [Japanese Model Training](../guides/training/training-guide.md#japanese-model-training) - Japanese-specific data format and preprocessing
 - [Training Guide](../guides/training/training-guide.md) - Training models with custom phoneme sets

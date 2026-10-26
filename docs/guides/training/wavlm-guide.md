@@ -41,7 +41,7 @@ WavLM Discriminator は Microsoft WavLM をベースにした知覚品質判別�
 
 WavLM Discriminator はデフォルトで有効なため、特別なフラグは不要です。通常の学習コマンドをそのまま実行できます。
 
-> **注意:** Zero-Shot TTS 学習（`feat/zero-shot-tts` ブランチ）では CAM++ SCL が知覚品質ロスを担うため、`--no-wavlm` を推奨します。WavLM を有効にすると GPU メモリを余分に消費し、T4/V100 ではバッチサイズを削減する必要があります。
+> **注意:** Zero-Shot TTS 学習 ([学習ガイドの Zero-Shot TTS Training](training-guide.md#zero-shot-tts-training)) では CAM++ SCL が知覚品質ロスを担うため、`--no-wavlm` を推奨します。WavLM を有効にすると GPU メモリを余分に消費し、T4/V100 ではバッチサイズを削減する必要があります。
 
 ```bash
 NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
