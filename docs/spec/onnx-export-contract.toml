@@ -190,7 +190,8 @@ preserve_through_fp16 = true
 # ============================================================================
 # The exporters call piper_train.onnx_validation on each actual artifact.
 # This validates graph bytes, creates ORT sessions and runs deterministic feeds.
-# Model Quality Gate tests this validator with real tiny ONNX graphs and negative
+# The model-quality-gate steps of lint-gates.yml (formerly the Model Quality
+# Gate workflow) test this validator with real tiny ONNX graphs and negative
 # outputs. Normal PR CI does not re-export every published checkpoint. Runtime
 # fixture / public-base jobs provide separate model inference evidence.
 

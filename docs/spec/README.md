@@ -22,8 +22,12 @@ piper-plus の **ランタイム横断の仕様・整合契約** の目次。`.t
 | 推論入力 | [`inference-input-contract.toml`](inference-input-contract.toml) | scales / language_id 正規化 |
 | ONNX エクスポート | [`onnx-export-contract.toml`](onnx-export-contract.toml) | EMA / FP16 / emb_lang 統一 |
 | CLI フラグ | [`cli-flag-contract.toml`](cli-flag-contract.toml) | CLI parity とランタイム別の未対応項目 |
-| 言語 ID マップ | [`language-id-map-contract.toml`](language-id-map-contract.toml) | ja=0 ~ sv=7 |
+| 言語 ID マップ | [`language-id-map-contract.toml`](language-id-map-contract.toml) | ja=0 ~ sv=6 (拡張: ko=7) |
 | PT 方言 | [`pt-dialect-contract.toml`](pt-dialect-contract.toml) | BR / EU 切替 |
+| 日本語 N バリアント | [`japanese-n-variant-contract.toml`](japanese-n-variant-contract.toml) | 「ん」の 4 allophone 規則 (8 G2P ランタイム) |
+| 中国語声調 | [`chinese-tone-contract.toml`](chinese-tone-contract.toml) | `tone1`〜`tone5` 音素 token と PUA mapping |
+| CJK 句読点 | [`cjk-punctuation-contract.toml`](cjk-punctuation-contract.toml) | 言語判定で neutral 扱いする範囲と Latin 系 segment での置換 |
+| Checkpoint 互換 | [`checkpoint-compat-contract.toml`](checkpoint-compat-contract.toml) | 公開 checkpoint の key → shape snapshot (strict load 検査) |
 | ORT セッション | [`ort-session-contract.toml`](ort-session-contract.toml) | warmup / cache / threads |
 | ORT プロバイダ | [`ort-provider-contract.toml`](ort-provider-contract.toml) | EP 選択優先度 |
 | Swift G2P FFI | [`swift-g2p-contract.toml`](swift-g2p-contract.toml) | iOS / macOS FFI ABI |
@@ -36,13 +40,40 @@ piper-plus の **ランタイム横断の仕様・整合契約** の目次。`.t
 | Dictionary バージョン | [`dictionary-versions.toml`](dictionary-versions.toml) | 外部辞書 SHA-256 pin |
 | Dictionary mirrors | [`dictionary-mirrors.toml`](dictionary-mirrors.toml) | WASM 配布 mirror |
 | Loanword mirrors | [`loanword-mirrors.toml`](loanword-mirrors.toml) | ZH-EN JSON のランタイムデータ・テスト fixture mirror |
+| Swedish LID mirrors | [`swedish-lid-mirrors.toml`](swedish-lid-mirrors.toml) | sv function-word JSON のランタイムデータ・テスト fixture mirror |
+| Dependency floors | [`dependency-floors.toml`](dependency-floors.toml) | Python 依存のセキュリティ下限 version |
 | Model SHA-256 | [`model-sha256-manifest.toml`](model-sha256-manifest.toml) | 公式モデル hash |
+
+## CI Baselines & Allowlists
+
+既存の状態を上限・許可リストとして固定し、新規の悪化だけを検出する設定です。
+
+| 仕様 | パス | 用途 |
+|------|------|------|
+| Cargo.lock 重複 | [`cargo-lock-duplicates-baseline.toml`](cargo-lock-duplicates-baseline.toml) | 同名 crate の複数 version 併存の上限 |
+| Lockfile サイズ | [`lockfile-size-baseline.toml`](lockfile-size-baseline.toml) | 各 lockfile の byte size baseline (+20% warning / +50% fail) |
+| unwrap 密度 | [`unwrap-density-budget.toml`](unwrap-density-budget.toml) | Rust crate 別の `.unwrap()` / `.expect()` / `panic!` 密度上限 |
+| continue-on-error | [`continue-on-error-allowlist.toml`](continue-on-error-allowlist.toml) | workflow の `continue-on-error` 許可リスト |
+| Test skip | [`test-skip-allowlist.toml`](test-skip-allowlist.toml) | CI で skip してよいテストの許可リスト |
+| Mutation testing | [`mutation-testing.toml`](mutation-testing.toml) | mutation testing の対象・テスト・`break` score |
+
+## CI / Repository Policy
+
+| 仕様 | パス | 用途 |
+|------|------|------|
+| Artifact 保持期間 | [`artifact-retention-contract.toml`](artifact-retention-contract.toml) | GitHub Actions `retention-days` のカテゴリ |
+| Test retry | [`test-flake-retry-contract.toml`](test-flake-retry-contract.toml) | ランタイム別の flaky test retry 方針 |
+| Doc examples | [`doc-examples-contract.toml`](doc-examples-contract.toml) | `docs/` の fenced code block の分類・実行方針 |
+| Deferred proposals | [`wave3-deferred-proposals.toml`](wave3-deferred-proposals.toml) | Wave 3/5/6 で個別 PR に回した提案の集約 (多くは未実装。記載パスは予定のものを含む) |
+| 実装逆引きマップ | [`_implementation-map.auto.toml`](_implementation-map.auto.toml) | 各 toml が参照する実装パスの自動生成 dump (`scripts/build_spec_implementation_map.py`、手編集しない・enforce しない) |
 
 ## ファイル命名規則
 
 - `*-contract.toml` — ランタイム横断の形式・数値規則・対応範囲の契約
 - `*-versions.toml` / `*-mirrors.toml` — バージョン pin / mirror リスト
 - `*-manifest.toml` — 公式アセットの hash
+- `*-baseline.toml` / `*-budget.toml` / `*-allowlist.toml` / `*-floors.toml` — 既存状態の上限・許可リスト・下限 (新規の悪化だけを検出)
+- `_*.auto.toml` — スクリプトが生成するファイル (手編集しない)
 
 ## CI Gate
 
@@ -52,5 +83,7 @@ piper-plus の **ランタイム横断の仕様・整合契約** の目次。`.t
 - `check_phoneme_set_version.py` ← `phoneme-set-version.toml`
 - `check_version_manifest_sync.py` ← `release-versions.toml`
 - `check_cli_flag_parity.py` ← `cli-flag-contract.toml`
+
+その他の多くの toml も、冒頭コメントに対応する検査スクリプト (`scripts/check_*.py`) を記載しています。
 
 Ruff の pin 同期は `check_ruff_version_sync.py` が `pyproject.toml`、pre-commit、Python lint workflow を直接照合します。

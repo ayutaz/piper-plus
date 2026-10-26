@@ -1,7 +1,7 @@
 # PUA (Private Use Area) Mapping Contract
 # ========================================
 # Defines canonical PUA codepoint assignments for multi-character phoneme tokens
-# that ALL runtimes (Python, Rust, Go, C++, C#, WASM/JS) MUST implement identically.
+# that ALL runtimes (Python, Rust, Go, C++, C#, WASM/JS, Swift) MUST implement identically.
 #
 # Multi-codepoint IPA tokens (e.g. "a:", "ɔɪ", "œ̃") are mapped to single Unicode
 # Private Use Area codepoints (U+E000..U+F8FF in BMP) so that:
@@ -24,11 +24,14 @@ forward_compat_policy = "strict"
 # Invariant 1 — Single canonical source
 # ============================================================================
 # pua.json is the ONLY authoritative table. Every other PUA table in the codebase
-# (Python token_mapper, Rust token_map, Go pua, JS pua-map, C# OpenJTalkToPiperMapping,
-# C++ phoneme_parser) MUST be byte-equivalent (after tokenization) to pua.json.
+# (Python token_mapper, Python G2P pua, Rust token_map, Go pua, JS pua-map,
+# C# OpenJTalkToPiperMapping, Swift PUAMap, C++ phoneme_parser) MUST be
+# byte-equivalent (after tokenization) to pua.json.
 #
-# Any change to pua.json requires synchronized PR updates to all 6 runtime tables.
-# CI gate: scripts/check_pua_consistency.py validates this on every push.
+# Any change to pua.json requires synchronized PR updates to all runtime tables.
+# CI gate: scripts/check_pua_consistency.py validates the 7 tables other than
+# C++ on every push. It does not parse the C++ phoneme_parser table; that check
+# is deferred (docs/reference/pua-test-matrix.md L1.9).
 
 [invariants.canonical_source]
 file = "src/python/g2p/piper_plus_g2p/data/pua.json"

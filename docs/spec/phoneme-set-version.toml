@@ -30,7 +30,8 @@
 #   - C#:                  src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs
 #   - C/C++:               src/cpp/phoneme_parser.cpp
 #   - WASM/JS:             src/wasm/g2p/src/pua-map.js
-#   - Kotlin/Android:      android/piper-plus-g2p/src/main/kotlin/.../PUAMap.kt
+#   - Kotlin/Android:      no separate map; delegated via JNI to the Rust map
+#                          (android/piper-plus-g2p/src/main/cpp/piper_plus_g2p_jni.cpp)
 #   - Swift:               Sources/PiperPlusG2P/PUAMap.swift
 #
 # Related contracts:

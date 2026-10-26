@@ -95,7 +95,7 @@ Android アプリ開発者が `implementation("io.github.ayutaz:piper-plus-g2p-a
 
 | 資産 | パス | 状態 |
 |------|------|------|
-| Android NDK ビルド CI | `.github/workflows/android-build.yml` | 3 ABI (arm64-v8a / armeabi-v7a / x86_64)、NDK 26.1、ORT 1.17.0、API 24 |
+| Android NDK ビルド CI | `.github/workflows/android-build.yml` | 3 ABI (arm64-v8a / armeabi-v7a / x86_64)、NDK 26.1、ORT 1.17.0 (調査時点。現行は 1.20.0、[ort-versions.md](ort-versions.md) 参照)、API 24 |
 | ZH-EN loanword embedding | `cmake/PiperCommon.cmake:103-146` | `PIPER_PLUS_EMBEDDED_LOANWORD` flag、Android branch 対応済 |
 | Android クロスコンパイル設定 | `cmake/CompilerSettings.cmake:37-49` | NDK toolchain propagation 済 |
 | 既存 JNI パターン | `android/piper-plus/src/main/cpp/piper_plus_jni.cpp` | `JNIStringGuard` RAII、`JNI_OnLoad` キャッシュ、例外スロー |

@@ -159,7 +159,8 @@ codes = [
 # ===========================================================================
 # Forward-compatibility plan: alternative sample rates
 # ===========================================================================
-# As of v1.12.0 the only trained piper-plus models emit 22050 Hz audio.
+# As of v1.12.0 (and still at v2.0.2, including the public zs-v1 base and
+# Tsukuyomi zs-v1 models) the only trained piper-plus models emit 22050 Hz audio.
 # Future work may produce models targeting other rates:
 #
 #   - 16000 Hz: Lower-bandwidth voices; reduced model size; some embedded /

@@ -17,7 +17,7 @@
 #      here.
 #
 # This file is design-time documentation. Hash verification is enforced at
-# build time via the cmake/SetupOpenJTalk.cmake URL_HASH directive (C++) and
+# build time via the cmake/ExternalDeps.cmake URL_HASH directive (C++) and
 # Cargo.lock checksum (Rust); the JSON-mirror parity is enforced by
 # scripts/check_loanword_consistency.py for the only non-pinyin/cmudict
 # JSON we maintain (zh_en_loanword.json).
@@ -257,7 +257,7 @@ mirrors_canonical_plus_runtimes = [
     "android/piper-plus-g2p/src/main/assets/zh_en_loanword.json",            # Kotlin/Android
     "Sources/PiperPlusG2P/Resources/zh_en_loanword.json",                    # Swift
 ]
-ci_gate = "scripts/check_loanword_consistency.py + .github/workflows/zh-en-loanword.yml"
+ci_gate = "scripts/check_loanword_consistency.py + .github/workflows/zh-en-loanword-sync.yml"
 
 # ===========================================================================
 # Korean — g2pK2
@@ -301,7 +301,7 @@ Per-runtime ports under:
   src/csharp/PiperPlus.Core/Phonemize/{Spanish,Portuguese,French,Swedish}{Phonemizer,G2PEngine}.cs
   src/wasm/g2p/src/{spanish,portuguese,french,swedish}.js
   src/cpp/g2p/{spanish,portuguese,french,swedish}.cpp
-  android/piper-plus-g2p/src/main/kotlin/...
+  android/piper-plus-g2p/ (JNI wrapper over the Rust ports; no Kotlin port)
   Sources/PiperPlusG2P/{Spanish,Portuguese,French,Swedish}.swift
 """
 license = "MIT (this repository)"

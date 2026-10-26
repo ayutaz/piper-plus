@@ -102,7 +102,7 @@ val g2p = PiperPlusG2p.create(
 
 | 資産 | 場所 | 状態 |
 |------|------|------|
-| 3 ABI ビルド CI | `.github/workflows/android-build.yml` | arm64-v8a / armeabi-v7a / x86_64 を NDK 26.1 + ORT 1.17.0 でビルド済 |
+| 3 ABI ビルド CI | `.github/workflows/android-build.yml` | arm64-v8a / armeabi-v7a / x86_64 を NDK 26.1 + ORT 1.17.0 でビルド済 (設計時点。現行の ORT は 1.20.0、[ort-versions.md](ort-versions.md) 参照) |
 | Release artifact | `.github/workflows/release-shared-lib.yml:496-579` | **arm64-v8a 単体のみ配布** (拡張余地あり) |
 | ZH-EN loanword embedding | `cmake/PiperCommon.cmake:103-132` | `PIPER_PLUS_EMBEDDED_LOANWORD` flag で iOS/Android に C-array 埋め込み |
 | Android stub | `src/cpp/openjtalk_ios_stub.c` | iOS 専用、Android 用は不要 (Linux と同じビルド) |

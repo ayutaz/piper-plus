@@ -5,8 +5,8 @@
 [meta]
 generator = "scripts/build_spec_implementation_map.py"
 forward_compat_policy = "accept_unknown_fields"
-spec_count = 33
-unique_paths = 123
+spec_count = 38
+unique_paths = 158
 
 # Forward index: spec → paths
 
@@ -41,6 +41,18 @@ paths = [
     "src/wasm/g2p/src/pua-map.js",
 ]
 
+[spec."cjk-punctuation-contract.toml"]
+paths = [
+    "src/cpp/tests/test_cjk_punctuation_contract.cpp",
+    "src/csharp/PiperPlus.Core.Tests/CjkPunctuationContractTests.cs",
+    "src/go/phonemize/cjk_punctuation_contract_test.go",
+    "src/python/g2p/piper_plus_g2p/multilingual.py",
+    "src/python/g2p/tests/test_cjk_punctuation_contract.py",
+    "src/python_run/tests/test_cjk_punctuation_contract.py",
+    "src/rust/piper-plus-g2p/tests/cjk_punctuation_contract.rs",
+    "src/wasm/g2p/test/test-cjk-punctuation-contract.js",
+]
+
 [spec."cli-flag-contract.toml"]
 paths = [
     "scripts/check_cli_flag_parity.py",
@@ -52,28 +64,47 @@ paths = [
     "src/rust/piper-cli/src/main.rs",
 ]
 
+[spec."continue-on-error-allowlist.toml"]
+paths = []
+
+[spec."dependency-floors.toml"]
+paths = [
+    "scripts/check_dependency_floors.py",
+]
+
 [spec."dictionary-mirrors.toml"]
 paths = [
+    "src/rust/piper-plus-g2p/data/cmudict_data.json",
+    "src/rust/piper-plus-g2p/data/pinyin_phrases.json",
+    "src/rust/piper-plus-g2p/data/pinyin_single.json",
+    "src/wasm/g2p/data/cmudict_data.json",
+    "src/wasm/g2p/data/pinyin_phrases.json",
+    "src/wasm/g2p/data/pinyin_single.json",
     "src/wasm/openjtalk-web/assets/additional_tech_dict.json",
     "src/wasm/openjtalk-web/assets/default_common_dict.json",
     "src/wasm/openjtalk-web/assets/default_tech_dict.json",
+    "src/wasm/openjtalk-web/assets/pinyin_phrases.json",
+    "src/wasm/openjtalk-web/assets/pinyin_single.json",
 ]
 
 [spec."dictionary-versions.toml"]
 paths = [
     "Sources/PiperPlusG2P/Resources/zh_en_loanword.json",
     "android/piper-plus-g2p/src/main/assets/zh_en_loanword.json",
+    "scripts/build_pinyin_dicts.py",
     "src/cpp/data/zh_en_loanword.json",
     "src/csharp/PiperPlus.Core/Phonemize/Data/zh_en_loanword.json",
     "src/go/phonemize/data/zh_en_loanword.json",
     "src/python/g2p/piper_plus_g2p/data/pua.json",
     "src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json",
+    "src/python_run/piper_plus/_vendor/g2p_en/provenance.json",
     "src/python_run/piper_plus/phonemize/data/zh_en_loanword.json",
     "src/rust/piper-core/data/zh_en_loanword.json",
     "src/rust/piper-plus-g2p/data/cmudict_data.json",
     "src/rust/piper-plus-g2p/data/pinyin_phrases.json",
     "src/rust/piper-plus-g2p/data/pinyin_single.json",
     "src/rust/piper-plus-g2p/data/zh_en_loanword.json",
+    "src/wasm/g2p/data/cmudict_data.json",
     "src/wasm/g2p/data/zh_en_loanword.json",
     "src/wasm/openjtalk-web/assets/pinyin_phrases.json",
     "src/wasm/openjtalk-web/assets/pinyin_single.json",
@@ -148,6 +179,31 @@ paths = [
 
 [spec."model-sha256-manifest.toml"]
 paths = []
+
+[spec."mutation-testing.toml"]
+paths = [
+    ".github/workflows/mutation-testing.yml",
+    "src/csharp/stryker-config.json",
+    "src/python/g2p/piper_plus_g2p/base.py",
+    "src/python/g2p/piper_plus_g2p/multilingual.py",
+    "src/python/g2p/piper_plus_g2p/ssml.py",
+    "src/python/g2p/tests/test_base.py",
+    "src/python/g2p/tests/test_cjk_punctuation_contract.py",
+    "src/python/g2p/tests/test_encode.py",
+    "src/python/g2p/tests/test_encoder.py",
+    "src/python/g2p/tests/test_multilingual.py",
+    "src/python/g2p/tests/test_segment_text.py",
+    "src/python/g2p/tests/test_ssml.py",
+    "src/python/g2p/tests/test_ssml_attacks.py",
+    "src/python_run/piper_plus/text_splitter.py",
+    "src/python_run/piper_plus/timing.py",
+    "src/python_run/tests/test_http_timing.py",
+    "src/python_run/tests/test_phoneme_timing.py",
+    "src/python_run/tests/test_phoneme_timing_parity.py",
+    "src/python_run/tests/test_text_splitter.py",
+    "src/python_run/tests/test_text_splitter_contract.py",
+    "src/python_run/tests/test_voice_timing.py",
+]
 
 [spec."onnx-export-contract.toml"]
 paths = [
@@ -262,8 +318,20 @@ paths = [
     ".github/workflows/test-webassembly.yml",
 ]
 
+[spec."test-skip-allowlist.toml"]
+paths = [
+    "scripts/check_test_skips.py",
+]
+
 [spec."text-splitter-contract.toml"]
-paths = []
+paths = [
+    "src/cpp/tests/test_text_splitter_contract.cpp",
+    "src/csharp/PiperPlus.Core.Tests/TextSplitterContractTests.cs",
+    "src/go/piperplus/text_splitter_contract_test.go",
+    "src/python_run/tests/test_text_splitter_contract.py",
+    "src/rust/piper-core/tests/test_text_splitter_contract.rs",
+    "src/wasm/openjtalk-web/test/js/test-streaming-pipeline.js",
+]
 
 [spec."unwrap-density-budget.toml"]
 paths = []
@@ -272,6 +340,11 @@ paths = []
 paths = []
 
 # Reverse index: path → specs that mention it
+
+[path.".github/workflows/mutation-testing.yml"]
+specs = [
+    "mutation-testing.toml",
+]
 
 [path.".github/workflows/pua-consistency.yml"]
 specs = [
@@ -325,9 +398,19 @@ specs = [
     "audio-parity-contract.toml",
 ]
 
+[path."scripts/build_pinyin_dicts.py"]
+specs = [
+    "dictionary-versions.toml",
+]
+
 [path."scripts/check_cli_flag_parity.py"]
 specs = [
     "cli-flag-contract.toml",
+]
+
+[path."scripts/check_dependency_floors.py"]
+specs = [
+    "dependency-floors.toml",
 ]
 
 [path."scripts/check_doc_examples.py"]
@@ -358,6 +441,11 @@ specs = [
 [path."scripts/check_srt_rounding_parity.py"]
 specs = [
     "phoneme-timing-contract.toml",
+]
+
+[path."scripts/check_test_skips.py"]
+specs = [
+    "test-skip-allowlist.toml",
 ]
 
 [path."src/cpp/chinese_phonemize.cpp"]
@@ -416,6 +504,11 @@ specs = [
     "phoneme-timing-contract.toml",
 ]
 
+[path."src/cpp/tests/test_cjk_punctuation_contract.cpp"]
+specs = [
+    "cjk-punctuation-contract.toml",
+]
+
 [path."src/cpp/tests/test_phoneme_timing.cpp"]
 specs = [
     "phoneme-timing-contract.toml",
@@ -429,6 +522,11 @@ specs = [
 [path."src/cpp/tests/test_phoneme_timing_text_path.cpp"]
 specs = [
     "phoneme-timing-contract.toml",
+]
+
+[path."src/cpp/tests/test_text_splitter_contract.cpp"]
+specs = [
+    "text-splitter-contract.toml",
 ]
 
 [path."src/cpp/timing_format.hpp"]
@@ -446,6 +544,11 @@ specs = [
     "cli-flag-contract.toml",
 ]
 
+[path."src/csharp/PiperPlus.Core.Tests/CjkPunctuationContractTests.cs"]
+specs = [
+    "cjk-punctuation-contract.toml",
+]
+
 [path."src/csharp/PiperPlus.Core.Tests/Phonemize/TestData/swedish_lid_matrix.json"]
 specs = [
     "swedish-lid-mirrors.toml",
@@ -454,6 +557,11 @@ specs = [
 [path."src/csharp/PiperPlus.Core.Tests/Phonemize/TestData/zh_en_loanword_matrix.json"]
 specs = [
     "loanword-mirrors.toml",
+]
+
+[path."src/csharp/PiperPlus.Core.Tests/TextSplitterContractTests.cs"]
+specs = [
+    "text-splitter-contract.toml",
 ]
 
 [path."src/csharp/PiperPlus.Core.Tests/TimingWriterTests.cs"]
@@ -498,6 +606,11 @@ specs = [
     "release-versions.toml",
 ]
 
+[path."src/csharp/stryker-config.json"]
+specs = [
+    "mutation-testing.toml",
+]
+
 [path."src/go/cmd/piper-plus/main.go"]
 specs = [
     "cli-flag-contract.toml",
@@ -506,6 +619,11 @@ specs = [
 [path."src/go/go.sum"]
 specs = [
     "lockfile-size-baseline.toml",
+]
+
+[path."src/go/phonemize/cjk_punctuation_contract_test.go"]
+specs = [
+    "cjk-punctuation-contract.toml",
 ]
 
 [path."src/go/phonemize/data/sv_function_words.json"]
@@ -545,6 +663,11 @@ specs = [
     "language-id-map-contract.toml",
 ]
 
+[path."src/go/piperplus/text_splitter_contract_test.go"]
+specs = [
+    "text-splitter-contract.toml",
+]
+
 [path."src/go/piperplus/timing.go"]
 specs = [
     "phoneme-timing-contract.toml",
@@ -553,6 +676,11 @@ specs = [
 [path."src/go/piperplus/timing_test.go"]
 specs = [
     "phoneme-timing-contract.toml",
+]
+
+[path."src/python/g2p/piper_plus_g2p/base.py"]
+specs = [
+    "mutation-testing.toml",
 ]
 
 [path."src/python/g2p/piper_plus_g2p/chinese.py"]
@@ -589,6 +717,12 @@ specs = [
     "japanese-n-variant-contract.toml",
 ]
 
+[path."src/python/g2p/piper_plus_g2p/multilingual.py"]
+specs = [
+    "cjk-punctuation-contract.toml",
+    "mutation-testing.toml",
+]
+
 [path."src/python/g2p/piper_plus_g2p/portuguese.py"]
 specs = [
     "pt-dialect-contract.toml",
@@ -597,6 +731,52 @@ specs = [
 [path."src/python/g2p/piper_plus_g2p/registry.py"]
 specs = [
     "pt-dialect-contract.toml",
+]
+
+[path."src/python/g2p/piper_plus_g2p/ssml.py"]
+specs = [
+    "mutation-testing.toml",
+]
+
+[path."src/python/g2p/tests/test_base.py"]
+specs = [
+    "mutation-testing.toml",
+]
+
+[path."src/python/g2p/tests/test_cjk_punctuation_contract.py"]
+specs = [
+    "cjk-punctuation-contract.toml",
+    "mutation-testing.toml",
+]
+
+[path."src/python/g2p/tests/test_encode.py"]
+specs = [
+    "mutation-testing.toml",
+]
+
+[path."src/python/g2p/tests/test_encoder.py"]
+specs = [
+    "mutation-testing.toml",
+]
+
+[path."src/python/g2p/tests/test_multilingual.py"]
+specs = [
+    "mutation-testing.toml",
+]
+
+[path."src/python/g2p/tests/test_segment_text.py"]
+specs = [
+    "mutation-testing.toml",
+]
+
+[path."src/python/g2p/tests/test_ssml.py"]
+specs = [
+    "mutation-testing.toml",
+]
+
+[path."src/python/g2p/tests/test_ssml_attacks.py"]
+specs = [
+    "mutation-testing.toml",
 ]
 
 [path."src/python/g2p/uv.lock"]
@@ -624,6 +804,11 @@ specs = [
     "cli-flag-contract.toml",
 ]
 
+[path."src/python_run/piper_plus/_vendor/g2p_en/provenance.json"]
+specs = [
+    "dictionary-versions.toml",
+]
+
 [path."src/python_run/piper_plus/phonemize/data/sv_function_words.json"]
 specs = [
     "swedish-lid-mirrors.toml",
@@ -640,8 +825,14 @@ specs = [
     "pt-dialect-contract.toml",
 ]
 
+[path."src/python_run/piper_plus/text_splitter.py"]
+specs = [
+    "mutation-testing.toml",
+]
+
 [path."src/python_run/piper_plus/timing.py"]
 specs = [
+    "mutation-testing.toml",
     "phoneme-timing-contract.toml",
 ]
 
@@ -650,18 +841,42 @@ specs = [
     "language-id-map-contract.toml",
 ]
 
+[path."src/python_run/tests/test_cjk_punctuation_contract.py"]
+specs = [
+    "cjk-punctuation-contract.toml",
+]
+
 [path."src/python_run/tests/test_http_timing.py"]
 specs = [
+    "mutation-testing.toml",
     "phoneme-timing-contract.toml",
 ]
 
 [path."src/python_run/tests/test_phoneme_timing.py"]
 specs = [
+    "mutation-testing.toml",
     "phoneme-timing-contract.toml",
+]
+
+[path."src/python_run/tests/test_phoneme_timing_parity.py"]
+specs = [
+    "mutation-testing.toml",
+]
+
+[path."src/python_run/tests/test_text_splitter.py"]
+specs = [
+    "mutation-testing.toml",
+]
+
+[path."src/python_run/tests/test_text_splitter_contract.py"]
+specs = [
+    "mutation-testing.toml",
+    "text-splitter-contract.toml",
 ]
 
 [path."src/python_run/tests/test_voice_timing.py"]
 specs = [
+    "mutation-testing.toml",
     "phoneme-timing-contract.toml",
 ]
 
@@ -722,18 +937,26 @@ specs = [
     "loanword-mirrors.toml",
 ]
 
+[path."src/rust/piper-core/tests/test_text_splitter_contract.rs"]
+specs = [
+    "text-splitter-contract.toml",
+]
+
 [path."src/rust/piper-plus-g2p/data/cmudict_data.json"]
 specs = [
+    "dictionary-mirrors.toml",
     "dictionary-versions.toml",
 ]
 
 [path."src/rust/piper-plus-g2p/data/pinyin_phrases.json"]
 specs = [
+    "dictionary-mirrors.toml",
     "dictionary-versions.toml",
 ]
 
 [path."src/rust/piper-plus-g2p/data/pinyin_single.json"]
 specs = [
+    "dictionary-mirrors.toml",
     "dictionary-versions.toml",
 ]
 
@@ -769,6 +992,11 @@ specs = [
     "japanese-n-variant-contract.toml",
 ]
 
+[path."src/rust/piper-plus-g2p/tests/cjk_punctuation_contract.rs"]
+specs = [
+    "cjk-punctuation-contract.toml",
+]
+
 [path."src/rust/piper-plus-g2p/tests/fixtures/swedish_lid_matrix.json"]
 specs = [
     "swedish-lid-mirrors.toml",
@@ -782,6 +1010,22 @@ specs = [
 [path."src/rust/piper-wasm/src/lib.rs"]
 specs = [
     "language-id-map-contract.toml",
+]
+
+[path."src/wasm/g2p/data/cmudict_data.json"]
+specs = [
+    "dictionary-mirrors.toml",
+    "dictionary-versions.toml",
+]
+
+[path."src/wasm/g2p/data/pinyin_phrases.json"]
+specs = [
+    "dictionary-mirrors.toml",
+]
+
+[path."src/wasm/g2p/data/pinyin_single.json"]
+specs = [
+    "dictionary-mirrors.toml",
 ]
 
 [path."src/wasm/g2p/data/sv_function_words.json"]
@@ -826,6 +1070,11 @@ specs = [
     "loanword-mirrors.toml",
 ]
 
+[path."src/wasm/g2p/test/test-cjk-punctuation-contract.js"]
+specs = [
+    "cjk-punctuation-contract.toml",
+]
+
 [path."src/wasm/openjtalk-web/assets/additional_tech_dict.json"]
 specs = [
     "dictionary-mirrors.toml",
@@ -843,11 +1092,13 @@ specs = [
 
 [path."src/wasm/openjtalk-web/assets/pinyin_phrases.json"]
 specs = [
+    "dictionary-mirrors.toml",
     "dictionary-versions.toml",
 ]
 
 [path."src/wasm/openjtalk-web/assets/pinyin_single.json"]
 specs = [
+    "dictionary-mirrors.toml",
     "dictionary-versions.toml",
 ]
 
@@ -874,6 +1125,11 @@ specs = [
 [path."src/wasm/openjtalk-web/test/js/test-phoneme-timing.js"]
 specs = [
     "phoneme-timing-contract.toml",
+]
+
+[path."src/wasm/openjtalk-web/test/js/test-streaming-pipeline.js"]
+specs = [
+    "text-splitter-contract.toml",
 ]
 
 [path."tests/PiperPlusG2PTests/Fixtures/zh_en_loanword_matrix.json"]

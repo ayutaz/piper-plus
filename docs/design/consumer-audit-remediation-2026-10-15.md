@@ -39,7 +39,7 @@
 ## CI
 
 - `.github/workflows/consumer-contracts.yml`: 3 runtime の実 CLI subprocess と WAV/timing 検査、Python provider の排他と実導入、専用 UI lock の確認。
-- `model-quality-gate.yml`: nested hash/update、published manifest の negative test、実 ONNX graph/ORT/warmup と negative output の回帰テスト。
+- `model-quality-gate.yml` (後に #884 で `lint-gates.yml` の model-quality-gate step に統合): nested hash/update、published manifest の negative test、実 ONNX graph/ORT/warmup と negative output の回帰テスト。
 - ORT / Gradio の source 移動・pin 追加に合わせて既存 gate の path trigger も更新。
 
 ローカルで CI と同じ helper/harness を実行している。push・タグ・release は行わず、この時点の GitHub Actions のリモート run 成功を主張するものではない。

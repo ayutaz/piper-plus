@@ -104,7 +104,7 @@ GPLを許可するリスト変更や、Distanceを検査から除外する変更
 | [protobuf 7.36.2](https://pypi.org/pypi/protobuf/7.36.2/json) | BSD-3-Clause、元Google protobuf著作権表示 | package単位のscanner補正 |
 | [regex 2026.9.29](https://pypi.org/pypi/regex/2026.9.29/json) | Apache-2.0 AND CNRI-Python | package単位のscanner補正 |
 
-`dependency-review.yml` と `security-audit.yml` の両方を同期します。
+`dependency-review.yml` と `security-audit.yml` の両方を同期します (`dependency-review.yml` は後に #884 で `lint-gates.yml` の dependency-review step に統合)。
 既存の学習専用 `soxr` 例外は変更しません。
 
 ## テストとCI

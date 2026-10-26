@@ -50,7 +50,7 @@ mirror 数とパスは `docs/spec/loanword-mirrors.toml` を参照する。
 合計: ~5.5h
 ```
 
-**新規 CI job (案)**:
+**新規 CI job (案)** (実装は [`.github/workflows/zh-en-loanword-sync.yml`](../../../.github/workflows/zh-en-loanword-sync.yml) 「ZH-EN Loanword Sync Gate」。下の `loanword-consistency.yml` は計画時の名前):
 
 ```yaml
 # .github/workflows/loanword-consistency.yml
