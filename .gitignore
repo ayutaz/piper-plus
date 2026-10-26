@@ -130,9 +130,6 @@ check_*.py
 # Wave 5 — workflow automation 第 3 波 で追加した check スクリプト群
 # M1.1 — cancelled / skipped baseline alarm gateway
 # M1.2 — migration guide cross-ref lint
-# M1.3 — first-PR fast lane (gate neutralizer + weekly health)
-!scripts/first_pr_fast_lane.py
-!scripts/first_pr_health.py
 # Audio MOS proxy metrics (PESQ / STOI / UTMOS / Whisper WER)
 !scripts/audio_quality_metrics.py
 # Cross-runtime audio byte parity (SHA256 / RMS / SNR tiers)

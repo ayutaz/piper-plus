@@ -123,8 +123,8 @@ def test_diagnostic_contains_sticky_marker(gate, capsys):
 
 
 def test_neutral_conclusion_treated_as_success(gate, tmp_path):
-    """The first-PR fast lane (M1.3) downgrades contract gates to ``neutral``;
-    the gateway must not flag those as fail-open."""
+    """``neutral`` is a deliberate non-failure; the gateway must not flag it
+    as fail-open."""
     payload = {
         "workflow_runs": [
             {
@@ -382,7 +382,7 @@ def test_all_workflows_cancelled_run_fails(gate, tmp_path):
 
 def test_all_workflows_skipped_and_neutral_runs_pass(gate, tmp_path):
     """A run whose jobs were all skipped by `if:` is intentional, and
-    `neutral` is the first-PR fast lane's downgrade."""
+    `neutral` is a deliberate non-failure."""
     verdict = _all_mode(gate, tmp_path, [
         _r(1, "CI"), _r(2, "Release Kotlin G2P (Maven Central)", conclusion="skipped"),
         _r(3, "Parity Hub", conclusion="neutral"),

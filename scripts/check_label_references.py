@@ -14,9 +14,6 @@ ever created failed silently — or, worse, loudly at the wrong time:
     routing step fails outright.
   * ``actions/stale`` was told to exempt ``help-wanted`` while the repository
     label is spelled ``help wanted``. The exemption never matched.
-  * ``scripts/first_pr_fast_lane.py`` promotes contract gates back to blocker
-    when ``run-full-gate`` is attached. That label did not exist either, so
-    the escape hatch could not be used without first creating it by hand.
 
 ``.github/labels.yml`` already declared itself the source-of-truth for the
 label catalogue. This gate makes that claim enforceable: every label named by
@@ -55,7 +52,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 LABELS_YML = REPO_ROOT / ".github" / "labels.yml"
 DEPENDABOT_YML = REPO_ROOT / ".github" / "dependabot.yml"
 WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
-FAST_LANE_SCRIPT = REPO_ROOT / "scripts" / "first_pr_fast_lane.py"
 
 # `- name: <label>` at the top level of .github/labels.yml.
 DECLARED_RE = re.compile(r"^- name:\s*(.+?)\s*$", re.MULTILINE)
@@ -86,9 +82,6 @@ STALE_LIST_KEYS = (
 GH_LABEL_FLAG_RE = re.compile(
     r"--(?:add|remove)-label[ =]+(?P<q>[\"']?)(?P<value>[^\"'\n]+)(?P=q)"
 )
-
-# `PROMOTE_LABEL = "run-full-gate"` in first_pr_fast_lane.py.
-PROMOTE_LABEL_RE = re.compile(r'^PROMOTE_LABEL\s*=\s*["\'](?P<value>[^"\']+)["\']', re.M)
 
 
 def _strip_scalar(raw: str) -> str:
@@ -156,21 +149,8 @@ def _from_workflow(path: Path) -> list[tuple[str, str, int]]:
     return out
 
 
-def _from_fast_lane(path: Path) -> list[tuple[str, str, int]]:
-    if not path.exists():
-        return []
-    text = path.read_text(encoding="utf-8")
-    match = PROMOTE_LABEL_RE.search(text)
-    if not match:
-        return []
-    lineno = text[: match.start()].count("\n") + 1
-    rel = path.relative_to(REPO_ROOT).as_posix()
-    return [(match.group("value"), rel, lineno)]
-
-
 def collect_references() -> list[tuple[str, str, int]]:
     refs = _from_dependabot(DEPENDABOT_YML)
-    refs += _from_fast_lane(FAST_LANE_SCRIPT)
     for workflow in sorted(WORKFLOWS_DIR.glob("*.yml")):
         refs += _from_workflow(workflow)
     return refs
@@ -250,7 +230,7 @@ def main(argv: list[str] | None = None) -> int:
         # extraction rule that stops matching must be loud, not green.
         print(
             "ERROR: scan found 0 label references — extraction rules are stale "
-            "(dependabot.yml / workflows / first_pr_fast_lane.py all changed?).",
+            "(dependabot.yml / workflows both changed?).",
             file=sys.stderr,
         )
         return 1
