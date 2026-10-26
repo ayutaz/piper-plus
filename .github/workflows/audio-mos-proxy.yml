@@ -26,8 +26,18 @@ on:
       - 'tests/fixtures/audio-mos-baseline.json'
       - 'scripts/audio_quality_metrics.py'
       - '.github/workflows/audio-mos-proxy.yml'
+  # A push to dev runs on the same paths as a pull request. It ran on every
+  # push, but the metrics read only these files (and are stubs until the
+  # baseline is recorded).
   push:
     branches: [dev]
+    paths:
+      - 'src/python_run/**'
+      - 'src/python/piper_train/**'
+      - 'tests/fixtures/audio-corpus/**'
+      - 'tests/fixtures/audio-mos-baseline.json'
+      - 'scripts/audio_quality_metrics.py'
+      - '.github/workflows/audio-mos-proxy.yml'
   workflow_dispatch:
 
 concurrency:

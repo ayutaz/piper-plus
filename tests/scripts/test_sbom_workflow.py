@@ -50,11 +50,21 @@ def test_every_upload_fails_when_its_files_are_missing(workflow):
 
 
 def test_every_generator_checks_its_output_is_not_empty(workflow):
-    for job_name in ("cyclonedx-python", "cyclonedx-rust", "cyclonedx-go", "cyclonedx-dotnet", "cyclonedx-npm"):
-        runs = [s["run"] for s in workflow["jobs"][job_name]["steps"] if s.get("name", "").startswith("Generate")]
-        assert runs, job_name
-        for run in runs:
-            assert "jq -e" in run and "components | length" in run, (job_name, run)
+    generators = {
+        s["name"]: s["run"]
+        for s in workflow["jobs"]["generate"]["steps"]
+        if s.get("name", "").startswith("Generate")
+    }
+    for ecosystem in ("Python", "Rust", "Go", "C#", "NPM SBOM (g2p)", "NPM SBOM (openjtalk-web)"):
+        assert any(ecosystem in name for name in generators), ecosystem
+    for name, run in generators.items():
+        assert "jq -e" in run and "components | length" in run, (name, run)
+
+
+def test_one_failed_generator_does_not_hide_the_others(workflow):
+    """The generators share one job, so each step must run after a failure."""
+    for step in workflow["jobs"]["generate"]["steps"][1:]:
+        assert step.get("if") == "${{ !cancelled() }}", step.get("name") or step.get("uses")
 
 
 def test_tools_are_pinned():
@@ -67,12 +77,20 @@ def test_tools_are_pinned():
 
 
 def test_python_sbom_comes_from_the_lock_file(workflow):
-    run = "\n".join(s.get("run", "") for s in workflow["jobs"]["cyclonedx-python"]["steps"])
+    run = next(
+        s["run"]
+        for s in workflow["jobs"]["generate"]["steps"]
+        if s.get("name") == "Generate Python SBOMs from uv.lock"
+    )
     assert "cyclonedx-py environment" not in run
     assert "uv export" in run and "--frozen" in run
 
 
 def test_rust_upload_matches_cargo_cyclonedx_output(workflow):
-    upload = next(s for s in workflow["jobs"]["cyclonedx-rust"]["steps"] if "upload-artifact" in str(s.get("uses")))
+    upload = next(
+        s
+        for s in workflow["jobs"]["generate"]["steps"]
+        if "upload-artifact" in str(s.get("uses")) and s["with"]["name"] == "sbom-rust"
+    )
     # cargo-cyclonedx writes <crate dir>/<package>.cdx.json
     assert upload["with"]["path"] == "src/rust/*/*.cdx.json"
