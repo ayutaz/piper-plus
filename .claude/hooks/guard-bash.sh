@@ -107,8 +107,9 @@ case "$CMD" in
 esac
 
 # --- PR 作成は /create-pr skill 経由を強制 -------------------------------
-# `gh pr create` を直接実行すると /create-pr skill のフェーズ 6.2 で発動する
-# `/watch-pr` auto-chain が走らず、 CI 監視が起動しない (PR #498 で発覚)。
+# `gh pr create` を直接実行すると /create-pr skill の構造化 PR 本文と、 同 skill
+# 内で続けて行う CI 監視 (フェーズ 5) / review thread 返信 + resolve (フェーズ 6)
+# が行われない (PR #498 で発覚)。
 # memory: feedback_pr_create_skill_only.md
 # command 先頭 / `&& ` / `; ` 直後の場合のみ block (commit message 等の
 # 引用内文字列は誤発動を避けるため除外)。
@@ -173,7 +174,7 @@ case "$CMD" in
     if is_in_skill create-pr; then
       exit 0
     fi
-    deny "gh pr create の直接実行は禁止です。/create-pr skill を使うと watch-pr の auto-chain が発動し、 PR 構造化本文 + CI 監視が一括で起動します。" ;;
+    deny "gh pr create の直接実行は禁止です。/create-pr skill を使うと、 構造化 PR 本文での作成から CI 監視・review thread 対応までを同じ skill 内で行います。" ;;
 esac
 
 exit 0
