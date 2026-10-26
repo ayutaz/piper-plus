@@ -186,7 +186,11 @@ jobs:
             test/
           retention-days: 7
 
-  # Generate combined summary
+  # Generate combined summary. The pull request check that this data
+  # exists and the 30-day copy were a separate workflow_run workflow
+  # (generate-combined-report.yml) that ran generate_job_summary.py again
+  # on the same files; a workflow_run run is recorded against dev, so the
+  # required gate never saw it fail.
   generate_summary:
     name: Generate Combined Summary
     needs: test_japanese
@@ -229,6 +233,16 @@ jobs:
           # Generate combined summary
           python scripts/generate_job_summary.py --results-dir combined-results
 
+      - name: Require performance data
+        if: needs.test_japanese.result == 'success'
+        run: |
+          count=$(find combined-results/performance -name '*.json' -type f 2>/dev/null | wc -l)
+          echo "performance JSON files: ${count}"
+          if [ "$count" -eq 0 ]; then
+            echo "::error::The Japanese TTS tests passed but left no performance JSON"
+            exit 1
+          fi
+
       - name: Upload combined summary
         if: always()
         uses: actions/upload-artifact@v4.6.2
@@ -236,4 +250,5 @@ jobs:
           name: japanese-tts-combined-summary-run${{ github.run_number }}
           path: |
             combined-results/
-          retention-days: 7
+          # regression-baseline: compared against past runs.
+          retention-days: 30
