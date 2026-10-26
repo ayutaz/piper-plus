@@ -78,7 +78,7 @@ examples = [
     "multi-runtime-rtf.yml: rtf-benchmark-results",
     "mutation-testing.yml: stryker-report",
     "memory-regression.yml: memory-profile",
-    "generate-combined-report.yml: combined-report",
+    "test-japanese-tts.yml: japanese-tts-combined-summary",
     "bundle-size-gate.yml: bundle-size-baseline",
     "csharp-ci.yml: test-results-${matrix.os}",
     "csharp-build-all-platforms.yml: platform-binaries",

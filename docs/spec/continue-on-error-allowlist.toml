@@ -80,13 +80,6 @@ kind = "harmless"
 reason = "Report upload; the report only exists for push runs."
 
 [[entry]]
-workflow = "coverage-aggregation.yml"
-job = "aggregate"
-step = "Upload aggregated coverage to Codecov"
-kind = "harmless"
-reason = "Upload to an external service (fail_ci_if_error: false); each runtime's own workflow runs the tests."
-
-[[entry]]
 workflow = "cppcheck.yml"
 job = "cppcheck"
 step = "Upload cppcheck report"
