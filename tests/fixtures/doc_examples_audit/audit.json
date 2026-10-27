@@ -936,8 +936,8 @@
     },
     {
       "file": "docs/features/webui.md",
-      "line_start": 91,
-      "line_end": 105,
+      "line_start": 112,
+      "line_end": 126,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -951,8 +951,8 @@
     },
     {
       "file": "docs/features/webui.md",
-      "line_start": 118,
-      "line_end": 127,
+      "line_start": 139,
+      "line_end": 148,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -964,8 +964,8 @@
     },
     {
       "file": "docs/features/webui.md",
-      "line_start": 156,
-      "line_end": 159,
+      "line_start": 177,
+      "line_end": 180,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
