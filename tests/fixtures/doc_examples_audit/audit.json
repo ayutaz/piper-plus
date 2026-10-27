@@ -2,14 +2,14 @@
   "schema_version": 1,
   "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
-    "executable": 234,
+    "executable": 235,
     "needs_placeholder": 7,
     "skip_warranted": 235,
-    "total": 476
+    "total": 477
   },
   "by_language": {
     "bash": {
-      "executable": 171,
+      "executable": 172,
       "needs_placeholder": 7,
       "skip_warranted": 44
     },
@@ -936,8 +936,21 @@
     },
     {
       "file": "docs/features/webui.md",
-      "line_start": 112,
-      "line_end": 126,
+      "line_start": 114,
+      "line_end": 119,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "5aa4395abe5a9dad7a174f2911040af3b7587683"
+    },
+    {
+      "file": "docs/features/webui.md",
+      "line_start": 140,
+      "line_end": 154,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -951,8 +964,8 @@
     },
     {
       "file": "docs/features/webui.md",
-      "line_start": 139,
-      "line_end": 148,
+      "line_start": 167,
+      "line_end": 176,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -964,8 +977,8 @@
     },
     {
       "file": "docs/features/webui.md",
-      "line_start": 177,
-      "line_end": 180,
+      "line_start": 205,
+      "line_end": 208,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",

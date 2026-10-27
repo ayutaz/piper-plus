@@ -15,6 +15,15 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# How a run starts from a checkpoint, by WebUI start mode. "resume" continues a
+# run of this model (optimizer state and epoch counter included); "finetune"
+# loads the weights of a multi-speaker base into a single-speaker model
+# (piper_train removes emb_g and freezes the duration predictor).
+CHECKPOINT_FLAGS = {
+    "resume": "--resume_from_checkpoint",
+    "finetune": "--resume-from-multispeaker-checkpoint",
+}
+
 
 @dataclass
 class TrainingStatus:
@@ -64,8 +73,8 @@ class TrainingManager:
         self,
         dataset_path: str,
         output_dir: str,
-        base_model: str | None = None,
-        num_speakers: int = 1,
+        start_mode: str = "new",
+        checkpoint_path: str | None = None,
         quality: str = "medium",
         batch_size: int = 16,
         learning_rate: float = 1e-4,
@@ -79,6 +88,13 @@ class TrainingManager:
         """Start training process"""
         if self.is_running():
             logger.warning("Training is already running")
+            return False
+
+        if start_mode != "new" and start_mode not in CHECKPOINT_FLAGS:
+            self.status.error = f"Unknown start mode: {start_mode}"
+            return False
+        if start_mode != "new" and not checkpoint_path:
+            self.status.error = f"Start mode {start_mode!r} needs a .ckpt checkpoint"
             return False
 
         # Create output directory
@@ -117,6 +133,10 @@ class TrainingManager:
 
         # Add environment variables to find piper_train
         env = os.environ.copy()
+        # piper_train logs non-ASCII text (Japanese messages, paths). Make it
+        # write UTF-8 and read it as UTF-8: on Windows the locale encoding
+        # (cp932) failed to decode the log and stopped the progress monitor.
+        env["PYTHONIOENCODING"] = "utf-8"
         if piper_python_path.exists():
             env["PYTHONPATH"] = (
                 str(piper_python_path) + os.pathsep + env.get("PYTHONPATH", "")
@@ -125,8 +145,10 @@ class TrainingManager:
         if num_workers is not None:
             cmd.extend(["--num-workers", str(num_workers)])
 
-        if base_model and base_model != "New Model":
-            cmd.extend(["--resume_from_checkpoint", str(Path(base_model).resolve())])
+        if start_mode != "new":
+            cmd.extend(
+                [CHECKPOINT_FLAGS[start_mode], str(Path(checkpoint_path).resolve())]
+            )
 
         # Speaker count is read from the preprocessed config by piper_train;
         # it has no --num-speakers override.
@@ -145,8 +167,9 @@ class TrainingManager:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 bufsize=1,
-                universal_newlines=True,
                 env=env,
                 cwd=piper_python_path if piper_python_path.exists() else None,
             )
@@ -159,6 +182,8 @@ class TrainingManager:
             self._add_log(f"Training started at {self.status.start_time}")
             self._add_log(f"Dataset: {dataset_path}")
             self._add_log(f"Output: {output_dir}")
+            if start_mode != "new":
+                self._add_log(f"Start: {start_mode} from {checkpoint_path}")
             self._add_log(f"Quality: {quality}, Batch size: {batch_size}")
             self._add_log(f"Epochs: {num_epochs}, LR: {learning_rate}")
 

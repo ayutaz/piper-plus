@@ -150,8 +150,14 @@ def get_available_models(data_dir: Path) -> list[tuple[str, str]]:
                     "es": "Spanish",
                     "zh": "Chinese",
                     "ko": "Korean",
+                    "pt": "Portuguese",
+                    "sv": "Swedish",
+                    "multilingual": "Multilingual",
                 }
-                lang_display = lang_names.get(lang_code, lang_code.upper())
+                # Voice configs carry locale codes (en_US, pt-BR); name the
+                # language by its family.
+                lang_family = lang_code.replace("-", "_").split("_")[0].lower()
+                lang_display = lang_names.get(lang_family, lang_code.upper())
 
                 # Extract quality from filename if present
                 quality = ""
@@ -360,8 +366,36 @@ def synthesize_speech(
         raise gr.Error(f"Synthesis failed: {e!s}") from e
 
 
+# Raw (LJSpeech-style) datasets are turned into config.json + dataset.jsonl by
+# piper_train.preprocess; the trainer reads only the preprocessed form.
+PREPROCESS_HINT = (
+    "Preprocess it first, e.g.: python -m piper_train.preprocess "
+    "--input-dir <raw dataset> --output-dir <preprocessed dataset> "
+    "--dataset-format ljspeech --language <language> --sample-rate 22050 "
+    "--single-speaker"
+)
+
+# Start modes of the Training tab (label, value); the values are the ones
+# TrainingManager.start_training takes.
+START_MODES = [
+    ("New model", "new"),
+    ("Resume training", "resume"),
+    ("Fine-tune from a base model", "finetune"),
+]
+
+# Default learning rate per start mode. Fine-tuning uses 1/10 of the
+# pretraining rate against catastrophic forgetting (training guide, Template
+# B). A resumed run restores its optimizer state, learning rate included.
+START_MODE_LEARNING_RATES = {"new": 1e-4, "finetune": 2e-5}
+
+
+def _read_dataset_config(dataset_dir: Path) -> dict:
+    with open(dataset_dir / "config.json", encoding="utf-8") as f:
+        return json.load(f)
+
+
 def validate_dataset(dataset_path: str) -> dict:
-    """Validate dataset structure and return statistics"""
+    """Validate a preprocessed dataset (config.json + dataset.jsonl)."""
     if not dataset_path:
         return {"error": "Please specify a dataset path"}
 
@@ -372,43 +406,132 @@ def validate_dataset(dataset_path: str) -> dict:
     if not dataset_dir.is_dir():
         return {"error": f"{dataset_path} is not a directory"}
 
-    # Check for metadata.csv
-    metadata_file = dataset_dir / "metadata.csv"
-    if not metadata_file.exists():
-        return {"error": "metadata.csv not found in dataset directory"}
+    missing = [
+        name
+        for name in ("config.json", "dataset.jsonl")
+        if not (dataset_dir / name).is_file()
+    ]
+    if missing:
+        error = f"{' and '.join(missing)} not found in {dataset_path}."
+        if (dataset_dir / "metadata.csv").exists():
+            error += " This looks like a raw dataset. " + PREPROCESS_HINT
+        return {"error": error}
 
-    # Analyze dataset
-    stats = {
+    try:
+        config = _read_dataset_config(dataset_dir)
+    except (OSError, json.JSONDecodeError) as e:
+        return {"error": f"Cannot read config.json: {e}"}
+
+    with open(dataset_dir / "dataset.jsonl", encoding="utf-8") as f:
+        utterances = sum(1 for line in f if line.strip())
+    if utterances == 0:
+        return {"error": "dataset.jsonl has no utterances"}
+
+    language = config.get("language", {})
+    return {
         "path": dataset_path,
         "status": "Valid",
-        "files": 0,
-        "total_duration": "Unknown",
-        "speakers": [],
-        "sample_rate": "Unknown",
+        "utterances": utterances,
+        "num_speakers": config.get("num_speakers"),
+        "num_symbols": config.get("num_symbols"),
+        "language": language.get("code") if isinstance(language, dict) else language,
+        "sample_rate": config.get("audio", {}).get("sample_rate"),
     }
 
-    # Count audio files
-    audio_extensions = {".wav", ".mp3", ".flac", ".ogg"}
-    audio_files = []
-    for ext in audio_extensions:
-        audio_files.extend(dataset_dir.rglob(f"*{ext}"))
-    stats["files"] = len(audio_files)
 
-    # Try to read metadata.csv for speaker info
+def find_checkpoints(output_dir: str) -> list[str]:
+    """List the .ckpt files under a training output directory, newest first."""
+    if not output_dir or not Path(output_dir).is_dir():
+        return []
+    checkpoints = sorted(
+        Path(output_dir).rglob("*.ckpt"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    return [str(path) for path in checkpoints]
+
+
+def check_start_options(
+    start_mode: str, checkpoint_path: str | None, dataset_path: str
+) -> str | None:
+    """Return why a run cannot start this way, or None when it can."""
+    if start_mode == "new":
+        return None
+    if start_mode not in {value for _, value in START_MODES}:
+        return f"Unknown start mode: {start_mode}"
+    if not checkpoint_path:
+        return "Select a .ckpt checkpoint to resume or fine-tune from"
+
+    checkpoint = Path(checkpoint_path)
+    if checkpoint.suffix != ".ckpt":
+        return (
+            f"{checkpoint.name} is not a training checkpoint (.ckpt). "
+            "An ONNX voice cannot be trained further; use the .ckpt it was "
+            "exported from."
+        )
+    if not checkpoint.is_file():
+        return f"Checkpoint {checkpoint_path} does not exist"
+
+    if start_mode != "finetune":
+        return None
+
     try:
-        import csv
+        dataset_config = _read_dataset_config(Path(dataset_path))
+    except (OSError, json.JSONDecodeError):
+        # validate_dataset reports a missing or unreadable config.
+        return None
+    if dataset_config.get("num_speakers") != 1:
+        return (
+            "Fine-tuning from a base model trains a single-speaker voice, but "
+            f"the dataset has {dataset_config.get('num_speakers')} speakers. "
+            "Preprocess it with --single-speaker."
+        )
 
-        speakers = set()
-        with open(metadata_file, encoding="utf-8") as f:
-            reader = csv.reader(f, delimiter="|")
-            for row in reader:
-                if len(row) >= 3:  # speaker|filename|text format
-                    speakers.add(row[0])
-        stats["speakers"] = list(speakers)
-    except Exception as e:
-        logger.error(f"Error reading metadata.csv: {e}")
+    # A released base (e.g. releases/zs-v1) ships its config.json next to the
+    # checkpoint. The same symbol count does not mean the same phoneme IDs.
+    base_config_path = checkpoint.parent / "config.json"
+    if base_config_path.is_file():
+        with open(base_config_path, encoding="utf-8") as f:
+            base_config = json.load(f)
+        if dataset_config.get("phoneme_id_map") != base_config.get("phoneme_id_map"):
+            return (
+                "The dataset's phoneme IDs differ from the base model's "
+                f"{base_config_path}. Align them first: python "
+                "scripts/prepare_single_speaker_finetune.py --input-dir "
+                f"{dataset_path} --base-config {base_config_path} "
+                "--output-dir <aligned dataset>"
+            )
+    return None
 
-    return stats
+
+def refresh_checkpoints(start_mode: str, output_dir: str):
+    """In resume mode, offer the output directory's .ckpt files, newest first.
+
+    Other modes keep what the user entered: a base for fine-tuning does not
+    live in the output directory.
+    """
+    if start_mode != "resume":
+        return gr.update()
+    choices = find_checkpoints(output_dir)
+    return gr.update(choices=choices, value=choices[0] if choices else None)
+
+
+def update_start_mode(start_mode: str, output_dir: str):
+    """Show the checkpoint picker and the mode's default learning rate."""
+    if start_mode == "resume":
+        choices = find_checkpoints(output_dir)
+        checkpoint = gr.update(
+            visible=True, choices=choices, value=choices[0] if choices else None
+        )
+    else:
+        # A checkpoint picked for another mode is not a base to fine-tune.
+        checkpoint = gr.update(visible=start_mode != "new", choices=[], value=None)
+    learning_rate = (
+        gr.update(value=START_MODE_LEARNING_RATES[start_mode])
+        if start_mode in START_MODE_LEARNING_RATES
+        else gr.update()
+    )
+    return checkpoint, learning_rate
 
 
 def check_training_dependencies():
@@ -472,8 +595,8 @@ def check_training_dependencies():
 
 def start_training(
     dataset_path: str,
-    base_model: str,
-    num_speakers: int,
+    start_mode: str,
+    checkpoint_path: str | None,
     quality: str,
     batch_size: int,
     learning_rate: float,
@@ -485,6 +608,14 @@ def start_training(
     """Start training process"""
     if not dataset_path or not Path(dataset_path).exists():
         return "❌ Error: Dataset path does not exist"
+
+    dataset = validate_dataset(dataset_path)
+    if "error" in dataset:
+        return f"❌ Error: {dataset['error']}"
+
+    option_error = check_start_options(start_mode, checkpoint_path, dataset_path)
+    if option_error:
+        return f"❌ Error: {option_error}"
 
     # Check dependencies
     missing_deps = check_training_dependencies()
@@ -499,8 +630,8 @@ def start_training(
     success = training_manager.start_training(
         dataset_path=dataset_path,
         output_dir=output_dir,
-        base_model=base_model if base_model != "New Model" else None,
-        num_speakers=num_speakers,
+        start_mode=start_mode,
+        checkpoint_path=checkpoint_path if start_mode != "new" else None,
         quality=quality,
         batch_size=batch_size,
         learning_rate=learning_rate,
@@ -791,8 +922,8 @@ def create_interface(data_dir: Path) -> gr.Blocks:
 
                         dataset_path = gr.Textbox(
                             label="Dataset Directory Path",
-                            placeholder="/path/to/your/dataset",
-                            info="Folder containing audio files and metadata.csv",
+                            placeholder="/path/to/preprocessed/dataset",
+                            info="Preprocessed dataset (config.json and dataset.jsonl from piper_train.preprocess)",
                         )
 
                         validate_btn = gr.Button("Validate Dataset")
@@ -806,31 +937,33 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                         ### Expected folder structure:
                         ```
                         dataset/
-                        ├── metadata.csv (speaker|filename|text)
-                        ├── wavs/
-                        │   ├── audio_001.wav
-                        │   ├── audio_002.wav
-                        │   └── ...
-                        └── speaker_info.json (optional)
+                        ├── config.json    (phoneme_id_map, num_speakers, ...)
+                        ├── dataset.jsonl  (one utterance per line)
+                        └── cache/         (normalized audio and spectrograms)
                         ```
+                        A raw LJSpeech-style folder (metadata.csv + wavs/) has
+                        to be preprocessed first with `python -m piper_train.preprocess`.
+                        To fine-tune a released base, also align the phoneme IDs
+                        with `scripts/prepare_single_speaker_finetune.py`.
                         """)
 
                     with gr.Column():
                         gr.Markdown("## Training Configuration")
 
-                        base_model_dropdown = gr.Dropdown(
-                            choices=["New Model"] + [m[0] for m in available_models],
-                            label="Base Model",
-                            value="New Model",
-                            info="Start from scratch or fine-tune existing model",
+                        start_mode = gr.Radio(
+                            choices=START_MODES,
+                            label="Start",
+                            value="new",
+                            info="Resume continues a run from its .ckpt; fine-tuning trains a single-speaker voice from a multi-speaker base .ckpt",
                         )
 
-                        num_speakers = gr.Number(
-                            label="Number of Speakers",
-                            value=1,
-                            precision=0,
-                            minimum=1,
-                            maximum=100,
+                        checkpoint_path = gr.Dropdown(
+                            choices=[],
+                            label="Checkpoint (.ckpt)",
+                            value=None,
+                            allow_custom_value=True,
+                            visible=False,
+                            info="Resume lists the .ckpt files in the output directory; enter any other path directly",
                         )
 
                         quality = gr.Radio(
@@ -853,8 +986,8 @@ def create_interface(data_dir: Path) -> gr.Blocks:
 
                             learning_rate = gr.Number(
                                 label="Learning Rate",
-                                value=1e-4,
-                                info="Default: 1e-4",
+                                value=START_MODE_LEARNING_RATES["new"],
+                                info="Default: 1e-4 (new model), 2e-5 (fine-tuning); a resumed run keeps its saved optimizer state",
                             )
 
                             num_epochs = gr.Number(
@@ -963,13 +1096,25 @@ def create_interface(data_dir: Path) -> gr.Blocks:
             outputs=[dataset_info],
         )
 
+        start_mode.change(
+            fn=update_start_mode,
+            inputs=[start_mode, output_dir],
+            outputs=[checkpoint_path, learning_rate],
+        )
+
+        output_dir.change(
+            fn=refresh_checkpoints,
+            inputs=[start_mode, output_dir],
+            outputs=[checkpoint_path],
+        )
+
         # Training control handlers
         start_training_btn.click(
             fn=start_training,
             inputs=[
                 dataset_path,
-                base_model_dropdown,
-                num_speakers,
+                start_mode,
+                checkpoint_path,
                 quality,
                 batch_size,
                 learning_rate,
