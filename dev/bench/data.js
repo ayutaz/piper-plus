@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793072711355,
+  "lastUpdate": 1793080974948,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1668,6 +1668,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 218.4,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "532fbc71b5183c9d1bbfae93bbbf1e6cd46e01c2",
+          "message": "fix(webui): resume and fine-tune from the Training tab (#911)\n\n* fix(train): keep --freeze-dp when resuming a run trained with it\n\nLightning restores the optimizer state on --resume_from_checkpoint, which\nonly fits the parameter groups it was saved with. A fine-tuning run\n(--resume-from-multispeaker-checkpoint enables --freeze-dp, which keeps the\nduration predictor out of the optimizer) resumed without the flag put those\nparameters back, and Lightning stopped with \"loaded state dict contains a\nparameter group that doesn't match the size of optimizer's group\".\napply_transfer_defaults now reads freeze_dp from the checkpoint's\nhyper_parameters before the model is built.\n\n* fix(webui): resume and fine-tune from the Training tab\n\nThe tab passed the display name of the ONNX voice chosen as Base Model to\n--resume_from_checkpoint, which takes a Lightning .ckpt, so resuming always\nfailed, and nothing sent --resume-from-multispeaker-checkpoint. A Start\nchoice (new / resume / fine-tune) now picks the flag and a Checkpoint field\ntakes the .ckpt; resume lists the output directory's checkpoints, newest\nfirst, and fine-tuning sets the learning rate to 2e-5.\n\nBefore starting piper_train the tab checks that the dataset is preprocessed\n(config.json + dataset.jsonl; a raw metadata.csv folder gets the\npreprocess command), that the checkpoint is an existing .ckpt, and, for\nfine-tuning, that the dataset has one speaker and the phoneme_id_map of a\nbase config.json next to the checkpoint (otherwise it names\nscripts/prepare_single_speaker_finetune.py). The unused Number of\nSpeakers field is gone.\n\nThe monitor reads piper_train's output as UTF-8 and the child writes UTF-8:\non Windows the cp932 locale failed on the first Japanese log line and the\nmonitor stopped while training went on. Model names from locale codes\n(en_US) show the language instead of EN_US, which also made\ntest_model_detection fail from the repository root.\n\nThe integration tests now use a preprocessed fixture. Two of them never\npassed where gradio is installed: one hung the interpreter (a mocked\nreadline that never returned kept the monitor thread alive) and one raced\nthe monitor thread. Blocking readline mocks now time out.\n\n* ci(webui): run the WebUI tests in the locked WebUI environment\n\ntest_webui.py and the WebUI tests in test_training_manager.py /\ntest_training_integration.py ran in no job: python-tests skips them without\ngradio, which its training environment cannot hold (Gradio requires HF Hub\n1.x, Transformers 4.x requires HF Hub <1), and webui-test.yml, the workflow\nthe skip allowlist named as running them, is disabled. consumer-contracts\nalready syncs environments/webui; it now also runs the three files there,\nfrom the repository root, and fails on any skip but the one that needs a\nmaintainer's local checkout. pytest comes from a new test dependency group\nof environments/webui, so the user environment is unchanged.\n\nThe allowlist reasons now name consumer-contracts, and CLAUDE.md no longer\npoints the WebUI's CI at webui-test.yml.\n\n* docs(webui): use path placeholders the docs syntax gate can parse\n\nThe <placeholder> arguments in the alignment example are shell\nredirections, so bash -n rejected the block. Use /path/to paths as the\nrest of the page does and regenerate the doc-examples snapshot.",
+          "timestamp": "2026-10-27T15:02:05+09:00",
+          "tree_id": "477abf1bc72eaa8fdb9439254e407718279e5a6a",
+          "url": "https://github.com/ayutaz/piper-plus/commit/532fbc71b5183c9d1bbfae93bbbf1e6cd46e01c2"
+        },
+        "date": 1793080973156,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0827,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 21.1,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 21.3,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1701.4,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 218.3,
             "unit": "MB"
           },
           {
