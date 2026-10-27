@@ -584,8 +584,8 @@ jobs:
 
   # Trial distroless variants. Build-only (never pushed to ghcr.io)
   # until a promotion PR validates each image's runtime behaviour
-  # (HF Space cold start for python-inference, webui-test.yml smoke
-  # for webui, container test for cpp-inference, dev-experience for
+  # (HF Space cold start for python-inference, a Gradio container
+  # smoke for webui, container test for cpp-inference, dev-experience for
   # cpp-dev). Each job catches multi-arch buildx breakage the
   # per-image trial workflow doesn't exercise (those run amd64 only
   # for A/B size comparisons).

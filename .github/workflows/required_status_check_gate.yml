@@ -118,7 +118,6 @@ on:
       - Trivy Container Scan
       - Tsukuyomi Publication Preparation
       - WASM Build
-      - WebUI Tests
       - Wyoming Protocol Smoke Test
       - ZH-EN Loanword Sync Gate
     types: [completed]

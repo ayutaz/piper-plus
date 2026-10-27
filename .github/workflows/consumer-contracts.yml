@@ -10,6 +10,8 @@ on:
       - 'src/python_run/**'
       - 'src/python/g2p/**'
       - 'environments/webui/**'
+      - 'docker/webui/app.py'
+      - 'docker/webui/test_app.py'
       - 'pyproject.toml'
       - 'uv.lock'
       - 'scripts/check_cli_consumer_outputs.py'
@@ -132,10 +134,10 @@ jobs:
         # test_webui.py and the WebUI tests in test_training_manager.py /
         # test_training_integration.py need gradio, which python-tests' training
         # environment cannot hold (Gradio requires HF Hub 1.x, Transformers 4.x
-        # requires HF Hub <1), so python-tests skips them. webui-test.yml, which
-        # was meant to run them, is disabled. Run them in the environment
-        # docs/features/webui.md installs, from the repository root so the
-        # model detection test finds test/models.
+        # requires HF Hub <1), so python-tests skips them. Run them in the
+        # environment docs/features/webui.md installs, from the repository root
+        # so the model detection test finds test/models. docker/webui/test_app.py
+        # reads docker/webui/app.py with ast and needs only numpy and pytest.
         env:
           PYTEST_PLUGINS: piper_plus_skip_log
           PYTHONPATH: ${{ github.workspace }}/scripts/pytest_plugins
@@ -146,6 +148,7 @@ jobs:
             src/python_run/tests/test_webui.py \
             src/python_run/tests/test_training_manager.py \
             src/python_run/tests/test_training_integration.py \
+            docker/webui/test_app.py \
             -v --tb=short --override-ini="addopts="
           # gradio is installed here: only the test that needs a maintainer's
           # local checkout may skip (docs/spec/test-skip-allowlist.toml).
