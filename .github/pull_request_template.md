@@ -12,6 +12,8 @@
 - [ ] C++ (src/cpp/, CMakeLists.txt)
 - [ ] Go (src/go/)
 - [ ] WASM/npm (src/wasm/)
+- [ ] Kotlin/Android (android/)
+- [ ] Swift/iOS (Sources/, Package.swift)
 - [ ] Docker (docker/)
 - [ ] CI/CD (.github/workflows/)
 - [ ] Documentation (docs/, README*)

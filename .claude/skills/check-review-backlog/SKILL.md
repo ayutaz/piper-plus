@@ -1,6 +1,6 @@
 ---
 name: check-review-backlog
-description: PR 作成直後の review チェック / 全 open PR の未解決 review thread (isResolved=false) を gh api graphql で集計し、 N 日以上未対応のものを backlog として表示する。 `--pr <N>` で単一 PR の review 即時確認 (PR 作成 chain で発動)、 引数なしで全 PR backlog 監視。 `/loop /check-review-backlog` で週次監視に利用可能。 read-only (POST / mutation なし)。
+description: PR 作成直後の review チェック / 全 open PR の未解決 review thread (isResolved=false) を gh api graphql で集計し、 N 日以上未対応のものを backlog として表示する。 `--pr <N>` で単一 PR の review 即時確認 (PR 作成直後の手動確認用)、 引数なしで全 PR backlog 監視。 `/loop /check-review-backlog` で週次監視に利用可能。 read-only (POST / mutation なし)。
 argument-hint: "[--pr <N>] [--days N] [--author <login>]"
 disable-model-invocation: false
 allowed-tools: Bash(gh api *) Bash(gh pr list *) Bash(date *) Read Grep
@@ -12,7 +12,7 @@ allowed-tools: Bash(gh api *) Bash(gh pr list *) Bash(date *) Read Grep
 
 ## 引数
 
-- `--pr <N>` (任意): 単一 PR の review 即時確認モード。 経過日数フィルタを無視し、 全未解決 thread を表示。 `/create-pr` skill から PR 作成直後に自動 chain される (例: `/check-review-backlog --pr 496`)
+- `--pr <N>` (任意): 単一 PR の review 即時確認モード。 経過日数フィルタを無視し、 全未解決 thread を表示。 `/create-pr` は同等の GraphQL をフェーズ 6 で inline 実行するため本 skill を chain しない。 standalone で PR 作成直後に確認したい時に使う (例: `/check-review-backlog --pr 496`)
 - `--days N` (任意): 経過日数の閾値 (デフォルト: 7 日)。 `--pr` 指定時は無視
 - `--author <login>` (任意): 特定 reviewer (例: `copilot-pull-request-reviewer`) のコメントに絞る
 
@@ -27,7 +27,7 @@ allowed-tools: Bash(gh api *) Bash(gh pr list *) Bash(date *) Read Grep
 
 `$ARGUMENTS` を解析:
 
-- `--pr <N>` を含む: **単一 PR モード** (PR 作成直後の auto chain 用)。 フェーズ 1 を skip、 フェーズ 2 を該当 PR 1 件で実行、 フェーズ 3 (日数フィルタ) を skip、 フェーズ 4 で「PR #N の未解決 thread 全件」レポート
+- `--pr <N>` を含む: **単一 PR モード** (PR 作成直後の確認用)。 フェーズ 1 を skip、 フェーズ 2 を該当 PR 1 件で実行、 フェーズ 3 (日数フィルタ) を skip、 フェーズ 4 で「PR #N の未解決 thread 全件」レポート
 - それ以外: **backlog 監視モード** (週次運用)。 全 open PR を走査
 
 ### フェーズ 1: Open PR 一覧取得 (backlog モードのみ)

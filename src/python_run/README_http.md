@@ -5,17 +5,21 @@ FastAPI ベースの HTTP サーバー。`/synthesize` の代わりにルート 
 
 ## インストール
 
-`[http]` extras で `fastapi` + `uvicorn[standard]` を入れます。
+`[http]` extras は `fastapi` + `uvicorn[standard]` だけを入れます。v2.0.2 は
+ONNX Runtime を基底依存に含めないため、CPU なら `[cpu]`、GPU なら `[gpu]` を
+一緒に指定します。
 
 ```sh
-uv pip install "piper-plus[http]"
+uv pip install "piper-plus[cpu,http]"
 ```
 
 `uv add` を使う場合:
 
 ```sh
-uv add "piper-plus[http]"
+uv add "piper-plus[cpu,http]"
 ```
+
+GPU は `[cpu,http]` の代わりに `[gpu,http]` を使います。
 
 ## 起動
 

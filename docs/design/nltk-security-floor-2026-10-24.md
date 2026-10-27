@@ -5,7 +5,7 @@
 GHSA-8mgp-746c-j5xp (CVE-2026-81726) は、nltk の model-artifact API が許可されたディレクトリの外のファイルに触れる脆弱性です。対象は `<= 3.10.3` で、公開時は修正版がありませんでした。そのため、次の 2 か所で抑止していました。
 
 - pip-audit: `--ignore-vuln` で 2 か所 (root と `src/python_run`)
-- dependency-review: `allow-ghsas` で 2 か所 (`security-audit.yml` と `dependency-review.yml`)
+- dependency-review: `allow-ghsas` で 2 か所 (`security-audit.yml` と `dependency-review.yml`。後者は後に #884 で `lint-gates.yml` の dependency-review step に統合)
 
 nltk 3.10.4 (2026-10-21) はこの脆弱性を修正した版です。この版では、ファイルの読み書き、展開、URL の取得をデータディレクトリの中に限ります。また、pickle を制限付きで読みます。
 

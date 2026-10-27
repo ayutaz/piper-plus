@@ -182,8 +182,8 @@ order = ["noise_scale", "length_scale", "noise_w"]
 # piper_train.infer_onnx CLI defaults). A published model may override these
 # in its config.json; the public zs-v1 base uses noise_scale=0.667,
 # length_scale=1.0, noise_w=0.8.
-# v1.12.0 で全 runtime CLI を 0.4 / 1.0 / 0.5 に統一済 (CLAUDE.md
-# "Inference defaults"、 PR #222 / commit c644e9e2)。 Note: これは
+# v1.12.0 で全 runtime CLI を 0.4 / 1.0 / 0.5 に統一済 (PR #222 /
+# commit c644e9e2。 当時参照していた CLAUDE.md の "Inference defaults" 節は削除済み)。 Note: これは
 # Warmup scales (ORT 内部最適化、 ort-session-contract.toml) と同値だが
 # 意味的には別カテゴリ — Warmup は dummy run 用の "安定な" 値、 推論
 # default は audio quality (低 noise / 短 duration) と graph 安定性の

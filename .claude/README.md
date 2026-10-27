@@ -22,14 +22,21 @@
 │   ├── commit/SKILL.md             # /commit — CLAUDE.md 準拠コミット
 │   ├── run-tests/SKILL.md          # /run-tests — 各言語ランタイムテスト
 │   ├── sync-docs/SKILL.md          # /sync-docs — エージェントチームによる全ドキュメント監査・更新
+│   ├── create-pr/SKILL.md          # /create-pr — push → 構造化 PR 本文 → CI 監視 → review 対応 (一括)
+│   ├── watch-pr/SKILL.md           # /watch-pr — 既存 PR の CI 集計 + 失敗分類 (create-pr フェーズ 5 の standalone 版)
 │   ├── reply-review/SKILL.md       # /reply-review — レビューコメントに返信 + thread resolve
+│   ├── check-review-backlog/SKILL.md # /check-review-backlog — open PR の未解決 review thread 集計 (read-only)
 │   ├── release-prep/SKILL.md       # /release-prep — リリース前 version 状況確認 (read-mostly)
 │   ├── prepare-release/SKILL.md    # /prepare-release — 9 manifest bump 案 + Swift checksum + tag 順序
 │   ├── publish-model/SKILL.md      # /publish-model — 学習 ckpt → export + sanity + bench + HF upload
 │   ├── bump-deps/SKILL.md          # /bump-deps — ORT/openjtalk/ruff の canonical sync 更新
 │   ├── watch-ci-patterns/SKILL.md  # /watch-ci-patterns — CI failure を flake/drift/env/test bug 分類
-│   ├── skill-health/SKILL.md       # /skill-health — skill / hook の health check (meta)
-│   └── ... (他 cross-runtime gate skill)
+│   ├── check-loanword/SKILL.md     # /check-loanword — ZH-EN loanword mirror 同期検査
+│   ├── check-pua/SKILL.md          # /check-pua — PUA テーブル / fixture / config 整合性検査
+│   ├── check-runtime-parity/SKILL.md # /check-runtime-parity — 推論パス変更時の全ランタイム追従検査
+│   ├── check-cross-runtime/SKILL.md  # /check-cross-runtime — Python canonical 変更の他ランタイム波及検査
+│   ├── check-new-runtime-asset/SKILL.md # /check-new-runtime-asset — 新データアセットの package metadata 検査
+│   └── skill-health/SKILL.md       # /skill-health — skill / hook の health check (meta)
 └── commands/                       # 既存の slash commands (skills と併存可)
     ├── add-language.md             # 新言語追加ガイド
     └── review-language.md          # 10 エージェント並列レビュー
@@ -58,6 +65,8 @@
 - `rm -rf /data/piper/output-*` / `rm -rf /data/piper/dataset-*` (学習データ保護)
 - `epoch=*.ckpt` / `checkpoints/` の削除 (チェックポイント保護)
 - `npm publish` (リリースワークフロー経由を強制)
+- `git push` の hook bypass フラグ / main・master への `--force-with-lease` push
+- `gh pr create` の直接実行 (`/create-pr` skill 内からの実行のみ許可)
 
 `echo`/`printf`/`cat`/`tee` で始まるコマンドは false-positive 防止のためチェックをスキップします (例: `echo 'git push --force main'` のようなデモ・テスト)。
 
@@ -88,7 +97,7 @@ CLAUDE.md のコミットルール (`--no-verify` 禁止、HEREDOC、適切な p
 1. 実装・テスト追加
 2. `/sync-docs` でドキュメント監査 → 承認後に自動更新
 3. `/commit` でコミット
-4. `/check-pr-ready` → PR 作成
+4. `/check-pr-ready` → `/create-pr` で PR 作成
 
 **監査エージェント**:
 
@@ -121,6 +130,36 @@ PR #349 で発生した「ドキュメント更新を一括で後付けする」
 GitHub CLI (`gh`) の認証が必要です。`$1` を省略した場合は引数不足エラー、`$2` を省略した場合は `git rev-parse HEAD` の短縮ハッシュを使用します。
 
 PR #349 / #350 のレビュー対応で手動実行していたワークフローを skill 化したものです。
+
+### `/create-pr [base-branch] [--title <title>] [--no-watch]`
+
+push → `.github/pull_request_template.md` 準拠の PR 本文で PR 作成 → CI 監視ループ → review thread 返信 + resolve までを 1 skill の inline フェーズで行います (他 skill を chain しない)。 PR 本文は `pr-metadata.yml` の `pr-body-validate` step (Test Plan / Risk Level / Affected Components / Type) を通る形で生成します。 `gh pr create` の直接実行は guard hook が block するため、 PR 作成は本 skill 経由です。
+
+### `/watch-pr [pr-number]` / `/check-review-backlog [--pr <N>]`
+
+既存 PR の CI checks (`gh pr checks --json name,state,bucket,...`) と未解決 review thread を 1 回集計する standalone skill。 継続監視は `/loop /watch-pr <PR>`。 `/check-review-backlog` は全 open PR の未解決 thread を日数で絞って表示します (read-only)。
+
+### その他の skill
+
+| skill | 用途 |
+|-------|------|
+| `/release-prep` / `/prepare-release` | リリース前の version 確認 (read-mostly) と bump 適用案 + publish 順序ガイド |
+| `/publish-model` | 学習 ckpt → ONNX export + sanity + RTF bench + HF upload |
+| `/bump-deps` | ORT / openjtalk / ruff の canonical → mirror 同期 bump 案 |
+| `/watch-ci-patterns` | workflow 単位の最近 run を集計し failure を flake / drift / env / test bug に分類 |
+| `/check-loanword` / `/check-pua` / `/check-runtime-parity` / `/check-cross-runtime` / `/check-new-runtime-asset` | cross-runtime 同期検査 |
+| `/skill-health` | skill / hook 自身の health check (frontmatter / script 参照 / trigger 衝突 / hook の shebang) |
+
+## Pre-commit / pre-push gates
+
+git hook 側の gate は `.pre-commit-config.yaml` に集約されています (hook 数は 119、 2026-10-26 時点)。 Claude Code の hooks (上記) とは別の仕組みで、 Claude を使わない commit / push にも効きます。
+
+| 段階 | 有効化 | 主な内容 |
+|------|--------|---------|
+| commit 時 (default stage) | `pre-commit install` | ruff check + format、 PUA / loanword 等の contract gate (対象ファイル変更時のみ)、 `action-pin-gate`、 `test-threshold-relaxation`、 ruff version sync など |
+| push 時 (`stages: [pre-push]`) | `pre-commit install --hook-type pre-push` (opt-in) | `pre-push-contract-gates` (loanword / PUA / language parity / CHANGELOG unreleased の 4 script を full-repo で実行)、 mypy-g2p、 cargo-clippy、 dotnet-format、 golangci-lint、 markdownlint-cli2、 codespell、 gitleaks、 hadolint、 editorconfig-checker |
+
+個々の hook の trigger 条件 (`files:` / `stages:`) は `.pre-commit-config.yaml` の各 entry が正です。 CI 側では `.github/workflows/pre-commit.yml` が commit 段と pre-push 段 (`--hook-stage pre-push`) の hook を PR で実行し、 `lint-gates.yml` が contract gate 等を別 step で実行します。
 
 ## 依存
 

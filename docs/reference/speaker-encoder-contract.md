@@ -19,7 +19,7 @@ pinned Hugging Face revision
 | Encoder | `campplus.onnx` |
 | Embedding | 192-dimensional, L2-normalized `float32` `speaker_embedding` |
 | Encoder SHA-256 | `a6ac6a63997761ae2997373e2ee1c47040854b4b759ea41ec48e4e42df0f4d73` |
-| Verification scope | Python `piper-plus==2.0.0` functional inference; other runtimes are not claimed |
+| Verification scope | Released package: Python `piper-plus==2.0.0` functional inference only. Source/runtime CI: [run 38189966578](https://github.com/ayutaz/piper-plus/actions/runs/38189966578) ran Python/Rust/Go/C#/C++/WASM jobs on source; this is not a claim for released packages of the other runtimes |
 
 The CAM++ encoder and the TTS graph are a matched generation. Do not feed a
 legacy 256-dimensional ECAPA embedding into `base.onnx`, and do not treat the

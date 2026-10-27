@@ -1,5 +1,7 @@
 # HF Space zero-shot デモ 実装計画 (Issue #790 / ステップ 1)
 
+> **ステータス**: 実装済み ([PR #806](https://github.com/ayutaz/piper-plus/pull/806)、2026-10-17 merge、`huggingface-space/zero_shot.py`)。以下は実装前の計画のまま残している。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** HF Space `ayousanz/piper-plus-demo` に、参照音声 (アップロード / マイク録音) から声を写して合成できる実験的な zero-shot タブを追加する。

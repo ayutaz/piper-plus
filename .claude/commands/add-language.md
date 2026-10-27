@@ -157,8 +157,8 @@ except ImportError:
 
 - `src/cpp/piper.cpp` — `#include` + `"$ARGUMENTS"` ディスパッチ
 - `src/cpp/language_detector.cpp/.hpp` — 言語検出 (ラテン文字)
-- `CMakeLists.txt` — ソースファイル追加
-- `src/cpp/tests/CMakeLists.txt` — テストターゲット追加
+- `cmake/PiperCommon.cmake` — `PIPER_COMMON_SOURCES` にソースファイル追加 (`CMakeLists.txt` が include し、 CLI / C API 共有ライブラリが `piper_common` を共有する)
+- `src/cpp/tests/CMakeLists.txt` — テストのソース一覧に `test_$ARGUMENTS_phonemize.cpp` を追加し、 `../$ARGUMENTS_phonemize.cpp` を link する分岐 (既存の `test_swedish_phonemize` 等と同じ形) と、 他の phonemizer ソースを列挙しているテストターゲットへの追加を行う
 
 ---
 
@@ -201,17 +201,16 @@ except ImportError:
 
 ### CI
 
-- `.github/workflows/cpp-tests.yml` — テスト実行リストに追加
-- `.github/workflows/ci.yml` — テスト実行リストに追加
-- `.github/workflows/dev-build-all.yml` — スモークテストに追加
+- C++ / C# / Rust / Go / JS のテストは各 runner が自動検出する (C++ は `src/cpp/tests/CMakeLists.txt` の `add_test` → `ctest`)。 workflow 側にテスト名のリストはない
+- `.github/workflows/ci.yml` — ランタイム別 job を起動する paths filter に新しいデータファイル等が含まれるか確認
+- `.github/workflows/dev-build-all.yml` — `Smoke test all N languages` step の言語リストに追加
 
 ### ドキュメント
 
 - `CLAUDE.md` — フォネマイザーテーブル + ファイルパス追加
-- `README.md`, `README_EN.md`, `README_ZH.md`, `README_FR.md` — 言語数更新
+- `README.md` と翻訳版 7 本 (`README_EN.md` / `README_ZH.md` / `README_FR.md` / `README_ES.md` / `README_PT.md` / `README_DE.md` / `README_KO.md`) — 言語数更新
 - `src/wasm/openjtalk-web/README.npm.md` — 言語テーブル追加
-- `src/python_run/setup.py` — 言語リスト更新
-- `docker/cpp-dev/Dockerfile` — コメント更新
+- `docker/cpp-dev/Dockerfile` — コメント (`self-contained G2P for all N languages`) 更新
 
 ---
 

@@ -95,7 +95,7 @@ L2 再正規化を入れた v6 でも `loss_dino` が step ~1249 で突如 0.00 
 - `src/python/piper_train/vits/lightning.py:944-983`: 有限性チェック付き EMA + center 更新
 - `src/python/piper_train/vits/losses.py:84-148`: dino_loss 入力検証 + 警告
 
-テスト:
+テスト (`src/python/` 配下):
 
 - `tests/test_mb_istft_film.py`: 15 ケース (FiLM 数値挙動、構造、forward、勾配)
 - `tests/test_ddp_synced_finite.py`: 11 ケース (DDP all_reduce mock)

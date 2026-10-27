@@ -1,6 +1,6 @@
 ---
 name: watch-pr
-description: PR push 直後 / PR 作成後の auto chain (`/create-pr` のフェーズ 6.2 から発動) / CI 監視 / レビュー対応 / merge 前確認 の文脈で発動。`gh pr checks` を一度 polling し green / red / pending を集計、 red なら失敗 job のログを fetch して「format drift / test fail / build error / flake / contract drift」に分類。 同時に unresolved review thread (人間 / Copilot) も集計し、 安全カテゴリ (stale / Copilot style ノイズ) は `/reply-review --auto-safe` を auto chain で起動して reply + resolve まで自動完了。 人間 reviewer / blocker 候補は user 判断のため提示のみ。 `/loop /watch-pr <PR>` で継続監視に使える。
+description: PR push 直後 / 既存 PR の CI 監視 (`/create-pr` はフェーズ 5 で同等の監視を inline 実行し本 skill を chain しない。 本 skill はその standalone 版) / レビュー対応 / merge 前確認 の文脈で発動。`gh pr checks` を一度 polling し green / red / pending を集計、 red なら失敗 job のログを fetch して「format drift / test fail / build error / flake / contract drift」に分類。 同時に unresolved review thread (人間 / Copilot) も集計し、 安全カテゴリ (stale / Copilot style ノイズ) は `/reply-review --auto-safe` を auto chain で起動して reply + resolve まで自動完了。 人間 reviewer / blocker 候補は user 判断のため提示のみ。 `/loop /watch-pr <PR>` で継続監視に使える。
 argument-hint: "[pr-number]"
 disable-model-invocation: false
 allowed-tools: Bash(gh pr checks *) Bash(gh pr view *) Bash(gh run view *) Bash(gh api *) Bash(git rev-parse *) Bash(git branch *) Read Grep Skill
@@ -39,13 +39,15 @@ PR_NUM=$(gh pr view --json number --jq '.number' 2>/dev/null)
 ### フェーズ 2: CI checks の一括取得
 
 ```bash
-gh pr checks "$PR_NUM" --json name,state,conclusion,link --jq '.[]'
+gh pr checks "$PR_NUM" --json name,state,bucket,link,workflow --jq '.[]'
 ```
 
-各 check は以下の状態のいずれか:
+`gh pr checks --json` に `conclusion` フィールドはない (指定すると `Unknown JSON field` エラー)。 使えるフィールドは `bucket` / `completedAt` / `description` / `event` / `link` / `name` / `startedAt` / `state` / `workflow` (`gh pr checks --help` の JSON FIELDS)。 集計は `bucket` で行う:
 
-- **state**: `QUEUED` / `IN_PROGRESS` / `COMPLETED`
-- **conclusion** (COMPLETED 時のみ): `SUCCESS` / `FAILURE` / `CANCELLED` / `SKIPPED` / `NEUTRAL` / `TIMED_OUT` / `ACTION_REQUIRED`
+- **bucket**: `pass` / `fail` / `pending` / `skipping` / `cancel` (`state` を gh が 5 分類したもの)
+- **state** (詳細表示用): `SUCCESS` / `FAILURE` / `PENDING` / `SKIPPED` / `NEUTRAL` / `CANCELLED` 等。 例: `NEUTRAL` と `SKIPPED` はどちらも bucket `skipping`
+
+pending があると `gh pr checks` は exit code 8 で終わる (失敗ではない)。
 
 ### フェーズ 3: 集計とサマリ
 
@@ -69,7 +71,7 @@ Total: <total> checks
 
 - **All green** (failure=0, pending=0, cancelled=0): 「全 N checks green、merge 可能状態」
 - **Red** (failure ≥ 1): フェーズ 4 へ
-- **Pending** (queued/in_progress ≥ 1): 「N checks がまだ走行中、再度 polling を推奨」
+- **Pending** (bucket `pending` ≥ 1): 「N checks がまだ走行中、再度 polling を推奨」
 - **Suspicious skip** (cancelled+skipped が 3 件以上連続): silent skip の可能性を警告 (PR #419 事例)
 
 ### フェーズ 4: 失敗 job の分析 (failure ≥ 1 時のみ)
@@ -225,6 +227,6 @@ REVIEW-human / REVIEW-copilot-blocker は memory `feedback_pr_body_over_comments
 
 ## 期待効果
 
-- ユーザーが 7 ランタイム × ~94 jobs の CI を手動で `gh pr checks` ポーリングする手間を削減
+- ユーザーが 7 ランタイム分の CI (PR あたり数十 checks。 例: PR #906 で 37 件) を手動で `gh pr checks` ポーリングする手間を削減
 - red 時に「どの分類の失敗か」即座に分類することで対応時間を短縮
 - silent skip (PR #419 type) の早期検出

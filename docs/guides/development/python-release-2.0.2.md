@@ -1,5 +1,12 @@
 # Python 2.0.2 / G2P 0.3.1 リリースチェックリスト
 
+> **状態: 公開済み (2026-10-16)。** この文書は公開前に使った手順の記録です。
+> `piper-plus==2.0.2` (PyPI 2026-10-16) と `piper-plus-g2p==0.3.1` (PyPI 2026-10-16) は公開済みで、
+> `v2.0.2`・`python-g2p-v0.3.1`・`docker-v2.0.2` の各タグは同じコミット `f90333e3` を指します。
+> GitHub Release は [piper-plus 2.0.2](https://github.com/ayutaz/piper-plus/releases/tag/v2.0.2) と
+> [Python G2P 0.3.1](https://github.com/ayutaz/piper-plus/releases/tag/python-g2p-v0.3.1) です。
+> 次の版の公開では、版番号と成果物を読み替えて同じ手順を使います。
+
 この文書は `piper-plus==2.0.2` / `piper-plus-g2p==0.3.1` の公開手順です。
 版番号の更新やPRのマージだけでは公開されません。公開状況は GitHub Release と PyPI を確認してください。
 既存のPyPI wheelや公開済みのバージョン付きDockerタグは置き換えません。

@@ -75,8 +75,14 @@ CLAUDE.md のコミット規約に従い、ステージ済みまたは指定フ�
 | `refactor(<scope>):` | リファクタ (機能変更なし) |
 | `docs:` | ドキュメントのみ |
 | `test:` | テスト追加・修正 |
-| `chore(<scope>):` | ビルド/依存/雑務 |
+| `chore(<scope>):` | 依存/雑務 |
 | `perf(<scope>):` | パフォーマンス改善 |
+| `ci:` / `ci(<scope>):` | CI workflow / gate の変更 |
+| `build(<scope>):` | ビルド設定 (CMake / Cargo / packaging 等) |
+| `style(<scope>):` | フォーマットのみ (挙動変更なし) |
+| `revert:` | 過去コミットの取り消し |
+
+type の許容一覧は `.commitlintrc.json` の `type-enum` と `pr-metadata.yml` の `pr-title-check` (feat / fix / chore / docs / test / ci / refactor / perf / build / style / revert) が正。 一覧外の type は CI の `commitlint` step で fail する。
 
 #### メッセージ本文の規約
 

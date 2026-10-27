@@ -75,7 +75,10 @@ dependencies {
 }
 ```
 
-When published to GitHub Packages:
+If you publish the AAR to GitHub Packages (`./gradlew :piper-plus:publish`;
+no CI workflow publishes it), the coordinates are `com.piperplus:piper-plus`
+with the version taken from `VERSION_NAME` in `android/gradle.properties`
+(currently `1.0.1`, shared with `piper-plus-g2p-android`):
 
 ```kotlin
 repositories {
@@ -89,7 +92,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.piperplus:piper-plus:0.1.0")
+    implementation("com.piperplus:piper-plus:1.0.1")
 }
 ```
 

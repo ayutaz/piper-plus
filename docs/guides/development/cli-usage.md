@@ -108,10 +108,10 @@ Use `--json-input` flag for JSON input:
 ### Download Models
 
 ```bash
-# Download a model by name. Resolver aliases are source/next-release features;
-# released piper-plus 2.0.0 and 2.0.1 do not add new model aliases.
+# Download a model by name or alias. The `base` / `zero-shot-base-zs-v1`
+# aliases are available from 2.0.2; released 2.0.0 and 2.0.1 do not have them.
 ./bin/piper-plus --download-model tsukuyomi
-./bin/piper-plus --download-model en_US-lessac-medium
+./bin/piper-plus --download-model css10
 
 # Specify download directory
 ./bin/piper-plus --download-model tsukuyomi --model-dir /path/to/models
@@ -119,6 +119,11 @@ Use `--json-input` flag for JSON input:
 # After download, use by model name (no full path needed)
 ./bin/piper-plus --model tsukuyomi --text "こんにちは"
 ```
+
+The embedded catalog contains only piper-plus models. Upstream rhasspy voice
+keys (for example `en_US-lessac-medium`) are listed only when an upstream
+`voices.json` is placed next to the executable (or in `../share/` or
+`../share/piper/`).
 
 ## Environment Variables (C++ CLI)
 

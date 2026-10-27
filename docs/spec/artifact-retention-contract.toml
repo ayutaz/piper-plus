@@ -13,7 +13,8 @@ forward_compat_policy = "strict"
 # `direction` (added per M2 T-006):
 #   - "pre-impl": this TOML pins the allowed retention values; workflow
 #     YAMLs mirror the policy. Drift is enforced by
-#     scripts/check_artifact_retention.py + artifact-retention-gate.yml.
+#     scripts/check_artifact_retention.py via contract-gates-extended.yml
+#     (step: artifact-retention) + .pre-commit-config.yaml hook.
 direction = "pre-impl"
 # `mode` controls the gate behaviour:
 #   - "warn" → emit ::warning:: but exit 0 (initial introduction safe).

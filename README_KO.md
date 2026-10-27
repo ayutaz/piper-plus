@@ -19,9 +19,9 @@
 
 > **🔑 유일한 MIT 라이선스 Piper 포크** — 원본 [rhasspy/piper](https://github.com/rhasspy/piper)는 2025년 10월에 아카이브되었으며, [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl)은 GPL-3.0으로 전환되었습니다. piper-plus는 espeak-ng에 의존하지 않는 유일한 MIT 호환 포크입니다. 자체 구현 G2P로 8개 언어 (JA/EN/ZH/KO/ES/FR/PT/SV)를 지원하며, 상용 및 임베디드 용도에 적합합니다.
 
-> **📢 v2.0.0 주요 변경사항:** Docker 이미지는 CUDA 12.8 + Ubuntu 24.04 + Python 3.13을 사용합니다(호스트 NVIDIA 드라이버 **R570+** 필요). 학습은 torch **2.11.0** + CUDA 12.8이며 TF32 + bf16-mixed가 기본값입니다. torch 2.2 체크포인트의 학습 재개는 지원하지 않습니다. Python import / CLI는 `piper_plus` / `piper-plus`로 변경되었습니다. 1.13.0에서 현재 공개 버전으로 업데이트: `pip install --upgrade "piper-plus[cpu]==2.0.2"`. [마이그레이션 가이드](docs/migration/v1.12-to-v2.0.md)를 확인하세요.
+> **📢 v2.0.0 주요 변경사항:** Docker 기본 이미지는 CUDA 12.8 + Ubuntu 24.04 + Python 3.13을 사용합니다 (호스트 NVIDIA 드라이버 **R570+** 필요). 학습은 torch **2.11.0** + CUDA 12.8이며 TF32 + bf16-mixed가 기본값입니다. torch 2.2로 만든 체크포인트의 학습 재개는 지원하지 않습니다. Python import / CLI는 `piper_plus` / `piper-plus`로 변경되었습니다. 1.13.0에서 현재 공개 버전으로 업데이트하려면 `pip install --upgrade "piper-plus[cpu]==2.0.2"`를 실행하세요. 자세한 내용: [마이그레이션 가이드](docs/migration/v1.12-to-v2.0.md).
 
-빠르고 고품질의 뉴럴 텍스트 음성 합성 (TTS) 시스템. [VITS](https://github.com/jaywalnut310/vits/) 아키텍처를 채택하여 8개 언어 G2P/음소화와 현재 학습된 6개 언어(일본어, 영어, 중국어, 스페인어, 프랑스어, 포르투갈어)의 다중 화자 합성을 지원합니다. [Piper](https://github.com/rhasspy/piper)의 포크로, 일본어 지원, 음질 향상, 학습 기능을 대폭 강화했습니다.
+빠르고 고품질의 뉴럴 텍스트 음성 합성 (TTS) 시스템입니다. [VITS](https://github.com/jaywalnut310/vits/) 아키텍처를 채택하여 8개 언어 G2P/음소화와, 현재 6개 언어로 학습된 모델을 통한 다중 화자 음성 합성을 지원합니다. [Piper](https://github.com/rhasspy/piper)의 포크로, 일본어 지원, 음질 향상, 학습 기능을 대폭 강화했습니다.
 
 **[Hugging Face 데모](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** | **[WebAssembly 데모](https://ayutaz.github.io/piper-plus/)** (브라우저에서 동작, 서버 불필요)
 
@@ -29,15 +29,49 @@
 
 ## 목차
 
+- [벤치마크](#벤치마크)
 - [주요 기능](#주요-기능)
 - [빠른 시작](#빠른-시작)
-- [사전 학습 모델](#사전-학습-모델)
 - [설치](#설치)
 - [사용법](#사용법)
-- [학습](#학습)
-- [일본어 TTS](#일본어-tts)
+- [학습](#학습-1)
+- [사전 학습 모델](#사전-학습-모델)
 - [플랫폼](#플랫폼)
 - [관련 링크](#관련-링크)
+
+---
+
+## 벤치마크
+
+> **측정 환경**: Intel Xeon E5-2650 v4 @ 2.20GHz / 48 cores / Linux x86_64 / Python 3.12 / ONNX Runtime 1.24
+> **테스트 문장**: "Hello, how are you doing today?" (영어, 25 음소)
+> **측정 파라미터**: warmup 5회 / 측정 30회 (intra-op threads = auto)
+> **사용 모델**:
+>
+> - piper-plus: 6lang MB-iSTFT 75epoch ONNX (PR #320에서 도입된 통합 Decoder)
+> - Piper 원본: `en_US-lessac-medium` (rhasspy/piper-voices v1.0.0)
+> - sherpa-onnx: `vits-piper-en_US-amy-low` (k2-fsa 릴리스)
+>
+> **재현**: `uv run python scripts/benchmark.py --model <model.onnx> --config <config.json> --language en --text "Hello, how are you doing today?" --n-warmup 5 --n-runs 30 --format markdown`
+
+| 시스템 | RTF ↓ | Latency P50 (ms) | 크기 (MB) | RAM (MB) | 첫 실행 (ms) | 파라미터 | 언어 수 | 라이선스 |
+|---------|-------|------------------|-----------|---------|-------------|----------|--------|----------|
+| **piper-plus (MB-iSTFT)** | **0.078** | **27** | **38** | **208** | **1633** | **19.6 M** | **8** | **MIT** |
+| Piper 원본 (archived) | 0.066 | 35 | 60 | 185 | 2510 | 15.7 M | 1/model | MIT |
+| sherpa-onnx (VITS Piper-fmt) | 0.075 | 53 | 60 | 202 | 2554 | 15.6 M | 1/model | Apache-2.0 |
+| piper1-gpl (OHF fork) † | 0.06 | — | 75 | 150 | 400 | — | 1/model | GPL-3.0 |
+| Kokoro-82M † | 0.12 | — | 320 | 450 | 800 | — | 1 | Apache-2.0 |
+| eSpeak-NG † | 0.001 | — | 2 | 15 | 10 | — | 100+ | GPL-3.0 |
+
+> **참고**: RTF (Real-Time Factor)는 낮을수록 빠릅니다. `Latency P50`은 단일 추론의 중앙값으로 "실제 응답성"을 직접 나타내는 지표입니다. piper-plus는 MB-iSTFT 통합 Decoder 덕분에 Latency P50 27ms로 가장 빠르며 (Piper 원본 35ms 대비 -23%, sherpa-onnx 53ms 대비 -49%), 모델 크기도 38MB로 가장 작은 수준입니다. 이전 piper-plus HiFi-GAN 기반 (P50 43.3ms)과 비교해도 -38% 개선되었습니다.
+>
+> **†** 표시된 행은 이번 PR에서 다시 측정하지 않았습니다 (`piper1-gpl`은 Piper 원본과 동일한 아키텍처·ONNX 형식이므로 Piper 원본 행과 거의 같을 것으로 예상됩니다. `Kokoro-82M`은 다른 아키텍처이고 `eSpeak-NG`는 비뉴럴 CLI이므로 `scripts/benchmark.py`의 텐서 계약에 맞지 않아 별도의 측정 도구가 필요합니다). 이 값들은 이전 측정 (Apple M2 Max) 결과입니다.
+
+### 멀티 런타임 RTF 벤치마크 (최신 값)
+
+Python / Rust / Go / C# / C++ / WASM 6개 런타임을 `multilingual-test-medium.onnx`로 횡단 측정한 최신 RTF·지연 시간 결과를 공개하고 있습니다. dev 브랜치에 병합될 때마다 자동으로 갱신됩니다.
+
+👉 **[Multi-Runtime RTF Benchmark](https://ayutaz.github.io/piper-plus/bench/multi-runtime/)**
 
 ---
 
@@ -45,54 +79,43 @@
 
 ### 음성 합성
 
-- **8개 언어 G2P/음소화** — 일본어, 영어, 중국어, 스페인어, 프랑스어, 포르투갈어, 스웨덴어, 한국어 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7). 현재 학습된 모델은 6개 언어 (JA/EN/ZH/ES/FR/PT)를 지원합니다
+- **8개 언어 G2P/음소화** — 일본어, 영어, 중국어, 스페인어, 프랑스어, 포르투갈어, 스웨덴어, 한국어 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7). 현재 학습된 모델은 6개 언어 (JA/EN/ZH/ES/FR/PT)
 - **일본어 TTS** — OpenJTalk 통합, 운율 정보 (A1/A2/A3), 의문사 마커 (#204), 문맥 의존 'ん' 변이형 (#207)
-- **영어 TTS** — v2.0.2에는 [g2p-en](https://github.com/Kyubyong/g2p) 기반 G2P와 Apache-2.0 추론 코드 및 Tacotron MIT 고지가 포함됩니다. 외부 `g2p-en`/`Distance`와 espeak-ng는 필요하지 않습니다. 이전 PyPI 2.0.1 메타데이터는 변경되지 않습니다. [마이그레이션 가이드](docs/migration/python-g2p-license.md)를 참조하세요
-- **다중 화자** — 실험용 Zero-Shot/FT 번들 `zs-v1`의 571 화자, SpeakerBalancedBatchSampler, 언어 그룹 균등 샘플링
+- **영어 TTS** — v2.0.2에는 [g2p-en](https://github.com/Kyubyong/g2p) 기반 G2P가 Apache-2.0 추론 코드 및 Tacotron의 MIT 라이선스 고지와 함께 포함되어 있습니다. 외부 `g2p-en` / `Distance`나 espeak-ng는 필요하지 않습니다. 이전 PyPI 2.0.1의 의존성 정의는 변경되지 않습니다. [마이그레이션 가이드](docs/migration/python-g2p-license.md)를 참조하세요
+- **다중 화자** — 571 화자 지원 (학습용 기본 모델), SpeakerBalancedBatchSampler, 언어 그룹 균등 샘플링
 - **커스텀 사전** — 200개 이상의 기술 용어 발음 사전 내장
 - **음소 입력** — `[[ phonemes ]]` 표기법으로 직접 지정 — [가이드](docs/features/phoneme-input.md)
 
 ### 학습
 
-- **WavLM 판별기** — MOS +0.15-0.25 향상 (기본 활성화, 학습 시에만 사용)
-- **MB-iSTFT-VITS2 디코더** — 디코더를 MB-iSTFT + PQMF로 통합, CPU 추론 약 2.21배 가속. 기존 런타임과 ONNX 호환
-- **FP16 혼합 정밀도** — 학습 속도 2-3배, 메모리 약 50% 절감 (기본 활성화)
+- **WavLM Discriminator** — MOS +0.15-0.25 향상 (기본 활성화, 학습 시에만 사용)
+- **MB-iSTFT-VITS2 Decoder** — Decoder를 MB-iSTFT + PQMF로 통합, CPU 추론 2.21배 가속. ONNX 형식은 변경되지 않아 기존 런타임과 호환
+- **BF16 혼합 정밀도** — `--precision bf16-mixed`가 기본값 (TF32도 기본 활성화). FP16보다 수치적으로 안정적이며 loss scaling이 필요 없습니다. BF16을 지원하지 않는 GPU (T4 등)에서는 `--precision 16-mixed`를 지정하세요
 - **EMA** — Exponential Moving Average를 통한 학습 안정성 향상 (기본 활성화)
 - **다중 GPU** — DDP 지원, 자동 학습률 스케일링
-- **운율 특성** — Duration Predictor에 운율 정보 주입 (`--prosody-dim 16`)
+- **Prosody Features** — Duration Predictor에 운율 정보 주입 (`--prosody-dim 16`)
 - **Wandb 통합** — 실시간 메트릭 모니터링
 
 ### 인터페이스
 
-- **[WebUI (Gradio)](docs/features/webui.md)** — 추론 및 Docker 지원. 로컬 Training Tab은 아직 오래된 CLI 인자를 보내므로 학습에는 [학습 가이드](docs/guides/training/training-guide.md)를 사용하세요.
-- **C++ CLI** — 스트리밍, CUDA 추론, **Phoneme Timing 출력 (JSON/TSV/SRT)**, 커스텀 사전
-- **[C API 공유 라이브러리](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, FFI 호환 (Flutter/Godot/Swift 등), 스트리밍 API
-- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — 브라우저 내에서 완전 동작, **Phoneme Timing 출력 (JSON/TSV/SRT)**, 서버 불필요
-- **[Docker](docker/README.md)** — 추론, 학습, WebUI, C++ 등 5개 이미지 제공
-- **PyPI** — `pip install piper-plus`, 8개 언어 G2P/음소화 (현재 학습된 모델은 6개 언어), **Phoneme Timing 출력 (JSON/TSV/SRT)**, 스트리밍, **FastAPI 기반 HTTP API**
-- **C# CLI** — .NET 10 크로스 플랫폼, 8개 언어 G2P/음소화 (현재 학습된 모델은 6개 언어), ONNX 추론, **Phoneme Timing 출력 (JSON/TSV/SRT)**
-- **Rust CLI** — piper-plus/piper-plus-cli, 스트리밍, CUDA/CoreML/DirectML 지원, **Phoneme Timing 출력 (JSON/TSV/SRT)**, 사전 자동 다운로드
-- **[Go CLI](src/go/README.md)** — HTTP API 서버, 세션 풀링, Docker 지원, 단일 바이너리, **Phoneme Timing 출력 (JSON/TSV/SRT)**
-- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 모델 호환 사전 계산 `speaker_embedding` 입력을 런타임 기능 수준에서 6개 런타임 (Python/Rust/C#/Go/WASM/C++) 모두 지원합니다. C++ CLI/C API는 사전 계산 embedding만 받으며, C++의 `--reference-audio` 추출은 구현되지 않았습니다. 공개 `zs-v1` 실제 추론은 Python `piper-plus==2.0.0`에서만 기능 검증되었습니다. 공개 CI run `38189966578`은 Python 공유 phoneme IDs를 사용한 6개 런타임 추론을 보고하며, native G2P와 청취 품질은 범위 밖이고 품질 승인은 없습니다.
-- **SSML 지원** — 파서 계약은 Python/Rust/Go/C#/WASM/C++에 구현되어 있으며 합성 진입점은 Python/Rust/Go/WASM/C++입니다. C# Core에는 파서가 있지만 C# CLI의 `--text` 경로에는 아직 연결되지 않았습니다. C++는 CLI `--ssml`로 제공되며 C API에는 노출되지 않습니다.
-- **단문 품질 개선 (Strategy A/B/C)** — Strategy A/B는 런타임 행 전체에 구현되어 있습니다. Strategy C(SSML `<break>` 자동 삽입)는 추론 Python/Rust/Go/C# 범위이며 학습 Python, WASM, C++는 대상이 아닙니다. 자세한 내용은 [단문 계약](docs/spec/short-text-contract.toml)을 참조하세요.
+- **[WebUI (Gradio)](docs/features/webui.md)** — 추론 및 Docker 지원. 로컬 Training Tab은 이전 CLI 인자를 보내므로 학습에는 [학습 가이드](docs/guides/training/training-guide.md)를 사용하세요.
+- **C++ CLI** — 스트리밍, CUDA 추론, **음소 타이밍 출력 (JSON/TSV/SRT)**, 커스텀 사전
+- **[C API 공유 라이브러리](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, FFI 지원 (Flutter/Godot/Swift 등), 스트리밍 API
+- **[iOS xcframework + SPM](docs/guides/platform/ios-integration.md)** — `PiperPlus` (Swift Package), 합성 엔진 본체를 iOS arm64 device + simulator universal로 배포
+- **[iOS Swift G2P (SPM)](docs/guides/platform/swift-g2p-integration.md)** — `PiperPlusG2P` 단독 라이브러리, 8개 언어 G2P를 ONNX Runtime 없이 iOS에서 사용 가능 (Issue #387)
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — 브라우저 내에서 완전 동작, **음소 타이밍 출력 (JSON/TSV/SRT)**, 서버 불필요
+- **[Docker](docker/README.md)** — 추론·학습·WebUI·C++ (추론/개발)·Wyoming (Home Assistant)의 6개 이미지 제공
+- **PyPI** — `pip install piper-plus`로 간편 설치, 8개 언어 G2P/음소화 (현재 학습된 모델은 6개 언어), **음소 타이밍 출력 (JSON/TSV/SRT)**, 스트리밍, HTTP API
+- **C# CLI** — .NET 10 크로스 플랫폼, 8개 언어 G2P/음소화 (현재 학습된 모델은 6개 언어), ONNX 추론, **음소 타이밍 출력 (JSON/TSV/SRT)**
+- **Rust CLI** — piper-plus/piper-plus-cli, 스트리밍, CUDA/CoreML/DirectML 지원, **음소 타이밍 출력 (JSON/TSV/SRT)**, 사전 자동 다운로드
+- **[Go CLI](src/go/README.md)** — HTTP API 서버, 세션 풀링, Docker 지원, 단일 바이너리, **음소 타이밍 출력 (JSON/TSV/SRT)**
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 6개 런타임 (Python/Rust/C#/Go/WASM/C++) 모두에서 모델 호환 사전 계산 `speaker_embedding` 입력을 지원합니다. C++ CLI/C API는 사전 계산 embedding만 받으며, `--reference-audio`를 통한 추출은 구현되지 않았습니다. 공개 `zs-v1`의 실제 추론 확인은 Python `piper-plus==2.0.0`에서만 이루어졌습니다. 공개 CI run `38189966578`에서는 Python이 생성한 공유 phoneme IDs를 입력으로 6개 런타임 추론을 확인했으며, native G2P와 사람의 청취 품질은 범위 밖이고 품질 승인은 이루어지지 않았습니다.
+- **SSML 지원** — SSML 파서 계약은 Python/Rust/Go/C#/WASM/C++에 구현되어 있습니다. 합성 측은 Python/Rust/Go/WASM/C++가 지원하며, C# Core에는 파서가 있지만 CLI의 `--text`에는 아직 연결되지 않았습니다. C++는 CLI `--ssml`을 통해 제공됩니다 (C API에는 노출되지 않음).
+- **단문 품질 개선 (Strategy A/B/C)** — Strategy A/B는 각 런타임에 구현되어 있습니다. Strategy C (SSML `<break>` 자동 삽입)는 추론용 Python/Rust/Go/C# 범위이며, 학습용 Python·WASM·C++는 대상이 아닙니다. 자세한 내용은 [단문 계약](docs/spec/short-text-contract.toml)을 참조하세요.
 
 ### 런타임별 기능 지원
 
-6개 런타임 (Python/Rust/C#/Go/JS-WASM/C++)에서 현재 학습된 모델의 6개 언어 합성을 제공하며, 8개 언어 G2P/음소화도 제공합니다. Phoneme Timing, 스트리밍 (문장 단위 분할 포함), 모델 호환 사전 계산 embedding 입력을 사용하는 Voice Cloning, 커스텀 사전은 런타임 기능으로 지원합니다. C++는 사전 계산 embedding만 받고 `--reference-audio`는 구현되지 않았습니다. 공개 `zs-v1` 실제 추론은 Python `piper-plus==2.0.0`에서 검증되었고, CI run `38189966578`은 Python 공유 phoneme IDs를 사용한 6개 런타임 추론을 별도로 보고합니다. native G2P와 청취 품질은 범위 밖이고 품질 승인은 없습니다. SSML 합성은 Python/Rust/Go/WASM/C++에서 지원하며 C# Core 파서는 CLI `--text` 경로에 연결되지 않았습니다. HTTP API는 2개 런타임 (Python/Go)에서 지원합니다.
-
-### 플랫폼
-
-| 플랫폼 | 아키텍처 | 비고 |
-|---|---|---|
-| Linux | x86_64 / ARM64 / ARMv7 | v2.0.2 C++ 배포물; ARM64 ABI 검사 상한 glibc 2.31 |
-| macOS | ARM64 (Apple Silicon) 전용 | M1/M2/M3+ |
-| Windows | x64 | C++ 배포물은 x64, C# CLI는 x64 / arm64 |
-| C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | 공유 라이브러리, Android AAR |
-| Web | WebAssembly | Chrome/Edge/Firefox/Safari |
-| C# (.NET) | x64 / ARM64 | .NET 10, Linux/macOS/Windows |
-| Rust | Linux x64, macOS ARM64, Windows x64 | CUDA/CoreML/DirectML |
-| Go | Linux x64, macOS ARM64, Windows x64 | HTTP API, Docker |
+6개 런타임 (Python/Rust/C#/Go/JS-WASM/C++)에서 현재 학습된 모델의 6개 언어 합성을 제공하며, 8개 언어 G2P/음소화도 제공합니다. 음소 타이밍, 스트리밍 (문장 단위 분할 포함), 모델 호환 사전 계산 embedding을 사용하는 Voice Cloning, 커스텀 사전은 런타임 기능으로 지원합니다. C++는 사전 계산 embedding만 받으며 `--reference-audio`는 구현되지 않았습니다. 공개 `zs-v1`의 실제 추론 확인은 Python `piper-plus==2.0.0`에서만 이루어졌습니다. 공개 CI run `38189966578`은 Python 공유 phoneme IDs를 사용한 6개 런타임 추론을 확인하지만, native G2P와 사람의 청취 품질은 범위 밖이며 품질 승인은 이루어지지 않았습니다. SSML 합성 측 지원은 Python/Rust/Go/WASM/C++입니다 (C++는 CLI `--ssml` 경유, C API에는 노출되지 않음). C# Core의 파서는 CLI `--text`에 연결되지 않았으며, HTTP API는 Python/Go 2개 런타임에서 지원합니다.
 
 ---
 
@@ -104,7 +127,7 @@
 
 **1. 바이너리 다운로드**
 
-사용 중인 OS에 맞게 다운로드 및 압축을 해제하세요.
+사용 중인 OS에 맞게 다운로드 및 압축 해제하세요.
 
 **Windows (PowerShell):**
 
@@ -131,12 +154,22 @@ tar xzf piper-plus-cpp.tar.gz
 cd piper-plus
 ```
 
-**Linux (ARM64, 라즈베리 파이 4/5):**
+**Linux (ARM64, Raspberry Pi 4/5):**
 
-**ARM64 호환성:** v2.0.2 Linux ARM64 C++ 배포물은 glibc 2.31을 ABI 검사 상한으로 사용합니다. CI는 QEMU의 Debian Bullseye / Bookworm / Trixie(64비트)에서 실행과 일본어 합성을 검증합니다. Raspberry Pi 실기기와 Raspberry Pi OS 자체는 아직 검증하지 않았습니다. glibc 2.38이 필요한 이전 v2.0.1 대신 v2.0.2를 사용하세요.
+**ARM64 호환성:** v2.0.2 Linux ARM64 C++ 배포물은 glibc 2.31을 ABI 상한으로 검사합니다. QEMU에서 Debian Bullseye / Bookworm / Trixie (64비트)의 실행과 일본어 합성을 검증합니다. Raspberry Pi 실기기와 Raspberry Pi OS 자체는 검증하지 않았습니다. 이전 v2.0.1 배포물은 glibc 2.38 이상이 필요하므로 v2.0.2를 사용하세요.
 
 ```bash
 curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-arm64.tar.gz
+tar xzf piper-plus-cpp.tar.gz
+cd piper-plus
+```
+
+**Linux (ARMv7, 32비트 ARM):**
+
+ARMv7 배포물은 C++ CLI만 제공됩니다. CI에서는 QEMU의 Debian Trixie (32비트 ARM)에서 빌드와 일본어 합성을 확인하고 있습니다. Raspberry Pi 실기기는 검증하지 않았습니다.
+
+```bash
+curl -L -o piper-plus-cpp.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-plus-cpp-linux-armv7.tar.gz
 tar xzf piper-plus-cpp.tar.gz
 cd piper-plus
 ```
@@ -147,42 +180,42 @@ cd piper-plus
 # 츠쿠요미짱 모델 다운로드
 ./bin/piper-plus --download-model tsukuyomi
 
-# 음성 생성 (모델 이름만으로 OK — 다운로드된 모델을 자동 검색)
+# 음성 생성 (모델 이름만으로 OK — 다운로드된 모델을 자동으로 찾음)
 ./bin/piper-plus --model tsukuyomi --text "こんにちは、今日は良い天気ですね。" --output_file output.wav
 ```
 
-> **Windows cmd의 코드 페이지에 대해:** `--text` 옵션은 내부적으로 `GetCommandLineW()` (UTF-16)를 사용하므로 코드 페이지에 관계없이 그대로 동작합니다. 파이프 입력(`echo ... | piper-plus`)을 사용하는 경우에만 `chcp 65001`로 UTF-8로 전환해 주세요.
+> **Windows cmd의 코드 페이지에 대해:** `--text` 옵션은 내부적으로 `GetCommandLineW()` (UTF-16)를 사용하므로 코드 페이지와 관계없이 그대로 동작합니다. 파이프 입력 (`echo ... | piper-plus`)을 사용하는 경우에만 미리 `chcp 65001`로 UTF-8로 전환하세요.
 >
-> **output.wav 출력 위치:** 현재 디렉터리(`cd piper-plus`한 위치)에 생성됩니다.
+> **output.wav 출력 위치:** 현재 디렉터리 (`cd piper-plus`한 위치)에 생성됩니다.
 
-> **어떤 바이너리를 선택해야 하나요?** 릴리스에는 `piper-plus-cli-*` (C# .NET) 및 `piper-plus-rs-cli-*` (Rust) CLI도 포함되어 있습니다. 위의 빠른 시작은 **C++ CLI (`piper-plus-cpp-*`)**를 사용하며, 가장 폭넓은 플랫폼을 지원하므로 대부분의 사용자에게 권장됩니다. 자세한 내용은 [CLI 바이너리 선택하기](docs/getting-started/binary-selection.md)를 참조하세요.
+> **어떤 바이너리를 선택해야 하나요?** Releases에는 `piper-plus-cpp-*` (C++) 외에도 `piper-plus-cli-*` (C# .NET)와 `piper-plus-rs-cli-*` (Rust) CLI가 있습니다. 위 빠른 시작에서 사용하는 **C++ CLI**(`piper-plus-cpp-*`)가 가장 많은 플랫폼을 지원하므로 권장합니다. 자세한 내용은 [CLI 바이너리 선택 방법](docs/getting-started/binary-selection.md)을 참조하세요.
 
 ### Python 추론
 
 ```bash
 # 설치
-# source checkout의 저장소 루트에서 실행
+# 저장소 루트의 source checkout에서 실행
 uv sync --extra inference
 
 # 일본어 추론
 uv run python -m piper_train.infer_onnx \
-  --model /path/to/model.onnx \
-  --config /path/to/config.json \
-  --output-dir ./output \
-  --text "こんにちは、今日は良い天気ですね。"
+    --model /path/to/model.onnx \
+    --config /path/to/config.json \
+    --output-dir ./output \
+    --text "こんにちは、今日は良い天気ですね。"
 
 # 영어 추론
 uv run python -m piper_train.infer_onnx \
-  --model /path/to/en_model.onnx \
-  --config /path/to/en_model.onnx.json \
-  --output-dir ./output \
-  --text "Hello, how are you today?" \
-  --language en
+    --model /path/to/en_model.onnx \
+    --config /path/to/en_model.onnx.json \
+    --output-dir ./output \
+    --text "Hello, how are you today?" \
+    --language en
 ```
 
-주요 옵션: `--speaker-id`(화자 ID), `--device auto|cpu|gpu`, `--noise-scale`(음성 변동), `--noise-scale-w`(음소 길이 변동, 기본값: 0.5), `--length-scale`(말하기 속도)
+주요 옵션: `--speaker-id`(화자 ID), `--device auto|cpu|gpu`, `--noise-scale`(음성 변동), `--length-scale`(말하기 속도), `--noise-scale-w`(음소 길이 변동, 기본값: 0.5)
 
-> **WavLM 모델 권장 설정:** WavLM 판별기로 학습된 모델 (츠쿠요미짱 등)은 `--noise-scale 0.5`에서 최적의 음질을 얻을 수 있습니다 (기본값은 0.4).
+> **WavLM 모델 권장 설정:** WavLM Discriminator로 학습된 모델 (츠쿠요미짱 등)은 `--noise-scale 0.5`에서 최적의 음질을 얻을 수 있습니다 (기본값은 0.4).
 
 #### Python CLI 모델 관리
 
@@ -196,7 +229,7 @@ uv run --no-sync python -m piper_plus --download-model tsukuyomi
 uv run --no-sync python -m piper_plus --download-model ja_JP-tsukuyomi-chan-medium
 
 # 다운로드 후 사용
-uv run --no-sync python -m piper_plus --model ja_JP-tsukuyomi-chan-medium "こんにちは" -f output.wav
+uv run --no-sync python -m piper_plus --model ja_JP-tsukuyomi-chan-medium -f output.wav "こんにちは"
 ```
 
 ### WebUI
@@ -217,19 +250,19 @@ docker run -p 7860:7860 -v ./models:/models:ro piper-webui
 # Python 추론 (CPU)
 docker build -t piper-inference -f docker/python-inference/Dockerfile .
 docker run --rm \
-  -v ./models:/app/models:ro -v ./output:/app/output \
-  piper-inference \
-  python -m piper_train.infer_onnx \
-    --model /app/models/model.onnx --config /app/models/config.json \
-    --output-dir /app/output --text "こんにちは" --device cpu
+    -v ./models:/app/models:ro -v ./output:/app/output \
+    piper-inference \
+    python -m piper_train.infer_onnx \
+        --model /app/models/model.onnx --config /app/models/config.json \
+        --output-dir /app/output --text "こんにちは" --device cpu
 
 # GPU 추론 (--gpus all 추가)
 docker run --rm --gpus all \
-  -v ./models:/app/models:ro -v ./output:/app/output \
-  piper-inference \
-  python -m piper_train.infer_onnx \
-    --model /app/models/model.onnx --config /app/models/config.json \
-    --output-dir /app/output --text "こんにちは" --device gpu
+    -v ./models:/app/models:ro -v ./output:/app/output \
+    piper-inference \
+    python -m piper_train.infer_onnx \
+        --model /app/models/model.onnx --config /app/models/config.json \
+        --output-dir /app/output --text "こんにちは" --device gpu
 ```
 
 CI/CD 빌드 이미지:
@@ -240,9 +273,8 @@ docker pull ghcr.io/ayutaz/piper-plus/python-train:dev
 docker pull ghcr.io/ayutaz/piper-plus/webui:dev
 docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:dev
 docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
+docker pull ghcr.io/ayutaz/piper-plus/wyoming:dev
 ```
-
-> **참고:** webui 이미지는 CI에서 자동 빌드되지 않습니다. 수동 빌드: `docker build -t piper-webui -f docker/webui/Dockerfile .`
 
 자세한 내용은 [docker/README.md](docker/README.md)를 참조하세요.
 
@@ -252,7 +284,7 @@ docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
 
 ### Python
 
-Python 3.13+ 권장 (3.11+ 지원). 의존성 관리에는 [uv](https://docs.astral.sh/uv/)를 권장합니다.
+Python 3.13+ 권장 (3.11+ 지원). 의존성 관리는 [uv](https://docs.astral.sh/uv/)를 권장합니다.
 
 ```bash
 # CPU 추론
@@ -264,11 +296,11 @@ uv sync --no-group cpu --extra inference-gpu
 # 학습
 uv sync --extra train
 
-# 개발 (테스트, 린터 포함)
+# 개발 (테스트·린터 포함)
 uv sync --extra dev
 ```
 
-PyPI 패키지로도 설치 가능:
+PyPI 패키지로도 설치할 수 있습니다:
 
 ```bash
 pip install piper-plus
@@ -313,419 +345,49 @@ dotnet add package PiperPlus.Core
 piper-plus = "0.5"
 ```
 
-### 소스에서 빌드 (C++)
+### 소스에서 빌드
 
-```bash
-git clone https://github.com/ayutaz/piper-plus.git
-cd piper-plus
-mkdir build && cd build
-cmake ..
-cmake --build . --config Release
-```
-
-필수 요건: C++17 호환 컴파일러, CMake 3.15+
-
-- **Linux**: 의존성 (ONNX Runtime, OpenJTalk 등)은 CMake에 의해 자동 다운로드됩니다
-- **Windows**: [Windows 설정 가이드](docs/getting-started/windows-setup.md) 참조
-- **macOS**: 의존성은 자동 다운로드
-
-### 소스에서 빌드 (C#)
-
-```bash
-# C# CLI 빌드
-dotnet build src/csharp/PiperPlus.sln -c Release
-# 테스트
-dotnet test src/csharp/PiperPlus.Core.Tests/
-```
-
-필수 요건: .NET 10 SDK 이상
-
-#### C# CLI 사용 예시
-
-```bash
-# 모델 이름으로 추론 (자동 다운로드 지원, --output-file 생략 시 output.wav로 출력)
-piper-plus --model tsukuyomi --text "こんにちは" --language ja
-
-# 영어
-piper-plus --model model.onnx --text "Hello world" --language en
-
-# 다중 언어 (자동 언어 감지)
-piper-plus --model model.onnx --text "こんにちはHello你好" --language ja-en-zh
-
-# 인라인 음소 표기 (텍스트 안에 직접 음소 지정)
-piper-plus --model model.onnx --text "Hello [[ h ə l oʊ ]] world" --language en
-
-# 스트리밍 (문장별 순차 PCM 출력)
-piper-plus --model model.onnx --text "最初の文。次の文。" --language ja --streaming | aplay -r 22050 -f S16_LE
-
-# 커스텀 사전 (JSON v1/v2 또는 TSV)
-piper-plus --model model.onnx --text "AI技術" --language ja --custom-dict my_dict.json
-
-# 모델 다운로드
-piper-plus --download-model tsukuyomi
-piper-plus --list-models ja
-
-# 테스트 모드 (ONNX 추론 없이 음소 ID 확인)
-piper-plus --model model.onnx --test-mode --text "こんにちは" --language ja
-```
-
-#### Rust CLI 사용 예시
-
-```bash
-# 모델 이름으로 추론 (자동 다운로드 지원)
-piper-plus-cli --model tsukuyomi --text "こんにちは" --language ja
-
-# 영어
-piper-plus-cli --model model.onnx --text "Hello world" --language en
-
-# 모델 다운로드 및 관리
-piper-plus-cli --download-model tsukuyomi
-piper-plus-cli --list-models ja
-
-# 스트리밍 (문장별 순차 합성)
-piper-plus-cli --model model.onnx --text "First sentence. Second sentence." --stream --output-dir chunks/
-
-# 커스텀 사전
-piper-plus-cli --model model.onnx --text "AI技術" --custom-dict my_dict.json
-
-# GPU 추론
-piper-plus-cli --model model.onnx --text "Hello" --device cuda
-
-# 테스트 모드 및 무음 모드
-piper-plus-cli --model model.onnx --test-mode --text "hello" --language en
-piper-plus-cli --model model.onnx --text "hello" --language en --quiet
-
-# raw PCM 출력 (WAV 헤더 없음)
-piper-plus-cli --model model.onnx --text "hello" --language en --output-raw | aplay -r 22050 -f S16_LE
-```
-
-> **Note:** C# CLI는 `dotnet tool install -g PiperPlus.Cli`로, Rust CLI는 `cargo install piper-plus-cli`로 설치할 수 있습니다. 두 CLI 모두 8개 언어 G2P/음소화를 제공하며, 현재 학습된 모델은 6개 언어이고 커스텀 사전과 스트리밍도 지원합니다.
-
-### 소스에서 빌드 (Rust)
-
-```bash
-# Rust CLI 빌드
-cargo build --release -p piper-plus-cli
-# 테스트
-cargo test -p piper-plus
-```
-
-필수 요건: Rust 1.88+, cargo
+프리빌드 바이너리가 제공되지 않는 플랫폼에서 사용하거나 piper-plus를 수정하려는 경우 소스에서 빌드할 수 있습니다. C++ / C# / Rust 각 런타임의 빌드 절차는 **[소스 빌드 가이드](docs/guides/development/building-from-source.md)** 문서를 참조하세요.
 
 ---
 
 ## 사용법
 
-### C++ CLI
+C++ CLI의 자세한 명령줄 옵션, JSON 입력 형식, 모델 관리, 환경 변수, Windows 헬퍼 스크립트 사용법은 **[CLI 사용 가이드](docs/guides/development/cli-usage.md)** 문서를 참조하세요.
 
-#### 텍스트 직접 입력 (권장)
-
-`--text` 옵션으로 파이프 없이 텍스트를 직접 입력할 수 있습니다:
-
-```sh
-# 텍스트에서 음성 생성
-./bin/piper-plus --model model.onnx --text "Hello, how are you?" -f output.wav
-
-# 일본어 텍스트 (Windows에서의 인코딩 문제 회피)
-bin\piper-plus.exe --model models\tsukuyomi.onnx --text "こんにちは、今日は良い天気ですね。" -f output.wav
-
-# 화자 지정
-./bin/piper-plus --model model.onnx --text "Hello" --speaker 3 -f output.wav
-```
-
-#### 파이프 입력
-
-```sh
-# 기본
-echo "こんにちは" | ./bin/piper-plus --model ja_model.onnx --output_file output.wav
-
-# 스트리밍 (저지연)
-echo "長いテキスト..." | ./bin/piper-plus --model ja_model.onnx --output_file output.wav --streaming
-
-# GPU 추론
-echo "Hello" | ./bin/piper-plus --model en_model.onnx --use-cuda --output_file output.wav
-
-# 음소 타이밍 출력 (립싱크, 자막 동기화용)
-echo "Hello world" | ./bin/piper-plus --model en_model.onnx -f speech.wav --output-timing timing.json
-
-# 커스텀 사전
-echo "DockerとGitHubを使います" | ./bin/piper-plus --model ja_model.onnx --custom-dict my_dict.json -f output.wav
-
-# 인라인 음소 입력
-echo 'Hello [[ h ə l oʊ ]] world' | ./bin/piper-plus --model en_model.onnx -f output.wav
-
-# 원시 음소 입력
-echo 'h ə l oʊ _ w ɜː l d' | ./bin/piper-plus --model en_model.onnx --raw-phonemes -f output.wav
-
-# 스트리밍 (raw audio 출력)
-echo 'Long text...' | ./bin/piper-plus --model en_model.onnx --output-raw | \
-  aplay -r 22050 -f S16_LE -t raw -
-```
-
-주요 옵션:
-
-| 옵션 | 설명 | 기본값 |
-|---|---|---|
-| `--model PATH\|NAME` | 모델 파일 경로 또는 모델 이름 (다운로드된 모델 자동 검색) | - |
-| `--text TEXT` | 텍스트 직접 입력 (파이프 불필요) | - |
-| `--streaming` | 청크 기반 스트리밍 모드 | off |
-| `--use-cuda` | CUDA GPU 추론 활성화 | off |
-| `--gpu-device-id NUM` | GPU 디바이스 ID | 0 |
-| `--length-scale VAL` | 말하기 속도 조정 (작을수록 빠름) | 1.0 |
-| `--noise-scale VAL` | 음성 변동 제어 | 0.4 |
-| `--noise-w VAL` | 음소 길이 변동 제어 | 0.5 |
-| `--sentence-silence SEC` | 문장 사이 무음 (초) | 0.2 |
-| `--speaker NUM` | 다중 화자 모델의 화자 번호 | 0 |
-| `--phoneme-silence PHONEME SEC` | 특정 음소의 무음 시간 설정 | - |
-| `--raw-phonemes` | 입력을 음소로 해석 | off |
-| `--output-timing FILE` | 음소 타이밍 정보를 파일로 출력 (JSON/TSV) | - |
-| `--custom-dict FILE` | 커스텀 사전 (쉼표 구분으로 복수 지정 가능) | - |
-| `--json-input` | JSON 입력 모드 | off |
-| `--list-models [LANG]` | 사용 가능한 모델 목록 표시 | - |
-| `--download-model NAME` | 모델 다운로드 | - |
-| `--model-dir DIR` | 모델 다운로드 디렉터리 | - |
-| `--version` | 버전 표시 | - |
-| `--config PATH` / `-c` | 설정 파일 경로 | - |
-| `--output_file PATH` / `-f` | 출력 WAV 파일 경로 | - |
-| `--output_dir PATH` / `-d` | 출력 디렉토리 | - |
-| `--output-raw` | raw PCM 오디오를 표준 출력으로 출력 | off |
-| `--language LANG` / `-l` | 언어 코드 | - |
-| `--timing-format FMT` | 타이밍 출력 형식 (json/tsv/srt) | json |
-| `--test-mode` | 테스트 모드 (ONNX 추론 스킵) | off |
-| `--debug` | 디버그 로그 활성화 | off |
-| `--quiet` / `-q` | 로그 비활성화 | off |
-
-`piper-plus --help`로 전체 옵션을 확인할 수 있습니다.
-
-> **WavLM 모델 권장 설정:** WavLM 판별기로 학습된 모델은 `--noise-scale 0.5`를 권장합니다 (기본값은 0.4).
->
-> ```sh
-> echo "こんにちは" | ./bin/piper-plus --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav
-> ```
-
-### JSON 입력
-
-`--json-input` 플래그로 JSON 입력을 받을 수 있습니다:
-
-```json
-{ "text": "First speaker.", "speaker_id": 0, "output_file": "/tmp/speaker_0.wav" }
-{ "text": "Second speaker.", "speaker_id": 1, "output_file": "/tmp/speaker_1.wav" }
-```
-
-### 모델 관리
-
-#### 모델 목록 보기
+간단한 사용 예:
 
 ```bash
-# 사용 가능한 모델 목록 표시
-./bin/piper-plus --list-models
-
-# 언어별 필터링
-./bin/piper-plus --list-models ja
-./bin/piper-plus --list-models en
-```
-
-#### 모델 다운로드
-
-```bash
-# 모델 이름을 지정하여 다운로드 (별칭도 사용 가능)
-./bin/piper-plus --download-model tsukuyomi
-./bin/piper-plus --download-model en_US-lessac-medium
-
-# 다운로드 디렉터리 지정
-./bin/piper-plus --download-model tsukuyomi --model-dir /path/to/models
-
-# 다운로드 후 모델 이름으로 추론 (전체 경로 불필요)
-./bin/piper-plus --model tsukuyomi --text "こんにちは"
-```
-
-### 환경 변수 (C++ CLI)
-
-| 변수명 | 설명 | 예시 |
-|---|---|---|
-| `PIPER_PLUS_DEFAULT_MODEL` | `--model` 미지정 시 기본 모델 경로 | `/path/to/model.onnx` |
-| `PIPER_PLUS_DEFAULT_CONFIG` | `--config` 미지정 시 기본 설정 파일 경로 | `/path/to/config.json` |
-| `PIPER_PLUS_MODEL_DIR` | 다운로드 모델 저장 디렉터리 | `~/.local/share/piper-plus/models` |
-| `PIPER_PLUS_GPU_DEVICE_ID` | CUDA GPU 디바이스 ID | `0` |
-
-### 헬퍼 스크립트 (Windows)
-
-Windows 사용자를 위해 `scripts/` 디렉터리에 헬퍼 스크립트를 제공하고 있습니다.
-
-**PowerShell:**
-
-```powershell
-.\scripts\speak.ps1 "こんにちは、今日は良い天気ですね。"
-.\scripts\speak.ps1 -Model "models\tsukuyomi.onnx" -Text "テスト"
-```
-
-**명령 프롬프트:**
-
-```cmd
-scripts\speak.bat "こんにちは、今日は良い天気ですね。"
-scripts\speak.bat --model models\tsukuyomi.onnx "テスト"
+./bin/piper-plus --model tsukuyomi --text "こんにちは" --output_file hello.wav
 ```
 
 ---
 
 ## 학습
 
-자세한 내용은 [학습 가이드](docs/guides/training/training-guide.md)를 참조하세요.
+piper-plus 모델의 학습·파인튜닝 방법 (기본 설정, 다중 화자 / 다중 GPU, ONNX 변환, 체크포인트 관리, 음성 평가)은 **[학습 가이드](docs/guides/training/training-guide.md)** 문서를 참조하세요.
 
-### 기본
-
-```bash
-uv sync --extra train
-
-uv run python -m piper_train \
-  --dataset-dir /path/to/dataset \
-  --accelerator gpu --devices 1 --precision 16-mixed \
-  --max_epochs 200 --batch-size 16 \
-  --quality medium \
-  --prosody-dim 16 \
-  --ema-decay 0.9995
-```
-
-### 다중 화자 및 다중 GPU
-
-```bash
-NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
-uv run python -m piper_train \
-  --dataset-dir /path/to/dataset \
-  --prosody-dim 16 \
-  --accelerator gpu --devices 4 --precision 16-mixed \
-  --max_epochs 200 --batch-size 12 --samples-per-speaker 2 \
-  --checkpoint-epochs 1 --quality medium \
-  --base_lr 2e-4 --disable_auto_lr_scaling \
-  --ema-decay 0.9995
-```
-
-다중 GPU에서는 DDP (Distributed Data Parallel)가 자동으로 설정됩니다. NCCL 환경 변수 설정이 필요합니다. 자세한 내용은 다중 GPU 학습 가이드를 참조하세요.
-
-### ONNX 변환
-
-기본적으로 FP16 변환이 적용되어 모델 크기가 약 50% 줄어듭니다. `--no-fp16`으로 비활성화 가능합니다. 수치 안정성을 위해 LayerNormalization, Sigmoid, Softmax는 FP32로 유지됩니다.
-
-```bash
-# 표준 모델 (FP16 출력)
-CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-  /path/to/checkpoint.ckpt /path/to/output.onnx
-
-# FP32 출력
-CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-  --no-fp16 /path/to/checkpoint.ckpt /path/to/output.onnx
-
-# WavLM 모델 (--stochastic 기본 활성화)
-CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-  --stochastic /path/to/checkpoint.ckpt /path/to/output.onnx
-```
-
-### 체크포인트 관리
-
-- `--resume_from_checkpoint` — 체크포인트에서 학습 재개
-- `--resume_from_single_speaker_checkpoint` — 단일 화자 모델에서 다중 화자로 변환
-
-### 음성 평가
-
-`scripts/evaluation/` 에 평가용 테스트 텍스트가 있습니다.
+실제 운용용 6개 언어 사전 학습 및 츠쿠요미짱 파인튜닝 명령 템플릿은 [CLAUDE.md](CLAUDE.md)에 있습니다.
 
 ---
 
 ## 사전 학습 모델
 
-추론용 음성 합성 모델을 Hugging Face에 공개하고 있습니다.
+공개된 piper-plus 모델 목록, 다운로드 방법, 6개 언어 기본 모델의 특징, 일본어 TTS의 자세한 내용은 **[모델 가이드](docs/guides/development/pretrained-models.md)** 문서를 참조하세요.
 
-**추론용 모델 (바로 사용 가능):**
+주요 모델: `tsukuyomi` (일본어), `zs-v1` (6개 언어 Zero-Shot/FT 실험용 기본 모델), `bilingual-ja-en-v4` (일본어·영어 2개 언어) — 자세한 내용은 Hugging Face의 [고정 공개 zs-v1 번들](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)과 [ayousanz/piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)을 참조하세요.
 
-| 모델 | 언어 | 화자 수 | 설명 | 다운로드 |
-|---|---|---|---|---|
-| 츠쿠요미짱 6lang | JA/EN/ZH/ES/FR/PT | 1 | 츠쿠요미짱 음성, 6개 언어 지원, FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
-| CSS10 일본어 6lang | JA/EN/ZH/ES/FR/PT | 1 | CSS10 일본어 음성, 6개 언어 지원, FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang) |
+> **Zero-Shot/FT 기본 모델 (`zs-v1`, 2026-10-10):** 고정 공개 번들은 기존 v7 epoch 32 실험 기준 버전입니다 (JA/EN/ZH/ES/FR/PT, 571 화자, 173 음소, CAM++ 192차원). Zero-Shot 추론에는 `base.onnx`와 함께 제공되는 `campplus.onnx`로 추출한 참조 embedding을, 추가 학습에는 `base.ckpt`와 함께 제공되는 `config.json`을 사용하세요. PyPI `piper-plus==2.0.0`의 공개 예제로 기능을 확인했지만, 품질 승인·사람의 청취 합격·최신/최고 품질을 의미하지는 않습니다. `base` / `zero-shot-base-zs-v1` alias는 v2.0.2에 포함되어 있습니다 (2.0.0 / 2.0.1에는 미포함). 루트의 `model.ckpt`는 이전 세대로 별도 취급합니다.
 
-**Zero-Shot/FT 기본 모델 (실험용):**
-
-| 모델 | 언어 | 화자 수 | 설명 | 다운로드 |
-|---|---|---|---|---|
-| `zs-v1` Zero-Shot/FT 기본 모델 | JA/EN/ZH/ES/FR/PT | 571 | v7 epoch32 실험 모델, 173 음소, 192차원 CAM++ 화자 임베딩 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) |
-
-> Zero-Shot에는 `campplus.onnx`로 추출한 참조 embedding과 `base.onnx`가 필요합니다. 파인튜닝은 `base.ckpt`와 함께 제공된 `config.json`을 사용합니다. 공개 예제는 PyPI `piper-plus==2.0.0`에서 기능만 확인했습니다. 이 모델은 실험용이며 노이즈와 음성 전이 한계가 남아 있고, 품질 승인이나 사람의 청취 승인을 의미하지 않습니다. `base` 및 `zero-shot-base-zs-v1` alias는 v2.0.2에 포함됩니다(2.0.0/2.0.1에는 없음). 루트 `model.ckpt`는 별도의 legacy 파일입니다.
-
-### 모델 다운로드
-
-**츠쿠요미짱 모델:**
-
-> **츠쿠요미 FT (`zs-v1`, 2026-10-15):** [고정 공개 버전](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/tree/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1)은 동일한 공개 base 세대에서 파인튜닝되었습니다. `releases/zs-v1/tsukuyomi.onnx`와 `tsukuyomi.onnx.json`을 함께 사용하며, 이 고정 음성은 참조 오디오나 CAM++가 필요하지 않습니다. 사람의 확인을 기록했고 실험 버전 공개를 승인했지만 `quality_approval=false`입니다. 아래 `resolve/main` 다운로드는 legacy root 아티팩트와의 호환성 예제로만 유지합니다.
-
-**Windows (PowerShell):**
-
-```powershell
-mkdir models
-Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx" -OutFile models/tsukuyomi.onnx
-Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json" -OutFile models/config.json
-```
-
-**macOS / Linux:**
-
-```bash
-mkdir -p models
-curl -L -o models/tsukuyomi.onnx https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx
-curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json
-```
-
-### 6개 언어 기본 모델 특징 (학습용)
-
-- `zs-v1`: v7 epoch32 실험용 Zero-Shot/FT 기본 모델
-- 언어: JA/EN/ZH/ES/FR/PT; 571 화자
-- 샘플링 레이트: 22,050 Hz; 173 음소
-- 화자 조건화: 192차원 CAM++ embedding
-- Zero-Shot에는 참조 embedding이 필요하며, 파인튜닝은 `base.ckpt`와 일치하는 `config.json`을 사용
-
-> **Note:** piper-plus는 독자적인 아키텍처 확장을 사용하므로 upstream Piper 체크포인트/ONNX와 호환되지 않습니다. 선택한 모델에 포함된 `config.json`을 사용하고, 루트 `model.ckpt`는 별도의 legacy 파일로 취급해 주세요.
-
----
-
-## 일본어 TTS
-
-OpenJTalk 통합에 의한 고품질 일본어 음성 합성. 사전 및 음성 파일은 첫 실행 시 자동으로 다운로드됩니다.
-
-**환경 변수 (선택사항):**
-
-| 변수명 | 설명 |
-|---|---|
-| `OPENJTALK_DICTIONARY_PATH` | OpenJTalk 사전 경로 (미설정 시 자동 다운로드) |
-| `PIPER_PLUS_AUTO_DOWNLOAD_DICT` | `0`으로 자동 다운로드 비활성화 |
-| `PIPER_PLUS_OFFLINE_MODE` | `1`로 오프라인 모드 |
-
-자세한 내용은 일본어 음성 합성 가이드 및 [음소 매핑 레퍼런스](docs/api-reference/phoneme-mapping.md)를 참조하세요.
+> **츠쿠요미짱 FT (`zs-v1`, 2026-10-15):** 동일한 공개 base 세대를 추가 학습한 [고정 공개 모델](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/tree/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1)을 공개했습니다. `tsukuyomi.onnx`와 `tsukuyomi.onnx.json`을 조합하면 참조 음성이나 CAM++ 없이 생성할 수 있습니다. 일본어 3문장에 대한 사람의 확인을 기록했고 실험 버전으로서의 공개를 승인했습니다 (quality_approval=false, 품질 승인은 아닙니다). 기존 `tsukuyomi` alias는 계속 이전 루트 모델을 선택하므로, 새 모델은 [모델 가이드](docs/guides/development/pretrained-models.md)의 고정 URL에서 받으세요.
 
 ---
 
 ## 플랫폼
 
-### macOS
-
-**Apple Silicon (M1/M2/M3+)만 지원.** Intel Mac은 Docker 또는 소스 빌드를 이용해 주세요.
-
-첫 실행 시 보안 경고:
-
-```bash
-xattr -cr piper/
-```
-
-### Windows
-
-C++ 릴리스 배포물은 x64이며 C# CLI는 x64 / arm64도 제공합니다. OpenJTalk 사전은 첫 실행 시 자동으로 다운로드됩니다. 자세한 내용은 [Windows 설정 가이드](docs/getting-started/windows-setup.md)를 참조하세요.
-
-```cmd
-piper-plus.exe --model en_US-lessac-medium.onnx -f output.wav
-```
-
-### WebAssembly
-
-브라우저에서 직접 동작하는 일본어 TTS. 서버 불필요, 오프라인 지원.
-
-- **[온라인 데모](https://ayutaz.github.io/piper-plus/)**
-- **[기술 상세 및 통합 가이드](src/wasm/openjtalk-web/README.npm.md)**
+- **macOS**: Apple Silicon (arm64) 네이티브 지원. 자세한 내용은 [macOS 설정](docs/getting-started/binary-selection.md#macos-開発元を確認できないため開けません)을 참조
+- **Windows**: C++ 배포물은 x64, C# CLI는 x64 / arm64. OpenJTalk 설정은 [Windows 설정 가이드](docs/getting-started/windows-setup.md)를 참조
+- **WebAssembly**: 브라우저에서 완전 오프라인 실행. [데모](https://ayutaz.github.io/piper-plus/) | [npm 패키지](https://www.npmjs.com/package/piper-plus)
 
 ---
 
@@ -737,28 +399,29 @@ Piper를 Unity에서 사용하기 위한 플러그인: [github.com/ayutaz/uPiper
 
 - Unity 6000.0.35f1+, Unity.InferenceEngine
 - Windows / macOS (Apple Silicon) / Linux / Android 지원
-- 일본어, 영어 지원, 비동기 API, 스트리밍
+- 일본어·영어 지원, 비동기 API, 스트리밍
 
 ### 음성 모델 (Voices)
 
-piper-plus 모델: [`zs-v1` Zero-Shot/FT 기본 모델](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) · [Tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
+piper-plus 전용 모델: [zs-v1 Zero-Shot/FT 기본 모델](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) · [츠쿠요미짱](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
 
-> **Note:** piper-plus는 자체 G2P 및 음소 시스템을 사용하므로 upstream Piper 모델 (rhasspy/piper-voices)은 호환되지 않습니다.
+> **Note:** piper-plus는 자체 G2P·음소 체계를 사용하므로 upstream Piper (rhasspy/piper-voices) 모델과 호환되지 않습니다.
 
 ### 관련 글
 
-- [LJSpeechを使って英語のpiperの事前学習モデルを作成する](https://ayousanz.hatenadiary.jp/entry/2025/05/26/230341)
-- [jvs音声データセットを使ったpiper日本語モデルの作成](https://ayousanz.hatenadiary.jp/entry/2025/06/05/093217)
-- [piperモデルからつくよみちゃんデータセットを使って追加学習を行う](https://ayousanz.hatenadiary.jp/entry/2025/06/07/074232)
+- [LJSpeechを使って英語のpiperの事前学習モデルを作成する](https://ayousanz.hatenadiary.jp/entry/2025/05/26/230341) (LJSpeech로 영어 Piper 사전 학습 모델 만들기, 일본어)
+- [jvs音声データセットを使ったpiper日本語モデルの作成](https://ayousanz.hatenadiary.jp/entry/2025/06/05/093217) (JVS 음성 데이터셋으로 Piper 일본어 모델 만들기, 일본어)
+- [piperモデルからつくよみちゃんデータセットを使って追加学習を行う](https://ayousanz.hatenadiary.jp/entry/2025/06/07/074232) (츠쿠요미짱 데이터셋으로 Piper 모델 추가 학습하기, 일본어)
 
 ### piper-plus-g2p (독립 G2P 패키지)
 
-다국어 G2P (Grapheme-to-Phoneme) 를 독립 패키지로 제공:
+다국어 G2P (Grapheme-to-Phoneme)를 독립 패키지로 제공합니다:
 
 - **Python**: `pip install piper-plus-g2p` — [소스 코드](src/python/g2p/)
 - **Rust**: `cargo add piper-plus-g2p` — [소스 코드](src/rust/piper-plus-g2p/)
 - **Go**: `go get github.com/ayutaz/piper-plus/src/go/phonemize` — [소스 코드](src/go/phonemize/)
 - **JavaScript/WASM**: `npm install @piper-plus/g2p` — [소스 코드](src/wasm/g2p/)
+- **Kotlin/Android**: `implementation("io.github.ayutaz:piper-plus-g2p-android:1.0.1")` — [소스 코드](android/piper-plus-g2p/) · [사전 배포 가이드](docs/guides/platform/android-g2p-dictionary.md)
 
 ### People using Piper
 
@@ -773,14 +436,14 @@ piper-plus 모델: [`zs-v1` Zero-Shot/FT 기본 모델](https://huggingface.co/a
 | 일본어 TTS | 일본어 음성 합성 가이드 |
 | 학습 | [학습 가이드](docs/guides/training/training-guide.md) · 다중 GPU |
 | API | [음소 매핑](docs/api-reference/phoneme-mapping.md) · [환경 변수](docs/getting-started/environment-variables.md) |
-| 기능 | [WebUI](docs/features/webui.md) · CLI 강화 · 스트리밍 · Phoneme Timing · SSML |
+| 기능 | [WebUI](docs/features/webui.md) · CLI 강화 · 스트리밍 |
 | 설정 | 빠른 시작 (일본어) · [Windows](docs/getting-started/windows-setup.md) · [문제 해결](docs/getting-started/troubleshooting.md) |
 | Docker | [Docker 환경](docker/README.md) |
 | WebAssembly | [기술 상세](src/wasm/openjtalk-web/README.npm.md) |
 
 ## Contributing
 
-[CONTRIBUTING.md](CONTRIBUTING.md)를 참조하세요.
+[CONTRIBUTING.md](CONTRIBUTING.md)를 참조하세요. 질문이나 버그 보고는 [Issues](https://github.com/ayutaz/piper-plus/issues)에 남겨 주세요. 행동 강령은 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)를 참조하세요.
 
 ## Changelog
 
@@ -788,4 +451,4 @@ piper-plus 모델: [`zs-v1` Zero-Shot/FT 기본 모델](https://huggingface.co/a
 
 ## 감사의 말
 
-piper-plus 실험에 사용하는 GPU 컴퓨팅은 [CloudRift](https://www.cloudrift.ai/)의 AI Builder Grant 지원을 받고 있습니다.
+piper-plus의 GPU를 사용하는 실험은 [CloudRift](https://www.cloudrift.ai/)의 AI Builder Grant (GPU 크레딧) 지원을 받고 있습니다.

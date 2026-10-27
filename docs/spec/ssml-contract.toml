@@ -16,7 +16,8 @@
 #
 # Implementations:
 #   Python (g2p): src/python/g2p/piper_plus_g2p/ssml.py            SSMLParser
-#   Rust:         src/rust/piper-core/src/ssml.rs                  SsmlParser
+#   Rust:         src/rust/piper-plus-g2p/src/ssml.rs              SsmlParser
+#                 (re-exported by piper-core as `piper_plus::ssml`)
 #   Go:           src/go/piperplus/ssml/parser.go                  Parse
 #   C#:           src/csharp/PiperPlus.Core/Ssml/SsmlParser.cs     SsmlParser
 #   WASM/JS:      src/wasm/g2p/src/ssml.js                         SsmlParser

@@ -1,5 +1,8 @@
 # C++ ORT アップグレード検証レポート (Issue #383 follow-up)
 
+> Issue #383 の実装ブランチに対する歴史的な計測記録です。数値・コマンド名・
+> 依存バージョンは当時の環境と commit に固定され、現行 release の性能保証ではありません。
+
 ## TL;DR
 
 `fix(cpp): ONNX Runtime 1.17.0 → 1.20.0` (commit `37c7c72a`) に加え、test exe

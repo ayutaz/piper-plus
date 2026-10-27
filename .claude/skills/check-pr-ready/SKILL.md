@@ -55,15 +55,18 @@ PR を出す前にすべての品質チェックを実行し、問題があれ�
 
 ### Phase 4: PR 本文ドラフト
 
-1. 上記すべてが OK なら、PR 本文のドラフトを生成:
-    - タイトル: dev..HEAD の最初のコミット件名 (70 文字以内)
-    - Summary: 各コミットの要約から 3-5 個の bullet
-    - Test plan: 実行したチェックの結果 checklist
-    - 形式は `gh pr create --body "$(cat <<'EOF' ... EOF\n)"` で渡せる Markdown
+1. 上記すべてが OK なら、PR 本文のドラフトを `.github/pull_request_template.md` の見出しどおりに生成:
+    - タイトル: dev..HEAD の最初のコミット件名 (70 文字以内、 Conventional Commits の `type(scope): ...` 形式。 `pr-metadata.yml` の `pr-title-check` が検査する)
+    - `## Summary`: 各コミットの要約から 3-5 個の bullet
+    - `## Affected Components` / `## Type`: 該当を `- [x]` で最低 1 個ずつ
+    - `## Risk Level`: patch / minor / major のうち **ちょうど 1 個**を `- [x]`
+    - `## Contract Impact` / `## Checklist` / `## Related Issues`: template の項目を埋める
+    - `## Test Plan` (**大文字 P**): 実行したチェックの結果 checklist。 空やコメントだけにしない
+    - `pr-metadata.yml` の `pr-body-validate` step は Test Plan の中身、 Risk Level の 1 個、 Affected Components と Type の最低 1 個を検査し、 欠けると PR が red になる (詳細は `/create-pr` の「PR 本文フォーマット」)
 
 ### Phase 5: 最終判定
 
-1. すべて緑 → 「PR 作成準備完了」と報告し、`gh pr create` コマンドの提案を出力
+1. すべて緑 → 「PR 作成準備完了」と報告し、`/create-pr` の実行を提案 (`gh pr create` の直接実行は `.claude/hooks/guard-bash.sh` が block する)
 2. 1 つでも警告/失敗 → 修正項目をリスト化、緑にしてから再実行を促す
 
 ## 報告フォーマット
@@ -99,4 +102,4 @@ PR を出す前にすべての品質チェックを実行し、問題があれ�
 - ユーザーが `skip-tests` 引数を渡した場合は Phase 2 のみスキップ (緊急修正用)
 - pytest.ini の `--cov` に注意: `-o addopts=""` で上書き
 - 大規模機能 (>100 行) では CLAUDE.md / CHANGELOG / docs/features の更新を必須とする
-- PR 作成自体は Phase 5 の **提案だけ** で、実行はユーザーに任せる
+- PR 作成自体は Phase 5 の **提案だけ** で、実行はユーザーに任せる (作成は `/create-pr` 経由)

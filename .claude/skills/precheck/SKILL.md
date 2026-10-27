@@ -18,7 +18,7 @@ allowed-tools: Bash(uv run *) Bash(cargo *) Bash(dotnet *) Bash(go test *) Bash(
 
 引数 `$ARGUMENTS`:
 
-- `python` → src/python/ + src/python_run/ のみ
+- `python` → src/python/ + src/python_run/ (ruff は CI と同じく repo 全体の `.py` が対象。 `scripts/` / `tests/` / `docker/` 等の変更も python scope とみなす)
 - `rust` → src/rust/ のみ
 - `cs` → src/csharp/ のみ
 - `go` → src/go/ のみ
@@ -32,11 +32,11 @@ allowed-tools: Bash(uv run *) Bash(cargo *) Bash(dotnet *) Bash(go test *) Bash(
 ### Python
 
 ```bash
-# Lint
-uv run ruff check src/python_run/ src/python/
+# Lint (CI の lint-gates.yml python-lint step と同じく repo 全体。 除外は pyproject.toml の [tool.ruff])
+uv run ruff check
 
 # Format check
-uv run ruff format --check src/python_run/ src/python/
+uv run ruff format --check
 
 # Unit tests (runtime + g2p)
 cd src/python_run && uv run pytest tests/ -o addopts="" --tb=short -q && cd ../..
@@ -101,8 +101,8 @@ ctest --test-dir build -C Release --output-on-failure
 
 ## 失敗時の対応
 
-- **ruff format 失敗** → `uv run ruff format src/python_run/ src/python/` で自動修正
-- **ruff check 失敗** → `uv run ruff check --fix src/python_run/ src/python/` で自動修正
+- **ruff format 失敗** → `uv run ruff format` で自動修正
+- **ruff check 失敗** → `uv run ruff check --fix` で自動修正
 - **pytest 失敗** → 失敗テストの最初の 3 件を要約して原因候補を提示
 - **dotnet format 失敗** → `dotnet format src/csharp/PiperPlus.sln` で自動修正
 

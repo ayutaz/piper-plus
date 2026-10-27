@@ -14,7 +14,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-piper-plus-g2p = { version = "0.4", features = ["naist-jdic"] }
+piper-plus-g2p = { version = "0.5", features = ["naist-jdic"] }
 ```
 
 ```rust
@@ -55,7 +55,7 @@ To use only specific languages, disable defaults:
 
 ```toml
 [dependencies]
-piper-plus-g2p = { version = "0.4", default-features = false, features = ["english", "japanese"] }
+piper-plus-g2p = { version = "0.5", default-features = false, features = ["english", "japanese"] }
 ```
 
 ## Supported Languages
@@ -74,9 +74,10 @@ piper-plus-g2p = { version = "0.4", default-features = false, features = ["engli
 
 ### Brazilian vs European Portuguese
 
-`PortuguesePhonemizer::new(Dialect::BR)` and `PortuguesePhonemizer::new(Dialect::EU)`
-share the same class but differ in five post-processing transformations
-(see `docs/spec/pt-dialect-contract.toml`). EU also introduces the central
+`portuguese::PortuguesePhonemizer::new()` (BR, `pt` / `pt-BR`) and
+`portuguese::EuropeanPortuguesePhonemizer::new()` (EU, `pt-PT`) share the same
+rule-based core; the EU type applies five post-processing transformations
+on top (see `docs/spec/pt-dialect-contract.toml`). EU also introduces the central
 vowel `ɨ` and the velarised lateral `ɫ` (registered in the PUA contract).
 
 ## SSML Basic Profile
@@ -161,7 +162,7 @@ Enable the `ffi` feature for C-compatible functions suitable for
 iOS (Swift) and Android (Kotlin) bindings:
 
 ```toml
-piper-plus-g2p = { version = "0.4", features = ["ffi", "all-languages", "naist-jdic", "bundled-dicts"] }
+piper-plus-g2p = { version = "0.5", features = ["ffi", "all-languages", "naist-jdic", "bundled-dicts"] }
 ```
 
 The crate exposes 5 C functions with the `piper_plus_g2p_` prefix:

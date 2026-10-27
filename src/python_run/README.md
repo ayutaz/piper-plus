@@ -40,9 +40,27 @@ piper-plus --list-models ja
 # モデルをダウンロード
 piper-plus --download-model tsukuyomi
 
-# 音声を生成
-piper-plus --model tsukuyomi --text "こんにちは、今日は良い天気ですね。" --output_file output.wav
+# 音声を生成 (テキストは位置引数)
+piper-plus --model tsukuyomi --output_file output.wav "こんにちは、今日は良い天気ですね。"
+
+# 標準入力から読む
+echo "こんにちは、今日は良い天気ですね。" | piper-plus --model tsukuyomi --output_file output.wav
+
+# テキストファイルから読む (複数回指定可)
+piper-plus --model tsukuyomi --input-file input.txt --output_file output.wav
 ```
+
+テキストの位置引数がない場合は、`--input-file` のファイル、次に標準入力の順で読みます。主なオプション:
+
+| オプション | 説明 |
+|-----------|------|
+| `--input-file FILE` | テキストファイルを読む (複数回指定可) |
+| `--json-input` | 標準入力を JSONL として読む。各行に `phoneme_ids` (必須) と `speaker_id` / `language_id` / `output_file` (任意) を書く。G2P は通らない |
+| `--speaker-embedding FILE` | Zero-Shot TTS 用の話者 embedding (`.npy`、192 次元 float32) |
+| `-s` / `--speaker` | 話者 ID (既定 0) |
+| `-d` / `--output-dir` | 出力ディレクトリ (1 行ごとに WAV を書き出す) |
+
+全オプションは `piper-plus --help` で確認できます。
 
 ### Python API
 

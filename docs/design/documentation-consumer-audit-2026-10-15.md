@@ -126,7 +126,7 @@ field bytes= not found in block
 exit=0, manifest_text_unchanged=true
 ```
 
-**影響の限界。** `.github/workflows/model-quality-gate.yml:95-97` は `--print-manifest` のみを呼び、`continue-on-error: true`。
+**影響の限界。** `.github/workflows/model-quality-gate.yml:95-97` (当時。後に #884 で `lint-gates.yml` の model-quality-gate step に統合) は `--print-manifest` のみを呼び、`continue-on-error: true`。
 更新 helper が現行 HF publisher に接続されている証拠は見つからなかった。
 `scripts/tsukuyomi_release/publish_bundle.py:109-128,319` と `scripts/public_base_runtime.py:60-73` は独自に size/hash を照合する。これらまで無検査とは結論しない。
 
@@ -150,7 +150,7 @@ exit=0, manifest_text_unchanged=true
 ### A15: ONNX export の CI 保証と実際の検査範囲
 
 **記載と対応 gate の不一致。** `docs/spec/onnx-export-contract.toml:191-224,263-266` は export ごとの roundtrip、ORT session、warmup、FP16 parity を CI で実行済みとする。
-対応する `.github/workflows/model-quality-gate.yml:68` が呼ぶ `scripts/check_onnx_export_contract.py:36-49` は、opset の正規表現と `checker.check_model`／`shape_inference.infer_shapes` の文字列存在を検査する。
+対応する `.github/workflows/model-quality-gate.yml:68` (当時。同上) が呼ぶ `scripts/check_onnx_export_contract.py:36-49` は、opset の正規表現と `checker.check_model`／`shape_inference.infer_shapes` の文字列存在を検査する。
 次の内容しかない scratch source でも `check_opset(...,15,...)` の結果は `[]` だった。
 
 ```python

@@ -28,11 +28,12 @@ Out of scope:
 
 * `src/rust/piper-core/Cargo.toml` (`ort = "2.0.0-rc.X"`) — `ort`'s
   versioning scheme does not map 1:1 to upstream, and a stable `ort`
-  release is not yet available on crates.io (as of 2026-05). Tracked
+  release is not yet available on crates.io (as of 2026-10). Tracked
   separately so the gate is not coupled to upstream `ort` cadence.
 * `docs/` (history-bearing; reviewed by humans, not by the gate).
 
-`scripts/check_ort_version_drift.py` (workflow `Model Quality Gate`) keeps
+`scripts/check_ort_version_drift.py` (the `model-quality-gate` steps of
+`lint-gates.yml`; the former `Model Quality Gate` workflow) keeps
 the `## Current versions` table below honest by comparing each row against
 the real pin, per row. It covers only the rows this file does **not**
 exempt: the `Rust` row is out of scope per the bullet above, and the C++ /
@@ -58,6 +59,9 @@ exact-match group.
 | Kotlin G2P (release/CI) | 1.20.0 | exact ✓ | `release-kotlin-g2p.yml`, `kotlin-g2p-ci.yml` |
 | JS/WASM  | `>=1.22.0` (browser validation: `1.30.0`) | `>=1.20.0` ✓ | `onnxruntime-web` (npm, peerDependency; input metadata required) |
 
+The workspace root `pyproject.toml` (uv workspace) declares its own
+`onnxruntime>=1.28.0`. It is not a row above and neither gate checks it.
+
 ## CI Workflow References
 
 | Workflow | Variable | Used By |
@@ -66,6 +70,7 @@ exact-match group.
 | `android-build.yml` | `env.ONNXRUNTIME_VERSION` (job-level) | Android PR CI builds |
 | `release-kotlin-g2p.yml` | `env.ONNXRUNTIME_VERSION` (top-level) | Kotlin G2P AAR release |
 | `kotlin-g2p-ci.yml` | `env.ONNXRUNTIME_VERSION` (top-level) | Kotlin G2P PR CI |
+| `bundle-size-gate.yml` | `env.ONNXRUNTIME_VERSION` (top-level) | Android shared lib build for AAR size measurement |
 | `lint-gates.yml` | (gate; its ort-version-sync step runs `scripts/check_ort_versions.py`) | All exact-match + floor-check files |
 
 ## Updating
@@ -74,9 +79,9 @@ When bumping the C++ canonical ORT version (e.g. 1.20.0 → 1.22.0):
 
 1. Update `set(ONNXRUNTIME_VERSION ...)` in `cmake/OnnxRuntime.cmake`.
 2. Update `cmake/find_onnxruntime_windows.cmake` to match.
-3. Update `env.ONNXRUNTIME_VERSION` in all 4 workflow files
+3. Update `env.ONNXRUNTIME_VERSION` in all 5 workflow files
    (release-shared-lib / android-build / release-kotlin-g2p /
-   kotlin-g2p-ci).
+   kotlin-g2p-ci / bundle-size-gate).
 4. Update the hard-coded URLs in `build-piper.yml` and
    `_build-test-cpp.yml` (Linux/macOS/Windows).
 5. Update the hard-coded URL in `docker/cpp-dev/Dockerfile`.
@@ -84,8 +89,10 @@ When bumping the C++ canonical ORT version (e.g. 1.20.0 → 1.22.0):
    release; see `release-shared-lib.yml` `ORT_IOS_SHA256` env).
 7. If the new canonical is *higher* than any ecosystem's pin, raise
    that pin too:
-   * Python: `pyproject.toml` (3 extras) + `requirements*.txt` +
-     `setup.py`.
+   * Python: `src/python/pyproject.toml` (3 extras) +
+     `src/python_run/pyproject.toml` + `src/python_run/requirements_gpu.txt`.
+     (`src/python_run/setup.py` has declared no dependencies since
+     Issue #418, so it is not a pin site.)
    * C#: 5 csproj files (`PiperPlus.{Core,Cli,Cli.Tests,Core.Tests,Bench}`).
    * Go: `src/go/go.mod`.
    * WASM: `src/wasm/openjtalk-web/package.json` peerDependencies.

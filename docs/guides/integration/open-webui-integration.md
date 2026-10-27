@@ -236,8 +236,9 @@ piper-plus が提供する OpenAI 互換エンドポイントの一覧です。
 | `speaker_id` | int | `0` | 話者 ID (piper-plus 拡張) |
 | `noise_scale` | float | `0.4` | ノイズスケール (piper-plus 拡張) |
 | `noise_w` | float | `0.5` | ノイズ W (piper-plus 拡張) |
+| `stream` | bool | `false` | `true` で文単位の chunked WAV を返す (piper-plus 拡張) |
 
-**レスポンス:** `audio/wav` (バイナリ)
+**レスポンス:** `audio/wav` (バイナリ)。`stream=true` のときは、サイズ欄を `0xFFFFFFFF` にした WAV ヘッダーの後に文ごとの PCM を順に送ります。
 
 ### GET /v1/models
 
@@ -331,7 +332,7 @@ docker run -d --gpus all \
   python /app/inference.py --server --model /app/models/model.onnx --device gpu
 ```
 
-前提条件: ホストに NVIDIA Driver (>= 525.60.13) と [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) がインストール済みであること。
+前提条件: ホストに NVIDIA Driver R570 以上 (GPU イメージは CUDA 12.8.1 ベース、[移行ガイド](../../migration/v1.12-to-v2.0.md#docker-base-image-upgrade)) と [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) がインストール済みであること。
 
 ---
 

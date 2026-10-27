@@ -86,8 +86,9 @@ Linux ARM64 の glibc 2.31 互換修正は **v2.0.2** に収録されていま�
 
 ## Migration
 
+- [Migration INDEX](migration/README.md) — 移行ガイドの一覧、命名規則、CHANGELOG `### Breaking` からのリンク規則
 - [Python 英語G2Pのライセンス対応](migration/python-g2p-license.md) — Distance依存を除去したソース版への移行、学習側のローカルG2P導入境界、既存配布物との差
-- [Python 2.0.2 / G2P 0.3.1 リリース準備](guides/development/python-release-2.0.2.md) — 版番号、公開前の必須CI、公開操作との境界
+- [Python 2.0.2 / G2P 0.3.1 リリース記録](guides/development/python-release-2.0.2.md) — 2026-10-16 公開済み。版番号、公開前の必須CI、公開操作との境界
 - [Python 2.0.2 provider / WebUI 環境](migration/provider-environments.md) — CPU/GPU extra の選択、UI と学習環境の分離
 - [v1.11 → v1.12](migration/v1.11-to-v1.12.md) — HiFi-GAN/Flask/HTS-voice 削除など
 - [v1.12 → v2.0](migration/v1.12-to-v2.0.md) — Python 3.13 + CUDA 12.8 + Ubuntu 24.04 統一、 TF32 / bf16-mixed Template default、 旧 ckpt resume 非サポート
@@ -109,9 +110,29 @@ Linux ARM64 の glibc 2.31 互換修正は **v2.0.2** に収録されていま�
 - [文書・consumer 経路の第三次監査](design/documentation-consumer-audit-2026-10-15.md) — 2026-10-15 時点の導入・実行・配布・CI の対応漏れ、根拠と修正順序
 - [Zero-Shot base zs-v1 公開記録](design/zero-shot-base-zs-v1-release-2026-10-10.md) — 公開 revision、成果物、検証範囲
 - [つくよみちゃん zs-v1 公開記録](design/tsukuyomi-publication-ready-2026-10-12.md) — 公開済み FT bundle と consumer 検証
+- [つくよみちゃん zs-v1 公開前検証の履歴](design/tsukuyomi-zs-v1-release-2026-10-10.md) — 2026-10-10 時点の候補選定・来歴照合・検証 (公開前の状態の記録)
 - [Zero-Shot Public Model Release Plan](design/zero-shot-public-model-release-plan-2026-10-10.md) — 完了済み公開工程と将来の品質改善計画を分離した記録
 - [Zero-Shot Quality Improvement Plan](design/zero-shot-quality-improvement-plan.md) — 実装済み項目と未着手の研究提案
 - [Multi-6lang Zero-Shot v7 Training Results](design/multi-6lang-zero-shot-v7-training-results.md) - Canonical v7 training results + 5 fix commit history
+- [HF Space zero-shot デモ 実装計画](design/hf-space-zero-shot-demo-plan-2026-10-17.md) — 参照音声から声を写す実験タブ (PR #806 で実装済み、計画を保存)
+- [piper → piper_plus モジュール改名](design/piper-plus-module-rename-v2.md) — v2.0 の改名 (Issue #590) の完成時点の構成記録
+- [G2P の正解照合を全ランタイムでそろえる](design/g2p-golden-parity-across-runtimes-2026-10-23.md) — Python の音素列 golden fixture と各ランタイムの照合
+- [英語 G2P の前処理を C++ / Rust に移植](design/english-g2p-normalization-cpp-rust-2026-10-23.md) — 数字・記号の正規化を g2p_en に合わせる (#821)
+- [Go の英語 G2P に g2p_en の正規化を移す](design/english-g2p-normalization-go-2026-10-24.md) — #821 の正規化を Go へ (#841)
+- [フランス語のエリジオンとリエゾン](design/french-elision-liaison-across-runtimes-2026-10-23.md) — 全ランタイムで Python の動作に合わせる (#822)
+- [CJK 句読点を中立文字として扱う](design/cjk-punctuation-neutral-2026-10-24.md) — 言語判定で句読点を日本語に振り分けない (#823)
+- [1 言語指定の入口を多言語音素化器に通す](design/single-language-entry-multilingual-2026-10-24.md) — C# CLI text mode などの入口 (#827 / #833)
+- [`@piper-plus/g2p` の英語を CMU 辞書で読む](design/js-g2p-english-cmudict-2026-10-24.md) — CMU 辞書の npm 同梱と g2p_en の正規化 (#828)
+- [`@piper-plus/g2p` の中国語を pinyin 辞書で読む](design/js-g2p-chinese-pinyin-2026-10-24.md) — pinyin 辞書の npm 同梱 (#829)
+- [Python ランタイムのスウェーデン語音素化器](design/python-runtime-swedish-2026-10-24.md) — PyPI `piper-plus` への sv 追加 (#830)
+- [文分割で小数点と e.g. / i.e. を文末にしない](design/text-splitter-decimal-abbreviation-2026-10-24.md) — 文分割の規則修正 (#831)
+- [C# の英語 G2P を PiperPlus.Core に移す](design/csharp-english-core-2026-10-24.md) — `DotNetG2P.English` からの移行 (#832 / #821)
+- [C# のスペイン語・ポルトガル語 G2P を PiperPlus.Core に移す](design/csharp-spanish-portuguese-core-2026-10-24.md) — `DotNetG2P.Spanish` / `Portuguese` からの移行 (#832)
+- [ブラウザの中国語文中の数字を英語の数として読む](design/wasm-zh-english-digits-2026-10-24.md) — npm `piper-plus` の zh 数字 (#847)
+- [CLI help の正本を CI の取得に固定](design/cli-help-canonical-drift-2026-10-24.md) — `cli-help-extract.yml` の不一致対応 (#813)
+- [nltk の下限を 3.10.4 に上げる](design/nltk-security-floor-2026-10-24.md) — 修正済み advisory の抑止解除 (#709)
+- [gradio 環境で Pillow を 13.0.0 に上げる](design/pillow-13-override-2026-10-24.md) — Trivy の CRITICAL 対応
+- [Trivy の msgpack / setuptools 報告の出所](design/trivy-pip-vendor-findings-2026-10-24.md) — pip 同梱の SBOM が原因だった件 (#748)
 - [2026-06-20 研究環境引き継ぎ](handoff/zero-shot-tts-handoff-2026-06-20.md) — 過去の private 研究環境の記録。現在の一般公開モデル利用手順はモデル一覧を参照
 
 ## Development

@@ -40,11 +40,11 @@ deferred check because the script does not parse that table.
 
 | ID | Test | Where | Status |
 |----|------|-------|--------|
-| L2.1 | No duplicate `token` values | `tests/test_pua_invariants.py::TestPuaJsonSchema::test_no_duplicate_tokens` | ✅ |
-| L2.2 | No duplicate `codepoint` values | `tests/test_pua_invariants.py::TestPuaJsonSchema::test_no_duplicate_codepoints` | ✅ |
-| L2.3 | All codepoints in BMP PUA range (U+E000–U+F8FF) | `tests/test_pua_invariants.py::TestPuaJsonSchema::test_codepoints_in_pua_range` | ✅ |
-| L2.4 | No single-codepoint tokens (no PUA mapping needed) | `tests/test_pua_invariants.py::TestPuaJsonSchema::test_all_tokens_are_multi_codepoint_or_special` | ✅ |
-| L2.5 | `version` field equals `PUA_COMPAT_VERSION` constant | `tests/test_pua_invariants.py::TestPuaJsonSchema::test_version_matches_pua_compat_version` | ✅ |
+| L2.1 | No duplicate `token` values | `src/python/g2p/tests/test_pua_invariants.py::TestPuaJsonSchema::test_no_duplicate_tokens` | ✅ |
+| L2.2 | No duplicate `codepoint` values | `src/python/g2p/tests/test_pua_invariants.py::TestPuaJsonSchema::test_no_duplicate_codepoints` | ✅ |
+| L2.3 | All codepoints in BMP PUA range (U+E000–U+F8FF) | `src/python/g2p/tests/test_pua_invariants.py::TestPuaJsonSchema::test_codepoints_in_pua_range` | ✅ |
+| L2.4 | No single-codepoint tokens (no PUA mapping needed) | `src/python/g2p/tests/test_pua_invariants.py::TestPuaJsonSchema::test_all_tokens_are_multi_codepoint_or_special` | ✅ |
+| L2.5 | `version` field equals `PUA_COMPAT_VERSION` constant | `src/python/g2p/tests/test_pua_invariants.py::TestPuaJsonSchema::test_version_matches_pua_compat_version` | ✅ |
 
 ### L3 — Inventory coverage
 

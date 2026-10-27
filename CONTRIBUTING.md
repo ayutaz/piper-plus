@@ -1,4 +1,4 @@
-# Contributing to Piper
+# Contributing to piper-plus
 
 ## Requirements
 
@@ -131,7 +131,8 @@ measurement, and the bug shipped in every MB-iSTFT model for 15 months.
 ### Rust
 
 ```bash
-cd src/rust && cargo test --workspace
+# piper-plus-python (PyO3) and piper-plus-wasm are tested with maturin / wasm-pack
+cd src/rust && cargo test --workspace --exclude piper-plus-python --exclude piper-plus-wasm
 ```
 
 ### C\#
@@ -312,12 +313,15 @@ piper-plus ships as several packages. `VERSION` tracks the Python/native release
 |---|---|---|---|---|
 | `piper-plus` (Python TTS) | PyPI | `src/python_run/` | `v<X.Y.Z>` | SemVer |
 | `piper-plus-g2p` (Python G2P) | PyPI | `src/python/g2p/` | `python-g2p-v<X.Y.Z>` | SemVer |
-| `piper-plus-cli` / `piper-plus` (Rust crate) | crates.io | `src/rust/` | `rust-v<X.Y.Z>` | SemVer |
+| `piper-plus-cli` / `piper-plus` / `piper-plus-g2p` (Rust crate) | crates.io | `src/rust/` | `rust-v<X.Y.Z>` (one workspace version) | SemVer |
 | `PiperPlus.Core` / `PiperPlus.Cli` (NuGet) | NuGet | `src/csharp/` | `csharp-v<X.Y.Z>` | SemVer |
 | `piper-plus` (npm) | npm | `src/wasm/openjtalk-web/` | `npm-v<X.Y.Z>` | SemVer |
 | `@piper-plus/g2p` (npm) | npm | `src/wasm/g2p/` | `wasm-g2p-v<X.Y.Z>` | SemVer |
-| `github.com/ayutaz/piper-plus/src/go` | Go module | `src/go/` | (none — uses commit SHA via `go get`) | Go module versioning |
-| C API shared library (`libpiper_plus`) | GitHub Releases | `src/cpp/` | `shared-lib-v<X.Y.Z>` | SemVer |
+| `github.com/ayutaz/piper-plus/src/go` | Go module | `src/go/` | `src/go/v<X.Y.Z>` (module tag pushed by hand) | Go module versioning |
+| `github.com/ayutaz/piper-plus/src/go/phonemize` (Go G2P) | Go module | `src/go/phonemize/` | `go-g2p-v<X.Y.Z>` (`g2p-go-publish.yml` then pushes the module tag `src/go/phonemize/v<X.Y.Z>`) | Go module versioning |
+| C API shared library (`libpiper_plus`) | GitHub Releases | `src/cpp/` | `v<X.Y.Z>` (`release-shared-lib.yml`) | SemVer |
+| `PiperPlus` / `PiperPlusG2P` (Swift Package) | SwiftPM | `Package.swift`, `Sources/` | `v<X.Y.Z>` (same tag as the C API; `let version` / `let g2pVersion`) | SemVer |
+| Docker images (`ghcr.io/ayutaz/piper-plus/*`) | ghcr.io | `docker/` | `docker-v<X.Y.Z>` (`docker-build.yml`) | Same version as `VERSION` |
 | `io.github.ayutaz:piper-plus-g2p-android` (Kotlin G2P) | Maven Central | `android/piper-plus-g2p/` | `kotlin-g2p-v<X.Y.Z>` | SemVer |
 
 ### Why independent versioning
@@ -329,7 +333,7 @@ piper-plus ships as several packages. `VERSION` tracks the Python/native release
 ### Ground rules
 
 1. Each package keeps its own `CHANGELOG.md` (root `CHANGELOG.md` mirrors the **Python** package + project-wide highlights).
-2. Each release has a tag matching the prefix scheme above; do not reuse a generic `v<X.Y.Z>` tag for non-Python releases.
+2. Each release has a tag matching the prefix scheme above; do not reuse a generic `v<X.Y.Z>` tag for packages outside the Python/native release line (only the Python runtime, the C API and the Swift Package share it).
 3. Cross-package compatibility is documented in the relevant package README (e.g. npm `piper-plus` declares its required `@piper-plus/g2p` range in `package.json`).
 4. When making a change that affects multiple packages (e.g. adding a new language), bump each affected package's version individually and document the relationship in the root CHANGELOG.
 
@@ -376,7 +380,7 @@ Python runtimeのPyPI公開は、準備済みタグを選択した `dev-create-r
    # → Package.swift の `let checksum` を更新 → dev に commit → その commit に v<X.Y.Z> tag
    ```
 
-   **g2pChecksum の特例:** PiperPlusG2P xcframework は自身の `g2pVersion` tag で debut する。`g2pVersion != tag 版` のとき (例: synthesis `v1.13.0` に対し g2p は `1.14.0` 先行設定)、`release-shared-lib.yml` は g2p checksum 検証を**自動 skip** する (Issue #387)。この場合 `g2pChecksum` は placeholder のままで良い。
+   **g2pChecksum の特例:** PiperPlusG2P xcframework は自身の `g2pVersion` tag で debut する。`g2pVersion != tag 版` のとき (例: synthesis `v1.13.0` に対し g2p は `1.14.0` 先行設定)、`release-shared-lib.yml` は g2p checksum 検証を**自動 skip** する (Issue #387)。この場合 `g2pChecksum` は placeholder のままで良い。現在の `Package.swift` は `version` と `g2pVersion` がどちらも `2.0.2` なので、`v2.0.2` 系のタグでは両方の checksum が検証される。
 
 3. **GitHub Release は 2 workflow から作られる。** `dev-create-release.yml` が `--draft` + 自動 note を、`release-shared-lib.yml` が同 tag に `generate_release_notes: true` で asset を添付する。**どちらも CHANGELOG `[X.Y.Z]` 本文を使わない**ため、draft の本文を CHANGELOG `[X.Y.Z]` で手動置換してから publish する。
 
@@ -389,4 +393,4 @@ dev へのマージ条件とタグの保護は、 リポジトリ設定の rules
 - `piper-dev` (`refs/heads/dev*`): squash のみ、 削除と force push を禁止、 必須チェックは `ci-required` と `required-gate/all-workflows`、 未解決のレビュースレッドがあるとマージ不可、 strict (base の最新化を必須にする設定) は off、 例外の人は置かない。
 - `release-tags` (`refs/tags/v*`、 `refs/tags/*-v*`、 `refs/tags/src/go/**`): タグの削除と付け直し (移動) を禁止、 例外の人は置かない。 意図して動かす `openjtalk-binaries-latest` と `dev-20250610` はどの pattern にも当たらない。
 
-変更の手順: JSON を PR で変える → PR では `Rulesets` workflow がファイルの条件 (`scripts/check_rulesets.py --validate`) を検査する → マージ後、 admin が `python scripts/check_rulesets.py --apply` で差分を表示して適用し、 読み戻して一致を確かめる。 dev への push・毎日の schedule では `--check` が live の設定とファイルを比べ、 設定画面で直接変えると赤になります。
+変更の手順: JSON を PR で変える → PR では `lint-gates.yml` の `rulesets:` step がファイルの条件 (`scripts/check_rulesets.py --validate`) を検査する → マージ後、 admin が `python scripts/check_rulesets.py --apply` で差分を表示して適用し、 読み戻して一致を確かめる。 dev への push・毎日の schedule では `--check` が live の設定とファイルを比べ、 設定画面で直接変えると赤になります。

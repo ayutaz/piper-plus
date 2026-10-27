@@ -91,9 +91,10 @@ baseline (README.md の Benchmark 表、 Xeon E5-2650 v4 / 25 phoneme 英文 / 2
 uv run python scripts/upload_model_to_hf.py \
     --onnx "$OUTPUT_ONNX" \
     --config "$OUTPUT_ONNX.json" \
-    --repo "$HF_REPO" \
-    --license cc-by-nc-sa-4.0
+    --repo "$HF_REPO"
 ```
+
+`upload_model_to_hf.py` に license 指定の引数はない (引数は `--repo` / `--config` / `--onnx` / `--config-remote-name` / `--onnx-remote-name` / `--commit-message` / `--dry-run`)。 license は HF repo の model card (README.md の YAML `license:`) 側で管理する。
 
 upload 後、 `docs/spec/model-sha256-manifest.toml` に新 entry を追加するための diff 提案 (sha256sum 値含む)。
 
@@ -103,10 +104,10 @@ Python/Rust で「model を load できるか」を確認し、追加 runtime �
 
 ```bash
 # Python
-uv run python -c "from piper import PiperVoice; v = PiperVoice.load('$OUTPUT_ONNX', '$OUTPUT_ONNX.json'); print('Python: OK')"
+uv run python -c "from piper_plus import PiperVoice; v = PiperVoice.load('$OUTPUT_ONNX', '$OUTPUT_ONNX.json'); print('Python: OK')"
 
 # Rust
-(cd src/rust && cargo run --release --bin piper-plus -- --model $OUTPUT_ONNX --text 'test' --output-file /tmp/r.wav 2>&1 | tail -3)
+(cd src/rust && cargo run --release -p piper-plus-cli -- --model $OUTPUT_ONNX --text 'test' --output-file /tmp/r.wav 2>&1 | tail -3)
 
 # Go / C# / C++ / WASM / Swift / Kotlin はオプション
 ```

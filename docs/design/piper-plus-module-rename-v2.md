@@ -1,7 +1,7 @@
 # piper → piper_plus モジュール改名 (v2.0 / Issue #590)
 
 **ステータス**: Completed / as-built architecture record (2026-10-15 review)
-**対象バージョン**: v2.0.x (`v2.0.0` and `v2.0.1` are released)
+**対象バージョン**: v2.0.x (`v2.0.0`, `v2.0.1` and `v2.0.2` are released)
 **関連 Issue**: [#590](https://github.com/ayutaz/piper-plus/issues/590) — Allow to install piper and piper-plus to the same environment
 **実装状態**: Python runtime is under `src/python_run/piper_plus/`; the published
 entry point is `piper-plus`. This document retains the original design decisions and

@@ -106,8 +106,9 @@ if timing:
 
 ### JavaScript / WASM
 
-tsukuyomi is a legacy compatibility alias resolved by the source/next model
-resolver. For a reproducible release example, provide the pinned
+tsukuyomi is a legacy compatibility alias; the npm model resolver (including
+published `piper-plus` 0.8.1 and 0.8.2) maps it to the legacy root model, not to
+the zs-v1 fine-tune. For a reproducible release example, provide the pinned
 releases/zs-v1/tsukuyomi.onnx and matching config.json URLs (or local files).
 The alias below is retained only to document the legacy API.
 
@@ -130,7 +131,7 @@ if (result.hasTimingInfo) {
 ### Rust CLI
 
 ```bash
-piper-plus-cli -m model.onnx --text "Hello" -o speech.wav --timing json
+piper-plus-cli -m model.onnx --text "Hello" -f speech.wav --timing json
 ```
 
 The Rust CLI writes timing JSON to stderr; redirect or capture stderr when

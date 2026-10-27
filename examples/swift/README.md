@@ -2,23 +2,23 @@
 
 Swift integration for piper-plus on **iOS** (device + simulator).
 
-> **Compatibility (v2.0.1)**: the released xcframework currently contains
+> **Compatibility (v2.0.2)**: the released xcframework currently contains
 > `ios-arm64` + `ios-arm64_x86_64-simulator` slices only. macOS / Mac Catalyst
 > / visionOS / tvOS / watchOS slices are M5 candidates and not yet supported.
 
-> **Recommended path (v2.0.1+)**: use the `Package.swift` shipped at the **piper-plus repo root** as a Swift Package Manager dependency. See [SPM Quick Start](#spm-quick-start) below.
+> **Recommended path (v2.0.2+)**: use the `Package.swift` shipped at the **piper-plus repo root** as a Swift Package Manager dependency. See [SPM Quick Start](#spm-quick-start) below.
 >
 > **Alternative**: manual `xcframework` drag-and-drop. See [Manual Integration](#manual-integration) below.
 
 ## SPM Quick Start
 
-### v2.0.1 dependency compatibility
+### v2.0.2 dependency compatibility
 
-The published `v2.0.1` manifest pins the compatible ONNX Runtime SDK, so
+The published `v2.0.2` manifest pins the compatible ONNX Runtime SDK, so
 consumers do not need to add a separate ONNX Runtime package constraint:
 
 ```swift
-.package(url: "https://github.com/ayutaz/piper-plus", exact: "2.0.1"),
+.package(url: "https://github.com/ayutaz/piper-plus", exact: "2.0.2"),
 ```
 
 This uses the unmodified public release and its official transitive SDK dependency.
@@ -39,7 +39,7 @@ let package = Package(
     // iOS-only — piper-plus xcframework currently has no macOS slice.
     platforms: [.iOS(.v15)],
     dependencies: [
-        .package(url: "https://github.com/ayutaz/piper-plus", from: "2.0.1"),
+        .package(url: "https://github.com/ayutaz/piper-plus", from: "2.0.2"),
         // No need to declare onnxruntime — piper-plus pulls it transitively
         // through its wrapper target. See Package.swift in the piper-plus repo.
     ],
@@ -58,7 +58,7 @@ Or in Xcode:
 
 1. **File → Add Package Dependencies…**
 2. Paste `https://github.com/ayutaz/piper-plus`
-3. Select `from: 2.0.1`
+3. Select `from: 2.0.2`
 4. Add `PiperPlus` to your target — `onnxruntime` is added automatically.
 
 ### Step 2: Resolve and use
@@ -78,7 +78,7 @@ import PiperPlus
 
 > **Note**: the `Package.swift` at the piper-plus repo root combines a Swift wrapper `target` (named `PiperPlus`) with a `binaryTarget` (named `PiperPlusBinary`) that points at `libpiper_plus-ios-v${VERSION}.xcframework.zip` published in GitHub Releases. SPM downloads the zip on first resolve and caches it in `~/Library/Developer/Xcode/DerivedData/SourcePackages/`. The wrapper target depends on `onnxruntime`, so consumers don't need to declare it.
 
-> **Release-cycle caveat**: SPM resolves `binaryTarget` against the manifest at the resolved tag commit. The piper-plus maintainer updates `Package.swift`'s version + checksum on `dev` BEFORE tagging; if you depend on a tag whose `Package.swift` was not updated to match its release asset, `swift package resolve` will fail with a checksum mismatch. Pin to the known-good public tag `from: "2.0.1"`.
+> **Release-cycle caveat**: SPM resolves `binaryTarget` against the manifest at the resolved tag commit. The piper-plus maintainer updates `Package.swift`'s version + checksum on `dev` BEFORE tagging; if you depend on a tag whose `Package.swift` was not updated to match its release asset, `swift package resolve` will fail with a checksum mismatch. Pin to the known-good public tag `from: "2.0.2"`.
 
 ## Manual Integration
 
@@ -168,7 +168,7 @@ MyApp/
 |------|--------|
 | iOS device (arm64) | ✓ |
 | iOS Simulator (arm64 / x86_64) | ✓ |
-| macOS / Mac Catalyst | ✗ — the synthesis xcframework has no macOS slice in v2.0.1. M5 candidate |
+| macOS / Mac Catalyst | ✗ — the synthesis xcframework has no macOS slice in v2.0.2. M5 candidate |
 | visionOS / tvOS / watchOS | ✗ — pending ORT support and dedicated slices. M5 candidate |
 | App Extension / App Clip | ✗ — size limits (32 MB / 10 MB uncompressed) cannot fit piper-plus + ORT |
 

@@ -444,7 +444,9 @@ the source of truth for this repository's blocking/informational policy.
 
 ### DotNetG2P パッケージエラー
 
-**問題**: 中国語/スペイン語/フランス語/ポルトガル語の G2P でエラーが発生
+**問題**: 日本語の G2P でエラーが発生
+
+C# CLI で外部パッケージ `DotNetG2P` / `DotNetG2P.MeCab` を使うのは日本語だけです。英語・中国語・スペイン語・フランス語・ポルトガル語の G2P は `PiperPlus.Core` に移行済みで、外部パッケージを使いません。
 
 **解決策**: NuGet パッケージの復元を実行:
 

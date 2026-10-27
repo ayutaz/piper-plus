@@ -121,10 +121,10 @@ canonical registry である。catalog 接続された runtime はこの定義�
 The catalog key for this entry is `multilingual-zero-shot-base-zs-v1`. It is
 not an additional user-facing alias; its aliases are the three values above.
 
-> `base` と `zero-shot-base-zs-v1` は、次のリリースで公開する pinned aliases です。
+> `base` と `zero-shot-base-zs-v1` は、v2.0.2 で公開した pinned aliases です。
 > いずれも root の legacy `model.ckpt` を指さず、上記 revision の
-> `releases/zs-v1/base.onnx` と対応する `releases/zs-v1/base.onnx.json` を解決します。リリース済み
-> v2.0.0/v2.0.1 の alias 表には遡及して追加しません。`base.onnx` は 192 次元 CAM++
+> `releases/zs-v1/base.onnx` と対応する `releases/zs-v1/base.onnx.json` を解決します。v2.0.0/v2.0.1
+> には含まれず、alias 表にも遡及して追加しません。`base.onnx` は 192 次元 CAM++
 > `speaker_embedding` を使う実験用 Zero-Shot base で、通常の参照なし音声用 alias ではありません。
 
 #### Runtime-specific alias status

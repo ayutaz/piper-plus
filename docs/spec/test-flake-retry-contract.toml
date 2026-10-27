@@ -91,6 +91,10 @@ implementation_phase_2 = """
 # -----------------------------------------------------------------------------
 # WASM (jest)
 # -----------------------------------------------------------------------------
+# 注 (2026-10): src/wasm/openjtalk-web のテストは jest ではなく `node --test`
+# (package.json の scripts.test) で実行しており、 jest.config.js も存在しない。
+# 下の package / ci_flag / implementation_phase_2 は jest 前提の当初案のまま
+# (status = "proposed" のため gate は形だけを検査する)。
 [wasm]
 status = "proposed"  # jest.config.js に retry 設定なし、 phase 2 で追加
 package = "jest"

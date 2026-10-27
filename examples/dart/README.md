@@ -115,7 +115,7 @@ tts.dispose();
   In a Flutter app, run synthesis in a separate `Isolate` to avoid blocking the
   UI thread. The streaming example uses `scheduleMicrotask` for simplicity.
 - **Library path**: On Android, the `.so` is typically bundled via the AAR in
-  `jniLibs/`. On iOS, use the **xcframework** approach described in [iOS Integration](#ios-integration) below. Pre-built Android AAR packaging is not yet tracked — please open an issue at [ayutaz/piper-plus/issues](https://github.com/ayutaz/piper-plus/issues) if you need it.
+  `jniLibs/`. On iOS, use the **xcframework** approach described in [iOS Integration](#ios-integration) below. An Android AAR project that wraps `libpiper_plus.so` lives in [`android/piper-plus`](../../android/README.md); build it locally with Gradle (no pre-built AAR is published).
 - **Native assets**: Dart's native assets RFC is experimental as of 2026. This
   example uses `DynamicLibrary.open()` with explicit paths. Once native assets
   stabilize, consider migrating to declarative native dependencies.
@@ -145,7 +145,7 @@ tts.dispose();
 - **iOS Deployment Target** 15.0+
 - **Apple Silicon Mac** for development (Intel Macs work via the simulator universal slice)
 
-### Distribution selection (v2.0.1)
+### Distribution selection (v2.0.2)
 
 | Your situation | Recommended artifact | Why |
 |----------------|---------------------|-----|
@@ -157,7 +157,7 @@ tts.dispose();
 ### Step 1: Download piper-plus xcframework
 
 ```bash
-gh release download v2.0.1 -p 'libpiper_plus-ios-*.xcframework.zip'
+gh release download v2.0.2 -p 'libpiper_plus-ios-*.xcframework.zip'
 unzip libpiper_plus-ios-*.xcframework.zip
 # Result: piper_plus.xcframework/
 #   ├── Info.plist
@@ -179,7 +179,7 @@ ORT is **not** bundled with `piper_plus.xcframework` — the consumer chooses ho
 
 ```ruby
 # ios/Podfile
-pod 'onnxruntime-c', '1.17.0'
+pod 'onnxruntime-c', '1.20.0'
 ```
 
 ```bash
@@ -190,18 +190,18 @@ cd ios && pod install
 
 ```swift
 // Package.swift — semver range, see docs/reference/ort-versions.md for the matrix
-.package(url: "https://github.com/microsoft/onnxruntime-swift-package-manager", from: "1.17.0")
+.package(url: "https://github.com/microsoft/onnxruntime-swift-package-manager", from: "1.20.0")
 ```
 
 #### Option C: Microsoft CDN (manual)
 
 ```bash
-curl -LO https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.0.zip
-unzip pod-archive-onnxruntime-c-1.17.0.zip
+curl -LO https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.20.0.zip
+unzip pod-archive-onnxruntime-c-1.20.0.zip
 # Result: onnxruntime.xcframework/
 ```
 
-> **sha256 (1.17.0)**: `1623e1150507d9e50554e3d3e5cf9abf75e1bfd8324b74a602acfe45343db871`
+> **sha256 (1.20.0)**: `50891a8aadd17d4811acb05ed151ba6c394129bb3ab14e843b0fc83a48d450ff` (44,218,716 bytes, verified 2026-05-09). piper-plus is link-tested against ORT 1.20.0; see [`docs/reference/ort-versions.md`](../../docs/reference/ort-versions.md).
 
 ### Step 3: Add to Xcode (Link PiperPlus + Embed & Sign ORT)
 
@@ -237,7 +237,7 @@ On iOS, the static archive in the xcframework gets linked into the consumer app,
 | `dyld: Library not loaded: @rpath/onnxruntime.framework/onnxruntime` (runtime) | ORT framework not embedded | Step 3 — set onnxruntime.xcframework to **Embed & Sign** |
 | `_OrtCreateEnv` undefined symbol (link time) | ORT framework not added to the target / wrong slice picked | Confirm onnxruntime.xcframework is in **Frameworks, Libraries, and Embedded Content**, and that the slice (`ios-arm64` for device, `ios-arm64_x86_64-simulator` for simulator) matches your build target |
 | `_piper_plus_*` undefined symbol (link time) | piper_plus.xcframework not added to the target | Step 3 — drag piper_plus.xcframework into Frameworks (Embed = "Do Not Embed" is correct, but it must still be **linked**) |
-| Simulator crash on Apple Silicon Mac | Old xcframework without simulator slice | Use v2.0.1+ xcframework.zip (the release includes the simulator slice) |
+| Simulator crash on Apple Silicon Mac | Old xcframework without simulator slice | Use v2.0.2+ xcframework.zip (the release includes the simulator slice) |
 | App Store Connect rejects build | Missing Privacy Manifest for ORT | Add your own `PrivacyInfo.xcprivacy` covering Microsoft's ORT (piper-plus side already includes empty Manifest) |
 
 ### Note: Privacy Manifest (iOS 17+)

@@ -118,6 +118,8 @@ Err(G2pError::LoanwordSchema { path, section, key })
 
 `src/rust/piper-plus-g2p/tests/test_zh_en_unified.rs` を新規作成し、共有 fixture (`tests/fixtures/g2p/zh_en_loanword_matrix.json`) からロードして parametrize:
 
+> 注: `test_zh_en_unified.rs` は作成されていない。共有 fixture の読み込みは [`src/rust/piper-core/tests/test_zh_en_two_crate.rs`](../../../src/rust/piper-core/tests/test_zh_en_two_crate.rs) の `test_fixture_matrix_loadable_and_well_formed` (piper-core 側 mirror を読む) が担う。以下は計画時の案。
+
 ```rust
 // Rust: piper-plus-g2p/tests/test_zh_en_unified.rs
 #[test]

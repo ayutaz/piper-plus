@@ -5,10 +5,11 @@
 # scripts/_mirror_check.py).
 #
 # Two groups:
-#   1. Runtime data files (10 mirrors across Python / Rust × 2 crate /
-#      Go / C# / WASM / C++ / Kotlin AAR / Swift SPM)
-#   2. Cross-runtime fixture matrix (8 mirrors for cross-language parity
-#      tests; TICKET-06b deliverable)
+#   1. Runtime data files (10 files = canonical + 9 mirrors across
+#      Python runtime / Rust × 2 crate / Go / C# / WASM / C++ / Kotlin AAR /
+#      Swift SPM; the group name counts the canonical)
+#   2. Cross-runtime fixture matrix (canonical + 8 mirrors for
+#      cross-language parity tests; TICKET-06b deliverable)
 #
 # Schema validation for group 1 is registered in code by the wrapper
 # (`register_schema_validator`) because it inspects JSON structure that

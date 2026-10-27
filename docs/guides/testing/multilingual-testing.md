@@ -64,10 +64,10 @@ CI is defined in `.github/workflows/csharp-ci.yml` and runs on:
 
 | Dimension | Values |
 |-----------|--------|
-| OS | ubuntu-24.04, windows-latest, macos-14 |
+| OS | ubuntu-24.04, windows-latest, macos-14, macos-latest |
 | .NET | 10.0.x |
 
-This gives a 3 OS x 1 .NET version matrix (3 combinations).
+This gives a 4 OS x 1 .NET version matrix (4 combinations).
 
 ## Rust Tests (piper-plus)
 
@@ -228,7 +228,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
 ### よくある問題
 
 1. **日本語テストが失敗する**
-   - OpenJTalk 辞書のパスが正しいか確認 (`OPENJTALK_DICTIONARY_DIR`)
+   - OpenJTalk 辞書のパスが正しいか確認 (`OPENJTALK_DICTIONARY_PATH`)
    - C API テストでは OpenJTalk 不在時に自動スキップ
 
 2. **テストモデルのダウンロードに失敗する**

@@ -17,7 +17,8 @@ Run `pre-commit run --all-files` for a one-shot full sweep.
 
 > **v1.12.0 notes:** Python runtime now uses FastAPI (not Flask) for the HTTP server,
 > and the HTS-voice dependency has been removed from the Python runtime
-> (C++/Go/Rust/WASM continue to use OpenJTalk + HTS-voice). HiFi-GAN decoder ckpts
+> (C++/Go/Rust/WASM use the OpenJTalk dictionary only; the C++ build links an
+> HTS Engine stub and loads no HTS voice). HiFi-GAN decoder ckpts
 > are no longer supported. The retained root `piper-plus-base/model.ckpt` is the
 > legacy MB-iSTFT fine-tuning source; the public v2 Zero-Shot + fine-tuning bundle is
 > the pinned `piper-plus-base/releases/zs-v1` base documented in the
@@ -54,8 +55,8 @@ Prerequisites: .NET 10 SDK or later
 ### C# CLI Usage Examples
 
 ```bash
-# Inference with model name (auto-download supported in the source/next resolver;
-# released 2.0.0/2.0.1 do not add new model aliases)
+# Inference with model name (auto-download). A source build includes the
+# `base` / `zero-shot-base-zs-v1` aliases; released NuGet PiperPlus.Cli 0.5.1 does not
 piper-plus --model tsukuyomi --text "こんにちは" --language ja
 
 # English

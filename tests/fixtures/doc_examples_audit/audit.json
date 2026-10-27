@@ -4,8 +4,8 @@
   "totals": {
     "executable": 234,
     "needs_placeholder": 7,
-    "skip_warranted": 236,
-    "total": 477
+    "skip_warranted": 235,
+    "total": 476
   },
   "by_language": {
     "bash": {
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 191
+      "skip_warranted": 190
     },
     "wasm": {
       "executable": 10,
@@ -296,8 +296,8 @@
     },
     {
       "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
-      "line_start": 81,
-      "line_end": 142,
+      "line_start": 83,
+      "line_end": 144,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -309,8 +309,8 @@
     },
     {
       "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
-      "line_start": 174,
-      "line_end": 177,
+      "line_start": 176,
+      "line_end": 179,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -322,8 +322,8 @@
     },
     {
       "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
-      "line_start": 197,
-      "line_end": 219,
+      "line_start": 199,
+      "line_end": 221,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -335,8 +335,8 @@
     },
     {
       "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
-      "line_start": 245,
-      "line_end": 248,
+      "line_start": 247,
+      "line_end": 250,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -348,8 +348,8 @@
     },
     {
       "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
-      "line_start": 271,
-      "line_end": 276,
+      "line_start": 273,
+      "line_end": 278,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -363,8 +363,8 @@
     },
     {
       "file": "docs/design/hf-space-zero-shot-demo-plan-2026-10-17.md",
-      "line_start": 314,
-      "line_end": 317,
+      "line_start": 316,
+      "line_end": 319,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -806,8 +806,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 114,
-      "line_end": 128,
+      "line_start": 115,
+      "line_end": 129,
       "language_raw": "javascript",
       "language": "wasm",
       "category": "executable",
@@ -819,8 +819,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 132,
-      "line_end": 134,
+      "line_start": 133,
+      "line_end": 135,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -828,12 +828,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "67bc36a8f75694afcde36c290dfc84377cdddd20"
+      "hash_sha1": "142a0a1d387dc934c5cb0e9775abed058d28eb34"
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 142,
-      "line_end": 145,
+      "line_start": 143,
+      "line_end": 146,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -845,8 +845,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 149,
-      "line_end": 152,
+      "line_start": 150,
+      "line_end": 153,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -858,8 +858,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 156,
-      "line_end": 159,
+      "line_start": 157,
+      "line_end": 160,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -871,8 +871,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 167,
-      "line_end": 180,
+      "line_start": 168,
+      "line_end": 181,
       "language_raw": "javascript",
       "language": "wasm",
       "category": "executable",
@@ -884,8 +884,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 186,
-      "line_end": 189,
+      "line_start": 187,
+      "line_end": 190,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -897,8 +897,8 @@
     },
     {
       "file": "docs/features/phoneme-timing.md",
-      "line_start": 195,
-      "line_end": 199,
+      "line_start": 196,
+      "line_end": 200,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -1705,8 +1705,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 451,
-      "line_end": 453,
+      "line_start": 453,
+      "line_end": 455,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1834,7 +1834,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "0341c6aa2e096b2a8db6d59176a60d17d7b981e9"
+      "hash_sha1": "2c0ae9843b298a98c00720093343565926a97a29"
     },
     {
       "file": "docs/guides/development/adding-pua-codepoint.md",
@@ -1853,8 +1853,8 @@
     },
     {
       "file": "docs/guides/development/adding-pua-codepoint.md",
-      "line_start": 71,
-      "line_end": 78,
+      "line_start": 72,
+      "line_end": 79,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -1866,8 +1866,8 @@
     },
     {
       "file": "docs/guides/development/adding-pua-codepoint.md",
-      "line_start": 84,
-      "line_end": 86,
+      "line_start": 85,
+      "line_end": 87,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1879,8 +1879,8 @@
     },
     {
       "file": "docs/guides/development/adding-pua-codepoint.md",
-      "line_start": 106,
-      "line_end": 108,
+      "line_start": 107,
+      "line_end": 109,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1894,8 +1894,8 @@
     },
     {
       "file": "docs/guides/development/adding-pua-codepoint.md",
-      "line_start": 112,
-      "line_end": 124,
+      "line_start": 113,
+      "line_end": 125,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1920,8 +1920,8 @@
     },
     {
       "file": "docs/guides/development/building-from-source.md",
-      "line_start": 28,
-      "line_end": 34,
+      "line_start": 29,
+      "line_end": 35,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1933,8 +1933,8 @@
     },
     {
       "file": "docs/guides/development/building-from-source.md",
-      "line_start": 44,
-      "line_end": 50,
+      "line_start": 45,
+      "line_end": 51,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1946,8 +1946,8 @@
     },
     {
       "file": "docs/guides/development/building-from-source.md",
-      "line_start": 56,
-      "line_end": 82,
+      "line_start": 57,
+      "line_end": 83,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1955,12 +1955,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "96fd2ffb7000bae86917d4f017d48ee183c2455c"
+      "hash_sha1": "b2f22e6200be155c9a5da070001cf403081f2b48"
     },
     {
       "file": "docs/guides/development/building-from-source.md",
-      "line_start": 86,
-      "line_end": 112,
+      "line_start": 87,
+      "line_end": 113,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1972,8 +1972,8 @@
     },
     {
       "file": "docs/guides/development/building-from-source.md",
-      "line_start": 118,
-      "line_end": 125,
+      "line_start": 119,
+      "line_end": 126,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1985,8 +1985,8 @@
     },
     {
       "file": "docs/guides/development/building-from-source.md",
-      "line_start": 131,
-      "line_end": 133,
+      "line_start": 132,
+      "line_end": 134,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2061,12 +2061,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "d3fd93d303661e4a17a07ddb361dab0f1b02c2e8"
+      "hash_sha1": "61e315bbb1cab5c890466ba9903a850fa56f0934"
     },
     {
       "file": "docs/guides/development/cli-usage.md",
-      "line_start": 138,
-      "line_end": 141,
+      "line_start": 143,
+      "line_end": 146,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2080,8 +2080,8 @@
     },
     {
       "file": "docs/guides/development/cli-usage.md",
-      "line_start": 145,
-      "line_end": 148,
+      "line_start": 150,
+      "line_end": 153,
       "language_raw": "cmd",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2096,7 +2096,7 @@
     {
       "file": "docs/guides/development/pretrained-models.md",
       "line_start": 35,
-      "line_end": 40,
+      "line_end": 43,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2104,12 +2104,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "49e02e9fc7579aa6a163c3b96cc4bdecf42ec31a"
+      "hash_sha1": "b242739974d21e18266a71de3399a1e6870ae153"
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 94,
-      "line_end": 98,
+      "line_start": 97,
+      "line_end": 101,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2123,8 +2123,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 102,
-      "line_end": 106,
+      "line_start": 105,
+      "line_end": 109,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2136,8 +2136,8 @@
     },
     {
       "file": "docs/guides/development/python-release-2.0.2.md",
-      "line_start": 31,
-      "line_end": 36,
+      "line_start": 38,
+      "line_end": 43,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2742,8 +2742,8 @@
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 246,
-      "line_end": 258,
+      "line_start": 247,
+      "line_end": 259,
       "language_raw": "json",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2757,8 +2757,8 @@
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 264,
-      "line_end": 268,
+      "line_start": 265,
+      "line_end": 269,
       "language_raw": "json",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2772,8 +2772,8 @@
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 276,
-      "line_end": 278,
+      "line_start": 277,
+      "line_end": 279,
       "language_raw": "json",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2787,8 +2787,8 @@
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 288,
-      "line_end": 290,
+      "line_start": 289,
+      "line_end": 291,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2800,8 +2800,8 @@
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 294,
-      "line_end": 296,
+      "line_start": 295,
+      "line_end": 297,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2813,8 +2813,8 @@
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 305,
-      "line_end": 307,
+      "line_start": 306,
+      "line_end": 308,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2826,8 +2826,8 @@
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 315,
-      "line_end": 317,
+      "line_start": 316,
+      "line_end": 318,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2839,8 +2839,8 @@
     },
     {
       "file": "docs/guides/integration/open-webui-integration.md",
-      "line_start": 325,
-      "line_end": 332,
+      "line_start": 326,
+      "line_end": 333,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2861,12 +2861,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "d1578d7faaf2bc1d7f3e0856048c2292ccdbfab5"
+      "hash_sha1": "9112b1d0cfb26fc7c7311d9786eb6dbb0caf2cb0"
     },
     {
       "file": "docs/guides/integration/wasm-bundler-guide.md",
-      "line_start": 17,
-      "line_end": 28,
+      "line_start": 19,
+      "line_end": 30,
       "language_raw": "js",
       "language": "wasm",
       "category": "executable",
@@ -2878,8 +2878,8 @@
     },
     {
       "file": "docs/guides/integration/wasm-bundler-guide.md",
-      "line_start": 34,
-      "line_end": 36,
+      "line_start": 36,
+      "line_end": 38,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2891,8 +2891,8 @@
     },
     {
       "file": "docs/guides/integration/wasm-bundler-guide.md",
-      "line_start": 40,
-      "line_end": 47,
+      "line_start": 42,
+      "line_end": 49,
       "language_raw": "js",
       "language": "wasm",
       "category": "executable",
@@ -2904,8 +2904,8 @@
     },
     {
       "file": "docs/guides/integration/wasm-bundler-guide.md",
-      "line_start": 53,
-      "line_end": 71,
+      "line_start": 55,
+      "line_end": 73,
       "language_raw": "js",
       "language": "wasm",
       "category": "executable",
@@ -2917,8 +2917,8 @@
     },
     {
       "file": "docs/guides/integration/wasm-bundler-guide.md",
-      "line_start": 75,
-      "line_end": 84,
+      "line_start": 77,
+      "line_end": 86,
       "language_raw": "js",
       "language": "wasm",
       "category": "executable",
@@ -2930,8 +2930,8 @@
     },
     {
       "file": "docs/guides/integration/wasm-bundler-guide.md",
-      "line_start": 103,
-      "line_end": 106,
+      "line_start": 105,
+      "line_end": 108,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3130,7 +3130,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "648327e84100d588f3f263b4983ec4db18bffb89"
+      "hash_sha1": "71807bd3752a85d620154220bbc69117f720ce3c"
     },
     {
       "file": "docs/guides/platform/ios-integration.md",
@@ -3319,7 +3319,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "3c14a1836a400e8571f803b908cb3d5c0cbd9c8d"
+      "hash_sha1": "eda2f4ae6a9e69c4fa8330cdf7a34a4d5360b084"
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
@@ -3332,7 +3332,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "90009afada9bec8e585b7d06ea25b92c69c1a7ca"
+      "hash_sha1": "e5ff1514a67c697a2ad3723d2a61af57c6c47846"
     },
     {
       "file": "docs/guides/platform/swift-g2p-integration.md",
@@ -3519,8 +3519,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 62,
-      "line_end": 64,
+      "line_start": 68,
+      "line_end": 70,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -3532,8 +3532,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 68,
-      "line_end": 70,
+      "line_start": 74,
+      "line_end": 76,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -3545,8 +3545,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 74,
-      "line_end": 77,
+      "line_start": 80,
+      "line_end": 83,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -3558,8 +3558,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 164,
-      "line_end": 166,
+      "line_start": 177,
+      "line_end": 179,
       "language_raw": "csv",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3573,8 +3573,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 172,
-      "line_end": 174,
+      "line_start": 185,
+      "line_end": 187,
       "language_raw": "csv",
       "language": "unknown",
       "category": "skip_warranted",
@@ -3588,8 +3588,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 183,
-      "line_end": 191,
+      "line_start": 196,
+      "line_end": 204,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -3601,8 +3601,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 205,
-      "line_end": 211,
+      "line_start": 218,
+      "line_end": 224,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -3614,8 +3614,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 217,
-      "line_end": 223,
+      "line_start": 230,
+      "line_end": 236,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -3627,8 +3627,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 229,
-      "line_end": 233,
+      "line_start": 242,
+      "line_end": 246,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -3640,8 +3640,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 248,
-      "line_end": 258,
+      "line_start": 261,
+      "line_end": 271,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -3653,23 +3653,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 269,
-      "line_end": 276,
-      "language_raw": "dockerfile",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "326cd401516ca6f67c2b147615580e6f21a3dce0"
-    },
-    {
-      "file": "docs/guides/training/training-guide.md",
-      "line_start": 280,
-      "line_end": 293,
+      "line_start": 289,
+      "line_end": 304,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -3677,12 +3662,12 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "0d5a41a4ddd6ebfada36342836adc8b7d878426c"
+      "hash_sha1": "610ee8fad4c4e8d8ae13eba1df69fb2f404c85fe"
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 313,
-      "line_end": 328,
+      "line_start": 333,
+      "line_end": 348,
       "language_raw": "sh",
       "language": "bash",
       "category": "needs_placeholder",
@@ -3696,8 +3681,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 354,
-      "line_end": 362,
+      "line_start": 374,
+      "line_end": 382,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -3709,8 +3694,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 397,
-      "line_end": 403,
+      "line_start": 417,
+      "line_end": 423,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -3724,8 +3709,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 414,
-      "line_end": 426,
+      "line_start": 434,
+      "line_end": 446,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -3739,8 +3724,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 432,
-      "line_end": 449,
+      "line_start": 452,
+      "line_end": 469,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -3754,8 +3739,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 479,
-      "line_end": 489,
+      "line_start": 499,
+      "line_end": 509,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -3769,8 +3754,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 493,
-      "line_end": 508,
+      "line_start": 513,
+      "line_end": 528,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -3781,12 +3766,12 @@
         "/data/piper/",
         "CUDA_VISIBLE_DEVICES"
       ],
-      "hash_sha1": "8357a47af1134179dd1408cd1928f3ca334941ac"
+      "hash_sha1": "83ec7a244297238c45edd8a27481152bfa9b51e0"
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 536,
-      "line_end": 549,
+      "line_start": 556,
+      "line_end": 569,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -3798,8 +3783,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 576,
-      "line_end": 590,
+      "line_start": 596,
+      "line_end": 610,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -3811,8 +3796,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 628,
-      "line_end": 632,
+      "line_start": 648,
+      "line_end": 652,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -3826,8 +3811,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 636,
-      "line_end": 641,
+      "line_start": 656,
+      "line_end": 661,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -3841,8 +3826,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 647,
-      "line_end": 654,
+      "line_start": 667,
+      "line_end": 674,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -3856,8 +3841,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 660,
-      "line_end": 667,
+      "line_start": 680,
+      "line_end": 687,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -3869,8 +3854,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 674,
-      "line_end": 695,
+      "line_start": 694,
+      "line_end": 715,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -3884,8 +3869,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 711,
-      "line_end": 718,
+      "line_start": 731,
+      "line_end": 738,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -3899,8 +3884,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 722,
-      "line_end": 729,
+      "line_start": 742,
+      "line_end": 749,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -3914,8 +3899,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 733,
-      "line_end": 740,
+      "line_start": 753,
+      "line_end": 760,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -3929,8 +3914,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 744,
-      "line_end": 751,
+      "line_start": 764,
+      "line_end": 771,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -3944,8 +3929,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 755,
-      "line_end": 762,
+      "line_start": 775,
+      "line_end": 782,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -3959,8 +3944,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 766,
-      "line_end": 773,
+      "line_start": 786,
+      "line_end": 793,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -3974,8 +3959,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 777,
-      "line_end": 784,
+      "line_start": 797,
+      "line_end": 804,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -3989,8 +3974,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 791,
-      "line_end": 793,
+      "line_start": 811,
+      "line_end": 813,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4002,8 +3987,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 806,
-      "line_end": 812,
+      "line_start": 826,
+      "line_end": 832,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -4017,8 +4002,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 836,
-      "line_end": 842,
+      "line_start": 856,
+      "line_end": 862,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4030,8 +4015,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 857,
-      "line_end": 861,
+      "line_start": 877,
+      "line_end": 881,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4045,8 +4030,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 865,
-      "line_end": 873,
+      "line_start": 885,
+      "line_end": 893,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4058,8 +4043,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 891,
-      "line_end": 898,
+      "line_start": 911,
+      "line_end": 918,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4071,8 +4056,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 914,
-      "line_end": 918,
+      "line_start": 934,
+      "line_end": 938,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -4086,8 +4071,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 922,
-      "line_end": 927,
+      "line_start": 942,
+      "line_end": 947,
       "language_raw": "sh",
       "language": "bash",
       "category": "skip_warranted",
@@ -4101,8 +4086,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 933,
-      "line_end": 949,
+      "line_start": 953,
+      "line_end": 969,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4114,8 +4099,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 964,
-      "line_end": 967,
+      "line_start": 984,
+      "line_end": 987,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4127,8 +4112,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 997,
-      "line_end": 1004,
+      "line_start": 1019,
+      "line_end": 1026,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4140,8 +4125,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 1017,
-      "line_end": 1023,
+      "line_start": 1039,
+      "line_end": 1045,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4153,8 +4138,8 @@
     },
     {
       "file": "docs/guides/training/training-guide.md",
-      "line_start": 1038,
-      "line_end": 1047,
+      "line_start": 1060,
+      "line_end": 1069,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -4686,8 +4671,8 @@
     },
     {
       "file": "docs/migration/README.md",
-      "line_start": 48,
-      "line_end": 53,
+      "line_start": 50,
+      "line_end": 55,
       "language_raw": "markdown",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5551,8 +5536,8 @@
     },
     {
       "file": "docs/reference/ort-versions.md",
-      "line_start": 129,
-      "line_end": 134,
+      "line_start": 136,
+      "line_end": 141,
       "language_raw": "toml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6560,8 +6545,8 @@
     },
     {
       "file": "docs/reference/zh-en-loanword/rust.md",
-      "line_start": 121,
-      "line_end": 128,
+      "line_start": 123,
+      "line_end": 130,
       "language_raw": "rust",
       "language": "rust",
       "category": "executable",

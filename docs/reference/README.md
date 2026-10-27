@@ -30,11 +30,11 @@ piper-plus の **設計書 / 運用 SOP / テストマトリクス** の目次�
 | 文書 | パス | 用途 |
 |------|------|------|
 | PUA テストマトリクス | [`pua-test-matrix.md`](pua-test-matrix.md) | 7 ソースの固定 PUA 99 エントリと回帰テスト。学習済みモデルの 173 シンボルとは別の件数 |
-| Mutation Testing | [`mutation-testing.md`](mutation-testing.md) | Python/Rust/C# (baseline 計測中) |
+| Mutation Testing | [`mutation-testing.md`](mutation-testing.md) | Python/Rust/C# (2026-10-25 実測、`break` score は [`mutation-testing.toml`](../spec/mutation-testing.toml)) |
 
 ## CLI Help Snapshots
 
-実際のヘルプ出力を保存した参照です。最新の利用方法は各ランタイムの README と実行ファイルの `--help` を参照してください。抽出・正規化は [CLI Help Extract](../../.github/workflows/cli-help-extract.yml) と [sanitizer](../../scripts/sanitize_cli_help.py) で管理します。現行 workflow の C++ 自動ビルド・抽出は未実装のため、C++ の参照更新には検証済みビルドからの取得が必要です。
+実際のヘルプ出力を保存した参照です。最新の利用方法は各ランタイムの README と実行ファイルの `--help` を参照してください。抽出・正規化は [CLI Help Extract](../../.github/workflows/cli-help-extract.yml) と [sanitizer](../../scripts/sanitize_cli_help.py) で管理します。C++ を含む 6 ランタイムとも同 workflow の Linux 取得 (artifact `cli-help-<runtime>-<run_id>`) を正本とし、ローカル (Windows / 日本語ロケール) で取得した出力では更新しません。
 
 - [Python](cli-help/python.txt)
 - [C++](cli-help/cpp.txt)

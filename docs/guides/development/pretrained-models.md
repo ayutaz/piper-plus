@@ -36,7 +36,10 @@ the public Tsukuyomi zs-v1 fine-tune using the explicit URLs above.
 mkdir -p models/tsukuyomi-zs-v1
 curl -fL -o models/tsukuyomi-zs-v1/tsukuyomi.onnx https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1/tsukuyomi.onnx
 curl -fL -o models/tsukuyomi-zs-v1/tsukuyomi.onnx.json https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1/tsukuyomi.onnx.json
+# C++ / Go CLI (`piper-plus` binary from GitHub Releases)
 piper-plus --model models/tsukuyomi-zs-v1/tsukuyomi.onnx --config models/tsukuyomi-zs-v1/tsukuyomi.onnx.json --output-file output.wav --text "こんにちは。今日は良い天気ですね。"
+# Python CLI (`pip install "piper-plus[cpu]"`): no --text option; pass text on stdin
+echo "こんにちは。今日は良い天気ですね。" | piper-plus --model models/tsukuyomi-zs-v1/tsukuyomi.onnx --config models/tsukuyomi-zs-v1/tsukuyomi.onnx.json --output-file output.wav
 ```
 
 **Inference Models (ready to use):**
@@ -130,7 +133,7 @@ High-quality Japanese speech synthesis with OpenJTalk integration. The dictionar
 | `PIPER_PLUS_AUTO_DOWNLOAD_DICT` | Set to `0` to disable auto-download |
 | `PIPER_PLUS_OFFLINE_MODE` | Set to `1` for offline mode |
 
-See the Japanese Usage Guide and [Phoneme Mapping Reference](../../api-reference/phoneme-mapping.md).
+See the [Environment Variables reference](../../getting-started/environment-variables.md) and [Phoneme Mapping Reference](../../api-reference/phoneme-mapping.md).
 
 ---
 

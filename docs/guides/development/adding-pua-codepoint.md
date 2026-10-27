@@ -8,7 +8,7 @@
 
 ```text
 [1] pua.json 編集     ← canonical source
-[2] 6 ランタイムのテーブル更新
+[2] 7 ランタイムのテーブル更新
 [3] inventory に登録
 [4] fixture 再生成
 [5] PUA_COMPAT_VERSION bump (必要時)
@@ -48,7 +48,7 @@
 - 既存 entry を **削除しない** (古いモデルとの互換性)
 - version は **下げない**
 
-### 2. 6 ランタイムのテーブルを更新
+### 2. 7 ランタイムのテーブルを更新
 
 `pua.json` を canonical として、以下を **byte-for-byte 一致** させる:
 
@@ -61,6 +61,7 @@
 | JS / WASM | `src/wasm/g2p/src/pua-map.js` |
 | C# | `src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs` |
 | C++ | `src/cpp/phoneme_parser.cpp` |
+| Swift | `Sources/PiperPlusG2P/PUAMap.swift` |
 
 挿入位置は既存 entry の並び (codepoint 昇順) に合わせる。
 
@@ -127,7 +128,7 @@ python scripts/regenerate_test_fixture.py --check
 
 CI が:
 
-- `PUA Consistency Gate` workflow (6 jobs: cross-runtime, inventory, fixture drift, Rust/Go/JS PUA tests, pre-flight)
+- `PUA Consistency Gate` workflow (8 jobs: cross-runtime (Ubuntu / macOS / Windows), inventory, fixture drift, Rust/Go/JS PUA tests, pre-flight config validator, distributed (HF) config validator)
 - `cross-platform consistency` workflow (Python/Rust/Go/JS/C# 出力比較)
 - 各ランタイムの個別 test suite
 
@@ -136,11 +137,11 @@ CI が:
 ## チェックリスト (PR レビュー時)
 
 - [ ] `pua.json` の codepoint が **既存 entry を変更/削除していない**
-- [ ] 6 ランタイム全てのテーブルに同じ entry が追加されている
+- [ ] 7 ランタイム全てのテーブルに同じ entry が追加されている
 - [ ] `id_maps.py` の inventory に該当言語の entry が追加されている
 - [ ] fixture が `regenerate_test_fixture.py` で再生成済み (手動編集していない)
 - [ ] `PUA_COMPAT_VERSION` が必要に応じて bump されている (4 箇所すべて)
-- [ ] CI の `PUA Consistency Gate` 全 6 jobs が green
+- [ ] CI の `PUA Consistency Gate` 全 8 jobs が green
 
 ## トラブルシューティング
 

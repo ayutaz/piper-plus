@@ -24,8 +24,12 @@ const { tokens } = g2p.phonemize('Hello, world!', { language: 'en' });
 import { Encoder } from '@piper-plus/g2p/encode';
 const config = await fetch('/path/to/model.onnx.json').then((r) => r.json());
 const encoder = new Encoder(config.phoneme_id_map);
-const ids = encoder.encode(tokens);
+const { phonemeIds, droppedSymbols } = encoder.encode(tokens);
 ```
+
+`encode()` returns an object, not an array. `droppedSymbols` lists tokens that
+have no entry in `phoneme_id_map` and were skipped; it is added after 0.4.2
+(0.4.2 returns `{ phonemeIds }` only).
 
 Japanese additionally requires an OpenJTalk WASM module supplied by the
 application and the dictionary data loaded by `DictLoader`:
@@ -121,7 +125,15 @@ string, e.g. `{ hello: 'HH AH0 L OW1' }`).
 
 Creates and initializes a G2P instance.
 
-- `options.languages` -- Array of language codes to load (default: all)
+- `options.languages` -- Array of language codes to load (default: all 8)
+- `options.openjtalkModule` -- OpenJTalk WASM module supplied by the
+  application (required for Japanese)
+- `options.jaDict` -- Japanese dictionary data from `DictLoader.loadJaDict()`
+- `options.customDicts` -- `CustomDictionary` instances applied before
+  phonemization
+- `options.cmuDict` -- English dictionary (lowercase word -> ARPAbet string)
+  used instead of the bundled CMU dictionary (optional; see
+  [English dictionary](#english-dictionary))
 - `options.pinyinDict` -- Pinyin dictionaries for Chinese, `{ single, phrases }`
   (optional; see [Chinese](#chinese))
 - Returns: `Promise<G2P>`
@@ -165,7 +177,9 @@ Returns `{ tokens, prosody, language }` with per-token prosody features
 
 ### `Encoder.encode(tokens)`
 
-Encodes IPA tokens to Piper-compatible phoneme IDs with BOS/EOS/padding.
+Encodes IPA tokens to Piper-compatible phoneme IDs with BOS/EOS/padding and
+returns `{ phonemeIds, droppedSymbols }` (`droppedSymbols` is added after
+0.4.2). `encodeWithProsody(tokens, prosody)` also returns `prosodyFlat`.
 
 ## Cross-Platform Consistency
 
@@ -176,16 +190,19 @@ Also available as:
 - **Go**: `go get github.com/ayutaz/piper-plus/src/go/phonemize`
 
 The current runtime export uses PUA compatibility version 2 and is validated
-against a common test fixture. The `pua_compat_version` field in this checkout's
-package metadata is still `1`; package metadata must be synchronized before a
+against a common test fixture. The `pua_compat_version` field in `package.json` is
+still `1` (also in the published 0.4.2); it must be synchronized before a
 release that relies on that field.
 
 ## Zero Dependencies
 
-@piper-plus/g2p has **zero npm runtime dependencies** for rule-based
-languages (EN, ZH, KO, ES, FR, PT, SV). Only Japanese requires the bundled
-OpenJTalk WASM binary. This eliminates the most common vector for
-supply chain attacks in the JavaScript ecosystem.
+@piper-plus/g2p has **zero npm runtime dependencies**. EN, ZH, KO, ES, FR,
+PT, and SV need nothing outside the package. Japanese needs an OpenJTalk WASM
+module supplied by the application and the dictionary loaded by `DictLoader`;
+the package does not bundle an OpenJTalk WASM binary (the Emscripten build was
+retired, and 0.4.2 removed the stale `dist/openjtalk.*` entries). This
+eliminates the most common vector for supply chain attacks in the JavaScript
+ecosystem.
 
 ## License
 
