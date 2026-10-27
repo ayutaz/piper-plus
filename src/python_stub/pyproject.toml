@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,16 +8,16 @@ dynamic = ["version"]
 description = "This package has been renamed to piper-plus. Install piper-plus instead."
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "yousan", email = "rabbitcats77@gmail.com"},
 ]
-dependencies = ["piper-plus"]
+# 2.0.2 is the first piper-plus with the cpu / gpu provider extras relayed below.
+dependencies = ["piper-plus>=2.0.2"]
 classifiers = [
     "Development Status :: 7 - Inactive",
     "Intended Audience :: Developers",
     "Topic :: Text Processing :: Linguistic",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
