@@ -17,14 +17,17 @@
 // # PUA (Private Use Area) Encoding
 //
 // Multi-character phoneme tokens (e.g., "tʃ", "N_m", "tone1") are
-// mapped to single Unicode codepoints in the Private Use Area (U+E000-U+E058)
-// via [RegisterToken]. This ensures compatibility with ONNX model input format.
+// mapped to single Unicode codepoints in the Private Use Area via
+// [RegisterToken]. Known tokens use the fixed table (U+E000-U+E064, see
+// docs/spec/pua-contract.toml); an unknown multi-character token is given the
+// next free codepoint from U+E065 upward. This ensures compatibility with ONNX
+// model input format.
 //
 // # Custom Dictionary
 //
 // [CustomDictionary] allows overriding phonemization for specific words.
-// Use [LoadDictFile] to load dictionary files and [WrapPhonemizer] to
-// create a dictionary-aware phonemizer.
+// Use [LoadDictFile] to load dictionary files and
+// [CustomDictionary.WrapPhonemizer] to create a dictionary-aware phonemizer.
 //
 // # Usage
 //
