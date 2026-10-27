@@ -59,6 +59,28 @@ def test_no_multispeaker_checkpoint_leaves_freeze_dp_false():
     assert args.freeze_dp is False
 
 
+@pytest.mark.unit
+@pytest.mark.parametrize("saved", [True, False])
+def test_resume_keeps_the_checkpoint_freeze_dp(tmp_path, saved):
+    """Resuming a run restores its optimizer, which only fits the same params.
+
+    A fine-tuning run (freeze_dp auto-enabled) resumed with
+    --resume_from_checkpoint alone put the DP parameters back into the
+    optimizer, and Lightning stopped: "loaded state dict contains a parameter
+    group that doesn't match the size of optimizer's group".
+    """
+    checkpoint = tmp_path / "last.ckpt"
+    torch.save({"hyper_parameters": {"freeze_dp": saved}, "state_dict": {}}, checkpoint)
+    args = argparse.Namespace(
+        resume_from_checkpoint=str(checkpoint),
+        resume_from_multispeaker_checkpoint=None,
+        freeze_dp=False,
+        gin_channels=0,
+    )
+    apply_transfer_defaults(args, num_speakers=1, num_languages=1)
+    assert args.freeze_dp is saved
+
+
 # ---------------------------------------------------------------------------
 # Test 2: freeze_dp is set before model creation (order verification)
 # ---------------------------------------------------------------------------

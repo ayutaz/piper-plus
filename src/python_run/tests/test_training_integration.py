@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Integration tests for training functionality"""
 
+import contextlib
 import importlib.util
+import json
 import sys
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -47,6 +50,28 @@ class TestTrainingIntegration:
         """Create a minimal test dataset"""
         dataset_dir = tmp_path / "test_dataset"
         dataset_dir.mkdir()
+
+        # The WebUI starts piper_train only on a preprocessed dataset.
+        (dataset_dir / "config.json").write_text(
+            json.dumps(
+                {
+                    "audio": {"sample_rate": 22050},
+                    "language": {"code": "en"},
+                    "num_symbols": 3,
+                    "num_speakers": 1,
+                    "phoneme_id_map": {"_": [0], "^": [1], "$": [2]},
+                }
+            ),
+            encoding="utf-8",
+        )
+        (dataset_dir / "dataset.jsonl").write_text(
+            "".join(
+                json.dumps({"phoneme_ids": [1, 0, 2], "audio_norm_path": f"{i}.pt"})
+                + "\n"
+                for i in range(3)
+            ),
+            encoding="utf-8",
+        )
 
         # Create metadata.csv
         metadata_file = dataset_dir / "metadata.csv"
@@ -228,17 +253,25 @@ class TestTrainingIntegration:
             mock_check.return_value = []  # No missing dependencies
 
             with patch("piper_plus.training_manager.subprocess.Popen") as mock_popen:
-                # Mock successful process
+                # Mock a running process: readline blocks until terminate().
+                # An immediate EOF let the monitor thread end the run before
+                # the status check below.
+                stopped = threading.Event()
                 mock_process = Mock()
                 mock_process.poll.return_value = None
-                mock_process.stdout.readline.return_value = ""
+                mock_process.returncode = 0
+                mock_process.stdout.readline.side_effect = lambda: (
+                    stopped.wait(timeout=10),
+                    "",
+                )[1]
+                mock_process.terminate.side_effect = stopped.set
                 mock_popen.return_value = mock_process
 
                 # Start training via WebUI
                 result = start_training(
                     dataset_path=str(create_test_dataset),
-                    base_model="New Model",
-                    num_speakers=1,
+                    start_mode="new",
+                    checkpoint_path=None,
                     quality="x-low",
                     batch_size=1,
                     learning_rate=1e-4,
@@ -268,28 +301,39 @@ class TestTrainingIntegration:
     )
     def test_concurrent_training_prevention(self, create_test_dataset, tmp_path):
         """Test that concurrent training is prevented"""
-        from piper_plus.webui import start_training
+        from piper_plus.webui import start_training, stop_training
 
         with patch("piper_plus.training_manager.subprocess.Popen") as mock_popen:
-            import threading as _threading
-
-            gate = _threading.Event()
+            gate = threading.Event()
             mock_process = Mock()
             mock_process.poll.return_value = None  # Process is running
+            mock_process.returncode = 0
             # Block readline until the gate is released so the first training's
             # monitor thread keeps is_running=True (avoids immediate-EOF race).
-            mock_process.stdout.readline.side_effect = lambda: (gate.wait(), "")[1]
+            # The gate is released by terminate() and, at the latest, after 10
+            # s: a monitor thread left waiting kept the interpreter from exiting.
+            mock_process.stdout.readline.side_effect = lambda: (
+                gate.wait(timeout=10),
+                "",
+            )[1]
+            mock_process.terminate.side_effect = gate.set
             mock_popen.return_value = mock_process
 
             # Mock dependencies check
-            with patch("piper_plus.webui.check_training_dependencies") as mock_check:
+            with (
+                patch("piper_plus.webui.check_training_dependencies") as mock_check,
+                contextlib.ExitStack() as cleanup,
+            ):
+                # The WebUI's training_manager is module-wide: stop the run so
+                # later tests do not find it running.
+                cleanup.callback(stop_training)
                 mock_check.return_value = []
 
                 # Start first training
                 result1 = start_training(
                     dataset_path=str(create_test_dataset),
-                    base_model="New Model",
-                    num_speakers=1,
+                    start_mode="new",
+                    checkpoint_path=None,
                     quality="x-low",
                     batch_size=1,
                     learning_rate=1e-4,
@@ -304,8 +348,8 @@ class TestTrainingIntegration:
                 # Try to start second training
                 result2 = start_training(
                     dataset_path=str(create_test_dataset),
-                    base_model="New Model",
-                    num_speakers=1,
+                    start_mode="new",
+                    checkpoint_path=None,
                     quality="x-low",
                     batch_size=1,
                     learning_rate=1e-4,

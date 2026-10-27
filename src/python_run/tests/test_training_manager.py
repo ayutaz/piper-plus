@@ -119,7 +119,7 @@ class TestTrainingManager:
         block = threading.Event()
         mock_process = MagicMock()
         mock_process.poll.return_value = None  # Process is running
-        mock_process.stdout.readline.side_effect = lambda: (block.wait() and "") or ""
+        mock_process.stdout.readline.side_effect = lambda: (block.wait(timeout=10) and "") or ""
         mock_process.returncode = 0
         mock_popen.return_value = mock_process
 
@@ -164,6 +164,118 @@ class TestTrainingManager:
         # Unblock the monitor thread so it can clean up
         block.set()
 
+    @pytest.mark.parametrize(
+        ("start_mode", "flag"),
+        [
+            ("resume", "--resume_from_checkpoint"),
+            ("finetune", "--resume-from-multispeaker-checkpoint"),
+        ],
+    )
+    @patch("piper_plus.training_manager.subprocess.Popen")
+    def test_start_mode_selects_the_checkpoint_flag(
+        self, mock_popen, manager, test_dataset, tmp_path, start_mode, flag
+    ):
+        """Resume continues a run; fine-tuning loads a multi-speaker base.
+
+        The WebUI used to pass the display name of an ONNX voice to
+        --resume_from_checkpoint, and had no way to fine-tune.
+        """
+        block = threading.Event()
+        mock_process = MagicMock()
+        mock_process.poll.return_value = None
+        mock_process.stdout.readline.side_effect = lambda: (block.wait(timeout=10) and "") or ""
+        mock_popen.return_value = mock_process
+        checkpoint = tmp_path / "base.ckpt"
+        checkpoint.touch()
+
+        assert manager.start_training(
+            dataset_path=str(test_dataset),
+            output_dir=str(tmp_path / "output"),
+            start_mode=start_mode,
+            checkpoint_path=str(checkpoint),
+        )
+
+        cmd = mock_popen.call_args[0][0]
+        assert cmd[cmd.index(flag) + 1] == str(checkpoint.resolve())
+        other_flags = {
+            "--resume_from_checkpoint",
+            "--resume-from-multispeaker-checkpoint",
+        } - {flag}
+        assert not other_flags & set(cmd)
+        block.set()
+
+    @patch("piper_plus.training_manager.subprocess.Popen")
+    def test_training_output_is_read_as_utf8(
+        self, mock_popen, manager, test_dataset, tmp_path
+    ):
+        """piper_train logs Japanese text; the locale encoding is not UTF-8 everywhere.
+
+        On Windows (cp932) the progress monitor stopped at the first such line
+        while piper_train kept running.
+        """
+        block = threading.Event()
+        mock_process = MagicMock()
+        mock_process.poll.return_value = None
+        mock_process.stdout.readline.side_effect = lambda: (
+            (block.wait(timeout=10) and "") or ""
+        )
+        mock_popen.return_value = mock_process
+
+        assert manager.start_training(
+            dataset_path=str(test_dataset), output_dir=str(tmp_path / "output")
+        )
+
+        kwargs = mock_popen.call_args.kwargs
+        assert kwargs["encoding"] == "utf-8"
+        assert kwargs["env"]["PYTHONIOENCODING"] == "utf-8"
+        block.set()
+
+    @patch("piper_plus.training_manager.subprocess.Popen")
+    def test_new_model_passes_no_checkpoint(
+        self, mock_popen, manager, test_dataset, tmp_path
+    ):
+        block = threading.Event()
+        mock_process = MagicMock()
+        mock_process.poll.return_value = None
+        mock_process.stdout.readline.side_effect = lambda: (block.wait(timeout=10) and "") or ""
+        mock_popen.return_value = mock_process
+
+        assert manager.start_training(
+            dataset_path=str(test_dataset),
+            output_dir=str(tmp_path / "output"),
+            start_mode="new",
+            checkpoint_path=str(tmp_path / "ignored.ckpt"),
+        )
+
+        cmd = mock_popen.call_args[0][0]
+        assert not {
+            "--resume_from_checkpoint",
+            "--resume-from-multispeaker-checkpoint",
+        } & set(cmd)
+        block.set()
+
+    @pytest.mark.parametrize(
+        ("start_mode", "checkpoint", "error"),
+        [
+            ("resume", None, "needs a .ckpt"),
+            ("finetune", "", "needs a .ckpt"),
+            ("transfer", "base.ckpt", "Unknown start mode"),
+        ],
+    )
+    @patch("piper_plus.training_manager.subprocess.Popen")
+    def test_start_mode_without_a_usable_checkpoint_does_not_start(
+        self, mock_popen, manager, test_dataset, tmp_path, start_mode, checkpoint, error
+    ):
+        assert not manager.start_training(
+            dataset_path=str(test_dataset),
+            output_dir=str(tmp_path / "output"),
+            start_mode=start_mode,
+            checkpoint_path=checkpoint,
+        )
+        assert error in manager.status.error
+        assert not manager.is_running()
+        mock_popen.assert_not_called()
+
     def test_start_training_invalid_dataset(self, manager, tmp_path):
         """Test starting training with invalid dataset path"""
         success = manager.start_training(
@@ -187,7 +299,7 @@ class TestTrainingManager:
             mock_process = MagicMock()
             mock_process.poll.return_value = None
             mock_process.stdout.readline.side_effect = lambda: (
-                (block.wait() and "") or ""
+                (block.wait(timeout=10) and "") or ""
             )
             mock_process.returncode = 0
             mock_popen.return_value = mock_process
@@ -338,7 +450,7 @@ class TestTrainingManager:
         block = threading.Event()
         mock_process = MagicMock()
         mock_process.poll.return_value = None  # Running
-        mock_process.stdout.readline.side_effect = lambda: (block.wait() and "") or ""
+        mock_process.stdout.readline.side_effect = lambda: (block.wait(timeout=10) and "") or ""
         mock_process.returncode = 0
         mock_popen.return_value = mock_process
 
@@ -386,8 +498,8 @@ class TestTrainingWebUIIntegration:
 
         result = start_training(
             dataset_path="/non/existent/path",
-            base_model="New Model",
-            num_speakers=1,
+            start_mode="new",
+            checkpoint_path=None,
             quality="medium",
             batch_size=16,
             learning_rate=1e-4,

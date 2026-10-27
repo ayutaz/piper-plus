@@ -58,8 +58,9 @@ uv run --project environments/webui --no-sync python -m piper_plus.webui \
 
 ### Training Tab (local only, legacy)
 
-- Dataset path validation with structure check
-- Base model selection or new model training
+- Validation of a preprocessed dataset (`config.json` and `dataset.jsonl`):
+  utterance count, speaker count, symbol count, language and sample rate
+- Start: a new model, resuming a run, or fine-tuning from a base model
 - Quality selection (`x-low` / `medium` / `high`, the `piper_train --quality` choices)
 - Training parameters (batch size, learning rate, epochs, checkpoint interval, validation split)
 - Start/Stop controls with real-time log display
@@ -76,22 +77,49 @@ uv run --project environments/webui --no-sync python -m piper_plus.webui \
 | Checkpoint Interval (epochs) | `--checkpoint-epochs` |
 | Validation Split | `--validation-split` |
 | Output Directory | `--default_root_dir` |
-| Base Model (other than `New Model`) | `--resume_from_checkpoint` |
+| Start = Resume training, Checkpoint | `--resume_from_checkpoint` |
+| Start = Fine-tune from a base model, Checkpoint | `--resume-from-multispeaker-checkpoint` |
 
 It also sends `--accelerator auto` and `--devices 1`. The speaker count is
-read from the dataset's `config.json`; the UI's Number of Speakers is not sent.
+read from the dataset's `config.json`.
 
-Limitations:
+Start modes:
 
-- `piper_train` reads a preprocessed dataset directory (`config.json` and
-  `dataset.jsonl`). The tab's validation checks for a raw `metadata.csv`, so
-  preprocess the dataset first and give the preprocessed directory as the
-  Dataset Directory Path.
-- The Base Model list shows the ONNX voices found in the data directory, and
-  the tab passes the selected entry to `--resume_from_checkpoint`, which takes
-  a Lightning `.ckpt` file. Choose `New Model`; to resume or fine-tune, run
-  `piper_train` from the command line as described in the
+- **New model**: trains from scratch.
+- **Resume training**: continues a run from one of its Lightning `.ckpt`
+  files (optimizer state and epoch counter included). The Checkpoint list
+  shows the `.ckpt` files under the Output Directory, newest first. Set
+  Number of Epochs above the epoch the checkpoint reached.
+- **Fine-tune from a base model**: trains a single-speaker voice from a
+  multi-speaker base `.ckpt`, such as the public
+  [`zs-v1` base](../guides/development/pretrained-models.md). `piper_train`
+  loads the weights only (training starts at epoch 0), removes the speaker
+  embedding table and freezes the duration predictor. The learning rate field
+  changes to `2e-5`, the fine-tuning rate of the
   [training guide](../guides/training/training-guide.md).
+
+Before it starts `piper_train`, the tab checks:
+
+- The dataset directory has `config.json` and `dataset.jsonl`. A raw
+  LJSpeech-style folder (`metadata.csv` + `wavs/`) is rejected with the
+  `python -m piper_train.preprocess` command to run first.
+- Resume and fine-tuning get an existing `.ckpt`. An ONNX voice cannot be
+  trained further.
+- Fine-tuning gets a single-speaker dataset (`--single-speaker` at
+  preprocessing).
+- When the base checkpoint has a `config.json` next to it (as
+  `releases/zs-v1` does), the dataset's `phoneme_id_map` equals the base's.
+  Otherwise the tab asks to align the dataset first:
+
+```bash
+uv run python scripts/prepare_single_speaker_finetune.py \
+  --input-dir /path/to/preprocessed/dataset \
+  --base-config /path/to/base/config.json \
+  --output-dir /path/to/aligned/dataset
+```
+
+The same symbol count does not mean the same phoneme IDs; training an
+unaligned dataset maps the phonemes to the wrong embeddings.
 
 Neither WebUI exposes a reference-audio/speaker-embedding input for the public
 `zs-v1/base.onnx`. Use a fixed-voice model for these UI examples; use the
