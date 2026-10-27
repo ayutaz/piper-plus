@@ -25,15 +25,34 @@ def cache_export(value):
     return m.group("fmt").replace("{0}", "${{ " + m.group("arg") + " }}")
 
 
+def pr_load(step):
+    """A pull-request-only build that loads an image for tests and publishes nothing.
+
+    A multi-platform build cannot be loaded into docker, so a job that
+    publishes one may load a single platform from the same builder on a
+    pull request. It pushes nothing, so it cannot change a published digest.
+    """
+    options = step.get("with", {})
+    return (
+        step.get("if", "").strip() == "github.event_name == 'pull_request'"
+        and options.get("push") is False
+        and options.get("load") is True
+    )
+
+
 def check(data):
     errors = []
     scopes = set()
     for name, job in data["jobs"].items():
-        builds = [
+        steps = [
             s
             for s in job["steps"]
             if s.get("uses", "").startswith("docker/build-push-action@")
         ]
+        builds = [s for s in steps if not pr_load(s)]
+        for step in steps:
+            if pr_load(step) and "cache-to" in step.get("with", {}):
+                errors.append(f"{name}: a pull request must not export the cache")
         if not builds:
             continue
         if len(builds) != 1:

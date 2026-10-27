@@ -1225,6 +1225,83 @@ jobs:
           provenance: true
           sbom: true
 
+      # PR only. The build above makes a multi-platform manifest list, which
+      # `load` cannot import, so load the amd64 image from the same builder:
+      # its layers were just built and are reused. These checks moved here
+      # from webui-test.yml, which was disabled and deleted (#912).
+      - name: Load the amd64 image for the PR checks
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@v6.19.2
+        with:
+          context: .
+          file: ./docker/webui/Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: piper-webui:test
+          cache-from: type=gha,scope=build-webui,timeout=2m
+          provenance: false
+          sbom: false
+
+      - name: Container startup test
+        if: github.event_name == 'pull_request'
+        run: |
+          docker run -d --name piper-webui-test -p 7861:7860 \
+            -e GRADIO_ANALYTICS_ENABLED=False \
+            -v ${{ github.workspace }}/test/models:/models:ro \
+            piper-webui:test
+          # Gradio answers on / once the interface is built.
+          for _ in $(seq 1 60); do
+            if [ "$(docker inspect -f '{{.State.Running}}' piper-webui-test)" != true ]; then
+              docker logs piper-webui-test
+              echo "ERROR: the WebUI container exited"
+              exit 1
+            fi
+            if curl -fsS -o /dev/null http://127.0.0.1:7861/; then
+              docker logs piper-webui-test
+              echo "WebUI container startup test passed"
+              docker rm -f piper-webui-test
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs piper-webui-test
+          echo "ERROR: the WebUI did not answer on port 7860 within 120 seconds"
+          exit 1
+
+      - name: Inference test - Japanese and English
+        if: github.event_name == 'pull_request'
+        run: |
+          mkdir -p /tmp/webui-output && chmod 777 /tmp/webui-output
+          docker run --rm \
+            -v ${{ github.workspace }}/test/models:/models:ro \
+            -v /tmp/webui-output:/output \
+            --entrypoint python \
+            piper-webui:test \
+            -c "
+          from app import synthesize
+          import soundfile as sf
+          model = '/models/multilingual-test-medium.onnx'
+          for language, text in [
+              ('ja', 'こんにちは、今日は良い天気ですね。'),
+              ('en', 'Hello, how are you today?'),
+          ]:
+              result = synthesize(text, model, 0, language, 0.4, 1.0, 0.5)
+              assert result is not None, f'synthesize returned None for {language}'
+              sr, audio = result
+              assert len(audio) > sr // 10, f'{language}: only {len(audio)} samples'
+              sf.write(f'/output/test_{language}.wav', audio, sr)
+              print(f'{language} inference OK: {len(audio)} samples, {sr}Hz')
+          "
+          for language in ja en; do
+            FILE_SIZE=$(stat --format=%s "/tmp/webui-output/test_${language}.wav")
+            echo "Output: test_${language}.wav ($FILE_SIZE bytes)"
+            if [ "$FILE_SIZE" -lt 1000 ]; then
+              echo "ERROR: Output file too small ($FILE_SIZE bytes)"
+              exit 1
+            fi
+          done
+
       - name: Install Cosign
         if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/docker-v')
         uses: sigstore/cosign-installer@v3.10.1
