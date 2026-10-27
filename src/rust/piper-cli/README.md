@@ -66,9 +66,15 @@ piper-plus-cli --model models/zs-v1/base.onnx \
 ```
 
 `--reference-audio` additionally requires `--speaker-encoder-model` and lets
-the CLI compute the embedding. A precomputed embedding is preferred when the
-published preprocessing bundle is used. The model's ONNX metadata determines
-the required dimension; legacy models may use a different encoder.
+the CLI compute the embedding. The model's ONNX metadata determines the
+required dimension; legacy models may use a different encoder.
+
+With a 192-dimensional encoder such as `campplus.onnx`, the CLI computes the
+embedding with the zs-v1 recipe (Kaiser resampling, Kaldi fbank, L2
+normalization) and matches the Python embedding (cosine ≥ 0.9999 in CI).
+Releases up to 0.5.3 used the legacy mel front end for every encoder, which
+gives a different embedding for `campplus.onnx` (cosine 0.18); with those,
+pass a precomputed `--speaker-embedding` instead.
 
 The published reference-conditioned example was verified with PyPI
 `piper-plus==2.0.0`. CI run `38189966578` reports six-runtime inference from

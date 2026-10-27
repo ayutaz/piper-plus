@@ -18,7 +18,7 @@
   - `test_japanese.txt` - 日本語のテスト用テキスト
   - `test_english.txt` - 英語のテスト用テキスト
   - `speaker_encoder_golden.json` - Speaker Encoder の mel 前処理の cross-runtime golden（`generate_speaker_encoder_golden.py` で生成）
-  - `kaldi_fbank_golden.json` / `zs_campplus_golden.json` - ブラウザ版 zero-shot 話者 encoder（Kaldi fbank / CAM++）の golden（`generate_kaldi_fbank_golden.py` / `generate_zs_campplus_golden.py` で生成）
+  - `kaldi_fbank_golden.json` / `zs_campplus_golden.json` - zero-shot 話者 encoder（Kaldi fbank / CAM++）の cross-runtime golden（Rust / Go / C# / WASM）（`generate_kaldi_fbank_golden.py` / `generate_zs_campplus_golden.py` で生成）
 
 - `model_resolution_vectors.json` - モデル名解決の cross-runtime テストベクタ（[`docs/reference/model-resolution.md`](../docs/reference/model-resolution.md)）
 - `test_*.py` - Python テスト（Speaker Encoder、音素 ID、言語サンプラー）

@@ -1,10 +1,22 @@
 //! Speaker Encoder for Voice Cloning
 //!
-//! Loads an ECAPA-TDNN speaker encoder ONNX model and extracts speaker
-//! embeddings from audio samples. The embedding can then be passed to
+//! Loads a speaker encoder ONNX model and extracts speaker embeddings from
+//! audio samples. The embedding can then be passed to
 //! `SynthesisRequest::speaker_embedding` for voice cloning synthesis.
 //!
-//! # Mel spectrogram parameters (unified across all runtimes):
+//! Two feature front ends are available ([`SpeakerFrontEnd`]):
+//!
+//! - [`SpeakerFrontEnd::KaldiFbank`]: the recipe the public zs-v1 base's
+//!   CAM++ encoder (192-dim) was verified with: kaiser_best resample to
+//!   16 kHz, Kaldi fbank, mean subtraction, L2-normalized output. See
+//!   [`crate::kaldi_fbank`].
+//! - [`SpeakerFrontEnd::Mel`]: the legacy ECAPA-TDNN (256-dim) contract
+//!   below.
+//!
+//! [`SpeakerEncoder::new`] picks the front end from the model's output
+//! dimension; [`SpeakerEncoder::with_front_end`] sets it explicitly.
+//!
+//! # Legacy mel spectrogram parameters (unified across all runtimes):
 //! - sample_rate: 16000
 //! - n_fft: 400  (Kaldi frame_length=25ms at 16kHz = 400 samples)
 //! - hop_length: 160
@@ -20,6 +32,7 @@ use ort::session::builder::GraphOptimizationLevel;
 use ort::value::Tensor;
 
 use crate::error::PiperError;
+use crate::kaldi_fbank;
 
 /// Mel spectrogram parameters — must match across all runtimes.
 const MEL_SAMPLE_RATE: u32 = 16000;
@@ -29,16 +42,87 @@ const MEL_N_MELS: usize = 80;
 const MEL_FMIN: f32 = 20.0;
 const MEL_FMAX: f32 = 7600.0;
 
-/// Speaker encoder wrapping an ECAPA-TDNN ONNX model.
+/// Embedding dimension of the CAM++ encoder bundled with the public zs-v1
+/// base (`campplus.onnx`).
+pub const CAMPPLUS_EMBEDDING_DIM: usize = 192;
+
+/// Feature front end that turns audio into the encoder's input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpeakerFrontEnd {
+    /// Legacy ECAPA-TDNN mel spectrogram (linear resample, Hann window,
+    /// 400-point DFT, 20-7600 Hz). The output is returned as the model
+    /// produced it.
+    Mel,
+    /// zs-v1 CAM++ recipe: kaiser_best resample, Kaldi fbank, mean
+    /// subtraction. The output is L2-normalized.
+    KaldiFbank,
+}
+
+impl SpeakerFrontEnd {
+    /// Front end for an encoder whose embedding has `dim` values:
+    /// [`SpeakerFrontEnd::KaldiFbank`] for CAM++ (192), otherwise
+    /// [`SpeakerFrontEnd::Mel`].
+    pub fn for_embedding_dim(dim: Option<usize>) -> Self {
+        if dim == Some(CAMPPLUS_EMBEDDING_DIM) {
+            Self::KaldiFbank
+        } else {
+            Self::Mel
+        }
+    }
+}
+
+/// Speaker encoder wrapping a speaker encoder ONNX model.
 pub struct SpeakerEncoder {
     session: Session,
+    front_end: SpeakerFrontEnd,
 }
 
 impl SpeakerEncoder {
     /// Load a speaker encoder model from the given ONNX file path.
+    ///
+    /// The front end follows the model's output dimension (see
+    /// [`SpeakerFrontEnd::for_embedding_dim`]): the zs-v1 CAM++ encoder gets
+    /// [`SpeakerFrontEnd::KaldiFbank`], anything else
+    /// [`SpeakerFrontEnd::Mel`].
     pub fn new(model_path: &Path) -> Result<Self, PiperError> {
+        // Load for the CAM++ front end first; the output dimension decides
+        // whether the legacy optimization level is needed instead.
+        let session = Self::load_session(model_path, SpeakerFrontEnd::KaldiFbank)?;
+        let front_end = SpeakerFrontEnd::for_embedding_dim(output_dim(&session));
+        tracing::info!("Speaker encoder front end: {front_end:?}");
+        if front_end == SpeakerFrontEnd::KaldiFbank {
+            return Ok(Self { session, front_end });
+        }
+        drop(session);
+        Self::with_front_end(model_path, front_end)
+    }
+
+    /// Load a speaker encoder model with an explicit front end.
+    pub fn with_front_end(
+        model_path: &Path,
+        front_end: SpeakerFrontEnd,
+    ) -> Result<Self, PiperError> {
+        let session = Self::load_session(model_path, front_end)?;
+        Ok(Self { session, front_end })
+    }
+
+    /// The feature front end this encoder uses.
+    pub fn front_end(&self) -> SpeakerFrontEnd {
+        self.front_end
+    }
+
+    fn load_session(model_path: &Path, front_end: SpeakerFrontEnd) -> Result<Session, PiperError> {
+        // ONNX Runtime 1.24-1.28 graph optimizations (even the basic level)
+        // change CAM++ output (cosine 0.998 against the unoptimized and 1.29+
+        // result). The bundled 1.31 is not affected, but the CAM++ session
+        // runs unoptimized in every runtime so the embedding does not depend
+        // on the ONNX Runtime version; it runs once per reference.
+        let level = match front_end {
+            SpeakerFrontEnd::KaldiFbank => GraphOptimizationLevel::Disable,
+            SpeakerFrontEnd::Mel => GraphOptimizationLevel::Level3,
+        };
         let session = crate::ort_env::session_builder()?
-            .with_optimization_level(GraphOptimizationLevel::Level3)
+            .with_optimization_level(level)
             .map_err(|e| PiperError::ModelLoad(format!("speaker encoder opt level: {e}")))?
             .with_intra_threads(2)
             .map_err(|e| PiperError::ModelLoad(format!("speaker encoder threads: {e}")))?
@@ -51,15 +135,18 @@ impl SpeakerEncoder {
             })?;
 
         tracing::info!("Speaker encoder loaded: {}", model_path.display());
-        Ok(Self { session })
+        Ok(session)
     }
 
     /// Encode audio samples into a speaker embedding vector.
     ///
     /// `audio_samples` should be mono float32 PCM. If `sample_rate` is not
-    /// 16000, the audio will be resampled using linear interpolation.
+    /// 16000, the audio is resampled first (kaiser_best sinc for
+    /// [`SpeakerFrontEnd::KaldiFbank`], linear interpolation for
+    /// [`SpeakerFrontEnd::Mel`]).
     ///
-    /// Returns a Vec<f32> containing the speaker embedding (typically 256-d).
+    /// Returns the speaker embedding (192-d and L2-normalized for the zs-v1
+    /// CAM++ encoder, 256-d for the legacy ECAPA-TDNN encoder).
     pub fn encode(
         &mut self,
         audio_samples: &[f32],
@@ -71,15 +158,30 @@ impl SpeakerEncoder {
             ));
         }
 
+        if sample_rate == 0 {
+            return Err(PiperError::Inference(
+                "speaker encoder: sample rate must be positive".to_string(),
+            ));
+        }
+        let kaldi = self.front_end == SpeakerFrontEnd::KaldiFbank;
+
         // Resample to 16kHz if needed
-        let resampled = if sample_rate != MEL_SAMPLE_RATE {
-            resample_linear(audio_samples, sample_rate, MEL_SAMPLE_RATE)
-        } else {
+        let resampled = if sample_rate == MEL_SAMPLE_RATE {
             audio_samples.to_vec()
+        } else if kaldi {
+            kaldi_fbank::resample_kaiser_best(audio_samples, sample_rate, MEL_SAMPLE_RATE)
+        } else {
+            resample_linear(audio_samples, sample_rate, MEL_SAMPLE_RATE)
         };
 
-        // Compute mel spectrogram
-        let mel = compute_mel_spectrogram(&resampled);
+        // Compute features (frame-major [n_frames * n_mels])
+        let mel = if kaldi {
+            let mut feats = kaldi_fbank::kaldi_fbank(&resampled);
+            kaldi_fbank::subtract_band_means(&mut feats);
+            feats
+        } else {
+            compute_mel_spectrogram(&resampled)
+        };
         let n_frames = mel.len() / MEL_N_MELS;
 
         if n_frames == 0 {
@@ -122,7 +224,11 @@ impl SpeakerEncoder {
             .try_extract_tensor::<f32>()
             .map_err(|e| PiperError::Inference(format!("speaker encoder output: {e}")))?;
 
-        let embedding = emb_data.to_vec();
+        let embedding = if kaldi {
+            l2_normalize(emb_data)?
+        } else {
+            emb_data.to_vec()
+        };
         tracing::debug!(
             "Speaker embedding extracted: {} dimensions",
             embedding.len()
@@ -136,6 +242,36 @@ impl SpeakerEncoder {
         let (samples, sample_rate) = read_wav_file(path)?;
         self.encode(&samples, sample_rate)
     }
+}
+
+/// The last dimension of the model's first output, when it is static.
+fn output_dim(session: &Session) -> Option<usize> {
+    let output = session.outputs().iter().next()?;
+    match output.dtype() {
+        ort::value::ValueType::Tensor { shape, .. } => match shape.last() {
+            Some(&d) if d > 0 => Some(d as usize),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Scale an embedding to unit L2 norm.
+fn l2_normalize(embedding: &[f32]) -> Result<Vec<f32>, PiperError> {
+    let norm = embedding
+        .iter()
+        .map(|&v| f64::from(v) * f64::from(v))
+        .sum::<f64>()
+        .sqrt();
+    if !norm.is_finite() || norm == 0.0 {
+        return Err(PiperError::Inference(
+            "speaker encoder returned a zero or non-finite embedding".to_string(),
+        ));
+    }
+    Ok(embedding
+        .iter()
+        .map(|&v| (f64::from(v) / norm) as f32)
+        .collect())
 }
 
 /// Read a WAV file and return (samples_f32, sample_rate).
@@ -354,6 +490,30 @@ fn mel_to_hz(mel: f32) -> f32 {
 #[cfg(test)]
 mod speaker_encoder_tests {
     use super::*;
+
+    #[test]
+    fn test_front_end_follows_embedding_dim() {
+        assert_eq!(
+            SpeakerFrontEnd::for_embedding_dim(Some(192)),
+            SpeakerFrontEnd::KaldiFbank
+        );
+        assert_eq!(
+            SpeakerFrontEnd::for_embedding_dim(Some(256)),
+            SpeakerFrontEnd::Mel
+        );
+        assert_eq!(
+            SpeakerFrontEnd::for_embedding_dim(None),
+            SpeakerFrontEnd::Mel
+        );
+    }
+
+    #[test]
+    fn test_l2_normalize() {
+        let out = l2_normalize(&[3.0, 4.0]).unwrap();
+        assert!((out[0] - 0.6).abs() < 1e-7 && (out[1] - 0.8).abs() < 1e-7);
+        assert!(l2_normalize(&[0.0, 0.0]).is_err());
+        assert!(l2_normalize(&[f32::NAN, 1.0]).is_err());
+    }
 
     #[test]
     fn test_resample_linear_same_rate() {

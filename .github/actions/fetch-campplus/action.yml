@@ -1,0 +1,45 @@
+name: 'Fetch zs-v1 CAM++ encoder'
+description: >-
+  Download the revision-pinned campplus.onnx of the public zs-v1 base, verify
+  its SHA-256 and export PIPER_PLUS_CAMPPLUS_ONNX for the CAM++ parity tests
+  (Rust test_campplus_parity, Go campplus_parity_test, C# CampplusParityTests).
+  The pin matches docs/spec/model-sha256-manifest.toml and
+  src/wasm/openjtalk-web/test/browser/zero-shot-models.json.
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Cache campplus.onnx
+      uses: actions/cache@v4.3.0
+      with:
+        path: ${{ runner.temp }}/zs-v1-campplus
+        # This file holds the pin, so editing it starts a new cache entry.
+        key: zs-v1-campplus-${{ hashFiles('.github/actions/fetch-campplus/action.yml') }}
+
+    - name: Download and verify campplus.onnx
+      shell: bash
+      env:
+        DIR: ${{ runner.temp }}/zs-v1-campplus
+        URL: https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/campplus.onnx
+        SHA256: a6ac6a63997761ae2997373e2ee1c47040854b4b759ea41ec48e4e42df0f4d73
+      run: |
+        set -euo pipefail
+        mkdir -p "$DIR"
+        model="$DIR/campplus.onnx"
+        if [ ! -f "$model" ]; then
+          curl -fsSL --retry 5 --retry-all-errors -o "$model.part" "$URL"
+          mv "$model.part" "$model"
+        fi
+        # Hash stdin: on Windows sha256sum escapes a path with backslashes
+        # and prefixes the digest with "\".
+        if command -v sha256sum >/dev/null; then
+          actual=$(sha256sum < "$model" | cut -d' ' -f1)
+        else
+          actual=$(shasum -a 256 < "$model" | cut -d' ' -f1)
+        fi
+        if [ "$actual" != "$SHA256" ]; then
+          echo "::error::campplus.onnx SHA-256 $actual, want $SHA256"
+          rm -f "$model"
+          exit 1
+        fi
+        echo "PIPER_PLUS_CAMPPLUS_ONNX=$model" >> "$GITHUB_ENV"

@@ -13,7 +13,7 @@ import (
 // speakerEncoderInputName and speakerEncoderOutputName are read dynamically
 // from the ONNX model graph to avoid hard-coded name assumptions.
 
-// Mel spectrogram parameters — unified across all runtimes.
+// Legacy (ECAPA-TDNN) mel spectrogram parameters — unified across all runtimes.
 const (
 	melSampleRate = 16000
 	melNFFT       = 400 // Kaldi frame_length=25ms at 16kHz = 400 samples
@@ -23,16 +23,77 @@ const (
 	melFmax       = 7600.0
 )
 
-// SpeakerEncoder loads an ECAPA-TDNN speaker encoder ONNX model and
-// extracts speaker embeddings from audio. The embedding can be passed
-// to SynthesisRequest.SpeakerEmbedding for voice cloning.
+// CampplusEmbeddingDim is the embedding dimension of the CAM++ encoder
+// bundled with the public zs-v1 base (campplus.onnx).
+const CampplusEmbeddingDim = 192
+
+// SpeakerFrontEnd selects how audio is turned into the encoder's input.
+type SpeakerFrontEnd int
+
+const (
+	// SpeakerFrontEndMel is the legacy ECAPA-TDNN mel spectrogram (linear
+	// resample, Hann window, 400-point DFT, 20-7600 Hz). The output is
+	// returned as the model produced it.
+	SpeakerFrontEndMel SpeakerFrontEnd = iota
+	// SpeakerFrontEndKaldiFbank is the zs-v1 CAM++ recipe: kaiser_best
+	// resample, Kaldi fbank, mean subtraction. The output is L2-normalized.
+	SpeakerFrontEndKaldiFbank
+)
+
+// String returns the front end's name.
+func (f SpeakerFrontEnd) String() string {
+	switch f {
+	case SpeakerFrontEndMel:
+		return "mel"
+	case SpeakerFrontEndKaldiFbank:
+		return "kaldi-fbank"
+	default:
+		return fmt.Sprintf("SpeakerFrontEnd(%d)", int(f))
+	}
+}
+
+// SpeakerFrontEndForEmbeddingDim returns the front end for an encoder whose
+// embedding has dim values (0 when unknown): SpeakerFrontEndKaldiFbank for
+// CAM++ (192), otherwise SpeakerFrontEndMel.
+func SpeakerFrontEndForEmbeddingDim(dim int) SpeakerFrontEnd {
+	if dim == CampplusEmbeddingDim {
+		return SpeakerFrontEndKaldiFbank
+	}
+	return SpeakerFrontEndMel
+}
+
+// SpeakerEncoder loads a speaker encoder ONNX model and extracts speaker
+// embeddings from audio. The embedding can be passed to
+// SynthesisRequest.SpeakerEmbedding for voice cloning.
 type SpeakerEncoder struct {
-	session *ort.DynamicAdvancedSession
+	session  *ort.DynamicAdvancedSession
+	frontEnd SpeakerFrontEnd
 }
 
 // NewSpeakerEncoder creates a speaker encoder from an ONNX model file.
-// Input and output names are read dynamically from the model graph.
+// Input and output names are read dynamically from the model graph. The
+// front end follows the model's output dimension (see
+// SpeakerFrontEndForEmbeddingDim): the zs-v1 CAM++ encoder gets
+// SpeakerFrontEndKaldiFbank, anything else SpeakerFrontEndMel.
 func NewSpeakerEncoder(modelPath string) (*SpeakerEncoder, error) {
+	return newSpeakerEncoder(modelPath, nil)
+}
+
+// NewSpeakerEncoderWithFrontEnd creates a speaker encoder with an explicit
+// front end.
+func NewSpeakerEncoderWithFrontEnd(modelPath string, frontEnd SpeakerFrontEnd) (*SpeakerEncoder, error) {
+	if frontEnd != SpeakerFrontEndMel && frontEnd != SpeakerFrontEndKaldiFbank {
+		return nil, fmt.Errorf("speaker encoder: unknown front end %v", frontEnd)
+	}
+	return newSpeakerEncoder(modelPath, &frontEnd)
+}
+
+// FrontEnd returns the feature front end this encoder uses.
+func (se *SpeakerEncoder) FrontEnd() SpeakerFrontEnd {
+	return se.frontEnd
+}
+
+func newSpeakerEncoder(modelPath string, frontEnd *SpeakerFrontEnd) (*SpeakerEncoder, error) {
 	// Dynamically read input/output names from the model graph.
 	inputs, outputs, err := ort.GetInputOutputInfo(modelPath)
 	if err != nil {
@@ -47,35 +108,79 @@ func NewSpeakerEncoder(modelPath string) (*SpeakerEncoder, error) {
 	inputNames := []string{inputs[0].Name}
 	outputNames := []string{outputs[0].Name}
 
+	fe := SpeakerFrontEndForEmbeddingDim(staticLastDim(outputs[0].Dimensions))
+	if frontEnd != nil {
+		fe = *frontEnd
+	}
+
 	sessOpts, err := ort.NewSessionOptions()
 	if err != nil {
 		return nil, fmt.Errorf("speaker encoder session options: %w", err)
 	}
 	defer func() { _ = sessOpts.Destroy() }()
+	if fe == SpeakerFrontEndKaldiFbank {
+		// ONNX Runtime 1.24-1.28 graph optimizations (even the basic level)
+		// change CAM++ output (cosine 0.998 against the unoptimized and
+		// 1.29+ result); the encoder runs once per reference, so the
+		// unoptimized graph costs little.
+		if err := sessOpts.SetGraphOptimizationLevel(ort.GraphOptimizationLevelDisableAll); err != nil {
+			return nil, fmt.Errorf("speaker encoder optimization level: %w", err)
+		}
+	}
 
 	session, err := ort.NewDynamicAdvancedSession(modelPath, inputNames, outputNames, sessOpts)
 	if err != nil {
 		return nil, fmt.Errorf("speaker encoder load %s: %w", modelPath, err)
 	}
 
-	return &SpeakerEncoder{session: session}, nil
+	return &SpeakerEncoder{session: session, frontEnd: fe}, nil
+}
+
+// staticLastDim returns the last dimension of a shape, or 0 when the shape
+// is empty or that dimension is dynamic.
+func staticLastDim(shape ort.Shape) int {
+	if len(shape) == 0 || shape[len(shape)-1] <= 0 {
+		return 0
+	}
+	return int(shape[len(shape)-1])
 }
 
 // Encode extracts a speaker embedding from mono float32 audio samples.
-// If sampleRate is not 16000, the audio is resampled via linear interpolation.
+// If sampleRate is not 16000, the audio is resampled first (kaiser_best sinc
+// for SpeakerFrontEndKaldiFbank, linear interpolation for
+// SpeakerFrontEndMel). The zs-v1 CAM++ encoder returns a 192-d
+// L2-normalized embedding, the legacy ECAPA-TDNN encoder a 256-d one.
 func (se *SpeakerEncoder) Encode(audio []float32, sampleRate int) ([]float32, error) {
 	if len(audio) == 0 {
 		return nil, fmt.Errorf("speaker encoder: empty audio input")
 	}
+	if sampleRate <= 0 {
+		return nil, fmt.Errorf("speaker encoder: sample rate must be positive, got %d", sampleRate)
+	}
+	kaldi := se.frontEnd == SpeakerFrontEndKaldiFbank
 
 	// Resample to 16kHz if needed
 	resampled := audio
 	if sampleRate != melSampleRate {
-		resampled = resampleLinear(audio, sampleRate)
+		if kaldi {
+			var err error
+			resampled, err = ResampleKaiserBest(audio, sampleRate, melSampleRate)
+			if err != nil {
+				return nil, fmt.Errorf("speaker encoder: %w", err)
+			}
+		} else {
+			resampled = resampleLinear(audio, sampleRate)
+		}
 	}
 
-	// Compute mel spectrogram: returned in frame-major order [n_frames * n_mels]
-	mel := computeMelSpectrogram(resampled)
+	// Compute features: returned in frame-major order [n_frames * n_mels]
+	var mel []float32
+	if kaldi {
+		mel = KaldiFbank(resampled)
+		subtractBandMeans(mel)
+	} else {
+		mel = computeMelSpectrogram(resampled)
+	}
 	nFrames := len(mel) / melNMels
 
 	if nFrames == 0 {
@@ -108,10 +213,30 @@ func (se *SpeakerEncoder) Encode(audio []float32, sampleRate int) ([]float32, er
 		return nil, fmt.Errorf("speaker encoder: unexpected output tensor type")
 	}
 	rawData := outputTensor.GetData()
+	if kaldi {
+		return l2Normalize(rawData)
+	}
 	result := make([]float32, len(rawData))
 	copy(result, rawData)
 
 	return result, nil
+}
+
+// l2Normalize returns a copy of embedding scaled to unit L2 norm.
+func l2Normalize(embedding []float32) ([]float32, error) {
+	sum := 0.0
+	for _, v := range embedding {
+		sum += float64(v) * float64(v)
+	}
+	norm := math.Sqrt(sum)
+	if norm == 0 || math.IsNaN(norm) || math.IsInf(norm, 0) {
+		return nil, fmt.Errorf("speaker encoder returned a zero or non-finite embedding")
+	}
+	out := make([]float32, len(embedding))
+	for i, v := range embedding {
+		out[i] = float32(float64(v) / norm)
+	}
+	return out, nil
 }
 
 // EncodeFile reads a WAV file and extracts a speaker embedding.

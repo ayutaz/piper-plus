@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
-"""Generate golden data for the browser's zero-shot speaker front end.
+"""Generate golden data for the runtimes' zero-shot speaker front end.
 
 The public zs-v1 base is conditioned on CAM++ embeddings computed as
 resample to 16 kHz -> torchaudio Kaldi fbank -> mean subtraction -> CAM++ ->
 L2 normalization (scripts/public_base_runtime.py, the Hugging Face Space's
-zero_shot.py). The JS port in src/wasm/openjtalk-web/src/kaldi-fbank.js is
-checked against this fixture.
+zero_shot.py). The ports in src/wasm/openjtalk-web/src/kaldi-fbank.js,
+src/rust/piper-core/src/kaldi_fbank.rs, src/go/piperplus/kaldi_fbank.go and
+src/csharp/PiperPlus.Core/Inference/KaldiFbank.cs are checked against this
+fixture.
 
 Resampling uses torchaudio's Kaiser-windowed sinc with the "kaiser_best"
 parameters, as the Space does (soxr, used by the CI recipe, is LGPL).
 
-The input signals are closed-form sums of sines, rebuilt in JS by
-`testSignal()` in test/js/test-kaldi-fbank-golden.js, so the fixture stores
-only outputs.
+The input signals are closed-form sums of sines, rebuilt by each runtime's
+test (`testSignal()` in test/js/test-kaldi-fbank-golden.js), so the fixture
+stores only outputs.
 
 Usage:
     uv run --no-project --python 3.13 \\

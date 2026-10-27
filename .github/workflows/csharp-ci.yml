@@ -35,6 +35,9 @@ on:
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
       - 'test/fixtures/speaker_encoder_golden.json'
+      - 'test/fixtures/kaldi_fbank_golden.json'
+      - 'test/fixtures/zs_campplus_golden.json'
+      - '.github/actions/fetch-campplus/**'
       - '.github/workflows/csharp-ci.yml'
       - 'scripts/check_test_skips.py'
       - 'docs/spec/test-skip-allowlist.toml'
@@ -82,6 +85,9 @@ on:
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
       - 'test/fixtures/speaker_encoder_golden.json'
+      - 'test/fixtures/kaldi_fbank_golden.json'
+      - 'test/fixtures/zs_campplus_golden.json'
+      - '.github/actions/fetch-campplus/**'
       - '.github/workflows/csharp-ci.yml'
       - 'scripts/check_test_skips.py'
       - 'docs/spec/test-skip-allowlist.toml'
@@ -161,6 +167,10 @@ jobs:
           fi
           echo "No High/Critical vulnerabilities found"
         shell: bash
+
+      # CampplusParityTests skips without PIPER_PLUS_CAMPPLUS_ONNX; the skip
+      # gate fails the job if that happens.
+      - uses: ./.github/actions/fetch-campplus
 
       - name: Run C# tests
         # Each test project writes src/csharp/<project>/TestResults/test-results.xml.

@@ -46,6 +46,7 @@ pub mod wasm;
 
 // --- Phase 4 modules (推論非依存) ---
 pub mod audio_format;
+pub mod kaldi_fbank;
 pub mod model_download;
 pub mod short_text;
 // `ssml` lives in piper-plus-g2p so that the G2P-only WASM npm

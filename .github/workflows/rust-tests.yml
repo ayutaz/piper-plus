@@ -25,6 +25,9 @@ on:
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
       - 'test/fixtures/speaker_encoder_golden.json'
+      - 'test/fixtures/kaldi_fbank_golden.json'
+      - 'test/fixtures/zs_campplus_golden.json'
+      - '.github/actions/fetch-campplus/**'
       - '.github/workflows/rust-tests.yml'
       - 'scripts/check_test_skips.py'
       - 'docs/spec/test-skip-allowlist.toml'
@@ -61,6 +64,9 @@ on:
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
       - 'test/fixtures/speaker_encoder_golden.json'
+      - 'test/fixtures/kaldi_fbank_golden.json'
+      - 'test/fixtures/zs_campplus_golden.json'
+      - '.github/actions/fetch-campplus/**'
       - 'scripts/check_test_skips.py'
       - 'docs/spec/test-skip-allowlist.toml'
       - '.github/actions/check-test-skips/**'
@@ -125,6 +131,7 @@ jobs:
     - uses: Swatinem/rust-cache@v2
       with:
         workspaces: src/rust -> target
+    - uses: ./.github/actions/fetch-campplus
 
     - uses: actions/setup-python@v6.2.0
       with:
@@ -165,6 +172,13 @@ jobs:
       # from piper_core::engine which is gated behind onnx; mirror the short-text
       # gate so the per-runtime drift assert runs in CI.
       run: cargo test -p piper-plus --features onnx --test test_ort_session_contract --no-fail-fast 2>&1 | tee -a "$RUNNER_TEMP/rust-test.log"
+
+    - name: Run CAM++ parity tests (onnx feature, zs-v1 campplus.onnx)
+      # The test returns early without PIPER_PLUS_CAMPPLUS_ONNX, so check
+      # that fetch-campplus exported it before trusting a green run.
+      run: |
+        test -f "${PIPER_PLUS_CAMPPLUS_ONNX:?fetch-campplus did not export PIPER_PLUS_CAMPPLUS_ONNX}"
+        cargo test -p piper-plus --features onnx --test test_campplus_parity --no-fail-fast -- --nocapture 2>&1 | tee -a "$RUNNER_TEMP/rust-test.log"
 
     - name: Run zero-shot E2E tests (onnx feature, Linux only)
       if: runner.os == 'Linux'

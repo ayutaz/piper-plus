@@ -85,7 +85,16 @@ piper-plus --model models/zs-v1/base.onnx \
 
 The embedding dimension is declared by the loaded ONNX model. The public
 zs-v1 model uses a 192-dim L2-normalized CAM++ embedding; legacy models may
-use a 256-dim ECAPA-TDNN embedding. The published reference-conditioned
+use a 256-dim ECAPA-TDNN embedding.
+
+With a 192-dimensional encoder such as `campplus.onnx`, `--reference-audio`
+computes the embedding with the zs-v1 recipe (Kaiser resampling, Kaldi fbank,
+L2 normalization) and matches the Python embedding (cosine ≥ 0.9999 in CI).
+Releases up to 0.5.1 used the legacy mel front end for every encoder, which
+gives a different embedding for `campplus.onnx` (cosine 0.18); with those,
+pass a precomputed `--speaker-embedding` instead.
+
+The published reference-conditioned
 example was functionally verified with PyPI `piper-plus==2.0.0`. CI run
 `38189966578` also reports six-runtime inference from shared Python phoneme
 IDs; native G2P and listening quality were excluded, and quality approval
