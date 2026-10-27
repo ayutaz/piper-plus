@@ -113,9 +113,9 @@ Before it starts `piper_train`, the tab checks:
 
 ```bash
 uv run python scripts/prepare_single_speaker_finetune.py \
-  --input-dir <preprocessed dataset> \
-  --base-config <base dir>/config.json \
-  --output-dir <aligned dataset>
+  --input-dir /path/to/preprocessed/dataset \
+  --base-config /path/to/base/config.json \
+  --output-dir /path/to/aligned/dataset
 ```
 
 The same symbol count does not mean the same phoneme IDs; training an
