@@ -834,7 +834,9 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                         )
 
                         quality = gr.Radio(
-                            choices=["low", "medium", "high"],
+                            # piper_train --quality choices
+                            # (src/python/piper_train/__main__.py).
+                            choices=["x-low", "medium", "high"],
                             label="Model Quality",
                             value="medium",
                             info="Higher quality = longer training time",

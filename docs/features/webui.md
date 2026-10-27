@@ -60,17 +60,38 @@ uv run --project environments/webui --no-sync python -m piper_plus.webui \
 
 - Dataset path validation with structure check
 - Base model selection or new model training
-- Quality selection (UI labels include low/medium/high)
-- Training parameters (batch size, learning rate, epochs)
+- Quality selection (`x-low` / `medium` / `high`, the `piper_train --quality` choices)
+- Training parameters (batch size, learning rate, epochs, checkpoint interval, validation split)
 - Start/Stop controls with real-time log display
 
-The UI exists, but `training_manager.py` still sends `--learning-rate`,
-`--epochs`, `--validation-split` and `--checkpoint-path`; the current trainer
-uses `--base_lr`, `--max_epochs` and the documented resume/fine-tuning options,
-and does not accept the UI's `--validation-split`. Its quality choices are
-`x-low`, `medium`, `high`.
-Installing training dependencies does not resolve these argument mismatches.
-Follow the [training guide](../guides/training/training-guide.md) instead.
+`training_manager.py` starts `python -m piper_train` with these flags:
+
+| UI field | Flag sent |
+|----------|-----------|
+| Dataset Directory Path | `--dataset-dir` |
+| Model Quality | `--quality` |
+| Batch Size | `--batch-size` |
+| Learning Rate | `--base_lr` |
+| Number of Epochs | `--max_epochs` |
+| Checkpoint Interval (epochs) | `--checkpoint-epochs` |
+| Validation Split | `--validation-split` |
+| Output Directory | `--default_root_dir` |
+| Base Model (other than `New Model`) | `--resume_from_checkpoint` |
+
+It also sends `--accelerator auto` and `--devices 1`. The speaker count is
+read from the dataset's `config.json`; the UI's Number of Speakers is not sent.
+
+Limitations:
+
+- `piper_train` reads a preprocessed dataset directory (`config.json` and
+  `dataset.jsonl`). The tab's validation checks for a raw `metadata.csv`, so
+  preprocess the dataset first and give the preprocessed directory as the
+  Dataset Directory Path.
+- The Base Model list shows the ONNX voices found in the data directory, and
+  the tab passes the selected entry to `--resume_from_checkpoint`, which takes
+  a Lightning `.ckpt` file. Choose `New Model`; to resume or fine-tune, run
+  `piper_train` from the command line as described in the
+  [training guide](../guides/training/training-guide.md).
 
 Neither WebUI exposes a reference-audio/speaker-embedding input for the public
 `zs-v1/base.onnx`. Use a fixed-voice model for these UI examples; use the

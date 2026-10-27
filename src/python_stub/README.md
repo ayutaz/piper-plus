@@ -2,13 +2,28 @@
 
 This package has been renamed to **[piper-plus](https://pypi.org/project/piper-plus/)**.
 
-Please update your dependencies:
+Please update your dependencies. Since piper-plus 2.0.2 the ONNX Runtime
+provider is chosen with an extra; install exactly one of them:
 
 ```bash
-pip install piper-plus
+# CPU
+pip install "piper-plus[cpu]"
+# or NVIDIA GPU (CUDA 12 / cuDNN required)
+pip install "piper-plus[gpu]"
 ```
 
-If you have `piper-tts-plus` in your `requirements.txt` or `pyproject.toml`, replace it with `piper-plus`.
+If you have `piper-tts-plus` in your `requirements.txt` or `pyproject.toml`,
+replace it with `piper-plus[cpu]` or `piper-plus[gpu]`.
+
+`piper-tts-plus` passes the same extras on to piper-plus, so an existing
+dependency keeps working once it names a provider:
+
+```bash
+pip install "piper-tts-plus[cpu]"
+```
+
+A bare `piper-tts-plus` (or `piper-plus`) installs no ONNX Runtime; importing
+`piper_plus.voice` then raises an `ImportError` that asks for one of the extras.
 
 All future releases will be published under the new name.
 

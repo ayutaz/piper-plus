@@ -25,6 +25,10 @@ classifiers = [
 keywords = ["piper", "tts", "deprecated", "renamed"]
 
 [project.optional-dependencies]
+# Relay piper-plus's extras. Since piper-plus 2.0.2 its base dependencies carry
+# no ONNX Runtime: choose exactly one provider extra (cpu or gpu). Keep the base
+# dependency provider-free so [gpu] does not also pull the CPU wheel.
+cpu = ["piper-plus[cpu]"]
 gpu = ["piper-plus[gpu]"]
 http = ["piper-plus[http]"]
 
