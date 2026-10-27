@@ -260,8 +260,13 @@ jobs:
       - name: Install onnxruntime-node (no full npm install)
         # The full `npm install` triggers WASM build dependencies that are
         # unrelated to the parity gate. We only need onnxruntime-node for
-        # bin/piper-cli.js to load the model.
-        run: npm install --no-save --no-package-lock onnxruntime-node
+        # bin/piper-cli.js to load the model. Install the version that
+        # package-lock.json records: an unpinned install took each new release,
+        # and onnxruntime-node 1.31.1 reached npm before its NuGet GPU package,
+        # so its install script failed on every run.
+        run: |
+          version="$(node -p "require('./package-lock.json').packages['node_modules/onnxruntime-node'].version")"
+          npm install --no-save --no-package-lock "onnxruntime-node@${version}"
 
       - name: Synthesize via bin/piper-cli.js
         working-directory: ${{ github.workspace }}
