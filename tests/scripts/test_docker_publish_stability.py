@@ -73,6 +73,32 @@ def test_guard_rejects_publication_regressions(mutation):
     assert load("check_docker_publish_stability").check(data)
 
 
+def webui_pr_load(data):
+    steps = data["jobs"]["build-webui"]["steps"]
+    return next(s for s in steps if s.get("name") == "Load the amd64 image for the PR checks")
+
+
+def test_webui_loads_one_platform_for_the_pr_checks_and_publishes_nothing():
+    module = load("check_docker_publish_stability")
+    step = webui_pr_load(workflow())
+    assert module.pr_load(step)
+    assert step["with"]["platforms"] == "linux/amd64"
+    assert "cache-to" not in step["with"]
+
+
+@pytest.mark.parametrize("mutation", ["every-event", "push", "pr-export"])
+def test_guard_rejects_a_pr_load_that_could_publish(mutation):
+    data = copy.deepcopy(workflow())
+    step = webui_pr_load(data)
+    if mutation == "every-event":
+        del step["if"]
+    elif mutation == "push":
+        step["with"]["push"] = True
+    else:
+        step["with"]["cache-to"] = "type=gha,mode=max,scope=build-webui"
+    assert load("check_docker_publish_stability").check(data)
+
+
 def test_copy_preserves_every_platform_and_verifies_remote_bytes(tmp_path):
     module = load("publish_docker_mirror")
     raw = b'{"manifests":[]}'
