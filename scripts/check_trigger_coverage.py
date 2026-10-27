@@ -115,11 +115,6 @@ ALLOWLIST: dict[str, dict[str, str]] = {
             "model-sha256-manifest instead"
         ),
     },
-    "webui-test.yml": {
-        "test/models/multilingual-test-medium.onnx": (
-            "test asset used for a smoke run, not an artifact under review"
-        ),
-    },
     "integration-tests-issue-426.yml": {
         "src/python/tests/test_infer_onnx_speaker_embedding_integration.py": (
             "run by python-tests.yml, which covers src/python/** already"

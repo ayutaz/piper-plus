@@ -8,7 +8,7 @@
 #   final   = gcr.io/distroless/python3-debian13
 #
 # The canonical docker/webui/Dockerfile stays UNCHANGED so docker-compose
-# and webui-test.yml continue to operate against the proven image.
+# continues to operate against the proven image.
 # Promotion to canonical is a follow-up PR after the trial verifies
 # Gradio cold-start works under distroless.
 #
