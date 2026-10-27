@@ -525,6 +525,8 @@ def apply_transfer_defaults(
     1. gin_channels: set to 512 for multi-speaker or multi-language models
        when not explicitly specified (value == 0).
     2. freeze_dp: auto-enable when --resume-from-multispeaker-checkpoint is used.
+    3. freeze_dp: keep it when --resume_from_checkpoint resumes a run that
+       was trained with it (the optimizer state needs the same parameters).
 
     Mutates *args* in place.  Callers should use ``vars(args)`` afterward
     to obtain a dict view that reflects the updated values.
@@ -547,6 +549,19 @@ def apply_transfer_defaults(
         _LOGGER.info(
             "Auto-enabled --freeze-dp for multispeaker→single-speaker transfer"
         )
+
+    # freeze_dp を再開元の checkpoint から引き継ぐ
+    # optimizer state は同じ parameter group にしか復元できない。FT run
+    # (freeze_dp 自動有効) を --resume_from_checkpoint だけで再開すると DP の
+    # parameter が optimizer に戻り、Lightning が ValueError で止まる。
+    resume_from = getattr(args, "resume_from_checkpoint", None)
+    if resume_from and not args.freeze_dp:
+        saved = load_checkpoint(resume_from).get("hyper_parameters", {})
+        if saved.get("freeze_dp"):
+            args.freeze_dp = True
+            _LOGGER.info(
+                "Enabled --freeze-dp: the checkpoint being resumed was trained with it"
+            )
 
 
 def main():
