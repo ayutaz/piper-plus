@@ -62,8 +62,9 @@ test("Zero-shot demo speaks six languages in the reference voice", async ({ page
   const reference = await readWav(page.locator("#audioPlayer"));
   await writeFile(info.outputPath("reference.wav"), reference.bytes);
 
-  await page.locator("#zsLoadBtn").click();
+  // The zero-shot models load on their own after the main demo is ready.
   await expect(page.locator("#zsControls")).toBeVisible();
+  await expect(page.locator("#zsLoadBtn")).toBeHidden();
   // The embedding must reach the model and steer it. Reference B is
   // reference A slowed to 70 %, a deeper voice; outputs conditioned on B must
   // be clearly closer to B than outputs conditioned on A are. Absolute

@@ -315,14 +315,14 @@
         </div>
 
         <section class="zero-shot" id="zeroShot">
-            <h2 id="zsTitle">Zero-shot (experimental)</h2>
+            <h2 id="zsTitle">Zero-shot</h2>
             <div class="notice">
                 <p id="zsIntro"></p>
                 <ul id="zsNotes"><li></li><li></li><li></li><li></li></ul>
             </div>
             <div id="zsStatus" class="status info"></div>
-            <div class="button-group">
-                <button id="zsLoadBtn">Load zero-shot model</button>
+            <div class="button-group" style="display: none;">
+                <button id="zsLoadBtn">Retry loading</button>
             </div>
             <div id="zsControls" style="display: none;">
                 <div class="voice-group">
@@ -408,15 +408,15 @@
                 done: '完了',
                 error: '初期化エラー',
                 zs: {
-                    title: 'ゼロショット (実験的)',
+                    title: 'ゼロショット',
                     intro: '参照音声の声で読み上げます。公開 zs-v1 base と CAM++ 話者エンコーダをブラウザ内で動かします。品質は承認前で、学習にない話者の声は一部しか再現されません。',
                     notes: [
                         '本人の同意がある声だけを使ってください。',
                         '参照音声はブラウザの外に送信されません。',
                         'モデルに学習されていない音素 (ポルトガル語の鼻母音「ã」、フランス語 nuit の「ɥ」など) や 6 言語以外の文字を含む文章は、黙って省かずにエラーにします。',
-                        '初回は約 70MB (base 40.8MB + CAM++ 28.3MB) をダウンロードします。',
+                        'ページを開くと約 70MB (base 40.8MB + CAM++ 28.3MB) を自動でダウンロードします。',
                     ],
-                    load: 'ゼロショットモデルを読み込む',
+                    load: 'もう一度読み込む',
                     reference: '参照音声 (3〜30 秒)',
                     record: '録音',
                     stopRecording: '録音停止',
@@ -424,7 +424,7 @@
                     text: '読み上げる文章',
                     synthesize: '音声合成',
                     audio: '音声:',
-                    idle: 'ボタンを押すとモデルを読み込みます。',
+                    idle: 'ゼロショットモデルの読み込みを待っています...',
                     loadingEncoder: 'CAM++ 話者エンコーダをダウンロード中...',
                     loadingBase: 'zs-v1 base を初期化中...',
                     needReference: '参照音声をアップロードするか録音してください。',
@@ -479,15 +479,15 @@
                 done: 'Done',
                 error: 'Initialization error',
                 zs: {
-                    title: 'Zero-shot (experimental)',
+                    title: 'Zero-shot',
                     intro: 'Speaks in the voice of a reference clip, running the public zs-v1 base and the CAM++ speaker encoder in your browser. Its quality is not approved, and an unseen speaker is reproduced only partially.',
                     notes: [
                         "Only use voices you have the speaker's consent to use.",
                         'The reference clip never leaves your browser.',
                         'Text whose phonemes the model never learned (for example the Portuguese nasal vowel "ã" or the French "ɥ" in "nuit"), or with letters outside the six languages, is rejected instead of being dropped.',
-                        'The first load downloads about 70 MB (base 40.8 MB + CAM++ 28.3 MB).',
+                        'Opening the page downloads about 70 MB (base 40.8 MB + CAM++ 28.3 MB) automatically.',
                     ],
-                    load: 'Load zero-shot model',
+                    load: 'Retry loading',
                     reference: 'Reference audio (3-30 seconds)',
                     record: 'Record',
                     stopRecording: 'Stop recording',
@@ -495,7 +495,7 @@
                     text: 'Text to synthesize',
                     synthesize: 'Synthesize',
                     audio: 'Audio:',
-                    idle: 'Press the button to load the model.',
+                    idle: 'Waiting to load the zero-shot model...',
                     loadingEncoder: 'Downloading the CAM++ speaker encoder...',
                     loadingBase: 'Initializing the zs-v1 base...',
                     needReference: 'Upload or record a reference clip.',
@@ -884,6 +884,7 @@
         }
 
         async function zsLoad() {
+            zsEl('zsLoadBtn').parentElement.style.display = 'none';
             zsEl('zsLoadBtn').disabled = true;
             try {
                 await ensureOrt();
@@ -909,13 +910,14 @@
                         zsStatus(`[${stage}] ${message} (${Math.round(progress * 100)}%)`);
                     },
                 });
-                zsEl('zsLoadBtn').parentElement.style.display = 'none';
                 zsEl('zsControls').style.display = 'block';
                 zsEl('zsText').value = ZS_SAMPLE_TEXTS[zsEl('zsLanguage').value];
                 zsStatus(ui.zs.needReference);
             } catch (error) {
                 console.error('Zero-shot load failed:', error);
                 zsStatus(`${ui.zs.errors.load}: ${error.message}`, 'error');
+                // Offer a retry; the first load starts on its own.
+                zsEl('zsLoadBtn').parentElement.style.display = '';
                 zsEl('zsLoadBtn').disabled = false;
             }
         }
@@ -1052,8 +1054,9 @@
         });
         zsEl('zsSynthesizeBtn').addEventListener('click', zsSynthesize);
 
-        // Initialize on load
-        init();
+        // Initialize on load. The zero-shot models load next, one after the
+        // other, so the two PiperPlus instances do not initialize at once.
+        init().then(zsLoad);
     </script>
 </body>
 </html>
