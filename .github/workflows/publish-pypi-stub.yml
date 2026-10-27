@@ -1,0 +1,158 @@
+name: PyPI Stub (piper-tts-plus)
+
+# piper-tts-plus is the pre-#289 name of piper-plus, kept on PyPI as a
+# redirect (src/python_stub). It is not republished with every release (#564):
+# the published stub depends on piper-plus without an upper bound, so it keeps
+# installing the latest piper-plus. It has to be republished only when the stub
+# itself changes, e.g. when piper-plus adds an extra the stub must relay.
+#
+# A pull request that touches the stub builds it and installs the wheel with
+# each provider extra. A manual run on dev does the same and then publishes the
+# version in src/python_stub/VERSION. Publishing uses PyPI Trusted Publishing:
+# the piper-tts-plus project needs a Trusted Publisher entry for
+# repository=ayutaz/piper-plus, workflow=publish-pypi-stub.yml,
+# environment=pypi-stub.
+
+on:
+  pull_request:
+    paths:
+      - 'src/python_stub/**'
+      - '.github/workflows/publish-pypi-stub.yml'
+      - 'tests/scripts/test_python_stub_extras.py'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  # Never cancel a manual run: it may be publishing.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build stub
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6.1.0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build stub package
+        working-directory: src/python_stub
+        run: python -m build
+
+      - name: Check the built version and metadata
+        working-directory: src/python_stub
+        run: |
+          version="$(cat VERSION)"
+          ls -la dist/
+          for f in "dist/piper_tts_plus-${version}-py3-none-any.whl" "dist/piper_tts_plus-${version}.tar.gz"; do
+            if [ ! -f "$f" ]; then
+              echo "::error::$f was not built (src/python_stub/VERSION is ${version})"
+              exit 1
+            fi
+          done
+          twine check --strict dist/*
+
+      - uses: actions/upload-artifact@v7.0.0
+        with:
+          name: piper-tts-plus-dist
+          path: src/python_stub/dist/
+          retention-days: 7
+
+  verify:
+    name: Install stub (Python ${{ matrix.python-version }})
+    needs: build
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # The stub's requires-python / classifiers.
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: piper-tts-plus-dist
+          path: dist/
+
+      - name: Set up Python
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: "[cpu] installs ONNX Runtime and piper-plus imports"
+        run: |
+          wheel="$(ls dist/*.whl)"
+          python -m venv "$RUNNER_TEMP/stub-cpu"
+          "$RUNNER_TEMP/stub-cpu/bin/pip" install "${wheel}[cpu]"
+          "$RUNNER_TEMP/stub-cpu/bin/python" -c "import onnxruntime, piper_plus.voice; print('onnxruntime', onnxruntime.__version__)"
+
+      - name: "[gpu] resolves onnxruntime-gpu without the CPU wheel"
+        # Resolve only: the GPU wheel is large and the runner has no GPU.
+        run: |
+          wheel="$(ls dist/*.whl)"
+          python -m pip install --upgrade pip
+          python -m pip install --dry-run --ignore-installed --quiet --report "$RUNNER_TEMP/gpu.json" "${wheel}[gpu]"
+          python - "$RUNNER_TEMP/gpu.json" <<'EOF'
+          import json
+          import sys
+
+          names = {
+              item["metadata"]["name"].lower().replace("_", "-")
+              for item in json.load(open(sys.argv[1], encoding="utf-8"))["install"]
+          }
+          errors = []
+          if "onnxruntime-gpu" not in names:
+              errors.append("onnxruntime-gpu is not installed")
+          if "onnxruntime" in names:
+              errors.append("the CPU onnxruntime wheel is installed next to onnxruntime-gpu")
+          for error in errors:
+              print(f"::error::piper-tts-plus[gpu]: {error}")
+          sys.exit(1 if errors else 0)
+          EOF
+
+  publish:
+    name: Publish stub to PyPI
+    needs: verify
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi-stub
+      url: https://pypi.org/p/piper-tts-plus
+    permissions:
+      contents: read
+      id-token: write       # OIDC for PyPI Trusted Publishing
+      attestations: write   # SLSA build provenance attestation
+    steps:
+      - uses: actions/checkout@v6.1.0
+
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: piper-tts-plus-dist
+          path: dist/
+
+      - name: Check the version is not on PyPI yet
+        run: |
+          version="$(cat src/python_stub/VERSION)"
+          status="$(curl -sS -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/piper-tts-plus/${version}/json")"
+          if [ "$status" != 404 ]; then
+            echo "::error::piper-tts-plus ${version} is already on PyPI (HTTP ${status}). Raise src/python_stub/VERSION first."
+            exit 1
+          fi
+
+      - name: Generate SLSA build provenance attestation
+        uses: actions/attest-build-provenance@v3.2.0
+        with:
+          subject-path: 'dist/*'
+
+      - name: Publish to PyPI (Trusted Publisher)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
