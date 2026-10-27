@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792894420505,
+  "lastUpdate": 1793072711355,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1614,6 +1614,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 217.4,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "84f9010372eb09394293c04ae150fe73db63ffe6",
+          "message": "fix: align code with documented env vars, extras and versions (#908)\n\n* fix(phonemize): read PIPER_PLUS_PHONEMIZE_DEBUG in the bundled piper_phonemize\n\nThe v2.0 rename of public env vars from PIPER_* to PIPER_PLUS_* missed the\ndebug switch of the legacy bundled module, which still read\nPIPER_PHONEMIZE_DEBUG while the environment variable guide documents\nPIPER_PLUS_PHONEMIZE_DEBUG. Like the other renamed variables, the old name\nis not read. python-tests now also runs when the module changes.\n\n* fix(webui): offer only the quality values piper_train accepts\n\nThe Training tab offered quality \"low\", which piper_train rejects (its\nchoices are x-low / medium / high), so a run started with it exited at\nargument parsing. test_webui.py now reads the trainer's --quality choices\nand compares them with the radio. docs/features/webui.md lists the flags\ntraining_manager.py actually sends and the tab's remaining limits.\n\n* fix(stub): relay the cpu provider extra from piper-tts-plus\n\nSince piper-plus 2.0.2 the ONNX Runtime provider comes only from the cpu or\ngpu extra. The stub relayed gpu and http only, so piper-tts-plus could not\ninstall a CPU runtime. Add cpu, keep the base dependency provider-free so\n[gpu] does not also pull the CPU wheel, and name the extras in the README.\ntests/scripts/test_python_stub_extras.py fails when the stub stops relaying\na user extra of piper-plus.\n\n* fix(android): take the publish version from gradle.properties only\n\nBoth modules read VERSION_NAME and fell back to a literal when it was\nmissing: 0.1.0 in :piper-plus and 1.0.0 in :piper-plus-g2p, while\ngradle.properties says 1.0.1. The root gradle.properties applies to both\nmodules, so the literals were never used, but a build without the property\nwould have published a stale version. Read it with project.property(), which\nfails when it is missing. The published versions are unchanged (both 1.0.1).\ntests/scripts/test_android_publish_version.py fails on a literal fallback.\n\n* fix(pre-commit): point version-sync hooks at workflows that exist\n\nruff-version-sync listed .github/workflows/python-lint.yml, removed in #884;\nthe ruff pin it checks is now in lint-gates.yml, so changing that file did\nnot run the hook. ort-version-sync listed the removed ort-version-sync.yml\nand missed bundle-size-gate.yml, which check_ort_versions.py reads. No other\nhook files filter names a workflow that does not exist.\n\n* docs(hooks): describe the current /create-pr flow in guard-bash.sh\n\nThe comment and the deny message for a direct gh pr create still said that\n/create-pr starts /watch-pr through an auto-chain from its phase 6.2. The\nskill now runs CI monitoring and review replies as inline phases. Only the\nwording changes; what the hook blocks is unchanged.\n\n* docs(go): fix the phonemize package comment's WrapPhonemizer and PUA range\n\nWrapPhonemizer is a method on *CustomDictionary, not a package function, and\nthe fixed PUA table now ends at U+E064 with unknown tokens assigned from U+E065.\n\n* test(docs): regenerate the doc-examples snapshot for the rewritten webui.md",
+          "timestamp": "2026-10-27T12:39:27+09:00",
+          "tree_id": "4c3d3b188149b6cd8d87f16b08bc05179d2d4b18",
+          "url": "https://github.com/ayutaz/piper-plus/commit/84f9010372eb09394293c04ae150fe73db63ffe6"
+        },
+        "date": 1793072707645,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0842,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 21.4,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 21.7,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1711.2,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 218.4,
             "unit": "MB"
           },
           {
