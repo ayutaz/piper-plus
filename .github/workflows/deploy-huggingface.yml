@@ -163,6 +163,10 @@ jobs:
 
       - name: Validate Python imports before deployment
         working-directory: hf-space-deploy
+        # Importing from the bundle would otherwise write __pycache__/*.pyc
+        # back into it right after "Prepare Space files" removed them.
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
         run: |
           pip install numpy onnxruntime huggingface_hub
           echo "=== Pre-deployment import validation ==="
@@ -216,7 +220,9 @@ jobs:
 
           python << 'PYEOF'
           import os
+          import sys
           from datetime import datetime
+          from pathlib import Path
           from huggingface_hub import HfApi, login
 
           login(token=os.environ["HF_TOKEN"])
@@ -232,14 +238,38 @@ jobs:
           else:
               commit_msg = f"Update from GitHub Actions - {timestamp}"
 
+          space_id = "ayousanz/piper-plus-demo"
           api = HfApi()
+          # upload_folder only adds and overwrites, so files dropped from the
+          # bundle stayed on the Space forever (#916). delete_patterns="*"
+          # removes every remote file the bundle no longer has; files being
+          # re-uploaded are not deleted, and huggingface_hub never deletes
+          # .gitattributes.
           api.upload_folder(
-              repo_id="ayousanz/piper-plus-demo",
+              repo_id=space_id,
               folder_path="hf-space-deploy",
               repo_type="space",
               commit_message=commit_msg,
+              ignore_patterns=["*.pyc", "*/__pycache__/*"],
+              delete_patterns="*",
           )
-          print("Successfully deployed to Hugging Face Spaces")
+
+          # The Space must now hold exactly the bundle (plus .gitattributes).
+          bundle = {
+              p.relative_to("hf-space-deploy").as_posix()
+              for p in Path("hf-space-deploy").rglob("*")
+              if p.is_file() and "__pycache__" not in p.parts
+          }
+          remote = set(api.list_repo_files(space_id, repo_type="space")) - {".gitattributes"}
+          extra = sorted(remote - bundle)
+          missing = sorted(bundle - remote)
+          if extra or missing:
+              for f in extra:
+                  print(f"  not in bundle: {f}")
+              for f in missing:
+                  print(f"  not uploaded: {f}")
+              sys.exit(f"Space files do not match the bundle ({len(extra)} extra, {len(missing)} missing)")
+          print(f"Successfully deployed to Hugging Face Spaces ({len(remote)} files, matches the bundle)")
           PYEOF
 
       - name: Post-deploy verification -- wait for HF Space to reach RUNNING
