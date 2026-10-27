@@ -19,3 +19,8 @@ PiperPlus.Core.Phonemize.SpanishG2PEngine.ToPhonemeList(string! text) -> System.
 static PiperPlus.Core.Phonemize.EnglishG2PEngine.FromJson(System.IO.Stream! dictionary) -> PiperPlus.Core.Phonemize.EnglishG2PEngine!
 static PiperPlus.Core.Phonemize.MultilingualPhonemizer.NormalizeCjkPunctuationForLatin(string! text) -> string!
 static PiperPlus.Core.Phonemize.PinyinDictionaryChineseG2PEngine.FromJson(System.IO.Stream! single, System.IO.Stream! phrases) -> PiperPlus.Core.Phonemize.PinyinDictionaryChineseG2PEngine!
+PiperPlus.Core.Inference.SpeakerEncoder.FrontEnd.get -> PiperPlus.Core.Inference.SpeakerFrontEnd
+PiperPlus.Core.Inference.SpeakerEncoder.SpeakerEncoder(string! modelPath, PiperPlus.Core.Inference.SpeakerFrontEnd frontEnd) -> void
+PiperPlus.Core.Inference.SpeakerFrontEnd
+PiperPlus.Core.Inference.SpeakerFrontEnd.KaldiFbank = 1 -> PiperPlus.Core.Inference.SpeakerFrontEnd
+PiperPlus.Core.Inference.SpeakerFrontEnd.Mel = 0 -> PiperPlus.Core.Inference.SpeakerFrontEnd

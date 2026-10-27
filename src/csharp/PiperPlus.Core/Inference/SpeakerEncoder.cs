@@ -5,16 +5,39 @@ using Microsoft.ML.OnnxRuntime;
 namespace PiperPlus.Core.Inference;
 
 /// <summary>
-/// Speaker encoder for voice cloning — loads a CAM++ ONNX model
+/// Feature front end that turns audio into the speaker encoder's input.
+/// </summary>
+public enum SpeakerFrontEnd
+{
+    /// <summary>
+    /// Legacy ECAPA-TDNN mel spectrogram (linear resample, Hann window,
+    /// 400-point DFT, 20-7600 Hz). The output is returned as the model produced it.
+    /// </summary>
+    Mel = 0,
+
+    /// <summary>
+    /// zs-v1 CAM++ recipe: kaiser_best resample, Kaldi fbank, mean subtraction.
+    /// The output is L2-normalized.
+    /// </summary>
+    KaldiFbank = 1,
+}
+
+/// <summary>
+/// Speaker encoder for voice cloning — loads a speaker encoder ONNX model
 /// and extracts speaker embedding vectors from reference audio.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Mel spectrogram parameters are unified across all runtimes:
+/// <see cref="SpeakerFrontEnd.KaldiFbank"/> reproduces the recipe the public
+/// zs-v1 base's CAM++ encoder (192-d) was verified with (see
+/// <see cref="KaldiFbank"/>). <see cref="SpeakerFrontEnd.Mel"/> keeps the legacy
+/// ECAPA-TDNN (256-d) parameters, unified across all runtimes:
 /// sr=16000, n_fft=400 (Kaldi 25ms @ 16kHz), hop=160, n_mels=80, fmin=20, fmax=7600.
+/// <see cref="SpeakerEncoder(string)"/> picks the front end from the model's
+/// output dimension.
 /// </para>
 /// <para>
-/// The extracted embedding (192-d float32) can be passed to
+/// The extracted embedding can be passed to
 /// <see cref="SynthesisInput.SpeakerEmbedding"/> for voice cloning synthesis.
 /// </para>
 /// </remarks>
@@ -35,15 +58,80 @@ public sealed class SpeakerEncoder : IDisposable
     internal const float MelFmin = 20f;
     internal const float MelFmax = 7600f;
 
+    /// <summary>Embedding dimension of the CAM++ encoder bundled with the public zs-v1 base.</summary>
+    internal const int CampplusEmbeddingDim = 192;
+
     private readonly InferenceSession _session;
     private bool _disposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SpeakerEncoder"/> class.
-    /// Load a speaker encoder model from an ONNX file.
+    /// Load a speaker encoder model from an ONNX file. The front end follows the
+    /// model's output dimension: the zs-v1 CAM++ encoder (192) gets
+    /// <see cref="SpeakerFrontEnd.KaldiFbank"/>, anything else
+    /// <see cref="SpeakerFrontEnd.Mel"/>.
     /// </summary>
     /// <param name="modelPath">Path to the speaker encoder ONNX model.</param>
     public SpeakerEncoder(string modelPath)
+    {
+        // Load for the CAM++ front end first; the output dimension decides
+        // whether the legacy optimization level is needed instead.
+        _session = CreateSession(modelPath, SpeakerFrontEnd.KaldiFbank);
+        try
+        {
+            FrontEnd = ForEmbeddingDim(OutputDim(_session));
+        }
+        catch
+        {
+            _session.Dispose();
+            throw;
+        }
+
+        if (FrontEnd != SpeakerFrontEnd.KaldiFbank)
+        {
+            _session.Dispose();
+            _session = CreateSession(modelPath, FrontEnd);
+        }
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SpeakerEncoder"/> class
+    /// with an explicit front end.
+    /// </summary>
+    /// <param name="modelPath">Path to the speaker encoder ONNX model.</param>
+    /// <param name="frontEnd">Feature front end to use.</param>
+    public SpeakerEncoder(string modelPath, SpeakerFrontEnd frontEnd)
+    {
+        if (!Enum.IsDefined(frontEnd))
+        {
+            throw new ArgumentOutOfRangeException(nameof(frontEnd), frontEnd, "Unknown speaker front end.");
+        }
+
+        FrontEnd = frontEnd;
+        _session = CreateSession(modelPath, frontEnd);
+    }
+
+    /// <summary>
+    /// Gets the feature front end this encoder uses.
+    /// </summary>
+    public SpeakerFrontEnd FrontEnd { get; }
+
+    /// <summary>
+    /// Front end for an encoder whose embedding has <paramref name="dim"/> values
+    /// (0 when unknown).
+    /// </summary>
+    internal static SpeakerFrontEnd ForEmbeddingDim(int dim) =>
+        dim == CampplusEmbeddingDim ? SpeakerFrontEnd.KaldiFbank : SpeakerFrontEnd.Mel;
+
+    // Last dimension of the first output, or 0 when it is dynamic.
+    internal static int OutputDim(InferenceSession session)
+    {
+        NodeMetadata? output = session.OutputMetadata.Values.FirstOrDefault();
+        int[] dims = output?.Dimensions ?? [];
+        return dims.Length > 0 && dims[^1] > 0 ? dims[^1] : 0;
+    }
+
+    private static InferenceSession CreateSession(string modelPath, SpeakerFrontEnd frontEnd)
     {
         ArgumentException.ThrowIfNullOrEmpty(modelPath);
         if (!File.Exists(modelPath))
@@ -51,22 +139,32 @@ public sealed class SpeakerEncoder : IDisposable
             throw new FileNotFoundException($"Speaker encoder model not found: {modelPath}", modelPath);
         }
 
-        var options = new SessionOptions
+        // ONNX Runtime 1.24-1.28 graph optimizations (even the basic level)
+        // change CAM++ output (cosine 0.998 against the unoptimized and 1.29+
+        // result); the encoder runs once per reference, so the unoptimized
+        // graph costs little.
+        using var options = new SessionOptions
         {
-            GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL,
+            GraphOptimizationLevel = frontEnd == SpeakerFrontEnd.KaldiFbank
+                ? GraphOptimizationLevel.ORT_DISABLE_ALL
+                : GraphOptimizationLevel.ORT_ENABLE_ALL,
             IntraOpNumThreads = 2,
             InterOpNumThreads = 1,
         };
 
-        _session = new InferenceSession(modelPath, options);
+        return new InferenceSession(modelPath, options);
     }
 
     /// <summary>
     /// Encode audio samples into a speaker embedding vector.
     /// </summary>
     /// <param name="audioSamples">Mono float32 PCM samples.</param>
-    /// <param name="sampleRate">Sample rate of the input audio.</param>
-    /// <returns>Speaker embedding vector (192-d float32).</returns>
+    /// <param name="sampleRate">Sample rate of the input audio. Audio at other
+    /// rates is resampled to 16 kHz first (kaiser_best sinc for
+    /// <see cref="SpeakerFrontEnd.KaldiFbank"/>, linear interpolation for
+    /// <see cref="SpeakerFrontEnd.Mel"/>).</param>
+    /// <returns>Speaker embedding vector (192-d and L2-normalized for the zs-v1
+    /// CAM++ encoder, 256-d for the legacy ECAPA-TDNN encoder).</returns>
     public float[] Encode(float[] audioSamples, int sampleRate)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -77,13 +175,26 @@ public sealed class SpeakerEncoder : IDisposable
             throw new ArgumentException("Audio samples cannot be empty.", nameof(audioSamples));
         }
 
-        // Resample to 16kHz if needed
-        float[] resampled = sampleRate != MelSampleRate
-            ? ResampleLinear(audioSamples, sampleRate, MelSampleRate)
-            : audioSamples;
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sampleRate);
+        bool kaldi = FrontEnd == SpeakerFrontEnd.KaldiFbank;
 
-        // Compute mel spectrogram: frame-major layout [nFrames, nMels]
-        float[] mel = ComputeMelSpectrogram(resampled);
+        // Resample to 16kHz if needed, then compute features: frame-major
+        // layout [nFrames, nMels]
+        float[] mel;
+        if (kaldi)
+        {
+            float[] resampled = KaldiFbank.ResampleKaiserBest(audioSamples, sampleRate, MelSampleRate);
+            mel = KaldiFbank.Fbank(resampled);
+            KaldiFbank.SubtractBandMeans(mel);
+        }
+        else
+        {
+            float[] resampled = sampleRate != MelSampleRate
+                ? ResampleLinear(audioSamples, sampleRate, MelSampleRate)
+                : audioSamples;
+            mel = ComputeMelSpectrogram(resampled);
+        }
+
         int nFrames = mel.Length / MelNMels;
 
         if (nFrames == 0)
@@ -110,7 +221,7 @@ public sealed class SpeakerEncoder : IDisposable
         using IDisposableReadOnlyCollection<OrtValue> results = _session.Run(runOptions, inputNames, inputValues, outputNames);
 
         ReadOnlySpan<float> embedding = results[0].GetTensorDataAsSpan<float>();
-        return embedding.ToArray();
+        return kaldi ? L2Normalize(embedding) : embedding.ToArray();
     }
 
     /// <summary>
@@ -248,6 +359,29 @@ public sealed class SpeakerEncoder : IDisposable
     // ------------------------------------------------------------------
     // Internal: Audio processing
     // ------------------------------------------------------------------
+    internal static float[] L2Normalize(ReadOnlySpan<float> embedding)
+    {
+        double sum = 0;
+        foreach (float v in embedding)
+        {
+            sum += (double)v * v;
+        }
+
+        double norm = Math.Sqrt(sum);
+        if (!double.IsFinite(norm) || norm <= 0)
+        {
+            throw new InvalidOperationException("Speaker encoder returned a zero or non-finite embedding.");
+        }
+
+        float[] output = new float[embedding.Length];
+        for (int i = 0; i < output.Length; i++)
+        {
+            output[i] = (float)(embedding[i] / norm);
+        }
+
+        return output;
+    }
+
     internal static float[] ResampleLinear(float[] samples, int fromRate, int toRate)
     {
         double ratio = (double)fromRate / toRate;

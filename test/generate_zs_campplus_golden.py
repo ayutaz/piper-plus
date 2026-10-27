@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Generate golden CAM++ embeddings for the browser's zero-shot speaker encoder.
+"""Generate golden CAM++ embeddings for the runtimes' zero-shot speaker encoders.
 
 Runs the zs-v1 embedding recipe of the Hugging Face Space
 (huggingface-space/zero_shot.py: kaiser_best resample to 16 kHz -> Kaldi
 fbank -> mean subtraction -> CAM++ -> L2 normalization) on the pinned
 campplus.onnx. test/js/test-zs-campplus-parity.js runs the browser
-SpeakerEncoder (frontEnd "kaldi-fbank") on the same model and inputs.
+SpeakerEncoder (frontEnd "kaldi-fbank") on the same model and inputs, and the
+Rust (test_campplus_parity.rs), Go (campplus_parity_test.go) and C#
+(CampplusParityTests.cs) SpeakerEncoders do the same.
 
-The inputs are closed-form voiced tones, rebuilt in JS by `voicedSignal()`,
-so the fixture stores only parameters and embeddings.
+The inputs are closed-form voiced tones, rebuilt by `voicedSignal()` in each
+test, so the fixture stores only parameters and embeddings.
 
 Usage (downloads the pinned model first):
     node src/wasm/openjtalk-web/test/browser/prepare-models.mjs
@@ -131,8 +133,15 @@ def main() -> None:
     digest = hashlib.sha256(model.read_bytes()).hexdigest()
     if digest != pinned["sha256"]:
         raise SystemExit(f"{model}: SHA-256 {digest} != pinned {pinned['sha256']}")
+    # ONNX Runtime 1.24-1.28 graph optimizations (any level) change the CAM++
+    # output (cosine 0.998-0.9998 against 1.29+); the runtimes disable them
+    # for this model too.
+    options = onnxruntime.SessionOptions()
+    options.graph_optimization_level = (
+        onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
+    )
     session = onnxruntime.InferenceSession(
-        str(model), providers=["CPUExecutionProvider"]
+        str(model), options, providers=["CPUExecutionProvider"]
     )
 
     cases = []

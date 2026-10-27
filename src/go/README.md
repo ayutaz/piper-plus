@@ -204,6 +204,13 @@ shared Python phoneme IDs; native G2P and listening quality were excluded, and
 quality approval remains false. The `--download-model` option accepts a URL;
 no public `base` alias is provided by this Go runtime.
 
+With a 192-dimensional encoder such as `campplus.onnx`, `--reference-audio`
+computes the embedding with the zs-v1 recipe (Kaiser resampling, Kaldi fbank,
+L2 normalization) and matches the Python embedding (cosine ≥ 0.9999 in CI).
+Releases up to `src/go/v0.2.0` used the legacy mel front end for every
+encoder, which gives a different embedding for `campplus.onnx` (cosine 0.18);
+with those, pass a precomputed `--speaker-embedding` instead.
+
 ## API Reference / APIリファレンス
 
 ### Initialization / 初期化

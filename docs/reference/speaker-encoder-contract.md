@@ -26,6 +26,56 @@ legacy 256-dimensional ECAPA embedding into `base.onnx`, and do not treat the
 Zero-Shot base as an ordinary reference-free API voice. The public bundle is an
 experimental functional release; the embedding path has no new quality approval.
 
+### CAM++ front end in the runtimes
+
+The zs-v1 embedding recipe (`scripts/public_base_runtime.py`,
+`huggingface-space/zero_shot.py`) is: mono, resample to 16 kHz with torchaudio
+`sinc_interp_kaiser` (kaiser_best), `torchaudio.compliance.kaldi.fbank`
+(80 bins, 25 ms / 10 ms frames, povey window, DC removal, preemphasis 0.97,
+512-point FFT, mel 20 Hz to Nyquist, dither 0), subtract each bin's mean over
+time, run CAM++, L2-normalize. The legacy mel front end of Layer 1 below
+differs in every one of these steps; on the real `campplus.onnx` it gives a
+cosine of 0.18 to the Python embedding.
+
+| Runtime | Selection | Explicit choice |
+|---|---|---|
+| Rust | `SpeakerEncoder::new` reads the encoder's output dimension: 192 selects the Kaldi fbank front end, anything else keeps the legacy mel front end | `SpeakerEncoder::with_front_end(path, SpeakerFrontEnd::KaldiFbank \| Mel)` |
+| Go | same rule in `NewSpeakerEncoder` | `NewSpeakerEncoderWithFrontEnd(path, SpeakerFrontEndKaldiFbank \| SpeakerFrontEndMel)` |
+| C# | same rule in `new SpeakerEncoder(path)` | `new SpeakerEncoder(path, SpeakerFrontEnd.KaldiFbank \| Mel)` |
+| WASM / npm | `frontEnd` option, default `"mel"` | `SpeakerEncoder.initialize({ frontEnd: "kaldi-fbank" })` |
+
+The CLIs' `--reference-audio` uses the automatic rule, so `campplus.onnx`
+gets the zs-v1 recipe. The Kaldi fbank front end L2-normalizes the embedding
+and rejects a zero or non-finite one; the mel front end returns the raw
+encoder output as before.
+
+The Kaldi fbank front end runs CAM++ with ONNX Runtime graph optimizations
+disabled. With ONNX Runtime 1.24 to 1.28, any optimization level (including
+basic) changes the CAM++ output to a cosine of 0.998 to 0.9998 against the
+Python embedding; 1.29 and later, and optimizations disabled, reproduce it.
+Go CI runs 1.24.4, the C# package depends on 1.24.3, and the npm package
+accepts `onnxruntime-web` from 1.22. Disabling them costs about 10 % (one encoder
+run per reference clip).
+
+Tests share two fixtures generated with torchaudio and onnxruntime:
+
+- `test/fixtures/kaldi_fbank_golden.json` (`test/generate_kaldi_fbank_golden.py`):
+  resampler and fbank values, max abs error 5e-5 (resample) and 1e-2 / mean
+  1e-3 (fbank). Runs without a model.
+- `test/fixtures/zs_campplus_golden.json` (`test/generate_zs_campplus_golden.py`):
+  CAM++ embeddings of synthetic voices at 16, 22.05, 24 and 48 kHz; each
+  runtime must reach cosine ≥ 0.9999 and max abs ≤ 5e-4, and two distinct
+  voices must stay below cosine 0.95. Needs the pinned `campplus.onnx` in
+  `PIPER_PLUS_CAMPPLUS_ONNX`; CI downloads and checks it with
+  `.github/actions/fetch-campplus`.
+
+| Runtime | Fbank golden | CAM++ parity (CI job) |
+|---|---|---|
+| Rust | `src/rust/piper-core/tests/test_kaldi_fbank_golden.rs` | `tests/test_campplus_parity.rs` (`rust-tests`, 3 OSes) |
+| Go | `src/go/piperplus/kaldi_fbank_test.go` | `campplus_parity_test.go`, `integration` tag (`go-ci` integration-test) |
+| C# | `src/csharp/PiperPlus.Core.Tests/KaldiFbankTests.cs` | `CampplusParityTests.cs` (`csharp-ci`, 4 OS images) |
+| WASM / npm | `test/js/test-kaldi-fbank-golden.js` | `test/js/test-zs-campplus-parity.js` (`ci.yml`, onnxruntime-node) |
+
 The remainder of this document is the retained legacy ECAPA-TDNN 256-dimensional
 contract used by pre-v2 exports. New v2 Zero-Shot exports use the CAM++ contract
 above; runtimes must inspect the ONNX input dimension instead of assuming 256.

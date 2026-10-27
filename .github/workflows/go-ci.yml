@@ -30,6 +30,9 @@ on:
       - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
       - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
       - 'test/fixtures/speaker_encoder_golden.json'
+      - 'test/fixtures/kaldi_fbank_golden.json'
+      - 'test/fixtures/zs_campplus_golden.json'
+      - '.github/actions/fetch-campplus/**'
       - '.github/workflows/go-ci.yml'
       # Skipped-test gate.
       - 'scripts/check_test_skips.py'
@@ -60,6 +63,9 @@ on:
       - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
       - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
       - 'test/fixtures/speaker_encoder_golden.json'
+      - 'test/fixtures/kaldi_fbank_golden.json'
+      - 'test/fixtures/zs_campplus_golden.json'
+      - '.github/actions/fetch-campplus/**'
       - 'scripts/check_test_skips.py'
       - 'docs/spec/test-skip-allowlist.toml'
       - '.github/actions/check-test-skips/**'
@@ -165,6 +171,9 @@ jobs:
             cp "onnxruntime-linux-x64-${ORT_VERSION}"/lib/libonnxruntime.so onnxruntime/lib/
           fi
         working-directory: .
+      # campplus_parity_test.go skips without PIPER_PLUS_CAMPPLUS_ONNX; the
+      # skip gate below fails the job if that happens here.
+      - uses: ./.github/actions/fetch-campplus
       - run: go test -v -race -count=1 -tags integration ./... 2>&1 | tee "$RUNNER_TEMP/go-test.log"
         shell: bash
         env:

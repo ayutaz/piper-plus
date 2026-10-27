@@ -77,9 +77,13 @@ export class SpeakerEncoder {
       throw new Error("options.modelUrl or options.modelData is required for SpeakerEncoder");
     }
 
+    // ONNX Runtime 1.24-1.28 graph optimizations (even the basic level)
+    // change CAM++ output (cosine 0.998 against the unoptimized and 1.29+
+    // result), and the peer range allows those versions; the encoder runs
+    // once per reference, so the unoptimized graph costs little.
     instance._session = await ort.InferenceSession.create(model, {
       executionProviders: ["wasm"],
-      graphOptimizationLevel: "all",
+      graphOptimizationLevel: frontEnd === "kaldi-fbank" ? "disabled" : "all",
     });
 
     return instance;

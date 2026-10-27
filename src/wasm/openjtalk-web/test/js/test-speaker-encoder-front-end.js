@@ -117,6 +117,18 @@ describe("SpeakerEncoder frontEnd: kaldi-fbank", () => {
     }
   });
 
+  it("runs the encoder without graph optimizations", async () => {
+    // onnxruntime 1.24-1.28 optimizations change CAM++ output (cosine
+    // 0.998); the parity test runs onnxruntime-node 1.30 and cannot see it.
+    const ort = fakeOrt();
+    await SpeakerEncoder.initialize({ modelUrl: "campplus.onnx", ort, frontEnd: "kaldi-fbank" });
+    assert.equal(ort.created[0].options.graphOptimizationLevel, "disabled");
+
+    const mel = fakeOrt();
+    await SpeakerEncoder.initialize({ modelUrl: "enc.onnx", ort: mel });
+    assert.equal(mel.created[0].options.graphOptimizationLevel, "all");
+  });
+
   it("rejects audio shorter than one 25 ms frame", async () => {
     const encoder = await SpeakerEncoder.initialize({
       modelUrl: "campplus.onnx",
