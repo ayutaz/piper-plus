@@ -37,7 +37,7 @@
 
 [meta]
 spec_version = 1
-last_updated = "2026-10-25"
+last_updated = "2026-10-27"
 applies_to = ["python", "go", "cpp", "csharp", "rust"]
 canonical_reference = "scripts/check_test_skips.py"
 # Unknown entry fields fail the gate (a typo such as `expire` must not
@@ -137,7 +137,7 @@ runtime = "python"
 test = "src/python_run/tests/test_training_integration.py::TestTrainingIntegration::test_real_piper_train_invocation"
 kind = "tracked"
 expires = "2027-01-31"
-reason = "Needs piper_train next to the WebUI; neither python-tests nor webui-test installs both, so it never runs."
+reason = "Runs only when a maintainer's local checkout (/Users/s19447/Desktop/total-piper/...) exists, so it never runs in CI. Point it at this repository's piper_train or remove it."
 
 [[entry]]
 runtime = "python"
@@ -226,19 +226,19 @@ reason = "The .opt.onnx + .ok cache race depends on Linux filesystem semantics; 
 runtime = "python"
 test = "src/python_run/tests/test_webui.py::*"
 kind = "harmless"
-reason = "Needs gradio; webui-test.yml installs the WebUI requirements and runs this file."
+reason = "Needs gradio, which python-tests' training environment cannot hold (HF Hub 1.x vs <1). consumer-contracts.yml runs this file in environments/webui and fails on any skip there."
 
 [[entry]]
 runtime = "python"
 test = "src/python_run/tests/test_training_manager.py::TestTrainingWebUIIntegration::*"
 kind = "harmless"
-reason = "Needs gradio; webui-test.yml runs tests/test_training_manager.py."
+reason = "Needs gradio; consumer-contracts.yml runs tests/test_training_manager.py in environments/webui and fails on any skip there."
 
 [[entry]]
 runtime = "python"
 test = "src/python_run/tests/test_training_integration.py::TestTrainingIntegration::test_*_training_*"
 kind = "harmless"
-reason = "Needs gradio; webui-test.yml runs tests/test_training_integration.py."
+reason = "Needs gradio; consumer-contracts.yml runs tests/test_training_integration.py in environments/webui and fails on any skip there."
 
 [[entry]]
 runtime = "python"

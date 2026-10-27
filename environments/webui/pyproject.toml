@@ -21,3 +21,8 @@ piper-plus = { path = "../../src/python_run", editable = true }
 # while the training workspace's Transformers 4.x requires HF Hub <1.
 [tool.uv.workspace]
 members = []
+
+[dependency-groups]
+test = [
+    "pytest>=9.1.1,<10",
+]

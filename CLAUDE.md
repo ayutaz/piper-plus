@@ -249,7 +249,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 ### サーバー / Docker / 統合
 
 - **OpenAI 互換 TTS API** (`docker/python-inference/inference.py`) — FastAPI ベース、`/v1/audio/speech`、`/v1/models`、`/v1/audio/speech/languages`、`/health`、`/api/phoneme-timing`。テスト: `test_openai_api.py`。
-- **WebUI (Gradio)** (`docker/webui/app.py`) — 6lang モデル対応。CI: `webui-test.yml`。ドキュメント: `docs/features/webui.md`。
+- **WebUI (Gradio)** (`docker/webui/app.py`) — 6lang モデル対応。CI: `consumer-contracts.yml` が `environments/webui` で WebUI のテストを実行 (`webui-test.yml` は無効化されている)。ドキュメント: `docs/features/webui.md`。
 - **Wyoming Docker + HA 統合** (`docker/wyoming/`) — Home Assistant 連携。ガイド: `docs/guides/integration/home-assistant.md`。
 - **MOS ベンチマーク** (`tools/benchmark/`) — サンプル生成、PESQ/STOI 計算、調査フォーム生成。ドキュメント: `docs/benchmark-mos.md`。
 - **iOS/Android ビルド CI** (`release-shared-lib.yml`, `cmake/ios.toolchain.cmake`) — libpiper_plus を iOS arm64 / Android (arm64-v8a/armeabi-v7a/x86_64) でクロスコンパイル。iOS は xcframework (device + simulator universal) として配信、`Package.swift` 経由で SPM 利用可能。Apple-embedded プラットフォーム検出は `PIPER_APPLE_EMBEDDED` 変数で集約 (CMakeLists.txt)、OpenJTalk 関数は `src/cpp/openjtalk_ios_stub.c` で stub 化。詳細: `docs/guides/platform/ios-integration.md`、`docs/reference/ios-shared-lib.md`。
