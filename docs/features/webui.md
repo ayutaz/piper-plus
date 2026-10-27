@@ -126,7 +126,7 @@ Neither WebUI exposes a reference-audio/speaker-embedding input for the public
 [pretrained-model guide](../guides/development/pretrained-models.md) for
 reference-conditioned Zero-Shot inference. The separate
 [Hugging Face Space demo](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
-has an experimental Zero-shot tab that conditions the pinned `zs-v1` base on an
+has a Zero-shot tab that conditions the pinned `zs-v1` base on an
 uploaded or recorded reference clip.
 
 ## Architecture

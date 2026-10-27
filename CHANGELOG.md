@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- HF Space demo: add an experimental Zero-shot tab that speaks in the voice of an uploaded or recorded reference clip (#790, PR #806). It uses the revision-pinned public `zs-v1` base and CAM++ encoder with the CI-verified embedding recipe, rejects text containing phonemes the model never learned or letters outside the six languages instead of dropping them, and is a functional demo, not a quality approval.
+- HF Space demo: add a Zero-shot tab that speaks in the voice of an uploaded or recorded reference clip (#790, PR #806). It uses the revision-pinned public `zs-v1` base and CAM++ encoder with the CI-verified embedding recipe, rejects text containing phonemes the model never learned or letters outside the six languages instead of dropping them, and is a functional demo, not a quality approval.
 - Training: `--no-cudnn-benchmark` turns off cuDNN kernel search. VITS batches change sequence length every step, so the search reruns for each new shape; on an RTX 5090 with batch 24 a step took 1.81 s with the search and 0.61 s without. The default stays on.
 - GitHub Pages demo: zero-shot section that computes a CAM++ embedding from an uploaded or recorded clip in the browser and reads text in six languages with the public zs-v1 base (#790, PR #809). Its models load on their own once the main demo is ready, and a retry button appears only when loading fails.
 - Browser (`piper-plus` npm): `SpeakerEncoder` option `frontEnd: "kaldi-fbank"` that matches the zs-v1 Python embedding recipe (torchaudio Kaiser resampling + 80-bin `kaldi.fbank`), checked against a torchaudio golden fixture. The default front end is unchanged.

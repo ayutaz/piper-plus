@@ -255,7 +255,7 @@ def on_zero_shot_language_change(language: str) -> str:
 def _build_zero_shot_tab() -> None:
     """Zero-shot tab: synthesize in the voice of a reference clip."""
     gr.Markdown("""
-        **Experimental.** Uses the public
+        This tab uses the public
         [zs-v1 base](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1)
         with the CAM++ speaker encoder. Its quality is not approved, and an
         unseen speaker is reproduced only partially.
@@ -334,7 +334,7 @@ def create_interface():
             Chinese, Spanish, French, and Portuguese.
 
             This demo uses a single multilingual ONNX model for fast CPU inference.
-            The **Zero-shot (experimental)** tab speaks in the voice of a reference clip.
+            The **Zero-shot** tab speaks in the voice of a reference clip.
             """)
 
         with gr.Tabs():
@@ -463,7 +463,7 @@ def create_interface():
                     outputs=audio_output,
                 )
 
-            with gr.Tab("Zero-shot (experimental)"):
+            with gr.Tab("Zero-shot"):
                 _build_zero_shot_tab()
 
     return interface
