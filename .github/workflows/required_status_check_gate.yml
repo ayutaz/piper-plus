@@ -93,6 +93,7 @@ on:
       - Pre-commit
       - PUA Consistency Gate
       - Public Base Runtime Verification
+      - PyPI Stub (piper-tts-plus)
       - public-api-diff
       - Python Doctest
       - Python license and wheel consumers
