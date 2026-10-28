@@ -8,7 +8,7 @@ VITS ベースの高品質ニューラル TTS。**6言語マルチリンガル�
 
 ## Research / archive and publication pointers
 
-現在の研究ブランチは `feat/zero-shot-v8-dataset-scaling` です。研究用の v7 zero-shot 学習結果と手順は、次の文書を正本とします。
+現在の研究ブランチは `feat/zero-shot-speaker-identity` です (2026-10-28 に旧研究ブランチ `feat/zero-shot-v8-dataset-scaling` を最新 dev へリベースして作成)。旧ブランチは削除し、先端は tag `archive/feat/zero-shot-v8-dataset-scaling` に残しています。リベース前のコミットハッシュは、本書や設計文書に書かれたものも含めてこの tag から辿ってください。研究用の v7 zero-shot 学習結果と手順は、次の文書を正本とします。
 
 - [v7 学習結果・根本原因](docs/design/multi-6lang-zero-shot-v7-training-results.md) — epoch 32、6言語、571話者、研究上の修正と評価。
 - [zero-shot handoff](docs/handoff/zero-shot-tts-handoff-2026-06-20.md) — private/gated 研究保存先、旧 `/data/piper` パス、再現・再開手順。
