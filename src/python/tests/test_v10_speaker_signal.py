@@ -391,6 +391,7 @@ class TestSwapSclCli:
         assert args.swap_spk_ramp_epochs == 2
 
 
+@pytest.mark.unit
 class TestSwapSclWaveform:
     """SynthesizerTrn.swap_scl_waveform の形状 + 勾配隔離 (tiny model)。"""
 
@@ -803,6 +804,7 @@ class TestBuildLatentFillingEmbeddings:
         assert mixed, "異話者ありで補間 branch が一度も発火しない (配線が死んでいる)"
 
 
+@pytest.mark.unit
 class TestLatentFillingConsistencyGradient:
     def test_lfcl_gradient_reaches_spk_proj(self, tmp_path):
         """LFCL = 1 - cos(scl_encoder(y_hat), s̃) の勾配が spk_proj に届く。

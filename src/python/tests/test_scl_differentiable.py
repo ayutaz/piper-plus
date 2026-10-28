@@ -131,6 +131,7 @@ class TestSpeakerInfoNCELoss:
         )
 
 
+@pytest.mark.unit
 class TestSpeakerInfoNCECrossUtt:
     """positive_mode='cross_utt' (v10 roadmap B-1) の回帰テスト。
 
@@ -306,6 +307,7 @@ def _tiny_synthesizer():
     )
 
 
+@pytest.mark.unit
 class TestSclWaveformDetachedZ:
     """scl_waveform_detached_z (v10 roadmap B-3) の勾配隔離を実モデルで固定。"""
 

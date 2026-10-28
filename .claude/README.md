@@ -73,6 +73,12 @@
 - `npm publish` (リリースワークフロー経由を強制)
 - `git push` の hook bypass フラグ / main・master への `--force-with-lease` push
 - `gh pr create` の直接実行 (`/create-pr` skill 内からの実行のみ許可)
+- `pkill` + `nohup` 起動の同一コマンド連結 (pkill 自己マッチで ssh ごと死ぬ
+  無言死 — v10a/v10b/v11 で実測。kill と起動は別々の呼び出しに分ける)
+- `pkill -f <pattern>` のパターンが同一コマンド内に再出現する形 (自己マッチの
+  一般形。PID 指定 kill へ誘導 — 2026-08 までに通算 6 回実測)
+- `~/.ssh/id_*` 秘密鍵への上書き (`cp`/`mv`/リダイレクト。`cp -n` / 事前 `.bak` /
+  `.pub` は除外 — 2026-08 の復元不能上書き事故の再発防止)
 - `eval_zs_secs` の `--encoder2` なし実行 (単一 encoder では Goodhart を検知
   できない — 2026-08 の same-utt 0.775 誤報 / Arm B 偽改善事故の再発防止。
   pytest / `--help` / `pre-commit run` / `ruff` / `git add` / `git diff` は

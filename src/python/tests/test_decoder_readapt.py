@@ -179,6 +179,7 @@ def test_reinit_requires_weights_only():
     assert "raise SystemExit" in src
 
 
+@pytest.mark.unit
 def test_namespace_placeholder():
     # argparse import は CLI テストの将来拡張用に保持
     assert argparse is not None

@@ -358,3 +358,25 @@ def test_allowed_prefixes_must_be_dotted_module_prefixes(prefixes):
         load_state_with_allowed_missing(
             _reference_generator(), _source_state(_legacy_generator()), prefixes
         )
+
+
+def test_training_entrypoints_load_checkpoints_through_checkpoint_io():
+    # 別 OS で保存した ckpt の warm start / resume の読み直しは、素の
+    # torch.load ではパス型を復元できずに落ちる。ckpt を読む入口はすべて
+    # checkpoint_io を通す。main は strict resume を Lightning に任せ、
+    # 自分では ckpt を読まない (失敗時に weights-only へ切り替えない)。
+    import inspect
+
+    from piper_train import __main__ as entry
+
+    loaders = (
+        entry.load_weights_only_checkpoint,
+        entry.load_single_speaker_checkpoint,
+        entry.load_multispeaker_checkpoint,
+        entry.apply_transfer_defaults,
+    )
+    for func in loaders:
+        src = inspect.getsource(func)
+        assert "load_checkpoint(" in src, func.__name__
+        assert "torch.load(" not in src, func.__name__
+    assert "torch.load(" not in inspect.getsource(entry.main)
