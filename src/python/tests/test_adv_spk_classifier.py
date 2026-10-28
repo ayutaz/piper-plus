@@ -427,6 +427,7 @@ class TestAdvSpkCli:
         assert args.adv_spk_ramp_epochs == 3
 
 
+@pytest.mark.unit
 class TestSparseSpeakerIdSizing:
     """v10b smoke 実測事故の再発防止: データゲートで speaker_id が疎な dataset
     (config num_speakers=個数 < max_id+1) では classifier を max_id+1 で

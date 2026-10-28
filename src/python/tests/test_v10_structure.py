@@ -793,6 +793,7 @@ class TestV10StructureCli:
         assert args.spk_emb_noise_sigma == 0.0
 
 
+@pytest.mark.unit
 class TestStreamingExportGuards:
     """streaming export が v10 opt-in 構造を silent に落とした graph を
     出力しないこと (レビュー指摘: ガードの対称性)。"""

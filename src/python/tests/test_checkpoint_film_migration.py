@@ -44,6 +44,7 @@ UPSAMPLE_INITIAL_CHANNEL = 32
 INITIAL_CHANNEL = 16
 
 
+@pytest.mark.unit
 def test_old_checkpoint_backfills_only_fixed_added_loss_buffers():
     from piper_train.vits.stft_loss import HighBandSTFTLoss, MultiResolutionSTFTLoss
 

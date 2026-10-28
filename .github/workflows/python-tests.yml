@@ -60,6 +60,11 @@ on:
       - 'scripts/check_swedish_lid_consistency.py'
       - 'docs/spec/swedish-lid-mirrors.toml'
       - '.github/workflows/swedish-lid-sync.yml'
+      - 'scripts/run_zero_shot_cpu_evaluation.py'
+      - 'tests/scripts/test_zero_shot_cpu_hash_cache.py'
+      - 'scripts/run_reference_fusion_s0.py'
+      - 'tests/scripts/test_reference_fusion_s0.py'
+      - 'scripts/check_onnx_inputs.py'
   # A push to dev runs the Ubuntu / Python 3.13 entry only (see the
   # matrix), as ci.yml's copy of the unit tests did before it was removed.
   push:
@@ -88,6 +93,8 @@ on:
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'
+      # test_reference_schema_rejection.py が読む C++ 共用 fixture (+ drift test)
+      - 'src/cpp/tests/fixtures/reference_spec_inputs/**'
       - 'docs/spec/phoneme-timing-contract.toml'
       - 'docs/spec/short-text-contract.toml'
       - 'docs/spec/ort-session-contract.toml'
@@ -114,6 +121,11 @@ on:
       - 'scripts/check_swedish_lid_consistency.py'
       - 'docs/spec/swedish-lid-mirrors.toml'
       - '.github/workflows/swedish-lid-sync.yml'
+      - 'scripts/run_zero_shot_cpu_evaluation.py'
+      - 'tests/scripts/test_zero_shot_cpu_hash_cache.py'
+      - 'scripts/run_reference_fusion_s0.py'
+      - 'tests/scripts/test_reference_fusion_s0.py'
+      - 'scripts/check_onnx_inputs.py'
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
@@ -281,6 +293,26 @@ jobs:
         python -m pytest tests/scripts/test_check_python_test_selection.py -q -o addopts=
         python scripts/check_python_test_selection.py
 
+    - name: Run Zero-Shot CPU preparation regressions (Unix)
+      # These offline tests are deliberately explicit: unmarked tests are
+      # omitted by the marker-filtered suites above, and tests/scripts is
+      # outside pytest.ini testpaths. No private models, GPU or ASR download.
+      # Zero-shot tests that carry `unit` / `training` markers run in the
+      # marker-filtered steps (the `unit` ones count toward the coverage gate),
+      # so they are not repeated here.
+      if: runner.os != 'Windows'
+      env:
+        CUDA_VISIBLE_DEVICES: '-1'
+        OMP_NUM_THREADS: '1'
+        MKL_NUM_THREADS: '1'
+      run: |
+        python -m pytest \
+          src/python/tests/test_extract_speaker_embedding.py \
+          src/python/tests/test_check_onnx_inputs.py \
+          tests/scripts/test_zero_shot_cpu_hash_cache.py \
+          tests/scripts/test_reference_fusion_s0.py \
+          -q --no-cov
+
     # ---------------------------------------------------------------
     # Runtime package tests (src/python_run — PyPI piper-plus)
     # ---------------------------------------------------------------
@@ -315,7 +347,7 @@ jobs:
       run: |
         cd src/python_run
         # Wave 4: --reruns 1 で HTTP server bind race / ONNX warmup / threading-related flake を retry。
-        pytest tests/test_config_fallback.py tests/test_english_phonemization.py tests/test_runtime.py tests/test_util_impl.py tests/test_cli_models.py tests/test_training_manager.py tests/test_training_integration.py tests/test_phoneme_timing.py tests/test_voice_timing.py tests/test_http_timing.py tests/test_http_server_root.py tests/test_voice_streaming.py tests/test_text_splitter.py tests/test_text_splitter_contract.py tests/test_voice_g2p_parallel.py tests/test_short_text_mitigation.py tests/test_zh_en_loanword_runtime.py tests/test_webui.py tests/test_audio_result.py tests/test_model_resolver.py tests/test_public_zero_shot_base_resolution.py tests/test_piper_plus_api.py tests/test_piper_plus_engine.py tests/test_download_resilience.py tests/test_french_phonemization.py tests/test_json_input_cli.py tests/test_pt_dialect_parity.py tests/test_swedish_lid_runtime.py tests/test_voice_speaker_embedding.py tests/test_zero_shot_parity_fixture.py tests/test_g2p_golden_parity.py tests/test_swedish_phonemization.py tests/test_cjk_punctuation_contract.py -v --tb=short --override-ini="addopts=" --reruns 1 --reruns-delay 1
+        pytest tests/test_config_fallback.py tests/test_english_phonemization.py tests/test_runtime.py tests/test_util_impl.py tests/test_cli_models.py tests/test_training_manager.py tests/test_training_integration.py tests/test_phoneme_timing.py tests/test_voice_timing.py tests/test_http_timing.py tests/test_http_server_root.py tests/test_voice_streaming.py tests/test_text_splitter.py tests/test_text_splitter_contract.py tests/test_voice_g2p_parallel.py tests/test_short_text_mitigation.py tests/test_zh_en_loanword_runtime.py tests/test_webui.py tests/test_audio_result.py tests/test_model_resolver.py tests/test_public_zero_shot_base_resolution.py tests/test_piper_plus_api.py tests/test_piper_plus_engine.py tests/test_download_resilience.py tests/test_french_phonemization.py tests/test_json_input_cli.py tests/test_pt_dialect_parity.py tests/test_swedish_lid_runtime.py tests/test_voice_speaker_embedding.py tests/test_zero_shot_parity_fixture.py tests/test_g2p_golden_parity.py tests/test_swedish_phonemization.py tests/test_cjk_punctuation_contract.py tests/test_reference_schema_rejection.py -v --tb=short --override-ini="addopts=" --reruns 1 --reruns-delay 1
       env:
         PYTHONUTF8: '1'
 
