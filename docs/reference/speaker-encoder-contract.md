@@ -144,7 +144,7 @@ fixture against the generator and that `audio_utils` keeps `n_fft` 512 and
 
 | Runtime | Status | Test path |
 |---|---|---|
-| Python (canonical) | ✅ 14 tests (3 mel cases recomputed exactly, `integration`) | `test/generate_speaker_encoder_golden.py` (the reference impl), checked by `src/python/tests/test_speaker_encoder_golden.py` |
+| Python (canonical) | ✅ 14 tests (3 mel cases recomputed exactly, `integration`, x86_64 only) | `test/generate_speaker_encoder_golden.py` (the reference impl), checked by `src/python/tests/test_speaker_encoder_golden.py` |
 | Rust | ✅ 16 tests | `src/rust/piper-core/tests/test_speaker_encoder_golden.rs` |
 | Go | ✅ ~26 tests | `src/go/piperplus/speaker_encoder_test.go` |
 | C# | ✅ ~23 facts | `src/csharp/PiperPlus.Core.Tests/SpeakerEncoderTests.cs` |

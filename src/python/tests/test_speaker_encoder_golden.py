@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import platform
 from pathlib import Path
 from types import ModuleType
 
@@ -32,6 +33,12 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _FIXTURE_PATH = _REPO_ROOT / "test" / "fixtures" / "speaker_encoder_golden.json"
 _GENERATOR_PATH = _REPO_ROOT / "test" / "generate_speaker_encoder_golden.py"
+# Loaded by path: the piper_train.speaker_encoder package imports ecapa_tdnn,
+# which needs torch, and the Windows CI job has no torch. audio_utils itself
+# needs only numpy.
+_AUDIO_UTILS_PATH = (
+    _REPO_ROOT / "src" / "python" / "piper_train" / "speaker_encoder" / "audio_utils.py"
+)
 
 _MEL_CASES = [
     ("sine_440hz_1s", "sine", 440.0, 1.0),
@@ -49,17 +56,19 @@ def golden() -> dict:
         return json.load(f)
 
 
+def _load_by_path(name: str, path: Path) -> ModuleType:
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 @pytest.fixture(scope="module")
 def generator() -> ModuleType:
     """Import the fixture generator by path (``test/`` is not a package)."""
     if not _GENERATOR_PATH.exists():
         pytest.skip(f"Golden generator not found at {_GENERATOR_PATH}")
-    spec = importlib.util.spec_from_file_location(
-        "speaker_encoder_golden_generator", _GENERATOR_PATH
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return _load_by_path("speaker_encoder_golden_generator", _GENERATOR_PATH)
 
 
 def _find_case(g: dict, case_id: str) -> dict:
@@ -151,6 +160,14 @@ class TestFixtureMatchesGenerator:
 
 
 @pytest.mark.integration
+@pytest.mark.skipif(
+    platform.machine().lower() not in {"x86_64", "amd64"},
+    reason=(
+        "the fixture was generated on x86_64; float32 sin/cos/log are not "
+        "correctly rounded, so other CPUs (macOS arm64 in CI) give different "
+        "low-energy log-mel values and checksums"
+    ),
+)
 @pytest.mark.parametrize(("case_id", "kind", "freq", "duration_s"), _MEL_CASES)
 def test_mel_case_matches_generator(golden, generator, case_id, kind, freq, duration_s):
     """Recompute each mel case with the generator and compare it exactly.
@@ -159,6 +176,12 @@ def test_mel_case_matches_generator(golden, generator, case_id, kind, freq, dura
     (about 8 s for a 0.5 s case on a desktop CPU). A vectorized DFT is no
     shortcut, because float32 accumulation order moves the low-energy bins by
     up to 0.4 in log mel.
+
+    x86_64 only: float32 + and * are IEEE exact, but numpy leaves the rounding
+    of sin/cos/log to the platform, and the log of a low-energy bin magnifies
+    that difference past the checksum's 6 decimals. A fixture that drifted
+    from the generator fails on every CPU, so x86_64 (Linux in CI) still
+    catches it.
     """
     tc = _find_case(golden, case_id)
     mel = generator.compute_mel_spectrogram(_case_audio(generator, kind, freq, duration_s))
@@ -183,15 +206,14 @@ def test_ecapa_front_end_is_not_the_fixture_front_end(golden):
     front end (n_fft=400, ``(T, n_mels)``, mean subtraction) would feed that
     model a layout it was not built for (#857).
     """
-    from piper_train.speaker_encoder.audio_utils import (
-        DEFAULT_HOP_LENGTH,
-        DEFAULT_N_FFT,
-        DEFAULT_N_MELS,
-        compute_mel_spectrogram,
-    )
+    audio_utils = _load_by_path("speaker_encoder_audio_utils", _AUDIO_UTILS_PATH)
+    n_fft = audio_utils.DEFAULT_N_FFT
 
-    assert DEFAULT_N_FFT == 512
+    assert n_fft == 512
     assert golden["mel_params"]["n_fft"] == 400
 
-    mel = compute_mel_spectrogram(np.zeros(16000, dtype=np.float32))
-    assert mel.shape == (DEFAULT_N_MELS, 1 + (16000 - DEFAULT_N_FFT) // DEFAULT_HOP_LENGTH)
+    mel = audio_utils.compute_mel_spectrogram(np.zeros(16000, dtype=np.float32))
+    assert mel.shape == (
+        audio_utils.DEFAULT_N_MELS,
+        1 + (16000 - n_fft) // audio_utils.DEFAULT_HOP_LENGTH,
+    )
