@@ -121,11 +121,30 @@ Fixture: `test/fixtures/speaker_encoder_golden.json`. Includes:
 - 4 deterministic test cases (sine 440Hz, sine 1000Hz, multitone, resample
   48k→16k) — each with mel checksum + sampled values + corner values
 
+### Not the ECAPA-TDNN front end
+
+`piper_train.speaker_encoder.audio_utils` computes the input of the
+ECAPA-TDNN in `piper_train.speaker_encoder`, not this front end: `n_fft` 512,
+symmetric Hann (`np.hanning`), `np.fft.rfft`, layout `(n_mels, T)`, no mean
+subtraction, and scipy resampling with a linear fallback. `ECAPATDNN.forward`
+takes `(batch, n_mels, time)` and `export_encoder` declares the ONNX `mel`
+input as `[B, 80, T]`, while the runtimes feed this front end as
+`[1, T, 80]`. #579 moved this fixture and the runtimes to the front end above
+and left the ECAPA path as it was. No trained ECAPA-TDNN weights are
+published (`docs/spec/model-sha256-manifest.toml` lists the artifact as
+`publish_status = "pending"`).
+
+Keep the two separate. Aligning `audio_utils` to this fixture would change the
+input of the model it serves (#857).
+`src/python/tests/test_speaker_encoder_golden.py` pins both: it checks the
+fixture against the generator and that `audio_utils` keeps `n_fft` 512 and
+`(n_mels, T)`.
+
 ### Layer 1 — runtime status
 
 | Runtime | Status | Test path |
 |---|---|---|
-| Python (canonical) | ✅ | `test/generate_speaker_encoder_golden.py` (also serves as the reference impl) |
+| Python (canonical) | ✅ 14 tests (3 mel cases recomputed exactly, `integration`) | `test/generate_speaker_encoder_golden.py` (the reference impl), checked by `src/python/tests/test_speaker_encoder_golden.py` |
 | Rust | ✅ 16 tests | `src/rust/piper-core/tests/test_speaker_encoder_golden.rs` |
 | Go | ✅ ~26 tests | `src/go/piperplus/speaker_encoder_test.go` |
 | C# | ✅ ~23 facts | `src/csharp/PiperPlus.Core.Tests/SpeakerEncoderTests.cs` |

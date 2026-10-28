@@ -5577,8 +5577,8 @@
     },
     {
       "file": "docs/reference/speaker-encoder-contract.md",
-      "line_start": 141,
-      "line_end": 164,
+      "line_start": 160,
+      "line_end": 183,
       "language_raw": "json",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5592,8 +5592,8 @@
     },
     {
       "file": "docs/reference/speaker-encoder-contract.md",
-      "line_start": 168,
-      "line_end": 177,
+      "line_start": 187,
+      "line_end": 196,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5607,8 +5607,8 @@
     },
     {
       "file": "docs/reference/speaker-encoder-contract.md",
-      "line_start": 235,
-      "line_end": 241,
+      "line_start": 254,
+      "line_end": 260,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -5620,8 +5620,8 @@
     },
     {
       "file": "docs/reference/speaker-encoder-contract.md",
-      "line_start": 251,
-      "line_end": 270,
+      "line_start": 270,
+      "line_end": 289,
       "language_raw": "yaml",
       "language": "unknown",
       "category": "skip_warranted",
