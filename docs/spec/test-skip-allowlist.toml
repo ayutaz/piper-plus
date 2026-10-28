@@ -37,7 +37,7 @@
 
 [meta]
 spec_version = 1
-last_updated = "2026-10-27"
+last_updated = "2026-10-28"
 applies_to = ["python", "go", "cpp", "csharp", "rust"]
 canonical_reference = "scripts/check_test_skips.py"
 # Unknown entry fields fail the gate (a typo such as `expire` must not
@@ -171,6 +171,13 @@ test = "PiperPlus.Core.Tests.CliWorkingDirectoryTests.Version_FromDeletedParentD
 kind = "harmless"
 platforms = ["macos", "windows"]
 reason = "A Linux-only regression (getcwd returning ENOENT after the current directory is deleted); runs on Linux."
+
+[[entry]]
+runtime = "python"
+test = "src/python/tests/test_speaker_encoder_golden.py::test_mel_case_matches_generator*"
+kind = "harmless"
+platforms = ["macos"]
+reason = "Recomputes the golden mel cases and compares them exactly; the fixture was generated on x86_64, and numpy's float32 sin/cos/log round differently on arm64, so the macOS runners give different checksums (#857). A fixture that drifted from its generator fails on every CPU, and the Linux job runs the test."
 
 [[entry]]
 runtime = "python"
