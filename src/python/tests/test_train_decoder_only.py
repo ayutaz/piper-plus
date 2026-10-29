@@ -234,6 +234,117 @@ def test_trained_generator_uses_the_ema_decoder(tmp_path):
         torch.testing.assert_close(v, ema[k], msg=k)
 
 
+def _trained_run(tmp_path, candidate="d0"):
+    from piper_train.checkpoint_io import load_checkpoint
+    from piper_train.tools.train_decoder_only import (
+        CANDIDATES,
+        DecoderTrainer,
+        TrainConfig,
+        build_models,
+    )
+
+    path, ckpt = _tiny_checkpoint(tmp_path)
+    # a small EMA offset: the +0.5 of the fixture makes the tiny decoder diverge
+    shadow = ckpt["ema_generator_state"]["shadow_params"]
+    ckpt["ema_generator_state"]["shadow_params"] = {
+        n: v - 0.5 + 0.01 for n, v in shadow.items()
+    }
+    torch.save(ckpt, path)
+    t = DecoderTrainer(
+        build_models(load_checkpoint(path), CANDIDATES[candidate]),
+        TrainConfig(segment_frames=16, band_disc_ffts=(256, 128)),
+        device="cpu",
+    )
+    t.step(_batch())
+    run = tmp_path / "run.pt"
+    t.save(run, candidate=candidate)
+    return path, run
+
+
+def _synthesis_manifest(tmp_path, base):
+    from piper_train.evaluation_manifest import create_manifest
+
+    np.save(tmp_path / "ref.npy", np.full(192, 192**-0.5, dtype=np.float32))
+    (tmp_path / "ref.wav").write_bytes(b"ref")
+    rows = [
+        {
+            "id": f"c{i}",
+            "text": text,
+            "phoneme_ids": [1] + [5, 6, 7] * 4 + [2],
+            "language_id": 0,
+            "speaker_embedding_path": "ref.npy",
+            "reference_audio_paths": ["ref.wav"],
+        }
+        for i, text in enumerate(["あ", "い"])
+    ]
+    source = tmp_path / "test.jsonl"
+    source.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+    manifest = tmp_path / "manifest.json"
+    create_manifest(
+        source_path=source,
+        output_path=manifest,
+        models={"torch-raw": base, "torch-ema": base},
+        sample_rate=22050,
+        asr_revision="a" * 40,
+        source_revision="b" * 40,
+    )
+    return manifest
+
+
+def test_synthesis_with_a_trained_decoder_matches_the_trained_generator(tmp_path):
+    """P2 前の確認: v10b の合成経路の decoder だけを P1 の decoder に替える。"""
+    from piper_train.embedding_cache import file_sha256
+    from piper_train.inference_eval import isolated_inference
+    from piper_train.tools import generate_eval_audio as generation
+    from piper_train.tools.train_decoder_only import load_trained_generator
+    from piper_train.vits.wavfile import read
+
+    base, run = _trained_run(tmp_path)
+    manifest = _synthesis_manifest(tmp_path, base)
+    out = tmp_path / "swap"
+    report = generation.generate_audio(
+        manifest, "torch-ema", out, device="cpu", decoder_run=run
+    )
+    assert report["decoder_run"] == {
+        "path": str(run),
+        "sha256": file_sha256(run),
+        "candidate": "d0",
+        "global_step": 1,
+    }
+    expected = load_trained_generator(base, run, device="cpu")
+    clips = json.loads(manifest.read_text(encoding="utf-8"))["clips"]
+    for ordinal, clip in enumerate(clips):
+        with isolated_inference(expected, 42 + ordinal):
+            audio = expected.infer(
+                torch.tensor([clip["phoneme_ids"]]),
+                torch.tensor([len(clip["phoneme_ids"])]),
+                speaker_embeddings=torch.from_numpy(
+                    np.load(tmp_path / "ref.npy")[None]
+                ),
+                lid=torch.tensor([0]),
+                sid=torch.tensor([clip["speaker_id"]]),
+                noise_scale=0.4,
+                length_scale=1.0,
+                noise_scale_w=0.5,
+            )[0]
+        _, wav = read(out / f"{clip['id']}.wav")
+        np.testing.assert_allclose(wav, audio.numpy().reshape(-1), atol=1e-6)
+    plain = generation.generate_audio(manifest, "torch-ema", tmp_path / "plain")
+    assert "decoder_run" not in plain
+    assert plain["clips"][0]["wav_sha256"] != report["clips"][0]["wav_sha256"]
+
+
+def test_trained_decoder_is_only_for_the_ema_backend(tmp_path):
+    from piper_train.tools import generate_eval_audio as generation
+
+    base, run = _trained_run(tmp_path)
+    manifest = _synthesis_manifest(tmp_path, base)
+    with pytest.raises(ValueError, match="torch-ema"):
+        generation.generate_audio(
+            manifest, "torch-raw", tmp_path / "raw", device="cpu", decoder_run=run
+        )
+
+
 def test_dataset_conditions_on_another_utterance_of_the_same_speaker(tmp_path):
     from piper_train.tools.train_decoder_only import SegmentDataset
 

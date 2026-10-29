@@ -308,15 +308,26 @@ def _reference_spec_for_clip(manifest: dict, clip: dict, max_frames: int):
 
 
 def generate_audio(
-    manifest_path: Path, backend: str, output_dir: Path, *, device="auto"
+    manifest_path: Path,
+    backend: str,
+    output_dir: Path,
+    *,
+    device="auto",
+    decoder_run: Path | None = None,
 ) -> dict:
-    """Generate all expected clips; publish a report only on complete success."""
+    """Generate all expected clips; publish a report only on complete success.
+
+    ``decoder_run`` (torch-ema only) replaces the EMA decoder with the EMA
+    decoder of a ``train_decoder_only`` run; the report records the run.
+    """
     from ..vits.wavfile import write  # noqa: PLC0415
 
     manifest_path = Path(manifest_path)
     manifest = load_manifest(manifest_path)
     if backend not in manifest["models"]:
         raise ValueError(f"Backend not pinned in manifest: {backend}")
+    if decoder_run is not None and backend != "torch-ema":
+        raise ValueError("--decoder-run replaces the EMA decoder: use torch-ema")
     output_dir = Path(output_dir)
     if output_dir.exists() and any(output_dir.iterdir()):
         raise ValueError(f"Evaluation output directory must be empty: {output_dir}")
@@ -324,6 +335,8 @@ def generate_audio(
     model_spec = manifest["models"][backend]
     generator = None
     restored_weights = None
+    original_decoder = None
+    decoder_record = None
     ema_report = {}
     # 参照 spec (F-mel) を feed するモデルなら、モデルが宣言する参照 spec 契約
     # (torch: checkpoint hparams、ONNX: <model>.onnx.json の reference_conditioning)。
@@ -366,6 +379,12 @@ def generate_audio(
             except Exception:
                 generator.load_state_dict(restored_weights)
                 raise
+            if decoder_run is not None:
+                from .train_decoder_only import trained_decoder  # noqa: PLC0415
+
+                decoder, decoder_record = trained_decoder(checkpoint, decoder_run)
+                original_decoder = generator.dec
+                generator.dec = decoder.to(next(generator.parameters()).device)
     elif backend == "onnx":
         # 先頭 clip の session (seed も先頭 clip のもの) を loop でそのまま使う
         first_session = load_onnx_session(model_spec["path"], manifest["seed"])
@@ -408,6 +427,8 @@ def generate_audio(
             "settings": manifest["reference_spec"],
             "model_contract": reference_contract,
         }
+    if decoder_record is not None:
+        result["decoder_run"] = decoder_record
     try:
         for ordinal, clip in enumerate(manifest["clips"]):
             seed = manifest["seed"] + ordinal
@@ -550,6 +571,8 @@ def generate_audio(
         )
         return result
     finally:
+        if original_decoder is not None:
+            generator.dec = original_decoder
         if restored_weights is not None:
             generator.load_state_dict(restored_weights)
 
@@ -611,6 +634,12 @@ def main() -> int:
         default="auto",
         help="Torch device; auto prefers CUDA, explicit cuda never falls back",
     )
+    generate.add_argument(
+        "--decoder-run",
+        type=Path,
+        help="torch-ema only: use the EMA decoder of a train_decoder_only run "
+        "(step*.pt) in place of the checkpoint's decoder",
+    )
     args = parser.parse_args()
     if args.command == "prepare":
         stft_overrides = {
@@ -665,7 +694,13 @@ def main() -> int:
             **extra,
         )
     else:
-        generate_audio(args.manifest, args.backend, args.output_dir, device=args.device)
+        generate_audio(
+            args.manifest,
+            args.backend,
+            args.output_dir,
+            device=args.device,
+            decoder_run=args.decoder_run,
+        )
     return 0
 
 
