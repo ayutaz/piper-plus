@@ -117,3 +117,40 @@ def test_variants_are_described_and_baseline_is_unchanged():
     assert VARIANTS["baseline"].transforms == ()
     for name, spec in VARIANTS.items():
         assert spec.description, name
+
+
+def _tiny_onnx(path, width):
+    model = torch.nn.Sequential(torch.nn.Linear(width, width), torch.nn.ReLU())
+    torch.onnx.export(
+        model.eval(),
+        (torch.randn(1, width),),
+        str(path),
+        input_names=["x"],
+        output_names=["y"],
+        dynamic_axes={"x": {0: "n"}},
+        dynamo=False,
+    )
+
+
+def test_measure_memory_reports_peak_and_grows_with_model(tmp_path):
+    import numpy as np
+
+    from piper_train.tools.measure_variant_cost import measure_memory
+
+    small, large = tmp_path / "small.onnx", tmp_path / "large.onnx"
+    _tiny_onnx(small, 16)
+    _tiny_onnx(large, 2048)  # 16 MiB of fp32 weights
+    feeds = [{"x": np.ones((4, 16), np.float32)}]
+    s = measure_memory(small, feeds, warmup=1, runs=2, repeats=1)
+    big_feeds = [{"x": np.ones((4, 2048), np.float32)}]
+    lg = measure_memory(large, big_feeds, warmup=1, runs=2, repeats=1)
+    for m in (s, lg):
+        assert m["repeats"] == 1
+        assert m["peak_bytes"] >= m["model_delta_bytes"] > 0
+    assert lg["model_delta_bytes"] - s["model_delta_bytes"] > 8 * 2**20
+
+
+def test_flow_3_variant_is_registered():
+    from piper_train.tools.measure_variant_cost import VARIANTS
+
+    assert "flow-3" in VARIANTS

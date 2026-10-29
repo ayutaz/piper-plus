@@ -3,7 +3,7 @@
 The candidates are built from the v10b checkpoint: every parameter whose name
 and shape still match is loaded, the rest keep their random init. Size and
 speed do not depend on the trained values, so this answers the N5 question
-(FP16 40MB, CPU p50 +10%) before any candidate is trained
+(size, CPU p50 and memory against v10b) before any candidate is trained
 (docs/design/zero-shot-decoder-p1-design-2026-10-29.md §4).
 
 The prototypes here (fullband iSTFT decoder, reference cross-attention) exist
@@ -315,6 +315,7 @@ VARIANTS: dict[str, VariantSpec] = {
         "参照 32 トークンへの cross-attention を各 upsample 段に追加",
         transforms=(_xattn,),
     ),
+    "flow-3": VariantSpec("flow の段数 4 → 3", transforms=(_flow(3, 192, 4),)),
     "flow-2x": VariantSpec("flow の段数 4 → 2", transforms=(_flow(2, 192, 4),)),
     "flow-h128": VariantSpec("flow の幅 192 → 128", transforms=(_flow(4, 128, 4),)),
     "flow-2x-h128": VariantSpec(
@@ -533,6 +534,97 @@ def bench(
     return {"intra_op_threads": threads, "variants": result}
 
 
+# Runs in a fresh interpreter so that each model's memory is measured alone.
+# It loads ort_utils by file path: importing the piper_train package would pull
+# in torch and dwarf the numbers being measured.
+_MEMORY_PROBE = r"""
+import ctypes, importlib.util, json, sys
+import numpy as np, onnxruntime
+
+def peak():
+    if sys.platform == "win32":
+        class C(ctypes.Structure):
+            _fields_ = [("cb", ctypes.c_ulong), ("faults", ctypes.c_ulong)] + [
+                (n, ctypes.c_size_t) for n in ("peak_wset", "wset", "qpp", "qp",
+                "qnpp", "qnp", "pagefile", "peak_pagefile")]
+        c = C(); c.cb = ctypes.sizeof(C)
+        k32 = ctypes.WinDLL("kernel32")
+        k32.GetCurrentProcess.restype = ctypes.c_void_p
+        ctypes.WinDLL("psapi").GetProcessMemoryInfo(
+            ctypes.c_void_p(k32.GetCurrentProcess()), ctypes.byref(c), c.cb)
+        return c.peak_wset
+    import resource
+    rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return rss if sys.platform == "darwin" else rss * 1024
+
+ort_utils_path, onnx_path, npz_path, warmup, runs = sys.argv[1:6]
+spec = importlib.util.spec_from_file_location("ort_utils", ort_utils_path)
+ort_utils = importlib.util.module_from_spec(spec); spec.loader.exec_module(ort_utils)
+data = np.load(npz_path)
+feeds = {}
+for key in data.files:
+    i, name = key.split(":", 1)
+    feeds.setdefault(i, {})[name] = data[key]
+before = peak()
+sess = onnxruntime.InferenceSession(
+    onnx_path, ort_utils.create_session_options(), providers=["CPUExecutionProvider"])
+loaded = peak()
+for feed in feeds.values():
+    for _ in range(int(warmup) + int(runs)):
+        sess.run(None, feed)
+print(json.dumps({"before": before, "loaded": loaded, "peak": peak()}))
+"""
+
+
+def measure_memory(
+    path: Path, feeds: list[dict], *, warmup: int, runs: int, repeats: int
+) -> dict:
+    """Peak working set of a fresh process that loads ``path`` and runs ``feeds``.
+
+    ``model_delta_bytes`` is the growth from just before the session is created
+    to the end of inference, i.e. what the model adds to a host process.
+    """
+    import subprocess  # noqa: PLC0415
+    import sys  # noqa: PLC0415
+    import tempfile  # noqa: PLC0415
+
+    from .. import ort_utils  # noqa: PLC0415
+
+    with tempfile.TemporaryDirectory() as tmp:
+        npz = Path(tmp) / "feeds.npz"
+        np.savez(
+            npz, **{f"{i}:{k}": v for i, f in enumerate(feeds) for k, v in f.items()}
+        )
+        samples = []
+        for _ in range(repeats):
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    _MEMORY_PROBE,
+                    ort_utils.__file__,
+                    str(path),
+                    str(npz),
+                    str(warmup),
+                    str(runs),
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            samples.append(json.loads(proc.stdout.strip().splitlines()[-1]))
+    peaks = [s["peak"] for s in samples]
+    deltas = [s["peak"] - s["before"] for s in samples]
+    loads = [s["loaded"] - s["before"] for s in samples]
+    return {
+        "repeats": repeats,
+        "peak_bytes": int(statistics.median(peaks)),
+        "model_delta_bytes": int(statistics.median(deltas)),
+        "load_delta_bytes": int(statistics.median(loads)),
+        "model_delta_range_bytes": int(max(deltas) - min(deltas)),
+    }
+
+
 def export_reference_encoder(out_fp16: Path) -> int:
     """Export the reference token encoder prototype; returns its parameter count."""
     from ..export_onnx import OPSET_VERSION  # noqa: PLC0415
@@ -568,10 +660,16 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument(
-        "--variants", required=True, help="comma-separated; a+b composes variants"
+        "--variants", default="", help="comma-separated; a+b composes variants"
     )
     parser.add_argument("--warmup", type=int, default=5)
     parser.add_argument("--runs", type=int, default=30)
+    parser.add_argument(
+        "--memory-repeats",
+        type=int,
+        default=3,
+        help="fresh processes per model for the peak-memory measurement (0 skips)",
+    )
     parser.add_argument(
         "--reference-encoder",
         action="store_true",
@@ -593,6 +691,7 @@ def main(argv: list[str] | None = None) -> None:
     extra = dict(item.split("=", 1) for item in args.extra_onnx)
     if args.out_dir.exists():
         raise SystemExit(f"refusing to overwrite {args.out_dir}")
+    args.out_dir.mkdir(parents=True)
     checkpoint = load_checkpoint(args.checkpoint)
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
 
@@ -602,10 +701,9 @@ def main(argv: list[str] | None = None) -> None:
         "variants": {},
     }
     paths = {}
-    prosody_dim = 0
+    prosody_dim = int(checkpoint["hyper_parameters"].get("prosody_dim", 16))
     for name, spec in specs.items():
         model_g, skipped = build_variant(checkpoint, spec)
-        prosody_dim = getattr(model_g, "prosody_dim", 0)
         params = count_parameters(model_g)
         path = args.out_dir / f"{name}.onnx"
         export_variant(model_g, path)
@@ -635,6 +733,12 @@ def main(argv: list[str] | None = None) -> None:
     report["intra_op_threads"] = timing["intra_op_threads"]
     for name, per_input in timing["variants"].items():
         report["variants"][name]["latency"] = per_input
+    if args.memory_repeats > 0:
+        mem_feeds = [v["feed"] for v in feeds.values()]
+        for name, path in paths.items():
+            report["variants"][name]["memory"] = measure_memory(
+                path, mem_feeds, warmup=1, runs=2, repeats=args.memory_repeats
+            )
     if args.reference_encoder:
         path = args.out_dir / "reference-token-encoder.onnx"
         n = export_reference_encoder(path)
@@ -654,6 +758,8 @@ def main(argv: list[str] | None = None) -> None:
             if base is not None:
                 rel = f" ({lat['p50_ms'] / base['latency'][label]['p50_ms'] - 1:+.1%})"
             line += f" | {label} {lat['p50_ms']:7.1f} ms{rel}"
+        if "memory" in v:
+            line += f" | mem +{v['memory']['model_delta_bytes'] / 2**20:.0f} MiB"
         print(line)
 
 
