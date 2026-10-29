@@ -503,6 +503,7 @@ def prepare(
     utts, embs, rejected = [], [], {"gate": 0, "no_metrics": 0, "duration": 0}
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
+        (tmp / "cache").mkdir()
         for speaker in spec["speakers"]:
             with zipfile.ZipFile(zips / f"{speaker}.zip") as zf:
                 members = sorted(

@@ -97,3 +97,18 @@ def test_real_recordings_at_another_rate_are_resampled(tmp_path):
         )
     report = directory_report(tmp_path / "test", tmp_path / "real")
     assert report["abs_mean_db"] < 0.5
+
+
+def test_real_recordings_can_sit_in_a_subdirectory_of_each_group(tmp_path):
+    import soundfile as sf
+
+    from piper_train.tools.measure_highband_deviation import directory_report
+
+    for i in range(2):
+        x = _voice(i + 1)
+        (tmp_path / "test" / "a").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "set" / "a" / "speaker").mkdir(parents=True, exist_ok=True)
+        sf.write(tmp_path / "test" / "a" / f"{i}.wav", x, SR)
+        sf.write(tmp_path / "set" / "a" / "speaker" / f"{i}.wav", x, SR)
+    report = directory_report(tmp_path / "test", tmp_path / "set", "speaker")
+    assert report["abs_mean_db"] == pytest.approx(0.0, abs=1e-9)
