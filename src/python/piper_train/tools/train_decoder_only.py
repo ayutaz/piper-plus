@@ -411,6 +411,27 @@ def load_trained_generator(base_checkpoint: Path, run_path: Path, *, device: str
     return models.model_g.to(device).eval()
 
 
+def trained_decoder(base_checkpoint: dict, run_path: Path) -> tuple[nn.Module, dict]:
+    """The run's EMA decoder, built as in training (PQMF fixed), and its record.
+
+    The decoder learned to render the frozen v10b posterior z, which is also
+    what the v10b flow produces in synthesis, so it can replace the decoder of
+    the v10b TTS path without retraining.
+    """
+    from ..embedding_cache import file_sha256  # noqa: PLC0415
+
+    run = torch.load(run_path, map_location="cpu", weights_only=False)
+    models = build_models(base_checkpoint, CANDIDATES[run["candidate"]])
+    models.model_g.dec.load_state_dict(run["dec_ema"])
+    record = {
+        "path": str(run_path),
+        "sha256": file_sha256(run_path),
+        "candidate": run["candidate"],
+        "global_step": int(run["global_step"]),
+    }
+    return models.model_g.dec, record
+
+
 # ---------------------------------------------------------------------------
 # Data
 # ---------------------------------------------------------------------------
