@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import copy
 import dataclasses
+import functools
 import hashlib
 import json
 import math
@@ -649,7 +650,7 @@ def _train(args) -> int:
         shuffle=True,
         drop_last=True,
         num_workers=args.num_workers,
-        collate_fn=lambda items: collate(items, hop),
+        collate_fn=functools.partial(collate, hop=hop),
         persistent_workers=args.num_workers > 0,
         generator=torch.Generator().manual_seed(args.seed + trainer.global_step),
     )
