@@ -95,11 +95,17 @@ def _load_dir(directory: Path, sample_rate: int | None = None):
     return wavs, rates.pop()
 
 
-def directory_report(test_root: Path, real_root: Path) -> dict:
+def directory_report(test_root: Path, real_root: Path, real_subdir: str = "") -> dict:
+    """``real_subdir`` reads ``<real_root>/<group>/<real_subdir>`` (e.g. an
+    evaluation set's ``groups/<group>/speaker``)."""
+
+    def real_dir(group: str) -> Path:
+        return Path(real_root) / group / real_subdir
+
     groups = sorted(
         d.name
         for d in Path(test_root).iterdir()
-        if d.is_dir() and (Path(real_root) / d.name).is_dir()
+        if d.is_dir() and real_dir(d.name).is_dir()
     )
     if not groups:
         raise ValueError("no voice directory present under both roots")
@@ -107,7 +113,7 @@ def directory_report(test_root: Path, real_root: Path) -> dict:
     sample_rate = None
     for group in groups:
         test, sr_t = _load_dir(Path(test_root) / group)
-        real, _ = _load_dir(Path(real_root) / group, sample_rate=sr_t)
+        real, _ = _load_dir(real_dir(group), sample_rate=sr_t)
         sample_rate = sr_t
         per_group[group] = voice_deviation(test, real, sr_t)
     return {
@@ -127,9 +133,12 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--test", type=Path, required=True)
     parser.add_argument("--real", type=Path, required=True)
+    parser.add_argument(
+        "--real-subdir", default="", help="e.g. speaker for <set>/groups/<g>/speaker"
+    )
     parser.add_argument("--out", type=Path)
     args = parser.parse_args(argv)
-    report = directory_report(args.test, args.real)
+    report = directory_report(args.test, args.real, args.real_subdir)
     text = json.dumps(report, indent=1, ensure_ascii=False)
     if args.out:
         args.out.write_text(text, encoding="utf-8")
