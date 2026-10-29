@@ -280,6 +280,7 @@ def main(argv=None) -> int:
     build.add_argument("--per-condition", type=int, required=True)
     build.add_argument("--seed", type=int, required=True)
     build.add_argument("--sessions", type=int, default=1)
+    build.add_argument("--session-prefix", default="s")
     build.add_argument("--repeat-fraction", type=float, default=0.1)
     build.add_argument("--output", type=Path, required=True)
     build.add_argument("--key-dir", type=Path, required=True)
@@ -295,7 +296,7 @@ def main(argv=None) -> int:
         rng = random.Random(args.seed)
         rng.shuffle(trials)
         for index in range(args.sessions):
-            session = f"s{index + 1}"
+            session = f"{args.session_prefix}{index + 1}"
             part = trials[index :: args.sessions]
             build_session(
                 part,
