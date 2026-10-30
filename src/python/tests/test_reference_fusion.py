@@ -442,7 +442,8 @@ def _tiny_model_class():
             self.save_hyperparameters(hp)
             self.model_g = _TinyGenerator(with_reference=with_reference)
             self.model_d = _TinyDiscriminator()
-            self.model_d_wavlm = self.model_d_mrd = self.model_c_spk = None
+            self.model_d_wavlm = self.model_d_mrd = self.model_d_bmrd = None
+            self.model_c_spk = None
             self._grad_probe_losses = None
             self._lf_step_active = False
             self._kl_cap_abort_steps = 300

@@ -255,11 +255,6 @@ class _SealedFlagAction(argparse.Action):
         parser.error(self.message or f"{option_string} is sealed")
 
 
-def configure_cudnn_benchmark(args) -> None:
-    """cuDNN kernel search: on by default, off with --no-cudnn-benchmark."""
-    torch.backends.cudnn.benchmark = not args.no_cudnn_benchmark
-
-
 def create_parser():
     """Create the argument parser for piper_train.
 
@@ -418,6 +413,25 @@ def create_parser():
         "A1). Costs about the same activation memory as the existing 2048 "
         "branch because the longer window yields proportionally fewer frames. "
         "Requires --use-mrd. Default: off.",
+    )
+    parser.add_argument(
+        "--use-band-split-mrd",
+        action="store_true",
+        default=False,
+        help="Add a DAC-style band-split multi-resolution spectrogram "
+        "discriminator (STFT 2048/1024/512, complex input, one conv stack per "
+        "frequency band). The full-band MRD lets the loud low band dominate; "
+        "this one also puts adversarial pressure on the quiet bands above "
+        "2.8 kHz where the audible roughness lives. Independent of --use-mrd. "
+        "Same discriminator as the P1 decoder comparison's D0 "
+        "(docs/design/zero-shot-decoder-p1-design-2026-10-29.md). Default: off.",
+    )
+    parser.add_argument(
+        "--c-band-split-mrd",
+        type=float,
+        default=1.0,
+        help="Band-split MRD loss weight (default: 1.0, used with "
+        "--use-band-split-mrd)",
     )
     parser.add_argument(
         "--use-adv-spk-classifier",
