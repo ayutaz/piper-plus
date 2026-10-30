@@ -29,6 +29,7 @@ from ..zero_shot_requirements import (
     validate_strict_resume_reference_hparams,
     validate_training_batch,
 )
+from .band_split_discriminator import BandSplitSpectrogramDiscriminator
 from .commons import (
     migrate_prefilm_decoder_cond,
     migrate_prefilm_optimizer_states,
@@ -455,6 +456,11 @@ class VitsModel(pl.LightningModule):
         # H-3: MRD に高分解能 resolution を 1 本 **追加** (置換ではない)。
         # "off" / MRD_HIRES_RESOLUTIONS のキー ("2048" / "4096")
         mrd_hires_resolution: str = "off",
+        # 帯域分割 MRD (DAC 型、vits/band_split_discriminator.py)。P1 の D0
+        # (docs/design/zero-shot-decoder-p1-design-2026-10-29.md) と同じ識別器を
+        # MRD とは別に足す。2.8 kHz より上の静かな帯域にも敵対的な監督を当てる
+        use_band_split_mrd: bool = False,
+        c_band_split_mrd: float = 1.0,
         # S-1b: 共進化 adversarial speaker classifier。C は実音声を真の話者、
         # 生成音声を「生成」クラスに分類するよう学習し (= 生成分布上でも
         # 更新される)、G は生成音声が条件話者に分類されるよう CE 最小化する。
@@ -905,6 +911,17 @@ class VitsModel(pl.LightningModule):
             _PKG_LOGGER.warning(
                 "--use-jcu-mrd / --mrd-hires-resolution require --use-mrd; "
                 "MRD is disabled so both options have no effect."
+            )
+
+        # 帯域分割 MRD (optional、P2 の K1)。解像度は P1 の D0 と同じ
+        self.model_d_bmrd = None
+        if getattr(self.hparams, "use_band_split_mrd", False):
+            _LOGGER.info(
+                "Initializing band-split MRD, c_band_split_mrd=%s",
+                self.hparams.c_band_split_mrd,
+            )
+            self.model_d_bmrd = BandSplitSpectrogramDiscriminator(
+                fft_sizes=(2048, 1024, 512)
             )
 
         # v10b S-1b: 共進化 adversarial speaker classifier (学習時のみ、
@@ -1942,6 +1959,25 @@ class VitsModel(pl.LightningModule):
     # v10b S-1a: JCU MRD の loss (無条件項 + 条件項を 1/2 ずつ)
     # ------------------------------------------------------------------
 
+    def discriminator_parameters(self) -> list:
+        """D の optimizer と勾配クリップが扱うパラメータ (有効な識別器すべて)。
+
+        WavLM / MRD / 帯域分割 MRD / adversarial speaker classifier を含む。
+        分類器は G と敵対的に更新されるので D の optimizer に属し、G の
+        backward で付いた勾配は ``training_step_d`` の前の
+        ``opt_d.zero_grad()`` で消える。
+        """
+        params = list(self.model_d.parameters())
+        for module in (
+            self.model_d_wavlm,
+            self.model_d_mrd,
+            self.model_d_bmrd,
+            self.model_c_spk,
+        ):
+            if module is not None:
+                params += list(module.parameters())
+        return params
+
     def _mrd_generator_losses(self, y, y_hat, spk_cond):
         """MRD の G 側 loss を返す ``(adv, fm, adv_cond)``。
 
@@ -2371,14 +2407,7 @@ class VitsModel(pl.LightningModule):
 
         self.manual_backward(loss_d)
         if grad_clip is not None:
-            d_params = list(self.model_d.parameters())
-            if self.model_d_wavlm is not None:
-                d_params = d_params + list(self.model_d_wavlm.parameters())
-            if self.model_d_mrd is not None:
-                d_params = d_params + list(self.model_d_mrd.parameters())
-            if self.model_c_spk is not None:
-                d_params = d_params + list(self.model_c_spk.parameters())
-            torch.nn.utils.clip_grad_norm_(d_params, grad_clip)
+            torch.nn.utils.clip_grad_norm_(self.discriminator_parameters(), grad_clip)
         if self._step_optimizer(opt_d):
             self.discriminator_updates += 1
             self._log_with_batch_info(
@@ -3175,6 +3204,22 @@ class VitsModel(pl.LightningModule):
                 if probe_losses is not None:
                     probe_losses["mrd"] = loss_mrd
 
+            # 帯域分割 MRD の G 側 (optional、P2 の K1)。話者の条件は使わない
+            # (P1 の D0 と同じ)
+            if self.model_d_bmrd is not None:
+                with self._disc_autocast_ctx():
+                    _y_d_r, y_d_g, fmap_r, fmap_g = self.model_d_bmrd(y, y_hat)
+                loss_gen_bmrd, _ = generator_loss(y_d_g)
+                loss_fm_bmrd = feature_loss(fmap_r, fmap_g)
+                loss_bmrd = (
+                    loss_gen_bmrd + loss_fm_bmrd
+                ) * self.hparams.c_band_split_mrd
+                loss_gen_all = loss_gen_all + loss_bmrd
+                self._log_with_batch_info("loss_gen_bmrd", loss_gen_bmrd, batch)
+                self._log_with_batch_info("loss_fm_bmrd", loss_fm_bmrd, batch)
+                if probe_losses is not None:
+                    probe_losses["bmrd"] = loss_bmrd
+
             # v10b S-1b: adversarial speaker classifier の G 側敵対項。
             # 生成音声が条件話者に分類されるよう CE 最小化する (frozen encoder
             # cosine ではなく共進化する分類器が相手なので静的に game できない)
@@ -3248,6 +3293,16 @@ class VitsModel(pl.LightningModule):
                     self._log_with_batch_info(
                         "loss_disc_mrd_cond", loss_disc_mrd_cond, batch
                     )
+
+            # 帯域分割 MRD の D 側 (optional、P2 の K1)
+            if self.model_d_bmrd is not None:
+                with self._disc_autocast_ctx():
+                    y_d_r_bmrd, y_d_g_bmrd, _, _ = self.model_d_bmrd(y, y_hat_detached)
+                loss_disc_bmrd, _, _ = discriminator_loss(y_d_r_bmrd, y_d_g_bmrd)
+                loss_disc_all = (
+                    loss_disc_all + loss_disc_bmrd * self.hparams.c_band_split_mrd
+                )
+                self._log_with_batch_info("loss_disc_bmrd", loss_disc_bmrd, batch)
 
             # v10b S-1b: 分類器 C 自身の更新 (実音声 = 真の話者 / 生成音声 =
             # 「生成」クラス)。**ramp に従わず step 0 から学習する** — C が
@@ -3546,18 +3601,7 @@ class VitsModel(pl.LightningModule):
                 getattr(self.hparams, "reference_warmup_steps", 0),
             )
 
-        # Collect discriminator parameters (including WavLM / MRD / adversarial
-        # speaker classifier if enabled). The classifier belongs to the D
-        # optimizer: it is updated adversarially against the generator, and any
-        # gradient it picks up during the G backward is cleared by the
-        # ``opt_d.zero_grad()`` that precedes ``training_step_d``.
-        d_params = list(self.model_d.parameters())
-        if self.model_d_wavlm is not None:
-            d_params = d_params + list(self.model_d_wavlm.parameters())
-        if self.model_d_mrd is not None:
-            d_params = d_params + list(self.model_d_mrd.parameters())
-        if self.model_c_spk is not None:
-            d_params = d_params + list(self.model_c_spk.parameters())
+        d_params = self.discriminator_parameters()
 
         optimizers = [
             torch.optim.AdamW(

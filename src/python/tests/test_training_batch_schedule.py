@@ -99,7 +99,7 @@ class _ScheduleModel(VitsModel):
         self.model_g = _TinyGenerator()
         self.model_d = _TinyDiscriminator()
         self.model_d_wavlm = _TinyDiscriminator()
-        self.model_d_mrd = self.model_c_spk = None
+        self.model_d_mrd = self.model_d_bmrd = self.model_c_spk = None
         self._grad_probe_losses = None
         self._lf_step_active = False
         self._kl_cap_consecutive = 0
