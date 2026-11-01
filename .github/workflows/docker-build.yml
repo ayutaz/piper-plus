@@ -138,7 +138,7 @@ jobs:
         # PR では push しないので ghcr.io login も不要 (token write 権限も
         # 持たない fork PR でここが落ちるのも回避できる)。
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4.6.0
+        uses: docker/login-action@v4.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -425,7 +425,7 @@ jobs:
         if: >-
           steps.dockerhub-check.outputs.available == 'true' &&
           (startsWith(github.ref, 'refs/tags/docker-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
-        uses: docker/login-action@v4.6.0
+        uses: docker/login-action@v4.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -517,7 +517,7 @@ jobs:
         # PR では push しないので ghcr.io login も不要 (token write 権限も
         # 持たない fork PR でここが落ちるのも回避できる)。
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4.6.0
+        uses: docker/login-action@v4.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -703,7 +703,7 @@ jobs:
         # PR では push しないので ghcr.io login も不要 (token write 権限も
         # 持たない fork PR でここが落ちるのも回避できる)。
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4.6.0
+        uses: docker/login-action@v4.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -837,7 +837,7 @@ jobs:
         # PR では push しないので ghcr.io login も不要 (token write 権限も
         # 持たない fork PR でここが落ちるのも回避できる)。
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4.6.0
+        uses: docker/login-action@v4.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -928,7 +928,7 @@ jobs:
         # PR では push しないので ghcr.io login も不要 (token write 権限も
         # 持たない fork PR でここが落ちるのも回避できる)。
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4.6.0
+        uses: docker/login-action@v4.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -1022,7 +1022,7 @@ jobs:
         # PR では push しないので ghcr.io login も不要 (token write 権限も
         # 持たない fork PR でここが落ちるのも回避できる)。
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4.6.0
+        uses: docker/login-action@v4.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -1105,7 +1105,7 @@ jobs:
         if: >-
           steps.dockerhub-check.outputs.available == 'true' &&
           (startsWith(github.ref, 'refs/tags/docker-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
-        uses: docker/login-action@v4.6.0
+        uses: docker/login-action@v4.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -1190,7 +1190,7 @@ jobs:
         # PR では push しないので ghcr.io login も不要 (token write 権限も
         # 持たない fork PR でここが落ちるのも回避できる)。
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4.6.0
+        uses: docker/login-action@v4.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -1347,7 +1347,7 @@ jobs:
         if: >-
           steps.dockerhub-check.outputs.available == 'true' &&
           (startsWith(github.ref, 'refs/tags/docker-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
-        uses: docker/login-action@v4.6.0
+        uses: docker/login-action@v4.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
