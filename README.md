@@ -405,6 +405,8 @@ Piper を Unity で使用するプラグイン: [github.com/ayutaz/uPiper](https
 
 piper-plus 専用モデル: [zs-v1 Zero-Shot/FT ベース](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) · [つくよみちゃん](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
 
+> **つくよみちゃんモデルについて:** 生成した音声を使う際は「Piper Plus:つくよみちゃん」のクレジット表記が必須です。禁止事項と利用条件は[モデルページ](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)を確認してください。このモデルはつくよみちゃん側から見ると非公式の作品で、夢前黎様は開発・サポートに携わっていません。お問い合わせは夢前黎様ではなく、[GitHub Issues](https://github.com/ayutaz/piper-plus/issues) などで開発者へお願いします。
+
 > **Note:** piper-plus は独自の G2P・音素体系を使用しているため、upstream Piper (rhasspy/piper-voices) のモデルとは互換性がありません。
 
 ### 関連記事

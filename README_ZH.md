@@ -405,6 +405,8 @@ piper-plus 模型的训练和微调方法（基本设置、多说话人 / 多 GP
 
 piper-plus 专用模型：[zs-v1 Zero-Shot/FT 基础模型](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) · [Tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
 
+> **Tsukuyomi-chan 模型：** 使用生成的音频时，必须注明 `Piper Plus:つくよみちゃん`。禁止用途和使用条件请参阅[模型页面](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)。从 Tsukuyomi-chan 一方来看，本模型属于非官方作品，夢前黎（Rei Yumesaki）不参与其开发和支持。如有疑问，请通过 [GitHub Issues](https://github.com/ayutaz/piper-plus/issues) 等渠道联系开发者，而不要联系夢前黎。
+
 > **Note:** piper-plus 使用自有的 G2P 和音素体系，因此与上游 Piper (rhasspy/piper-voices) 的模型不兼容。
 
 ### 相关文章（日语）
