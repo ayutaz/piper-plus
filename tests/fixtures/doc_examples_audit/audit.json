@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-05-19T00:00:00Z",
+  "generated_at": "2026-11-04T21:53:10Z",
   "totals": {
     "executable": 235,
     "needs_placeholder": 7,
@@ -2108,8 +2108,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 35,
-      "line_end": 43,
+      "line_start": 42,
+      "line_end": 50,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -2121,8 +2121,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 97,
-      "line_end": 101,
+      "line_start": 104,
+      "line_end": 108,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2136,8 +2136,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 105,
-      "line_end": 109,
+      "line_start": 112,
+      "line_end": 116,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
