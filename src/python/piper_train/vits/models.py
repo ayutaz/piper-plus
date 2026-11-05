@@ -48,6 +48,22 @@ class InferOutput(NamedTuple):
     durations: torch.Tensor
 
 
+class PriorPathLatent(NamedTuple):
+    """Return type of :meth:`SynthesizerTrn.prior_path_latent`.
+
+    ``z`` は decoder に渡す推論経路の latent (y のフレーム数、mask 済み)。
+    ``z_p`` は flow⁻¹ に入れた値、``m_p`` / ``logs_p`` は MAS で引き伸ばして
+    clamp した prior、``z_p_posterior`` は flow(z_q) (残差 σ_r の診断用)。
+    """
+
+    z: torch.Tensor
+    z_p: torch.Tensor
+    m_p: torch.Tensor
+    logs_p: torch.Tensor
+    attention: torch.Tensor
+    z_p_posterior: torch.Tensor
+
+
 class StochasticDurationPredictor(nn.Module):
     def __init__(
         self,
@@ -1883,37 +1899,8 @@ class SynthesizerTrn(nn.Module):
 
         z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g)
         logs_q = logs_q.clamp(min=-8.0, max=8.0)
-        if self.use_snac_flow:
-            # v10 M1+E2: SN/SDN 統計は話者成分のみ、WN 条件付けは lang 成分
-            # のみ (n_languages == 1 なら None)。logdet は KL 配線用に返す。
-            z_p, flow_logdet = self.flow(z, y_mask, g=g_lang, g_spk=g_spk)
-        else:
-            z_p = self.flow(z, y_mask, g=g)
-            flow_logdet = None
-
-        with torch.no_grad():
-            # negative cross-entropy
-            s_p_sq_r = torch.exp(-2 * logs_p)  # [b, d, t]
-            neg_cent1 = torch.sum(
-                -0.5 * math.log(2 * math.pi) - logs_p, [1], keepdim=True
-            )  # [b, 1, t_s]
-            neg_cent2 = torch.matmul(
-                -0.5 * (z_p**2).transpose(1, 2), s_p_sq_r
-            )  # [b, t_t, d] x [b, d, t_s] = [b, t_t, t_s]
-            neg_cent3 = torch.matmul(
-                z_p.transpose(1, 2), (m_p * s_p_sq_r)
-            )  # [b, t_t, d] x [b, d, t_s] = [b, t_t, t_s]
-            neg_cent4 = torch.sum(
-                -0.5 * (m_p**2) * s_p_sq_r, [1], keepdim=True
-            )  # [b, 1, t_s]
-            neg_cent = neg_cent1 + neg_cent2 + neg_cent3 + neg_cent4
-
-            attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
-            attn = (
-                monotonic_align.maximum_path(neg_cent, attn_mask.squeeze(1))
-                .unsqueeze(1)
-                .detach()
-            )
+        z_p, flow_logdet = self._flow_forward(z, y_mask, g, g_spk, g_lang)
+        attn = self._mas_attention(z_p, m_p, logs_p, x_mask, y_mask)
 
         # Prepare input for duration predictor with prosody features
         x_dp = self._prepare_prosody_input(x, x_mask, prosody_features, lid=lid)
@@ -1932,9 +1919,7 @@ class SynthesizerTrn(nn.Module):
                 x_mask
             )  # for averaging
 
-        # expand prior
-        m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
-        logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
+        m_p, logs_p = self._expand_prior(attn, m_p, logs_p)
 
         # v10b S-2p/S-2r: frame 格子の F0 予測 → (opt-in) prior 残差。
         # 残差は clamp の **前** に足す (下の clamp が最終 m_p を必ず縛る)。
@@ -1953,8 +1938,7 @@ class SynthesizerTrn(nn.Module):
         # is safe because in a converged model attn is essentially one-hot
         # and the post-expansion range already lies inside the pre-expansion
         # range. Also re-clamp m_p to prevent (z_p - m_p)**2 from overflowing.
-        logs_p = logs_p.clamp(min=-8.0, max=8.0)
-        m_p = m_p.clamp(min=-100.0, max=100.0)
+        m_p, logs_p = self._clamp_expanded_prior(m_p, logs_p)
 
         z_slice, ids_slice = commons.rand_slice_segments(
             z, y_lengths, self.segment_size
@@ -1978,6 +1962,143 @@ class SynthesizerTrn(nn.Module):
             flow_logdet=flow_logdet,
             f0_pred=f0_pred,
             f0_decoder=f0_decoder,
+        )
+
+    # ------------------------------------------------------------------
+    # prior 経路の部品 (forward / infer / prior_path_latent が共有する)
+    # ------------------------------------------------------------------
+
+    def _flow_forward(self, z, y_mask, g, g_spk, g_lang):
+        """flow の順方向。返り値 ``(z_p, logdet)`` (SNAC 以外は logdet=None)。"""
+        if self.use_snac_flow:
+            # v10 M1+E2: SN/SDN 統計は話者成分のみ、WN 条件付けは lang 成分
+            # のみ (n_languages == 1 なら None)。logdet は KL 配線用に返す。
+            return self.flow(z, y_mask, g=g_lang, g_spk=g_spk)
+        return self.flow(z, y_mask, g=g), None
+
+    def _flow_inverse(self, z_p, y_mask, g, g_spk, g_lang):
+        if self.use_snac_flow:
+            # v10 M1+E2: reverse でも学習と同じ分離 (SDN=話者、WN=lang)
+            return self.flow(z_p, y_mask, g=g_lang, g_spk=g_spk, reverse=True)
+        return self.flow(z_p, y_mask, g=g, reverse=True)
+
+    @staticmethod
+    def _mas_attention(z_p, m_p, logs_p, x_mask, y_mask):
+        """flow(z_q) と prior の MAS の並び ``[b, 1, t_y, t_x]`` (勾配なし)。"""
+        with torch.no_grad():
+            # negative cross-entropy
+            s_p_sq_r = torch.exp(-2 * logs_p)  # [b, d, t]
+            neg_cent1 = torch.sum(
+                -0.5 * math.log(2 * math.pi) - logs_p, [1], keepdim=True
+            )  # [b, 1, t_s]
+            neg_cent2 = torch.matmul(
+                -0.5 * (z_p**2).transpose(1, 2), s_p_sq_r
+            )  # [b, t_t, d] x [b, d, t_s] = [b, t_t, t_s]
+            neg_cent3 = torch.matmul(
+                z_p.transpose(1, 2), (m_p * s_p_sq_r)
+            )  # [b, t_t, d] x [b, d, t_s] = [b, t_t, t_s]
+            neg_cent4 = torch.sum(
+                -0.5 * (m_p**2) * s_p_sq_r, [1], keepdim=True
+            )  # [b, 1, t_s]
+            neg_cent = neg_cent1 + neg_cent2 + neg_cent3 + neg_cent4
+
+            attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
+            return (
+                monotonic_align.maximum_path(neg_cent, attn_mask.squeeze(1))
+                .unsqueeze(1)
+                .detach()
+            )
+
+    @staticmethod
+    def _expand_prior(attn, m_p, logs_p):
+        """音素ごとの prior を並び attn でフレームへ引き伸ばす。"""
+        # [b, t', t], [b, t, d] -> [b, d, t']
+        m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
+        logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
+        return m_p, logs_p
+
+    @staticmethod
+    def _clamp_expanded_prior(m_p, logs_p):
+        """引き伸ばし後の clamp (理由は forward のコメント)。"""
+        return m_p.clamp(min=-100.0, max=100.0), logs_p.clamp(min=-8.0, max=8.0)
+
+    def _sample_prior_latent(
+        self, m_p, logs_p, y_mask, g, g_spk, g_lang, *, noise_scale, eps=None
+    ):
+        """``z_p = m_p + ε·exp(logs_p)·noise_scale`` を flow⁻¹ に通す。
+
+        返り値 ``(z, z_p)``。``eps`` を省くと推論と同じく ``randn_like(m_p)``。
+        """
+        if eps is None:
+            eps = torch.randn_like(m_p)
+        z_p = m_p + eps * torch.exp(logs_p) * noise_scale
+        return self._flow_inverse(z_p, y_mask, g, g_spk, g_lang), z_p
+
+    @torch.no_grad()
+    def prior_path_latent(
+        self,
+        x,
+        x_lengths,
+        z_q,
+        y_mask,
+        *,
+        sid=None,
+        lid=None,
+        speaker_embeddings=None,
+        noise_scale: float = 0.4,
+        residual_scale: float | None = None,
+        eps=None,
+    ) -> PriorPathLatent:
+        """実録音の posterior z_q と MAS で並べた、推論経路の latent (勾配なし)。
+
+        音素の境目は実録音にそろえ (学習の ``forward`` と同じ MAS・引き伸ばし・
+        F0 残差・clamp)、z は推論と同じく prior から作って flow⁻¹ に通す
+        (``infer`` と同じ ``_sample_prior_latent``)。継続長予測は通らないので、
+        z のフレーム数は z_q と同じ (候補 A、next-direction impl.md §2.2)。
+
+        Parameters
+        ----------
+        z_q : torch.Tensor
+            ``enc_q`` の posterior latent [B, inter_channels, T_frames]。
+            同じ g で作ったものを渡す。
+        y_mask : torch.Tensor
+            frame mask [B, 1, T_frames]
+        noise_scale : float
+            A1: ``z_p = m_p + noise_scale·exp(logs_p)·ε`` (推論と同じ)。
+        residual_scale : float or None
+            A2: ``z_p = m_p + residual_scale·(flow(z_q) − m_p)``。指定時は
+            乱数を使わない (``eps`` と同時には指定できない)。
+        eps : torch.Tensor or None
+            A1 の乱数を固定するとき (省くと ``randn_like``)。
+        """
+        if residual_scale is not None and eps is not None:
+            raise ValueError("residual_scale and eps are exclusive")
+        g, g_spk, g_lang = self._get_global_conditioning(
+            sid, lid, speaker_embeddings=speaker_embeddings, return_components=True
+        )
+        h, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g, g_spk=g_spk)
+        logs_p = logs_p.clamp(min=-8.0, max=8.0)
+        z_p_q, _ = self._flow_forward(z_q, y_mask, g, g_spk, g_lang)
+        attn = self._mas_attention(z_p_q, m_p, logs_p, x_mask, y_mask)
+        m_p, logs_p = self._expand_prior(attn, m_p, logs_p)
+        if self.use_f0_path:
+            log_f0, vuv_logit = self._predict_f0(h, attn, y_mask, g)
+            m_p = self._apply_f0_prior_residual(m_p, log_f0, vuv_logit, y_mask)
+        m_p, logs_p = self._clamp_expanded_prior(m_p, logs_p)
+        if residual_scale is not None:
+            z_p = m_p + residual_scale * (z_p_q - m_p)
+            z = self._flow_inverse(z_p, y_mask, g, g_spk, g_lang)
+        else:
+            z, z_p = self._sample_prior_latent(
+                m_p, logs_p, y_mask, g, g_spk, g_lang, noise_scale=noise_scale, eps=eps
+            )
+        return PriorPathLatent(
+            z=z * y_mask,
+            z_p=z_p,
+            m_p=m_p,
+            logs_p=logs_p,
+            attention=attn,
+            z_p_posterior=z_p_q,
         )
 
     def scl_waveform_detached_z(
@@ -2086,11 +2207,7 @@ class SynthesizerTrn(nn.Module):
             reference_spec=reference_spec,
             reference_spec_lengths=reference_spec_lengths,
         )
-        if self.use_snac_flow:
-            # v10 M1+E2: reverse でも SN/SDN 統計は話者成分のみ、WN は lang のみ
-            z_swap = self.flow(z_p, y_mask, g=g_lang, g_spk=g_spk, reverse=True)
-        else:
-            z_swap = self.flow(z_p, y_mask, g=g, reverse=True)
+        z_swap = self._flow_inverse(z_p, y_mask, g, g_spk, g_lang)
         z_slice = commons.slice_segments(z_swap * y_mask, ids_slice, self.segment_size)
         o, _ = self.dec(z_slice, g=g, f0=f0)
         return o
@@ -2169,12 +2286,7 @@ class SynthesizerTrn(nn.Module):
         attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
         attn = commons.generate_path(w_ceil, attn_mask)
 
-        m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(
-            1, 2
-        )  # [b, t', t], [b, t, d] -> [b, d, t']
-        logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(
-            1, 2
-        )  # [b, t', t], [b, t, d] -> [b, d, t']
+        m_p, logs_p = self._expand_prior(attn, m_p, logs_p)
 
         # v10b S-2: 推論時は常に予測 F0 (GT は存在しない)。学習の
         # ``forward`` と同じ順序 — 予測 → prior 残差 → clamp。
@@ -2188,19 +2300,16 @@ class SynthesizerTrn(nn.Module):
         # inference produces the same numerical range as training. In
         # inference w_ceil is always integer and attn is truly one-hot so
         # this is a no-op after convergence.
-        logs_p = logs_p.clamp(min=-8.0, max=8.0)
-        m_p = m_p.clamp(min=-100.0, max=100.0)
+        m_p, logs_p = self._clamp_expanded_prior(m_p, logs_p)
 
         # Use mean only for deterministic ONNX export
         if getattr(self, "onnx_export_mode", False):
             z_p = m_p
+            z = self._flow_inverse(z_p, y_mask, g, g_spk, g_lang)
         else:
-            z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
-        if self.use_snac_flow:
-            # v10 M1+E2: reverse でも学習と同じ分離 (SDN=話者、WN=lang)
-            z = self.flow(z_p, y_mask, g=g_lang, g_spk=g_spk, reverse=True)
-        else:
-            z = self.flow(z_p, y_mask, g=g, reverse=True)
+            z, z_p = self._sample_prior_latent(
+                m_p, logs_p, y_mask, g, g_spk, g_lang, noise_scale=noise_scale
+            )
         dec_out = self.dec(
             (z * y_mask)[:, :, :max_len],
             g=g,
