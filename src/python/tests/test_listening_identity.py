@@ -216,3 +216,108 @@ def test_pools_from_set_rejects_an_unknown_excluded_voice(tmp_path):
     set_dir = _built_set(tmp_path / "set")
     with pytest.raises(ValueError, match="tsukuyomi_typo"):
         pools_from_set(set_dir, [tmp_path / "synth"], exclude=["tsukuyomi_typo"])
+
+
+def _threshold_case(tmp_path: Path, identified: int):
+    """ja_aaaa: refs0 is the reference, cross0/cross1 are the cross utterances; six Z+ clips."""
+    set_dir = tmp_path / "set"
+    base = set_dir / "groups" / "ja_aaaa"
+    for name in ("refs0", "cross0", "cross1"):
+        _wav(base / "speaker" / f"{name}.wav", 48000)
+    (set_dir / "set.json").write_text(
+        json.dumps(
+            {"groups": {"ja_aaaa": {"embeddings": [{"reference": "refs0.wav"}]}}}
+        ),
+        encoding="utf-8",
+    )
+    run = tmp_path / "K1-s1234-s42" / "secs-run"
+    sims = [0.80, 0.70, 0.60, 0.90, 0.50, 0.95]
+    clips = [_wav(run / "synth" / "ja_aaaa" / f"z{i}.wav", 22050) for i in range(6)]
+    (run / "secs").mkdir(parents=True)
+    (run / "secs" / "ja_aaaa.json").write_text(
+        json.dumps(
+            {
+                "encoders": {
+                    "campplus": {"ceiling": 0.9, "floor": 0.4},
+                    "encoder2": {"ceiling": 0.8, "floor": 0.3},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    vectors = {"cross0": (1.0, 0.0), "cross1": (1.0, 0.0), "refs0": (0.0, 1.0)}
+    for i, s in enumerate(sims):
+        vectors[f"z{i}"] = (s, float(np.sqrt(1 - s * s)))
+    embed = lambda path: np.asarray(vectors[Path(path).stem])  # noqa: E731
+    trials = [
+        {
+            "trial": f"t{i}",
+            "condition": "Z+",
+            "voice": "ja_aaaa",
+            "test": str(c),
+            "repeat_of": None,
+        }
+        for i, c in enumerate(clips)
+    ]
+    trials += [
+        {
+            "trial": "t6",
+            "condition": "R+",
+            "voice": "ja_aaaa",
+            "test": str(base / "speaker" / "cross0.wav"),
+            "repeat_of": None,
+        },
+        {
+            "trial": "t7",
+            "condition": "Z+",
+            "voice": "ja_aaaa",
+            "test": str(clips[5]),
+            "repeat_of": "t5",
+        },
+    ]
+    answers = {f"t{i}": (4 if i < identified else 2) for i in range(6)}
+    answers.update({"t6": 4, "t7": 4})
+    key = {"session": "k1", "trials": trials}
+    return key, {"session": "k1", "answers": answers}, set_dir, sims, embed
+
+
+def test_threshold_median_of_identified_clips(tmp_path):
+    from piper_train.tools.listening_identity import transfer_threshold
+
+    key, answers, set_dir, sims, embed = _threshold_case(tmp_path, identified=5)
+    result = transfer_threshold(
+        [key], [answers], set_dir, {"campplus": embed, "encoder2": embed}
+    )
+    assert result["n_identified"] == 5
+    cam = sorted((s - 0.4) / 0.5 for s in sims[:5])
+    ecapa = sorted((s - 0.3) / 0.5 for s in sims[:5])
+    assert [c["campplus"] for c in result["clips"]] == pytest.approx(
+        [(s - 0.4) / 0.5 for s in sims[:5]]
+    )
+    assert result["median"]["campplus"] == pytest.approx(cam[2])
+    assert result["median"]["encoder2"] == pytest.approx(ecapa[2])
+    assert result["T"] == pytest.approx(max(cam[2], ecapa[2], 0.6))
+    assert result["fallback"] is False
+
+
+def test_threshold_falls_back_to_0_6_with_fewer_than_five_identified(tmp_path):
+    from piper_train.tools.listening_identity import transfer_threshold
+
+    key, answers, set_dir, _sims, embed = _threshold_case(tmp_path, identified=4)
+    result = transfer_threshold(
+        [key], [answers], set_dir, {"campplus": embed, "encoder2": embed}
+    )
+    assert result["n_identified"] == 4
+    assert result["T"] == 0.6
+    assert result["fallback"] is True
+
+
+def test_threshold_rejects_a_clip_outside_its_voice_directory(tmp_path):
+    from piper_train.tools.listening_identity import transfer_threshold
+
+    key, answers, set_dir, _sims, embed = _threshold_case(tmp_path, identified=5)
+    key["trials"][0]["voice"] = "ja_bbbb"
+    with pytest.raises(ValueError, match="ja_bbbb"):
+        transfer_threshold(
+            [key], [answers], set_dir, {"campplus": embed, "encoder2": embed}
+        )
