@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793080974948,
+  "lastUpdate": 1793857345368,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1722,6 +1722,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 218.3,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fcec98e41a444dbcd00fe822f8a55229ce33c48b",
+          "message": "fix(python): --model にエイリアスを渡すと find_voice で失敗する不具合を直す (#928)\n\nCLI と HTTP サーバーは --model の値をそのまま find_voice に渡すが、find_voice はカタログをキーでしか引かなかったため、tsukuyomi などのエイリアスはダウンロード後に \"Missing files for voice\" で失敗していた。キーかエイリアスからエントリを引く resolve_piper_plus_voice() を足し、find_voice で使う。",
+          "timestamp": "2026-11-05T14:40:25+09:00",
+          "tree_id": "9f2d4aa1c5d3e12933ca204f16c50a64fc6ac402",
+          "url": "https://github.com/ayutaz/piper-plus/commit/fcec98e41a444dbcd00fe822f8a55229ce33c48b"
+        },
+        "date": 1793857343446,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0881,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 21.9,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 26,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1713.8,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 227.6,
             "unit": "MB"
           },
           {
