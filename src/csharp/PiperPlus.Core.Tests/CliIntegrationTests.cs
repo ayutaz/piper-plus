@@ -702,11 +702,11 @@ public sealed class CliIntegrationTests
     private static async Task<(int ExitCode, string StdOut, string StdErr)> RunWithLocalModelFileAsync(
         string fileName, string? disableNotice, params string[] extraArgs)
     {
-        string dir = Path.Combine(Path.GetTempPath(), $"piper_notice_{Guid.NewGuid():N}");
+        string dir = Path.Join(Path.GetTempPath(), $"piper_notice_{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         try
         {
-            string modelFile = Path.Combine(dir, fileName);
+            string modelFile = Path.Join(dir, fileName);
             await File.WriteAllBytesAsync(modelFile, []);
 
             var env = new Dictionary<string, string?>
