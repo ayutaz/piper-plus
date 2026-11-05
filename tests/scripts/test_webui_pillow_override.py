@@ -2,7 +2,7 @@
 
 Pillow 13.0.0 fixes 40+ advisories (5 CRITICAL, e.g. CVE-2026-112393 heap
 overflow in the libtiff writer, CVE-2026-112900 Ghostscript argument
-injection). gradio 6.26.0 (and 6.30.0, the latest) still declares
+injection). gradio 6.26.0 (and 6.31.0, the latest) still declares
 `pillow<13.0,>=8.0`, so a plain install resolves the vulnerable 12.3.0 and the
 Trivy container scan fails. Every place that installs gradio overrides the cap:
 
