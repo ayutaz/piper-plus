@@ -19,7 +19,6 @@ from wyoming.server import AsyncEventHandler, AsyncServer
 from wyoming.tts import Synthesize
 
 from piper_plus.api import PiperPlus
-from piper_plus.download import show_model_notice
 from piper_wyoming.handler import SUPPORTED_LANGUAGES, build_info, resolve_language
 
 
@@ -174,7 +173,10 @@ def main() -> None:
     logger.info("Loading model: %s (device=%s)", args.model, args.device)
     tts = PiperPlus(args.model, config=args.config, device=args.device)
     logger.info("Model loaded. Languages: %s", tts.languages)
-    # Usage notice for models with terms (docs/reference/model-resolution.md §9)
+    # Usage notice for models with terms (docs/reference/model-resolution.md §9).
+    # Imported here so that tests stubbing piper_plus need only piper_plus.api.
+    from piper_plus.download import show_model_notice  # noqa: PLC0415
+
     show_model_notice(tts.model_notice)
 
     logger.info("Starting Wyoming TTS server: %s", uri)
