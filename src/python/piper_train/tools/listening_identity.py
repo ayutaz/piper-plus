@@ -279,6 +279,109 @@ def pools_from_set(
     return pools
 
 
+def _cosine_mean(clip: np.ndarray, cross: np.ndarray) -> float:
+    a = clip / max(np.linalg.norm(clip), 1e-8)
+    b = cross / np.maximum(np.linalg.norm(cross, axis=1, keepdims=True), 1e-8)
+    return float(np.mean(b @ a))
+
+
+def transfer_threshold(
+    keys: list[dict],
+    answer_sets: list[dict],
+    set_dir: Path,
+    embedders: dict,
+    *,
+    minimum: int = 5,
+    default: float = 0.6,
+) -> dict:
+    """T from the Z+ clips answered "本人" (plan P0-5′).
+
+    For each such clip: the mean cosine to the voice's cross utterances (the
+    speaker files minus the references, as in the evaluation), normalised by
+    the ceiling and floor of the same voice in the clip's evaluation report
+    (``<run>/secs-run/secs/<voice>.json``), per encoder. T is the largest of
+    the per-encoder medians and ``default``; with fewer than ``minimum``
+    identified clips, T is ``default``.
+    """
+    set_dir = Path(set_dir)
+    record = json.loads((set_dir / "set.json").read_text(encoding="utf-8"))
+    by_session = {a["session"]: a["answers"] for a in answer_sets}
+    cross_cache: dict[tuple[str, str], np.ndarray] = {}
+    clips = []
+    for key in keys:
+        answers = by_session[key["session"]]
+        for trial in key["trials"]:
+            if trial["condition"] != "Z+" or trial["repeat_of"] is not None:
+                continue
+            if answers[trial["trial"]] < 3:
+                continue
+            voice, test = trial["voice"], Path(trial["test"])
+            if test.parent.name != voice:
+                raise ValueError(f"{test} is not under the directory of {voice}")
+            report = json.loads(
+                (test.parent.parent.parent / "secs" / f"{voice}.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            base = set_dir / "groups" / voice / "speaker"
+            references = {e["reference"] for e in record["groups"][voice]["embeddings"]}
+            row = {
+                "session": key["session"],
+                "trial": trial["trial"],
+                "test": str(test),
+            }
+            for name, embed in embedders.items():
+                if (voice, name) not in cross_cache:
+                    cross_cache[(voice, name)] = np.stack(
+                        [
+                            np.asarray(embed(p), dtype=np.float64)
+                            for p in sorted(base.glob("*.wav"))
+                            if p.name not in references
+                        ]
+                    )
+                block = report["encoders"][name]
+                similarity = _cosine_mean(
+                    np.asarray(embed(test), dtype=np.float64),
+                    cross_cache[(voice, name)],
+                )
+                row[name] = (similarity - block["floor"]) / (
+                    block["ceiling"] - block["floor"]
+                )
+            clips.append(row)
+    medians = {
+        name: float(np.median([c[name] for c in clips])) if clips else None
+        for name in embedders
+    }
+    fallback = len(clips) < minimum
+    threshold = default if fallback else max([*(m for m in medians.values()), default])
+    return {
+        "rule": "P0-5′ (plan §6 P2′ の後の改定)",
+        "n_identified": len(clips),
+        "clips": clips,
+        "median": medians,
+        "T": threshold,
+        "fallback": fallback,
+    }
+
+
+def onnx_embedder(model_path: Path):
+    """The evaluation's embedding (same preprocessing and session as the SECS report)."""
+    from . import eval_zs_secs  # noqa: PLC0415
+
+    session = eval_zs_secs._create_session(model_path)
+    cache: dict[Path, np.ndarray] = {}
+
+    def embed(path) -> np.ndarray:
+        path = Path(path).resolve()
+        if path not in cache:
+            cache[path] = eval_zs_secs.extract_embedding(
+                session, eval_zs_secs.preprocess_audio(path)
+            )
+        return cache[path]
+
+    return embed
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -302,7 +405,34 @@ def main(argv=None) -> int:
     scoring.add_argument("--key", type=Path, action="append", required=True)
     scoring.add_argument("--answers", type=Path, action="append", required=True)
     scoring.add_argument("--json-out", type=Path)
+    thresholding = sub.add_parser(
+        "threshold", help="T from identified Z+ clips (P0-5′)"
+    )
+    thresholding.add_argument("--key", type=Path, action="append", required=True)
+    thresholding.add_argument("--answers", type=Path, action="append", required=True)
+    thresholding.add_argument("--set", type=Path, required=True)
+    thresholding.add_argument("--encoder", type=Path, required=True, help="CAM++ ONNX")
+    thresholding.add_argument("--encoder2", type=Path, required=True, help="ECAPA ONNX")
+    thresholding.add_argument("--json-out", type=Path)
     args = parser.parse_args(argv)
+
+    if args.command == "threshold":
+        keys = [json.loads(p.read_text(encoding="utf-8")) for p in args.key]
+        answers = [json.loads(p.read_text(encoding="utf-8")) for p in args.answers]
+        result = transfer_threshold(
+            keys,
+            answers,
+            args.set,
+            {
+                "campplus": onnx_embedder(args.encoder),
+                "encoder2": onnx_embedder(args.encoder2),
+            },
+        )
+        text = json.dumps(result, ensure_ascii=False, indent=1)
+        if args.json_out:
+            args.json_out.write_text(text, encoding="utf-8")
+        print(text)
+        return 0
 
     if args.command == "build":
         pools = pools_from_set(args.set, args.synth, exclude=args.exclude_voice)
