@@ -18,8 +18,10 @@ from piper_plus.download import (  # noqa: E402
     VoiceNotFoundError,
     download_model,
     ensure_voice_exists,
+    find_voice,
     get_voices,
     list_voices,
+    resolve_piper_plus_voice,
 )
 
 
@@ -181,6 +183,102 @@ class TestFindVoiceFallback:
         files = list(voice["files"].keys())
         assert "css10-ja-6lang-fp16.onnx" in files
         assert "config.json" in files
+
+
+def _place_catalog_files(data_dir: Path, voice_key: str) -> tuple[Path, Path]:
+    """Create empty files named like the catalog entry's downloaded files."""
+    onnx_path = config_path = None
+    for file_path in PIPER_PLUS_VOICES[voice_key]["files"]:
+        target = data_dir / Path(file_path).name
+        target.write_bytes(b"")
+        if file_path.endswith(".onnx"):
+            onnx_path = target
+        elif file_path.endswith(".json"):
+            config_path = target
+    assert onnx_path is not None and config_path is not None
+    return onnx_path, config_path
+
+
+def _alias_cases() -> list[tuple[str, str]]:
+    return [
+        (alias, key)
+        for key, info in PIPER_PLUS_VOICES.items()
+        for alias in info.get("aliases", [])
+    ]
+
+
+class TestFindVoiceAlias:
+    """find_voice() must accept catalog aliases, not only catalog keys."""
+
+    @pytest.mark.parametrize(("alias", "key"), _alias_cases())
+    def test_alias_finds_downloaded_files(self, tmp_path, alias, key):
+        expected = _place_catalog_files(tmp_path, key)
+        assert find_voice(alias, [tmp_path]) == expected
+
+    @pytest.mark.parametrize("key", list(PIPER_PLUS_VOICES))
+    def test_key_still_finds_downloaded_files(self, tmp_path, key):
+        expected = _place_catalog_files(tmp_path, key)
+        assert find_voice(key, [tmp_path]) == expected
+
+    def test_unknown_name_still_raises(self, tmp_path):
+        with pytest.raises(ValueError, match="Missing files for voice"):
+            find_voice("no-such-voice", [tmp_path])
+
+    @pytest.mark.parametrize(("alias", "key"), _alias_cases())
+    def test_resolve_piper_plus_voice(self, alias, key):
+        assert resolve_piper_plus_voice(alias)["key"] == key
+        assert resolve_piper_plus_voice(key)["key"] == key
+
+    def test_resolve_piper_plus_voice_unknown(self):
+        assert resolve_piper_plus_voice("no-such-voice") is None
+
+
+class _LoadReached(Exception):
+    """Raised by the patched PiperVoice.load to stop main() after resolution."""
+
+
+def _run_main_until_load(module, argv: list[str]) -> tuple[str, str]:
+    seen: dict[str, str] = {}
+
+    def fake_load(model_path, config_path=None, **_kwargs):
+        seen["model"] = str(model_path)
+        seen["config"] = str(config_path)
+        raise _LoadReached
+
+    with (
+        patch.object(sys, "argv", argv),
+        patch.object(module, "ensure_voice_exists"),
+        patch.object(module.PiperVoice, "load", side_effect=fake_load),
+        pytest.raises(_LoadReached),
+    ):
+        module.main()
+    return seen["model"], seen["config"]
+
+
+class TestMainAcceptsAlias:
+    """CLI and HTTP server resolve `--model <alias>` to the downloaded files."""
+
+    @pytest.mark.parametrize("alias", ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"])
+    def test_cli_main(self, tmp_path, alias):
+        from piper_plus import __main__ as cli
+
+        onnx_path, config_path = _place_catalog_files(
+            tmp_path, "ja_JP-tsukuyomi-chan-medium"
+        )
+        argv = ["piper-plus", "--model", alias, "--data-dir", str(tmp_path)]
+        assert _run_main_until_load(cli, argv) == (str(onnx_path), str(config_path))
+
+    @pytest.mark.parametrize("alias", ["tsukuyomi", "base"])
+    def test_http_server_main(self, tmp_path, alias):
+        from piper_plus import http_server
+
+        key = resolve_piper_plus_voice(alias)["key"]
+        onnx_path, config_path = _place_catalog_files(tmp_path, key)
+        argv = ["piper-plus-http", "--model", alias, "--data-dir", str(tmp_path)]
+        assert _run_main_until_load(http_server, argv) == (
+            str(onnx_path),
+            str(config_path),
+        )
 
 
 class TestVersion:
