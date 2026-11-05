@@ -164,8 +164,12 @@ def _ensure_piper_plus_stub() -> None:
     pp = MagicMock()
     api = MagicMock()
     pp.api = api
+    # piper_wyoming.__main__ は利用案内の表示に `piper_plus.download.show_model_notice` も使う
+    download = MagicMock()
+    pp.download = download
     sys.modules["piper_plus"] = pp
     sys.modules["piper_plus.api"] = api
+    sys.modules["piper_plus.download"] = download
 
 
 # Install stubs before any piper_wyoming import
