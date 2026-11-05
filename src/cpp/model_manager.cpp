@@ -68,7 +68,8 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
         "aliases": [
             "tsukuyomi",
             "tsukuyomi-chan",
-            "ja-tsukuyomi"
+            "ja-tsukuyomi",
+            "ayousanz/piper-plus-tsukuyomi-chan"
         ],
         "description": "Tsukuyomi-chan 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT)",
         "notice": [
@@ -114,7 +115,8 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
             "css10",
             "css10-6lang",
             "css10-ja",
-            "ja-css10"
+            "ja-css10",
+            "ayousanz/piper-plus-css10-ja-6lang"
         ],
         "description": "CSS10 Japanese 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT, 6841 utterances)"
     },

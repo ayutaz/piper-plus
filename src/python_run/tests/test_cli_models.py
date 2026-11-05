@@ -1,5 +1,6 @@
 """Tests for Python CLI model management features."""
 
+import json
 import sys
 import tempfile
 from pathlib import Path
@@ -199,11 +200,31 @@ def _place_catalog_files(data_dir: Path, voice_key: str) -> tuple[Path, Path]:
     return onnx_path, config_path
 
 
+# The canonical catalog shared by every runtime. Reading the names from it
+# (not from PIPER_PLUS_VOICES) makes a name missing from this runtime fail.
+CANONICAL_VECTORS = (
+    Path(__file__).resolve().parents[3] / "test" / "model_resolution_vectors.json"
+)
+
+
+def _canonical_catalog() -> dict[str, dict]:
+    catalog = json.loads(CANONICAL_VECTORS.read_text(encoding="utf-8"))["voice_catalog"]
+    return {k: v for k, v in catalog.items() if not k.startswith("_")}
+
+
 def _alias_cases() -> list[tuple[str, str]]:
     return [
         (alias, key)
-        for key, info in PIPER_PLUS_VOICES.items()
-        for alias in info.get("aliases", [])
+        for key, entry in _canonical_catalog().items()
+        for alias in entry["aliases"]
+    ]
+
+
+def _name_cases() -> list[tuple[str, str]]:
+    return [
+        (name, key)
+        for key, entry in _canonical_catalog().items()
+        for name in [key, *entry["aliases"]]
     ]
 
 
@@ -215,7 +236,7 @@ class TestFindVoiceAlias:
         expected = _place_catalog_files(tmp_path, key)
         assert find_voice(alias, [tmp_path]) == expected
 
-    @pytest.mark.parametrize("key", list(PIPER_PLUS_VOICES))
+    @pytest.mark.parametrize("key", list(_canonical_catalog()))
     def test_key_still_finds_downloaded_files(self, tmp_path, key):
         expected = _place_catalog_files(tmp_path, key)
         assert find_voice(key, [tmp_path]) == expected
@@ -231,6 +252,16 @@ class TestFindVoiceAlias:
 
     def test_resolve_piper_plus_voice_unknown(self):
         assert resolve_piper_plus_voice("no-such-voice") is None
+
+    @pytest.mark.parametrize(("name", "key"), _name_cases())
+    def test_canonical_name_resolves_to_canonical_files(self, name, key):
+        entry = _canonical_catalog()[key]
+        voice = resolve_piper_plus_voice(name)
+        assert voice is not None, name
+        assert voice["repo"] == entry["repo_id"]
+        assert entry["onnx_file"] in voice["files"]
+        assert entry["config_file"] in voice["files"]
+        assert voice.get("revision") == entry.get("revision")
 
 
 class _LoadReached(Exception):
@@ -258,13 +289,11 @@ def _run_main_until_load(module, argv: list[str]) -> tuple[str, str]:
 class TestMainAcceptsAlias:
     """CLI and HTTP server resolve `--model <alias>` to the downloaded files."""
 
-    @pytest.mark.parametrize("alias", ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"])
-    def test_cli_main(self, tmp_path, alias):
+    @pytest.mark.parametrize(("alias", "key"), _name_cases())
+    def test_cli_main(self, tmp_path, alias, key):
         from piper_plus import __main__ as cli
 
-        onnx_path, config_path = _place_catalog_files(
-            tmp_path, "ja_JP-tsukuyomi-chan-medium"
-        )
+        onnx_path, config_path = _place_catalog_files(tmp_path, key)
         argv = ["piper-plus", "--model", alias, "--data-dir", str(tmp_path)]
         assert _run_main_until_load(cli, argv) == (str(onnx_path), str(config_path))
 

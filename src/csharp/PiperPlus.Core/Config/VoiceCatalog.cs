@@ -46,7 +46,13 @@ public static class VoiceCatalog
                 new VoiceFileInfo("tsukuyomi-chan-6lang-fp16.onnx", 39652717, string.Empty),
                 new VoiceFileInfo("config.json", 6279, string.Empty),
             ],
-            Aliases: ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"],
+            Aliases:
+            [
+                "tsukuyomi",
+                "tsukuyomi-chan",
+                "ja-tsukuyomi",
+                "ayousanz/piper-plus-tsukuyomi-chan",
+            ],
             Description: "Tsukuyomi-chan 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT)")
         {
             // Canonical source: test/model_resolution_vectors.json (voice_catalog
@@ -79,7 +85,14 @@ public static class VoiceCatalog
                 new VoiceFileInfo("css10-ja-6lang-fp16.onnx", 39652717, string.Empty),
                 new VoiceFileInfo("config.json", 5912, string.Empty),
             ],
-            Aliases: ["css10", "css10-6lang", "css10-ja", "ja-css10"],
+            Aliases:
+            [
+                "css10",
+                "css10-6lang",
+                "css10-ja",
+                "ja-css10",
+                "ayousanz/piper-plus-css10-ja-6lang",
+            ],
             Description: "CSS10 Japanese 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT, 6841 utterances)"),
     ];
 

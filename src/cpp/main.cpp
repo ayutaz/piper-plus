@@ -1438,6 +1438,8 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
       bool looksLikeName = pathStr.find('/') == string::npos &&
                            pathStr.find('\\') == string::npos &&
                            pathStr.find('.') == string::npos;
+      // Catalog names count too, including repo IDs ("owner/repo") with '/'.
+      looksLikeName = looksLikeName || piper::findVoice(pathStr).has_value();
       if (looksLikeName) {
         auto voice = piper::findVoice(pathStr);
         if (voice) {

@@ -19,6 +19,7 @@ three raw aliases from the PUA contract pass, anything else fails.
 from __future__ import annotations
 
 import importlib.util
+import json
 import re
 import sys
 import urllib.error
@@ -26,6 +27,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "check_config_phoneme_keys.py"
@@ -69,8 +71,12 @@ def test_aliases_are_the_ones_the_cpp_reader_accepts():
     source = PIPER_CPP.read_text(encoding="utf-8")
     block = source[source.index("knownTokens") : source.index("knownTokens.find")]
     cpp = {
-        "".join(chr(int(h, 16)) for h in re.findall(r"\\u([0-9A-Fa-f]{4})", token)): int(cp, 16)
-        for token, cp in re.findall(r'\{"((?:\\u[0-9A-Fa-f]{4})+)",\s*0x([0-9A-Fa-f]+)\}', block)
+        "".join(
+            chr(int(h, 16)) for h in re.findall(r"\\u([0-9A-Fa-f]{4})", token)
+        ): int(cp, 16)
+        for token, cp in re.findall(
+            r'\{"((?:\\u[0-9A-Fa-f]{4})+)",\s*0x([0-9A-Fa-f]+)\}', block
+        )
     }
     assert cpp == ALIASES
 
@@ -104,6 +110,15 @@ def test_distributed_urls_use_the_pinned_revision():
     assert len(urls) == len(set(urls))
 
 
+def test_distributed_urls_cover_every_catalog_model():
+    catalog = json.loads(ck.CATALOG.read_text(encoding="utf-8"))["voice_catalog"]
+    repos = {e["repo_id"] for k, e in catalog.items() if not k.startswith("_")}
+    urls = ck.distributed_urls()
+    assert {
+        u.split("/resolve/")[0].removeprefix("https://huggingface.co/") for u in urls
+    } == repos
+
+
 def test_a_fetch_failure_fails_instead_of_skipping(monkeypatch):
     def boom(*_a, **_k):
         raise urllib.error.URLError("offline")
@@ -133,7 +148,9 @@ def _runs(job: dict) -> str:
 
 
 def test_in_repo_job_runs_the_script_over_the_repo(jobs):
-    assert "scripts/check_config_phoneme_keys.py --repo" in _runs(jobs["config-key-validator"])
+    assert "scripts/check_config_phoneme_keys.py --repo" in _runs(
+        jobs["config-key-validator"]
+    )
 
 
 def test_distributed_job_runs_the_script_on_every_event(jobs):

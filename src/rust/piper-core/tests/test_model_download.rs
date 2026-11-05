@@ -611,3 +611,110 @@ mod model_notice_tests {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Catalog key / alias resolution (test/model_resolution_vectors.json)
+// ---------------------------------------------------------------------------
+
+mod catalog_alias_tests {
+    use piper_plus::model_download::{MODEL_ALIASES, builtin_registry, find_model};
+
+    /// All entries of `voice_catalog` (skipping `_comment`).
+    fn canonical_entries() -> Vec<serde_json::Value> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../test/model_resolution_vectors.json");
+        let text = std::fs::read_to_string(&path).expect("canonical vectors readable");
+        let data: serde_json::Value = serde_json::from_str(&text).unwrap();
+        data["voice_catalog"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .filter(|(k, _)| !k.starts_with('_'))
+            .map(|(_, v)| v.clone())
+            .collect()
+    }
+
+    /// Key followed by every alias of a catalog entry.
+    fn names_of(entry: &serde_json::Value) -> Vec<String> {
+        let mut names = vec![entry["key"].as_str().unwrap().to_string()];
+        for alias in entry["aliases"].as_array().unwrap() {
+            names.push(alias.as_str().unwrap().to_string());
+        }
+        names
+    }
+
+    fn expected_urls(entry: &serde_json::Value) -> (String, String) {
+        let repo = entry["repo_id"].as_str().unwrap();
+        let revision = entry["revision"].as_str().unwrap_or("main");
+        let onnx = entry["onnx_file"].as_str().unwrap();
+        let config = entry["config_file"].as_str().unwrap();
+        let prefix = format!("https://huggingface.co/{repo}/resolve/{revision}/");
+        (format!("{prefix}{onnx}"), format!("{prefix}{config}"))
+    }
+
+    #[test]
+    fn catalog_has_three_entries() {
+        assert_eq!(canonical_entries().len(), 3);
+    }
+
+    #[test]
+    fn every_key_and_alias_resolves_to_catalog_files() {
+        let mut failures = Vec::new();
+        for entry in canonical_entries() {
+            let (model_url, config_url) = expected_urls(&entry);
+            for name in names_of(&entry) {
+                match find_model(&name) {
+                    None => failures.push(format!("{name}: not resolved")),
+                    Some(m) if m.model_url != model_url || m.config_url != config_url => {
+                        failures.push(format!("{name}: resolved to {}", m.model_url))
+                    }
+                    Some(_) => {}
+                }
+            }
+        }
+        assert!(failures.is_empty(), "{failures:#?}");
+    }
+
+    #[test]
+    fn every_key_and_alias_resolves_cached_path() {
+        for entry in canonical_entries() {
+            let onnx_file = entry["onnx_file"].as_str().unwrap();
+            let config_file = entry["config_file"].as_str().unwrap();
+            let onnx_name = onnx_file.rsplit('/').next().unwrap();
+            let config_name = config_file.rsplit('/').next().unwrap();
+            for name in names_of(&entry) {
+                let dir = tempfile::tempdir().unwrap();
+                std::fs::write(dir.path().join(onnx_name), b"graph").unwrap();
+                std::fs::write(dir.path().join(config_name), b"{}").unwrap();
+                let resolved =
+                    piper_plus::model_download::resolve_model_path(&name, Some(dir.path()))
+                        .unwrap_or_else(|e| panic!("{name}: {e}"));
+                assert_eq!(resolved, dir.path().join(onnx_name), "{name}");
+            }
+        }
+    }
+
+    #[test]
+    fn alias_table_covers_catalog_and_points_to_registry() {
+        let registry_names: Vec<&str> =
+            builtin_registry().iter().map(|m| m.name.as_str()).collect();
+        for (alias, target) in MODEL_ALIASES {
+            assert!(registry_names.contains(target), "{alias} -> {target}");
+        }
+        for entry in canonical_entries() {
+            for name in names_of(&entry) {
+                assert!(
+                    MODEL_ALIASES.iter().any(|(a, _)| *a == name),
+                    "{name} missing from MODEL_ALIASES"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn legacy_registry_names_still_resolve() {
+        for name in ["tsukuyomi-6lang-v2", "css10-6lang", "zero-shot-base-zs-v1"] {
+            assert_eq!(find_model(name).map(|m| m.name.as_str()), Some(name));
+        }
+    }
+}

@@ -9,6 +9,7 @@ and triangulation with multiple resolution paths.
 from __future__ import annotations
 
 import importlib
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -125,6 +126,49 @@ class TestFindConfig:
 # ===================================================================
 # Alias resolution (Case 2)
 # ===================================================================
+
+# The catalog shared by every runtime (docs/reference/model-resolution.md).
+CANONICAL_VECTORS = (
+    Path(__file__).resolve().parents[3] / "test" / "model_resolution_vectors.json"
+)
+
+
+def _canonical_catalog() -> dict[str, dict]:
+    catalog = json.loads(CANONICAL_VECTORS.read_text(encoding="utf-8"))["voice_catalog"]
+    return {k: v for k, v in catalog.items() if not k.startswith("_")}
+
+
+def _canonical_names() -> list[tuple[str, str]]:
+    return [
+        (name, key)
+        for key, entry in _canonical_catalog().items()
+        for name in [key, *entry["aliases"]]
+    ]
+
+
+@pytest.mark.unit
+class TestResolveModelCanonicalNames:
+    """Every catalog key and alias resolves to the catalog's pinned files."""
+
+    @pytest.mark.parametrize(("name", "key"), _canonical_names())
+    @patch("piper_plus.api._model_resolver._download_from_hf")
+    def test_name_resolves_to_catalog_files(self, mock_download, tmp_path, name, key):
+        entry = _canonical_catalog()[key]
+        mock_download.return_value = (tmp_path / "m.onnx", tmp_path / "c.json")
+
+        resolve_model(name, cache_dir=tmp_path)
+
+        args, kwargs = mock_download.call_args
+        assert args[:3] == (entry["repo_id"], entry["onnx_file"], entry["config_file"])
+        assert kwargs.get("revision") == entry.get("revision")
+
+    @pytest.mark.parametrize(("name", "key"), _canonical_names())
+    def test_name_is_listed_in_model_aliases(self, name, key):
+        assert MODEL_ALIASES[name]["repo_id"] == _canonical_catalog()[key]["repo_id"]
+
+    def test_unknown_name_lists_the_catalog_names(self, tmp_path):
+        with pytest.raises(ModelNotFoundError, match="ja-tsukuyomi"):
+            resolve_model("no-such-voice", cache_dir=tmp_path, download=False)
 
 
 @pytest.mark.unit

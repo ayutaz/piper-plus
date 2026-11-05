@@ -86,10 +86,11 @@ public sealed class VoiceCatalogTests : IDisposable
         IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadBuiltInCatalog();
         VoiceInfo tsukuyomi = catalog.Single(v => v.Key == "ja_JP-tsukuyomi-chan-medium");
 
-        Assert.Equal(3, tsukuyomi.Aliases.Count);
+        Assert.Equal(4, tsukuyomi.Aliases.Count);
         Assert.Contains("tsukuyomi", tsukuyomi.Aliases);
         Assert.Contains("tsukuyomi-chan", tsukuyomi.Aliases);
         Assert.Contains("ja-tsukuyomi", tsukuyomi.Aliases);
+        Assert.Contains("ayousanz/piper-plus-tsukuyomi-chan", tsukuyomi.Aliases);
     }
 
     [Fact]
@@ -118,11 +119,12 @@ public sealed class VoiceCatalogTests : IDisposable
         IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadBuiltInCatalog();
         VoiceInfo css10 = catalog.Single(v => v.Key == "ja_JP-css10-6lang-medium");
 
-        Assert.Equal(4, css10.Aliases.Count);
+        Assert.Equal(5, css10.Aliases.Count);
         Assert.Contains("css10", css10.Aliases);
         Assert.Contains("css10-6lang", css10.Aliases);
         Assert.Contains("css10-ja", css10.Aliases);
         Assert.Contains("ja-css10", css10.Aliases);
+        Assert.Contains("ayousanz/piper-plus-css10-ja-6lang", css10.Aliases);
     }
 
     [Fact]

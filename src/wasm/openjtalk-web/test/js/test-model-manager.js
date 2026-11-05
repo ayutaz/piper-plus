@@ -237,15 +237,11 @@ describe("ModelManager", { skip }, () => {
     it("HuggingFaceリポジトリ名からモデルをダウンロードして返す", async () => {
       const expectedConfig = { sample_rate: 22050, language: "ja" };
       globalThis.fetch = createMockFetch(
-        createHuggingFaceRoutes(
-          "ayousanz/piper-plus-tsukuyomi-chan",
-          "model-fp16.onnx",
-          expectedConfig
-        )
+        createHuggingFaceRoutes("example-owner/example-voice", "model-fp16.onnx", expectedConfig)
       );
 
       const mgr = new ModelManager();
-      const result = await mgr.loadModel("ayousanz/piper-plus-tsukuyomi-chan");
+      const result = await mgr.loadModel("example-owner/example-voice");
 
       assert.ok(result.modelData instanceof ArrayBuffer);
       assert.deepEqual(result.config, expectedConfig);
@@ -256,7 +252,7 @@ describe("ModelManager", { skip }, () => {
       globalThis.fetch = createMockFetch(
         createHuggingFaceRoutes(
           "ayousanz/piper-plus-tsukuyomi-chan",
-          "tsukuyomi.onnx",
+          "tsukuyomi-chan-6lang-fp16.onnx",
           expectedConfig
         )
       );
@@ -444,7 +440,7 @@ describe("ModelManager", { skip }, () => {
       );
 
       const mgr = new ModelManager();
-      const urls = await mgr._resolveUrls("ayousanz/piper-plus-tsukuyomi-chan");
+      const urls = await mgr._resolveUrls("example-owner/example-voice");
 
       assert.ok(urls.modelUrl.includes("huggingface.co"));
     });
@@ -466,9 +462,9 @@ describe("ModelManager", { skip }, () => {
       );
 
       const mgr = new ModelManager();
-      const urls = await mgr._resolveUrls("ayousanz/piper-plus-tsukuyomi-chan");
+      const urls = await mgr._resolveUrls("example-owner/example-voice");
 
-      assert.ok(urls.modelUrl.includes("ayousanz/piper-plus-tsukuyomi-chan"));
+      assert.ok(urls.modelUrl.includes("example-owner/example-voice"));
     });
 
     it("HuggingFaceリポジトリ名のmodelUrlが.onnxで終わる", async () => {
@@ -488,7 +484,7 @@ describe("ModelManager", { skip }, () => {
       );
 
       const mgr = new ModelManager();
-      const urls = await mgr._resolveUrls("ayousanz/piper-plus-tsukuyomi-chan");
+      const urls = await mgr._resolveUrls("example-owner/example-voice");
 
       assert.ok(urls.modelUrl.endsWith(".onnx"));
     });
@@ -510,9 +506,9 @@ describe("ModelManager", { skip }, () => {
       );
 
       const mgr = new ModelManager();
-      const urls = await mgr._resolveUrls("ayousanz/piper-plus-tsukuyomi-chan");
+      const urls = await mgr._resolveUrls("example-owner/example-voice");
 
-      assert.equal(urls.cacheKey, "ayousanz/piper-plus-tsukuyomi-chan");
+      assert.equal(urls.cacheKey, "example-owner/example-voice");
     });
 
     it('レジストリショートカット "tsukuyomi" をフルリポジトリ名に解決する', async () => {
@@ -675,7 +671,7 @@ describe("ModelManager", { skip }, () => {
       );
 
       const mgr = new ModelManager();
-      const urls = await mgr._resolveUrls("ayousanz/piper-plus-tsukuyomi-chan");
+      const urls = await mgr._resolveUrls("example-owner/example-voice");
 
       assert.ok(urls.modelUrl.includes("model-fp16.onnx"));
     });
@@ -900,6 +896,97 @@ describe("pinned public zero-shot base", () => {
         assert.equal(urls.cacheKey, prefix + "base.onnx");
       } finally {
         globalThis.fetch = originalFetch;
+      }
+    });
+  }
+});
+
+// =====================================================================
+// 正本カタログ (test/model_resolution_vectors.json の voice_catalog)
+// =====================================================================
+
+const { readFileSync } = await import("node:fs");
+const { dirname, join, resolve } = await import("node:path");
+const { fileURLToPath } = await import("node:url");
+
+const TEST_DIR = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(TEST_DIR, "../../../../..");
+const VECTORS = JSON.parse(
+  readFileSync(join(REPO_ROOT, "test/model_resolution_vectors.json"), "utf8")
+);
+const CATALOG = Object.entries(VECTORS.voice_catalog).filter(([key]) => !key.startsWith("_"));
+const MODEL_MANAGER_SOURCE = readFileSync(resolve(TEST_DIR, "../../src/model-manager.js"), "utf8");
+
+/** The URL HuggingFace serves a catalog file from (revision defaults to main). */
+function catalogFileUrl(entry, file) {
+  return `https://huggingface.co/${entry.repo_id}/resolve/${entry.revision ?? "main"}/${file}`;
+}
+
+describe("canonical voice_catalog resolution", { skip }, () => {
+  let originalFetch;
+  let fetchedUrls;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    fetchedUrls = [];
+    globalThis.fetch = async (url) => {
+      fetchedUrls.push(url);
+      throw new Error(`catalog names must resolve without fetching: ${url}`);
+    };
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("canonical catalog has entries", () => {
+    assert.ok(CATALOG.length > 0);
+  });
+
+  for (const [catalogKey, entry] of CATALOG) {
+    const names = [entry.key, ...entry.aliases];
+
+    for (const name of names) {
+      it(`${catalogKey}: "${name}" resolves to the catalog repo and files`, async () => {
+        const urls = await new ModelManager().resolveUrls(name);
+
+        assert.equal(urls.modelUrl, catalogFileUrl(entry, entry.onnx_file));
+        assert.equal(urls.configUrl, catalogFileUrl(entry, entry.config_file));
+        assert.equal(urls.configFallbackUrl, null);
+        assert.deepEqual(fetchedUrls, [], "catalog names must not query the HuggingFace API");
+      });
+    }
+
+    it(`${catalogKey}: every name shares one cache key`, async () => {
+      const keys = new Set();
+      for (const name of names) {
+        keys.add((await new ModelManager().resolveUrls(name)).cacheKey);
+      }
+      assert.equal(keys.size, 1, `cache keys differ: ${[...keys].join(", ")}`);
+    });
+
+    for (const name of [entry.key, ...entry.aliases, entry.repo_id]) {
+      it(`${catalogKey}: "${name}" appears as a quoted literal in model-manager.js`, () => {
+        assert.ok(
+          MODEL_MANAGER_SOURCE.includes(`"${name}"`) || MODEL_MANAGER_SOURCE.includes(`'${name}'`),
+          `"${name}" is missing from src/model-manager.js`
+        );
+      });
+    }
+  }
+
+  for (const vector of VECTORS.test_cases.filter(
+    (v) => (v.type === "alias" || v.type === "catalog_key") && v.expected_repo
+  )) {
+    it(`test_cases.${vector.id}: "${vector.input}" resolves to ${vector.expected_repo}`, async () => {
+      const urls = await new ModelManager().resolveUrls(vector.input);
+
+      assert.ok(
+        urls.modelUrl.startsWith(`https://huggingface.co/${vector.expected_repo}/resolve/`),
+        urls.modelUrl
+      );
+      if (vector.expected_onnx) {
+        assert.ok(urls.modelUrl.endsWith(`/${vector.expected_onnx}`), urls.modelUrl);
       }
     });
   }

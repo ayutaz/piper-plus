@@ -79,7 +79,7 @@ var embeddedCatalog = []VoiceCatalogEntry{
 			{RelativePath: "tsukuyomi-chan-6lang-fp16.onnx", SizeBytes: 39_652_717},
 			{RelativePath: "config.json", SizeBytes: 6_279},
 		},
-		Aliases: []string{"tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"},
+		Aliases: []string{"tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi", "ayousanz/piper-plus-tsukuyomi-chan"},
 		Notice: []string{
 			"[piper-plus] つくよみちゃんモデルの利用条件 / Terms for the Tsukuyomi-chan model",
 			"生成した音声を使うときは「Piper Plus:つくよみちゃん」のクレジット表記が必須です。",
@@ -98,7 +98,7 @@ var embeddedCatalog = []VoiceCatalogEntry{
 			{RelativePath: "css10-ja-6lang-fp16.onnx", SizeBytes: 39_652_717},
 			{RelativePath: "config.json", SizeBytes: 5_912},
 		},
-		Aliases: []string{"css10", "css10-6lang", "css10-ja", "ja-css10"},
+		Aliases: []string{"css10", "css10-6lang", "css10-ja", "ja-css10", "ayousanz/piper-plus-css10-ja-6lang"},
 	},
 }
 

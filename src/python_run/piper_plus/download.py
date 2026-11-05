@@ -75,7 +75,12 @@ PIPER_PLUS_VOICES: dict[str, Any] = {
                 "md5_digest": "",
             },
         },
-        "aliases": ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"],
+        "aliases": [
+            "tsukuyomi",
+            "tsukuyomi-chan",
+            "ja-tsukuyomi",
+            "ayousanz/piper-plus-tsukuyomi-chan",
+        ],
         "description": "Tsukuyomi-chan 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT)",
         # Usage notice shown by the CLI and servers (docs/reference/model-resolution.md §9).
         # Canonical copy: test/model_resolution_vectors.json.
@@ -115,7 +120,13 @@ PIPER_PLUS_VOICES: dict[str, Any] = {
                 "md5_digest": "",
             },
         },
-        "aliases": ["css10", "css10-6lang", "css10-ja", "ja-css10"],
+        "aliases": [
+            "css10",
+            "css10-6lang",
+            "css10-ja",
+            "ja-css10",
+            "ayousanz/piper-plus-css10-ja-6lang",
+        ],
         "description": "CSS10 Japanese 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT, 6841 utterances)",
     },
 }

@@ -3,9 +3,9 @@
 """Voice catalog parity checker across the runtime catalog mirrors.
 
 `test/model_resolution_vectors.json` の `voice_catalog` を canonical source
-として、5 ランタイム (Python / C++ / Rust / C# / Go) の voice catalog
-mirror の `repo_id` / `onnx_file` / `config_file` / `revision` / `aliases` と、
-利用案内 (`notice` / `notice_files`) を確認する。
+として、各ランタイム (Python / C++ / Rust / C# / Go / WASM) の voice catalog
+mirror の `repo_id` / `onnx_file` / `config_file` / `revision`、モデル名
+(`key` と `aliases` のすべて)、利用案内 (`notice` / `notice_files`) を確認する。
 
 Why: voice catalog は各ランタイムで「JSON ファイル」または「ハードコード」
 の形で分散しており、Python と C++ は JSON、Rust/C#/Go はソース内ハード
@@ -16,9 +16,14 @@ Why: voice catalog は各ランタイムで「JSON ファイル」または「�
 検証粒度: 各 catalog entry について以下を assert
   - full mirror (catalog を持つランタイム):
       - canonical の `repo_id` / `onnx_file` / `config_file` と任意の `revision` が出現
-      - canonical の `aliases` のうち少なくとも 1 つが出現
+      - canonical の `key` と `aliases` の**すべて**が文字列リテラル
+        (`"name"` か `'name'`) として出現。部分一致は数えない
+        (`"ja-tsukuyomi"` は `tsukuyomi` の代わりにならない)
       - canonical の `notice` の各行と `notice_files` の各要素が出現
-  - notice mirror (catalog の形が違うが利用案内を出すもの: WASM と学習側 Python):
+  - alias mirror (名前 → repo の対応だけを持つもの: WASM):
+      - `repo_id`、`key` と `aliases` のすべて (文字列リテラル)、
+        `notice` を持つ entry では `notice` の各行と `notice_files`
+  - notice mirror (学習側 Python の旧カタログ。全モデルは持たない):
       - `notice` を持つ entry についてだけ、`repo_id`、`notice` の各行、
         `notice_files` の各要素が出現
 
@@ -34,7 +39,7 @@ Usage:
     python scripts/check_voice_catalog_parity.py
 
 Exit codes:
-    0 -- all runtime mirrors carry the canonical aliases / files / notices
+    0 -- all runtime mirrors carry the canonical names / files / notices
     1 -- drift detected
 """
 
@@ -66,12 +71,17 @@ MIRRORS: dict[str, Path] = {
     "Go voice_catalog.go": REPO_ROOT / "src/go/piperplus/voice_catalog.go",
 }
 
-# Mirrors that only carry the usage notice for the entries that have one.
-# Their catalogs are shaped differently (WASM maps alias -> repo only; the
-# training-side Python catalog is a separate registry), so only the repo and
-# the notice are compared.
-NOTICE_MIRRORS: dict[str, Path] = {
+# Mirrors that map every model name to its repo but do not repeat the file
+# metadata (WASM resolves files per repo), so the names, the repo and the
+# notice are compared.
+ALIAS_MIRRORS: dict[str, Path] = {
     "WASM model-manager.js": REPO_ROOT / "src/wasm/openjtalk-web/src/model-manager.js",
+}
+
+# Mirrors that only carry the usage notice for the entries that have one.
+# The training-side Python catalog is a separate legacy registry without the
+# public base, so only the repo and the notice are compared.
+NOTICE_MIRRORS: dict[str, Path] = {
     "Python piper_train model_manager.py": REPO_ROOT
     / "src/python/piper_train/model_manager.py",
 }
@@ -135,6 +145,22 @@ def _notice_failures(
     return failures
 
 
+def _has_literal(text: str, value: str) -> bool:
+    """Whether `value` appears as a whole string literal (either quote style)."""
+    return f'"{value}"' in text or f"'{value}'" in text
+
+
+def _name_failures(
+    entry_key: str, entry: dict, mirror_label: str, text: str
+) -> list[str]:
+    names = [entry.get("key", entry_key), *entry.get("aliases", [])]
+    return [
+        f"  [{mirror_label}] {entry_key}: name '{name}' not found as a string literal"
+        for name in names
+        if not _has_literal(text, name)
+    ]
+
+
 def check_entry(
     entry_key: str, entry: dict, mirror_label: str, mirror_path: Path
 ) -> list[str]:
@@ -160,16 +186,25 @@ def check_entry(
                 f"  [{mirror_label}] {entry_key}: {field} '{value}' not found"
             )
 
-    aliases = entry.get("aliases", [])
-    if aliases:
-        # At least one alias must appear in the mirror. Rust uses a
-        # synthetic name like `tsukuyomi-6lang-v2` and relies on partial
-        # match; requiring all aliases would be too strict.
-        if not any(alias in text for alias in aliases):
-            failures.append(
-                f"  [{mirror_label}] {entry_key}: none of aliases {aliases} found"
-            )
+    # Every name must resolve in every runtime, so every name must be listed.
+    failures.extend(_name_failures(entry_key, entry, mirror_label, text))
+    failures.extend(_notice_failures(entry_key, entry, mirror_label, text))
+    return failures
 
+
+def check_alias_entry(
+    entry_key: str, entry: dict, mirror_label: str, mirror_path: Path
+) -> list[str]:
+    """Return failures for an alias mirror (names, repo and notice)."""
+    if not mirror_path.exists():
+        return [f"  MISSING {mirror_label}: {mirror_path}"]
+
+    text = normalize_mirror_text(mirror_path.read_text(encoding="utf-8"))
+    failures: list[str] = []
+    repo = entry.get("repo_id")
+    if repo and repo not in text:
+        failures.append(f"  [{mirror_label}] {entry_key}: repo_id '{repo}' not found")
+    failures.extend(_name_failures(entry_key, entry, mirror_label, text))
     failures.extend(_notice_failures(entry_key, entry, mirror_label, text))
     return failures
 
@@ -197,9 +232,11 @@ def main(
     *,
     canonical_path: Path = CANONICAL,
     mirrors: dict[str, Path] | None = None,
+    alias_mirrors: dict[str, Path] | None = None,
     notice_mirrors: dict[str, Path] | None = None,
 ) -> int:
     mirrors = MIRRORS if mirrors is None else mirrors
+    alias_mirrors = ALIAS_MIRRORS if alias_mirrors is None else alias_mirrors
     notice_mirrors = NOTICE_MIRRORS if notice_mirrors is None else notice_mirrors
     canonical = load_canonical(canonical_path)
     print(f"Canonical: {canonical_path}")
@@ -216,6 +253,9 @@ def main(
             print(f, file=sys.stderr)
 
         checks = [(label, path, check_entry) for label, path in mirrors.items()]
+        checks += [
+            (label, path, check_alias_entry) for label, path in alias_mirrors.items()
+        ]
         checks += [
             (label, path, check_notice_entry) for label, path in notice_mirrors.items()
         ]
@@ -241,7 +281,8 @@ def main(
 
     print(
         f"OK all {len(canonical)} canonical entries present in all "
-        f"{len(mirrors)} runtime mirrors and {len(notice_mirrors)} notice mirrors"
+        f"{len(mirrors)} runtime mirrors, {len(alias_mirrors)} alias mirror(s) "
+        f"and {len(notice_mirrors)} notice mirror(s)"
     )
     return 0
 

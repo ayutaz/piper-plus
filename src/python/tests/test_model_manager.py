@@ -1,6 +1,8 @@
 """Tests for piper_train.model_manager."""
 
+import json
 import os
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -15,6 +17,19 @@ from piper_train.model_manager import (
 
 
 pytestmark = pytest.mark.unit
+
+_CANONICAL_CATALOG = {
+    key: entry
+    for key, entry in json.loads(
+        (
+            Path(__file__).resolve().parents[3]
+            / "test"
+            / "model_resolution_vectors.json"
+        ).read_text(encoding="utf-8")
+    )["voice_catalog"].items()
+    if not key.startswith("_")
+}
+_TRAINING_CATALOG_KEYS = ("ja_JP-tsukuyomi-chan-medium", "ja_JP-css10-6lang-medium")
 
 
 class TestFindVoice:
@@ -47,6 +62,22 @@ class TestFindVoice:
 
     def test_find_none(self):
         assert find_voice(None) is None
+
+    @pytest.mark.parametrize(
+        ("name", "key"),
+        [
+            (name, key)
+            for key, entry in _CANONICAL_CATALOG.items()
+            if key in _TRAINING_CATALOG_KEYS
+            for name in [key, *entry["aliases"]]
+        ],
+    )
+    def test_every_canonical_name_finds_the_model(self, name, key):
+        """The training catalog has no public base; its two voices take every name."""
+        voice = find_voice(name)
+        assert voice is not None, name
+        assert voice["key"] == key
+        assert voice["repo_id"] == _CANONICAL_CATALOG[key]["repo_id"]
 
 
 class TestGetDefaultModelDir:

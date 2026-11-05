@@ -27,7 +27,12 @@ _BUILTIN_CATALOG = {
             "tsukuyomi-chan-6lang-fp16.onnx": {"size_bytes": 39652717},
             "config.json": {"size_bytes": 6279},
         },
-        "aliases": ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"],
+        "aliases": [
+            "tsukuyomi",
+            "tsukuyomi-chan",
+            "ja-tsukuyomi",
+            "ayousanz/piper-plus-tsukuyomi-chan",
+        ],
         "description": "Tsukuyomi-chan 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT)",
         # Usage notice shown by the CLIs and servers (docs/reference/model-resolution.md §9).
         # Canonical copy: test/model_resolution_vectors.json.
@@ -56,7 +61,13 @@ _BUILTIN_CATALOG = {
             "css10-ja-6lang-fp16.onnx": {"size_bytes": 39652717},
             "config.json": {"size_bytes": 5912},
         },
-        "aliases": ["css10", "css10-6lang", "css10-ja", "ja-css10"],
+        "aliases": [
+            "css10",
+            "css10-6lang",
+            "css10-ja",
+            "ja-css10",
+            "ayousanz/piper-plus-css10-ja-6lang",
+        ],
         "description": "CSS10 Japanese 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT, 6841 utterances)",
     },
 }

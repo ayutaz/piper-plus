@@ -22,6 +22,9 @@
 #include <windows.h>
 #endif
 
+#include <fstream>
+
+#include "json.hpp"
 #include "model_manager.hpp"
 
 // ============================================
@@ -593,5 +596,131 @@ TEST(ModelManager, PublicBasePinnedPair) {
         ASSERT_EQ(voice->files.size(), 2u);
         EXPECT_EQ(voice->files[0].relativePath, "releases/zs-v1/base.onnx");
         EXPECT_EQ(voice->files[1].relativePath, "releases/zs-v1/base.onnx.json");
+    }
+}
+
+// ============================================
+// Canonical voice_catalog (test/model_resolution_vectors.json):
+// every key and alias resolves to the entry's repo / onnx / config / revision.
+// ============================================
+
+#ifndef PIPER_PLUS_SOURCE_DIR
+#error "PIPER_PLUS_SOURCE_DIR must point at the repository root"
+#endif
+
+namespace {
+
+struct CanonicalName {
+    std::string name;
+    std::string key;
+    std::string repoId;
+    std::string onnxFile;
+    std::string configFile;
+    std::string revision;
+};
+
+nlohmann::json loadJson(const std::filesystem::path& path) {
+    std::ifstream in(path);
+    EXPECT_TRUE(in.good()) << "cannot open " << path.string();
+    return nlohmann::json::parse(in);
+}
+
+std::vector<CanonicalName> loadCanonicalNames() {
+    const auto root = std::filesystem::path(PIPER_PLUS_SOURCE_DIR);
+    const auto doc = loadJson(root / "test" / "model_resolution_vectors.json");
+    std::vector<CanonicalName> names;
+    for (const auto& [id, e] : doc.at("voice_catalog").items()) {
+        if (!id.empty() && id[0] == '_') {
+            continue;
+        }
+        CanonicalName base{"",
+                           e.at("key").get<std::string>(),
+                           e.at("repo_id").get<std::string>(),
+                           e.at("onnx_file").get<std::string>(),
+                           e.at("config_file").get<std::string>(),
+                           e.value("revision", std::string("main"))};
+        base.name = base.key;
+        names.push_back(base);
+        for (const auto& alias : e.at("aliases")) {
+            base.name = alias.get<std::string>();
+            names.push_back(base);
+        }
+    }
+    return names;
+}
+
+std::string firstOnnx(const piper::VoiceInfo& voice) {
+    for (const auto& file : voice.files) {
+        if (std::filesystem::path(file.relativePath).extension() == ".onnx") {
+            return file.relativePath;
+        }
+    }
+    return "";
+}
+
+}  // namespace
+
+TEST(ModelResolutionVectorsTest, CanonicalNamesIncludeRepoIds) {
+    std::vector<std::string> names;
+    for (const auto& c : loadCanonicalNames()) {
+        names.push_back(c.name);
+    }
+    for (const char* repo : {"ayousanz/piper-plus-tsukuyomi-chan",
+                             "ayousanz/piper-plus-css10-ja-6lang", "ayousanz/piper-plus-base"}) {
+        EXPECT_NE(std::find(names.begin(), names.end(), repo), names.end()) << repo;
+    }
+}
+
+TEST(ModelResolutionVectorsTest, EveryKeyAndAliasResolvesToCanonicalEntry) {
+    for (const auto& c : loadCanonicalNames()) {
+        SCOPED_TRACE(c.name);
+        auto voice = piper::findVoice(c.name);
+        ASSERT_TRUE(voice.has_value());
+        EXPECT_EQ(voice->key, c.key);
+        EXPECT_EQ(voice->repoId, c.repoId);
+        EXPECT_EQ(voice->revision, c.revision);
+        EXPECT_EQ(firstOnnx(*voice), c.onnxFile);
+        bool hasConfig = std::any_of(voice->files.begin(), voice->files.end(),
+                                     [&](const auto& f) { return f.relativePath == c.configFile; });
+        EXPECT_TRUE(hasConfig) << c.configFile;
+    }
+}
+
+TEST(ModelResolutionVectorsTest, ResolveModelPathUsesCatalogOnnxFile) {
+    // A name that is not a file (repo IDs included) goes through the catalog
+    // entry and its fixed ONNX file name, not a generic repo lookup.
+    const auto dir = std::filesystem::temp_directory_path() / "piper-plus-resolve-vectors";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    for (const auto& c : loadCanonicalNames()) {
+        SCOPED_TRACE(c.name);
+        const auto onnx = dir / std::filesystem::path(c.onnxFile).filename();
+        std::ofstream(onnx) << "x";
+        auto resolved = piper::resolveModelPath(c.name, dir);
+        ASSERT_TRUE(resolved.has_value());
+        EXPECT_EQ(*resolved, onnx);
+    }
+    std::filesystem::remove_all(dir);
+}
+
+TEST(ModelResolutionVectorsTest, VoicesJsonAliasesMatchCanonical) {
+    // piper_plus_voices.json is not read at runtime but mirrors the embedded
+    // catalog; keep its aliases equal to the canonical ones.
+    const auto root = std::filesystem::path(PIPER_PLUS_SOURCE_DIR);
+    const auto voices = loadJson(root / "src" / "cpp" / "piper_plus_voices.json");
+    const auto doc = loadJson(root / "test" / "model_resolution_vectors.json");
+    for (const auto& [id, e] : doc.at("voice_catalog").items()) {
+        if (!id.empty() && id[0] == '_') {
+            continue;
+        }
+        const auto key = e.at("key").get<std::string>();
+        SCOPED_TRACE(key);
+        ASSERT_TRUE(voices.contains(key));
+        auto expected = e.at("aliases").get<std::vector<std::string>>();
+        auto actual = voices.at(key).at("aliases").get<std::vector<std::string>>();
+        std::sort(expected.begin(), expected.end());
+        std::sort(actual.begin(), actual.end());
+        EXPECT_EQ(actual, expected);
+        EXPECT_EQ(voices.at(key).at("repo").get<std::string>(), e.at("repo_id").get<std::string>());
     }
 }

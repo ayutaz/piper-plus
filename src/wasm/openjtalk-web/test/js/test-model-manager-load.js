@@ -263,7 +263,7 @@ describe("ModelManager.loadModel() 成功ケース", { skip }, () => {
     const mgr = new ModelManager();
 
     // Act
-    const result = await mgr.loadModel("ayousanz/piper-plus-tsukuyomi-chan");
+    const result = await mgr.loadModel("example-owner/example-voice");
 
     // Assert
     assert.ok(result.modelData, "modelData should be present");
@@ -417,7 +417,7 @@ describe("ModelManager.loadModel() 成功ケース", { skip }, () => {
     const mgr = new ModelManager();
 
     // Act
-    const result = await mgr.loadModel("ayousanz/piper-plus-tsukuyomi-chan");
+    const result = await mgr.loadModel("example-owner/example-voice");
 
     // Assert -- the fp16 file should have been selected
     const modelFetchUrl = calledUrls.find(

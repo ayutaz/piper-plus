@@ -305,6 +305,10 @@ foreach(test_source ${TEST_SOURCES})
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
         )
+        # Reads test/model_resolution_vectors.json (canonical voice_catalog).
+        target_compile_definitions(${test_name} PRIVATE
+            PIPER_PLUS_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+        )
         # model_manager.cpp uses spdlog for logging
         target_link_directories(${test_name} PRIVATE
             ${CMAKE_BINARY_DIR}/si/lib

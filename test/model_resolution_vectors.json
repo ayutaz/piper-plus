@@ -40,7 +40,8 @@
       "aliases": [
         "tsukuyomi",
         "tsukuyomi-chan",
-        "ja-tsukuyomi"
+        "ja-tsukuyomi",
+        "ayousanz/piper-plus-tsukuyomi-chan"
       ],
       "notice": [
         "[piper-plus] つくよみちゃんモデルの利用条件 / Terms for the Tsukuyomi-chan model",
@@ -67,7 +68,8 @@
         "css10",
         "css10-6lang",
         "css10-ja",
-        "ja-css10"
+        "ja-css10",
+        "ayousanz/piper-plus-css10-ja-6lang"
       ]
     },
     "multilingual-zero-shot-base-zs-v1": {
@@ -117,10 +119,18 @@
       "description": "Exact catalog key match (e.g., ja_JP-tsukuyomi-chan-medium)"
     },
     {
-      "id": "hf_repo_id",
+      "id": "catalog_repo_id",
       "input": "ayousanz/piper-plus-tsukuyomi-chan",
+      "type": "alias",
+      "expected_repo": "ayousanz/piper-plus-tsukuyomi-chan",
+      "expected_onnx": "tsukuyomi-chan-6lang-fp16.onnx",
+      "description": "A catalog model's HuggingFace repo ID is one of its aliases and resolves to the catalog files"
+    },
+    {
+      "id": "hf_repo_id",
+      "input": "example-owner/example-voice",
       "type": "huggingface",
-      "description": "HuggingFace repo ID (contains slash) triggers download"
+      "description": "Any other HuggingFace repo ID (contains slash) triggers download"
     },
     {
       "id": "nonexistent_alias",
