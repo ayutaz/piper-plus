@@ -155,9 +155,9 @@ func printModelNotice(w io.Writer, inputs ...string) {
 	}
 	modelNoticeShown = true
 	for _, line := range lines {
-		fmt.Fprintln(w, line)
+		_, _ = fmt.Fprintln(w, line)
 	}
-	fmt.Fprintln(w, piperplus.ModelNoticeFooter)
+	_, _ = fmt.Fprintln(w, piperplus.ModelNoticeFooter)
 }
 
 // stdinHasData reports whether stdin is connected to a pipe or file (i.e. not a

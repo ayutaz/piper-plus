@@ -96,23 +96,26 @@ func TestModelNoticeFooter(t *testing.T) {
 }
 
 func TestParseModelNoticeDisabled(t *testing.T) {
-	cases := map[string]bool{
-		"1":      true,
-		"true":   true,
-		" TRUE ": true,
-		"True":   true,
-		"yes":    true,
-		"YES\n":  true,
-		"0":      false,
-		"":       false,
-		"false":  false,
-		"no":     false,
-		"on":     false,
-		"2":      false,
+	cases := []struct {
+		in   string
+		want bool
+	}{
+		{"1", true},
+		{"true", true},
+		{" TRUE ", true},
+		{"True", true},
+		{"yes", true},
+		{"YES\n", true},
+		{"0", false},
+		{"", false},
+		{"false", false},
+		{"no", false},
+		{"on", false},
+		{"2", false},
 	}
-	for in, want := range cases {
-		if got := ParseModelNoticeDisabled(in); got != want {
-			t.Errorf("ParseModelNoticeDisabled(%q) = %v, want %v", in, got, want)
+	for _, c := range cases {
+		if got := ParseModelNoticeDisabled(c.in); got != c.want {
+			t.Errorf("ParseModelNoticeDisabled(%q) = %v, want %v", c.in, got, c.want)
 		}
 	}
 }
