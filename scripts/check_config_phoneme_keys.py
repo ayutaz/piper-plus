@@ -22,8 +22,10 @@ C++ 側の一覧との一致は ``tests/scripts/test_check_config_phoneme_keys.p
 Usage:
   check_config_phoneme_keys.py <config.json> ...   # 指定した config
   check_config_phoneme_keys.py --repo              # git 管理下の全 config
-  check_config_phoneme_keys.py --distributed       # MODEL_ALIASES の HF 配布 config
+  check_config_phoneme_keys.py --distributed       # カタログの HF 配布 config
 
+``--distributed`` の対象は ``test/model_resolution_vectors.json`` の
+``voice_catalog`` (全ランタイム共通のカタログの正本) の各 model。
 ``--distributed`` は取得に失敗した model を skip せず失敗として数える
 (以前の inline 検査は取得失敗を WARN で skip し、 その model を検査しないまま
 緑になり得た)。 一時的な失敗に備えて数回 retry する。
@@ -36,7 +38,6 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import subprocess
 import sys
@@ -45,10 +46,11 @@ import tomllib
 import urllib.request
 from pathlib import Path
 
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = REPO_ROOT / "docs" / "spec" / "pua-contract.toml"
 PUA_JSON = REPO_ROOT / "src" / "python" / "g2p" / "piper_plus_g2p" / "data" / "pua.json"
-MODEL_RESOLVER = REPO_ROOT / "src" / "python_run" / "piper_plus" / "api" / "_model_resolver.py"
+CATALOG = REPO_ROOT / "test" / "model_resolution_vectors.json"
 
 FETCH_ATTEMPTS = 3
 FETCH_TIMEOUT_S = 30
@@ -108,14 +110,14 @@ def repo_configs(root: Path = REPO_ROOT) -> list[Path]:
 
 
 def distributed_urls() -> list[str]:
-    """HF config URLs for MODEL_ALIASES, at each alias's pinned revision."""
-    spec = importlib.util.spec_from_file_location("_model_resolver", MODEL_RESOLVER)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    """HF config URLs for the catalog models, at each model's pinned revision."""
+    catalog = json.loads(CATALOG.read_text(encoding="utf-8"))["voice_catalog"]
     urls: list[str] = []
-    for alias in mod.MODEL_ALIASES.values():
-        rev = alias.get("revision", "main")
-        url = f"https://huggingface.co/{alias['repo_id']}/resolve/{rev}/{alias['config_file']}"
+    for key, entry in catalog.items():
+        if key.startswith("_"):
+            continue
+        rev = entry.get("revision", "main")
+        url = f"https://huggingface.co/{entry['repo_id']}/resolve/{rev}/{entry['config_file']}"
         if url not in urls:
             urls.append(url)
     return urls
@@ -137,8 +139,12 @@ def _fetch(url: str) -> dict:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("configs", nargs="*", type=Path)
-    parser.add_argument("--repo", action="store_true", help="check every git-tracked config")
-    parser.add_argument("--distributed", action="store_true", help="check the HF configs")
+    parser.add_argument(
+        "--repo", action="store_true", help="check every git-tracked config"
+    )
+    parser.add_argument(
+        "--distributed", action="store_true", help="check the HF configs"
+    )
     args = parser.parse_args(argv)
     if not (args.configs or args.repo or args.distributed):
         parser.error("give config paths, --repo or --distributed")

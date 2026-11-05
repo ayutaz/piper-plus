@@ -32,7 +32,7 @@ on:
       - 'scripts/test_sync_gates_meta.py'
       - 'scripts/check_config_phoneme_keys.py'
       - 'tests/scripts/test_check_config_phoneme_keys.py'
-      - 'src/python_run/piper_plus/api/_model_resolver.py'
+      - 'test/model_resolution_vectors.json'
   pull_request:
     paths:
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
@@ -54,7 +54,7 @@ on:
       - 'scripts/test_sync_gates_meta.py'
       - 'scripts/check_config_phoneme_keys.py'
       - 'tests/scripts/test_check_config_phoneme_keys.py'
-      - 'src/python_run/piper_plus/api/_model_resolver.py'
+      - 'test/model_resolution_vectors.json'
   schedule:
     # Weekly: catch a stale *distributed* (HuggingFace) config — e.g. the
     # v1.12.0 ɔɪ/œ̃/ɐ̃ multi-codepoint leak that broke C++ inference on Windows.
@@ -216,7 +216,7 @@ jobs:
     name: Distributed (HF) config validator
     # 配布中の config は HF にあり、 PR の差分には現れない (v1.12.0 の
     # ɔɪ/œ̃/ɐ̃ 漏れで Windows の C++ 推論が壊れた事例)。 この workflow が
-    # 走るたびに (PUA 関連ファイルを触る PR / push と週次)、 MODEL_ALIASES の
+    # 走るたびに (PUA 関連ファイルを触る PR / push と週次)、 カタログ正本の
     # 各 config を pin された revision で取得して検査する。 取得に失敗した
     # model は skip せず失敗にする (script 側で retry する)。
     runs-on: ubuntu-latest

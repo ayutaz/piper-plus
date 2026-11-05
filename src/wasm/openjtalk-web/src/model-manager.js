@@ -13,24 +13,83 @@ const DB_VERSION = 2;
 const HUGGINGFACE_API_BASE = "https://huggingface.co/api/models";
 const HUGGINGFACE_RESOLVE_BASE = "https://huggingface.co";
 
-/**
- * Shortcut names that resolve to full HuggingFace repository identifiers.
- */
-const MODEL_REGISTRY = {
-  tsukuyomi: "ayousanz/piper-plus-tsukuyomi-chan",
-  "tsukuyomi-chan": "ayousanz/piper-plus-tsukuyomi-chan",
-  css10: "ayousanz/piper-plus-css10-ja-6lang",
-  "css10-ja": "ayousanz/piper-plus-css10-ja-6lang",
-};
-
-// Experimental reference-conditioned graph: do not auto-select an encoder or
-// combine the nested release with the repository's legacy root config.
-const PUBLIC_BASE_PREFIX =
-  "https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/";
-const PUBLIC_BASE_ALIASES = new Set(["base", "zero-shot-base-zs-v1", "ayousanz/piper-plus-base"]);
 // The published base.onnx.json carries no sha256; keep in sync with
 // scripts/public_base_runtime.py (FILES["base.onnx"]).
 const PUBLIC_BASE_SHA256 = "e9860701a941db02149c7cfbe19cfb578c235c5e25020f1f592131d9b3b30f84";
+
+/**
+ * Catalog models. Mirrors `voice_catalog` in test/model_resolution_vectors.json
+ * (key, every alias, repo, files and revision); scripts/check_voice_catalog_parity.py
+ * checks that each name appears here. The catalog key and every alias resolve
+ * straight to these files, without querying the HuggingFace API.
+ */
+const VOICE_CATALOG = Object.freeze([
+  Object.freeze({
+    key: "ja_JP-tsukuyomi-chan-medium",
+    repoId: "ayousanz/piper-plus-tsukuyomi-chan",
+    onnxFile: "tsukuyomi-chan-6lang-fp16.onnx",
+    configFile: "config.json",
+    aliases: Object.freeze([
+      "tsukuyomi",
+      "tsukuyomi-chan",
+      "ja-tsukuyomi",
+      "ayousanz/piper-plus-tsukuyomi-chan",
+    ]),
+  }),
+  Object.freeze({
+    key: "ja_JP-css10-6lang-medium",
+    repoId: "ayousanz/piper-plus-css10-ja-6lang",
+    onnxFile: "css10-ja-6lang-fp16.onnx",
+    configFile: "config.json",
+    aliases: Object.freeze([
+      "css10",
+      "css10-6lang",
+      "css10-ja",
+      "ja-css10",
+      "ayousanz/piper-plus-css10-ja-6lang",
+    ]),
+  }),
+  // Experimental reference-conditioned graph: do not auto-select an encoder or
+  // combine the nested release with the repository's legacy root config.
+  Object.freeze({
+    key: "multilingual-zero-shot-base-zs-v1",
+    repoId: "ayousanz/piper-plus-base",
+    revision: "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1",
+    onnxFile: "releases/zs-v1/base.onnx",
+    configFile: "releases/zs-v1/base.onnx.json",
+    sha256: PUBLIC_BASE_SHA256,
+    aliases: Object.freeze(["base", "zero-shot-base-zs-v1", "ayousanz/piper-plus-base"]),
+  }),
+]);
+
+/**
+ * Catalog key / alias -> catalog entry. A Map, so a name such as
+ * "constructor" never reaches Object.prototype.
+ */
+const MODEL_REGISTRY = new Map(
+  VOICE_CATALOG.flatMap((entry) => [entry.key, ...entry.aliases].map((name) => [name, entry]))
+);
+
+/**
+ * Concrete URLs for a catalog entry. An entry without a pinned revision keeps
+ * the repo id as its cache key (the key used before the catalog existed, so
+ * cached models stay valid); a pinned revision uses the model URL so another
+ * revision never reuses the cache entry.
+ */
+function catalogLocations(entry) {
+  const prefix = `${HUGGINGFACE_RESOLVE_BASE}/${entry.repoId}/resolve/${entry.revision ?? "main"}/`;
+  const modelUrl = prefix + entry.onnxFile;
+  const resolved = {
+    modelUrl,
+    configUrl: prefix + entry.configFile,
+    configFallbackUrl: null,
+    cacheKey: entry.revision ? modelUrl : entry.repoId,
+  };
+  if (entry.sha256) {
+    resolved.sha256 = entry.sha256;
+  }
+  return resolved;
+}
 
 // ---------------------------------------------------------------------------
 // Model usage notice (docs/reference/model-resolution.md §9)
@@ -96,7 +155,7 @@ export function getModelNotice(modelNameOrUrl) {
     if (
       modelNameOrUrl === entry.repoId ||
       entry.names.includes(modelNameOrUrl) ||
-      MODEL_REGISTRY[modelNameOrUrl] === entry.repoId
+      MODEL_REGISTRY.get(modelNameOrUrl)?.repoId === entry.repoId
     ) {
       return entry.lines;
     }
@@ -348,13 +407,16 @@ export class ModelManager {
    * Resolve a model identifier to concrete URLs for the ONNX model and its
    * companion config JSON.
    *
-   * The experimental "base" / "zero-shot-base-zs-v1" aliases use the pinned
-   * zs-v1 graph and sidecar, with a revision/path-specific cache key.
+   * A catalog key or alias (see VOICE_CATALOG, including a catalog model's
+   * repo id) resolves to the catalog's files without querying the HuggingFace
+   * API. The experimental "base" / "zero-shot-base-zs-v1" aliases use the
+   * pinned zs-v1 graph and sidecar, with a revision/path-specific cache key.
    *
    * Accepted formats:
-   *   - Registry shortcut: "css10"
-   *   - HuggingFace repo:  "ayousanz/piper-plus-css10-ja-6lang"
-   *   - Direct URL:        "https://example.com/model.onnx"
+   *   - Catalog key / alias: "css10", "ja_JP-css10-6lang-medium",
+   *                          "ayousanz/piper-plus-css10-ja-6lang"
+   *   - Other HuggingFace repo: "example-owner/example-voice" (files found via the API)
+   *   - Direct URL:          "https://example.com/model.onnx"
    *
    * @param {string} modelNameOrUrl
    * @returns {Promise<{modelUrl: string, configUrl: string, configFallbackUrl: string|null, cacheKey: string, notice: readonly string[]|null, sha256?: string}>}
@@ -372,15 +434,10 @@ export class ModelManager {
    * @private
    */
   async _resolveLocations(modelNameOrUrl) {
-    if (PUBLIC_BASE_ALIASES.has(modelNameOrUrl)) {
-      const modelUrl = PUBLIC_BASE_PREFIX + "base.onnx";
-      return {
-        modelUrl,
-        configUrl: PUBLIC_BASE_PREFIX + "base.onnx.json",
-        configFallbackUrl: null,
-        cacheKey: modelUrl,
-        sha256: PUBLIC_BASE_SHA256,
-      };
+    // Catalog key or alias (a catalog model's repo id is one of its aliases).
+    const catalogEntry = MODEL_REGISTRY.get(modelNameOrUrl);
+    if (catalogEntry) {
+      return catalogLocations(catalogEntry);
     }
     // Direct URL.
     if (/^https?:\/\//i.test(modelNameOrUrl)) {
@@ -393,10 +450,8 @@ export class ModelManager {
       return { modelUrl, configUrl, configFallbackUrl, cacheKey: modelUrl };
     }
 
-    // Registry shortcut.
-    const repoName = MODEL_REGISTRY[modelNameOrUrl] || modelNameOrUrl;
-
-    // Resolve ONNX and config filenames from the HuggingFace API.
+    // Any other HuggingFace repo: find the ONNX and config filenames with the API.
+    const repoName = modelNameOrUrl;
     const { onnxFilename, configFilename } = await resolveModelFiles(repoName);
 
     const modelUrl = `${HUGGINGFACE_RESOLVE_BASE}/${repoName}/resolve/main/${onnxFilename}`;
@@ -478,7 +533,9 @@ export class ModelManager {
       // Verify against the pinned digest, else the expected hash in the config.
       const expected = pinnedSha256 ?? config.sha256;
       if (expected && sha256 !== expected) {
-        throw new Error(`SHA-256 mismatch for downloaded model: expected ${expected}, got ${sha256}`);
+        throw new Error(
+          `SHA-256 mismatch for downloaded model: expected ${expected}, got ${sha256}`
+        );
       }
     }
 

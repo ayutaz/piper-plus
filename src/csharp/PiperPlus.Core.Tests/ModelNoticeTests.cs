@@ -14,7 +14,7 @@ public sealed class ModelNoticeTests
 {
     private const string TsukuyomiKey = "ja_JP-tsukuyomi-chan-medium";
 
-    private static string RepoRoot()
+    internal static string RepoRoot()
     {
         DirectoryInfo? d = new(AppContext.BaseDirectory);
         for (int i = 0; i < 8 && d is not null; i++)

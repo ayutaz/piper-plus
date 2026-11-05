@@ -326,18 +326,47 @@ pub fn builtin_registry() -> &'static [ModelInfo] {
     })
 }
 
+/// Catalog keys and aliases mapped to the [`builtin_registry`] model name
+/// they select, as `(alias, registry_name)` pairs.
+///
+/// Mirror of every `key` and `aliases` entry of `voice_catalog` in
+/// `test/model_resolution_vectors.json` (checked by
+/// `scripts/check_voice_catalog_parity.py`). [`find_model`] looks these up
+/// by exact match before any partial or description match.
+pub const MODEL_ALIASES: &[(&str, &str)] = &[
+    // voice_catalog["ja_JP-tsukuyomi-chan-medium"]
+    ("ja_JP-tsukuyomi-chan-medium", "tsukuyomi-6lang-v2"),
+    ("tsukuyomi", "tsukuyomi-6lang-v2"),
+    ("tsukuyomi-chan", "tsukuyomi-6lang-v2"),
+    ("ja-tsukuyomi", "tsukuyomi-6lang-v2"),
+    ("ayousanz/piper-plus-tsukuyomi-chan", "tsukuyomi-6lang-v2"),
+    // voice_catalog["ja_JP-css10-6lang-medium"]
+    ("ja_JP-css10-6lang-medium", "css10-6lang"),
+    ("css10", "css10-6lang"),
+    ("css10-6lang", "css10-6lang"),
+    ("css10-ja", "css10-6lang"),
+    ("ja-css10", "css10-6lang"),
+    ("ayousanz/piper-plus-css10-ja-6lang", "css10-6lang"),
+    // voice_catalog["multilingual-zero-shot-base-zs-v1"]
+    ("multilingual-zero-shot-base-zs-v1", "zero-shot-base-zs-v1"),
+    ("base", "zero-shot-base-zs-v1"),
+    ("zero-shot-base-zs-v1", "zero-shot-base-zs-v1"),
+    ("ayousanz/piper-plus-base", "zero-shot-base-zs-v1"),
+];
+
 /// Find a model by name or alias in the built-in registry.
 ///
-/// Supports exact name match, unique partial match (contains), and unique
-/// description match (case-insensitive).
+/// Lookup order:
+/// 1. exact catalog key or alias in [`MODEL_ALIASES`];
+/// 2. exact registry name;
+/// 3. unique partial name match (contains);
+/// 4. unique description match (case-insensitive).
 pub fn find_model(query: &str) -> Option<&'static ModelInfo> {
     let registry = builtin_registry();
-    let query = match query {
-        "base" | "ayousanz/piper-plus-base" | "multilingual-zero-shot-base-zs-v1" => {
-            "zero-shot-base-zs-v1"
-        }
-        other => other,
-    };
+    let query = MODEL_ALIASES
+        .iter()
+        .find(|(alias, _)| *alias == query)
+        .map_or(query, |(_, name)| *name);
 
     // 1. Exact name match
     if let Some(m) = registry.iter().find(|m| m.name == query) {

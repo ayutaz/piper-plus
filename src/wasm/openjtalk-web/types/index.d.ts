@@ -603,14 +603,18 @@ export class ModelManager {
    * Resolve a model identifier to concrete URLs for the ONNX model and its
    * companion config JSON.
    *
+   * A catalog key or alias (including a catalog model's repo id) resolves to
+   * the catalog's ONNX and config files without querying the HuggingFace API.
    * The experimental "base" / "zero-shot-base-zs-v1" aliases use the pinned
    * zs-v1 graph and sidecar, with a revision/path-specific cache key.
    *
    * Accepted formats:
-   *   - Registry shortcut: "css10"
-   *   - Pinned public base alias: "base", "zero-shot-base-zs-v1", or "ayousanz/piper-plus-base"
-   *   - HuggingFace repo:  "ayousanz/piper-plus-css10-ja-6lang"
-   *   - Direct URL:        "https://example.com/model.onnx"
+   *   - Catalog key / alias: "css10", "css10-6lang", "ja-css10",
+   *     "ja_JP-css10-6lang-medium", "ayousanz/piper-plus-css10-ja-6lang"
+   *   - Pinned public base alias: "base", "zero-shot-base-zs-v1",
+   *     "multilingual-zero-shot-base-zs-v1", or "ayousanz/piper-plus-base"
+   *   - Other HuggingFace repo: "example-owner/example-voice" (files found via the API)
+   *   - Direct URL:          "https://example.com/model.onnx"
    *
    * `notice` holds the model's usage notice lines (see getModelNotice), or
    * null; resolveUrls() itself does not print it.

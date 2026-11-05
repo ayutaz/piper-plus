@@ -109,3 +109,46 @@ func TestVoiceCatalog_NoticeMatchesCanonical(t *testing.T) {
 		}
 	}
 }
+
+// TestFindVoice_EveryCanonicalName resolves every key and alias of
+// test/model_resolution_vectors.json, so a name missing here fails.
+func TestFindVoice_EveryCanonicalName(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "test", "model_resolution_vectors.json"))
+	if err != nil {
+		t.Fatalf("read canonical vectors: %v", err)
+	}
+	var vectors struct {
+		VoiceCatalog map[string]json.RawMessage `json:"voice_catalog"`
+	}
+	if err := json.Unmarshal(data, &vectors); err != nil {
+		t.Fatalf("parse vectors: %v", err)
+	}
+	for key, raw := range vectors.VoiceCatalog {
+		if strings.HasPrefix(key, "_") {
+			continue
+		}
+		var canon struct {
+			RepoID   string   `json:"repo_id"`
+			OnnxFile string   `json:"onnx_file"`
+			Revision string   `json:"revision"`
+			Aliases  []string `json:"aliases"`
+		}
+		if err := json.Unmarshal(raw, &canon); err != nil {
+			t.Fatalf("parse %s: %v", key, err)
+		}
+		for _, name := range append([]string{key}, canon.Aliases...) {
+			entry, ok := FindVoice(name)
+			if !ok {
+				t.Errorf("FindVoice(%q) not found, want %s", name, key)
+				continue
+			}
+			if entry.Key != key || entry.RepoID != canon.RepoID || entry.Revision != canon.Revision {
+				t.Errorf("FindVoice(%q) = %s %s@%q, want %s %s@%q",
+					name, entry.Key, entry.RepoID, entry.Revision, key, canon.RepoID, canon.Revision)
+			}
+			if entry.OnnxFileName() != filepath.Base(canon.OnnxFile) {
+				t.Errorf("FindVoice(%q) onnx = %q, want %q", name, entry.OnnxFileName(), canon.OnnxFile)
+			}
+		}
+	}
+}

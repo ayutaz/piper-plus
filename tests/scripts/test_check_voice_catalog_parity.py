@@ -58,25 +58,17 @@ def test_canonical_tsukuyomi_entry_has_notice(canonical):
     assert entry["onnx_file"] in entry["notice_files"]
 
 
-@pytest.mark.parametrize("table", ["MIRRORS", "NOTICE_MIRRORS"])
+@pytest.mark.parametrize("table", ["MIRRORS", "ALIAS_MIRRORS", "NOTICE_MIRRORS"])
 def test_removing_a_notice_line_from_any_mirror_fails(gate, canonical, tmp_path, table):
-    full_dir = tmp_path / "full"
-    notice_dir = tmp_path / "notice"
-    full_dir.mkdir()
-    notice_dir.mkdir()
-    mirrors = _copy_mirrors(full_dir, gate.MIRRORS)
-    notice_mirrors = _copy_mirrors(notice_dir, gate.NOTICE_MIRRORS)
-    assert gate.main(mirrors=mirrors, notice_mirrors=notice_mirrors) == 0, (
-        "copied mirrors must pass before the mutation"
-    )
+    copies = _copy_all(gate, tmp_path)
+    assert _run(gate, copies) == 0, "copied mirrors must pass before the mutation"
 
     line = canonical[NOTICE_KEY]["notice"][-1]
-    targets = mirrors if table == "MIRRORS" else notice_mirrors
-    for label, path in targets.items():
+    for label, path in copies[table].items():
         text = gate.normalize_mirror_text(path.read_text(encoding="utf-8"))
         assert line in text, label
         path.write_text(text.replace(line, "removed"), encoding="utf-8")
-        assert gate.main(mirrors=mirrors, notice_mirrors=notice_mirrors) == 1, label
+        assert _run(gate, copies) == 1, label
         path.write_text(text, encoding="utf-8")
 
 
@@ -100,6 +92,82 @@ def test_canonical_notice_line_must_be_literal_safe(gate, bad):
 
 def test_notice_without_notice_files_is_rejected(gate):
     assert gate.validate_canonical_notice("k", {"notice": ["ok"]})
+
+
+def _all_mirrors(gate) -> dict[str, dict[str, Path]]:
+    return {
+        "MIRRORS": gate.MIRRORS,
+        "ALIAS_MIRRORS": gate.ALIAS_MIRRORS,
+        "NOTICE_MIRRORS": gate.NOTICE_MIRRORS,
+    }
+
+
+def _copy_all(gate, tmp_path: Path) -> dict[str, dict[str, Path]]:
+    copies: dict[str, dict[str, Path]] = {}
+    for table, mirrors in _all_mirrors(gate).items():
+        target = tmp_path / table
+        target.mkdir()
+        copies[table] = _copy_mirrors(target, mirrors)
+    return copies
+
+
+def _run(gate, copies: dict[str, dict[str, Path]]) -> int:
+    return gate.main(
+        mirrors=copies["MIRRORS"],
+        alias_mirrors=copies["ALIAS_MIRRORS"],
+        notice_mirrors=copies["NOTICE_MIRRORS"],
+    )
+
+
+def _names(entry: dict) -> list[str]:
+    return [entry["key"], *entry["aliases"]]
+
+
+def test_canonical_catalog_models_list_their_repo_id_as_an_alias(canonical):
+    for key, entry in canonical.items():
+        assert entry["repo_id"] in entry["aliases"], key
+
+
+@pytest.mark.parametrize("table", ["MIRRORS", "ALIAS_MIRRORS"])
+def test_removing_any_name_from_a_mirror_fails(gate, canonical, tmp_path, table):
+    """Every key and every alias is required, not just one of them."""
+    copies = _copy_all(gate, tmp_path)
+    assert _run(gate, copies) == 0, "copied mirrors must pass before the mutation"
+
+    for label, path in copies[table].items():
+        original = path.read_text(encoding="utf-8")
+        text = gate.normalize_mirror_text(original)
+        for key, entry in canonical.items():
+            for name in _names(entry):
+                quoted = [q for q in (f'"{name}"', f"'{name}'") if q in text]
+                assert quoted, f"{label}: {key} name {name!r} must be a string literal"
+                mutated = text
+                for literal in quoted:
+                    mutated = mutated.replace(literal, '"removed-name"')
+                path.write_text(mutated, encoding="utf-8")
+                assert _run(gate, copies) == 1, f"{label}: removing {name!r} must fail"
+        path.write_text(original, encoding="utf-8")
+
+
+def test_a_name_inside_a_longer_literal_does_not_count(gate, canonical, tmp_path):
+    """`"ja-tsukuyomi"` must not satisfy the alias `tsukuyomi`."""
+    entry = canonical[NOTICE_KEY]
+    mirror = tmp_path / "partial.rs"
+    mirror.write_text(
+        "\n".join(
+            [
+                # The repo inside a URL: present, but not as the repo-ID alias.
+                f'"https://huggingface.co/{entry["repo_id"]}/resolve/main"',
+                f'"{entry["onnx_file"]}"',
+                f'"{entry["config_file"]}"',
+                *(f'"x-{name}"' for name in _names(entry)),
+            ]
+        ),
+        encoding="utf-8",
+    )
+    failures = gate.check_alias_entry(NOTICE_KEY, entry, "partial", mirror)
+    name_failures = [f for f in failures if "not found as a string literal" in f]
+    assert len(name_failures) == len(_names(entry))
 
 
 def test_canonical_drift_is_reported(gate, tmp_path):
