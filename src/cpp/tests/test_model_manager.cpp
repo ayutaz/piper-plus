@@ -450,8 +450,10 @@ const std::vector<std::string> kTsukuyomiNotice = {
     "生成した音声を使うときは「Piper Plus:つくよみちゃん」のクレジット表記が必須です。",
     "Credit 'Piper Plus:つくよみちゃん' is required when you use the generated audio.",
     "非公式の作品です。夢前黎様は開発・サポートに携わっていません。お問い合わせは開発者へ。",
-    "Unofficial work. Rei Yumesaki is not involved in development or support; contact the developer.",
-    "禁止事項と規約 / Terms and prohibited uses: https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan",
+    "Unofficial work. Rei Yumesaki is not involved in development or support; contact the "
+    "developer.",
+    "禁止事項と規約 / Terms and prohibited uses: "
+    "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan",
 };
 
 }  // namespace
@@ -461,8 +463,7 @@ TEST(ModelNoticeTest, CatalogEntryCarriesNotice) {
     ASSERT_TRUE(voice.has_value());
     EXPECT_EQ(voice->notice, kTsukuyomiNotice);
     EXPECT_EQ(voice->noticeFiles,
-              (std::vector<std::string>{"tsukuyomi-chan-6lang-fp16.onnx",
-                                        "tsukuyomi.onnx"}));
+              (std::vector<std::string>{"tsukuyomi-chan-6lang-fp16.onnx", "tsukuyomi.onnx"}));
 
     auto css10 = piper::findVoice("css10");
     ASSERT_TRUE(css10.has_value());
@@ -480,7 +481,8 @@ TEST(ModelNoticeTest, DetectsTsukuyomiInputs) {
         "ayousanz/piper-plus-tsukuyomi-chan",
         "  tsukuyomi  ",
         // URLs containing /<repo_id>/
-        "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx",
+        "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/"
+        "tsukuyomi-chan-6lang-fp16.onnx",
         "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json",
         // paths whose file name is a notice file
         "tsukuyomi-chan-6lang-fp16.onnx",
@@ -532,8 +534,7 @@ TEST(ModelNoticeTest, FooterText) {
     EXPECT_STREQ(piper::kModelNoticeFooter,
                  "(この表示は PIPER_PLUS_DISABLE_MODEL_NOTICE=1 で消せます / "
                  "Set PIPER_PLUS_DISABLE_MODEL_NOTICE=1 to hide this notice.)");
-    EXPECT_STREQ(piper::kModelNoticeDisableEnv,
-                 "PIPER_PLUS_DISABLE_MODEL_NOTICE");
+    EXPECT_STREQ(piper::kModelNoticeDisableEnv, "PIPER_PLUS_DISABLE_MODEL_NOTICE");
 }
 
 TEST(ModelNoticeTest, ParseDisabledValues) {

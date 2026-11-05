@@ -41,8 +41,7 @@ inline constexpr const char* kModelNoticeFooter =
     "Set PIPER_PLUS_DISABLE_MODEL_NOTICE=1 to hide this notice.)";
 
 // Environment variable that turns the model notice off.
-inline constexpr const char* kModelNoticeDisableEnv =
-    "PIPER_PLUS_DISABLE_MODEL_NOTICE";
+inline constexpr const char* kModelNoticeDisableEnv = "PIPER_PLUS_DISABLE_MODEL_NOTICE";
 
 // Get the default model directory (platform-specific)
 // Windows: %APPDATA%\piper-plus\models

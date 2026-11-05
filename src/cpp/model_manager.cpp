@@ -214,8 +214,7 @@ static VoiceInfo parseVoiceEntry(const std::string& key,
     }
 
     // Usage notice (docs/reference/model-resolution.md §9)
-    auto readStringArray = [&entry](const char* field,
-                                    std::vector<std::string>& out) {
+    auto readStringArray = [&entry](const char* field, std::vector<std::string>& out) {
         if (entry.contains(field) && entry[field].is_array()) {
             for (const auto& item : entry[field]) {
                 if (item.is_string()) {
@@ -239,15 +238,13 @@ static std::vector<VoiceInfo> loadEmbeddedCatalog() {
             catalog.push_back(parseVoiceEntry(key, entry, "piper-plus"));
         }
     } catch (const json::exception& e) {
-        spdlog::error("Failed to parse embedded piper-plus catalog: {}",
-                       e.what());
+        spdlog::error("Failed to parse embedded piper-plus catalog: {}", e.what());
     }
     return catalog;
 }
 
 static bool isNoticeSpace(char c) {
-    return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' ||
-           c == '\f';
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f';
 }
 
 static std::string trimNoticeInput(const std::string& s) {
@@ -431,8 +428,7 @@ std::filesystem::path getDefaultModelDir() {
 std::vector<VoiceInfo> loadVoiceCatalog() {
     // 1. Parse embedded piper-plus catalog
     std::vector<VoiceInfo> catalog = loadEmbeddedCatalog();
-    spdlog::debug("Loaded {} piper-plus voices from embedded catalog",
-                   catalog.size());
+    spdlog::debug("Loaded {} piper-plus voices from embedded catalog", catalog.size());
 
     // 2. Try to load upstream voices.json
     auto upstreamPath = findUpstreamVoicesJson();
@@ -729,18 +725,15 @@ std::vector<std::string> getModelNotice(const std::string& nameOrPath) {
         if (voice.notice.empty()) {
             continue;
         }
-        bool match = value == voice.key ||
-                     std::find(voice.aliases.begin(), voice.aliases.end(),
-                               value) != voice.aliases.end();
+        bool match = value == voice.key || std::find(voice.aliases.begin(), voice.aliases.end(),
+                                                     value) != voice.aliases.end();
         if (!match && !voice.repoId.empty()) {
             match = value == voice.repoId ||
-                    (isUrl && value.find("/" + voice.repoId + "/") !=
-                                  std::string::npos);
+                    (isUrl && value.find("/" + voice.repoId + "/") != std::string::npos);
         }
         if (!match && !fileName.empty()) {
-            match = std::find(voice.noticeFiles.begin(),
-                              voice.noticeFiles.end(),
-                              fileName) != voice.noticeFiles.end();
+            match = std::find(voice.noticeFiles.begin(), voice.noticeFiles.end(), fileName) !=
+                    voice.noticeFiles.end();
         }
         if (match) {
             return voice.notice;
@@ -754,14 +747,11 @@ bool parseModelNoticeDisabled(const char* value) {
         return false;
     }
     std::string v = trimNoticeInput(value);
-    std::transform(v.begin(), v.end(), v.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    std::transform(v.begin(), v.end(), v.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return v == "1" || v == "true" || v == "yes";
 }
 
-bool modelNoticeDisabled() {
-    return parseModelNoticeDisabled(std::getenv(kModelNoticeDisableEnv));
-}
+bool modelNoticeDisabled() { return parseModelNoticeDisabled(std::getenv(kModelNoticeDisableEnv)); }
 
 } // namespace piper

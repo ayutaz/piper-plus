@@ -194,23 +194,23 @@ std::vector<float> loadSpeakerEmbedding(const filesystem::path &path) {
 // (docs/reference/model-resolution.md §9). Goes to stderr directly — not
 // spdlog — so --quiet does not hide it, and stdout stays untouched. Printed at
 // most once per process; PIPER_PLUS_DISABLE_MODEL_NOTICE=1 turns it off.
-static void printModelNoticeOnce(const vector<string> &candidates) {
-  static bool printed = false;
-  if (printed || piper::modelNoticeDisabled()) {
-    return;
-  }
-  for (const auto &candidate : candidates) {
-    auto notice = piper::getModelNotice(candidate);
-    if (notice.empty()) {
-      continue;
+static void printModelNoticeOnce(const vector<string>& candidates) {
+    static bool printed = false;
+    if (printed || piper::modelNoticeDisabled()) {
+        return;
     }
-    for (const auto &line : notice) {
-      cerr << line << '\n';
+    for (const auto& candidate : candidates) {
+        auto notice = piper::getModelNotice(candidate);
+        if (notice.empty()) {
+            continue;
+        }
+        for (const auto& line : notice) {
+            cerr << line << '\n';
+        }
+        cerr << piper::kModelNoticeFooter << endl;
+        printed = true;
+        return;
     }
-    cerr << piper::kModelNoticeFooter << endl;
-    printed = true;
-    return;
-  }
 }
 
 // ----------------------------------------------------------------------------
@@ -341,7 +341,7 @@ int main(int argc, char *argv[]) {
     auto modelDir = runConfig.modelDir.value_or(piper::getDefaultModelDir());
     bool success = piper::downloadModel(runConfig.downloadModelName.value(), modelDir);
     if (success) {
-      printModelNoticeOnce({runConfig.downloadModelName.value()});
+        printModelNoticeOnce({runConfig.downloadModelName.value()});
     }
     return success ? EXIT_SUCCESS : EXIT_FAILURE;
   }
