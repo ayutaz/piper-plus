@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793857345368,
+  "lastUpdate": 1793862243675,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1776,6 +1776,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 227.6,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d1007a6735b62f17055467ab2b4551d6d7b56438",
+          "message": "feat: つくよみちゃんモデルの利用条件を全ランタイムの CLI とサーバーで表示する (#929)\n\n* feat: つくよみちゃんモデルの利用条件を全ランタイムの CLI とサーバーで表示する\n\nつくよみちゃんモデルを使うときに、クレジット表記が必須であることと、\n非公式の作品であることを標準エラー出力に表示する (権利者からの依頼)。\n\n- 正本は test/model_resolution_vectors.json の notice / notice_files\n- 判定: キー・エイリアス・repo_id の一致、HF URL、ファイル名\n- 表示はプロセスにつき 1 回、PIPER_PLUS_DISABLE_MODEL_NOTICE=1 で消せる\n- ライブラリは案内を返すだけで、表示するのは CLI とサーバー\n- Python / Rust / Go / C# / C++ / WASM と学習側 (piper_train) に実装\n- check_voice_catalog_parity.py が全ミラーの notice 一致を検査する\n\n* docs: モデルの利用案内と PIPER_PLUS_DISABLE_MODEL_NOTICE を説明する\n\n- model-resolution.md §9 に利用案内の判定規則・表示規則・実装一覧を追加\n- environment-variables.md に PIPER_PLUS_DISABLE_MODEL_NOTICE を追加\n- Wyoming / Home Assistant / iOS (C API) / 事前学習モデル一覧に案内の扱いを追記\n- CHANGELOG (root / npm) と README.npm.md を更新、doc-examples audit を再生成\n\n* style(cpp): 利用案内の C++ コードを clang-format に合わせる\n\n* test(wyoming): piper_plus の仮モジュールに download を足す\n\n* fix(go): 利用案内の golangci-lint 指摘 (errcheck / gocritic) を直す\n\n* fix(wyoming): 利用案内の import を main() の中に移す\n\npiper_plus を仮モジュールに差し替えるテスト (src/python/tests と\ndocker/wyoming) は piper_plus.api しか用意しないため、モジュールの先頭で\npiper_plus.download を import すると読み込みで落ちる。表示する main() の\n中で import する。先に足したテスト側の仮モジュールの変更は戻す。\n\n* test(csharp): 利用案内のテストで Path.Combine を Path.Join に変える (CodeQL)",
+          "timestamp": "2026-11-05T16:01:51+09:00",
+          "tree_id": "3c65503b970b9559dc44dbafa5d031849d2fcb28",
+          "url": "https://github.com/ayutaz/piper-plus/commit/d1007a6735b62f17055467ab2b4551d6d7b56438"
+        },
+        "date": 1793862240521,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0836,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 21.3,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 21.8,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1717.6,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 227.5,
             "unit": "MB"
           },
           {
