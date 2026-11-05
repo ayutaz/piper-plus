@@ -235,15 +235,23 @@ def score(keys: list[dict], answer_sets: list[dict]) -> dict:
     }
 
 
-def pools_from_set(set_dir: Path, synth_roots: list[Path]) -> dict:
+def pools_from_set(
+    set_dir: Path, synth_roots: list[Path], exclude: list[str] | None = None
+) -> dict:
     """Voices from a built evaluation set and per-group synth directories.
 
     ``others`` are the voices whose speaker id appears in this voice's floor
     files (the fixed floor speakers); if none match, every other voice.
+    ``exclude`` drops voices entirely, also from every other voice's R-/Z-
+    pool (e.g. tsukuyomi, which the plan keeps for the final listening test).
     """
     set_dir = Path(set_dir)
     record = json.loads((set_dir / "set.json").read_text(encoding="utf-8"))
-    groups = list(record["groups"])
+    excluded = set(exclude or ())
+    unknown = sorted(excluded - set(record["groups"]))
+    if unknown:
+        raise ValueError(f"excluded voices not in the set: {unknown}")
+    groups = [g for g in record["groups"] if g not in excluded]
     pools = {}
     for group in groups:
         base = set_dir / "groups" / group
@@ -284,6 +292,12 @@ def main(argv=None) -> int:
     build.add_argument("--repeat-fraction", type=float, default=0.1)
     build.add_argument("--output", type=Path, required=True)
     build.add_argument("--key-dir", type=Path, required=True)
+    build.add_argument(
+        "--exclude-voice",
+        action="append",
+        default=[],
+        help="leave this voice out of the test, also as R-/Z- (repeatable)",
+    )
     scoring = sub.add_parser("score")
     scoring.add_argument("--key", type=Path, action="append", required=True)
     scoring.add_argument("--answers", type=Path, action="append", required=True)
@@ -291,7 +305,7 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "build":
-        pools = pools_from_set(args.set, args.synth)
+        pools = pools_from_set(args.set, args.synth, exclude=args.exclude_voice)
         trials = plan_trials(pools, args.per_condition, args.seed)
         rng = random.Random(args.seed)
         rng.shuffle(trials)
