@@ -248,6 +248,21 @@ def ensure_voice_exists(
         _LOGGER.info("Downloaded %s (%s)", download_file_path, file_url)
 
 
+def resolve_piper_plus_voice(name: str) -> dict[str, Any] | None:
+    """Return the piper-plus catalog entry for a catalog key or alias.
+
+    The key wins over an alias, matching ``download_model``'s resolution
+    order. Returns ``None`` when ``name`` is neither.
+    """
+    voice_info = PIPER_PLUS_VOICES.get(name)
+    if voice_info is not None:
+        return voice_info
+    for voice_info in PIPER_PLUS_VOICES.values():
+        if name in voice_info.get("aliases", []):
+            return voice_info
+    return None
+
+
 def find_voice(name: str, data_dirs: Iterable[str | Path]) -> tuple[Path, Path]:
     data_dirs = list(data_dirs)
 
@@ -261,8 +276,10 @@ def find_voice(name: str, data_dirs: Iterable[str | Path]) -> tuple[Path, Path]:
             return onnx_path, config_path
 
     # For piper-plus models, file names may differ from the voice key.
-    # Look up files from the catalog and search by actual file names.
-    voice_info = PIPER_PLUS_VOICES.get(name)
+    # Look up files from the catalog (by key or alias, since the CLI and
+    # HTTP server pass `--model` through unchanged) and search by actual
+    # file names.
+    voice_info = resolve_piper_plus_voice(name)
     if voice_info and voice_info.get("source") == "piper-plus":
         onnx_file = None
         config_file = None
