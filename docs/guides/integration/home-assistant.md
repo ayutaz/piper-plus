@@ -39,6 +39,8 @@ Home Assistant  ── Synthesize (text + language) ──>  piper-plus
 
 最も簡単な方法です。デフォルトモデル (tsukuyomi) は初回起動時に HuggingFace から自動ダウンロードされます。
 
+つくよみちゃんモデルを使うと、サーバーは起動時に利用条件をログ (stderr) に 1 回表示します。生成した音声を使うときは「Piper Plus:つくよみちゃん」のクレジット表記が必須です。禁止事項と規約は[モデルページ](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)を確認してください。表示を消すには、環境変数 `PIPER_PLUS_DISABLE_MODEL_NOTICE=1` を設定します (規約は表示を消しても変わりません)。
+
 ```bash
 cd docker/wyoming
 docker compose up -d
