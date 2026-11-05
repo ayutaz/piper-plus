@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793862243675,
+  "lastUpdate": 1793879925713,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1830,6 +1830,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 227.5,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "75caff9d20b5d2420c629f79ce2b7b6158287fe4",
+          "message": "fix(model): accept every catalog key and alias in every runtime (#932)\n\n* fix(model): accept every catalog key and alias in every runtime\n\nEach runtime accepted a different subset of the model names, so a name that\nworked in one CLI failed in another and the Python high-level API knew only\ntsukuyomi and the base. The Hugging Face repo IDs of tsukuyomi and css10 are\nnow aliases too, so they resolve to the catalog files.\n\n- Python: the high-level API resolves through download.PIPER_PLUS_VOICES;\n  MODEL_ALIASES stays as a read-only view for PiperPlus.list_models().\n- Rust / WASM: complete their name tables; C# / C++ / Go / training side:\n  add the repo IDs. The C++ CLI points a repo ID to --download-model.\n- check_voice_catalog_parity requires the key and every alias as a string\n  literal; each runtime's tests read the names from the canonical file.\n- check_config_phoneme_keys --distributed reads the canonical catalog.\n\n* chore(ci): refresh the bundle size baseline to the measured sizes\n\nThe usage notice (#929) and the full alias tables grew the piper-plus crate\nfrom 309.5 KiB to 325.5 KiB (+5.19%), past the 5% tolerance. Both are intended,\nso the baseline takes the sizes this branch's CI job measured.",
+          "timestamp": "2026-11-05T20:55:18+09:00",
+          "tree_id": "6a48549587a485867df9d4b9f8ad0c53382c7132",
+          "url": "https://github.com/ayutaz/piper-plus/commit/75caff9d20b5d2420c629f79ce2b7b6158287fe4"
+        },
+        "date": 1793879922533,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0657,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 16.8,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 16.9,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1463.8,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 226.9,
             "unit": "MB"
           },
           {
