@@ -30,6 +30,12 @@ type VoiceCatalogEntry struct {
 	RepoID          string          `json:"repo_id,omitempty"`
 	Files           []VoiceFileInfo `json:"files,omitempty"`
 	Aliases         []string        `json:"aliases,omitempty"`
+	// Notice is the usage notice shown by executables (CLI / server) when this
+	// model is used. The library never prints it; see ModelNotice.
+	Notice []string `json:"notice,omitempty"`
+	// NoticeFiles are file names that identify this model when it is given as
+	// a path (docs/reference/model-resolution.md section 9).
+	NoticeFiles []string `json:"notice_files,omitempty"`
 }
 
 // HasAlias reports whether the entry has the given alias.
@@ -74,6 +80,15 @@ var embeddedCatalog = []VoiceCatalogEntry{
 			{RelativePath: "config.json", SizeBytes: 6_279},
 		},
 		Aliases: []string{"tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"},
+		Notice: []string{
+			"[piper-plus] つくよみちゃんモデルの利用条件 / Terms for the Tsukuyomi-chan model",
+			"生成した音声を使うときは「Piper Plus:つくよみちゃん」のクレジット表記が必須です。",
+			"Credit 'Piper Plus:つくよみちゃん' is required when you use the generated audio.",
+			"非公式の作品です。夢前黎様は開発・サポートに携わっていません。お問い合わせは開発者へ。",
+			"Unofficial work. Rei Yumesaki is not involved in development or support; contact the developer.",
+			"禁止事項と規約 / Terms and prohibited uses: https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan",
+		},
+		NoticeFiles: []string{"tsukuyomi-chan-6lang-fp16.onnx", "tsukuyomi.onnx"},
 	},
 	{
 		Key: "ja_JP-css10-6lang-medium", Name: "css10-6lang",

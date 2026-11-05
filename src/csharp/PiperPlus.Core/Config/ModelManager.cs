@@ -124,6 +124,83 @@ public static class ModelManager
     }
 
     // ------------------------------------------------------------------
+    // Model usage notice (docs/reference/model-resolution.md §9)
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Environment variable that hides the model usage notice when set to
+    /// <c>1</c> / <c>true</c> / <c>yes</c> (case-insensitive, trimmed).
+    /// </summary>
+    public const string DisableModelNoticeEnvVar = "PIPER_PLUS_DISABLE_MODEL_NOTICE";
+
+    /// <summary>
+    /// Line that executables print after the notice lines (same text in every runtime).
+    /// </summary>
+    public const string ModelNoticeFooter =
+        "(この表示は PIPER_PLUS_DISABLE_MODEL_NOTICE=1 で消せます / " +
+        "Set PIPER_PLUS_DISABLE_MODEL_NOTICE=1 to hide this notice.)";
+
+    /// <summary>
+    /// Returns the usage notice of the catalog model named by
+    /// <paramref name="nameOrPath"/>, or an empty list when the model has none.
+    /// The input matches an entry that has a notice when it is the entry's key,
+    /// one of its aliases or its repo ID; a URL containing <c>/&lt;repo_id&gt;/</c>;
+    /// or a path (Windows or POSIX separators) whose file name is one of the
+    /// entry's <see cref="VoiceInfo.NoticeFiles"/>. This method never prints.
+    /// </summary>
+    /// <param name="nameOrPath">Model name, alias, repo ID, URL, or file path.</param>
+    /// <returns>The notice lines, or an empty list.</returns>
+    public static IReadOnlyList<string> GetModelNotice(string nameOrPath)
+        => GetModelNotice(nameOrPath, VoiceCatalog.LoadMergedCatalog());
+
+    internal static IReadOnlyList<string> GetModelNotice(
+        string? nameOrPath, IReadOnlyList<VoiceInfo> catalog)
+    {
+        var value = nameOrPath?.Trim();
+        if (string.IsNullOrEmpty(value))
+        {
+            return [];
+        }
+
+        var fileName = value[(value.LastIndexOfAny(['/', '\\']) + 1)..];
+        bool isUrl = value.Contains("://", StringComparison.Ordinal);
+
+        foreach (VoiceInfo voice in catalog)
+        {
+            if (voice.Notice.Count == 0)
+            {
+                continue;
+            }
+
+            string repo = voice.RepoId;
+            if (string.Equals(value, voice.Key, StringComparison.Ordinal)
+                || voice.Aliases.Contains(value, StringComparer.Ordinal)
+                || (repo.Length > 0 && string.Equals(value, repo, StringComparison.Ordinal))
+                || (repo.Length > 0 && isUrl && value.Contains($"/{repo}/", StringComparison.Ordinal))
+                || voice.NoticeFiles.Contains(fileName, StringComparer.Ordinal))
+            {
+                return voice.Notice;
+            }
+        }
+
+        return [];
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when <see cref="DisableModelNoticeEnvVar"/> is set to
+    /// <c>1</c> / <c>true</c> / <c>yes</c> (case-insensitive, trimmed).
+    /// </summary>
+    /// <returns></returns>
+    public static bool IsModelNoticeDisabled()
+        => EnvFlags.IsTruthyEnv(DisableModelNoticeEnvVar);
+
+    /// <summary>
+    /// Pure form of <see cref="IsModelNoticeDisabled()"/> for a given value.
+    /// </summary>
+    internal static bool IsModelNoticeDisabled(string? value)
+        => EnvFlags.IsTruthy(value);
+
+    // ------------------------------------------------------------------
     // ListModels
     // ------------------------------------------------------------------
 

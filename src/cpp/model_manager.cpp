@@ -70,7 +70,19 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
             "tsukuyomi-chan",
             "ja-tsukuyomi"
         ],
-        "description": "Tsukuyomi-chan 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT)"
+        "description": "Tsukuyomi-chan 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT)",
+        "notice": [
+            "[piper-plus] つくよみちゃんモデルの利用条件 / Terms for the Tsukuyomi-chan model",
+            "生成した音声を使うときは「Piper Plus:つくよみちゃん」のクレジット表記が必須です。",
+            "Credit 'Piper Plus:つくよみちゃん' is required when you use the generated audio.",
+            "非公式の作品です。夢前黎様は開発・サポートに携わっていません。お問い合わせは開発者へ。",
+            "Unofficial work. Rei Yumesaki is not involved in development or support; contact the developer.",
+            "禁止事項と規約 / Terms and prohibited uses: https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan"
+        ],
+        "notice_files": [
+            "tsukuyomi-chan-6lang-fp16.onnx",
+            "tsukuyomi.onnx"
+        ]
     },
     "ja_JP-css10-6lang-medium": {
         "key": "ja_JP-css10-6lang-medium",
@@ -201,7 +213,59 @@ static VoiceInfo parseVoiceEntry(const std::string& key,
         }
     }
 
+    // Usage notice (docs/reference/model-resolution.md §9)
+    auto readStringArray = [&entry](const char* field, std::vector<std::string>& out) {
+        if (entry.contains(field) && entry[field].is_array()) {
+            for (const auto& item : entry[field]) {
+                if (item.is_string()) {
+                    out.push_back(item.get<std::string>());
+                }
+            }
+        }
+    };
+    readStringArray("notice", vi.notice);
+    readStringArray("notice_files", vi.noticeFiles);
+
     return vi;
+}
+
+// Parse only the embedded piper-plus catalog (no upstream voices.json).
+static std::vector<VoiceInfo> loadEmbeddedCatalog() {
+    std::vector<VoiceInfo> catalog;
+    try {
+        json piperPlusCatalog = json::parse(PIPER_PLUS_CATALOG_JSON);
+        for (auto& [key, entry] : piperPlusCatalog.items()) {
+            catalog.push_back(parseVoiceEntry(key, entry, "piper-plus"));
+        }
+    } catch (const json::exception& e) {
+        spdlog::error("Failed to parse embedded piper-plus catalog: {}", e.what());
+    }
+    return catalog;
+}
+
+static bool isNoticeSpace(char c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f';
+}
+
+static std::string trimNoticeInput(const std::string& s) {
+    size_t begin = 0;
+    size_t end = s.size();
+    while (begin < end && isNoticeSpace(s[begin])) ++begin;
+    while (end > begin && isNoticeSpace(s[end - 1])) --end;
+    return s.substr(begin, end - begin);
+}
+
+// Last path component, splitting on both '/' and '\\' so Windows paths
+// are handled the same way on every platform. Trailing separators are
+// ignored ("dir/model.onnx/" -> "model.onnx").
+static std::string noticeFileName(const std::string& value) {
+    size_t end = value.find_last_not_of("/\\");
+    if (end == std::string::npos) {
+        return "";
+    }
+    std::string trimmed = value.substr(0, end + 1);
+    size_t sep = trimmed.find_last_of("/\\");
+    return sep == std::string::npos ? trimmed : trimmed.substr(sep + 1);
 }
 
 // Try to locate the upstream voices.json file near the executable
@@ -362,20 +426,9 @@ std::filesystem::path getDefaultModelDir() {
 }
 
 std::vector<VoiceInfo> loadVoiceCatalog() {
-    std::vector<VoiceInfo> catalog;
-
     // 1. Parse embedded piper-plus catalog
-    try {
-        json piperPlusCatalog = json::parse(PIPER_PLUS_CATALOG_JSON);
-        for (auto& [key, entry] : piperPlusCatalog.items()) {
-            catalog.push_back(parseVoiceEntry(key, entry, "piper-plus"));
-        }
-        spdlog::debug("Loaded {} piper-plus voices from embedded catalog",
-                       catalog.size());
-    } catch (const json::exception& e) {
-        spdlog::error("Failed to parse embedded piper-plus catalog: {}",
-                       e.what());
-    }
+    std::vector<VoiceInfo> catalog = loadEmbeddedCatalog();
+    spdlog::debug("Loaded {} piper-plus voices from embedded catalog", catalog.size());
 
     // 2. Try to load upstream voices.json
     auto upstreamPath = findUpstreamVoicesJson();
@@ -657,5 +710,48 @@ std::optional<fs::path> resolveModelPath(
 
     return std::nullopt;
 }
+
+std::vector<std::string> getModelNotice(const std::string& nameOrPath) {
+    const std::string value = trimNoticeInput(nameOrPath);
+    if (value.empty()) {
+        return {};
+    }
+
+    static const std::vector<VoiceInfo> embedded = loadEmbeddedCatalog();
+    const std::string fileName = noticeFileName(value);
+    const bool isUrl = value.find("://") != std::string::npos;
+
+    for (const auto& voice : embedded) {
+        if (voice.notice.empty()) {
+            continue;
+        }
+        bool match = value == voice.key || std::find(voice.aliases.begin(), voice.aliases.end(),
+                                                     value) != voice.aliases.end();
+        if (!match && !voice.repoId.empty()) {
+            match = value == voice.repoId ||
+                    (isUrl && value.find("/" + voice.repoId + "/") != std::string::npos);
+        }
+        if (!match && !fileName.empty()) {
+            match = std::find(voice.noticeFiles.begin(), voice.noticeFiles.end(), fileName) !=
+                    voice.noticeFiles.end();
+        }
+        if (match) {
+            return voice.notice;
+        }
+    }
+    return {};
+}
+
+bool parseModelNoticeDisabled(const char* value) {
+    if (value == nullptr) {
+        return false;
+    }
+    std::string v = trimNoticeInput(value);
+    std::transform(v.begin(), v.end(), v.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return v == "1" || v == "true" || v == "yes";
+}
+
+bool modelNoticeDisabled() { return parseModelNoticeDisabled(std::getenv(kModelNoticeDisableEnv)); }
 
 } // namespace piper

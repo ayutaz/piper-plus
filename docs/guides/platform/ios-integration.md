@@ -201,6 +201,14 @@ tts.load_model()
 tts.speak("こんにちは。")
 ```
 
+> **Model terms:** the C API takes a model path only, so it does not show the usage
+> notice that the CLIs print. If your app ships the Tsukuyomi-chan model
+> (`tsukuyomi-chan-6lang-fp16.onnx` or `tsukuyomi.onnx`), show its terms to your users:
+> the credit "Piper Plus:つくよみちゃん" is required on generated audio, and the
+> prohibited uses are on the [model page](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan).
+> The notice text is in `test/model_resolution_vectors.json` (`notice`); see
+> [model-resolution.md §9](../../reference/model-resolution.md#9-利用案内-model-notice).
+
 ## Time-To-Hello-World Target
 
 | Stage | Target | Action |

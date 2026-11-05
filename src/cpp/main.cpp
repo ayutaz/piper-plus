@@ -190,6 +190,29 @@ std::vector<float> loadSpeakerEmbedding(const filesystem::path &path) {
       });
 }
 
+// Print the usage notice of the first candidate that names a model with one
+// (docs/reference/model-resolution.md §9). Goes to stderr directly — not
+// spdlog — so --quiet does not hide it, and stdout stays untouched. Printed at
+// most once per process; PIPER_PLUS_DISABLE_MODEL_NOTICE=1 turns it off.
+static void printModelNoticeOnce(const vector<string>& candidates) {
+    static bool printed = false;
+    if (printed || piper::modelNoticeDisabled()) {
+        return;
+    }
+    for (const auto& candidate : candidates) {
+        auto notice = piper::getModelNotice(candidate);
+        if (notice.empty()) {
+            continue;
+        }
+        for (const auto& line : notice) {
+            cerr << line << '\n';
+        }
+        cerr << piper::kModelNoticeFooter << endl;
+        printed = true;
+        return;
+    }
+}
+
 // ----------------------------------------------------------------------------
 
 int main(int argc, char *argv[]) {
@@ -317,6 +340,9 @@ int main(int argc, char *argv[]) {
   if (runConfig.downloadModelName) {
     auto modelDir = runConfig.modelDir.value_or(piper::getDefaultModelDir());
     bool success = piper::downloadModel(runConfig.downloadModelName.value(), modelDir);
+    if (success) {
+        printModelNoticeOnce({runConfig.downloadModelName.value()});
+    }
     return success ? EXIT_SUCCESS : EXIT_FAILURE;
   }
 
@@ -1392,6 +1418,8 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
     cerr << "Path must not contain '..' traversal sequences." << endl;
     exit(1);
   }
+  // The name/path as given, before alias resolution, for the usage notice.
+  const string requestedModel = runConfig.modelPath.string();
   ifstream modelFile(*safeModelPath, ios::binary);
   if (!modelFile.good()) {
     auto modelDir = runConfig.modelDir.value_or(piper::getDefaultModelDir());
@@ -1426,6 +1454,10 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
       exit(1);
     }
   }
+
+  // Model resolved: show its usage notice, matching either the name as given
+  // (key / alias / repo ID / URL) or the resolved file name.
+  printModelNoticeOnce({requestedModel, runConfig.modelPath.string()});
 
   if (!modelConfigPath) {
     runConfig.modelConfigPath =

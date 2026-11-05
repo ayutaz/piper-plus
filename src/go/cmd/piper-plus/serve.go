@@ -60,6 +60,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 
 	// Try resolving model name/alias if file doesn't exist.
+	modelInput := resolvedModel
 	if _, err := os.Stat(resolvedModel); os.IsNotExist(err) {
 		mgr := piperplus.NewModelManager(modelDir, logger)
 		resolved, resolveErr := mgr.FindModel(resolvedModel)
@@ -68,6 +69,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		}
 		resolvedModel = resolved
 	}
+	printModelNotice(cmd.ErrOrStderr(), modelInput, resolvedModel)
 
 	// Initialize ONNX Runtime.
 	if err := piperplus.Init(""); err != nil {

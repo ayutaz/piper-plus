@@ -828,11 +828,13 @@ def main():
         from .model_manager import (  # noqa: PLC0415
             download_model,
             list_models,
+            print_model_notice,
             resolve_model_path,
         )
     except ImportError:
         list_models = None  # type: ignore[assignment]
         download_model = None  # type: ignore[assignment]
+        print_model_notice = None  # type: ignore[assignment]
         resolve_model_path = None  # type: ignore[assignment]
 
     # Handle --list-models (early exit)
@@ -869,6 +871,7 @@ def main():
             sys.exit(1)
 
     # Resolve model name/alias to file path
+    model_arg = args.model
     resolved = (
         resolve_model_path(args.model, args.model_dir) if resolve_model_path else None
     )
@@ -882,6 +885,10 @@ def main():
             file=sys.stderr,
         )
         sys.exit(1)
+
+    # Usage notice for models with terms (docs/reference/model-resolution.md §9)
+    if print_model_notice is not None:
+        print_model_notice(model_arg, args.model)
 
     args.output_dir = Path(args.output_dir)
     args.output_dir.mkdir(parents=True, exist_ok=True)

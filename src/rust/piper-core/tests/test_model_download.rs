@@ -491,3 +491,123 @@ fn test_download_progress_zero_bytes() {
     assert_eq!(progress.bytes_downloaded, 0);
     assert_eq!(progress.percentage, Some(0.0));
 }
+
+// ---------------------------------------------------------------------------
+// model_notice (docs/reference/model-resolution.md §9)
+// ---------------------------------------------------------------------------
+
+mod model_notice_tests {
+    use piper_plus::model_download::{
+        MODEL_NOTICE_FOOTER, TSUKUYOMI_NOTICE, TSUKUYOMI_NOTICE_FILES,
+        is_model_notice_disabled_value, model_notice,
+    };
+
+    /// Canonical voice catalog entry from `test/model_resolution_vectors.json`.
+    fn canonical_tsukuyomi() -> serde_json::Value {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../test/model_resolution_vectors.json");
+        let text = std::fs::read_to_string(&path).expect("canonical vectors readable");
+        let data: serde_json::Value = serde_json::from_str(&text).unwrap();
+        data["voice_catalog"]["ja_JP-tsukuyomi-chan-medium"].clone()
+    }
+
+    #[test]
+    fn notice_lines_match_canonical() {
+        let entry = canonical_tsukuyomi();
+        let expected: Vec<&str> = entry["notice"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(TSUKUYOMI_NOTICE, expected.as_slice());
+        for file in entry["notice_files"].as_array().unwrap() {
+            assert!(TSUKUYOMI_NOTICE_FILES.contains(&file.as_str().unwrap()));
+        }
+    }
+
+    #[test]
+    fn footer_is_shared_text() {
+        assert_eq!(
+            MODEL_NOTICE_FOOTER,
+            "(この表示は PIPER_PLUS_DISABLE_MODEL_NOTICE=1 で消せます / Set PIPER_PLUS_DISABLE_MODEL_NOTICE=1 to hide this notice.)"
+        );
+    }
+
+    #[test]
+    fn notice_for_key_aliases_and_repo_id() {
+        let entry = canonical_tsukuyomi();
+        let mut names = vec![
+            entry["key"].as_str().unwrap().to_string(),
+            entry["repo_id"].as_str().unwrap().to_string(),
+        ];
+        for alias in entry["aliases"].as_array().unwrap() {
+            names.push(alias.as_str().unwrap().to_string());
+        }
+        for name in &names {
+            assert_eq!(model_notice(name), Some(TSUKUYOMI_NOTICE), "{name}");
+        }
+    }
+
+    #[test]
+    fn notice_for_legacy_rust_name() {
+        assert_eq!(model_notice("tsukuyomi-6lang-v2"), Some(TSUKUYOMI_NOTICE));
+        assert_eq!(
+            model_notice("/models/tsukuyomi-6lang-v2.onnx"),
+            Some(TSUKUYOMI_NOTICE)
+        );
+    }
+
+    #[test]
+    fn notice_for_url_with_repo() {
+        assert_eq!(
+            model_notice(
+                "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json"
+            ),
+            Some(TSUKUYOMI_NOTICE)
+        );
+    }
+
+    #[test]
+    fn notice_for_paths_with_notice_file_name() {
+        for path in [
+            "tsukuyomi.onnx",
+            "/data/models/tsukuyomi.onnx",
+            r"C:\models\tsukuyomi-chan-6lang-fp16.onnx",
+            "./tsukuyomi-chan-6lang-fp16.onnx",
+        ] {
+            assert_eq!(model_notice(path), Some(TSUKUYOMI_NOTICE), "{path}");
+        }
+    }
+
+    #[test]
+    fn no_notice_for_other_models() {
+        for input in [
+            "ja_JP-css10-6lang-medium",
+            "css10",
+            "css10-6lang",
+            "ayousanz/piper-plus-css10-ja-6lang",
+            "/models/css10-ja-6lang-fp16.onnx",
+            "base",
+            "zero-shot-base-zs-v1",
+            "ayousanz/piper-plus-base",
+            "https://huggingface.co/ayousanz/piper-plus-base/resolve/main/releases/zs-v1/base.onnx",
+            "/models/base.onnx",
+            "/models/tsukuyomi.onnx.json",
+            "/models/my-tsukuyomi.onnx",
+            "",
+        ] {
+            assert_eq!(model_notice(input), None, "{input}");
+        }
+    }
+
+    #[test]
+    fn disable_env_value_parsing() {
+        for value in ["1", "true", "TRUE", " TRUE ", "yes", "Yes", "\tyes\n"] {
+            assert!(is_model_notice_disabled_value(value), "{value:?}");
+        }
+        for value in ["0", "", "false", "no", "on", "2", "y"] {
+            assert!(!is_model_notice_disabled_value(value), "{value:?}");
+        }
+    }
+}

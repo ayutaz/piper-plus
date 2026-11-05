@@ -11,6 +11,7 @@ import numpy as np
 import onnxruntime
 
 from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
+from piper_train.model_manager import print_model_notice
 from piper_train.ort_utils import create_session_with_cache, warmup_onnx_session
 
 
@@ -60,6 +61,8 @@ def _get_session(model_path: str) -> onnxruntime.InferenceSession:
             )
             warmup_onnx_session(session)
             _session_cache[model_path] = session
+            # Usage notice for models with terms (docs/reference/model-resolution.md §9)
+            print_model_notice(model_path)
         return _session_cache[model_path]
 
 

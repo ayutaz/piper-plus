@@ -363,6 +363,104 @@ pub fn find_model(query: &str) -> Option<&'static ModelInfo> {
     None
 }
 
+// ---------------------------------------------------------------------------
+// Model usage notice (docs/reference/model-resolution.md §9)
+// ---------------------------------------------------------------------------
+
+/// Usage notice for the Tsukuyomi-chan model.
+///
+/// Mirror of `voice_catalog["ja_JP-tsukuyomi-chan-medium"].notice` in
+/// `test/model_resolution_vectors.json` (checked by
+/// `scripts/check_voice_catalog_parity.py`). Executables print each line to
+/// stderr, followed by [`MODEL_NOTICE_FOOTER`].
+pub const TSUKUYOMI_NOTICE: &[&str] = &[
+    "[piper-plus] つくよみちゃんモデルの利用条件 / Terms for the Tsukuyomi-chan model",
+    "生成した音声を使うときは「Piper Plus:つくよみちゃん」のクレジット表記が必須です。",
+    "Credit 'Piper Plus:つくよみちゃん' is required when you use the generated audio.",
+    "非公式の作品です。夢前黎様は開発・サポートに携わっていません。お問い合わせは開発者へ。",
+    "Unofficial work. Rei Yumesaki is not involved in development or support; contact the developer.",
+    "禁止事項と規約 / Terms and prohibited uses: https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan",
+];
+
+/// HuggingFace repository of the Tsukuyomi-chan model.
+pub const TSUKUYOMI_REPO_ID: &str = "ayousanz/piper-plus-tsukuyomi-chan";
+
+/// Names (catalog key, aliases, repo id, legacy Rust registry name) that
+/// select the Tsukuyomi-chan model and therefore carry [`TSUKUYOMI_NOTICE`].
+pub const TSUKUYOMI_NOTICE_NAMES: &[&str] = &[
+    "ja_JP-tsukuyomi-chan-medium",
+    "tsukuyomi",
+    "tsukuyomi-chan",
+    "ja-tsukuyomi",
+    TSUKUYOMI_REPO_ID,
+    "tsukuyomi-6lang-v2",
+];
+
+/// File names that identify the Tsukuyomi-chan model when a path is given.
+///
+/// Mirror of `voice_catalog["ja_JP-tsukuyomi-chan-medium"].notice_files`,
+/// plus the legacy Rust cache file name `tsukuyomi-6lang-v2.onnx`.
+pub const TSUKUYOMI_NOTICE_FILES: &[&str] = &[
+    "tsukuyomi-chan-6lang-fp16.onnx",
+    "tsukuyomi.onnx",
+    "tsukuyomi-6lang-v2.onnx",
+];
+
+/// Line printed after a model notice (identical across runtimes).
+pub const MODEL_NOTICE_FOOTER: &str = "(この表示は PIPER_PLUS_DISABLE_MODEL_NOTICE=1 で消せます / Set PIPER_PLUS_DISABLE_MODEL_NOTICE=1 to hide this notice.)";
+
+/// Environment variable that disables printing of model notices.
+pub const MODEL_NOTICE_DISABLE_ENV: &str = "PIPER_PLUS_DISABLE_MODEL_NOTICE";
+
+/// Return the usage notice for a model name, alias, repo id, URL, or path.
+///
+/// A notice is returned when `input`:
+/// 1. exactly equals the catalog key, an alias, or the repo id;
+/// 2. is a URL containing `/<repo_id>/`; or
+/// 3. is a path whose file name (last component) is one of the notice files.
+///
+/// The library never prints the notice; executables decide how to show it.
+pub fn model_notice(input: &str) -> Option<&'static [&'static str]> {
+    let input = input.trim();
+    if input.is_empty() {
+        return None;
+    }
+
+    if TSUKUYOMI_NOTICE_NAMES.contains(&input) {
+        return Some(TSUKUYOMI_NOTICE);
+    }
+
+    if input.contains("://") && input.contains(&format!("/{TSUKUYOMI_REPO_ID}/")) {
+        return Some(TSUKUYOMI_NOTICE);
+    }
+
+    let file_name = input.rsplit(['/', '\\']).next().unwrap_or(input);
+    if TSUKUYOMI_NOTICE_FILES.contains(&file_name) {
+        return Some(TSUKUYOMI_NOTICE);
+    }
+
+    None
+}
+
+/// Whether a value of `PIPER_PLUS_DISABLE_MODEL_NOTICE` disables the notice.
+///
+/// `1`, `true`, and `yes` (case-insensitive, surrounding whitespace ignored)
+/// disable it; anything else does not.
+pub fn is_model_notice_disabled_value(value: &str) -> bool {
+    let value = value.trim();
+    ["1", "true", "yes"]
+        .iter()
+        .any(|v| value.eq_ignore_ascii_case(v))
+}
+
+/// Whether the `PIPER_PLUS_DISABLE_MODEL_NOTICE` environment variable
+/// disables model notices for this process.
+pub fn model_notice_disabled() -> bool {
+    std::env::var(MODEL_NOTICE_DISABLE_ENV)
+        .map(|v| is_model_notice_disabled_value(&v))
+        .unwrap_or(false)
+}
+
 /// Resolve a model path from a name, alias, or file path.
 ///
 /// 1. If the string is a path to an existing file, return it directly.

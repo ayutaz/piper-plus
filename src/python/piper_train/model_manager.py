@@ -6,6 +6,7 @@ resolver; fine-tuning uses the checkpoint from the published release bundle.
 """
 
 import os
+import re
 import sys
 
 
@@ -28,6 +29,17 @@ _BUILTIN_CATALOG = {
         },
         "aliases": ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"],
         "description": "Tsukuyomi-chan 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT)",
+        # Usage notice shown by the CLIs and servers (docs/reference/model-resolution.md §9).
+        # Canonical copy: test/model_resolution_vectors.json.
+        "notice": [
+            "[piper-plus] つくよみちゃんモデルの利用条件 / Terms for the Tsukuyomi-chan model",
+            "生成した音声を使うときは「Piper Plus:つくよみちゃん」のクレジット表記が必須です。",
+            "Credit 'Piper Plus:つくよみちゃん' is required when you use the generated audio.",
+            "非公式の作品です。夢前黎様は開発・サポートに携わっていません。お問い合わせは開発者へ。",
+            "Unofficial work. Rei Yumesaki is not involved in development or support; contact the developer.",
+            "禁止事項と規約 / Terms and prohibited uses: https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan",
+        ],
+        "notice_files": ["tsukuyomi-chan-6lang-fp16.onnx", "tsukuyomi.onnx"],
     },
     "ja_JP-css10-6lang-medium": {
         "key": "ja_JP-css10-6lang-medium",
@@ -48,6 +60,68 @@ _BUILTIN_CATALOG = {
         "description": "CSS10 Japanese 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT, 6841 utterances)",
     },
 }
+
+MODEL_NOTICE_FOOTER = (
+    "(この表示は PIPER_PLUS_DISABLE_MODEL_NOTICE=1 で消せます / "
+    "Set PIPER_PLUS_DISABLE_MODEL_NOTICE=1 to hide this notice.)"
+)
+MODEL_NOTICE_ENV = "PIPER_PLUS_DISABLE_MODEL_NOTICE"
+
+_shown_model_notices: set[str] = set()
+
+
+def get_model_notice(*candidates) -> list[str] | None:
+    """Return the usage notice for the first candidate that names a model with one.
+
+    Mirrors ``piper_plus.download.get_model_notice`` (this package cannot depend
+    on ``piper_plus``). A candidate matches an entry with a ``notice`` when it is
+    the key, an alias or the repo ID, a URL containing ``/<repo_id>/``, or a path
+    whose file name is in ``notice_files`` (docs/reference/model-resolution.md §9).
+    """
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        value = str(candidate).strip()
+        if not value:
+            continue
+        file_name = re.split(r"[\\/]", value.rstrip("\\/"))[-1]
+        for voice in _BUILTIN_CATALOG.values():
+            notice = voice.get("notice")
+            if not notice:
+                continue
+            repo_id = voice.get("repo_id", "")
+            if (
+                value == voice.get("key")
+                or value in voice.get("aliases", [])
+                or (repo_id and value == repo_id)
+                or (repo_id and "://" in value and f"/{repo_id}/" in value)
+                or file_name in voice.get("notice_files", [])
+            ):
+                return list(notice)
+    return None
+
+
+def is_model_notice_disabled(value: str | None = None) -> bool:
+    """Whether ``PIPER_PLUS_DISABLE_MODEL_NOTICE`` (or ``value``) turns the notice off."""
+    if value is None:
+        value = os.environ.get(MODEL_NOTICE_ENV, "")
+    return value.strip().lower() in ("1", "true", "yes")
+
+
+def print_model_notice(*candidates, stream=None) -> bool:
+    """Print the usage notice for the model to stderr, once per process."""
+    notice = get_model_notice(*candidates)
+    if not notice or is_model_notice_disabled():
+        return False
+    identity = "\n".join(notice)
+    if identity in _shown_model_notices:
+        return False
+    _shown_model_notices.add(identity)
+    out = sys.stderr if stream is None else stream
+    for line in notice:
+        print(line, file=out)
+    print(MODEL_NOTICE_FOOTER, file=out)
+    return True
 
 
 def get_default_model_dir() -> str:
@@ -170,6 +244,9 @@ def download_model(model_name: str, model_dir: str | None = None) -> bool:
             file=sys.stderr,
         )
         return False
+
+    # Usage notice for models with terms (docs/reference/model-resolution.md §9)
+    print_model_notice(voice["key"])
 
     if model_dir is None:
         model_dir = get_default_model_dir()

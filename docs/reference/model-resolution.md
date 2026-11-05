@@ -100,6 +100,8 @@ Voice catalog から以下の優先順位で検索する:
 | `files` | array/map | ダウンロード対象ファイル (ONNX + config) |
 | `aliases` | array | ショートネームのリスト |
 | `description` | string | 説明文 |
+| `notice` | array of string (optional) | モデルを使う前に表示する利用案内。1 要素が 1 行 ([§9](#9-利用案内-model-notice)) |
+| `notice_files` | array of string (optional) | パスで指定されたときに、このエントリの利用案内を出す ONNX のファイル名 ([§9](#9-利用案内-model-notice)) |
 
 ### Alias Registry and catalog key
 
@@ -302,6 +304,59 @@ high-level API の `css10`、flat cache、directory-specific error）は、実�
 | Catalog format | Python CLIはdict、Rust/C#/Goはsource内定義、C++はJSONと埋め込み定義 | JSON catalog を正とし各言語で読み込み |
 | Partial match | Rust のみ partial name + description match | 全実装で catalog alias ベースに統一予定 |
 | Auto-download | Python は `huggingface_hub`, 他は直接 HTTP | 各実装の依存に応じて許容 |
+
+---
+
+## 9. 利用案内 (model notice)
+
+利用条件のあるモデル (現在はつくよみちゃんモデルのみ) を使うとき、CLI とサーバーは
+`notice` を stderr に表示する。つくよみちゃんモデルは、生成音声を使うときに
+「Piper Plus:つくよみちゃん」のクレジット表記が必須で、つくよみちゃん側から見ると
+非公式の作品である (規約: <https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan>)。
+
+### 正本
+
+`test/model_resolution_vectors.json` の `voice_catalog.<key>.notice` が案内文の正本で、
+`notice_files` がファイル名による判定の正本である。各ランタイムの catalog はこれを写し、
+`scripts/check_voice_catalog_parity.py` が写しの各行の有無を検査する。案内文の行には
+`"` と `\` を入れない (各言語の文字列リテラルにそのまま書けるようにするため)。
+
+### 判定
+
+入力 (モデル名・パス・URL) が次のどれかに当たるとき、そのエントリの `notice` を返す。
+
+1. catalog の `key`、`aliases` のどれか、または `repo_id` と完全に一致する
+2. URL で、`/<repo_id>/` を含む
+3. パスで、ファイル名 (最後の要素) が `notice_files` のどれかと一致する
+
+### 表示
+
+| 項目 | 規則 |
+|------|------|
+| 表示する側 | CLI とサーバー (HTTP / Wyoming / OpenAI 互換 / WebUI) などの実行ファイル。ライブラリは判定結果を返すだけで、自分では表示しない |
+| 出力先 | stderr (ブラウザは `console.warn`)。stdout は音声やパスの出力に使われるため使わない |
+| 回数 | 1 プロセスで 1 回 |
+| 形式 | `notice` の各行をそのまま 1 行ずつ出し、最後に下の消し方の行を出す |
+| 消し方 | 環境変数 `PIPER_PLUS_DISABLE_MODEL_NOTICE` が `1` / `true` / `yes` (大文字小文字を区別せず、前後の空白を除く) のとき表示しない。`--quiet` では消えない。ブラウザ (npm) は `showModelNotice: false` オプション |
+
+消し方の行 (各ランタイム共通):
+
+```text
+(この表示は PIPER_PLUS_DISABLE_MODEL_NOTICE=1 で消せます / Set PIPER_PLUS_DISABLE_MODEL_NOTICE=1 to hide this notice.)
+```
+
+### 実装
+
+| ランタイム | 判定 (ライブラリ) | 表示 (実行ファイル) |
+|-----------|------------------|--------------------|
+| Python | `piper_plus.download.get_model_notice()`、`PiperPlus.model_notice` (表示は `print_model_notice()` / `show_model_notice()`) | CLI、HTTP サーバー、Wyoming |
+| Python (学習側・Docker) | `piper_train.model_manager.get_model_notice()` | `infer_onnx`、`model_manager.download_model()`、OpenAI 互換サーバー、WebUI |
+| Rust | `piper_plus::model_download::model_notice()` (旧名 `tsukuyomi-6lang-v2` とそのキャッシュファイル名も判定する) | `piper-plus` CLI |
+| Go | `piperplus.ModelNotice()` | `piper-plus` CLI (合成と `serve`) |
+| C# | `ModelManager.GetModelNotice()`、`VoiceInfo.Notice` | `piper-plus` CLI |
+| C++ | `piper::getModelNotice()` (`model_manager.hpp`) | `piper` CLI |
+| WASM / npm | `getModelNotice()`、`ModelManager.resolveUrls()` / `loadModel()` の `notice` | ブラウザにはプロセスの stderr がないため、`PiperPlus.initialize()` と `ModelManager.loadModel()` が `console.warn` で出す (`showModelNotice: false` で止める)。`piper-cli.js` は stderr |
+| C API / Swift / Kotlin | なし (モデルのパスだけを受け取るため) | アプリ側で表示する |
 
 
 ## Public baseline cache and integrity scope

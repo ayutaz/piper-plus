@@ -71,6 +71,9 @@ on:
       - 'src/rust/piper-core/src/model_download.rs'
       - 'src/csharp/PiperPlus.Core/Config/VoiceCatalog.cs'
       - 'src/go/piperplus/voice_catalog.go'
+      # voice-catalog usage-notice mirrors
+      - 'src/wasm/openjtalk-web/src/model-manager.js'
+      - 'src/python/piper_train/model_manager.py'
       # Scripts
       - 'scripts/check_cli_flag_parity.py'
       - 'scripts/check_language_id_map_contract.py'
@@ -95,6 +98,7 @@ on:
       - 'src/cpp/tests/test_text_splitter_contract.cpp'
       - 'src/wasm/openjtalk-web/test/js/test-streaming-pipeline.js'
       - 'scripts/check_voice_catalog_parity.py'
+      - 'tests/scripts/test_check_voice_catalog_parity.py'
       - 'scripts/build_english_normalize_fixture.py'
       - 'tests/scripts/test_build_english_normalize_fixture.py'
       - 'src/cpp/tests/test_english_normalize.cpp'
@@ -166,9 +170,11 @@ jobs:
               pip install pytest
               python -m pytest tests/scripts/test_build_english_normalize_fixture.py -q -o addopts=
           - id: voice-catalog
-            description: 5 runtime catalogs honour canonical vector
+            description: 5 runtime catalogs and the usage-notice mirrors honour canonical vector
             scripts: |
               python scripts/check_voice_catalog_parity.py
+              pip install pytest
+              python -m pytest tests/scripts/test_check_voice_catalog_parity.py -q -o addopts=
     steps:
       - uses: actions/checkout@v6.1.0
       - uses: actions/setup-python@v6.2.0

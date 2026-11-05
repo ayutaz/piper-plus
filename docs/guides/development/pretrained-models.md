@@ -38,6 +38,9 @@ base-model licenses are listed on the [model page](https://huggingface.co/ayousa
 The model is an unofficial work from the Tsukuyomi-chan side; Rei Yumesaki (the corpus rights holder)
 is not involved in its development or support. Send questions to the developer through
 [GitHub Issues](https://github.com/ayutaz/piper-plus/issues), not to Rei Yumesaki.
+The CLIs and servers print these terms to stderr once when they load either model, whether you
+name it by alias or repo ID or pass a file named `tsukuyomi-chan-6lang-fp16.onnx` or `tsukuyomi.onnx`;
+set `PIPER_PLUS_DISABLE_MODEL_NOTICE=1` to hide the notice.
 
 ```bash
 mkdir -p models/tsukuyomi-zs-v1

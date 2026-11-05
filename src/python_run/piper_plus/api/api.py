@@ -21,6 +21,7 @@ from piper_plus.api.engine import (
     synthesize as engine_synthesize,
     warmup_session,
 )
+from piper_plus.download import get_model_notice
 
 
 logger = logging.getLogger(__name__)
@@ -90,6 +91,7 @@ class PiperPlus:
         )
         self._onnx_path = onnx_path
         self._config_path = config_path
+        self._model_notice = get_model_notice(model, onnx_path)
 
         # Load config via engine helper (no piper_train dependency)
         self._config: dict = load_config(config_path)
@@ -160,6 +162,16 @@ class PiperPlus:
     def config(self) -> dict:
         """Raw model config dictionary."""
         return dict(self._config)
+
+    @property
+    def model_notice(self) -> list[str] | None:
+        """Usage notice for the loaded model, or ``None`` when it has none.
+
+        The Tsukuyomi-chan model requires the credit "Piper Plus:つくよみちゃん"
+        on generated audio. ``PiperPlus`` never prints this; applications
+        should show it to their users (docs/reference/model-resolution.md §9).
+        """
+        return list(self._model_notice) if self._model_notice else None
 
     # ------------------------------------------------------------------
     # Core synthesis

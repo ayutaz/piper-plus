@@ -311,6 +311,7 @@ Static async factory that downloads (and caches) the ONNX model and config, then
 | `model` | `string` | -- | **Required.** HuggingFace repo name (e.g. `"ayousanz/piper-plus-tsukuyomi-chan"`), registry shortcut (e.g. `"tsukuyomi"`), or direct URL to an ONNX file. |
 | `ort` | `object` | `globalThis.ort` | `onnxruntime-web` module instance. |
 | `onProgress` | `function` | -- | Callback receiving `{ stage, progress, message }`. |
+| `showModelNotice` | `boolean` | `true` | Print the usage notice of models with terms (Tsukuyomi-chan) with `console.warn`, once per page. |
 
 Returns `Promise<PiperPlus>`.
 
@@ -380,7 +381,7 @@ Returned by `synthesize()`. Wraps raw PCM audio samples.
 Resolves a model identifier to concrete URLs without downloading.
 
 - `modelNameOrUrl` -- Registry shortcut (`"tsukuyomi"`), HuggingFace repo (`"ayousanz/piper-plus-tsukuyomi-chan"`), or direct URL
-- Returns: `Promise<{ modelUrl: string, configUrl: string, configFallbackUrl: string | null, cacheKey: string }>`
+- Returns: `Promise<{ modelUrl: string, configUrl: string, configFallbackUrl: string | null, cacheKey: string, notice: readonly string[] | null }>` (`notice`: the model's usage notice lines, or `null`; not printed)
 
 ## Available Models
 
@@ -399,6 +400,15 @@ const tts = await PiperPlus.initialize({ model: "ayousanz/piper-plus-tsukuyomi-c
 // Shortcut
 const tts = await PiperPlus.initialize({ model: "tsukuyomi", ort });
 ```
+
+> **Tsukuyomi-chan terms:** audio made with this model must carry the credit
+> `Piper Plus:つくよみちゃん`, and it is an unofficial work
+> ([terms](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)).
+> `PiperPlus.initialize()`, `ModelManager.loadModel()` and the `piper-plus` bin
+> print this notice once (`console.warn`, stderr for the bin). Hide it with
+> `showModelNotice: false` (or `new ModelManager({ showModelNotice: false })`),
+> or in Node with `PIPER_PLUS_DISABLE_MODEL_NOTICE=1`. `getModelNotice(name)`
+> returns the lines without printing them.
 
 The public `zs-v1` base is stored below a versioned subdirectory. Since npm
 0.8.2, `base`, `zero-shot-base-zs-v1`, and `ayousanz/piper-plus-base` are

@@ -339,7 +339,14 @@ describe("ModelManager.loadModel() 成功ケース", { skip }, () => {
     // Assert -- verify return value structure
     assert.ok("modelData" in result, "result should have modelData property");
     assert.ok("config" in result, "result should have config property");
-    assert.equal(Object.keys(result).length, 2, "result should have exactly two properties");
+    // notice: usage notice lines, null for models without one
+    // (docs/reference/model-resolution.md §9).
+    assert.deepEqual(
+      Object.keys(result).sort(),
+      ["config", "modelData", "notice"],
+      "result should have exactly modelData, config and notice"
+    );
+    assert.equal(result.notice, null, "a model without terms has no notice");
 
     // Verify modelData
     assert.ok(result.modelData instanceof ArrayBuffer, "modelData should be an ArrayBuffer");

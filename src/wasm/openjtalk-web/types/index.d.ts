@@ -85,6 +85,12 @@ export interface PiperPlusOptions {
   wasmG2pUrl?: string;
   /** Async WASM module loader for dependency injection; takes precedence over wasmG2pUrl. */
   wasmLoader?: () => Promise<unknown>;
+  /**
+   * Print the usage notice of models with terms (e.g. Tsukuyomi-chan) with
+   * console.warn, once per page / process. Default: true. In Node,
+   * PIPER_PLUS_DISABLE_MODEL_NOTICE=1 also suppresses it.
+   */
+  showModelNotice?: boolean;
 }
 
 /** Options for PiperPlus.synthesize(). */
@@ -466,6 +472,12 @@ export interface ModelManagerOptions {
   cachePrefix?: string;
   /** Recompute a stored SHA-256 hash on cache hits. Default: false. */
   verifyOnCacheHit?: boolean;
+  /**
+   * Let loadModel() print a model's usage notice with console.warn, once per
+   * page / process. Default: true. In Node, PIPER_PLUS_DISABLE_MODEL_NOTICE=1
+   * also suppresses it.
+   */
+  showModelNotice?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -520,7 +532,25 @@ export class SpeakerEncoder {
 export interface ModelLoadResult {
   modelData: ArrayBuffer;
   config: ModelConfig;
+  /**
+   * Usage notice lines of the model (see getModelNotice), or null. Set by
+   * loadModel(); getFromCache() leaves it out.
+   */
+  notice?: readonly string[] | null;
 }
+
+/**
+ * Line printed after a model usage notice; identical across runtimes
+ * (docs/reference/model-resolution.md section 9).
+ */
+export const MODEL_NOTICE_FOOTER: string;
+
+/**
+ * Usage notice lines for a model name, HuggingFace repo id, URL or file path
+ * (e.g. "tsukuyomi", "ayousanz/piper-plus-tsukuyomi-chan", ".../tsukuyomi.onnx"),
+ * or null when the model has no notice. Does not print anything.
+ */
+export function getModelNotice(modelNameOrUrl: string): readonly string[] | null;
 
 /** Download and cache ONNX models from HuggingFace. */
 export class ModelManager {
@@ -528,6 +558,8 @@ export class ModelManager {
 
   /**
    * Load a model and its config, using the IndexedDB cache when available.
+   * A model with a usage notice gets it printed with console.warn once per
+   * page / process unless `showModelNotice: false` was passed.
    *
    * @param modelNameOrUrl - Registry shortcut, HuggingFace repo name, or direct URL.
    * @param options - Optional settings including progress callback.
@@ -580,6 +612,9 @@ export class ModelManager {
    *   - HuggingFace repo:  "ayousanz/piper-plus-css10-ja-6lang"
    *   - Direct URL:        "https://example.com/model.onnx"
    *
+   * `notice` holds the model's usage notice lines (see getModelNotice), or
+   * null; resolveUrls() itself does not print it.
+   *
    * @param modelNameOrUrl - Registry shortcut, HuggingFace repo, or direct URL.
    */
   resolveUrls(modelNameOrUrl: string): Promise<{
@@ -587,6 +622,7 @@ export class ModelManager {
     configUrl: string;
     configFallbackUrl: string | null;
     cacheKey: string;
+    notice: readonly string[] | null;
   }>;
 
   /** Remove all cached models and dictionaries. */
