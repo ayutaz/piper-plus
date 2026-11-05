@@ -173,3 +173,46 @@ def test_score_rejects_incomplete_or_mismatched_answers(problem):
         answers["session"] = "s2"
     with pytest.raises(ValueError):
         score([key], [answers])
+
+
+def _built_set(root: Path) -> Path:
+    """A minimal built evaluation set: ja_aaaa's floor names ja_bbbb; ja_bbbb's floor names
+    nobody in the set, so its R-/Z- pool falls back to every other voice (tsukuyomi included)."""
+    floors = {"ja_aaaa": "bbbb", "ja_bbbb": "zzzz", "tsukuyomi": "aaaa"}
+    groups = {}
+    for group, floor_speaker in floors.items():
+        base = root / "groups" / group
+        _wav(base / "speaker" / "refs0.wav", 48000)
+        _wav(base / "speaker" / "cross0.wav", 48000)
+        _wav(base / "floor" / f"floor0_wavs_{floor_speaker}_001.wav", 48000)
+        groups[group] = {"embeddings": [{"reference": "refs0.wav"}]}
+    (root / "set.json").write_text(json.dumps({"groups": groups}), encoding="utf-8")
+    return root
+
+
+def test_pools_from_set_can_leave_out_a_voice_everywhere(tmp_path):
+    from piper_train.tools.listening_identity import pools_from_set
+
+    set_dir = _built_set(tmp_path / "set")
+    synth = tmp_path / "synth"
+    for group in ("ja_aaaa", "ja_bbbb", "tsukuyomi"):
+        _wav(synth / group / "s0.wav", 22050)
+
+    assert pools_from_set(set_dir, [synth])["ja_bbbb"]["others"] == [
+        "ja_aaaa",
+        "tsukuyomi",
+    ]
+
+    pools = pools_from_set(set_dir, [synth], exclude=["tsukuyomi"])
+
+    assert sorted(pools) == ["ja_aaaa", "ja_bbbb"]
+    assert pools["ja_aaaa"]["others"] == ["ja_bbbb"]
+    assert pools["ja_bbbb"]["others"] == ["ja_aaaa"]
+
+
+def test_pools_from_set_rejects_an_unknown_excluded_voice(tmp_path):
+    from piper_train.tools.listening_identity import pools_from_set
+
+    set_dir = _built_set(tmp_path / "set")
+    with pytest.raises(ValueError, match="tsukuyomi_typo"):
+        pools_from_set(set_dir, [tmp_path / "synth"], exclude=["tsukuyomi_typo"])
