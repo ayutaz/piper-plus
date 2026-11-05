@@ -439,6 +439,141 @@ TEST(ModelManagerTest, CatalogLoadIsIdempotent) {
 }
 
 // ============================================
+// Model usage notice (docs/reference/model-resolution.md §9)
+// ============================================
+
+namespace {
+
+// Copied from test/model_resolution_vectors.json (voice_catalog notice).
+const std::vector<std::string> kTsukuyomiNotice = {
+    "[piper-plus] つくよみちゃんモデルの利用条件 / Terms for the Tsukuyomi-chan model",
+    "生成した音声を使うときは「Piper Plus:つくよみちゃん」のクレジット表記が必須です。",
+    "Credit 'Piper Plus:つくよみちゃん' is required when you use the generated audio.",
+    "非公式の作品です。夢前黎様は開発・サポートに携わっていません。お問い合わせは開発者へ。",
+    "Unofficial work. Rei Yumesaki is not involved in development or support; contact the developer.",
+    "禁止事項と規約 / Terms and prohibited uses: https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan",
+};
+
+}  // namespace
+
+TEST(ModelNoticeTest, CatalogEntryCarriesNotice) {
+    auto voice = piper::findVoice("ja_JP-tsukuyomi-chan-medium");
+    ASSERT_TRUE(voice.has_value());
+    EXPECT_EQ(voice->notice, kTsukuyomiNotice);
+    EXPECT_EQ(voice->noticeFiles,
+              (std::vector<std::string>{"tsukuyomi-chan-6lang-fp16.onnx",
+                                        "tsukuyomi.onnx"}));
+
+    auto css10 = piper::findVoice("css10");
+    ASSERT_TRUE(css10.has_value());
+    EXPECT_TRUE(css10->notice.empty());
+    EXPECT_TRUE(css10->noticeFiles.empty());
+}
+
+TEST(ModelNoticeTest, DetectsTsukuyomiInputs) {
+    const std::vector<std::string> inputs = {
+        // catalog key, each alias, repo id
+        "ja_JP-tsukuyomi-chan-medium",
+        "tsukuyomi",
+        "tsukuyomi-chan",
+        "ja-tsukuyomi",
+        "ayousanz/piper-plus-tsukuyomi-chan",
+        "  tsukuyomi  ",
+        // URLs containing /<repo_id>/
+        "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx",
+        "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json",
+        // paths whose file name is a notice file
+        "tsukuyomi-chan-6lang-fp16.onnx",
+        "tsukuyomi.onnx",
+        "/home/user/models/tsukuyomi-chan-6lang-fp16.onnx",
+        "./releases/zs-v1/tsukuyomi.onnx",
+        "C:\\Users\\user\\AppData\\Roaming\\piper-plus\\models\\tsukuyomi-chan-6lang-fp16.onnx",
+        "C:\\models\\zs-v1\\tsukuyomi.onnx",
+        "C:/models/tsukuyomi.onnx",
+    };
+    for (const auto& input : inputs) {
+        EXPECT_EQ(piper::getModelNotice(input), kTsukuyomiNotice)
+            << "expected a notice for: " << input;
+    }
+}
+
+TEST(ModelNoticeTest, NoNoticeForOtherInputs) {
+    const std::vector<std::string> inputs = {
+        "",
+        "   ",
+        // other catalog models
+        "ja_JP-css10-6lang-medium",
+        "css10",
+        "css10-6lang",
+        "ayousanz/piper-plus-css10-ja-6lang",
+        "multilingual-zero-shot-base-zs-v1",
+        "base",
+        "ayousanz/piper-plus-base",
+        "https://huggingface.co/ayousanz/piper-plus-base/resolve/main/releases/zs-v1/base.onnx",
+        "/models/css10-ja-6lang-fp16.onnx",
+        "C:\\models\\base.onnx",
+        // near misses
+        "Tsukuyomi",
+        "tsukuyomi-chan-medium",
+        "/models/my-tsukuyomi.onnx",
+        "/models/tsukuyomi.onnx.json",
+        "/models/config.json",
+        // repo without a URL scheme is not a URL
+        "/data/ayousanz/piper-plus-tsukuyomi-chan/model.onnx",
+        "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan-v2/resolve/main/model.onnx",
+    };
+    for (const auto& input : inputs) {
+        EXPECT_TRUE(piper::getModelNotice(input).empty())
+            << "expected no notice for: '" << input << "'";
+    }
+}
+
+TEST(ModelNoticeTest, FooterText) {
+    EXPECT_STREQ(piper::kModelNoticeFooter,
+                 "(この表示は PIPER_PLUS_DISABLE_MODEL_NOTICE=1 で消せます / "
+                 "Set PIPER_PLUS_DISABLE_MODEL_NOTICE=1 to hide this notice.)");
+    EXPECT_STREQ(piper::kModelNoticeDisableEnv,
+                 "PIPER_PLUS_DISABLE_MODEL_NOTICE");
+}
+
+TEST(ModelNoticeTest, ParseDisabledValues) {
+    EXPECT_TRUE(piper::parseModelNoticeDisabled("1"));
+    EXPECT_TRUE(piper::parseModelNoticeDisabled("true"));
+    EXPECT_TRUE(piper::parseModelNoticeDisabled(" TRUE "));
+    EXPECT_TRUE(piper::parseModelNoticeDisabled("yes"));
+    EXPECT_TRUE(piper::parseModelNoticeDisabled("Yes\n"));
+    EXPECT_FALSE(piper::parseModelNoticeDisabled(nullptr));
+    EXPECT_FALSE(piper::parseModelNoticeDisabled(""));
+    EXPECT_FALSE(piper::parseModelNoticeDisabled("0"));
+    EXPECT_FALSE(piper::parseModelNoticeDisabled("false"));
+    EXPECT_FALSE(piper::parseModelNoticeDisabled("no"));
+    EXPECT_FALSE(piper::parseModelNoticeDisabled("on"));
+    EXPECT_FALSE(piper::parseModelNoticeDisabled("y"));
+}
+
+TEST(ModelNoticeTest, DisabledReadsEnvironment) {
+    EnvVarGuard guard("PIPER_PLUS_DISABLE_MODEL_NOTICE");
+
+    guard.unset();
+    EXPECT_FALSE(piper::modelNoticeDisabled());
+
+    guard.set(" TRUE ");
+    EXPECT_TRUE(piper::modelNoticeDisabled());
+
+    guard.set("yes");
+    EXPECT_TRUE(piper::modelNoticeDisabled());
+
+    guard.set("1");
+    EXPECT_TRUE(piper::modelNoticeDisabled());
+
+    guard.set("0");
+    EXPECT_FALSE(piper::modelNoticeDisabled());
+
+    guard.set("");
+    EXPECT_FALSE(piper::modelNoticeDisabled());
+}
+
+// ============================================
 // Main
 // ============================================
 

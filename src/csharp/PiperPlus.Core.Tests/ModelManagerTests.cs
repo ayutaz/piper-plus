@@ -129,6 +129,29 @@ public sealed class ModelManagerTests : IDisposable
     }
 
     // ================================================================
+    // GetModelNotice (library returns the notice, never prints it)
+    // ================================================================
+    [Fact]
+    public void GetModelNotice_ReturnsNoticeWithoutWritingToStdErr()
+    {
+        using StringWriter sw = CaptureStdErr();
+
+        IReadOnlyList<string> notice = ModelManager.GetModelNotice("tsukuyomi");
+
+        Assert.Equal(6, notice.Count);
+        Assert.Equal(string.Empty, sw.ToString());
+    }
+
+    [Fact]
+    public void GetModelNotice_MatchesFindVoiceNotice()
+    {
+        VoiceInfo voice = Assert.IsType<VoiceInfo>(ModelManager.FindVoice("tsukuyomi"));
+
+        Assert.Equal(voice.Notice, ModelManager.GetModelNotice("tsukuyomi"));
+        Assert.Empty(ModelManager.GetModelNotice("css10"));
+    }
+
+    // ================================================================
     // ListModels
     // ================================================================
     [Fact]

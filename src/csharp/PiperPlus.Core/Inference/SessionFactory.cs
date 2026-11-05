@@ -503,16 +503,7 @@ public static class SessionFactory
     /// <c>PIPER_PLUS_DISABLE_WARMUP</c> / <c>PIPER_PLUS_DISABLE_CACHE</c>.
     /// </summary>
     private static bool IsTruthyEnv(string name)
-    {
-        var value = Environment.GetEnvironmentVariable(name);
-        if (string.IsNullOrEmpty(value))
-        {
-            return false;
-        }
-
-        var normalized = value.Trim().ToLowerInvariant();
-        return normalized is "1" or "true" or "yes";
-    }
+        => EnvFlags.IsTruthyEnv(name);
 
     /// <summary>
     /// Resolves the intra-op thread count. When <c>PIPER_PLUS_INTRA_THREADS</c> is set

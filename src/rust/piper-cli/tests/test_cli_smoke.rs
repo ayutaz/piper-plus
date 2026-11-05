@@ -283,3 +283,86 @@ fn rejects_speaker_id_with_speaker_embedding() {
                 .and(predicate::str::contains("mutually exclusive")),
         );
 }
+
+// ---------------------------------------------------------------------------
+// 利用案内 (model notice、docs/reference/model-resolution.md §9)
+// ---------------------------------------------------------------------------
+
+const NOTICE_HEAD: &str =
+    "[piper-plus] つくよみちゃんモデルの利用条件 / Terms for the Tsukuyomi-chan model";
+const NOTICE_FOOTER: &str = "(この表示は PIPER_PLUS_DISABLE_MODEL_NOTICE=1 で消せます / Set PIPER_PLUS_DISABLE_MODEL_NOTICE=1 to hide this notice.)";
+
+/// 偽のモデルファイルを置き、 config が無いため解決後に失敗する呼び出しを作る
+/// (ネットワークも実モデルも使わずに案内の表示箇所まで到達させる)。
+fn notice_cmd(model_file_name: &str, tmp: &tempfile::TempDir) -> Command {
+    let model = tmp.path().join(model_file_name);
+    std::fs::write(&model, b"not a real onnx model").unwrap();
+    let mut cmd = cli();
+    cmd.env_remove("PIPER_PLUS_DISABLE_MODEL_NOTICE")
+        .env_remove("PIPER_PLUS_DEFAULT_CONFIG")
+        .env_remove("PIPER_PLUS_MODEL_DIR")
+        .args(["--text", "test", "--model", model.to_str().unwrap()]);
+    cmd
+}
+
+#[test]
+fn tsukuyomi_model_prints_notice_to_stderr_once() {
+    let tmp = tempfile::tempdir().unwrap();
+    let output = notice_cmd("tsukuyomi.onnx", &tmp)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(NOTICE_HEAD))
+        .stderr(predicate::str::contains(
+            "Credit 'Piper Plus:つくよみちゃん' is required when you use the generated audio.",
+        ))
+        .stderr(predicate::str::contains(NOTICE_FOOTER))
+        .stdout(predicate::str::contains("つくよみ").not())
+        .get_output()
+        .clone();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(stderr.matches(NOTICE_HEAD).count(), 1, "stderr: {stderr}");
+    assert_eq!(stderr.matches(NOTICE_FOOTER).count(), 1, "stderr: {stderr}");
+}
+
+#[test]
+fn tsukuyomi_notice_is_not_hidden_by_quiet() {
+    let tmp = tempfile::tempdir().unwrap();
+    notice_cmd("tsukuyomi-chan-6lang-fp16.onnx", &tmp)
+        .arg("--quiet")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(NOTICE_HEAD));
+}
+
+#[test]
+fn tsukuyomi_notice_hidden_by_env() {
+    for value in ["1", " TRUE ", "yes"] {
+        let tmp = tempfile::tempdir().unwrap();
+        notice_cmd("tsukuyomi.onnx", &tmp)
+            .env("PIPER_PLUS_DISABLE_MODEL_NOTICE", value)
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains(NOTICE_HEAD).not())
+            .stderr(predicate::str::contains(NOTICE_FOOTER).not());
+    }
+}
+
+#[test]
+fn tsukuyomi_notice_not_hidden_by_env_zero() {
+    let tmp = tempfile::tempdir().unwrap();
+    notice_cmd("tsukuyomi.onnx", &tmp)
+        .env("PIPER_PLUS_DISABLE_MODEL_NOTICE", "0")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(NOTICE_HEAD));
+}
+
+#[test]
+fn other_model_prints_no_notice() {
+    let tmp = tempfile::tempdir().unwrap();
+    notice_cmd("css10-ja-6lang-fp16.onnx", &tmp)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(NOTICE_HEAD).not())
+        .stderr(predicate::str::contains(NOTICE_FOOTER).not());
+}

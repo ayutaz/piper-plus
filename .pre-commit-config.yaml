@@ -887,12 +887,12 @@ repos:
 
       # Mirror of .github/workflows/parity-hub.yml (voice-catalog matrix
       # entry). canonical model_resolution_vectors.json vs 5 runtime
-      # mirror catalogs.
+      # mirror catalogs, plus the usage-notice mirrors (WASM, piper_train).
       - id: voice-catalog-parity
-        name: voice catalog parity (canonical vs 5 runtime mirrors)
+        name: voice catalog parity (canonical vs 5 runtime mirrors + notice mirrors)
         entry: uv run --no-sync python scripts/check_voice_catalog_parity.py
         language: system
-        files: ^(test/model_resolution_vectors\.json|src/python_run/piper_plus/download\.py|src/cpp/(piper_plus_voices\.json|model_manager\.cpp)|src/rust/piper-core/src/model_download\.rs|src/csharp/PiperPlus\.Core/Config/VoiceCatalog\.cs|src/go/piperplus/voice_catalog\.go|scripts/check_voice_catalog_parity\.py|src/python_run/piper_plus/voices\.json)$
+        files: ^(test/model_resolution_vectors\.json|src/python_run/piper_plus/download\.py|src/cpp/(piper_plus_voices\.json|model_manager\.cpp)|src/rust/piper-core/src/model_download\.rs|src/csharp/PiperPlus\.Core/Config/VoiceCatalog\.cs|src/go/piperplus/voice_catalog\.go|src/wasm/openjtalk-web/src/model-manager\.js|src/python/piper_train/model_manager\.py|docs/reference/model-resolution\.md|scripts/check_voice_catalog_parity\.py|tests/scripts/test_check_voice_catalog_parity\.py|src/python_run/piper_plus/voices\.json)$
         pass_filenames: false
 
       # Mirror of the action-pin-gate steps of .github/workflows/lint-gates.yml. Codespell-baseline

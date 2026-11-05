@@ -47,6 +47,12 @@ internal sealed class VoiceJsonEntry
 
     [JsonPropertyName("speaker_id_map")]
     public Dictionary<string, int>? SpeakerIdMap { get; set; }
+
+    [JsonPropertyName("notice")]
+    public List<string>? Notice { get; set; }
+
+    [JsonPropertyName("notice_files")]
+    public List<string>? NoticeFiles { get; set; }
 }
 
 /// <summary>
@@ -127,6 +133,8 @@ internal static class VoiceJsonConverter
             Description: entry.Description)
         {
             Revision = entry.Revision,
+            Notice = entry.Notice ?? [],
+            NoticeFiles = entry.NoticeFiles ?? [],
         };
     }
 }

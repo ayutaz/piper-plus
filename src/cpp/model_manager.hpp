@@ -28,7 +28,21 @@ struct VoiceInfo {
     std::vector<VoiceFileInfo> files;
     std::vector<std::string> aliases;
     std::string revision = "main"; // Optional pinned HuggingFace revision
+    // Usage notice shown by executables when this model is used
+    // (docs/reference/model-resolution.md §9). Empty for most models.
+    std::vector<std::string> notice;
+    // File names (last path component) that identify this model for the notice.
+    std::vector<std::string> noticeFiles;
 };
+
+// Line printed after a model notice, identical across runtimes.
+inline constexpr const char* kModelNoticeFooter =
+    "(この表示は PIPER_PLUS_DISABLE_MODEL_NOTICE=1 で消せます / "
+    "Set PIPER_PLUS_DISABLE_MODEL_NOTICE=1 to hide this notice.)";
+
+// Environment variable that turns the model notice off.
+inline constexpr const char* kModelNoticeDisableEnv =
+    "PIPER_PLUS_DISABLE_MODEL_NOTICE";
 
 // Get the default model directory (platform-specific)
 // Windows: %APPDATA%\piper-plus\models
@@ -58,6 +72,24 @@ std::optional<VoiceInfo> findVoice(const std::string& nameOrAlias);
 std::optional<std::filesystem::path> resolveModelPath(
     const std::string& nameOrAlias,
     const std::filesystem::path& modelDir);
+
+// Return the usage notice for a model name, alias, repo ID, URL or path
+// (docs/reference/model-resolution.md §9), checked against the embedded
+// piper-plus catalog. The input matches an entry with a notice when it equals
+// the entry's key, an alias or its repo ID; when it is a URL ("://")
+// containing "/<repo_id>/"; or when its file name (last component, '/' or
+// '\\' separated) is one of the entry's notice files. Leading/trailing
+// whitespace is ignored. Returns an empty vector when nothing matches.
+// This never prints; the CLI prints the notice to stderr.
+std::vector<std::string> getModelNotice(const std::string& nameOrPath);
+
+// Pure parser for PIPER_PLUS_DISABLE_MODEL_NOTICE: true when the value is
+// "1", "true" or "yes" (case-insensitive, surrounding whitespace ignored).
+// A null value (unset) returns false.
+bool parseModelNoticeDisabled(const char* value);
+
+// Whether PIPER_PLUS_DISABLE_MODEL_NOTICE turns the notice off.
+bool modelNoticeDisabled();
 
 } // namespace piper
 

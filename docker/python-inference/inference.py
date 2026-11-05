@@ -42,6 +42,7 @@ import soundfile as sf
 
 from piper_plus_g2p.encode.pua import FIXED_PUA_MAPPING
 from piper_plus_g2p.registry import get_phonemizer
+from piper_train.model_manager import print_model_notice
 from piper_train.ort_utils import create_session_with_cache, warmup_onnx_session
 
 
@@ -575,6 +576,9 @@ def main():
             config_path = str(candidate)
         else:
             config_path = str(Path(args.model).parent / "config.json")
+
+    # Usage notice for models with terms (docs/reference/model-resolution.md §9)
+    print_model_notice(args.model)
 
     engine = PiperInferenceEngine(
         args.model, config_path, sample_rate=args.sample_rate, device=args.device

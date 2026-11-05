@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 import re
 import shutil
 import sys
@@ -76,6 +77,17 @@ PIPER_PLUS_VOICES: dict[str, Any] = {
         },
         "aliases": ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"],
         "description": "Tsukuyomi-chan 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT)",
+        # Usage notice shown by the CLI and servers (docs/reference/model-resolution.md §9).
+        # Canonical copy: test/model_resolution_vectors.json.
+        "notice": [
+            "[piper-plus] つくよみちゃんモデルの利用条件 / Terms for the Tsukuyomi-chan model",
+            "生成した音声を使うときは「Piper Plus:つくよみちゃん」のクレジット表記が必須です。",
+            "Credit 'Piper Plus:つくよみちゃん' is required when you use the generated audio.",
+            "非公式の作品です。夢前黎様は開発・サポートに携わっていません。お問い合わせは開発者へ。",
+            "Unofficial work. Rei Yumesaki is not involved in development or support; contact the developer.",
+            "禁止事項と規約 / Terms and prohibited uses: https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan",
+        ],
+        "notice_files": ["tsukuyomi-chan-6lang-fp16.onnx", "tsukuyomi.onnx"],
     },
     "ja_JP-css10-6lang-medium": {
         "key": "ja_JP-css10-6lang-medium",
@@ -261,6 +273,85 @@ def resolve_piper_plus_voice(name: str) -> dict[str, Any] | None:
         if name in voice_info.get("aliases", []):
             return voice_info
     return None
+
+
+MODEL_NOTICE_FOOTER = (
+    "(この表示は PIPER_PLUS_DISABLE_MODEL_NOTICE=1 で消せます / "
+    "Set PIPER_PLUS_DISABLE_MODEL_NOTICE=1 to hide this notice.)"
+)
+MODEL_NOTICE_ENV = "PIPER_PLUS_DISABLE_MODEL_NOTICE"
+
+_shown_model_notices: set[str] = set()
+
+
+def _file_name(value: str) -> str:
+    return re.split(r"[\\/]", value.rstrip("\\/"))[-1]
+
+
+def get_model_notice(*candidates: str | Path | None) -> list[str] | None:
+    """Return the usage notice for the first candidate that names a model with one.
+
+    A candidate matches a catalog entry that has a ``notice`` when it is the
+    entry's key, one of its aliases or its repo ID, a URL containing
+    ``/<repo>/``, or a path whose file name is in ``notice_files``
+    (docs/reference/model-resolution.md §9). Returns ``None`` when nothing
+    matches. This never prints; executables use :func:`print_model_notice`.
+    """
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        value = str(candidate).strip()
+        if not value:
+            continue
+        file_name = _file_name(value)
+        for voice_info in PIPER_PLUS_VOICES.values():
+            notice = voice_info.get("notice")
+            if not notice:
+                continue
+            repo = voice_info.get("repo", "")
+            if (
+                value == voice_info.get("key")
+                or value in voice_info.get("aliases", [])
+                or (repo and value == repo)
+                or (repo and "://" in value and f"/{repo}/" in value)
+                or file_name in voice_info.get("notice_files", [])
+            ):
+                return list(notice)
+    return None
+
+
+def is_model_notice_disabled(value: str | None = None) -> bool:
+    """Whether ``PIPER_PLUS_DISABLE_MODEL_NOTICE`` (or ``value``) turns the notice off."""
+    if value is None:
+        value = os.environ.get(MODEL_NOTICE_ENV, "")
+    return value.strip().lower() in ("1", "true", "yes")
+
+
+def print_model_notice(*candidates: str | Path | None, stream: Any = None) -> bool:
+    """Print the usage notice for the model to stderr, once per process.
+
+    Returns ``True`` when the notice was printed.
+    """
+    return show_model_notice(get_model_notice(*candidates), stream=stream)
+
+
+def show_model_notice(notice: list[str] | None, stream: Any = None) -> bool:
+    """Print ``notice`` (from :func:`get_model_notice`) to stderr, once per process.
+
+    Does nothing when ``notice`` is empty or ``PIPER_PLUS_DISABLE_MODEL_NOTICE``
+    is set. Returns ``True`` when the notice was printed.
+    """
+    if not notice or is_model_notice_disabled():
+        return False
+    identity = "\n".join(notice)
+    if identity in _shown_model_notices:
+        return False
+    _shown_model_notices.add(identity)
+    out = sys.stderr if stream is None else stream
+    for line in notice:
+        print(line, file=out)
+    print(MODEL_NOTICE_FOOTER, file=out)
+    return True
 
 
 def find_voice(name: str, data_dirs: Iterable[str | Path]) -> tuple[Path, Path]:

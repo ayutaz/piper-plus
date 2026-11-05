@@ -1,6 +1,14 @@
 #nullable enable
 PiperPlus.Core.Config.VoiceInfo.Revision.get -> string!
 PiperPlus.Core.Config.VoiceInfo.Revision.init -> void
+PiperPlus.Core.Config.VoiceInfo.Notice.get -> System.Collections.Generic.IReadOnlyList<string!>!
+PiperPlus.Core.Config.VoiceInfo.Notice.init -> void
+PiperPlus.Core.Config.VoiceInfo.NoticeFiles.get -> System.Collections.Generic.IReadOnlyList<string!>!
+PiperPlus.Core.Config.VoiceInfo.NoticeFiles.init -> void
+const PiperPlus.Core.Config.ModelManager.DisableModelNoticeEnvVar = "PIPER_PLUS_DISABLE_MODEL_NOTICE" -> string!
+const PiperPlus.Core.Config.ModelManager.ModelNoticeFooter = "(この表示は PIPER_PLUS_DISABLE_MODEL_NOTICE=1 で消せます / Set PIPER_PLUS_DISABLE_MODEL_NOTICE=1 to hide this notice.)" -> string!
+static PiperPlus.Core.Config.ModelManager.GetModelNotice(string! nameOrPath) -> System.Collections.Generic.IReadOnlyList<string!>!
+static PiperPlus.Core.Config.ModelManager.IsModelNoticeDisabled() -> bool
 PiperPlus.Core.Phonemize.EnglishG2PEngine
 PiperPlus.Core.Phonemize.EnglishG2PEngine.ConvertToArpabet(string! text) -> System.Collections.Generic.List<System.Collections.Generic.List<string!>!>!
 PiperPlus.Core.Phonemize.EnglishG2PEngine.EnglishG2PEngine(System.Collections.Generic.IReadOnlyDictionary<string!, string!>! dictionary) -> void

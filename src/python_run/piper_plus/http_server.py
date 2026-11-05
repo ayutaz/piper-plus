@@ -33,7 +33,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 
 from . import PiperVoice
-from .download import ensure_voice_exists, find_voice, get_voices
+from .download import ensure_voice_exists, find_voice, get_voices, print_model_notice
 from .timing import timing_to_json, timing_to_tsv
 
 
@@ -501,6 +501,7 @@ def main() -> None:
     if not args.download_dir:
         args.download_dir = args.data_dir[0]
 
+    model_arg = args.model
     model_path = Path(args.model)
     if not model_path.exists():
         voices_info = get_voices(args.download_dir, update_voices=args.update_voices)
@@ -511,6 +512,9 @@ def main() -> None:
         voices_info.update(aliases_info)
         ensure_voice_exists(args.model, args.data_dir, args.download_dir, voices_info)
         args.model, args.config = find_voice(args.model, args.data_dir)
+
+    # Usage notice for models with terms (docs/reference/model-resolution.md §9)
+    print_model_notice(model_arg, args.model)
 
     voice = PiperVoice.load(args.model, config_path=args.config, use_cuda=args.cuda)
     synthesize_args: dict[str, Any] = {

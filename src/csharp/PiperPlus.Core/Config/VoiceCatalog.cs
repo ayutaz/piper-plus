@@ -47,7 +47,21 @@ public static class VoiceCatalog
                 new VoiceFileInfo("config.json", 6279, string.Empty),
             ],
             Aliases: ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"],
-            Description: "Tsukuyomi-chan 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT)"),
+            Description: "Tsukuyomi-chan 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT)")
+        {
+            // Canonical source: test/model_resolution_vectors.json (voice_catalog
+            // notice / notice_files), checked by scripts/check_voice_catalog_parity.py.
+            Notice =
+            [
+                "[piper-plus] つくよみちゃんモデルの利用条件 / Terms for the Tsukuyomi-chan model",
+                "生成した音声を使うときは「Piper Plus:つくよみちゃん」のクレジット表記が必須です。",
+                "Credit 'Piper Plus:つくよみちゃん' is required when you use the generated audio.",
+                "非公式の作品です。夢前黎様は開発・サポートに携わっていません。お問い合わせは開発者へ。",
+                "Unofficial work. Rei Yumesaki is not involved in development or support; contact the developer.",
+                "禁止事項と規約 / Terms and prohibited uses: https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan",
+            ],
+            NoticeFiles = ["tsukuyomi-chan-6lang-fp16.onnx", "tsukuyomi.onnx"],
+        },
 
         new VoiceInfo(
             Key: "ja_JP-css10-6lang-medium",

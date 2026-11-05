@@ -125,6 +125,70 @@ public sealed class VoiceCatalogTests : IDisposable
         Assert.Contains("ja-css10", css10.Aliases);
     }
 
+    [Fact]
+    public void Tsukuyomi_HasUsageNotice()
+    {
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadBuiltInCatalog();
+        VoiceInfo tsukuyomi = catalog.Single(v => v.Key == "ja_JP-tsukuyomi-chan-medium");
+
+        Assert.Equal(6, tsukuyomi.Notice.Count);
+        Assert.Equal(
+            "[piper-plus] つくよみちゃんモデルの利用条件 / Terms for the Tsukuyomi-chan model",
+            tsukuyomi.Notice[0]);
+        Assert.Equal(
+            "禁止事項と規約 / Terms and prohibited uses: https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan",
+            tsukuyomi.Notice[5]);
+        Assert.Equal(
+            new[] { "tsukuyomi-chan-6lang-fp16.onnx", "tsukuyomi.onnx" },
+            tsukuyomi.NoticeFiles);
+    }
+
+    [Fact]
+    public void Css10_HasNoUsageNotice()
+    {
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadBuiltInCatalog();
+        VoiceInfo css10 = catalog.Single(v => v.Key == "ja_JP-css10-6lang-medium");
+
+        Assert.Empty(css10.Notice);
+        Assert.Empty(css10.NoticeFiles);
+    }
+
+    [Fact]
+    public void LoadFromFile_ReadsNoticeFields()
+    {
+        const string externalJson = """
+        {
+            "xx_XX-noticed-medium": {
+                "name": "noticed",
+                "language": { "code": "xx_XX", "family": "xx" },
+                "quality": "medium",
+                "repo": "someone/noticed",
+                "files": {},
+                "notice": ["first line", "second line"],
+                "notice_files": ["noticed.onnx"]
+            },
+            "xx_XX-plain-medium": {
+                "name": "plain",
+                "language": { "code": "xx_XX", "family": "xx" },
+                "quality": "medium",
+                "repo": "someone/plain",
+                "files": {}
+            }
+        }
+        """;
+
+        var path = WriteTempJson(externalJson);
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadFromFile(path);
+
+        VoiceInfo noticed = catalog.Single(v => v.Key == "xx_XX-noticed-medium");
+        Assert.Equal(new[] { "first line", "second line" }, noticed.Notice);
+        Assert.Equal(new[] { "noticed.onnx" }, noticed.NoticeFiles);
+
+        VoiceInfo plain = catalog.Single(v => v.Key == "xx_XX-plain-medium");
+        Assert.Empty(plain.Notice);
+        Assert.Empty(plain.NoticeFiles);
+    }
+
     // ================================================================
     // External catalog merge tests
     // ================================================================

@@ -32,6 +32,128 @@ const PUBLIC_BASE_ALIASES = new Set(["base", "zero-shot-base-zs-v1", "ayousanz/p
 // scripts/public_base_runtime.py (FILES["base.onnx"]).
 const PUBLIC_BASE_SHA256 = "e9860701a941db02149c7cfbe19cfb578c235c5e25020f1f592131d9b3b30f84";
 
+// ---------------------------------------------------------------------------
+// Model usage notice (docs/reference/model-resolution.md §9)
+// ---------------------------------------------------------------------------
+
+/**
+ * Models whose use carries terms the user must see. Mirrors
+ * `voice_catalog.<key>.notice` / `notice_files` in
+ * test/model_resolution_vectors.json; scripts/check_voice_catalog_parity.py
+ * checks that every line below matches the canonical text.
+ */
+const MODEL_NOTICES = [
+  {
+    // voice_catalog["ja_JP-tsukuyomi-chan-medium"]
+    repoId: "ayousanz/piper-plus-tsukuyomi-chan",
+    // Catalog key and aliases (also matched when MODEL_REGISTRY lacks them).
+    names: ["ja_JP-tsukuyomi-chan-medium", "tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"],
+    lines: Object.freeze([
+      "[piper-plus] つくよみちゃんモデルの利用条件 / Terms for the Tsukuyomi-chan model",
+      "生成した音声を使うときは「Piper Plus:つくよみちゃん」のクレジット表記が必須です。",
+      "Credit 'Piper Plus:つくよみちゃん' is required when you use the generated audio.",
+      "非公式の作品です。夢前黎様は開発・サポートに携わっていません。お問い合わせは開発者へ。",
+      "Unofficial work. Rei Yumesaki is not involved in development or support; contact the developer.",
+      "禁止事項と規約 / Terms and prohibited uses: https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan",
+    ]),
+    files: ["tsukuyomi-chan-6lang-fp16.onnx", "tsukuyomi.onnx"],
+  },
+];
+
+/** Line printed after every notice; identical across runtimes. */
+export const MODEL_NOTICE_FOOTER =
+  "(この表示は PIPER_PLUS_DISABLE_MODEL_NOTICE=1 で消せます / Set PIPER_PLUS_DISABLE_MODEL_NOTICE=1 to hide this notice.)";
+
+const MODEL_NOTICE_ENV = "PIPER_PLUS_DISABLE_MODEL_NOTICE";
+const URL_SCHEME_RE = /^[a-z][a-z0-9+.-]*:\/\//i;
+
+let modelNoticeShown = false;
+
+/**
+ * Return the usage notice lines for a model name, HuggingFace repo id, URL or
+ * file path, or null when the model has no notice.
+ *
+ * Matches when the input equals a registry alias for the repo or the repo id,
+ * when a URL contains `/<repo_id>/`, or when the last path component equals
+ * one of the notice file names.
+ *
+ * @param {string} modelNameOrUrl
+ * @returns {readonly string[]|null}
+ */
+export function getModelNotice(modelNameOrUrl) {
+  if (typeof modelNameOrUrl !== "string" || modelNameOrUrl === "") {
+    return null;
+  }
+  const isUrl = URL_SCHEME_RE.test(modelNameOrUrl);
+  let path = modelNameOrUrl;
+  if (isUrl) {
+    path = path.split(/[?#]/, 1)[0];
+  }
+  const segments = path.split(/[/\\]/);
+  const fileName = segments[segments.length - 1];
+
+  for (const entry of MODEL_NOTICES) {
+    if (
+      modelNameOrUrl === entry.repoId ||
+      entry.names.includes(modelNameOrUrl) ||
+      MODEL_REGISTRY[modelNameOrUrl] === entry.repoId
+    ) {
+      return entry.lines;
+    }
+    if (isUrl && modelNameOrUrl.includes(`/${entry.repoId}/`)) {
+      return entry.lines;
+    }
+    if (entry.files.includes(fileName)) {
+      return entry.lines;
+    }
+  }
+  return null;
+}
+
+/**
+ * True when the `PIPER_PLUS_DISABLE_MODEL_NOTICE` environment variable is
+ * `1`, `true` or `yes` (case-insensitive, surrounding whitespace ignored).
+ * Always false where there is no `process.env` (browsers).
+ *
+ * @param {Object<string, string|undefined>} [env]
+ * @returns {boolean}
+ */
+export function isModelNoticeDisabled(env = globalThis.process?.env) {
+  const value = env?.[MODEL_NOTICE_ENV];
+  if (typeof value !== "string") {
+    return false;
+  }
+  return ["1", "true", "yes"].includes(value.trim().toLowerCase());
+}
+
+/**
+ * Print a notice (its lines, then {@link MODEL_NOTICE_FOOTER}) at most once
+ * per page / process.
+ *
+ * @param {readonly string[]|null|undefined} notice
+ * @param {Object} [options]
+ * @param {boolean} [options.showModelNotice=true] - false suppresses the notice
+ * @param {(message: string) => void} [options.logger] - defaults to console.warn
+ * @returns {boolean} true when the notice was printed by this call
+ */
+export function emitModelNotice(notice, options = {}) {
+  if (!notice || notice.length === 0 || modelNoticeShown) {
+    return false;
+  }
+  if (options.showModelNotice === false || isModelNoticeDisabled()) {
+    return false;
+  }
+  modelNoticeShown = true;
+  const logger = options.logger ?? ((message) => console.warn(message));
+  logger([...notice, MODEL_NOTICE_FOOTER].join("\n"));
+  return true;
+}
+
+/** Test hook: allow the notice to be printed again. @private */
+export function _resetModelNoticeState() {
+  modelNoticeShown = false;
+}
+
 /**
  * Open (or create) the IndexedDB database used for model caching.
  *
@@ -171,11 +293,14 @@ export class ModelManager {
    * @param {Object} [options]
    * @param {string} [options.cachePrefix='piper-plus-models'] - IndexedDB database name
    * @param {boolean} [options.verifyOnCacheHit=false] - Re-verify SHA-256 on cache retrieval
+   * @param {boolean} [options.showModelNotice=true] - Let loadModel() print a model's
+   *   usage notice with console.warn (once per page / process)
    */
   constructor(options = {}) {
     this._dbName = options.cachePrefix || DB_NAME;
     this._db = null;
     this._verifyOnCacheHit = options.verifyOnCacheHit || false;
+    this._showModelNotice = options.showModelNotice !== false;
   }
 
   /**
@@ -232,10 +357,21 @@ export class ModelManager {
    *   - Direct URL:        "https://example.com/model.onnx"
    *
    * @param {string} modelNameOrUrl
-   * @returns {Promise<{modelUrl: string, configUrl: string, configFallbackUrl: string|null, cacheKey: string, sha256?: string}>}
+   * @returns {Promise<{modelUrl: string, configUrl: string, configFallbackUrl: string|null, cacheKey: string, notice: readonly string[]|null, sha256?: string}>}
    *   `sha256` is the pinned model digest, set only for the public base.
+   *   `notice` is the model's usage notice (see {@link getModelNotice}), or null.
    */
   async _resolveUrls(modelNameOrUrl) {
+    const resolved = await this._resolveLocations(modelNameOrUrl);
+    resolved.notice = getModelNotice(modelNameOrUrl) ?? getModelNotice(resolved.modelUrl);
+    return resolved;
+  }
+
+  /**
+   * URL resolution behind {@link _resolveUrls}, without the notice lookup.
+   * @private
+   */
+  async _resolveLocations(modelNameOrUrl) {
     if (PUBLIC_BASE_ALIASES.has(modelNameOrUrl)) {
       const modelUrl = PUBLIC_BASE_PREFIX + "base.onnx";
       return {
@@ -274,8 +410,11 @@ export class ModelManager {
    *
    * This is the public entry point that delegates to {@link _resolveUrls}.
    *
+   * The result's `notice` holds the model's usage notice lines, or null. This
+   * method only reports it; it does not print anything.
+   *
    * @param {string} modelNameOrUrl - Registry shortcut, HuggingFace repo, or direct URL
-   * @returns {Promise<{modelUrl: string, configUrl: string, configFallbackUrl: string|null, cacheKey: string}>}
+   * @returns {Promise<{modelUrl: string, configUrl: string, configFallbackUrl: string|null, cacheKey: string, notice: readonly string[]|null}>}
    */
   async resolveUrls(modelNameOrUrl) {
     return this._resolveUrls(modelNameOrUrl);
@@ -284,20 +423,32 @@ export class ModelManager {
   /**
    * Load a model and its config, using the IndexedDB cache when available.
    *
+   * When the model has a usage notice, it is printed with console.warn once
+   * per page / process unless `showModelNotice: false` was passed to the
+   * constructor or `PIPER_PLUS_DISABLE_MODEL_NOTICE` is set (Node).
+   *
    * @param {string} modelNameOrUrl - Registry shortcut, HuggingFace repo name, or direct URL
    * @param {Object} [options]
    * @param {Function} [options.onProgress] - ({loaded, total, percentage}) => void
-   * @returns {Promise<{modelData: ArrayBuffer, config: Object}>}
+   * @returns {Promise<{modelData: ArrayBuffer, config: Object, notice: readonly string[]|null}>}
    */
   async loadModel(modelNameOrUrl, options = {}) {
     const { onProgress } = options;
-    const { modelUrl, configUrl, configFallbackUrl, cacheKey, sha256: pinnedSha256 } =
-      await this._resolveUrls(modelNameOrUrl);
+    const {
+      modelUrl,
+      configUrl,
+      configFallbackUrl,
+      cacheKey,
+      notice,
+      sha256: pinnedSha256,
+    } = await this._resolveUrls(modelNameOrUrl);
+
+    emitModelNotice(notice, { showModelNotice: this._showModelNotice });
 
     // Try the cache first.
     const cached = await this.getFromCache(cacheKey);
     if (cached) {
-      return cached;
+      return { ...cached, notice };
     }
 
     // Download config with fallback (small, no progress tracking needed).
@@ -337,7 +488,7 @@ export class ModelManager {
     const store = tx.objectStore(STORE_NAME);
     await wrapRequest(store.put({ modelData, config, timestamp: Date.now(), sha256 }, cacheKey));
 
-    return { modelData, config };
+    return { modelData, config, notice };
   }
 
   /**
