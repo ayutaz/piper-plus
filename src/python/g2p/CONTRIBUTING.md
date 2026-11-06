@@ -10,6 +10,14 @@ uv run ruff check piper_plus_g2p/    # lint
 uv run mypy piper_plus_g2p/          # type-check
 ```
 
+## Phonemizer Data Flow
+
+Language phonemizers turn text into IPA token strings and aligned optional
+prosody data. The shared `PiperEncoder` later maps those tokens to model IDs;
+language modules should not add BOS/EOS, padding, or PUA encoding themselves.
+If a change affects pronunciation in other runtimes, update their matching
+implementation and shared golden tests as well.
+
 ## How to Add a New Language
 
 1. **Create `piper_plus_g2p/<lang>.py`** -- subclass `Phonemizer` (from `piper_plus_g2p.base`).
