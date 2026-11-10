@@ -4,7 +4,8 @@
 A fork PR runs with a read-only GITHUB_TOKEN, so a step that writes a PR
 comment fails with "Resource not accessible by integration" and takes the
 job, and required-gate/all-workflows, down with it (PR #934). The gate
-fails when, in a workflow triggered by ``pull_request``:
+fails when, in a workflow triggered by ``pull_request`` or ``workflow_call``
+(a callee runs with its caller's token):
 
 * a step that posts to the PR (sticky-pull-request-comment, github-script
   calling createComment / updateComment / createReview, ``gh pr comment`` /
@@ -74,7 +75,9 @@ def check(root: Path) -> list[str]:
     workflows = sorted((root / ".github" / "workflows").glob("*.y*ml"))
     for wf in workflows:
         doc = yaml.safe_load(wf.read_text(encoding="utf-8")) or {}
-        if "pull_request" not in _events(doc):
+        # A workflow_call callee runs with its caller's token, which is the
+        # read-only one when the caller is a fork PR.
+        if not _events(doc) & {"pull_request", "workflow_call"}:
             continue
         for job_id, job in (doc.get("jobs") or {}).items():
             steps = job.get("steps") or []

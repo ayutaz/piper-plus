@@ -195,3 +195,10 @@ def test_main_returns_1_and_prints_error(gate, tmp_path, capsys):
 
 def test_real_repository_has_no_violations(gate):
     assert gate.check(REPO_ROOT) == []
+
+
+def test_reusable_workflow_is_checked(gate, tmp_path):
+    # A workflow_call callee runs with its pull_request caller's read-only
+    # token, so an unguarded comment there fails a fork PR the same way.
+    _write(tmp_path, _sticky_workflow(on="on: workflow_call"))
+    assert gate.check(tmp_path) == [NO_GUARD]
