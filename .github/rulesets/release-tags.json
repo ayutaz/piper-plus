@@ -4,7 +4,7 @@
   "enforcement": "active",
   "conditions": {
     "ref_name": {
-      "include": ["refs/tags/v*", "refs/tags/*-v*", "refs/tags/src/go/**"],
+      "include": ["refs/tags/v*", "refs/tags/*-v*", "refs/tags/src/go/**", "refs/tags/archive/**"],
       "exclude": []
     }
   },

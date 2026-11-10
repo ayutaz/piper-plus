@@ -391,6 +391,6 @@ Python runtimeのPyPI公開は、準備済みタグを選択した `dev-create-r
 dev へのマージ条件とタグの保護は、 リポジトリ設定の ruleset で決まります。 その正本は `.github/rulesets/*.json` です (1 ファイル = 1 ruleset、 `name` で照合)。
 
 - `piper-dev` (`refs/heads/dev*`): squash のみ、 削除と force push を禁止、 必須チェックは `ci-required` と `required-gate/all-workflows`、 未解決のレビュースレッドがあるとマージ不可、 strict (base の最新化を必須にする設定) は off、 例外の人は置かない。
-- `release-tags` (`refs/tags/v*`、 `refs/tags/*-v*`、 `refs/tags/src/go/**`): タグの削除と付け直し (移動) を禁止、 例外の人は置かない。 意図して動かす `openjtalk-binaries-latest` と `dev-20250610` はどの pattern にも当たらない。
+- `release-tags` (`refs/tags/v*`、 `refs/tags/*-v*`、 `refs/tags/src/go/**`、 `refs/tags/archive/**`): タグの削除と付け直し (移動) を禁止、 例外の人は置かない。 `archive/<branch>` は削除したブランチの先端を残すタグなので、 リリースのタグと同じく守る。 意図して動かす `openjtalk-binaries-latest` と `dev-20250610` はどの pattern にも当たらない。
 
 変更の手順: JSON を PR で変える → PR では `lint-gates.yml` の `rulesets:` step がファイルの条件 (`scripts/check_rulesets.py --validate`) を検査する → マージ後、 admin が `python scripts/check_rulesets.py --apply` で差分を表示して適用し、 読み戻して一致を確かめる。 dev への push・毎日の schedule では `--check` が live の設定とファイルを比べ、 設定画面で直接変えると赤になります。

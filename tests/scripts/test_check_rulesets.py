@@ -26,6 +26,14 @@ npm-v0.8.2 kotlin-g2p-v1.0.1 go-g2p-v0.3.0 docker-v2.0.2
 docker-signatures-v2.0.0 dev-20250610 csharp-v0.5.1
 """.split()
 
+# Tags that keep a deleted branch's tip (`archive/<branch>`). They are kept on
+# purpose, so they must be protected like the release tags.
+ARCHIVE_TAGS = """
+archive/v2 archive/test/790-g2p-zh-golden archive/release/docker-public-verification
+archive/feat/zero-shot-v8-dataset-scaling archive/feat/wavenext-decoder-ablation
+archive/feat/hardware-ep archive/docs/peav-style-conditioning-research
+""".split()
+
 
 @pytest.fixture
 def desired() -> dict[str, dict]:
@@ -44,6 +52,8 @@ def test_repository_files_are_valid(desired: dict[str, dict]) -> None:
         ("refs/tags/*-v*", "refs/tags/src/go/v0.2.0", False),  # `*` stops at `/`
         ("refs/tags/src/go/**", "refs/tags/src/go/phonemize/v0.3.0", True),
         ("refs/tags/*-v*", "refs/tags/openjtalk-binaries-latest", False),
+        ("refs/tags/archive/**", "refs/tags/archive/feat/hardware-ep", True),
+        ("refs/tags/archive/**", "refs/tags/archive/v2", True),
         ("refs/heads/dev*", "refs/heads/dev", True),
         ("refs/heads/dev*", "refs/heads/feature/dev", False),
     ],
@@ -102,6 +112,18 @@ def test_tag_bypass_is_rejected(desired: dict[str, dict]) -> None:
 def test_uncovered_tag_is_reported(desired: dict[str, dict]) -> None:
     errors = gate.validate(desired, [*EXISTING_TAGS, "release-2027"])
     assert errors == ["release-tags: tag release-2027 is not covered"]
+
+
+def test_archive_tags_are_covered(desired: dict[str, dict]) -> None:
+    assert gate.validate(desired, ARCHIVE_TAGS) == []
+
+
+def test_dropping_the_archive_pattern_is_reported(desired: dict[str, dict]) -> None:
+    def drop(d):
+        names = d["release-tags"]["conditions"]["ref_name"]
+        names["include"] = [p for p in names["include"] if not p.startswith("refs/tags/archive/")]
+
+    assert any("archive tag" in e for e in _errors_after(desired, drop))
 
 
 def test_moving_tag_covered_is_reported(desired: dict[str, dict]) -> None:
