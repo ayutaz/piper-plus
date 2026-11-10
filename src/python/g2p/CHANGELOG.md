@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeps them in the segment around them: a Chinese sentence keeps its
   `，` and `。`, and `你好，GPS` reads GPS in Mandarin (#823).
 
+### Fixed
+
+- `Phonemizer._sanitize_input` also strips DEL (U+007F) and the C1 control
+  characters (U+0080-009F), the same set the Rust `validate_input`
+  removes with `char::is_control()`. One of them inside a word used to
+  break the reading in ja / en / sv: an accent phrase split, a lost stress,
+  a word read as two (#934).
+
 ### Security
 
 - The `en` and `all` extras require `nltk>=3.10.4` instead of
