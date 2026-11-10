@@ -191,3 +191,7 @@ def test_main_returns_1_and_prints_error(gate, tmp_path, capsys):
     _write(tmp_path, _sticky_workflow())
     assert gate.main(["--root", str(tmp_path)]) == 1
     assert f"ERROR: {NO_GUARD}" in capsys.readouterr().err
+
+
+def test_real_repository_has_no_violations(gate):
+    assert gate.check(REPO_ROOT) == []

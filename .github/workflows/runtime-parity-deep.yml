@@ -339,8 +339,15 @@ jobs:
           cat /tmp/parity/parity-diff.md
           exit "${rc:-0}"
 
-      - name: Post sticky comment
+      # Fork PRs get a read-only GITHUB_TOKEN, so the comment would fail and
+      # take the job down. They read the report in the job summary instead
+      # (pre-commit hook fork-pr-comment-guard).
+      - name: Write report to job summary
         if: always() && github.event_name == 'pull_request'
+        run: cat /tmp/parity/parity-diff.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post sticky comment
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         uses: marocchino/sticky-pull-request-comment@v2.9.4
         with:
           header: runtime-parity-deep
