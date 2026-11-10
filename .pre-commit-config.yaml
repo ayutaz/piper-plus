@@ -537,6 +537,18 @@ repos:
         files: ^(docs/spec/continue-on-error-allowlist\.toml|\.github/workflows/.*\.ya?ml|scripts/check_continue_on_error\.py)$
         pass_filenames: false
 
+      # PR にコメントを書くステップは、 フォーク PR (読み取り専用の GITHUB_TOKEN)
+      # では飛ばし、 本文は job summary に書き出す。 PR #934 (2026-11) で検査は
+      # 全部通ったのにコメント投稿だけが失敗し、 必須ゲートが落ちたため。
+      # job ごと飛ばすと検査も消えるので、 飛ばすのはコメントのステップだけ。
+      # scripts-tests.yml でも全 PR で同じ検査が走る。
+      - id: fork-pr-comment-guard
+        name: PR へのコメント投稿はフォーク PR で飛ばし、 本文を job summary にも出すか
+        entry: uv run --no-sync python scripts/check_fork_pr_comment_guard.py
+        language: system
+        files: ^(\.github/workflows/.*\.ya?ml|scripts/check_fork_pr_comment_guard\.py)$
+        pass_filenames: false
+
       # M2 T-008: docs/spec/test-flake-retry-contract.toml gate。
       # phase-1/2 runtime の dependency/CI flag 同期 + retry-count-max-2 invariant。
       - id: test-flake-retry
