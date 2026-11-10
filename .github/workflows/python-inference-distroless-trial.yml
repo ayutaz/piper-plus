@@ -143,8 +143,15 @@ jobs:
           cat "$REPORT_PATH"
           echo "path=$REPORT_PATH" >> "$GITHUB_OUTPUT"
 
-      - name: Post sticky report comment (PR only)
+      # Fork PRs get a read-only GITHUB_TOKEN, so the comment would fail and
+      # take the job down. They read the report in the job summary instead
+      # (pre-commit hook fork-pr-comment-guard).
+      - name: Write report to job summary
         if: github.event_name == 'pull_request'
+        run: cat /tmp/distroless-report/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post sticky report comment (PR only)
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         uses: marocchino/sticky-pull-request-comment@v2.9.4
         with:
           header: python-inference-distroless-trial

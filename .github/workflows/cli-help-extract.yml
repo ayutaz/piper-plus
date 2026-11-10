@@ -313,8 +313,10 @@ jobs:
 
       - name: Post sticky comment (PR only)
         # Report file is now guaranteed to exist (see diff step), so this
-        # step is safe even when diff exited 2 / 1.
-        if: github.event_name == 'pull_request'
+        # step is safe even when diff exited 2 / 1. Fork PRs get a read-only
+        # GITHUB_TOKEN and read the report in the job summary instead
+        # (pre-commit hook fork-pr-comment-guard).
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         uses: marocchino/sticky-pull-request-comment@v2.9.4
         with:
           header: cli-help-extract

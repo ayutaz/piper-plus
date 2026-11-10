@@ -586,8 +586,15 @@ jobs:
             --current  tests/fixtures/public-abi/kotlin.json \
             --output /tmp/kotlin-abi-diff.md
 
-      - name: "public-abi-snapshot: post sticky comment"
+      # Fork PRs get a read-only GITHUB_TOKEN, so the comment would fail and
+      # take the job down. They read the report in the job summary instead
+      # (pre-commit hook fork-pr-comment-guard).
+      - name: "public-abi-snapshot: write report to job summary"
         if: ${{ !cancelled() && steps.abi-c.outcome == 'success' && github.event_name == 'pull_request' }}
+        run: cat /tmp/c-abi-diff.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "public-abi-snapshot: post sticky comment"
+        if: ${{ !cancelled() && steps.abi-c.outcome == 'success' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
         uses: marocchino/sticky-pull-request-comment@v2.9.4
         with:
           header: public-abi-snapshot
@@ -978,7 +985,7 @@ jobs:
           retention-days: 7
 
       - name: "cli-help-docs-sync: comment drift report on PR"
-        if: ${{ !cancelled() && steps.cli-help-drift.outcome == 'failure' && github.event_name == 'pull_request' }}
+        if: ${{ !cancelled() && steps.cli-help-drift.outcome == 'failure' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
         uses: actions/github-script@v7.1.0
         with:
           script: |
