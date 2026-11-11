@@ -157,4 +157,78 @@ public sealed class CliInputSanitizeTests
             await SynthesizedBytesAsync(null, Line(c.Clean)),
             await SynthesizedBytesAsync(null, Line(c.Dirty)));
     }
+
+    // A text of only control characters (the fixture's only_controls case,
+    // with DEL for its NUL) is an empty text. Before, it was read as BOS/EOS
+    // and synthesized.
+    private const string OnlyControls = "\u007f\u0001\u007f\u009f";
+
+    private static async Task<(int ExitCode, string Stderr, bool Wrote)> RunWithTextAsync(string text, params string[] extra)
+    {
+        string output = Path.Join(Path.GetTempPath(), $"sanitize-{Guid.NewGuid():N}.wav");
+        try
+        {
+            (int exitCode, string _, string stderr) = await CliIntegrationTests.RunCliAsync(
+                ["--model", ModelPath, "--language", "es", "--no-warmup", "--output_file", output, .. extra, "--text", text]);
+            return (exitCode, stderr, File.Exists(output));
+        }
+        finally
+        {
+            File.Delete(output);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task TextOnlyControls_IsAnEmptyTextError()
+    {
+        (int exitCode, string stderr, bool wrote) = await RunWithTextAsync(OnlyControls);
+        Assert.NotEqual(0, exitCode);
+        Assert.False(wrote, "a WAV was written for a text of only control characters");
+        Assert.Contains("empty", stderr, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task TestModeOnlyControls_IsAnEmptyTextError()
+    {
+        (int exitCode, string _, string stderr) = await CliIntegrationTests.RunCliAsync(
+            "--test-mode", "--config", ModelPath + ".json", "--language", "es", "--text", OnlyControls);
+        Assert.NotEqual(0, exitCode);
+        Assert.DoesNotContain("[test-mode] phoneme_ids", stderr, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task JsonlOnlyControls_ReadsLikeAnEmptyText()
+    {
+        string output = Path.Join(Path.GetTempPath(), $"sanitize-{Guid.NewGuid():N}.wav");
+        string[] args = ["--model", ModelPath, "--language", "es", "--no-warmup", "--output_file", output, "--json-input"];
+        try
+        {
+            (int emptyExit, string _, string emptyErr) = await CliIntegrationTests.RunCliWithInputAsync("{\"text\":\"\"}\n", args);
+            (int dirtyExit, string _, string dirtyErr) = await CliIntegrationTests.RunCliWithInputAsync(
+                "{\"text\":\"" + JsonEncodedText.Encode("\u0000" + OnlyControls) + "\"}\n", args);
+            Assert.NotEqual(0, emptyExit);
+            Assert.Equal(emptyExit, dirtyExit);
+            Assert.Contains("Missing or empty phoneme_ids", emptyErr, StringComparison.Ordinal);
+            Assert.Contains("Missing or empty phoneme_ids", dirtyErr, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(output);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task JsonlOnlyControlsWithPhonemeIds_UsesTheIds()
+    {
+        string line = await TestModeIdsAsync("hola");
+        string ids = line[(line.IndexOf(": ", StringComparison.Ordinal) + 2)..];
+        Assert.StartsWith("[", ids, StringComparison.Ordinal);
+        Assert.Equal(
+            await SynthesizedBytesAsync(null, "{\"phoneme_ids\":" + ids + "}\n"),
+            await SynthesizedBytesAsync(null, "{\"text\":\"\\u0000\\u007f\",\"phoneme_ids\":" + ids + "}\n"));
+    }
 }

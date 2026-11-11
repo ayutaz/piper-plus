@@ -303,6 +303,31 @@ public sealed class TextSanitizerContractTests
         };
     }
 
+    /// <summary>
+    /// MultilingualPhonemizer strips before it detects the language. Swedish
+    /// is detected per word, and words are split on spaces only: a NUL inside
+    /// "och" hid the function word, and FF between two words joined them, so
+    /// both were read as English.
+    /// </summary>
+    [Theory]
+    [InlineData("och", "o\u0000ch")]
+    [InlineData("hello och", "hello\u000Coch")]
+    [InlineData("hello och", "hello\u0085och")]
+    public void Multilingual_DetectsSwedishInTheStrippedText(string clean, string dirty)
+    {
+        var recorder = new Recorder();
+        var p = new MultilingualPhonemizer(
+            new Dictionary<string, IPhonemizer>
+            {
+                ["en"] = new EnglishPhonemizer(new RecordingEnglishEngine(recorder)),
+                ["sv"] = new SwedishPhonemizer(new RecordingLatinEngine(recorder)),
+            },
+            defaultLatinLanguage: "en");
+        List<string> cleanTokens = p.Phonemize(clean);
+        Assert.Contains("a", cleanTokens); // the Swedish engine read "och"
+        Assert.Equal(cleanTokens, p.Phonemize(dirty));
+    }
+
     [Theory]
     [MemberData(nameof(WordCases))]
     public void RealEngine_ReadsDirtyLikeClean(TextCase c)
