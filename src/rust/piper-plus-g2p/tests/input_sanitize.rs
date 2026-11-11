@@ -39,6 +39,8 @@ fn data() -> std::path::PathBuf {
 /// A phonemizer under test: fixture language, type name, phonemizer.
 type Entry = (&'static str, &'static str, Box<dyn Phonemizer>);
 
+// Each push depends on a feature, so the list cannot be one `vec![]`.
+#[allow(clippy::vec_init_then_push)]
 fn single_language() -> Vec<Entry> {
     #[allow(unused_mut)]
     let mut out: Vec<Entry> = Vec::new();

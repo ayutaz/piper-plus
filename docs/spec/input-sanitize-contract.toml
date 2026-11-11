@@ -85,7 +85,7 @@ notes = "Also the path of src/python_run/piper_plus/api/api.py, which calls phon
 
 [[runtime]]
 name = "rust-g2p"
-status = "pending"
+status = "enforced"
 function = "phonemizer::strip_control_chars"
 consumer_tests = ["src/rust/piper-plus-g2p/tests/input_sanitize.rs"]
 entry_points = [
@@ -99,7 +99,7 @@ entry_points = [
   {file = "src/rust/piper-plus-g2p/src/swedish.rs", calls = "strip_control_chars"},
   {file = "src/rust/piper-plus-g2p/src/multilingual.rs", calls = "strip_control_chars"},
 ]
-notes = "Also covers piper-plus (piper-core), the Rust WASM path of npm piper-plus and the Swift G2P, which call these phonemizers."
+notes = "Also covers piper-plus (piper-core), the Rust WASM path of npm piper-plus and the Swift G2P (Rust FFI), which call these phonemizers. Not Kotlin: its AAR wraps the C++ library."
 
 [[runtime]]
 name = "python-runtime"
@@ -144,7 +144,7 @@ entry_points = [
   {file = "src/cpp/piper_plus_c_api.cpp", calls = "stripControlChars"},
   {file = "src/cpp/main.cpp", calls = "stripControlChars"},
 ]
-notes = "Also the Swift TTS (Sources/PiperPlus), which wraps the C API in the released xcframework."
+notes = "Also the Swift TTS (Sources/PiperPlus), which wraps the C API in the released xcframework, and the Kotlin G2P, whose AAR wraps libpiper_plus.so."
 
 [[runtime]]
 name = "npm"
@@ -163,6 +163,9 @@ entry_points = [
 name = "kotlin-swift-ffi"
 status = "pending"
 function = "none of its own: the native library underneath strips"
+# Kotlin wraps libpiper_plus.so, the C++ G2P C API (stripped with cpp). The
+# Swift G2P wraps the Rust FFI of piper-plus-g2p (stripped with rust-g2p).
+# These tests pin that the stripping reaches them through the native call.
 consumer_tests = [
   "android/piper-plus-g2p/src/test/java/com/piperplus/g2p/InputSanitizeContractTest.kt",
   "tests/PiperPlusG2PTests/InputSanitizeContractTests.swift",

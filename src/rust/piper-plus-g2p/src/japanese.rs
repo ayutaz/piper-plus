@@ -448,7 +448,8 @@ impl Phonemizer for JapanesePhonemizer {
         &self,
         text: &str,
     ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError> {
-        let mut input = text.to_string();
+        // Strip first, so the custom dictionary matches the text that is read.
+        let mut input = crate::phonemizer::strip_control_chars(text).into_owned();
 
         // Apply custom dictionary if present
         if let Some(ref dict) = self.dictionary {

@@ -1090,6 +1090,8 @@ impl Phonemizer for SpanishPhonemizer {
         &self,
         text: &str,
     ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError> {
+        let stripped = crate::phonemizer::strip_control_chars(text);
+        let text: &str = &stripped;
         Ok(phonemize_spanish_with_prosody(text))
     }
 

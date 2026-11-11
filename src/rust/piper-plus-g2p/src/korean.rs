@@ -552,6 +552,8 @@ impl Phonemizer for KoreanPhonemizer {
         &self,
         text: &str,
     ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError> {
+        let stripped = crate::phonemizer::strip_control_chars(text);
+        let text: &str = &stripped;
         let chars = text_to_phoneme_chars(text);
 
         // Convert each char to a single-char String token.
