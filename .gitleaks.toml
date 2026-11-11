@@ -87,6 +87,13 @@ regexes = [
     # 当たった false positive。Go が決める固定の形だけを丸ごと一致で allow
     # する (この形の秘密情報はない)。
     '''^v0\.0\.0-\d{14}-[0-9a-f]{12}$''',
+    # 参照融合 S0 の集計スクリプト (scripts/run_reference_fusion_s0.py、
+    # 研究ブランチ) が結果の辞書のキーに使う `key = "trim=energy-vad"` /
+    # `trim_key = "trim=none"`。変数名の "key" と値の entropy で generic-api-key
+    # に当たった false positive。schedule の gitleaks は全ブランチの履歴を
+    # 見るので、dev にないファイルでも dev が赤くなる。この 2 値だけを丸ごと
+    # 一致で allow する。
+    '''^trim=(energy-vad|none)$''',
 ]
 
 # Stop words that, when present in a match, mark it as a false-positive.
