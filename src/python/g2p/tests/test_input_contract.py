@@ -123,11 +123,12 @@ def test_too_long_is_rejected_where_it_was(language, method):
             getattr(phonemizer, method)(too_long)
 
 
-@pytest.mark.parametrize("method", METHODS)
-@pytest.mark.parametrize("language", LANGUAGES)
+@pytest.mark.parametrize(
+    ("language", "method"),
+    [(lang, m) for lang in LANGUAGES for m in METHODS if (lang, m) not in LIMITED],
+    ids=str,
+)
 def test_stripping_adds_no_length_limit(language, method):
-    if (language, method) in LIMITED:
-        pytest.skip("limited before stripping was added")
     if language == "multilingual":
         # Latin text to es, which has no limit (en, in the other set-up, has one).
         phonemizers = [p for p in _phonemizers(language) if "en" not in p.languages]

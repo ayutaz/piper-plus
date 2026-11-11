@@ -217,6 +217,13 @@ reason = "Korean (g2pk2); runs on ubuntu with Python 3.11 / 3.12 only, see test_
 
 [[entry]]
 runtime = "python"
+# `[[]` is a literal `[`: the Korean cases of the input-sanitize contract.
+test = "src/python/g2p/tests/test_input_contract.py::*[[]ko-*"
+kind = "harmless"
+reason = "Korean (g2pk2); runs on ubuntu with Python 3.11 / 3.12 only, see test_korean.py."
+
+[[entry]]
+runtime = "python"
 test = "src/python/tests/test_compat.py::test_posixpath_routed_to_windowspath_on_windows"
 kind = "harmless"
 platforms = ["linux", "macos"]
