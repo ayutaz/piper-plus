@@ -55,6 +55,10 @@ public static class PhonemeEncoder
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(phonemeIdMap);
 
+        // Strip control characters first, so that a phonemizer which does not
+        // strip them reads the text the same way (docs/spec/input-sanitize-contract.toml).
+        text = TextSanitizer.StripControlChars(text);
+
         // Step 1: Phonemize text into tokens + prosody.
         (List<string>? tokens, List<ProsodyInfo?>? prosodyList) = phonemizer.PhonemizeWithProsody(text);
 

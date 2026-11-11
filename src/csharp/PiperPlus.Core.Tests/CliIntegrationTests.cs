@@ -271,8 +271,20 @@ public sealed class CliIntegrationTests
     /// <see cref="RunCliAsync"/> with environment overrides for the child
     /// (a <c>null</c> value removes the variable from the child environment).
     /// </summary>
-    internal static async Task<(int ExitCode, string StdOut, string StdErr)> RunCliWithEnvAsync(
+    internal static Task<(int ExitCode, string StdOut, string StdErr)> RunCliWithEnvAsync(
         IReadOnlyDictionary<string, string?>? env, params string[] args)
+        => RunCliCoreAsync(env, null, args);
+
+    /// <summary>
+    /// <see cref="RunCliAsync"/> with <paramref name="stdin"/> written to the
+    /// child's standard input (UTF-8), which is then closed.
+    /// </summary>
+    internal static Task<(int ExitCode, string StdOut, string StdErr)> RunCliWithInputAsync(
+        string stdin, params string[] args)
+        => RunCliCoreAsync(null, stdin, args);
+
+    private static async Task<(int ExitCode, string StdOut, string StdErr)> RunCliCoreAsync(
+        IReadOnlyDictionary<string, string?>? env, string? stdin, string[] args)
     {
         string cliAssemblyPath = GetCliAssemblyPath();
 
@@ -281,6 +293,8 @@ public sealed class CliIntegrationTests
             FileName = GetDotnetHostPath(),
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            RedirectStandardInput = stdin is not null,
+            StandardInputEncoding = stdin is not null ? new System.Text.UTF8Encoding(false) : null,
             UseShellExecute = false,
             CreateNoWindow = true,
 
@@ -322,6 +336,12 @@ public sealed class CliIntegrationTests
 
         using var process = new Process { StartInfo = psi };
         process.Start();
+
+        if (stdin is not null)
+        {
+            await process.StandardInput.WriteAsync(stdin);
+            process.StandardInput.Close();
+        }
 
         // Read stdout and stderr concurrently to avoid deadlocks
         Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync();

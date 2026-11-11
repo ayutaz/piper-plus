@@ -32,3 +32,5 @@ PiperPlus.Core.Inference.SpeakerEncoder.SpeakerEncoder(string! modelPath, PiperP
 PiperPlus.Core.Inference.SpeakerFrontEnd
 PiperPlus.Core.Inference.SpeakerFrontEnd.KaldiFbank = 1 -> PiperPlus.Core.Inference.SpeakerFrontEnd
 PiperPlus.Core.Inference.SpeakerFrontEnd.Mel = 0 -> PiperPlus.Core.Inference.SpeakerFrontEnd
+PiperPlus.Core.Phonemize.TextSanitizer
+static PiperPlus.Core.Phonemize.TextSanitizer.StripControlChars(string! text) -> string!

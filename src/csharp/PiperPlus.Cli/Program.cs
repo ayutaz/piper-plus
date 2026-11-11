@@ -691,6 +691,9 @@ internal static partial class Program
                 {
                     LogDebug(debug, quiet, "[test-mode] Phonemizing text without inference.");
 
+                    // Before the custom dictionary and [[ ]] (docs/spec/input-sanitize-contract.toml).
+                    textInput = TextSanitizer.StripControlChars(textInput);
+
                     IPhonemizer phonemizer;
                     try
                     {
@@ -946,6 +949,10 @@ internal static partial class Program
                 // ================================================================
                 if (!string.IsNullOrEmpty(textInput))
                 {
+                    // Before the custom dictionary, the short-text check, [[ ]] and
+                    // sentence splitting (docs/spec/input-sanitize-contract.toml).
+                    textInput = TextSanitizer.StripControlChars(textInput);
+
                     // Apply custom dictionary before phonemization
                     if (customDict is not null)
                     {
@@ -1407,7 +1414,9 @@ internal static partial class Program
                                     }
                                 }
 
-                                string textToPhon = utterance!.Text;
+                                // Before the custom dictionary and the short-text check
+                                // (docs/spec/input-sanitize-contract.toml).
+                                string textToPhon = TextSanitizer.StripControlChars(utterance!.Text);
 
                                 // Apply custom dict
                                 if (customDict is not null)

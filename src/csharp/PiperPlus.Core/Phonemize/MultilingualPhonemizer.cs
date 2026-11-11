@@ -305,6 +305,9 @@ public sealed class MultilingualPhonemizer : IPhonemizer
     /// </summary>
     private (List<string> Tokens, List<ProsodyInfo?> Prosody) PhonemizeCore(string text)
     {
+        // docs/spec/input-sanitize-contract.toml
+        text = TextSanitizer.StripControlChars(text);
+
         List<(string Lang, string Text)> segments = _detector.SegmentText(text);
         if (segments.Count == 0)
         {
