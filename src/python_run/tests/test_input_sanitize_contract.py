@@ -6,10 +6,12 @@ Cases: tests/fixtures/g2p/input_sanitize_cases.json, read by every runtime.
 Regression focus: #934 (2026-11) stripped control characters in the G2P
 package only. ``PiperVoice`` reads text with its own phonemizers
 (``piper_plus.phonemize``), so a NUL inside "hola" still split the word in
-two there, a NUL after "." hid the sentence boundary, and a text made long by
-control characters lost the short-text padding. ``PiperPlus`` split the raw
-text into sentences before its G2P stripped it. Every public entry point
-below reads a dirty text the way it reads the clean one.
+two there, a NUL after "?" became a sentence of its own (an extra chunk of
+BOS/EOS audio), and a text made long by control characters lost the
+short-text padding. ``PiperPlus`` split the raw text into sentences before
+its G2P stripped it, so a NUL after "." hid the sentence boundary there.
+Every public entry point below reads a dirty text the way it reads the clean
+one.
 """
 
 from __future__ import annotations
@@ -175,6 +177,13 @@ def test_piper_plus_reads_dirty_like_clean(tts, entry, case):
 def test_only_controls_read_as_empty_text(voice):
     assert voice.phonemize(ONLY_CONTROLS) == []
     assert _stream_raw(voice, ONLY_CONTROLS, None) == []
+
+
+def test_piper_plus_reads_only_controls_as_empty_text(tts):
+    # The word cases cannot show PiperPlus.synthesize stripping: its G2P
+    # strips again. A text of control characters only gave BOS/EOS audio.
+    assert len(tts.synthesize(ONLY_CONTROLS).audio) == 0
+    assert list(tts.synthesize_stream(ONLY_CONTROLS)) == []
 
 
 def test_short_text_padding_counts_stripped_text(voice):
