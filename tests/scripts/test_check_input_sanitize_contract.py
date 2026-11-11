@@ -60,7 +60,9 @@ def _fixture(**overrides) -> dict:
     return data
 
 
-def _contract(status: str = "enforced", languages: str = '["es"]') -> str:
+def _contract(
+    status: str = "enforced", languages: str = '["es"]', coverage: str = ""
+) -> str:
     return textwrap.dedent(
         f"""\
         schema_version = 1
@@ -78,7 +80,15 @@ def _contract(status: str = "enforced", languages: str = '["es"]') -> str:
         consumer_tests = ["src/toy/test_contract.py"]
         entry_points = [{{file = "src/toy/spanish.py", calls = "_sanitize_input"}}]
         """
-    )
+    ) + coverage
+
+
+SKILL = ".claude/skills/check-cross-runtime/SKILL.md"
+
+
+def _skill(*paths: str) -> str:
+    rows = "".join(f'  ["{p}"]="{p}"\n' for p in paths)
+    return f"# skill\n\n```bash\ndeclare -A RUNTIME_PATHS=(\n{rows})\n```\n"
 
 
 def _repo(
@@ -89,7 +99,8 @@ def _repo(
     contract: str | None = None,
     consumer: str | None = 'FIXTURE = "input_sanitize_cases.json"\n',
     entry: str = "def phonemize(text):\n    text = self._sanitize_input(text)\n",
-    hook_files: str | None = r"^(docs/spec/input-sanitize-contract\.toml|tests/fixtures/g2p/input_sanitize_cases\.json|src/rust/g2p/tests/fixtures/input_sanitize_cases\.json|src/toy/.*)$",
+    hook_files: str | None = r"^(docs/spec/input-sanitize-contract\.toml|tests/fixtures/g2p/input_sanitize_cases\.json|src/rust/g2p/tests/fixtures/input_sanitize_cases\.json|src/toy/.*|\.claude/skills/check-cross-runtime/SKILL\.md)$",
+    skill: str | None = None,
 ) -> Path:
     data = json.dumps(fixture or _fixture(), ensure_ascii=False, indent=2).encode()
     (root / "tests/fixtures/g2p").mkdir(parents=True)
@@ -104,6 +115,9 @@ def _repo(
     if consumer is not None:
         (root / "src/toy/test_contract.py").write_text(consumer, encoding="utf-8")
     (root / "src/toy/spanish.py").write_text(entry, encoding="utf-8")
+    if skill is not None:
+        (root / SKILL).parent.mkdir(parents=True)
+        (root / SKILL).write_text(skill, encoding="utf-8")
     if hook_files is not None:
         (root / ".pre-commit-config.yaml").write_text(
             textwrap.dedent(
@@ -152,16 +166,18 @@ def test_entry_point_without_call_is_reported(gate, tmp_path):
     assert "_sanitize_input" in errors[0]
 
 
-def test_pending_is_listed_not_failed(gate, tmp_path, capsys):
-    root = _repo(
-        tmp_path,
-        contract=_contract(status="pending"),
-        consumer=None,
-        entry="def phonemize(text):\n    return text\n",
+def test_pending_is_reported(gate, tmp_path):
+    # Every runtime strips now; a runtime set back to pending is a regression.
+    errors = gate.check(
+        _repo(
+            tmp_path,
+            contract=_contract(status="pending"),
+            consumer=None,
+            entry="def phonemize(text):\n    return text\n",
+        )
     )
-    assert gate.check(root) == []
-    assert gate.main(["--root", str(root)]) == 0
-    assert "PENDING: toy" in capsys.readouterr().out
+    assert len(errors) == 1
+    assert "pending" in errors[0]
 
 
 def test_unknown_status_is_reported(gate, tmp_path):
@@ -220,6 +236,46 @@ def test_contract_path_outside_hook_files_is_reported(gate, tmp_path):
     assert any("src/toy/spanish.py" in e and "files:" in e for e in errors)
 
 
+COVERAGE = '[coverage]\n"src/toy/" = "toy"\n'
+
+
+def test_runtime_path_covered_by_a_runtime_passes(gate, tmp_path):
+    root = _repo(tmp_path, contract=_contract(coverage=COVERAGE), skill=_skill("src/toy/"))
+    assert gate.check(root) == []
+
+
+def test_runtime_path_without_coverage_is_reported(gate, tmp_path):
+    # A runtime added to /check-cross-runtime without a row here would never
+    # be asked to strip: the gate fails until the contract names it.
+    root = _repo(
+        tmp_path,
+        contract=_contract(coverage=COVERAGE),
+        skill=_skill("src/toy/", "src/newlang/"),
+    )
+    errors = gate.check(root)
+    assert len(errors) == 1
+    assert "src/newlang/" in errors[0]
+
+
+def test_coverage_naming_an_unknown_runtime_is_reported(gate, tmp_path):
+    coverage = '[coverage]\n"src/toy/" = "nobody"\n'
+    root = _repo(tmp_path, contract=_contract(coverage=coverage), skill=_skill("src/toy/"))
+    errors = gate.check(root)
+    assert len(errors) == 1
+    assert "nobody" in errors[0]
+
+
+def test_unreadable_runtime_paths_block_is_reported(gate, tmp_path):
+    root = _repo(
+        tmp_path,
+        contract=_contract(coverage=COVERAGE),
+        skill="# skill without the block\n",
+    )
+    errors = gate.check(root)
+    assert len(errors) == 1
+    assert "RUNTIME_PATHS" in errors[0]
+
+
 def test_main_returns_1_and_prints_error(gate, tmp_path, capsys):
     root = _repo(tmp_path, consumer=None)
     assert gate.main(["--root", str(root)]) == 1
@@ -228,3 +284,9 @@ def test_main_returns_1_and_prints_error(gate, tmp_path, capsys):
 
 def test_real_repository_has_no_violations(gate):
     assert gate.check(REPO_ROOT) == []
+
+
+def test_real_repository_lists_the_runtime_paths(gate):
+    paths = gate.runtime_paths(REPO_ROOT)
+    assert "src/python_run/piper_plus/" in paths
+    assert "android/piper-plus-g2p/" in paths

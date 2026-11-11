@@ -277,6 +277,8 @@ val syncG2pFixture = tasks.register<Copy>("syncG2pFixture") {
             "phoneme_test_cases.json",
             "phoneme_test_cases_golden.json",
             "known_divergences.json",
+            // InputSanitizeInstrumentedTest (input-sanitize contract).
+            "input_sanitize_cases.json",
         )
     }
     from(rootProject.layout.projectDirectory.file("../src/python/g2p/piper_plus_g2p/data/pua.json"))

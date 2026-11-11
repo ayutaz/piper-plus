@@ -19,10 +19,13 @@ unless something reads all of them. This gate checks:
 * every ``enforced`` entry point still calls the runtime's stripping
   function (a call removed later is caught here, not in review);
 * every file the contract names is in the pre-commit hook's ``files:``,
-  because a hook does not run on a change it does not watch.
+  because a hook does not run on a change it does not watch;
+* every runtime path listed in ``RUNTIME_PATHS`` of the /check-cross-runtime
+  skill maps to a runtime of the contract (``[coverage]``), so a runtime
+  added there fails here until it strips too.
 
-``pending`` runtimes are printed on every run (``PENDING: <name>``) so an
-unfinished rollout stays visible.
+Every runtime is ``enforced``. The rollout status ``pending`` is gone: a
+runtime that stops stripping is an error, not a note.
 
 Exit codes: 0 = no violations, 1 = at least one violation.
 """
@@ -42,7 +45,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 CONTRACT = "docs/spec/input-sanitize-contract.toml"
 FIXTURE_NAME = "input_sanitize_cases"
 HOOK_ID = "input-sanitize-contract"
-STATUSES = ("enforced", "pending")
+STATUSES = ("enforced",)
+SKILL = ".claude/skills/check-cross-runtime/SKILL.md"
+_PATHS_BLOCK = re.compile(r"declare -A RUNTIME_PATHS=\((.*?)^\)", re.S | re.M)
+_PATHS_ROW = re.compile(r'\["[^"]+"\]="([^"]+)"')
 
 
 def strip(text: str, keep: str, to_space: str = "") -> str:
@@ -150,9 +156,40 @@ def _check_runtime(root: Path, runtime: dict) -> list[str]:
     return errors
 
 
+def runtime_paths(root: Path) -> list[str] | None:
+    """Return the paths of ``RUNTIME_PATHS`` in the /check-cross-runtime
+    skill: None without the skill file, [] when the block is unreadable."""
+    skill = root / SKILL
+    if not skill.exists():
+        return None
+    block = _PATHS_BLOCK.search(skill.read_text(encoding="utf-8"))
+    return _PATHS_ROW.findall(block.group(1)) if block else []
+
+
+def _check_coverage(root: Path, contract: dict) -> list[str]:
+    paths = runtime_paths(root)
+    if paths is None:
+        return []
+    if not paths:
+        return [f"{SKILL}: no readable 'declare -A RUNTIME_PATHS=(' block"]
+    coverage = contract.get("coverage", {})
+    names = {r.get("name") for r in contract.get("runtime", [])}
+    errors: list[str] = []
+    for path in paths:
+        if path not in coverage:
+            errors.append(
+                f"{path}: a runtime path of {SKILL} with no [coverage] row in "
+                f"{CONTRACT} (name the runtime that strips its input)"
+            )
+    for path, name in coverage.items():
+        if name not in names:
+            errors.append(f"{CONTRACT}: [coverage] {path} names unknown runtime {name!r}")
+    return errors
+
+
 def _contract_paths(contract: dict) -> list[str]:
     fixture = contract.get("fixture", {})
-    paths = [CONTRACT, fixture.get("canonical", ""), *fixture.get("mirrors", [])]
+    paths = [CONTRACT, SKILL, fixture.get("canonical", ""), *fixture.get("mirrors", [])]
     for runtime in contract.get("runtime", []):
         paths += runtime.get("consumer_tests", [])
         paths += [e["file"] for e in runtime.get("entry_points", [])]
@@ -175,25 +212,19 @@ def check(root: Path) -> list[str]:
     )
     for runtime in contract.get("runtime", []):
         errors += _check_runtime(root, runtime)
+    errors += _check_coverage(root, contract)
 
     files = _hook_files_regex(root)
     if files is not None:
         for path in _contract_paths(contract):
+            if path == SKILL and not (root / SKILL).exists():
+                continue
             if not files.match(path):
                 errors.append(
                     f"{path}: not in the files: of the {HOOK_ID} pre-commit hook, "
                     "so a change to it never runs this gate"
                 )
     return errors
-
-
-def pending(root: Path) -> list[str]:
-    contract = tomllib.loads((root / CONTRACT).read_text(encoding="utf-8"))
-    return [
-        r.get("name", "?")
-        for r in contract.get("runtime", [])
-        if r.get("status") == "pending"
-    ]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -204,9 +235,6 @@ def main(argv: list[str] | None = None) -> int:
     errors = check(args.root)
     for error in errors:
         print(f"ERROR: {error}", file=sys.stderr)
-    if (args.root / CONTRACT).exists():
-        for name in pending(args.root):
-            print(f"PENDING: {name} (does not strip control characters yet)")
     if errors:
         return 1
     print("input-sanitize contract: OK")

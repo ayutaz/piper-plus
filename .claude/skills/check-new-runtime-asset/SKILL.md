@@ -95,6 +95,7 @@ cp scripts/check_dictionary_consistency.py scripts/check_<topic>_consistency.py
 - [ ] Android なら `src/main/assets/` 配下にコピーされること
 - [ ] SPM なら `Package.swift` の resources 宣言があること
 - [ ] 該当する sync gate (`scripts/check_*_consistency.py`) に登録済み
+- [ ] 新しいランタイム (配布物) そのものを足すなら、 `docs/spec/input-sanitize-contract.toml` に `[[runtime]]` (制御文字を消す関数・入口) と `[coverage]` の行を足し、 共通 fixture `tests/fixtures/g2p/input_sanitize_cases.json` を読む consumer test を書く。 `/check-cross-runtime` の `RUNTIME_PATHS` に足したパスが `[coverage]` に無いと `check_input_sanitize_contract.py` が落ちる
 
 ## 関連ドキュメント
 

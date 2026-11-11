@@ -39,7 +39,9 @@ class PiperPlusG2p private constructor(
      * Phonemize text into a [PhonemeResult].
      *
      * @param text     Input UTF-8 text. Empty / whitespace yields zero
-     *                 phonemes (`numPhonemes == 0`) without error.
+     *                 phonemes (`numPhonemes == 0`) without error. Control
+     *                 characters are stripped first
+     *                 ([TextSanitizer.stripControlChars]).
      * @param language ISO-style language code (`"en"`, `"ja"`, ...). Pass
      *                 `null` to enable Unicode-script auto-detection.
      * @throws IllegalStateException if this instance has been closed.
@@ -50,7 +52,10 @@ class PiperPlusG2p private constructor(
     @JvmOverloads
     fun phonemize(text: String, language: String? = null): PhonemeResult {
         val handle = requireOpen()
-        val triple = PiperPlusG2pNative.nativePhonemize(handle, text, language)
+        // Before the native call: JNI passes a NUL as the bytes C0 80, which
+        // the native strip keeps (docs/spec/input-sanitize-contract.toml).
+        val clean = TextSanitizer.stripControlChars(text)
+        val triple = PiperPlusG2pNative.nativePhonemize(handle, clean, language)
         val phonemes = triple[0]
         val resolvedLang = triple[1]
         val numPhonemes = triple[2].toIntOrNull() ?: 0

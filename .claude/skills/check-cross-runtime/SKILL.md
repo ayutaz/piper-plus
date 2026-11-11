@@ -266,7 +266,8 @@ uv run python scripts/check_input_sanitize_contract.py
 | 短テキスト戦略変更 | `check_short_text_contract.py` |
 | PT BR/EU 切替変更 | `check_pt_dialect_contract.py` |
 | Swift G2P 変更 | `check_swift_g2p_contract.py` |
-| `_sanitize_input` / `strip_control_chars` / 各言語の入口 / `docs/spec/input-sanitize-contract.toml` / `tests/fixtures/g2p/input_sanitize_cases.json` | `check_input_sanitize_contract.py`。 契約の全ランタイム (`[[runtime]]`) を見て、 `pending` のものが残っていれば追随の PR を出す。 「他ランタイムと同じ」 と書く前に、 相手側の関数の呼び出し元を grep で確かめる |
+| `_sanitize_input` / `strip_control_chars` / 各言語の入口 / `docs/spec/input-sanitize-contract.toml` / `tests/fixtures/g2p/input_sanitize_cases.json` | `check_input_sanitize_contract.py`。 契約の全ランタイム (`[[runtime]]`) が `enforced` で、 変更が全ランタイムに入っているかを見る。 「他ランタイムと同じ」 と書く前に、 相手側の関数の呼び出し元を grep で確かめる。 ラッパー (Kotlin JNI / Swift FFI) は C 文字列や modified UTF-8 で NUL が届かないので、 下の層が消すことに頼らずラッパー側でも消す |
+| `RUNTIME_PATHS` に新しいランタイムを足す | `check_input_sanitize_contract.py`。 `docs/spec/input-sanitize-contract.toml` の `[coverage]` にそのパスの行が無いと gate が落ちる。 制御文字を消すランタイムを `[[runtime]]` に書き (関数・入口・`tests/fixtures/g2p/input_sanitize_cases.json` を読む consumer test)、 `[coverage]` にパス → ランタイム名の行を足す |
 
 ### 7. Docker image の追随確認 (PR #443 の盲点)
 
@@ -304,6 +305,7 @@ PR 提出前にメンタルチェック:
 - [ ] follow-up issue がある場合は PR description にリンク
 - [ ] ONNX I/O 変更なら `/check-runtime-parity` も併用した
 - [ ] 新規データファイル追加なら `/check-new-runtime-asset` も併用した
+- [ ] `RUNTIME_PATHS` にランタイムを足したなら、 `docs/spec/input-sanitize-contract.toml` に `[[runtime]]` と `[coverage]` の行を足し、 共通 fixture (`tests/fixtures/g2p/input_sanitize_cases.json`) を読むテストを書いた
 
 ## 影響度別 quick action
 

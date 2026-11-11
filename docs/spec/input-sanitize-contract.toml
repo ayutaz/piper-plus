@@ -11,10 +11,10 @@
 # only, `validate_input` had no caller, and no other runtime stripped
 # anything. A NUL inside "hola" split the word in two for es / fr / pt.
 #
-# Status per runtime:
-#   enforced  the consumer tests exist and read the fixture, and every entry
-#             point calls the stripping function. The gate checks both.
-#   pending   not done yet. Printed as `PENDING: <name>` on every gate run.
+# Status per runtime: `enforced` only. The consumer tests exist and read the
+# fixture, and every entry point calls the stripping function; the gate
+# checks both. A new runtime gets a [[runtime]] table and a [coverage] row
+# (the gate fails without the row).
 
 schema_version = 1
 
@@ -105,7 +105,7 @@ entry_points = [
   {file = "src/rust/piper-plus-g2p/src/swedish.rs", calls = "strip_control_chars"},
   {file = "src/rust/piper-plus-g2p/src/multilingual.rs", calls = "strip_control_chars"},
 ]
-notes = "Also covers piper-plus (piper-core), the Rust WASM path of npm piper-plus and the Swift G2P (Rust FFI), which call these phonemizers. Not Kotlin: its AAR wraps the C++ library."
+notes = "Also covers piper-plus (piper-core), the Rust WASM path of npm piper-plus and the Swift G2P (Rust FFI, which also strips in its wrapper: swift-g2p), which call these phonemizers. Not Kotlin: its AAR wraps the C++ library."
 
 [[runtime]]
 name = "python-runtime"
@@ -210,7 +210,7 @@ entry_points = [
   # dictionary and SSML detection.
   {file = "src/cpp/main.cpp", calls = "stripControlChars"},
 ]
-notes = "Bytes that are not valid UTF-8 are kept. The C API takes C strings, which cannot hold a NUL, so its cases put DEL where a case has a NUL. scripts/test_cpp_cli_input_sanitize.py runs the built CLI (CI step 'CLI input sanitizing E2E' in _build-test-cpp.yml). Also the Swift TTS (Sources/PiperPlus), which wraps the C API in the released xcframework, and the Kotlin G2P, whose AAR wraps libpiper_plus.so: both get the stripping with their next native build."
+notes = "Bytes that are not valid UTF-8 are kept. The C API takes C strings, which cannot hold a NUL, so its cases put DEL where a case has a NUL. scripts/test_cpp_cli_input_sanitize.py runs the built CLI (CI step 'CLI input sanitizing E2E' in _build-test-cpp.yml). Also the Swift TTS (Sources/PiperPlus), which wraps the C API in the released xcframework and gets the stripping with its next native build, and the Kotlin G2P, whose AAR wraps libpiper_plus.so (it also strips in its wrapper: kotlin)."
 
 [[runtime]]
 name = "npm"
@@ -245,14 +245,51 @@ entry_points = [
 notes = "piper-plus does not import the function from @piper-plus/g2p: releases up to 0.4.2 do not export it, and a named import of a missing export fails module linking for the whole package. Both copies are tested against the fixture. The Rust WASM G2P (ja / zh in piper-plus) also strips, with rust-g2p."
 
 [[runtime]]
-name = "kotlin-swift-ffi"
-status = "pending"
-function = "none of its own: the native library underneath strips"
-# Kotlin wraps libpiper_plus.so, the C++ G2P C API (stripped with cpp). The
-# Swift G2P wraps the Rust FFI of piper-plus-g2p (stripped with rust-g2p).
-# These tests pin that the stripping reaches them through the native call.
+name = "kotlin"
+status = "enforced"
+function = "com.piperplus.g2p.TextSanitizer.stripControlChars"
 consumer_tests = [
   "android/piper-plus-g2p/src/test/java/com/piperplus/g2p/InputSanitizeContractTest.kt",
-  "tests/PiperPlusG2PTests/InputSanitizeContractTests.swift",
 ]
-entry_points = []
+entry_points = [
+  # PiperPlusG2p.phonemize, before the JNI call.
+  {file = "android/piper-plus-g2p/src/main/java/com/piperplus/g2p/PiperPlusG2p.kt", calls = "stripControlChars"},
+]
+notes = "The AAR wraps libpiper_plus.so, which strips too (cpp), but JNI passes the text as modified UTF-8, where U+0000 is the bytes C0 80: the native strip keeps bytes that are not valid UTF-8, so a NUL inside 'hola' reached the phonemizer. The wrapper strips before the call. The consumer test (L1, JVM) reads the fixture; src/androidTest/java/com/piperplus/g2p/InputSanitizeInstrumentedTest.kt (L3, emulator in kotlin-g2p-ci) phonemizes the word cases through the native library."
+
+[[runtime]]
+name = "swift-g2p"
+status = "enforced"
+function = "PiperPlusG2P.TextSanitizer.stripControlChars"
+consumer_tests = ["tests/PiperPlusG2PTests/InputSanitizeContractTests.swift"]
+entry_points = [
+  # Phonemizer.phonemize, before the FFI call.
+  {file = "Sources/PiperPlusG2P/Phonemizer.swift", calls = "stripControlChars"},
+]
+notes = "Wraps the Rust FFI of piper-plus-g2p, which strips too (rust-g2p), but the text crosses as a C string, which ends at the first NUL: 'ho' + NUL + 'la' reached Rust as 'ho'. The wrapper strips before the call. swift-g2p-ci runs the consumer test against the Rust library built from source."
+
+# ---------------------------------------------------------------- coverage
+
+[coverage]
+# Every runtime path in RUNTIME_PATHS of .claude/skills/check-cross-runtime/
+# SKILL.md, mapped to the runtime above that strips its input. The gate fails
+# for a path listed there without a row here, so a new runtime cannot ship
+# without saying where it strips.
+"src/python_run/piper_plus/" = "python-runtime"
+"docker/python-inference/" = "python-runtime"
+"docker/webui/" = "python-runtime"
+"src/csharp/PiperPlus.Core/" = "csharp"
+"src/csharp/PiperPlus.Cli/" = "csharp"
+"src/rust/piper-core/" = "rust-g2p"
+"src/rust/piper-cli/" = "rust-g2p"
+"src/rust/piper-plus-g2p/" = "rust-g2p"
+"src/rust/piper-wasm/" = "rust-g2p"
+"src/go/piperplus/" = "go"
+"src/go/cmd/piper-plus/" = "go"
+"src/go/phonemize/" = "go"
+"src/wasm/openjtalk-web/" = "npm"
+"src/wasm/g2p/" = "npm"
+"src/cpp/" = "cpp"
+"Sources/PiperPlus/" = "cpp"
+"Sources/PiperPlusG2P/" = "swift-g2p"
+"android/piper-plus-g2p/" = "kotlin"
