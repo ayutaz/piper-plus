@@ -1,6 +1,8 @@
 """Tests for piper_train.model_manager."""
 
+import json
 import os
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -15,6 +17,19 @@ from piper_train.model_manager import (
 
 
 pytestmark = pytest.mark.unit
+
+_CANONICAL_CATALOG = {
+    key: entry
+    for key, entry in json.loads(
+        (
+            Path(__file__).resolve().parents[3]
+            / "test"
+            / "model_resolution_vectors.json"
+        ).read_text(encoding="utf-8")
+    )["voice_catalog"].items()
+    if not key.startswith("_")
+}
+_TRAINING_CATALOG_KEYS = ("ja_JP-tsukuyomi-chan-medium", "ja_JP-css10-6lang-medium")
 
 
 class TestFindVoice:
@@ -47,6 +62,22 @@ class TestFindVoice:
 
     def test_find_none(self):
         assert find_voice(None) is None
+
+    @pytest.mark.parametrize(
+        ("name", "key"),
+        [
+            (name, key)
+            for key, entry in _CANONICAL_CATALOG.items()
+            if key in _TRAINING_CATALOG_KEYS
+            for name in [key, *entry["aliases"]]
+        ],
+    )
+    def test_every_canonical_name_finds_the_model(self, name, key):
+        """The training catalog has no public base; its two voices take every name."""
+        voice = find_voice(name)
+        assert voice is not None, name
+        assert voice["key"] == key
+        assert voice["repo_id"] == _CANONICAL_CATALOG[key]["repo_id"]
 
 
 class TestGetDefaultModelDir:
@@ -204,3 +235,70 @@ class TestDownloadModel:
             download_model("tsukuyomi", str(target))
 
         assert target.exists()
+
+
+class TestModelNotice:
+    """Usage notice for models with terms (docs/reference/model-resolution.md §9)."""
+
+    @pytest.fixture(autouse=True)
+    def _fresh_state(self, monkeypatch):
+        import piper_train.model_manager as mm
+
+        monkeypatch.setattr(mm, "_shown_model_notices", set())
+        monkeypatch.delenv("PIPER_PLUS_DISABLE_MODEL_NOTICE", raising=False)
+
+    def _canonical(self):
+        import json
+        from pathlib import Path
+
+        vectors = (
+            Path(__file__).resolve().parents[3]
+            / "test"
+            / "model_resolution_vectors.json"
+        )
+        data = json.loads(vectors.read_text(encoding="utf-8"))
+        return data["voice_catalog"]["ja_JP-tsukuyomi-chan-medium"]
+
+    def test_notice_matches_canonical(self):
+        from piper_train.model_manager import get_model_notice
+
+        assert get_model_notice("tsukuyomi") == self._canonical()["notice"]
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "ja_JP-tsukuyomi-chan-medium",
+            "tsukuyomi-chan",
+            "ja-tsukuyomi",
+            "ayousanz/piper-plus-tsukuyomi-chan",
+            "/models/tsukuyomi-chan-6lang-fp16.onnx",
+            r"C:\models\tsukuyomi.onnx",
+        ],
+    )
+    def test_tsukuyomi_inputs(self, value):
+        from piper_train.model_manager import get_model_notice
+
+        assert get_model_notice(value) == self._canonical()["notice"]
+
+    @pytest.mark.parametrize("value", ["css10", "/models/css10-ja-6lang-fp16.onnx", ""])
+    def test_other_inputs(self, value):
+        from piper_train.model_manager import get_model_notice
+
+        assert get_model_notice(value) is None
+
+    def test_download_prints_notice_once_to_stderr(self, tmp_path, capsys):
+        mock_hf = MagicMock(hf_hub_download=MagicMock())
+        with patch.dict("sys.modules", {"huggingface_hub": mock_hf}):
+            download_model("tsukuyomi", str(tmp_path))
+            download_model("tsukuyomi", str(tmp_path))
+        captured = capsys.readouterr()
+        first_line = self._canonical()["notice"][0]
+        assert captured.out == ""
+        assert captured.err.count(first_line) == 1
+
+    def test_env_var_disables(self, tmp_path, capsys, monkeypatch):
+        from piper_train.model_manager import print_model_notice
+
+        monkeypatch.setenv("PIPER_PLUS_DISABLE_MODEL_NOTICE", " Yes ")
+        assert print_model_notice("tsukuyomi") is False
+        assert capsys.readouterr().err == ""

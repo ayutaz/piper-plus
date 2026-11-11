@@ -5,29 +5,44 @@ from __future__ import annotations
 import logging
 import shutil
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
+from types import MappingProxyType
+from typing import Any
+
+from piper_plus.download import PIPER_PLUS_VOICES, resolve_piper_plus_voice
 
 
 logger = logging.getLogger(__name__)
 
-# The experimental base requires a reference embedding. These aliases select
-# its versioned TTS graph, never the auxiliary encoder or legacy root config.
-_PUBLIC_BASE = {
-    "repo_id": "ayousanz/piper-plus-base",
-    "revision": "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1",
-    "onnx_file": "releases/zs-v1/base.onnx",
-    "config_file": "releases/zs-v1/base.onnx.json",
-}
-MODEL_ALIASES: dict[str, dict[str, str]] = {
-    "base": _PUBLIC_BASE,
-    "zero-shot-base-zs-v1": _PUBLIC_BASE,
-    "ayousanz/piper-plus-base": _PUBLIC_BASE,
-    "tsukuyomi": {
-        "repo_id": "ayousanz/piper-plus-tsukuyomi-chan",
-        "onnx_file": "tsukuyomi-chan-6lang-fp16.onnx",
-        "config_file": "config.json",
-    },
-}
+
+def _catalog_download(voice: dict[str, Any]) -> dict[str, str]:
+    """The Hub pair of a ``PIPER_PLUS_VOICES`` entry, at its pinned revision.
+
+    The experimental base lists its versioned TTS graph here, never the
+    auxiliary encoder or the legacy root config.
+    """
+    files = list(voice["files"])
+    info = {
+        "repo_id": voice["repo"],
+        "onnx_file": next(f for f in files if f.endswith(".onnx")),
+        "config_file": next(f for f in files if f.endswith(".json")),
+    }
+    if voice.get("revision"):
+        info["revision"] = voice["revision"]
+    return info
+
+
+# Every catalog key and alias, as the CLI and HTTP server accept them. The
+# catalog itself is ``piper_plus.download.PIPER_PLUS_VOICES``; this read-only
+# view keeps the shape ``PiperPlus.list_models()`` has always returned.
+MODEL_ALIASES: Mapping[str, dict[str, str]] = MappingProxyType(
+    {
+        name: _catalog_download(voice)
+        for key, voice in PIPER_PLUS_VOICES.items()
+        for name in [key, *voice.get("aliases", [])]
+    }
+)
 
 DEFAULT_CACHE_DIR = Path.home() / ".cache" / "piper-plus" / "models"
 
@@ -47,7 +62,8 @@ def resolve_model(
     Resolution order:
 
     1. Direct file path (if *model* points to an existing ``.onnx`` file).
-    2. Built-in alias (see :data:`MODEL_ALIASES`).
+    2. Catalog key or alias (``piper_plus.download.PIPER_PLUS_VOICES``,
+       listed in :data:`MODEL_ALIASES`).
     3. HuggingFace repo ID (any string containing ``/``).
     4. Local cache directory lookup.
 
@@ -71,16 +87,17 @@ def resolve_model(
         config_path = _find_config(onnx_path, config)
         return onnx_path, config_path
 
-    # Case 2: Alias
-    if model in MODEL_ALIASES:
-        alias = MODEL_ALIASES[model]
+    # Case 2: Catalog key or alias
+    voice = resolve_piper_plus_voice(model)
+    if voice is not None:
+        pair = _catalog_download(voice)
         return _download_from_hf(
-            alias["repo_id"],
-            alias["onnx_file"],
-            alias["config_file"],
+            pair["repo_id"],
+            pair["onnx_file"],
+            pair["config_file"],
             cache_dir,
             download,
-            revision=alias.get("revision"),
+            revision=pair.get("revision"),
         )
 
     # Case 3: HuggingFace repo ID (contains '/')
@@ -104,7 +121,7 @@ def resolve_model(
 
     raise ModelNotFoundError(
         f"Model '{model}' not found. "
-        f"Available aliases: {', '.join(MODEL_ALIASES.keys())}. "
+        f"Available names: {', '.join(MODEL_ALIASES)}. "
         f"Or provide a file path or HuggingFace repo ID (e.g., 'user/repo')."
     )
 

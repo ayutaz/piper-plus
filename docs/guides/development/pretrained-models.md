@@ -32,6 +32,16 @@ released `2.0.0` and `2.0.1` do not retroactively gain those aliases.
 The `tsukuyomi` alias continues to resolve the legacy root model below; download
 the public Tsukuyomi zs-v1 fine-tune using the explicit URLs above.
 
+**Tsukuyomi-chan terms:** credit `Piper Plus:つくよみちゃん` is required when you use the
+generated audio from either Tsukuyomi-chan model. Prohibited uses, redistribution conditions and
+base-model licenses are listed on the [model page](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan).
+The model is an unofficial work from the Tsukuyomi-chan side; Rei Yumesaki (the corpus rights holder)
+is not involved in its development or support. Send questions to the developer through
+[GitHub Issues](https://github.com/ayutaz/piper-plus/issues), not to Rei Yumesaki.
+The CLIs and servers print these terms to stderr once when they load either model, whether you
+name it by alias or repo ID or pass a file named `tsukuyomi-chan-6lang-fp16.onnx` or `tsukuyomi.onnx`;
+set `PIPER_PLUS_DISABLE_MODEL_NOTICE=1` to hide the notice.
+
 ```bash
 mkdir -p models/tsukuyomi-zs-v1
 curl -fL -o models/tsukuyomi-zs-v1/tsukuyomi.onnx https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/93c1fb6d67c29accc9ddf52326bb4582b1b52a3d/releases/zs-v1/tsukuyomi.onnx

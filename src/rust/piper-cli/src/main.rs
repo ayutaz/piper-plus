@@ -200,6 +200,32 @@ fn jsonl_output_path(
     )
 }
 
+/// 利用条件のあるモデルの案内を stderr に 1 プロセス 1 回だけ表示する
+/// (docs/reference/model-resolution.md §9)。`--quiet` では消さず、
+/// `PIPER_PLUS_DISABLE_MODEL_NOTICE` が `1`/`true`/`yes` のときだけ消す。
+/// `inputs` (モデル名・パス・URL) のどれかが案内対象なら表示する。
+fn print_model_notice_once(inputs: &[&str]) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static SHOWN: AtomicBool = AtomicBool::new(false);
+
+    let Some(lines) = inputs
+        .iter()
+        .find_map(|input| piper_plus::model_download::model_notice(input))
+    else {
+        return;
+    };
+    if piper_plus::model_download::model_notice_disabled() {
+        return;
+    }
+    if SHOWN.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    for line in lines {
+        eprintln!("{line}");
+    }
+    eprintln!("{}", piper_plus::model_download::MODEL_NOTICE_FOOTER);
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -272,6 +298,7 @@ fn main() -> Result<()> {
                 model_name
             )
         })?;
+        print_model_notice_once(&[model_name.as_str(), model_info.model_url.as_str()]);
 
         let dest_dir = model_dir_arg
             .clone()
@@ -322,11 +349,15 @@ fn main() -> Result<()> {
         let model_str = model_arg.as_ref().ok_or_else(|| {
             anyhow::anyhow!("--model is required for synthesis (or set PIPER_PLUS_DEFAULT_MODEL env var). Only --list-devices, --list-models, and --download-model work without it.")
         })?;
-        piper_plus::model_download::resolve_model_path(
-            &model_str.to_string_lossy(),
-            model_dir_arg.as_deref(),
-        )
-        .context("Failed to resolve model")?
+        let model_str = model_str.to_string_lossy();
+        // 入力 (名前・パス・URL) で判定し、解決後のファイル名でも判定する
+        // (部分一致や説明一致で解決したときもファイル名で拾うため)。
+        print_model_notice_once(&[&model_str]);
+        let resolved =
+            piper_plus::model_download::resolve_model_path(&model_str, model_dir_arg.as_deref())
+                .context("Failed to resolve model")?;
+        print_model_notice_once(&[&resolved.to_string_lossy()]);
+        resolved
     };
 
     // config.json 検出 (env: PIPER_PLUS_DEFAULT_CONFIG)

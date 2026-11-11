@@ -537,6 +537,18 @@ repos:
         files: ^(docs/spec/continue-on-error-allowlist\.toml|\.github/workflows/.*\.ya?ml|scripts/check_continue_on_error\.py)$
         pass_filenames: false
 
+      # PR にコメントを書くステップは、 フォーク PR (読み取り専用の GITHUB_TOKEN)
+      # では飛ばし、 本文は job summary に書き出す。 PR #934 (2026-11) で検査は
+      # 全部通ったのにコメント投稿だけが失敗し、 必須ゲートが落ちたため。
+      # job ごと飛ばすと検査も消えるので、 飛ばすのはコメントのステップだけ。
+      # scripts-tests.yml でも全 PR で同じ検査が走る。
+      - id: fork-pr-comment-guard
+        name: PR へのコメント投稿はフォーク PR で飛ばし、 本文を job summary にも出すか
+        entry: uv run --no-sync python scripts/check_fork_pr_comment_guard.py
+        language: system
+        files: ^(\.github/workflows/.*\.ya?ml|scripts/check_fork_pr_comment_guard\.py)$
+        pass_filenames: false
+
       # M2 T-008: docs/spec/test-flake-retry-contract.toml gate。
       # phase-1/2 runtime の dependency/CI flag 同期 + retry-count-max-2 invariant。
       - id: test-flake-retry
@@ -887,12 +899,12 @@ repos:
 
       # Mirror of .github/workflows/parity-hub.yml (voice-catalog matrix
       # entry). canonical model_resolution_vectors.json vs 5 runtime
-      # mirror catalogs.
+      # mirror catalogs, plus the usage-notice mirrors (WASM, piper_train).
       - id: voice-catalog-parity
-        name: voice catalog parity (canonical vs 5 runtime mirrors)
+        name: voice catalog parity (canonical vs 5 runtime mirrors + notice mirrors)
         entry: uv run --no-sync python scripts/check_voice_catalog_parity.py
         language: system
-        files: ^(test/model_resolution_vectors\.json|src/python_run/piper_plus/download\.py|src/cpp/(piper_plus_voices\.json|model_manager\.cpp)|src/rust/piper-core/src/model_download\.rs|src/csharp/PiperPlus\.Core/Config/VoiceCatalog\.cs|src/go/piperplus/voice_catalog\.go|scripts/check_voice_catalog_parity\.py|src/python_run/piper_plus/voices\.json)$
+        files: ^(test/model_resolution_vectors\.json|src/python_run/piper_plus/download\.py|src/cpp/(piper_plus_voices\.json|model_manager\.cpp)|src/rust/piper-core/src/model_download\.rs|src/csharp/PiperPlus\.Core/Config/VoiceCatalog\.cs|src/go/piperplus/voice_catalog\.go|src/wasm/openjtalk-web/src/model-manager\.js|src/python/piper_train/model_manager\.py|docs/reference/model-resolution\.md|scripts/check_voice_catalog_parity\.py|tests/scripts/test_check_voice_catalog_parity\.py|src/python_run/piper_plus/voices\.json)$
         pass_filenames: false
 
       # Mirror of the action-pin-gate steps of .github/workflows/lint-gates.yml. Codespell-baseline

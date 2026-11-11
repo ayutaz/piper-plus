@@ -1,5 +1,6 @@
 """Abstract base class and common types for language phonemizers."""
 
+import unicodedata
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -55,8 +56,10 @@ class Phonemizer(ABC):
             raise TypeError(f"Expected str, got {type(text).__name__}")
         if len(text) > self.MAX_INPUT_LENGTH:
             raise ValueError(f"Input too long: {len(text)} > {self.MAX_INPUT_LENGTH}")
-        # Remove control characters, keep newline / tab / carriage-return
-        return "".join(ch for ch in text if ch >= " " or ch in "\n\t\r")
+        # Remove C0/C1 controls, keeping newline / tab / carriage-return.
+        return "".join(
+            ch for ch in text if unicodedata.category(ch) != "Cc" or ch in "\n\t\r"
+        )
 
     # ------------------------------------------------------------------
     # Public API

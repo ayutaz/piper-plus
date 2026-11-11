@@ -13,24 +13,205 @@ const DB_VERSION = 2;
 const HUGGINGFACE_API_BASE = "https://huggingface.co/api/models";
 const HUGGINGFACE_RESOLVE_BASE = "https://huggingface.co";
 
-/**
- * Shortcut names that resolve to full HuggingFace repository identifiers.
- */
-const MODEL_REGISTRY = {
-  tsukuyomi: "ayousanz/piper-plus-tsukuyomi-chan",
-  "tsukuyomi-chan": "ayousanz/piper-plus-tsukuyomi-chan",
-  css10: "ayousanz/piper-plus-css10-ja-6lang",
-  "css10-ja": "ayousanz/piper-plus-css10-ja-6lang",
-};
-
-// Experimental reference-conditioned graph: do not auto-select an encoder or
-// combine the nested release with the repository's legacy root config.
-const PUBLIC_BASE_PREFIX =
-  "https://huggingface.co/ayousanz/piper-plus-base/resolve/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/";
-const PUBLIC_BASE_ALIASES = new Set(["base", "zero-shot-base-zs-v1", "ayousanz/piper-plus-base"]);
 // The published base.onnx.json carries no sha256; keep in sync with
 // scripts/public_base_runtime.py (FILES["base.onnx"]).
 const PUBLIC_BASE_SHA256 = "e9860701a941db02149c7cfbe19cfb578c235c5e25020f1f592131d9b3b30f84";
+
+/**
+ * Catalog models. Mirrors `voice_catalog` in test/model_resolution_vectors.json
+ * (key, every alias, repo, files and revision); scripts/check_voice_catalog_parity.py
+ * checks that each name appears here. The catalog key and every alias resolve
+ * straight to these files, without querying the HuggingFace API.
+ */
+const VOICE_CATALOG = Object.freeze([
+  Object.freeze({
+    key: "ja_JP-tsukuyomi-chan-medium",
+    repoId: "ayousanz/piper-plus-tsukuyomi-chan",
+    onnxFile: "tsukuyomi-chan-6lang-fp16.onnx",
+    configFile: "config.json",
+    aliases: Object.freeze([
+      "tsukuyomi",
+      "tsukuyomi-chan",
+      "ja-tsukuyomi",
+      "ayousanz/piper-plus-tsukuyomi-chan",
+    ]),
+  }),
+  Object.freeze({
+    key: "ja_JP-css10-6lang-medium",
+    repoId: "ayousanz/piper-plus-css10-ja-6lang",
+    onnxFile: "css10-ja-6lang-fp16.onnx",
+    configFile: "config.json",
+    aliases: Object.freeze([
+      "css10",
+      "css10-6lang",
+      "css10-ja",
+      "ja-css10",
+      "ayousanz/piper-plus-css10-ja-6lang",
+    ]),
+  }),
+  // Experimental reference-conditioned graph: do not auto-select an encoder or
+  // combine the nested release with the repository's legacy root config.
+  Object.freeze({
+    key: "multilingual-zero-shot-base-zs-v1",
+    repoId: "ayousanz/piper-plus-base",
+    revision: "3620ed788667cb76f08bd6cf2db8152c1f4c8bd1",
+    onnxFile: "releases/zs-v1/base.onnx",
+    configFile: "releases/zs-v1/base.onnx.json",
+    sha256: PUBLIC_BASE_SHA256,
+    aliases: Object.freeze(["base", "zero-shot-base-zs-v1", "ayousanz/piper-plus-base"]),
+  }),
+]);
+
+/**
+ * Catalog key / alias -> catalog entry. A Map, so a name such as
+ * "constructor" never reaches Object.prototype.
+ */
+const MODEL_REGISTRY = new Map(
+  VOICE_CATALOG.flatMap((entry) => [entry.key, ...entry.aliases].map((name) => [name, entry]))
+);
+
+/**
+ * Concrete URLs for a catalog entry. An entry without a pinned revision keeps
+ * the repo id as its cache key (the key used before the catalog existed, so
+ * cached models stay valid); a pinned revision uses the model URL so another
+ * revision never reuses the cache entry.
+ */
+function catalogLocations(entry) {
+  const prefix = `${HUGGINGFACE_RESOLVE_BASE}/${entry.repoId}/resolve/${entry.revision ?? "main"}/`;
+  const modelUrl = prefix + entry.onnxFile;
+  const resolved = {
+    modelUrl,
+    configUrl: prefix + entry.configFile,
+    configFallbackUrl: null,
+    cacheKey: entry.revision ? modelUrl : entry.repoId,
+  };
+  if (entry.sha256) {
+    resolved.sha256 = entry.sha256;
+  }
+  return resolved;
+}
+
+// ---------------------------------------------------------------------------
+// Model usage notice (docs/reference/model-resolution.md §9)
+// ---------------------------------------------------------------------------
+
+/**
+ * Models whose use carries terms the user must see. Mirrors
+ * `voice_catalog.<key>.notice` / `notice_files` in
+ * test/model_resolution_vectors.json; scripts/check_voice_catalog_parity.py
+ * checks that every line below matches the canonical text.
+ */
+const MODEL_NOTICES = [
+  {
+    // voice_catalog["ja_JP-tsukuyomi-chan-medium"]
+    repoId: "ayousanz/piper-plus-tsukuyomi-chan",
+    // Catalog key and aliases (also matched when MODEL_REGISTRY lacks them).
+    names: ["ja_JP-tsukuyomi-chan-medium", "tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"],
+    lines: Object.freeze([
+      "[piper-plus] つくよみちゃんモデルの利用条件 / Terms for the Tsukuyomi-chan model",
+      "生成した音声を使うときは「Piper Plus:つくよみちゃん」のクレジット表記が必須です。",
+      "Credit 'Piper Plus:つくよみちゃん' is required when you use the generated audio.",
+      "非公式の作品です。夢前黎様は開発・サポートに携わっていません。お問い合わせは開発者へ。",
+      "Unofficial work. Rei Yumesaki is not involved in development or support; contact the developer.",
+      "禁止事項と規約 / Terms and prohibited uses: https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan",
+    ]),
+    files: ["tsukuyomi-chan-6lang-fp16.onnx", "tsukuyomi.onnx"],
+  },
+];
+
+/** Line printed after every notice; identical across runtimes. */
+export const MODEL_NOTICE_FOOTER =
+  "(この表示は PIPER_PLUS_DISABLE_MODEL_NOTICE=1 で消せます / Set PIPER_PLUS_DISABLE_MODEL_NOTICE=1 to hide this notice.)";
+
+const MODEL_NOTICE_ENV = "PIPER_PLUS_DISABLE_MODEL_NOTICE";
+const URL_SCHEME_RE = /^[a-z][a-z0-9+.-]*:\/\//i;
+
+let modelNoticeShown = false;
+
+/**
+ * Return the usage notice lines for a model name, HuggingFace repo id, URL or
+ * file path, or null when the model has no notice.
+ *
+ * Matches when the input equals a registry alias for the repo or the repo id,
+ * when a URL contains `/<repo_id>/`, or when the last path component equals
+ * one of the notice file names.
+ *
+ * @param {string} modelNameOrUrl
+ * @returns {readonly string[]|null}
+ */
+export function getModelNotice(modelNameOrUrl) {
+  if (typeof modelNameOrUrl !== "string" || modelNameOrUrl === "") {
+    return null;
+  }
+  const isUrl = URL_SCHEME_RE.test(modelNameOrUrl);
+  let path = modelNameOrUrl;
+  if (isUrl) {
+    path = path.split(/[?#]/, 1)[0];
+  }
+  const segments = path.split(/[/\\]/);
+  const fileName = segments[segments.length - 1];
+
+  for (const entry of MODEL_NOTICES) {
+    if (
+      modelNameOrUrl === entry.repoId ||
+      entry.names.includes(modelNameOrUrl) ||
+      MODEL_REGISTRY.get(modelNameOrUrl)?.repoId === entry.repoId
+    ) {
+      return entry.lines;
+    }
+    if (isUrl && modelNameOrUrl.includes(`/${entry.repoId}/`)) {
+      return entry.lines;
+    }
+    if (entry.files.includes(fileName)) {
+      return entry.lines;
+    }
+  }
+  return null;
+}
+
+/**
+ * True when the `PIPER_PLUS_DISABLE_MODEL_NOTICE` environment variable is
+ * `1`, `true` or `yes` (case-insensitive, surrounding whitespace ignored).
+ * Always false where there is no `process.env` (browsers).
+ *
+ * @param {Object<string, string|undefined>} [env]
+ * @returns {boolean}
+ */
+export function isModelNoticeDisabled(env = globalThis.process?.env) {
+  const value = env?.[MODEL_NOTICE_ENV];
+  if (typeof value !== "string") {
+    return false;
+  }
+  return ["1", "true", "yes"].includes(value.trim().toLowerCase());
+}
+
+/**
+ * Print a notice (its lines, then {@link MODEL_NOTICE_FOOTER}) at most once
+ * per page / process.
+ *
+ * @param {readonly string[]|null|undefined} notice
+ * @param {Object} [options]
+ * @param {boolean} [options.showModelNotice=true] - false suppresses the notice
+ * @param {(message: string) => void} [options.logger] - defaults to console.warn
+ * @returns {boolean} true when the notice was printed by this call
+ */
+export function emitModelNotice(notice, options = {}) {
+  if (!notice || notice.length === 0 || modelNoticeShown) {
+    return false;
+  }
+  if (options.showModelNotice === false || isModelNoticeDisabled()) {
+    return false;
+  }
+  modelNoticeShown = true;
+  const logger = options.logger ?? ((message) => console.warn(message));
+  logger([...notice, MODEL_NOTICE_FOOTER].join("\n"));
+  return true;
+}
+
+/** Test hook: allow the notice to be printed again. @private */
+export function _resetModelNoticeState() {
+  modelNoticeShown = false;
+}
 
 /**
  * Open (or create) the IndexedDB database used for model caching.
@@ -171,11 +352,14 @@ export class ModelManager {
    * @param {Object} [options]
    * @param {string} [options.cachePrefix='piper-plus-models'] - IndexedDB database name
    * @param {boolean} [options.verifyOnCacheHit=false] - Re-verify SHA-256 on cache retrieval
+   * @param {boolean} [options.showModelNotice=true] - Let loadModel() print a model's
+   *   usage notice with console.warn (once per page / process)
    */
   constructor(options = {}) {
     this._dbName = options.cachePrefix || DB_NAME;
     this._db = null;
     this._verifyOnCacheHit = options.verifyOnCacheHit || false;
+    this._showModelNotice = options.showModelNotice !== false;
   }
 
   /**
@@ -223,28 +407,37 @@ export class ModelManager {
    * Resolve a model identifier to concrete URLs for the ONNX model and its
    * companion config JSON.
    *
-   * The experimental "base" / "zero-shot-base-zs-v1" aliases use the pinned
-   * zs-v1 graph and sidecar, with a revision/path-specific cache key.
+   * A catalog key or alias (see VOICE_CATALOG, including a catalog model's
+   * repo id) resolves to the catalog's files without querying the HuggingFace
+   * API. The experimental "base" / "zero-shot-base-zs-v1" aliases use the
+   * pinned zs-v1 graph and sidecar, with a revision/path-specific cache key.
    *
    * Accepted formats:
-   *   - Registry shortcut: "css10"
-   *   - HuggingFace repo:  "ayousanz/piper-plus-css10-ja-6lang"
-   *   - Direct URL:        "https://example.com/model.onnx"
+   *   - Catalog key / alias: "css10", "ja_JP-css10-6lang-medium",
+   *                          "ayousanz/piper-plus-css10-ja-6lang"
+   *   - Other HuggingFace repo: "example-owner/example-voice" (files found via the API)
+   *   - Direct URL:          "https://example.com/model.onnx"
    *
    * @param {string} modelNameOrUrl
-   * @returns {Promise<{modelUrl: string, configUrl: string, configFallbackUrl: string|null, cacheKey: string, sha256?: string}>}
+   * @returns {Promise<{modelUrl: string, configUrl: string, configFallbackUrl: string|null, cacheKey: string, notice: readonly string[]|null, sha256?: string}>}
    *   `sha256` is the pinned model digest, set only for the public base.
+   *   `notice` is the model's usage notice (see {@link getModelNotice}), or null.
    */
   async _resolveUrls(modelNameOrUrl) {
-    if (PUBLIC_BASE_ALIASES.has(modelNameOrUrl)) {
-      const modelUrl = PUBLIC_BASE_PREFIX + "base.onnx";
-      return {
-        modelUrl,
-        configUrl: PUBLIC_BASE_PREFIX + "base.onnx.json",
-        configFallbackUrl: null,
-        cacheKey: modelUrl,
-        sha256: PUBLIC_BASE_SHA256,
-      };
+    const resolved = await this._resolveLocations(modelNameOrUrl);
+    resolved.notice = getModelNotice(modelNameOrUrl) ?? getModelNotice(resolved.modelUrl);
+    return resolved;
+  }
+
+  /**
+   * URL resolution behind {@link _resolveUrls}, without the notice lookup.
+   * @private
+   */
+  async _resolveLocations(modelNameOrUrl) {
+    // Catalog key or alias (a catalog model's repo id is one of its aliases).
+    const catalogEntry = MODEL_REGISTRY.get(modelNameOrUrl);
+    if (catalogEntry) {
+      return catalogLocations(catalogEntry);
     }
     // Direct URL.
     if (/^https?:\/\//i.test(modelNameOrUrl)) {
@@ -257,10 +450,8 @@ export class ModelManager {
       return { modelUrl, configUrl, configFallbackUrl, cacheKey: modelUrl };
     }
 
-    // Registry shortcut.
-    const repoName = MODEL_REGISTRY[modelNameOrUrl] || modelNameOrUrl;
-
-    // Resolve ONNX and config filenames from the HuggingFace API.
+    // Any other HuggingFace repo: find the ONNX and config filenames with the API.
+    const repoName = modelNameOrUrl;
     const { onnxFilename, configFilename } = await resolveModelFiles(repoName);
 
     const modelUrl = `${HUGGINGFACE_RESOLVE_BASE}/${repoName}/resolve/main/${onnxFilename}`;
@@ -274,8 +465,11 @@ export class ModelManager {
    *
    * This is the public entry point that delegates to {@link _resolveUrls}.
    *
+   * The result's `notice` holds the model's usage notice lines, or null. This
+   * method only reports it; it does not print anything.
+   *
    * @param {string} modelNameOrUrl - Registry shortcut, HuggingFace repo, or direct URL
-   * @returns {Promise<{modelUrl: string, configUrl: string, configFallbackUrl: string|null, cacheKey: string}>}
+   * @returns {Promise<{modelUrl: string, configUrl: string, configFallbackUrl: string|null, cacheKey: string, notice: readonly string[]|null}>}
    */
   async resolveUrls(modelNameOrUrl) {
     return this._resolveUrls(modelNameOrUrl);
@@ -284,20 +478,32 @@ export class ModelManager {
   /**
    * Load a model and its config, using the IndexedDB cache when available.
    *
+   * When the model has a usage notice, it is printed with console.warn once
+   * per page / process unless `showModelNotice: false` was passed to the
+   * constructor or `PIPER_PLUS_DISABLE_MODEL_NOTICE` is set (Node).
+   *
    * @param {string} modelNameOrUrl - Registry shortcut, HuggingFace repo name, or direct URL
    * @param {Object} [options]
    * @param {Function} [options.onProgress] - ({loaded, total, percentage}) => void
-   * @returns {Promise<{modelData: ArrayBuffer, config: Object}>}
+   * @returns {Promise<{modelData: ArrayBuffer, config: Object, notice: readonly string[]|null}>}
    */
   async loadModel(modelNameOrUrl, options = {}) {
     const { onProgress } = options;
-    const { modelUrl, configUrl, configFallbackUrl, cacheKey, sha256: pinnedSha256 } =
-      await this._resolveUrls(modelNameOrUrl);
+    const {
+      modelUrl,
+      configUrl,
+      configFallbackUrl,
+      cacheKey,
+      notice,
+      sha256: pinnedSha256,
+    } = await this._resolveUrls(modelNameOrUrl);
+
+    emitModelNotice(notice, { showModelNotice: this._showModelNotice });
 
     // Try the cache first.
     const cached = await this.getFromCache(cacheKey);
     if (cached) {
-      return cached;
+      return { ...cached, notice };
     }
 
     // Download config with fallback (small, no progress tracking needed).
@@ -327,7 +533,9 @@ export class ModelManager {
       // Verify against the pinned digest, else the expected hash in the config.
       const expected = pinnedSha256 ?? config.sha256;
       if (expected && sha256 !== expected) {
-        throw new Error(`SHA-256 mismatch for downloaded model: expected ${expected}, got ${sha256}`);
+        throw new Error(
+          `SHA-256 mismatch for downloaded model: expected ${expected}, got ${sha256}`
+        );
       }
     }
 
@@ -337,7 +545,7 @@ export class ModelManager {
     const store = tx.objectStore(STORE_NAME);
     await wrapRequest(store.put({ modelData, config, timestamp: Date.now(), sha256 }, cacheKey));
 
-    return { modelData, config };
+    return { modelData, config, notice };
   }
 
   /**

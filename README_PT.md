@@ -405,6 +405,8 @@ Plugin para usar o Piper no Unity: [github.com/ayutaz/uPiper](https://github.com
 
 Modelos exclusivos do piper-plus: [base Zero-Shot/FT zs-v1](https://huggingface.co/ayousanz/piper-plus-base/tree/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1) · [Tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
 
+> **Modelo Tsukuyomi-chan:** ao usar o áudio gerado, é obrigatório incluir o crédito `Piper Plus:つくよみちゃん`. Consulte os usos proibidos e as condições de uso na [página do modelo](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan). Do ponto de vista da Tsukuyomi-chan, este modelo é uma obra não oficial; Rei Yumesaki não participa do seu desenvolvimento nem do suporte. Envie dúvidas ao desenvolvedor pelo [GitHub Issues](https://github.com/ayutaz/piper-plus/issues) ou por outros canais, e não para Rei Yumesaki.
+
 > **Nota:** O piper-plus usa seu próprio G2P e sistema de fonemas, portanto não é compatível com os modelos do Piper upstream (rhasspy/piper-voices).
 
 ### Artigos relacionados

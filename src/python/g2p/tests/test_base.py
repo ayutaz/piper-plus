@@ -43,3 +43,34 @@ class TestPhonemizerABC:
 
         with pytest.raises(TypeError):
             PartialPhonemizer()
+
+
+class _EchoPhonemizer(Phonemizer):
+    def phonemize_with_prosody(self, text: str):
+        return list(text), [None] * len(text)
+
+
+class TestPhonemizerInputContract:
+    def test_strips_c0_and_c1_controls_but_keeps_line_whitespace(self):
+        phonemizer = _EchoPhonemizer()
+
+        assert phonemizer.phonemize("A\x00B\x7fC\u0085D\n\t\r") == list("ABCD\n\t\r")
+
+    def test_rejects_non_string_input(self):
+        phonemizer = _EchoPhonemizer()
+
+        with pytest.raises(TypeError, match="Expected str, got int"):
+            phonemizer.phonemize(123)
+
+    def test_accepts_input_at_maximum_length(self):
+        phonemizer = _EchoPhonemizer()
+        text = "a" * phonemizer.MAX_INPUT_LENGTH
+
+        assert len(phonemizer.phonemize(text)) == phonemizer.MAX_INPUT_LENGTH
+
+    def test_rejects_input_over_maximum_length(self):
+        phonemizer = _EchoPhonemizer()
+        text = "a" * (phonemizer.MAX_INPUT_LENGTH + 1)
+
+        with pytest.raises(ValueError, match="Input too long"):
+            phonemizer.phonemize(text)

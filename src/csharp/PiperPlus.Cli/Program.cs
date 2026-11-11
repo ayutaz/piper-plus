@@ -338,6 +338,11 @@ internal static partial class Program
                         LogInfo(quiet, $"Resolved '{downloadModelName}' -> '{resolvedName}'");
                     }
 
+                    if (resolvedVoice is not null)
+                    {
+                        ShowModelNotice(downloadModelName, resolvedVoice.Key);
+                    }
+
                     DirectoryInfo? dlModelDir = parseResult.GetValue(modelDirOption);
                     string targetDir = dlModelDir?.FullName
                         ?? Environment.GetEnvironmentVariable("PIPER_PLUS_MODEL_DIR")
@@ -470,6 +475,11 @@ internal static partial class Program
                         {
                             LogInfo(quiet, $"Resolved model: {resolvedModelPath}");
                         }
+
+                        // Usage notice (model-resolution.md §9): the raw input
+                        // (name / alias / repo / URL / path) or the resolved
+                        // file name. Not tied to --quiet.
+                        ShowModelNotice(modelPath, resolvedModelPath);
 
                         modelPath = resolvedModelPath;
                     }
@@ -1884,6 +1894,47 @@ internal static partial class Program
         if (debug && !quiet)
         {
             Console.Error.WriteLine($"[DBG] {message}");
+        }
+    }
+
+    // ----------------------------------------------------------------
+    // Model usage notice (docs/reference/model-resolution.md §9)
+    // ----------------------------------------------------------------
+    private static bool modelNoticeShown;
+
+    /// <summary>
+    /// Prints the usage notice of the first candidate that names a model with
+    /// one, to stderr, at most once per process. Hidden only by
+    /// <c>PIPER_PLUS_DISABLE_MODEL_NOTICE</c>, never by <c>--quiet</c>.
+    /// </summary>
+    private static void ShowModelNotice(params string?[] candidates)
+    {
+        if (modelNoticeShown || ModelManager.IsModelNoticeDisabled())
+        {
+            return;
+        }
+
+        foreach (string? candidate in candidates)
+        {
+            if (string.IsNullOrEmpty(candidate))
+            {
+                continue;
+            }
+
+            IReadOnlyList<string> notice = ModelManager.GetModelNotice(candidate);
+            if (notice.Count == 0)
+            {
+                continue;
+            }
+
+            modelNoticeShown = true;
+            foreach (string line in notice)
+            {
+                Console.Error.WriteLine(line);
+            }
+
+            Console.Error.WriteLine(ModelManager.ModelNoticeFooter);
+            return;
         }
     }
 

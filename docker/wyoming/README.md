@@ -13,6 +13,13 @@ docker compose up -d
 The default model (`tsukuyomi`) is downloaded from HuggingFace on first
 startup.  Subsequent starts use the cached model.
 
+With the Tsukuyomi-chan model the server prints its terms to the log
+(stderr) once at startup: the credit "Piper Plus:つくよみちゃん" is required
+when you use the generated audio. See the
+[model page](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) for
+prohibited uses. Set `PIPER_PLUS_DISABLE_MODEL_NOTICE=1` to hide the notice;
+the terms still apply.
+
 ## Home Assistant setup
 
 1. Open **Settings > Devices & Services > Add Integration**.

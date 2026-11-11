@@ -40,7 +40,20 @@
       "aliases": [
         "tsukuyomi",
         "tsukuyomi-chan",
-        "ja-tsukuyomi"
+        "ja-tsukuyomi",
+        "ayousanz/piper-plus-tsukuyomi-chan"
+      ],
+      "notice": [
+        "[piper-plus] つくよみちゃんモデルの利用条件 / Terms for the Tsukuyomi-chan model",
+        "生成した音声を使うときは「Piper Plus:つくよみちゃん」のクレジット表記が必須です。",
+        "Credit 'Piper Plus:つくよみちゃん' is required when you use the generated audio.",
+        "非公式の作品です。夢前黎様は開発・サポートに携わっていません。お問い合わせは開発者へ。",
+        "Unofficial work. Rei Yumesaki is not involved in development or support; contact the developer.",
+        "禁止事項と規約 / Terms and prohibited uses: https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan"
+      ],
+      "notice_files": [
+        "tsukuyomi-chan-6lang-fp16.onnx",
+        "tsukuyomi.onnx"
       ]
     },
     "ja_JP-css10-6lang-medium": {
@@ -55,7 +68,8 @@
         "css10",
         "css10-6lang",
         "css10-ja",
-        "ja-css10"
+        "ja-css10",
+        "ayousanz/piper-plus-css10-ja-6lang"
       ]
     },
     "multilingual-zero-shot-base-zs-v1": {
@@ -105,10 +119,18 @@
       "description": "Exact catalog key match (e.g., ja_JP-tsukuyomi-chan-medium)"
     },
     {
-      "id": "hf_repo_id",
+      "id": "catalog_repo_id",
       "input": "ayousanz/piper-plus-tsukuyomi-chan",
+      "type": "alias",
+      "expected_repo": "ayousanz/piper-plus-tsukuyomi-chan",
+      "expected_onnx": "tsukuyomi-chan-6lang-fp16.onnx",
+      "description": "A catalog model's HuggingFace repo ID is one of its aliases and resolves to the catalog files"
+    },
+    {
+      "id": "hf_repo_id",
+      "input": "example-owner/example-voice",
       "type": "huggingface",
-      "description": "HuggingFace repo ID (contains slash) triggers download"
+      "description": "Any other HuggingFace repo ID (contains slash) triggers download"
     },
     {
       "id": "nonexistent_alias",

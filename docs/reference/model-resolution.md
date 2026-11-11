@@ -100,26 +100,25 @@ Voice catalog から以下の優先順位で検索する:
 | `files` | array/map | ダウンロード対象ファイル (ONNX + config) |
 | `aliases` | array | ショートネームのリスト |
 | `description` | string | 説明文 |
+| `notice` | array of string (optional) | モデルを使う前に表示する利用案内。1 要素が 1 行 ([§9](#9-利用案内-model-notice)) |
+| `notice_files` | array of string (optional) | パスで指定されたときに、このエントリの利用案内を出す ONNX のファイル名 ([§9](#9-利用案内-model-notice)) |
 
 ### Alias Registry and catalog key
 
-`test/model_resolution_vectors.json` の `aliases` セクションが user-facing alias の
-canonical registry である。catalog 接続された runtime はこの定義と一致させる。
-高レベル API と download CLI が別の入口を持つ場合は、実装済み alias を runtime 別に
-明記し、未接続の alias を全 runtime の機能として扱わない。`voice_catalog` の `key`
-は alias とは別の完全なカタログ識別子であり、catalog 接続されたランタイムでは直接
-指定できる。
+`test/model_resolution_vectors.json` の `voice_catalog` が、モデル名の正本である。
+各エントリの `key` (完全なカタログ識別子) と `aliases` のすべてを、catalog を持つ
+すべてのランタイムが受け付け、正本の `repo_id` / `onnx_file` / `config_file` /
+`revision` に解決する。HuggingFace の repo ID も `aliases` に入れてあるので、
+`ayousanz/piper-plus-tsukuyomi-chan` のような指定も Step 3 の自動検出ではなく
+カタログのファイルに解決される。`scripts/check_voice_catalog_parity.py` が、
+各ランタイムの写しに `key` と全 `aliases` が文字列リテラルとして出てくることを
+検査する。正本の先頭にある旧 `aliases` セクションは参照用で、どのランタイムも読まない。
 
-| Alias | Repo ID | ONNX File |
-|-------|---------|-----------|
-| `tsukuyomi` | `ayousanz/piper-plus-tsukuyomi-chan` | `tsukuyomi-chan-6lang-fp16.onnx` |
-| `css10` | `ayousanz/piper-plus-css10-ja-6lang` | `css10-ja-6lang-fp16.onnx` |
-| `base` | `ayousanz/piper-plus-base` at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` | `releases/zs-v1/base.onnx` |
-| `zero-shot-base-zs-v1` | `ayousanz/piper-plus-base` at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` | `releases/zs-v1/base.onnx` |
-| `ayousanz/piper-plus-base` | `ayousanz/piper-plus-base` at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` | `releases/zs-v1/base.onnx` |
-
-The catalog key for this entry is `multilingual-zero-shot-base-zs-v1`. It is
-not an additional user-facing alias; its aliases are the three values above.
+| Key | Aliases | Repo ID | ONNX File |
+|-----|---------|---------|-----------|
+| `ja_JP-tsukuyomi-chan-medium` | `tsukuyomi`, `tsukuyomi-chan`, `ja-tsukuyomi`, `ayousanz/piper-plus-tsukuyomi-chan` | `ayousanz/piper-plus-tsukuyomi-chan` | `tsukuyomi-chan-6lang-fp16.onnx` |
+| `ja_JP-css10-6lang-medium` | `css10`, `css10-6lang`, `css10-ja`, `ja-css10`, `ayousanz/piper-plus-css10-ja-6lang` | `ayousanz/piper-plus-css10-ja-6lang` | `css10-ja-6lang-fp16.onnx` |
+| `multilingual-zero-shot-base-zs-v1` | `base`, `zero-shot-base-zs-v1`, `ayousanz/piper-plus-base` | `ayousanz/piper-plus-base` at revision `3620ed788667cb76f08bd6cf2db8152c1f4c8bd1` | `releases/zs-v1/base.onnx` |
 
 > `base` と `zero-shot-base-zs-v1` は、v2.0.2 で公開した pinned aliases です。
 > いずれも root の legacy `model.ckpt` を指さず、上記 revision の
@@ -129,11 +128,13 @@ not an additional user-facing alias; its aliases are the three values above.
 
 #### Runtime-specific alias status
 
-The Python high-level API (`src/python_run/piper_plus/api/_model_resolver.py`) currently
-exposes `base`, `zero-shot-base-zs-v1`, `ayousanz/piper-plus-base`, and `tsukuyomi`.
-It does not expose the CLI/catalog `css10` alias. The Python download CLI and the native
-catalog implementations have separate alias registries; a name present there is not
-automatically available through the high-level API.
+| ランタイム | 名前を受け付ける入口 |
+|-----------|--------------------|
+| Python | CLI と HTTP サーバー (`download.find_voice()`)、高レベル API (`_model_resolver.resolve_model()`)。どちらも `download.PIPER_PLUS_VOICES` を引く。`MODEL_ALIASES` はこのカタログから作る読み取り専用の一覧 (`PiperPlus.list_models()` が返す) |
+| Rust | `find_model()` が `MODEL_ALIASES` 表で完全一致を引き、旧 registry 名・部分一致・説明文一致も互換のため残す |
+| C# / C++ | `FindVoice()` / `findVoice()` (key と alias) |
+| WASM / npm | `ModelManager.resolveUrls()` / `loadModel()`。カタログの名前は HF API を呼ばずに URL を組み立てる |
+| Go | `piperplus.FindVoice()` (ライブラリ)。CLI はまだカタログに接続していない |
 
 ---
 
@@ -244,8 +245,8 @@ function find_config(onnx_path, explicit_config=None):
 | 機能 | Python | Rust | C# | Go |
 |------|--------|------|-----|-----|
 | Entry point | `_model_resolver.resolve_model()` | `model_download::resolve_model_path()` | `ModelManager.ResolveModelPathAsync()` | `ModelManager.FindModel()` |
-| Voice catalog | CLI: `download.PIPER_PLUS_VOICES`; API: `MODEL_ALIASES` | `model_download::builtin_registry()` | `VoiceCatalog.LoadMergedCatalog()` | metadataのみ。CLI未接続 |
-| Alias lookup | `MODEL_ALIASES` dict | `find_model()` (name/partial/desc) | `FindVoice()` (key/alias dict) | -- |
+| Voice catalog | `download.PIPER_PLUS_VOICES` (CLI と API で共通) | `model_download::builtin_registry()` | `VoiceCatalog.LoadMergedCatalog()` | `voice_catalog.go`。CLI未接続 |
+| Alias lookup | `download.resolve_piper_plus_voice()` | `find_model()` (`MODEL_ALIASES` 表、name/partial/desc) | `FindVoice()` (key/alias dict) | `FindVoice()` (key/alias) |
 | Config detection | API: `_find_config()`; CLI: `download.find_voice()` | `resolve_model_path()` | Download 時に catalog から取得 | `buildModelInfo()` |
 | Cache dir | API: `~/.cache/piper-plus/models`; CLI: 指定download dir | `default_model_dir()` | `GetDefaultModelDir()` | `DefaultCacheDir()` |
 | Download | API: `huggingface_hub`; CLI: `urlopen` | `reqwest` (feature-gated) | `HttpClient` | `net/http` |
@@ -268,9 +269,9 @@ function find_config(onnx_path, explicit_config=None):
 
 テストベクトルは `test/model_resolution_vectors.json` に定義されている。これは共有目標
 と検証項目の canonical matrix であり、各 runtime のテストは実装済み入口に対応する
-case を読み込んで検証する。runtime-specific な未実装経路（たとえば Python
-high-level API の `css10`、flat cache、directory-specific error）は、実装済みと
-報告せず差異として扱う。
+case を読み込んで検証する。runtime-specific な未実装経路（たとえば flat cache、directory-specific error）は、実装済みと
+報告せず差異として扱う。モデル名については、各ランタイムのテストが `voice_catalog` の
+`key` と全 `aliases` を読み、それぞれが正本のファイルに解決されることを確かめる。
 
 ### テストケース一覧
 
@@ -281,7 +282,8 @@ high-level API の `css10`、flat cache、directory-specific error）は、実�
 | `alias_base` | alias | `base` -> repo 解決 |
 | `alias_css10` | alias | `css10` -> repo 解決 |
 | `catalog_key_exact` | catalog_key | 完全キーマッチ。公開 base では `multilingual-zero-shot-base-zs-v1` |
-| `hf_repo_id` | huggingface | `/` 含む文字列を HF repo として処理 |
+| `catalog_repo_id` | alias | カタログにあるモデルの repo ID はエイリアスとしてカタログのファイルに解決する |
+| `hf_repo_id` | huggingface | カタログにない `/` 含む文字列を HF repo として処理 |
 | `nonexistent_alias` | error | 不明な名前でエラー |
 | `empty_input` | error | 空文字列でエラー |
 | `config_auto_detect_onnx_json` | config_detection | `.onnx.json` -> `config.json` の順で検索 |
@@ -302,6 +304,59 @@ high-level API の `css10`、flat cache、directory-specific error）は、実�
 | Catalog format | Python CLIはdict、Rust/C#/Goはsource内定義、C++はJSONと埋め込み定義 | JSON catalog を正とし各言語で読み込み |
 | Partial match | Rust のみ partial name + description match | 全実装で catalog alias ベースに統一予定 |
 | Auto-download | Python は `huggingface_hub`, 他は直接 HTTP | 各実装の依存に応じて許容 |
+
+---
+
+## 9. 利用案内 (model notice)
+
+利用条件のあるモデル (現在はつくよみちゃんモデルのみ) を使うとき、CLI とサーバーは
+`notice` を stderr に表示する。つくよみちゃんモデルは、生成音声を使うときに
+「Piper Plus:つくよみちゃん」のクレジット表記が必須で、つくよみちゃん側から見ると
+非公式の作品である (規約: <https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan>)。
+
+### 正本
+
+`test/model_resolution_vectors.json` の `voice_catalog.<key>.notice` が案内文の正本で、
+`notice_files` がファイル名による判定の正本である。各ランタイムの catalog はこれを写し、
+`scripts/check_voice_catalog_parity.py` が写しの各行の有無を検査する。案内文の行には
+`"` と `\` を入れない (各言語の文字列リテラルにそのまま書けるようにするため)。
+
+### 判定
+
+入力 (モデル名・パス・URL) が次のどれかに当たるとき、そのエントリの `notice` を返す。
+
+1. catalog の `key`、`aliases` のどれか、または `repo_id` と完全に一致する
+2. URL で、`/<repo_id>/` を含む
+3. パスで、ファイル名 (最後の要素) が `notice_files` のどれかと一致する
+
+### 表示
+
+| 項目 | 規則 |
+|------|------|
+| 表示する側 | CLI とサーバー (HTTP / Wyoming / OpenAI 互換 / WebUI) などの実行ファイル。ライブラリは判定結果を返すだけで、自分では表示しない |
+| 出力先 | stderr (ブラウザは `console.warn`)。stdout は音声やパスの出力に使われるため使わない |
+| 回数 | 1 プロセスで 1 回 |
+| 形式 | `notice` の各行をそのまま 1 行ずつ出し、最後に下の消し方の行を出す |
+| 消し方 | 環境変数 `PIPER_PLUS_DISABLE_MODEL_NOTICE` が `1` / `true` / `yes` (大文字小文字を区別せず、前後の空白を除く) のとき表示しない。`--quiet` では消えない。ブラウザ (npm) は `showModelNotice: false` オプション |
+
+消し方の行 (各ランタイム共通):
+
+```text
+(この表示は PIPER_PLUS_DISABLE_MODEL_NOTICE=1 で消せます / Set PIPER_PLUS_DISABLE_MODEL_NOTICE=1 to hide this notice.)
+```
+
+### 実装
+
+| ランタイム | 判定 (ライブラリ) | 表示 (実行ファイル) |
+|-----------|------------------|--------------------|
+| Python | `piper_plus.download.get_model_notice()`、`PiperPlus.model_notice` (表示は `print_model_notice()` / `show_model_notice()`) | CLI、HTTP サーバー、Wyoming |
+| Python (学習側・Docker) | `piper_train.model_manager.get_model_notice()` | `infer_onnx`、`model_manager.download_model()`、OpenAI 互換サーバー、WebUI |
+| Rust | `piper_plus::model_download::model_notice()` (旧名 `tsukuyomi-6lang-v2` とそのキャッシュファイル名も判定する) | `piper-plus` CLI |
+| Go | `piperplus.ModelNotice()` | `piper-plus` CLI (合成と `serve`) |
+| C# | `ModelManager.GetModelNotice()`、`VoiceInfo.Notice` | `piper-plus` CLI |
+| C++ | `piper::getModelNotice()` (`model_manager.hpp`) | `piper` CLI |
+| WASM / npm | `getModelNotice()`、`ModelManager.resolveUrls()` / `loadModel()` の `notice` | ブラウザにはプロセスの stderr がないため、`PiperPlus.initialize()` と `ModelManager.loadModel()` が `console.warn` で出す (`showModelNotice: false` で止める)。`piper-cli.js` は stderr |
+| C API / Swift / Kotlin | なし (モデルのパスだけを受け取るため) | アプリ側で表示する |
 
 
 ## Public baseline cache and integrity scope

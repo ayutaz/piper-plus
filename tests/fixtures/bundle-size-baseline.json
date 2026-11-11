@@ -7,37 +7,37 @@
       "package": "piper-plus",
       "ecosystem": "cargo",
       "tolerance": 0.05,
-      "size_bytes": 316914
+      "size_bytes": 333361
     },
     "maven::piper-plus-g2p-android": {
       "package": "piper-plus-g2p-android",
       "ecosystem": "maven",
       "tolerance": 0.05,
-      "size_bytes": 4762390
+      "size_bytes": 4762387
     },
     "npm::@piper-plus/g2p": {
       "package": "@piper-plus/g2p",
       "ecosystem": "npm",
       "tolerance": 0.03,
-      "size_bytes": 1707304
+      "size_bytes": 1707864
     },
     "npm::piper-plus": {
       "package": "piper-plus",
       "ecosystem": "npm",
       "tolerance": 0.03,
-      "size_bytes": 819496
+      "size_bytes": 824478
     },
     "nuget::PiperPlus.Cli": {
       "package": "PiperPlus.Cli",
       "ecosystem": "nuget",
       "tolerance": 0.05,
-      "size_bytes": 128467998
+      "size_bytes": 128475434
     },
     "nuget::PiperPlus.Core": {
       "package": "PiperPlus.Core",
       "ecosystem": "nuget",
       "tolerance": 0.05,
-      "size_bytes": 138030
+      "size_bytes": 142866
     }
   }
 }

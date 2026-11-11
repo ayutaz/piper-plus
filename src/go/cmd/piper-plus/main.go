@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/spf13/cobra"
 
@@ -122,6 +123,43 @@ func main() {
 	}
 }
 
+// modelNoticeMu and modelNoticeShown keep the model usage notice to one print
+// per process (docs/reference/model-resolution.md section 9). Tests reset
+// modelNoticeShown.
+var (
+	modelNoticeMu    sync.Mutex
+	modelNoticeShown bool
+)
+
+// printModelNotice writes the usage notice of the first input that has one
+// (model name, path, or URL) to w, followed by the footer. It prints at most
+// once per process, and not at all when PIPER_PLUS_DISABLE_MODEL_NOTICE is
+// set. --quiet does not hide it.
+func printModelNotice(w io.Writer, inputs ...string) {
+	if piperplus.ModelNoticeDisabled() {
+		return
+	}
+	var lines []string
+	for _, in := range inputs {
+		if lines = piperplus.ModelNotice(in); lines != nil {
+			break
+		}
+	}
+	if lines == nil {
+		return
+	}
+	modelNoticeMu.Lock()
+	defer modelNoticeMu.Unlock()
+	if modelNoticeShown {
+		return
+	}
+	modelNoticeShown = true
+	for _, line := range lines {
+		_, _ = fmt.Fprintln(w, line)
+	}
+	_, _ = fmt.Fprintln(w, piperplus.ModelNoticeFooter)
+}
+
 // stdinHasData reports whether stdin is connected to a pipe or file (i.e. not a
 // terminal). This is used to detect whether JSONL is being piped in.
 func stdinHasData() bool {
@@ -171,6 +209,7 @@ func runSynthesize(cmd *cobra.Command, args []string) error {
 
 	// --download-model: download a model by URL and exit.
 	if downloadModel != "" {
+		printModelNotice(cmd.ErrOrStderr(), downloadModel)
 		mgr := piperplus.NewModelManager(modelDir, logger)
 		path, err := mgr.DownloadModel(ctx, downloadModel)
 		if err != nil {
@@ -189,6 +228,7 @@ func runSynthesize(cmd *cobra.Command, args []string) error {
 	}
 
 	// Try resolving model name/alias if file doesn't exist.
+	modelInput := modelPath
 	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
 		mgr := piperplus.NewModelManager(modelDir, logger)
 		resolved, resolveErr := mgr.FindModel(modelPath)
@@ -197,6 +237,7 @@ func runSynthesize(cmd *cobra.Command, args []string) error {
 		}
 		modelPath = resolved
 	}
+	printModelNotice(cmd.ErrOrStderr(), modelInput, modelPath)
 
 	// Parse --phoneme-silence flags ("phoneme:seconds" format).
 	var phonemeSilenceMap map[string]float64

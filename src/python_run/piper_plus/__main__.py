@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from . import PiperVoice
-from .download import ensure_voice_exists, find_voice, get_voices
+from .download import ensure_voice_exists, find_voice, get_voices, print_model_notice
 from .inference_config import InferenceConfig
 
 
@@ -240,6 +240,7 @@ def main() -> None:
                 args.download_model,
                 args.download_dir,
             )
+            print_model_notice(args.download_model, onnx_path)
             print("Model downloaded successfully!", file=sys.stderr)
             print(f"Use with:  --model {onnx_path}", file=sys.stderr)
         except Exception as e:
@@ -252,6 +253,7 @@ def main() -> None:
         parser.error("--model is required (or use --list-models / --download-model)")
 
     # Download voice if file doesn't exist
+    model_arg = args.model
     model_path = Path(args.model)
     if not model_path.exists():
         # Load voice info
@@ -266,6 +268,9 @@ def main() -> None:
         voices_info.update(aliases_info)
         ensure_voice_exists(args.model, args.data_dir, args.download_dir, voices_info)
         args.model, args.config = find_voice(args.model, args.data_dir)
+
+    # Usage notice for models with terms (docs/reference/model-resolution.md §9)
+    print_model_notice(model_arg, args.model)
 
     # Create inference config
     config = InferenceConfig.from_args(args)

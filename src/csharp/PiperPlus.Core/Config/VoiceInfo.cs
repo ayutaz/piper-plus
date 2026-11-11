@@ -30,4 +30,17 @@ public record VoiceInfo(
 {
     /// <summary>HuggingFace revision for pinned model downloads.</summary>
     public string Revision { get; init; } = "main";
+
+    /// <summary>
+    /// Usage notice (terms, required credit) to show when this model is used.
+    /// Empty for models without usage conditions. Executables print it to
+    /// stderr; the library never prints it (docs/reference/model-resolution.md §9).
+    /// </summary>
+    public IReadOnlyList<string> Notice { get; init; } = [];
+
+    /// <summary>
+    /// Model file names that identify this model when given as a path, used to
+    /// decide whether <see cref="Notice"/> applies to a local file.
+    /// </summary>
+    public IReadOnlyList<string> NoticeFiles { get; init; } = [];
 }

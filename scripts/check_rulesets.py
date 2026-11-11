@@ -14,7 +14,8 @@ Modes:
     Checks the files themselves: the merge requirements on ``dev`` (the
     required checks, unresolved threads blocking merge, ``strict`` off, no
     bypass) and that the tag ruleset blocks deleting and moving every release
-    tag, ``v*``, ``*-v*`` and ``src/go/**``, and not the two moving tags
+    tag, ``v*``, ``*-v*`` and ``src/go/**``, and every ``archive/**`` tag
+    (the kept tip of a deleted branch), and not the two moving tags
     (``openjtalk-binaries-latest``, ``dev-20250610``). With ``--tags FILE``
     (one tag name per line) every listed tag must be covered or be one of
     those two.
@@ -64,6 +65,9 @@ RELEASE_TAG_SAMPLES = [
     "src/go/v0.2.0",
     "src/go/phonemize/v0.3.0",
 ]
+# A deleted branch's tip is kept as an `archive/<branch>` tag on purpose,
+# so those tags are protected like the release tags.
+ARCHIVE_TAG_SAMPLES = ["archive/v2", "archive/feat/zero-shot-v8-dataset-scaling"]
 
 
 class ApiError(RuntimeError):
@@ -157,6 +161,9 @@ def validate(desired: dict[str, dict], tags: list[str] | None = None) -> list[st
     for name in RELEASE_TAG_SAMPLES:
         if not ref_covered(tag, f"refs/tags/{name}"):
             errors.append(f"{TAG_RULESET}: release tag {name} is not covered")
+    for name in ARCHIVE_TAG_SAMPLES:
+        if not ref_covered(tag, f"refs/tags/{name}"):
+            errors.append(f"{TAG_RULESET}: archive tag {name} is not covered")
     for name in sorted(MOVING_TAGS):
         if ref_covered(tag, f"refs/tags/{name}"):
             errors.append(f"{TAG_RULESET}: {name} is moved on purpose and must not be covered")

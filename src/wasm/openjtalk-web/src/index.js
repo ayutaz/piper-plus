@@ -15,7 +15,7 @@ export { WebGPUSessionManager } from "./webgpu-session-manager.js";
 export { StreamingTTSPipeline, TextChunker } from "./streaming-pipeline.js";
 export { AudioBackendFactory } from "./audio-backend-factory.js";
 export { CacheManager } from "./cache-manager.js";
-export { ModelManager } from "./model-manager.js";
+export { ModelManager, MODEL_NOTICE_FOOTER, getModelNotice } from "./model-manager.js";
 export { AudioResult } from "./audio-result.js";
 export { SpeakerEncoder } from "./speaker-encoder.js";
 
@@ -53,7 +53,7 @@ import { checkPuaCompat, isSsml, parseSsml } from "@piper-plus/g2p";
 import * as piperPlusG2p from "@piper-plus/g2p";
 import { WebGPUSessionManager } from "./webgpu-session-manager.js";
 import { StreamingTTSPipeline } from "./streaming-pipeline.js";
-import { ModelManager } from "./model-manager.js";
+import { ModelManager, emitModelNotice, getModelNotice } from "./model-manager.js";
 import { AudioResult } from "./audio-result.js";
 import {
   DEFAULT_HOP_LENGTH,
@@ -159,6 +159,9 @@ export class PiperPlus {
    *   Defaults to `../dist/rust-wasm/piper_plus_wasm.js`.
    * @param {Function} [options.wasmLoader] - DI: async function returning WASM
    *   module for testing. Takes precedence over wasmG2pUrl.
+   * @param {boolean} [options.showModelNotice=true] - Print the usage notice of
+   *   models with terms (e.g. Tsukuyomi-chan) with console.warn, once per page.
+   *   In Node, `PIPER_PLUS_DISABLE_MODEL_NOTICE=1` also suppresses it.
    * @returns {Promise<PiperPlus>}
    */
   static async initialize(options = {}) {
@@ -625,10 +628,14 @@ export class PiperPlus {
 
       progress({ stage: "model", progress: 0, message: "Resolving model..." });
 
-      const modelManager = new ModelManager();
-      const { modelUrl, configUrl, configFallbackUrl } = await modelManager.resolveUrls(
-        options.model
-      );
+      const modelManager = new ModelManager({ showModelNotice: options.showModelNotice });
+      const resolved = await modelManager.resolveUrls(options.model);
+      const { modelUrl, configUrl, configFallbackUrl } = resolved;
+
+      // Usage notice for models with terms (docs/reference/model-resolution.md §9).
+      emitModelNotice(resolved.notice ?? getModelNotice(options.model), {
+        showModelNotice: options.showModelNotice,
+      });
 
       progress({ stage: "model", progress: 0.1, message: "Downloading config..." });
       let configResponse = await fetch(configUrl);

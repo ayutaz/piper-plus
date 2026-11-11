@@ -45,6 +45,7 @@ import {
   trimPaddingByDurations,
   trimSilence,
 } from '../src/short-text.js';
+import { emitModelNotice, getModelNotice } from '../src/model-manager.js';
 
 const HELP = `Usage: piper-plus --model <onnx> --config <json> --json-input [--output-file <wav>]
 
@@ -214,6 +215,12 @@ async function main() {
     stderr.write(HELP);
     exit(2);
   }
+
+  // Usage notice for models with terms, on stderr (stdout may carry the WAV).
+  // PIPER_PLUS_DISABLE_MODEL_NOTICE=1 hides it (docs/reference/model-resolution.md §9).
+  emitModelNotice(getModelNotice(opts.model), {
+    logger: (message) => console.error(message),
+  });
 
   const config = JSON.parse(readFileSync(opts.config, 'utf8'));
   const sampleRate = config?.audio?.sample_rate ?? 22050;

@@ -181,6 +181,17 @@ This document covers user-facing dictionary, model, and inference settings. Vari
   export PIPER_PLUS_MODEL_DIR=/opt/piper/models
   ```
 
+### PIPER_PLUS_DISABLE_MODEL_NOTICE
+
+- **Description**: Hide the usage notice that the CLIs and servers print to stderr when you use a model with terms (currently the Tsukuyomi-chan model: the credit "Piper Plus:つくよみちゃん" is required on generated audio). Accepts `1`, `true`, or `yes` (case-insensitive). The notice is printed once per process and is not hidden by `--quiet`. Hiding it does not lift the terms. See [model-resolution.md §9](../reference/model-resolution.md#9-利用案内-model-notice).
+- **Used by**: Python CLI, HTTP server, Wyoming, `infer_onnx.py`, Docker inference and WebUI; Rust, Go, C# and C++ CLIs; the `piper-plus` npm package under Node.js (in the browser, pass `showModelNotice: false` instead)
+- **Use cases**: Scripts and services that log stderr, after you have read the terms
+- **Example**:
+
+  ```bash
+  export PIPER_PLUS_DISABLE_MODEL_NOTICE=1
+  ```
+
 ## Runtime Configuration
 
 ### ESPEAK_DATA_PATH

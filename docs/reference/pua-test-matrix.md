@@ -86,7 +86,7 @@ these guards refuse to ship a config with multi-codepoint keys.
 | L5.1 | `get_phoneme_id_map(language)` returns single-codepoint keys for all languages | `test_pua_invariants.py::TestGeneratedMapInvariants` (param) | ✅ |
 | L5.2 | PUA v2 additions (ɔɪ, œ̃, ɐ̃) are in multilingual map as PUA chars | `test_pua_invariants.py::TestGeneratedMapInvariants::test_multilingual_contains_pua_v2_additions` | ✅ |
 | L5.3 | Pre-flight: every git-tracked config with a `phoneme_id_map` has only keys the C++ reader loads (single codepoint, or the raw aliases ɔɪ/œ̃/ɐ̃) | `scripts/check_config_phoneme_keys.py --repo` (`pua-consistency.yml::config-key-validator`), `tests/scripts/test_check_config_phoneme_keys.py` | ✅ |
-| L5.4 | Distributed (HF) configs of `MODEL_ALIASES`, at their pinned revision, satisfy the same rule; a fetch failure fails | `scripts/check_config_phoneme_keys.py --distributed` (`pua-consistency.yml::distributed-config-validator`) | ✅ |
+| L5.4 | Distributed (HF) configs of the catalog models (`voice_catalog` in `test/model_resolution_vectors.json`), at their pinned revision, satisfy the same rule; a fetch failure fails | `scripts/check_config_phoneme_keys.py --distributed` (`pua-consistency.yml::distributed-config-validator`) | ✅ |
 
 ### L6 — End-to-end runtime smoke tests (deferred)
 

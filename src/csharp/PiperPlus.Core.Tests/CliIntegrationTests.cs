@@ -263,8 +263,16 @@ public sealed class CliIntegrationTests
     /// (observed: macos-14 arm64, .NET 9 SDK 9.0.313). The CI workflow builds the CLI
     /// in Release mode before tests run, so the DLL is guaranteed to exist.
     /// </remarks>
-    internal static async Task<(int ExitCode, string StdOut, string StdErr)> RunCliAsync(
+    internal static Task<(int ExitCode, string StdOut, string StdErr)> RunCliAsync(
         params string[] args)
+        => RunCliWithEnvAsync(null, args);
+
+    /// <summary>
+    /// <see cref="RunCliAsync"/> with environment overrides for the child
+    /// (a <c>null</c> value removes the variable from the child environment).
+    /// </summary>
+    internal static async Task<(int ExitCode, string StdOut, string StdErr)> RunCliWithEnvAsync(
+        IReadOnlyDictionary<string, string?>? env, params string[] args)
     {
         string cliAssemblyPath = GetCliAssemblyPath();
 
@@ -287,6 +295,21 @@ public sealed class CliIntegrationTests
             // during Parse(), i.e. before `--version` is handled (Issue #735).
             WorkingDirectory = AppContext.BaseDirectory,
         };
+
+        if (env is not null)
+        {
+            foreach ((string key, string? value) in env)
+            {
+                if (value is null)
+                {
+                    psi.Environment.Remove(key);
+                }
+                else
+                {
+                    psi.Environment[key] = value;
+                }
+            }
+        }
 
         // Use ArgumentList to avoid quoting/escaping issues with spaces in paths.
         // Invoke the pre-built DLL directly to skip the implicit MSBuild that
@@ -657,6 +680,103 @@ public sealed class CliIntegrationTests
             || combined.Contains("Error", StringComparison.OrdinalIgnoreCase)
             || exitCode != 0,
             $"Expected model resolution attempt. ExitCode={exitCode}, Output: {combined}");
+    }
+
+    // ================================================================
+    // Model usage notice (docs/reference/model-resolution.md §9)
+    // ================================================================
+
+    // ASCII-only parts of the notice, so the assertions do not depend on the
+    // console code page the child uses for stderr on Windows.
+    private const string NoticeAsciiLine =
+        "Unofficial work. Rei Yumesaki is not involved in development or support; contact the developer.";
+
+    private const string NoticeFooterAscii =
+        "Set PIPER_PLUS_DISABLE_MODEL_NOTICE=1 to hide this notice.)";
+
+    /// <summary>
+    /// Runs the CLI with <c>--model &lt;dir&gt;/&lt;fileName&gt;</c> pointing at an
+    /// empty file: model resolution succeeds (the file exists) and the run then
+    /// stops at the missing config, so no model is loaded and nothing is downloaded.
+    /// </summary>
+    private static async Task<(int ExitCode, string StdOut, string StdErr)> RunWithLocalModelFileAsync(
+        string fileName, string? disableNotice, params string[] extraArgs)
+    {
+        string dir = Path.Join(Path.GetTempPath(), $"piper_notice_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            string modelFile = Path.Join(dir, fileName);
+            await File.WriteAllBytesAsync(modelFile, []);
+
+            var env = new Dictionary<string, string?>
+            {
+                ["PIPER_PLUS_DISABLE_MODEL_NOTICE"] = disableNotice,
+                ["PIPER_PLUS_DEFAULT_MODEL"] = null,
+            };
+            return await RunCliWithEnvAsync(
+                env, ["--model", modelFile, "--text", "test", .. extraArgs]);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    private static int CountOccurrences(string text, string value)
+    {
+        int count = 0;
+        for (int i = text.IndexOf(value, StringComparison.Ordinal);
+             i >= 0;
+             i = text.IndexOf(value, i + value.Length, StringComparison.Ordinal))
+        {
+            count++;
+        }
+
+        return count;
+    }
+
+    [Theory]
+    [Trait("Category", "CLI")]
+    [InlineData("tsukuyomi.onnx")]
+    [InlineData("tsukuyomi-chan-6lang-fp16.onnx")]
+    public async Task ModelNotice_TsukuyomiFile_PrintsOnceToStdErrEvenWhenQuiet(string fileName)
+    {
+        (int exitCode, string stdout, string stderr) =
+            await RunWithLocalModelFileAsync(fileName, null, "--quiet");
+        SkipIfBuildFailed(exitCode, stderr);
+
+        Assert.Equal(1, CountOccurrences(stderr, NoticeAsciiLine));
+        Assert.Equal(1, CountOccurrences(stderr, NoticeFooterAscii));
+        Assert.DoesNotContain(NoticeAsciiLine, stdout, StringComparison.Ordinal);
+        Assert.DoesNotContain(NoticeFooterAscii, stdout, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [Trait("Category", "CLI")]
+    [InlineData("1")]
+    [InlineData(" TRUE ")]
+    [InlineData("yes")]
+    public async Task ModelNotice_DisabledByEnv_PrintsNothing(string disableValue)
+    {
+        (int exitCode, string stdout, string stderr) =
+            await RunWithLocalModelFileAsync("tsukuyomi.onnx", disableValue);
+        SkipIfBuildFailed(exitCode, stderr);
+
+        Assert.DoesNotContain(NoticeAsciiLine, stderr + stdout, StringComparison.Ordinal);
+        Assert.DoesNotContain(NoticeFooterAscii, stderr + stdout, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task ModelNotice_OtherModelFile_PrintsNothing()
+    {
+        (int exitCode, string stdout, string stderr) =
+            await RunWithLocalModelFileAsync("css10-ja-6lang-fp16.onnx", "0");
+        SkipIfBuildFailed(exitCode, stderr);
+
+        Assert.DoesNotContain(NoticeAsciiLine, stderr + stdout, StringComparison.Ordinal);
+        Assert.DoesNotContain(NoticeFooterAscii, stderr + stdout, StringComparison.Ordinal);
     }
 
     // ================================================================
