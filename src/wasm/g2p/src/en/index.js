@@ -23,6 +23,7 @@
 
 import { getCmuDictSync, isCmuDictLoaded, loadCmuDict, toCmuDictMap } from "./cmudict.js";
 import { normalizeAndTokenize, normalizeNumbers } from "./normalize.js";
+import { stripControlChars } from "../sanitize.js";
 
 export { isCmuDictLoaded, loadCmuDict, normalizeAndTokenize, normalizeNumbers };
 
@@ -660,6 +661,7 @@ export class EnglishG2P {
    * @returns {{ tokens: string[], prosody: null[] }}
    */
   phonemize(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     const { tokens } = this._phonemize(text);
     return { tokens, prosody: new Array(tokens.length).fill(null) };
   }
@@ -673,6 +675,7 @@ export class EnglishG2P {
    * @returns {{ tokens: string[], prosody: {a1: number, a2: number, a3: number}[] }}
    */
   phonemizeWithProsody(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     return this._phonemize(text);
   }
 }

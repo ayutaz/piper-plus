@@ -17,6 +17,7 @@
  */
 
 import { extractPhonemesFromLabels } from "./phoneme-extract.js";
+import { stripControlChars } from "../sanitize.js";
 
 /**
  * Dictionary file names required for OpenJTalk.
@@ -114,6 +115,7 @@ export class JapaneseG2P {
    * @throws {Error} If OpenJTalk returns an error
    */
   phonemize(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     const { tokens } = this._synthesizeLabelsAndExtract(text);
     return { tokens, prosody: tokens.map(() => null) };
   }
@@ -130,6 +132,7 @@ export class JapaneseG2P {
    * @throws {Error} If OpenJTalk returns an error
    */
   phonemizeWithProsody(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     return this._synthesizeLabelsAndExtract(text);
   }
 

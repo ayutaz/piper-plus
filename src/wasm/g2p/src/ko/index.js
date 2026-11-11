@@ -18,6 +18,8 @@
  * Pure JavaScript -- no external dependencies.
  */
 
+import { stripControlChars } from "../sanitize.js";
+
 // ---------------------------------------------------------------------------
 // Hangul syllable block range
 // ---------------------------------------------------------------------------
@@ -493,6 +495,7 @@ export class KoreanG2P {
    * @returns {{ tokens: string[], prosody: null[] }}
    */
   phonemize(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     if (!text || typeof text !== "string") {
       return { tokens: [], prosody: [] };
     }
@@ -512,6 +515,7 @@ export class KoreanG2P {
    * @returns {{ tokens: string[], prosody: ({ a1: number, a2: number, a3: number })[] }}
    */
   phonemizeWithProsody(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     if (!text || typeof text !== "string") {
       return { tokens: [], prosody: [] };
     }

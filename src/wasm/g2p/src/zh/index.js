@@ -29,6 +29,7 @@ import {
 } from "./pinyin-dict.js";
 import { phonemizeChinese } from "./pinyin.js";
 import { phonemizeEmbeddedEnglish } from "./loanword.js";
+import { stripControlChars } from "../sanitize.js";
 
 export { PinyinDictionary, createPinyinDictionary, isPinyinDictionaryLoaded, loadPinyinDictionary };
 
@@ -172,6 +173,7 @@ export class ChineseG2P {
    * @returns {{ tokens: string[], prosody: null[] }}
    */
   phonemize(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     const { tokens } = this._phonemize(text);
     return { tokens, prosody: new Array(tokens.length).fill(null) };
   }
@@ -188,6 +190,7 @@ export class ChineseG2P {
    * @returns {{ tokens: string[], prosody: ({ a1: number, a2: number, a3: number }|null)[] }}
    */
   phonemizeWithProsody(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     return this._phonemize(text);
   }
 
@@ -201,6 +204,7 @@ export class ChineseG2P {
    * @returns {{ tokens: string[], prosody: null[] }}
    */
   phonemizeEmbeddedEnglish(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     const { tokens } = phonemizeEmbeddedEnglish(text);
     return { tokens, prosody: new Array(tokens.length).fill(null) };
   }
@@ -212,6 +216,7 @@ export class ChineseG2P {
    * @returns {{ tokens: string[], prosody: { a1: number, a2: number, a3: number }[] }}
    */
   phonemizeEmbeddedEnglishWithProsody(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     return phonemizeEmbeddedEnglish(text);
   }
 

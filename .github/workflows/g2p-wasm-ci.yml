@@ -20,6 +20,8 @@ on:
       - 'tests/fixtures/g2p/known_divergences.json'
       # Read by the CJK punctuation contract tests (#823).
       - 'tests/fixtures/g2p/cjk_punctuation_cases.json'
+      # Read by the input-sanitize contract tests.
+      - 'tests/fixtures/g2p/input_sanitize_cases.json'
       - 'tests/fixtures/g2p/english_no_drop_words.json'
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
@@ -44,6 +46,8 @@ on:
       - 'tests/fixtures/g2p/known_divergences.json'
       # Read by the CJK punctuation contract tests (#823).
       - 'tests/fixtures/g2p/cjk_punctuation_cases.json'
+      # Read by the input-sanitize contract tests.
+      - 'tests/fixtures/g2p/input_sanitize_cases.json'
       - 'tests/fixtures/g2p/english_no_drop_words.json'
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
@@ -114,7 +118,7 @@ jobs:
         run: npm install
 
       - name: Run tests
-        run: node --test test/test-encode.js test/test-english.js test/test-g2p.js test/test-g2p-contract.js test/test-g2p-integration.js test/test-languages.js test/test-detect.js test/test-cjk-punctuation-contract.js test/test-pua-map.js test/test-swedish.js test/test-korean.js test/test-custom-dict.js test/test-strict-mode.js test/test-spanish.js test/test-french.js test/test-portuguese.js test/test-chinese.js test/test-chinese-zh-en.js test/test-latin-common.js test/test-exports.js test/test-package-metadata.js
+        run: node --test test/test-encode.js test/test-english.js test/test-g2p.js test/test-g2p-contract.js test/test-g2p-integration.js test/test-languages.js test/test-detect.js test/test-cjk-punctuation-contract.js test/test-pua-map.js test/test-swedish.js test/test-korean.js test/test-custom-dict.js test/test-strict-mode.js test/test-spanish.js test/test-french.js test/test-portuguese.js test/test-chinese.js test/test-chinese-zh-en.js test/test-latin-common.js test/test-exports.js test/test-package-metadata.js test/test-input-sanitize-contract.js
 
       - name: Run golden tests
         run: node --test test/test-g2p-golden.js test/test-g2p-golden-parity.js

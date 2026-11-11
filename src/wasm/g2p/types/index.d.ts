@@ -870,6 +870,21 @@ export class UnicodeLanguageDetector {
  */
 export function normalizeCjkPunctuationForLatin(text: string): string;
 
+/**
+ * Strip control characters from a text before it is read, by the rule every
+ * runtime shares (`docs/spec/input-sanitize-contract.toml`).
+ *
+ * `\n`, `\t` and `\r` stay; VT, FF and NEL (U+000B, U+000C, U+0085) become a
+ * space; every other control character (Unicode category Cc) is removed.
+ * Format characters, separators, NBSP and lone surrogates stay. Idempotent.
+ * `G2P` and every language class apply this at the start of each public
+ * reading method.
+ *
+ * @param text - Any text.
+ * @returns The text without control characters (a non-string is returned as it is).
+ */
+export function stripControlChars(text: string): string;
+
 // ---------------------------------------------------------------------------
 // Encoder
 // ---------------------------------------------------------------------------

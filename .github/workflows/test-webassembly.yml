@@ -15,6 +15,8 @@ on:
       # Read by the G2P golden parity tests.
       - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
       - 'tests/fixtures/g2p/known_divergences.json'
+      # Read by the input-sanitize contract tests.
+      - 'tests/fixtures/g2p/input_sanitize_cases.json'
       # Read by the text-splitter contract tests (#831).
       - 'tests/fixtures/text_splitter/**'
       - 'tests/fixtures/g2p/english_no_drop_words.json'
@@ -32,6 +34,8 @@ on:
       # Read by the G2P golden parity tests.
       - 'tests/fixtures/g2p/phoneme_test_cases_golden.json'
       - 'tests/fixtures/g2p/known_divergences.json'
+      # Read by the input-sanitize contract tests.
+      - 'tests/fixtures/g2p/input_sanitize_cases.json'
       # Read by the text-splitter contract tests (#831).
       - 'tests/fixtures/text_splitter/**'
       - 'tests/fixtures/g2p/english_no_drop_words.json'
@@ -163,7 +167,7 @@ jobs:
           test/js/test-model-manager-cache.js \
           test/js/test-dictionary-cache.js \
           test/js/test-g2p-golden.js \
-          test/js/test-speaker-embedding.js
+          test/js/test-speaker-embedding.js \n          test/js/test-input-sanitize-contract.js
 
     - name: Upload coverage to Codecov (wasm)
       uses: codecov/codecov-action@v5.5.5

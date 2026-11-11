@@ -14,6 +14,8 @@
  * Pure JavaScript -- no external dependencies.
  */
 
+import { stripControlChars } from "../sanitize.js";
+
 // ---------------------------------------------------------------------------
 // Vowel / consonant sets
 // ---------------------------------------------------------------------------
@@ -1162,6 +1164,7 @@ export class SwedishG2P {
    * @returns {{ tokens: string[], prosody: null[] }}
    */
   phonemize(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     if (!text || typeof text !== "string") {
       return { tokens: [], prosody: [] };
     }
@@ -1182,6 +1185,7 @@ export class SwedishG2P {
    * @returns {{ tokens: string[], prosody: ({ a1: number, a2: number, a3: number }|null)[] }}
    */
   phonemizeWithProsody(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     if (!text || typeof text !== "string") {
       return { tokens: [], prosody: [] };
     }

@@ -29,6 +29,10 @@ import { readSpeakerInputContract, createSpeakerFeeds } from "./onnx-input-contr
 // the parsed segment list directly.
 export { isSsml, parseSsml, SsmlParser } from "@piper-plus/g2p";
 
+// The input-sanitize rule (docs/spec/input-sanitize-contract.toml) that every
+// synthesize method applies first.
+export { stripControlChars } from "./sanitize.js";
+
 // Re-export timing utilities from the main package entry so that users can
 // bring them in alongside the high-level PiperPlus and AudioResult APIs
 // without needing a separate subpath import.
@@ -47,6 +51,7 @@ export {
 // ---------------------------------------------------------------------------
 
 import { checkPuaCompat, isSsml, parseSsml } from "@piper-plus/g2p";
+import { stripControlChars } from "./sanitize.js";
 // Namespace import for `loadCmuDict`: @piper-plus/g2p releases up to 0.4.2
 // do not export it, and a named import of a missing export fails module
 // linking for the whole package. RustWasmAdapter checks it is a function.
@@ -193,6 +198,7 @@ export class PiperPlus {
    * @returns {Promise<AudioResult>}
    */
   async synthesize(text, options = {}) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     this._assertReady();
     if (this._warmupPromise) {
       await this._warmupPromise;
@@ -310,6 +316,7 @@ export class PiperPlus {
    *   would require time-shifting which is out of scope here).
    */
   async synthesizeSsml(ssmlText, options = {}) {
+    ssmlText = stripControlChars(ssmlText); // docs/spec/input-sanitize-contract.toml
     this._assertReady();
     if (this._warmupPromise) {
       await this._warmupPromise;
@@ -388,6 +395,7 @@ export class PiperPlus {
    * @returns {Promise<AudioResult>}
    */
   async synthesizeWithVoiceCloning(text, speakerEmbedding, options = {}) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     this._assertReady();
     if (this._warmupPromise) {
       await this._warmupPromise;
@@ -484,6 +492,7 @@ export class PiperPlus {
    * @returns {Promise<AudioResult>}
    */
   async synthesizeFromReferenceAudio({ text, referenceWav, encoder, sampleRate, options = {} }) {
+    // synthesize() strips the control characters (input-sanitize contract).
     if (!text) {
       throw new Error("text is required");
     }
@@ -511,6 +520,7 @@ export class PiperPlus {
    * @returns {Promise<string[]>} Each symbol once, in first-seen order.
    */
   async findDroppedSymbols(text, options = {}) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     this._assertReady();
     if (!text) {
       throw new Error("text is required");
@@ -536,6 +546,7 @@ export class PiperPlus {
    * @returns {Promise<void>}
    */
   async synthesizeStreaming(text, options = {}) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     this._assertReady();
     if (!text) {
       throw new Error("text is required");

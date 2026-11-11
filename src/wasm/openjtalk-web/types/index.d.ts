@@ -942,6 +942,16 @@ export class SsmlParser {
   static parse(text: string): SsmlSegment[];
 }
 
+/**
+ * Strip control characters from a text by the rule every runtime shares
+ * (`docs/spec/input-sanitize-contract.toml`): `\n`, `\t` and `\r` stay; VT,
+ * FF and NEL become a space; every other control character (Unicode category
+ * Cc) is removed. Every `synthesize*` method and `findDroppedSymbols` apply
+ * it first, before SSML detection, the language detection and sentence
+ * splitting, so a text of only control characters is an empty text.
+ */
+export function stripControlChars(text: string): string;
+
 // ===========================================================================
 // AUTO-GENERATED CONSTANTS START — do not edit by hand
 //
