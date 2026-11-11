@@ -1,7 +1,7 @@
 // Strips control characters from a text before it is read, by the rule every
 // runtime shares (docs/spec/input-sanitize-contract.toml).
 //
-// Header-only: piper.cpp, chinese_loanword.cpp, the C API and main.cpp call
+// Header-only: piper.cpp, chinese_phonemize.cpp, the C API and main.cpp call
 // it, and several test executables compile those sources directly.
 
 #ifndef PIPER_TEXT_SANITIZE_HPP

@@ -598,6 +598,13 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synth_start(
 
         // Before the custom dictionary (docs/spec/input-sanitize-contract.toml).
         std::string processedText = piper::stripControlChars(text);
+        if (processedText.empty()) {
+            // A text of only control characters is an empty text, which is
+            // rejected above.
+            engine->voice.synthesisConfig = engine->iterState.configSnapshot_;
+            set_error("text is empty after removing control characters");
+            return PIPER_PLUS_ERR_TEXT;
+        }
         if (engine->customDict) {
             processedText = engine->customDict->applyToText(processedText);
         }
