@@ -21,36 +21,36 @@ namespace piper {
 // Works on bytes: C0 and DEL are single bytes, and C1 is the two-byte
 // sequence 0xC2 0x80-0x9F. Bytes that are not valid UTF-8 are kept as they
 // are, so the phonemizers see the same invalid input as before.
-inline std::string stripControlChars(const std::string &utf8) {
-  std::string out;
-  out.reserve(utf8.size());
-  const std::size_t n = utf8.size();
-  for (std::size_t i = 0; i < n; ++i) {
-    const auto b = static_cast<unsigned char>(utf8[i]);
-    if (b < 0x20) {
-      if (b == '\n' || b == '\t' || b == '\r') {
-        out.push_back(static_cast<char>(b));
-      } else if (b == 0x0B || b == 0x0C) {
-        out.push_back(' ');
-      }
-      continue;
-    }
-    if (b == 0x7F) {
-      continue;
-    }
-    if (b == 0xC2 && i + 1 < n) {
-      const auto next = static_cast<unsigned char>(utf8[i + 1]);
-      if (next >= 0x80 && next <= 0x9F) {
-        if (next == 0x85) {
-          out.push_back(' ');
+inline std::string stripControlChars(const std::string& utf8) {
+    std::string out;
+    out.reserve(utf8.size());
+    const std::size_t n = utf8.size();
+    for (std::size_t i = 0; i < n; ++i) {
+        const auto b = static_cast<unsigned char>(utf8[i]);
+        if (b < 0x20) {
+            if (b == '\n' || b == '\t' || b == '\r') {
+                out.push_back(static_cast<char>(b));
+            } else if (b == 0x0B || b == 0x0C) {
+                out.push_back(' ');
+            }
+            continue;
         }
-        ++i;
-        continue;
-      }
+        if (b == 0x7F) {
+            continue;
+        }
+        if (b == 0xC2 && i + 1 < n) {
+            const auto next = static_cast<unsigned char>(utf8[i + 1]);
+            if (next >= 0x80 && next <= 0x9F) {
+                if (next == 0x85) {
+                    out.push_back(' ');
+                }
+                ++i;
+                continue;
+            }
+        }
+        out.push_back(static_cast<char>(b));
     }
-    out.push_back(static_cast<char>(b));
-  }
-  return out;
+    return out;
 }
 
 }  // namespace piper
