@@ -774,15 +774,24 @@ class ChinesePhonemizer(Phonemizer):
         return "zh"
 
     def phonemize(self, text: str) -> list[str]:
+        text = self._sanitize_input(text)
+        if not text:
+            return []
         return phonemize_chinese(text)
 
     def phonemize_with_prosody(
         self, text: str
     ) -> tuple[list[str], list[ProsodyInfo | None]]:
+        text = self._sanitize_input(text)
+        if not text:
+            return [], []
         return phonemize_chinese_with_prosody(text)
 
     def phonemize_embedded_english(
         self, text: str
     ) -> tuple[list[str], list[ProsodyInfo | None]]:
         """Phonemize English text embedded in Chinese context as Mandarin pinyin."""
+        text = self._sanitize_input(text)
+        if not text:
+            return [], []
         return phonemize_embedded_english(text, loanword_data=self._loanword_data)

@@ -978,9 +978,15 @@ class FrenchPhonemizer(Phonemizer):
         return "fr"
 
     def phonemize(self, text: str) -> list[str]:
+        text = self._sanitize_input(text)
+        if not text:
+            return []
         return phonemize_french(text)
 
     def phonemize_with_prosody(
         self, text: str
     ) -> tuple[list[str], list[ProsodyInfo | None]]:
+        text = self._sanitize_input(text)
+        if not text:
+            return [], []
         return phonemize_french_with_prosody(text)

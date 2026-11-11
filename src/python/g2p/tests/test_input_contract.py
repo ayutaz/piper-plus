@@ -22,6 +22,7 @@ from piper_plus_g2p import available_languages, get_phonemizer
 from piper_plus_g2p.base import Phonemizer
 from piper_plus_g2p.custom_dict import CustomDictionary
 from piper_plus_g2p.multilingual import MultilingualPhonemizer
+from tests.conftest import _has_g2p_en, _has_g2pk2, _has_pyopenjtalk, _has_pypinyin
 
 FIXTURE = (
     Path(__file__).resolve().parents[4]
@@ -39,18 +40,24 @@ LANGUAGES = [*available_languages(), "multilingual"]
 ONLY_CONTROLS = "\u0000\u0001\u007f\u0085"
 
 
+# Optional backends, checked the same way as the per-language test files.
+BACKENDS = {
+    "ja": _has_pyopenjtalk,
+    "en": _has_g2p_en,
+    "zh": _has_pypinyin,
+    "ko": _has_g2pk2,
+}
+
+
 def _phonemizers(language: str) -> list[Phonemizer]:
+    """Every phonemizer to test for *language*; skip when a backend is missing."""
+    needs = MULTILINGUAL[0] if language == "multilingual" else [language]
+    missing = [lang for lang in needs if not BACKENDS.get(lang, lambda: True)()]
+    if missing:
+        pytest.skip(f"optional backend missing for {missing}")
     if language == "multilingual":
         return [MultilingualPhonemizer(langs) for langs in MULTILINGUAL]
     return [get_phonemizer(language)]
-
-
-def _call(phonemizer: Phonemizer, method: str, text):
-    """Run one entry point; skip when an optional backend is not installed."""
-    try:
-        return getattr(phonemizer, method)(text)
-    except (ImportError, LookupError) as exc:  # g2p_en / g2pk2 / NLTK data
-        pytest.skip(f"optional dependency missing: {exc}")
 
 
 @pytest.mark.parametrize("case", CASES["strip_cases"], ids=lambda c: c["name"])
@@ -77,9 +84,8 @@ def test_dirty_word_reads_like_clean(case, method):
     if case["language"] not in LANGUAGES:
         pytest.skip(f"{case['language']} is not registered here")
     for phonemizer in _phonemizers(case["language"]):
-        assert _call(phonemizer, method, case["dirty"]) == _call(
-            phonemizer, method, case["clean"]
-        )
+        read = getattr(phonemizer, method)
+        assert read(case["dirty"]) == read(case["clean"])
 
 
 @pytest.mark.parametrize("method", METHODS)
@@ -87,7 +93,7 @@ def test_dirty_word_reads_like_clean(case, method):
 def test_only_controls_give_empty(language, method):
     empty = {"phonemize": [], "phonemize_with_prosody": ([], [])}[method]
     for phonemizer in _phonemizers(language):
-        assert _call(phonemizer, method, ONLY_CONTROLS) == empty
+        assert getattr(phonemizer, method)(ONLY_CONTROLS) == empty
 
 
 @pytest.mark.parametrize("method", METHODS)
@@ -108,7 +114,7 @@ def test_too_long_is_rejected(language, method):
 
 
 def test_zh_embedded_english_is_sanitized():
-    zh = get_phonemizer("zh")
+    (zh,) = _phonemizers("zh")
     assert zh.phonemize_embedded_english("G\u0000PS") == (
         zh.phonemize_embedded_english("GPS")
     )
@@ -116,6 +122,7 @@ def test_zh_embedded_english_is_sanitized():
 
 @pytest.mark.parametrize("method", METHODS)
 def test_ja_custom_dict_sees_sanitized_text(method):
+    _phonemizers("ja")  # skip without pyopenjtalk
     from piper_plus_g2p.japanese import JapanesePhonemizer  # noqa: PLC0415
 
     words = CustomDictionary(load_defaults=False)

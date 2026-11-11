@@ -67,7 +67,7 @@ languages = ["ja", "en", "zh", "ko", "es", "fr", "pt", "pt-PT", "sv", "multiling
 
 [[runtime]]
 name = "python-g2p"
-status = "pending"
+status = "enforced"
 function = "Phonemizer._sanitize_input"
 consumer_tests = ["src/python/g2p/tests/test_input_contract.py"]
 entry_points = [
