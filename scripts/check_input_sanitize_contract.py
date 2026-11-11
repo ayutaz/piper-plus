@@ -48,7 +48,11 @@ HOOK_ID = "input-sanitize-contract"
 STATUSES = ("enforced",)
 SKILL = ".claude/skills/check-cross-runtime/SKILL.md"
 _PATHS_BLOCK = re.compile(r"declare -A RUNTIME_PATHS=\((.*?)^\)", re.S | re.M)
-_PATHS_ROW = re.compile(r'\["[^"]+"\]="([^"]+)"')
+# One row of the associative array, in any bash quoting of the value:
+# ["label"]="path", ['label']='path' or ["label"]=path.
+_PATHS_ROW = re.compile(
+    r"""^\s*\[(?:"[^"]*"|'[^']*'|[^\]]*)\]=(?:"([^"]*)"|'([^']*)'|(\S+))\s*$"""
+)
 
 
 def strip(text: str, keep: str, to_space: str = "") -> str:
@@ -156,25 +160,46 @@ def _check_runtime(root: Path, runtime: dict) -> list[str]:
     return errors
 
 
-def runtime_paths(root: Path) -> list[str] | None:
-    """Return the paths of ``RUNTIME_PATHS`` in the /check-cross-runtime
-    skill: None without the skill file, [] when the block is unreadable."""
+def _read_rows(root: Path) -> tuple[list[str], list[str]] | None:
+    """Return (paths, unreadable lines) of ``RUNTIME_PATHS`` in the
+    /check-cross-runtime skill, or None without the skill file. Both lists
+    are empty when the block itself is missing."""
     skill = root / SKILL
     if not skill.exists():
         return None
     block = _PATHS_BLOCK.search(skill.read_text(encoding="utf-8"))
-    return _PATHS_ROW.findall(block.group(1)) if block else []
+    paths: list[str] = []
+    bad: list[str] = []
+    for line in block.group(1).splitlines() if block else []:
+        if not line.strip() or line.strip().startswith("#"):
+            continue
+        row = _PATHS_ROW.match(line)
+        if row:
+            paths.append(next(g for g in row.groups() if g is not None))
+        else:
+            bad.append(line.strip())
+    return paths, bad
+
+
+def runtime_paths(root: Path) -> list[str]:
+    """Return the paths of ``RUNTIME_PATHS`` ([] without the skill file)."""
+    rows = _read_rows(root)
+    return rows[0] if rows else []
 
 
 def _check_coverage(root: Path, contract: dict) -> list[str]:
-    paths = runtime_paths(root)
-    if paths is None:
-        return []
-    if not paths:
-        return [f"{SKILL}: no readable 'declare -A RUNTIME_PATHS=(' block"]
     coverage = contract.get("coverage", {})
+    rows = _read_rows(root)
+    if rows is None:
+        # A repository without the skill and without [coverage] has nothing
+        # to compare. With [coverage], a moved or renamed skill would switch
+        # the check off silently.
+        return [f"{SKILL} does not exist; [coverage] in {CONTRACT} reads it"] if coverage else []
+    paths, bad = rows
+    errors = [f"{SKILL}: unreadable RUNTIME_PATHS row: {line}" for line in bad]
+    if not paths and not bad:
+        return [f"{SKILL}: no readable 'declare -A RUNTIME_PATHS=(' block"]
     names = {r.get("name") for r in contract.get("runtime", [])}
-    errors: list[str] = []
     for path in paths:
         if path not in coverage:
             errors.append(
@@ -184,6 +209,11 @@ def _check_coverage(root: Path, contract: dict) -> list[str]:
     for path, name in coverage.items():
         if name not in names:
             errors.append(f"{CONTRACT}: [coverage] {path} names unknown runtime {name!r}")
+        if path not in paths:
+            errors.append(
+                f"{CONTRACT}: [coverage] {path} is not a runtime path of {SKILL} "
+                "(remove the row, or fix the path)"
+            )
     return errors
 
 

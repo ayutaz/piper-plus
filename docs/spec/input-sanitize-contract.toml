@@ -210,7 +210,7 @@ entry_points = [
   # dictionary and SSML detection.
   {file = "src/cpp/main.cpp", calls = "stripControlChars"},
 ]
-notes = "Bytes that are not valid UTF-8 are kept. The C API takes C strings, which cannot hold a NUL, so its cases put DEL where a case has a NUL. scripts/test_cpp_cli_input_sanitize.py runs the built CLI (CI step 'CLI input sanitizing E2E' in _build-test-cpp.yml). Also the Swift TTS (Sources/PiperPlus), which wraps the C API in the released xcframework and gets the stripping with its next native build, and the Kotlin G2P, whose AAR wraps libpiper_plus.so (it also strips in its wrapper: kotlin)."
+notes = "Bytes that are not valid UTF-8 are kept. The C API takes C strings, which cannot hold a NUL, so its cases put DEL where a case has a NUL. scripts/test_cpp_cli_input_sanitize.py runs the built CLI (CI step 'CLI input sanitizing E2E' in _build-test-cpp.yml). Also the Swift TTS (Sources/PiperPlus), which re-exports the C API of the released xcframework and gets the stripping with its next native build; it has no Swift wrapper to strip in, so a NUL inside a Swift String still ends the C string there (the caller's concern, as with any C API caller), and the Kotlin G2P, whose AAR wraps libpiper_plus.so (it also strips in its wrapper: kotlin)."
 
 [[runtime]]
 name = "npm"
@@ -250,12 +250,13 @@ status = "enforced"
 function = "com.piperplus.g2p.TextSanitizer.stripControlChars"
 consumer_tests = [
   "android/piper-plus-g2p/src/test/java/com/piperplus/g2p/InputSanitizeContractTest.kt",
+  "android/piper-plus-g2p/src/androidTest/java/com/piperplus/g2p/InputSanitizeInstrumentedTest.kt",
 ]
 entry_points = [
   # PiperPlusG2p.phonemize, before the JNI call.
   {file = "android/piper-plus-g2p/src/main/java/com/piperplus/g2p/PiperPlusG2p.kt", calls = "stripControlChars"},
 ]
-notes = "The AAR wraps libpiper_plus.so, which strips too (cpp), but JNI passes the text as modified UTF-8, where U+0000 is the bytes C0 80: the native strip keeps bytes that are not valid UTF-8, so a NUL inside 'hola' reached the phonemizer. The wrapper strips before the call. The consumer test (L1, JVM) reads the fixture; src/androidTest/java/com/piperplus/g2p/InputSanitizeInstrumentedTest.kt (L3, emulator in kotlin-g2p-ci) phonemizes the word cases through the native library."
+notes = "The AAR wraps libpiper_plus.so, which strips too (cpp), but JNI passes the text as modified UTF-8, where U+0000 is the bytes C0 80: the native strip keeps bytes that are not valid UTF-8, so a NUL inside 'hola' reached the phonemizer. The wrapper strips before the call. InputSanitizeContractTest (L1, JVM) checks the rule on the fixture; InputSanitizeInstrumentedTest (L3, emulator in kotlin-g2p-ci, reads the fixture synced into its assets) phonemizes the word cases through the native library."
 
 [[runtime]]
 name = "swift-g2p"

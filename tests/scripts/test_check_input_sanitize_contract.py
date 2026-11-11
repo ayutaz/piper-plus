@@ -276,6 +276,34 @@ def test_unreadable_runtime_paths_block_is_reported(gate, tmp_path):
     assert "RUNTIME_PATHS" in errors[0]
 
 
+def test_runtime_path_row_in_another_quoting_is_reported(gate, tmp_path):
+    # bash also accepts ["Zig"]=src/zig/ and ['Zig']='src/zig/'; a row the
+    # parser skips would hide the very runtime the check exists to catch.
+    skill = _skill("src/toy/").replace(
+        ")\n```", "  ['Zig']='src/zig/'\n)\n```"
+    )
+    root = _repo(tmp_path, contract=_contract(coverage=COVERAGE), skill=skill)
+    errors = gate.check(root)
+    assert len(errors) == 1
+    assert "src/zig/" in errors[0]
+
+
+def test_coverage_row_for_a_path_no_longer_listed_is_reported(gate, tmp_path):
+    coverage = COVERAGE + '"src/gone/" = "toy"\n'
+    root = _repo(tmp_path, contract=_contract(coverage=coverage), skill=_skill("src/toy/"))
+    errors = gate.check(root)
+    assert len(errors) == 1
+    assert "src/gone/" in errors[0]
+
+
+def test_coverage_without_the_skill_file_is_reported(gate, tmp_path):
+    # Moving or renaming the skill must not switch the check off.
+    root = _repo(tmp_path, contract=_contract(coverage=COVERAGE))
+    errors = gate.check(root)
+    assert len(errors) == 1
+    assert "SKILL.md" in errors[0]
+
+
 def test_main_returns_1_and_prints_error(gate, tmp_path, capsys):
     root = _repo(tmp_path, consumer=None)
     assert gate.main(["--root", str(root)]) == 1
