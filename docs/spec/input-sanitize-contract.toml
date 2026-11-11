@@ -138,6 +138,7 @@ entry_points = [
   {file = "src/go/phonemize/japanese.go", calls = "StripControlChars"},
   {file = "src/go/phonemize/english.go", calls = "StripControlChars"},
   {file = "src/go/phonemize/chinese.go", calls = "StripControlChars"},
+  {file = "src/go/phonemize/chinese_loanword.go", calls = "StripControlChars"},
   {file = "src/go/phonemize/korean.go", calls = "StripControlChars"},
   {file = "src/go/phonemize/spanish.go", calls = "StripControlChars"},
   {file = "src/go/phonemize/french.go", calls = "StripControlChars"},

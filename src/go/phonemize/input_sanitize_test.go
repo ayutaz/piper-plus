@@ -217,8 +217,10 @@ func TestInputSanitize_Japanese(t *testing.T) {
 	}
 }
 
-// Every PhonemizeWithProsody / PhonemizeWithLanguage method in the package
-// calls StripControlChars, so a new language that forgets it fails here.
+// Every PhonemizeWithProsody / PhonemizeWithLanguage method in the package,
+// and ChinesePhonemizer.PhonemizeEmbeddedEnglish (MultilingualPhonemizer
+// calls it for the English run between Chinese text), calls
+// StripControlChars, so a new language that forgets it fails here.
 // This reads the source instead of a registry: the package has none, and
 // piperplus builds its own list.
 func TestInputSanitize_EveryPhonemizerMethodStrips(t *testing.T) {
@@ -245,7 +247,9 @@ func TestInputSanitize_EveryPhonemizerMethodStrips(t *testing.T) {
 			if !ok || fn.Recv == nil || fn.Body == nil {
 				continue
 			}
-			if fn.Name.Name != "PhonemizeWithProsody" && fn.Name.Name != "PhonemizeWithLanguage" {
+			switch fn.Name.Name {
+			case "PhonemizeWithProsody", "PhonemizeWithLanguage", "PhonemizeEmbeddedEnglish":
+			default:
 				continue
 			}
 			label := name + ":" + receiverName(fn) + "." + fn.Name.Name
@@ -255,7 +259,7 @@ func TestInputSanitize_EveryPhonemizerMethodStrips(t *testing.T) {
 			}
 		}
 	}
-	if len(methods) < 10 {
+	if len(methods) < 11 {
 		t.Fatalf("found only %d phonemizer methods: %v", len(methods), methods)
 	}
 	sort.Strings(missing)
@@ -286,4 +290,23 @@ func callsStripControlChars(body *ast.BlockStmt) bool {
 		return !found
 	})
 	return found
+}
+
+// The English run between Chinese text is read as pinyin; a NUL inside
+// "Python" split it into two runs and the letters were spelled out.
+func TestInputSanitize_ChineseEmbeddedEnglish(t *testing.T) {
+	cp := &ChinesePhonemizer{}
+	data, err := LoadLoanwordData()
+	if err != nil {
+		t.Fatal(err)
+	}
+	clean := cp.PhonemizeEmbeddedEnglish("Python", data)
+	if len(clean) == 0 {
+		t.Fatal("Python has no loanword reading")
+	}
+	for _, dirty := range []string{"Py\x00thon", "\x07Python\x1b", "Pyth\u009fon"} {
+		if got := cp.PhonemizeEmbeddedEnglish(dirty, data); !reflect.DeepEqual(got, clean) {
+			t.Errorf("PhonemizeEmbeddedEnglish(%q) = %v, want %v", dirty, got, clean)
+		}
+	}
 }

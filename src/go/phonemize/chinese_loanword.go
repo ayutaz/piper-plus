@@ -178,6 +178,7 @@ func (cp *ChinesePhonemizer) PhonemizeEmbeddedEnglish(text string, data *Loanwor
 		data = d
 	}
 
+	text = StripControlChars(text) // docs/spec/input-sanitize-contract.toml
 	pinyinSyllables := tokenizeAndLookup(text, data)
 	if len(pinyinSyllables) == 0 {
 		return nil

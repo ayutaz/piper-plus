@@ -6,8 +6,9 @@ package piperplus
 // Cases: tests/fixtures/g2p/input_sanitize_cases.json.
 //
 // Regression focus: before this, only the phonemizers stripped. A NUL in
-// front of <speak> hid the SSML (its markup was read as words), a NUL after
-// "." hid the sentence boundary from SynthesizeStream, a custom text
+// front of <speak> hid the SSML (its markup was read as words),
+// SynthesizeStream split the raw text (a NUL inside "3.5" cut it in two, a
+// NUL after the last sentence became an empty sentence), a custom text
 // dictionary missed a word with a NUL inside it, and twenty NULs made
 // "hola" too long for the short-text padding.
 //
@@ -240,6 +241,35 @@ func TestInputSanitize_SynthesizeStream(t *testing.T) {
 		}
 		if dirty, clean := read(c.Dirty), read(c.Clean); !reflect.DeepEqual(dirty, clean) {
 			t.Errorf("%s: G2P got %q, want %q", c.label(), dirty, clean)
+		}
+	}
+}
+
+// SynthesizeStream splits sentences after stripping. With a phonemizer that
+// does not fail and an engine with no session, a stream that phonemized
+// every sentence stops at inference with ErrModelClosed.
+func TestInputSanitize_SynthesizeStreamSplitsTheStrippedText(t *testing.T) {
+	t.Setenv("PIPER_PLUS_G2P_PARALLELISM", "1")
+	cases := []sanitizeTextCase{
+		// A NUL after the last sentence was a sentence of its own, and
+		// stripping it there left an empty text (ErrEmptyText).
+		{Name: "nul_after_last_sentence", Clean: "hola.", Dirty: "hola. \x00"},
+		// A NUL between "3." and "5" hid the decimal point from the splitter.
+		{Name: "nul_in_decimal", Clean: "3.5 metros.", Dirty: "3.\x005 metros."},
+	}
+	for _, c := range cases {
+		read := func(text string) []string {
+			v, rec := newRecordingVoice(t, false)
+			v.engine = &OnnxEngine{}
+			var buf strings.Builder
+			err := v.SynthesizeStream(context.Background(), text, NewWriterAudioSink(&buf), WithLanguage("es"))
+			if !errors.Is(err, ErrModelClosed) {
+				t.Errorf("%s: SynthesizeStream(%q) = %v, want it to reach inference", c.Name, text, err)
+			}
+			return rec.take()
+		}
+		if dirty, clean := read(c.Dirty), read(c.Clean); !reflect.DeepEqual(dirty, clean) {
+			t.Errorf("%s: G2P got %q, want %q", c.Name, dirty, clean)
 		}
 	}
 }
