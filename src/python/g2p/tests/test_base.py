@@ -54,7 +54,8 @@ class TestPhonemizerInputContract:
     def test_strips_c0_and_c1_controls_but_keeps_line_whitespace(self):
         phonemizer = _EchoPhonemizer()
 
-        assert phonemizer.phonemize("A\x00B\x7fC\u0085D\n\t\r") == list("ABCD\n\t\r")
+        # NEL separates words, so it becomes a space (input-sanitize contract).
+        assert phonemizer.phonemize("A\x00B\x7fC\u0085D\n\t\r") == list("ABC D\n\t\r")
 
     def test_rejects_non_string_input(self):
         phonemizer = _EchoPhonemizer()

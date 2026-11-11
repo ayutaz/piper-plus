@@ -464,7 +464,7 @@ class MultilingualPhonemizer(Phonemizer):
 
         # Strip before segmenting: a control character inside a word must not
         # split it, and every segment then reaches its phonemizer already clean.
-        text = self._sanitize_input(text)
+        text = self._strip_control_chars(text)
         if not text:
             return [], []
 

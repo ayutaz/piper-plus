@@ -45,10 +45,13 @@ HOOK_ID = "input-sanitize-contract"
 STATUSES = ("enforced", "pending")
 
 
-def strip(text: str, keep: str) -> str:
-    """The contract's rule: drop Unicode Cc except the characters in *keep*."""
+def strip(text: str, keep: str, to_space: str = "") -> str:
+    """The contract's rule for Unicode Cc: keep *keep*, turn *to_space* into a
+    space, drop the rest."""
     return "".join(
-        ch for ch in text if unicodedata.category(ch) != "Cc" or ch in keep
+        " " if ch in to_space else ch
+        for ch in text
+        if unicodedata.category(ch) != "Cc" or ch in keep or ch in to_space
     )
 
 
@@ -73,7 +76,7 @@ def _hook_files_regex(root: Path) -> re.Pattern[str] | None:
 
 
 def _check_fixture(
-    root: Path, fixture: dict, keep: str, languages: list[str]
+    root: Path, fixture: dict, keep: str, to_space: str, languages: list[str]
 ) -> list[str]:
     errors: list[str] = []
     canonical = fixture.get("canonical", "")
@@ -91,7 +94,7 @@ def _check_fixture(
             errors.append(f"{mirror}: differs from {canonical} (copy the canonical)")
 
     for case in data.get("strip_cases", []):
-        want = strip(case["input"], keep)
+        want = strip(case["input"], keep, to_space)
         if case["expected"] != want:
             errors.append(
                 f"{canonical}: strip_cases[{case['name']}] expects "
@@ -101,7 +104,7 @@ def _check_fixture(
     for group in ("word_cases", "pipeline_cases"):
         for case in data.get(group, []):
             label = case.get("language") or case.get("name")
-            if strip(case["dirty"], keep) != case["clean"]:
+            if strip(case["dirty"], keep, to_space) != case["clean"]:
                 errors.append(
                     f"{canonical}: {group}[{label}] dirty does not strip to clean"
                 )
@@ -162,10 +165,14 @@ def check(root: Path) -> list[str]:
     if not cpath.exists():
         return [f"{CONTRACT} does not exist"]
     contract = tomllib.loads(cpath.read_text(encoding="utf-8"))
-    keep = "".join(contract.get("rule", {}).get("keep", []))
+    rule = contract.get("rule", {})
+    keep = "".join(rule.get("keep", []))
+    to_space = "".join(rule.get("to_space", []))
     fixture = contract.get("fixture", {})
 
-    errors = _check_fixture(root, fixture, keep, fixture.get("languages", []))
+    errors = _check_fixture(
+        root, fixture, keep, to_space, fixture.get("languages", [])
+    )
     for runtime in contract.get("runtime", []):
         errors += _check_runtime(root, runtime)
 

@@ -29,6 +29,12 @@ forward_compat_policy = "strict"
 strip_category = "Cc"
 # Sentence splitting and SSML rely on these.
 keep = ["\n", "\t", "\r"]
+# The other Cc in Unicode White_Space (VT, FF, NEL) separate words: Word
+# writes VT for a manual line break, PDF text has FF. Deleting them joined the
+# words around them ("hola\fadiós" read as one word), so they become U+0020.
+# U+001C-001F are removed: Python's str.isspace counts them, but they are not
+# White_Space, and Rust / Go / C# do not treat them as spaces.
+to_space = ["\u000B", "\u000C", "\u0085"]
 # Stripping is idempotent, so a text that passes two layers (a TTS runtime
 # and the G2P library under it) reads the same as one that passes one.
 idempotent = true
@@ -47,7 +53,7 @@ python_phonemize_with_prosody = "([], [])"
 
 [length_limits]
 # Recorded, not part of the contract: each runtime keeps its current limit.
-python-g2p = "10000 characters (ValueError)"
+python-g2p = "10000 characters (ValueError) in ja and en, and in sv phonemize, as before: they call _sanitize_input, which adds the limit. The other entry points call _strip_control_chars and have none, as before (PiperPlus.synthesize, infer_onnx and /api/phoneme-timing pass whole texts)"
 python-http = "1 MB in bytes (HTTP 413)"
 cpp-c-api = "1 MB in bytes (OpenJTalk input)"
 rust-g2p = "none (piper-core passes the whole text, a limit would reject texts read today)"
@@ -68,20 +74,20 @@ languages = ["ja", "en", "zh", "ko", "es", "fr", "pt", "pt-PT", "sv", "multiling
 [[runtime]]
 name = "python-g2p"
 status = "enforced"
-function = "Phonemizer._sanitize_input"
+function = "Phonemizer._strip_control_chars"
 consumer_tests = ["src/python/g2p/tests/test_input_contract.py"]
 entry_points = [
   {file = "src/python/g2p/piper_plus_g2p/japanese.py", calls = "_sanitize_input"},
   {file = "src/python/g2p/piper_plus_g2p/english.py", calls = "_sanitize_input"},
-  {file = "src/python/g2p/piper_plus_g2p/chinese.py", calls = "_sanitize_input"},
-  {file = "src/python/g2p/piper_plus_g2p/korean.py", calls = "_sanitize_input"},
-  {file = "src/python/g2p/piper_plus_g2p/spanish.py", calls = "_sanitize_input"},
-  {file = "src/python/g2p/piper_plus_g2p/french.py", calls = "_sanitize_input"},
-  {file = "src/python/g2p/piper_plus_g2p/portuguese.py", calls = "_sanitize_input"},
-  {file = "src/python/g2p/piper_plus_g2p/swedish.py", calls = "_sanitize_input"},
-  {file = "src/python/g2p/piper_plus_g2p/multilingual.py", calls = "_sanitize_input"},
+  {file = "src/python/g2p/piper_plus_g2p/chinese.py", calls = "_strip_control_chars"},
+  {file = "src/python/g2p/piper_plus_g2p/korean.py", calls = "_strip_control_chars"},
+  {file = "src/python/g2p/piper_plus_g2p/spanish.py", calls = "_strip_control_chars"},
+  {file = "src/python/g2p/piper_plus_g2p/french.py", calls = "_strip_control_chars"},
+  {file = "src/python/g2p/piper_plus_g2p/portuguese.py", calls = "_strip_control_chars"},
+  {file = "src/python/g2p/piper_plus_g2p/swedish.py", calls = "_strip_control_chars"},
+  {file = "src/python/g2p/piper_plus_g2p/multilingual.py", calls = "_strip_control_chars"},
 ]
-notes = "Also the path of src/python_run/piper_plus/api/api.py, which calls phonemize_with_prosody directly."
+notes = "Also the path of src/python_run/piper_plus/api/api.py (PiperPlus), which calls phonemize_with_prosody directly: its text is stripped from this change on."
 
 [[runtime]]
 name = "rust-g2p"

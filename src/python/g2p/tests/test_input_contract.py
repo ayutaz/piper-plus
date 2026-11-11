@@ -37,7 +37,9 @@ CASES = json.loads(FIXTURE.read_text(encoding="utf-8"))
 MULTILINGUAL = (["ja", "en", "zh", "es", "fr", "pt"], ["es", "zh"])
 METHODS = ("phonemize", "phonemize_with_prosody")
 LANGUAGES = [*available_languages(), "multilingual"]
-ONLY_CONTROLS = "\u0000\u0001\u007f\u0085"
+ONLY_CONTROLS = next(
+    c["input"] for c in CASES["strip_cases"] if c["name"] == "only_controls"
+)
 
 
 # Optional backends, checked the same way as the per-language test files.
@@ -104,13 +106,41 @@ def test_non_str_is_rejected(language, method):
             getattr(phonemizer, method)(123)
 
 
-@pytest.mark.parametrize("method", METHODS)
-@pytest.mark.parametrize("language", LANGUAGES)
-def test_too_long_is_rejected(language, method):
+# The entry points that had the length limit before stripping was added to
+# every language. Stripping adds no limit: PiperPlus.synthesize, infer_onnx
+# and /api/phoneme-timing pass the whole text, and a limit would reject texts
+# that read today.
+LIMITED = (
+    {("ja", m) for m in METHODS} | {("en", m) for m in METHODS} | {("sv", "phonemize")}
+)
+
+
+@pytest.mark.parametrize(("language", "method"), sorted(LIMITED), ids=str)
+def test_too_long_is_rejected_where_it_was(language, method):
     too_long = "x" * (Phonemizer.MAX_INPUT_LENGTH + 1)
     for phonemizer in _phonemizers(language):
         with pytest.raises(ValueError, match="too long"):
             getattr(phonemizer, method)(too_long)
+
+
+@pytest.mark.parametrize("method", METHODS)
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_stripping_adds_no_length_limit(language, method):
+    if (language, method) in LIMITED:
+        pytest.skip("limited before stripping was added")
+    if language == "multilingual":
+        # Latin text to es, which has no limit (en, in the other set-up, has one).
+        phonemizers = [p for p in _phonemizers(language) if "en" not in p.languages]
+        text = "hola " * 2001
+    else:
+        phonemizers = _phonemizers(language)
+        word = next(
+            c["clean"] for c in CASES["word_cases"] if c["language"] == language
+        )
+        text = f"{word} " * (Phonemizer.MAX_INPUT_LENGTH // len(word) + 1)
+    assert len(text) > Phonemizer.MAX_INPUT_LENGTH
+    for phonemizer in phonemizers:
+        getattr(phonemizer, method)(text)  # does not raise
 
 
 def test_zh_embedded_english_is_sanitized():

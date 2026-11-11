@@ -67,6 +67,7 @@ def _contract(status: str = "enforced", languages: str = '["es"]') -> str:
         [rule]
         strip_category = "Cc"
         keep = ["\\n", "\\t", "\\r"]
+        to_space = ["\\u000B", "\\u000C", "\\u0085"]
         [fixture]
         canonical = "{FIXTURE}"
         mirrors = ["{MIRROR}"]
@@ -182,6 +183,25 @@ def test_fixture_case_breaking_rule_is_reported(gate, tmp_path):
     errors = gate.check(_repo(tmp_path, fixture=bad))
     assert len(errors) == 1
     assert "keeps_tab_wrongly" in errors[0]
+
+
+def test_space_like_control_must_become_space(gate, tmp_path):
+    # Deleting VT / FF / NEL joined the words around them ("hola\fadiós"
+    # read as one word); the rule turns them into a space.
+    bad = _fixture(
+        strip_cases=[{"name": "ff_deleted", "input": "a\u000cb", "expected": "ab"}]
+    )
+    errors = gate.check(_repo(tmp_path, fixture=bad))
+    assert len(errors) == 1
+    assert "ff_deleted" in errors[0]
+
+
+def test_space_like_control_as_space_passes(gate, tmp_path):
+    good = _fixture(
+        strip_cases=[{"name": "nel", "input": "a\u0085b\u000bc", "expected": "a b c"}],
+        word_cases=[{"language": "es", "clean": "hola hola", "dirty": "hola\u000chola"}],
+    )
+    assert gate.check(_repo(tmp_path, fixture=good)) == []
 
 
 def test_dirty_that_does_not_strip_to_clean_is_reported(gate, tmp_path):

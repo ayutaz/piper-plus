@@ -914,7 +914,7 @@ class PortuguesePhonemizer(Phonemizer):
         return self._dialect
 
     def phonemize(self, text: str) -> list[str]:
-        text = self._sanitize_input(text)
+        text = self._strip_control_chars(text)
         if not text:
             return []
         if self._dialect == Dialect.EU:
@@ -924,7 +924,7 @@ class PortuguesePhonemizer(Phonemizer):
     def phonemize_with_prosody(
         self, text: str
     ) -> tuple[list[str], list[ProsodyInfo | None]]:
-        text = self._sanitize_input(text)
+        text = self._strip_control_chars(text)
         if not text:
             return [], []
         if self._dialect == Dialect.EU:

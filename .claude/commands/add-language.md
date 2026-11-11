@@ -125,7 +125,7 @@ except ImportError:
 **入力の掃除 (制御文字) の契約:** `docs/spec/input-sanitize-contract.toml`
 
 - 新しいクラスの `phonemize` と `phonemize_with_prosody` の先頭で `self._sanitize_input(text)` を呼ぶ (空になったら `[]` / `([], [])` を返す)。
-- `tests/fixtures/g2p/input_sanitize_cases.json` の `word_cases` に、新しい言語の単語を 3 件 (U+0000 / U+007F / U+0085 を 1 つずつ入れたもの) 足し、契約 toml の `[fixture].languages` にも足す。Rust crate の写し (`src/rust/piper-plus-g2p/tests/fixtures/`) にもコピーする。
+- `tests/fixtures/g2p/input_sanitize_cases.json` の `word_cases` に、新しい言語の単語を、語中に U+0000 / U+007F / U+009F を 1 つずつ入れたもの 3 件と、同じ単語 2 つの間に U+000B / U+000C / U+0085 (空白に置き換わる) を入れたもの 3 件、合わせて 6 件足し、契約 toml の `[fixture].languages` にも足す。Rust crate の写し (`src/rust/piper-plus-g2p/tests/fixtures/`) にもコピーする。
 - 足さないと、`tests/test_input_contract.py::test_every_registered_language_has_word_case` と gate `scripts/check_input_sanitize_contract.py` が落ちる。#934 では一部の言語だけが掃除を呼ばず、NUL が単語を 2 つに割っていた。
 
 実行: `cd src/python/g2p && uv run pytest tests/ -x -q`

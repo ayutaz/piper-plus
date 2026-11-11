@@ -204,10 +204,18 @@ fn zh_embedded_english_is_stripped() {
 
 #[test]
 fn only_controls_read_as_empty_text() {
+    let cases = cases();
+    let only = cases["strip_cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "only_controls")
+        .expect("strip_cases has only_controls");
+    let only = only["input"].as_str().unwrap();
     for language in ["es", "multilingual"] {
         for p in phonemizers_for(language) {
             assert_eq!(
-                read(p.as_ref(), "\u{0}\u{1}\u{7f}\u{85}", language),
+                read(p.as_ref(), only, language),
                 read(p.as_ref(), "", language),
                 "{language}"
             );

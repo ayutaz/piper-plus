@@ -808,7 +808,7 @@ class SpanishPhonemizer(Phonemizer):
         return "es"
 
     def phonemize(self, text: str) -> list[str]:
-        text = self._sanitize_input(text)
+        text = self._strip_control_chars(text)
         if not text:
             return []
         return phonemize_spanish(text)
@@ -816,7 +816,7 @@ class SpanishPhonemizer(Phonemizer):
     def phonemize_with_prosody(
         self, text: str
     ) -> tuple[list[str], list[ProsodyInfo | None]]:
-        text = self._sanitize_input(text)
+        text = self._strip_control_chars(text)
         if not text:
             return [], []
         return phonemize_spanish_with_prosody(text)

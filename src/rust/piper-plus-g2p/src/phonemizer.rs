@@ -99,16 +99,27 @@ pub trait Phonemizer: Send + Sync {
     }
 }
 
-/// Strip Unicode control characters (category Cc) except `\n`, `\t` and `\r`.
+/// Strip Unicode control characters (category Cc) by the rule of
+/// `docs/spec/input-sanitize-contract.toml`.
 ///
-/// Every phonemizer of this crate calls it first
-/// (`docs/spec/input-sanitize-contract.toml`). Format characters (U+200D,
-/// U+FEFF), separators (U+2028) and NBSP are kept. Returns the input
-/// unchanged, without allocating, when there is nothing to strip.
+/// `\n`, `\t` and `\r` are kept. VT, FF and NEL (U+000B, U+000C, U+0085)
+/// separate words, so they become a space; deleting them joined the words
+/// around them. Every other Cc is removed. Format characters (U+200D,
+/// U+FEFF), separators (U+2028) and NBSP are kept. Every phonemizer of this
+/// crate calls it first. Returns the input unchanged, without allocating,
+/// when there is nothing to change.
 pub(crate) fn strip_control_chars(text: &str) -> Cow<'_, str> {
-    let stripped = |c: char| c.is_control() && !matches!(c, '\n' | '\t' | '\r');
-    if text.chars().any(stripped) {
-        Cow::Owned(text.chars().filter(|&c| !stripped(c)).collect())
+    let changed = |c: char| c.is_control() && !matches!(c, '\n' | '\t' | '\r');
+    if text.chars().any(changed) {
+        Cow::Owned(
+            text.chars()
+                .filter_map(|c| match c {
+                    '\u{0B}' | '\u{0C}' | '\u{85}' => Some(' '),
+                    c if changed(c) => None,
+                    c => Some(c),
+                })
+                .collect(),
+        )
     } else {
         Cow::Borrowed(text)
     }

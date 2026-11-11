@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Control characters every runtime strips before phonemizing. Rule and entry points: docs/spec/input-sanitize-contract.toml. Unicode Cc is removed except newline, tab and carriage return; format characters (Cf), separators (Zl) and NBSP stay.",
+  "description": "Control characters every runtime strips before phonemizing. Rule and entry points: docs/spec/input-sanitize-contract.toml. Unicode Cc is removed, except newline, tab and carriage return, which stay, and VT, FF and NEL (U+000B, U+000C, U+0085), which become a space; format characters (Cf), separators (Zl) and NBSP stay.",
   "strip_cases": [
     {
       "name": "nul",
@@ -18,9 +18,19 @@
       "expected": "ab"
     },
     {
-      "name": "c1_nel",
+      "name": "c1_nel_is_space",
       "input": "a\u0085b",
-      "expected": "ab"
+      "expected": "a b"
+    },
+    {
+      "name": "vt_ff_are_space",
+      "input": "a\u000bb\fc",
+      "expected": "a b c"
+    },
+    {
+      "name": "information_separators_removed",
+      "input": "a\u001cb\u001fc",
+      "expected": "abc"
     },
     {
       "name": "c1_last",
@@ -34,17 +44,17 @@
     },
     {
       "name": "keeps_format_chars",
-      "input": "a‍b﻿c d",
-      "expected": "a‍b﻿c d"
+      "input": "a\u200db\ufeffc\u2028d",
+      "expected": "a\u200db\ufeffc\u2028d"
     },
     {
       "name": "keeps_nbsp_and_cjk",
-      "input": "a b 日本語",
-      "expected": "a b 日本語"
+      "input": "a\u00a0b 日本語",
+      "expected": "a\u00a0b 日本語"
     },
     {
       "name": "only_controls",
-      "input": "\u0000\u0001\u007f\u0085",
+      "input": "\u0000\u0001\u007f\u009f",
       "expected": ""
     },
     {
@@ -73,9 +83,9 @@
     },
     {
       "language": "ja",
-      "control": "U+0085",
+      "control": "U+009F",
       "clean": "こんにちは",
-      "dirty": "こん\u0085にちは"
+      "dirty": "こん\u009fにちは"
     },
     {
       "language": "en",
@@ -91,9 +101,9 @@
     },
     {
       "language": "en",
-      "control": "U+0085",
+      "control": "U+009F",
       "clean": "hello",
-      "dirty": "he\u0085llo"
+      "dirty": "he\u009fllo"
     },
     {
       "language": "zh",
@@ -109,9 +119,9 @@
     },
     {
       "language": "zh",
-      "control": "U+0085",
+      "control": "U+009F",
       "clean": "你好",
-      "dirty": "你\u0085好"
+      "dirty": "你\u009f好"
     },
     {
       "language": "ko",
@@ -127,9 +137,9 @@
     },
     {
       "language": "ko",
-      "control": "U+0085",
+      "control": "U+009F",
       "clean": "안녕",
-      "dirty": "안\u0085녕"
+      "dirty": "안\u009f녕"
     },
     {
       "language": "es",
@@ -145,9 +155,9 @@
     },
     {
       "language": "es",
-      "control": "U+0085",
+      "control": "U+009F",
       "clean": "hola",
-      "dirty": "ho\u0085la"
+      "dirty": "ho\u009fla"
     },
     {
       "language": "fr",
@@ -163,9 +173,9 @@
     },
     {
       "language": "fr",
-      "control": "U+0085",
+      "control": "U+009F",
       "clean": "bonjour",
-      "dirty": "bon\u0085jour"
+      "dirty": "bon\u009fjour"
     },
     {
       "language": "pt",
@@ -181,9 +191,9 @@
     },
     {
       "language": "pt",
-      "control": "U+0085",
+      "control": "U+009F",
       "clean": "olá",
-      "dirty": "ol\u0085á"
+      "dirty": "ol\u009fá"
     },
     {
       "language": "pt-PT",
@@ -199,9 +209,9 @@
     },
     {
       "language": "pt-PT",
-      "control": "U+0085",
+      "control": "U+009F",
       "clean": "olá",
-      "dirty": "ol\u0085á"
+      "dirty": "ol\u009fá"
     },
     {
       "language": "sv",
@@ -217,9 +227,9 @@
     },
     {
       "language": "sv",
-      "control": "U+0085",
+      "control": "U+009F",
       "clean": "hej",
-      "dirty": "h\u0085ej"
+      "dirty": "h\u009fej"
     },
     {
       "language": "multilingual",
@@ -235,9 +245,9 @@
     },
     {
       "language": "multilingual",
-      "control": "U+0085",
+      "control": "U+009F",
       "clean": "hello你好",
-      "dirty": "hello\u0085你好"
+      "dirty": "hello\u009f你好"
     },
     {
       "language": "multilingual",
@@ -253,9 +263,195 @@
     },
     {
       "language": "multilingual",
-      "control": "U+0085",
+      "control": "U+009F",
       "clean": "我用GPS",
-      "dirty": "我用G\u0085PS"
+      "dirty": "我用G\u009fPS"
+    },
+    {
+      "language": "ja",
+      "control": "U+0000",
+      "clean": "本当?",
+      "dirty": "本当?\u0000"
+    },
+    {
+      "language": "ja",
+      "control": "U+007F",
+      "clean": "本当?!",
+      "dirty": "本当?\u007f!"
+    },
+    {
+      "language": "ja",
+      "control": "U+000B",
+      "clean": "こんにちは こんにちは",
+      "dirty": "こんにちは\u000bこんにちは"
+    },
+    {
+      "language": "ja",
+      "control": "U+000C",
+      "clean": "こんにちは こんにちは",
+      "dirty": "こんにちは\fこんにちは"
+    },
+    {
+      "language": "ja",
+      "control": "U+0085",
+      "clean": "こんにちは こんにちは",
+      "dirty": "こんにちは\u0085こんにちは"
+    },
+    {
+      "language": "en",
+      "control": "U+000B",
+      "clean": "hello hello",
+      "dirty": "hello\u000bhello"
+    },
+    {
+      "language": "en",
+      "control": "U+000C",
+      "clean": "hello hello",
+      "dirty": "hello\fhello"
+    },
+    {
+      "language": "en",
+      "control": "U+0085",
+      "clean": "hello hello",
+      "dirty": "hello\u0085hello"
+    },
+    {
+      "language": "zh",
+      "control": "U+000B",
+      "clean": "你好 你好",
+      "dirty": "你好\u000b你好"
+    },
+    {
+      "language": "zh",
+      "control": "U+000C",
+      "clean": "你好 你好",
+      "dirty": "你好\f你好"
+    },
+    {
+      "language": "zh",
+      "control": "U+0085",
+      "clean": "你好 你好",
+      "dirty": "你好\u0085你好"
+    },
+    {
+      "language": "ko",
+      "control": "U+000B",
+      "clean": "안녕 안녕",
+      "dirty": "안녕\u000b안녕"
+    },
+    {
+      "language": "ko",
+      "control": "U+000C",
+      "clean": "안녕 안녕",
+      "dirty": "안녕\f안녕"
+    },
+    {
+      "language": "ko",
+      "control": "U+0085",
+      "clean": "안녕 안녕",
+      "dirty": "안녕\u0085안녕"
+    },
+    {
+      "language": "es",
+      "control": "U+000B",
+      "clean": "hola hola",
+      "dirty": "hola\u000bhola"
+    },
+    {
+      "language": "es",
+      "control": "U+000C",
+      "clean": "hola hola",
+      "dirty": "hola\fhola"
+    },
+    {
+      "language": "es",
+      "control": "U+0085",
+      "clean": "hola hola",
+      "dirty": "hola\u0085hola"
+    },
+    {
+      "language": "fr",
+      "control": "U+000B",
+      "clean": "bonjour bonjour",
+      "dirty": "bonjour\u000bbonjour"
+    },
+    {
+      "language": "fr",
+      "control": "U+000C",
+      "clean": "bonjour bonjour",
+      "dirty": "bonjour\fbonjour"
+    },
+    {
+      "language": "fr",
+      "control": "U+0085",
+      "clean": "bonjour bonjour",
+      "dirty": "bonjour\u0085bonjour"
+    },
+    {
+      "language": "pt",
+      "control": "U+000B",
+      "clean": "olá olá",
+      "dirty": "olá\u000bolá"
+    },
+    {
+      "language": "pt",
+      "control": "U+000C",
+      "clean": "olá olá",
+      "dirty": "olá\folá"
+    },
+    {
+      "language": "pt",
+      "control": "U+0085",
+      "clean": "olá olá",
+      "dirty": "olá\u0085olá"
+    },
+    {
+      "language": "pt-PT",
+      "control": "U+000B",
+      "clean": "olá olá",
+      "dirty": "olá\u000bolá"
+    },
+    {
+      "language": "pt-PT",
+      "control": "U+000C",
+      "clean": "olá olá",
+      "dirty": "olá\folá"
+    },
+    {
+      "language": "pt-PT",
+      "control": "U+0085",
+      "clean": "olá olá",
+      "dirty": "olá\u0085olá"
+    },
+    {
+      "language": "sv",
+      "control": "U+000B",
+      "clean": "hej hej",
+      "dirty": "hej\u000bhej"
+    },
+    {
+      "language": "sv",
+      "control": "U+000C",
+      "clean": "hej hej",
+      "dirty": "hej\fhej"
+    },
+    {
+      "language": "sv",
+      "control": "U+0085",
+      "clean": "hej hej",
+      "dirty": "hej\u0085hej"
+    },
+    {
+      "language": "multilingual",
+      "control": "U+000C",
+      "clean": "hello 你好",
+      "dirty": "hello\f你好"
+    },
+    {
+      "language": "multilingual",
+      "control": "U+0085",
+      "clean": "hola adiós",
+      "dirty": "hola\u0085adiós"
     }
   ],
   "pipeline_cases": [
