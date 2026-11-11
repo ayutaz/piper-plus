@@ -498,6 +498,17 @@ jobs:
         if: ${{ !cancelled() }}
         run: python scripts/check_g2p_known_divergences.py
 
+      # -------------------------------------------------------- doc-hook-count
+      - name: "doc-hook-count: unit tests for the gate"
+        id: doc-hook-count-tests
+        if: ${{ !cancelled() }}
+        run: python -m pytest tests/scripts/test_check_doc_hook_count.py -q -o addopts=
+
+      - name: "doc-hook-count: hook counts in CLAUDE.md and .claude/README.md"
+        id: doc-hook-count
+        if: ${{ !cancelled() }}
+        run: python scripts/check_doc_hook_count.py
+
       # -------------------------------------------------- inference-input-contract
       - name: "inference-input-contract: contract constants match the Python implementation"
         id: inference-input-contract
