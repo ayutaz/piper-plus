@@ -17,6 +17,7 @@
 #include "library_path.h"
 #include "openjtalk_dictionary_manager.h"
 #include "g2p_parallelism.hpp"
+#include "text_sanitize.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -445,8 +446,8 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synthesize(
         PiperPlusStatus idCheck = validateSynthIds(engine);
         if (idCheck != PIPER_PLUS_OK) return idCheck;
 
-        // Apply custom dictionary
-        std::string processedText = text;
+        // Before the custom dictionary (docs/spec/input-sanitize-contract.toml).
+        std::string processedText = piper::stripControlChars(text);
         if (engine->customDict) {
             processedText = engine->customDict->applyToText(processedText);
         }
@@ -595,8 +596,8 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synth_start(
             return idCheck;
         }
 
-        // Apply custom dictionary
-        std::string processedText = text;
+        // Before the custom dictionary (docs/spec/input-sanitize-contract.toml).
+        std::string processedText = piper::stripControlChars(text);
         if (engine->customDict) {
             processedText = engine->customDict->applyToText(processedText);
         }
@@ -1115,8 +1116,8 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_phonemize(
             }
         }
 
-        // Apply custom dictionary
-        std::string processedText = text;
+        // Before the custom dictionary (docs/spec/input-sanitize-contract.toml).
+        std::string processedText = piper::stripControlChars(text);
         if (engine->customDict) {
             processedText = engine->customDict->applyToText(processedText);
         }
@@ -1557,7 +1558,8 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_g2p_phonemize(
             handle->voice.synthesisConfig.languageId = it->second;
         }
 
-        std::string processedText = inText;
+        // Before the custom dictionary (docs/spec/input-sanitize-contract.toml).
+        std::string processedText = piper::stripControlChars(inText);
         if (handle->customDict) {
             processedText = handle->customDict->applyToText(processedText);
         }

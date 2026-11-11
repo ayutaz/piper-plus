@@ -346,6 +346,20 @@ jobs:
           export ESPEAK_NG_DATA="${PWD}/build/espeak-ng-data"
           python3 scripts/test_cpp_cli_timing.py --binary build/piper-plus
 
+      # ── CLI input sanitizing E2E ──────────────────────────────
+      # docs/spec/input-sanitize-contract.toml (runtime cpp). The C API and
+      # the library are covered by test_c_api; main.cpp reads --text, stdin
+      # and JSONL itself and applies the custom dictionary and SSML detection
+      # to the line, which only running the binary reaches. Same scope as the
+      # timing E2E above.
+      - name: CLI input sanitizing E2E
+        if: ${{ runner.os != 'Windows' && inputs.run-integration-tests }}
+        shell: bash
+        run: |
+          export OPENJTALK_DICTIONARY_PATH="${PWD}/build/naist-jdic"
+          export ESPEAK_NG_DATA="${PWD}/build/espeak-ng-data"
+          python3 scripts/test_cpp_cli_input_sanitize.py --binary build/piper-plus
+
       # ── Test result summary ──────────────────────────────────
       - name: Test result summary
         if: always()

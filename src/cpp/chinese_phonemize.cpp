@@ -12,6 +12,7 @@
 #include "json.hpp"
 #include "utf8.h"
 #include "utf8_utils.hpp"
+#include "text_sanitize.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -873,7 +874,8 @@ void append_pinyin_to_ipa_flat(const std::vector<std::string>& syllables,
 void phonemizeEmbeddedEnglish(const std::string& text,
                               std::vector<Phoneme>& out,
                               const LoanwordData& data) {
-    for (const auto& token : tokenize_alnum(text)) {
+    const std::string cleaned = stripControlChars(text);  // docs/spec/input-sanitize-contract.toml
+    for (const auto& token : tokenize_alnum(cleaned)) {
         if (token.empty()) continue;
 
         // 1. Case-sensitive loanword

@@ -51,6 +51,7 @@
 #include "chinese_loanword.hpp"
 #include "korean_phonemize.hpp"
 #include "swedish_phonemize.hpp"
+#include "text_sanitize.hpp"
 
 #ifdef USE_ARM64_NEON
 #include "audio_neon.hpp"
@@ -2353,9 +2354,11 @@ std::vector<std::string> splitTextToSentences(
 // Phonemize text into per-sentence phoneme sequences (public API).
 // Pure: does not modify voice.  Auto-detected language is returned
 // in result.detectedLanguageId.
-void phonemizeText(const Voice &voice, const std::string &text,
+void phonemizeText(const Voice &voice, const std::string &rawText,
                    PhonemizeResult &result,
                    const std::vector<ProsodyFeature> *externalProsody) {
+  // Before the [[ ]] notation, the language split and every phonemizer.
+  const std::string text = stripControlChars(rawText);  // docs/spec/input-sanitize-contract.toml
 
   result.phonemes.clear();
   result.prosody.clear();
@@ -2688,6 +2691,7 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
   // Clear output buffer
   audioBuffer.clear();
 
+  text = stripControlChars(text);  // before sentence splitting // docs/spec/input-sanitize-contract.toml
   if (text.empty()) {
     return;
   }

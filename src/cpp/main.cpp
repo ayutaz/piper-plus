@@ -43,6 +43,7 @@
 #include "safe_path.hpp"
 #include "ssml.hpp"
 #include "ssml_synth.hpp"
+#include "text_sanitize.hpp"
 
 using namespace std;
 using json = nlohmann::json;
@@ -765,6 +766,10 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
     }
   }
 
+  // Before the custom dictionary and SSML detection
+  // (docs/spec/input-sanitize-contract.toml).
+  line = piper::stripControlChars(line);
+
   // Apply custom dictionary
   if (customDict && !line.empty()) {
     line = customDict->applyToText(line);
@@ -856,7 +861,7 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
       stringstream text;
       text << line;
       while (getline(cin, line)) {
-        text << " " << line;
+        text << " " << piper::stripControlChars(line);
       }
 
       line = text.str();
