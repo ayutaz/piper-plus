@@ -125,6 +125,7 @@ func (m *MultilingualPhonemizer) LanguageCode() string {
 // phonemizers, strips BOS/EOS from each segment, and concatenates the results.
 // The dynamically determined EOS token is stored in result.EOSToken.
 func (m *MultilingualPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	text = StripControlChars(text) // docs/spec/input-sanitize-contract.toml
 	return m.phonemizeWithDetector(text, m.detector)
 }
 
@@ -135,6 +136,7 @@ func (m *MultilingualPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeRe
 // a registered Latin-script language (e.g. "zh", "ja", or "") behaves like
 // PhonemizeWithProsody.
 func (m *MultilingualPhonemizer) PhonemizeWithLanguage(text, language string) (*PhonemizeResult, error) {
+	text = StripControlChars(text) // docs/spec/input-sanitize-contract.toml
 	detector, ok := m.latinDetectors[language]
 	if !ok {
 		detector = m.detector

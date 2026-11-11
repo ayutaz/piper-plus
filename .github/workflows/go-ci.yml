@@ -26,6 +26,8 @@ on:
       - 'tests/fixtures/g2p/english_no_drop_words.json'
       # Read by the English normalization test (#841).
       - 'tests/fixtures/g2p/english_normalize_cases.json'
+      # Read by phonemize/ and piperplus/input_sanitize_test.go.
+      - 'tests/fixtures/g2p/input_sanitize_cases.json'
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
       - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
@@ -59,6 +61,8 @@ on:
       - 'tests/fixtures/g2p/english_no_drop_words.json'
       # Read by the English normalization test (#841).
       - 'tests/fixtures/g2p/english_normalize_cases.json'
+      # Read by phonemize/ and piperplus/input_sanitize_test.go.
+      - 'tests/fixtures/g2p/input_sanitize_cases.json'
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
       - 'src/rust/piper-plus-g2p/data/pinyin_*.json'

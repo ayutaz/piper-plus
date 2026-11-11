@@ -477,6 +477,7 @@ func (p *EnglishPhonemizer) wordArpabet(word string) []string {
 // converted to IPA, destressed when it is a function word, and given stress
 // markers and prosody as Python's english.py does.
 func (p *EnglishPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	text = StripControlChars(text) // docs/spec/input-sanitize-contract.toml
 	if strings.TrimSpace(text) == "" {
 		return &PhonemizeResult{EOSToken: "$"}, nil
 	}

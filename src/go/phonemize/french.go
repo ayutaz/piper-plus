@@ -492,6 +492,7 @@ func frStartsWithVowelSound(word string) bool {
 
 // PhonemizeWithProsody converts French text to phoneme tokens with prosody.
 func (p *FrenchPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	text = StripControlChars(text) // docs/spec/input-sanitize-contract.toml
 	text = strings.Join(strings.Fields(strings.ToLower(strings.TrimSpace(text))), " ")
 	toks := frSplit(text)
 	var phs []string

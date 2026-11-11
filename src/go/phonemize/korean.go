@@ -21,6 +21,7 @@ func (p *KoreanPhonemizer) LanguageCode() string { return "ko" }
 
 // PhonemizeWithProsody converts Korean text to phoneme tokens with prosody.
 func (p *KoreanPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	text = StripControlChars(text) // docs/spec/input-sanitize-contract.toml
 	tokens, a3Values, eos := koProcessWithA3(text)
 	mapped := MapSequence(tokens)
 

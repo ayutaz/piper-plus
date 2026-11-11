@@ -488,6 +488,7 @@ func ptTokenize(text string) []textToken {
 
 // PhonemizeWithProsody converts Brazilian Portuguese text to IPA tokens with prosody.
 func (p *PortuguesePhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	text = StripControlChars(text) // docs/spec/input-sanitize-contract.toml
 	text = strings.ToLower(strings.TrimSpace(text))
 	toks := ptTokenize(text)
 	var phons []string
@@ -672,6 +673,7 @@ func (e *EuropeanPortuguesePhonemizer) LanguageCode() string { return "pt-PT" }
 
 // PhonemizeWithProsody runs the BR pipeline and applies EU post-processing.
 func (e *EuropeanPortuguesePhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	text = StripControlChars(text) // docs/spec/input-sanitize-contract.toml
 	res, err := e.br.PhonemizeWithProsody(text)
 	if err != nil {
 		return nil, err

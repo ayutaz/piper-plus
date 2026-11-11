@@ -28,6 +28,7 @@ func (p *SwedishPhonemizer) LanguageCode() string { return "sv" }
 
 // PhonemizeWithProsody converts Swedish text to phoneme tokens with prosody.
 func (p *SwedishPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	text = StripControlChars(text) // docs/spec/input-sanitize-contract.toml
 	text = svNormalize(text)
 	toks := svTokenize(text)
 

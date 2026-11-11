@@ -528,6 +528,7 @@ func zhApplyToneSandhiToChars(chars []charPinyin) {
 
 // PhonemizeWithProsody converts Chinese text to IPA phonemes with prosody.
 func (p *ChinesePhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	text = StripControlChars(text) // docs/spec/input-sanitize-contract.toml
 	if len(text) == 0 {
 		return &PhonemizeResult{
 			EOSToken: "$",

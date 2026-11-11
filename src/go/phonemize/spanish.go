@@ -18,6 +18,7 @@ func (p *SpanishPhonemizer) LanguageCode() string { return "es" }
 
 // PhonemizeWithProsody converts Spanish text to phoneme tokens with prosody.
 func (p *SpanishPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	text = StripControlChars(text) // docs/spec/input-sanitize-contract.toml
 	tokens, prosody, eos := esProcess(text)
 	mapped := MapSequence(tokens)
 	return &PhonemizeResult{Tokens: mapped, Prosody: prosody, EOSToken: eos}, nil

@@ -34,6 +34,7 @@ func NewJapanesePhonemizer(engine JapaneseG2PEngine) *JapanesePhonemizer {
 // PhonemizeWithProsody converts Japanese text to phoneme tokens with prosody.
 // It implements the Phonemizer interface.
 func (p *JapanesePhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	text = StripControlChars(text) // docs/spec/input-sanitize-contract.toml
 	labels, err := p.engine.ExtractFullcontext(text)
 	if err != nil {
 		return nil, err
