@@ -45,7 +45,7 @@ metadata. ONNX Runtime Web 1.21 does not provide this API.
 To update an existing installation:
 
 ```bash
-npm install piper-plus@0.8.2 onnxruntime-web@1.30.0
+npm install piper-plus@0.8.2 onnxruntime-web@1.31.1
 ```
 
 For importmap users, update both CDN URLs as shown below.
@@ -60,7 +60,7 @@ For importmap users, update both CDN URLs as shown below.
   "imports": {
     "piper-plus": "https://unpkg.com/piper-plus@0.8.2/src/index.js",
     "@piper-plus/g2p": "https://cdn.jsdelivr.net/npm/@piper-plus/g2p@0.4.2/src/index.js",
-    "onnxruntime-web": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/ort.min.mjs"
+    "onnxruntime-web": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/ort.min.mjs"
   }
 }
 </script>

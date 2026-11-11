@@ -58,7 +58,7 @@ live assets and runs the browser synthesis/playback test with
 ## Runtime URL and model rules
 
 The active demo and npm README use the exact `onnxruntime-web` version pinned
-in `package.json` (currently `1.30.0`). Run the URL check after changing either
+in `package.json` (currently `1.31.1`). Run the URL check after changing either
 the manifest or demo:
 
 ```bash
