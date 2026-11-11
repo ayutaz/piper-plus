@@ -237,8 +237,9 @@ entry_points = [
   # ChineseG2P also strips in phonemizeEmbeddedEnglish(WithProsody).
   {file = "src/wasm/g2p/src/zh/index.js", calls = "stripControlChars"},
   # piper-plus: every synthesize method and findDroppedSymbols, first (before
-  # SSML detection, the language detection and sentence splitting).
-  # synthesizeFromReferenceAudio passes the text to synthesize().
+  # SSML detection, the language detection and sentence splitting), and
+  # synthesizeSsml again for each segment, since the SSML parser decodes
+  # character references such as &#0;.
   {file = "src/wasm/openjtalk-web/src/index.js", calls = "stripControlChars"},
 ]
 notes = "piper-plus does not import the function from @piper-plus/g2p: releases up to 0.4.2 do not export it, and a named import of a missing export fails module linking for the whole package. Both copies are tested against the fixture. The Rust WASM G2P (ja / zh in piper-plus) also strips, with rust-g2p."

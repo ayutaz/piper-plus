@@ -142,6 +142,16 @@ describe("PiperPlus input sanitizing", () => {
     }
   });
 
+  it("strips the control characters a character reference puts in an SSML segment", async () => {
+    // parseSsml decodes &#0; and &#x0C;, after the text was stripped.
+    for (const method of ["synthesize", "synthesizeSsml"]) {
+      const clean = await record(method, "<speak>hola adiós</speak>");
+      for (const dirty of ["<speak>ho&#0;la adiós</speak>", "<speak>hola&#x0C;adiós</speak>"]) {
+        assert.deepEqual(await record(method, dirty), clean, `${method} ${dirty}`);
+      }
+    }
+  });
+
   it("a text of only control characters is an empty text", async () => {
     for (const method of Object.keys(METHODS)) {
       const { instance } = recordingInstance();
@@ -150,6 +160,37 @@ describe("PiperPlus input sanitizing", () => {
         /is required/,
         method
       );
+    }
+  });
+
+  it("synthesizeFromReferenceAudio does not encode the reference for a text of only control characters", async () => {
+    const { instance } = recordingInstance();
+    let encoded = 0;
+    const encoder = {
+      encode: async () => {
+        encoded += 1;
+        return EMBEDDING;
+      },
+    };
+    await assert.rejects(
+      instance.synthesizeFromReferenceAudio({
+        text: "\u0000\u0001",
+        referenceWav: new Float32Array(16000),
+        encoder,
+      }),
+      /text is required/
+    );
+    assert.equal(encoded, 0);
+  });
+
+  it("has the same rule as @piper-plus/g2p", async () => {
+    // piper-plus keeps its own copy (see src/sanitize.js); CI links the
+    // @piper-plus/g2p of this repository, which exports the original.
+    const g2p = await import("@piper-plus/g2p");
+    assert.equal(typeof g2p.stripControlChars, "function", "link the local @piper-plus/g2p");
+    for (let cp = 0; cp <= 0xffff; cp += 1) {
+      const text = `a${String.fromCharCode(cp)}b`;
+      assert.equal(stripControlChars(text), g2p.stripControlChars(text), `U+${cp.toString(16)}`);
     }
   });
 });

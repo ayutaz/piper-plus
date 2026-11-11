@@ -6,7 +6,7 @@
  *
  * Regression focus: #934 (2026-11) stripped control characters in the
  * Python G2P only. Here a NUL inside "hola" split the word in two, a NUL
- * inside "och" or a form feed between two words hid Swedish from the
+ * inside "och" or a NEL between two words hid Swedish from the
  * language detection, and a NUL inside "Python" between Chinese text made
  * it spelled out letter by letter.
  *

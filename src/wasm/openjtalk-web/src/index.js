@@ -338,11 +338,14 @@ export class PiperPlus {
     const chunks = [];
 
     for (const seg of segments) {
+      // parseSsml decodes character references (&#0;, &#x0C;), so a segment
+      // can hold control characters the text did not.
+      const segText = stripControlChars(seg.text);
       // 1. Emit the text body of this segment (if any), at the segment's
       //    rate (multiplied into the base length_scale).
-      if (seg.text && seg.text.length > 0) {
-        const language = options.language || this._detectLanguage(seg.text);
-        const { phonemeIds, prosodyFeatures } = await this._textToPhonemeIds(seg.text, language);
+      if (segText && segText.length > 0) {
+        const language = options.language || this._detectLanguage(segText);
+        const { phonemeIds, prosodyFeatures } = await this._textToPhonemeIds(segText, language);
         // Skip degenerate segments with no phonemizable content.
         if (phonemeIds.length === 0) {
           // fall through to break handling
@@ -492,7 +495,9 @@ export class PiperPlus {
    * @returns {Promise<AudioResult>}
    */
   async synthesizeFromReferenceAudio({ text, referenceWav, encoder, sampleRate, options = {} }) {
-    // synthesize() strips the control characters (input-sanitize contract).
+    // Before the check, so a text of only control characters is rejected
+    // before the reference is encoded.
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     if (!text) {
       throw new Error("text is required");
     }

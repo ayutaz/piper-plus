@@ -167,7 +167,8 @@ jobs:
           test/js/test-model-manager-cache.js \
           test/js/test-dictionary-cache.js \
           test/js/test-g2p-golden.js \
-          test/js/test-speaker-embedding.js \n          test/js/test-input-sanitize-contract.js
+          test/js/test-speaker-embedding.js \
+          test/js/test-input-sanitize-contract.js
 
     - name: Upload coverage to Codecov (wasm)
       uses: codecov/codecov-action@v5.5.5
