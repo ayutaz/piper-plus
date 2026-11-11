@@ -1,0 +1,170 @@
+# Input sanitizing contract: control characters are stripped before phonemizing.
+#
+# Gate: scripts/check_input_sanitize_contract.py (pre-commit hook
+# `input-sanitize-contract`, lint-gates step of the same name).
+# Shared cases: tests/fixtures/g2p/input_sanitize_cases.json. Every runtime's
+# consumer test reads that file (or its mirror), so one edit there re-tests
+# every runtime.
+#
+# Why: #934 (2026-11) added C1 stripping to the Python G2P and said it matched
+# Rust's `validate_input`. It did not. The Python helper ran for ja / en / sv
+# only, `validate_input` had no caller, and no other runtime stripped
+# anything. A NUL inside "hola" split the word in two for es / fr / pt.
+#
+# Status per runtime:
+#   enforced  the consumer tests exist and read the fixture, and every entry
+#             point calls the stripping function. The gate checks both.
+#   pending   not done yet. Printed as `PENDING: <name>` on every gate run.
+
+schema_version = 1
+
+[meta]
+forward_compat_policy = "strict"
+
+[rule]
+# Unicode general category Cc: C0 (U+0000-001F), DEL (U+007F), C1
+# (U+0080-009F). Format characters (Cf: U+200D, U+FEFF), separators (Zl:
+# U+2028), NBSP and astral characters are kept. A UTF-16 runtime decides per
+# code point, never per surrogate half.
+strip_category = "Cc"
+# Sentence splitting and SSML rely on these.
+keep = ["\n", "\t", "\r"]
+# Stripping is idempotent, so a text that passes two layers (a TTS runtime
+# and the G2P library under it) reads the same as one that passes one.
+idempotent = true
+
+[where]
+# (a) A G2P library strips at every public per-language phonemizer entry.
+g2p_library = "every public per-language phonemizer entry point"
+# (b) A TTS runtime also strips first, before SSML detection, the [[ ]]
+#     inline phoneme notation, custom dictionaries and sentence splitting.
+tts_runtime = "first thing, before SSML detection, [[ ]] notation, custom dictionaries and sentence splitting"
+
+[empty_result]
+# A text that is only control characters reads like an empty text.
+python_phonemize = "[]"
+python_phonemize_with_prosody = "([], [])"
+
+[length_limits]
+# Recorded, not part of the contract: each runtime keeps its current limit.
+python-g2p = "10000 characters (ValueError)"
+python-http = "1 MB in bytes (HTTP 413)"
+cpp-c-api = "1 MB in bytes (OpenJTalk input)"
+rust-g2p = "none (piper-core passes the whole text, a limit would reject texts read today)"
+others = "none"
+
+[fixture]
+canonical = "tests/fixtures/g2p/input_sanitize_cases.json"
+# Packages published on their own carry a copy.
+mirrors = [
+  "src/rust/piper-plus-g2p/tests/fixtures/input_sanitize_cases.json",
+]
+# Every language here needs a word in word_cases. A new language without one
+# fails the gate (and the Python contract test, which reads the registry).
+languages = ["ja", "en", "zh", "ko", "es", "fr", "pt", "pt-PT", "sv", "multilingual"]
+
+# ---------------------------------------------------------------- runtimes
+
+[[runtime]]
+name = "python-g2p"
+status = "pending"
+function = "Phonemizer._sanitize_input"
+consumer_tests = ["src/python/g2p/tests/test_input_contract.py"]
+entry_points = [
+  {file = "src/python/g2p/piper_plus_g2p/japanese.py", calls = "_sanitize_input"},
+  {file = "src/python/g2p/piper_plus_g2p/english.py", calls = "_sanitize_input"},
+  {file = "src/python/g2p/piper_plus_g2p/chinese.py", calls = "_sanitize_input"},
+  {file = "src/python/g2p/piper_plus_g2p/korean.py", calls = "_sanitize_input"},
+  {file = "src/python/g2p/piper_plus_g2p/spanish.py", calls = "_sanitize_input"},
+  {file = "src/python/g2p/piper_plus_g2p/french.py", calls = "_sanitize_input"},
+  {file = "src/python/g2p/piper_plus_g2p/portuguese.py", calls = "_sanitize_input"},
+  {file = "src/python/g2p/piper_plus_g2p/swedish.py", calls = "_sanitize_input"},
+  {file = "src/python/g2p/piper_plus_g2p/multilingual.py", calls = "_sanitize_input"},
+]
+notes = "Also the path of src/python_run/piper_plus/api/api.py, which calls phonemize_with_prosody directly."
+
+[[runtime]]
+name = "rust-g2p"
+status = "pending"
+function = "phonemizer::strip_control_chars"
+consumer_tests = ["src/rust/piper-plus-g2p/tests/input_sanitize.rs"]
+entry_points = [
+  {file = "src/rust/piper-plus-g2p/src/japanese.rs", calls = "strip_control_chars"},
+  {file = "src/rust/piper-plus-g2p/src/english.rs", calls = "strip_control_chars"},
+  {file = "src/rust/piper-plus-g2p/src/chinese.rs", calls = "strip_control_chars"},
+  {file = "src/rust/piper-plus-g2p/src/korean.rs", calls = "strip_control_chars"},
+  {file = "src/rust/piper-plus-g2p/src/spanish.rs", calls = "strip_control_chars"},
+  {file = "src/rust/piper-plus-g2p/src/french.rs", calls = "strip_control_chars"},
+  {file = "src/rust/piper-plus-g2p/src/portuguese.rs", calls = "strip_control_chars"},
+  {file = "src/rust/piper-plus-g2p/src/swedish.rs", calls = "strip_control_chars"},
+  {file = "src/rust/piper-plus-g2p/src/multilingual.rs", calls = "strip_control_chars"},
+]
+notes = "Also covers piper-plus (piper-core), the Rust WASM path of npm piper-plus and the Swift G2P, which call these phonemizers."
+
+[[runtime]]
+name = "python-runtime"
+status = "pending"
+function = "piper_plus.text_sanitize.strip_control_chars"
+consumer_tests = ["src/python_run/tests/test_input_sanitize_contract.py"]
+entry_points = [
+  {file = "src/python_run/piper_plus/voice.py", calls = "strip_control_chars"},
+  {file = "src/python_run/piper_plus/phonemize/multilingual.py", calls = "strip_control_chars"},
+]
+
+[[runtime]]
+name = "go"
+status = "pending"
+function = "phonemize.StripControlChars"
+consumer_tests = [
+  "src/go/phonemize/input_sanitize_test.go",
+  "src/go/piperplus/input_sanitize_test.go",
+]
+entry_points = [
+  {file = "src/go/phonemize/multilingual.go", calls = "StripControlChars"},
+  {file = "src/go/piperplus/synthesize.go", calls = "StripControlChars"},
+]
+
+[[runtime]]
+name = "csharp"
+status = "pending"
+function = "PiperPlus.Core.Text.TextSanitizer.StripControlChars"
+consumer_tests = ["src/csharp/PiperPlus.Core.Tests/TextSanitizerContractTests.cs"]
+entry_points = [
+  {file = "src/csharp/PiperPlus.Core/Phonemize/PhonemeEncoder.cs", calls = "StripControlChars"},
+  {file = "src/csharp/PiperPlus.Cli/Program.cs", calls = "StripControlChars"},
+]
+
+[[runtime]]
+name = "cpp"
+status = "pending"
+function = "piper::stripControlChars"
+consumer_tests = ["src/cpp/tests/test_input_sanitize_contract.cpp"]
+entry_points = [
+  {file = "src/cpp/piper.cpp", calls = "stripControlChars"},
+  {file = "src/cpp/piper_plus_c_api.cpp", calls = "stripControlChars"},
+  {file = "src/cpp/main.cpp", calls = "stripControlChars"},
+]
+notes = "Also the Swift TTS (Sources/PiperPlus), which wraps the C API in the released xcframework."
+
+[[runtime]]
+name = "npm"
+status = "pending"
+function = "stripControlChars (src/wasm/g2p/src/sanitize.js)"
+consumer_tests = [
+  "src/wasm/g2p/test/test-input-sanitize-contract.js",
+  "src/wasm/openjtalk-web/test/js/test-input-sanitize-contract.js",
+]
+entry_points = [
+  {file = "src/wasm/g2p/src/index.js", calls = "stripControlChars"},
+  {file = "src/wasm/openjtalk-web/src/index.js", calls = "stripControlChars"},
+]
+
+[[runtime]]
+name = "kotlin-swift-ffi"
+status = "pending"
+function = "none of its own: the native library underneath strips"
+consumer_tests = [
+  "android/piper-plus-g2p/src/test/java/com/piperplus/g2p/InputSanitizeContractTest.kt",
+  "tests/PiperPlusG2PTests/InputSanitizeContractTests.swift",
+]
+entry_points = []
