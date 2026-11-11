@@ -22,13 +22,23 @@ token), the gate fails when:
   same job writes to ``$GITHUB_STEP_SUMMARY`` on the same ``run`` line, so
   fork PR authors would not see the report at all.
 
-Writes to a PR, as detected: sticky-pull-request-comment; github-script
-calling createComment / updateComment / createReview(Comment) / addLabels /
-removeLabel / setLabels, or ``github.request`` with POST / PATCH / PUT /
-DELETE; ``gh pr comment|review|edit`` and ``gh issue comment``; ``gh api``
-on ``/comments``, ``/reviews`` or ``/labels`` with a write method or field;
-benchmark-action with ``comment-on-alert`` or ``comment-always``. A new way
-to write gets a pattern here and a row in the parametrized tests.
+Writes, as detected: sticky-pull-request-comment; github-script calling
+create/update/deleteComment, createReview(Comment), add/remove/setLabels,
+requestReviewers, createCommitStatus, ``issues.update`` / ``pulls.update``,
+``checks.create`` / ``checks.update``, a GraphQL mutation, or
+``github.request`` with POST / PATCH / PUT / DELETE (as a string or as
+``method:``); ``gh pr comment|review|edit`` and ``gh issue comment|edit``
+(``-R`` allowed); any ``gh api`` call that is not a GET or a GraphQL query,
+whatever its target, because every write fails with the read-only token
+(lines continued with a backslash are joined first); benchmark-action with
+``comment-on-alert`` or ``comment-always``. A script loaded with
+``require()`` is not read. A new way to write gets a pattern here and a row
+in the parametrized tests.
+
+The fork guard may also be written reversed (``github.repository ==
+...head.repo.full_name``) or as ``!github.event.pull_request.head.repo.fork``
+/ ``... .fork == false``; a job ``if`` that reads ``head.repo.full_name`` or
+``head.repo.fork`` at all is reported.
 
 Usage:
     uv run python scripts/check_fork_pr_comment_guard.py
@@ -54,17 +64,30 @@ BENCHMARK = "benchmark-action/github-action-benchmark@"
 SCRIPT_CALLS = (
     "createComment",
     "updateComment",
+    "deleteComment",
     "createReview",  # also matches createReviewComment
     "addLabels",
     "removeLabel",
     "setLabels",
+    "requestReviewers",
+    "createCommitStatus",
 )
-SCRIPT_REQUEST = re.compile(r"""github\.request\(\s*['"`](POST|PATCH|PUT|DELETE)\b""")
-RUN_CALLS = re.compile(r"\bgh\s+(pr\s+(comment|review|edit)|issue\s+comment)\b")
-GH_API_TARGET = re.compile(r"/(comments|reviews|labels)\b")
-GH_API_WRITE = re.compile(
-    r"(-X|--method)\s*(POST|PATCH|PUT|DELETE)\b|\s(-f|-F|--field|--raw-field|--input)\s"
+SCRIPT_WRITES = re.compile(
+    r"""github\.request\(\s*['"`](POST|PATCH|PUT|DELETE)\b"""
+    r"""|\bmethod\s*:\s*['"`](POST|PATCH|PUT|DELETE)\b"""
+    r"""|\.(issues|pulls)\.update\("""
+    r"""|\.checks\.(create|update)\("""
 )
+SCRIPT_GRAPHQL = re.compile(r"\bgraphql\(")
+RUN_CALLS = re.compile(
+    r"\bgh\s+(?:(?:-R|--repo)[\s=]\S+\s+)?"
+    r"(pr\s+(comment|review|edit)|issue\s+(comment|edit))\b"
+)
+GH_API = re.compile(r"\bgh\s+api\b")
+GH_API_METHOD = re.compile(r"""(?:^|\s)(?:-X|--method)(?:\s+|=)?['"]?([A-Za-z]+)""")
+GH_API_FIELD = re.compile(r"(?:^|\s)(?:-[fF]|--field|--raw-field|--input)(?=[\s=]|\S)")
+GH_API_GRAPHQL = re.compile(r"\bgh\s+api\s+graphql\b")
+WRITE_METHODS = ("POST", "PATCH", "PUT", "DELETE")
 NON_PR_EVENTS = ("push", "workflow_dispatch", "schedule")
 
 
@@ -72,9 +95,18 @@ def _squash(text: str) -> str:
     return re.sub(r"\s+", "", text)
 
 
-GUARD_TERMS = {_squash(FORK_GUARD)} | {
+# The fork guard, and the forms that mean the same.
+FORK_GUARD_FORMS = {
+    _squash(FORK_GUARD),
+    "github.repository==github.event.pull_request.head.repo.full_name",
+    "!github.event.pull_request.head.repo.fork",
+    "github.event.pull_request.head.repo.fork==false",
+}
+GUARD_TERMS = FORK_GUARD_FORMS | {
     f"github.event_name=={q}{event}{q}" for event in NON_PR_EVENTS for q in "'\""
 }
+# Any job `if` that reads these decides by fork.
+JOB_FORK_TERMS = ("head.repo.full_name", "head.repo.fork")
 
 
 def _unwrap(expr: str) -> str:
@@ -130,6 +162,26 @@ def _truthy(value) -> bool:
     return value is True or str(value).strip().lower() == "true"
 
 
+def _gh_api_writes(line: str) -> bool:
+    """A ``gh api`` call writes unless it is a GET or a GraphQL query.
+
+    Any write fails with the read-only token, so the target does not matter
+    (it is often in a variable). Without ``-X`` / ``--method``, ``gh api``
+    sends a POST when it has a field or an input.
+    """
+    method = GH_API_METHOD.search(line)
+    if method:
+        return method.group(1).upper() in WRITE_METHODS
+    if GH_API_GRAPHQL.search(line):
+        return "mutation" in line
+    return GH_API_FIELD.search(line) is not None
+
+
+def _run_lines(run: str) -> list[str]:
+    """The lines of *run*, with lines that end in a backslash joined."""
+    return re.sub(r"\\[ \t]*\n", " ", run).splitlines()
+
+
 def _posts_to_pr(step: dict) -> bool:
     uses = str(step.get("uses") or "")
     with_ = step.get("with") if isinstance(step.get("with"), dict) else {}
@@ -137,15 +189,17 @@ def _posts_to_pr(step: dict) -> bool:
         return True
     if uses.startswith("actions/github-script@"):
         script = str(with_.get("script", ""))
-        if any(call in script for call in SCRIPT_CALLS) or SCRIPT_REQUEST.search(script):
+        if any(call in script for call in SCRIPT_CALLS) or SCRIPT_WRITES.search(script):
+            return True
+        if SCRIPT_GRAPHQL.search(script) and "mutation" in script:
             return True
     if uses.startswith(BENCHMARK):
         if _truthy(with_.get("comment-on-alert")) or _truthy(with_.get("comment-always")):
             return True
-    for line in str(step.get("run") or "").splitlines():
+    for line in _run_lines(str(step.get("run") or "")):
         if RUN_CALLS.search(line):
             return True
-        if "gh api" in line and GH_API_TARGET.search(line) and GH_API_WRITE.search(line):
+        if GH_API.search(line) and _gh_api_writes(line):
             return True
     return False
 
@@ -187,7 +241,8 @@ def check(root: Path) -> list[str]:
         for job_id, job in jobs.items():
             if not isinstance(job, dict):
                 continue
-            if _squash(FORK_GUARD) in _squash(str(job.get("if", ""))):
+            job_if = _squash(str(job.get("if", "")))
+            if any(term in job_if for term in JOB_FORK_TERMS):
                 errors.append(
                     f"{wf.name} / {job_id}: job-level fork guard skips the whole "
                     "job on forks; guard the comment step instead"

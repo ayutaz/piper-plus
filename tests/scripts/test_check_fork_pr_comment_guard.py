@@ -145,7 +145,17 @@ def test_job_continue_on_error_is_reported(gate, tmp_path):
     assert gate.check(tmp_path) == [NO_GUARD]
 
 
-def test_job_guard_without_comment_step_is_reported(gate, tmp_path):
+@pytest.mark.parametrize(
+    "job_if",
+    [
+        GUARD,
+        "github.repository == github.event.pull_request.head.repo.full_name",
+        "${{ !github.event.pull_request.head.repo.fork }}",
+        "github.event.pull_request.head.repo.fork == false",
+    ],
+    ids=["guard", "reversed", "not-fork", "fork-false"],
+)
+def test_job_guard_without_comment_step_is_reported(gate, tmp_path, job_if):
     _write(
         tmp_path,
         f"""\
@@ -153,7 +163,7 @@ def test_job_guard_without_comment_step_is_reported(gate, tmp_path):
         jobs:
           build:
             runs-on: ubuntu-24.04
-            if: {GUARD}
+            if: "{job_if}"
             steps:
               - run: make check
         """,
@@ -197,8 +207,21 @@ def test_guard_loopholes_are_reported(gate, tmp_path, step_if):
         "github.event_name == 'push' && always()",
         "always() && github.event_name == 'workflow_dispatch'",
         "github.event_name == 'schedule'",
+        "github.repository == github.event.pull_request.head.repo.full_name",
+        "!github.event.pull_request.head.repo.fork",
+        "github.event.pull_request.head.repo.fork == false",
     ],
-    ids=["and-parenthesized-or", "extra-spaces", "parenthesized", "push", "dispatch", "schedule"],
+    ids=[
+        "and-parenthesized-or",
+        "extra-spaces",
+        "parenthesized",
+        "push",
+        "dispatch",
+        "schedule",
+        "reversed",
+        "not-fork",
+        "fork-false",
+    ],
 )
 def test_guarded_or_non_pr_steps_pass(gate, tmp_path, step_if):
     _write(tmp_path, _sticky_workflow(step_if=step_if))
@@ -234,8 +257,30 @@ def test_github_script_create_comment_is_reported(gate, tmp_path):
         "github.rest.pulls.createReviewComment({pull_number: 1})",
         "github.request('POST /repos/{owner}/{repo}/issues/{n}/labels')",
         "github.request('PATCH /repos/{owner}/{repo}/issues/comments/1')",
+        "github.rest.issues.deleteComment({comment_id: 1})",
+        "github.rest.issues.update({issue_number: 1, title: 'x'})",
+        "github.rest.pulls.update({pull_number: 1, body: 'x'})",
+        "github.rest.pulls.requestReviewers({pull_number: 1})",
+        "github.rest.repos.createCommitStatus({sha: 'a', state: 'success'})",
+        "github.rest.checks.create({name: 'x', head_sha: 'a'})",
+        "github.graphql('mutation { addComment(input: {}) { clientMutationId } }')",
+        "github.request({method: 'POST', url: '/repos/o/r/issues/1/comments'})",
     ],
-    ids=["addLabels", "removeLabel", "createReviewComment", "request-post", "request-patch"],
+    ids=[
+        "addLabels",
+        "removeLabel",
+        "createReviewComment",
+        "request-post",
+        "request-patch",
+        "deleteComment",
+        "issues-update",
+        "pulls-update",
+        "requestReviewers",
+        "createCommitStatus",
+        "checks-create",
+        "graphql-mutation",
+        "request-object-post",
+    ],
 )
 def test_github_script_writes_are_reported(gate, tmp_path, script):
     _write(tmp_path, _script_step(script))
@@ -257,11 +302,61 @@ def test_github_request_get_is_not_a_write(gate, tmp_path):
         "gh api repos/o/r/issues/1/comments -f body=x",
         "gh api -X POST repos/o/r/pulls/1/reviews",
         "gh api repos/o/r/issues/1/labels -f labels[]=x",
+        # Every write fails with the read-only token, not only a comment, and
+        # the target is often in a variable.
+        "gh api --method=POST repos/o/r/issues/1/comments",
+        "gh api repos/o/r/issues/1/comments --field=body=x",
+        "gh api repos/o/r/issues/1/comments -fbody=x",
+        "gh api repos/o/r/issues/1/comments --raw-field body=x",
+        "gh api repos/o/r/issues/1/comments -F body=@report.md",
+        "gh api repos/o/r/issues/1/comments --input body.json",
+        'gh api "$URL" -X POST',
+        "gh api -X PATCH repos/o/r/pulls/1",
+        "gh api repos/o/r/statuses/abc -f state=success",
+        "gh api graphql -f query='mutation{addComment(input:{}){clientMutationId}}'",
+        "gh issue edit 1 --add-label x",
+        "gh -R o/r pr comment 1 --body x",
     ],
 )
 def test_gh_cli_writes_are_reported(gate, tmp_path, run):
     _write(tmp_path, _run_step(run))
     assert gate.check(tmp_path) == [COMMENT_NO_GUARD]
+
+
+def test_gh_api_continued_on_next_lines_is_reported(gate, tmp_path):
+    # The usual way to write a long `gh api` call in a workflow.
+    _write(
+        tmp_path,
+        """\
+        on: pull_request
+        jobs:
+          build:
+            runs-on: ubuntu-24.04
+            steps:
+              - name: Comment
+                run: |
+                  gh api \\
+                    repos/o/r/issues/1/comments \\
+                    -f body=x
+        """,
+    )
+    assert gate.check(tmp_path) == [COMMENT_NO_GUARD]
+
+
+@pytest.mark.parametrize(
+    "run",
+    [
+        "gh api repos/o/r/pulls/1/comments",
+        "gh api -X GET repos/o/r/issues/1/comments -f per_page=100",
+        "gh api --method GET repos/o/r/issues/1/comments -F per_page=100",
+        "gh api graphql -f query='query{viewer{login}}'",
+        "gh pr view 1 --json comments",
+    ],
+    ids=["get", "x-get-with-field", "method-get", "graphql-query", "pr-view"],
+)
+def test_gh_reads_are_not_writes(gate, tmp_path, run):
+    _write(tmp_path, _run_step(run))
+    assert gate.check(tmp_path) == []
 
 
 @pytest.mark.parametrize("key", ["comment-on-alert", "comment-always"])

@@ -45,17 +45,17 @@ gh pr view "$PR_NUM" --json isCrossRepository,headRepositoryOwner,headRefName,he
 
 `fork` が `true` (フォークからの PR) なら、 次の 4 点がこのリポジトリのブランチの PR と違う (#934, 2026-11):
 
-- **checks が 0 件 / 一部しか出ないのは承認待ち**。 maintainer がフォークのブランチに push すると (`gh pr update-branch` を含む)、 その head の workflow 実行は全部 `action_required` になり PR の checks に出ない。 「CI が動いていない」と報告する前に数える:
+- **checks が 0 件 / 一部しか出ないのは承認待ち**。 maintainer がフォークのブランチに push すると (`gh pr update-branch` を含む)、 その head の workflow 実行は `action_required` (承認待ち) になり PR の checks に出ない (リポジトリの承認設定と、 投稿者が初めての貢献者かどうかで変わる)。 「CI が動いていない」と報告する前に数える (pull_request で動く workflow は 70 本以上あり、 既定の 1 ページ 30 件では足りない):
 
   ```bash
-  gh api "repos/ayutaz/piper-plus/actions/runs?head_sha=<head>&status=action_required" \
+  gh api --paginate "repos/ayutaz/piper-plus/actions/runs?head_sha=<head>&status=action_required&per_page=100" \
     --jq '.workflow_runs[] | "\(.id) \(.name)"'
   ```
 
   承認は差分を確認してからユーザーに聞き、 了承を得て 1 件ずつ `gh api -X POST repos/ayutaz/piper-plus/actions/runs/<id>/approve`。 外部の人のコードを CI で走らせる操作なので、 自分で判断して承認しない。
 - **`gh pr update-branch` や push のあとは、 新しい head でまた承認が要る**。 push を重ねる予定なら最後の head で一度だけ承認する。
 - **フォークへの push 先**は `git push https://github.com/<owner>/<repo>.git HEAD:<branch>`。 `gh pr checkout` のローカル名が PR のブランチ名と違うと素の `git push` は拒否される。 dev の取り込みは投稿者のコミットを書き換えない merge (`gh pr update-branch` の既定) にし、 rebase しない。
-- **PR へのコメントは来ない**。 フォーク PR の `GITHUB_TOKEN` は読み取り専用なので、 bundle-size / memory / RTF などのコメントのステップは飛ばされ、 本文は各 job の summary (`gh run view <run-id>` の Summary) にだけ出る。 コメントのステップが `Resource not accessible by integration` で落ちていたら、 フォーク判定の付け忘れ (pre-commit hook `fork-pr-comment-guard` が見逃した書き方) として報告する。
+- **PR へのコメントは来ない**。 フォーク PR の `GITHUB_TOKEN` は読み取り専用なので、 bundle-size / memory / RTF などのコメントのステップは飛ばされ、 本文は各 run の Summary ページ (`gh run view <run-id> --web`、 または `https://github.com/ayutaz/piper-plus/actions/runs/<run-id>`) にだけ出る。 `gh run view` の端末出力には job summary は出ない。 コメントのステップが `Resource not accessible by integration` で落ちていたら、 フォーク判定の付け忘れ (pre-commit hook `fork-pr-comment-guard` が見逃した書き方) として報告する。
 
 ### フェーズ 2: CI checks の一括取得
 
