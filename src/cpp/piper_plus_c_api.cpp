@@ -8,18 +8,8 @@
  * to satisfy the tests in test_c_api.cpp.
  */
 
-#include "piper_plus.h"
-#include "piper.hpp"
-#include "chinese_loanword.hpp"
-#include "custom_dictionary.hpp"
-#include "english_phonemize.hpp"
-#include "chinese_phonemize.hpp"
-#include "library_path.h"
-#include "openjtalk_dictionary_manager.h"
-#include "g2p_parallelism.hpp"
-#include "text_sanitize.hpp"
-
 #include <spdlog/spdlog.h>
+#include <sys/stat.h>
 
 #include <algorithm>
 #include <atomic>
@@ -35,7 +25,16 @@
 #include <thread>
 #include <vector>
 
-#include <sys/stat.h>
+#include "chinese_loanword.hpp"
+#include "chinese_phonemize.hpp"
+#include "custom_dictionary.hpp"
+#include "english_phonemize.hpp"
+#include "g2p_parallelism.hpp"
+#include "library_path.h"
+#include "openjtalk_dictionary_manager.h"
+#include "piper.hpp"
+#include "piper_plus.h"
+#include "text_sanitize.hpp"
 
 #ifdef _WIN32
 #ifndef NOMINMAX

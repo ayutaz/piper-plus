@@ -19,10 +19,6 @@
  */
 
 #include <gtest/gtest.h>
-#include "piper_plus.h"
-#include "../json.hpp"
-#include "../piper.hpp"
-#include "../text_sanitize.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -33,6 +29,11 @@
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include "../json.hpp"
+#include "../piper.hpp"
+#include "../text_sanitize.hpp"
+#include "piper_plus.h"
 
 #ifndef PIPER_PLUS_SOURCE_DIR
 #error "PIPER_PLUS_SOURCE_DIR must point at the repository root"
@@ -56,11 +57,11 @@ struct TextCase {
     std::string label;
     std::string language;  // "" = detect
     std::string clean;
-    std::string dirty;     // NUL replaced by DEL
+    std::string dirty;  // NUL replaced by DEL
 };
 
 std::string asCString(std::string s) {
-    for (auto &c : s) {
+    for (auto& c : s) {
         if (c == '\0') c = '\x7f';
     }
     return s;
@@ -71,15 +72,16 @@ std::vector<TextCase> textCases() {
     static const std::set<std::string> skipped = {"ja", "pt-PT"};
     const json doc = loadCases();
     std::vector<TextCase> out;
-    for (const auto &c : doc["word_cases"]) {
+    for (const auto& c : doc["word_cases"]) {
         std::string lang = c["language"];
         if (skipped.count(lang)) continue;
-        out.push_back({lang + " " + c["control"].get<std::string>() + " '" + c["clean"].get<std::string>() + "'",
-                       lang == "multilingual" ? "" : lang,
-                       c["clean"], asCString(c["dirty"])});
+        out.push_back({lang + " " + c["control"].get<std::string>() + " '" +
+                           c["clean"].get<std::string>() + "'",
+                       lang == "multilingual" ? "" : lang, c["clean"], asCString(c["dirty"])});
     }
-    for (const auto &c : doc["pipeline_cases"]) {
-        out.push_back({c["name"].get<std::string>(), c["language"], c["clean"], asCString(c["dirty"])});
+    for (const auto& c : doc["pipeline_cases"]) {
+        out.push_back(
+            {c["name"].get<std::string>(), c["language"], c["clean"], asCString(c["dirty"])});
     }
     return out;
 }
@@ -87,16 +89,16 @@ std::vector<TextCase> textCases() {
 // Points PIPER_PLUS_DICTIONARIES_PATH at the canonical CMU / pinyin files
 // (as test_c_api_g2p_golden.cpp does) and restores it afterwards.
 class ScopedDictionaries {
-public:
+   public:
     ScopedDictionaries() {
-        const char *old = std::getenv("PIPER_PLUS_DICTIONARIES_PATH");
+        const char* old = std::getenv("PIPER_PLUS_DICTIONARIES_PATH");
         if (old) previous_ = old;
         set(kRoot + "/src/rust/piper-plus-g2p/data");
     }
     ~ScopedDictionaries() { set(previous_); }
 
-private:
-    static void set(const std::string &value) {
+   private:
+    static void set(const std::string& value) {
 #ifdef _WIN32
         _putenv_s("PIPER_PLUS_DICTIONARIES_PATH", value.c_str());
 #else
@@ -110,7 +112,7 @@ private:
     std::string previous_;
 };
 
-std::string g2p(PiperPlusG2pHandle *h, const std::string &text, const std::string &lang) {
+std::string g2p(PiperPlusG2pHandle* h, const std::string& text, const std::string& lang) {
     PiperPlusPhonemeResult r{};
     const PiperPlusStatus rc = piper_plus_g2p_phonemize(h, text.c_str(), lang.c_str(), &r);
     if (rc != PIPER_PLUS_OK) return "<error " + std::to_string(rc) + ">";
@@ -134,7 +136,7 @@ std::string writeHolaDict() {
 TEST(InputSanitize, StripMatchesEveryStripCase) {
     const json doc = loadCases();
     int checked = 0;
-    for (const auto &c : doc["strip_cases"]) {
+    for (const auto& c : doc["strip_cases"]) {
         const std::string input = c["input"];
         EXPECT_EQ(piper::stripControlChars(input), c["expected"].get<std::string>())
             << c["name"].get<std::string>();
@@ -145,7 +147,7 @@ TEST(InputSanitize, StripMatchesEveryStripCase) {
 
 TEST(InputSanitize, StripIsIdempotent) {
     const json doc = loadCases();
-    for (const auto &c : doc["strip_cases"]) {
+    for (const auto& c : doc["strip_cases"]) {
         const std::string once = piper::stripControlChars(c["input"].get<std::string>());
         EXPECT_EQ(piper::stripControlChars(once), once) << c["name"].get<std::string>();
     }
@@ -153,11 +155,21 @@ TEST(InputSanitize, StripIsIdempotent) {
 
 TEST(InputSanitize, StripKeepsInvalidUtf8Bytes) {
     // A lone 0xFF, a 0xC2 at the end and a 0xC2 before a non-C1 byte stay.
-    EXPECT_EQ(piper::stripControlChars(std::string("a\xff\x00" "b", 4)), "a\xff" "b");
+    EXPECT_EQ(piper::stripControlChars(std::string("a\xff\x00"
+                                                   "b",
+                                                   4)),
+              "a\xff"
+              "b");
     EXPECT_EQ(piper::stripControlChars("a\xc2"), "a\xc2");
-    EXPECT_EQ(piper::stripControlChars("\xc2" "A"), "\xc2" "A");
+    EXPECT_EQ(piper::stripControlChars("\xc2"
+                                       "A"),
+              "\xc2"
+              "A");
     // U+00A0 (C2 A0) is NBSP, not C1.
-    EXPECT_EQ(piper::stripControlChars("a\xc2\xa0" "b"), "a\xc2\xa0" "b");
+    EXPECT_EQ(piper::stripControlChars("a\xc2\xa0"
+                                       "b"),
+              "a\xc2\xa0"
+              "b");
 }
 
 // ---------------------------------------------------------------------------
@@ -167,7 +179,7 @@ TEST(InputSanitize, StripKeepsInvalidUtf8Bytes) {
 // One handle per suite: creating one loads the CMU and pinyin dictionaries
 // (about 5 s in a Debug build), and test_c_api has a 60 s timeout.
 class InputSanitizeG2p : public ::testing::Test {
-protected:
+   protected:
     static void SetUpTestSuite() {
         dictionaries_ = new ScopedDictionaries();  // must outlive create()
         handle_ = piper_plus_g2p_create(nullptr);
@@ -180,8 +192,8 @@ protected:
     }
     void SetUp() override { ASSERT_NE(handle_, nullptr) << piper_plus_get_last_error(); }
 
-    static inline ScopedDictionaries *dictionaries_ = nullptr;
-    static inline PiperPlusG2pHandle *handle_ = nullptr;
+    static inline ScopedDictionaries* dictionaries_ = nullptr;
+    static inline PiperPlusG2pHandle* handle_ = nullptr;
 };
 
 // A suite of its own (and so a handle of its own): the dictionary it loads
@@ -191,7 +203,7 @@ class InputSanitizeG2pDict : public InputSanitizeG2p {};
 TEST_F(InputSanitizeG2p, ReadsDirtyLikeClean) {
     const auto cases = textCases();
     ASSERT_GT(cases.size(), 30u);
-    for (const auto &c : cases) {
+    for (const auto& c : cases) {
         const std::string clean = g2p(handle_, c.clean, c.language);
         ASSERT_EQ(clean.rfind("<error", 0), std::string::npos) << c.label << ": " << clean;
         EXPECT_EQ(g2p(handle_, c.dirty, c.language), clean) << c.label;
@@ -219,9 +231,9 @@ TEST_F(InputSanitizeG2pDict, CustomDictionaryFindsTheWord) {
 // ---------------------------------------------------------------------------
 
 TEST(InputSanitize, EmbeddedEnglishReadsDirtyLikeClean) {
-    PiperPlusLoanwordHandle *h = piper_plus_loanword_load_default();
+    PiperPlusLoanwordHandle* h = piper_plus_loanword_load_default();
     ASSERT_NE(h, nullptr) << piper_plus_get_last_error();
-    auto read = [h](const char *text) {
+    auto read = [h](const char* text) {
         PiperPlusPhonemeResult r{};
         EXPECT_EQ(piper_plus_phonemize_embedded_english(h, text, &r), PIPER_PLUS_OK);
         return std::string(r.phonemes ? r.phonemes : "");
@@ -242,7 +254,7 @@ TEST(InputSanitize, EmbeddedEnglishReadsDirtyLikeClean) {
 
 // One engine per suite, for the same reason as InputSanitizeG2p.
 class InputSanitizeEngine : public ::testing::Test {
-protected:
+   protected:
     static void SetUpTestSuite() {
         const std::string model = kRoot + "/test/models/multilingual-test-medium.onnx";
         PiperPlusConfig config = {};
@@ -267,24 +279,25 @@ protected:
         ASSERT_GE(opts_.language_id, 0);
     }
 
-    static std::string phonemize(const std::string &text) {
+    static std::string phonemize(const std::string& text) {
         PiperPlusPhonemeResult r{};
         const PiperPlusStatus rc = piper_plus_phonemize(engine_, text.c_str(), "es", &r);
         if (rc != PIPER_PLUS_OK) return "<error " + std::to_string(rc) + ">";
         return r.phonemes ? r.phonemes : "";
     }
 
-    static int32_t synthesizedSamples(const std::string &text) {
-        float *samples = nullptr;
+    static int32_t synthesizedSamples(const std::string& text) {
+        float* samples = nullptr;
         int32_t n = 0, rate = 0;
-        EXPECT_EQ(piper_plus_synthesize(engine_, text.c_str(), &opts_, &samples, &n, &rate), PIPER_PLUS_OK)
+        EXPECT_EQ(piper_plus_synthesize(engine_, text.c_str(), &opts_, &samples, &n, &rate),
+                  PIPER_PLUS_OK)
             << piper_plus_get_last_error();
         piper_plus_free_audio(samples);
         return n;
     }
 
     // Number of chunks synth_next yields, and their total length.
-    static std::pair<int, int64_t> streamed(const std::string &text) {
+    static std::pair<int, int64_t> streamed(const std::string& text) {
         EXPECT_EQ(piper_plus_synth_start(engine_, text.c_str(), &opts_), PIPER_PLUS_OK)
             << piper_plus_get_last_error();
         int chunks = 0;
@@ -312,14 +325,16 @@ protected:
     // and "5" hid the decimal point.
     static std::vector<TextCase> spanishCases() {
         std::vector<TextCase> out;
-        for (const auto &c : textCases()) {
+        for (const auto& c : textCases()) {
             if (c.language == "es") out.push_back(c);
         }
-        out.push_back({"del_in_decimal", "es", "3.5 metros.", "3.\x7f" "5 metros."});
+        out.push_back({"del_in_decimal", "es", "3.5 metros.",
+                       "3.\x7f"
+                       "5 metros."});
         return out;
     }
 
-    static inline PiperPlusEngine *engine_ = nullptr;
+    static inline PiperPlusEngine* engine_ = nullptr;
     static inline PiperPlusSynthOptions opts_{};
 };
 
@@ -329,7 +344,7 @@ class InputSanitizeEngineDict : public InputSanitizeEngine {};
 TEST_F(InputSanitizeEngine, PhonemizeReadsDirtyLikeClean) {
     const auto cases = spanishCases();
     ASSERT_GT(cases.size(), 5u);
-    for (const auto &c : cases) {
+    for (const auto& c : cases) {
         const std::string clean = phonemize(c.clean);
         ASSERT_EQ(clean.rfind("<error", 0), std::string::npos) << c.label << ": " << clean;
         EXPECT_EQ(phonemize(c.dirty), clean) << c.label;
@@ -337,13 +352,13 @@ TEST_F(InputSanitizeEngine, PhonemizeReadsDirtyLikeClean) {
 }
 
 TEST_F(InputSanitizeEngine, SynthesizeReadsDirtyLikeClean) {
-    for (const auto &c : spanishCases()) {
+    for (const auto& c : spanishCases()) {
         EXPECT_EQ(synthesizedSamples(c.dirty), synthesizedSamples(c.clean)) << c.label;
     }
 }
 
 TEST_F(InputSanitizeEngine, SynthStartSplitsTheStrippedText) {
-    for (const auto &c : spanishCases()) {
+    for (const auto& c : spanishCases()) {
         const auto clean = streamed(c.clean);
         ASSERT_GT(clean.first, 0) << c.label;
         const auto dirty = streamed(c.dirty);
@@ -357,7 +372,7 @@ TEST_F(InputSanitizeEngine, SynthStartSplitsTheStrippedText) {
 TEST_F(InputSanitizeEngine, SynthStartRejectsOnlyControlsLikeAnEmptyText) {
     ASSERT_EQ(piper_plus_synth_start(engine_, "", &opts_), PIPER_PLUS_ERR_TEXT);
     EXPECT_EQ(piper_plus_synth_start(engine_, "\x01\x7f\xc2\x9f", &opts_), PIPER_PLUS_ERR_TEXT);
-    PiperPlusAudioCallback ignore = [](const float *, int32_t, int32_t, void *) {};
+    PiperPlusAudioCallback ignore = [](const float*, int32_t, int32_t, void*) {};
     EXPECT_EQ(piper_plus_synthesize_streaming(engine_, "\x01\x7f", &opts_, ignore, nullptr),
               PIPER_PLUS_ERR_TEXT);
     // The engine is usable afterwards.
@@ -367,7 +382,8 @@ TEST_F(InputSanitizeEngine, SynthStartRejectsOnlyControlsLikeAnEmptyText) {
 
 TEST_F(InputSanitizeEngineDict, CustomDictionaryFindsTheWord) {
     const std::string dict = writeHolaDict();
-    ASSERT_EQ(piper_plus_load_custom_dict(engine_, dict.c_str()), PIPER_PLUS_OK) << piper_plus_get_last_error();
+    ASSERT_EQ(piper_plus_load_custom_dict(engine_, dict.c_str()), PIPER_PLUS_OK)
+        << piper_plus_get_last_error();
     const std::string expected = phonemize("pero");
     EXPECT_EQ(phonemize("ho\x7fla"), expected);
     EXPECT_EQ(synthesizedSamples("ho\x7fla"), synthesizedSamples("hola"));
@@ -385,7 +401,7 @@ TEST_F(InputSanitizeEngineDict, CustomDictionaryFindsTheWord) {
 
 // One voice per suite, for the same reason as InputSanitizeG2p.
 class InputSanitizeLibrary : public ::testing::Test {
-protected:
+   protected:
     static void SetUpTestSuite() {
         const std::string model = kRoot + "/test/models/multilingual-test-medium.onnx";
         config_ = std::make_unique<piper::PiperConfig>();
@@ -409,32 +425,35 @@ protected:
     static std::vector<std::pair<std::string, std::pair<std::string, std::string>>> cases() {
         std::vector<std::pair<std::string, std::pair<std::string, std::string>>> out;
         const json doc = loadCases();
-        for (const auto &c : doc["word_cases"]) {
+        for (const auto& c : doc["word_cases"]) {
             if (c["language"] == "es") {
                 out.push_back({"es " + c["control"].get<std::string>(),
                                {c["clean"].get<std::string>(), c["dirty"].get<std::string>()}});
             }
         }
-        for (const auto &c : doc["pipeline_cases"]) {
+        for (const auto& c : doc["pipeline_cases"]) {
             out.push_back({c["name"].get<std::string>(),
                            {c["clean"].get<std::string>(), c["dirty"].get<std::string>()}});
         }
-        out.push_back({"nul_in_decimal", {"3.5 metros.", std::string("3.\0" "5 metros.", 12)}});
+        out.push_back({"nul_in_decimal",
+                       {"3.5 metros.", std::string("3.\0"
+                                                   "5 metros.",
+                                                   12)}});
         return out;
     }
 
-    static std::vector<std::vector<piper::Phoneme>> phonemes(const std::string &text) {
+    static std::vector<std::vector<piper::Phoneme>> phonemes(const std::string& text) {
         piper::PhonemizeResult r;
         piper::phonemizeText(*voice_, text, r, nullptr);
         return r.phonemes;
     }
 
-    static std::pair<int, size_t> streamed(const std::string &text) {
+    static std::pair<int, size_t> streamed(const std::string& text) {
         std::vector<int16_t> audio;
         piper::SynthesisResult result;
         int chunks = 0;
         piper::textToAudioStreaming(*config_, *voice_, text, audio, result,
-                                    [&chunks](const std::vector<int16_t> &) { ++chunks; });
+                                    [&chunks](const std::vector<int16_t>&) { ++chunks; });
         return {chunks, audio.size()};
     }
 
@@ -445,13 +464,13 @@ protected:
 TEST_F(InputSanitizeLibrary, PhonemizeTextReadsDirtyLikeClean) {
     const auto all = cases();
     ASSERT_GT(all.size(), 5u);
-    for (const auto &[label, c] : all) {
+    for (const auto& [label, c] : all) {
         EXPECT_EQ(phonemes(c.second), phonemes(c.first)) << label;
     }
 }
 
 TEST_F(InputSanitizeLibrary, TextToAudioStreamingSplitsTheStrippedText) {
-    for (const auto &[label, c] : cases()) {
+    for (const auto& [label, c] : cases()) {
         const auto clean = streamed(c.first);
         ASSERT_GT(clean.first, 0) << label;
         EXPECT_EQ(streamed(c.second), clean) << label;

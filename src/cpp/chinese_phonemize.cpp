@@ -8,11 +8,6 @@
 // No runtime Python dependency — dictionaries are loaded from JSON at startup.
 
 #include "chinese_phonemize.hpp"
-#include "chinese_loanword.hpp"
-#include "json.hpp"
-#include "utf8.h"
-#include "utf8_utils.hpp"
-#include "text_sanitize.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -21,6 +16,12 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+
+#include "chinese_loanword.hpp"
+#include "json.hpp"
+#include "text_sanitize.hpp"
+#include "utf8.h"
+#include "utf8_utils.hpp"
 
 using json = nlohmann::json;
 
