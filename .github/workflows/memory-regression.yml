@@ -56,8 +56,6 @@ jobs:
     name: Peak RSS per language (Ubuntu)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    # Fork PRs cannot post comments; matches rtf-regression.yml.
-    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
     permissions:
       contents: read
       pull-requests: write
@@ -106,8 +104,15 @@ jobs:
             memory-report.md
           retention-days: 30
 
-      - name: Upsert sticky PR comment
+      - name: Write report to job summary
         if: always() && steps.compare.outcome != 'skipped' && github.event_name == 'pull_request'
+        run: if [ -f memory-report.md ]; then cat memory-report.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      # Fork PRs get a read-only GITHUB_TOKEN, so the comment would fail there:
+      # it is skipped on forks, and the report is in the job summary
+      # (pre-commit hook fork-pr-comment-guard). The check itself runs on forks.
+      - name: Upsert sticky PR comment
+        if: always() && steps.compare.outcome != 'skipped' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@v7.1.0
         with:
           script: |
