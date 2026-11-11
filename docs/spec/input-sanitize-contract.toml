@@ -156,13 +156,36 @@ notes = "Also the Go CLI (cmd/piper-plus), which calls Voice. src/go/piperplus/i
 
 [[runtime]]
 name = "csharp"
-status = "pending"
-function = "PiperPlus.Core.Text.TextSanitizer.StripControlChars"
-consumer_tests = ["src/csharp/PiperPlus.Core.Tests/TextSanitizerContractTests.cs"]
+status = "enforced"
+function = "PiperPlus.Core.Phonemize.TextSanitizer.StripControlChars"
+consumer_tests = [
+  "src/csharp/PiperPlus.Core.Tests/TextSanitizerContractTests.cs",
+  "src/csharp/PiperPlus.Core.Tests/CliInputSanitizeTests.cs",
+]
 entry_points = [
+  # Every IPhonemizer strips at the start of its PhonemizeCore (the
+  # European Portuguese one delegates to PortuguesePhonemizer), and so does
+  # ChineseEmbeddedEnglish.Convert (the English run between Chinese text).
+  # The consumer test lists every IPhonemizer type by reflection and fails
+  # for one it does not know.
+  {file = "src/csharp/PiperPlus.Core/Phonemize/ChinesePhonemizer.cs", calls = "StripControlChars"},
+  {file = "src/csharp/PiperPlus.Core/Phonemize/ChineseEmbeddedEnglish.cs", calls = "StripControlChars"},
+  {file = "src/csharp/PiperPlus.Core/Phonemize/EnglishPhonemizer.cs", calls = "StripControlChars"},
+  {file = "src/csharp/PiperPlus.Core/Phonemize/FrenchPhonemizer.cs", calls = "StripControlChars"},
+  {file = "src/csharp/PiperPlus.Core/Phonemize/JapanesePhonemizer.cs", calls = "StripControlChars"},
+  {file = "src/csharp/PiperPlus.Core/Phonemize/KoreanPhonemizer.cs", calls = "StripControlChars"},
+  {file = "src/csharp/PiperPlus.Core/Phonemize/MultilingualPhonemizer.cs", calls = "StripControlChars"},
+  {file = "src/csharp/PiperPlus.Core/Phonemize/PortuguesePhonemizer.cs", calls = "StripControlChars"},
+  {file = "src/csharp/PiperPlus.Core/Phonemize/SpanishPhonemizer.cs", calls = "StripControlChars"},
+  {file = "src/csharp/PiperPlus.Core/Phonemize/SwedishPhonemizer.cs", calls = "StripControlChars"},
+  # PhonemeEncoder.Encode / EncodeDirect, before any phonemizer.
   {file = "src/csharp/PiperPlus.Core/Phonemize/PhonemeEncoder.cs", calls = "StripControlChars"},
+  # The CLI: --text in test mode, --text with a model (before the custom
+  # dictionary, the short-text check, [[ ]] and sentence splitting) and the
+  # text of JSONL input.
   {file = "src/csharp/PiperPlus.Cli/Program.cs", calls = "StripControlChars"},
 ]
+notes = "CliInputSanitizeTests runs the CLI process with the test model. A command-line argument cannot hold a NUL, so its --text cases put DEL where a case has a NUL; JSONL carries the NUL itself."
 
 [[runtime]]
 name = "cpp"

@@ -345,4 +345,22 @@ public sealed class TextSanitizerContractTests
         PhonemeEncoder.EncodeDirect(p, c.Dirty, map);
         Assert.Equal([c.Clean, c.Clean], p.Texts);
     }
+
+    /// <summary>
+    /// The English run between Chinese text is read as pinyin, as in the
+    /// Python and Rust G2P. A NUL inside "Python" split it into two tokens,
+    /// and the letters were spelled out one by one.
+    /// </summary>
+    [Theory]
+    [InlineData("Py\u0000thon")]
+    [InlineData("\u0007Python\u001b")]
+    [InlineData("Pyth\u009fon")]
+    public void ChineseEmbeddedEnglish_ReadsDirtyLikeClean(string dirty)
+    {
+        ChineseG2PResult clean = ChineseEmbeddedEnglish.Convert("Python");
+        Assert.NotEmpty(clean.Phonemes);
+        ChineseG2PResult got = ChineseEmbeddedEnglish.Convert(dirty);
+        Assert.Equal(clean.Phonemes, got.Phonemes);
+        Assert.Equal(clean.A1, got.A1);
+    }
 }
