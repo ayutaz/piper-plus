@@ -319,7 +319,9 @@ bool CustomDictionary::isMixedCase(const std::string& str) const {
     bool hasUpper = false;
     bool hasLower = false;
 
-    for (char c : str) {
+    // unsigned char: the bytes of a UTF-8 word are negative as char, and
+    // passing a negative value other than EOF to <cctype> is undefined.
+    for (unsigned char c : str) {
         if (std::isupper(c)) hasUpper = true;
         if (std::islower(c)) hasLower = true;
         if (hasUpper && hasLower) return true;

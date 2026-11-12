@@ -71,7 +71,7 @@ PIPER_PLUS_VOICES: dict[str, Any] = {
                 "md5_digest": "",
             },
             "config.json": {
-                "size_bytes": 6279,
+                "size_bytes": 6901,
                 "md5_digest": "",
             },
         },

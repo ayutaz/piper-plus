@@ -80,15 +80,16 @@ jobs:
             --baseline tests/fixtures/audio-mos-baseline.json \
             --output /tmp/diff.md
 
-      # Fork PRs get a read-only GITHUB_TOKEN, so the comment fails there
-      # (continue-on-error keeps the job green); they read the report in the
-      # job summary instead (pre-commit hook fork-pr-comment-guard).
+      # Fork PRs get a read-only GITHUB_TOKEN, so the comment would fail there
+      # (continue-on-error would keep the job green but mark the step failed):
+      # it is skipped on forks, and they read the report in the job summary
+      # (pre-commit hook fork-pr-comment-guard).
       - name: Write report to job summary
         if: github.event_name == 'pull_request'
         run: cat /tmp/diff.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Post sticky comment
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         uses: marocchino/sticky-pull-request-comment@v2.9.4
         with:
           header: audio-mos-proxy

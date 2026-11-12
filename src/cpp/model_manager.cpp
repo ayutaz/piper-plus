@@ -61,7 +61,7 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
                 "md5_digest": ""
             },
             "config.json": {
-                "size_bytes": 6279,
+                "size_bytes": 6901,
                 "md5_digest": ""
             }
         },

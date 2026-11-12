@@ -25,7 +25,7 @@ _BUILTIN_CATALOG = {
         "repo_id": "ayousanz/piper-plus-tsukuyomi-chan",
         "files": {
             "tsukuyomi-chan-6lang-fp16.onnx": {"size_bytes": 39652717},
-            "config.json": {"size_bytes": 6279},
+            "config.json": {"size_bytes": 6901},
         },
         "aliases": [
             "tsukuyomi",

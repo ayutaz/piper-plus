@@ -44,7 +44,7 @@ public static class VoiceCatalog
             Files:
             [
                 new VoiceFileInfo("tsukuyomi-chan-6lang-fp16.onnx", 39652717, string.Empty),
-                new VoiceFileInfo("config.json", 6279, string.Empty),
+                new VoiceFileInfo("config.json", 6901, string.Empty),
             ],
             Aliases:
             [
