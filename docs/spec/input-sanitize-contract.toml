@@ -109,12 +109,18 @@ notes = "Also covers piper-plus (piper-core), the Rust WASM path of npm piper-pl
 
 [[runtime]]
 name = "python-runtime"
-status = "pending"
+status = "enforced"
 function = "piper_plus.text_sanitize.strip_control_chars"
 consumer_tests = ["src/python_run/tests/test_input_sanitize_contract.py"]
 entry_points = [
+  # PiperVoice.phonemize and synthesize_stream_raw; synthesize and
+  # synthesize_with_timing go through them. The CLI, the HTTP server and the
+  # WebUI call these methods.
   {file = "src/python_run/piper_plus/voice.py", calls = "strip_control_chars"},
   {file = "src/python_run/piper_plus/phonemize/multilingual.py", calls = "strip_control_chars"},
+  # PiperPlus.synthesize and synthesize_stream (which splits sentences before
+  # its G2P strips).
+  {file = "src/python_run/piper_plus/api/api.py", calls = "strip_control_chars"},
 ]
 
 [[runtime]]

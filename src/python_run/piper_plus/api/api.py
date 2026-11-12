@@ -22,6 +22,7 @@ from piper_plus.api.engine import (
     warmup_session,
 )
 from piper_plus.download import get_model_notice
+from piper_plus.text_sanitize import strip_control_chars
 
 
 logger = logging.getLogger(__name__)
@@ -198,6 +199,7 @@ class PiperPlus:
         Raises:
             ValueError: If scale parameters are out of valid range.
         """
+        text = strip_control_chars(text)
         if not text or not text.strip():
             return AudioResult(
                 audio=np.array([], dtype=np.int16), sample_rate=self.sample_rate
@@ -238,7 +240,9 @@ class PiperPlus:
         Yields:
             :class:`AudioResult` for each sentence.
         """
-        sentences = _split_sentences(text)
+        # Strip before splitting, so a control character after "." does not
+        # hide the sentence boundary.
+        sentences = _split_sentences(strip_control_chars(text))
         if not sentences:
             return
 

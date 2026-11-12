@@ -22,6 +22,7 @@ except ImportError as exc:
 from .config import PhonemeType, PiperConfig
 from .const import BOS, EOS, PAD
 from .phonemize.token_mapper import FIXED_PUA_MAPPING
+from .text_sanitize import strip_control_chars
 from .timing import (
     SPECIAL_PHONEME_IDS as _SPECIAL_PHONEME_IDS,
     PhonemeTimingInfo,
@@ -786,7 +787,11 @@ class PiperVoice:
 
         Empty or whitespace-only input returns ``[]`` (no sentences) so
         callers do not waste cycles synthesizing a BOS/EOS-only chunk.
+
+        Control characters are stripped first
+        (:func:`piper_plus.text_sanitize.strip_control_chars`).
         """
+        text = strip_control_chars(text)
         sentences = self._split_sentences(text)
         if not sentences:
             return []
@@ -893,6 +898,9 @@ class PiperVoice:
         silence; very short plain-text inputs additionally receive
         Strategy C silence padding around every chunk.
         """
+        # Strip control characters first, so the short-text check, SSML
+        # detection and sentence splitting read the text that is spoken.
+        text = strip_control_chars(text)
         # Strategy C: auto-inject silence padding for very short plain text
         is_short = is_short_text(text)
 

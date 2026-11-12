@@ -11,6 +11,7 @@ import logging
 import re
 from pathlib import Path
 
+from ..text_sanitize import strip_control_chars
 from .token_mapper import TOKEN2CHAR, map_sequence
 
 
@@ -458,7 +459,11 @@ class MultilingualPhonemizer:
         (``[zh, en]``, ``[en, zh]``, or ``[zh, en, zh]``) is dispatched
         to the embedded-English-as-pinyin path so the English token is
         rendered in Mandarin pinyin instead of US English.
+
+        Control characters are stripped first
+        (:func:`piper_plus.text_sanitize.strip_control_chars`).
         """
+        text = strip_control_chars(text)
         segments = _segment_text_multilingual(text, self._detector)
         if not segments:
             return []
