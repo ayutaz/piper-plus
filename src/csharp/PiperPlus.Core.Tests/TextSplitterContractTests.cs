@@ -73,11 +73,11 @@ public class TextSplitterContractTests
         Assert.Equal("post-consume", csharp.GetProperty("strategy").GetString());
     }
 
-    public static IEnumerable<object[]> CsharpClosingPunctuation()
+    public static TheoryData<int> CsharpClosingPunctuation()
     {
         JsonElement fixture = LoadFixture();
         JsonElement arr = fixture.GetProperty("runtimes").GetProperty("csharp").GetProperty("closing_punctuation");
-        return arr.EnumerateArray().Select(v => new object[] { v.GetInt32() });
+        return new TheoryData<int>(arr.EnumerateArray().Select(v => v.GetInt32()));
     }
 
     [Theory]
@@ -92,11 +92,11 @@ public class TextSplitterContractTests
         Assert.False(chunks[1].StartsWith(close), $"closing punct U+{codepoint:X4} leaked into second chunk: {chunks[1]}");
     }
 
-    public static IEnumerable<object[]> CsharpSentenceTerminators()
+    public static TheoryData<int> CsharpSentenceTerminators()
     {
         JsonElement fixture = LoadFixture();
         JsonElement arr = fixture.GetProperty("runtimes").GetProperty("csharp").GetProperty("sentence_terminators");
-        return arr.EnumerateArray().Select(v => new object[] { v.GetInt32() });
+        return new TheoryData<int>(arr.EnumerateArray().Select(v => v.GetInt32()));
     }
 
     [Theory]
@@ -143,16 +143,20 @@ public class TextSplitterContractTests
         Assert.Equal(new[] { 0xFF0E }, omitted);
     }
 
-    public static IEnumerable<object[]> SplitCases()
+    public static TheoryData<string, string[]> SplitCases()
     {
         // Issue #831: split_cases pin full stops that do not end a sentence
         // ("3.14", "e.g.", "i.e.") on top of the ordinary splits.
         JsonElement fixture = LoadFixture();
-        return fixture.GetProperty("split_cases").EnumerateArray().Select(c => new object[]
+        var data = new TheoryData<string, string[]>();
+        foreach (JsonElement c in fixture.GetProperty("split_cases").EnumerateArray())
         {
-            c.GetProperty("input").GetString()!,
-            c.GetProperty("expected").EnumerateArray().Select(v => v.GetString()!).ToArray(),
-        });
+            data.Add(
+                c.GetProperty("input").GetString()!,
+                c.GetProperty("expected").EnumerateArray().Select(v => v.GetString()!).ToArray());
+        }
+
+        return data;
     }
 
     [Theory]

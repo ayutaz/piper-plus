@@ -51,13 +51,11 @@ public sealed class ZhEnLoanwordParityTests
     /// <summary>Test theory: every case name in the fixture's <c>cases</c>
     /// array becomes one parameterized run. The fixture itself decides which
     /// assertions apply (count / equiv / equiv_sum / relation / forward-compat).</summary>
-    public static IEnumerable<object[]> CaseNames()
+    public static TheoryData<string> CaseNames()
     {
         JsonElement root = FixtureRoot.Value;
-        foreach (JsonElement caseElement in root.GetProperty("cases").EnumerateArray())
-        {
-            yield return new object[] { caseElement.GetProperty("name").GetString()! };
-        }
+        return new TheoryData<string>(
+            root.GetProperty("cases").EnumerateArray().Select(c => c.GetProperty("name").GetString()!));
     }
 
     [Fact]

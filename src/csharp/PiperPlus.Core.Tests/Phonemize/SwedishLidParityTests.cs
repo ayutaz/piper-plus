@@ -35,17 +35,18 @@ public sealed class SwedishLidParityTests
 {
     private static readonly Lazy<JsonElement> FixtureRoot = new(LoadFixtureRoot);
 
-    public static IEnumerable<object[]> Cases()
+    public static TheoryData<string, bool> Cases()
     {
         JsonElement root = FixtureRoot.Value;
+        var data = new TheoryData<string, bool>();
         foreach (JsonElement caseElement in root.GetProperty("cases").EnumerateArray())
         {
-            yield return new object[]
-            {
+            data.Add(
                 caseElement.GetProperty("text").GetString()!,
-                caseElement.GetProperty("expect_contains_sv").GetBoolean(),
-            };
+                caseElement.GetProperty("expect_contains_sv").GetBoolean());
         }
+
+        return data;
     }
 
     [Fact]

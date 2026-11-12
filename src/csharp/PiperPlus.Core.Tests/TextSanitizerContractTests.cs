@@ -23,12 +23,16 @@ public sealed class TextSanitizerContractTests
 {
     private sealed record StripCase(string Name, string Input, string Expected);
 
-    public sealed record TextCase(string Language, string Control, string Clean, string Dirty)
+    private sealed record TextCase(string Language, string Control, string Clean, string Dirty)
     {
-        public override string ToString() => $"{Language} {Control} {Clean}";
+        public string Name => $"{Language} {Control} {Clean}";
     }
 
     private static readonly Lazy<(List<StripCase> Strip, List<TextCase> Words)> S_cases = new(LoadCases);
+
+    // ToDictionary throws on a duplicate name, so two word cases cannot share one.
+    private static readonly Lazy<Dictionary<string, TextCase>> S_words =
+        new(() => S_cases.Value.Words.ToDictionary(c => c.Name, StringComparer.Ordinal));
 
     internal static string RepoRoot()
     {
@@ -68,16 +72,15 @@ public sealed class TextSanitizerContractTests
         return (strip, words);
     }
 
-    public static TheoryData<TextCase> WordCases()
-    {
-        var data = new TheoryData<TextCase>();
-        foreach (TextCase c in S_cases.Value.Words)
-        {
-            data.Add(c);
-        }
+    /// <summary>
+    /// The word case names. The theories take the name, not the
+    /// <see cref="TextCase"/>: xUnit gives a theory one test case per row only
+    /// when every argument is serializable, and a record is not (xUnit1044,
+    /// an error in src/csharp/.editorconfig).
+    /// </summary>
+    public static TheoryData<string> WordCases() => new(S_words.Value.Keys);
 
-        return data;
-    }
+    private static TextCase Word(string name) => S_words.Value[name];
 
     private static string OnlyControls => S_cases.Value.Strip.Single(c => c.Name == "only_controls").Input;
 
@@ -216,14 +219,14 @@ public sealed class TextSanitizerContractTests
         Assert.True(missing.Count == 0, "not in S_factories: " + string.Join(", ", missing));
     }
 
-    public static TheoryData<string, TextCase> PhonemizerCases()
+    public static TheoryData<string, string> PhonemizerCases()
     {
-        var data = new TheoryData<string, TextCase>();
+        var data = new TheoryData<string, string>();
         foreach (Type type in S_factories.Keys)
         {
-            foreach (TextCase c in S_cases.Value.Words)
+            foreach (string name in S_words.Value.Keys)
             {
-                data.Add(type.Name, c);
+                data.Add(type.Name, name);
             }
         }
 
@@ -235,8 +238,9 @@ public sealed class TextSanitizerContractTests
 
     [Theory]
     [MemberData(nameof(PhonemizerCases))]
-    public void Phonemizer_ReadsDirtyLikeClean(string typeName, TextCase c)
+    public void Phonemizer_ReadsDirtyLikeClean(string typeName, string name)
     {
+        TextCase c = Word(name);
         var recorder = new Recorder();
         IPhonemizer p = Factory(typeName)(recorder);
 
@@ -330,8 +334,9 @@ public sealed class TextSanitizerContractTests
 
     [Theory]
     [MemberData(nameof(WordCases))]
-    public void RealEngine_ReadsDirtyLikeClean(TextCase c)
+    public void RealEngine_ReadsDirtyLikeClean(string name)
     {
+        TextCase c = Word(name);
         if (c.Language is "ja" or "ko")
         {
             return; // OpenJTalk / g2pk engines live in PiperPlus.Cli; covered above with recording engines.
@@ -362,8 +367,9 @@ public sealed class TextSanitizerContractTests
 
     [Theory]
     [MemberData(nameof(WordCases))]
-    public void PhonemeEncoder_StripsBeforeAnyPhonemizer(TextCase c)
+    public void PhonemeEncoder_StripsBeforeAnyPhonemizer(string name)
     {
+        TextCase c = Word(name);
         var p = new RecordingPhonemizer();
         var map = new Dictionary<string, int[]> { ["a"] = [1] };
         PhonemeEncoder.Encode(p, c.Dirty, map);
