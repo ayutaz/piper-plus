@@ -77,7 +77,7 @@ var embeddedCatalog = []VoiceCatalogEntry{
 		Quality: "medium", NumSpeakers: 1, Source: "piper-plus", RepoID: "ayousanz/piper-plus-tsukuyomi-chan",
 		Files: []VoiceFileInfo{
 			{RelativePath: "tsukuyomi-chan-6lang-fp16.onnx", SizeBytes: 39_652_717},
-			{RelativePath: "config.json", SizeBytes: 6_279},
+			{RelativePath: "config.json", SizeBytes: 6_901},
 		},
 		Aliases: []string{"tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi", "ayousanz/piper-plus-tsukuyomi-chan"},
 		Notice: []string{
