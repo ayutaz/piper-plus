@@ -91,6 +91,17 @@ curl -L https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/c
   -o tsukuyomi-chan-6lang-fp16.onnx.json
 ```
 
+> **Model terms:** the C API takes a model path only, so it does not show the usage
+> notice that the CLIs print. If your app ships the Tsukuyomi-chan model
+> (`tsukuyomi-chan-6lang-fp16.onnx` or `tsukuyomi.onnx`), show its terms to your users:
+> the credit "Piper Plus:つくよみちゃん" is required on generated audio, and the
+> prohibited uses are on the [model page](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan).
+> The model is unofficial: Rei Yumesaki (the corpus rights holder) is not involved in its
+> development or support, so send questions to the developer through
+> [GitHub Issues](https://github.com/ayutaz/piper-plus/issues), not to Rei Yumesaki.
+> The notice text is in `test/model_resolution_vectors.json` (`notice`); see
+> [model-resolution.md §9](../../docs/reference/model-resolution.md#9-利用案内-model-notice).
+
 This C API example uses a reference-free voice. C++ reference-audio
 speaker-encoder inference is not implemented. For Zero-Shot embedding
 precomputation, follow the canonical [published zs-v1 README](https://huggingface.co/ayousanz/piper-plus-base/blob/3620ed788667cb76f08bd6cf2db8152c1f4c8bd1/releases/zs-v1/README.md).
