@@ -1226,7 +1226,12 @@ if(TARGET openjtalk_external)
 endif()
 
 add_test(NAME test_c_api COMMAND test_c_api)
-set_tests_properties(test_c_api PROPERTIES TIMEOUT 60)
+# test_input_sanitize_contract.cpp (#943) made this a model-backed test: five
+# of its suites load the fixture model and the dictionaries, about 6 s each in
+# a Windows Debug build. The run took 25 s before it and 58.8 s after (60 s
+# limit), and timed out on the next run. Same 300 s budget as the other
+# model-backed tests (Issue #652).
+set_tests_properties(test_c_api PROPERTIES TIMEOUT 300)
 
 # Stage zh_en_loanword.json next to the test_c_api binary so the bundled
 # loanword default-data path (resolved via piper_plus_get_exe_dir() +
