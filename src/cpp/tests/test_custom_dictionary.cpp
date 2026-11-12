@@ -202,3 +202,39 @@ TEST_F(CustomDictionaryTest, DefaultDictionary) {
     auto stats = dict->getStats();
     EXPECT_GE(stats.totalEntries, 0);
 }
+
+#if defined(_MSC_VER) && defined(_DEBUG)
+#include <crtdbg.h>
+namespace {
+int g_crtAssertCount = 0;
+int __cdecl countCrtAssert(int reportType, wchar_t*, int* returnValue) {
+    if (reportType != _CRT_ASSERT) return 0;
+    ++g_crtAssertCount;
+    *returnValue = 0;  // do not break into the debugger
+    return 1;          // handled: no message, no dialog
+}
+}  // namespace
+#endif
+
+// isMixedCase passed each byte of the word to std::isupper / std::islower as
+// a char. The bytes of a UTF-8 word are negative there, which is undefined
+// behavior, and the MSVC Debug CRT asserts on every one: a Windows Debug run
+// of test_c_api printed about 500,000 "Assertion failed: c >= -1 && c <= 255"
+// lines while loading the default (Japanese) dictionary. The assertion count
+// is checked on MSVC Debug only, where the CRT reports it; elsewhere the test
+// still checks that the words are stored.
+TEST_F(CustomDictionaryTest, NonAsciiWordsDoNotPassNegativeCharsToCtype) {
+#if defined(_MSC_VER) && defined(_DEBUG)
+    g_crtAssertCount = 0;
+    ASSERT_NE(_CrtSetReportHookW2(_CRT_RPTHOOK_INSTALL, countCrtAssert), -1);
+#endif
+    CustomDictionary dict;
+    dict.addWord("東京", "トーキョー", 10);
+    dict.addWord("Café", "カフェ", 10);
+#if defined(_MSC_VER) && defined(_DEBUG)
+    _CrtSetReportHookW2(_CRT_RPTHOOK_REMOVE, countCrtAssert);
+    EXPECT_EQ(g_crtAssertCount, 0);
+#endif
+    EXPECT_TRUE(dict.getPronunciation("東京").has_value());
+    EXPECT_TRUE(dict.getPronunciation("Café").has_value());
+}
