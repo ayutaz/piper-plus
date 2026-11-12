@@ -26,6 +26,7 @@ public static class ChineseEmbeddedEnglish
     public static ChineseG2PResult Convert(string text, LoanwordData? data = null)
     {
         data ??= LoanwordDataLoader.Default;
+        text = TextSanitizer.StripControlChars(text); // docs/spec/input-sanitize-contract.toml
 
         var pinyinSyllables = new List<string>();
         foreach (var token in TokenizeAlnum(text))

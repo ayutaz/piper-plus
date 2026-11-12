@@ -107,6 +107,9 @@ public sealed class JapanesePhonemizer : IPhonemizer
     /// </summary>
     private (List<string> Tokens, List<ProsodyInfo?> Prosody) PhonemizeCore(string text)
     {
+        // docs/spec/input-sanitize-contract.toml
+        text = TextSanitizer.StripControlChars(text);
+
         G2PResult g2p = _engine.Convert(text);
         var phonemes = g2p.Phonemes;
         var a1Arr = g2p.A1;

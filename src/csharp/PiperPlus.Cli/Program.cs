@@ -589,6 +589,24 @@ internal static partial class Program
                 bool outputRaw = parseResult.GetValue(outputRawOption);
                 bool jsonInput = parseResult.GetValue(jsonInputOption);
                 string? textInput = parseResult.GetValue(textOption);
+
+                // Strip control characters before anything reads --text: the
+                // custom dictionary, the short-text check, [[ ]], sentence
+                // splitting and the checks below
+                // (docs/spec/input-sanitize-contract.toml). A text of only
+                // control characters is an empty text; --text "" reads stdin,
+                // which a text that had characters must not silently do.
+                if (!string.IsNullOrEmpty(textInput))
+                {
+                    textInput = TextSanitizer.StripControlChars(textInput);
+                    if (textInput.Length == 0)
+                    {
+                        LogError("--text is empty after removing control characters.");
+                        Environment.ExitCode = 1;
+                        return Environment.ExitCode;
+                    }
+                }
+
                 string language = parseResult.GetValue(languageOption)!;
 
                 string? outputFile = parseResult.GetValue(outputFileOption);
@@ -1388,7 +1406,14 @@ internal static partial class Program
                             long[]? prosodyFlat = null;
                             bool uttIsShortText = false;
 
-                            if (!string.IsNullOrEmpty(utterance?.Text))
+                            // Before the emptiness check, the custom dictionary and
+                            // the short-text check (docs/spec/input-sanitize-contract.toml):
+                            // a text of only control characters is an empty text.
+                            string uttText = utterance?.Text is { } rawText
+                                ? TextSanitizer.StripControlChars(rawText)
+                                : string.Empty;
+
+                            if (uttText.Length > 0)
                             {
                                 // Lazily create phonemizer
                                 if (jsonlPhonemizer is null)
@@ -1407,7 +1432,7 @@ internal static partial class Program
                                     }
                                 }
 
-                                string textToPhon = utterance!.Text;
+                                string textToPhon = uttText;
 
                                 // Apply custom dict
                                 if (customDict is not null)

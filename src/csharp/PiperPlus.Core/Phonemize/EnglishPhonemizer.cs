@@ -137,6 +137,9 @@ public sealed partial class EnglishPhonemizer : IPhonemizer
     /// </summary>
     private (List<string> Tokens, List<ProsodyInfo?> Prosody) PhonemizeCore(string text)
     {
+        // docs/spec/input-sanitize-contract.toml
+        text = TextSanitizer.StripControlChars(text);
+
         // Step 1: G2P — text to per-word ARPAbet tokens.
         List<List<string>> words = _engine.ConvertToArpabet(text);
 
