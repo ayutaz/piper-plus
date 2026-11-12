@@ -19,13 +19,13 @@ Flags:
       --custom-dict stringArray        custom dictionary JSON file paths (repeatable)
       --debug                          enable debug logging
       --device string                  inference device (cpu, cuda, coreml, directml) (default "cpu")
-      --download-model string          download model by URL into cache directory
+      --download-model string          download a catalog model by name (e.g. tsukuyomi) or a model file by URL into the cache directory
   -h, --help                           help for piper-plus
       --json-input                     read stdin as JSON lines
       --language string                language code (e.g. ja, en, zh, ko)
       --length-scale float32           speech rate (length scale) (default 1)
       --list-models                    list downloaded models in cache directory
-  -m, --model string                   path to ONNX model file (or $PIPER_PLUS_DEFAULT_MODEL)
+  -m, --model string                   ONNX model file, catalog name (e.g. tsukuyomi; downloaded when not cached) or cached model name (or $PIPER_PLUS_DEFAULT_MODEL)
       --model-dir string               model cache directory override
       --noise-scale float32            generation noise scale (default 0.4)
       --noise-w float32                duration predictor noise scale (default 0.5)
