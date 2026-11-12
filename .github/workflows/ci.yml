@@ -191,10 +191,10 @@ jobs:
           - os: ubuntu-24.04
             rid: linux-arm64
             cross: true
-          - os: macos-14
+          - os: macos-15
             rid: osx-arm64
             cross: false
-          - os: macos-14
+          - os: macos-15
             rid: osx-x64
             cross: true
           - os: windows-latest

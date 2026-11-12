@@ -311,11 +311,11 @@ jobs:
             archive_ext: tar.gz
             cross: true
           - rid: osx-x64
-            os: macos-14
+            os: macos-15
             archive_ext: tar.gz
             cross: true
           - rid: osx-arm64
-            os: macos-14
+            os: macos-15
             archive_ext: tar.gz
             cross: false
     steps:
@@ -442,7 +442,7 @@ jobs:
             artifact: piper-plus-rs-cli-linux-x64
             archive_ext: tar.gz
             cross: false
-          - os: macos-14
+          - os: macos-15
             target: aarch64-apple-darwin
             artifact: piper-plus-rs-cli-osx-arm64
             archive_ext: tar.gz
