@@ -396,7 +396,7 @@ cat test.jsonl | uv run python -m piper_train.infer_onnx --model <model.onnx> --
 | `/bump-deps` | ORT/openjtalk/ruff の cross-runtime canonical sync 更新 |
 | `/skill-health` | skill / hook 自身の health check (frontmatter / script 参照 / trigger 衝突) |
 
-pre-commit / pre-push gate は `.pre-commit-config.yaml` に集約 (121 hook、 うち id に `contract` を含む gate 20、 cross-language formatter 6 言語)。 各 hook の trigger 条件と既知パターンは [.claude/README.md](.claude/README.md) を参照。
+pre-commit / pre-push gate は `.pre-commit-config.yaml` に集約 (122 hook、 うち id に `contract` を含む gate 20、 cross-language formatter 6 言語)。 各 hook の trigger 条件と既知パターンは [.claude/README.md](.claude/README.md) を参照。
 
 ---
 

@@ -126,6 +126,8 @@ PR 作成後、 CI を完了まで監視する。 **`/watch-pr` skill は呼ば�
 
 **5.1 ポーリング** — `gh pr checks <PR> --json name,bucket` を取得し bucket (pass/fail/pending/skipping/cancel) を集計。
 
+> 既存のフォーク PR (`gh pr view <PR> --json isCrossRepository` が `true`) のブランチに push してこの skill を使った場合、 checks が 0 件なのは承認待ち (`action_required`) のため。 承認の手順と、 push 先・コメントが来ない点は `watch-pr/SKILL.md` のフェーズ 1.5 に従う。 承認はユーザーの了承を得てから行う。
+
 **5.2 判定**:
 
 - **pending ≥ 1** → 5.3 (継続監視)
