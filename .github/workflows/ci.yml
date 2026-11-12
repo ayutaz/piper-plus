@@ -86,6 +86,8 @@ jobs:
               - 'scripts/test_cpp_cli_input_sanitize.py'
             wasm:
               - 'src/wasm/**'
+              # Read by the input-sanitize contract tests of both npm packages.
+              - 'tests/fixtures/g2p/input_sanitize_cases.json'
               - 'src/rust/piper-wasm/**'
               # Golden data read by the npm-package-tests zero-shot checks.
               - 'test/fixtures/zs_campplus_golden.json'

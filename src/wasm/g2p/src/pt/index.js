@@ -23,6 +23,7 @@ import {
   tokenize,
   normalizeWhitespace,
 } from "../latin-common/index.js";
+import { stripControlChars } from "../sanitize.js";
 
 // ---------------------------------------------------------------------------
 // PUA codepoints for multi-codepoint IPA tokens
@@ -949,6 +950,7 @@ export class PortugueseG2P {
    * @returns {{ tokens: string[], prosody: null[] }}
    */
   phonemize(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     if (!text || typeof text !== "string") {
       return { tokens: [], prosody: [] };
     }
@@ -965,6 +967,7 @@ export class PortugueseG2P {
    * @returns {{ tokens: string[], prosody: Array<{a1: number, a2: number, a3: number}> }}
    */
   phonemizeWithProsody(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     if (!text || typeof text !== "string") {
       return { tokens: [], prosody: [] };
     }
@@ -1171,11 +1174,13 @@ export class EuropeanPortugueseG2P {
   }
 
   phonemize(text) {
+    // brG2P strips (docs/spec/input-sanitize-contract.toml).
     const result = this.brG2P.phonemizeWithProsody(text);
     return applyEuPostprocessing(result.tokens);
   }
 
   phonemizeWithProsody(text) {
+    // brG2P strips (docs/spec/input-sanitize-contract.toml).
     const result = this.brG2P.phonemizeWithProsody(text);
     return {
       tokens: applyEuPostprocessing(result.tokens),

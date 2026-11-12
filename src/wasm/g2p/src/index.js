@@ -18,6 +18,7 @@ import { KoreanG2P } from "./ko/index.js";
 import { UnicodeLanguageDetector, normalizeCjkPunctuationForLatin } from "./detect.js";
 import { Encoder } from "./encode.js";
 import { mapToken } from "./pua-map.js";
+import { stripControlChars } from "./sanitize.js";
 
 // ---- Constants ---------------------------------------------------------------
 
@@ -201,6 +202,7 @@ export class G2P {
    */
   phonemize(text, options = {}) {
     this._ensureNotDisposed();
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     const language = this._resolveLanguage(text, options);
     const g2p = this._getPhonemizerOrThrow(language);
 
@@ -237,6 +239,7 @@ export class G2P {
    */
   phonemizeWithProsody(text, options = {}) {
     this._ensureNotDisposed();
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     const language = this._resolveLanguage(text, options);
     const g2p = this._getPhonemizerOrThrow(language);
     if (language === "zh") {
@@ -299,6 +302,7 @@ export class G2P {
    */
   detectLanguage(text) {
     this._ensureNotDisposed();
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     return this._detector.detectLanguage(text);
   }
 
@@ -314,6 +318,7 @@ export class G2P {
    */
   segmentText(text) {
     this._ensureNotDisposed();
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     return this._detector.segmentText(text);
   }
 
@@ -488,3 +493,4 @@ export { extractPhonemesFromLabels, applyNPhonemeRules, mapToPUA } from "./ja/ph
 
 // SSML support — see ./ssml.js for the parser. Mirrors Python/Rust/C#/Go.
 export { isSsml, parseSsml, SsmlParser } from "./ssml.js";
+export { stripControlChars } from "./sanitize.js";

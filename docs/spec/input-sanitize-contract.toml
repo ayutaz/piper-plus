@@ -214,16 +214,35 @@ notes = "Bytes that are not valid UTF-8 are kept. The C API takes C strings, whi
 
 [[runtime]]
 name = "npm"
-status = "pending"
-function = "stripControlChars (src/wasm/g2p/src/sanitize.js)"
+status = "enforced"
+function = "stripControlChars (src/wasm/g2p/src/sanitize.js; piper-plus has the same rule in src/wasm/openjtalk-web/src/sanitize.js)"
 consumer_tests = [
   "src/wasm/g2p/test/test-input-sanitize-contract.js",
   "src/wasm/openjtalk-web/test/js/test-input-sanitize-contract.js",
 ]
 entry_points = [
+  # @piper-plus/g2p: G2P.phonemize / phonemizeWithProsody / detectLanguage /
+  # segmentText, and phonemize / phonemizeWithProsody of every language class
+  # (EuropeanPortugueseG2P delegates to the Brazilian class in pt/index.js).
+  # The consumer test lists the exported classes and fails for one it does
+  # not know.
   {file = "src/wasm/g2p/src/index.js", calls = "stripControlChars"},
+  {file = "src/wasm/g2p/src/en/index.js", calls = "stripControlChars"},
+  {file = "src/wasm/g2p/src/es/index.js", calls = "stripControlChars"},
+  {file = "src/wasm/g2p/src/fr/index.js", calls = "stripControlChars"},
+  {file = "src/wasm/g2p/src/ja/index.js", calls = "stripControlChars"},
+  {file = "src/wasm/g2p/src/ko/index.js", calls = "stripControlChars"},
+  {file = "src/wasm/g2p/src/pt/index.js", calls = "stripControlChars"},
+  {file = "src/wasm/g2p/src/sv/index.js", calls = "stripControlChars"},
+  # ChineseG2P also strips in phonemizeEmbeddedEnglish(WithProsody).
+  {file = "src/wasm/g2p/src/zh/index.js", calls = "stripControlChars"},
+  # piper-plus: every synthesize method and findDroppedSymbols, first (before
+  # SSML detection, the language detection and sentence splitting), and
+  # synthesizeSsml again for each segment, since the SSML parser decodes
+  # character references such as &#0;.
   {file = "src/wasm/openjtalk-web/src/index.js", calls = "stripControlChars"},
 ]
+notes = "piper-plus does not import the function from @piper-plus/g2p: releases up to 0.4.2 do not export it, and a named import of a missing export fails module linking for the whole package. Both copies are tested against the fixture. The Rust WASM G2P (ja / zh in piper-plus) also strips, with rust-g2p."
 
 [[runtime]]
 name = "kotlin-swift-ffi"

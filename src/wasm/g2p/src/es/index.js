@@ -17,6 +17,7 @@
  */
 
 import { collapseNfdAccents } from "../latin-common/index.js";
+import { stripControlChars } from "../sanitize.js";
 
 // ---------------------------------------------------------------------------
 // IPA codepoints used in output
@@ -966,6 +967,7 @@ export class SpanishG2P {
    * @returns {{ tokens: string[], prosody: null[] }}
    */
   phonemize(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     if (!text || typeof text !== "string") {
       return { tokens: [], prosody: [] };
     }
@@ -984,6 +986,7 @@ export class SpanishG2P {
    * @returns {{ tokens: string[], prosody: (null|{ a1: number, a2: number, a3: number })[] }}
    */
   phonemizeWithProsody(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     if (!text || typeof text !== "string") {
       return { tokens: [], prosody: [] };
     }

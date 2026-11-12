@@ -23,6 +23,7 @@ import {
   PUNCTUATION,
   normalizeWhitespace,
 } from "../latin-common/index.js";
+import { stripControlChars } from "../sanitize.js";
 
 // ---------------------------------------------------------------------------
 // PUA codepoints for multi-character phoneme tokens
@@ -1250,6 +1251,7 @@ export class FrenchG2P {
    * @returns {{ tokens: string[], prosody: null[] }}
    */
   phonemize(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     if (!text || typeof text !== "string") {
       return { tokens: [], prosody: [] };
     }
@@ -1269,6 +1271,7 @@ export class FrenchG2P {
    * @returns {{ tokens: string[], prosody: ({ a1: number, a2: number, a3: number })[] }}
    */
   phonemizeWithProsody(text) {
+    text = stripControlChars(text); // docs/spec/input-sanitize-contract.toml
     if (!text || typeof text !== "string") {
       return { tokens: [], prosody: [] };
     }
