@@ -31,6 +31,7 @@ piper-plus の **ランタイム横断の仕様・整合契約** の目次。`.t
 | ORT セッション | [`ort-session-contract.toml`](ort-session-contract.toml) | warmup / cache / threads |
 | ORT プロバイダ | [`ort-provider-contract.toml`](ort-provider-contract.toml) | EP 選択優先度 |
 | Swift G2P FFI | [`swift-g2p-contract.toml`](swift-g2p-contract.toml) | iOS / macOS FFI ABI |
+| 入力の制御文字 | [`input-sanitize-contract.toml`](input-sanitize-contract.toml) | 音素化の前に制御文字を消す規則 (全 G2P / TTS ランタイム、共通 fixture `tests/fixtures/g2p/input_sanitize_cases.json`) |
 
 ## Versions & Manifests
 

@@ -213,6 +213,7 @@ spm_product = "PiperPlusG2P"
 "Language" = "enum, CaseIterable, Sendable, rawValue is the ISO 639-1 code"
 "G2PError" = "enum: initializationFailed, phonemizeReturnedNull, invalidUTF8, decodeFailed(String)"
 "PhonemizeResult" = "Codable struct with tokens: [String], language: String"
+"TextSanitizer" = "enum (no cases), static stripControlChars(_:) -> String: the rule of docs/spec/input-sanitize-contract.toml, which Phonemizer.phonemize applies before the FFI call"
 
 [swift_api.thread_safety]
 phonemizer_init = "thread-safe (each Phonemizer owns its handle)"

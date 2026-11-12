@@ -223,6 +223,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 
 ### ランタイム共通機能
 
+- **入力の制御文字除去** — 全 G2P / TTS ランタイム (Python G2P・runtime / Rust / Go / C# / C++ / npm 2 パッケージ / Kotlin / Swift G2P) が音素化の前に Unicode Cc を消す (`\n` `\t` `\r` は残し、VT/FF/NEL は空白に)。Kotlin JNI (modified UTF-8) と Swift FFI (C 文字列) は NUL が下の層に届かないためラッパー側でも消す。仕様: `docs/spec/input-sanitize-contract.toml`、共通 fixture: `tests/fixtures/g2p/input_sanitize_cases.json`、gate: `scripts/check_input_sanitize_contract.py` (`/check-cross-runtime` の `RUNTIME_PATHS` に足したランタイムは契約の `[coverage]` に行が無いと落ちる)。
 - **CPU 推論最適化 (Tier 1-2)** — 4 言語実装で ORT セッション設定統一、Warmup 2 回 (100 phonemes、scales=[0.667,1.0,0.8])、`.opt.onnx`+`.ok` キャッシュ、JA 音素化 LRU キャッシュ (Python のみ)。仕様: `docs/spec/ort-session-contract.toml`。CLI: `--no-warmup`。env: `PIPER_PLUS_DISABLE_WARMUP`, `PIPER_PLUS_DISABLE_CACHE`, `PIPER_PLUS_INTRA_THREADS`, `PIPER_PLUS_G2P_PARALLELISM` (G2P 文単位並列度、`=1` で逐次の旧挙動。Issue #383 / PR #403)。
 - **短テキスト合成品質改善 (Strategy A/B/C)** — 全 6 ランタイム (Python/Rust/C#/Go/WASM/C++) 並列実装。A: Silence Padding + Post-trim、B: Dynamic Scales、C: SSML `<break>` 自動挿入 (SSML 実装ランタイムでのみ)。仕様: `docs/spec/short-text-contract.toml`。
 - **ストリーミング文単位分割** — 終止符 `.`/`!`/`?`/`。`/`！`/`？`/`．` で分割し文ごとに音素化・推論・yield。SSML は単一ユニット。Python: `src/python_run/piper_plus/text_splitter.py`、Rust: `piper-core/src/streaming.rs`、他言語: 同等実装。仕様: `docs/spec/text-splitter-contract.toml`。**Breaking (v1.12.0):** Python `PiperVoice.phonemize()` が単一要素から複数要素へ (詳細: マイグレーションガイド)。

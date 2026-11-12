@@ -75,6 +75,7 @@ val dict = DictionaryDownloader.downloadFromHuggingFace(context)
 | `class PiperPlusG2pException`               | Thrown on native error. Subclass of `RuntimeException`. |
 | `class OpenJTalkDictionary`                 | Handle to an extracted OpenJTalk dictionary directory. |
 | `object DictionaryDownloader`               | `suspend` helper that fetches the dictionary from Hugging Face Hub. |
+| `TextSanitizer.stripControlChars(text)`     | Removes control characters by the shared rule (`docs/spec/input-sanitize-contract.toml`); `phonemize` calls it before the native call. |
 
 ---
 

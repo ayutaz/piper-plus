@@ -44,14 +44,19 @@ public final class Phonemizer: @unchecked Sendable {
     /// Phonemize `text` as `language`. Runs of another registered language
     /// are read by that language (English letters in Chinese text become
     /// pinyin when `.english` is registered, as in Python); Japanese text
-    /// goes whole to the Japanese phonemizer.
+    /// goes whole to the Japanese phonemizer. Control characters are
+    /// stripped first (``TextSanitizer/stripControlChars(_:)``).
     ///
     /// - Returns: tokens (IPA + occasional PUA codepoints for language-
     ///   specific phonemes) plus the language code echo.
     /// - Throws: ``G2PError`` on null result, invalid UTF-8, or JSON
     ///   decode failure.
     public func phonemize(_ text: String, language: Language) throws -> PhonemizeResult {
-        let raw: UnsafeMutablePointer<CChar>? = text.withCString { textPtr in
+        // Before the FFI call: a C string ends at the first NUL, so the
+        // Rust strip never sees the text after it
+        // (docs/spec/input-sanitize-contract.toml).
+        let clean = TextSanitizer.stripControlChars(text)
+        let raw: UnsafeMutablePointer<CChar>? = clean.withCString { textPtr in
             language.rawValue.withCString { langPtr in
                 piper_plus_g2p_phonemize(handle, textPtr, langPtr)
             }
