@@ -57,10 +57,10 @@ jobs:
     name: RTF benchmark (Ubuntu)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    # Fork PR では GITHUB_TOKEN に contents:write / pull-requests:write が
-    # 付与されないため job 自体をスキップ。同 repo の PR / push に
-    # 限って実行する (review #458 fork-PR 指摘への対応)。
-    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
+    # Fork PR の GITHUB_TOKEN は読み取り専用。 PR で動くのは計測と gh-pages の
+    # 読み取りだけなので、 フォーク PR でも job を走らせる。 書き込み
+    # (gh-pages への push、 benchmark-action のコメント) は dev への push のときだけ
+    # (pre-commit hook fork-pr-comment-guard)。
     permissions:
       contents: write  # benchmark-action pushes to gh-pages (push only)
       pull-requests: write  # benchmark-action comments on PR alerts
@@ -124,7 +124,7 @@ jobs:
         # 万一 gh-pages が削除された場合は warning が出るが merge 自体は可能、
         # 直後の dev push で自動再生成される。
         # push to dev: 不在なら空 orphan commit で自動作成 (idempotent)。
-        # fork PR は上位 job の if: gate で既に skip 済み。
+        # PR (フォークを含む) では読み取りだけなので、 読み取り専用の token で足りる。
         if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/dev')
         env:
           GH_TOKEN: ${{ github.token }}

@@ -28,7 +28,7 @@ def test_contract_job_runs_on_all_dev_prs_with_both_runtimes():
     assert "if" not in job
     assert job.get("continue-on-error", "false") == "false"
     assert job["strategy"]["fail-fast"] == "false"
-    assert set(job["strategy"]["matrix"]["ort"]) == {"1.22.0", "1.30.0"}
+    assert set(job["strategy"]["matrix"]["ort"]) == {"1.22.0", "1.31.1"}
     commands = "\n".join(s.get("run", "") for s in job["steps"])
     assert "npm run test:onnx-inputs" in commands
     assert "test_wasm_onnx_ci_contract.py" in commands
