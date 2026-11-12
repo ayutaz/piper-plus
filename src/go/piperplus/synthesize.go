@@ -166,6 +166,9 @@ func (v *Voice) prepareSynthesisRequest(text string, so SynthesisOptions) (*Synt
 	if v.phonemizer == nil {
 		return nil, false, fmt.Errorf("piperplus: phonemizer not configured; use SynthesizeFromIDs for direct phoneme input")
 	}
+	// Before the custom dictionary and the short-text check
+	// (docs/spec/input-sanitize-contract.toml).
+	text = phonemize.StripControlChars(text)
 	if text == "" {
 		return nil, false, ErrEmptyText
 	}
@@ -269,6 +272,8 @@ func (v *Voice) Synthesize(ctx context.Context, text string, opts ...SynthesisOp
 	for _, fn := range opts {
 		fn(&so)
 	}
+	// Before SSML detection (docs/spec/input-sanitize-contract.toml).
+	text = phonemize.StripControlChars(text)
 	if ssml.IsSSML(text) {
 		return synthesizeSSML(ctx, text, v.config.Audio.SampleRate, func(part string, rate float32) (*SynthesisResult, error) {
 			segmentOpts := append([]SynthesisOption(nil), opts...)

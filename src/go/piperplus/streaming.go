@@ -6,6 +6,7 @@ import (
 	"io"
 	"math"
 
+	"github.com/ayutaz/piper-plus/src/go/phonemize"
 	"github.com/ayutaz/piper-plus/src/go/piperplus/internal/parallelism"
 )
 
@@ -65,7 +66,8 @@ func (v *Voice) SynthesizeStream(
 		return fmt.Errorf("piperplus: phonemizer not configured; use SynthesizeFromIDs for direct phoneme input")
 	}
 
-	sentences := SplitSentences(text)
+	// Before sentence splitting (docs/spec/input-sanitize-contract.toml).
+	sentences := SplitSentences(phonemize.StripControlChars(text))
 	if len(sentences) == 0 {
 		return sink.Close()
 	}

@@ -125,16 +125,34 @@ entry_points = [
 
 [[runtime]]
 name = "go"
-status = "pending"
+status = "enforced"
 function = "phonemize.StripControlChars"
 consumer_tests = [
   "src/go/phonemize/input_sanitize_test.go",
   "src/go/piperplus/input_sanitize_test.go",
 ]
 entry_points = [
+  # Every PhonemizeWithProsody / PhonemizeWithLanguage of the phonemize
+  # module (a G2P library published on its own). The consumer test also
+  # parses the package and fails for a method that does not strip.
+  {file = "src/go/phonemize/japanese.go", calls = "StripControlChars"},
+  {file = "src/go/phonemize/english.go", calls = "StripControlChars"},
+  {file = "src/go/phonemize/chinese.go", calls = "StripControlChars"},
+  {file = "src/go/phonemize/chinese_loanword.go", calls = "StripControlChars"},
+  {file = "src/go/phonemize/korean.go", calls = "StripControlChars"},
+  {file = "src/go/phonemize/spanish.go", calls = "StripControlChars"},
+  {file = "src/go/phonemize/french.go", calls = "StripControlChars"},
+  {file = "src/go/phonemize/portuguese.go", calls = "StripControlChars"},
+  {file = "src/go/phonemize/swedish.go", calls = "StripControlChars"},
+  {file = "src/go/phonemize/dict.go", calls = "StripControlChars"},
   {file = "src/go/phonemize/multilingual.go", calls = "StripControlChars"},
+  # Voice.Synthesize (before SSML detection) and prepareSynthesisRequest
+  # (before the text dictionary and the short-text check).
   {file = "src/go/piperplus/synthesize.go", calls = "StripControlChars"},
+  # Voice.SynthesizeStream, before sentence splitting.
+  {file = "src/go/piperplus/streaming.go", calls = "StripControlChars"},
 ]
+notes = "Also the Go CLI (cmd/piper-plus), which calls Voice. src/go/piperplus/input_sanitize_integration_test.go (build tag integration, go-ci integration-test job) compares the audio of a real model for the same cases."
 
 [[runtime]]
 name = "csharp"

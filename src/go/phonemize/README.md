@@ -90,6 +90,14 @@ single Unicode codepoints in the Private Use Area (fixed table U+E000–U+E064;
 unknown tokens are allocated dynamically from U+E065) for compatibility with
 Piper ONNX model input format.
 
+## Control Characters
+
+Every phonemizer strips control characters first, by the rule every runtime
+shares (`docs/spec/input-sanitize-contract.toml`): `\n`, `\t` and `\r` stay,
+VT, FF and NEL (U+000B, U+000C, U+0085) become a space, and every other
+control character (Unicode category Cc) is removed. `StripControlChars`
+applies the rule on its own, for text you pass elsewhere.
+
 ## Cross-Platform Consistency
 
 Also available as:
