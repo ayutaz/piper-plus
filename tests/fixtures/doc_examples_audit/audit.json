@@ -2887,7 +2887,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "9112b1d0cfb26fc7c7311d9786eb6dbb0caf2cb0"
+      "hash_sha1": "5a76f22beb9f1d08d1de1e6f2f63928f1d009b1d"
     },
     {
       "file": "docs/guides/integration/wasm-bundler-guide.md",
