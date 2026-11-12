@@ -62,16 +62,30 @@ public sealed class CliInputSanitizeTests
         return cases;
     }
 
-    public static TheoryData<TextCase> Cases()
+    private static readonly Lazy<Dictionary<string, TextCase>> S_cases =
+        new(() => LoadCases().ToDictionary(c => c.Name, StringComparer.Ordinal));
+
+    /// <summary>
+    /// The case names. The theories take the name, not the <see cref="TextCase"/>:
+    /// xUnit expands a theory into one test case per row only when every
+    /// argument is serializable, and a record is not. Unexpanded, a theory is
+    /// one test case to VSTest, and each of these runs the CLI 20 or more
+    /// times (over 30 seconds on a Windows runner). The CI's
+    /// <c>--blame-hang-timeout 30s</c> then took the theory for a hung test
+    /// and killed the test host after every test had passed.
+    /// </summary>
+    public static TheoryData<string> Cases()
     {
-        var data = new TheoryData<TextCase>();
-        foreach (TextCase c in LoadCases())
+        var data = new TheoryData<string>();
+        foreach (string name in S_cases.Value.Keys)
         {
-            data.Add(c);
+            data.Add(name);
         }
 
         return data;
     }
+
+    private static TextCase Case(string name) => S_cases.Value[name];
 
     private static string AsArgument(string text) => text.Replace('\u0000', '\u007f');
 
@@ -93,8 +107,9 @@ public sealed class CliInputSanitizeTests
     [Theory]
     [MemberData(nameof(Cases))]
     [Trait("Category", "CLI")]
-    public async Task TestMode_ReadsDirtyLikeClean(TextCase c)
+    public async Task TestMode_ReadsDirtyLikeClean(string name)
     {
+        TextCase c = Case(name);
         Assert.Equal(await TestModeIdsAsync(c.Clean), await TestModeIdsAsync(AsArgument(c.Dirty)));
     }
 
@@ -140,8 +155,9 @@ public sealed class CliInputSanitizeTests
     [Theory]
     [MemberData(nameof(Cases))]
     [Trait("Category", "CLI")]
-    public async Task TextMode_SynthesizesDirtyLikeClean(TextCase c)
+    public async Task TextMode_SynthesizesDirtyLikeClean(string name)
     {
+        TextCase c = Case(name);
         Assert.Equal(
             await SynthesizedBytesAsync(c.Clean, null),
             await SynthesizedBytesAsync(AsArgument(c.Dirty), null));
@@ -150,8 +166,9 @@ public sealed class CliInputSanitizeTests
     [Theory]
     [MemberData(nameof(Cases))]
     [Trait("Category", "CLI")]
-    public async Task JsonlText_SynthesizesDirtyLikeClean(TextCase c)
+    public async Task JsonlText_SynthesizesDirtyLikeClean(string name)
     {
+        TextCase c = Case(name);
         static string Line(string text) => "{\"text\":\"" + JsonEncodedText.Encode(text) + "\"}\n";
         Assert.Equal(
             await SynthesizedBytesAsync(null, Line(c.Clean)),
