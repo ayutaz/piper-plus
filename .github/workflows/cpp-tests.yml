@@ -124,7 +124,7 @@ jobs:
     # iOS xcframework は release-shared-lib.yml が tag push 時のみ動く構成。
     # PR で iOS toolchain と PrivacyInfo manifest の最低限の妥当性を検証する。
     name: iOS toolchain & PrivacyInfo smoke
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v6.1.0
       - name: PrivacyInfo.xcprivacy plist lint
