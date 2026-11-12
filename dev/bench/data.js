@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794486398710,
+  "lastUpdate": 1794486720843,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1938,6 +1938,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 227.2,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "92f506310f65753b52d972e047cb463137243c41",
+          "message": "fix(python-runtime): strip control characters before reading a text (#940)\n\n* test(contract): add the input sanitizing contract, fixture and gate\n\n* test(g2p): pin input sanitizing for every registered language\n\n* fix(g2p): sanitize input in every language, not only ja / en\n\n* test(rust-g2p): pin control character stripping for every phonemizer\n\n* fix(rust-g2p): strip control characters before phonemizing\n\n* docs(skills): add input sanitizing to the language and cross-runtime checklists\n\n* fix(g2p): turn VT / FF / NEL into a space, keep the old length limit\n\nReview of the sanitizing change found three regressions:\n\n* VT, FF and NEL (U+000B, U+000C, U+0085) separate words: Word writes VT\n  for a manual line break and PDF text has FF. Deleting them joined the\n  words around them (\"hola\" FF \"adios\" read as one word, the stress of\n  hola lost). They now become a space, in Python and Rust. U+001C-001F\n  are still removed: Python's str.isspace counts them, but they are not\n  Unicode White_Space and the other runtimes do not treat them as spaces.\n  The contract gets [rule] to_space, the gate applies it, and the fixture\n  gets a case per language with the control between two words.\n* The Rust Japanese phonemizer took the question type from the raw text,\n  so a control character after \"?\" turned a question into a statement.\n  It now reads the stripped text; the fixture gets two such ja cases.\n* Python added the 10000-character limit to every language. Callers such\n  as PiperPlus.synthesize pass the whole text, so texts read today would\n  have raised. The new Phonemizer._strip_control_chars sets no limit;\n  _sanitize_input (the limit plus stripping) stays only where it was:\n  ja, en and the phonemize of sv.\n\n* docs(changelog): drop the entry the rebase left twice\n\nThe rebase onto #936 kept the first wording of the sanitizing entry next\nto the rewritten one. Keep the rewritten one.\n\n* test(g2p): list the Korean input-sanitize cases as allowed skips\n\npython-tests on Windows failed its skip gate: g2pk2 needs mecab-ko,\nwhich starts only on ubuntu with Python 3.11 / 3.12, so the ko cases of\ntest_input_contract.py skip elsewhere, like test_korean.py. The length\nlimit test skipped the entry points that keep the limit; it now leaves\nthem out of its parameters instead of skipping them.\n\n* test(python-runtime): pin control character stripping for every entry point\n\nPiperVoice reads text with its own phonemizers (piper_plus.phonemize), not\nwith piper-plus-g2p, so the stripping added there did not reach it: a NUL\ninside \"hola\" split the word, a NUL after \".\" hid the sentence boundary,\nand control characters pushed a short text past the short-text limit.\nPiperPlus split the raw text into sentences before its G2P stripped it.\n\nThe test reads the shared fixture and runs every word and pipeline case\nthrough PiperVoice.phonemize, synthesize_stream_raw, synthesize,\nsynthesize_with_timing, MultilingualPhonemizer.phonemize and PiperPlus\nsynthesize / synthesize_stream with the multilingual test model. It is\nlisted in the runtime test step of python-tests.yml, and the fixture in\nthat workflow's paths; the input-sanitize hook also watches api/api.py.\n\n* fix(python-runtime): strip control characters before reading a text\n\nPiperVoice.phonemize and synthesize_stream_raw strip first, before the\nshort-text check, SSML detection and sentence splitting; synthesize and\nsynthesize_with_timing go through them, and so do the CLI, the HTTP\nserver and the WebUI. MultilingualPhonemizer.phonemize strips too, for\ncallers that use it directly, and PiperPlus.synthesize /\nsynthesize_stream strip before splitting sentences.\n\nThe rule is in the new piper_plus.text_sanitize.strip_control_chars,\nthe same as the G2P package's: \\n, \\t and \\r stay, VT / FF / NEL become\na space, every other Unicode Cc character is removed. python-runtime is\nnow enforced in docs/spec/input-sanitize-contract.toml.\n\n* test(python-runtime): pin PiperPlus.synthesize stripping a text of control characters only\n\nThe word cases could not show it: the G2P under PiperPlus strips again,\nso removing the call in PiperPlus.synthesize failed no test. A text of\ncontrol characters only gave BOS/EOS audio there. Also correct the\ndocstring and the CHANGELOG: in PiperVoice a NUL after a terminator made\nan extra sentence; the hidden sentence boundary was PiperPlus's.",
+          "timestamp": "2026-11-12T21:31:12+09:00",
+          "tree_id": "bb9ceee3afa1d3698373bcb5aa590a0c2194c02e",
+          "url": "https://github.com/ayutaz/piper-plus/commit/92f506310f65753b52d972e047cb463137243c41"
+        },
+        "date": 1794486719375,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0843,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 21.4,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 21.8,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1715.1,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 227,
             "unit": "MB"
           },
           {
