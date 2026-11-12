@@ -64,7 +64,7 @@ CI is defined in `.github/workflows/csharp-ci.yml` and runs on:
 
 | Dimension | Values |
 |-----------|--------|
-| OS | ubuntu-24.04, windows-latest, macos-14, macos-latest |
+| OS | ubuntu-24.04, windows-latest, macos-15, macos-latest |
 | .NET | 10.0.x |
 
 This gives a 4 OS x 1 .NET version matrix (4 combinations).
