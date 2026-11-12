@@ -79,7 +79,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	// Persistent flags shared across subcommands (synthesize + serve).
 	pf := rootCmd.PersistentFlags()
-	pf.StringVarP(&modelPath, "model", "m", "", "path to ONNX model file (or $PIPER_PLUS_DEFAULT_MODEL)")
+	pf.StringVarP(&modelPath, "model", "m", "", "ONNX model file, catalog name (e.g. tsukuyomi; downloaded when not cached) or cached model name (or $PIPER_PLUS_DEFAULT_MODEL)")
 	pf.StringVarP(&configPath, "config", "c", "", "path to config.json (auto-detected if omitted)")
 	pf.StringVar(&device, "device", "cpu", "inference device (cpu, cuda, coreml, directml)")
 	pf.BoolVar(&debug, "debug", false, "enable debug logging")
@@ -106,7 +106,7 @@ func init() {
 	f.BoolVar(&outputRaw, "output-raw", false, "output raw PCM audio to stdout (no WAV header)")
 	f.BoolVar(&jsonInput, "json-input", false, "read stdin as JSON lines")
 	f.BoolVar(&listModels, "list-models", false, "list downloaded models in cache directory")
-	f.StringVar(&downloadModel, "download-model", "", "download model by URL into cache directory")
+	f.StringVar(&downloadModel, "download-model", "", "download a catalog model by name (e.g. tsukuyomi) or a model file by URL into the cache directory")
 	f.StringArrayVar(&phonemeSilence, "phoneme-silence", nil, "per-phoneme silence (format: phoneme:seconds, repeatable)")
 
 	// Voice cloning flags
@@ -207,11 +207,11 @@ func runSynthesize(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// --download-model: download a model by URL and exit.
+	// --download-model: download a catalog model by name, or a model by URL, and exit.
 	if downloadModel != "" {
 		printModelNotice(cmd.ErrOrStderr(), downloadModel)
 		mgr := piperplus.NewModelManager(modelDir, logger)
-		path, err := mgr.DownloadModel(ctx, downloadModel)
+		path, err := downloadModelArg(ctx, mgr, downloadModel)
 		if err != nil {
 			return fmt.Errorf("download failed: %w", err)
 		}
@@ -227,16 +227,13 @@ func runSynthesize(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("model path required: specify --model /path/to/model.onnx or set $PIPER_PLUS_DEFAULT_MODEL")
 	}
 
-	// Try resolving model name/alias if file doesn't exist.
+	// Resolve a catalog name (downloading it when not cached) or a cached name.
 	modelInput := modelPath
-	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
-		mgr := piperplus.NewModelManager(modelDir, logger)
-		resolved, resolveErr := mgr.FindModel(modelPath)
-		if resolveErr != nil {
-			return fmt.Errorf("model not found: %s (try --list-models or --download-model)", modelPath)
-		}
-		modelPath = resolved
+	resolved, err := resolveModelArg(ctx, piperplus.NewModelManager(modelDir, logger), modelPath)
+	if err != nil {
+		return err
 	}
+	modelPath = resolved
 	printModelNotice(cmd.ErrOrStderr(), modelInput, modelPath)
 
 	// Parse --phoneme-silence flags ("phoneme:seconds" format).

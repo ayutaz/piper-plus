@@ -11,8 +11,7 @@
 本仕様は、piper-plus の4言語実装 (Python, Rust, C#, Go) における**モデル解決 (model resolution)** アルゴリズムを定義する。ユーザーが `--model` 引数に指定する文字列から、実際の ONNX モデルファイルと config.json のパスを決定するまでの手順を統一する。
 
 解決順序は統一を目指す仕様であり、全ランタイムで全経路が実装済みという意味ではない。
-現在の入口と差異は§6・§8を参照。特にGo CLIはURL取得とローカルcache検索のみで、
-voice catalogのaliasによる取得には接続していない。
+現在の入口と差異は§6・§8を参照。
 
 ---
 
@@ -134,7 +133,7 @@ Voice catalog から以下の優先順位で検索する:
 | Rust | `find_model()` が `MODEL_ALIASES` 表で完全一致を引き、旧 registry 名・部分一致・説明文一致も互換のため残す |
 | C# / C++ | `FindVoice()` / `findVoice()` (key と alias) |
 | WASM / npm | `ModelManager.resolveUrls()` / `loadModel()`。カタログの名前は HF API を呼ばずに URL を組み立てる |
-| Go | `piperplus.FindVoice()` (ライブラリ)。CLI はまだカタログに接続していない |
+| Go | `piperplus.FindVoice()`。CLI (`--model`、`serve --model`、`--download-model`) は `ModelManager.ResolveVoice()` / `DownloadVoice()` でカタログから解決し、未取得なら自動 DL する |
 
 ---
 
@@ -209,6 +208,8 @@ function find_config(onnx_path, explicit_config=None):
     config.json
 ```
 
+Go はカタログのモデルを `{cache_dir}/{catalog key}/` に置く (例: `ja_JP-tsukuyomi-chan-medium/tsukuyomi-chan-6lang-fp16.onnx` と `config.json`)。tsukuyomi と css10 はどちらも `config.json` を持つので、モデルごとにディレクトリを分けて上書きを防ぐ。revision を固定したモデル (base) はカタログのサイズと一致するファイルだけをキャッシュとみなし、`main` を指すモデルは Hub 側で更新されうるのでサイズを問わない。
+
 > **Note:** Python `_model_resolver.py` は `~/.cache/piper-plus/models/{repo_id_with_dashes}/` を使用する (huggingface_hub 方式)。他の実装はプラットフォームデータディレクトリを使用する。将来的に統一予定。
 
 ---
@@ -235,7 +236,7 @@ function find_config(onnx_path, explicit_config=None):
 | チェック | 共有目標 | 現行実装の差異 |
 |---------|------|------|
 | Path traversal | `..` を含む入力を alias/name 解決で拒否 | Python API は入力を明示検証しない。C#/C++/Go の catalog/download 経路には検証があるが、入口が異なる |
-| Repo ID format | `owner/repo` 形式のみ許可 (英数字, `-`, `_`, `.` のみ) | Python API は `/` を含む文字列を Hub repo として渡す。C# catalog は形式検証する。Go CLI は URL/file 情報を扱う repo alias 入口ではない |
+| Repo ID format | `owner/repo` 形式のみ許可 (英数字, `-`, `_`, `.` のみ) | Python API は `/` を含む文字列を Hub repo として渡す。C# catalog は形式検証する。Go のカタログ DL は key・repo ID・revision・ファイルパスを検証する |
 | Download protocol | HTTPS のみ許可 (`http://localhost` はテスト用に許可) | Go は `https://`、`file://`、localhost HTTP を許可する。ブラウザの direct URL は `http://` と `https://` の両方を受け付ける |
 
 ---
@@ -244,8 +245,8 @@ function find_config(onnx_path, explicit_config=None):
 
 | 機能 | Python | Rust | C# | Go |
 |------|--------|------|-----|-----|
-| Entry point | `_model_resolver.resolve_model()` | `model_download::resolve_model_path()` | `ModelManager.ResolveModelPathAsync()` | `ModelManager.FindModel()` |
-| Voice catalog | `download.PIPER_PLUS_VOICES` (CLI と API で共通) | `model_download::builtin_registry()` | `VoiceCatalog.LoadMergedCatalog()` | `voice_catalog.go`。CLI未接続 |
+| Entry point | `_model_resolver.resolve_model()` | `model_download::resolve_model_path()` | `ModelManager.ResolveModelPathAsync()` | CLI `resolveModelArg()` (`ModelManager.ResolveVoice()` → `FindModel()`) |
+| Voice catalog | `download.PIPER_PLUS_VOICES` (CLI と API で共通) | `model_download::builtin_registry()` | `VoiceCatalog.LoadMergedCatalog()` | `voice_catalog.go` (CLI と共通) |
 | Alias lookup | `download.resolve_piper_plus_voice()` | `find_model()` (`MODEL_ALIASES` 表、name/partial/desc) | `FindVoice()` (key/alias dict) | `FindVoice()` (key/alias) |
 | Config detection | API: `_find_config()`; CLI: `download.find_voice()` | `resolve_model_path()` | Download 時に catalog から取得 | `buildModelInfo()` |
 | Cache dir | API: `~/.cache/piper-plus/models`; CLI: 指定download dir | `default_model_dir()` | `GetDefaultModelDir()` | `DefaultCacheDir()` |
