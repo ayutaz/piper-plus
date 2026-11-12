@@ -2504,10 +2504,6 @@ void phonemizeText(const Voice& voice, const std::string& rawText, PhonemizeResu
                                     continue;  // Skip BOS/EOS
                                 }
                                 allPhonemes.push_back(ph);
-                                if (voice.session.hasProsodyInput && s < langProsody.size()) {
-                                    // Find matching prosody index (approximate)
-                                    // JA phonemizer produces 1:1 phoneme:prosody
-                                }
                             }
                             // Add prosody for JA phonemes (after stripping)
                             if (voice.session.hasProsodyInput && s < langProsody.size()) {
