@@ -40,7 +40,7 @@ jobs:
     name: Build macOS ARM64
     uses: ./.github/workflows/build-piper.yml
     with:
-      os: macos-14
+      os: macos-15
       build-type: Release
       artifact-name: piper-plus-cpp-macos-arm64
       cache-key-prefix: piper-plus-cpp-macos-arm64
