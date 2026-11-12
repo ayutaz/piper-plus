@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794486720843,
+  "lastUpdate": 1794510811718,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1992,6 +1992,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 227,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4c9c60af913dd3cd030d2962560f0fc16e1e8902",
+          "message": "fix(model): つくよみちゃんの config.json のサイズを 6901 バイトに直す (#947)\n\nHugging Face の config.json は 2026-06-13 (36b59c825c) に 6279 から\n6901 バイトに変わった。phoneme_id_map の複数コードポイントの IPA 音素を\nC++ ランタイム向けに PUA 文字にした修正で、中身は正しい。カタログは\nmain を指したまま 6279 を持っていたので、正しいファイルが壊れていると\n見なされていた。\n\n- Python ランタイム: Wrong size の警告を出し、確認のたびに再取得\n- C# ModelManager / C++ --download-model / piper_train: スキップせず再取得\n- Go CLI: 取得のたびに警告\n\n6 か所のカタログ (download.py、piper_train/model_manager.py、\nVoiceCatalog.cs、voice_catalog.go、model_manager.cpp、\npiper_plus_voices.json) を 6901 にする。Rust とブラウザは config.json\nのサイズを持たない。モデル本体 (39652717 バイト) は変わっていない。\n\nあわせて、#937 のリベースで CHANGELOG に重複して残った古い項目\n(「Go CLI はまだカタログを使わない」で終わるもの) を消す。",
+          "timestamp": "2026-11-13T04:11:00+09:00",
+          "tree_id": "9777dd480c4dd4bbc8130a29a6180ff6410c2ef3",
+          "url": "https://github.com/ayutaz/piper-plus/commit/4c9c60af913dd3cd030d2962560f0fc16e1e8902"
+        },
+        "date": 1794510809353,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0431,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 10.9,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 12.5,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 995.9,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 226.9,
             "unit": "MB"
           },
           {
