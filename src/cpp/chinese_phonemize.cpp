@@ -8,10 +8,6 @@
 // No runtime Python dependency — dictionaries are loaded from JSON at startup.
 
 #include "chinese_phonemize.hpp"
-#include "chinese_loanword.hpp"
-#include "json.hpp"
-#include "utf8.h"
-#include "utf8_utils.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -20,6 +16,12 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+
+#include "chinese_loanword.hpp"
+#include "json.hpp"
+#include "text_sanitize.hpp"
+#include "utf8.h"
+#include "utf8_utils.hpp"
 
 using json = nlohmann::json;
 
@@ -873,7 +875,8 @@ void append_pinyin_to_ipa_flat(const std::vector<std::string>& syllables,
 void phonemizeEmbeddedEnglish(const std::string& text,
                               std::vector<Phoneme>& out,
                               const LoanwordData& data) {
-    for (const auto& token : tokenize_alnum(text)) {
+    const std::string cleaned = stripControlChars(text);  // docs/spec/input-sanitize-contract.toml
+    for (const auto& token : tokenize_alnum(cleaned)) {
         if (token.empty()) continue;
 
         // 1. Case-sensitive loanword

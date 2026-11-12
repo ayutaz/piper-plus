@@ -80,6 +80,10 @@ jobs:
               - 'src/cpp/**'
               - 'CMakeLists.txt'
               - 'cmake/**'
+              # Read by test_c_api (test_input_sanitize_contract.cpp) and the
+              # CLI input sanitizing E2E.
+              - 'tests/fixtures/g2p/input_sanitize_cases.json'
+              - 'scripts/test_cpp_cli_input_sanitize.py'
             wasm:
               - 'src/wasm/**'
               - 'src/rust/piper-wasm/**'

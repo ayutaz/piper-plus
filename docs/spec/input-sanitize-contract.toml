@@ -189,15 +189,28 @@ notes = "CliInputSanitizeTests runs the CLI process with the test model. A comma
 
 [[runtime]]
 name = "cpp"
-status = "pending"
-function = "piper::stripControlChars"
-consumer_tests = ["src/cpp/tests/test_input_sanitize_contract.cpp"]
+status = "enforced"
+function = "piper::stripControlChars (src/cpp/text_sanitize.hpp)"
+consumer_tests = [
+  "src/cpp/tests/test_input_sanitize_contract.cpp",
+  "scripts/test_cpp_cli_input_sanitize.py",
+]
 entry_points = [
+  # piper::phonemizeText (before the [[ ]] notation, the language split and
+  # every phonemizer) and piper::textToAudioStreaming (before sentence
+  # splitting).
   {file = "src/cpp/piper.cpp", calls = "stripControlChars"},
+  # piper::phonemizeEmbeddedEnglish (the English run between Chinese text;
+  # the C API piper_plus_phonemize_embedded_english calls it).
+  {file = "src/cpp/chinese_phonemize.cpp", calls = "stripControlChars"},
+  # piper_plus_synthesize / synth_start (and so synthesize_streaming) /
+  # phonemize / g2p_phonemize, before the custom dictionary.
   {file = "src/cpp/piper_plus_c_api.cpp", calls = "stripControlChars"},
+  # The CLI: every line (--text, stdin, the text of JSONL) before the custom
+  # dictionary and SSML detection.
   {file = "src/cpp/main.cpp", calls = "stripControlChars"},
 ]
-notes = "Also the Swift TTS (Sources/PiperPlus), which wraps the C API in the released xcframework, and the Kotlin G2P, whose AAR wraps libpiper_plus.so."
+notes = "Bytes that are not valid UTF-8 are kept. The C API takes C strings, which cannot hold a NUL, so its cases put DEL where a case has a NUL. scripts/test_cpp_cli_input_sanitize.py runs the built CLI (CI step 'CLI input sanitizing E2E' in _build-test-cpp.yml). Also the Swift TTS (Sources/PiperPlus), which wraps the C API in the released xcframework, and the Kotlin G2P, whose AAR wraps libpiper_plus.so: both get the stripping with their next native build."
 
 [[runtime]]
 name = "npm"

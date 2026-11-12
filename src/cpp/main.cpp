@@ -29,20 +29,20 @@
 #include <shellapi.h>  // CommandLineToArgvW
 #endif
 
+#include <onnxruntime_cxx_api.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
-#include <onnxruntime_cxx_api.h>
-
-#include "speaker_embedding_io.hpp"
-#include "json.hpp"
-#include "piper.hpp"
-#include "phoneme_parser.hpp"
 #include "custom_dictionary.hpp"
+#include "json.hpp"
 #include "model_manager.hpp"
+#include "phoneme_parser.hpp"
+#include "piper.hpp"
 #include "safe_path.hpp"
+#include "speaker_embedding_io.hpp"
 #include "ssml.hpp"
 #include "ssml_synth.hpp"
+#include "text_sanitize.hpp"
 
 using namespace std;
 using json = nlohmann::json;
@@ -765,6 +765,10 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
     }
   }
 
+  // Before the custom dictionary and SSML detection
+  // (docs/spec/input-sanitize-contract.toml).
+  line = piper::stripControlChars(line);
+
   // Apply custom dictionary
   if (customDict && !line.empty()) {
     line = customDict->applyToText(line);
@@ -856,7 +860,7 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
       stringstream text;
       text << line;
       while (getline(cin, line)) {
-        text << " " << line;
+          text << " " << piper::stripControlChars(line);
       }
 
       line = text.str();

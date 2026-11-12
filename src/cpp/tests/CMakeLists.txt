@@ -1143,6 +1143,7 @@ add_executable(test_c_api
     test_c_api_g2p.cpp
     test_c_api_g2p_golden.cpp
     test_cjk_punctuation_contract.cpp
+    test_input_sanitize_contract.cpp
     ../piper_plus_c_api.cpp
 )
 

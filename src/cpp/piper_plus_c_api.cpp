@@ -8,17 +8,8 @@
  * to satisfy the tests in test_c_api.cpp.
  */
 
-#include "piper_plus.h"
-#include "piper.hpp"
-#include "chinese_loanword.hpp"
-#include "custom_dictionary.hpp"
-#include "english_phonemize.hpp"
-#include "chinese_phonemize.hpp"
-#include "library_path.h"
-#include "openjtalk_dictionary_manager.h"
-#include "g2p_parallelism.hpp"
-
 #include <spdlog/spdlog.h>
+#include <sys/stat.h>
 
 #include <algorithm>
 #include <atomic>
@@ -34,7 +25,16 @@
 #include <thread>
 #include <vector>
 
-#include <sys/stat.h>
+#include "chinese_loanword.hpp"
+#include "chinese_phonemize.hpp"
+#include "custom_dictionary.hpp"
+#include "english_phonemize.hpp"
+#include "g2p_parallelism.hpp"
+#include "library_path.h"
+#include "openjtalk_dictionary_manager.h"
+#include "piper.hpp"
+#include "piper_plus.h"
+#include "text_sanitize.hpp"
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -445,8 +445,8 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synthesize(
         PiperPlusStatus idCheck = validateSynthIds(engine);
         if (idCheck != PIPER_PLUS_OK) return idCheck;
 
-        // Apply custom dictionary
-        std::string processedText = text;
+        // Before the custom dictionary (docs/spec/input-sanitize-contract.toml).
+        std::string processedText = piper::stripControlChars(text);
         if (engine->customDict) {
             processedText = engine->customDict->applyToText(processedText);
         }
@@ -595,8 +595,15 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synth_start(
             return idCheck;
         }
 
-        // Apply custom dictionary
-        std::string processedText = text;
+        // Before the custom dictionary (docs/spec/input-sanitize-contract.toml).
+        std::string processedText = piper::stripControlChars(text);
+        if (processedText.empty()) {
+            // A text of only control characters is an empty text, which is
+            // rejected above.
+            engine->voice.synthesisConfig = engine->iterState.configSnapshot_;
+            set_error("text is empty after removing control characters");
+            return PIPER_PLUS_ERR_TEXT;
+        }
         if (engine->customDict) {
             processedText = engine->customDict->applyToText(processedText);
         }
@@ -1115,8 +1122,8 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_phonemize(
             }
         }
 
-        // Apply custom dictionary
-        std::string processedText = text;
+        // Before the custom dictionary (docs/spec/input-sanitize-contract.toml).
+        std::string processedText = piper::stripControlChars(text);
         if (engine->customDict) {
             processedText = engine->customDict->applyToText(processedText);
         }
@@ -1557,7 +1564,8 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_g2p_phonemize(
             handle->voice.synthesisConfig.languageId = it->second;
         }
 
-        std::string processedText = inText;
+        // Before the custom dictionary (docs/spec/input-sanitize-contract.toml).
+        std::string processedText = piper::stripControlChars(inText);
         if (handle->customDict) {
             processedText = handle->customDict->applyToText(processedText);
         }
