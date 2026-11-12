@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793879925713,
+  "lastUpdate": 1794486398710,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -1884,6 +1884,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 226.9,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7a7c365479f7c0b743c4e24ce84a5b4d4fb28c00",
+          "message": "fix(ci): run checks on fork PRs, skip only the PR comment (#939)\n\n* fix(ci): run size, memory and RTF checks on fork PRs, skip only the comment\n\n* fix(ci): require a step-level fork guard and close its loopholes\n\n* test(ci): check the hook counts written in CLAUDE.md and .claude/README.md\n\nBoth documents said 119 hooks while .pre-commit-config.yaml had 120: a PR\nthat adds a hook has to update two numbers in two files, and nothing\nfailed when it did not. scripts/check_doc_hook_count.py counts the\n`- id:` lines (and the ids that contain `contract`) and compares them with\nthe numbers in both documents; wording it cannot find is an error too, so\na rephrasing updates the gate instead of turning it off.\n\nRuns as the pre-commit hook doc-hook-count and in lint-gates.yml. The\ndocuments now say 121 (this hook included) and 19 contract gates.\n\n* docs(skills): handle fork PRs in watch-pr and create-pr\n\n#934 was the first PR from a fork, and it ran into three things in turn:\nno checks appeared because every run of a maintainer-pushed head waits\nfor approval (action_required), the push to the fork needs the fork's\nURL, and the PR comments never come because the fork's token is\nread-only. watch-pr gets a phase 1.5 that detects a fork PR\n(isCrossRepository), lists the runs waiting for approval and says to\napprove them only after the user agrees; create-pr points to it.\n\n* fix(ci): catch more ways to write, and other forms of the fork guard\n\nReview of the fork guard gate found writes it did not see and guards it\ndid not read:\n\n* `gh api` split over lines with a backslash, `--method=POST`,\n  `--field=` / `-fbody=`, a target in a variable, statuses, PATCH on a\n  pull, a GraphQL mutation, `gh issue edit` and `gh -R o/r pr comment`\n  all passed. Every write fails with the read-only token, so any\n  `gh api` call that is not a GET or a GraphQL query now counts,\n  whatever its target, after continued lines are joined.\n* github-script deleteComment, issues/pulls.update, requestReviewers,\n  createCommitStatus, checks.create, a GraphQL mutation and\n  `github.request({method: 'POST'})` passed.\n* A job `if` with the guard reversed, or with `head.repo.fork`, skipped\n  the whole job on forks without an error; the same forms on a step\n  were rejected although they work. A job `if` that reads\n  head.repo.full_name or head.repo.fork is now reported, and the step\n  accepts the reversed and `.fork` forms.\n\nwatch-pr: list the runs waiting for approval with --paginate and\nper_page=100 (more than 70 workflows run on pull_request), point to the\nrun's Summary page (`gh run view` prints no job summary), and say that\nthe approval depends on the repository settings.",
+          "timestamp": "2026-11-12T21:25:08+09:00",
+          "tree_id": "9bbd05268fc08be747f881239bf38e78bac1c9cd",
+          "url": "https://github.com/ayutaz/piper-plus/commit/7a7c365479f7c0b743c4e24ce84a5b4d4fb28c00"
+        },
+        "date": 1794486396728,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0833,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 21.2,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 21.4,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1706.7,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 227.2,
             "unit": "MB"
           },
           {
