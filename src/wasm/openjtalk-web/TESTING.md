@@ -72,7 +72,7 @@ deployment as diagnostic fixtures does not make their runtime pins current.
   real audio playback.
 - Browser errors are collected and fail the test.
 - ORT URLs are pinned to the exact `onnxruntime-web` version in
-  `package.json` (currently `1.30.0`).
+  `package.json` (currently `1.31.1`).
 
 Keep historical migration and changelog examples unchanged; this file
 documents only the current commands and active test paths.
