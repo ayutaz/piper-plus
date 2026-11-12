@@ -30,6 +30,12 @@ class ProsodyInfo:
     a3: int
 
 
+# Control characters (Unicode Cc) that stripping does not remove:
+# docs/spec/input-sanitize-contract.toml [rule] keep / to_space.
+_CONTROLS_TO_SPACE = "\u000b\u000c\u0085"
+_CONTROLS_KEPT_OR_SPACED = "\n\t\r" + _CONTROLS_TO_SPACE
+
+
 class Phonemizer(ABC):
     """G2P abstract base class.
 
@@ -44,22 +50,35 @@ class Phonemizer(ABC):
     # Input validation
     # ------------------------------------------------------------------
 
-    def _sanitize_input(self, text: str) -> str:
-        """Validate and clean *text* before phonemization.
+    def _strip_control_chars(self, text: str) -> str:
+        """Clean *text* by the rule of ``docs/spec/input-sanitize-contract.toml``.
 
         * Rejects non-str inputs with :class:`TypeError`.
-        * Rejects inputs longer than :attr:`MAX_INPUT_LENGTH` with
-          :class:`ValueError`.
-        * Strips control characters except ``\\n``, ``\\t`` and ``\\r``.
+        * Keeps ``\\n``, ``\\t`` and ``\\r``; turns VT, FF and NEL (U+000B,
+          U+000C, U+0085), which separate words, into a space; removes every
+          other control character (Unicode Cc).
+
+        No length limit: callers pass whole texts.
         """
         if not isinstance(text, str):
             raise TypeError(f"Expected str, got {type(text).__name__}")
-        if len(text) > self.MAX_INPUT_LENGTH:
-            raise ValueError(f"Input too long: {len(text)} > {self.MAX_INPUT_LENGTH}")
-        # Remove C0/C1 controls, keeping newline / tab / carriage-return.
         return "".join(
-            ch for ch in text if unicodedata.category(ch) != "Cc" or ch in "\n\t\r"
+            " " if ch in _CONTROLS_TO_SPACE else ch
+            for ch in text
+            if unicodedata.category(ch) != "Cc" or ch in _CONTROLS_KEPT_OR_SPACED
         )
+
+    def _sanitize_input(self, text: str) -> str:
+        """:meth:`_strip_control_chars`, plus the :attr:`MAX_INPUT_LENGTH` limit.
+
+        Rejects inputs longer than :attr:`MAX_INPUT_LENGTH` with
+        :class:`ValueError`. Only the entry points that had the limit before
+        stripping reached every language call this (ja, en, sv's
+        ``phonemize``); the others call :meth:`_strip_control_chars`.
+        """
+        if isinstance(text, str) and len(text) > self.MAX_INPUT_LENGTH:
+            raise ValueError(f"Input too long: {len(text)} > {self.MAX_INPUT_LENGTH}")
+        return self._strip_control_chars(text)
 
     # ------------------------------------------------------------------
     # Public API

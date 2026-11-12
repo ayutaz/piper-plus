@@ -283,9 +283,15 @@ class KoreanPhonemizer(Phonemizer):
         return "ko"
 
     def phonemize(self, text: str) -> list[str]:
+        text = self._strip_control_chars(text)
+        if not text:
+            return []
         return phonemize_korean(text)
 
     def phonemize_with_prosody(
         self, text: str
     ) -> tuple[list[str], list[ProsodyInfo | None]]:
+        text = self._strip_control_chars(text)
+        if not text:
+            return [], []
         return phonemize_korean_with_prosody(text)

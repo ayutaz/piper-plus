@@ -265,8 +265,9 @@ class JapanesePhonemizer(Phonemizer):
         >>> JapanesePhonemizer().phonemize("")  # doctest: +SKIP
         []
         """
-        text = self._apply_custom_dict(text)
+        # Strip first so the dictionary matches the text that is read.
         text = self._sanitize_input(text)
+        text = self._apply_custom_dict(text)
         if not text:
             return []
         tokens_tuple, _prosody_tuple = _phonemize_core_cached(text)
@@ -275,8 +276,9 @@ class JapanesePhonemizer(Phonemizer):
     def phonemize_with_prosody(
         self, text: str
     ) -> tuple[list[str], list[ProsodyInfo | None]]:
-        text = self._apply_custom_dict(text)
+        # Strip first so the dictionary matches the text that is read.
         text = self._sanitize_input(text)
+        text = self._apply_custom_dict(text)
         if not text:
             return [], []
         tokens_tuple, prosody_tuple = _phonemize_core_cached(text)

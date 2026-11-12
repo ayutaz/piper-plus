@@ -895,6 +895,8 @@ impl Phonemizer for EnglishPhonemizer {
         &self,
         text: &str,
     ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError> {
+        let stripped = crate::phonemizer::strip_control_chars(text);
+        let text: &str = &stripped;
         Ok(self.phonemize_impl(text))
     }
 

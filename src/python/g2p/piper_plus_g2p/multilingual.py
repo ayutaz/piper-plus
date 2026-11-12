@@ -462,6 +462,12 @@ class MultilingualPhonemizer(Phonemizer):
         """
         from .registry import get_phonemizer  # noqa: PLC0415
 
+        # Strip before segmenting: a control character inside a word must not
+        # split it, and every segment then reaches its phonemizer already clean.
+        text = self._strip_control_chars(text)
+        if not text:
+            return [], []
+
         # Pre-compute has_kana once and pass to _segment_text_multilingual
         # to avoid a redundant full-text scan inside the segmenter.
         context_has_kana = self._detector.has_kana(text)

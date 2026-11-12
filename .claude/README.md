@@ -152,7 +152,7 @@ push → `.github/pull_request_template.md` 準拠の PR 本文で PR 作成 →
 
 ## Pre-commit / pre-push gates
 
-git hook 側の gate は `.pre-commit-config.yaml` に集約されています (hook 数は 119、 2026-10-26 時点)。 Claude Code の hooks (上記) とは別の仕組みで、 Claude を使わない commit / push にも効きます。
+git hook 側の gate は `.pre-commit-config.yaml` に集約されています (hook 数は 121、 2026-11-11 時点)。 Claude Code の hooks (上記) とは別の仕組みで、 Claude を使わない commit / push にも効きます。
 
 | 段階 | 有効化 | 主な内容 |
 |------|--------|---------|
