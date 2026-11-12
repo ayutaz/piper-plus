@@ -732,7 +732,10 @@ impl MultilingualPhonemizer {
         text: &str,
         detector: &UnicodeLanguageDetector,
     ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError> {
-        let segments = segment_text(text, detector);
+        // Strip before segmenting: a control character inside a word must not
+        // split it, and every segment then reaches its phonemizer clean.
+        let stripped = crate::phonemizer::strip_control_chars(text);
+        let segments = segment_text(&stripped, detector);
         if segments.is_empty() {
             return Ok((Vec::new(), Vec::new()));
         }

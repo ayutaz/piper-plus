@@ -122,6 +122,12 @@ except ImportError:
 - 双方向マッピングテスト
 - 7lang → Nlang ID マップテスト
 
+**入力の掃除 (制御文字) の契約:** `docs/spec/input-sanitize-contract.toml`
+
+- 新しいクラスの `phonemize` と `phonemize_with_prosody` の先頭で `self._sanitize_input(text)` を呼ぶ (空になったら `[]` / `([], [])` を返す)。
+- `tests/fixtures/g2p/input_sanitize_cases.json` の `word_cases` に、新しい言語の単語を、語中に U+0000 / U+007F / U+009F を 1 つずつ入れたもの 3 件と、同じ単語 2 つの間に U+000B / U+000C / U+0085 (空白に置き換わる) を入れたもの 3 件、合わせて 6 件足し、契約 toml の `[fixture].languages` にも足す。Rust crate の写し (`src/rust/piper-plus-g2p/tests/fixtures/`) にもコピーする。
+- 足さないと、`tests/test_input_contract.py::test_every_registered_language_has_word_case` と gate `scripts/check_input_sanitize_contract.py` が落ちる。#934 では一部の言語だけが掃除を呼ばず、NUL が単語を 2 つに割っていた。
+
 実行: `cd src/python/g2p && uv run pytest tests/ -x -q`
 
 ---
@@ -142,6 +148,8 @@ except ImportError:
 - `src/rust/piper-cli/src/main.rs` — `SUPPORTED_LANGUAGES` に追加
 
 テスト: `#[cfg(test)]` セクションに 30+ テスト、`cargo fmt` + `cargo clippy` 実行
+
+**入力の掃除:** `piper-plus-g2p` の新しい `impl Phonemizer` は、`phonemize_with_prosody` の先頭で `crate::phonemizer::strip_control_chars(text)` を呼ぶ。`tests/input_sanitize.rs` の `single_language()` と `COVERED` に新しい型を足す (`every_phonemizer_impl_is_covered` が `impl Phonemizer for` を数えるので、足さないと落ちる)。契約 toml の `rust-g2p` の `entry_points` にも新しいファイルを足す。
 
 ---
 
@@ -204,6 +212,7 @@ except ImportError:
 - C++ / C# / Rust / Go / JS のテストは各 runner が自動検出する (C++ は `src/cpp/tests/CMakeLists.txt` の `add_test` → `ctest`)。 workflow 側にテスト名のリストはない
 - `.github/workflows/ci.yml` — ランタイム別 job を起動する paths filter に新しいデータファイル等が含まれるか確認
 - `.github/workflows/dev-build-all.yml` — `Smoke test all N languages` step の言語リストに追加
+- `uv run python scripts/check_input_sanitize_contract.py` が rc=0 になること。新しい入口のファイルを契約に足したら、pre-commit hook `input-sanitize-contract` の `files:` にも足す (gate が検査する)
 
 ### ドキュメント
 

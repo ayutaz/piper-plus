@@ -897,6 +897,18 @@ repos:
         files: ^(\.pre-commit-config\.yaml|CLAUDE\.md|\.claude/README\.md|scripts/check_doc_hook_count\.py)$
         pass_filenames: false
 
+      # 音素化の前に制御文字を消す契約 (#934 の後始末)。 #934 は Python G2P に
+      # C1 の除去を足し 「Rust の validate_input と同じ」 と書いたが、 Python は
+      # ja / en / sv しか呼ばず、 Rust の validate_input は呼び出し元が無かった。
+      # gate は fixture の写し・各ランタイムの契約テスト・入口での呼び出しを
+      # 見る。 files: は契約に書いた全パスを含むこと (gate 自身が検査する)。
+      - id: input-sanitize-contract
+        name: Input sanitize contract (control characters stripped before phonemizing)
+        entry: uv run --no-sync python scripts/check_input_sanitize_contract.py
+        language: system
+        files: ^(docs/spec/input-sanitize-contract\.toml|scripts/check_input_sanitize_contract\.py|tests/scripts/test_check_input_sanitize_contract\.py|(tests/fixtures/g2p|src/rust/piper-plus-g2p/tests/fixtures)/input_sanitize_cases\.json|src/python/g2p/piper_plus_g2p/[^/]+\.py|src/python/g2p/tests/test_input_contract\.py|src/rust/piper-plus-g2p/(src/[^/]+\.rs|tests/input_sanitize\.rs)|src/python_run/piper_plus/(voice|phonemize/multilingual)\.py|src/python_run/tests/test_input_sanitize_contract\.py|src/go/(phonemize|piperplus)/[^/]+\.go|src/csharp/PiperPlus\.Core/Phonemize/PhonemeEncoder\.cs|src/csharp/PiperPlus\.Cli/Program\.cs|src/csharp/PiperPlus\.Core\.Tests/TextSanitizerContractTests\.cs|src/cpp/(piper|piper_plus_c_api|main)\.cpp|src/cpp/tests/test_input_sanitize_contract\.cpp|src/wasm/g2p/(src/index|test/test-input-sanitize-contract)\.js|src/wasm/openjtalk-web/(src/index|test/js/test-input-sanitize-contract)\.js|android/piper-plus-g2p/src/test/java/com/piperplus/g2p/InputSanitizeContractTest\.kt|tests/PiperPlusG2PTests/InputSanitizeContractTests\.swift)$
+        pass_filenames: false
+
       # Mirror of the ort-version-sync steps of .github/workflows/lint-gates.yml. Same Dependabot
       # drift pattern as ruff (cmake source-of-truth + 7 workflow + 5
       # workspace consumers). `check_ort_versions.py` is pure Python / IO.

@@ -913,6 +913,8 @@ impl Phonemizer for ChinesePhonemizer {
         &self,
         text: &str,
     ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError> {
+        let stripped = crate::phonemizer::strip_control_chars(text);
+        let text: &str = &stripped;
         Ok(phonemize_chinese_internal(
             text,
             self.dict.single(),
@@ -1209,7 +1211,8 @@ impl ChinesePhonemizer {
     ///
     /// See [`phonemize_embedded_english`] for the underlying lookup logic.
     pub fn phonemize_embedded_english(&self, text: &str) -> Vec<String> {
-        phonemize_embedded_english(text, load_default_loanword_data())
+        let text = crate::phonemizer::strip_control_chars(text);
+        phonemize_embedded_english(&text, load_default_loanword_data())
     }
 }
 

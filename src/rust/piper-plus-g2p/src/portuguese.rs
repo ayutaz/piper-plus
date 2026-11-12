@@ -1030,6 +1030,8 @@ impl Phonemizer for PortuguesePhonemizer {
         &self,
         text: &str,
     ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError> {
+        let stripped = crate::phonemizer::strip_control_chars(text);
+        let text: &str = &stripped;
         let (tokens, prosody) = phonemize_sentence_with_prosody(text);
         Ok((tokens, prosody))
     }
@@ -1189,6 +1191,8 @@ impl Phonemizer for EuropeanPortuguesePhonemizer {
         &self,
         text: &str,
     ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError> {
+        let stripped = crate::phonemizer::strip_control_chars(text);
+        let text: &str = &stripped;
         let (mut tokens, prosody) = phonemize_sentence_with_prosody(text);
         apply_eu_postprocessing(&mut tokens);
         debug_assert_eq!(tokens.len(), prosody.len());

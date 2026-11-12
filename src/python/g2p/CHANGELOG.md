@@ -24,11 +24,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `Phonemizer._sanitize_input` also strips DEL (U+007F) and the C1 control
-  characters (U+0080-009F), the same set the Rust `validate_input`
-  removes with `char::is_control()`. One of them inside a word used to
-  break the reading in ja / en / sv: an accent phrase split, a lost stress,
-  a word read as two (#934).
+- Control characters are stripped by one rule, shared with the other
+  runtimes: `\n`, `\t` and `\r` stay; VT, FF and NEL (U+000B, U+000C,
+  U+0085) become a space, because they separate words; DEL, the other C0
+  and the C1 characters (U+0080-009F) are removed. One of them inside a
+  word used to break the reading in ja / en / sv: an accent phrase split, a
+  lost stress, a word read as two (#934). #934 removed VT / FF / NEL too,
+  which joined the words around them.
+- Every language strips control characters before phonemizing, through
+  both `phonemize` and `phonemize_with_prosody`. Until now only ja and en
+  (and the `phonemize` of sv) did: zh, ko, es, fr, pt, pt-PT, the
+  `phonemize_with_prosody` of sv, `ChinesePhonemizer.phonemize_embedded_english`
+  and `MultilingualPhonemizer` passed them through, and a NUL inside
+  `hola` made es / fr / pt read two words. The new
+  `Phonemizer._strip_control_chars` sets no length limit; the
+  10000-character limit of `_sanitize_input` stays where it was (ja, en,
+  the `phonemize` of sv), so callers that pass whole texts, such as
+  `piper_plus.PiperPlus.synthesize`, are not rejected. A non-`str`
+  argument raises `TypeError` in every language.
+- `JapanesePhonemizer` applies the custom dictionary after stripping, so an
+  entry matches a word that had a control character inside it.
+- The rule is now a cross-runtime contract,
+  `docs/spec/input-sanitize-contract.toml`, and
+  `tests/test_input_contract.py` runs the shared cases of
+  `tests/fixtures/g2p/input_sanitize_cases.json` for every registered
+  language.
 
 ### Security
 

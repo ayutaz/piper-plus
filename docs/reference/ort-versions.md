@@ -57,7 +57,7 @@ exact-match group.
 | Android (release) | 1.20.0 | exact ✓ | AAR (Maven Central) |
 | Android (PR CI)   | 1.20.0 | exact ✓ | AAR (Maven Central) |
 | Kotlin G2P (release/CI) | 1.20.0 | exact ✓ | `release-kotlin-g2p.yml`, `kotlin-g2p-ci.yml` |
-| JS/WASM  | `>=1.22.0` (browser validation: `1.30.0`) | `>=1.20.0` ✓ | `onnxruntime-web` (npm, peerDependency; input metadata required) |
+| JS/WASM  | `>=1.22.0` (browser validation: `1.31.1`) | `>=1.20.0` ✓ | `onnxruntime-web` (npm, peerDependency; input metadata required) |
 
 The workspace root `pyproject.toml` (uv workspace) declares its own
 `onnxruntime>=1.28.0`. It is not a row above and neither gate checks it.

@@ -33,6 +33,7 @@ Swift G2P) + 2 docker image (python-inference / webui) が **同じ振る舞い�
 | **#391** | speaker_embedding 形状修正 | 5 ランタイム (Rust / Go / C# / C++ / WASM) が古い形状のまま | PR #443 で偶然発見 (silent regression) |
 | **#443** | MB-iSTFT speaker_embedding 未対応の修正 | 4 runtime (Rust / Go / C# / WASM) + 2 docker image (python-inference / webui) で同じバグ | 手動レビューでようやく発見 |
 | **#384** | ZH-EN loanword 辞書 schema 拡張 | Rust / Go / C# / WASM / C++ で旧 schema のままパース失敗 | CI gate を後付けで作成 |
+| **#934** | `_sanitize_input` に C1 制御文字の除去を追加し 「Rust の `validate_input` と同じ」 と記載 | Python G2P でも ja / en / sv しか呼んでおらず、 Rust の `validate_input` は呼び出し元がゼロ。 ほかのランタイムは何も消していなかった | 翌日の調査で発見 → `docs/spec/input-sanitize-contract.toml` + 共通 fixture + gate を後付け |
 
 共通パターン:
 
@@ -246,6 +247,7 @@ uv run python scripts/check_speaker_encoder_contract.py
 uv run python scripts/check_audio_format_contract.py
 uv run python scripts/check_swift_g2p_contract.py
 uv run python scripts/check_pt_dialect_contract.py
+uv run python scripts/check_input_sanitize_contract.py
 ```
 
 該当領域別の gate 早見表:
@@ -264,6 +266,7 @@ uv run python scripts/check_pt_dialect_contract.py
 | 短テキスト戦略変更 | `check_short_text_contract.py` |
 | PT BR/EU 切替変更 | `check_pt_dialect_contract.py` |
 | Swift G2P 変更 | `check_swift_g2p_contract.py` |
+| `_sanitize_input` / `strip_control_chars` / 各言語の入口 / `docs/spec/input-sanitize-contract.toml` / `tests/fixtures/g2p/input_sanitize_cases.json` | `check_input_sanitize_contract.py`。 契約の全ランタイム (`[[runtime]]`) を見て、 `pending` のものが残っていれば追随の PR を出す。 「他ランタイムと同じ」 と書く前に、 相手側の関数の呼び出し元を grep で確かめる |
 
 ### 7. Docker image の追随確認 (PR #443 の盲点)
 

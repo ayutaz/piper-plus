@@ -4,6 +4,7 @@
 //! Each language module (e.g. [`crate::english`], [`crate::chinese`])
 //! provides a concrete implementation of [`Phonemizer`].
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use crate::error::G2pError;
@@ -69,20 +70,18 @@ pub trait Phonemizer: Send + Sync {
     ///
     /// Default implementation checks length and strips control characters.
     /// Returns sanitized text or error.
+    ///
+    /// The phonemizers of this crate strip control characters themselves
+    /// (see `strip_control_chars`) and set no length limit; this method is
+    /// for callers that want the limit too.
     fn validate_input(&self, text: &str) -> Result<String, G2pError> {
-        if text.len() > MAX_INPUT_LENGTH {
+        let chars = text.chars().count();
+        if chars > MAX_INPUT_LENGTH {
             return Err(G2pError::Phonemize(format!(
-                "input too long: {} chars (max {})",
-                text.chars().count(),
-                MAX_INPUT_LENGTH
+                "input too long: {chars} chars (max {MAX_INPUT_LENGTH})"
             )));
         }
-        // Strip control characters (keep \n, \t, \r)
-        let sanitized: String = text
-            .chars()
-            .filter(|c| !c.is_control() || *c == '\n' || *c == '\t' || *c == '\r')
-            .collect();
-        Ok(sanitized)
+        Ok(strip_control_chars(text).into_owned())
     }
 
     /// Toggle the ZH-EN code-switching dispatch (Issue #384).
@@ -97,6 +96,32 @@ pub trait Phonemizer: Send + Sync {
     /// Default is `false` for phonemizers that don't implement the toggle.
     fn is_zh_en_dispatch_enabled(&self) -> bool {
         false
+    }
+}
+
+/// Strip Unicode control characters (category Cc) by the rule of
+/// `docs/spec/input-sanitize-contract.toml`.
+///
+/// `\n`, `\t` and `\r` are kept. VT, FF and NEL (U+000B, U+000C, U+0085)
+/// separate words, so they become a space; deleting them joined the words
+/// around them. Every other Cc is removed. Format characters (U+200D,
+/// U+FEFF), separators (U+2028) and NBSP are kept. Every phonemizer of this
+/// crate calls it first. Returns the input unchanged, without allocating,
+/// when there is nothing to change.
+pub(crate) fn strip_control_chars(text: &str) -> Cow<'_, str> {
+    let changed = |c: char| c.is_control() && !matches!(c, '\n' | '\t' | '\r');
+    if text.chars().any(changed) {
+        Cow::Owned(
+            text.chars()
+                .filter_map(|c| match c {
+                    '\u{0B}' | '\u{0C}' | '\u{85}' => Some(' '),
+                    c if changed(c) => None,
+                    c => Some(c),
+                })
+                .collect(),
+        )
+    } else {
+        Cow::Borrowed(text)
     }
 }
 

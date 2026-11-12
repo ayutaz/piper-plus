@@ -85,6 +85,7 @@ piper-plus の新言語実装を徹底的にレビューするスキルです。
 - C#: xUnit テスト数
 - JS: Node.js テスト数
 - **最低テスト数目安**: Python 100+, Rust 30+, C++ 25+, C# 40+, JS 30+
+- 入力の掃除: `docs/spec/input-sanitize-contract.toml` で `enforced` の全ランタイムの契約テスト (Python `test_input_contract.py`、Rust `tests/input_sanitize.rs` ほか) が新しい言語で通り、`tests/fixtures/g2p/input_sanitize_cases.json` の `word_cases` に新しい言語がある。`scripts/check_input_sanitize_contract.py` が rc=0
 
 #### Agent 9: CI 実行確認
 

@@ -44,11 +44,11 @@ jobs:
             archive: tar.gz
             cross: true
           - rid: osx-x64
-            os: macos-14    # ARM64 runner, cross-compile for x64
+            os: macos-15    # ARM64 runner, cross-compile for x64
             archive: tar.gz
             cross: true     # PublishReadyToRun disabled for cross-compile
           - rid: osx-arm64
-            os: macos-14
+            os: macos-15
             archive: tar.gz
             cross: false
 

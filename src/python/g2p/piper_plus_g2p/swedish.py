@@ -1158,4 +1158,7 @@ class SwedishPhonemizer(Phonemizer):
     def phonemize_with_prosody(
         self, text: str
     ) -> tuple[list[str], list[ProsodyInfo | None]]:
+        text = self._strip_control_chars(text)
+        if not text:
+            return [], []
         return phonemize_swedish_with_prosody(text)

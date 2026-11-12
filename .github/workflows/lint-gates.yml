@@ -509,6 +509,17 @@ jobs:
         if: ${{ !cancelled() }}
         run: python scripts/check_doc_hook_count.py
 
+      # ---------------------------------------------------- input-sanitize-contract
+      - name: "input-sanitize-contract: unit tests for the gate"
+        id: input-sanitize-contract-tests
+        if: ${{ !cancelled() }}
+        run: python -m pytest tests/scripts/test_check_input_sanitize_contract.py -q -o addopts=
+
+      - name: "input-sanitize-contract: every runtime strips control characters"
+        id: input-sanitize-contract
+        if: ${{ !cancelled() }}
+        run: python scripts/check_input_sanitize_contract.py
+
       # -------------------------------------------------- inference-input-contract
       - name: "inference-input-contract: contract constants match the Python implementation"
         id: inference-input-contract

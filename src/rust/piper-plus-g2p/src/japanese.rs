@@ -448,15 +448,19 @@ impl Phonemizer for JapanesePhonemizer {
         &self,
         text: &str,
     ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError> {
-        let mut input = text.to_string();
+        // Strip first, so the custom dictionary matches the text that is read.
+        let stripped = crate::phonemizer::strip_control_chars(text);
 
         // Apply custom dictionary if present
-        if let Some(ref dict) = self.dictionary {
-            input = dict.apply_to_text(&input);
-        }
+        let input = match self.dictionary {
+            Some(ref dict) => dict.apply_to_text(&stripped),
+            None => stripped.to_string(),
+        };
 
         let label_strings = self.extract_labels(&input)?;
-        Ok(labels_to_tokens_with_prosody(&label_strings, text))
+        // The question type (`?`, `?!` ...) comes from the stripped text: read
+        // from the raw text, "本当?" followed by a NUL ended as a statement.
+        Ok(labels_to_tokens_with_prosody(&label_strings, &stripped))
     }
 
     fn language_code(&self) -> &str {

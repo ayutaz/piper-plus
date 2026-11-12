@@ -146,6 +146,8 @@ jobs:
               - 'tests/fixtures/g2p/english_no_drop_words.json'
               # Read by the C++ / Rust English normalization tests (#821).
               - 'tests/fixtures/g2p/english_normalize_cases.json'
+              # Read by every runtime's input sanitize contract test (#934).
+              - 'tests/fixtures/g2p/input_sanitize_cases.json'
               - 'src/python/g2p/piper_plus_g2p/data/pua.json'
               - 'src/rust/piper-plus-g2p/data/cmudict_data.json'
               - 'src/rust/piper-plus-g2p/data/pinyin_*.json'
@@ -191,10 +193,10 @@ jobs:
           - os: ubuntu-24.04
             rid: linux-arm64
             cross: true
-          - os: macos-14
+          - os: macos-15
             rid: osx-arm64
             cross: false
-          - os: macos-14
+          - os: macos-15
             rid: osx-x64
             cross: true
           - os: windows-latest
@@ -251,7 +253,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ort: ['1.22.0', '1.30.0']
+        ort: ['1.22.0', '1.31.1']
     defaults:
       run:
         working-directory: src/wasm/openjtalk-web

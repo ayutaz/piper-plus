@@ -5,6 +5,8 @@ on:
     branches: [dev, main]
     paths:
       - 'src/python/g2p/**'
+      # Read by tests/test_input_contract.py.
+      - 'tests/fixtures/g2p/input_sanitize_cases.json'
       - '.github/workflows/g2p-python-ci.yml'
       - 'scripts/check_python_release_wheel.py'
       - 'scripts/check_bundled_english.py'
@@ -14,6 +16,8 @@ on:
   pull_request:
     paths:
       - 'src/python/g2p/**'
+      # Read by tests/test_input_contract.py.
+      - 'tests/fixtures/g2p/input_sanitize_cases.json'
       - '.github/workflows/g2p-python-ci.yml'
       - 'scripts/check_python_release_wheel.py'
       - 'scripts/check_bundled_english.py'
