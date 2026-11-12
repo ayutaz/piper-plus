@@ -148,7 +148,7 @@ piper-plus -m model.onnx -t "Hello" --streaming | aplay -r 22050 -f S16_LE
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `-m, --model` | `$PIPER_PLUS_DEFAULT_MODEL` | Path to ONNX model file |
+| `-m, --model` | `$PIPER_PLUS_DEFAULT_MODEL` | ONNX model file, catalog name (`tsukuyomi`, `css10`, `base`, a catalog key or a repo ID such as `ayousanz/piper-plus-tsukuyomi-chan`; downloaded into `--model-dir` when not cached), or the name of a model already in the cache |
 | `-c, --config` | auto-detected | Path to config.json |
 | `-t, --text` | | Text to synthesize (single utterance) |
 | `--language` | | Language code (ja, en, zh, ko, es, fr, pt, pt-PT, sv) |
@@ -172,7 +172,7 @@ piper-plus -m model.onnx -t "Hello" --streaming | aplay -r 22050 -f S16_LE
 | `--speaker-encoder-model` | | Speaker encoder ONNX used with `--reference-audio`; its output dimension must match the loaded TTS model |
 | `--model-dir` | `$PIPER_PLUS_MODEL_DIR`, else `DefaultCacheDir()` | Model cache directory. The OS-specific default is described under [Model Manager](#model-manager--モデル管理) |
 | `--list-models` | | List models already downloaded in the cache |
-| `--download-model` | | Download one model/config file by HTTPS URL and exit |
+| `--download-model` | | Download a catalog model (its `.onnx` and config) by name, or one file by HTTPS URL, into the cache and exit |
 | `--version` | | Print the CLI version string and exit |
 | `--custom-dict` | | Custom dictionary path (JSON v1/v2 or TSV); repeatable |
 | `-q, --quiet` | `false` | Suppress informational output |
@@ -201,8 +201,10 @@ contains the canonical reference-audio embedding precomputation example.
 The published reference-conditioned example was verified with PyPI
 `piper-plus==2.0.0`. CI run `38189966578` reports six-runtime inference from
 shared Python phoneme IDs; native G2P and listening quality were excluded, and
-quality approval remains false. The `--download-model` option accepts a URL;
-no public `base` alias is provided by this Go runtime.
+quality approval remains false. `--model base` (or `--download-model base`)
+downloads `base.onnx` and `base.onnx.json` of this pinned revision into
+`{model-dir}/multilingual-zero-shot-base-zs-v1/`; `campplus.onnx` is not part
+of the catalog entry, so download it as above.
 
 With a 192-dimensional encoder such as `campplus.onnx`, `--reference-audio`
 computes the embedding with the zs-v1 recipe (Kaiser resampling, Kaldi fbank,
@@ -285,6 +287,10 @@ with those, pass a precomputed `--speaker-embedding` instead.
 | `manager.ListModels() ([]ModelInfo, error)` | List all cached `.onnx` models. |
 | `manager.FindModel(name) (string, error)` | Locate a model by name in the cache. |
 | `manager.DownloadModel(ctx, url) (string, error)` | Download a model to the cache (atomic write). |
+| `manager.ResolveVoice(ctx, name) (string, error)` | `.onnx` path of a catalog voice named by key or alias, downloaded when not cached. Returns `ErrVoiceNotInCatalog` for other names. |
+| `manager.DownloadVoice(ctx, entry) (string, error)` | Download every file of a catalog voice from its Hugging Face repo (at the catalog revision, else `main`) into `{cacheDir}/{key}/`. Files already there are kept; for a pinned revision a size different from the catalog is an error. |
+| `manager.CachedVoice(entry) (string, bool)` / `manager.VoiceDir(entry) string` | The cached `.onnx` of a catalog voice, and its directory `{cacheDir}/{key}`. |
+| `piperplus.CatalogNames() []string` | Every catalog key and alias. |
 
 ### Timing / タイミング
 

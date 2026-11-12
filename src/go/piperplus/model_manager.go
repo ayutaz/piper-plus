@@ -25,6 +25,8 @@ type ModelInfo struct {
 type ModelManager struct {
 	cacheDir string
 	logger   *slog.Logger
+	// hubURL replaces https://huggingface.co for catalog downloads in tests.
+	hubURL string
 }
 
 // NewModelManager creates a manager with the specified cache directory.
@@ -131,31 +133,12 @@ func (m *ModelManager) FindModel(name string) (string, error) {
 // DownloadModel downloads a model from url into the cache directory.
 // It writes to a temp file then renames for atomicity.
 func (m *ModelManager) DownloadModel(ctx context.Context, rawURL string) (string, error) {
-	// Enforce HTTPS (or file:// for local, http://127.0.0.1 / http://localhost for testing).
-	if !strings.HasPrefix(rawURL, "https://") &&
-		!strings.HasPrefix(rawURL, "file://") &&
-		!strings.HasPrefix(rawURL, "http://127.0.0.1") &&
-		!strings.HasPrefix(rawURL, "http://localhost") {
+	if !allowedDownloadURL(rawURL) {
 		return "", fmt.Errorf("piperplus: download model: URL must use https:// (got %s)", rawURL)
 	}
 
 	if err := m.EnsureDir(); err != nil {
 		return "", fmt.Errorf("piperplus: download model: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-	if err != nil {
-		return "", fmt.Errorf("piperplus: download model: %w", err)
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("piperplus: download model: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("piperplus: download model: HTTP %d", resp.StatusCode)
 	}
 
 	// Derive filename from parsed URL path to prevent path traversal.
@@ -171,9 +154,45 @@ func (m *ModelManager) DownloadModel(ctx context.Context, rawURL string) (string
 		return "", fmt.Errorf("piperplus: download model: invalid filename %q", fileName)
 	}
 	destPath := filepath.Join(m.cacheDir, fileName)
-	tmpFile, err := os.CreateTemp(m.cacheDir, "download-*.tmp")
-	if err != nil {
+	if _, err := m.fetchTo(ctx, rawURL, destPath); err != nil {
 		return "", fmt.Errorf("piperplus: download model: %w", err)
+	}
+	return destPath, nil
+}
+
+// allowedDownloadURL accepts https://, file:// for local use, and
+// http://127.0.0.1 / http://localhost for testing.
+func allowedDownloadURL(rawURL string) bool {
+	return strings.HasPrefix(rawURL, "https://") ||
+		strings.HasPrefix(rawURL, "file://") ||
+		strings.HasPrefix(rawURL, "http://127.0.0.1") ||
+		strings.HasPrefix(rawURL, "http://localhost")
+}
+
+// fetchTo downloads rawURL into destPath through a temp file in the same
+// directory, renamed into place once complete, and returns the bytes written.
+func (m *ModelManager) fetchTo(ctx context.Context, rawURL, destPath string) (int64, error) {
+	if !allowedDownloadURL(rawURL) {
+		return 0, fmt.Errorf("URL must use https:// (got %s)", rawURL)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	tmpFile, err := os.CreateTemp(filepath.Dir(destPath), "download-*.tmp")
+	if err != nil {
+		return 0, err
 	}
 	tmpPath := tmpFile.Name()
 
@@ -184,23 +203,23 @@ func (m *ModelManager) DownloadModel(ctx context.Context, rawURL string) (string
 	}
 	if err != nil {
 		_ = os.Remove(tmpPath)
-		return "", fmt.Errorf("piperplus: download model: %w", err)
+		return 0, err
 	}
 
 	// Restrict file permissions to owner-only.
 	if chmodErr := os.Chmod(tmpPath, 0o600); chmodErr != nil {
 		_ = os.Remove(tmpPath)
-		return "", fmt.Errorf("piperplus: download model: chmod: %w", chmodErr)
+		return 0, fmt.Errorf("chmod: %w", chmodErr)
 	}
 
 	m.logger.Info("model downloaded", "path", destPath, "bytes", written)
 
 	if err := os.Rename(tmpPath, destPath); err != nil {
 		_ = os.Remove(tmpPath)
-		return "", fmt.Errorf("piperplus: download model: rename: %w", err)
+		return 0, fmt.Errorf("rename: %w", err)
 	}
 
-	return destPath, nil
+	return written, nil
 }
 
 // buildModelInfo constructs a ModelInfo if the .onnx file can be stat'd.
