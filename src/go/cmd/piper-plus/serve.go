@@ -59,16 +59,13 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("model path required: specify --model or set $PIPER_PLUS_DEFAULT_MODEL")
 	}
 
-	// Try resolving model name/alias if file doesn't exist.
+	// Resolve a catalog name (downloading it when not cached) or a cached name.
 	modelInput := resolvedModel
-	if _, err := os.Stat(resolvedModel); os.IsNotExist(err) {
-		mgr := piperplus.NewModelManager(modelDir, logger)
-		resolved, resolveErr := mgr.FindModel(resolvedModel)
-		if resolveErr != nil {
-			return fmt.Errorf("model not found: %s (try --list-models or --download-model)", resolvedModel)
-		}
-		resolvedModel = resolved
+	resolved, err := resolveModelArg(ctx, piperplus.NewModelManager(modelDir, logger), resolvedModel)
+	if err != nil {
+		return err
 	}
+	resolvedModel = resolved
 	printModelNotice(cmd.ErrOrStderr(), modelInput, resolvedModel)
 
 	// Initialize ONNX Runtime.
