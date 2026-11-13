@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - CI (`g2p-wasm-ci.yml`): `@piper-plus/g2p` could be published only from a `wasm-g2p-v*` tag push, and GitHub creates no tag push event when one push carries more than three tags, so `wasm-g2p-v0.5.0`, pushed with five other release tags, never published. The workflow now also runs by hand with `release_tag`: every job checks out that tag, and the publish job checks that the checkout is at the tag and that the tag matches `package.json`, as `g2p-python-ci.yml` already does.
+- npm (`@piper-plus/g2p` tests, `piper-plus` `check-cdn-delivery.mjs`) and CI (`g2p-wasm-ci.yml`): read both shapes of `npm pack --json`. npm 12 prints an object keyed by package name instead of npm 11's array, and the publish job installs `npm@latest` (12.2.2) for trusted publishing, so `prepublishOnly` failed three package tests inside the publish step and `wasm-g2p-v0.5.0` could not be published. The publish job now runs the `prepublishOnly` checks (`check:types` and `npm test`) before it upgrades npm and publishes with `--ignore-scripts`, so a tag cut before this fix can still be published after the same checks.
 
 ## [2.1.0] - 2026-11-13
 
