@@ -4,7 +4,7 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 
 ## 公開版と開発ブランチ
 
-Python/native のリリースは **v2.0.2** です。Rust・npm・NuGet・Kotlin の版は独立しており、[バージョン契約](spec/release-versions.toml) で管理します。`dev` の機能が既存の配布バイナリやパッケージに収録済みとは限りません。
+Python/native のリリースは **v2.1.0** です。Rust・npm・NuGet・Kotlin の版は独立しており、[バージョン契約](spec/release-versions.toml) で管理します。`dev` の機能が既存の配布バイナリやパッケージに収録済みとは限りません。
 
 Linux ARM64 の glibc 2.31 互換修正は **v2.0.2** に収録されています。CI は Debian Bullseye／Bookworm／Trixie の QEMU 起動・日本語合成を検証します。Raspberry Pi 実機は未検証です。取得方法と制約は [バイナリの選び方](getting-started/binary-selection.md) を参照してください。
 

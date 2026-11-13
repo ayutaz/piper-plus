@@ -423,7 +423,7 @@ Mehrsprachiges G2P (Grapheme-to-Phoneme) als eigenständiges Paket:
 - **Rust**: `cargo add piper-plus-g2p` — [Quellcode](src/rust/piper-plus-g2p/)
 - **Go**: `go get github.com/ayutaz/piper-plus/src/go/phonemize` — [Quellcode](src/go/phonemize/)
 - **JavaScript/WASM**: `npm install @piper-plus/g2p` — [Quellcode](src/wasm/g2p/)
-- **Kotlin/Android**: `implementation("io.github.ayutaz:piper-plus-g2p-android:1.0.1")` — [Quellcode](android/piper-plus-g2p/) · [Leitfaden zur Wörterbuchverteilung](docs/guides/platform/android-g2p-dictionary.md)
+- **Kotlin/Android**: `implementation("io.github.ayutaz:piper-plus-g2p-android:1.1.0")` — [Quellcode](android/piper-plus-g2p/) · [Leitfaden zur Wörterbuchverteilung](docs/guides/platform/android-g2p-dictionary.md)
 
 ### People using Piper
 

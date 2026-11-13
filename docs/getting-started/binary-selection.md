@@ -43,7 +43,7 @@ Intel Mac、Linux armv7、Windows arm64 のいずれかを使う場合は、選�
 ## 判断フロー
 
 1. **Raspberry Pi 4 (32bit) などの armv7 環境** -> **C++ CLI 一択** (`piper-plus-cpp-linux-armv7.tar.gz`)
-2. **Linux arm64 で Debian Bullseye 等の広い glibc 互換性が必要** -> **v2.0.2 の C++ CLI**を取得 (ABI 上限 GLIBC 2.31)
+2. **Linux arm64 で Debian Bullseye 等の広い glibc 互換性が必要** -> **v2.0.2 以降の C++ CLI**を取得 (ABI 上限 GLIBC 2.31)
 3. **Intel Mac (macOS x64)** -> **C# .NET CLI 一択** (`piper-plus-cli-osx-x64.tar.gz`)
 4. **Windows on ARM** -> **C# .NET CLI 一択** (`piper-plus-cli-win-arm64.zip`)
 5. **GPU 推論 (CUDA / CoreML / DirectML) を使いたい** -> **Rust CLI を provider feature 付きで source build**（[手順](../guides/development/building-from-source.md)。公開 `piper-plus-rs-cli-*` は CPU build）
@@ -54,12 +54,12 @@ Apple Silicon Mac で `piper-plus-cpp-macos-arm64.tar.gz` (C++) と `piper-plus-
 
 ## ダウンロード方法
 
-このリリースの配布先は [v2.0.2](https://github.com/ayutaz/piper-plus/releases) です。再現可能な取得には tag を固定してください。`latest` を使う場合は、asset 名と互換性をリリースページで再確認してください。
+このリリースの配布先は [v2.1.0](https://github.com/ayutaz/piper-plus/releases) です。再現可能な取得には tag を固定してください。`latest` を使う場合は、asset 名と互換性をリリースページで再確認してください。
 
 ### C++ CLI (macOS arm64)
 
 ```bash
-VERSION=v2.0.2
+VERSION=v2.1.0
 curl -LO https://github.com/ayutaz/piper-plus/releases/download/${VERSION}/piper-plus-cpp-macos-arm64.tar.gz
 tar -xzf piper-plus-cpp-macos-arm64.tar.gz
 cd piper-plus
@@ -69,7 +69,7 @@ cd piper-plus
 ### C# .NET CLI (Linux x64)
 
 ```bash
-VERSION=v2.0.2
+VERSION=v2.1.0
 curl -LO https://github.com/ayutaz/piper-plus/releases/download/${VERSION}/piper-plus-cli-linux-x64.tar.gz
 tar -xzf piper-plus-cli-linux-x64.tar.gz
 ./PiperPlus.Cli --help
@@ -80,7 +80,7 @@ tar -xzf piper-plus-cli-linux-x64.tar.gz
 PowerShell:
 
 ```powershell
-$version = "v2.0.2"
+$version = "v2.1.0"
 Invoke-WebRequest -Uri "https://github.com/ayutaz/piper-plus/releases/download/$version/piper-plus-rs-cli-win-x64.zip" -OutFile piper-plus-rs-cli.zip
 Expand-Archive piper-plus-rs-cli.zip -DestinationPath piper-plus-rs-cli
 .\piper-plus-rs-cli\piper-plus-cli.exe --help

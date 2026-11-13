@@ -423,7 +423,7 @@ piper-plus 専用モデル: [zs-v1 Zero-Shot/FT ベース](https://huggingface.c
 - **Rust**: `cargo add piper-plus-g2p` — [ソースコード](src/rust/piper-plus-g2p/)
 - **Go**: `go get github.com/ayutaz/piper-plus/src/go/phonemize` — [ソースコード](src/go/phonemize/)
 - **JavaScript/WASM**: `npm install @piper-plus/g2p` — [ソースコード](src/wasm/g2p/)
-- **Kotlin/Android**: `implementation("io.github.ayutaz:piper-plus-g2p-android:1.0.1")` — [ソースコード](android/piper-plus-g2p/) · [辞書配布ガイド](docs/guides/platform/android-g2p-dictionary.md)
+- **Kotlin/Android**: `implementation("io.github.ayutaz:piper-plus-g2p-android:1.1.0")` — [ソースコード](android/piper-plus-g2p/) · [辞書配布ガイド](docs/guides/platform/android-g2p-dictionary.md)
 
 ### People using Piper
 

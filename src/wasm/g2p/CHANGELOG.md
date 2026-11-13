@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-13
+
 ### Fixed
 
 - **Control characters are stripped before a text is read**: a NUL or other control character inside a word split it in two (`ho\u0000la` read as `ho` + `la`), and a NUL inside `och` or a NEL between two words hid Swedish from the language detection. `G2P.phonemize`, `phonemizeWithProsody`, `detectLanguage` and `segmentText`, and `phonemize` / `phonemizeWithProsody` of every language class (and `ChineseG2P#phonemizeEmbeddedEnglish*`), now apply the rule every runtime shares (`docs/spec/input-sanitize-contract.toml`): `\n`, `\t` and `\r` stay, VT, FF and NEL become a space, every other control character is removed. The rule is exported as `stripControlChars`.
@@ -78,7 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DictLoader` for OpenJTalk dictionary management (download + IndexedDB cache)
 - Per-language subpath exports (`@piper-plus/g2p/ja`, `@piper-plus/g2p/en`, etc.)
 
-[Unreleased]: https://github.com/ayutaz/piper-plus/compare/wasm-g2p-v0.4.2...HEAD
+[Unreleased]: https://github.com/ayutaz/piper-plus/compare/wasm-g2p-v0.5.0...HEAD
+[0.5.0]: https://github.com/ayutaz/piper-plus/releases/tag/wasm-g2p-v0.5.0
 [0.4.2]: https://github.com/ayutaz/piper-plus/releases/tag/wasm-g2p-v0.4.2
 [0.4.1]: https://github.com/ayutaz/piper-plus/releases/tag/wasm-g2p-v0.4.1
 [0.2.0]: https://github.com/ayutaz/piper-plus/releases/tag/wasm-g2p-v0.2.0

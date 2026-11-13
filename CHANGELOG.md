@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [2.1.0] - 2026-11-13
+
+Python/native (PyPI `piper-plus`, C++ / C API, Swift `PiperPlus` and `PiperPlusG2P`, Docker) **2.1.0**, Python G2P (`piper-plus-g2p`) **0.4.0**, Rust (`piper-plus-g2p`, `piper-plus`, `piper-plus-cli`) **0.5.4**, NuGet (`PiperPlus.Core`, `PiperPlus.Cli`) **0.6.0**, npm `@piper-plus/g2p` **0.5.0** and `piper-plus` **0.9.0**, Kotlin G2P (`piper-plus-g2p-android`) **1.1.0**, Go module `src/go` **v0.3.0** and `src/go/phonemize` **v0.4.0**.
+
+### Added
+
 - Go: the `piper-plus` CLI resolves catalog names. `--model` (and `serve --model`) takes any catalog key or alias, such as `tsukuyomi`, `css10`, `base` or `ayousanz/piper-plus-tsukuyomi-chan`, and downloads the model from Hugging Face into `--model-dir` when it is not cached; `--download-model` takes the same names as well as a URL. Before, the Go CLI only found a model already in the cache under the given name and `--download-model` took only a URL, so a catalog name failed with `model not found` on a fresh machine. Each catalog model is kept in `{model-dir}/{catalog key}/`, because Tsukuyomi-chan and CSS10 both ship a `config.json`; a copy cached earlier as `{model-dir}/{name}.onnx` or `{model-dir}/{name}/` is still used. The pinned public base is fetched at its revision and a file whose size differs from the catalog is rejected. The library adds `ModelManager.ResolveVoice`, `DownloadVoice`, `CachedVoice`, `VoiceDir`, `CatalogNames` and `ErrVoiceNotInCatalog`.
 - Python / Rust / Go / C# / C++ / browser (`piper-plus` npm): the CLIs and servers print the terms of the Tsukuyomi-chan model to stderr once per process when they load it, by alias, catalog key, repo ID, Hugging Face URL, or a file named `tsukuyomi-chan-6lang-fp16.onnx` or `tsukuyomi.onnx`. The generated audio requires the credit "Piper Plus:つくよみちゃん", the model is an unofficial work from the Tsukuyomi-chan side, and questions go to the developer, not to the voice actor. The rights holder asked for this after questions reached them. The text lives once in `test/model_resolution_vectors.json` (`notice`, `notice_files`) and `check_voice_catalog_parity.py` now also fails when a runtime's copy differs, including the browser and training-side catalogs it did not check before. `PIPER_PLUS_DISABLE_MODEL_NOTICE=1` hides it (`--quiet` does not); in the browser, `showModelNotice: false`. Libraries only return the text: `piper_plus.download.get_model_notice()` and `PiperPlus.model_notice` (Python), `model_download::model_notice()` (Rust), `piperplus.ModelNotice()` (Go), `ModelManager.GetModelNotice()` and `VoiceInfo.Notice` (C#), `getModelNotice()` and the `notice` of `resolveUrls()` / `loadModel()` (npm). The C API takes a model path only and prints nothing; apps that ship the model show the terms themselves, as the iOS guide and the C API, Dart and Godot example READMEs say. No CLI flag or `--help` text changes.
 
@@ -1479,7 +1489,8 @@ Python ランタイムに完全な phoneme timing 出力機能を追加。VITS D
 
 Releases v1.5.0 and prior are archived in [CHANGELOG-archive.md](CHANGELOG-archive.md) for readability.
 
-[Unreleased]: https://github.com/ayutaz/piper-plus/compare/v2.0.2...HEAD
+[Unreleased]: https://github.com/ayutaz/piper-plus/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/ayutaz/piper-plus/compare/v2.0.2...v2.1.0
 [2.0.2]: https://github.com/ayutaz/piper-plus/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/ayutaz/piper-plus/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/ayutaz/piper-plus/compare/v1.13.0...v2.0.0

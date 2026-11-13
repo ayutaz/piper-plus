@@ -23,7 +23,7 @@ Cross-runtime guide for integrating piper-plus into iOS projects (Dart / Flutter
 
 ## Distribution Selection
 
-The current public release v2.0.2 ships the xcframework path described below.
+The current public release v2.1.0 ships the xcframework path described below.
 For historical context, piper-plus v1.13.0 shipped **two iOS artifacts** during
 the migration period. The v2.0.2 release still publishes the arm64 tarball as a
 deprecated compatibility artifact; new consumers should use the xcframework:

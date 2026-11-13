@@ -64,7 +64,7 @@ direction = "post-hoc"
 manifest = "VERSION"
 # expected_prefix is matched as a literal string prefix against the version
 # field. "2.0." matches 2.0.0, 2.0.1, 2.0.0.dev1 etc.
-expected_prefix = "2.0."
+expected_prefix = "2.1."
 
 [python.pyproject]
 manifest = "pyproject.toml"
@@ -86,22 +86,22 @@ expected_prefix = "0.5."
 # ---------------------------------------------------------------------------
 [dotnet.core]
 manifest = "src/csharp/PiperPlus.Core/PiperPlus.Core.csproj"
-expected_prefix = "0.5."
+expected_prefix = "0.6."
 
 [dotnet.cli]
 manifest = "src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj"
-expected_prefix = "0.5."
+expected_prefix = "0.6."
 
 # ---------------------------------------------------------------------------
 # npm — piper-plus (browser WASM synthesis) + @piper-plus/g2p
 # ---------------------------------------------------------------------------
 [npm.synthesis]
 manifest = "src/wasm/openjtalk-web/package.json"
-expected_prefix = "0.8."
+expected_prefix = "0.9."
 
 [npm.g2p]
 manifest = "src/wasm/g2p/package.json"
-expected_prefix = "0.4."
+expected_prefix = "0.5."
 
 # ---------------------------------------------------------------------------
 # SwiftPM — PiperPlus (synthesis xcframework) + PiperPlusG2P
@@ -112,12 +112,12 @@ expected_prefix = "0.4."
 [swift.synthesis]
 manifest = "Package.swift"
 field = "version"
-expected_prefix = "2.0."
+expected_prefix = "2.1."
 
 [swift.g2p]
 manifest = "Package.swift"
 field = "g2pVersion"
-expected_prefix = "2.0."
+expected_prefix = "2.1."
 
 # ---------------------------------------------------------------------------
 # Maven Central — io.github.ayutaz:piper-plus-g2p-android
@@ -125,4 +125,4 @@ expected_prefix = "2.0."
 [kotlin.android_g2p]
 manifest = "android/gradle.properties"
 field = "VERSION_NAME"
-expected_prefix = "1.0."
+expected_prefix = "1.1."

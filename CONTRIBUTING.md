@@ -307,7 +307,7 @@ Look for issues labeled [`good first issue`](https://github.com/ayutaz/piper-plu
 
 ## Package Versioning Policy
 
-piper-plus ships as several packages. `VERSION` tracks the Python/native release line (2.0.2); Rust, npm, NuGet and Kotlin use independent versions. The canonical current version families and manifest paths are in [release-versions.toml](docs/spec/release-versions.toml). See the [Python release checklist](docs/guides/development/python-release-2.0.2.md) for Python 2.0.2 / G2P 0.3.1.
+piper-plus ships as several packages. `VERSION` tracks the Python/native release line (2.1.0); Rust, npm, NuGet and Kotlin use independent versions. The canonical current version families and manifest paths are in [release-versions.toml](docs/spec/release-versions.toml). See the [Python release checklist](docs/guides/development/python-release-2.0.2.md) for Python 2.0.2 / G2P 0.3.1.
 
 | Package | Registry | Source | Tag prefix | Versioning |
 |---|---|---|---|---|

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-13
+
 ### Added
 
 - Add `SpeakerEncoder.initialize({ frontEnd: "kaldi-fbank" })`, which computes the zs-v1 CAM++ embedding the same way as the Python recipe (torchaudio Kaiser resampling to 16 kHz, 80-bin `kaldi.fbank`, mean subtraction, L2 normalization). Checked against torchaudio with a golden fixture. `initialize` also accepts `modelData` in place of `modelUrl`. The default `"mel"` front end is unchanged.
@@ -286,7 +288,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Streaming synthesis pipeline
 - TypeScript type definitions
 
-[Unreleased]: https://github.com/ayutaz/piper-plus/compare/npm-v0.8.2...HEAD
+[Unreleased]: https://github.com/ayutaz/piper-plus/compare/npm-v0.9.0...HEAD
+[0.9.0]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.9.0
 [0.8.2]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.8.2
 [0.8.1]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.8.1
 [0.8.0]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.8.0
