@@ -91,6 +91,24 @@ dotnet_diagnostic.CS1591.severity = none
 # design (no localization story planned for v1.x).
 dotnet_diagnostic.CA1303.severity = none
 
+# xUnit theory data must be serializable. xUnit gives a theory one test case
+# per data row only when every argument in the row is serializable; otherwise
+# the whole theory is one test case. In #942 three CLI theories took a record,
+# so each ran 20+ CLI calls as one test case, and the CI's
+# --blame-hang-timeout 30s took it for a hung test and killed the test host
+# after every test had passed. These rules are Info by default; as errors the
+# build stops on such data instead of the CI run.
+# xUnit1042: MemberData returns untyped rows (object[]). Its argument types
+#   cannot be checked, so require TheoryData<...> / TheoryDataRow<...>.
+# xUnit1044 / xUnit1045: a TheoryData type argument is (or might be) not
+#   serializable. Pass a string key and look the case up instead.
+# xUnit1046 / xUnit1047: the same two checks for TheoryDataRow.
+dotnet_diagnostic.xUnit1042.severity = error
+dotnet_diagnostic.xUnit1044.severity = error
+dotnet_diagnostic.xUnit1045.severity = error
+dotnet_diagnostic.xUnit1046.severity = error
+dotnet_diagnostic.xUnit1047.severity = error
+
 # XML files
 [*.{csproj,props,targets}]
 indent_style = space

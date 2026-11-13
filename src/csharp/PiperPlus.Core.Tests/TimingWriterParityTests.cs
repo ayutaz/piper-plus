@@ -16,16 +16,14 @@ namespace PiperPlus.Core.Tests;
 /// </summary>
 public sealed class TimingWriterParityTests
 {
-    public static IEnumerable<object[]> CaseNames()
-    {
-        yield return ["basic_konnichiwa"];
-        yield return ["single_phoneme"];
-        yield return ["negative_clamped"];
-        yield return ["high_sample_rate"];
-        yield return ["pua_phoneme"];
-        yield return ["empty"];
-        yield return ["all_zero_durations"];
-    }
+    public static TheoryData<string> CaseNames() => new(
+        "basic_konnichiwa",
+        "single_phoneme",
+        "negative_clamped",
+        "high_sample_rate",
+        "pua_phoneme",
+        "empty",
+        "all_zero_durations");
 
     [Theory]
     [MemberData(nameof(CaseNames))]
