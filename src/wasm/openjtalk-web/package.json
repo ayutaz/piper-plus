@@ -82,7 +82,7 @@
     "probe:demo": "playwright test --grep \"CSS10 official demo\""
   },
   "dependencies": {
-    "@piper-plus/g2p": "^0.4.2"
+    "@piper-plus/g2p": "^0.5.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.10.0",
