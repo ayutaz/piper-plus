@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Browser (`piper-plus` npm 0.9.0): depend on `@piper-plus/g2p` `^0.5.0` instead of `^0.4.2`, now that 0.5.0 is on npm. The release preparation kept `^0.4.2` because its lockfile could not point at an unpublished version; a fresh install of `^0.4.2` stays on 0.4.x.
 
+- CI (`release-csharp.yml`): publish to NuGet with Trusted Publishing. `NuGet/login` exchanges the job's GitHub OIDC token for a one-hour API key right before `dotnet nuget push`, so the workflow no longer reads the `NUGET_API_KEY` secret. That key had expired and stopped the C# 0.6.0 publish with HTTP 403. A tag runs the workflow file it points at, and the release proof checks that the source and the signing workflow are at the tag, so this applies from the next `csharp-v*` tag; 0.6.0 is published with a short-lived key once. The draft release title no longer names the 0.5.1 fix.
+
 ### Fixed
 
 - CI (`g2p-wasm-ci.yml`): `@piper-plus/g2p` could be published only from a `wasm-g2p-v*` tag push, and GitHub creates no tag push event when one push carries more than three tags, so `wasm-g2p-v0.5.0`, pushed with five other release tags, never published. The workflow now also runs by hand with `release_tag`: every job checks out that tag, and the publish job checks that the checkout is at the tag and that the tag matches `package.json`, as `g2p-python-ci.yml` already does.
