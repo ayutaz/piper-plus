@@ -73,6 +73,19 @@ def test_go_compares_every_module_on_its_own(workflow):
         assert module_dir in step["run"], module_dir
 
 
+def test_go_loads_src_go_with_the_in_repo_phonemize(workflow):
+    # src/go/go.mod has no `replace` (see test_go_module_publishable.py), so
+    # with GOWORK=off src/go would use the published phonemize and fail to
+    # load when it needs phonemize code that is not released yet.
+    job = workflow["jobs"]["go-public-api"]
+    step = next(s for s in job["steps"] if s.get("name") == "Compare module APIs to the merge base")
+    run = step["run"]
+    replace = "go mod edit -replace github.com/ayutaz/piper-plus/src/go/phonemize=./phonemize"
+    assert replace in run
+    assert 'for root in . "$RUNNER_TEMP/base"; do' in run
+    assert run.index(replace) < run.index("for dir in src/go src/go/phonemize; do")
+
+
 def test_csharp_publicapi_analyzer_is_enforced_for_core():
     props = PROPS.read_text(encoding="utf-8")
     # The global NoWarn must not silence the PublicAPI rules ...

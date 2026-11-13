@@ -348,6 +348,7 @@ Some packages depend on others published to the **same registry**. Publishing th
 | PyPI | Python runtime and G2P are independent | Runtime bundles its own English backend. G2P uses `g2p-python-ci.yml`; runtime uses Manual Release. There is no stub publication job. |
 | NuGet | `PiperPlus.Core` → `PiperPlus.Cli` | CLI references Core. |
 | Maven Central | `io.github.ayutaz:piper-plus-g2p-android` (standalone) | No internal dependents — publish via `kotlin-g2p-v<X.Y.Z>` tag triggers `release-kotlin-g2p.yml`. |
+| Go modules | `src/go/phonemize` → `src/go` | `src/go/go.mod` requires a published phonemize version and has no `replace` (`go install ...@version` refuses one; local development uses `src/go/go.work`). Push `go-g2p-v<X.Y.Z>` first, then raise the requirement in `src/go/go.mod` to `v<X.Y.Z>` (`cd src/go && GOWORK=off go get github.com/ayutaz/piper-plus/src/go/phonemize@v<X.Y.Z> && GOWORK=off go mod tidy`), confirm `GOWORK=off go test ./...`, merge, and push the `src/go/v<X.Y.Z>` tag by hand. |
 
 **Manual operation needed for npm:** the GitHub Actions Manual Release workflow publishes the Python runtime and verifies existing NuGet/crates.io packages. **npm publishes use separate tag triggers**: `g2p-wasm-ci.yml` listens on `wasm-g2p-v*` tags (publishes `@piper-plus/g2p`), and `npm-publish.yml` listens on `npm-v*` tags (publishes `piper-plus`). To publish a coordinated npm release:
 
