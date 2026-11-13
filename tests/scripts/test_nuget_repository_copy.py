@@ -108,6 +108,15 @@ def test_nuget_download_allows_bounded_registry_propagation(tmp_path, monkeypatc
     command, kwargs = commands[0]
     assert kwargs["check"] is True
     assert "--retry-all-errors" in command  # Registry 404s must be retried too.
-    assert int(command[command.index("--retry") + 1]) >= 120
-    assert int(command[command.index("--retry-max-time") + 1]) == 1200
+    # NuGet served 0.6.0 between 20 and 28 minutes after the push (#959);
+    # retries of 10 seconds must last the whole hour.
+    retries = int(command[command.index("--retry") + 1])
+    delay = int(command[command.index("--retry-delay") + 1])
+    max_time = int(command[command.index("--retry-max-time") + 1])
+    assert max_time == 3600
+    assert retries * delay >= max_time
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/release-csharp.yml").read_text(encoding="utf-8")
+    )
+    assert workflow["jobs"]["publish_nuget"]["timeout-minutes"] * 60 > max_time
     assert int(command[command.index("--max-time") + 1]) <= 30

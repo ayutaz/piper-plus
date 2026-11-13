@@ -174,20 +174,46 @@ jobs:
   # Publish to NuGet
   publish_nuget:
     name: Publish to NuGet
-    timeout-minutes: 45
+    # Up to an hour of waiting for the public copy (check_nuget_package.py).
+    timeout-minutes: 90
     needs: create_release
     runs-on: ubuntu-24.04
     permissions:
       contents: read
       id-token: write       # attest-build-provenance and NuGet/login (OIDC)
       attestations: write
+    env:
+      # The exact SDK that packs the release. A rerun of the job rebuilds the
+      # packages and compares them with the public copies, so the build must
+      # not depend on what the runner image has installed.
+      NUGET_PACK_SDK: 10.0.404
     steps:
       - uses: actions/checkout@v6.1.0
 
+      # Install into an empty directory so that this SDK is the only one the
+      # build sees. Two SDK feature bands ship reference packs and source
+      # generators under the same version (10.0.115 and 10.0.404 both carry
+      # Microsoft.NETCore.App.Ref 10.0.15) built separately, and whichever was
+      # installed first is used. On the 2026-11-11 runner image that came from
+      # the preinstalled 10.0.115, so reruns of the 0.6.0 release built a
+      # PiperPlus.Core.dll that differed from the published one (#959).
       - name: Setup .NET
         uses: actions/setup-dotnet@v5.4.0
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet-pack
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: ${{ env.NUGET_PACK_SDK }}
+
+      - name: Check that only the pinned .NET SDK is installed
+        run: |
+          set -euo pipefail
+          sdks=$(dotnet --list-sdks)
+          echo "$sdks"
+          expected="$NUGET_PACK_SDK [$RUNNER_TEMP/dotnet-pack/sdk]"
+          if [ "$sdks" != "$expected" ]; then
+            echo "::error::Expected only .NET SDK $expected"
+            exit 1
+          fi
 
       - name: Pack NuGet packages
         run: |

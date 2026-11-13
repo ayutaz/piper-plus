@@ -62,13 +62,15 @@ def download_public_copy(original: Path, destination: Path) -> None:
             "--silent",
             "--show-error",
             "--location",
+            # NuGet took more than 20 minutes to serve 0.6.0 after the push
+            # (#959). Wait up to an hour.
             "--retry",
-            "120",
+            "360",
             "--retry-all-errors",
             "--retry-delay",
             "10",
             "--retry-max-time",
-            "1200",
+            "3600",
             "--connect-timeout",
             "10",
             "--max-time",
