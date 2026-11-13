@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-05T02:51:00Z",
+  "generated_at": "2026-11-13T09:23:26Z",
   "totals": {
     "executable": 236,
     "needs_placeholder": 7,
@@ -1003,7 +1003,7 @@
       ],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "186b0eae9f9836e54027d4afba8c8df2771493e2"
+      "hash_sha1": "6041f8c21a52eb4e391169fde25537360aa6a2fd"
     },
     {
       "file": "docs/getting-started/binary-selection.md",
@@ -1018,7 +1018,7 @@
       ],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "c6b45926c098ee54508a8203919d98f5696a017d"
+      "hash_sha1": "3fdc9eb5f7121eea6a1bce201a373c82d1858c24"
     },
     {
       "file": "docs/getting-started/binary-selection.md",
@@ -1033,7 +1033,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "14f022a83d3df170d2211f620bdc6ac132c9989a"
+      "hash_sha1": "53ca0c73a2b4eadf3b3d2f012c7972621d80117e"
     },
     {
       "file": "docs/getting-started/binary-selection.md",
@@ -3070,7 +3070,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "2688f06d6fd8b75edda33d43cc02e0ec58081346"
+      "hash_sha1": "344fbe332c0c3814a5c34bb5d2395af71688abfe"
     },
     {
       "file": "docs/guides/platform/android-g2p-integration.md",
@@ -5249,7 +5249,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "15f6dfaf4e093149be1e565516c6eac805c0f092"
+      "hash_sha1": "826ed75300aa4bca77da3b78b8029bbff7dd28ae"
     },
     {
       "file": "docs/reference/kotlin-g2p-design.md",
@@ -5294,7 +5294,7 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "ac791c1c1777b669198c91ca8e632830d7294aa2"
+      "hash_sha1": "6d9db8f05b73cd6e61612e9b3bbe225c124615ba"
     },
     {
       "file": "docs/reference/kotlin-g2p-design.md",
