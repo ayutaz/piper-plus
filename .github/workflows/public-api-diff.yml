@@ -129,12 +129,21 @@ jobs:
       - name: Compare module APIs to the merge base
         env:
           # src/go/go.work joins both modules; compare each module on its
-          # own (src/go reaches phonemize through its `replace`).
+          # own.
           GOWORK: 'off'
         run: |
           set -euo pipefail
           base_sha=$(git merge-base HEAD "origin/$BASE_REF")
           git worktree add --detach "$RUNNER_TEMP/base" "$base_sha"
+          # src/go requires a published phonemize version and has no
+          # `replace` (one would break `go install ...@version`). Point it at
+          # the in-repo phonemize here only, so a change that needs phonemize
+          # code not yet released still loads.
+          for root in . "$RUNNER_TEMP/base"; do
+            if [ -f "$root/src/go/go.mod" ]; then
+              (cd "$root/src/go" && go mod edit -replace github.com/ayutaz/piper-plus/src/go/phonemize=./phonemize)
+            fi
+          done
           : > /tmp/apidiff.txt
           for dir in src/go src/go/phonemize; do
             mod=$(cd "$dir" && go list -m)

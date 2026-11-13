@@ -1,3 +1,5 @@
+github.com/ayutaz/piper-plus/src/go/phonemize v0.4.0 h1:3X2jscyJwpVRXzxvQjioYHA2yaVYSwKySKh/l40EIU4=
+github.com/ayutaz/piper-plus/src/go/phonemize v0.4.0/go.mod h1:8TiY9foWv8uVpec4B14+tAVj+LPh+d3kIDLDBjA0wmU=
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
