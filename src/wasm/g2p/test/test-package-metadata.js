@@ -87,7 +87,10 @@ function packedFiles() {
             shell: process.platform === 'win32',
             stdio: ['ignore', 'pipe', 'ignore'],
         });
-        packed = JSON.parse(out)[0].files.map((f) => ({ path: f.path.replace(/\\/g, '/'), size: f.size }));
+        // npm 11 prints [ { files } ]; npm 12 prints { "<name>": { files } }.
+        const payload = JSON.parse(out);
+        const entry = Array.isArray(payload) ? payload[0] : Object.values(payload)[0];
+        packed = entry.files.map((f) => ({ path: f.path.replace(/\\/g, '/'), size: f.size }));
     }
     return packed;
 }

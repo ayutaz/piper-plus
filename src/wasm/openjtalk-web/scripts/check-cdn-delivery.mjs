@@ -74,7 +74,10 @@ function packedFiles(dir) {
     shell: process.platform === "win32",
     stdio: ["ignore", "pipe", "ignore"],
   });
-  return JSON.parse(out)[0].files.map((f) => ({ path: f.path, size: f.size }));
+  // npm 11 prints [ { files } ]; npm 12 prints { "<name>": { files } }.
+  const payload = JSON.parse(out);
+  const entry = Array.isArray(payload) ? payload[0] : Object.values(payload)[0];
+  return entry.files.map((f) => ({ path: f.path, size: f.size }));
 }
 
 function installedFiles(dir) {

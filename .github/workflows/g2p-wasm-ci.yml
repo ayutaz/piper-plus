@@ -204,6 +204,17 @@ jobs:
           cache-dependency-path: src/wasm/g2p/package.json
           registry-url: https://registry.npmjs.org
 
+      # Run the prepublishOnly checks here, with the npm that setup-node
+      # installs, and publish with --ignore-scripts below. npm@latest is npm 12,
+      # whose `npm pack --json` prints an object keyed by package name instead
+      # of an array; a release tag cut before its tests read both shapes would
+      # otherwise fail inside `npm publish` and could never be published.
+      - name: Install dependencies
+        run: npm install
+
+      - name: Type check and test (prepublishOnly)
+        run: npm run check:types && npm test
+
       - name: Upgrade npm for OIDC trusted publishing (>= 11.5.1)
         run: npm install -g npm@latest
 
@@ -224,12 +235,9 @@ jobs:
             exit 1
           fi
 
-      - name: Install dependencies
-        run: npm install
-
       - name: Publish to npm
         # OIDC trusted publishing: NODE_AUTH_TOKEN を使わず、GitHub Actions の
         # OIDC token (permissions.id-token: write) で npm Trusted Publisher 設定に
         # 対して認証する。org の 2FA 強制を回避し、token 失効/期限切れも根絶する。
         # 要件: npm >= 11.5.1 (上で upgrade) + npm package 側の Trusted Publisher 登録。
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public --ignore-scripts
