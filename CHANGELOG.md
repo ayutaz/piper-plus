@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- CI (`g2p-wasm-ci.yml`): `@piper-plus/g2p` could be published only from a `wasm-g2p-v*` tag push, and GitHub creates no tag push event when one push carries more than three tags, so `wasm-g2p-v0.5.0`, pushed with five other release tags, never published. The workflow now also runs by hand with `release_tag`: every job checks out that tag, and the publish job checks that the checkout is at the tag and that the tag matches `package.json`, as `g2p-python-ci.yml` already does.
+
 ## [2.1.0] - 2026-11-13
 
 Python/native (PyPI `piper-plus`, C++ / C API, Swift `PiperPlus` and `PiperPlusG2P`, Docker) **2.1.0**, Python G2P (`piper-plus-g2p`) **0.4.0**, Rust (`piper-plus-g2p`, `piper-plus`, `piper-plus-cli`) **0.5.4**, NuGet (`PiperPlus.Core`, `PiperPlus.Cli`) **0.6.0**, npm `@piper-plus/g2p` **0.5.0** and `piper-plus` **0.9.0**, Kotlin G2P (`piper-plus-g2p-android`) **1.1.0**, Go module `src/go` **v0.3.0** and `src/go/phonemize` **v0.4.0**.
