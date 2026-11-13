@@ -38,14 +38,14 @@ npm install piper-plus onnxruntime-web
 
 `onnxruntime-web` is a peer dependency and must be installed alongside `piper-plus`.
 
-Version 0.8.2 requires ONNX Runtime Web 1.22.0 or later. Speaker embedding
+Since version 0.8.2, `piper-plus` requires ONNX Runtime Web 1.22.0 or later. Speaker embedding
 dimensions and mask shapes are read from the loaded model's public input
 metadata. ONNX Runtime Web 1.21 does not provide this API.
 
 To update an existing installation:
 
 ```bash
-npm install piper-plus@0.8.2 onnxruntime-web@1.31.1
+npm install piper-plus@0.9.1 onnxruntime-web@1.31.1
 ```
 
 For importmap users, update both CDN URLs as shown below.
@@ -58,8 +58,8 @@ For importmap users, update both CDN URLs as shown below.
 <script type="importmap">
 {
   "imports": {
-    "piper-plus": "https://unpkg.com/piper-plus@0.8.2/src/index.js",
-    "@piper-plus/g2p": "https://cdn.jsdelivr.net/npm/@piper-plus/g2p@0.4.2/src/index.js",
+    "piper-plus": "https://unpkg.com/piper-plus@0.9.1/src/index.js",
+    "@piper-plus/g2p": "https://cdn.jsdelivr.net/npm/@piper-plus/g2p@0.5.0/src/index.js",
     "onnxruntime-web": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/ort.min.mjs"
   }
 }
@@ -416,18 +416,17 @@ pinned aliases for its TTS graph and matching `base.onnx.json`, without
 repository sibling auto-detection. For 0.8.1 and earlier, use the direct URL
 below to avoid legacy root files.
 
-Integrity checks differ between the published package and the development
-branch:
+Integrity checks differ between npm releases:
 
 - **npm 0.8.2**: the aliases resolve pinned URLs, but `base.onnx` is not checked
   against a hash, because the published `base.onnx.json` has no `sha256` field.
-- **Next npm release** (on the `dev` branch, not yet published): `base.onnx`
+- **npm 0.9.0 and later**: `base.onnx`
   fetched through these aliases is checked against a pinned SHA-256 digest, and
   loading stops on a mismatch. The check needs `crypto.subtle` (a secure
   context such as HTTPS); without it the runtime logs a warning and skips the
   check.
 
-In both versions a direct URL is checked only when its config has a `sha256`
+In every version a direct URL is checked only when its config has a `sha256`
 field, and the other bundle files are not checked against the release
 manifest. Use the bundle manifest for separate integrity checks.
 
@@ -509,7 +508,7 @@ remains false. These are separate checks and do not establish WASM-specific
 G2P or listening-quality approval.
 
 The Kaldi fbank front end, the `modelData` option, and `findDroppedSymbols()`
-below were added after npm 0.8.2 (on the `dev` branch, not yet published).
+below were added in npm 0.9.0.
 
 To compute the zs-v1 embedding in the browser instead, load the published
 `campplus.onnx` with the Kaldi fbank front end, which matches the Python recipe
