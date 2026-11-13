@@ -236,6 +236,23 @@ def test_missing_nuget_credential_fails(tmp_path):
     assert result.returncode != 0, result.stdout + result.stderr
 
 
+def test_nuget_publishes_with_trusted_publishing_key():
+    steps = workflow("release-csharp.yml")["jobs"]["publish_nuget"]["steps"]
+    names = [s.get("name") for s in steps]
+    login = steps[names.index("Log in to NuGet (Trusted Publishing)")]
+    publish = steps[names.index("Publish to NuGet")]
+    assert login["uses"].startswith("NuGet/login@")
+    assert names.index(login["name"]) + 1 == names.index("Publish to NuGet")
+    assert publish["env"]["NUGET_API_KEY"] == (
+        "${{ steps.%s.outputs.NUGET_API_KEY }}" % login["id"]
+    )
+    permissions = workflow("release-csharp.yml")["jobs"]["publish_nuget"]["permissions"]
+    assert permissions["id-token"] == "write"
+    assert "secrets.NUGET_API_KEY" not in (
+        ROOT / ".github/workflows/release-csharp.yml"
+    ).read_text(encoding="utf-8")
+
+
 def test_missing_crates_credential_fails(tmp_path):
     script = step(
         "release-rust.yml",

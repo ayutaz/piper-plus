@@ -74,8 +74,8 @@ jobs:
             jq -e '.isDraft == true' release.json
           else
             gh release create "$tag" --verify-tag --draft \
-              --title "C# ${RELEASE_VERSION}: 読み取り専用モデルでの推論を修正" \
-              --notes 'キャッシュ保存先へ書き込めない場合も元のONNXモデルから推論する修正版です。公開前に配布物と実推論を検証します。'
+              --title "C# ${RELEASE_VERSION}" \
+              --notes '公開前に配布物と実推論を検証します。本文は src/csharp の CHANGELOG から差し替えてください。'
           fi
           echo "tag_name=${tag}" >> "$GITHUB_OUTPUT"
 
@@ -179,7 +179,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      id-token: write       # required by attest-build-provenance
+      id-token: write       # attest-build-provenance and NuGet/login (OIDC)
       attestations: write
     steps:
       - uses: actions/checkout@v6.1.0
@@ -235,9 +235,21 @@ jobs:
         with:
           subject-path: 'nupkgs/*.nupkg'
 
+      # Trusted Publishing: exchange this job's GitHub OIDC token for a
+      # short-lived NuGet API key. The nuget.org policy (owner `yousan`) allows
+      # PiperPlus.Core and PiperPlus.Cli from ayutaz/piper-plus,
+      # .github/workflows/release-csharp.yml. No long-lived key is stored, so
+      # nothing expires between releases. Logging in right before the push
+      # keeps the one-hour key valid after the slower steps above.
+      - name: Log in to NuGet (Trusted Publishing)
+        id: nuget_login
+        uses: NuGet/login@v1.2.0
+        with:
+          user: yousan
+
       - name: Publish to NuGet
         env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          NUGET_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
         run: |
           if [ -n "$NUGET_API_KEY" ]; then
             for pkg in nupkgs/*.nupkg; do

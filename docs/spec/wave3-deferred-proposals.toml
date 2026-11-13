@@ -175,14 +175,16 @@ implementation = """
 [t16_nuget_oidc]
 priority = "MEDIUM"
 effort = "S (~半日)"
-status = "proposal"
+status = "done"
 description = """
-NuGet Trusted Publishing (OIDC) で API key を廃止。 dotnet 6.17+ の
---interactive-oidc flag を使用。
+NuGet Trusted Publishing (OIDC) で API key を廃止。
 """
 implementation = """
-  1. dev-create-release.yml の NuGet publish step に oidc-provider: github
-  2. NUGET_API_KEY secret を廃止 (削除 PR)
+  1. release-csharp.yml の publish_nuget で NuGet/login が OIDC から
+     1 時間の API key を受け取り、 dotnet nuget push に渡す (2026-11-13)。
+     nuget.org 側の policy は owner yousan / ayutaz/piper-plus /
+     release-csharp.yml / PiperPlus.Core, PiperPlus.Cli
+  2. NUGET_API_KEY secret は、 この workflow を含むタグで公開できたら削除する
 """
 
 [t16_reproducibility_audit]

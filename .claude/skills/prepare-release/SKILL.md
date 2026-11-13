@@ -145,7 +145,7 @@ awk '/^## \[Unreleased\]/{flag=1; next} /^## /{flag=0} flag' CHANGELOG.md
 3. **必要な独立パッケージを公開** (既公開なら skip、 再 tag 不要):
    - npm: `wasm-g2p-v<X.Y.Z>` (`g2p-wasm-ci.yml`、 `@piper-plus/g2p`) の公開完了を待ってから `npm-v<X.Y.Z>` (`npm-publish.yml`、 `piper-plus`)。 逆順だと `piper-plus` の fresh install が `notarget` で失敗する
    - crates.io: `rust-v<X.Y.Z>` tag を push し、 その tag を選んで `release-rust.yml` を **workflow_dispatch** (`piper-plus-g2p` → `piper-plus` → `piper-plus-cli` の順に publish)
-   - NuGet: `csharp-v<X.Y.Z>` tag を push し、 その tag を選んで `release-csharp.yml` を **workflow_dispatch**
+   - NuGet: `csharp-v<X.Y.Z>` tag を push し、 その tag を選んで `release-csharp.yml` を **workflow_dispatch**。 公開は nuget.org の Trusted Publishing (`NuGet/login`) で、 API キーは使わない。 workflow はタグの時点のものが動き、 公開後の証明書検査もタグと workflow のコミットの一致を求めるので、 workflow を直したらタグを付け直す (dev から別のタグを公開する入口は作らない)
    - PyPI (G2P): `python-g2p-v<X.Y.Z>` (`g2p-python-ci.yml`)
    - Maven Central: `kotlin-g2p-v<X.Y.Z>` (`release-kotlin-g2p.yml`)
 4. **Docker**: 同じ検証済み commit に `docker-v<X.Y.Z>` を push → `docker-build.yml` が build・署名・公開 (`<X.Y.Z>` / `latest`)。 consumer 検証まで行う。 `v<X.Y.Z>` だけでは Docker は公開されない
