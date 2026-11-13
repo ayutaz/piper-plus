@@ -513,7 +513,7 @@ JSON v1.0 / v2.0 schema の互換要件は定義する。`docs/spec/custom-dicti
 | 観点 | 仕様 |
 |------|-----|
 | Maven coordinates | `io.github.ayutaz:piper-plus-g2p-android:VERSION` |
-| Gradle DSL | `implementation("io.github.ayutaz:piper-plus-g2p-android:1.0.1")` |
+| Gradle DSL | `implementation("io.github.ayutaz:piper-plus-g2p-android:1.1.0")` |
 | Git tag | `kotlin-g2p-v{semver}` (例: `kotlin-g2p-v1.0.1`) |
 | GitHub Actions trigger | `on: push: tags: ['kotlin-g2p-v*']` |
 | 必要 GitHub Actions secrets | `MAVEN_CENTRAL_USERNAME`, `MAVEN_CENTRAL_PASSWORD`, `SIGNING_IN_MEMORY_KEY`, `SIGNING_IN_MEMORY_KEY_PASSWORD` |

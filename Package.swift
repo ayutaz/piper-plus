@@ -49,17 +49,17 @@ import PackageDescription
 
 // Updated manually before each tag push (see header comment, step 3).
 // SHA-256 values from the verified pre-tag workflow artifacts.
-let version = "2.0.2"
-let checksum = "7b026f9f0af5b6b6ca56cddf56f75f398a0f3e0c9fc45c3848b8aa470dd30dff"
+let version = "2.1.0"
+let checksum = "dfbdc8a13eb8a4da7386f74ea11fc5dcc2146c0edde2907c1a4496f1a78a56fc"
 
 // G2P-only artifact — produced by the same release workflow but as a
 // separate xcframework that does NOT depend on ONNX Runtime. Consumers
 // who need only G2P (text → IPA tokens) can pull just `PiperPlusG2P`.
 // The G2P xcframework includes iOS device + iOS simulator + macOS slices.
-// Both products are prepared as assets of v2.0.2, following the pre-tag
+// Both products are prepared as assets of v2.1.0, following the pre-tag
 // checksum procedure above. Consumers should depend on a published tag.
-let g2pVersion = "2.0.2"
-let g2pChecksum = "64fdf30ed1a4805e9b8dfae114cd4736469b808d4742e6000b5f458955b76f70"
+let g2pVersion = "2.1.0"
+let g2pChecksum = "a10f165bd1c0858be67b383fe2bced678b472d8b80bb23b3fecfbcc7afca9e4b"
 
 let package = Package(
     name: "PiperPlus",

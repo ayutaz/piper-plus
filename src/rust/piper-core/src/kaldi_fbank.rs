@@ -193,8 +193,7 @@ impl Fft {
     /// In-place iterative radix-2 FFT.
     fn run(&self, re: &mut [f64], im: &mut [f64]) {
         let n = PADDED_LENGTH;
-        for i in 0..n {
-            let j = self.reverse[i];
+        for (i, &j) in self.reverse.iter().enumerate().take(n) {
             if j > i {
                 re.swap(i, j);
                 im.swap(i, j);

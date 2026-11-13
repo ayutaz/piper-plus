@@ -12,7 +12,7 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         // Use the local AAR module while developing in this repo. External
-        // consumers can use the published 1.0.1 artifact from Maven Central.
+        // consumers can use the published 1.1.0 artifact from Maven Central.
         mavenLocal()
     }
 }
