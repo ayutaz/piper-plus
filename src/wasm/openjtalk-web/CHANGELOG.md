@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-13
+
+### Fixed
+
+- The README shipped with 0.9.0, which is the npm package page, still described 0.8.2: the update command installed `piper-plus@0.8.2`, the importmap loaded `piper-plus@0.8.2` and `@piper-plus/g2p@0.4.2`, and two notes called the 0.9.0 features unpublished. Readers who followed it got 0.8.2, which does not show the Tsukuyomi-chan usage notice. The README now names 0.9.1 and `@piper-plus/g2p` 0.5.0, and a test checks that the README pins the version in `package.json` and a `@piper-plus/g2p` version inside the dependency range. The code is the same as 0.9.0.
+
 ## [0.9.0] - 2026-11-13
 
 ### Added
