@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Depend on `@piper-plus/g2p` `^0.5.0` instead of `^0.4.2`. A caret range below 1.0 stays inside its minor version, so a fresh install kept 0.4.x and missed the 0.5.0 English, Chinese, French, CJK punctuation and control-character changes.
 - Update the README installation and importmap examples and the demo to ONNX Runtime Web 1.31.1, the version the package is now tested with (was 1.30.0); the peer dependency stays `onnxruntime-web >=1.22.0`.
 
 ### Fixed
