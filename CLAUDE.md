@@ -235,7 +235,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 | ランタイム | パッケージ | バージョン | テスト | パス |
 |-----------|----------|----------|-------|------|
 | Python (PyPI) | `piper-plus` | 2.1.0 (VERSION 経由 dynamic) | pytest 多数 | `src/python_run/piper_plus/` |
-| C# (NuGet) | `PiperPlus.Core` / `PiperPlus.Cli` | 0.6.0 | CI / `dotnet test` 実測 | `src/csharp/PiperPlus.{Core,Cli}/` (TFM `net10.0`) |
+| C# (NuGet) | `PiperPlus.Core` / `PiperPlus.Cli` | 0.6.1 | CI / `dotnet test` 実測 | `src/csharp/PiperPlus.{Core,Cli}/` (TFM `net10.0`) |
 | Rust (crates.io) | `piper-plus` / `piper-plus-cli` | 0.5.4 | 多数 | `src/rust/piper-{core,cli,python,wasm}/` |
 | Go (Go module) | `github.com/ayutaz/piper-plus/src/go` | tag-based | CI / `go test ./...` 実測 | `src/go/piperplus/`, `src/go/cmd/piper-plus/` |
 | JS/WASM (npm) | `piper-plus` | 0.9.1 | CI / `npm run test:npm-package:all` 実測 | `src/wasm/openjtalk-web/`, `src/rust/piper-wasm/` |
