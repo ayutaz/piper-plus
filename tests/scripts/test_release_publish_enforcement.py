@@ -253,6 +253,52 @@ def test_nuget_publishes_with_trusted_publishing_key():
     ).read_text(encoding="utf-8")
 
 
+def test_nuget_packs_with_only_the_pinned_sdk():
+    """A rerun must rebuild the published bytes (#959).
+
+    SDK feature bands ship separately built reference packs under the same
+    version, and the first one installed wins, so the preinstalled SDKs of the
+    runner image changed PiperPlus.Core.dll between reruns of 0.6.0.
+    """
+    job = workflow("release-csharp.yml")["jobs"]["publish_nuget"]
+    assert re.fullmatch(r"\d+\.\d+\.\d+", job["env"]["NUGET_PACK_SDK"])
+    names = [s.get("name") for s in job["steps"]]
+    setup = job["steps"][names.index("Setup .NET")]
+    assert setup["with"]["dotnet-version"] == "${{ env.NUGET_PACK_SDK }}"
+    assert setup["env"]["DOTNET_INSTALL_DIR"] == "${{ runner.temp }}/dotnet-pack"
+    check = names.index("Check that only the pinned .NET SDK is installed")
+    assert names.index("Setup .NET") + 1 == check < names.index("Pack NuGet packages")
+
+
+@pytest.mark.parametrize(
+    "listing,ok",
+    [
+        (["10.0.404 [/runner/temp/dotnet-pack/sdk]"], True),
+        (
+            [
+                "10.0.115 [/runner/temp/dotnet-pack/sdk]",
+                "10.0.404 [/runner/temp/dotnet-pack/sdk]",
+            ],
+            False,
+        ),
+        (["10.0.404 [/usr/share/dotnet/sdk]"], False),
+        (["10.0.405 [/runner/temp/dotnet-pack/sdk]"], False),
+    ],
+)
+def test_nuget_sdk_check_rejects_other_sdks(tmp_path, listing, ok):
+    script = step(
+        "release-csharp.yml", "publish_nuget", "Check that only the pinned .NET SDK is installed"
+    )["run"]
+    stub = "cat <<'EOF'\n" + "\n".join(listing) + "\nEOF"
+    result = shell(
+        tmp_path,
+        script,
+        {"dotnet": stub},
+        {"NUGET_PACK_SDK": "10.0.404", "RUNNER_TEMP": "/runner/temp"},
+    )
+    assert (result.returncode == 0) is ok, result.stdout + result.stderr
+
+
 def test_missing_crates_credential_fails(tmp_path):
     script = step(
         "release-rust.yml",
