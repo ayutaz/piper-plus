@@ -8,7 +8,7 @@ VITS ベースの高品質ニューラル TTS。**6言語マルチリンガル�
 
 ## Research / archive and publication pointers
 
-現在の研究ブランチは `feat/zero-shot-speaker-identity` です (2026-10-28 に旧研究ブランチ `feat/zero-shot-v8-dataset-scaling` を最新 dev へリベースして作成)。旧ブランチは削除し、先端は tag `archive/feat/zero-shot-v8-dataset-scaling` に残しています。リベース前のコミットハッシュは、本書や設計文書に書かれたものも含めてこの tag から辿ってください。研究用の v7 zero-shot 学習結果と手順は、次の文書を正本とします。
+現在の研究ブランチは `feat/zero-shot-speaker-identity` です (2026-10-28 に旧研究ブランチ `feat/zero-shot-v8-dataset-scaling` を最新 dev へリベースして作成)。旧ブランチは削除し、先端は tag `archive/feat/zero-shot-v8-dataset-scaling` に残しています。リベース前のコミットハッシュは、本書や設計文書に書かれたものも含めてこの tag から辿ってください。2026-11-14 に最新 dev (2.1.0 の後) へもう一度リベースし、その前の先端 `4e0fca93` は tag `archive/feat/zero-shot-speaker-identity-pre-rebase-2026-11-14` に残しています。研究用の v7 zero-shot 学習結果と手順は、次の文書を正本とします。
 
 - [v7 学習結果・根本原因](docs/design/multi-6lang-zero-shot-v7-training-results.md) — epoch 32、6言語、571話者、研究上の修正と評価。
 - [zero-shot handoff](docs/handoff/zero-shot-tts-handoff-2026-06-20.md) — private/gated 研究保存先、旧 `/data/piper` パス、再現・再開手順。
@@ -488,7 +488,7 @@ cat test.jsonl | uv run python -m piper_train.infer_onnx --model <model.onnx> --
 | `/bump-deps` | ORT/openjtalk/ruff の cross-runtime canonical sync 更新 |
 | `/skill-health` | skill / hook 自身の health check (frontmatter / script 参照 / trigger 衝突) |
 
-pre-commit / pre-push gate は `.pre-commit-config.yaml` に集約 (122 hook、 うち id に `contract` を含む gate 20、 cross-language formatter 6 言語)。 各 hook の trigger 条件と既知パターンは [.claude/README.md](.claude/README.md) を参照。
+pre-commit / pre-push gate は `.pre-commit-config.yaml` に集約 (125 hook、 うち id に `contract` を含む gate 20、 cross-language formatter 6 言語)。 各 hook の trigger 条件と既知パターンは [.claude/README.md](.claude/README.md) を参照。
 
 ---
 
