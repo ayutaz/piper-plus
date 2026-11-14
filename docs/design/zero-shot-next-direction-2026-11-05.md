@@ -1,6 +1,6 @@
 # zero-shot の次の方向と計画 (2026-11-05)
 
-作成日: 2026-11-05。ブランチ: `feat/zero-shot-speaker-identity`。状態: **D1〜D4 はユーザーが推奨どおりに決めた (2026-11-05、計画書 §6 の「P2′ の後の改定」)**。
+作成日: 2026-11-05。ブランチ: `feat/zero-shot-speaker-identity`。状態: **D1〜D4 はユーザーが推奨どおりに決めた (2026-11-05、計画書 §6 の「P2′ の後の改定」)。S0 は済み (記録の修正、候補 A の事前診断は「どちらでもない」で λ = 0.40、計画書 §7.15)。2026-11-14 の時点で、次は P0-4′ の聞き分けと S1 の実装** ([引き継ぎ](../handoff/zero-shot-speaker-identity-2026-11-14.md))。
 
 P2′ で K1 が不合格になった (計画書 [zero-shot-speaker-identity-plan-2026-10-29.md](zero-shot-speaker-identity-plan-2026-10-29.md) §7.14、以下「計画書」)。そのため、ここからの方向と計画を立て直す。材料は 2 つある。1 つは改善候補の調査 ([zero-shot-improvement-survey-2026-11-03.md](zero-shot-improvement-survey-2026-11-03.md))。もう 1 つは、サブエージェント 4 つに分けて調べた次の報告で、本文を変えずに付録に収めた。
 
