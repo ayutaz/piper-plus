@@ -173,8 +173,8 @@ func stdinHasData() bool {
 func runSynthesize(cmd *cobra.Command, args []string) error {
 	// --version: print version and exit immediately.
 	if showVersion {
-		fmt.Fprintln(cmd.OutOrStdout(), versionLine())
-		return nil
+		_, err := fmt.Fprintln(cmd.OutOrStdout(), versionLine())
+		return err
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
