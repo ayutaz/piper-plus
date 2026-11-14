@@ -5,7 +5,7 @@ BINARY := piper-plus
 BUILD_DIR := build
 GO := go
 GOFLAGS := -race
-VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+VERSION := $(patsubst src/go/%,%,$(shell git describe --tags --match 'src/go/v*' --dirty 2>/dev/null || echo dev))
 LDFLAGS := -ldflags "-X main.version=$(VERSION)"
 
 ## Build targets

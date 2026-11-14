@@ -40,7 +40,7 @@ var (
 	customDictPaths []string // --custom-dict (repeatable)
 
 	// Additional CLI flags matching C++ implementation.
-	version        bool     // --version
+	showVersion    bool     // --version
 	quiet          bool     // -q, --quiet
 	outputRaw      bool     // --output-raw
 	jsonInput      bool     // --json-input
@@ -102,7 +102,7 @@ func init() {
 	f.StringVar(&batchFile, "batch", "", "batch file with one text line per utterance")
 	f.StringVar(&timingOutput, "output-timing", "", "write phoneme timing to file")
 	f.StringVar(&timingFormat, "timing-format", "json", "timing output format (json, tsv, or srt)")
-	f.BoolVar(&version, "version", false, "print version and exit")
+	f.BoolVar(&showVersion, "version", false, "print version and exit")
 	f.BoolVar(&outputRaw, "output-raw", false, "output raw PCM audio to stdout (no WAV header)")
 	f.BoolVar(&jsonInput, "json-input", false, "read stdin as JSON lines")
 	f.BoolVar(&listModels, "list-models", false, "list downloaded models in cache directory")
@@ -172,9 +172,9 @@ func stdinHasData() bool {
 
 func runSynthesize(cmd *cobra.Command, args []string) error {
 	// --version: print version and exit immediately.
-	if version {
-		fmt.Println("piper-plus (Go) v0.2.0")
-		return nil
+	if showVersion {
+		_, err := fmt.Fprintln(cmd.OutOrStdout(), versionLine())
+		return err
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
