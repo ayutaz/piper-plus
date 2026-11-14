@@ -16,6 +16,7 @@ VITS ベースの高品質ニューラル TTS。**6言語マルチリンガル�
 - [公開モデルカタログ](docs/guides/development/pretrained-models.md) — legacy root、public `releases/zs-v1`、private/gated research stores の区別。
 - [public zs-v1 release record](docs/design/zero-shot-base-zs-v1-release-2026-10-10.md) — pinned public base の配布・検証記録。
 - [Tsukuyomi publication record](docs/design/tsukuyomi-publication-ready-2026-10-12.md) — public `releases/zs-v1` の公開記録と品質上の制約。
+- **[「本人と分かる」計画](docs/design/zero-shot-speaker-identity-plan-2026-10-29.md) と [次の方向と計画](docs/design/zero-shot-next-direction-2026-11-05.md)** — 現在の研究の正本 (目的・判定規則・実施記録・GPU 費用、S0〜S4)。2026-11-14 時点で S0 まで済み、次は P0-4′ の聞き分けと S1 (候補 A) の実装。続きは [引き継ぎ](docs/handoff/zero-shot-speaker-identity-2026-11-14.md) から読む。
 - [参照融合 実験計画](docs/design/zero-shot-reference-fusion-plan-2026-10-17.md) — 参照spec encoder (F-mel、`--reference-conditioning`) と別発話参照 (`--generator-reference cross_utt`) の実装・事前登録・判定。2026-10-22終了: G4・G5′とも不合格で利得は未確認、コードはopt-in (既定off) のまま。
 
 > 旧 root `model.ckpt` / `config.json`、`piper-v11-local`、`output/`、private/gated research stores は歴史的・研究用資産として保持します。public `zs-v1` と legacy root の設定・用途を混同しないでください。
