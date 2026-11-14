@@ -18,9 +18,17 @@ Common to every candidate (§5.1):
 
 Sub-commands::
 
-    prepare   materialise the training data fixed by a spec JSON
-    train     train one candidate (resumes from <out>/last.pt)
-    recon     write reconstructions of the evaluation groups with the EMA decoder
+    prepare          materialise the training data fixed by a spec JSON
+    attach-phonemes  add the training jsonl's phoneme ids to prepared data (S1)
+    calibrate-env    measure the envelope-loss coefficient of arm a1e (S1)
+    train            train one candidate (resumes from <out>/last.pt)
+    recon            write reconstructions of the evaluation groups with the EMA decoder
+
+S1 (docs/design/zero-shot-next-direction-2026-11-05.md §3, impl.md §2-4): with
+``--arm a1 / a1e / a2`` the back half of each batch is rendered from the
+inference-path z (text -> enc_p -> MAS alignment -> prior -> flow^-1, built by
+``SynthesizerTrn.prior_path_latent``) instead of the posterior z. ``extend``
+keeps the posterior z only (the control: training the decoder for as long).
 """
 
 from __future__ import annotations
@@ -34,8 +42,10 @@ import json
 import math
 import os
 import random
+import re
 import time
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 import torch
@@ -62,7 +72,9 @@ CANDIDATES: dict[str, Candidate] = {
 }
 
 _DROP_ALWAYS = ("pqmf.synthesis_filter",)  # the drifted v10b filter (F6) never loads
-_DROP_SCRATCH = ("model_g.dec.", "model_d.", "model_d_mrd.")
+_DROP_SCRATCH = ("model_g.dec.", "model_d.", "model_d_mrd.", "model_d_bmrd.")
+# lightning の帯域分割 MRD (P2 の K1、vits/lightning.py) の解像度
+_CHECKPOINT_BMRD_FFTS = (2048, 1024, 512)
 
 
 @dataclasses.dataclass
@@ -74,6 +86,8 @@ class Models:
     sub_stft_loss: nn.Module
     full_stft_loss: nn.Module
     hparams: dict
+    # 土台が帯域分割 MRD を学習済み (K1) なら、その重みを読み込んだもの
+    model_d_bmrd: nn.Module | None = None
 
 
 def build_models(checkpoint: dict, candidate: Candidate) -> Models:
@@ -136,7 +150,40 @@ def build_models(checkpoint: dict, candidate: Candidate) -> Models:
         sub_stft_loss=model.sub_stft_loss,
         full_stft_loss=model.full_stft_loss,
         hparams=hp,
+        model_d_bmrd=None if scratch else getattr(model, "model_d_bmrd", None),
     )
+
+
+Z_SOURCES = ("posterior", "prior_noise", "prior_residual")
+PRIOR_LOSSES = ("full", "envelope")
+
+# S1 の腕 (next-direction §3 S1、impl.md §3.2)。z の作り方は decoder の形を
+# 変えないので候補表 (CANDIDATES) とは別に持つ。
+ARMS: dict[str, dict] = {
+    # 延長だけ: 今の道具のまま posterior の z だけで、同じステップ数学習する
+    "extend": {"z_source": "posterior"},
+    # A1: 後半は推論と同じ乱数の z、損失は前半と同じ
+    "a1": {"z_source": "prior_noise", "prior_noise_scale": 0.4, "prior_loss": "full"},
+    # A1e: 後半は判別器と包絡の損失だけ (mel・STFT・特徴の一致は当てない)
+    "a1e": {
+        "z_source": "prior_noise",
+        "prior_noise_scale": 0.4,
+        "prior_loss": "envelope",
+    },
+    # A2: 実録音の残差を λ 倍に縮める。λ = 0.4/σ_r = 0.40 (計画書 §7.15)
+    "a2": {"z_source": "prior_residual", "residual_scale": 0.40, "prior_loss": "full"},
+}
+
+# 学習の途中で変えると、ふるいの腕が混ざる設定 (resume のときに一致を確かめる)
+_ARM_KEYS = (
+    "z_source",
+    "prior_fraction",
+    "prior_noise_scale",
+    "residual_scale",
+    "prior_loss",
+    "c_env",
+    "env_coeffs",
+)
 
 
 @dataclasses.dataclass
@@ -155,6 +202,64 @@ class TrainConfig:
     ema_decay: float = 0.999
     bf16: bool = False
     seed: int = 0
+    # --- S1 候補 A (impl.md §2.2・§3) ---
+    z_source: str = "posterior"
+    prior_fraction: float = 0.5  # バッチの後ろの割合を推論経路の z にする
+    prior_noise_scale: float = 0.4
+    residual_scale: float | None = None  # A2 の λ
+    prior_loss: str = "full"  # 推論経路の半分に当てる損失
+    c_env: float | None = None  # 包絡の損失の係数 (calibrate-env で決める)
+    env_coeffs: int = 20  # log-mel の DCT の低い方から何次まで
+
+    def __post_init__(self):
+        if self.z_source not in Z_SOURCES:
+            raise ValueError(f"z_source must be one of {Z_SOURCES}: {self.z_source!r}")
+        if self.prior_loss not in PRIOR_LOSSES:
+            raise ValueError(
+                f"prior_loss must be one of {PRIOR_LOSSES}: {self.prior_loss!r}"
+            )
+        if self.z_source == "posterior" and self.prior_loss == "envelope":
+            raise ValueError("prior_loss 'envelope' needs a prior z_source")
+        if self.prior_loss == "envelope" and self.c_env is None:
+            raise ValueError("prior_loss 'envelope' needs c_env (see calibrate-env)")
+        if self.z_source == "prior_residual" and self.residual_scale is None:
+            raise ValueError("z_source 'prior_residual' needs residual_scale")
+        if self.z_source != "posterior" and not 0.0 < self.prior_fraction < 1.0:
+            raise ValueError(f"prior_fraction must be in (0, 1): {self.prior_fraction}")
+
+
+def envelope_l1(mel_a: torch.Tensor, mel_b: torch.Tensor, *, n_coeffs: int = 20):
+    """log-mel の包絡 (声の響きの形) どうしの L1 (impl.md §3.2、A1e)。
+
+    log-mel [B, n_mels, T] をフレームごとに mel 方向へ離散コサイン変換 (DCT-II、
+    正規直交) し、低い方の ``n_coeffs`` 次だけを比べる。音の高さの細かい調波の
+    位置はほぼ消え、包絡と強さの時間変化が残る (MFCC と同じ考え方)。学習する
+    パラメータは持たない。
+    """
+    basis = _dct_basis(mel_a.shape[1], n_coeffs, mel_a.device)
+    ca = torch.einsum("bmt,mk->bkt", mel_a.float(), basis)
+    cb = torch.einsum("bmt,mk->bkt", mel_b.float(), basis)
+    return F.l1_loss(ca, cb)
+
+
+@functools.lru_cache(maxsize=8)
+def _dct_basis(n_mels: int, n_coeffs: int, device) -> torch.Tensor:
+    m = torch.arange(n_mels, dtype=torch.float64)[:, None]
+    k = torch.arange(n_coeffs, dtype=torch.float64)[None, :]
+    basis = torch.cos(math.pi / n_mels * (m + 0.5) * k) * math.sqrt(2.0 / n_mels)
+    basis[:, 0] = basis[:, 0] / math.sqrt(2.0)
+    return basis.float().to(device)
+
+
+class Latents(NamedTuple):
+    """1 バッチの decoder 入力。前 ``n_posterior`` 行が posterior、残りが推論経路。"""
+
+    z: torch.Tensor
+    mask: torch.Tensor
+    spec: torch.Tensor
+    g: torch.Tensor
+    frames: torch.Tensor
+    n_posterior: int
 
 
 class DecoderTrainer:
@@ -168,7 +273,21 @@ class DecoderTrainer:
         self.device = torch.device(device)
         self.hp = models.hparams
         torch.manual_seed(config.seed)
-        self.bmrd = BandSplitSpectrogramDiscriminator(fft_sizes=config.band_disc_ffts)
+        if models.model_d_bmrd is not None:
+            # 土台 (K1) が学習した帯域分割 MRD から続ける。解像度が違えば重みを
+            # 読めないので、黙って作り直さずに止める。
+            if tuple(config.band_disc_ffts) != _CHECKPOINT_BMRD_FFTS:
+                raise ValueError(
+                    f"band_disc_ffts {tuple(config.band_disc_ffts)} differ from the "
+                    f"checkpoint's band-split MRD {_CHECKPOINT_BMRD_FFTS}"
+                )
+            self.bmrd = models.model_d_bmrd
+            self.bmrd_init = "checkpoint"
+        else:
+            self.bmrd = BandSplitSpectrogramDiscriminator(
+                fft_sizes=config.band_disc_ffts
+            )
+            self.bmrd_init = "fresh"
         for m in (
             models.model_g,
             models.model_d,
@@ -179,7 +298,7 @@ class DecoderTrainer:
             self.bmrd,
         ):
             m.to(self.device)
-        models.model_g.eval()  # frozen parts: no dropout in enc_q
+        models.model_g.eval()  # frozen parts: no dropout in enc_q / enc_p
         models.model_g.dec.train()
         self.ema = copy.deepcopy(models.model_g.dec).requires_grad_(False).eval()
         self.dec_params = [
@@ -215,51 +334,179 @@ class DecoderTrainer:
         )
         return spec.half().float()  # the training cache stores spec in fp16
 
-    def step(self, batch: dict) -> dict[str, float]:
-        from ..vits.commons import slice_segments  # noqa: PLC0415
-        from ..vits.losses import (  # noqa: PLC0415
-            discriminator_loss,
-            feature_loss,
-            generator_loss,
-            jcu_split,
-        )
-        from ..vits.mel_processing import (  # noqa: PLC0415
-            mel_spectrogram_torch,
-            spec_to_mel_torch,
-        )
+    def _n_prior(self, n: int) -> int:
+        if self.config.z_source == "posterior":
+            return 0
+        k = round(n * self.config.prior_fraction)
+        if not 0 < k < n:
+            raise ValueError(
+                f"prior_fraction {self.config.prior_fraction} leaves no rows for one "
+                f"half with batch size {n}"
+            )
+        return k
 
-        cfg, hp, m = self.config, self.hp, self.models
-        hop = hp["hop_length"]
+    @torch.no_grad()
+    def _latents(self, batch: dict) -> Latents:
+        """decoder に入れる z (勾配なし・fp32)。
+
+        前半は凍結した enc_q の posterior の z (今までと同じ)。後半は、同じ
+        posterior の標本と MAS で並べた推論経路の z で、作り方は学習・推論と
+        共通の ``SynthesizerTrn.prior_path_latent`` に任せる (impl.md §2.2)。
+        """
+        cfg, m = self.config, self.models
+        hop = self.hp["hop_length"]
         audio = batch["audio"].to(self.device).float()
         emb = batch["speaker_embeddings"].to(self.device).float()
         lid = batch["language_ids"].to(self.device)
         frames = (batch["audio_lengths"].to(self.device) // hop).long()
-        seg = cfg.segment_frames
-
-        with torch.no_grad():
-            spec = self._spec(audio)[..., : int(frames.max())]
-            g = m.model_g._get_global_conditioning(None, lid, speaker_embeddings=emb)
-            z, _m_q, _logs_q, mask = m.model_g.enc_q(spec, frames, g=g)
-            span = (frames - seg + 1).clamp(min=1).cpu()
-            ids = (torch.rand(len(span), generator=self.slice_rng) * span).long()
-            ids = ids.to(self.device)
-            z_slice = slice_segments(z * mask, ids, seg)
-            y = slice_segments(audio[:, None], ids * hop, seg * hop).contiguous()
-            mel = spec_to_mel_torch(
-                spec,
-                hp["filter_length"],
-                hp["mel_channels"],
-                hp["sample_rate"],
-                hp["mel_fmin"],
-                hp["mel_fmax"],
+        n_prior = self._n_prior(audio.shape[0])
+        if n_prior and "phoneme_ids" not in batch:
+            raise ValueError(
+                f"z_source {cfg.z_source!r} needs phoneme_ids in the batch "
+                "(run attach-phonemes on the training data)"
             )
-            y_mel = slice_segments(mel, ids, seg)
+        spec = self._spec(audio)[..., : int(frames.max())]
+        g = m.model_g._get_global_conditioning(None, lid, speaker_embeddings=emb)
+        z_q, _m_q, _logs_q, mask = m.model_g.enc_q(spec, frames, g=g)
+        z = z_q * mask
+        k = audio.shape[0] - n_prior
+        if n_prior:
+            residual = cfg.z_source == "prior_residual"
+            prior = m.model_g.prior_path_latent(
+                batch["phoneme_ids"][k:].to(self.device),
+                batch["phoneme_lengths"][k:].to(self.device),
+                z_q[k:],
+                mask[k:],
+                lid=lid[k:],
+                speaker_embeddings=emb[k:],
+                noise_scale=cfg.prior_noise_scale,
+                residual_scale=cfg.residual_scale if residual else None,
+            )
+            z = torch.cat([z[:k], prior.z.float()], dim=0)
+        return Latents(z=z, mask=mask, spec=spec, g=g, frames=frames, n_posterior=k)
+
+    @torch.no_grad()
+    def _segments(self, batch: dict, lat: Latents):
+        """乱数の区間を切り出した ``(z_slice, y, y_mel)``。"""
+        from ..vits.commons import slice_segments  # noqa: PLC0415
+        from ..vits.mel_processing import spec_to_mel_torch  # noqa: PLC0415
+
+        hp, seg, hop = self.hp, self.config.segment_frames, self.hp["hop_length"]
+        audio = batch["audio"].to(self.device).float()
+        span = (lat.frames - seg + 1).clamp(min=1).cpu()
+        ids = (torch.rand(len(span), generator=self.slice_rng) * span).long()
+        ids = ids.to(self.device)
+        z_slice = slice_segments(lat.z, ids, seg)
+        y = slice_segments(audio[:, None], ids * hop, seg * hop).contiguous()
+        mel = spec_to_mel_torch(
+            lat.spec,
+            hp["filter_length"],
+            hp["mel_channels"],
+            hp["sample_rate"],
+            hp["mel_fmin"],
+            hp["mel_fmax"],
+        )
+        return z_slice, y, slice_segments(mel, ids, seg)
+
+    def _mel(self, y_hat: torch.Tensor) -> torch.Tensor:
+        from ..vits.mel_processing import mel_spectrogram_torch  # noqa: PLC0415
+
+        hp = self.hp
+        return mel_spectrogram_torch(
+            y_hat.squeeze(1),
+            hp["filter_length"],
+            hp["mel_channels"],
+            hp["sample_rate"],
+            hp["hop_length"],
+            hp["win_length"],
+            hp["mel_fmin"],
+            hp["mel_fmax"],
+        )
+
+    def _generator_losses(self, y, y_hat, y_mel, o_mb, emb, mode: str) -> dict:
+        """1 つの半分の生成側の損失。``mode`` "full" は今までと同じ組、
+        "envelope" は判別器の敵対損失 + 包絡の損失だけ (impl.md §3.2 A1e)。
+
+        当てない損失 (envelope の mel など) も値は返し、記録だけに使う。
+        """
+        from ..vits.losses import (  # noqa: PLC0415
+            feature_loss,
+            generator_loss,
+            jcu_split,
+        )
+
+        cfg, m = self.config, self.models
+        with self._autocast():
+            _, gg, fr, fg = m.model_d(y, y_hat)
+            _, mgg, mfr, mfg = m.model_d_mrd(y, y_hat, speaker_embeddings=emb)
+            _, bgg, bfr, bfg = self.bmrd(y, y_hat)
+        with torch.autocast(self.device.type, enabled=False):
+            y_hat_mel = self._mel(y_hat)
+            loss_mel = F.l1_loss(y_mel, y_hat_mel) * cfg.c_mel
+            loss_env = envelope_l1(y_mel, y_hat_mel, n_coeffs=cfg.env_coeffs)
+            loss_gen, _ = generator_loss(gg)
+            loss_fm = feature_loss(fr, fg)
+            ug, cg = jcu_split(mgg, m.model_d_mrd.n_resolutions)
+            loss_gen_mrd, _ = generator_loss(ug)
+            if cg:
+                loss_gen_mrd = 0.5 * (loss_gen_mrd + generator_loss(cg)[0])
+            loss_fm_mrd = feature_loss(mfr, mfg)
+            loss_gen_bmrd, _ = generator_loss(bgg)
+            loss_fm_bmrd = feature_loss(bfr, bfg)
+            loss_full = m.full_stft_loss(y_hat, y) * cfg.c_full_stft
+            loss_sub = torch.zeros((), device=self.device)
+            if o_mb is not None:
+                loss_sub = (
+                    m.sub_stft_loss(o_mb.float(), m.pqmf.analysis(y)) * cfg.c_sub_stft
+                )
+            if mode == "full":
+                total = (
+                    loss_gen
+                    + loss_fm
+                    + loss_mel
+                    + loss_full
+                    + cfg.c_mrd * (loss_gen_mrd + loss_fm_mrd)
+                    + cfg.c_bmrd * (loss_gen_bmrd + loss_fm_bmrd)
+                    + loss_sub
+                )
+            else:
+                total = (
+                    loss_gen
+                    + cfg.c_mrd * loss_gen_mrd
+                    + cfg.c_bmrd * loss_gen_bmrd
+                    + cfg.c_env * loss_env
+                )
+        return {
+            "loss_total": total,
+            "loss_mel": loss_mel,
+            "loss_env": loss_env,
+            "loss_gen": loss_gen,
+            "loss_fm": loss_fm,
+            "loss_gen_mrd": loss_gen_mrd,
+            "loss_fm_mrd": loss_fm_mrd,
+            "loss_gen_bmrd": loss_gen_bmrd,
+            "loss_fm_bmrd": loss_fm_bmrd,
+            "loss_full_stft": loss_full,
+            "loss_sub_stft": loss_sub,
+            # 偽物の点 (1 が本物)。推論経路の半分だけ 0 に張り付いたら止める (impl.md §7)
+            "d_fake_mpd": _mean_score(gg),
+            "d_fake_mrd": _mean_score(ug),
+            "d_fake_bmrd": _mean_score(bgg),
+        }
+
+    def step(self, batch: dict) -> dict[str, float]:
+        from ..vits.losses import discriminator_loss, jcu_split  # noqa: PLC0415
+
+        cfg, m = self.config, self.models
+        emb = batch["speaker_embeddings"].to(self.device).float()
+        lat = self._latents(batch)
+        z_slice, y, y_mel = self._segments(batch, lat)
 
         with self._autocast():
-            y_hat, o_mb = m.model_g.dec(z_slice, g=g)
+            y_hat, o_mb = m.model_g.dec(z_slice, g=lat.g)
         y_hat = y_hat.float()
 
-        # --- discriminators ---
+        # --- discriminators (16 本とも偽物として渡す、impl.md §3.1) ---
         y_hat_d = y_hat.detach()
         with self._autocast():
             r, gd, _, _ = m.model_d(y, y_hat_d)
@@ -279,68 +526,56 @@ class DecoderTrainer:
         torch.nn.utils.clip_grad_norm_(self.disc_params, cfg.grad_clip)
         self.opt_d.step()
 
-        # --- decoder ---
-        with self._autocast():
-            _, gg, fr, fg = m.model_d(y, y_hat)
-            _, mgg, mfr, mfg = m.model_d_mrd(y, y_hat, speaker_embeddings=emb)
-            _, bgg, bfr, bfg = self.bmrd(y, y_hat)
-        with torch.autocast(self.device.type, enabled=False):
-            y_hat_mel = mel_spectrogram_torch(
-                y_hat.squeeze(1),
-                hp["filter_length"],
-                hp["mel_channels"],
-                hp["sample_rate"],
-                hop,
-                hp["win_length"],
-                hp["mel_fmin"],
-                hp["mel_fmax"],
+        # --- decoder: 半分ごとに損失を出し、行数で重みをつけて足す ---
+        n_rows, k = y.shape[0], lat.n_posterior
+        parts = [("post", slice(0, k), "full")]
+        if k < n_rows:
+            parts.append(("prior", slice(k, n_rows), cfg.prior_loss))
+        loss_all = torch.zeros((), device=self.device)
+        logs: dict[str, torch.Tensor] = {}
+        combined: dict[str, torch.Tensor] = {}
+        for name, rows, mode in parts:
+            weight = (rows.stop - rows.start) / n_rows
+            part = self._generator_losses(
+                y[rows],
+                y_hat[rows],
+                y_mel[rows],
+                None if o_mb is None else o_mb[rows],
+                emb[rows],
+                mode,
             )
-            loss_mel = F.l1_loss(y_mel, y_hat_mel) * cfg.c_mel
-            loss_gen, _ = generator_loss(gg)
-            loss_fm = feature_loss(fr, fg)
-            ug, cg = jcu_split(mgg, m.model_d_mrd.n_resolutions)
-            loss_gen_mrd, _ = generator_loss(ug)
-            if cg:
-                loss_gen_mrd = 0.5 * (loss_gen_mrd + generator_loss(cg)[0])
-            loss_fm_mrd = feature_loss(mfr, mfg)
-            loss_gen_bmrd, _ = generator_loss(bgg)
-            loss_fm_bmrd = feature_loss(bfr, bfg)
-            loss_full = m.full_stft_loss(y_hat, y) * cfg.c_full_stft
-            loss_all = (
-                loss_gen
-                + loss_fm
-                + loss_mel
-                + loss_full
-                + cfg.c_mrd * (loss_gen_mrd + loss_fm_mrd)
-                + cfg.c_bmrd * (loss_gen_bmrd + loss_fm_bmrd)
-            )
-            loss_sub = torch.zeros((), device=self.device)
-            if o_mb is not None:
-                loss_sub = (
-                    m.sub_stft_loss(o_mb.float(), m.pqmf.analysis(y)) * cfg.c_sub_stft
-                )
-                loss_all = loss_all + loss_sub
+            loss_all = loss_all + weight * part["loss_total"]
+            for key, value in part.items():
+                logs[f"{key}_{name}"] = value
+                combined[key] = combined.get(key, 0.0) + weight * value.detach()
         self.opt_g.zero_grad(set_to_none=True)
         loss_all.backward()
         grad_norm = torch.nn.utils.clip_grad_norm_(self.dec_params, cfg.grad_clip)
         self.opt_g.step()
         self._update_ema()
         self.global_step += 1
-        logs = {
-            "loss_all": loss_all,
-            "loss_mel": loss_mel,
-            "loss_gen": loss_gen,
-            "loss_fm": loss_fm,
-            "loss_gen_mrd": loss_gen_mrd,
-            "loss_fm_mrd": loss_fm_mrd,
-            "loss_gen_bmrd": loss_gen_bmrd,
-            "loss_fm_bmrd": loss_fm_bmrd,
-            "loss_full_stft": loss_full,
-            "loss_sub_stft": loss_sub,
-            "loss_disc_all": loss_disc_all,
-            "loss_disc_bmrd": loss_d_bmrd,
-            "grad_norm_g": grad_norm,
+        # 今までの名前 (P1 の log.jsonl と同じ) は、半分の行数で重みをつけた値
+        legacy = {
+            k: combined[k]
+            for k in (
+                "loss_mel",
+                "loss_gen",
+                "loss_fm",
+                "loss_gen_mrd",
+                "loss_fm_mrd",
+                "loss_gen_bmrd",
+                "loss_fm_bmrd",
+                "loss_full_stft",
+                "loss_sub_stft",
+            )
         }
+        logs.update(
+            legacy,
+            loss_all=loss_all,
+            loss_disc_all=loss_disc_all,
+            loss_disc_bmrd=loss_d_bmrd,
+            grad_norm_g=grad_norm,
+        )
         return {k: float(v.detach()) for k, v in logs.items()}
 
     @torch.no_grad()
@@ -357,6 +592,7 @@ class DecoderTrainer:
             "candidate": candidate,
             "variant": CANDIDATES[candidate].variant,
             "init": CANDIDATES[candidate].init,
+            "bmrd_init": self.bmrd_init,
             "config": dataclasses.asdict(self.config),
             "global_step": self.global_step,
             "dec": m.model_g.dec.state_dict(),
@@ -383,6 +619,15 @@ class DecoderTrainer:
 
     def load(self, path: Path) -> dict:
         run = torch.load(path, map_location=self.device, weights_only=False)
+        defaults = dataclasses.asdict(TrainConfig())
+        saved = {**defaults, **run.get("config", {})}
+        current = dataclasses.asdict(self.config)
+        for key in _ARM_KEYS:
+            if saved[key] != current[key]:
+                raise ValueError(
+                    f"{path} was trained with {key}={saved[key]!r}, "
+                    f"not {current[key]!r}"
+                )
         m = self.models
         m.model_g.dec.load_state_dict(run["dec"])
         self.ema.load_state_dict(run["dec_ema"])
@@ -397,6 +642,53 @@ class DecoderTrainer:
         self.slice_rng.set_state(run["rng"]["slice"].cpu())
         self.global_step = int(run["global_step"])
         return run
+
+
+def _mean_score(outputs) -> torch.Tensor:
+    return torch.stack([o.detach().float().mean() for o in outputs]).mean()
+
+
+@torch.no_grad()
+def calibrate_envelope(trainer: DecoderTrainer, batches, *, n_batches=None) -> dict:
+    """学習前の decoder で、推論経路の半分の mel L1 と包絡の L1 を測る。
+
+    c_env は、学習の始めに推論経路の半分で ``c_env·包絡 = c_mel·mel`` になる
+    値 (impl.md §3.2「係数は mel と同じ桁になるよう、学習前に測って決める」)。
+    実録音を正解にした損失の大きさで、評価の指標は使わない。学習はしない。
+    """
+    if trainer.config.z_source == "posterior":
+        raise ValueError("calibration needs a prior z_source")
+    mel_sum = env_sum = 0.0
+    count = 0
+    dec = trainer.models.model_g.dec
+    was_training = dec.training
+    dec.eval()
+    try:
+        for batch in batches:
+            if n_batches is not None and count >= n_batches:
+                break
+            lat = trainer._latents(batch)
+            z_slice, _y, y_mel = trainer._segments(batch, lat)
+            k = lat.n_posterior
+            y_hat, _ = dec(z_slice[k:], g=lat.g[k:])
+            y_hat_mel = trainer._mel(y_hat.float())
+            mel_sum += float(F.l1_loss(y_mel[k:], y_hat_mel))
+            env_sum += float(
+                envelope_l1(y_mel[k:], y_hat_mel, n_coeffs=trainer.config.env_coeffs)
+            )
+            count += 1
+    finally:
+        dec.train(was_training)
+    if count == 0:
+        raise ValueError("no batches")
+    mel, env = mel_sum / count, env_sum / count
+    return {
+        "batches": count,
+        "mel_l1_prior": mel,
+        "env_l1_prior": env,
+        "c_mel": trainer.config.c_mel,
+        "c_env": trainer.config.c_mel * mel / env,
+    }
 
 
 def load_trained_generator(base_checkpoint: Path, run_path: Path, *, device: str):
@@ -458,14 +750,19 @@ class SegmentDataset(torch.utils.data.Dataset):
         return len(self.utts)
 
     def __getitem__(self, i: int) -> dict:
-        audio = np.load(self.root / self.utts[i]["audio"])
+        utt = self.utts[i]
+        audio = np.load(self.root / utt["audio"])
         j = self.rng.choice(self.others[i])
-        return {
+        item = {
             "audio": torch.from_numpy(np.asarray(audio, dtype=np.float32)),
             "speaker_embedding": torch.from_numpy(
                 self.embeddings[j].astype(np.float32)
             ),
+            "language_id": int(utt.get("language_id", 0)),
         }
+        if "phoneme_ids" in utt:
+            item["phoneme_ids"] = torch.tensor(utt["phoneme_ids"], dtype=torch.long)
+        return item
 
 
 def collate(items: list[dict], hop: int) -> dict:
@@ -473,12 +770,88 @@ def collate(items: list[dict], hop: int) -> dict:
     audio = torch.zeros(len(items), max(lengths))
     for row, (it, n) in enumerate(zip(items, lengths, strict=True)):
         audio[row, :n] = it["audio"][:n]
-    return {
+    batch = {
         "audio": audio,
         "audio_lengths": torch.tensor(lengths),
         "speaker_embeddings": torch.stack([it["speaker_embedding"] for it in items]),
-        "language_ids": torch.zeros(len(items), dtype=torch.long),
+        "language_ids": torch.tensor(
+            [it.get("language_id", 0) for it in items], dtype=torch.long
+        ),
     }
+    with_ids = ["phoneme_ids" in it for it in items]
+    if any(with_ids):
+        if not all(with_ids):
+            raise ValueError("some utterances have phoneme_ids and some do not")
+        x_lengths = [int(it["phoneme_ids"].numel()) for it in items]
+        ids = torch.zeros(len(items), max(x_lengths), dtype=torch.long)
+        for row, (it, n) in enumerate(zip(items, x_lengths, strict=True)):
+            ids[row, :n] = it["phoneme_ids"]
+        batch["phoneme_ids"] = ids
+        batch["phoneme_lengths"] = torch.tensor(x_lengths)
+    return batch
+
+
+_AUDIO_PATH = re.compile(r'"audio_path":\s*"([^"]*)"')
+
+
+def attach_phonemes(root: Path, jsonl: Path) -> dict:
+    """prepare 済みの学習データの各発話に、学習の jsonl の音素列を書き足す。
+
+    発話は ``audio_path`` の stem (例 ``18460462_0020``) と話者でつなぐ
+    (impl.md §2.1)。つながらない発話、同じ発話に違う音素列がある、混在言語の
+    印 (負の ID) があれば、何も書かずに止める。音声と埋め込みは変えず、元の
+    index は ``index.pre-phonemes.json`` に残す。
+    """
+    from ..embedding_cache import file_sha256  # noqa: PLC0415
+
+    root, jsonl = Path(root), Path(jsonl)
+    index_path = root / "index.json"
+    backup = root / "index.pre-phonemes.json"
+    index = json.loads(index_path.read_text(encoding="utf-8"))
+    if "phonemes" in index or backup.exists():
+        raise ValueError(f"phonemes are already attached to {root}")
+    wanted = {u["id"]: u["speaker"] for u in index["utterances"]}
+    found: dict[str, dict] = {}
+    with open(jsonl, encoding="utf-8") as handle:
+        for line in handle:
+            hit = _AUDIO_PATH.search(line)
+            if hit is None:
+                continue
+            stem = Path(hit.group(1).replace("\\", "/")).stem
+            if stem not in wanted:
+                continue
+            row = json.loads(line)
+            if row["speaker"] != wanted[stem]:
+                continue
+            entry = {
+                "phoneme_ids": [int(v) for v in row["phoneme_ids"]],
+                "language_id": int(row.get("language_id", 0)),
+            }
+            if stem in found and found[stem] != entry:
+                raise ValueError(f"{stem}: rows with different phoneme_ids in {jsonl}")
+            found[stem] = entry
+    missing = sorted(set(wanted) - set(found))
+    if missing:
+        raise ValueError(
+            f"{len(missing)} utterances not found in {jsonl}: {missing[:10]}"
+        )
+    negative = sorted(s for s, e in found.items() if min(e["phoneme_ids"]) < 0)
+    if negative:
+        raise ValueError(f"negative phoneme ids (mixed language) in {negative[:10]}")
+    original = index_path.read_bytes()
+    for u in index["utterances"]:
+        u.update(found[u["id"]])
+    record = {
+        "jsonl": str(jsonl),
+        "jsonl_sha256": file_sha256(jsonl),
+        "matched": len(found),
+    }
+    index["phonemes"] = record
+    backup.write_bytes(original)
+    tmp = index_path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(index, ensure_ascii=False, indent=1), encoding="utf-8")
+    os.replace(tmp, index_path)
+    return record
 
 
 def select_speakers(
@@ -651,12 +1024,45 @@ def reconstruct_groups(
 # ---------------------------------------------------------------------------
 
 
+def train_config(args) -> TrainConfig:
+    """``--arm`` (ARMS) と CLI の値から TrainConfig を組む。"""
+    arm = dict(ARMS[args.arm])
+    if args.c_env is not None:
+        if arm.get("prior_loss") != "envelope":
+            raise ValueError(
+                f"--c-env is only used by the envelope arm, not {args.arm}"
+            )
+        arm["c_env"] = args.c_env
+    if args.prior_fraction is not None:
+        arm["prior_fraction"] = args.prior_fraction
+    return TrainConfig(bf16=args.bf16, seed=args.seed, **arm)
+
+
+def _loader(args, dataset, hop: int, step: int):
+    return torch.utils.data.DataLoader(
+        dataset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        drop_last=True,
+        num_workers=args.num_workers,
+        collate_fn=functools.partial(collate, hop=hop),
+        persistent_workers=args.num_workers > 0,
+        generator=torch.Generator().manual_seed(args.seed + step),
+    )
+
+
+def _data_phonemes(data: Path):
+    index = json.loads((Path(data) / "index.json").read_text(encoding="utf-8"))
+    return index.get("phonemes")
+
+
 def _train(args) -> int:
     from ..checkpoint_io import load_checkpoint  # noqa: PLC0415
+    from ..embedding_cache import file_sha256  # noqa: PLC0415
 
     candidate = CANDIDATES[args.candidate]
+    config = train_config(args)
     args.out.mkdir(parents=True, exist_ok=True)
-    config = TrainConfig(bf16=args.bf16, seed=args.seed)
     models = build_models(load_checkpoint(args.base_checkpoint), candidate)
     trainer = DecoderTrainer(models, config, device=args.device)
     last = args.out / "last.pt"
@@ -665,16 +1071,7 @@ def _train(args) -> int:
         print(f"resumed at step {trainer.global_step}")
     hop = models.hparams["hop_length"]
     dataset = SegmentDataset(args.data, seed=args.seed + trainer.global_step)
-    loader = torch.utils.data.DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        shuffle=True,
-        drop_last=True,
-        num_workers=args.num_workers,
-        collate_fn=functools.partial(collate, hop=hop),
-        persistent_workers=args.num_workers > 0,
-        generator=torch.Generator().manual_seed(args.seed + trainer.global_step),
-    )
+    loader = _loader(args, dataset, hop, trainer.global_step)
     log = open(args.out / "log.jsonl", "a", encoding="utf-8")  # noqa: SIM115
     meta = args.out / "run.json"
     if not meta.exists():
@@ -683,9 +1080,14 @@ def _train(args) -> int:
                 {
                     "candidate": args.candidate,
                     **dataclasses.asdict(candidate),
+                    "arm": args.arm,
+                    "bmrd_init": trainer.bmrd_init,
                     "config": dataclasses.asdict(config),
                     "base_checkpoint": str(args.base_checkpoint),
+                    # C の 4 本・K1 の 2 本のどれを土台にしたかを取り違えないため
+                    "base_checkpoint_sha256": file_sha256(args.base_checkpoint),
                     "data": str(args.data),
+                    "data_phonemes": _data_phonemes(args.data),
                     "batch_size": args.batch_size,
                     "steps": args.steps,
                 },
@@ -714,10 +1116,18 @@ def _train(args) -> int:
                         json.dumps({"step": step, "steps_per_s": rate, **mean}) + "\n"
                     )
                     log.flush()
-                    print(
-                        f"step {step} {rate:.2f} it/s mel {mean['loss_mel']:.3f} bmrd {mean['loss_gen_bmrd']:.3f} d {mean['loss_disc_all']:.3f}",
-                        flush=True,
+                    line = (
+                        f"step {step} {rate:.2f} it/s mel {mean['loss_mel_post']:.3f} "
+                        f"bmrd {mean['loss_gen_bmrd']:.3f} d {mean['loss_disc_all']:.3f}"
                     )
+                    if "loss_mel_prior" in mean:
+                        line += (
+                            f" | prior mel {mean['loss_mel_prior']:.3f}"
+                            f" env {mean['loss_env_prior']:.3f}"
+                            f" d_fake mpd {mean['d_fake_mpd_prior']:.3f}"
+                            f" bmrd {mean['d_fake_bmrd_prior']:.3f}"
+                        )
+                    print(line, flush=True)
                     t0, window = time.time(), []
                 if step % args.save_every == 0 or step >= args.steps:
                     trainer.save(last, candidate=args.candidate)
@@ -777,6 +1187,41 @@ def _recon(args) -> int:
     return 0
 
 
+def _attach(args) -> int:
+    record = attach_phonemes(args.data, args.jsonl)
+    print(f"attached phoneme ids to {record['matched']} utterances ({args.data})")
+    return 0
+
+
+def _calibrate(args) -> int:
+    from ..checkpoint_io import load_checkpoint  # noqa: PLC0415
+    from ..embedding_cache import file_sha256  # noqa: PLC0415
+
+    if args.out.exists():
+        raise SystemExit(f"output exists: {args.out}")
+    config = TrainConfig(seed=args.seed, **ARMS["a1"])
+    models = build_models(load_checkpoint(args.base_checkpoint), CANDIDATES["d0"])
+    trainer = DecoderTrainer(models, config, device=args.device)
+    dataset = SegmentDataset(args.data, seed=args.seed)
+    loader = _loader(args, dataset, models.hparams["hop_length"], 0)
+    report = calibrate_envelope(trainer, loader, n_batches=args.batches)
+    report.update(
+        base_checkpoint=str(args.base_checkpoint),
+        base_checkpoint_sha256=file_sha256(args.base_checkpoint),
+        data=str(args.data),
+        data_phonemes=_data_phonemes(args.data),
+        batch_size=args.batch_size,
+        seed=args.seed,
+        z_source=config.z_source,
+        prior_noise_scale=config.prior_noise_scale,
+    )
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(report, ensure_ascii=False, indent=1)
+    args.out.write_text(text, encoding="utf-8")
+    print(text)
+    return 0
+
+
 def _prepare(args) -> int:
     spec = json.loads(args.spec.read_text(encoding="utf-8"))
     index = prepare(spec, args.zips, args.band_metrics, args.campplus, args.out)
@@ -787,6 +1232,11 @@ def _prepare(args) -> int:
 
 
 def main(argv=None) -> int:
+    args = main_parser().parse_args(argv)
+    return args.func(args)
+
+
+def main_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -814,7 +1264,35 @@ def main(argv=None) -> int:
     t.add_argument("--log-every", type=int, default=100)
     t.add_argument("--save-every", type=int, default=1000)
     t.add_argument("--keep-every", type=int, default=10000)
+    t.add_argument(
+        "--arm",
+        choices=sorted(ARMS),
+        default="extend",
+        help="S1 の腕: z の作り方と推論経路の半分の損失 (既定は posterior だけ)",
+    )
+    t.add_argument("--c-env", type=float, help="a1e の包絡の損失の係数 (calibrate-env)")
+    t.add_argument(
+        "--prior-fraction", type=float, help="推論経路の z にする割合 (既定 0.5)"
+    )
     t.set_defaults(func=_train)
+
+    a = sub.add_parser("attach-phonemes", help="学習データに jsonl の音素列を足す")
+    a.add_argument("--data", type=Path, required=True)
+    a.add_argument("--jsonl", type=Path, required=True)
+    a.set_defaults(func=_attach)
+
+    c = sub.add_parser(
+        "calibrate-env", help="学習前の decoder で a1e の包絡の損失の係数を測る"
+    )
+    c.add_argument("--base-checkpoint", type=Path, required=True)
+    c.add_argument("--data", type=Path, required=True)
+    c.add_argument("--out", type=Path, required=True, help="結果の JSON")
+    c.add_argument("--batches", type=int, default=50)
+    c.add_argument("--batch-size", type=int, default=16)
+    c.add_argument("--seed", type=int, default=0)
+    c.add_argument("--device", default="cuda")
+    c.add_argument("--num-workers", type=int, default=2)
+    c.set_defaults(func=_calibrate)
 
     r = sub.add_parser("recon")
     r.add_argument("--base-checkpoint", type=Path, required=True)
@@ -828,9 +1306,7 @@ def main(argv=None) -> int:
     r.add_argument("--seed", type=int, default=42)
     r.add_argument("--device", default="cuda")
     r.set_defaults(func=_recon)
-
-    args = parser.parse_args(argv)
-    return args.func(args)
+    return parser
 
 
 if __name__ == "__main__":
