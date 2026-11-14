@@ -74,3 +74,17 @@ def test_required_phonemize_version_is_tagged():
     assert f"src/go/phonemize/{version}" in tags, (
         f"src/go/go.mod requires phonemize {version}, but tag src/go/phonemize/{version} does not exist"
     )
+
+
+def test_makefile_version_comes_from_the_src_go_tag():
+    """``make build`` stamps ``-X main.version`` from ``git describe``.
+
+    Without ``--match``, ``git describe --tags`` picks the nearest tag of any
+    package, such as ``csharp-v0.6.1``, so the Go CLI reported another
+    package's version.
+    """
+    makefile = (GO_ROOT / "Makefile").read_text(encoding="utf-8")
+    line = next(ln for ln in makefile.splitlines() if ln.startswith("VERSION :="))
+    assert "--match 'src/go/v*'" in line, line
+    assert "patsubst src/go/%,%," in line, line
+    assert '-X main.version=$(VERSION)' in makefile

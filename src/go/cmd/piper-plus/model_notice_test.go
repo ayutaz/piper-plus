@@ -58,7 +58,7 @@ func resetNoticeCLIState() {
 	downloadModel = ""
 	modelDir = ""
 	quiet = false
-	version = false
+	showVersion = false
 	listModels = false
 	textInput = ""
 	batchFile = ""
