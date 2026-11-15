@@ -308,7 +308,7 @@ S2-x extend (posterior だけの 2 段目) の確かめ (2026-11-16 登録、学
 
 - 目的: S1 で参考の記録として見えた extend の効果 (2 段目を行わない土台より CAM++ +0.14・ECAPA +0.24、6 土台すべてで上、§7.16) を、S1 で使っていない土台で確かめ、S4 のレシピに 2 段目を入れるかを決める。
 - 土台: S2 の K1 の新しい 4 本 (K1-s1236〜K1-s1239) の ep40 の EMA。ep20 の条件で止めた run は除く。
-- 2 段目: S1 の extend と同じ。`piper_train.tools.train_decoder_only train --arm extend`、候補 `d0`、20,000 ステップ、バッチ 16、bf16、lr 2e-4、EMA 0.999、学習 seed 0。学習データは S1 と同じ P1 の 4,776 発話 (`piper-zs-identity/s1/data`)。K1 が学習した帯域分割 MRD の重みから続ける。土台は S1 と同じ slim 版で送る。コードはこの登録のコミット。GPU は S1 と同じ RTX 4090 を優先し、借りられなければ L40S にする。
+- 2 段目: S1 の extend と同じ。`piper_train.tools.train_decoder_only train --arm extend`、候補 `d0`、20,000 ステップ、バッチ 16、bf16、lr 2e-4、EMA 0.999、学習 seed 0。学習データは S1 と同じ P1 の 4,776 発話 (`piper-zs-identity/s1/data`)。K1 が学習した帯域分割 MRD の重みから続ける。コードはこの登録のコミット。GPU は、S2 の学習が終わった同じ VM の L40S 4 枚で、4 本を並べて回す (改定 2026-11-16、学習の開始前: 当初は「S1 と同じ RTX 4090 を優先し、slim 版の土台を送る」としていたが、VM をもう 1 台借りて土台を送る手間を省くため)。
 - 評価: S1 と同じ手順 (`s1_eval.py` の形: `generate_eval_audio generate --backend torch-ema --decoder-run`、開発群、推論 seed 42/43/44 × 参照 2 本、`--encoder2`、2.8 kHz より上のずれ、CER)。`--baseline` は同じ土台・同じ推論 seed の 2 段目なし (S2 の評価)。
 - Δ_b = 土台 b での (extend の run の値 − 同じ土台の 2 段目なしの run の値)。
 
